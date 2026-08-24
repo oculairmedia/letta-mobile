@@ -166,7 +166,7 @@ class IrohChannelTransport(
     private var resubscribeJob: Job? = null
 
     override fun hasActiveChatTurn(conversationId: String): Boolean =
-        turnRegistry.hasActiveTurn(conversationId)
+        turnRegistry.hasActiveTurn(IrohConversationKey(conversationId))
 
     override val hasAnyActiveChatTurn: Boolean
         get() = turnRegistry.hasAnyActiveTurn
@@ -179,7 +179,7 @@ class IrohChannelTransport(
     )
 
     internal fun activeTurnSnapshot(conversationId: String): ActiveTurnSnapshot? {
-        val s = turnRegistry.snapshotForTest(conversationId) ?: return null
+        val s = turnRegistry.snapshotForTest(IrohConversationKey(conversationId)) ?: return null
         return ActiveTurnSnapshot(
             turnId = s.turnId,
             runId = s.runId,
@@ -188,7 +188,7 @@ class IrohChannelTransport(
         )
     }
 
-    internal fun activeSendJob(conversationId: String): Job? = turnRegistry.getSendJob(conversationId)
+    internal fun activeSendJob(conversationId: String): Job? = turnRegistry.getSendJob(IrohConversationKey(conversationId))
     internal fun activeTurnsCount(): Int = turnRegistry.activeTurnsCount()
     internal fun activeSendJobsCount(): Int = turnRegistry.activeSendJobsCount()
 
@@ -230,8 +230,8 @@ class IrohChannelTransport(
 
     private fun handleCloseResources(reason: String) {
         turnRegistry.allSendJobEntries().forEach { (conversationId, _) ->
-            val job = turnRegistry.removeSendJob(conversationId) ?: return@forEach
-            val turn = turnRegistry.getActiveTurn(conversationId)
+            val job = turnRegistry.removeSendJob(IrohConversationKey(conversationId)) ?: return@forEach
+            val turn = turnRegistry.getActiveTurn(IrohConversationKey(conversationId))
             if (turn != null && !turn.hasTerminal) {
                 Telemetry.event(
                     "IrohTransport", "turn.torn_down_nonterminal",
@@ -269,7 +269,7 @@ class IrohChannelTransport(
     private fun handleReadyState(supervisorState: IrohConnectionState.Ready) {
         val generation = connectionGeneration.incrementAndGet()
         notifyRedialIfTurnActive()
-        observerIngestor.start(supervisorState.handle, generation)
+        observerIngestor.start(IrohObserverIngestor.ObserverConnection(supervisorState.handle, generation))
         observerIngestor.reSubscribeViewedConversation(generation)
         livenessProbe.start(supervisorState.handle)
     }
@@ -340,7 +340,7 @@ class IrohChannelTransport(
         turnRegistry.interruptedTurnsSnapshot().forEach { recovery ->
             announced += recovery.conversationId
             if (_redialWhileTurnActive.tryEmit(recovery)) {
-                turnRegistry.removeInterruptedTurn(recovery.conversationId, recovery)
+                turnRegistry.removeInterruptedTurn(recovery)
             }
         }
         turnRegistry.activeTurnsSnapshot().forEach { turn ->
@@ -361,13 +361,13 @@ class IrohChannelTransport(
     }
 
     private fun clearInterruptedTurn(conversationId: String) {
-        turnRegistry.removeInterruptedTurn(conversationId)
+        turnRegistry.removeInterruptedTurn(IrohConversationKey(conversationId))
     }
 
     private fun recordFrameOwnership(observation: IrohObserverIngestor.FrameObservation) {
         val conversationId = observation.conversationId
         val localTurn = observation.localTurn
-        val result = turnRegistry.recordFrameOwnership(IrohFrameOwnershipObservation(conversationId, localTurn))
+        val result = turnRegistry.recordFrameOwnership(IrohFrameOwnershipObservation(IrohConversationKey(conversationId), localTurn))
         if (result is IrohTurnRegistry.FrameOwnershipResult.Switched) {
             Telemetry.event(
                 "IrohObserver", "ingest.ownership_switched",
@@ -382,7 +382,7 @@ class IrohChannelTransport(
 
     /** Comma-joined ids of live nonterminal turns other than [conversationId]. */
     private fun otherActiveConversationsLabel(conversationId: String): String =
-        turnRegistry.concurrentTurns(excludingConversationId = conversationId)
+        turnRegistry.concurrentTurns(excludingConversation = IrohConversationKey(conversationId))
             .joinToString(",") { it.conversationId }
 
     /** Test/wiring visibility: current generation admin RPC retry state. */
@@ -462,7 +462,7 @@ class IrohChannelTransport(
         val turn = (startResult as IrohTryStartResult.Started).turn
         // SENSING (a): a turn is starting for THIS conversation while another
         // conversation still has a nonterminal turn in flight.
-        val concurrent = turnRegistry.concurrentTurns(excludingConversationId = conversationId)
+        val concurrent = turnRegistry.concurrentTurns(excludingConversation = IrohConversationKey(conversationId))
         if (concurrent.isNotEmpty()) {
             Telemetry.event(
                 "IrohTransport", "turn.concurrent_start",
@@ -626,7 +626,7 @@ class IrohChannelTransport(
             }
         }
         turn.job = sendJob
-        turnRegistry.registerSendJob(IrohSendJobRegistration(conversationId, sendJob))
+        turnRegistry.registerSendJob(IrohSendJobRegistration(IrohConversationKey(conversationId), sendJob))
         sendJob.invokeOnCompletion {
             val removed = turnRegistry.finish(turn.token)
             if (removed) {
@@ -645,10 +645,10 @@ class IrohChannelTransport(
                     "conversationId" to conversationId,
                     "turnId" to turn.turnId,
                     "hasTerminal" to turn.hasTerminal,
-                    "currentTurnId" to (turnRegistry.getActiveTurn(conversationId)?.turnId ?: ""),
+                    "currentTurnId" to (turnRegistry.getActiveTurn(IrohConversationKey(conversationId))?.turnId ?: ""),
                 )
             }
-            turnRegistry.unregisterSendJob(IrohSendJobRegistration(conversationId, sendJob))
+            turnRegistry.unregisterSendJob(IrohSendJobRegistration(IrohConversationKey(conversationId), sendJob))
         }
         return true
     }
@@ -780,7 +780,7 @@ class IrohChannelTransport(
      * That is the reported "cancelling one conversation froze the other".
      */
     override fun cancel(conversationId: String): Boolean {
-        val turn = turnRegistry.getActiveTurn(conversationId)
+        val turn = turnRegistry.getActiveTurn(IrohConversationKey(conversationId))
         if (turn == null) {
             clearInterruptedTurn(conversationId)
             // Nothing streaming ON THIS CONVERSATION: preserve the "cancel always
@@ -792,7 +792,7 @@ class IrohChannelTransport(
                 "conversationId" to conversationId,
                 "otherActiveConversations" to otherActiveConversationsLabel(conversationId),
             )
-            turnRegistry.removeSendJob(conversationId)?.cancel()
+            turnRegistry.removeSendJob(IrohConversationKey(conversationId))?.cancel()
             scope.launch {
                 emitBoth(
                     ServerFrame.TurnDone(
@@ -816,7 +816,7 @@ class IrohChannelTransport(
             // Guard against stale ActiveTurn race: if send(A) was called twice
             // quickly and this cancel captured the old ActiveTurn, aborting would
             // target the NEW turn. Only proceed if this is still the active turn.
-            if (turnRegistry.getActiveTurn(conversationId) !== turn) return@launch
+            if (turnRegistry.getActiveTurn(IrohConversationKey(conversationId)) !== turn) return@launch
             // 1. Ask the server to abort the active run so it emits its own
             //    authoritative terminal (and, per 8s45p, closes open tool_calls).
             //    A still-synthetic run id means the real run id has not streamed
@@ -869,13 +869,13 @@ class IrohChannelTransport(
             //    only. Keyed removal: another conversation's in-flight job is
             //    structurally unreachable from here.
             turn.job?.cancel()
-            turn.job?.let { turnRegistry.unregisterSendJob(IrohSendJobRegistration(conversationId, it)) }
+            turn.job?.let { turnRegistry.unregisterSendJob(IrohSendJobRegistration(IrohConversationKey(conversationId), it)) }
             if (!turnRegistry.finish(turn.token)) {
                 Telemetry.event(
                     "IrohTransport", "cancel.turn_already_replaced",
                     "conversationId" to conversationId,
                     "turnId" to turn.turnId,
-                    "currentTurnId" to (turnRegistry.getActiveTurn(conversationId)?.turnId ?: ""),
+                    "currentTurnId" to (turnRegistry.getActiveTurn(IrohConversationKey(conversationId))?.turnId ?: ""),
                 )
             }
         }

@@ -17,7 +17,7 @@ class IrohTurnRegistryTest {
         assertEquals("conv-1", result.turn.conversationId)
         assertEquals("turn-1", result.turn.turnId)
         assertEquals("run-1", result.turn.runId)
-        assertTrue(registry.hasActiveTurn("conv-1"))
+        assertTrue(registry.hasActiveTurn(IrohConversationKey("conv-1")))
         assertTrue(registry.hasAnyActiveTurn)
     }
 
@@ -36,7 +36,7 @@ class IrohTurnRegistryTest {
         val start = startTurn(initialRunId = "iroh-run-synth-1")
         assertTrue(start is IrohTryStartResult.Started)
         assertTrue(registry.promoteRunId(IrohRunPromotion(IrohTurnToken("conv-1", 1L, "turn-1"), "real-run-123")))
-        assertEquals("real-run-123", registry.getActiveTurn("conv-1")?.runId)
+        assertEquals("real-run-123", registry.getActiveTurn(IrohConversationKey("conv-1"))?.runId)
         assertFalse(registry.promoteRunId(IrohRunPromotion(IrohTurnToken("conv-1", 1L, "turn-1"), "real-run-456")))
     }
 
@@ -49,9 +49,9 @@ class IrohTurnRegistryTest {
         assertTrue(turn.hasTerminal)
         assertEquals("engine", turn.terminalSource)
         assertTrue(turn.terminalReached.isCompleted)
-        assertNull(registry.getActiveTurn("conv-1"))
-        assertFalse(registry.hasActiveTurn("conv-1"))
-        assertTrue(registry.isRetiredRun("real-run-1"))
+        assertNull(registry.getActiveTurn(IrohConversationKey("conv-1")))
+        assertFalse(registry.hasActiveTurn(IrohConversationKey("conv-1")))
+        assertTrue(registry.isRetiredRun(IrohRunKey("real-run-1")))
         assertFalse(registry.publishTerminal(IrohTerminalPublication(turn, "completed", "observer")))
     }
 
@@ -60,7 +60,7 @@ class IrohTurnRegistryTest {
         val start = startTurn()
         assertTrue(start is IrohTryStartResult.Started)
         assertTrue(registry.finish(start.turn.token))
-        assertNull(registry.getActiveTurn("conv-1"))
+        assertNull(registry.getActiveTurn(IrohConversationKey("conv-1")))
     }
 
     @Test
@@ -68,7 +68,7 @@ class IrohTurnRegistryTest {
         val start = startTurn()
         assertTrue(start is IrohTryStartResult.Started)
         val job = Job()
-        registry.registerSendJob(IrohSendJobRegistration("conv-1", job))
+        registry.registerSendJob(IrohSendJobRegistration(IrohConversationKey("conv-1"), job))
         registry.clear()
         assertTrue(job.isCancelled)
         assertTrue(start.turn.terminalReached.isCompleted)

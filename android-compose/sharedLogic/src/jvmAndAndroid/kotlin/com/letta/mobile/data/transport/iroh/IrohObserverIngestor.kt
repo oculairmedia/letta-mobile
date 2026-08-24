@@ -81,7 +81,9 @@ internal class IrohObserverIngestor(
     val isIngesting: Boolean get() = observerJob?.isActive == true
     val currentObserverGeneration: Int get() = observerGeneration.value
 
-    fun start(handle: IrohConnectionHandle, generation: Long) {
+    fun start(connection: ObserverConnection) {
+        val handle = connection.handle
+        val generation = connection.generation
         val streamFrames = handle.effectiveObserverStreamFrames
         if (streamFrames == null) {
             stop("no_observer_stream")
@@ -98,7 +100,7 @@ internal class IrohObserverIngestor(
             runCatching {
                 streamFrames.collect { received ->
                     if (connectionGeneration() != generation) return@collect
-                    ingestObserverFrame(received, generation)
+                    ingestObserverFrame(ObserverFrameReceipt(received, generation))
                 }
             }.onFailure { error ->
                 if (error is CancellationException) throw error
@@ -153,14 +155,15 @@ internal class IrohObserverIngestor(
         )
     }
 
-    suspend fun ingestObserverFrame(received: AppServerReceivedFrame, expectedGeneration: Long? = null) {
-        if (expectedGeneration != null && connectionGeneration() != expectedGeneration) return
-        val streamDelta = received.frame as? AppServerInboundFrame.StreamDelta ?: return
-        ingestStreamDelta(ObserverFrameContext(received, streamDelta))
+    suspend fun ingestObserverFrame(receipt: ObserverFrameReceipt) {
+        if (receipt.expectedGeneration != null && connectionGeneration() != receipt.expectedGeneration) return
+        val streamDelta = receipt.received.frame as? AppServerInboundFrame.StreamDelta ?: return
+        ingestStreamDelta(ObserverFrameContext(receipt.received, streamDelta))
     }
 
     private suspend fun ingestStreamDelta(context: ObserverFrameContext) {
-        val localTurn = turnRegistry.getActiveTurn(context.conversationId)
+        val conversation = IrohConversationKey(context.conversationId)
+        val localTurn = turnRegistry.getActiveTurn(conversation)
         recordFrameOwnership(FrameObservation(context.conversationId, localTurn))
         if (localTurn == null) {
             ingestPassiveObserverDelta(context)
@@ -190,7 +193,7 @@ internal class IrohObserverIngestor(
     private fun skipRetiredRun(context: ObserverFrameContext): Boolean {
         val delta = context.streamDelta.delta as? JsonObject ?: return false
         val runId = delta.string("run_id") ?: delta.string("runId") ?: return false
-        if (!turnRegistry.isRetiredRun(runId)) return false
+        if (!turnRegistry.isRetiredRun(IrohRunKey(runId))) return false
         Telemetry.event(
             "IrohObserver", "ingest.skip_already_retired",
             "conversationId" to context.conversationId,
@@ -303,7 +306,7 @@ internal class IrohObserverIngestor(
 
     fun currentSubagentScope(): SubagentRpcScope? {
         val conversationId = viewedConversationId ?: return null
-        val agentId = turnRegistry.getActiveTurn(conversationId)?.agentId
+        val agentId = turnRegistry.getActiveTurn(IrohConversationKey(conversationId))?.agentId
         return SubagentRpcScope(conversationId, agentId)
     }
 
@@ -322,6 +325,12 @@ internal class IrohObserverIngestor(
         val id = after.substringBefore('/').substringBefore('?')
         return id.takeIf { it.isNotBlank() }
     }
+
+    internal data class ObserverConnection(val handle: IrohConnectionHandle, val generation: Long)
+    internal data class ObserverFrameReceipt(
+        val received: AppServerReceivedFrame,
+        val expectedGeneration: Long? = null,
+    )
 
     private data class ViewedConversation(
         val path: String,

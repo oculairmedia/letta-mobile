@@ -18,21 +18,25 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-private fun IrohObserverIngestor(
-    scope: TestScope,
-    turnRegistry: IrohTurnRegistry,
-    connectionGeneration: () -> Long,
-    emitBoth: suspend (ServerFrame) -> Unit,
-    adminRpc: suspend (String, String, String?) -> AppServerInboundFrame.AdminRpcResponse,
-    recordFrameOwnership: (String, IrohActiveTurn?) -> Unit,
-): IrohObserverIngestor = IrohObserverIngestor(
+private data class ObserverIngestorTestDependencies(
+    val scope: TestScope,
+    val turnRegistry: IrohTurnRegistry,
+    val connectionGeneration: () -> Long,
+    val emitBoth: suspend (ServerFrame) -> Unit,
+    val adminRpc: suspend (String, String, String?) -> AppServerInboundFrame.AdminRpcResponse,
+    val recordFrameOwnership: (String, IrohActiveTurn?) -> Unit,
+)
+
+private fun createObserverIngestor(dependencies: ObserverIngestorTestDependencies): IrohObserverIngestor = IrohObserverIngestor(
     IrohObserverIngestor.Dependencies(
-        scope = scope,
-        turnRegistry = turnRegistry,
-        connectionGeneration = connectionGeneration,
-        emit = emitBoth,
-        adminRpc = { request -> adminRpc(request.method, request.path, request.body) },
-        recordFrameOwnership = { observation -> recordFrameOwnership(observation.conversationId, observation.localTurn) },
+        scope = dependencies.scope,
+        turnRegistry = dependencies.turnRegistry,
+        connectionGeneration = dependencies.connectionGeneration,
+        emit = dependencies.emitBoth,
+        adminRpc = { request -> dependencies.adminRpc(request.method, request.path, request.body) },
+        recordFrameOwnership = { observation ->
+            dependencies.recordFrameOwnership(observation.conversationId, observation.localTurn)
+        },
     ),
 )
 
@@ -82,16 +86,18 @@ class IrohObserverIngestorTest {
     private fun observerIngestor(
         generation: AtomicLong,
         calls: CopyOnWriteArrayList<Pair<String, String>>,
-    ) = IrohObserverIngestor(
-        scope = testScope,
-        turnRegistry = IrohTurnRegistry(),
-        connectionGeneration = { generation.get() },
-        emitBoth = { },
-        adminRpc = { method, path, _ ->
-            calls.add(method to path)
-            AppServerInboundFrame.AdminRpcResponse("req-1", true, buildJsonObject { }, null)
-        },
-        recordFrameOwnership = { _, _ -> },
+    ) = createObserverIngestor(
+        ObserverIngestorTestDependencies(
+            scope = testScope,
+            turnRegistry = IrohTurnRegistry(),
+            connectionGeneration = { generation.get() },
+            emitBoth = { },
+            adminRpc = { method, path, _ ->
+                calls.add(method to path)
+                AppServerInboundFrame.AdminRpcResponse("req-1", true, buildJsonObject { }, null)
+            },
+            recordFrameOwnership = { _, _ -> },
+        ),
     )
 
     @Test
@@ -105,13 +111,15 @@ class IrohObserverIngestorTest {
         )
         val activeTurn = (startResult as IrohTryStartResult.Started).turn
 
-        val ingestor = IrohObserverIngestor(
-            scope = testScope,
-            turnRegistry = turnRegistry,
-            connectionGeneration = { connectionGeneration.get() },
-            emitBoth = { emittedFrames.add(it) },
-            adminRpc = { _, _, _ -> error("unexpected") },
-            recordFrameOwnership = { _, _ -> },
+        val ingestor = createObserverIngestor(
+            ObserverIngestorTestDependencies(
+                scope = testScope,
+                turnRegistry = turnRegistry,
+                connectionGeneration = { connectionGeneration.get() },
+                emitBoth = { emittedFrames.add(it) },
+                adminRpc = { _, _, _ -> error("unexpected") },
+                recordFrameOwnership = { _, _ -> },
+            ),
         )
 
         // 1. Normal streaming frame for engine-owned conversation -> dropped from observer emission
@@ -121,7 +129,7 @@ class IrohObserverIngestorTest {
             seq = 1L,
             delta = """{"message_type": "assistant_message", "content": "hello from engine"}""",
         )
-        ingestor.ingestObserverFrame(streamFrame, expectedGeneration = 1L)
+        ingestor.ingestObserverFrame(IrohObserverIngestor.ObserverFrameReceipt(streamFrame, expectedGeneration = 1L))
         assertTrue(emittedFrames.isEmpty(), "Engine-owned non-terminal delta must not be emitted by observer")
 
         // 2. Terminal TurnDone frame for engine-owned conversation -> claims terminal and publishes
@@ -131,7 +139,7 @@ class IrohObserverIngestorTest {
             seq = 2L,
             delta = """{"message_type": "stop_reason", "stop_reason": "end_turn"}""",
         )
-        ingestor.ingestObserverFrame(terminalDelta, expectedGeneration = 1L)
+        ingestor.ingestObserverFrame(IrohObserverIngestor.ObserverFrameReceipt(terminalDelta, expectedGeneration = 1L))
         assertEquals(1, emittedFrames.size)
         assertTrue(emittedFrames[0] is ServerFrame.TurnDone)
         assertEquals("completed", (emittedFrames[0] as ServerFrame.TurnDone).status)
@@ -144,13 +152,15 @@ class IrohObserverIngestorTest {
         val turnRegistry = IrohTurnRegistry()
         val connectionGeneration = AtomicLong(1L)
 
-        val ingestor = IrohObserverIngestor(
-            scope = testScope,
-            turnRegistry = turnRegistry,
-            connectionGeneration = { connectionGeneration.get() },
-            emitBoth = { emittedFrames.add(it) },
-            adminRpc = { _, _, _ -> error("unexpected") },
-            recordFrameOwnership = { _, _ -> },
+        val ingestor = createObserverIngestor(
+            ObserverIngestorTestDependencies(
+                scope = testScope,
+                turnRegistry = turnRegistry,
+                connectionGeneration = { connectionGeneration.get() },
+                emitBoth = { emittedFrames.add(it) },
+                adminRpc = { _, _, _ -> error("unexpected") },
+                recordFrameOwnership = { _, _ -> },
+            ),
         )
 
         val assistantFrame = streamDelta(
@@ -159,7 +169,7 @@ class IrohObserverIngestorTest {
             seq = 1L,
             delta = """{"message_type": "assistant_message", "id": "m1", "content": "passive hello"}""",
         )
-        ingestor.ingestObserverFrame(assistantFrame, expectedGeneration = 1L)
+        ingestor.ingestObserverFrame(IrohObserverIngestor.ObserverFrameReceipt(assistantFrame, expectedGeneration = 1L))
 
         assertFalse(emittedFrames.isEmpty(), "Passive observer frame must be projected and emitted")
     }
@@ -176,13 +186,15 @@ class IrohObserverIngestorTest {
         val turn = (startResult as IrohTryStartResult.Started).turn
         turnRegistry.publishTerminal(IrohTerminalPublication(turn, "completed", "engine"))
 
-        val ingestor = IrohObserverIngestor(
-            scope = testScope,
-            turnRegistry = turnRegistry,
-            connectionGeneration = { connectionGeneration.get() },
-            emitBoth = { emittedFrames.add(it) },
-            adminRpc = { _, _, _ -> error("unexpected") },
-            recordFrameOwnership = { _, _ -> },
+        val ingestor = createObserverIngestor(
+            ObserverIngestorTestDependencies(
+                scope = testScope,
+                turnRegistry = turnRegistry,
+                connectionGeneration = { connectionGeneration.get() },
+                emitBoth = { emittedFrames.add(it) },
+                adminRpc = { _, _, _ -> error("unexpected") },
+                recordFrameOwnership = { _, _ -> },
+            ),
         )
 
         val delta = streamDelta(
@@ -191,7 +203,7 @@ class IrohObserverIngestorTest {
             seq = 1L,
             delta = """{"message_type": "assistant_message", "run_id": "run-retired", "content": "afterlife message"}""",
         )
-        ingestor.ingestObserverFrame(delta, expectedGeneration = 1L)
+        ingestor.ingestObserverFrame(IrohObserverIngestor.ObserverFrameReceipt(delta, expectedGeneration = 1L))
 
         assertTrue(emittedFrames.isEmpty(), "Retired run frame must be skipped")
     }
@@ -202,13 +214,15 @@ class IrohObserverIngestorTest {
         val turnRegistry = IrohTurnRegistry()
         val connectionGeneration = AtomicLong(1L)
 
-        val ingestor = IrohObserverIngestor(
-            scope = testScope,
-            turnRegistry = turnRegistry,
-            connectionGeneration = { connectionGeneration.get() },
-            emitBoth = { emittedFrames.add(it) },
-            adminRpc = { _, _, _ -> error("unexpected") },
-            recordFrameOwnership = { _, _ -> },
+        val ingestor = createObserverIngestor(
+            ObserverIngestorTestDependencies(
+                scope = testScope,
+                turnRegistry = turnRegistry,
+                connectionGeneration = { connectionGeneration.get() },
+                emitBoth = { emittedFrames.add(it) },
+                adminRpc = { _, _, _ -> error("unexpected") },
+                recordFrameOwnership = { _, _ -> },
+            ),
         )
 
         // 1. Agent tool call dispatch
@@ -228,7 +242,7 @@ class IrohObserverIngestorTest {
                 }
             """.trimIndent(),
         )
-        ingestor.ingestObserverFrame(dispatchDelta, expectedGeneration = 1L)
+        ingestor.ingestObserverFrame(IrohObserverIngestor.ObserverFrameReceipt(dispatchDelta, expectedGeneration = 1L))
 
         val subagentUpdate1 = emittedFrames.filterIsInstance<ServerFrame.SubagentsUpdated>().firstOrNull()
         assertNotNull(subagentUpdate1, "SubagentsUpdated must be emitted on Agent dispatch")
@@ -248,7 +262,7 @@ class IrohObserverIngestorTest {
                 }
             """.trimIndent(),
         )
-        ingestor.ingestObserverFrame(returnDelta, expectedGeneration = 1L)
+        ingestor.ingestObserverFrame(IrohObserverIngestor.ObserverFrameReceipt(returnDelta, expectedGeneration = 1L))
 
         val subagentUpdate2 = emittedFrames.filterIsInstance<ServerFrame.SubagentsUpdated>().lastOrNull()
         assertNotNull(subagentUpdate2, "SubagentsUpdated must be emitted on Agent return")
@@ -260,13 +274,15 @@ class IrohObserverIngestorTest {
         val turnRegistry = IrohTurnRegistry()
         val connectionGeneration = AtomicLong(1L)
 
-        val ingestor = IrohObserverIngestor(
-            scope = testScope,
-            turnRegistry = turnRegistry,
-            connectionGeneration = { connectionGeneration.get() },
-            emitBoth = { },
-            adminRpc = { _, _, _ -> error("unexpected") },
-            recordFrameOwnership = { _, _ -> },
+        val ingestor = createObserverIngestor(
+            ObserverIngestorTestDependencies(
+                scope = testScope,
+                turnRegistry = turnRegistry,
+                connectionGeneration = { connectionGeneration.get() },
+                emitBoth = { },
+                adminRpc = { _, _, _ -> error("unexpected") },
+                recordFrameOwnership = { _, _ -> },
+            ),
         )
 
         val dispatchDelta = streamDelta(
@@ -285,7 +301,7 @@ class IrohObserverIngestorTest {
                 }
             """.trimIndent(),
         )
-        ingestor.ingestObserverFrame(dispatchDelta, expectedGeneration = 1L)
+        ingestor.ingestObserverFrame(IrohObserverIngestor.ObserverFrameReceipt(dispatchDelta, expectedGeneration = 1L))
         assertTrue(ingestor.subagentCorrelator.revision > 0L)
         assertTrue(ingestor.subagentCorrelator.snapshot().isNotEmpty())
 

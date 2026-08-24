@@ -71,8 +71,16 @@ sealed interface IrohTryStartResult {
 data class IrohTurnStartRequest(val token: IrohTurnToken, val initialRunId: String, val agentId: String)
 data class IrohRunPromotion(val token: IrohTurnToken, val realRunId: String)
 data class IrohTerminalPublication(val turn: IrohActiveTurn, val status: String, val source: String)
-data class IrohFrameOwnershipObservation(val conversationId: String, val localTurn: IrohActiveTurn?)
-data class IrohSendJobRegistration(val conversationId: String, val job: Job)
+
+/** A conversation key used by registry operations and its internal indexes. */
+data class IrohConversationKey(val value: String)
+
+/** A run key used when looking up recently retired server runs. */
+data class IrohRunKey(val value: String)
+
+data class IrohFrameOwnershipObservation(val conversation: IrohConversationKey, val localTurn: IrohActiveTurn?)
+data class IrohSendJobRegistration(val conversation: IrohConversationKey, val job: Job)
+data class IrohTerminalObservation(val conversation: IrohConversationKey, val source: String)
 
 /**
  * Atomic registry of active turns, send jobs, interrupted turns, and frame ownership
@@ -101,25 +109,25 @@ class IrohTurnRegistry {
 
 
     fun registerSendJob(registration: IrohSendJobRegistration) {
-        activeSendJobs[registration.conversationId] = registration.job
+        activeSendJobs[registration.conversation.value] = registration.job
     }
 
     fun unregisterSendJob(registration: IrohSendJobRegistration): Boolean =
-        activeSendJobs.remove(registration.conversationId, registration.job)
+        activeSendJobs.remove(registration.conversation.value, registration.job)
 
-    fun removeSendJob(conversationId: String): Job? = activeSendJobs.remove(conversationId)
-    fun getSendJob(conversationId: String): Job? = activeSendJobs[conversationId]
+    fun removeSendJob(conversation: IrohConversationKey): Job? = activeSendJobs.remove(conversation.value)
+    fun getSendJob(conversation: IrohConversationKey): Job? = activeSendJobs[conversation.value]
 
-    fun getActiveTurn(conversationId: String): IrohActiveTurn? = activeTurns[conversationId]
+    fun getActiveTurn(conversation: IrohConversationKey): IrohActiveTurn? = activeTurns[conversation.value]
 
-    fun hasActiveTurn(conversationId: String): Boolean =
-        activeTurns[conversationId]?.terminalReached?.isCompleted == false
+    fun hasActiveTurn(conversation: IrohConversationKey): Boolean =
+        activeTurns[conversation.value]?.terminalReached?.isCompleted == false
 
     val hasAnyActiveTurn: Boolean
         get() = activeTurns.values.any { !it.terminalReached.isCompleted }
 
-    fun concurrentTurns(excludingConversationId: String): List<IrohActiveTurn> =
-        activeTurns.values.filter { it.conversationId != excludingConversationId && !it.hasTerminal }
+    fun concurrentTurns(excludingConversation: IrohConversationKey): List<IrohActiveTurn> =
+        activeTurns.values.filter { it.conversationId != excludingConversation.value && !it.hasTerminal }
 
     fun promoteRunId(promotion: IrohRunPromotion): Boolean {
         val turn = activeTurns[promotion.token.conversationId] ?: return false
@@ -127,9 +135,9 @@ class IrohTurnRegistry {
         return turn.promoteRunId(promotion.realRunId)
     }
 
-    fun observeTerminal(conversationId: String, source: String): Boolean {
-        val turn = activeTurns[conversationId] ?: return false
-        return turn.tryClaimTerminal(source)
+    fun observeTerminal(observation: IrohTerminalObservation): Boolean {
+        val turn = activeTurns[observation.conversation.value] ?: return false
+        return turn.tryClaimTerminal(observation.source)
     }
 
     fun publishTerminal(publication: IrohTerminalPublication): Boolean {
@@ -162,23 +170,23 @@ class IrohTurnRegistry {
         return removed
     }
 
-    fun isRetiredRun(runId: String): Boolean {
-        val retiredAt = recentlyRetiredRuns[runId] ?: return false
+    fun isRetiredRun(run: IrohRunKey): Boolean {
+        val retiredAt = recentlyRetiredRuns[run.value] ?: return false
         val valid = System.currentTimeMillis() - retiredAt <= RETIRED_RUN_TTL_MS
         if (!valid) {
-            recentlyRetiredRuns.remove(runId, retiredAt)
+            recentlyRetiredRuns.remove(run.value, retiredAt)
         }
         return valid
     }
 
     fun recordFrameOwnership(observation: IrohFrameOwnershipObservation): FrameOwnershipResult {
-        val previous = frameOwnershipPath[observation.conversationId]
+        val previous = frameOwnershipPath[observation.conversation.value]
         val current = if (observation.localTurn != null) "engine" else "observer"
         if (previous != null && previous != current) {
-            frameOwnershipPath[observation.conversationId] = current
+            frameOwnershipPath[observation.conversation.value] = current
             return FrameOwnershipResult.Switched(from = previous, to = current)
         }
-        if (previous == null) frameOwnershipPath[observation.conversationId] = current
+        if (previous == null) frameOwnershipPath[observation.conversation.value] = current
         return FrameOwnershipResult.Unchanged(current)
     }
 
@@ -187,9 +195,9 @@ class IrohTurnRegistry {
         data class Switched(val from: String, val to: String) : FrameOwnershipResult
     }
 
-    fun frameOwnership(conversationId: String): String? = frameOwnershipPath[conversationId]
-    fun clearFrameOwnership(conversationId: String) {
-        frameOwnershipPath.remove(conversationId)
+    fun frameOwnership(conversation: IrohConversationKey): String? = frameOwnershipPath[conversation.value]
+    fun clearFrameOwnership(conversation: IrohConversationKey) {
+        frameOwnershipPath.remove(conversation.value)
     }
 
     fun rememberInterruptedTurns() {
@@ -209,10 +217,10 @@ class IrohTurnRegistry {
         interruptedTurns.clear()
     }
 
-    fun getInterruptedTurn(conversationId: String): RedialWhileTurnActive? = interruptedTurns[conversationId]
-    fun removeInterruptedTurn(conversationId: String): RedialWhileTurnActive? = interruptedTurns.remove(conversationId)
-    fun removeInterruptedTurn(conversationId: String, recovery: RedialWhileTurnActive): Boolean =
-        interruptedTurns.remove(conversationId, recovery)
+    fun getInterruptedTurn(conversation: IrohConversationKey): RedialWhileTurnActive? = interruptedTurns[conversation.value]
+    fun removeInterruptedTurn(conversation: IrohConversationKey): RedialWhileTurnActive? = interruptedTurns.remove(conversation.value)
+    fun removeInterruptedTurn(recovery: RedialWhileTurnActive): Boolean =
+        interruptedTurns.remove(recovery.conversationId, recovery)
     fun interruptedTurnsSnapshot(): List<RedialWhileTurnActive> = interruptedTurns.values.toList()
     fun activeTurnsSnapshot(): List<IrohActiveTurn> = activeTurns.values.toList()
 
@@ -234,8 +242,8 @@ class IrohTurnRegistry {
     fun activeTurnsCount(): Int = activeTurns.size
     fun activeSendJobsCount(): Int = activeSendJobs.size
 
-    fun snapshotForTest(conversationId: String): IrohTurnSnapshot? {
-        val turn = activeTurns[conversationId] ?: return null
+    fun snapshotForTest(conversation: IrohConversationKey): IrohTurnSnapshot? {
+        val turn = activeTurns[conversation.value] ?: return null
         return IrohTurnSnapshot(
             token = turn.token,
             turnId = turn.turnId,
