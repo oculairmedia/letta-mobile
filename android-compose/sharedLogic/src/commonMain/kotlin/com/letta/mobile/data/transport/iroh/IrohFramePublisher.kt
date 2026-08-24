@@ -37,13 +37,6 @@ internal class IrohFramePublisher(
         _events.tryEmit(frame)
     }
 
-    fun tryPublish(frame: ServerFrame): Boolean {
-        val event = TransportFrameEvent(frame = frame)
-        val r1 = _canonicalEvents.tryEmit(event)
-        val r2 = _events.tryEmit(frame)
-        return r1 && r2
-    }
-
     companion object {
         const val DEFAULT_BUFFER_CAPACITY = 64
     }
