@@ -3,6 +3,9 @@ package com.letta.mobile.data.transport.iroh
 import com.letta.mobile.data.transport.BridgeTurnStatus
 import com.letta.mobile.data.transport.ServerFrame
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 
 @Serializable
 data class IrohProbeTurnMetrics(
@@ -129,13 +132,37 @@ object IrohProbeAssertions {
     fun classifyAdminRpc(
         method: String,
         success: Boolean,
-        resultIsArray: Boolean,
+        result: JsonElement?,
         error: String?,
     ): String? = when {
-        !success -> "admin_rpc_method_missing:$method"
-        AdminRpcErrors.isUnknownMethod(error) -> "admin_rpc_method_missing:$method"
-        !resultIsArray -> "admin_rpc_method_missing:$method"
+        !success && AdminRpcErrors.isUnknownMethod(error) -> "admin_rpc_method_missing:$method"
+        !success -> "admin_rpc_failed:$method:${normalizeAdminRpcError(error)}"
+        !isValidAdminRpcResult(method, result) -> "admin_rpc_shape_invalid:$method:${topLevelKind(result)}"
         else -> null
+    }
+
+    private fun isValidAdminRpcResult(method: String, result: JsonElement?): Boolean = when (method) {
+        "message.list" -> result is JsonArray || (result is JsonObject && result["messages"] is JsonArray)
+        "agent.list", "conversation.list" -> result is JsonArray
+        else -> true
+    }
+
+    private fun topLevelKind(result: JsonElement?): String = when (result) {
+        null -> "null"
+        is JsonArray -> "array"
+        is JsonObject -> "object"
+        else -> "primitive"
+    }
+
+    private fun normalizeAdminRpcError(error: String?): String {
+        val normalized = error.orEmpty()
+            .lowercase()
+            .map { character -> if (character.isLetterOrDigit() || character in "._-") character else '-' }
+            .joinToString("")
+            .trim('-')
+            .replace(Regex("-+"), "-")
+            .take(80)
+        return normalized.ifBlank { "unknown" }
     }
 
     fun classifyIdleSendFailure(error: String?): String =
