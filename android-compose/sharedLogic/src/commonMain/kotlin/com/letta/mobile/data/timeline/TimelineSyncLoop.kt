@@ -70,6 +70,7 @@ class TimelineSyncLoop(
 
     private var snapshotRevision: Long = initialRevision
     private var persistJob: Job? = null
+    private val persistMutex = Mutex()
 
     private val pendingToolReturnsByCallId = LinkedHashMap<String, ToolReturnMessage>()
     private val seenStreamMessageLock = SynchronizedObject()
@@ -131,15 +132,12 @@ class TimelineSyncLoop(
     )
 
     internal fun scheduleSnapshotPersist(immediate: Boolean = false) {
-        val scope = timelineScope ?: return
+        timelineScope ?: return
         if (confirmedTimelineStore === NoOpConfirmedTimelineStore) return
         if (immediate) {
             persistJob?.cancel()
-            loopScope.launch {
-                flushSnapshotNow()
-            }
-        } else {
-            if (persistJob?.isActive == true) return
+            persistJob = loopScope.launch { flushSnapshotNow() }
+        } else if (persistJob?.isActive != true) {
             persistJob = loopScope.launch {
                 delay(100)
                 flushSnapshotNow()
@@ -148,32 +146,39 @@ class TimelineSyncLoop(
     }
 
     suspend fun flushSnapshotNow() {
-        val scope = timelineScope ?: return
+        val snapshotScope = timelineScope ?: return
         if (confirmedTimelineStore === NoOpConfirmedTimelineStore) return
-        val currentTimeline = writeMutex.withLock { state.value }
-        val revision = ++snapshotRevision
-        val envelope = TimelineSnapshotCodec.timelineToStoredEnvelope(
-            timeline = currentTimeline,
-            scope = scope,
-            revision = revision,
-            writtenAtMillis = timelineCurrentTimeMillis(),
-        )
-        runCatching {
-            val written = confirmedTimelineStore.writeSnapshot(envelope)
-            if (!written) {
-                Telemetry.event(
-                    "TimelineSync", "snapshotPersist.staleRejected",
+        persistMutex.withLock {
+            val currentTimeline = writeMutex.withLock { state.value }
+            val revision = ++snapshotRevision
+            val envelope = TimelineSnapshotCodec.timelineToStoredEnvelope(
+                timeline = currentTimeline,
+                scope = snapshotScope,
+                revision = revision,
+                writtenAtMillis = timelineCurrentTimeMillis(),
+            )
+            runCatching {
+                withContext(NonCancellable) {
+                    val written = confirmedTimelineStore.writeSnapshot(envelope)
+                    confirmedTimelineStore.prune(snapshotScope.backendId, MAX_RETAINED_SNAPSHOTS)
+                    written
+                }
+            }.onSuccess { written ->
+                if (!written) {
+                    Telemetry.event(
+                        "TimelineSync", "snapshotPersist.staleRejected",
+                        "conversationId" to conversationId,
+                        "revision" to revision,
+                        level = Telemetry.Level.WARN,
+                    )
+                }
+            }.onFailure { error ->
+                Telemetry.error(
+                    "TimelineSync", "snapshotPersist.failed", error,
                     "conversationId" to conversationId,
                     "revision" to revision,
-                    level = Telemetry.Level.WARN,
                 )
             }
-        }.onFailure { error ->
-            Telemetry.error(
-                "TimelineSync", "snapshotPersist.failed", error,
-                "conversationId" to conversationId,
-                "revision" to revision,
-            )
         }
     }
 
@@ -616,6 +621,7 @@ class TimelineSyncLoop(
         // margin for network jitter) while detecting stuck streams faster.
         private const val STREAM_SILENCE_TIMEOUT_MS = STREAM_HEARTBEAT_EXPECTED_MS * 6
         private const val MAX_SEEN_STREAM_MESSAGES = 512
+        private const val MAX_RETAINED_SNAPSHOTS = 50
         private val activeStreamCount = TimelineAtomicCounter(0)
         internal val DEFAULT_INCLUDE_TYPES = listOf("assistant_message", "reasoning_message", "tool_call_message", "tool_return_message")
     }

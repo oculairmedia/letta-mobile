@@ -10,6 +10,7 @@ import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -22,6 +23,7 @@ import kotlinx.coroutines.withContext
 class DesktopConfirmedTimelineStore(
     private val rootDirectory: Path = defaultRootDirectory(),
 ) : ConfirmedTimelineStore {
+    private val scopeWriteLocks = ConcurrentHashMap<String, Any>()
 
     override suspend fun readSnapshot(scope: TimelineScope): StoredTimelineEnvelope? = withContext(Dispatchers.IO) {
         val start = timelineCurrentTimeMillis()
@@ -67,6 +69,8 @@ class DesktopConfirmedTimelineStore(
         val file = snapshotFile(scope)
         val parent = file.parent ?: return@withContext false
 
+        val scopeLock = scopeWriteLocks.computeIfAbsent(scope.storageKey) { Any() }
+        synchronized(scopeLock) {
         try {
             Files.createDirectories(parent)
 
@@ -114,6 +118,7 @@ class DesktopConfirmedTimelineStore(
         } catch (e: Exception) {
             Telemetry.error("DesktopTimelineStore", "writeSnapshot.failed", e, "scope" to scope.storageKey)
             false
+        }
         }
     }
 

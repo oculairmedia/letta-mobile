@@ -75,8 +75,9 @@ class RoomConfirmedTimelineStore(
                 return@withTransaction false
             }
 
-            val payloadJson = TimelineSnapshotCodec.encode(envelope)
-            val writtenAt = if (envelope.writtenAtMillis > 0) envelope.writtenAtMillis else timelineCurrentTimeMillis()
+            val writtenAt = envelope.writtenAtMillis.takeIf { it > 0 } ?: timelineCurrentTimeMillis()
+            val toWrite = envelope.copy(writtenAtMillis = writtenAt)
+            val payloadJson = TimelineSnapshotCodec.encode(toWrite)
 
             val entity = ConfirmedTimelineSnapshotEntity(
                 backendId = scope.backendId,
@@ -123,7 +124,10 @@ class RoomConfirmedTimelineStore(
     }
 
     override suspend fun prune(backendId: String, maxRetainedConversations: Int) {
-        if (maxRetainedConversations <= 0) return
+        if (maxRetainedConversations <= 0) {
+            clearForBackend(backendId)
+            return
+        }
         dao.pruneBackend(backendId, maxRetainedConversations)
         Telemetry.event(
             "RoomTimelineStore", "pruneBackend",

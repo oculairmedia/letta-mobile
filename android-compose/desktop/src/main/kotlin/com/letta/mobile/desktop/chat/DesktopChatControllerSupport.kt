@@ -14,7 +14,6 @@ import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
 import com.letta.mobile.desktop.data.DesktopConfirmedTimelineStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.runBlocking
 
 internal fun ChatComposerError.toDesktopMessage(limits: AttachmentLimits): String = when (this) {
     ChatComposerError.MaxAttachmentCountExceeded -> "Attach up to ${limits.maxAttachmentCount} images."
@@ -48,12 +47,14 @@ value class MessageListOrder(val value: String)
 @JvmInline
 value class TimelinePageLimit(val value: Int)
 
-internal class RealDesktopTimelineLoop(
+internal class RealDesktopTimelineLoop private constructor(
     gateway: DesktopChatGateway,
     conversation: DesktopConversationSummary,
     scope: CoroutineScope,
-    confirmedTimelineStore: ConfirmedTimelineStore = DesktopConfirmedTimelineStore(),
-    backendId: String = "desktop-local",
+    confirmedTimelineStore: ConfirmedTimelineStore,
+    backendId: String,
+    initialTimeline: Timeline?,
+    initialRevision: Long,
 ) : DesktopTimelineLoop {
     private val routing = resolveDesktopTimelineRouting(gateway, conversation)
     private val timelineScope = TimelineScope(
@@ -61,12 +62,6 @@ internal class RealDesktopTimelineLoop(
         conversationId = routing.loopConversationId.value,
         agentId = conversation.agentId,
     )
-    private val storedSnapshot = runCatching {
-        runBlocking { confirmedTimelineStore.readSnapshot(timelineScope) }
-    }.getOrNull()
-    private val initialTimeline = storedSnapshot?.let { TimelineSnapshotCodec.storedEnvelopeToTimeline(it) }
-    private val initialRevision = storedSnapshot?.revision ?: 0L
-
     private val delegate = TimelineSyncLoop(
         messageApi = routing.transport,
         conversationId = routing.loopConversationId.value,
@@ -93,6 +88,24 @@ internal class RealDesktopTimelineLoop(
 
     override fun close() {
         delegate.close()
+    }
+
+    companion object {
+        suspend fun create(
+            gateway: DesktopChatGateway,
+            conversation: DesktopConversationSummary,
+            scope: CoroutineScope,
+            confirmedTimelineStore: ConfirmedTimelineStore = DesktopConfirmedTimelineStore(),
+            backendId: String = "desktop-local",
+        ): RealDesktopTimelineLoop {
+            val routing = resolveDesktopTimelineRouting(gateway, conversation)
+            val timelineScope = TimelineScope(backendId, routing.loopConversationId.value, conversation.agentId)
+            val snapshot = runCatching { confirmedTimelineStore.readSnapshot(timelineScope) }.getOrNull()
+            return RealDesktopTimelineLoop(
+                gateway, conversation, scope, confirmedTimelineStore, backendId,
+                snapshot?.let(TimelineSnapshotCodec::storedEnvelopeToTimeline), snapshot?.revision ?: 0L,
+            )
+        }
     }
 }
 

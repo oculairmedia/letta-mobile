@@ -67,6 +67,8 @@ object ChatSessionReducer {
             isLoading = false,
             isSending = false,
             isRemoteBacked = true,
+            snapshotAvailability = SnapshotAvailability.None,
+            remoteSyncState = RemoteSyncState.Idle,
             connectionState = if (conversations.isEmpty()) {
                 ChatConnectionState.NoConversations
             } else {
@@ -117,6 +119,8 @@ object ChatSessionReducer {
             composer = ChatComposerState(),
             isSending = false,
             isLoading = nextSelected != null && state.isRemoteBacked,
+            snapshotAvailability = SnapshotAvailability.None,
+            remoteSyncState = RemoteSyncState.Idle,
             connectionState = when {
                 nextSelected == null -> ChatConnectionState.NoConversations
                 state.isRemoteBacked -> ChatConnectionState.Loading
