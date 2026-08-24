@@ -229,31 +229,35 @@ internal class IrohObserverIngestor(
             conversationId = streamDelta.runtime.conversationId,
             runId = delta.string("run_id"),
         )
-        val changedToolCallId: String
-        val reason: String
         when (messageType) {
-            "tool_call_message", "approval_request_message" -> {
-                val name = toolCall?.string("name") ?: return@runCatching emptyList()
-                if (name != "Agent") return@runCatching emptyList()
-                val toolCallId = toolCall.string("tool_call_id")
-                    ?: delta.string("tool_call_id") ?: return@runCatching emptyList()
-                val arguments = toolCall["arguments"]?.toString()
-                    ?: delta["arguments"]?.toString()
-                subagentCorrelator.onAgentDispatch(toolCallId, arguments, parent)
-                changedToolCallId = toolCallId
-                reason = SUBAGENT_REASON_STARTED
-            }
-            "tool_return_message" -> {
-                val toolCallId = toolCall?.string("tool_call_id")
-                    ?: delta.string("tool_call_id") ?: return@runCatching emptyList()
-                subagentCorrelator.onAgentReturn(toolCallId, parent)
-                changedToolCallId = toolCallId
-                reason = SUBAGENT_REASON_COMPLETED
-            }
-            else -> return@runCatching emptyList()
+            "tool_call_message", "approval_request_message" -> processAgentDispatch(delta, toolCall, parent)
+            "tool_return_message" -> processAgentReturn(delta, toolCall, parent)
+            else -> emptyList()
         }
-        buildSubagentsUpdatedIfChanged(changedToolCallId, reason)
     }.getOrElse { emptyList() }
+
+    private fun processAgentDispatch(
+        delta: JsonObject,
+        toolCall: JsonObject?,
+        parent: ParentContext,
+    ): List<ServerFrame> {
+        val name = toolCall?.string("name") ?: return emptyList()
+        if (name != "Agent") return emptyList()
+        val toolCallId = toolCall.string("tool_call_id") ?: delta.string("tool_call_id") ?: return emptyList()
+        val arguments = toolCall["arguments"]?.toString() ?: delta["arguments"]?.toString()
+        subagentCorrelator.onAgentDispatch(toolCallId, arguments, parent)
+        return buildSubagentsUpdatedIfChanged(toolCallId, SUBAGENT_REASON_STARTED)
+    }
+
+    private fun processAgentReturn(
+        delta: JsonObject,
+        toolCall: JsonObject?,
+        parent: ParentContext,
+    ): List<ServerFrame> {
+        val toolCallId = toolCall?.string("tool_call_id") ?: delta.string("tool_call_id") ?: return emptyList()
+        subagentCorrelator.onAgentReturn(toolCallId, parent)
+        return buildSubagentsUpdatedIfChanged(toolCallId, SUBAGENT_REASON_COMPLETED)
+    }
 
     private fun buildSubagentsUpdatedIfChanged(
         changedToolCallId: String,
