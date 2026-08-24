@@ -53,14 +53,38 @@ internal class IrohAdminRpcExecutor(
             first.adminRpc(method = method, path = path, body = body)
         }
         if (firstAttempt.isSuccess) {
-            if (connectionGeneration() == callGeneration) {
-                retryState.reset()
-                retryState.recordProofOfLife()
-            }
+            onAttemptSuccess(callGeneration, retryState)
             return firstAttempt.getOrThrow()
         }
 
         val firstError = firstAttempt.exceptionOrNull()!!
+        validateRetryableError(first, firstError, method, path, callGeneration)
+
+        val failures = retryState.recordFailure()
+        val idleMs = retryState.millisSinceLastStream()
+        val shouldEscalate = failures >= ADMIN_RPC_FAILURE_THRESHOLD && idleMs > STREAM_IDLE_THRESHOLD_MS
+
+        return if (!shouldEscalate) {
+            retryOnSameConnection(first, firstError, failures, idleMs, method, path, body, callGeneration, retryState)
+        } else {
+            escalateReconnect(first, firstError, failures, idleMs, method, path, body)
+        }
+    }
+
+    private suspend fun onAttemptSuccess(callGeneration: Long, retryState: GenerationRetryState) {
+        if (connectionGeneration() == callGeneration) {
+            retryState.reset()
+            retryState.recordProofOfLife()
+        }
+    }
+
+    private fun validateRetryableError(
+        first: IrohConnectionHandle,
+        firstError: Throwable,
+        method: String,
+        path: String,
+        callGeneration: Long,
+    ) {
         if (firstError is CancellationException) throw firstError
         if (firstError.isAdminRpcPayloadError()) throw firstError
         if (!firstError.isConnectionLostClass()) throw firstError
@@ -77,8 +101,6 @@ internal class IrohAdminRpcExecutor(
             throw firstError
         }
 
-        // Stale handle guard: if generation moved while first attempt was in flight,
-        // do not mutate failure state of old generation or escalate against the current generation
         if (connectionGeneration() != callGeneration) {
             Telemetry.event(
                 "IrohTransport", "admin_rpc.stale_generation_ignored",
@@ -88,66 +110,64 @@ internal class IrohAdminRpcExecutor(
             )
             throw firstError
         }
+    }
 
-        val failures = retryState.recordFailure()
-        val idleMs = retryState.millisSinceLastStream()
-        val shouldEscalate = failures >= ADMIN_RPC_FAILURE_THRESHOLD && idleMs > STREAM_IDLE_THRESHOLD_MS
+    private suspend fun retryOnSameConnection(
+        first: IrohConnectionHandle,
+        firstError: Throwable,
+        failures: Int,
+        idleMs: Long,
+        method: String,
+        path: String,
+        body: String?,
+        callGeneration: Long,
+        retryState: GenerationRetryState,
+    ): AppServerInboundFrame.AdminRpcResponse {
+        Telemetry.event(
+            "IrohTransport", "admin_rpc.retry.same_connection",
+            "method" to method,
+            "path" to path,
+            "error" to (firstError.message ?: firstError.toString()),
+            "class" to firstError::class.simpleName,
+            "consecutiveFailures" to failures.toString(),
+            "idleMs" to idleMs.toString(),
+        )
+        return runCatching {
+            first.adminRpc(method = method, path = path, body = body)
+        }.getOrElse { retryError ->
+            if (retryError is CancellationException) throw retryError
+            if (connectionGeneration() != callGeneration) throw retryError
+            escalateReconnect(first, retryError, failures + 1, idleMs, method, path, body)
+        }.also {
+            onAttemptSuccess(callGeneration, retryState)
+        }
+    }
 
-        if (!shouldEscalate) {
-            Telemetry.event(
-                "IrohTransport", "admin_rpc.retry.same_connection",
-                "method" to method,
-                "path" to path,
-                "error" to (firstError.message ?: firstError.toString()),
-                "class" to firstError::class.simpleName,
-                "consecutiveFailures" to failures.toString(),
-                "idleMs" to idleMs.toString(),
-            )
-            return runCatching {
-                first.adminRpc(method = method, path = path, body = body)
-            }.getOrElse { retryError ->
-                if (retryError is CancellationException) throw retryError
-                if (connectionGeneration() != callGeneration) throw retryError
-                Telemetry.event(
-                    "IrohTransport", "admin_rpc.escalate.reconnect",
-                    "method" to method,
-                    "path" to path,
-                    "error" to (retryError.message ?: retryError.toString()),
-                    "class" to retryError::class.simpleName,
-                    "consecutiveFailures" to (failures + 1).toString(),
-                )
-                supervisor.onConnectionLost("admin_rpc_failed_after_retry: ${retryError.message ?: retryError.toString()}", first)
-                val newHandle = supervisor.ready()
-                val nextGeneration = connectionGeneration()
-                val nextRetryState = retryStateFor(nextGeneration)
-                newHandle.adminRpc(method = method, path = path, body = body).also {
-                    nextRetryState.reset()
-                    nextRetryState.recordProofOfLife()
-                }
-            }.also {
-                if (connectionGeneration() == callGeneration) {
-                    retryState.reset()
-                    retryState.recordProofOfLife()
-                }
-            }
-        } else {
-            Telemetry.event(
-                "IrohTransport", "admin_rpc.escalate.reconnect",
-                "method" to method,
-                "path" to path,
-                "error" to (firstError.message ?: firstError.toString()),
-                "class" to firstError::class.simpleName,
-                "consecutiveFailures" to failures.toString(),
-                "idleMs" to idleMs.toString(),
-            )
-            supervisor.onConnectionLost("admin_rpc_failed: ${firstError.message ?: firstError.toString()}", first)
-            val retry = supervisor.ready()
-            val nextGeneration = connectionGeneration()
-            val nextRetryState = retryStateFor(nextGeneration)
-            return retry.adminRpc(method = method, path = path, body = body).also {
-                nextRetryState.reset()
-                nextRetryState.recordProofOfLife()
-            }
+    private suspend fun escalateReconnect(
+        first: IrohConnectionHandle,
+        error: Throwable,
+        failures: Int,
+        idleMs: Long,
+        method: String,
+        path: String,
+        body: String?,
+    ): AppServerInboundFrame.AdminRpcResponse {
+        Telemetry.event(
+            "IrohTransport", "admin_rpc.escalate.reconnect",
+            "method" to method,
+            "path" to path,
+            "error" to (error.message ?: error.toString()),
+            "class" to error::class.simpleName,
+            "consecutiveFailures" to failures.toString(),
+            "idleMs" to idleMs.toString(),
+        )
+        supervisor.onConnectionLost("admin_rpc_failed: ${error.message ?: error.toString()}", first)
+        val newHandle = supervisor.ready()
+        val nextGeneration = connectionGeneration()
+        val nextRetryState = retryStateFor(nextGeneration)
+        return newHandle.adminRpc(method = method, path = path, body = body).also {
+            nextRetryState.reset()
+            nextRetryState.recordProofOfLife()
         }
     }
 
