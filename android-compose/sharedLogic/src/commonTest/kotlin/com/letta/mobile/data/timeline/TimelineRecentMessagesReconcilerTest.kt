@@ -20,6 +20,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TimelineRecentMessagesReconcilerTest {
@@ -193,6 +194,151 @@ class TimelineRecentMessagesReconcilerTest {
         // The debounce only guards the "bypassing an active stream" path; when
         // there's no live stream subscriber every call is already load-bearing.
         assertEquals(2, transport.listCalls)
+    }
+
+    @Test
+    fun openAndResumedOverlapShareSingleNetworkFlightAndResultApplication() = runTest(UnconfinedTestDispatcher()) {
+        val transport = RecordingTimelineTransport()
+        val reconciler = TimelineRecentMessagesReconciler(
+            conversationId = "conv-1",
+            messageApi = transport,
+            eventQueue = Channel<TimelineGatewayEvent>(Channel.UNLIMITED).also { queue ->
+                backgroundScope.launch {
+                    for (event in queue) {
+                        if (event is TimelineGatewayEvent.RecentMessagesSnapshot) {
+                            event.ack.complete(event.serverMessages.size)
+                        }
+                    }
+                }
+            },
+            state = MutableStateFlow(Timeline("conv-1")),
+            streamSubscriberActive = MutableStateFlow(false),
+            writeMutex = Mutex(),
+            applyReturnsAndResponsesFromSnapshot = {},
+        )
+        val openEntered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        transport.onListEntered = { openEntered.complete(Unit); release.await() }
+
+        val openFlight = async { reconciler.reconcileRecentMessages("open", forceRefresh = false, connectionGeneration = 1L) }
+        openEntered.await()
+        val resumeFlight = async { reconciler.reconcileRecentMessages("screen_resumed", forceRefresh = false, connectionGeneration = 1L) }
+        release.complete(Unit)
+
+        val results = awaitAll(openFlight, resumeFlight)
+        assertEquals(1, transport.listCalls)
+        assertEquals(Applied(1), results[0])
+        assertEquals(Applied(1), results[1])
+    }
+
+    @Test
+    fun screenResumedAfterSuccessfulOpenWithinFreshnessWindowIsCoalesced() = runTest(UnconfinedTestDispatcher()) {
+        val transport = RecordingTimelineTransport()
+        var now = 1_000L
+        val reconciler = TimelineRecentMessagesReconciler(
+            conversationId = "conv-1",
+            messageApi = transport,
+            eventQueue = Channel<TimelineGatewayEvent>(Channel.UNLIMITED).also { queue ->
+                backgroundScope.launch {
+                    for (event in queue) {
+                        if (event is TimelineGatewayEvent.RecentMessagesSnapshot) {
+                            event.ack.complete(event.serverMessages.size)
+                        }
+                    }
+                }
+            },
+            state = MutableStateFlow(Timeline("conv-1")),
+            streamSubscriberActive = MutableStateFlow(false),
+            writeMutex = Mutex(),
+            applyReturnsAndResponsesFromSnapshot = {},
+            nowMillis = { now },
+        )
+
+        // 1. Open completes
+        assertEquals(Applied(1), reconciler.reconcileRecentMessages("open", forceRefresh = false, connectionGeneration = 1L))
+        assertEquals(1, transport.listCalls)
+
+        // 2. screen_resumed arrives 240ms later with no invalidation -> coalesced without network call
+        now += 240L
+        assertEquals(Applied(1), reconciler.reconcileRecentMessages("screen_resumed", forceRefresh = false, connectionGeneration = 1L))
+        assertEquals(1, transport.listCalls)
+
+        // 3. Invalidation occurs -> next screen_resumed fetches fresh
+        reconciler.invalidateFreshness()
+        assertEquals(Applied(1), reconciler.reconcileRecentMessages("screen_resumed", forceRefresh = false, connectionGeneration = 1L))
+        assertEquals(2, transport.listCalls)
+    }
+
+    @Test
+    fun reconnectGenerationChangeSupersedesPriorFlight() = runTest(UnconfinedTestDispatcher()) {
+        val transport = RecordingTimelineTransport()
+        val reconciler = TimelineRecentMessagesReconciler(
+            conversationId = "conv-1",
+            messageApi = transport,
+            eventQueue = Channel<TimelineGatewayEvent>(Channel.UNLIMITED).also { queue ->
+                backgroundScope.launch {
+                    for (event in queue) {
+                        if (event is TimelineGatewayEvent.RecentMessagesSnapshot) {
+                            event.ack.complete(event.serverMessages.size)
+                        }
+                    }
+                }
+            },
+            state = MutableStateFlow(Timeline("conv-1")),
+            streamSubscriberActive = MutableStateFlow(false),
+            writeMutex = Mutex(),
+            applyReturnsAndResponsesFromSnapshot = {},
+        )
+        val firstEntered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        transport.onListEntered = {
+            if (!firstEntered.isCompleted) firstEntered.complete(Unit)
+            release.await()
+        }
+
+        val gen1Flight = async { reconciler.reconcileRecentMessages("open", forceRefresh = false, connectionGeneration = 1L) }
+        firstEntered.await()
+
+        // Reconnect with gen 2
+        val gen2Flight = async { reconciler.reconcileRecentMessages("reconnect", forceRefresh = false, connectionGeneration = 2L) }
+        release.complete(Unit)
+
+        awaitAll(gen1Flight, gen2Flight)
+        assertEquals(2, transport.listCalls)
+    }
+
+    @Test
+    fun openFailureReleasesClaimAndAllowsSubsequentRetry() = runTest(UnconfinedTestDispatcher()) {
+        val transport = RecordingTimelineTransport()
+        var shouldFail = true
+        transport.onListEntered = {
+            if (shouldFail) throw IllegalStateException("Network drop")
+        }
+        val reconciler = TimelineRecentMessagesReconciler(
+            conversationId = "conv-1",
+            messageApi = transport,
+            eventQueue = Channel<TimelineGatewayEvent>(Channel.UNLIMITED).also { queue ->
+                backgroundScope.launch {
+                    for (event in queue) {
+                        if (event is TimelineGatewayEvent.RecentMessagesSnapshot) {
+                            event.ack.complete(event.serverMessages.size)
+                        }
+                    }
+                }
+            },
+            state = MutableStateFlow(Timeline("conv-1")),
+            streamSubscriberActive = MutableStateFlow(false),
+            writeMutex = Mutex(),
+            applyReturnsAndResponsesFromSnapshot = {},
+        )
+
+        val outcome1 = reconciler.reconcileRecentMessages("open", forceRefresh = false, connectionGeneration = 1L)
+        assertTrue(outcome1 is RecentMessagesReconcileOutcome.Failed)
+
+        // Retry succeeds and is not poisoned
+        shouldFail = false
+        val outcome2 = reconciler.reconcileRecentMessages("screen_resumed", forceRefresh = false, connectionGeneration = 1L)
+        assertEquals(Applied(1), outcome2)
     }
 
     private class RecordingTimelineTransport : TimelineTransport {

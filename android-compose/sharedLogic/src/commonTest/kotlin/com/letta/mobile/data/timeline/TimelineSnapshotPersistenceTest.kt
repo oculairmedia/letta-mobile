@@ -11,6 +11,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -39,7 +40,7 @@ class TimelineSnapshotPersistenceTest {
     }
 
     @Test
-    fun aChangeScheduledDuringPersistenceIsFlushedAfterTheInFlightWrite() = runTest {
+    fun aChangeScheduledDuringPersistenceIsFlushedAfterTheInFlightWriteWhenMutated() = runTest {
         val store = GatedConfirmedTimelineStore()
         val scope = TimelineScope(backendId = "test-backend", conversationId = "conv-pending")
         val loop = TimelineSyncLoop(
@@ -49,17 +50,85 @@ class TimelineSnapshotPersistenceTest {
             startStreamSubscriber = false,
             confirmedTimelineStore = store,
             timelineScope = scope,
+            ioDispatcher = kotlinx.coroutines.test.StandardTestDispatcher(testScheduler),
         )
 
         loop.scheduleSnapshotPersist(immediate = true)
         runCurrent()
         store.firstWriteStarted.await()
+        loop.ingestStreamEvent(
+            com.letta.mobile.data.model.UserMessage(
+                id = "msg-1",
+                date = "2026-08-24T12:00:00Z",
+                contentRaw = kotlinx.serialization.json.JsonPrimitive("confirmed hello"),
+            ),
+        )
         loop.scheduleSnapshotPersist(immediate = false)
         store.releaseFirstWrite.complete(Unit)
         advanceUntilIdle()
 
         assertTrue(store.writeCount >= 2)
+        val finalSnapshot = store.readSnapshot(scope)
+        assertNotNull(finalSnapshot)
+        assertEquals(1, finalSnapshot.events.size)
         loop.closeAndJoin()
+    }
+
+    @Test
+    fun duplicateOrNoOpMutationsDoNotWriteNewSnapshots() = runTest {
+        val store = GatedConfirmedTimelineStore()
+        val scope = TimelineScope(backendId = "test-backend", conversationId = "conv-dedupe")
+        val loop = TimelineSyncLoop(
+            messageApi = EmptyTimelineTransport,
+            conversationId = scope.conversationId,
+            scope = this,
+            startStreamSubscriber = false,
+            confirmedTimelineStore = store,
+            timelineScope = scope,
+            ioDispatcher = kotlinx.coroutines.test.StandardTestDispatcher(testScheduler),
+        )
+
+        loop.scheduleSnapshotPersist(immediate = true)
+        runCurrent()
+        store.firstWriteStarted.await()
+        store.releaseFirstWrite.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(1, store.writeCount)
+
+        // Trigger 100 un-mutated persist schedules
+        repeat(100) {
+            loop.scheduleSnapshotPersist(immediate = true)
+            advanceUntilIdle()
+        }
+
+        // writeCount must remain 1 because content was identical
+        assertEquals(1, store.writeCount)
+        loop.closeAndJoin()
+    }
+
+    @Test
+    fun deterministicEnvelopeFingerprintMatchesAcrossInstances() {
+        val scope = TimelineScope(backendId = "test-backend", conversationId = "conv-hash")
+        val env1 = StoredTimelineEnvelope(
+            schemaVersion = 1,
+            scope = scope,
+            revision = 1L,
+            liveCursor = "cursor-1",
+            events = emptyList(),
+            writtenAtMillis = 1000L,
+        )
+        val env2 = StoredTimelineEnvelope(
+            schemaVersion = 1,
+            scope = scope,
+            revision = 2L, // different revision and timestamp
+            liveCursor = "cursor-1",
+            events = emptyList(),
+            writtenAtMillis = 9999L,
+        )
+
+        val fp1 = com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec.computeStoredEnvelopeFingerprint(env1)
+        val fp2 = com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec.computeStoredEnvelopeFingerprint(env2)
+        assertEquals(fp1, fp2)
     }
 
     @Test
@@ -73,6 +142,7 @@ class TimelineSnapshotPersistenceTest {
             startStreamSubscriber = false,
             confirmedTimelineStore = store,
             timelineScope = scope,
+            ioDispatcher = kotlinx.coroutines.test.StandardTestDispatcher(testScheduler),
         )
 
         loop.scheduleSnapshotPersist(immediate = true)

@@ -53,6 +53,7 @@ class TimelineSyncLoop(
     private val timelineScope: TimelineScope? = null,
     initialTimeline: Timeline? = null,
     initialRevision: Long = 0L,
+    private val ioDispatcher: kotlinx.coroutines.CoroutineDispatcher = timelineIoDispatcher,
 ) {
     private val loopJob = SupervisorJob(scope.coroutineContext[Job])
     private val loopScope = CoroutineScope(scope.coroutineContext + loopJob)
@@ -69,6 +70,7 @@ class TimelineSyncLoop(
     val events: SharedFlow<TimelineSyncEvent> = _events.asSharedFlow()
 
     private var snapshotRevision: Long = initialRevision
+    private var lastPersistedFingerprint: Long = 0L
     private val persistRequests = Channel<SnapshotPersistRequest>(Channel.CONFLATED)
     private val persistMutex = Mutex()
     private val persistJob: Job
@@ -146,7 +148,7 @@ class TimelineSyncLoop(
                 delay(SNAPSHOT_PERSIST_DEBOUNCE_MS)
             }
             while (persistRequests.tryReceive().isSuccess) {
-                // Coalesce all timeline changes received during the debounce window.
+                // Coalesce all timeline changes received during the debounce window into the latest state.
             }
             flushSnapshotNow(prune = true)
         }
@@ -162,25 +164,53 @@ class TimelineSyncLoop(
 
     private suspend fun persistCurrentSnapshot(snapshotScope: TimelineScope, prune: Boolean) {
         val currentTimeline = writeMutex.withLock { state.value }
-        val revision = ++snapshotRevision
-        val envelope = TimelineSnapshotCodec.timelineToStoredEnvelope(
+        val provisionalEnvelope = TimelineSnapshotCodec.timelineToStoredEnvelope(
             timeline = currentTimeline,
             scope = snapshotScope,
-            revision = revision,
+            revision = snapshotRevision,
             writtenAtMillis = timelineCurrentTimeMillis(),
         )
+        val fingerprint = TimelineSnapshotCodec.computeStoredEnvelopeFingerprint(provisionalEnvelope)
+
+        if (fingerprint == lastPersistedFingerprint && lastPersistedFingerprint != 0L) {
+            Telemetry.event(
+                "TimelineSync", "snapshotPersist.identicalSkipped",
+                "conversationId" to conversationId,
+                "revision" to snapshotRevision,
+                "fingerprint" to fingerprint,
+                "eventCount" to provisionalEnvelope.events.size,
+            )
+            return
+        }
+
+        val revision = ++snapshotRevision
+        val envelope = provisionalEnvelope.copy(revision = revision)
+        val startedAtMs = timelineCurrentTimeMillis()
+
         try {
-            val written = confirmedTimelineStore.writeSnapshot(envelope)
-            if (prune) {
-                confirmedTimelineStore.prune(snapshotScope.backendId, MAX_RETAINED_SNAPSHOTS)
-            }
-            if (!written) {
-                Telemetry.event(
-                    "TimelineSync", "snapshotPersist.staleRejected",
-                    "conversationId" to conversationId,
-                    "revision" to revision,
-                    level = Telemetry.Level.WARN,
-                )
+            withContext(ioDispatcher + NonCancellable) {
+                val written = confirmedTimelineStore.writeSnapshot(envelope)
+                if (prune) {
+                    confirmedTimelineStore.prune(snapshotScope.backendId, MAX_RETAINED_SNAPSHOTS)
+                }
+                val durationMs = timelineCurrentTimeMillis() - startedAtMs
+                if (!written) {
+                    Telemetry.event(
+                        "TimelineSync", "snapshotPersist.staleRejected",
+                        "conversationId" to conversationId,
+                        "revision" to revision,
+                        level = Telemetry.Level.WARN,
+                    )
+                } else {
+                    lastPersistedFingerprint = fingerprint
+                    Telemetry.event(
+                        "TimelineSync", "snapshotPersist.written",
+                        "conversationId" to conversationId,
+                        "revision" to revision,
+                        "eventCount" to envelope.events.size,
+                        "durationMs" to durationMs,
+                    )
+                }
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
@@ -367,12 +397,15 @@ class TimelineSyncLoop(
         otid: String,
         content: String,
         attachments: List<MessageContentPart.Image> = emptyList(),
-    ): Boolean = stateTransitionHandler.appendOptimisticLocalSync(
-        otid = otid,
-        content = content,
-        attachments = attachments.toTimelinePersistentList(),
-        sentAt = timelineNow(),
-    )
+    ): Boolean {
+        recentMessagesReconciler.invalidateFreshness()
+        return stateTransitionHandler.appendOptimisticLocalSync(
+            otid = otid,
+            content = content,
+            attachments = attachments.toTimelinePersistentList(),
+            sentAt = timelineNow(),
+        )
+    }
 
     /** letta-mobile-mxwtn: synchronous SENT transition on a Local event. */
     suspend fun markOptimisticLocalSentSync(otid: String) {
@@ -408,16 +441,26 @@ class TimelineSyncLoop(
                         if (shouldDropDuplicateStreamMessage(event.message, event.source)) {
                             event.ack?.complete(Unit)
                         } else {
+                            recentMessagesReconciler.invalidateFreshness()
                             streamDispatcher.dispatch(event.message, event.source)
                             event.ack?.complete(Unit)
                         }
                     }
-                    is TimelineGatewayEvent.LocalSendAppend -> stateTransitionHandler.applyLocalSendAppend(event)
-                    is TimelineGatewayEvent.ExternalTransportLocalAppend -> externalTransportAppender.applyExternalTransportLocalAppend(event)
+                    is TimelineGatewayEvent.LocalSendAppend -> {
+                        recentMessagesReconciler.invalidateFreshness()
+                        stateTransitionHandler.applyLocalSendAppend(event)
+                    }
+                    is TimelineGatewayEvent.ExternalTransportLocalAppend -> {
+                        recentMessagesReconciler.invalidateFreshness()
+                        externalTransportAppender.applyExternalTransportLocalAppend(event)
+                    }
                     is TimelineGatewayEvent.ReconcileAfterSendSnapshot -> applyReconcileAfterSendSnapshot(event)
                     is TimelineGatewayEvent.RecentMessagesSnapshot -> recentMessagesReconciler.applyRecentMessagesSnapshot(event)
                     is TimelineGatewayEvent.PostHandlerCollapse -> event.ack.complete(Unit)
-                    is TimelineGatewayEvent.RetrySend -> stateTransitionHandler.applyRetrySend(event)
+                    is TimelineGatewayEvent.RetrySend -> {
+                        recentMessagesReconciler.invalidateFreshness()
+                        stateTransitionHandler.applyRetrySend(event)
+                    }
                     is TimelineGatewayEvent.MarkSent -> stateTransitionHandler.applyMarkSent(event)
                     is TimelineGatewayEvent.MarkFailed -> stateTransitionHandler.applyMarkFailed(event)
                     is TimelineGatewayEvent.CleanupAbandonedAssistantFragments -> applyCleanupAbandonedAssistantFragments(event)

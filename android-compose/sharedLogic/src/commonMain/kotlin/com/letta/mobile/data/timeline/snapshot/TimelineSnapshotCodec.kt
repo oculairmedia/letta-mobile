@@ -81,6 +81,81 @@ object TimelineSnapshotCodec {
         )
     }
 
+    /**
+     * Computes a deterministic 64-bit FNV-1a fingerprint of canonical timeline content.
+     * Excludes volatile written timestamps, UI models, and transient loaders.
+     */
+    fun computeStoredEnvelopeFingerprint(envelope: StoredTimelineEnvelope): Long {
+        var hash = -3750763034362895579L
+        fun mix(value: Long) {
+            hash = (hash xor value) * 1099511628211L
+        }
+        fun mixString(s: String?) {
+            if (s == null) {
+                mix(0L)
+                return
+            }
+            for (i in 0 until s.length) {
+                hash = (hash xor s[i].code.toLong()) * 1099511628211L
+            }
+        }
+        mix(envelope.schemaVersion.toLong())
+        mixString(envelope.scope.backendId)
+        mixString(envelope.scope.agentId)
+        mixString(envelope.scope.conversationId)
+        mixString(envelope.liveCursor)
+        mixString(envelope.backfillCursor)
+        mix(envelope.releasedOlderCount.toLong())
+        mix(envelope.events.size.toLong())
+        for (event in envelope.events) {
+            mix(event.position.toBits())
+            mixString(event.otid)
+            mixString(event.content)
+            mixString(event.serverId)
+            mixString(event.messageType)
+            mixString(event.dateIso)
+            mixString(event.runId)
+            mixString(event.stepId)
+            mixString(event.agentId)
+            mix(event.seqId?.toLong() ?: -1L)
+            mix(if (event.approvalDecided) 1L else 0L)
+            mixString(event.approvalRequestId)
+            mixString(event.approvalDecision)
+            mixString(event.toolReturnContent)
+            mix(if (event.toolReturnIsError) 1L else 0L)
+            mix(event.toolCalls.size.toLong())
+            for (tc in event.toolCalls) {
+                mixString(tc.id)
+                mixString(tc.name)
+                mixString(tc.arguments)
+            }
+            mix(event.toolReturnContentByCallId.size.toLong())
+            for ((k, v) in event.toolReturnContentByCallId) {
+                mixString(k)
+                mixString(v)
+            }
+            mix(event.toolReturnIsErrorByCallId.size.toLong())
+            for ((k, v) in event.toolReturnIsErrorByCallId) {
+                mixString(k)
+                mix(if (v) 1L else 0L)
+            }
+            mix(event.toolReturnTruncationByCallId.size.toLong())
+            for ((k, v) in event.toolReturnTruncationByCallId) {
+                mixString(k)
+                mixString(v.messageId)
+                mix(v.byteLen)
+            }
+            mix(event.attachments.size.toLong())
+            for (att in event.attachments) {
+                mixString(att.mediaType)
+                mix(att.byteSize)
+                mixString(att.uriOrUrl)
+                mixString(att.thumbnailBase64)
+            }
+        }
+        return hash
+    }
+
     fun storedEnvelopeToTimeline(envelope: StoredTimelineEnvelope): Timeline {
         val confirmedEvents = envelope.events.map { it.toConfirmedTimelineEvent() }
         return Timeline(
