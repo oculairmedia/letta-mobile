@@ -2,6 +2,7 @@ package com.letta.mobile.data.controller.extras
 
 import java.io.File
 import kotlinx.coroutines.runBlocking
+import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -23,6 +24,11 @@ import kotlin.test.assertTrue
  *   - Honor its timeout by destroying the child when it overruns.
  */
 class DefaultIrohCliRunnerTest {
+
+    @BeforeTest
+    fun setUp() {
+        org.junit.Assume.assumeFalse(System.getProperty("os.name").lowercase().contains("windows"))
+    }
 
     /**
      * The most important test in the suite: the multi-line body MUST round

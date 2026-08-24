@@ -171,6 +171,7 @@ abstract class AppModule {
             messageApi: MessageApi,
             pendingLocalStore: PendingLocalStore,
             conversationCursorStore: ConversationCursorStore,
+            confirmedTimelineStore: com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore,
             localTimelineTransport: com.letta.mobile.runtime.local.LettaCodeLocalTimelineTransport,
             channelTransport: IChannelTransport,
             settingsRepository: ISettingsRepository,
@@ -193,6 +194,8 @@ abstract class AppModule {
                 ),
                 pendingLocalStore = pendingLocalStore,
                 conversationCursorStore = conversationCursorStore,
+                confirmedTimelineStore = confirmedTimelineStore,
+                backendIdProvider = { settingsRepository.activeConfig.value?.id ?: "default" },
             )
         }
     }

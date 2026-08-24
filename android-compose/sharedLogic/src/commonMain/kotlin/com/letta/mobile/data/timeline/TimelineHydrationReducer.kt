@@ -38,15 +38,29 @@ object TimelineHydrationReducer {
             serverMessages = displayableServerMessages,
             rawConverted = rawConverted,
         )
+        val convertedKeys = converted.flatMap { it.identityKeys() }.toHashSet()
+        val existingConfirmedByServerId = (timelineBeforeFetch.events + currentTimeline.events)
+            .filterIsInstance<TimelineEvent.Confirmed>()
+            .associateBy { it.serverId }
+        val existingConfirmedByOtid = (timelineBeforeFetch.events + currentTimeline.events)
+            .filterIsInstance<TimelineEvent.Confirmed>()
+            .associateBy { it.otid }
+
+        val enrichedConverted = converted.map { event ->
+            val existing = existingConfirmedByServerId[event.serverId] ?: existingConfirmedByOtid[event.otid]
+            if (existing != null) mergeRicherEventFacts(event, existing) else event
+        }
+
         val pendingLocals = currentTimeline.events.filterIsInstance<TimelineEvent.Local>()
             .filter { it.deliveryState.isPendingOrRestorable() }
             .filter { local -> converted.none { c -> c.otid == local.otid } }
         val initialKeys = timelineBeforeFetch.events.flatMap { it.identityKeys() }.toHashSet()
-        val convertedKeys = converted.flatMap { it.identityKeys() }.toHashSet()
         val concurrentConfirmed = currentTimeline.events.filterIsInstance<TimelineEvent.Confirmed>()
             .filter { event -> event.identityKeys().none { it in initialKeys } }
             .filter { event -> event.identityKeys().none { it in convertedKeys } }
-        val knownOtids = (converted.map { it.otid } + pendingLocals.map { it.otid }).toHashSet()
+        val olderPersistedConfirmed = timelineBeforeFetch.events.filterIsInstance<TimelineEvent.Confirmed>()
+            .filter { event -> event.identityKeys().none { it in convertedKeys } && event.position < (converted.firstOrNull()?.position ?: Double.MAX_VALUE) }
+        val knownOtids = (converted.map { it.otid } + pendingLocals.map { it.otid } + olderPersistedConfirmed.map { it.otid }).toHashSet()
         val diskLocals = diskRecords
             .filter { it.otid !in knownOtids }
             .map { rec ->
@@ -60,10 +74,13 @@ object TimelineHydrationReducer {
                     attachments = rec.attachments.toTimelinePersistentList(),
                 )
             }
-        val maxServerPos = converted.lastOrNull()?.position ?: 0.0
+        val baseEvents = (olderPersistedConfirmed + enrichedConverted).mapIndexed { idx, event ->
+            event.copy(position = (idx + 1).toDouble())
+        }
+        val maxServerPos = baseEvents.lastOrNull()?.position ?: 0.0
         val runtimePreserved = (pendingLocals + concurrentConfirmed).sortedBy { it.position }
         val allPreserved = runtimePreserved + diskLocals
-        val merged = converted + allPreserved.mapIndexed { idx, event ->
+        val merged = baseEvents + allPreserved.mapIndexed { idx, event ->
             val position = maxServerPos + (idx + 1).toDouble()
             when (event) {
                 is TimelineEvent.Local -> event.copy(position = position)
@@ -78,9 +95,39 @@ object TimelineHydrationReducer {
             timeline = Timeline(
                 conversationId = conversationId,
                 events = deduped.toTimelinePersistentList(),
-                liveCursor = converted.lastOrNull()?.serverId,
+                liveCursor = enrichedConverted.lastOrNull()?.serverId ?: timelineBeforeFetch.liveCursor ?: currentTimeline.liveCursor,
+                backfillCursor = olderPersistedConfirmed.firstOrNull()?.serverId ?: enrichedConverted.firstOrNull()?.serverId ?: timelineBeforeFetch.backfillCursor ?: currentTimeline.backfillCursor,
+                releasedOlderCount = maxOf(timelineBeforeFetch.releasedOlderCount, currentTimeline.releasedOlderCount),
             ),
-            visibleEventCount = converted.size,
+            visibleEventCount = enrichedConverted.size + olderPersistedConfirmed.size,
+        )
+    }
+
+    private fun mergeRicherEventFacts(
+        serverEvent: TimelineEvent.Confirmed,
+        localEvent: TimelineEvent.Confirmed,
+    ): TimelineEvent.Confirmed {
+        val mergedApprovalDecided = serverEvent.approvalDecided || localEvent.approvalDecided
+        val mergedApprovalDecision = serverEvent.approvalDecision ?: localEvent.approvalDecision
+
+        val mergedToolReturnContentByCallId = (serverEvent.toolReturnContentByCallId + localEvent.toolReturnContentByCallId.filter { (callId, _) ->
+            callId !in serverEvent.toolReturnTruncationByCallId || callId !in localEvent.toolReturnTruncationByCallId
+        }).toTimelinePersistentMap()
+
+        val mergedTruncations = (serverEvent.toolReturnTruncationByCallId.filterKeys {
+            it !in localEvent.toolReturnContentByCallId || it in localEvent.toolReturnTruncationByCallId
+        }).toTimelinePersistentMap()
+
+        val mergedToolReturnContent = localEvent.toolReturnContent.takeIf { !it.isNullOrBlank() } ?: serverEvent.toolReturnContent
+        val mergedAttachments = if (serverEvent.attachments.isEmpty()) localEvent.attachments else serverEvent.attachments
+
+        return serverEvent.copy(
+            approvalDecided = mergedApprovalDecided,
+            approvalDecision = mergedApprovalDecision,
+            toolReturnContent = mergedToolReturnContent,
+            toolReturnContentByCallId = mergedToolReturnContentByCallId,
+            toolReturnTruncationByCallId = mergedTruncations,
+            attachments = mergedAttachments,
         )
     }
 

@@ -4,6 +4,10 @@ import com.letta.mobile.util.Telemetry
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.ToolReturnMessage
+import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore
+import com.letta.mobile.data.timeline.snapshot.NoOpConfirmedTimelineStore
+import com.letta.mobile.data.timeline.snapshot.TimelineScope
+import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
 import kotlin.concurrent.Volatile
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
@@ -11,8 +15,10 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -22,6 +28,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 /**
  * Single sync loop per conversation. Acts as a thin orchestrator (under 200 lines).
@@ -42,11 +49,15 @@ class TimelineSyncLoop(
     // scoping. Null when unknown/legacy. LAST param so positional callers are
     // unaffected.
     private val agentId: String? = null,
+    private val confirmedTimelineStore: ConfirmedTimelineStore = NoOpConfirmedTimelineStore,
+    private val timelineScope: TimelineScope? = null,
+    initialTimeline: Timeline? = null,
+    initialRevision: Long = 0L,
 ) {
     private val loopJob = SupervisorJob(scope.coroutineContext[Job])
     private val loopScope = CoroutineScope(scope.coroutineContext + loopJob)
 
-    private val _state = MutableStateFlow(Timeline(conversationId))
+    private val _state = MutableStateFlow(initialTimeline ?: Timeline(conversationId))
     val state: StateFlow<Timeline> = _state.asStateFlow()
 
     private val _streamSubscriberActive = MutableStateFlow(false)
@@ -57,12 +68,15 @@ class TimelineSyncLoop(
     private val _events = MutableSharedFlow<TimelineSyncEvent>(replay = 1, extraBufferCapacity = 64)
     val events: SharedFlow<TimelineSyncEvent> = _events.asSharedFlow()
 
+    private var snapshotRevision: Long = initialRevision
+    private var persistJob: Job? = null
+
     private val pendingToolReturnsByCallId = LinkedHashMap<String, ToolReturnMessage>()
     private val seenStreamMessageLock = SynchronizedObject()
     private val seenStreamMessageKeys = ArrayDeque<String>()
     private val seenStreamMessageKeySet = mutableSetOf<String>()
     private val holderFramesIn = MutableSharedFlow<LettaMessage>(extraBufferCapacity = 64)
-    private val holderHydrationSeed = MutableStateFlow(Timeline(conversationId))
+    private val holderHydrationSeed = MutableStateFlow(initialTimeline ?: Timeline(conversationId))
     
     private val holder = com.letta.mobile.data.timeline.experimental.ConversationStateHolder(
         conversationId = conversationId,
@@ -90,7 +104,8 @@ class TimelineSyncLoop(
         loopScope = loopScope,
         ingestNotificationDispatcher = ingestNotificationDispatcher,
         holderFramesIn = holderFramesIn,
-        getHolderEventCount = { holder.state.value.events.size }
+        getHolderEventCount = { holder.state.value.events.size },
+        onStreamFrameIngested = { scheduleSnapshotPersist(immediate = false) },
     )
 
     private val recentMessagesReconciler = TimelineRecentMessagesReconciler(
@@ -111,8 +126,56 @@ class TimelineSyncLoop(
         writeMutex = writeMutex,
         state = _state,
         events = _events,
-        holderHydrationSeed = holderHydrationSeed
+        holderHydrationSeed = holderHydrationSeed,
+        onHydrationCommitted = { scheduleSnapshotPersist(immediate = true) },
     )
+
+    internal fun scheduleSnapshotPersist(immediate: Boolean = false) {
+        val scope = timelineScope ?: return
+        if (confirmedTimelineStore === NoOpConfirmedTimelineStore) return
+        if (immediate) {
+            persistJob?.cancel()
+            loopScope.launch {
+                flushSnapshotNow()
+            }
+        } else {
+            if (persistJob?.isActive == true) return
+            persistJob = loopScope.launch {
+                delay(100)
+                flushSnapshotNow()
+            }
+        }
+    }
+
+    suspend fun flushSnapshotNow() {
+        val scope = timelineScope ?: return
+        if (confirmedTimelineStore === NoOpConfirmedTimelineStore) return
+        val currentTimeline = writeMutex.withLock { state.value }
+        val revision = ++snapshotRevision
+        val envelope = TimelineSnapshotCodec.timelineToStoredEnvelope(
+            timeline = currentTimeline,
+            scope = scope,
+            revision = revision,
+            writtenAtMillis = timelineCurrentTimeMillis(),
+        )
+        runCatching {
+            val written = confirmedTimelineStore.writeSnapshot(envelope)
+            if (!written) {
+                Telemetry.event(
+                    "TimelineSync", "snapshotPersist.staleRejected",
+                    "conversationId" to conversationId,
+                    "revision" to revision,
+                    level = Telemetry.Level.WARN,
+                )
+            }
+        }.onFailure { error ->
+            Telemetry.error(
+                "TimelineSync", "snapshotPersist.failed", error,
+                "conversationId" to conversationId,
+                "revision" to revision,
+            )
+        }
+    }
 
     // letta-mobile-dangling-tool: canonical-record-driven post-turn sweep +
     // hydration guard for tool-call cards left unresolved after PR #900

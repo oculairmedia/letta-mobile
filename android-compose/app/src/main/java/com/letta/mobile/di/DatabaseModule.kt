@@ -11,8 +11,11 @@ import com.letta.mobile.data.local.PendingLocalDao
 import com.letta.mobile.data.local.RoomConversationCursorStore
 import com.letta.mobile.data.local.RoomPendingLocalStore
 import com.letta.mobile.data.local.RuntimeEventDao
+import com.letta.mobile.data.local.ConfirmedTimelineSnapshotDao
+import com.letta.mobile.data.local.RoomConfirmedTimelineStore
 import com.letta.mobile.data.timeline.ConversationCursorStore
 import com.letta.mobile.data.timeline.PendingLocalStore
+import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -31,6 +34,10 @@ abstract class PendingLocalStoreModule {
     @Binds
     @Singleton
     abstract fun bindConversationCursorStore(impl: RoomConversationCursorStore): ConversationCursorStore
+
+    @Binds
+    @Singleton
+    abstract fun bindConfirmedTimelineStore(impl: RoomConfirmedTimelineStore): ConfirmedTimelineStore
 }
 
 @Module
@@ -40,6 +47,12 @@ object DatabaseModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): LettaDatabase {
         return LettaDatabase.getDatabase(context)
+    }
+
+    @Provides
+    @Singleton
+    fun provideRoomConfirmedTimelineStore(database: LettaDatabase): RoomConfirmedTimelineStore {
+        return RoomConfirmedTimelineStore(database)
     }
 
     // letta-mobile-g2ff0: DAOs returned directly here, but the LettaDatabase
@@ -82,5 +95,10 @@ object DatabaseModule {
     @Provides
     fun provideMemFsDao(database: LettaDatabase): MemFsDao {
         return database.memFsDao()
+    }
+
+    @Provides
+    fun provideConfirmedTimelineSnapshotDao(database: LettaDatabase): ConfirmedTimelineSnapshotDao {
+        return database.confirmedTimelineSnapshotDao()
     }
 }

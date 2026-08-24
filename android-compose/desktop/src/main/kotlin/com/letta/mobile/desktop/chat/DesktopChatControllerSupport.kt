@@ -8,8 +8,13 @@ import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.timeline.Timeline
 import com.letta.mobile.data.timeline.TimelineSyncLoop
 import com.letta.mobile.data.timeline.TimelineTransport
+import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore
+import com.letta.mobile.data.timeline.snapshot.TimelineScope
+import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
+import com.letta.mobile.desktop.data.DesktopConfirmedTimelineStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.runBlocking
 
 internal fun ChatComposerError.toDesktopMessage(limits: AttachmentLimits): String = when (this) {
     ChatComposerError.MaxAttachmentCountExceeded -> "Attach up to ${limits.maxAttachmentCount} images."
@@ -47,14 +52,31 @@ internal class RealDesktopTimelineLoop(
     gateway: DesktopChatGateway,
     conversation: DesktopConversationSummary,
     scope: CoroutineScope,
+    confirmedTimelineStore: ConfirmedTimelineStore = DesktopConfirmedTimelineStore(),
+    backendId: String = "desktop-local",
 ) : DesktopTimelineLoop {
     private val routing = resolveDesktopTimelineRouting(gateway, conversation)
+    private val timelineScope = TimelineScope(
+        backendId = backendId,
+        conversationId = routing.loopConversationId.value,
+        agentId = conversation.agentId,
+    )
+    private val storedSnapshot = runCatching {
+        runBlocking { confirmedTimelineStore.readSnapshot(timelineScope) }
+    }.getOrNull()
+    private val initialTimeline = storedSnapshot?.let { TimelineSnapshotCodec.storedEnvelopeToTimeline(it) }
+    private val initialRevision = storedSnapshot?.revision ?: 0L
 
     private val delegate = TimelineSyncLoop(
         messageApi = routing.transport,
         conversationId = routing.loopConversationId.value,
+        agentId = conversation.agentId,
         scope = scope,
         logTag = DESKTOP_CHAT_LOG_TAG.value,
+        confirmedTimelineStore = confirmedTimelineStore,
+        timelineScope = timelineScope,
+        initialTimeline = initialTimeline,
+        initialRevision = initialRevision,
     )
 
     override val state: StateFlow<Timeline> = delegate.state

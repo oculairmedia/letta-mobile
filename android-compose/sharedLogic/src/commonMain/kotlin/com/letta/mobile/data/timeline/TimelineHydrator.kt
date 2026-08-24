@@ -18,6 +18,7 @@ internal class TimelineHydrator(
     private val state: MutableStateFlow<Timeline>,
     private val events: MutableSharedFlow<TimelineSyncEvent>,
     private val holderHydrationSeed: MutableStateFlow<Timeline>,
+    private val onHydrationCommitted: (() -> Unit)? = null,
 ) {
     suspend fun hydrate(
         limit: Int = 50,
@@ -75,6 +76,7 @@ internal class TimelineHydrator(
                     holderHydrationSeed.value = result.timeline
                 }
             }
+            onHydrationCommitted?.invoke()
             if (recordConversationCursor && hydrateEndSeq != null) {
                 conversationCursorStore.recordFrame(conversationId, hydrateEndSeq)
                 Telemetry.event(

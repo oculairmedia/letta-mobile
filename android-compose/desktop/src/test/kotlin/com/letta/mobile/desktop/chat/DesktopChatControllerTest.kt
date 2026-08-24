@@ -510,7 +510,7 @@ class DesktopChatControllerTest {
 
         assertEquals(1, loop.closeCount)
         assertTrue(controller.state.value.isLoading)
-        assertEquals(DesktopChatConnectionState.Loading, controller.state.value.connectionState)
+        assertEquals(DesktopChatConnectionState.Live, controller.state.value.connectionState)
     }
 
     @Test
@@ -577,7 +577,7 @@ class DesktopChatControllerTest {
 
         assertEquals("conv-2", controller.state.value.selectedConversationId)
         assertTrue(controller.state.value.isLoading)
-        assertEquals(DesktopChatConnectionState.Loading, controller.state.value.connectionState)
+        assertEquals(DesktopChatConnectionState.Live, controller.state.value.connectionState)
         assertEquals(1, loops.first().closeCount)
 
         controller.close()
