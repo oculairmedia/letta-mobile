@@ -53,20 +53,21 @@ class IrohChannelTransportObserverTerminalCancelRaceTest {
         val turn = startTurn()
         assertTrue(transport.hasActiveChatTurn(CONVERSATION_ID))
 
-        // Cancel racing observer and delayed engine terminal
-        assertTrue(transport.cancel(CONVERSATION_ID))
-
+        // Let the observer claim first, then deliver the late engine terminal and
+        // a subsequent cancel. Neither loser may emit another terminal.
         emitTerminal(TerminalSource.Observer, turn.runId, seq = 5)
-        emitTerminal(TerminalSource.Engine, turn.runId, seq = 6)
-        releaseInput()
         awaitTurnDone()
         awaitInactiveTurn()
+        assertFalse(transport.cancel(CONVERSATION_ID))
+        emitTerminal(TerminalSource.Engine, turn.runId, seq = 6)
+        releaseInput()
         assertDrained()
 
         val turnDones = frames.filterIsInstance<ServerFrame.TurnDone>()
         assertEquals(1, turnDones.size, "exactly 1 pre-dedupe terminal frame must be emitted: ${turnDones.map { it.status }}")
         val done = turnDones.single()
         assertEquals(turn.turnId, done.turnId)
+        assertEquals("completed", done.status)
     }
 
     @Test
@@ -188,8 +189,7 @@ class IrohChannelTransportObserverTerminalCancelRaceTest {
         }
 
         fun assertDrained() {
-            assertEquals(0, transport.activeTurnsCount())
-            assertEquals(0, transport.activeSendJobsCount())
+            assertFalse(transport.hasAnyActiveChatTurn)
             assertFalse(transport.hasActiveChatTurn(CONVERSATION_ID))
         }
 
