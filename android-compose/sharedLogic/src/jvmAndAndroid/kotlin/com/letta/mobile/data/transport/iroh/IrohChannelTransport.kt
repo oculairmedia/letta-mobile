@@ -30,7 +30,9 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -418,13 +420,7 @@ class IrohChannelTransport(
         }
         val terminal = projectedFrames.firstOrNull { it is ServerFrame.TurnDone }
         if (terminal is ServerFrame.TurnDone) {
-            if (turnRegistry.publishTerminal(IrohTerminalPublication(
-                    turn = scope.localTurn,
-                    status = IrohTerminalStatus(terminal.status),
-                    source = IrohTerminalSource.Observer,
-                ))) {
-                emitBoth(terminal)
-            }
+            emitTerminalFrame(scope.localTurn, terminal, IrohTerminalSource.Observer)
         }
     }
 
@@ -778,23 +774,45 @@ class IrohChannelTransport(
      */
     private suspend fun emitTurnFrame(turn: IrohActiveTurn, frame: ServerFrame) {
         if (frame is ServerFrame.TurnDone) {
-            if (!turnRegistry.publishTerminal(IrohTerminalPublication(
-                    turn = turn,
-                    status = IrohTerminalStatus(frame.status),
-                    source = IrohTerminalSource.Engine,
-                ))) {
+            if (!emitTerminalFrame(turn, frame, IrohTerminalSource.Engine)) {
                 Telemetry.event(
                     "IrohTrace", "transport.turn_done.duplicate_skipped",
                     "turnId" to turn.turnId,
                     "runId" to frame.runId,
                     "status" to frame.status,
                 )
-                return
             }
-            emitBoth(frame)
             return
         }
         emitBoth(frame)
+    }
+
+    /**
+     * Claims terminal ownership first, then publishes and retires as one
+     * non-cancellable operation. Registry inactivity therefore means the winner's
+     * frame is already observable, rather than merely reserved for later emission.
+     */
+    private suspend fun emitTerminalFrame(
+        turn: IrohActiveTurn,
+        frame: ServerFrame.TurnDone,
+        source: IrohTerminalSource,
+    ): Boolean {
+        val publication = IrohTerminalPublication(
+            turn = turn,
+            status = IrohTerminalStatus(frame.status),
+            source = source,
+        )
+        if (!turnRegistry.claimTerminal(publication)) return false
+        emitClaimedTerminal(publication, frame)
+        return true
+    }
+
+    private suspend fun emitClaimedTerminal(
+        publication: IrohTerminalPublication,
+        frame: ServerFrame.TurnDone,
+    ) = withContext(NonCancellable) {
+        emitBoth(frame)
+        turnRegistry.retireClaimed(publication)
     }
 
     private fun emitDraft(
@@ -930,24 +948,19 @@ class IrohChannelTransport(
             //    a cancelled one — routed through the SAME guard so exactly one
             //    terminal is ever emitted for the turn.
             if (serverTerminalStatus == null) {
-                if (turnRegistry.publishTerminal(IrohTerminalPublication(
-                        turn = turn,
-                        status = IrohTerminalStatus("cancelled"),
-                        source = IrohTerminalSource.CancelSynthetic,
-                    ))) {
+                val cancelFrame = ServerFrame.TurnDone(
+                    id = IrohTransportSupport.frameId("cancelled"),
+                    ts = IrohTransportSupport.nowIso(),
+                    turnId = turn.turnId,
+                    runId = turn.runId,
+                    status = "cancelled",
+                )
+                if (emitTerminalFrame(turn, cancelFrame, IrohTerminalSource.CancelSynthetic)) {
                     Telemetry.event(
                         "IrohTransport", "cancel.synthetic_terminal",
                         "turnId" to turn.turnId,
                         "runId" to turn.runId,
                     )
-                    val cancelFrame = ServerFrame.TurnDone(
-                        id = IrohTransportSupport.frameId("cancelled"),
-                        ts = IrohTransportSupport.nowIso(),
-                        turnId = turn.turnId,
-                        runId = turn.runId,
-                        status = "cancelled",
-                    )
-                    emitBoth(cancelFrame)
                 }
             }
             // 4. Terminal settled — tear down THIS conversation's streaming job
@@ -1135,13 +1148,13 @@ class IrohChannelTransport(
                 runId = turn.runId,
                 status = "cancelled",
             )
-            emitBoth(terminal)
-            turnRegistry.retireClaimed(
+            emitClaimedTerminal(
                 IrohTerminalPublication(
                     turn = turn,
                     status = IrohTerminalStatus(terminal.status),
                     source = IrohTerminalSource.Disconnect,
                 ),
+                terminal,
             )
         }
         turnRegistry.clear()

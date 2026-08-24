@@ -46,22 +46,25 @@ class IrohTurnRegistryTest {
     }
 
     @Test
-    fun publishTerminalClaimsExactlyOnceAndRetires() {
+    fun claimedTerminalStaysActiveUntilOwnerPublishesAndRetires() {
         val start = registry.tryStart(request())
         assertTrue(start is IrohTryStartResult.Started)
         val turn = start.turn
+        val enginePublication = publication(turn, IrohTerminalSource.Engine)
 
-        val published = registry.publishTerminal(publication(turn, IrohTerminalSource.Engine))
-        assertTrue(published)
+        assertTrue(registry.claimTerminal(enginePublication))
         assertTrue(turn.hasTerminal)
         assertEquals(IrohTerminalSource.Engine, turn.terminalSource)
+        assertFalse(turn.terminalReached.isCompleted)
+        assertEquals(turn, registry.getActiveTurn(conversationId()))
+        assertTrue(registry.hasActiveTurn(conversationId()))
+        assertFalse(registry.claimTerminal(publication(turn, IrohTerminalSource.Observer)))
+
+        assertTrue(registry.retireClaimed(enginePublication))
         assertTrue(turn.terminalReached.isCompleted)
         assertNull(registry.getActiveTurn(conversationId()))
         assertFalse(registry.hasActiveTurn(conversationId()))
         assertTrue(registry.isRetiredRun(IrohRunId("run-1")))
-
-        val secondPublish = registry.publishTerminal(publication(turn, IrohTerminalSource.Observer))
-        assertFalse(secondPublish)
     }
 
     @Test

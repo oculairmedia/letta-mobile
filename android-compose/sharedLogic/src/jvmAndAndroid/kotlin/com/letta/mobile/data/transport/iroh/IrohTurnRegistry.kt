@@ -97,11 +97,13 @@ class IrohTurnRegistry {
     fun promoteRunId(promotion: IrohRunPromotion): Boolean =
         getActiveTurn(promotion.token.conversationId)?.promoteRunId(promotion) == true
 
-    fun publishTerminal(publication: IrohTerminalPublication): Boolean {
-        if (!publication.turn.tryClaimTerminal(publication.source)) return false
-        retire(publication)
-        return true
-    }
+    /**
+     * Reserves the exactly-once terminal slot without making the turn inactive.
+     * The owner must emit its frame before calling [retireClaimed], so observers
+     * cannot see a drained registry before the winning terminal is observable.
+     */
+    fun claimTerminal(publication: IrohTerminalPublication): Boolean =
+        publication.turn.tryClaimTerminal(publication.source)
 
     fun finish(token: IrohTurnToken): Boolean {
         val turn = getActiveTurn(token.conversationId) ?: return false
