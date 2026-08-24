@@ -618,4 +618,111 @@ class IrohChannelTransportAdminRpcTest {
         assertEquals(10, calls) // 5 pairs of (fail, retry-success)
         assertTrue(closed.isEmpty())
     }
+
+    @Test
+    fun staleRpcFromOldGenerationCannotEscalateOrCloseNewHandle() = runTest {
+        val aEntered = CompletableDeferred<Unit>()
+        val aRelease = CompletableDeferred<Unit>()
+        val closedHandles = mutableListOf<String>()
+        var dials = 0
+
+        val transport = transportWithHandles {
+            dials += 1
+            val sessionId = "dial-$dials"
+            fakeHandle(
+                sessionId = sessionId,
+                alive = { false },
+                close = { reason -> closedHandles += "$sessionId:$reason" },
+            ) { _, path, _ ->
+                if (sessionId == "dial-1" && path == "/a") {
+                    aEntered.complete(Unit)
+                    aRelease.await()
+                    throw IllegalStateException("connection lost on dial-1")
+                }
+                response("ok-$sessionId", success = true, result = JsonPrimitive("ok-$sessionId"))
+            }
+        }
+
+        // 1. Launch Call A on generation 1 (dial-1)
+        val pendingA = async {
+            runCatching { transport.adminRpc("message.list", "/a", null) }
+        }
+        runCurrent()
+        aEntered.await()
+
+        // 2. While Call A is suspended, trigger redial to generation 2
+        transport.connect("iroh://ticket2", "token", "device", "client")
+        runCurrent()
+        assertEquals(2, dials, "Redial to generation 2 must have occurred")
+
+        // Generation 2 is active. Now release Call A on old generation 1.
+        aRelease.complete(Unit)
+        runCurrent()
+        advanceUntilIdle()
+
+        val resultA = pendingA.await()
+        assertTrue(resultA.isFailure, "Call A on stale generation must fail")
+
+        // 3. Assert dial-2 is NOT closed by Call A's stale failure
+        assertFalse(closedHandles.any { it.startsWith("dial-2") }, "Stale RPC from dial-1 must not close dial-2")
+        assertEquals(0, transport.adminRpcRetryState.consecutiveFailures, "dial-2 retry state must not be corrupted by dial-1 failure")
+
+        // 4. Fresh RPC on dial-2 succeeds
+        val resultB = transport.adminRpc("message.list", "/b", null)
+        assertTrue(resultB.success)
+        assertEquals(JsonPrimitive("ok-dial-2"), resultB.result)
+    }
+
+    @Test
+    fun concurrentSuccessDoesNotResetFailingRpcGenerationRetryState() = runTest {
+        val aEntered = CompletableDeferred<Unit>()
+        val aRelease = CompletableDeferred<Unit>()
+        var dials = 0
+        var aAttempts = 0
+
+        val transport = transportWithHandles {
+            dials += 1
+            val sessionId = "dial-$dials"
+            fakeHandle(
+                sessionId = sessionId,
+                alive = { false },
+            ) { _, path, _ ->
+                if (path == "/a") {
+                    aAttempts += 1
+                    if (aAttempts == 1) {
+                        aEntered.complete(Unit)
+                        aRelease.await()
+                        throw IllegalStateException("connection lost attempt 1")
+                    }
+                    if (aAttempts == 2) {
+                        throw IllegalStateException("connection lost attempt 2")
+                    }
+                    response("ok-a", success = true, result = JsonPrimitive("ok-a"))
+                } else {
+                    response("ok-b", success = true, result = JsonPrimitive("ok-b"))
+                }
+            }
+        }
+
+        // 1. Call A begins first attempt and gates
+        val pendingA = async {
+            transport.adminRpc("message.list", "/a", null)
+        }
+        runCurrent()
+        aEntered.await()
+
+        // 2. Concurrent Call B executes successfully
+        val resultB = transport.adminRpc("message.list", "/b", null)
+        assertTrue(resultB.success)
+
+        // 3. Release Call A's first attempt (which fails, retries, fails again -> escalates)
+        aRelease.complete(Unit)
+        runCurrent()
+        advanceUntilIdle()
+
+        val resultA = pendingA.await()
+        assertTrue(resultA.success)
+        // Dial 1 failed after 2 attempts -> escalated to dial-2
+        assertEquals(2, dials)
+    }
 }

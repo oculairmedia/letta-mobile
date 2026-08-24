@@ -122,7 +122,7 @@ class IrohChannelTransport(
      *  WsChatBridge (via frameEvents) see each frame exactly once without split histories. */
     private suspend fun emitBoth(frame: ServerFrame) {
         // letta-mobile-34xoj: record stream activity to prevent premature reconnect
-        adminRpcRetryState.recordStreamActivity()
+        adminRpcExecutor.recordStreamActivity()
         Telemetry.event(
             "IrohGate", "gate1.emitBoth",
             "frame" to (frame::class.simpleName ?: ""),
@@ -228,6 +228,17 @@ class IrohChannelTransport(
         }
     }
 
+    // letta-mobile-53k65.10: Generation-scoped Admin RPC executor and retry state.
+    private val adminRpcExecutor = IrohAdminRpcExecutor(
+        supervisor = supervisor,
+        connectionGeneration = ::currentConnectionGeneration,
+        recordViewedConversation = { method, path ->
+            if (method == "message.list") {
+                IrohViewedConversation.fromMessageListPath(path)?.let(connectionSession::recordViewedConversation)
+            }
+        },
+    )
+
     /**
      * letta-mobile-wxy4s: application-level connection liveness. QUIC state alone
      * cannot detect a black-holed peer — the transport's unacked keepalive datagram
@@ -239,9 +250,9 @@ class IrohChannelTransport(
         timeoutMs = livenessProbeTimeoutMs,
         failuresToDeclareDead = livenessProbeFailuresToDeclareDead,
         maxDetectionMs = livenessMaxDetectionMs,
-        millisSinceLastProofOfLife = { adminRpcRetryState.millisSinceLastStream() },
+        millisSinceLastProofOfLife = { adminRpcExecutor.millisSinceLastProofOfLife() },
         youngInFlightAdminRpcCount = {
-            adminRpcRetryState.youngInFlightAdminRpcCount(graceMs = livenessCongestionGraceMs)
+            adminRpcExecutor.youngInFlightAdminRpcCount(graceMs = livenessCongestionGraceMs)
         },
         // Attribution is MANDATORY (r3i1z): an unattributed loss report landing
         // after a redial destroys the healthy NEW handle.
@@ -593,61 +604,9 @@ class IrohChannelTransport(
         }
     }
 
-    // letta-mobile-34xoj: track consecutive admin_rpc failures and last proof-of-life
-    // time to decide retry-on-same-connection vs. escalate-to-reconnect.
-    // letta-mobile-parg0: proof-of-life includes successful admin_rpc (not only
-    // stream frames), and in-flight admin_rpc ages feed the liveness congestion gate.
-    private val adminRpcRetryState = AdminRpcRetryState()
-    private class AdminRpcRetryState {
-        private val mutex = Mutex()
-        @Volatile var consecutiveFailures = 0
-        @Volatile private var lastProofOfLifeMs = System.currentTimeMillis()
-        /** Opaque tokens → start epoch ms for in-flight ChannelTransport.adminRpc. */
-        private val inFlightStartByToken = ConcurrentHashMap<Long, Long>()
-        private val nextInFlightToken = java.util.concurrent.atomic.AtomicLong(0L)
-
-        suspend fun recordFailure(): Int = mutex.withLock {
-            consecutiveFailures += 1
-            consecutiveFailures
-        }
-
-        suspend fun reset() = mutex.withLock {
-            consecutiveFailures = 0
-        }
-
-        fun recordProofOfLife() {
-            lastProofOfLifeMs = System.currentTimeMillis()
-        }
-
-        /** Alias kept for stream-frame call sites (emitBoth). */
-        fun recordStreamActivity() = recordProofOfLife()
-
-        fun millisSinceLastStream(): Long = System.currentTimeMillis() - lastProofOfLifeMs
-
-        fun beginAdminRpc(): Long {
-            val token = nextInFlightToken.incrementAndGet()
-            inFlightStartByToken[token] = System.currentTimeMillis()
-            return token
-        }
-
-        fun endAdminRpc(token: Long) {
-            inFlightStartByToken.remove(token)
-        }
-
-        /**
-         * Count of in-flight admin_rpc calls younger than [graceMs]. Stale hung
-         * calls (older than grace) do not protect the liveness probe forever.
-         */
-        fun youngInFlightAdminRpcCount(graceMs: Long = IrohLivenessProbe.CONGESTION_GRACE_MS): Int {
-            val now = System.currentTimeMillis()
-            var count = 0
-            for (startMs in inFlightStartByToken.values) {
-                val age = now - startMs
-                if (age in 0 until graceMs) count += 1
-            }
-            return count
-        }
-    }
+    /** Test/wiring visibility: current generation admin RPC retry state. */
+    internal val adminRpcRetryState get() = adminRpcExecutor.currentRetryState()
+    internal fun adminRpcRetryStateFor(generation: Long) = adminRpcExecutor.retryStateFor(generation)
 
     override suspend fun connect(baseShimUrl: String, token: String, deviceId: String, clientVersion: String) {
         explicitConfig = IrohConnectConfig(
@@ -1008,143 +967,8 @@ class IrohChannelTransport(
     override fun sendA2uiAction(action: A2uiAction): A2uiActionDispatchResult = A2uiActionDispatchResult.Failed
     override fun subscribe(runId: String, cursor: Long): Boolean = false
 
-    override suspend fun adminRpc(method: String, path: String, body: String?): AppServerInboundFrame.AdminRpcResponse {
-        // letta-mobile-r3i1z (A): learn the currently-viewed conversation from
-        // the hydrate so a later reconnect can re-register this connection as a
-        // server-side viewer with no user action. Recorded before the call so a
-        // hydrate that only succeeds on retry/redial is still captured.
-        if (method == "message.list") {
-            IrohViewedConversation.fromMessageListPath(path)?.let(connectionSession::recordViewedConversation)
-        }
-        // letta-mobile-parg0: in-flight admin_rpc (even before completion) proves
-        // openBi is progressing — the liveness probe must not declare-dead over it.
-        val inFlightToken = adminRpcRetryState.beginAdminRpc()
-        try {
-            return adminRpcTracked(method = method, path = path, body = body)
-        } finally {
-            adminRpcRetryState.endAdminRpc(inFlightToken)
-        }
-    }
-
-    private suspend fun adminRpcTracked(
-        method: String,
-        path: String,
-        body: String?,
-    ): AppServerInboundFrame.AdminRpcResponse {
-        // letta-mobile-34xoj: first attempt
-        val first = supervisor.ready()
-        val firstAttempt = runCatching {
-            first.adminRpc(method = method, path = path, body = body)
-        }
-        if (firstAttempt.isSuccess) {
-            adminRpcRetryState.reset()
-            // letta-mobile-parg0: successful admin_rpc is proof of life (not only
-            // stream frames) — suppresses the next liveness probe window.
-            adminRpcRetryState.recordProofOfLife()
-            return firstAttempt.getOrThrow()
-        }
-
-        val firstError = firstAttempt.exceptionOrNull()!!
-        if (firstError is CancellationException) throw firstError
-        // k7yyc: a decode / frame-size (payload) error is isolated to THIS
-        // request. It is NOT a transport fault, so never reconnect or close
-        // the shared connection for it — a single oversized or garbled
-        // list response must fail only its own request with the typed
-        // error, never tear down streaming for every other request.
-        if (firstError.isAdminRpcPayloadError()) throw firstError
-        if (!firstError.isConnectionLostClass()) throw firstError
-        if (!method.isReadOnlyAdminRpcMethod()) throw firstError
-
-        // Request isolation: if the shared connection is STILL ALIVE, this read's
-        // failure is isolated to THIS request (e.g. a method the node doesn't
-        // implement, or this request's own 15s timeout), NOT a transport fault.
-        // `isConnectionLostClass()` only inspects the error text — which for
-        // per-request errors ("admin_rpc stream closed before response", "admin_rpc
-        // timed out") matches "closed"/"stream"/"timeout" and looks connection-ish
-        // even though the QUIC connection is fine. Escalating here would call
-        // supervisor.onConnectionLost → close the shared connection → cancel every
-        // OTHER in-flight admin_rpc read on it (e.g. a large concurrent agent.list),
-        // which is exactly the desktop connect-burst teardown loop. A genuine drop
-        // instead flips `connected` false (reader-exit/close, which reconnect
-        // independently), so only fall through to retry/escalate when the
-        // connection is actually dead.
-        if (first.isConnectionAlive) {
-            com.letta.mobile.util.Telemetry.event(
-                "IrohTransport", "admin_rpc.request_isolated",
-                "method" to method,
-                "path" to path,
-                "error" to (firstError.message ?: firstError.toString()),
-                "class" to firstError::class.simpleName,
-            )
-            throw firstError
-        }
-
-        // letta-mobile-34xoj: an admin_rpc read timed out or failed with a
-        // connection-like error. NEVER invalidate the live connection while
-        // a turn is actively streaming — retry on the SAME connection.
-        val failures = adminRpcRetryState.recordFailure()
-        val idleMs = adminRpcRetryState.millisSinceLastStream()
-        val shouldEscalate = failures >= ADMIN_RPC_FAILURE_THRESHOLD && idleMs > STREAM_IDLE_THRESHOLD_MS
-
-        if (!shouldEscalate) {
-            // Retry on the SAME connection (no supervisor invalidation)
-            Telemetry.event(
-                "IrohTransport", "admin_rpc.retry.same_connection",
-                "method" to method,
-                "path" to path,
-                "error" to (firstError.message ?: firstError.toString()),
-                "class" to firstError::class.simpleName,
-                "consecutiveFailures" to failures.toString(),
-                "idleMs" to idleMs.toString(),
-            )
-            return runCatching {
-                // Re-use the SAME handle (no redial)
-                first.adminRpc(method = method, path = path, body = body)
-            }.getOrElse { retryError ->
-                if (retryError is CancellationException) throw retryError
-                // Second failure on same connection — now escalate
-                Telemetry.event(
-                    "IrohTransport", "admin_rpc.escalate.reconnect",
-                    "method" to method,
-                    "path" to path,
-                    "error" to (retryError.message ?: retryError.toString()),
-                    "class" to retryError::class.simpleName,
-                    "consecutiveFailures" to (failures + 1).toString(),
-                )
-                supervisor.onConnectionLost("admin_rpc_failed_after_retry: ${retryError.message ?: retryError.toString()}", first)
-                val newHandle = supervisor.ready()
-                newHandle.adminRpc(method = method, path = path, body = body).also {
-                    // Successful redial response clears the failure streak — otherwise
-                    // two fail-then-succeed cycles leave consecutiveFailures at threshold
-                    // and the next first-attempt failure forces an unnecessary reconnect.
-                    adminRpcRetryState.reset()
-                    adminRpcRetryState.recordProofOfLife()
-                }
-            }.also {
-                adminRpcRetryState.reset()
-                adminRpcRetryState.recordProofOfLife()
-            }
-        } else {
-            // Escalate: connection is idle and multiple failures accumulated
-            Telemetry.event(
-                "IrohTransport", "admin_rpc.escalate.reconnect",
-                "method" to method,
-                "path" to path,
-                "error" to (firstError.message ?: firstError.toString()),
-                "class" to firstError::class.simpleName,
-                "consecutiveFailures" to failures.toString(),
-                "idleMs" to idleMs.toString(),
-            )
-            supervisor.onConnectionLost("admin_rpc_failed: ${firstError.message ?: firstError.toString()}", first)
-            val retry = supervisor.ready()
-            return retry.adminRpc(method = method, path = path, body = body).also {
-                adminRpcRetryState.reset()
-                adminRpcRetryState.recordProofOfLife()
-            }
-        }
-    }
-
-    private fun String.isReadOnlyAdminRpcMethod(): Boolean = this in READ_ONLY_ADMIN_RPC_METHODS
+    override suspend fun adminRpc(method: String, path: String, body: String?): AppServerInboundFrame.AdminRpcResponse =
+        adminRpcExecutor.execute(method, path, body)
 
     override suspend fun disconnect() {
         connectionSession.stopAndJoin()
@@ -1171,6 +995,7 @@ class IrohChannelTransport(
             )
         }
         turnRegistry.clear()
+        adminRpcExecutor.clear()
         subagentCorrelator.reset()
         lastEmittedSubagentRevision = 0L
         livenessProbe.stop("disconnect")
