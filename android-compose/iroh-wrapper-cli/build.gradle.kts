@@ -96,14 +96,14 @@ dependencies {
     // production `implementation` declaration).
     implementation("computer.iroh:iroh:1.1.0")
 
-    testImplementation("org.junit.jupiter:junit-jupiter:6.1.0")
+    testImplementation(libs.junit.jupiter)
     testImplementation(libs.kotlinx.coroutines.test)
     // letta-mobile-gw0h1: jvmTest round-trips the QR encoder through
     // ZXing's reader + BufferedImageLuminanceSource to prove the CLI's
     // PNG renderer produces a scannable image. The `core` jar comes
     // transitively from :sharedLogic's `api` declaration.
     testImplementation("com.google.zxing:javase:3.5.3")
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher:6.1.0")
+    testRuntimeOnly(libs.junit.platform.launcher)
 }
 
 tasks.test {
