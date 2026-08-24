@@ -15,6 +15,7 @@ import com.letta.mobile.feature.chat.screen.messagelist.ChatPinchGestureBoxParam
 import com.letta.mobile.feature.chat.screen.messagelist.ChatMessageListPinchGestureBox
 import com.letta.mobile.feature.chat.screen.messagelist.ChatMessageListPinchIndicatorEffectParams
 import com.letta.mobile.feature.chat.screen.messagelist.ChatMessageListPinchIndicatorEffects
+import com.letta.mobile.feature.chat.screen.messagelist.ChatItemPinchState
 import com.letta.mobile.feature.chat.screen.messagelist.ChatPinchFrameBudgetSampler
 import com.letta.mobile.ui.chat.render.ChatMessageGeometryState
 import com.letta.mobile.ui.chat.render.ChatUiState
@@ -95,6 +96,7 @@ internal fun ChatMessageList(
         PinchScalePreviewController(minScale = 0.7f, maxScale = 1.6f, step = 0.02f)
     }
     val pinchFrameBudgetSampler = remember { ChatPinchFrameBudgetSampler() }
+    val pinchState = remember { ChatItemPinchState() }
 
     DisposableEffect(Unit) {
         onDispose { pinchFrameBudgetSampler.cancel() }
@@ -122,22 +124,6 @@ internal fun ChatMessageList(
     }
     SideEffect {
         pinchFontScaleController.syncCommittedScale(activeFontScale)
-    }
-
-    val scaleWindowIndexRange: IntRange = if (pinchFontScaleController.isPinching) {
-        val visible = listState.layoutInfo.visibleItemsInfo
-        if (visible.isEmpty()) {
-            IntRange.EMPTY
-        } else {
-            val visibleCount = visible.size
-            val scaleRatio = if (activeFontScale > 0f) liveFontScale / activeFontScale else 1f
-            val marginItems = (visibleCount * scaleRatio).toInt().coerceAtLeast(2)
-            val firstIdx = visible.first().index
-            val lastIdx = visible.last().index
-            (firstIdx - marginItems).coerceAtLeast(0)..(lastIdx + marginItems)
-        }
-    } else {
-        IntRange.EMPTY
     }
 
     ChatMessageListPinchIndicatorEffects(
@@ -184,6 +170,7 @@ internal fun ChatMessageList(
             currentLoadPressureSummary = currentLoadPressureSummary,
             callbacks = callbacks,
             pinchFontScaleController = pinchFontScaleController,
+            pinchState = pinchState,
             pinchFrameBudgetSampler = pinchFrameBudgetSampler,
             onPinchTick = { pinchTick = it },
             onPinchAnimationSuppressionTick = { pinchAnimationSuppressionTick = it },
@@ -202,7 +189,7 @@ internal fun ChatMessageList(
                 isUserScrolling = isUserScrolling,
                 liveFontScale = liveFontScale,
                 pinchFontScaleController = pinchFontScaleController,
-                scaleWindowIndexRange = scaleWindowIndexRange,
+                pinchState = pinchState,
                 itemGeometryState = itemGeometryState,
                 highlightedMessageId = highlightedMessageId,
                 showScrollFab = showScrollFab,

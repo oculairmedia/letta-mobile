@@ -40,3 +40,13 @@ internal fun chatRenderItemSeesPinchPreview(ownerKey: Any?, itemKey: Any): Boole
 
 internal fun boundedOuterHeightPx(owner: ChatItemPinchOwner?, itemKey: Any): Int? =
     owner?.takeIf { it.key == itemKey }?.outerHeightPx
+
+internal fun finishLocalPinch(
+    state: ChatItemPinchState,
+    cancelPreview: () -> Unit,
+    releaseAnimationSuppression: () -> Unit,
+) {
+    cancelPreview()
+    state.finish()
+    releaseAnimationSuppression()
+}

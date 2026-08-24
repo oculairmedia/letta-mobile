@@ -4,6 +4,7 @@ import com.letta.mobile.feature.chat.screen.messagelist.ChatItemPinchState
 import com.letta.mobile.feature.chat.screen.messagelist.ChatVisibleItemBounds
 import com.letta.mobile.feature.chat.screen.messagelist.boundedOuterHeightPx
 import com.letta.mobile.feature.chat.screen.messagelist.chatRenderItemSeesPinchPreview
+import com.letta.mobile.feature.chat.screen.messagelist.finishLocalPinch
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -55,6 +56,26 @@ class PinchLiveScaleTest {
 
         assertEquals(180, boundedOuterHeightPx(owner, "run-b"))
         assertNull(boundedOuterHeightPx(owner, "message-a"))
+    }
+
+    @Test
+    fun `finish resets local preview without any global commit callback`() {
+        val state = ChatItemPinchState()
+        state.begin(centroidYPx = 160f, visibleItems = visibleItems)
+        var previewCancelled = 0
+        var suppressionReleased = 0
+        var globalCommitCallbacks = 0
+
+        finishLocalPinch(
+            state = state,
+            cancelPreview = { previewCancelled++ },
+            releaseAnimationSuppression = { suppressionReleased++ },
+        )
+
+        assertNull(state.owner)
+        assertEquals(1, previewCancelled)
+        assertEquals(1, suppressionReleased)
+        assertEquals(0, globalCommitCallbacks)
     }
 
     @Test

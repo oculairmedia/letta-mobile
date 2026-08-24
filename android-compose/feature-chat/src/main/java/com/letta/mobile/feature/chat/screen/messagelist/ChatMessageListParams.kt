@@ -82,7 +82,7 @@ internal data class ChatMessageListBodyParams(
     val isUserScrolling: Boolean,
     val liveFontScale: Float,
     val pinchFontScaleController: com.letta.mobile.ui.zoom.PinchScalePreviewController,
-    val scaleWindowIndexRange: IntRange,
+    val pinchState: ChatItemPinchState,
     val itemGeometryState: com.letta.mobile.ui.chat.render.ChatMessageGeometryState,
     val highlightedMessageId: String?,
     val showScrollFab: Boolean,

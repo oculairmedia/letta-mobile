@@ -7,7 +7,6 @@ import com.letta.mobile.ui.chat.render.chatGeometrySignature
 import com.letta.mobile.feature.chat.render.LocalToolCardBodyParentVisible
 import com.letta.mobile.feature.chat.screen.RunBlock
 import com.letta.mobile.feature.chat.screen.SkillEnvelopeChip
-import com.letta.mobile.feature.chat.screen.chatRenderItemSeesLiveScale
 import com.letta.mobile.ui.components.DateSeparator
 import com.letta.mobile.ui.theme.ChatDimens
 import com.letta.mobile.ui.theme.ChatShapes
@@ -46,7 +45,7 @@ internal data class ChatMessageListLazyContext(
     val highlightedMessageId: String?,
     val itemGeometryState: ChatMessageGeometryState,
     val pinchFontScaleController: PinchScalePreviewController,
-    val scaleWindowIndexRange: IntRange,
+    val pinchState: ChatItemPinchState,
     val callbacks: ChatMessageRenderCallbacks,
 )
 
@@ -137,12 +136,12 @@ private fun ChatMessageListRenderItem(params: ChatMessageListRenderItemParams) {
     val isStreamingRenderItem = context.itemState.isStreaming &&
         context.newestMessageId != null &&
         renderItem.containsMessageId(context.newestMessageId)
-    val itemSeesLiveScale = chatRenderItemSeesLiveScale(
-        isPinching = context.pinchFontScaleController.isPinching,
-        scaleWindowIndexRange = context.scaleWindowIndexRange,
-        itemIndex = params.index,
+    val itemSeesLiveScale = chatRenderItemSeesPinchPreview(
+        ownerKey = context.pinchState.owner?.key,
+        itemKey = renderItem.key,
     )
     val perItemFontScale = if (itemSeesLiveScale) context.liveFontScale else context.activeFontScale
+    val boundedOuterHeightPx = boundedOuterHeightPx(context.pinchState.owner, renderItem.key)
     CompositionLocalProvider(
         LocalChatFontScale provides perItemFontScale,
         LocalToolCardBodyParentVisible provides itemSeesLiveScale,
@@ -150,6 +149,7 @@ private fun ChatMessageListRenderItem(params: ChatMessageListRenderItemParams) {
         MeasuredChatRenderItem(
             signature = geometrySignature,
             geometryState = context.itemGeometryState,
+            boundedOuterHeightPx = boundedOuterHeightPx,
         ) {
             ChatMessageListRenderItemBody(
                 params = ChatMessageListRenderItemBodyParams(

@@ -115,7 +115,7 @@ private fun ChatMessageListBodyContent(
         )
         CompositionLocalProvider(
             LocalChatIsPinching provides params.suppressPinchLayoutAnimations,
-            LocalChatFontScale provides params.liveFontScale,
+            LocalChatFontScale provides params.appearance.activeFontScale,
             LocalChatShouldDeferHeavyToolCards provides shouldDeferHeavyToolCards(params),
         ) {
             ChatMessageListLazyColumnContent(lazyColumnParams)
@@ -211,7 +211,7 @@ private fun ChatMessageListLazyColumn(params: ChatMessageListLazyColumnParams) {
                     highlightedMessageId = bodyParams.highlightedMessageId,
                     itemGeometryState = bodyParams.itemGeometryState,
                     pinchFontScaleController = bodyParams.pinchFontScaleController,
-                    scaleWindowIndexRange = bodyParams.scaleWindowIndexRange,
+                    pinchState = bodyParams.pinchState,
                     callbacks = params.renderCallbacks,
                 ),
                 chatDimens = params.chatDimens,

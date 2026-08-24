@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
@@ -23,6 +24,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
@@ -36,6 +38,7 @@ import com.letta.mobile.ui.theme.chatShapes
 internal fun MeasuredChatRenderItem(
     signature: ChatRenderItemGeometrySignature,
     geometryState: ChatMessageGeometryState,
+    boundedOuterHeightPx: Int? = null,
     content: @Composable () -> Unit,
 ) {
     val isPinching = LocalChatIsPinching.current
@@ -69,11 +72,16 @@ internal fun MeasuredChatRenderItem(
     // a much taller cached minimum; never let that floor survive into the new
     // visual state or a collapsed thought/run cannot shrink.
     val cachedHeightPx = if (hasMeasuredOnce.value) geometryState.heightFor(signature) else null
-    val heightModifier = if (cachedHeightPx != null && cachedHeightPx > 0) {
-        val cachedHeightDp = with(LocalDensity.current) { cachedHeightPx.toDp() }
-        Modifier.heightIn(min = cachedHeightDp)
-    } else {
-        Modifier
+    val heightModifier = when {
+        boundedOuterHeightPx != null && boundedOuterHeightPx > 0 -> {
+            val boundedHeightDp = with(LocalDensity.current) { boundedOuterHeightPx.toDp() }
+            Modifier.requiredHeight(boundedHeightDp).clipToBounds()
+        }
+        cachedHeightPx != null && cachedHeightPx > 0 -> {
+            val cachedHeightDp = with(LocalDensity.current) { cachedHeightPx.toDp() }
+            Modifier.heightIn(min = cachedHeightDp)
+        }
+        else -> Modifier
     }
 
     Box(
