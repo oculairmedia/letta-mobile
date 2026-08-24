@@ -24,7 +24,10 @@ internal class IrohAdminRpcExecutor(
     private val retryStates = ConcurrentHashMap<Long, GenerationRetryState>()
 
     fun retryStateFor(generation: Long): GenerationRetryState =
-        retryStates.computeIfAbsent(generation) { GenerationRetryState(generation) }
+        retryStates.computeIfAbsent(generation) {
+            retryStates.keys.removeIf { it < generation - RETAINED_GENERATIONS }
+            GenerationRetryState(generation)
+        }
 
     fun currentRetryState(): GenerationRetryState = retryStateFor(connectionGeneration())
 
@@ -232,22 +235,41 @@ internal class IrohAdminRpcExecutor(
     }
 
     companion object {
-        internal const val ADMIN_RPC_FAILURE_THRESHOLD = 2
-        internal const val STREAM_IDLE_THRESHOLD_MS = 5_000L
+        private const val RETAINED_GENERATIONS = 4L
+        internal const val ADMIN_RPC_FAILURE_THRESHOLD = 3
+        internal const val STREAM_IDLE_THRESHOLD_MS = 30_000L
 
         private val READ_ONLY_ADMIN_RPC_METHODS = setOf(
             "message.list",
             "message.get",
             "conversation.list",
             "conversation.get",
-            "goal.get",
-            "health.check",
-            "subagent.list",
-            "subagent.todos",
+            "agent.get",
+            "agent.list",
+            "agent.count",
+            "agent.context",
+            "tool.get",
+            "tool.list",
+            "block.get",
+            "block.list",
+            "block.list_agent",
+            "skill.get",
+            "skill.list",
+            "skill.list_agent",
+            "slash_command.list",
+            "slash_command.list_agent",
+            "schedule.get",
+            "schedule.list",
+            "project.get",
+            "project.list",
+            "project.beadsRemoteStatus",
             "cron.list",
             "cron.get",
+            "subagent.list",
+            "subagent.todos",
+            "health.check",
             "model.list",
-            "skill.list",
+            "goal.get",
         )
     }
 }
