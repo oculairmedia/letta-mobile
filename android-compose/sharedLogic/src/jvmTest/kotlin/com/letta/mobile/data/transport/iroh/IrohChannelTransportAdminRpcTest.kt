@@ -10,7 +10,9 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -30,6 +32,17 @@ import kotlin.time.Duration.Companion.seconds
 @OptIn(ExperimentalCoroutinesApi::class)
 class IrohChannelTransportAdminRpcTest {
     private val config = IrohConnectConfig("iroh://ticket", "token", "device", "client")
+
+    @Test
+    fun inactiveTransportDoesNotAddPermanentChildToCallerTestScope() = runTest {
+        val callerJob = currentCoroutineContext()[Job]!!
+        val childrenBeforeConstruction = callerJob.children.toSet()
+
+        val transport = IrohChannelTransport(scope = this)
+
+        assertFalse(transport.hasAnyActiveChatTurn)
+        assertEquals(childrenBeforeConstruction, callerJob.children.toSet())
+    }
 
     @Test
     fun cancellationDuringAdminRpcRethrowsWithoutFallback() = runTest {

@@ -57,39 +57,30 @@ class IrohObserverIngestorTest {
             },
             recordFrameOwnership = { _, _ -> },
         )
-        return ResubscribeFixture(ingestor, adminRpcCalls)
+        return ResubscribeFixture(ingestor, connectionGeneration, adminRpcCalls)
     }
 
     private data class ResubscribeFixture(
         val ingestor: IrohObserverIngestor,
+        val connectionGeneration: AtomicLong,
         val adminRpcCalls: CopyOnWriteArrayList<Pair<String, String>>,
     )
 
     @Test
-    fun testRecordViewedConversationAndResubscribe() = testScope.runTest {
+    fun testResubscribeOnlyForCurrentGeneration() = testScope.runTest {
         val fixture = resubscribeFixture(currentGeneration = 1L)
         val path = "/v1/conversations/conv-123/messages?limit=50"
 
         fixture.ingestor.recordViewedConversationFrom(ViewedConversationRequest("message.list", path))
-
         assertEquals("conv-123", fixture.ingestor.viewedConversationId)
         assertEquals(path, fixture.ingestor.viewedMessageListPath)
 
         fixture.ingestor.reSubscribeViewedConversation(ObserverResubscribeRequest(1L))
-
         assertEquals(listOf("message.list" to path), fixture.adminRpcCalls)
-    }
 
-    @Test
-    fun testResubscribeRejectedOnStaleGeneration() = testScope.runTest {
-        val fixture = resubscribeFixture(currentGeneration = 2L)
-        fixture.ingestor.recordViewedConversationFrom(
-            ViewedConversationRequest("message.list", "/v1/conversations/conv-123/messages"),
-        )
-
+        fixture.connectionGeneration.set(2L)
         fixture.ingestor.reSubscribeViewedConversation(ObserverResubscribeRequest(1L))
-
-        assertTrue(fixture.adminRpcCalls.isEmpty(), "Resubscribe on stale generation must not issue RPC")
+        assertEquals(1, fixture.adminRpcCalls.size, "Resubscribe on stale generation must not issue RPC")
     }
 
     @Test
