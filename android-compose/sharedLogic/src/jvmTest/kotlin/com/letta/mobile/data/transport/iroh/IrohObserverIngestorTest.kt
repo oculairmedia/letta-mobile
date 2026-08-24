@@ -180,13 +180,13 @@ class IrohObserverIngestorTest {
             ),
         )
         val turn = (startResult as IrohTryStartResult.Started).turn
-        turnRegistry.publishTerminal(
-            IrohTerminalPublication(
-                turn = turn,
-                status = IrohTerminalStatus("completed"),
-                source = IrohTerminalSource.Engine,
-            ),
+        val publication = IrohTerminalPublication(
+            turn = turn,
+            status = IrohTerminalStatus("completed"),
+            source = IrohTerminalSource.Engine,
         )
+        assertTrue(turnRegistry.claimTerminal(publication))
+        assertTrue(turnRegistry.retireClaimed(publication))
 
         val ingestor = IrohObserverIngestor(
             scope = testScope,
