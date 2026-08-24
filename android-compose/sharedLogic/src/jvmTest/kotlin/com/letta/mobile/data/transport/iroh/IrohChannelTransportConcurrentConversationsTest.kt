@@ -302,7 +302,7 @@ class IrohChannelTransportConcurrentConversationsTest {
 
             // The user cancels conversation B. B has no live turn of its own —
             // this must NOT reach into A's turn.
-            assertTrue(transport.cancel(CONV_B))
+            assertFalse(transport.cancel(CONV_B), "cancel(B) reports that B has no active turn")
             // Longer than serverTerminalWaitMs, so a mis-keyed cancel would have
             // already aborted + synthesized a cancelled terminal for A by now.
             delay(600.milliseconds)
@@ -316,12 +316,8 @@ class IrohChannelTransportConcurrentConversationsTest {
                 "A's turn must still be live after cancelling a DIFFERENT conversation",
             )
             assertTrue(
-                frames.any { it is ServerFrame.TurnDone && it.status == "cancelled" },
-                "cancel always yields a terminal so the cancelled surface can never hang",
-            )
-            assertTrue(
-                frames.none { it is ServerFrame.TurnDone && it.turnId == turnIdA },
-                "A's turn must not have been terminated by B's cancel",
+                frames.none { it is ServerFrame.TurnDone },
+                "cancel(B) must not fabricate a terminal or terminate A's turn",
             )
 
             // A is untouched and still settles on its own server terminal — the
