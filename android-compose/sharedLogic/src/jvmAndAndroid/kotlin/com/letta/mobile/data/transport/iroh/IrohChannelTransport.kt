@@ -1264,8 +1264,8 @@ class IrohChannelTransport(
         retireActiveTurn(turn, "cancelled", source = "cancel_synthetic")
     }
 
-    private suspend fun emitDisconnectTerminal(turn: IrohActiveTurn) {
-        if (!turn.tryClaimTerminal("disconnect")) return
+    /** Emits the cancellation terminal after disconnect has synchronously claimed this turn. */
+    private suspend fun emitClaimedDisconnectTerminal(turn: IrohActiveTurn) {
         emitBoth(
             ServerFrame.TurnDone(
                 id = frameId("cancelled"),
@@ -1436,14 +1436,20 @@ class IrohChannelTransport(
 
     override suspend fun disconnect() {
         connectionSession.stopAndJoin()
+        // Claim terminal ownership before cancelling send jobs. A cancelled job's
+        // completion handler removes its turn from activeTurns, so taking the
+        // snapshot after cancellation can lose the only terminal settlement.
+        // Claiming first makes disconnect the deterministic winner against the
+        // engine while preserving the exactly-once terminal guard.
+        val disconnectOwnedTurns = activeTurns.values.toList().filter { turn ->
+            turn.tryClaimTerminal("disconnect")
+        }
         interruptedTurns.clear()
         retiredRuns.clear()
         frameOwnershipPath.clear()
         activeSendJobs.values.forEach { it.cancel() }
         activeSendJobs.clear()
-        for (turn in activeTurns.values.toList()) {
-            emitDisconnectTerminal(turn)
-        }
+        disconnectOwnedTurns.forEach { turn -> emitClaimedDisconnectTerminal(turn) }
         activeTurns.clear()
         // The observer collector has fully stopped above, so these retain their
         // single-threaded ownership without racing a final ingested frame.
