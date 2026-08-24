@@ -233,7 +233,7 @@ class IrohChannelTransport(
                 // stream is the only thing that actually tests the path.
                 livenessProbe.start(supervisorState.handle)
             } else {
-                connectionSession.onNotReady("state:${supervisorState::class.simpleName}")
+                connectionSession.onNotReady()
                 // Snapshot turn identity before a degraded handle is closed and
                 // its send jobs drop their entries from activeTurns. Intentional
                 // disconnects and config replacement must not synthesize redial
@@ -292,7 +292,9 @@ class IrohChannelTransport(
     private val connectionSession = IrohConnectionSession(
         scope = scope,
         ingestObserverFrame = ::ingestObserverFrame,
-        resubscribe = { path -> adminRpc(method = "message.list", path = path, body = null) },
+        resubscribe = { conversation ->
+            adminRpc(method = "message.list", path = conversation.messageListPath, body = null)
+        },
     )
 
     /**
@@ -1299,7 +1301,9 @@ class IrohChannelTransport(
         // the hydrate so a later reconnect can re-register this connection as a
         // server-side viewer with no user action. Recorded before the call so a
         // hydrate that only succeeds on retry/redial is still captured.
-        if (method == "message.list") connectionSession.recordViewedConversation(path)
+        if (method == "message.list") {
+            IrohViewedConversation.fromMessageListPath(path)?.let(connectionSession::recordViewedConversation)
+        }
         // letta-mobile-parg0: in-flight admin_rpc (even before completion) proves
         // openBi is progressing — the liveness probe must not declare-dead over it.
         val inFlightToken = adminRpcRetryState.beginAdminRpc()
@@ -1431,7 +1435,7 @@ class IrohChannelTransport(
     private fun String.isReadOnlyAdminRpcMethod(): Boolean = this in READ_ONLY_ADMIN_RPC_METHODS
 
     override suspend fun disconnect() {
-        connectionSession.stopAndJoin("disconnect")
+        connectionSession.stopAndJoin()
         interruptedTurns.clear()
         retiredRuns.clear()
         frameOwnershipPath.clear()
@@ -1735,8 +1739,8 @@ class IrohChannelTransport(
 
     private fun currentSubagentScope(): SubagentRpcScope? {
         val conversationId = connectionSession.currentViewedConversationId() ?: return null
-        val agentId = activeTurns[conversationId]?.agentId
-        return SubagentRpcScope(conversationId, agentId)
+        val agentId = activeTurns[conversationId.value]?.agentId
+        return SubagentRpcScope(conversationId.value, agentId)
     }
 
     private fun subagentListFailure(requestId: String, error: String) = ServerFrame.SubagentListResponse(

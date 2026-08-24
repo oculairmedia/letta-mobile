@@ -1,6 +1,7 @@
 package com.letta.mobile.data.transport.iroh
 
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
+import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.util.Telemetry
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CancellationException
@@ -19,7 +20,7 @@ import java.util.concurrent.ConcurrentHashMap
 internal class IrohConnectionSession(
     private val scope: CoroutineScope,
     private val ingestObserverFrame: suspend (AppServerReceivedFrame) -> Unit,
-    private val resubscribe: suspend (String) -> Unit,
+    private val resubscribe: suspend (IrohViewedConversation) -> Unit,
 ) {
     private val generation = atomic(0L)
     @Volatile
@@ -28,46 +29,46 @@ internal class IrohConnectionSession(
     @Volatile
     private var resubscribeJob: Job? = null
     @Volatile
-    private var viewedMessageListPath: String? = null
+    private var viewedConversation: IrohViewedConversation? = null
 
     fun onReady(handle: IrohConnectionHandle) {
-        val readyGeneration = generation.incrementAndGet()
+        val readyGeneration = nextGeneration()
         startObserverIngest(handle, readyGeneration)
         reSubscribeViewedConversation(readyGeneration)
     }
 
-    fun onNotReady(reason: String) {
-        stopSessionWork(reason)
+    fun onNotReady() {
+        stopSessionWork(SessionStopReason.ConnectionStateChanged)
     }
 
     /** Stops the observer before callers reset state it exclusively owns. */
-    suspend fun stopAndJoin(reason: String) {
-        stopSessionWork(reason)
+    suspend fun stopAndJoin() {
+        stopSessionWork(SessionStopReason.Disconnect)
         stoppedObserverJobs.toList().forEach { job ->
             job.join()
             stoppedObserverJobs.remove(job)
         }
     }
 
-    private fun stopSessionWork(reason: String): Job? {
-        generation.incrementAndGet()
+    private fun nextGeneration() = IrohSessionGeneration(generation.incrementAndGet())
+
+    private fun stopSessionWork(reason: SessionStopReason): Job? {
+        nextGeneration()
         resubscribeJob?.cancel()
         resubscribeJob = null
         return stopObserverIngest(reason)
     }
 
-    fun recordViewedConversation(path: String) {
-        if (conversationIdFromMessageListPath(path) == null) return
-        viewedMessageListPath = path
+    fun recordViewedConversation(conversation: IrohViewedConversation) {
+        viewedConversation = conversation
     }
 
-    fun currentViewedConversationId(): String? =
-        viewedMessageListPath?.let(::conversationIdFromMessageListPath)
+    fun currentViewedConversationId(): ConversationId? = viewedConversation?.id
 
-    private fun startObserverIngest(handle: IrohConnectionHandle, readyGeneration: Long) {
+    private fun startObserverIngest(handle: IrohConnectionHandle, readyGeneration: IrohSessionGeneration) {
         val streamFrames = handle.effectiveObserverStreamFrames
         if (streamFrames == null) {
-            stopObserverIngest("no_observer_stream")
+            stopObserverIngest(SessionStopReason.ObserverStreamUnavailable)
             Telemetry.event("IrohObserver", "ingest.unavailable", "sessionId" to handle.sessionId)
             return
         }
@@ -83,7 +84,7 @@ internal class IrohConnectionSession(
         observerJob = scope.launch {
             runCatching {
                 streamFrames.collect { received ->
-                    if (generation.value != readyGeneration) return@collect
+                    if (!isCurrent(readyGeneration)) return@collect
                     ingestObserverFrame(received)
                 }
             }.onFailure { error ->
@@ -97,40 +98,42 @@ internal class IrohConnectionSession(
         }
     }
 
-    private fun stopObserverIngest(reason: String): Job? {
+    private fun isCurrent(candidate: IrohSessionGeneration): Boolean = generation.value == candidate.value
+
+    private fun stopObserverIngest(reason: SessionStopReason): Job? {
         val job = observerJob ?: return null
         observerJob = null
         stoppedObserverJobs.add(job)
         job.cancel()
-        Telemetry.event("IrohObserver", "ingest.stop", "reason" to reason)
+        Telemetry.event("IrohObserver", "ingest.stop", "reason" to reason.telemetryValue)
         return job
     }
 
     private data class ReSubscription(
-        val path: String,
-        val generation: Long,
+        val conversation: IrohViewedConversation,
+        val generation: IrohSessionGeneration,
     )
 
-    private fun reSubscribeViewedConversation(readyGeneration: Long) {
-        val path = viewedMessageListPath ?: return
-        val request = ReSubscription(path, readyGeneration)
+    private fun reSubscribeViewedConversation(readyGeneration: IrohSessionGeneration) {
+        val conversation = viewedConversation ?: return
+        val request = ReSubscription(conversation, readyGeneration)
         resubscribeJob?.cancel()
         resubscribeJob = scope.launch { runReSubscription(request) }
     }
 
     private suspend fun runReSubscription(request: ReSubscription) {
-        if (generation.value != request.generation) return
+        if (!isCurrent(request.generation)) return
         Telemetry.event(
             "IrohObserver", "resubscribe.begin",
-            "conversationId" to (conversationIdFromMessageListPath(request.path) ?: ""),
+            "conversationId" to request.conversation.id.value,
             "generation" to request.generation.toString(),
         )
         resubscribeIfCurrent(request)
     }
 
     private suspend fun resubscribeIfCurrent(request: ReSubscription) {
-        if (generation.value != request.generation) return
-        runCatching { resubscribe(request.path) }
+        if (!isCurrent(request.generation)) return
+        runCatching { resubscribe(request.conversation) }
             .onFailure { error -> reportResubscribeFailure(request, error) }
     }
 
@@ -138,18 +141,38 @@ internal class IrohConnectionSession(
         if (error is CancellationException) throw error
         Telemetry.event(
             "IrohObserver", "resubscribe.failed",
-            "conversationId" to (conversationIdFromMessageListPath(request.path) ?: ""),
+            "conversationId" to request.conversation.id.value,
             "error" to (error.message ?: error.toString()),
             "class" to error::class.simpleName,
         )
     }
 
-    private fun conversationIdFromMessageListPath(path: String): String? {
-        val marker = "/v1/conversations/"
-        val start = path.indexOf(marker)
-        if (start < 0) return null
-        val after = path.substring(start + marker.length)
-        val id = after.substringBefore('/').substringBefore('?')
-        return id.takeIf { it.isNotBlank() }
+    private enum class SessionStopReason(val telemetryValue: String) {
+        ConnectionStateChanged("connection_state_changed"),
+        Disconnect("disconnect"),
+        ObserverStreamUnavailable("no_observer_stream"),
     }
+}
+
+/** A validated message-list route for the conversation currently viewed on this connection. */
+internal data class IrohViewedConversation(
+    val id: ConversationId,
+    val messageListPath: String,
+) {
+    companion object {
+        fun fromMessageListPath(path: String): IrohViewedConversation? {
+            val marker = "/v1/conversations/"
+            val start = path.indexOf(marker)
+            if (start < 0) return null
+            val id = path.substring(start + marker.length).substringBefore('/').substringBefore('?')
+                .takeIf { it.isNotBlank() }
+                ?: return null
+            return IrohViewedConversation(ConversationId(id), path)
+        }
+    }
+}
+
+@JvmInline
+private value class IrohSessionGeneration(val value: Long) {
+    override fun toString(): String = value.toString()
 }
