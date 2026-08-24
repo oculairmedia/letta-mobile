@@ -94,24 +94,29 @@ internal class IrohConnectionSession(
         val conversationId = viewedConversationId
         resubscribeJob?.cancel()
         resubscribeJob = scope.launch {
-            if (generation.value != readyGeneration) return@launch
+            runReSubscription(path, conversationId, readyGeneration)
+        }
+    }
+
+    private suspend fun runReSubscription(path: String, conversationId: String?, readyGeneration: Long) {
+        if (generation.value != readyGeneration) return
+        Telemetry.event(
+            "IrohObserver", "resubscribe.begin",
+            "conversationId" to (conversationId ?: ""),
+            "generation" to readyGeneration.toString(),
+        )
+        try {
+            if (generation.value != readyGeneration) return
+            resubscribe(path)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
             Telemetry.event(
-                "IrohObserver", "resubscribe.begin",
+                "IrohObserver", "resubscribe.failed",
                 "conversationId" to (conversationId ?: ""),
-                "generation" to readyGeneration.toString(),
+                "error" to (error.message ?: error.toString()),
+                "class" to error::class.simpleName,
             )
-            runCatching {
-                if (generation.value != readyGeneration) return@launch
-                resubscribe(path)
-            }.onFailure { error ->
-                if (error is CancellationException) throw error
-                Telemetry.event(
-                    "IrohObserver", "resubscribe.failed",
-                    "conversationId" to (conversationId ?: ""),
-                    "error" to (error.message ?: error.toString()),
-                    "class" to error::class.simpleName,
-                )
-            }
         }
     }
 
