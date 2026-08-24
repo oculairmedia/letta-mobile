@@ -308,37 +308,150 @@ class TimelineRecentMessagesReconcilerTest {
     }
 
     @Test
-    fun openFailureReleasesClaimAndAllowsSubsequentRetry() = runTest(UnconfinedTestDispatcher()) {
+    fun staleGenerationResponseDroppedAndCannotOverwriteNewerGeneration() = runTest(UnconfinedTestDispatcher()) {
+        val state = MutableStateFlow(Timeline("conv-1"))
+        val queue = Channel<TimelineGatewayEvent>(Channel.UNLIMITED)
+        val reconciler = TimelineRecentMessagesReconciler(
+            conversationId = "conv-1",
+            messageApi = RecordingTimelineTransport(),
+            eventQueue = queue,
+            state = state,
+            streamSubscriberActive = MutableStateFlow(false),
+            writeMutex = Mutex(),
+            applyReturnsAndResponsesFromSnapshot = {},
+            scope = backgroundScope,
+        )
+
+        // 1. Apply generation 2 snapshot with msg-2
+        val gen2Ack = CompletableDeferred<Int>()
+        val gen2Event = TimelineGatewayEvent.RecentMessagesSnapshot(
+            serverMessages = listOf(UserMessage(id = "msg-2", date = "2026-08-24T12:00:00Z", contentRaw = JsonPrimitive("gen2"))),
+            telemetryName = "recentReconcile",
+            telemetryAttrs = emptyList(),
+            ack = gen2Ack,
+            generation = 2L,
+        )
+        reconciler.applyRecentMessagesSnapshot(gen2Event)
+        assertEquals(1, gen2Ack.await())
+        assertEquals("msg-2", (state.value.events.first() as TimelineEvent.Confirmed).serverId)
+
+        // 2. Delayed generation 1 snapshot with msg-1 arrives
+        val gen1Ack = CompletableDeferred<Int>()
+        val gen1Event = TimelineGatewayEvent.RecentMessagesSnapshot(
+            serverMessages = listOf(UserMessage(id = "msg-1", date = "2026-08-24T11:00:00Z", contentRaw = JsonPrimitive("gen1"))),
+            telemetryName = "recentReconcile",
+            telemetryAttrs = emptyList(),
+            ack = gen1Ack,
+            generation = 1L,
+        )
+        reconciler.applyRecentMessagesSnapshot(gen1Event)
+        assertEquals(0, gen1Ack.await())
+
+        // Verify state was NOT overwritten by stale gen1
+        assertEquals(1, state.value.events.size)
+        assertEquals("msg-2", (state.value.events.first() as TimelineEvent.Confirmed).serverId)
+    }
+
+    @Test
+    fun callerCancellationDoesNotCancelSharedFlightInReconcilerScope() = runTest(UnconfinedTestDispatcher()) {
         val transport = RecordingTimelineTransport()
-        var shouldFail = true
-        transport.onListEntered = {
-            if (shouldFail) throw IllegalStateException("Network drop")
+        val queue = Channel<TimelineGatewayEvent>(Channel.UNLIMITED).also { q ->
+            backgroundScope.launch {
+                for (event in q) {
+                    if (event is TimelineGatewayEvent.RecentMessagesSnapshot) {
+                        event.ack.complete(event.serverMessages.size)
+                    }
+                }
+            }
         }
         val reconciler = TimelineRecentMessagesReconciler(
             conversationId = "conv-1",
             messageApi = transport,
-            eventQueue = Channel<TimelineGatewayEvent>(Channel.UNLIMITED).also { queue ->
-                backgroundScope.launch {
-                    for (event in queue) {
-                        if (event is TimelineGatewayEvent.RecentMessagesSnapshot) {
-                            event.ack.complete(event.serverMessages.size)
-                        }
-                    }
-                }
-            },
+            eventQueue = queue,
             state = MutableStateFlow(Timeline("conv-1")),
             streamSubscriberActive = MutableStateFlow(false),
             writeMutex = Mutex(),
             applyReturnsAndResponsesFromSnapshot = {},
+            scope = backgroundScope,
         )
 
-        val outcome1 = reconciler.reconcileRecentMessages("open", forceRefresh = false, connectionGeneration = 1L)
-        assertTrue(outcome1 is RecentMessagesReconcileOutcome.Failed)
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        transport.onListEntered = {
+            if (!entered.isCompleted) entered.complete(Unit)
+            release.await()
+        }
 
-        // Retry succeeds and is not poisoned
-        shouldFail = false
-        val outcome2 = reconciler.reconcileRecentMessages("screen_resumed", forceRefresh = false, connectionGeneration = 1L)
-        assertEquals(Applied(1), outcome2)
+        // Caller 1 launches and awaits
+        val caller1Job = launch { reconciler.reconcileRecentMessages("open", forceRefresh = false, connectionGeneration = 1L) }
+        entered.await()
+
+        // Caller 2 joins the in-flight flight
+        val caller2 = async { reconciler.reconcileRecentMessages("screen_resumed", forceRefresh = false, connectionGeneration = 1L) }
+
+        // Caller 1 is cancelled (e.g. user navigates back)
+        caller1Job.cancel()
+
+        // Release the network call
+        release.complete(Unit)
+
+        // Caller 2 must still receive the successful Applied result without getting cancelled
+        val result2 = caller2.await()
+        assertEquals(Applied(1), result2)
+        assertEquals(1, transport.listCalls)
+    }
+
+    @Test
+    fun strongerWaiterExecutesTrailingForcedReconcileAndReturnsStrongerOutcome() = runTest(UnconfinedTestDispatcher()) {
+        val transport = RecordingTimelineTransport()
+        val queue = Channel<TimelineGatewayEvent>(Channel.UNLIMITED).also { q ->
+            backgroundScope.launch {
+                for (event in q) {
+                    if (event is TimelineGatewayEvent.RecentMessagesSnapshot) {
+                        event.ack.complete(event.serverMessages.size)
+                    }
+                }
+            }
+        }
+        val reconciler = TimelineRecentMessagesReconciler(
+            conversationId = "conv-1",
+            messageApi = transport,
+            eventQueue = queue,
+            state = MutableStateFlow(Timeline("conv-1")),
+            streamSubscriberActive = MutableStateFlow(false),
+            writeMutex = Mutex(),
+            applyReturnsAndResponsesFromSnapshot = {},
+            scope = backgroundScope,
+        )
+
+        val firstEntered = CompletableDeferred<Unit>()
+        val releaseFirst = CompletableDeferred<Unit>()
+        var callCount = 0
+        transport.onListEntered = {
+            callCount++
+            if (callCount == 1) {
+                firstEntered.complete(Unit)
+                releaseFirst.await()
+            }
+        }
+
+        // Weaker flight starts
+        val weakCaller = async { reconciler.reconcileRecentMessages("weak_open", forceRefresh = false, connectionGeneration = 1L) }
+        firstEntered.await()
+
+        // Stronger waiter joins during weaker flight
+        val strongCaller = async { reconciler.reconcileRecentMessages("strong_manual_refresh", forceRefresh = true, connectionGeneration = 1L) }
+
+        // Release first flight
+        releaseFirst.complete(Unit)
+
+        val weakResult = weakCaller.await()
+        val strongResult = strongCaller.await()
+
+        assertEquals(Applied(1), weakResult)
+        assertEquals(Applied(1), strongResult)
+        // Two network list calls executed: the initial weaker flight + the trailing forced stronger flight
+        assertEquals(2, transport.listCalls)
     }
 
     private class RecordingTimelineTransport : TimelineTransport {

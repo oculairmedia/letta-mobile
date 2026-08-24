@@ -44,7 +44,7 @@ internal data class ChatMessageListPerformAutoScrollParams(
     val lastStreamingSnapMs: Long,
 )
 
-enum class ChatRestorationState {
+internal enum class ChatRestorationState {
     AwaitingSnapshot,
     AwaitingFirstLayout,
     Restored,
@@ -89,6 +89,21 @@ private fun ChatMessageListViewportRestorationEffect(params: ChatMessageListEffe
     }
     var followLatest by remember(conversationId) { mutableStateOf(true) }
     val lastAutoScrollSignature = remember(conversationId) { mutableStateOf<ChatAutoScrollSignature?>(null) }
+
+    // User drag starts: immediately transition to UserControlled and cancel pending initial restore
+    LaunchedEffect(params.listState.interactionSource, conversationId) {
+        params.listState.interactionSource.interactions.collect { interaction ->
+            if (interaction is DragInteraction.Start) {
+                if (restorationState == ChatRestorationState.AwaitingFirstLayout || restorationState == ChatRestorationState.AwaitingSnapshot) {
+                    restorationState = ChatRestorationState.UserControlled
+                    followLatest = false
+                    ChatHydrationTrace.current(conversationId)?.let { generation ->
+                        ChatHydrationTrace.scrollInitialized(generation, correction = "user_controlled")
+                    }
+                }
+            }
+        }
+    }
 
     // 1. Monotonic restoration state machine: AwaitingSnapshot -> AwaitingFirstLayout -> Restored
     LaunchedEffect(params.renderItems.size, conversationId) {
@@ -139,10 +154,12 @@ private fun ChatMessageListViewportRestorationEffect(params: ChatMessageListEffe
         val previousSignature = lastAutoScrollSignature.value
 
         if (shouldForceScrollOnUserSend(signature, previousSignature?.messageId)) {
-            followLatest = true
-            restorationState = ChatRestorationState.FollowTail
-            val sendScrollOffset = with(density) { -ChatFadeEdgeLength.roundToPx() }
-            params.listState.animateScrollToItem(0, sendScrollOffset)
+            if (restorationState == ChatRestorationState.Restored || restorationState == ChatRestorationState.FollowTail) {
+                followLatest = true
+                restorationState = ChatRestorationState.FollowTail
+                val sendScrollOffset = with(density) { -ChatFadeEdgeLength.roundToPx() }
+                params.listState.animateScrollToItem(0, sendScrollOffset)
+            }
         } else if (restorationState == ChatRestorationState.Restored || restorationState == ChatRestorationState.FollowTail) {
             if (
                 shouldAutoScrollToLatest(

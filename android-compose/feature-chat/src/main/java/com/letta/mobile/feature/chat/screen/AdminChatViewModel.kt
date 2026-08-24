@@ -377,6 +377,7 @@ internal class AdminChatViewModel @Inject constructor(
 
     private fun triggerResumeSync() {
         val convId = conversationId?.value ?: chatConversationCoordinator.activeConversationId ?: return
+        val gen = chatConversationCoordinator.currentHydrationGeneration(convId)?.id ?: 0L
         viewModelScope.launch {
             try {
                 timelineRepository.reconcileRecentMessages(
@@ -384,6 +385,7 @@ internal class AdminChatViewModel @Inject constructor(
                     conversationId = convId,
                     reason = "screen_resumed",
                     forceRefresh = false,
+                    connectionGeneration = gen,
                 )
             } catch (t: Throwable) {
                 Telemetry.event(
@@ -569,8 +571,8 @@ internal class AdminChatViewModel @Inject constructor(
         currentClientModeConversationId = { null },
         startTimelineObserver = ::startTimelineObserver,
         stopTimelineObserver = ::stopTimelineObserver,
-        reconcileRecentMessages = { convId, reason ->
-            timelineRepository.reconcileRecentMessages(agentId.value, convId, reason)
+        reconcileRecentMessages = { convId, reason, gen ->
+            timelineRepository.reconcileRecentMessages(agentId.value, convId, reason, forceRefresh = false, connectionGeneration = gen)
         },
         sendMessageViaClientMode = { message ->
             sendPipeline.timelineChatSendStrategy.send(
