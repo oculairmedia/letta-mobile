@@ -47,6 +47,11 @@ value class MessageListOrder(val value: String)
 @JvmInline
 value class TimelinePageLimit(val value: Int)
 
+internal data class DesktopTimelinePersistence(
+    val store: ConfirmedTimelineStore = DesktopConfirmedTimelineStore(),
+    val backendId: String = "desktop-local",
+)
+
 internal class RealDesktopTimelineLoop private constructor(
     gateway: DesktopChatGateway,
     conversation: DesktopConversationSummary,
@@ -95,14 +100,13 @@ internal class RealDesktopTimelineLoop private constructor(
             gateway: DesktopChatGateway,
             conversation: DesktopConversationSummary,
             scope: CoroutineScope,
-            confirmedTimelineStore: ConfirmedTimelineStore = DesktopConfirmedTimelineStore(),
-            backendId: String = "desktop-local",
+            persistence: DesktopTimelinePersistence = DesktopTimelinePersistence(),
         ): RealDesktopTimelineLoop {
             val routing = resolveDesktopTimelineRouting(gateway, conversation)
-            val timelineScope = TimelineScope(backendId, routing.loopConversationId.value, conversation.agentId)
-            val snapshot = runCatching { confirmedTimelineStore.readSnapshot(timelineScope) }.getOrNull()
+            val timelineScope = TimelineScope(persistence.backendId, routing.loopConversationId.value, conversation.agentId)
+            val snapshot = runCatching { persistence.store.readSnapshot(timelineScope) }.getOrNull()
             return RealDesktopTimelineLoop(
-                gateway, conversation, scope, confirmedTimelineStore, backendId,
+                gateway, conversation, scope, persistence.store, persistence.backendId,
                 snapshot?.let(TimelineSnapshotCodec::storedEnvelopeToTimeline), snapshot?.revision ?: 0L,
             )
         }
