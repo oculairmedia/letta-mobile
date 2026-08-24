@@ -149,13 +149,13 @@ class IrohTurnRegistry {
         }
         frameOwnershipPath.remove(turn.conversationId)
         if (turn.runId.isNotBlank()) {
-            recentlyRetiredRuns[turn.runId] = System.currentTimeMillis()
+            val now = System.currentTimeMillis()
+            recentlyRetiredRuns.entries.removeIf { now - it.value > RETIRED_RUN_TTL_MS }
+            recentlyRetiredRuns[turn.runId] = now
         }
         activeTurns.remove(turn.conversationId, turn)
         turn.terminalReached.complete(status)
     }
-
-    fun cancel(conversationId: String): IrohActiveTurn? = activeTurns[conversationId]
 
     fun finish(token: IrohTurnToken): Boolean {
         val turn = activeTurns[token.conversationId] ?: return false
@@ -167,7 +167,14 @@ class IrohTurnRegistry {
         return removed
     }
 
-    fun isRetiredRun(runId: String): Boolean = recentlyRetiredRuns.containsKey(runId)
+    fun isRetiredRun(runId: String): Boolean {
+        val retiredAt = recentlyRetiredRuns[runId] ?: return false
+        val valid = System.currentTimeMillis() - retiredAt <= RETIRED_RUN_TTL_MS
+        if (!valid) {
+            recentlyRetiredRuns.remove(runId, retiredAt)
+        }
+        return valid
+    }
 
     fun recordFrameOwnership(conversationId: String, turn: IrohActiveTurn?): FrameOwnershipResult {
         val previous = frameOwnershipPath[conversationId]
@@ -253,4 +260,8 @@ class IrohTurnRegistry {
         val hasTerminal: Boolean,
         val isTerminalCompleted: Boolean,
     )
+
+    companion object {
+        const val RETIRED_RUN_TTL_MS = 5 * 60_000L
+    }
 }
