@@ -2,10 +2,14 @@ package com.letta.mobile.data.transport.iroh
 
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.TransportFrameEvent
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.shareIn
 
 /**
  * Single-source canonical publisher for Iroh transport frames.
@@ -17,24 +21,22 @@ import kotlinx.coroutines.flow.asSharedFlow
  * - Structural isolation preventing split histories across asymmetric consumers
  */
 internal class IrohFramePublisher(
+    scope: CoroutineScope,
     bufferCapacity: Int = DEFAULT_BUFFER_CAPACITY,
 ) {
-    private val _canonicalEvents = MutableSharedFlow<TransportFrameEvent>(
+    private val canonicalEvents = MutableSharedFlow<TransportFrameEvent>(
         extraBufferCapacity = bufferCapacity,
         onBufferOverflow = BufferOverflow.DROP_OLDEST,
     )
-    val frameEvents: SharedFlow<TransportFrameEvent> = _canonicalEvents.asSharedFlow()
+    val frameEvents: SharedFlow<TransportFrameEvent> = canonicalEvents.asSharedFlow()
 
-    private val _events = MutableSharedFlow<ServerFrame>(
-        extraBufferCapacity = bufferCapacity,
-        onBufferOverflow = BufferOverflow.DROP_OLDEST,
-    )
-    val events: SharedFlow<ServerFrame> = _events.asSharedFlow()
+    /** A derived projection; [canonicalEvents] is the only publication source. */
+    val events: SharedFlow<ServerFrame> = canonicalEvents
+        .map { event -> event.frame}
+        .shareIn(scope, started = SharingStarted.Eagerly, replay = 0)
 
     fun publish(frame: ServerFrame) {
-        val event = TransportFrameEvent(frame = frame)
-        _canonicalEvents.tryEmit(event)
-        _events.tryEmit(frame)
+        canonicalEvents.tryEmit(TransportFrameEvent(frame = frame))
     }
 
     companion object {

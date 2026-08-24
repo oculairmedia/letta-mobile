@@ -65,7 +65,7 @@ class IrohFrameFlowDropTest {
 
     @Test
     fun singleSourcePublisherDeliversIdenticalOrderedFramesToBothProjections() = runTest(UnconfinedTestDispatcher()) {
-        val publisher = IrohFramePublisher()
+        val publisher = IrohFramePublisher(backgroundScope)
         val eventsReceived = mutableListOf<String>()
         val frameEventsReceived = mutableListOf<String>()
 
@@ -111,7 +111,7 @@ class IrohFrameFlowDropTest {
 
     @Test
     fun asymmetricCancelledConsumerDoesNotSplitHistoryOrBlockSurvivingConsumer() = runTest(UnconfinedTestDispatcher()) {
-        val publisher = IrohFramePublisher()
+        val publisher = IrohFramePublisher(backgroundScope)
         val eventsReceived = mutableListOf<String>()
         val frameEventsReceived = mutableListOf<String>()
 
@@ -174,7 +174,7 @@ class IrohFrameFlowDropTest {
 
     @Test
     fun publisherPreservesReplayZeroForLateSubscribers() = runTest(UnconfinedTestDispatcher()) {
-        val publisher = IrohFramePublisher()
+        val publisher = IrohFramePublisher(backgroundScope)
 
         // Emit frame with no subscribers
         publisher.publish(

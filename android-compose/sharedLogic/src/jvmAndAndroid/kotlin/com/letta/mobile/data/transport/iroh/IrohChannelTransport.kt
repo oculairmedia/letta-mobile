@@ -111,7 +111,7 @@ class IrohChannelTransport(
     private val _state = MutableStateFlow<ChannelTransportState>(ChannelTransportState.Idle)
     override val state: StateFlow<ChannelTransportState> = _state.asStateFlow()
 
-    private val framePublisher = IrohFramePublisher()
+    private val framePublisher = IrohFramePublisher(scope)
     override val events: SharedFlow<ServerFrame> = framePublisher.events
     override val frameEvents: SharedFlow<TransportFrameEvent> = framePublisher.frameEvents
 
