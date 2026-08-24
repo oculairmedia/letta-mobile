@@ -15,12 +15,6 @@ data class IrohTurnToken(
     val turnId: String,
 )
 
-data class IrohTurnRegistration(
-    val token: IrohTurnToken,
-    val initialRunId: String,
-    val agentId: String,
-)
-
 /**
  * Per-turn client state shared between streaming send jobs, observer ingest, and cancel.
  */
@@ -84,9 +78,12 @@ class IrohTurnRegistry {
     private val recentlyRetiredRuns = ConcurrentHashMap<String, Long>()
     private val interruptedTurns = ConcurrentHashMap<String, RedialWhileTurnActive>()
 
-    fun tryStart(registration: IrohTurnRegistration): IrohTryStartResult {
-        val token = registration.token
-        val newTurn = IrohActiveTurn(token, registration.initialRunId, registration.agentId)
+    fun tryStart(
+        token: IrohTurnToken,
+        initialRunId: String,
+        agentId: String,
+    ): IrohTryStartResult {
+        val newTurn = IrohActiveTurn(token, initialRunId, agentId)
         var busy: IrohActiveTurn? = null
         activeTurns.compute(token.conversationId) { _, existing ->
             if (existing != null && !existing.terminalReached.isCompleted) {

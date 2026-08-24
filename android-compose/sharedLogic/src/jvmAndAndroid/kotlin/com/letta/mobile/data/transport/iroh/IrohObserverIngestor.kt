@@ -116,88 +116,90 @@ internal class IrohObserverIngestor(
 
     fun reSubscribeViewedConversation(generation: Long) {
         val path = viewedMessageListPath ?: return
-        val request = ResubscriptionRequest(generation, viewedConversationId, path)
         resubscribeJob?.cancel()
-        resubscribeJob = scope.launch { resubscribe(request) }
+        resubscribeJob = scope.launch { resubscribe(ViewedConversation(path, viewedConversationId), generation) }
     }
 
-    private suspend fun resubscribe(request: ResubscriptionRequest) {
-        if (!isExpectedGeneration(request.generation)) return
-        Telemetry.event("IrohObserver", "resubscribe.begin", "conversationId" to request.conversationId.orEmpty(), "generation" to request.generation.toString())
-        runCatching {
-            if (isExpectedGeneration(request.generation)) adminRpc("message.list", request.path, null)
-        }.onFailure { error -> reportResubscribeFailure(request, error) }
+    private suspend fun resubscribe(view: ViewedConversation, generation: Long) {
+        if (connectionGeneration() != generation) return
+        Telemetry.event(
+            "IrohObserver", "resubscribe.begin",
+            "conversationId" to view.conversationId.orEmpty(),
+            "generation" to generation.toString(),
+        )
+        runCatching { adminRpc("message.list", view.path, null) }
+            .onFailure { reportResubscribeFailure(it, view) }
     }
 
-    private fun reportResubscribeFailure(request: ResubscriptionRequest, error: Throwable) {
+    private fun reportResubscribeFailure(error: Throwable, view: ViewedConversation) {
         if (error is CancellationException) throw error
-        Telemetry.event("IrohObserver", "resubscribe.failed", "conversationId" to request.conversationId.orEmpty(), "error" to (error.message ?: error.toString()), "class" to error::class.simpleName)
+        Telemetry.event(
+            "IrohObserver", "resubscribe.failed",
+            "conversationId" to view.conversationId.orEmpty(),
+            "error" to (error.message ?: error.toString()),
+            "class" to error::class.simpleName,
+        )
     }
 
     suspend fun ingestObserverFrame(received: AppServerReceivedFrame, expectedGeneration: Long? = null) {
-        if (!isExpectedGeneration(expectedGeneration)) return
+        if (expectedGeneration != null && connectionGeneration() != expectedGeneration) return
         val streamDelta = received.frame as? AppServerInboundFrame.StreamDelta ?: return
-        val context = ObserverFrameContext(streamDelta)
-        val localTurn = turnRegistry.getActiveTurn(context.conversationId)
-        recordFrameOwnership(context.conversationId, localTurn)
-        if (localTurn != null) {
-            ingestEngineOwnedFrame(received, context, localTurn)
-            return
-        }
-        if (isRetiredFrame(streamDelta, context.conversationId)) return
-        ingestObserverOwnedFrame(received, streamDelta, context)
+        ingestStreamDelta(ObserverFrameContext(received, streamDelta))
     }
 
-    private fun isExpectedGeneration(expectedGeneration: Long?): Boolean =
-        expectedGeneration == null || connectionGeneration() == expectedGeneration
+    private suspend fun ingestStreamDelta(context: ObserverFrameContext) {
+        val localTurn = turnRegistry.getActiveTurn(context.conversationId)
+        recordFrameOwnership(context.conversationId, localTurn)
+        if (localTurn == null) {
+            ingestPassiveObserverDelta(context)
+        } else {
+            ingestEngineOwnedObserverDelta(context, localTurn)
+        }
+    }
 
-    private suspend fun ingestEngineOwnedFrame(
-        received: AppServerReceivedFrame,
-        context: ObserverFrameContext,
-        localTurn: IrohActiveTurn,
-    ) {
+    private suspend fun ingestEngineOwnedObserverDelta(context: ObserverFrameContext, localTurn: IrohActiveTurn) {
         Telemetry.event(
             "IrohObserver", "ingest.skip_engine_owned",
             "conversationId" to context.conversationId,
             "turnId" to localTurn.turnId,
         )
         projectEngineOwnedObserverDelta(
-            scope = ObserverProjectionScope(context.agentId, context.conversationId, localTurn),
-            received = received,
+            ObserverProjectionScope(context.agentId, context.conversationId, localTurn),
+            context.received,
         )
     }
 
-    private fun isRetiredFrame(streamDelta: AppServerInboundFrame.StreamDelta, conversationId: String): Boolean {
-        val frameRunId = (streamDelta.delta as? JsonObject)?.runId()
-        if (frameRunId == null || !turnRegistry.isRetiredRun(frameRunId)) return false
+    private suspend fun ingestPassiveObserverDelta(context: ObserverFrameContext) {
+        if (skipRetiredRun(context)) return
+        correlateAgentFrame(context.streamDelta).forEach { emitBoth(it) }
+        projectPassiveObserverDelta(context)
+    }
+
+    private fun skipRetiredRun(context: ObserverFrameContext): Boolean {
+        val delta = context.streamDelta.delta as? JsonObject ?: return false
+        val runId = delta.string("run_id") ?: delta.string("runId") ?: return false
+        if (!turnRegistry.isRetiredRun(runId)) return false
         Telemetry.event(
             "IrohObserver", "ingest.skip_already_retired",
-            "conversationId" to conversationId,
-            "runId" to frameRunId,
+            "conversationId" to context.conversationId,
+            "runId" to runId,
         )
         return true
     }
 
-    private suspend fun ingestObserverOwnedFrame(
-        received: AppServerReceivedFrame,
-        streamDelta: AppServerInboundFrame.StreamDelta,
-        context: ObserverFrameContext,
-    ) {
-        correlateAgentFrame(streamDelta).forEach { emitBoth(it) }
-        observerMapper.map(observerTurnCommand(context.agentId, context.conversationId), received)
-            .flatMap { mapObserverDraft(it, context) }
+    private suspend fun projectPassiveObserverDelta(context: ObserverFrameContext) {
+        val command = observerTurnCommand(context.agentId, context.conversationId)
+        observerMapper.map(command, context.received)
+            .flatMap { draft -> RuntimeEventServerFrameMapper.map(draft.payload, passiveContext(draft, context)) }
             .forEach { emitBoth(it) }
     }
 
-    private fun mapObserverDraft(draft: RuntimeEventDraft, context: ObserverFrameContext): List<ServerFrame> =
-        RuntimeEventServerFrameMapper.map(
-            payload = draft.payload,
-            context = RuntimeEventServerFrameMapper.Context(
-                agentId = draft.agentId?.value ?: context.agentId,
-                conversationId = draft.conversationId?.value ?: context.conversationId,
-                turnId = "iroh-observer-turn-${context.conversationId}",
-                runId = draft.runId?.value ?: "iroh-observer-run-${context.conversationId}",
-            ),
+    private fun passiveContext(draft: RuntimeEventDraft, context: ObserverFrameContext): RuntimeEventServerFrameMapper.Context =
+        RuntimeEventServerFrameMapper.Context(
+            agentId = draft.agentId?.value ?: context.agentId,
+            conversationId = draft.conversationId?.value ?: context.conversationId,
+            turnId = "iroh-observer-turn-${context.conversationId}",
+            runId = draft.runId?.value ?: "iroh-observer-run-${context.conversationId}",
         )
 
     private suspend fun projectEngineOwnedObserverDelta(
@@ -309,20 +311,14 @@ internal class IrohObserverIngestor(
         return id.takeIf { it.isNotBlank() }
     }
 
-    private data class ResubscriptionRequest(
-        val generation: Long,
-        val conversationId: String?,
-        val path: String,
-    )
+    private data class ViewedConversation(val path: String, val conversationId: String?)
 
     private data class ObserverFrameContext(
-        val agentId: String,
-        val conversationId: String,
+        val received: AppServerReceivedFrame,
+        val streamDelta: AppServerInboundFrame.StreamDelta,
     ) {
-        constructor(streamDelta: AppServerInboundFrame.StreamDelta) : this(
-            agentId = streamDelta.runtime.agentId,
-            conversationId = streamDelta.runtime.conversationId,
-        )
+        val agentId: String get() = streamDelta.runtime.agentId
+        val conversationId: String get() = streamDelta.runtime.conversationId
     }
 
     private data class ObserverProjectionScope(
@@ -340,8 +336,6 @@ internal class IrohObserverIngestor(
 
         private fun JsonObject.string(key: String): String? =
             this[key]?.jsonPrimitive?.contentOrNull
-
-        private fun JsonObject.runId(): String? = string("run_id") ?: string("runId")
 
         private fun observerTurnCommand(agentId: String, conversationId: String): TurnCommand =
             TurnCommand(

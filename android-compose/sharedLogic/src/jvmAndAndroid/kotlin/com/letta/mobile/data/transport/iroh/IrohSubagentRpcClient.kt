@@ -12,86 +12,121 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import java.time.Instant
 import java.util.UUID
 import kotlin.time.Duration.Companion.milliseconds
 
-/** Subagent RPC client bridging [ServerFrame] subagent requests over [adminRpc]. */
+/**
+ * Subagent RPC client bridging [ServerFrame] subagent requests over [adminRpc].
+ */
 internal class IrohSubagentRpcClient(
     private val readyHandle: suspend () -> IrohConnectionHandle,
     private val currentScope: () -> SubagentRpcScope?,
     private val adminRpc: suspend (method: String, path: String, body: String?) -> AppServerInboundFrame.AdminRpcResponse,
 ) {
-    suspend fun send(request: SubagentRpcRequest): ServerFrame {
-        val context = RpcContext(request.tag)
-        val scope = currentScope() ?: return request.failure(context, SCOPE_UNAVAILABLE)
+    suspend fun sendSubagentList(all: Boolean, timeoutMs: Long): ServerFrame.SubagentListResponse =
+        executeSubagentOp<SubagentListRpcResult, ServerFrame.SubagentListResponse>(
+            method = "subagent.list",
+            tag = "subagent_list",
+            payload = buildJsonObject { put("all", all) },
+            timeoutMs = timeoutMs,
+            onSuccess = { id, ts, reqId, decoded ->
+                ServerFrame.SubagentListResponse(id = id, ts = ts, requestId = reqId, success = true, subagents = decoded.subagents)
+            },
+            onFailure = { id, ts, reqId, error ->
+                ServerFrame.SubagentListResponse(id = id, ts = ts, requestId = reqId, success = false, error = error)
+            },
+        )
+
+    suspend fun sendSubagentTodos(toolCallId: String, timeoutMs: Long): ServerFrame.SubagentTodosResponse =
+        executeSubagentOp<SubagentTodosRpcResult, ServerFrame.SubagentTodosResponse>(
+            method = "subagent.todos",
+            tag = "subagent_todos",
+            payload = buildJsonObject { put("tool_call_id", toolCallId) },
+            timeoutMs = timeoutMs,
+            onSuccess = { id, ts, reqId, decoded ->
+                ServerFrame.SubagentTodosResponse(
+                    id = id,
+                    ts = ts,
+                    requestId = reqId,
+                    success = true,
+                    found = decoded.found,
+                    subagent = decoded.subagent,
+                    todos = decoded.todos,
+                    todosFound = decoded.todosFound,
+                )
+            },
+            onFailure = { id, ts, reqId, error ->
+                ServerFrame.SubagentTodosResponse(id = id, ts = ts, requestId = reqId, success = false, error = error)
+            },
+        )
+
+    private suspend inline fun <reified R, T> executeSubagentOp(
+        method: String,
+        tag: String,
+        payload: JsonObject,
+        timeoutMs: Long,
+        crossinline onSuccess: (id: String, ts: String, reqId: String, decoded: R) -> T,
+        crossinline onFailure: (id: String, ts: String, reqId: String, error: String) -> T,
+    ): T {
+        val reqId = "iroh-$tag-${UUID.randomUUID()}"
+        val frameId = "$tag-${UUID.randomUUID()}"
+        val ts = Instant.now().toString()
+
+        val scope = currentScope()
+            ?: return onFailure(frameId, ts, reqId, "subagent scope unavailable; hydrate a conversation first")
+
         return try {
-            withTimeoutOrNull(request.timeoutMs.milliseconds) {
-                val response = call(scope, request) ?: return@withTimeoutOrNull request.failure(context, SUBAGENT_RPC_UNSUPPORTED)
-                if (!response.success) return@withTimeoutOrNull request.failure(context, response.error ?: "${request.method} failed")
-                request.success(context, response.result ?: return@withTimeoutOrNull request.failure(context, "${request.method} failed: no result"))
-            } ?: request.failure(context, "${request.method} timed out")
+            withTimeoutOrNull(timeoutMs.milliseconds) {
+                val response = callScopedSubagentRpc(method, scope, payload)
+                    ?: return@withTimeoutOrNull onFailure(frameId, ts, reqId, SUBAGENT_RPC_UNSUPPORTED)
+                if (!response.success) return@withTimeoutOrNull onFailure(frameId, ts, reqId, response.error ?: "$method failed")
+                val result = response.result ?: return@withTimeoutOrNull onFailure(frameId, ts, reqId, "$method failed: no result")
+                val decoded = json.decodeFromJsonElement<R>(result)
+                onSuccess(frameId, ts, reqId, decoded)
+            } ?: onFailure(frameId, ts, reqId, "$method timed out")
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
-            request.failure(context, error.message ?: "${request.method} failed")
+            onFailure(frameId, ts, reqId, error.message ?: "$method failed")
         }
     }
 
-    private suspend fun call(scope: SubagentRpcScope, request: SubagentRpcRequest): AppServerInboundFrame.AdminRpcResponse? {
+    private suspend fun callScopedSubagentRpc(
+        method: String,
+        scope: SubagentRpcScope,
+        payload: JsonObject,
+    ): AppServerInboundFrame.AdminRpcResponse? {
         val handle = readyHandle()
-        if (handle.serverCapabilities?.contains(SUBAGENT_RPC_CAPABILITY) == false) return null
-        val body = buildJsonObject {
+        val advertised = handle.serverCapabilities
+        if (advertised != null && SUBAGENT_RPC_CAPABILITY !in advertised) return null
+        val scopedBody = buildJsonObject {
             put("conversation_id", scope.conversationId)
             scope.agentId?.let { put("agent_id", it) }
-            request.body.forEach { (key, value) -> put(key, value) }
-        }
-        val response = adminRpc(request.method, "/v1/conversations/${scope.conversationId}/subagents", body.toString())
-        return response.takeUnless { !it.success && AdminRpcErrors.isUnknownMethod(it.error) }
-    }
-
-    internal sealed class SubagentRpcRequest(val method: String, val tag: String, val timeoutMs: Long, val body: JsonObject) {
-        abstract fun success(context: RpcContext, result: kotlinx.serialization.json.JsonElement): ServerFrame
-        abstract fun failure(context: RpcContext, error: String): ServerFrame
-
-        class List(all: Boolean, timeoutMs: Long) : SubagentRpcRequest("subagent.list", "subagent_list", timeoutMs, buildJsonObject { put("all", all) }) {
-            override fun success(context: RpcContext, result: kotlinx.serialization.json.JsonElement): ServerFrame {
-                val decoded = json.decodeFromJsonElement<SubagentListRpcResult>(result)
-                return ServerFrame.SubagentListResponse(id = context.frameId, ts = context.timestamp, requestId = context.requestId, success = true, subagents = decoded.subagents)
-            }
-            override fun failure(context: RpcContext, error: String): ServerFrame =
-                ServerFrame.SubagentListResponse(id = context.frameId, ts = context.timestamp, requestId = context.requestId, success = false, error = error)
-        }
-
-        class Todos(toolCallId: String, timeoutMs: Long) : SubagentRpcRequest("subagent.todos", "subagent_todos", timeoutMs, buildJsonObject { put("tool_call_id", toolCallId) }) {
-            override fun success(context: RpcContext, result: kotlinx.serialization.json.JsonElement): ServerFrame {
-                val decoded = json.decodeFromJsonElement<SubagentTodosRpcResult>(result)
-                return ServerFrame.SubagentTodosResponse(id = context.frameId, ts = context.timestamp, requestId = context.requestId, success = true, found = decoded.found, subagent = decoded.subagent, todos = decoded.todos, todosFound = decoded.todosFound)
-            }
-            override fun failure(context: RpcContext, error: String): ServerFrame =
-                ServerFrame.SubagentTodosResponse(id = context.frameId, ts = context.timestamp, requestId = context.requestId, success = false, error = error)
+            payload.forEach { (key, value) -> put(key, value) }
+        }.toString()
+        val response = adminRpc(method, "/v1/conversations/${scope.conversationId}/subagents", scopedBody)
+        return response.takeUnless {
+            !it.success && AdminRpcErrors.isUnknownMethod(it.error)
         }
     }
 
-    internal data class RpcContext(val tag: String) {
-        val requestId = "iroh-$tag-${UUID.randomUUID()}"
-        val frameId = "$tag-${UUID.randomUUID()}"
-        val timestamp = Instant.now().toString()
-    }
+    @Serializable
+    private data class SubagentListRpcResult(val subagents: List<SubagentEntry> = emptyList())
 
-    @Serializable private data class SubagentListRpcResult(val subagents: List<SubagentEntry> = emptyList())
-    @Serializable private data class SubagentTodosRpcResult(
+    @Serializable
+    private data class SubagentTodosRpcResult(
         val found: Boolean = false,
         val subagent: SubagentEntry? = null,
         val todos: List<SubagentTodo> = emptyList(),
         @SerialName("todos_found") val todosFound: Boolean = false,
     )
 
-    private companion object {
-        const val SUBAGENT_RPC_CAPABILITY = "subagent_registry_v1"
-        const val SUBAGENT_RPC_UNSUPPORTED = "subagent registry is unavailable on this Iroh node"
-        const val SCOPE_UNAVAILABLE = "subagent scope unavailable; hydrate a conversation first"
-        val json = Json { ignoreUnknownKeys = true }
+    companion object {
+        internal const val SUBAGENT_RPC_CAPABILITY = "subagent_registry_v1"
+        private const val SUBAGENT_RPC_UNSUPPORTED = "subagent registry is unavailable on this Iroh node"
+        private val json = Json { ignoreUnknownKeys = true }
     }
 }

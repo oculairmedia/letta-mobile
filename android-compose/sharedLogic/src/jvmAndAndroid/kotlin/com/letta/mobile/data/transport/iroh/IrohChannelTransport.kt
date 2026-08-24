@@ -419,7 +419,11 @@ class IrohChannelTransport(
         val turnId = "iroh-turn-${UUID.randomUUID()}"
         val initialRunId = "iroh-run-${UUID.randomUUID()}"
         val token = IrohTurnToken(conversationId, connectionGeneration.value, turnId)
-        val startResult = turnRegistry.tryStart(IrohTurnRegistration(token, initialRunId, agentId))
+        val startResult = turnRegistry.tryStart(
+            token = token,
+            initialRunId = initialRunId,
+            agentId = agentId,
+        )
         if (startResult is IrohTryStartResult.Busy) {
             Telemetry.event(
                 "IrohTransport", "send.rejected_same_conversation_busy",
@@ -909,25 +913,27 @@ class IrohChannelTransport(
     }
 
     override suspend fun sendCronList(agentId: String?, conversationId: String?, timeoutMs: Long): ServerFrame.CronListResponse =
-        cronRpcClient.send(IrohCronRpcClient.CronRpcRequest.List(agentId, conversationId, timeoutMs)) as ServerFrame.CronListResponse
+        cronRpcClient.sendCronList(agentId, conversationId, timeoutMs)
 
     override suspend fun sendCronAdd(agentId: String, name: String, description: String, prompt: String, recurring: Boolean, cron: String?, every: String?, at: String?, timezone: String?, conversationId: String?, timeoutMs: Long): ServerFrame.CronAddResponse =
-        cronRpcClient.send(IrohCronRpcClient.CronRpcRequest.Add(agentId, name, description, prompt, recurring, cron, at, timezone, conversationId, timeoutMs)) as ServerFrame.CronAddResponse
+        cronRpcClient.sendCronAdd(
+            CronAddRequest(agentId, name, description, prompt, recurring, cron, every, at, timezone, conversationId, timeoutMs),
+        )
 
     override suspend fun sendCronGet(taskId: String, timeoutMs: Long): ServerFrame.CronGetResponse =
-        cronRpcClient.send(IrohCronRpcClient.CronRpcRequest.Get(taskId, timeoutMs)) as ServerFrame.CronGetResponse
+        cronRpcClient.sendCronGet(taskId, timeoutMs)
 
     override suspend fun sendCronDelete(taskId: String, timeoutMs: Long): ServerFrame.CronDeleteResponse =
-        cronRpcClient.send(IrohCronRpcClient.CronRpcRequest.Delete(taskId, timeoutMs)) as ServerFrame.CronDeleteResponse
+        cronRpcClient.sendCronDelete(taskId, timeoutMs)
 
     override suspend fun sendCronDeleteAll(agentId: String, timeoutMs: Long): ServerFrame.CronDeleteAllResponse =
-        cronRpcClient.send(IrohCronRpcClient.CronRpcRequest.DeleteAll(agentId, timeoutMs)) as ServerFrame.CronDeleteAllResponse
+        cronRpcClient.sendCronDeleteAll(agentId, timeoutMs)
 
     override suspend fun sendSubagentList(all: Boolean, timeoutMs: Long): ServerFrame.SubagentListResponse =
-        subagentRpcClient.send(IrohSubagentRpcClient.SubagentRpcRequest.List(all, timeoutMs)) as ServerFrame.SubagentListResponse
+        subagentRpcClient.sendSubagentList(all, timeoutMs)
 
     override suspend fun sendSubagentTodos(toolCallId: String, timeoutMs: Long): ServerFrame.SubagentTodosResponse =
-        subagentRpcClient.send(IrohSubagentRpcClient.SubagentRpcRequest.Todos(toolCallId, timeoutMs)) as ServerFrame.SubagentTodosResponse
+        subagentRpcClient.sendSubagentTodos(toolCallId, timeoutMs)
 
     private fun frameId(prefix: String): String = "$prefix-${UUID.randomUUID()}"
     private fun nowIso(): String = java.time.Instant.now().toString()

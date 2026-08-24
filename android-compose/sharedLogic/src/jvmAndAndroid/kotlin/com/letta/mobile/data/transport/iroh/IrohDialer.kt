@@ -37,60 +37,104 @@ internal class IrohDialer(
     ): IrohConnectionHandle {
         val ticket = extractTicket(config, effectiveUrlOverride)
         onConnecting()
+        val secretKey = secretKeyStore.loadOrCreate()
         return runCatching {
-            val endpoint = bindLocalEndpoint(secretKeyStore.loadOrCreate())
-            dialEndpoint(config, ticket, endpoint)
-        }.onFailure { onCloseResources("dial_failed") }
-            .getOrThrow()
+            val localEndpoint = bindLocalEndpoint(secretKey)
+            var transport: IrohAppServerTransport? = null
+            try {
+                val dialedHandle = AtomicReference<IrohConnectionHandle?>(null)
+                val irohTransport = createTransport(localEndpoint, ticket, dialedHandle)
+                transport = irohTransport
+                val appServerClient = DefaultAppServerClient(irohTransport)
+                val serverCapabilities = authenticateClient(appServerClient, config.token)
+                irohTransport.awaitConnectionReady()
+                val (engine, eventRouter) = buildIrohTurnEngine(appServerClient, config.clientVersion, scope)
+                buildHandle(
+                    HandleComponents(config, ticket, irohTransport, engine, serverCapabilities, eventRouter, localEndpoint),
+                ).also { dialedHandle.set(it) }
+            } catch (error: Throwable) {
+                closeIrohResources("dial_failed", transport, localEndpoint)
+                throw error
+            }
+        }.onFailure {
+            onCloseResources("dial_failed")
+        }.getOrThrow()
     }
 
-    private fun extractTicket(config: IrohConnectConfig, override: String?): String {
-        val url = override?.takeIf { it.isNotBlank() } ?: config.baseShimUrl
-        check(IrohChannelTransport.isIrohUrl(url)) { "IrohChannelTransport requires backend URL iroh://<EndpointTicket>." }
-        return IrohChannelTransport.normalizeIrohAddress(url).takeIf { it.isNotBlank() }
+    private fun extractTicket(config: IrohConnectConfig, effectiveUrlOverride: String?): String {
+        val effectiveUrl = effectiveUrlOverride?.takeIf { it.isNotBlank() } ?: config.baseShimUrl
+        if (!IrohChannelTransport.isIrohUrl(effectiveUrl)) {
+            error("IrohChannelTransport requires backend URL iroh://<EndpointTicket>.")
+        }
+        return IrohChannelTransport.normalizeIrohAddress(effectiveUrl).takeIf { it.isNotBlank() }
             ?: error("IrohChannelTransport requires backend URL iroh://<EndpointTicket>.")
     }
 
-    private suspend fun bindLocalEndpoint(secretKey: ByteArray): Endpoint = runCatching { bindEndpoint(secretKey) }
-        .onFailure { error ->
-            Telemetry.event("IrohTransport", "bind.failed", "error" to (error.message ?: error.toString()), "class" to error::class.simpleName)
-        }.getOrThrow()
+    private suspend fun bindLocalEndpoint(secretKey: ByteArray): Endpoint = runCatching {
+        bindEndpoint(secretKey)
+    }.onFailure { t ->
+        Telemetry.event("IrohTransport", "bind.failed", "error" to (t.message ?: t.toString()), "class" to t::class.simpleName)
+    }.getOrThrow()
 
-    private suspend fun dialEndpoint(config: IrohConnectConfig, ticket: String, endpoint: Endpoint): IrohConnectionHandle {
-        var transport: IrohAppServerTransport? = null
-        try {
-            val holder = AtomicReference<IrohConnectionHandle?>(null)
-            val connected = createTransport(endpoint, ticket, holder)
-            transport = connected
-            val client = DefaultAppServerClient(connected)
-            val capabilities = authenticate(client, config.token)
-            connected.awaitConnectionReady()
-            val (engine, router) = buildIrohTurnEngine(client, config.clientVersion, scope)
-            return IrohConnectionHandle(
-                config = config,
-                ticket = ticket,
-                sessionId = ticket.hashCode().toString(),
-                transport = connected,
-                turnEngine = engine,
-                serverCapabilities = capabilities,
-                close = { reason -> router.detach(); onCloseResources(reason); closeIrohResources(reason, connected, endpoint) },
-            ).also { holder.set(it) }
-        } catch (error: Throwable) {
-            closeIrohResources("dial_failed", transport, endpoint)
-            throw error
-        }
+    private fun createTransport(
+        localEndpoint: Endpoint,
+        ticket: String,
+        dialedHandle: AtomicReference<IrohConnectionHandle?>,
+    ): IrohAppServerTransport {
+        return IrohAppServerTransportAdapter(
+            endpoint = localEndpoint,
+            onConnectionLost = { reason -> onConnectionLost(reason, dialedHandle.get()) },
+        ).createTransport(
+            endpoint = AppServerEndpoint(scheme = "iroh", address = ticket),
+            scope = scope,
+        ) as IrohAppServerTransport
     }
 
-    private fun createTransport(endpoint: Endpoint, ticket: String, holder: AtomicReference<IrohConnectionHandle?>): IrohAppServerTransport =
-        IrohAppServerTransportAdapter(endpoint = endpoint, onConnectionLost = { reason -> onConnectionLost(reason, holder.get()) })
-            .createTransport(AppServerEndpoint(scheme = "iroh", address = ticket), scope) as IrohAppServerTransport
-
-    private suspend fun authenticate(client: DefaultAppServerClient, token: String): Set<String>? {
-        val auth = client.auth(AppServerCommand.Auth("auth-${UUID.randomUUID()}", token, listOf(IrohFrameCodec.FRAME_PART_CAPABILITY)))
-        if (!auth.success && token.isNotBlank()) throw IrohAuthFailure(auth.error ?: "Iroh auth failed")
-        Telemetry.event("IrohTransport", "auth.negotiated", "success" to auth.success, "serverCapabilities" to (auth.capabilities ?: emptyList()).sorted().joinToString(","))
+    private suspend fun authenticateClient(
+        appServerClient: DefaultAppServerClient,
+        token: String,
+    ): Set<String>? {
+        val auth = appServerClient.auth(
+            AppServerCommand.Auth(
+                requestId = "auth-${UUID.randomUUID()}",
+                token = token,
+                capabilities = listOf(IrohFrameCodec.FRAME_PART_CAPABILITY),
+            ),
+        )
+        if (!auth.success && token.isNotBlank()) {
+            throw IrohAuthFailure(auth.error ?: "Iroh auth failed")
+        }
+        Telemetry.event(
+            "IrohTransport", "auth.negotiated",
+            "success" to auth.success,
+            "serverCapabilities" to (auth.capabilities ?: emptyList()).sorted().joinToString(","),
+        )
         return auth.capabilities?.toSet()
     }
+
+    private fun buildHandle(components: HandleComponents): IrohConnectionHandle = IrohConnectionHandle(
+        config = components.config,
+        ticket = components.ticket,
+        sessionId = components.ticket.hashCode().toString(),
+        transport = components.transport,
+        turnEngine = components.engine,
+        serverCapabilities = components.serverCapabilities,
+        close = { reason ->
+            components.eventRouter.detach()
+            onCloseResources(reason)
+            closeIrohResources(reason, components.transport, components.localEndpoint)
+        },
+    )
+
+    private data class HandleComponents(
+        val config: IrohConnectConfig,
+        val ticket: String,
+        val transport: IrohAppServerTransport,
+        val engine: AppServerTurnEngine,
+        val serverCapabilities: Set<String>?,
+        val eventRouter: AppServerRuntimeEventRouter,
+        val localEndpoint: Endpoint,
+    )
 
     private fun buildIrohTurnEngine(
         client: DefaultAppServerClient,
