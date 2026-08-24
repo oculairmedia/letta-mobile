@@ -111,17 +111,15 @@ class IrohChannelTransport(
     private val _state = MutableStateFlow<ChannelTransportState>(ChannelTransportState.Idle)
     override val state: StateFlow<ChannelTransportState> = _state.asStateFlow()
 
-    private val _events = MutableSharedFlow<ServerFrame>(extraBufferCapacity = 64)
-    override val events: SharedFlow<ServerFrame> = _events.asSharedFlow()
-
-    private val _frameEvents = MutableSharedFlow<TransportFrameEvent>(extraBufferCapacity = 64)
-    override val frameEvents: SharedFlow<TransportFrameEvent> = _frameEvents.asSharedFlow()
+    private val framePublisher = IrohFramePublisher()
+    override val events: SharedFlow<ServerFrame> = framePublisher.events
+    override val frameEvents: SharedFlow<TransportFrameEvent> = framePublisher.frameEvents
 
     private val _redialWhileTurnActive = MutableSharedFlow<RedialWhileTurnActive>(extraBufferCapacity = 8)
     override val redialWhileTurnActive: SharedFlow<RedialWhileTurnActive> = _redialWhileTurnActive.asSharedFlow()
 
-    /** Emit to both event flows so both direct consumers and
-     *  WsChatBridge (via frameEvents) see each frame exactly once. */
+    /** Emit to canonical frame publisher so both direct consumers and
+     *  WsChatBridge (via frameEvents) see each frame exactly once without split histories. */
     private suspend fun emitBoth(frame: ServerFrame) {
         // letta-mobile-34xoj: record stream activity to prevent premature reconnect
         adminRpcRetryState.recordStreamActivity()
@@ -134,8 +132,7 @@ class IrohChannelTransport(
         IrohTransportSupport.frameFlowContent(frame)?.let { (key, type, content) ->
             IrohFrameFlowDiagnostics.record("gate1.emit", key, type, content)
         }
-        _events.emit(frame)
-        _frameEvents.emit(TransportFrameEvent(frame = frame))
+        framePublisher.publish(frame)
     }
 
     /**
