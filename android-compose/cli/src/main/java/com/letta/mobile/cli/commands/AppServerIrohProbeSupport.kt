@@ -26,7 +26,6 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -356,7 +355,7 @@ internal class ProbeSessionFixture(
             IrohProbeAssertions.classifyAdminRpc(
                 method = method,
                 success = response.success,
-                resultIsArray = response.result is JsonArray,
+                result = response.result,
                 error = response.error,
             )
         }
