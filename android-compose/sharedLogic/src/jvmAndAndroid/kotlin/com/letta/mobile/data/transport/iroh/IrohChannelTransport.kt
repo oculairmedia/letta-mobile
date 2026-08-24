@@ -241,22 +241,8 @@ class IrohChannelTransport(
         onStateChanged = { supervisorState ->
             _state.value = supervisorState.toChannelTransportState()
             if (supervisorState is IrohConnectionState.Ready) {
-                val generation = connectionGeneration.incrementAndGet()
                 notifyRedialIfTurnActive()
-                // letta-mobile-r3i1z: (re)start the passive observer ingestion loop
-                // bound to THIS connection generation. Any prior collector (tied to
-                // an older, now-dead flow) is cancelled first so a stale collector
-                // never ingests from a torn-down transport.
-                startObserverIngest(supervisorState.handle, generation)
-                // letta-mobile-r3i1z (A): on EVERY fresh Ready — including a silent
-                // redial after a QUIC timeout — re-register this connection as a
-                // viewer of the currently-viewed conversation. Server-side viewer
-                // registration only fires on runtime_start (send) or message.list
-                // (hydrate); a long-lived app that redials without doing either is
-                // invisible to the fanout (viewerCount drops to just the initiator).
-                // Re-issuing the hydrate's message.list both re-registers server-side
-                // AND reconciles frames missed during the dead window.
-                reSubscribeViewedConversation(generation)
+                connectionSession.onReady(supervisorState.handle)
                 // letta-mobile-wxy4s: arm the application-level liveness probe for
                 // THIS connection generation. QUIC state alone cannot detect a
                 // black-holed peer (the unacked keepalive datagram keeps resetting
@@ -264,9 +250,7 @@ class IrohChannelTransport(
                 // stream is the only thing that actually tests the path.
                 livenessProbe.start(supervisorState.handle)
             } else {
-                connectionGeneration.incrementAndGet()
-                resubscribeJob?.cancel()
-                resubscribeJob = null
+                connectionSession.onNotReady("state:${supervisorState::class.simpleName}")
                 // Snapshot turn identity before a degraded handle is closed and
                 // its send jobs drop their entries from activeTurns. Intentional
                 // disconnects and config replacement must not synthesize redial
@@ -324,6 +308,11 @@ class IrohChannelTransport(
     // stream_delta frames into the SAME _events/_frameEvents seam the initiator
     // uses, so observer frames reduce identically.
     private val observerMapper = AppServerRuntimeEventMapper()
+    private val connectionSession = IrohConnectionSession(
+        scope = scope,
+        ingestObserverFrame = ::ingestObserverFrame,
+        resubscribe = { path -> adminRpc(method = "message.list", path = path, body = null) },
+    )
     @Volatile
     private var observerJob: Job? = null
 
@@ -1440,7 +1429,7 @@ class IrohChannelTransport(
         // the hydrate so a later reconnect can re-register this connection as a
         // server-side viewer with no user action. Recorded before the call so a
         // hydrate that only succeeds on retry/redial is still captured.
-        recordViewedConversationFrom(method, path)
+        connectionSession.recordViewedConversation(method, path)
         // letta-mobile-parg0: in-flight admin_rpc (even before completion) proves
         // openBi is progressing — the liveness probe must not declare-dead over it.
         val inFlightToken = adminRpcRetryState.beginAdminRpc()
@@ -1572,9 +1561,7 @@ class IrohChannelTransport(
     private fun String.isReadOnlyAdminRpcMethod(): Boolean = this in READ_ONLY_ADMIN_RPC_METHODS
 
     override suspend fun disconnect() {
-        connectionGeneration.incrementAndGet()
-        resubscribeJob?.cancel()
-        resubscribeJob = null
+        connectionSession.onNotReady("disconnect")
         interruptedTurns.clear()
         retiredRuns.clear()
         frameOwnershipPath.clear()
@@ -1876,7 +1863,7 @@ class IrohChannelTransport(
     }
 
     private fun currentSubagentScope(): SubagentRpcScope? {
-        val conversationId = viewedConversationId ?: return null
+        val conversationId = connectionSession.currentViewedConversationId() ?: return null
         val agentId = activeTurns[conversationId]?.agentId
         return SubagentRpcScope(conversationId, agentId)
     }
