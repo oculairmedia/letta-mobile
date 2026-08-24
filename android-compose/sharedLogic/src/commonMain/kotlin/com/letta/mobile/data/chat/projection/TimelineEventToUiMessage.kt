@@ -151,28 +151,14 @@ fun timelineEventToUiMessage(ev: TimelineEvent, ownAgentId: String? = null): UiM
                                     timelineInstantDurationMillis(startedAt, completedAt).coerceAtLeast(0L)
                                 }
                         } else null
-                        UiToolCall(
-                            name = tc.name ?: "tool",
-                            arguments = tc.arguments ?: "",
-                            result = result,
-                            status = if (result == null) null else if (isError) "error" else "success",
-                            generatedImageAttachments = if (tc.name == "generate_image") {
-                                ev.attachments.map {
-                                    UiImageAttachment(base64 = it.base64, mediaType = it.mediaType)
-                                }
-                            } else {
-                                emptyList()
-                            },
-                            executionTimeMs = executionTimeMs,
-                            toolCallId = callId,
-                            approvalDecision = chip,
-                            subagentDispatch = tc.toSubagentDispatch(result),
-                            agentMessageProvenance = AgentMessageProvenanceProjection.projectOutbound(
-                                toolName = tc.name,
-                                argumentsJson = tc.arguments,
-                                resultJson = result,
+                        tc.toUiToolCall(
+                            ToolCallRenderData(
+                                result = result,
                                 isError = isError,
-                                fromAgentId = ownAgentId,
+                                generatedImageAttachments = tc.generatedImageAttachments(ev.attachments),
+                                executionTimeMs = executionTimeMs,
+                                approvalDecision = chip,
+                                sourceAgentId = ownAgentId,
                             ),
                         )
                     }
@@ -295,30 +281,16 @@ fun timelineEventToUiMessage(ev: TimelineEvent, ownAgentId: String? = null): UiM
                         // letta-mobile-fe51r: surface the pointer-diet marker
                         // so the card can lazily fetch the full body on expand.
                         val truncation = callId?.let { ev.toolReturnTruncationByCallId[it] }
-                        UiToolCall(
-                            name = tc.name ?: "tool",
-                            arguments = tc.arguments ?: "",
-                            result = result,
-                            status = if (result == null) null else if (isError) "error" else "success",
-                            generatedImageAttachments = if (tc.name == "generate_image") {
-                                ev.attachments.map {
-                                    UiImageAttachment(base64 = it.base64, mediaType = it.mediaType)
-                                }
-                            } else {
-                                emptyList()
-                            },
-                            toolCallId = callId,
-                            approvalDecision = chip,
-                            subagentDispatch = tc.toSubagentDispatch(result),
-                            resultTruncation = truncation?.let {
-                                UiToolResultTruncation(messageId = it.messageId, byteLen = it.byteLen)
-                            },
-                            agentMessageProvenance = AgentMessageProvenanceProjection.projectOutbound(
-                                toolName = tc.name,
-                                argumentsJson = tc.arguments,
-                                resultJson = result,
+                        tc.toUiToolCall(
+                            ToolCallRenderData(
+                                result = result,
                                 isError = isError,
-                                fromAgentId = ev.agentId,
+                                generatedImageAttachments = tc.generatedImageAttachments(ev.attachments),
+                                approvalDecision = chip,
+                                resultTruncation = truncation?.let {
+                                    UiToolResultTruncation(messageId = it.messageId, byteLen = it.byteLen)
+                                },
+                                sourceAgentId = ev.agentId,
                             ),
                         )
                     }
@@ -418,6 +390,77 @@ private fun com.letta.mobile.data.model.ToolCall.toSubagentDispatch(result: Stri
     } else {
         null
     }
+
+/**
+ * letta-mobile-45e2k: normalize a skill-invocation tool call for display.
+ *
+ * When a tool call's arguments contain a `skill` field (possibly wrapped in
+ * up to two JSON-string layers), replace the tool name with "Skill" and the
+ * remaining arguments as normalized JSON. Unknown or malformed payloads fall
+ * back to the original name/arguments so the tool call stays visible.
+ */
+private data class NormalizedToolCall(
+    val name: String,
+    val arguments: String,
+    val displayTarget: String? = null,
+)
+
+private fun normalizeSkillToolCall(name: String, arguments: String): NormalizedToolCall {
+    val normalized = com.letta.mobile.data.model.SkillArgumentNormalizer.normalize(arguments)
+    return if (normalized != null) {
+        // Keep invocation details on the ordinary tool-card path rather than
+        // projecting the injected skill document as a second timeline item.
+        NormalizedToolCall(
+            name = "Skill",
+            arguments = normalized.normalizedArguments,
+            displayTarget = normalized.skillName,
+        )
+    } else {
+        NormalizedToolCall(name = name, arguments = arguments)
+    }
+}
+
+private data class ToolCallRenderData(
+    val result: String?,
+    val isError: Boolean,
+    val generatedImageAttachments: List<UiImageAttachment>,
+    val executionTimeMs: Long? = null,
+    val approvalDecision: UiToolApprovalDecision? = null,
+    val resultTruncation: UiToolResultTruncation? = null,
+    val sourceAgentId: String? = null,
+)
+
+private fun com.letta.mobile.data.model.ToolCall.toUiToolCall(data: ToolCallRenderData): UiToolCall {
+    val normalized = normalizeSkillToolCall(name ?: "tool", arguments ?: "")
+    return UiToolCall(
+        name = normalized.name,
+        arguments = normalized.arguments,
+        result = data.result,
+        displayTarget = normalized.displayTarget,
+        status = data.result?.let { if (data.isError) "error" else "success" },
+        generatedImageAttachments = data.generatedImageAttachments,
+        executionTimeMs = data.executionTimeMs,
+        toolCallId = effectiveId.takeIf { it.isNotBlank() },
+        approvalDecision = data.approvalDecision,
+        subagentDispatch = toSubagentDispatch(data.result),
+        resultTruncation = data.resultTruncation,
+        agentMessageProvenance = AgentMessageProvenanceProjection.projectOutbound(
+            toolName = name,
+            argumentsJson = arguments,
+            resultJson = data.result,
+            isError = data.isError,
+            fromAgentId = data.sourceAgentId,
+        ),
+    )
+}
+
+private fun com.letta.mobile.data.model.ToolCall.generatedImageAttachments(
+    attachments: List<com.letta.mobile.data.model.MessageContentPart.Image>,
+): List<UiImageAttachment> = if (name == "generate_image") {
+    attachments.map { UiImageAttachment(base64 = it.base64, mediaType = it.mediaType) }
+} else {
+    emptyList()
+}
 
 /**
  * letta-mobile-c49of: approval chip for a TOOL_CALL event. An explicit

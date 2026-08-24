@@ -6,7 +6,6 @@ import com.letta.mobile.ui.chat.render.ChatRenderItemState
 import com.letta.mobile.ui.chat.render.chatGeometrySignature
 import com.letta.mobile.feature.chat.render.LocalToolCardBodyParentVisible
 import com.letta.mobile.feature.chat.screen.RunBlock
-import com.letta.mobile.feature.chat.screen.SkillEnvelopeChip
 import com.letta.mobile.feature.chat.screen.chatRenderItemSeesLiveScale
 import com.letta.mobile.ui.components.DateSeparator
 import com.letta.mobile.ui.theme.ChatDimens
@@ -68,7 +67,6 @@ internal fun LazyListScope.chatMessageListItems(params: ChatMessageListItemsPara
         item(key = renderItem.key, contentType = when (renderItem) {
             is ChatRenderItem.Single -> "single"
             is ChatRenderItem.RunBlock -> "runblock"
-            is ChatRenderItem.SkillEnvelopeChip -> "skill-envelope"
         }) {
             ChatMessageListRenderItem(
                 params = ChatMessageListRenderItemParams(
@@ -121,7 +119,6 @@ private fun ChatMessageListRenderItem(params: ChatMessageListRenderItemParams) {
                 contentType = when (renderItem) {
                     is ChatRenderItem.Single -> "single"
                     is ChatRenderItem.RunBlock -> "runblock"
-                    is ChatRenderItem.SkillEnvelopeChip -> "skill-envelope"
                 },
             )
         }
@@ -177,17 +174,6 @@ private fun ChatMessageListRenderItemBody(params: ChatMessageListRenderItemBodyP
                 showTimestamp = params.showTimestamp,
             ),
         )
-        is ChatRenderItem.SkillEnvelopeChip -> {
-            SkillEnvelopeChip(
-                slug = renderItem.slug,
-                name = renderItem.name,
-                description = renderItem.description,
-                args = renderItem.args,
-                rawContent = renderItem.rawContent,
-                chatMode = params.context.chatMode,
-                modifier = Modifier.padding(top = params.chatDimens.ungroupedMessageSpacing),
-            )
-        }
         is ChatRenderItem.RunBlock -> ChatMessageListRenderRunBlockItem(
             params = ChatMessageListRenderRunBlockItemParams(
                 renderItem = renderItem,

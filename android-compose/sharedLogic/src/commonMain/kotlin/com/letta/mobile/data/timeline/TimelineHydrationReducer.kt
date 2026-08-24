@@ -193,6 +193,18 @@ private fun TimelineEvent.Confirmed.semanticIdentityKeyOrNull(): String? {
         TimelineMessageType.REASONING,
         TimelineMessageType.TOOL_CALL,
         TimelineMessageType.ERROR -> "semantic:${messageType.name}:$stableRunId:${content.trim()}"
+        // Hydrated history can expose one logical invocation twice: once as a
+        // tool_call_message and once as an approval_request_message. Their
+        // server ids and rendered content can differ, but the call id is the
+        // canonical invocation identity used by the matching tool return.
+        TimelineMessageType.TOOL_CALL -> toolCalls
+            .map { it.effectiveId }
+            .filter { it.isNotBlank() }
+            .takeIf { it.isNotEmpty() }
+            ?.sorted()
+            ?.joinToString(",")
+            ?.let { "semantic:${messageType.name}:$stableRunId:callIds:$it" }
+            ?: "semantic:${messageType.name}:$stableRunId:${content.trim()}"
         TimelineMessageType.USER,
         TimelineMessageType.TOOL_RETURN,
         TimelineMessageType.SYSTEM,

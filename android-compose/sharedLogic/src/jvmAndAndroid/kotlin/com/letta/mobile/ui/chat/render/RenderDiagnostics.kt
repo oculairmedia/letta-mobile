@@ -103,7 +103,6 @@ object RenderDiagnostics {
                 val (runId, text) = when (item) {
                     is ChatRenderItem.Single -> (item.message.runId ?: "") to item.message.content
                     is ChatRenderItem.RunBlock -> item.runId to item.messages.joinToString("") { it.first.content }
-                    is ChatRenderItem.SkillEnvelopeChip -> item.slug to item.rawContent
                 }
                 if (item is ChatRenderItem.Single && item.message.role != "assistant") continue
                 val sig = "run=$runId|len=${text.length}|head=${text.take(24)}"
@@ -149,7 +148,6 @@ object RenderDiagnostics {
             val (kind, itemAgentId) = when (item) {
                 is ChatRenderItem.Single -> "message" to item.message.agentId
                 is ChatRenderItem.RunBlock -> "run" to item.messages.firstOrNull()?.first?.agentId
-                is ChatRenderItem.SkillEnvelopeChip -> "subagent" to null
             }
             // A foreign item = a proven agent mismatch (both non-null and differ).
             val foreign = activeAgentId != null && itemAgentId != null && itemAgentId != activeAgentId

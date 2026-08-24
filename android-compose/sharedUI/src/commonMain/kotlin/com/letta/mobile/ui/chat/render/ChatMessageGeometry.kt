@@ -228,13 +228,6 @@ private fun ChatRenderItem.geometryContentFingerprint(
                 include(position.hashCode())
             }
         }
-        is ChatRenderItem.SkillEnvelopeChip -> {
-            include(messageId.hashCode())
-            include(slug.hashCode())
-            include(name.hashCode())
-            include(args.hashCode())
-            // TODO: include expanded state when chip expansion is implemented
-        }
     }
     return ChatRenderItemContentFingerprint(length = length, hash = hash)
 }
@@ -261,10 +254,6 @@ private fun ChatRenderItem.geometryExpansionHash(state: ChatRenderItemState): In
                 include(position.hashCode())
                 include((message.id !in state.expandedReasoningMessageIds).hashCode())
             }
-        }
-        is ChatRenderItem.SkillEnvelopeChip -> {
-            include(messageId.hashCode())
-            // TODO: include expanded state when chip expansion is implemented
         }
     }
     return hash

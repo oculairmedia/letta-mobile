@@ -82,6 +82,8 @@ data class UiToolCall(
     val name: String,
     val arguments: String,
     val result: String?,
+    /** Optional compact target shown beside [name] without replacing expanded arguments. */
+    val displayTarget: String? = null,
     val status: String? = null,
     val generatedImageAttachments: List<UiImageAttachment> = emptyList(),
     /**

@@ -32,6 +32,7 @@ data class ToolTimelineCall(
     val name: String,
     val arguments: String,
     val result: String?,
+    val displayTarget: String? = null,
     val state: ToolTimelineState,
     val summary: String,
     val executionTimeMs: Long? = null,
@@ -194,7 +195,10 @@ fun projectToolTimelineCall(
     }
 
     val state = classifyToolCallState(toolCall, messageApprovalRequest)
-    val summary = deriveToolCallSummary(toolCall.name, toolCall.arguments)
+    val summary = toolCall.displayTarget
+        ?.takeIf { it.isNotBlank() }
+        ?.let { "${toolCall.name.ifBlank { "Tool" }} · $it" }
+        ?: deriveToolCallSummary(toolCall.name, toolCall.arguments)
 
     val fresh = ToolTimelineCall(
         key = key,
@@ -202,6 +206,7 @@ fun projectToolTimelineCall(
         name = toolCall.name,
         arguments = toolCall.arguments,
         result = toolCall.result,
+        displayTarget = toolCall.displayTarget,
         state = state,
         summary = summary,
         executionTimeMs = toolCall.executionTimeMs,
