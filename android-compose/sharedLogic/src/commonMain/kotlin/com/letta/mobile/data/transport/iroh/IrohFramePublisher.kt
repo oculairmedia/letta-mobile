@@ -2,14 +2,12 @@ package com.letta.mobile.data.transport.iroh
 
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.TransportFrameEvent
-import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalForInheritanceCoroutinesApi
 import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.shareIn
 
 /**
  * Single-source canonical publisher for Iroh transport frames.
@@ -21,7 +19,6 @@ import kotlinx.coroutines.flow.shareIn
  * - Structural isolation preventing split histories across asymmetric consumers
  */
 internal class IrohFramePublisher(
-    scope: CoroutineScope,
     bufferCapacity: Int = DEFAULT_BUFFER_CAPACITY,
 ) {
     private val canonicalEvents = MutableSharedFlow<TransportFrameEvent>(
@@ -30,10 +27,8 @@ internal class IrohFramePublisher(
     )
     val frameEvents: SharedFlow<TransportFrameEvent> = canonicalEvents.asSharedFlow()
 
-    /** A derived projection; [canonicalEvents] is the only publication source. */
-    val events: SharedFlow<ServerFrame> = canonicalEvents
-        .map { event -> event.frame}
-        .shareIn(scope, started = SharingStarted.Eagerly, replay = 0)
+    /** A synchronous projection; collecting it directly collects [canonicalEvents]. */
+    val events: SharedFlow<ServerFrame> = ServerFrameSharedFlow(canonicalEvents)
 
     fun publish(frame: ServerFrame) {
         canonicalEvents.tryEmit(TransportFrameEvent(frame = frame))
@@ -42,4 +37,16 @@ internal class IrohFramePublisher(
     companion object {
         const val DEFAULT_BUFFER_CAPACITY = 64
     }
+}
+
+/** Maps the canonical flow inline without owning a coroutine, buffer, or queue. */
+@OptIn(ExperimentalForInheritanceCoroutinesApi::class)
+internal class ServerFrameSharedFlow(
+    private val canonicalEvents: SharedFlow<TransportFrameEvent>,
+) : SharedFlow<ServerFrame> {
+    override val replayCache: List<ServerFrame>
+        get() = canonicalEvents.replayCache.map(TransportFrameEvent::frame)
+
+    override suspend fun collect(collector: FlowCollector<ServerFrame>): Nothing =
+        canonicalEvents.collect { event -> collector.emit(event.frame) }
 }

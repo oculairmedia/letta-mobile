@@ -2,10 +2,10 @@ package com.letta.mobile.data.transport.iroh
 
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.TransportFrameEvent
-import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.onSubscription
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runCurrent
@@ -20,6 +20,22 @@ import kotlin.test.assertTrue
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class IrohFrameFlowDropTest {
+
+    @Test
+    fun synchronousProjectionMapsCanonicalReplayCache() {
+        val canonical = MutableSharedFlow<TransportFrameEvent>(replay = 1)
+        val projection = ServerFrameSharedFlow(canonical)
+        val frame = ServerFrame.AssistantMessage(
+            id = "replayed-msg",
+            ts = "2026-08-23T00:00:00Z",
+            conversationId = "conv-1",
+            content = "replayed",
+        )
+
+        canonical.tryEmit(TransportFrameEvent(frame))
+
+        assertEquals(listOf(frame), projection.replayCache)
+    }
 
     @Test
     fun replayZeroSharedFlowDropsFrameEmittedWithNoCollector() = runTest(UnconfinedTestDispatcher()) {
@@ -65,27 +81,18 @@ class IrohFrameFlowDropTest {
 
     @Test
     fun singleSourcePublisherDeliversIdenticalOrderedFramesToBothProjections() = runTest(UnconfinedTestDispatcher()) {
-        val publisher = IrohFramePublisher(backgroundScope)
+        val publisher = IrohFramePublisher()
         val eventsReceived = mutableListOf<String>()
         val frameEventsReceived = mutableListOf<String>()
 
-        val eventsReady = CompletableDeferred<Unit>()
-        val frameEventsReady = CompletableDeferred<Unit>()
-
-        val job1 = launch {
-            publisher.events
-                .onSubscription { eventsReady.complete(Unit) }
-                .collect { eventsReceived += it.id }
+        val job1 = launch(start = CoroutineStart.UNDISPATCHED) {
+            publisher.events.collect { eventsReceived += it.id }
         }
-        val job2 = launch {
-            publisher.frameEvents
-                .onSubscription { frameEventsReady.complete(Unit) }
-                .collect { frameEventsReceived += it.frame.id }
+        val job2 = launch(start = CoroutineStart.UNDISPATCHED) {
+            publisher.frameEvents.collect { frameEventsReceived += it.frame.id }
         }
 
         runCurrent()
-        eventsReady.await()
-        frameEventsReady.await()
 
         val count = 20
         for (i in 1..count) {
@@ -105,33 +112,24 @@ class IrohFrameFlowDropTest {
         assertEquals(expectedIds, eventsReceived)
         assertEquals(expectedIds, frameEventsReceived)
 
-        job1.cancel()
-        job2.cancel()
+        job1.cancelAndJoin()
+        job2.cancelAndJoin()
     }
 
     @Test
     fun asymmetricCancelledConsumerDoesNotSplitHistoryOrBlockSurvivingConsumer() = runTest(UnconfinedTestDispatcher()) {
-        val publisher = IrohFramePublisher(backgroundScope)
+        val publisher = IrohFramePublisher()
         val eventsReceived = mutableListOf<String>()
         val frameEventsReceived = mutableListOf<String>()
 
-        val eventsReady = CompletableDeferred<Unit>()
-        val frameEventsReady = CompletableDeferred<Unit>()
-
-        val survivingJob = launch {
-            publisher.events
-                .onSubscription { eventsReady.complete(Unit) }
-                .collect { eventsReceived += it.id }
+        val survivingJob = launch(start = CoroutineStart.UNDISPATCHED) {
+            publisher.events.collect { eventsReceived += it.id }
         }
-        val cancelledJob = launch {
-            publisher.frameEvents
-                .onSubscription { frameEventsReady.complete(Unit) }
-                .collect { frameEventsReceived += it.frame.id }
+        val cancelledJob = launch(start = CoroutineStart.UNDISPATCHED) {
+            publisher.frameEvents.collect { frameEventsReceived += it.frame.id }
         }
 
         runCurrent()
-        eventsReady.await()
-        frameEventsReady.await()
 
         // 1. Emit 5 items to both
         for (i in 1..5) {
@@ -169,12 +167,12 @@ class IrohFrameFlowDropTest {
         assertEquals(allIds, eventsReceived, "Surviving events collector must receive all 10 frames in order")
         assertEquals(first5Ids, frameEventsReceived, "Cancelled frameEvents collector only receives frames prior to cancellation")
 
-        survivingJob.cancel()
+        survivingJob.cancelAndJoin()
     }
 
     @Test
     fun publisherPreservesReplayZeroForLateSubscribers() = runTest(UnconfinedTestDispatcher()) {
-        val publisher = IrohFramePublisher(backgroundScope)
+        val publisher = IrohFramePublisher()
 
         // Emit frame with no subscribers
         publisher.publish(
@@ -212,7 +210,7 @@ class IrohFrameFlowDropTest {
         assertEquals(listOf("fresh-msg"), lateEvents)
         assertEquals(listOf("fresh-msg"), lateFrameEvents)
 
-        job1.cancel()
-        job2.cancel()
+        job1.cancelAndJoin()
+        job2.cancelAndJoin()
     }
 }

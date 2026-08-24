@@ -2,6 +2,7 @@ package com.letta.mobile.data.transport.iroh
 
 import com.letta.mobile.data.runtime.AppServerTurnEngine
 import com.letta.mobile.data.transport.ServerFrame
+import com.letta.mobile.data.transport.TransportFrameEvent
 import com.letta.mobile.data.transport.appserver.AppServerChannel
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
@@ -11,6 +12,7 @@ import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -156,12 +158,25 @@ class IrohChannelTransportObserverTerminalCancelRaceTest {
             serverTerminalWaitMs = 150L,
         )
         val frames = CopyOnWriteArrayList<ServerFrame>()
+        val frameEvents = CopyOnWriteArrayList<TransportFrameEvent>()
         transport.connect("iroh://ticket", "", "device", "test")
-        val collector = clientScope.launch { transport.events.collect(frames::add) }
+        val eventsCollector = clientScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            transport.events.collect(frames::add)
+        }
+        val frameEventsCollector = clientScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            transport.frameEvents.collect(frameEvents::add)
+        }
         withTimeout(5.seconds) {
             while (observerStream.subscriptionCount.value < 1) delay(10.milliseconds)
         }
-        return Scenario(client, observerStream, transport, frames, collector)
+        return Scenario(
+            client,
+            observerStream,
+            transport,
+            frames,
+            frameEvents,
+            listOf(eventsCollector, frameEventsCollector),
+        )
     }
 
     private class Scenario(
@@ -169,7 +184,8 @@ class IrohChannelTransportObserverTerminalCancelRaceTest {
         private val observerStream: MutableSharedFlow<AppServerReceivedFrame>,
         val transport: IrohChannelTransport,
         val frames: CopyOnWriteArrayList<ServerFrame>,
-        private val collector: Job,
+        private val frameEvents: CopyOnWriteArrayList<TransportFrameEvent>,
+        private val collectors: List<Job>,
     ) {
         suspend fun startTurn(): ServerFrame.TurnStarted {
             assertTrue(transport.send(AGENT_ID, CONVERSATION_ID, "hello", "otid-1", null, false))
@@ -203,13 +219,23 @@ class IrohChannelTransportObserverTerminalCancelRaceTest {
             client.releaseInput.complete(Unit)
         }
 
-        fun assertDrained() {
+        suspend fun assertDrained() {
             assertFalse(transport.hasAnyActiveChatTurn)
             assertFalse(transport.hasActiveChatTurn(CONVERSATION_ID))
+            withTimeout(3.seconds) {
+                while (frames.map(ServerFrame::id) != frameEvents.map { it.frame.id }) {
+                    delay(10.milliseconds)
+                }
+            }
+            assertEquals(
+                frames,
+                frameEvents.map(TransportFrameEvent::frame),
+                "events and frameEvents must remain coherent after terminal publication retires the turn",
+            )
         }
 
         fun close() {
-            collector.cancel()
+            collectors.forEach(Job::cancel)
             runBlocking { transport.disconnect() }
         }
     }
