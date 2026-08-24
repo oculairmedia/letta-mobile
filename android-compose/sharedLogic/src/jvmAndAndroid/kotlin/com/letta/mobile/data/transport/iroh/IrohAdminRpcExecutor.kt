@@ -33,16 +33,34 @@ internal class IrohAdminRpcExecutor(
 
     suspend fun execute(method: String, path: String, body: String?): AppServerInboundFrame.AdminRpcResponse {
         recordViewedConversation(method, path)
-        val first = supervisor.ready()
-        val generation = connectionGeneration()
-        val retryState = retryStateFor(generation)
+        val attempt = acquireStableReadyHandle()
+        val retryState = retryStateFor(attempt.generation)
         val inFlightToken = retryState.beginAdminRpc()
         try {
-            return executeTracked(method, path, body, first, generation, retryState)
+            return executeTracked(method, path, body, attempt.handle, attempt.generation, retryState)
         } finally {
             retryState.endAdminRpc(inFlightToken)
         }
     }
+
+    /**
+     * A handle acquired while Ready changes cannot safely be attributed to either
+     * adjacent generation. Retry until the generation is stable around ready().
+     */
+    private suspend fun acquireStableReadyHandle(): ReadyHandle {
+        while (true) {
+            val generationBeforeReady = connectionGeneration()
+            val handle = supervisor.ready()
+            if (connectionGeneration() == generationBeforeReady) {
+                return ReadyHandle(handle, generationBeforeReady)
+            }
+        }
+    }
+
+    private data class ReadyHandle(
+        val handle: IrohConnectionHandle,
+        val generation: Long,
+    )
 
     private suspend fun executeTracked(
         method: String,
