@@ -200,6 +200,9 @@ class IrohChannelTransport(
      */
     private val frameOwnershipPath = ConcurrentHashMap<String, String>()
     private val retiredRuns = RetiredRunRegistry()
+    private val connectionGeneration = atomic(0L)
+    @Volatile
+    private var resubscribeJob: Job? = null
 
     override fun hasActiveChatTurn(conversationId: String): Boolean =
         activeTurns[conversationId]?.terminalReached?.isCompleted == false
@@ -238,12 +241,13 @@ class IrohChannelTransport(
         onStateChanged = { supervisorState ->
             _state.value = supervisorState.toChannelTransportState()
             if (supervisorState is IrohConnectionState.Ready) {
+                val generation = connectionGeneration.incrementAndGet()
                 notifyRedialIfTurnActive()
                 // letta-mobile-r3i1z: (re)start the passive observer ingestion loop
                 // bound to THIS connection generation. Any prior collector (tied to
                 // an older, now-dead flow) is cancelled first so a stale collector
                 // never ingests from a torn-down transport.
-                startObserverIngest(supervisorState.handle)
+                startObserverIngest(supervisorState.handle, generation)
                 // letta-mobile-r3i1z (A): on EVERY fresh Ready — including a silent
                 // redial after a QUIC timeout — re-register this connection as a
                 // viewer of the currently-viewed conversation. Server-side viewer
@@ -252,7 +256,7 @@ class IrohChannelTransport(
                 // invisible to the fanout (viewerCount drops to just the initiator).
                 // Re-issuing the hydrate's message.list both re-registers server-side
                 // AND reconciles frames missed during the dead window.
-                reSubscribeViewedConversation()
+                reSubscribeViewedConversation(generation)
                 // letta-mobile-wxy4s: arm the application-level liveness probe for
                 // THIS connection generation. QUIC state alone cannot detect a
                 // black-holed peer (the unacked keepalive datagram keeps resetting
@@ -260,6 +264,9 @@ class IrohChannelTransport(
                 // stream is the only thing that actually tests the path.
                 livenessProbe.start(supervisorState.handle)
             } else {
+                connectionGeneration.incrementAndGet()
+                resubscribeJob?.cancel()
+                resubscribeJob = null
                 // Snapshot turn identity before a degraded handle is closed and
                 // its send jobs drop their entries from activeTurns. Intentional
                 // disconnects and config replacement must not synthesize redial
@@ -317,11 +324,10 @@ class IrohChannelTransport(
     // stream_delta frames into the SAME _events/_frameEvents seam the initiator
     // uses, so observer frames reduce identically.
     private val observerMapper = AppServerRuntimeEventMapper()
-    private val observerGeneration = atomic(0)
     @Volatile
     private var observerJob: Job? = null
 
-    private fun startObserverIngest(handle: IrohConnectionHandle) {
+    private fun startObserverIngest(handle: IrohConnectionHandle, generation: Long) {
         val streamFrames = handle.effectiveObserverStreamFrames
         if (streamFrames == null) {
             // A Ready handle with no observable stream must STILL invalidate any
@@ -331,9 +337,8 @@ class IrohChannelTransport(
             Telemetry.event("IrohObserver", "ingest.unavailable", "sessionId" to handle.sessionId)
             return
         }
-        // Bump the generation and cancel any prior collector: exactly one observer
-        // collector is ever live, and it is pinned to this handle's session.
-        val generation = observerGeneration.incrementAndGet()
+        // Cancel any prior collector: exactly one observer collector is live,
+        // pinned to the connection generation supplied by the Ready transition.
         observerJob?.cancel()
         // Log at ARM time (synchronously), not inside the launched job: if a racing
         // teardown cancels the job before dispatch, telemetry still shows the
@@ -347,7 +352,7 @@ class IrohChannelTransport(
             runCatching {
                 streamFrames.collect { received ->
                     // Guard against a stale collector that a redial has superseded.
-                    if (observerGeneration.value != generation) return@collect
+                    if (connectionGeneration.value != generation) return@collect
                     ingestObserverFrame(received)
                 }
             }.onFailure { error ->
@@ -364,8 +369,6 @@ class IrohChannelTransport(
     private fun stopObserverIngest(reason: String) {
         val job = observerJob ?: return
         observerJob = null
-        // Invalidate the generation so an in-flight collect body drops its frame.
-        observerGeneration.incrementAndGet()
         job.cancel()
         Telemetry.event("IrohObserver", "ingest.stop", "reason" to reason)
     }
@@ -421,24 +424,29 @@ class IrohChannelTransport(
      * Fire-and-forget on [scope]; failures are swallowed (a dead connection just
      * escalates through the normal admin_rpc retry path on the next real read).
      */
-    private fun reSubscribeViewedConversation() {
+    private fun reSubscribeViewedConversation(generation: Long) {
         val path = viewedMessageListPath ?: return
         val conversationId = viewedConversationId
-        scope.launch {
+        resubscribeJob?.cancel()
+        resubscribeJob = scope.launch {
+            if (connectionGeneration.value != generation) return@launch
             Telemetry.event(
                 "IrohObserver", "resubscribe.begin",
                 "conversationId" to (conversationId ?: ""),
+                "generation" to generation.toString(),
             )
-            runCatching { adminRpc(method = "message.list", path = path, body = null) }
-                .onFailure { error ->
-                    if (error is CancellationException) throw error
-                    Telemetry.event(
-                        "IrohObserver", "resubscribe.failed",
-                        "conversationId" to (conversationId ?: ""),
-                        "error" to (error.message ?: error.toString()),
-                        "class" to error::class.simpleName,
-                    )
-                }
+            runCatching {
+                if (connectionGeneration.value != generation) return@launch
+                adminRpc(method = "message.list", path = path, body = null)
+            }.onFailure { error ->
+                if (error is CancellationException) throw error
+                Telemetry.event(
+                    "IrohObserver", "resubscribe.failed",
+                    "conversationId" to (conversationId ?: ""),
+                    "error" to (error.message ?: error.toString()),
+                    "class" to error::class.simpleName,
+                )
+            }
         }
     }
 
@@ -1564,8 +1572,20 @@ class IrohChannelTransport(
     private fun String.isReadOnlyAdminRpcMethod(): Boolean = this in READ_ONLY_ADMIN_RPC_METHODS
 
     override suspend fun disconnect() {
+        connectionGeneration.incrementAndGet()
+        resubscribeJob?.cancel()
+        resubscribeJob = null
         interruptedTurns.clear()
         retiredRuns.clear()
+        frameOwnershipPath.clear()
+        activeSendJobs.values.forEach { it.cancel() }
+        activeSendJobs.clear()
+        activeTurns.values.forEach { turn ->
+            turn.terminalReached.complete("disconnected")
+        }
+        activeTurns.clear()
+        subagentCorrelator.reset()
+        lastEmittedSubagentRevision = 0L
         stopObserverIngest("disconnect")
         livenessProbe.stop("disconnect")
         supervisor.disconnect("disconnect")
