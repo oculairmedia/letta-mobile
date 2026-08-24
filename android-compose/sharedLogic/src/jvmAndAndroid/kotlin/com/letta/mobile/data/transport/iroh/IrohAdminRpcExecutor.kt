@@ -8,18 +8,31 @@ import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
+/** A complete App Server admin RPC request. */
+internal data class AdminRpcRequest(
+    val method: String,
+    val path: String,
+    val body: String?,
+)
+
 /**
  * Generation-scoped Admin RPC executor and retry/escalation state for [IrohChannelTransport].
  *
- * Encapsulates generation-keyed retry state, same-connection retry, reconnect escalation,
- * and in-flight RPC tracking for liveness-probe congestion gating.
+ * A call captures a ready handle together with its generation before it is ever retried. This
+ * prevents a stale failure from closing a newer connection, while retry state remains shared by
+ * all calls that proved activity on the same generation.
  */
 internal class IrohAdminRpcExecutor(
-    private val supervisor: IrohConnectionSupervisor,
-    private val connectionGeneration: () -> Long,
-    private val recordViewedConversation: (method: String, path: String) -> Unit,
+    private val dependencies: Dependencies,
 ) {
+    internal data class Dependencies(
+        val supervisor: IrohConnectionSupervisor,
+        val connectionGeneration: () -> Long,
+        val onRequestObserved: (AdminRpcRequest) -> Unit,
+    )
+
     private val retryStates = ConcurrentHashMap<Long, GenerationRetryState>()
+    private val retryPolicy = AdminRpcRetryPolicy(dependencies.connectionGeneration)
 
     fun retryStateFor(generation: Long): GenerationRetryState =
         retryStates.computeIfAbsent(generation) {
@@ -27,112 +40,67 @@ internal class IrohAdminRpcExecutor(
             GenerationRetryState(generation)
         }
 
-    fun currentRetryState(): GenerationRetryState = retryStateFor(connectionGeneration())
+    fun currentRetryState(): GenerationRetryState = retryStateFor(dependencies.connectionGeneration())
 
-    suspend fun execute(method: String, path: String, body: String?): AppServerInboundFrame.AdminRpcResponse {
-        recordViewedConversation(method, path)
-        val request = AdminRpcRequest(method, path, body)
-        val attempt = acquireStableReadyHandle()
-        val retryState = retryStateFor(attempt.generation)
-        val token = retryState.beginAdminRpc()
-        val call = TrackedCall(request, attempt, retryState)
+    suspend fun execute(request: AdminRpcRequest): AppServerInboundFrame.AdminRpcResponse {
+        dependencies.onRequestObserved(request)
+        val call = newTrackedCall(request)
+        val token = call.retryState.beginAdminRpc()
         try {
             return executeTracked(call)
         } finally {
-            retryState.endAdminRpc(token)
+            call.retryState.endAdminRpc(token)
         }
     }
 
-    /** Retries acquisition until a ready handle is bracketed by the same generation. */
-    private suspend fun acquireStableReadyHandle(): ReadyHandle {
+    /** Retries acquisition until a ready handle is bracketed by one generation. */
+    private suspend fun newTrackedCall(request: AdminRpcRequest): TrackedCall {
         while (true) {
-            val generation = connectionGeneration()
-            val handle = supervisor.ready()
-            if (connectionGeneration() == generation) return ReadyHandle(handle, generation)
+            val generation = dependencies.connectionGeneration()
+            val handle = dependencies.supervisor.ready()
+            if (dependencies.connectionGeneration() == generation) {
+                return TrackedCall(request, ReadyHandle(handle, generation), retryStateFor(generation))
+            }
         }
     }
 
     private suspend fun executeTracked(call: TrackedCall): AppServerInboundFrame.AdminRpcResponse {
-        val firstAttempt = runCatching { call.handle.adminRpc(call.request.method, call.request.path, call.request.body) }
-        if (firstAttempt.isSuccess) return firstAttempt.getOrThrow().also { onAttemptSuccess(call) }
-
-        val error = firstAttempt.exceptionOrNull()!!
-        validateRetryableError(call, error)
-        val metrics = RetryMetrics(call.retryState.recordFailure(), call.retryState.millisSinceLastStream())
-        return if (metrics.shouldEscalate) escalateReconnect(call, error, metrics) else retryOnSameConnection(call, error, metrics)
-    }
-
-    private suspend fun onAttemptSuccess(call: TrackedCall) {
-        if (connectionGeneration() == call.generation) {
-            call.retryState.reset()
-            call.retryState.recordProofOfLife()
+        return try {
+            call.execute()
+        } catch (error: Throwable) {
+            retryAfter(call, error)
         }
     }
 
-    private fun validateRetryableError(call: TrackedCall, error: Throwable) {
-        throwIfNotRetryable(call.request, error)
-        throwIfConnectionStillAlive(call, error)
-        throwIfGenerationChanged(call, error)
+    private suspend fun retryAfter(call: TrackedCall, error: Throwable): AppServerInboundFrame.AdminRpcResponse {
+        when (retryPolicy.eligibility(call, error)) {
+            RetryEligibility.Rejected -> throw error
+            RetryEligibility.StaleGeneration -> throw error
+            RetryEligibility.Eligible -> Unit
+        }
+        val metrics = RetryMetrics(call.retryState.recordFailure(), call.retryState.millisSinceLastStream())
+        return if (metrics.shouldEscalate) reconnectAndRetry(ReconnectRequest(call, error, metrics)) else retryOnce(call, error, metrics)
     }
 
-    private fun throwIfNotRetryable(request: AdminRpcRequest, error: Throwable) {
-        if (error is CancellationException) throw error
-        if (error.isAdminRpcPayloadError()) throw error
-        if (!error.isConnectionLostClass()) throw error
-        if (!request.method.isReadOnlyAdminRpcMethod()) throw error
-    }
-
-    private fun throwIfConnectionStillAlive(call: TrackedCall, error: Throwable) {
-        if (!call.handle.isConnectionAlive) return
-        Telemetry.event(
-            "IrohTransport", "admin_rpc.request_isolated",
-            "method" to call.request.method,
-            "path" to call.request.path,
-            "error" to error.description(),
-            "class" to error::class.simpleName,
-        )
-        throw error
-    }
-
-    private fun throwIfGenerationChanged(call: TrackedCall, error: Throwable) {
-        val currentGeneration = connectionGeneration()
-        if (currentGeneration == call.generation) return
-        Telemetry.event(
-            "IrohTransport", "admin_rpc.stale_generation_ignored",
-            "callGeneration" to call.generation.toString(),
-            "currentGeneration" to currentGeneration.toString(),
-            "method" to call.request.method,
-        )
-        throw error
-    }
-
-    private suspend fun retryOnSameConnection(
+    private suspend fun retryOnce(
         call: TrackedCall,
         error: Throwable,
         metrics: RetryMetrics,
     ): AppServerInboundFrame.AdminRpcResponse {
         recordRetry("admin_rpc.retry.same_connection", call, error, metrics)
-        return runCatching { call.handle.adminRpc(call.request.method, call.request.path, call.request.body) }
-            .getOrElse { retryError ->
-                if (retryError is CancellationException || connectionGeneration() != call.generation) throw retryError
-                escalateReconnect(call, retryError, metrics.nextFailure())
-            }
-            .also { onAttemptSuccess(call) }
+        return try {
+            call.execute()
+        } catch (retryError: Throwable) {
+            if (retryError is CancellationException || dependencies.connectionGeneration() != call.generation) throw retryError
+            reconnectAndRetry(ReconnectRequest(call, retryError, metrics.nextFailure()))
+        }
     }
 
-    private suspend fun escalateReconnect(
-        call: TrackedCall,
-        error: Throwable,
-        metrics: RetryMetrics,
-    ): AppServerInboundFrame.AdminRpcResponse {
-        recordRetry("admin_rpc.escalate.reconnect", call, error, metrics)
-        supervisor.onConnectionLost("admin_rpc_failed_after_retry: ${error.description()}", call.handle)
-        val handle = supervisor.ready()
-        val retryState = retryStateFor(connectionGeneration())
-        return handle.adminRpc(call.request.method, call.request.path, call.request.body).also {
-            retryState.reset()
-            retryState.recordProofOfLife()
-        }
+    private suspend fun reconnectAndRetry(request: ReconnectRequest): AppServerInboundFrame.AdminRpcResponse {
+        recordRetry("admin_rpc.escalate.reconnect", request.call, request.error, request.metrics)
+        dependencies.supervisor.onConnectionLost(request.reason, request.call.handle)
+        val retryCall = newTrackedCall(request.call.request)
+        return retryCall.execute().also { retryCall.markSuccess() }
     }
 
     private fun recordRetry(event: String, call: TrackedCall, error: Throwable, metrics: RetryMetrics) {
@@ -147,24 +115,35 @@ internal class IrohAdminRpcExecutor(
         )
     }
 
-    fun recordStreamActivity() {
-        currentRetryState().recordProofOfLife()
-    }
-
+    fun recordStreamActivity() = currentRetryState().recordProofOfLife()
     fun millisSinceLastProofOfLife(): Long = currentRetryState().millisSinceLastStream()
-
     fun youngInFlightAdminRpcCount(graceMs: Long = IrohLivenessProbe.CONGESTION_GRACE_MS): Int =
         currentRetryState().youngInFlightAdminRpcCount(graceMs)
+    fun clear() = retryStates.clear()
 
-    fun clear() {
-        retryStates.clear()
-    }
-
-    private data class AdminRpcRequest(val method: String, val path: String, val body: String?)
     private data class ReadyHandle(val handle: IrohConnectionHandle, val generation: Long)
-    private data class TrackedCall(val request: AdminRpcRequest, val readyHandle: ReadyHandle, val retryState: GenerationRetryState) {
+    private data class TrackedCall(
+        val request: AdminRpcRequest,
+        val readyHandle: ReadyHandle,
+        val retryState: GenerationRetryState,
+    ) {
         val handle: IrohConnectionHandle get() = readyHandle.handle
         val generation: Long get() = readyHandle.generation
+        suspend fun execute(): AppServerInboundFrame.AdminRpcResponse =
+            handle.adminRpc(request.method, request.path, request.body).also { markSuccess() }
+        suspend fun markSuccess() {
+            // A concurrent success is proof-of-life for this generation and deliberately
+            // resets the generation-shared failure count.
+            retryState.reset()
+            retryState.recordProofOfLife()
+        }
+    }
+    private data class ReconnectRequest(
+        val call: TrackedCall,
+        val error: Throwable,
+        val metrics: RetryMetrics,
+    ) {
+        val reason: String get() = "admin_rpc_failed_after_retry: ${error.message ?: error}"
     }
     private data class RetryMetrics(val failures: Int, val idleMs: Long) {
         val shouldEscalate: Boolean get() = failures >= ADMIN_RPC_FAILURE_THRESHOLD && idleMs > STREAM_IDLE_THRESHOLD_MS
@@ -181,7 +160,6 @@ internal class IrohAdminRpcExecutor(
         suspend fun recordFailure(): Int = mutex.withLock { ++consecutiveFailures }
         suspend fun reset() = mutex.withLock { consecutiveFailures = 0 }
         fun recordProofOfLife() { lastProofOfLifeMs = System.currentTimeMillis() }
-        fun recordStreamActivity() = recordProofOfLife()
         fun millisSinceLastStream(): Long = System.currentTimeMillis() - lastProofOfLifeMs
         fun beginAdminRpc(): Long = nextInFlightToken.incrementAndGet().also { inFlightStartByToken[it] = System.currentTimeMillis() }
         fun endAdminRpc(token: Long) { inFlightStartByToken.remove(token) }
@@ -192,6 +170,26 @@ internal class IrohAdminRpcExecutor(
     }
 
     private fun Throwable.description(): String = message ?: toString()
+
+    private inner class AdminRpcRetryPolicy(
+        private val currentGeneration: () -> Long,
+    ) {
+        fun eligibility(call: TrackedCall, error: Throwable): RetryEligibility {
+            if (error is CancellationException || error.isAdminRpcPayloadError() || !error.isConnectionLostClass()) return RetryEligibility.Rejected
+            if (!call.request.method.isReadOnlyAdminRpcMethod()) return RetryEligibility.Rejected
+            if (call.handle.isConnectionAlive) {
+                Telemetry.event("IrohTransport", "admin_rpc.request_isolated", "method" to call.request.method, "path" to call.request.path, "error" to error.description(), "class" to error::class.simpleName)
+                return RetryEligibility.Rejected
+            }
+            if (currentGeneration() != call.generation) {
+                Telemetry.event("IrohTransport", "admin_rpc.stale_generation_ignored", "callGeneration" to call.generation.toString(), "currentGeneration" to currentGeneration().toString(), "method" to call.request.method)
+                return RetryEligibility.StaleGeneration
+            }
+            return RetryEligibility.Eligible
+        }
+    }
+
+    private enum class RetryEligibility { Eligible, Rejected, StaleGeneration }
     private fun String.isReadOnlyAdminRpcMethod(): Boolean = this in READ_ONLY_ADMIN_RPC_METHODS
 
     companion object {
