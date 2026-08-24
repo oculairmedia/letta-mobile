@@ -175,7 +175,7 @@ internal class IrohAdminRpcExecutor(
         private val currentGeneration: () -> Long,
     ) {
         fun eligibility(call: TrackedCall, error: Throwable): RetryEligibility {
-            if (error is CancellationException || error.isAdminRpcPayloadError() || !error.isConnectionLostClass()) return RetryEligibility.Rejected
+            if (!isRetryableConnectionFailure(error)) return RetryEligibility.Rejected
             if (!call.request.method.isReadOnlyAdminRpcMethod()) return RetryEligibility.Rejected
             if (call.handle.isConnectionAlive) {
                 Telemetry.event("IrohTransport", "admin_rpc.request_isolated", "method" to call.request.method, "path" to call.request.path, "error" to error.description(), "class" to error::class.simpleName)
@@ -186,6 +186,11 @@ internal class IrohAdminRpcExecutor(
                 return RetryEligibility.StaleGeneration
             }
             return RetryEligibility.Eligible
+        }
+
+        private fun isRetryableConnectionFailure(error: Throwable): Boolean {
+            if (error is CancellationException || error.isAdminRpcPayloadError()) return false
+            return error.isConnectionLostClass()
         }
     }
 
