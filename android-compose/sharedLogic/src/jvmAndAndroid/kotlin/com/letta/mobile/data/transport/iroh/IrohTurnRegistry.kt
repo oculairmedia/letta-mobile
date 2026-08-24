@@ -27,7 +27,10 @@ class IrohActiveTurn(request: IrohTurnRequest) {
     val terminalSource: IrohTerminalSource? get() = terminalClaimed.value
 
     fun promoteRunId(promotion: IrohRunPromotion): Boolean {
-        if (promotion.token != token || promotion.runId.value.isBlank() || promotion.runId.value.isIrohSyntheticRunId()) return false
+        if (promotion.token != token) return false
+        val candidate = promotion.runId.value
+        if (candidate.isBlank()) return false
+        if (candidate.isIrohSyntheticRunId()) return false
         while (true) {
             val current = runIdRef.value
             if (!current.value.isIrohSyntheticRunId() || current == promotion.runId) return false
