@@ -161,7 +161,7 @@ class HostSkillsEnumeratorTest {
             },
         )
         assertTrue(
-            HostSkillsEnumerator.resolveSkillsDir(null) { null }.endsWith("/.letta/skills"),
+            HostSkillsEnumerator.resolveSkillsDir(null) { null }.replace('\\', '/').endsWith("/.letta/skills"),
             "the documented default is letta-code's own ~/.letta/skills",
         )
     }

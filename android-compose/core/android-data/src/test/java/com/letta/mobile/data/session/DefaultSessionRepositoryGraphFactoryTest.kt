@@ -1,6 +1,9 @@
 package com.letta.mobile.data.session
 
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.model.Provider
+import com.letta.mobile.data.model.ProviderId
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.iroh.IrohScheduleRepository
 import com.letta.mobile.data.repository.ScheduleRepository
@@ -12,10 +15,13 @@ import com.letta.mobile.runtime.RuntimeId
 import com.letta.mobile.runtime.RuntimeEventOutbox
 import com.letta.mobile.runtime.MemFsStore
 import com.letta.mobile.runtime.TurnEngine
+import com.letta.mobile.testutil.FakeModelApi
+import com.letta.mobile.testutil.FakeProviderApi
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -34,6 +40,8 @@ class DefaultSessionRepositoryGraphFactoryTest {
     private fun factory(
         settingsRepository: ISettingsRepository? = null,
         localRuntimeOptions: LocalRuntimeOptions = LocalRuntimeOptions.Disabled,
+        modelApi: FakeModelApi? = null,
+        providerApi: FakeProviderApi? = null,
     ): DefaultSessionRepositoryGraphFactory =
         createTestDefaultSessionRepositoryGraphFactory {
             this.agentDao = lazyOf(this@DefaultSessionRepositoryGraphFactoryTest.agentDao)
@@ -41,6 +49,8 @@ class DefaultSessionRepositoryGraphFactoryTest {
             this.appContext = this@DefaultSessionRepositoryGraphFactoryTest.appContext
             this.settingsRepository = settingsRepository
             this.localRuntimeOptions = localRuntimeOptions
+            modelApi?.let { this.modelApi = it }
+            providerApi?.let { this.providerApi = it }
         }
 
     private fun settingsWith(config: LettaConfig): ISettingsRepository {
@@ -147,6 +157,33 @@ class DefaultSessionRepositoryGraphFactoryTest {
     }
 
     @Test
+    fun `create wires credentialed provider filter into model repository`() = runTest {
+        val modelApi = FakeModelApi().apply {
+            llmModels += model("openai/gpt-4o")
+            llmModels += model("anthropic/claude-sonnet")
+        }
+        val providerApi = FakeProviderApi().apply {
+            providers += Provider(
+                id = ProviderId("p1"),
+                name = "OpenAI",
+                providerType = "openai",
+            )
+        }
+        val graph = factory(modelApi = modelApi, providerApi = providerApi).create()
+
+        graph.modelRepository.refreshLlmModels()
+
+        assertTrue(providerApi.calls.contains("listProviders"))
+        assertEquals(listOf("openai/gpt-4o"), graph.modelRepository.llmModels.value.map { it.handle })
+        val listProviderCalls = providerApi.calls.count { it == "listProviders" }
+
+        graph.modelRepository.refreshLlmModels()
+
+        assertEquals(listProviderCalls, providerApi.calls.count { it == "listProviders" })
+        graph.close()
+    }
+
+    @Test
     fun `create with local config and enabled options falls back if no provider supports`() {
         val config = LettaConfig(
             id = "test-local-unsupported",
@@ -167,5 +204,15 @@ class DefaultSessionRepositoryGraphFactoryTest {
 
         assertEquals(BackendKind.RemoteLetta, graph.backendDescriptor.kind)
         assertNull(graph.localRuntimeBackend)
+    }
+
+    private fun model(handle: String): LlmModel {
+        val provider = handle.substringBefore('/')
+        return LlmModel(
+            id = handle,
+            name = handle.substringAfter('/'),
+            handle = handle,
+            providerType = provider,
+        )
     }
 }
