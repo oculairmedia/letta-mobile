@@ -573,7 +573,11 @@ class IrohChannelTransport(
     private fun isRetiredObserverRun(streamDelta: AppServerInboundFrame.StreamDelta, conversationId: String): Boolean {
         val deltaObj = streamDelta.delta as? JsonObject
         val frameRunId = deltaObj?.string("run_id") ?: deltaObj?.string("runId")
-        if (frameRunId != null && recentlyRetiredRuns.containsKey(frameRunId)) {
+        // A retired run may still have content/tool frames in flight. Only its
+        // terminal can be a duplicate; keep nonterminal frames observable and
+        // correlated even after the local turn has retired.
+        val isTerminal = deltaObj?.string("message_type") == "stop_reason"
+        if (isTerminal && frameRunId != null && recentlyRetiredRuns.containsKey(frameRunId)) {
             Telemetry.event(
                 "IrohObserver", "ingest.skip_already_retired",
                 "conversationId" to conversationId,
@@ -610,10 +614,10 @@ class IrohChannelTransport(
      * LOCAL turn id, the engine path's terminal `emitTurnFrame` will not run
      * (race / engine collect already returned / frame was dropped) and we must
      * retire the `ActiveTurn` ourselves — otherwise the composer keeps
-     * showing "Thinking…" indefinitely. The engine owns the emit slot (see
-     * [emitTurnFrame]'s exactly-once guard), so we retire using
-     * [retireActiveTurn] without re-emitting the frame. Anything else is
-     * engine-owned and we drop it as before.
+     * showing "Thinking…" indefinitely. The observer claims the terminal
+     * before emitting and retiring it, so a later engine or synthetic-cancel
+     * path loses the shared exactly-once guard. Anything else is engine-owned
+     * and we drop it as before.
      */
     private suspend fun projectEngineOwnedObserverDelta(
         scope: ObserverProjectionScope,
@@ -1298,20 +1302,11 @@ class IrohChannelTransport(
     }
 
     /**
-     * letta-mobile-dir4k: retire an [ActiveTurn] without re-emitting a
-     * [ServerFrame.TurnDone]. Used by the observer path when it sees a
-     * terminal for a turn whose engine path may or may not fire (race / engine
-     * already returned / engine never saw the frame). Crucially this does NOT
-     * call [ActiveTurn.claimTerminal] — that atomic guard still belongs to the
-     * engine path's [emitTurnFrame] so an engine path that DOES fire later
-     * can still emit the terminal exactly once (and complete the deferred if
-     * it wasn't already). Here we just:
-     *  - complete [ActiveTurn.terminalReached] so any [cancel] awaiters wake;
-     *  - drop the entry from [activeTurns] so [hasActiveChatTurn] clears;
-     *  - clear matching interrupted / ownership state.
-     * If the engine path fires afterward, [emitTurnFrame] will emit the
-     * frame and the keyed remove will no-op (entry already gone). `source` is
-     * the telemetry discriminator (e.g. `"observer_terminal"`).
+     * Retires a turn after its source has claimed the shared terminal guard.
+     * Engine, observer, and synthetic-cancel callers all claim before invoking
+     * this method, which preserves one terminal emission while waking cancel
+     * waiters, clearing active ownership, and dropping interrupted state.
+     * `source` identifies the winning path for telemetry.
      */
     private fun retireActiveTurn(turn: ActiveTurn, status: String, source: String) {
         if (interruptedTurns[turn.conversationId]?.turnId == turn.turnId) {
@@ -1322,6 +1317,7 @@ class IrohChannelTransport(
         // flip by [recordFrameOwnership].
         frameOwnershipPath.remove(turn.conversationId)
         if (turn.runId.isNotBlank()) {
+            pruneRecentlyRetiredRuns()
             recentlyRetiredRuns[turn.runId] = System.currentTimeMillis()
         }
         val removed = activeTurns.remove(turn.conversationId, turn)
@@ -1339,6 +1335,17 @@ class IrohChannelTransport(
             "source" to source,
             "entryRemoved" to removed.toString(),
         )
+    }
+
+    private fun pruneRecentlyRetiredRuns() {
+        val cutoff = System.currentTimeMillis() - RETIRED_RUN_RETENTION_MS
+        recentlyRetiredRuns.entries.removeIf { (_, retiredAt) -> retiredAt < cutoff }
+        if (recentlyRetiredRuns.size > MAX_RETIRED_RUNS) {
+            recentlyRetiredRuns.entries
+                .sortedBy { it.value }
+                .take(recentlyRetiredRuns.size - MAX_RETIRED_RUNS)
+                .forEach { (runId) -> recentlyRetiredRuns.remove(runId) }
+        }
     }
 
     private fun emitDraft(
@@ -1717,6 +1724,7 @@ class IrohChannelTransport(
             }
             runCatching { job.cancel() }
         }
+        recentlyRetiredRuns.clear()
         runCatching { transport?.close() }
         runCatching { endpoint?.shutdown() }
         runCatching { endpoint?.close() }
@@ -2089,6 +2097,8 @@ class IrohChannelTransport(
         // letta-mobile-34xoj: admin_rpc retry thresholds
         private const val ADMIN_RPC_FAILURE_THRESHOLD = 3
         private const val STREAM_IDLE_THRESHOLD_MS = 30_000L
+        private const val RETIRED_RUN_RETENTION_MS = 60_000L
+        private const val MAX_RETIRED_RUNS = 256
         // letta-mobile-wxy4s: liveness probe cadence lives on IrohLivenessProbe.
         internal const val LIVENESS_PROBE_INTERVAL_MS = IrohLivenessProbe.INTERVAL_MS
         internal const val LIVENESS_PROBE_TIMEOUT_MS = IrohLivenessProbe.TIMEOUT_MS

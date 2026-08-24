@@ -60,7 +60,7 @@ class IrohChannelTransportObserverTerminalCancelRaceTest {
         emitTerminal(TerminalSource.Engine, turn.runId, seq = 6)
         releaseInput()
         awaitTurnDone()
-        delay(200.milliseconds)
+        awaitInactiveTurn()
         assertDrained()
 
         val turnDones = frames.filterIsInstance<ServerFrame.TurnDone>()
@@ -77,9 +77,9 @@ class IrohChannelTransportObserverTerminalCancelRaceTest {
         assertTrue(transport.cancel(CONVERSATION_ID))
         emitTerminal(TerminalSource.Observer, turn.runId, seq = 5)
 
-        delay(300.milliseconds)
-        releaseInput()
+        awaitInactiveTurn()
         assertDrained()
+        releaseInput()
 
         val turnDones = frames.filterIsInstance<ServerFrame.TurnDone>()
         assertEquals(1, turnDones.size, "exactly 1 pre-dedupe terminal frame must be emitted")
@@ -91,16 +91,16 @@ class IrohChannelTransportObserverTerminalCancelRaceTest {
     fun verifyRepeatedCancelAndRepeatedTerminalDelivery(): Unit = scenarioTest {
         val turn = startTurn()
 
-        // Repeated cancel calls while turn is running
-        assertTrue(transport.cancel(CONVERSATION_ID))
         assertTrue(transport.cancel(CONVERSATION_ID))
 
-        // Concurrent engine and observer terminals arrive for this turn
+        // Retire before retrying: a second cancel must not fabricate a terminal
+        // after the original turn has been removed.
         emitTerminal(TerminalSource.Observer, turn.runId, seq = 10)
         emitTerminal(TerminalSource.Engine, turn.runId, seq = 11)
         releaseInput()
-        delay(300.milliseconds)
+        awaitInactiveTurn()
         assertDrained()
+        assertFalse(transport.cancel(CONVERSATION_ID))
 
         val turnDones = frames.filterIsInstance<ServerFrame.TurnDone>()
         assertEquals(1, turnDones.size, "exactly 1 pre-dedupe terminal frame must be emitted across all retries")
@@ -145,7 +145,6 @@ class IrohChannelTransportObserverTerminalCancelRaceTest {
         withTimeout(5.seconds) {
             while (observerStream.subscriptionCount.value < 1) delay(10.milliseconds)
         }
-        delay(150.milliseconds)
         return Scenario(client, observerStream, transport, frames, collector)
     }
 
