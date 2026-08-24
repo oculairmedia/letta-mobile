@@ -55,12 +55,13 @@ class DesktopChatController(
     // PATCHes the server so this lights up automatically once the backend lands.
     loadArchivedConversationIds: () -> Set<String> = { emptySet() },
     private val persistArchivedConversationIds: (Set<String>) -> Unit = {},
+    private val timelinePersistence: DesktopTimelinePersistence = DesktopTimelinePersistence(),
     private val loopFactory: suspend (
         gateway: DesktopChatGateway,
         conversation: DesktopConversationSummary,
         scope: CoroutineScope,
     ) -> DesktopTimelineLoop = { gateway, conversation, loopScope ->
-        RealDesktopTimelineLoop.create(gateway, conversation, loopScope)
+        RealDesktopTimelineLoop.create(gateway, conversation, loopScope, timelinePersistence)
     },
 ) {
     private val initialState = initialLiveDesktopChatSurfaceState(bootstrapState)

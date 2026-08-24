@@ -31,7 +31,9 @@ internal object DesktopTimelineSnapshotMaintenance {
             paths.filter { it.toString().endsWith(".json") }.toList()
         }
         val decodedSnapshots = snapshotFiles.mapNotNull { file ->
-            TimelineSnapshotCodec.decode(Files.readString(file))?.let { file to it.writtenAtMillis }
+            runCatching { Files.readString(file) }.getOrNull()
+                ?.let(TimelineSnapshotCodec::decode)
+                ?.let { file to it.writtenAtMillis }
         }
         val corruptSnapshots = snapshotFiles - decodedSnapshots.map { it.first }.toSet()
         corruptSnapshots.forEach { Files.deleteIfExists(it) }

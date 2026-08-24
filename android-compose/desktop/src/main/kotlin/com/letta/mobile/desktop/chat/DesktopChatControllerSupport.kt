@@ -14,6 +14,7 @@ import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
 import com.letta.mobile.desktop.data.DesktopConfirmedTimelineStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.runBlocking
 
 internal fun ChatComposerError.toDesktopMessage(limits: AttachmentLimits): String = when (this) {
     ChatComposerError.MaxAttachmentCountExceeded -> "Attach up to ${limits.maxAttachmentCount} images."
@@ -47,8 +48,12 @@ value class MessageListOrder(val value: String)
 @JvmInline
 value class TimelinePageLimit(val value: Int)
 
-internal data class DesktopTimelinePersistence(
-    val store: ConfirmedTimelineStore = DesktopConfirmedTimelineStore(),
+private val sharedDesktopConfirmedTimelineStore: ConfirmedTimelineStore by lazy {
+    DesktopConfirmedTimelineStore()
+}
+
+data class DesktopTimelinePersistence(
+    val store: ConfirmedTimelineStore = sharedDesktopConfirmedTimelineStore,
     val backendId: String = "desktop-local",
 )
 
@@ -92,7 +97,7 @@ internal class RealDesktopTimelineLoop private constructor(
         delegate.send(request.content.value, request.attachments)
 
     override fun close() {
-        delegate.close()
+        runBlocking { delegate.closeAndJoin() }
     }
 
     companion object {

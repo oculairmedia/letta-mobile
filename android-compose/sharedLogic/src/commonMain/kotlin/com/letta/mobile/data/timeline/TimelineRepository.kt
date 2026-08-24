@@ -308,7 +308,7 @@ open class TimelineRepository(
         val count = loops.size
         loops.values.forEach { loop ->
             removeHydrateFlight(loop)
-            loop.close()
+            loop.closeAndJoin()
         }
         loops.clear()
         Telemetry.event("TimelineRepo", "clearAll", "clearedLoopCount" to count)
@@ -652,7 +652,7 @@ open class TimelineRepository(
         val key = TimelineCacheKey(null, conversationId)
         (loops.remove(key) ?: removeAliasedLoopLocked(key))?.let { loop ->
             removeHydrateFlight(loop)
-            loop.close()
+            loop.closeAndJoin()
             Telemetry.event(
                 "TimelineRepo", "loop.cleared",
                 "conversationId" to conversationId,
@@ -664,7 +664,7 @@ open class TimelineRepository(
         val key = TimelineCacheKey(agentId, conversationId)
         (loops.remove(key) ?: removeAliasedLoopLocked(key))?.let { loop ->
             removeHydrateFlight(loop)
-            loop.close()
+            loop.closeAndJoin()
             Telemetry.event(
                 "TimelineRepo", "loop.cleared",
                 "agentId" to agentId.orEmpty(),

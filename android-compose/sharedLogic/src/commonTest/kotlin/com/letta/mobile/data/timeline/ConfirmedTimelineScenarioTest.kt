@@ -3,12 +3,15 @@ package com.letta.mobile.data.timeline
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.UserMessage
+import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore
 import com.letta.mobile.data.timeline.snapshot.InMemoryConfirmedTimelineStore
 import com.letta.mobile.data.timeline.snapshot.StoredTimelineEnvelope
 import com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
+import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -66,6 +69,26 @@ class ConfirmedTimelineScenarioTest {
         override suspend fun streamConversation(conversationId: String): Flow<TimelineStreamFrame> = emptyFlow()
     }
 
+    private class BlockingConfirmedTimelineStore : ConfirmedTimelineStore {
+        val writeStarted = CompletableDeferred<Unit>()
+        val writeFinished = CompletableDeferred<Unit>()
+
+        override suspend fun readSnapshot(scope: TimelineScope): StoredTimelineEnvelope? = null
+
+        override suspend fun writeSnapshot(envelope: StoredTimelineEnvelope): Boolean {
+            writeStarted.complete(Unit)
+            try {
+                awaitCancellation()
+            } finally {
+                writeFinished.complete(Unit)
+            }
+        }
+
+        override suspend fun deleteSnapshot(scope: TimelineScope) = Unit
+        override suspend fun clearForBackend(backendId: String) = Unit
+        override suspend fun prune(backendId: String, maxRetainedConversations: Int) = Unit
+    }
+
     @Test
     fun coldStartWithDurableSnapshotRendersImmediatelyBeforeRemoteCall() = runTest {
         val store = InMemoryConfirmedTimelineStore()
@@ -101,32 +124,38 @@ class ConfirmedTimelineScenarioTest {
             delayCompletion = gate,
             messagesByConversation = mapOf(
                 "conv-persisted" to listOf(
-                    UserMessage(id = "msg-1", contentRaw = kotlinx.serialization.json.JsonPrimitive("Hello from yesterday")),
-                    AssistantMessage(id = "msg-2", contentRaw = kotlinx.serialization.json.JsonPrimitive("I remember you!")),
+                    UserMessage(
+                        id = "fresh-msg",
+                        contentRaw = kotlinx.serialization.json.JsonPrimitive("Fresh from the server"),
+                    ),
                 ),
             ),
         )
-
-        val repo = TimelineRepository(
-            timelineTransport = transport,
-            pendingLocalStore = NoOpPendingLocalStore,
-            conversationCursorStore = NoOpConversationCursorStore,
+        val snapshot = store.readSnapshot(scope)
+        assertNotNull(snapshot)
+        val loop = TimelineSyncLoop(
+            messageApi = transport,
+            conversationId = scope.conversationId,
+            scope = this,
+            startStreamSubscriber = false,
             confirmedTimelineStore = store,
-            backendIdProvider = { "test-backend" },
-            startLoopStreamSubscribers = false,
+            timelineScope = scope,
+            initialTimeline = TimelineSnapshotCodec.storedEnvelopeToTimeline(snapshot),
+            initialRevision = snapshot.revision,
         )
 
         try {
-            val creation = async { repo.getOrCreate("conv-persisted") }
+            val hydration = async { loop.hydrate() }
             transport.listMessagesStarted.await()
             assertEquals(1, transport.listMessagesCallCount)
+            assertEquals("Hello from yesterday", loop.state.value.events[0].content)
+            assertEquals("I remember you!", loop.state.value.events[1].content)
+
             gate.complete(Unit)
-            val initialTimeline = creation.await().state.value
-            assertEquals(2, initialTimeline.events.size)
-            assertEquals("Hello from yesterday", initialTimeline.events[0].content)
-            assertEquals("I remember you!", initialTimeline.events[1].content)
+            hydration.await()
+            assertTrue(loop.state.value.events.any { it.content == "Fresh from the server" })
         } finally {
-            repo.clearAll()
+            loop.close()
         }
     }
 
@@ -199,7 +228,9 @@ class ConfirmedTimelineScenarioTest {
         )
         store.writeSnapshot(envelope)
 
+        val gate = CompletableDeferred<Unit>()
         val transport = FakeTimelineTransport(
+            delayCompletion = gate,
             messagesByConversation = mapOf(
                 "conv-slow" to listOf(
                     UserMessage(id = "msg-1", contentRaw = kotlinx.serialization.json.JsonPrimitive("Older message")),
@@ -207,23 +238,31 @@ class ConfirmedTimelineScenarioTest {
                 ),
             ),
         )
-
-        val repo = TimelineRepository(
-            timelineTransport = transport,
-            pendingLocalStore = NoOpPendingLocalStore,
-            conversationCursorStore = NoOpConversationCursorStore,
+        val snapshot = store.readSnapshot(scope)
+        assertNotNull(snapshot)
+        val loop = TimelineSyncLoop(
+            messageApi = transport,
+            conversationId = scope.conversationId,
+            scope = this,
+            startStreamSubscriber = false,
             confirmedTimelineStore = store,
-            backendIdProvider = { "test-backend" },
-            startLoopStreamSubscribers = false,
+            timelineScope = scope,
+            initialTimeline = TimelineSnapshotCodec.storedEnvelopeToTimeline(snapshot),
+            initialRevision = snapshot.revision,
         )
 
         try {
-            val loop = repo.getOrCreate("conv-slow")
+            val hydration = async { loop.hydrate() }
+            transport.listMessagesStarted.await()
+            assertEquals(listOf("Older message"), loop.state.value.events.map { it.content })
+
+            gate.complete(Unit)
+            hydration.await()
             assertEquals(2, loop.state.value.events.size)
             assertEquals("Older message", loop.state.value.events[0].content)
             assertEquals("Newly landed server delta", loop.state.value.events[1].content)
         } finally {
-            repo.clearAll()
+            loop.close()
         }
     }
 
@@ -284,6 +323,27 @@ class ConfirmedTimelineScenarioTest {
         } finally {
             repo.clearAll()
         }
+    }
+
+    @Test
+    fun closeCancelsAndJoinsInFlightSnapshotPersistence() = runTest {
+        val store = BlockingConfirmedTimelineStore()
+        val scope = TimelineScope("test-backend", "conv-closing")
+        val loop = TimelineSyncLoop(
+            messageApi = FakeTimelineTransport(),
+            conversationId = scope.conversationId,
+            scope = this,
+            startStreamSubscriber = false,
+            confirmedTimelineStore = store,
+            timelineScope = scope,
+        )
+
+        loop.scheduleSnapshotPersist(immediate = true)
+        store.writeStarted.await()
+
+        loop.closeAndJoin()
+
+        assertTrue(store.writeFinished.isCompleted)
     }
 
     @Test

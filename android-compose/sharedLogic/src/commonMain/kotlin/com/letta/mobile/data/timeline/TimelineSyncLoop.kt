@@ -15,7 +15,6 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -28,7 +27,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
 
 /**
  * Single sync loop per conversation. Acts as a thin orchestrator (under 200 lines).
@@ -136,7 +134,7 @@ class TimelineSyncLoop(
         if (confirmedTimelineStore === NoOpConfirmedTimelineStore) return
         if (immediate) {
             persistJob?.cancel()
-            persistJob = loopScope.launch { flushSnapshotNow() }
+            persistJob = loopScope.launch { flushSnapshotNow(prune = true) }
         } else if (persistJob?.isActive != true) {
             persistJob = loopScope.launch {
                 delay(100)
@@ -145,7 +143,7 @@ class TimelineSyncLoop(
         }
     }
 
-    suspend fun flushSnapshotNow() {
+    suspend fun flushSnapshotNow(prune: Boolean = false) {
         val snapshotScope = timelineScope ?: return
         if (confirmedTimelineStore === NoOpConfirmedTimelineStore) return
         persistMutex.withLock {
@@ -157,13 +155,11 @@ class TimelineSyncLoop(
                 revision = revision,
                 writtenAtMillis = timelineCurrentTimeMillis(),
             )
-            runCatching {
-                withContext(NonCancellable) {
-                    val written = confirmedTimelineStore.writeSnapshot(envelope)
+            try {
+                val written = confirmedTimelineStore.writeSnapshot(envelope)
+                if (prune) {
                     confirmedTimelineStore.prune(snapshotScope.backendId, MAX_RETAINED_SNAPSHOTS)
-                    written
                 }
-            }.onSuccess { written ->
                 if (!written) {
                     Telemetry.event(
                         "TimelineSync", "snapshotPersist.staleRejected",
@@ -172,7 +168,9 @@ class TimelineSyncLoop(
                         level = Telemetry.Level.WARN,
                     )
                 }
-            }.onFailure { error ->
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Throwable) {
                 Telemetry.error(
                     "TimelineSync", "snapshotPersist.failed", error,
                     "conversationId" to conversationId,
@@ -268,6 +266,11 @@ class TimelineSyncLoop(
         eventQueue.close(CancellationException("TimelineSyncLoop closed"))
         outboundSendProcessor.sendQueue.close(CancellationException("TimelineSyncLoop closed"))
         loopJob.cancel(CancellationException("TimelineSyncLoop closed"))
+    }
+
+    suspend fun closeAndJoin() {
+        close()
+        persistJob?.join()
     }
 
     @Volatile
