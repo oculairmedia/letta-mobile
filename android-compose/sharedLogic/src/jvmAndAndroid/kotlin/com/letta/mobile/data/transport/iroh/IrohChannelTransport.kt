@@ -875,12 +875,11 @@ class IrohChannelTransport(
         )
         val turnId = "iroh-turn-${UUID.randomUUID()}"
         val initialRunId = "iroh-run-${UUID.randomUUID()}"
+        val token = IrohTurnToken(conversationId, connectionGeneration.value, turnId)
         val startResult = turnRegistry.tryStart(
-            conversationId = conversationId,
-            turnId = turnId,
+            token = token,
             initialRunId = initialRunId,
             agentId = agentId,
-            generation = connectionGeneration.value,
         )
         if (startResult is IrohTryStartResult.Busy) {
             Telemetry.event(
