@@ -29,7 +29,6 @@ import computer.iroh.Endpoint
 import computer.iroh.EndpointOptions
 import computer.iroh.RelayMode
 import com.letta.mobile.util.Telemetry
-import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -139,19 +138,6 @@ class IrohChannelTransport(
         _frameEvents.emit(TransportFrameEvent(frame = frame))
     }
 
-    /** (key, messageType, content) for content-bearing frames, for FrameFlowDiag. */
-    private fun frameFlowContent(frame: ServerFrame): Triple<String, String, String>? = when (frame) {
-        is ServerFrame.AssistantMessage -> {
-            val f: ServerFrame.AssistantMessage = frame
-            Triple(f.otid ?: f.id, "assistant_message", f.content)
-        }
-        is ServerFrame.ReasoningMessage -> {
-            val f: ServerFrame.ReasoningMessage = frame
-            Triple(f.id, "reasoning_message", f.reasoning)
-        }
-        else -> null
-    }
-
     /**
      * letta-mobile-or40x: send jobs KEYED BY conversationId.
      *
@@ -239,20 +225,7 @@ class IrohChannelTransport(
             _state.value = supervisorState.toChannelTransportState()
             if (supervisorState is IrohConnectionState.Ready) {
                 notifyRedialIfTurnActive()
-                // letta-mobile-r3i1z: (re)start the passive observer ingestion loop
-                // bound to THIS connection generation. Any prior collector (tied to
-                // an older, now-dead flow) is cancelled first so a stale collector
-                // never ingests from a torn-down transport.
-                startObserverIngest(supervisorState.handle)
-                // letta-mobile-r3i1z (A): on EVERY fresh Ready — including a silent
-                // redial after a QUIC timeout — re-register this connection as a
-                // viewer of the currently-viewed conversation. Server-side viewer
-                // registration only fires on runtime_start (send) or message.list
-                // (hydrate); a long-lived app that redials without doing either is
-                // invisible to the fanout (viewerCount drops to just the initiator).
-                // Re-issuing the hydrate's message.list both re-registers server-side
-                // AND reconciles frames missed during the dead window.
-                reSubscribeViewedConversation()
+                connectionSession.onReady(supervisorState.handle)
                 // letta-mobile-wxy4s: arm the application-level liveness probe for
                 // THIS connection generation. QUIC state alone cannot detect a
                 // black-holed peer (the unacked keepalive datagram keeps resetting
@@ -260,6 +233,7 @@ class IrohChannelTransport(
                 // stream is the only thing that actually tests the path.
                 livenessProbe.start(supervisorState.handle)
             } else {
+                connectionSession.onNotReady()
                 // Snapshot turn identity before a degraded handle is closed and
                 // its send jobs drop their entries from activeTurns. Intentional
                 // disconnects and config replacement must not synthesize redial
@@ -269,10 +243,6 @@ class IrohChannelTransport(
                 } else if (supervisorState is IrohConnectionState.Degraded) {
                     interruptedTurns.clear()
                 }
-                // Any non-Ready transition (Degraded/Disconnected/Closed/dialing)
-                // stops observer ingestion. On redial a fresh Ready fires and the
-                // collector restarts against the new handle above.
-                stopObserverIngest("state:${supervisorState::class.simpleName}")
                 // letta-mobile-wxy4s: the probe is pinned to a Ready handle; any
                 // non-Ready transition disarms it. A fresh Ready re-arms it above.
                 livenessProbe.stop("state:${supervisorState::class.simpleName}")
@@ -317,130 +287,15 @@ class IrohChannelTransport(
     // stream_delta frames into the SAME _events/_frameEvents seam the initiator
     // uses, so observer frames reduce identically.
     private val observerMapper = AppServerRuntimeEventMapper()
-    private val observerGeneration = atomic(0)
-    @Volatile
-    private var observerJob: Job? = null
-
-    private fun startObserverIngest(handle: IrohConnectionHandle) {
-        val streamFrames = handle.effectiveObserverStreamFrames
-        if (streamFrames == null) {
-            // A Ready handle with no observable stream must STILL invalidate any
-            // prior collector — a stale collector pinned to a superseded
-            // connection's flow can never be left running (r3i1z redial gap).
-            stopObserverIngest("no_observer_stream")
-            Telemetry.event("IrohObserver", "ingest.unavailable", "sessionId" to handle.sessionId)
-            return
-        }
-        // Bump the generation and cancel any prior collector: exactly one observer
-        // collector is ever live, and it is pinned to this handle's session.
-        val generation = observerGeneration.incrementAndGet()
-        observerJob?.cancel()
-        // Log at ARM time (synchronously), not inside the launched job: if a racing
-        // teardown cancels the job before dispatch, telemetry still shows the
-        // (re)start happened — the r3i1z redial diagnosis relied on this signal.
-        Telemetry.event(
-            "IrohObserver", "ingest.start",
-            "sessionId" to handle.sessionId,
-            "generation" to generation.toString(),
-        )
-        observerJob = scope.launch {
-            runCatching {
-                streamFrames.collect { received ->
-                    // Guard against a stale collector that a redial has superseded.
-                    if (observerGeneration.value != generation) return@collect
-                    ingestObserverFrame(received)
-                }
-            }.onFailure { error ->
-                if (error is CancellationException) throw error
-                Telemetry.event(
-                    "IrohObserver", "ingest.failed",
-                    "error" to (error.message ?: error.toString()),
-                    "class" to error::class.simpleName,
-                )
-            }
-        }
-    }
-
-    private fun stopObserverIngest(reason: String) {
-        val job = observerJob ?: return
-        observerJob = null
-        // Invalidate the generation so an in-flight collect body drops its frame.
-        observerGeneration.incrementAndGet()
-        job.cancel()
-        Telemetry.event("IrohObserver", "ingest.stop", "reason" to reason)
-    }
-
-    // letta-mobile-r3i1z (A): RE-SUBSCRIBE ON RECONNECT.
-    //
-    // The "currently viewed conversation" is learned from the transport's OWN
-    // message.list admin_rpc traffic — the same hydrate that first registered
-    // this connection as a server-side viewer (path /v1/conversations/<id>/...).
-    // We record its (conversationId, path) and, on every fresh Ready, replay it.
-    // No new callback/provider is needed: the timeline layer already routes its
-    // hydrate through adminRpc(), so the transport already sees which
-    // conversation is being viewed.
-    @Volatile
-    private var viewedConversationId: String? = null
-    @Volatile
-    private var viewedMessageListPath: String? = null
-
-    /**
-     * Records the currently-viewed conversation from a message.list hydrate so a
-     * later reconnect can re-issue it. Called for every message.list adminRpc the
-     * transport handles. Non-message.list reads (agent.list, health.check, …) do
-     * not carry a viewed-conversation identity and are ignored.
-     */
-    private fun recordViewedConversationFrom(method: String, path: String) {
-        if (method != "message.list") return
-        val conversationId = conversationIdFromMessageListPath(path) ?: return
-        // A conversation switch re-points the re-subscribe target (mirrors the
-        // server's Option A de-scope rule). The freshest message.list wins.
-        viewedConversationId = conversationId
-        viewedMessageListPath = path
-    }
-
-    /**
-     * Extracts the conversation id from a message.list path of the shape
-     * `/v1/conversations/<id>/messages[?...]`. Returns null for any other shape.
-     */
-    private fun conversationIdFromMessageListPath(path: String): String? {
-        val marker = "/v1/conversations/"
-        val start = path.indexOf(marker)
-        if (start < 0) return null
-        val after = path.substring(start + marker.length)
-        val id = after.substringBefore('/').substringBefore('?')
-        return id.takeIf { it.isNotBlank() }
-    }
-
-    /**
-     * On a fresh Ready, re-issue the recorded message.list for the viewed
-     * conversation so the (possibly brand-new, redialed) connection re-registers
-     * as a viewer server-side. Idempotent — fires on the FIRST Ready too, where
-     * the normal open/hydrate already registers, so a duplicate hydrate is
-     * harmless (message.list is read-only + the server viewer set is a Set).
-     * Fire-and-forget on [scope]; failures are swallowed (a dead connection just
-     * escalates through the normal admin_rpc retry path on the next real read).
-     */
-    private fun reSubscribeViewedConversation() {
-        val path = viewedMessageListPath ?: return
-        val conversationId = viewedConversationId
-        scope.launch {
-            Telemetry.event(
-                "IrohObserver", "resubscribe.begin",
-                "conversationId" to (conversationId ?: ""),
-            )
-            runCatching { adminRpc(method = "message.list", path = path, body = null) }
-                .onFailure { error ->
-                    if (error is CancellationException) throw error
-                    Telemetry.event(
-                        "IrohObserver", "resubscribe.failed",
-                        "conversationId" to (conversationId ?: ""),
-                        "error" to (error.message ?: error.toString()),
-                        "class" to error::class.simpleName,
-                    )
-                }
-        }
-    }
+    // IrohConnectionSession owns the generation-bound observer and viewer
+    // re-subscription lifecycle, leaving this transport to map and emit frames.
+    private val connectionSession = IrohConnectionSession(
+        scope = scope,
+        ingestObserverFrame = ::ingestObserverFrame,
+        resubscribe = { conversation ->
+            adminRpc(method = "message.list", path = conversation.messageListPath, body = null)
+        },
+    )
 
     /**
      * Ingest ONE fanned-out stream frame the observer path owns.
@@ -1409,6 +1264,20 @@ class IrohChannelTransport(
         retireActiveTurn(turn, "cancelled", source = "cancel_synthetic")
     }
 
+    private suspend fun emitDisconnectTerminal(turn: IrohActiveTurn) {
+        if (!turn.tryClaimTerminal("disconnect")) return
+        emitBoth(
+            ServerFrame.TurnDone(
+                id = frameId("cancelled"),
+                ts = nowIso(),
+                turnId = turn.turnId,
+                runId = turn.runId,
+                status = "cancelled",
+            ),
+        )
+        retireActiveTurn(turn, "cancelled", source = "disconnect")
+    }
+
     private fun teardownCancelledTurn(conversationId: String, turn: IrohActiveTurn) {
         turn.job?.cancel()
         turn.job?.let { activeSendJobs.remove(conversationId, it) }
@@ -1432,7 +1301,9 @@ class IrohChannelTransport(
         // the hydrate so a later reconnect can re-register this connection as a
         // server-side viewer with no user action. Recorded before the call so a
         // hydrate that only succeeds on retry/redial is still captured.
-        recordViewedConversationFrom(method, path)
+        if (method == "message.list") {
+            IrohViewedConversation.fromMessageListPath(path)?.let(connectionSession::recordViewedConversation)
+        }
         // letta-mobile-parg0: in-flight admin_rpc (even before completion) proves
         // openBi is progressing — the liveness probe must not declare-dead over it.
         val inFlightToken = adminRpcRetryState.beginAdminRpc()
@@ -1564,9 +1435,20 @@ class IrohChannelTransport(
     private fun String.isReadOnlyAdminRpcMethod(): Boolean = this in READ_ONLY_ADMIN_RPC_METHODS
 
     override suspend fun disconnect() {
+        connectionSession.stopAndJoin()
         interruptedTurns.clear()
         retiredRuns.clear()
-        stopObserverIngest("disconnect")
+        frameOwnershipPath.clear()
+        activeSendJobs.values.forEach { it.cancel() }
+        activeSendJobs.clear()
+        for (turn in activeTurns.values.toList()) {
+            emitDisconnectTerminal(turn)
+        }
+        activeTurns.clear()
+        // The observer collector has fully stopped above, so these retain their
+        // single-threaded ownership without racing a final ingested frame.
+        subagentCorrelator.reset()
+        lastEmittedSubagentRevision = 0L
         livenessProbe.stop("disconnect")
         supervisor.disconnect("disconnect")
         _state.value = ChannelTransportState.Disconnected(1000, "disconnected")
@@ -1856,9 +1738,9 @@ class IrohChannelTransport(
     }
 
     private fun currentSubagentScope(): SubagentRpcScope? {
-        val conversationId = viewedConversationId ?: return null
-        val agentId = activeTurns[conversationId]?.agentId
-        return SubagentRpcScope(conversationId, agentId)
+        val conversationId = connectionSession.currentViewedConversationId() ?: return null
+        val agentId = activeTurns[conversationId.value]?.agentId
+        return SubagentRpcScope(conversationId.value, agentId)
     }
 
     private fun subagentListFailure(requestId: String, error: String) = ServerFrame.SubagentListResponse(

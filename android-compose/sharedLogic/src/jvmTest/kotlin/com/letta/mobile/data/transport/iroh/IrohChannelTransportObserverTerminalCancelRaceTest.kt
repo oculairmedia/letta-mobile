@@ -109,6 +109,21 @@ class IrohChannelTransportObserverTerminalCancelRaceTest {
         assertEquals(turn.turnId, done.turnId)
     }
 
+    @Test
+    fun verifyDisconnectSettlesActiveTurnThroughTerminalGuard(): Unit = scenarioTest {
+        val turn = startTurn()
+
+        transport.disconnect()
+        awaitTurnDone()
+        assertDrained()
+        releaseInput()
+
+        val turnDones = frames.filterIsInstance<ServerFrame.TurnDone>()
+        assertEquals(1, turnDones.size, "disconnect must settle its active turn exactly once")
+        assertEquals(turn.turnId, turnDones.single().turnId)
+        assertEquals("cancelled", turnDones.single().status)
+    }
+
     private fun scenarioTest(block: suspend Scenario.() -> Unit): Unit = runBlocking {
         val scenario = createScenario()
         try {
