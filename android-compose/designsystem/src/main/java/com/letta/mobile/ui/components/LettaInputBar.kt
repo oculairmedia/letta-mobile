@@ -49,6 +49,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -392,6 +393,13 @@ private fun ComposerTrailingAction(
 ) {
     val haptic = LocalHapticFeedback.current
     val view = LocalView.current
+    // AnimatedVisibility keeps composing while its exit animation runs. Retain
+    // the last custom slot during that exit; otherwise Voice -> Hidden clears
+    // the microphone immediately and the still-visible container falls through
+    // to the built-in Send icon for a frame.
+    var retainedCustomContent by remember { mutableStateOf(spec.customContent) }
+    if (spec.customContent != null) retainedCustomContent = spec.customContent
+    val customContent = if (spec.visible) spec.customContent else retainedCustomContent
     AnimatedVisibility(
         visible = spec.visible,
         enter = composerActionEnterTransition(spec.motionPreference),
@@ -399,7 +407,7 @@ private fun ComposerTrailingAction(
         modifier = modifier,
         label = "inputActionVisibility",
     ) {
-        spec.customContent?.let {
+        customContent?.let {
             it()
             return@AnimatedVisibility
         }
@@ -456,6 +464,10 @@ private fun composerActionExitTransition(
         fadeOut(tween(durationMillis = 0))
     } else {
         fadeOut(animationSpec = MaterialTheme.motionScheme.fastEffectsSpec()) +
+            scaleOut(
+                targetScale = 0.76f,
+                animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
+            ) +
             shrinkHorizontally(
                 animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
                 shrinkTowards = Alignment.End,

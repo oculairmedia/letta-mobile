@@ -1,5 +1,5 @@
 plugins {
-    id("com.android.library")
+    id("com.letta.mobile.android.library")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
     id("org.jetbrains.kotlin.plugin.allopen")
@@ -29,11 +29,6 @@ detekt {
 
 android {
     namespace = "com.letta.mobile.feature.editagent"
-    compileSdk = 37
-
-    defaultConfig {
-        minSdk = 26
-    }
 
     buildFeatures {
         compose = true
@@ -87,7 +82,7 @@ kotlin {
 }
 
 dependencies {
-    implementation(project(":core:data"))
+    implementation(project(":core:android-data"))
     testImplementation(project(":core:testutil"))
     implementation(project(":designsystem"))
     val composeBom = platform("androidx.compose:compose-bom:2026.03.01")
@@ -108,16 +103,16 @@ dependencies {
     implementation("app.cash.molecule:molecule-runtime:2.2.0")
     implementation("io.coil-kt.coil3:coil-compose:3.5.0-beta01")
     implementation("org.jetbrains.kotlinx:kotlinx-collections-immutable:0.5.0-beta01")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
+    implementation(libs.kotlinx.coroutines.android)
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
 
-    implementation("com.google.dagger:hilt-android:2.59.2")
-    ksp("com.google.dagger:hilt-compiler:2.59.2")
+    implementation(libs.hilt.android)
+    ksp(libs.hilt.compiler)
 
     testImplementation("junit:junit:4.13.2")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
-    testImplementation("io.ktor:ktor-client-mock:3.5.0")
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.ktor.client.mock)
     testImplementation("app.cash.turbine:turbine:1.2.1")
     testImplementation("io.mockk:mockk:1.14.9")
     testImplementation("io.kotest:kotest-runner-junit5:6.1.11")
@@ -126,7 +121,7 @@ dependencies {
     testImplementation("androidx.compose.ui:ui-test-junit4")
     testImplementation("androidx.test:core-ktx:1.7.0")
     testImplementation("androidx.test.ext:junit-ktx:1.3.0")
-    testRuntimeOnly("org.junit.vintage:junit-vintage-engine:6.1.0")
+    testRuntimeOnly(libs.junit.vintage.engine)
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
     debugImplementation("androidx.compose.ui:ui-test-manifest")

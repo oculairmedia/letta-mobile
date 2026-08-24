@@ -1,5 +1,5 @@
 plugins {
-    id("com.android.library")
+    id("com.letta.mobile.android.library")
     id("app.cash.paparazzi")
     id("org.jetbrains.kotlin.plugin.compose")
     id("io.gitlab.arturbosch.detekt")
@@ -22,16 +22,6 @@ detekt {
 
 android {
     namespace = "com.letta.mobile.designsystem"
-    compileSdk = 37
-
-    defaultConfig {
-        minSdk = 26
-    }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
 
     buildFeatures {
         compose = true
@@ -89,7 +79,8 @@ dependencies {
     implementation(composeBom)
 
     implementation(project(":sharedLogic"))
-    implementation(project(":core:data"))
+    api(project(":sharedUI"))
+    implementation(project(":core:android-data"))
 
     implementation("io.coil-kt.coil3:coil-compose:3.5.0-beta01")
     implementation("io.coil-kt.coil3:coil-svg:3.5.0-beta01")
@@ -116,11 +107,11 @@ dependencies {
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("io.mockk:mockk:1.14.9")
-    testImplementation("org.junit.jupiter:junit-jupiter-api:6.1.0")
+    testImplementation(libs.junit.jupiter.api)
     testImplementation("org.robolectric:robolectric:4.16.1")
     testImplementation("androidx.compose.ui:ui-test-junit4")
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher:6.1.0")
-    testRuntimeOnly("org.junit.vintage:junit-vintage-engine:6.1.0")
+    testRuntimeOnly(libs.junit.platform.launcher)
+    testRuntimeOnly(libs.junit.vintage.engine)
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
 

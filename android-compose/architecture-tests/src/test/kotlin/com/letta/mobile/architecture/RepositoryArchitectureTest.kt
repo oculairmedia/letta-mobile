@@ -43,19 +43,34 @@ internal fun repositoryBytecodeRules(): List<ArchRule> = listOf(
 )
 
 private fun importCoreClasses(projectRoot: Path): JavaClasses {
-    val classDirectories = sequenceOf("core/ids", "core/domain")
+    val classDirectories = sequenceOf("core/ids", "sharedLogic")
         .map { projectRoot.resolve("android-compose/$it/build/classes") }
         .filter { it.toFile().exists() }
         .toList()
 
     check(classDirectories.isNotEmpty()) {
-        "Compile :core:ids:jvmMainClasses and :core:domain:classes before running architectureTest"
+        "Compile :core:ids:jvmMainClasses and :sharedLogic:jvmMainClasses before running architectureTest"
     }
 
     return ClassFileImporter()
         .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
         .withImportOption(ExcludeGeneratedClasses)
+        .withImportOption(DomainContractSurface)
         .importPaths(classDirectories)
+}
+
+/**
+ * Keep bytecode rules on the former :core:domain contract surface
+ * (`data.model` + `data.repository.api`) plus `:core:ids`. Scanning all of
+ * `:sharedLogic` would treat every package as a slice and flag unrelated
+ * timeline/transport cycles the original domain-only gate never covered.
+ */
+private object DomainContractSurface : ImportOption {
+    override fun includes(location: com.tngtech.archunit.core.importer.Location): Boolean {
+        val path = location.toString().replace('\\', '/')
+        return path.contains("/com/letta/mobile/data/model/") ||
+            path.contains("/com/letta/mobile/data/repository/api/")
+    }
 }
 
 private object ExcludeGeneratedClasses : ImportOption {

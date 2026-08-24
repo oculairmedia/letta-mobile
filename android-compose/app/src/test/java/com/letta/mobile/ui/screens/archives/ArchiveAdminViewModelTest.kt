@@ -2,6 +2,7 @@ package com.letta.mobile.ui.screens.archives
 
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.ArchiveRepository
+import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.testutil.FakeAgentApi
 import com.letta.mobile.testutil.FakeArchiveApi
 import io.mockk.mockk
@@ -47,7 +48,9 @@ class ArchiveAdminViewModelTest {
             )
         )
         repository = ArchiveRepository(fakeApi)
-        agentRepository = AgentRepository(fakeAgentApi, mockk(relaxed = true))
+        // dagger.Lazy must return AgentDao; a bare mockk(relaxed=true) as Lazy
+        // erases get() to Object and ClassCastExceptions on cache warm-up.
+        agentRepository = AgentRepository(fakeAgentApi, dagger.Lazy { mockk<AgentDao>(relaxed = true) })
         viewModel = ArchiveAdminViewModel(repository, agentRepository)
     }
 

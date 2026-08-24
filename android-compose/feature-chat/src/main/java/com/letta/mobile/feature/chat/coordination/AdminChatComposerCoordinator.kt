@@ -175,6 +175,12 @@ internal class AdminChatComposerCoordinator(
         cancelWatchJob?.cancel()
         cancelWatchJob = null
         chatBannerController.clearCancelling()
+        // letta-mobile-aujte: a failed-turn banner from a PRIOR turn must not
+        // survive into a new one — without this, ChatUiState.error is sticky
+        // forever (TurnFailureNotices only ever SETS it; nothing else in the
+        // send path cleared it), so a successful turn still rendered under a
+        // stale red error banner from turns ago.
+        chatBannerController.clearError()
         val context = chatSendContext()
         chatSendStrategySelector.send(text, attachments, context)
     }
@@ -192,7 +198,7 @@ internal class AdminChatComposerCoordinator(
 
     private fun GoalStatus.toUi() = GoalStatusUi(
         objective = objective,
-        status = status,
+        status = status.wireValue,
         activeTimeSeconds = activeTimeSeconds,
         tokensUsed = tokensUsed,
         tokenBudget = tokenBudget,

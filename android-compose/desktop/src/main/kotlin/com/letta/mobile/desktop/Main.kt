@@ -13,6 +13,8 @@ import androidx.compose.ui.window.WindowExceptionHandler
 import androidx.compose.ui.window.WindowExceptionHandlerFactory
 import androidx.compose.ui.window.rememberWindowState
 import com.letta.mobile.desktop.markdown.DesktopMermaidDiagramRenderer
+import com.letta.mobile.desktop.touch.DesktopTouchKeyboardHost
+import com.letta.mobile.desktop.touch.DesktopWindowsTouchInput
 import com.letta.mobile.ui.markdown.LocalMermaidDiagramRenderer
 import dev.nucleusframework.application.NucleusBackend
 import dev.nucleusframework.application.SingleInstanceRestoreEffect
@@ -33,6 +35,11 @@ fun main(args: Array<String>) {
     applyLinuxHiDpiScale()
     DesktopCrashReporter.installGlobalHandler()
     initializeDesktopLifecycleMainThread()
+    // Kotzilla observability — must run before any UI composition so the SDK
+    // captures the full session including startup. Android target boots via
+    // ContentProvider; Desktop (and any future WasmJS) call this wrapper
+    // explicitly. See sharedLogic/commonMain/.../KotzillaKmpMonitoring.kt.
+    com.letta.mobile.data.observability.startKotzillaMonitoring()
     if (Platform.Current == Platform.Windows) {
         System.setProperty("nucleus.app.aumid", LETTA_WINDOWS_AUMID)
         WindowsJumpListManager.setProcessAppId(LETTA_WINDOWS_AUMID)
@@ -96,40 +103,49 @@ private fun runDesktopApplication(
                 LocalWindowExceptionHandlerFactory provides CrashReportingExceptionHandlerFactory,
                 LocalMermaidDiagramRenderer provides DesktopMermaidDiagramRenderer,
             ) {
-                DesktopJewelWindow(
-                    // Keep background agents and schedules alive; Quit remains
-                    // available from the Nucleus native tray menu.
-                    onCloseRequest = { activationHandler.hideWindow() },
-                    title = windowTitle,
-                    state = rememberWindowState(width = 1280.dp, height = 820.dp),
-                    header = headerChrome,
-                ) {
-                    LaunchedEffect(Unit) {
-                        activationHandler.attach(window)
-                        window.minimumSize = Dimension(960, 640)
-                        // Windows 11 standard rounded corners + outline on the
-                        // undecorated frame.
-                        DesktopWindowsChrome.applyStandardChrome(window)
-                    }
+                // Windows touchscreens: every text field that starts an input
+                // session while the last pointer input came from a finger gets
+                // the OS touch keyboard raised (and dismissed with the session).
+                DesktopTouchKeyboardHost {
+                    DesktopJewelWindow(
+                        // Keep background agents and schedules alive; Quit remains
+                        // available from the Nucleus native tray menu.
+                        onCloseRequest = { activationHandler.hideWindow() },
+                        title = windowTitle,
+                        state = rememberWindowState(width = 1280.dp, height = 820.dp),
+                        header = headerChrome,
+                    ) {
+                        LaunchedEffect(Unit) {
+                            activationHandler.attach(window)
+                            window.minimumSize = Dimension(960, 640)
+                            // Windows 11 standard rounded corners + outline on the
+                            // undecorated frame.
+                            DesktopWindowsChrome.applyStandardChrome(window)
+                            // Touch drag-to-scroll: AWT hands Compose every
+                            // WM_TOUCH as a PointerType.Mouse event, which
+                            // Compose Foundation refuses to drag-scroll.
+                            DesktopWindowsTouchInput.attach(window)
+                        }
 
-                    LettaDesktopApp(
-                        shell = DesktopAppShellBindings(
-                            nucleusApplicationScope = nucleusScope,
-                            window = window,
-                            deepLinks = deepLinks,
-                            quickQuery = quickQuery,
-                        ),
-                        onActiveTitleChange = { windowTitle = it },
-                        onHeaderChromeChange = { headerChrome = it },
-                    )
-                }
-                // Spotlight-style floating query bar, summoned by the global
-                // hotkey without raising the main window.
-                DesktopQuickQueryWindow(quickQuery)
-                // Realtime shader lookdev as a second window, for tuning the
-                // ambient glow against the real app theme and backend state.
-                if (System.getenv("LETTA_SHADER_LOOKDEV") == "1") {
-                    com.letta.mobile.desktop.lookdev.ShaderLookdevWindow()
+                        LettaDesktopApp(
+                            shell = DesktopAppShellBindings(
+                                nucleusApplicationScope = nucleusScope,
+                                window = window,
+                                deepLinks = deepLinks,
+                                quickQuery = quickQuery,
+                            ),
+                            onActiveTitleChange = { windowTitle = it },
+                            onHeaderChromeChange = { headerChrome = it },
+                        )
+                    }
+                    // Spotlight-style floating query bar, summoned by the global
+                    // hotkey without raising the main window.
+                    DesktopQuickQueryWindow(quickQuery)
+                    // Realtime shader lookdev as a second window, for tuning the
+                    // ambient glow against the real app theme and backend state.
+                    if (System.getenv("LETTA_SHADER_LOOKDEV") == "1") {
+                        com.letta.mobile.desktop.lookdev.ShaderLookdevWindow()
+                    }
                 }
             }
         }

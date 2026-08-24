@@ -27,12 +27,12 @@ Everything under [`android-compose/`](android-compose/).
 | `app/` | Android app: screens, navigation, ViewModels, Hilt DI |
 | `feature-chat/` | Chat screens, presenters |
 | `feature-editagent/` | Agent editor |
-| `core/data/` | Repositories, Room database, data sources |
-| `core/domain/` | Domain models, repository interfaces, business rules |
+| `core/android-data/` | Repositories, Room database, data sources |
 | `core/runtime/` | Turn engine, runtime event fanout |
 | `core/ids/` `core/schemas/` | Shared identifiers and wire schemas |
 | `designsystem/` | Reusable Android Compose UI, theming, and dialogs |
-| `sharedLogic/` | **KMP shared module.** Platform-neutral domain/transport plus shared Android/Desktop A2UI UI |
+| `sharedLogic/` | **KMP shared module.** Platform-neutral domain/transport plus shared Android/Desktop A2UI UI (UI moves to `sharedUI/` in Phase 3) |
+| `sharedUI/` | **KMP Compose UI** (android + jvm). Scaffold in Phase 3a; hosts shared composables after Phase 3b |
 | `desktop/` | Compose Desktop entry point, OS lock, installer |
 | `cli/` `appserver-cli/` | JVM command-line tooling, contract probes |
 | `architecture-tests/` | Module-boundary and parity gates |
@@ -41,6 +41,17 @@ Everything under [`android-compose/`](android-compose/).
 The cardinal rule: **feature logic lives in `sharedLogic/commonMain`; platform modules only bind.**
 Any behavior duplicated across `app/` and `desktop/` is drift — the `shared-multiplatform` required
 CI check (`sharedLogic:allTests` + `desktop:test`) backstops this.
+
+## Runnable entry points
+
+| Platform | Command (from `android-compose/`) |
+|---|---|
+| Android | `./gradlew :app:assembleDebug` |
+| Compose Desktop | `./gradlew :desktop:run` |
+| Browser WASM | `./gradlew :web:wasmJsBrowserDevelopmentRun` (CI job `web-wasm`) |
+| CLI / probes | `./gradlew :cli:run`; App Server contract probes via `:appserver-cli` (see [`kmp-phase-6-entrypoints.md`](docs/architecture/kmp-phase-6-entrypoints.md)) |
+
+Full notes: [`docs/architecture/kmp-phase-6-entrypoints.md`](docs/architecture/kmp-phase-6-entrypoints.md).
 
 ## Quick start
 

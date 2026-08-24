@@ -2,6 +2,7 @@ package com.letta.mobile.feature.chat
 import com.letta.mobile.ui.chat.render.*
 
 import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.model.ErrorMessage
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.ApprovalRequestMessage
@@ -15,6 +16,8 @@ import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.data.transport.WsConnectionState
 import com.letta.mobile.data.runtime.TurnFailureNotices
+import com.letta.mobile.data.timeline.RecentMessagesReconcileOutcome
+import com.letta.mobile.data.transport.BridgeTurnStatus
 import com.letta.mobile.data.transport.WsTimelineEvent
 import com.letta.mobile.data.transport.api.RedialWhileTurnActive
 import com.letta.mobile.runtime.BackendCapabilities
@@ -293,7 +296,7 @@ class WsChatSendCoordinatorTest {
         assertEquals("conv-1", timelineRepository.externalLocals.single().conversationId)
         assertEquals("hello", timelineRepository.externalLocals.single().content)
 
-        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = "completed"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = BridgeTurnStatus.Completed))
         advanceUntilIdle()
 
         verify(exactly = 2) {
@@ -510,7 +513,7 @@ class WsChatSendCoordinatorTest {
 
         var cancellationPropagated = false
         try {
-            coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = "failed"))
+            coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = BridgeTurnStatus.Failed))
         } catch (_: CancellationException) {
             cancellationPropagated = true
         }
@@ -539,7 +542,7 @@ class WsChatSendCoordinatorTest {
         coordinator.send("one").join()
         coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", "agent-1", "conv-1", "iroh-run-1"))
         coordinator.handleEvent(WsTimelineEvent.MessageDelta(AssistantMessage(id = "msg-1", contentRaw = JsonPrimitive("I"), runId = "run-app")))
-        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "iroh-run-1", status = "failed"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "iroh-run-1", status = BridgeTurnStatus.Failed))
         advanceUntilIdle()
 
         val cleanup = timelineRepository.abandonedFragmentCleanups.single()
@@ -577,7 +580,7 @@ class WsChatSendCoordinatorTest {
 
         verify(exactly = 1) { wsChatBridge.cancel("conv-a") }
 
-        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-a", runId = "run-a", status = "cancelled"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-a", runId = "run-a", status = BridgeTurnStatus.Cancelled))
         advanceUntilIdle()
 
         verify(exactly = 1) {
@@ -627,7 +630,7 @@ class WsChatSendCoordinatorTest {
         assertTrue(timelineRepository.failedLocals.isEmpty())
 
         activeConversation = "conv-a"
-        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-a", runId = "run-a", status = "completed"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-a", runId = "run-a", status = BridgeTurnStatus.Completed))
         advanceUntilIdle()
 
         verify(exactly = 2) {
@@ -770,7 +773,7 @@ class WsChatSendCoordinatorTest {
                 cachedInputTokens = 0L, reasoningTokens = 0L,
             )
         )
-        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = "completed"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = BridgeTurnStatus.Completed))
         coordinator.handleEvent(WsTimelineEvent.TurnStarted(turnId = "turn-2", agentId = "agent-1", conversationId = "conv-default-agent-1", runId = "run-2"))
         coordinator.handleEvent(
             WsTimelineEvent.UsageStatistics(
@@ -969,7 +972,7 @@ class WsChatSendCoordinatorTest {
             WsTimelineEvent.TurnDone(
                 turnId = "turn-1",
                 runId = "run-1",
-                status = "failed",
+                status = BridgeTurnStatus.Failed,
             )
         )
         runCurrent()
@@ -1016,7 +1019,7 @@ class WsChatSendCoordinatorTest {
             clientVersionProvider = clientVersionProvider,
         )
 
-        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = "failed"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = BridgeTurnStatus.Failed))
         advanceUntilIdle()
 
         assertEquals(TurnFailureNotices.GENERIC_MESSAGE, uiState.value.error)
@@ -1044,7 +1047,7 @@ class WsChatSendCoordinatorTest {
         )
 
         coordinator.handleEvent(WsTimelineEvent.StopReason(turnId = "turn-1", runId = "run-1", stopReason = "error"))
-        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = "completed"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = BridgeTurnStatus.Completed))
         advanceUntilIdle()
 
         assertEquals(
@@ -1074,7 +1077,7 @@ class WsChatSendCoordinatorTest {
             clientVersionProvider = clientVersionProvider,
         )
 
-        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = "cancelled"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = BridgeTurnStatus.Cancelled))
         advanceUntilIdle()
 
         assertEquals(null, uiState.value.error)
@@ -1102,7 +1105,7 @@ class WsChatSendCoordinatorTest {
         )
 
         coordinator.send("hello").join()
-        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = "completed", lossy = false))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = BridgeTurnStatus.Completed, lossy = false))
         advanceUntilIdle()
 
         assertTrue(timelineRepository.reconciledSends.isEmpty())
@@ -1130,7 +1133,7 @@ class WsChatSendCoordinatorTest {
         coordinator.send("hello").join()
         coordinator.handleEvent(
             WsTimelineEvent.TurnDone(
-                turnId = "turn-1", runId = "run-1", status = "completed",
+                turnId = "turn-1", runId = "run-1", status = BridgeTurnStatus.Completed,
                 lossy = true, dropCount = 3L,
             )
         )
@@ -1150,38 +1153,11 @@ class WsChatSendCoordinatorTest {
 
     @Test
     fun `redial during active turn reconciles and settles without resend`() = runTest {
-        val redials = MutableSharedFlow<RedialWhileTurnActive>(extraBufferCapacity = 1)
-        val wsChatBridge = mockBridge(sendAccepted = true, redialFlow = redials)
-        val timelineRepository = FakeTimelineExternalTransportWriter()
-        val uiState = MutableStateFlow(ChatUiState(agentName = "Agent"))
-        // This test is the only one in the suite that needs the
-        // coordinator's OWN background collector on
-        // wsChatBridge.redialWhileTurnActive to actually run (every other
-        // test drives state via coordinator.handleEvent(...) directly,
-        // bypassing the collector). TestScope.backgroundScope does not
-        // reliably get pumped by advanceUntilIdle() for this collect-based
-        // path in this coroutines-test setup, so use a plain structured
-        // child scope instead — cancelled explicitly at the end of the test
-        // so runTest doesn't fail on the still-running collector job.
-        val coordinatorScope = CoroutineScope(coroutineContext + Job())
-        val coordinator = WsChatSendCoordinator(
-            scope = coordinatorScope,
-            agentId = "agent-1",
-            activeConfig = settingsRepository(),
-            wsChatBridge = wsChatBridge,
-            timelineRepository = timelineRepository,
-            conversationRepository = stubConversationRepository(),
-            uiState = uiState,
-            clearComposerAfterSend = {},
-            activeConversationId = { "conv-default-agent-1" },
-            setActiveConversationId = {},
-            startTimelineObserver = {},
-            clientVersionProvider = clientVersionProvider,
-        )
+        val fixture = redialRecoveryFixture()
 
         try {
-            coordinator.send("hello").join()
-            coordinator.handleEvent(
+            fixture.coordinator.send("hello").join()
+            fixture.coordinator.handleEvent(
                 WsTimelineEvent.TurnStarted(
                     turnId = "turn-redial",
                     agentId = "agent-1",
@@ -1191,12 +1167,13 @@ class WsChatSendCoordinatorTest {
             )
             advanceUntilIdle()
 
-            redials.emit(
+            fixture.redials.emit(
                 RedialWhileTurnActive(
                     agentId = "agent-1",
                     conversationId = "conv-default-agent-1",
                     turnId = "turn-redial",
                     runId = "run-redial",
+                    connectionGeneration = 7L,
                 )
             )
             advanceUntilIdle()
@@ -1207,14 +1184,21 @@ class WsChatSendCoordinatorTest {
             // occurred rather than an exact list (see post-send reconcile
             // scheduling elsewhere in ChatSendCoordinator).
             assertTrue(
-                timelineRepository.recentReconciles.contains(
-                    FakeTimelineExternalTransportWriter.RecentReconcile("agent-1", "conv-default-agent-1", "redial-recovery", emptySet(), true),
+                fixture.timelineRepository.recentReconciles.contains(
+                    FakeTimelineExternalTransportWriter.RecentReconcile(
+                        agentId = "agent-1",
+                        conversationId = "conv-default-agent-1",
+                        reason = "redial-recovery",
+                        candidateRunIds = emptySet(),
+                        forceRefresh = true,
+                        connectionGeneration = 7L,
+                    ),
                 ),
             )
-            assertEquals(false, uiState.value.isStreaming)
-            assertEquals(false, uiState.value.isAgentTyping)
+            assertEquals(false, fixture.uiState.value.isStreaming)
+            assertEquals(false, fixture.uiState.value.isAgentTyping)
             verify(exactly = 1) {
-                wsChatBridge.send(
+                fixture.wsChatBridge.send(
                     agentId = "agent-1",
                     conversationId = "conv-default-agent-1",
                     text = "hello",
@@ -1224,8 +1208,64 @@ class WsChatSendCoordinatorTest {
                 )
             }
         } finally {
-            coordinatorScope.cancel()
+            fixture.coordinatorScope.cancel()
         }
+    }
+
+    @Test
+    fun `WS replayed remote start projects visible presence and cancellation copy`() = runTest {
+        val events = MutableSharedFlow<WsTimelineEvent>(extraBufferCapacity = 4)
+        val timelineRepository = FakeTimelineExternalTransportWriter()
+        val uiState = MutableStateFlow(ChatUiState(agentName = "Agent"))
+        val coordinator = WsChatSendCoordinator(
+            scope = backgroundScope,
+            agentId = "agent-1",
+            activeConfig = settingsRepository(),
+            wsChatBridge = mockBridge(sendAccepted = true, eventFlow = events),
+            timelineRepository = timelineRepository,
+            conversationRepository = stubConversationRepository(),
+            uiState = uiState,
+            clearComposerAfterSend = {},
+            activeConversationId = { "conv-default-agent-1" },
+            setActiveConversationId = {},
+            startTimelineObserver = {},
+            clientVersionProvider = clientVersionProvider,
+        )
+
+        coordinator.handleEvent(
+            WsTimelineEvent.TurnStarted(
+                turnId = "turn-remote",
+                agentId = "agent-1",
+                conversationId = "conv-default-agent-1",
+                runId = "run-remote",
+                isReplay = true,
+            )
+        )
+        runCurrent()
+
+        assertTrue("replayed remote start must show run chrome", uiState.value.isStreaming)
+        assertTrue("replayed remote start must show thinking presence", uiState.value.isAgentTyping)
+
+        coordinator.handleEvent(
+            WsTimelineEvent.Error(
+                code = TurnFailureNotices.CANCELLED_KIND,
+                message = TurnFailureNotices.CANCELLED_MESSAGE,
+                conversationId = "conv-default-agent-1",
+                turnId = "turn-remote",
+                runId = "run-remote",
+            )
+        )
+        coordinator.handleEvent(
+            WsTimelineEvent.TurnDone("turn-remote", "run-remote", BridgeTurnStatus.Cancelled),
+        )
+        advanceUntilIdle()
+
+        val cancellation = timelineRepository.ingestedMessages.single().message as ErrorMessage
+        assertEquals(TurnFailureNotices.CANCELLED_KIND, cancellation.code)
+        assertEquals(TurnFailureNotices.CANCELLED_MESSAGE, cancellation.text)
+        assertTrue(!cancellation.text.contains("failed", ignoreCase = true))
+        assertEquals(false, uiState.value.isStreaming)
+        assertEquals(false, uiState.value.isAgentTyping)
     }
 
     @Test
@@ -1266,7 +1306,7 @@ class WsChatSendCoordinatorTest {
                 runId = "run-replay",
             )
         )
-        events.emit(WsTimelineEvent.TurnDone(turnId = "turn-replay", runId = "run-replay", status = "completed"))
+        events.emit(WsTimelineEvent.TurnDone(turnId = "turn-replay", runId = "run-replay", status = BridgeTurnStatus.Completed))
         advanceUntilIdle()
 
         assertEquals(false, uiState.value.isStreaming)
@@ -1295,7 +1335,7 @@ class WsChatSendCoordinatorTest {
 
         coordinator.send("hello").join()
         val local = timelineRepository.externalLocals.single()
-        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = "failed"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = BridgeTurnStatus.Failed))
         advanceUntilIdle()
 
         assertEquals(
@@ -1341,7 +1381,7 @@ class WsChatSendCoordinatorTest {
         assertEquals(true, uiState.value.isStreaming)
         assertEquals(null, uiState.value.error)
 
-        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = "failed"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = BridgeTurnStatus.Failed))
         advanceUntilIdle()
 
         assertEquals("Worker died", uiState.value.error)
@@ -1391,7 +1431,7 @@ class WsChatSendCoordinatorTest {
         )
         assertNull(uiState.value.error)
 
-        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = "failed"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = BridgeTurnStatus.Failed))
         advanceUntilIdle()
 
         assertEquals(TurnFailureNotices.GENERIC_MESSAGE, uiState.value.error)
@@ -1442,6 +1482,49 @@ class WsChatSendCoordinatorTest {
             lastMessageAt = "1970-01-01T00:00:00Z",
         )
     }
+
+    private fun kotlinx.coroutines.test.TestScope.redialRecoveryFixture(): RedialRecoveryFixture {
+        val redials = MutableSharedFlow<RedialWhileTurnActive>(extraBufferCapacity = 1)
+        val wsChatBridge = mockBridge(sendAccepted = true, redialFlow = redials)
+        val timelineRepository = FakeTimelineExternalTransportWriter().apply {
+            recentMessagesReconcileOutcome = RecentMessagesReconcileOutcome.Applied(0)
+        }
+        val uiState = MutableStateFlow(ChatUiState(agentName = "Agent"))
+        // This path must exercise the coordinator's own redial collector. A structured
+        // child scope is deterministic here and is explicitly cancelled by the test.
+        val coordinatorScope = CoroutineScope(coroutineContext + Job())
+        val coordinator = WsChatSendCoordinator(
+            scope = coordinatorScope,
+            agentId = "agent-1",
+            activeConfig = settingsRepository(),
+            wsChatBridge = wsChatBridge,
+            timelineRepository = timelineRepository,
+            conversationRepository = stubConversationRepository(),
+            uiState = uiState,
+            clearComposerAfterSend = {},
+            activeConversationId = { "conv-default-agent-1" },
+            setActiveConversationId = {},
+            startTimelineObserver = {},
+            clientVersionProvider = clientVersionProvider,
+        )
+        return RedialRecoveryFixture(
+            redials = redials,
+            wsChatBridge = wsChatBridge,
+            timelineRepository = timelineRepository,
+            uiState = uiState,
+            coordinatorScope = coordinatorScope,
+            coordinator = coordinator,
+        )
+    }
+
+    private data class RedialRecoveryFixture(
+        val redials: MutableSharedFlow<RedialWhileTurnActive>,
+        val wsChatBridge: WsChatBridge,
+        val timelineRepository: FakeTimelineExternalTransportWriter,
+        val uiState: MutableStateFlow<ChatUiState>,
+        val coordinatorScope: CoroutineScope,
+        val coordinator: WsChatSendCoordinator,
+    )
 
     private fun mockBridge(
         sendAccepted: Boolean,

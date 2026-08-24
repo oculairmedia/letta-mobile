@@ -33,6 +33,7 @@
   "upstream_socket_behavior": {
     "source": "installed letta.js 0.29.12 one-socket app-server listener and dist/app-server-client.js",
     "session_model": "one bidirectional WebSocket per client at /ws (no channel query)",
+    "multiple_clients": "the listener accepts independent concurrent /ws clients; request correlation and runtime subscriptions are connection-local",
     "legacy_split_channel": "requests with ?channel=control|stream are rejected with HTTP 426 Upgrade Required",
     "capabilities_split_channels": false,
     "official_client": "AppServerClient opens one socket; control/stream properties are aliases of the same socket",

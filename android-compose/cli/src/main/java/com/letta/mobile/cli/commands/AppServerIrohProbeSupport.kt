@@ -53,6 +53,8 @@ internal data class IrohProbeOptions(
     val wrapperScanMode: WrapperScanMode = WrapperScanMode.DEPLOYMENT,
     /** Hermetic-only declaration that the harness spawns no wrapper process. */
     val wrapperScanNotApplicable: String? = null,
+    /** Exact wire permission mode sent by every runtime_start in this probe. */
+    val permissionMode: AppServerPermissionMode = AppServerPermissionMode.Standard,
 ) {
     fun dumpPath(): ProbeDumpPath? = dumpFramesPath?.let(::ProbeDumpPath)
 }
@@ -100,7 +102,7 @@ internal class ProbeSessionFixture(
             agentId = options.agentId.takeIf { it.isNotBlank() },
             conversationId = conversationId,
             createConversation = AppServerRuntimeStartCreateConversationOptions(body = null),
-            mode = AppServerPermissionMode.Standard,
+            mode = options.permissionMode,
             clientInfo = AppServerRuntimeStartClientInfo(
                 name = "letta-mobile-cli-iroh-probe",
                 version = "letta-mobile-q5iiv",
@@ -360,4 +362,3 @@ internal class ProbeSessionFixture(
         }
     }
 }
-

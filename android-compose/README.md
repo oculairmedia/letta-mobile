@@ -7,8 +7,7 @@ This directory contains the production Letta Mobile Android app.
 | Module | Purpose | Required / additive tests |
 | --- | --- | --- |
 | `app` | Screens, navigation, Hilt wiring, Android entrypoints | `:app:testRootDebugUnitTest` (required `test` job) |
-| `core/data` | Android data bindings, Ktor wiring, Room, mappers | `:core:data:testDebugUnitTest` (required `test` job) |
-| `core/domain` | JVM domain models | compiled in `test` job |
+| `core/android-data` | Android data bindings, Ktor wiring, Room, mappers | `:core:android-data:testDebugUnitTest` (required `test` job) |
 | `sharedLogic` | Platform-neutral repositories/timeline/transport plus shared Android/Desktop A2UI renderer | `:sharedLogic:allTests` (required `shared-multiplatform`) |
 | `designsystem` | Android Compose components, theme, and dialogs | `:designsystem:testDebugUnitTest` (additive on path change) |
 | `feature-chat` | Chat UI + ViewModels (admin chat stack) | `:feature-chat:testDebugUnitTest` (additive on path change) |
@@ -46,11 +45,18 @@ Do not assume changes to one path automatically belong in the other.
 
 ## Prerequisites
 
-- Android Studio with Android SDK Platform 36 and Build-Tools 36 installed
-- A full JDK 26 for CI parity. Gradle 9.4.1 can run on JDK 17-26, so Android
+- Android Studio with Android SDK Platform 37 and Build-Tools 36+ installed
+- A full JDK 26 for CI parity. Gradle 9.6.1 can run on JDK 17-26, so Android
   Studio's bundled JBR is still acceptable for local builds when it is within
   that range.
 - `local.properties` pointing at your Android SDK
+
+`compileSdk`, `targetSdk`, `minSdk`, kotlinx-coroutines, Ktor, Hilt, AGP, and
+Kotlin plugin versions live in `gradle/libs.versions.toml`. Android library
+modules apply `com.letta.mobile.android.library` instead of repeating SDK/Java
+17 settings. Documented exceptions: `:baselineprofile` uses
+`minSdkBaselineProfile` (28); `:feature-chat` still pins Hilt 2.60.1 and
+`ktor-client-core` 3.5.2.
 
 ## Local setup
 

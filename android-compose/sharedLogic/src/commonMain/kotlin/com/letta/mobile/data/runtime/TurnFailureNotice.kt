@@ -46,6 +46,9 @@ object TurnFailureNotices {
     /** Fallback copy for an unclassifiable failure. */
     const val GENERIC_MESSAGE: String = "This turn failed before the assistant could reply."
 
+    /** User-facing copy for an explicit cancelled terminal. */
+    const val CANCELLED_MESSAGE: String = "Previous response cancelled."
+
     /**
      * Stop reasons that mean the main assistant reply finished successfully
      * enough that a later Failed terminal is trailing aux work, not a dead turn.
@@ -106,6 +109,10 @@ object TurnFailureNotices {
         return TurnFailureNotice(kind = kind, message = messageFor(kind))
     }
 
+    /** A cancelled terminal is distinct from a failed terminal. */
+    fun forCancelledTerminal(): TurnFailureNotice =
+        TurnFailureNotice(kind = CANCELLED_KIND, message = CANCELLED_MESSAGE)
+
     /**
      * Whether [kind] is one of the sanitized families [terminalReasonKind]
      * produces — i.e. safe to trust as a pre-classified failure family from a
@@ -136,9 +143,11 @@ object TurnFailureNotices {
             "The run ended on an unresolved tool call, so this turn produced no reply."
         "aborted" ->
             "This turn was interrupted before the assistant replied."
+        CANCELLED_KIND -> CANCELLED_MESSAGE
         else -> GENERIC_MESSAGE
     }
 
+    const val CANCELLED_KIND: String = "cancelled"
     private const val OTHER_KIND = "other"
 
     /** Families [terminalReasonKind] can produce. Keep in sync with it. */
@@ -152,6 +161,7 @@ object TurnFailureNotices {
         "timeout",
         "provider_error",
         "aborted",
+        CANCELLED_KIND,
         OTHER_KIND,
     )
 

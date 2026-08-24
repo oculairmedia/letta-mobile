@@ -1,0 +1,376 @@
+package com.letta.mobile.data.repository
+
+import com.letta.mobile.data.model.AppTheme
+import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.model.ThemePreset
+import com.letta.mobile.data.session.BackendSwitchClearResult
+import com.letta.mobile.testutil.InMemorySecureSettingsStore
+import com.letta.mobile.testutil.createTestPreferencesDataStore
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeoutOrNull
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Tag
+import org.junit.jupiter.api.Test
+
+import kotlin.time.Duration.Companion.milliseconds
+@OptIn(ExperimentalCoroutinesApi::class)
+@Tag("unit")
+class SettingsRepositoryTest {
+
+    private lateinit var repository: SettingsRepository
+
+    @BeforeEach
+    fun setup() {
+        repository = SettingsRepository(
+            dataStore = createTestPreferencesDataStore(),
+            secureSettingsStore = InMemorySecureSettingsStore(),
+        )
+        runBlocking {
+            repository.clearAllData()
+        }
+    }
+
+    @Test
+    fun `initial state has empty configs`() {
+        assertTrue(repository.configs.value.isEmpty())
+    }
+
+    @Test
+    fun `initial state has null active config`() {
+        assertNull(repository.activeConfig.value)
+    }
+
+    @Test
+    fun `saveConfig adds new config and sets as active`() = runTest {
+        val config = LettaConfig(
+            id = "c1",
+            mode = LettaConfig.Mode.CLOUD,
+            serverUrl = "https://api.letta.com",
+            accessToken = "test-token"
+        )
+        repository.saveConfig(config)
+
+        assertEquals(1, repository.configs.value.size)
+        assertEquals("c1", repository.configs.value.first().id)
+        assertEquals("c1", repository.activeConfig.value?.id)
+    }
+
+    @Test
+    fun `saveConfig updates existing config`() = runTest {
+        val config = LettaConfig(id = "c1", mode = LettaConfig.Mode.CLOUD, serverUrl = "https://old.com")
+        repository.saveConfig(config)
+
+        val updated = config.copy(serverUrl = "https://new.com")
+        repository.saveConfig(updated)
+
+        assertEquals(1, repository.configs.value.size)
+        assertEquals("https://new.com", repository.configs.value.first().serverUrl)
+    }
+
+    @Test
+    fun `saveConfig persists local on-device model metadata`() = runTest {
+        val secureStore = InMemorySecureSettingsStore()
+        val dataStore = createTestPreferencesDataStore()
+        val scopedRepository = SettingsRepository(
+            dataStore = dataStore,
+            secureSettingsStore = secureStore,
+        )
+        val config = LettaConfig(
+            id = "local",
+            mode = LettaConfig.Mode.LOCAL,
+            serverUrl = "local-lettacode://device",
+            localModelPath = "/sdcard/models/gemma.litertlm",
+            localModelHandle = "google/gemma-3n",
+            localModelRuntime = "litert-lm",
+            localModelAccelerator = "gpu",
+            localModelMaxTokens = 32768,
+        )
+
+        scopedRepository.saveConfig(config)
+
+        val restoredRepository = SettingsRepository(
+            dataStore = dataStore,
+            secureSettingsStore = secureStore,
+        )
+        val restored = restoredRepository.configs.value.single()
+        assertEquals("/sdcard/models/gemma.litertlm", restored.localModelPath)
+        assertEquals("google/gemma-3n", restored.localModelHandle)
+        assertEquals("litert-lm", restored.localModelRuntime)
+        assertEquals("gpu", restored.localModelAccelerator)
+        assertEquals(32768, restored.localModelMaxTokens)
+    }
+
+    @Test
+    fun `setActiveConfigId changes active config`() = runTest {
+        val c1 = LettaConfig(id = "c1", mode = LettaConfig.Mode.CLOUD, serverUrl = "https://one.com")
+        val c2 = LettaConfig(id = "c2", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "http://two.com")
+        repository.saveConfig(c1)
+        repository.saveConfig(c2)
+
+        repository.setActiveConfigId("c1")
+        assertEquals("c1", repository.activeConfig.value?.id)
+    }
+
+    @Test
+    fun `activeConfigChanges emits first real selection after initial null and deduplicates by backend identity`() = runTest {
+        val emissions = Channel<LettaConfig>(Channel.UNLIMITED)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            repository.activeConfigChanges.collect { emissions.send(it) }
+        }
+
+        val c1 = LettaConfig(id = "c1", mode = LettaConfig.Mode.CLOUD, serverUrl = "https://one.com")
+        val c1Updated = c1.copy(accessToken = "rotated-token")
+        val c2 = LettaConfig(id = "c2", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "http://two.com")
+
+        repository.saveConfig(c1)
+        assertEquals("c1", emissions.receive().id)
+
+        // Token-only rotation keeps the same backend identity -> suppressed.
+        repository.saveConfig(c1Updated)
+        assertNull(withTimeoutOrNull(100.milliseconds) { emissions.receive() })
+
+        repository.saveConfig(c2)
+        assertEquals("c2", emissions.receive().id)
+    }
+
+    // letta-mobile-xzoy3: the config-edit mode dropdown reuses the active
+    // config's id (ConfigViewModel.saveConfig with asNewEntry=false), so a
+    // same-id mode flip must still emit or no consumer refreshes.
+    @Test
+    fun `activeConfigChanges emits on same-id mode flip`() = runTest {
+        val emissions = Channel<LettaConfig>(Channel.UNLIMITED)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            repository.activeConfigChanges.collect { emissions.send(it) }
+        }
+
+        val cloud = LettaConfig(id = "c1", mode = LettaConfig.Mode.CLOUD, serverUrl = "https://api.letta.com")
+        repository.saveConfig(cloud)
+        assertEquals("c1", emissions.receive().id)
+
+        repository.saveConfig(cloud.copy(mode = LettaConfig.Mode.LOCAL, serverUrl = "local-lettacode://device"))
+        assertEquals("c1", emissions.receive().id)
+
+        repository.saveConfig(cloud.copy(mode = LettaConfig.Mode.CLOUD, serverUrl = "https://api.letta.com"))
+        assertEquals("c1", emissions.receive().id)
+    }
+
+    @Test
+    fun `activeConfigChanges emits on same-id server url change`() = runTest {
+        val emissions = Channel<LettaConfig>(Channel.UNLIMITED)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            repository.activeConfigChanges.collect { emissions.send(it) }
+        }
+
+        val c1 = LettaConfig(id = "c1", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "http://old.com")
+        repository.saveConfig(c1)
+        assertEquals("c1", emissions.receive().id)
+
+        repository.saveConfig(c1.copy(serverUrl = "http://new.com"))
+        assertEquals("c1", emissions.receive().id)
+    }
+
+    @Test
+    fun `active backend change clears backend-scoped caches before active config update`() = runTest {
+        lateinit var scopedRepository: CachedSettingsRepository
+        val activeIdsAtClear = mutableListOf<String?>()
+        scopedRepository = SettingsRepository.forTests(
+            dataStore = createTestPreferencesDataStore(),
+            secureSettingsStore = InMemorySecureSettingsStore(),
+            clearBackendScopedCaches = {
+                activeIdsAtClear += scopedRepository.activeConfig.value?.id
+                BackendSwitchClearResult(successes = 1, failures = emptyList())
+            },
+        )
+
+        val c1 = LettaConfig(id = "c1", mode = LettaConfig.Mode.CLOUD, serverUrl = "https://one.com")
+        val c2 = LettaConfig(id = "c2", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "http://two.com")
+
+        scopedRepository.saveConfig(c1)
+        activeIdsAtClear.clear()
+
+        scopedRepository.saveConfig(c2)
+
+        assertEquals(listOf("c1"), activeIdsAtClear)
+        assertEquals("c2", scopedRepository.activeConfig.value?.id)
+
+        activeIdsAtClear.clear()
+        scopedRepository.setActiveConfigId("c1")
+
+        assertEquals(listOf("c2"), activeIdsAtClear)
+        assertEquals("c1", scopedRepository.activeConfig.value?.id)
+
+        activeIdsAtClear.clear()
+        scopedRepository.saveConfig(c2.copy(accessToken = "rotated-token"))
+
+        assertEquals(listOf("c1"), activeIdsAtClear)
+        assertEquals("c2", scopedRepository.activeConfig.value?.id)
+
+        activeIdsAtClear.clear()
+        scopedRepository.saveConfig(c2.copy(accessToken = "rotated-token-2"))
+
+        assertTrue(activeIdsAtClear.isEmpty())
+    }
+
+    @Test
+    fun `setActiveConfigId with nonexistent id does nothing`() = runTest {
+        val c1 = LettaConfig(id = "c1", mode = LettaConfig.Mode.CLOUD, serverUrl = "https://one.com")
+        repository.saveConfig(c1)
+
+        repository.setActiveConfigId("nonexistent")
+        assertEquals("c1", repository.activeConfig.value?.id)
+    }
+
+    @Test
+    fun `deleteConfig removes config`() = runTest {
+        val c1 = LettaConfig(id = "c1", mode = LettaConfig.Mode.CLOUD, serverUrl = "https://one.com")
+        val c2 = LettaConfig(id = "c2", mode = LettaConfig.Mode.CLOUD, serverUrl = "https://two.com")
+        repository.saveConfig(c1)
+        repository.saveConfig(c2)
+
+        repository.deleteConfig("c1")
+
+        assertEquals(1, repository.configs.value.size)
+        assertTrue(repository.configs.value.none { it.id == "c1" })
+    }
+
+    @Test
+    fun `deleteConfig clears active if deleted was active`() = runTest {
+        val c1 = LettaConfig(id = "c1", mode = LettaConfig.Mode.CLOUD, serverUrl = "https://one.com")
+        repository.saveConfig(c1)
+        assertEquals("c1", repository.activeConfig.value?.id)
+
+        repository.deleteConfig("c1")
+
+        assertNull(repository.activeConfig.value)
+    }
+
+    @Test
+    fun `deleteConfig switches active to first remaining`() = runTest {
+        val c1 = LettaConfig(id = "c1", mode = LettaConfig.Mode.CLOUD, serverUrl = "https://one.com")
+        val c2 = LettaConfig(id = "c2", mode = LettaConfig.Mode.CLOUD, serverUrl = "https://two.com")
+        repository.saveConfig(c1)
+        repository.saveConfig(c2)
+        repository.setActiveConfigId("c2")
+
+        repository.deleteConfig("c2")
+
+        assertNotNull(repository.activeConfig.value)
+        assertEquals("c1", repository.activeConfig.value?.id)
+    }
+
+    @Test
+    fun `getTheme returns SYSTEM by default`() = runTest {
+        val theme = repository.getTheme().first()
+        assertEquals(AppTheme.SYSTEM, theme)
+    }
+
+    @Test
+    fun `setTheme persists theme`() = runTest {
+        repository.setChatBackgroundKey("solid_charcoal")
+        repository.setTheme(AppTheme.DARK)
+        val theme = repository.getTheme().first()
+        assertEquals(AppTheme.DARK, theme)
+        assertEquals("default", repository.getChatBackgroundKey().first())
+    }
+
+    @Test
+    fun `getThemePreset returns DEFAULT by default`() = runTest {
+        val preset = repository.getThemePreset().first()
+        assertEquals(ThemePreset.DEFAULT, preset)
+    }
+
+    @Test
+    fun `setThemePreset persists preset`() = runTest {
+        repository.setChatBackgroundKey("gradient_night_sky")
+        repository.setThemePreset(ThemePreset.AMOLED_BLACK)
+
+        val preset = repository.getThemePreset().first()
+        assertEquals(ThemePreset.AMOLED_BLACK, preset)
+        assertEquals("default", repository.getChatBackgroundKey().first())
+    }
+
+    @Test
+    fun `legacy amoled dark mode maps to amoled preset`() = runTest {
+        repository.setAmoledDarkMode(true)
+
+        val preset = repository.getThemePreset().first()
+        assertEquals(ThemePreset.AMOLED_BLACK, preset)
+    }
+
+    @Test
+    fun `dynamic color defaults off on plain JVM runtime`() = runTest {
+        val dynamicColor = repository.getDynamicColor().first()
+        assertEquals(false, dynamicColor)
+    }
+
+    @Test
+    fun `setDynamicColor persists selection`() = runTest {
+        repository.setDynamicColor(false)
+
+        val dynamicColor = repository.getDynamicColor().first()
+        assertEquals(false, dynamicColor)
+    }
+
+    // letta-mobile-etib9: a blank agentName from a cold-start nav arg must not
+    // erase a previously resolved name, and must not survive across a switch to
+    // a different agent.
+    @Test
+    fun `setLastChatSelection blank agentName preserves stored name for same agent`() {
+        repository.setLastChatSelection("agent-1", "PM-letta-mobile", "conv-1")
+        assertEquals("PM-letta-mobile", repository.lastChatSelection.value?.agentName)
+
+        repository.setLastChatSelection("agent-1", null, "conv-1")
+        assertEquals("PM-letta-mobile", repository.lastChatSelection.value?.agentName)
+
+        repository.setLastChatSelection("agent-1", "   ", "conv-1")
+        assertEquals("PM-letta-mobile", repository.lastChatSelection.value?.agentName)
+    }
+
+    @Test
+    fun `setLastChatSelection blank agentName does not leak name across agents`() {
+        repository.setLastChatSelection("agent-1", "PM-letta-mobile", "conv-1")
+        repository.setLastChatSelection("agent-2", null, "conv-2")
+
+        assertEquals("agent-2", repository.lastChatSelection.value?.agentId)
+        assertNull(repository.lastChatSelection.value?.agentName)
+    }
+
+    @Test
+    fun `stored agent name survives restart after a blank selection write`() {
+        val secureStore = InMemorySecureSettingsStore()
+        val dataStore = createTestPreferencesDataStore()
+        val initialRepo = SettingsRepository(
+            dataStore = dataStore,
+            secureSettingsStore = secureStore,
+        )
+
+        initialRepo.setLastChatSelection("agent-1", "PM-letta-mobile", "conv-1")
+        // Cold-start entry into chat re-writes the selection with a blank name.
+        initialRepo.setLastChatSelection("agent-1", null, "conv-1")
+
+        val restoredRepo = SettingsRepository(
+            dataStore = dataStore,
+            secureSettingsStore = secureStore,
+        )
+        assertEquals("PM-letta-mobile", restoredRepo.lastChatSelection.value?.agentName)
+    }
+
+    @Test
+    fun `setLastChatSelection still stores a newly resolved name`() {
+        repository.setLastChatSelection("agent-1", null, "conv-1")
+        assertNull(repository.lastChatSelection.value?.agentName)
+
+        repository.setLastChatSelection("agent-1", "PM-letta-mobile", "conv-1")
+        assertEquals("PM-letta-mobile", repository.lastChatSelection.value?.agentName)
+    }
+}

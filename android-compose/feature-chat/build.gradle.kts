@@ -1,5 +1,5 @@
 plugins {
-    id("com.android.library")
+    id("com.letta.mobile.android.library")
     id("io.github.takahirom.roborazzi")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
@@ -30,11 +30,6 @@ detekt {
 
 android {
     namespace = "com.letta.mobile.feature.chat"
-    compileSdk = 37
-
-    defaultConfig {
-        minSdk = 26
-    }
 
     buildFeatures {
         compose = true
@@ -90,8 +85,9 @@ kotlin {
 }
 
 dependencies {
-    implementation(project(":core:data"))
+    implementation(project(":core:android-data"))
     implementation(project(":sharedLogic"))
+    implementation(project(":sharedUI"))
     testImplementation(project(":core:testutil"))
     implementation(project(":designsystem"))
     implementation("io.github.vinceglb:filekit-core:0.15.0")
@@ -116,17 +112,19 @@ dependencies {
     implementation("app.cash.molecule:molecule-runtime:2.2.0")
     implementation("io.coil-kt.coil3:coil-compose:3.5.0")
     implementation("org.jetbrains.kotlinx:kotlinx-collections-immutable:0.5.1")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
+    implementation(libs.kotlinx.coroutines.android)
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
     implementation("androidx.paging:paging-compose:3.5.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
 
+    // Deliberate override of catalog hilt=2.59.2; do not silently flatten.
     implementation("com.google.dagger:hilt-android:2.60.1")
     ksp("com.google.dagger:hilt-compiler:2.60.1")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.junit.jupiter:junit-jupiter-api:6.1.3")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
+    testImplementation(libs.kotlinx.coroutines.test)
+    // Deliberate override of catalog ktor=3.5.0; do not silently flatten.
     testImplementation("io.ktor:ktor-client-core:3.5.2")
     testImplementation("io.mockk:mockk:1.14.11")
     testImplementation("com.squareup.okhttp3:mockwebserver:5.4.0")

@@ -1,0 +1,252 @@
+package com.letta.mobile.desktop.chat
+
+import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
+import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.runtime.AppServerContextWindowPreflight
+import com.letta.mobile.data.runtime.AppServerTurnEngine
+import com.letta.mobile.data.runtime.TurnContextPreflight
+import com.letta.mobile.data.transport.appserver.AppServerClient
+import com.letta.mobile.data.transport.appserver.AppServerCommand
+import com.letta.mobile.data.transport.appserver.AppServerEndpoint
+import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
+import com.letta.mobile.data.transport.appserver.AppServerRuntimeStartClientInfo
+import com.letta.mobile.data.transport.appserver.AppServerTransport
+import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
+import com.letta.mobile.data.transport.appserver.KtorAppServerWebSocketTransport
+import com.letta.mobile.data.transport.iroh.IrohAppServerTransport
+import com.letta.mobile.data.transport.iroh.IrohAppServerTransportAdapter
+import com.letta.mobile.desktop.security.DesktopIrohIdentity
+import com.letta.mobile.desktop.runtime.DesktopLocalRuntimeHost
+import com.letta.mobile.desktop.runtime.DesktopLocalAppServerClientRegistry
+import com.letta.mobile.data.transport.iroh.IrohChannelTransport
+import com.letta.mobile.data.transport.iroh.IrohFrameCodec
+import computer.iroh.Endpoint
+import computer.iroh.EndpointOptions
+import computer.iroh.RelayMode
+import java.util.UUID
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.withContext
+
+/**
+ * Builds the desktop chat gateway backed by the App Server controller.
+ *
+ * Wires the controller stack (transport -> client -> turn engine) for either an
+ * iroh:// backend (QUIC, peer to the Android path) or a WebSocket App Server,
+ * authenticates the iroh session, and returns a hybrid gateway that routes
+ * send/stream through the controller. LOCAL admin reads/writes share that same
+ * child-owned protocol session; remote backends retain their HTTP admin path.
+ *
+ * Desktop does not use Hilt; callers inject this builder (or a test fake of
+ * [DesktopAppServerChatGatewayFactory]) instead of constructing the stack inline.
+ */
+class DesktopAppServerChatGatewayBuilder(
+    /** Coroutine scope for the controller and transport. */
+    private val controllerScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+    /**
+     * Stable client identity source (d6e8g.4): the desktop dials with the same
+     * vault-protected NodeId across restarts instead of an ephemeral keypair.
+     */
+    private val irohIdentity: () -> ByteArray = { DesktopIrohIdentity.loadOrCreate() },
+) : DesktopAppServerChatGatewayFactory {
+
+    override suspend fun create(
+        lettaConfig: LettaConfig,
+        appServerConfig: DesktopAppServerRuntimeConfig,
+    ): DesktopChatGateway = withContext(Dispatchers.IO) {
+        val serverUrl = appServerConfig.serverUrl
+            ?: throw IllegalArgumentException(
+                "App Server URL is required when ${DesktopAppServerRuntimeConfig.ENABLED_PROPERTY} is enabled. " +
+                    "Set ${DesktopAppServerRuntimeConfig.SERVER_URL_PROPERTY} or " +
+                    "${DesktopAppServerRuntimeConfig.SERVER_URL_ENV}.",
+            )
+
+        val isIroh = IrohChannelTransport.isIrohUrl(serverUrl)
+        val (transport, transportResources) = if (isIroh) {
+            buildIrohTransport(serverUrl, lettaConfig)
+        } else {
+            buildWebSocketTransport(serverUrl, lettaConfig)
+        }
+
+        val clientScope = CoroutineScope(
+            controllerScope.coroutineContext + SupervisorJob(controllerScope.coroutineContext[Job]),
+        )
+        val client = DefaultAppServerClient(transport, parentScope = clientScope)
+        var localClientLease: AutoCloseable? = null
+        var eventRouter: AppServerRuntimeEventRouter? = null
+        try {
+            if (transport is KtorAppServerWebSocketTransport) {
+                awaitDesktopAppServerReadiness(
+                    DesktopAppServerReadinessProbe(
+                        connectionState = transport.connectionState,
+                        client = client,
+                        expectation = if (lettaConfig.mode == LettaConfig.Mode.LOCAL) {
+                            localDesktopAppServerExpectation
+                        } else {
+                            DesktopAppServerReadinessExpectation()
+                        },
+                    ),
+                )
+            }
+            if (lettaConfig.mode == LettaConfig.Mode.LOCAL) {
+                localClientLease = DesktopLocalAppServerClientRegistry.shared.install(client)
+            }
+            // Iroh turns run on the wrapper; client-local preflight would be a
+            // duplicate typed-command path (Android dial already uses None).
+            eventRouter = AppServerRuntimeEventRouter()
+            val turnEngine = buildDesktopAppServerTurnEngine(
+                client = client,
+                scope = controllerScope,
+                eventRouter = eventRouter,
+                turnContextPreflight = if (isIroh) {
+                    TurnContextPreflight.None
+                } else {
+                    AppServerContextWindowPreflight(client)
+                },
+            )
+            val adminGateway: DesktopAdminChatGateway = if (lettaConfig.mode == LettaConfig.Mode.LOCAL) {
+                DesktopLocalBackendAdminGateway(appServerClient = client)
+            } else {
+                DesktopLettaHttpChatGateway(
+                    config = lettaConfig,
+                    httpClient = createDesktopLettaHttpClient(),
+                )
+            }
+            DesktopHybridAppServerChatGateway(
+                turnEngine = turnEngine,
+                client = client,
+                adminGateway = adminGateway,
+                transportResources = transportResources,
+                onClose = {
+                    eventRouter.detach()
+                    localClientLease?.close()
+                    client.failPendingRequests("Desktop App Server gateway closed")
+                    clientScope.cancel()
+                },
+            )
+        } catch (error: Throwable) {
+            eventRouter?.detach()
+            localClientLease?.close()
+            client.failPendingRequests("Desktop App Server gateway creation failed")
+            clientScope.cancel()
+            transportResources.close()
+            throw error
+        }
+    }
+
+    /**
+     * iroh://<ticket> — bind a local iroh endpoint, dial the backend over QUIC,
+     * wait for the connection, and run the auth/capability handshake. Any
+     * failure between bind and the authed hand-off tears the endpoint and
+     * transport down before rethrowing (mirrors IrohChannelTransport.dial).
+     */
+    private suspend fun buildIrohTransport(
+        serverUrl: String,
+        lettaConfig: LettaConfig,
+    ): Pair<IrohAppServerTransport, DesktopTransportResources> {
+        val normalizedAddress = IrohChannelTransport.normalizeIrohAddress(serverUrl)
+        val irohEndpoint = Endpoint.bind(
+            EndpointOptions(relayMode = RelayMode.defaultMode(), secretKey = irohIdentity()),
+        )
+        var resources: DesktopTransportResources? = null
+        try {
+            val irohTransport = IrohAppServerTransportAdapter(irohEndpoint).createTransport(
+                endpoint = AppServerEndpoint(scheme = "iroh", address = normalizedAddress),
+                scope = controllerScope,
+            ) as IrohAppServerTransport
+            resources = DesktopTransportResources(irohEndpoint, irohTransport)
+            irohTransport.awaitConnectionReady()
+            authenticateDesktopIrohAppServer(
+                client = DefaultAppServerClient(irohTransport),
+                accessToken = lettaConfig.accessToken,
+            )
+            return irohTransport to resources
+        } catch (t: Throwable) {
+            resources?.close() ?: run {
+                runCatching { irohEndpoint.shutdown() }
+                runCatching { irohEndpoint.close() }
+            }
+            throw t
+        }
+    }
+
+    private fun buildWebSocketTransport(
+        serverUrl: String,
+        lettaConfig: LettaConfig,
+    ): Pair<AppServerTransport, DesktopTransportResources> {
+        val endpoint = AppServerEndpoint.fromWebSocketUrl(url = serverUrl, bearerToken = lettaConfig.accessToken)
+        val httpClient = createDesktopLettaHttpClient()
+        val transport = KtorAppServerWebSocketTransport(
+            httpClient = httpClient,
+            baseUrl = endpoint.address,
+            scope = controllerScope,
+            bearerToken = endpoint.bearerToken,
+        )
+        return transport to DesktopTransportResources.forWebSocket(transport, httpClient)
+    }
+}
+
+/**
+ * Desktop runs every turn Unrestricted: no approval UI, so a Standard-mode
+ * approval_request would stall the turn; the engine auto-allows instead
+ * (parity with the Android iroh engine). Baking the mode into the engine lets
+ * ensureRuntime's single runtime_start carry it — no eager
+ * controller.startRuntime, no double runtime_start on first send (#831 Codex P2).
+ *
+ * Context-window preflight matches the Iroh wrapper path so direct Desktop
+ * App Server WebSocket connections also persist a default limit and compact
+ * poisoned empty-assistant transcripts before the turn starts. Desktop Iroh
+ * dials inject [TurnContextPreflight.None] — the wrapper owns preflight.
+ */
+internal fun buildDesktopAppServerTurnEngine(
+    client: AppServerClient,
+    scope: CoroutineScope,
+    eventRouter: AppServerRuntimeEventRouter = AppServerRuntimeEventRouter(),
+    turnContextPreflight: TurnContextPreflight = AppServerContextWindowPreflight(client),
+): AppServerTurnEngine {
+    // lgns8.22.3: one inbound collector per desktop gateway generation.
+    eventRouter.attach(scope, client.events)
+    return AppServerTurnEngine(
+        client = client,
+        clientInfo = AppServerRuntimeStartClientInfo(
+            name = "letta-desktop",
+            title = "Letta Desktop",
+            version = "0.2.0",
+        ),
+        permissionMode = AppServerPermissionMode.Unrestricted,
+        turnContextPreflight = turnContextPreflight,
+        eventRouter = eventRouter,
+    )
+}
+
+/**
+ * The iroh auth exchange doubles as the transport handshake: it advertises the
+ * frame_part chunked-frame capability so the server may split >1MiB frames.
+ * Sent even with a blank token — servers without a required token still ack
+ * and record capabilities (mirrors IrohChannelTransport.kt dial() and the
+ * CLI probe's tokenless handshake). A failure response is always fatal: the
+ * in-repo server (IrohNodeConnection.handleAuth) returns success=true for
+ * no-token servers, so success=false unambiguously means unauthenticated —
+ * tolerating it would hand an unauthenticated transport onward and surface as
+ * an opaque runtime_start timeout instead of a clear auth error.
+ */
+internal suspend fun authenticateDesktopIrohAppServer(
+    client: AppServerClient,
+    accessToken: String?,
+    requestIdFactory: () -> String = { "desktop-auth-${UUID.randomUUID()}" },
+) {
+    val token = accessToken?.trim().orEmpty()
+    val auth = client.auth(
+        AppServerCommand.Auth(
+            requestId = requestIdFactory(),
+            token = token,
+            capabilities = listOf(IrohFrameCodec.FRAME_PART_CAPABILITY),
+        ),
+    )
+    if (!auth.success) {
+        error("Desktop iroh App Server auth failed: ${auth.error ?: "unknown error"}")
+    }
+}

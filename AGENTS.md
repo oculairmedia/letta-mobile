@@ -55,8 +55,9 @@ git push --force-with-lease                 # safe force-push to your branch
 | Area | Module path | Put logic here | Host binding only |
 | --- | --- | --- | --- |
 | Shared domain / transport / timeline | `android-compose/sharedLogic/` | repositories, reducers, mappers, RPC, caching | — |
+| Shared Compose UI (Android + Desktop) | `android-compose/sharedUI/` | shared composables, A2UI renderer, markdown/bubbles (after Phase 3b) | — |
 | Android UI / navigation | `android-compose/app/`, `feature-*` | Compose screens, ViewModels that call shared APIs | Activity, Hilt, permissions |
-| Design system / A2UI | `android-compose/designsystem/`, `android-compose/sharedLogic/src/jvmAndAndroid/.../a2ui/` | reusable components/theme; shared Android/Desktop A2UI renderer | — |
+| Design system / A2UI | `android-compose/designsystem/`, `android-compose/sharedUI/` | reusable components/theme; shared Android/Desktop A2UI renderer | — |
 | Desktop shell | `android-compose/desktop/` | — | windowing, installer, Ktor engine, OS lock |
 | CLI / probes | `android-compose/cli/`, `appserver-cli/` | JVM tooling | — |
 
@@ -67,7 +68,7 @@ Local quality: run `bash scripts/tests/ci-policy-scripts-test.sh`, then `bash sc
 - **Feature LOGIC goes in `sharedLogic/commonMain`; platform modules add only the binding.** State, transforms, caching, TTL, retry/cache policy, request/response shaping, mappers, and reducers are platform-neutral — they belong in `sharedLogic`, implemented once, consumed by every host (Android `app`, `desktop`, future iOS). A platform module (`desktop/`, `app/`) should contain ONLY what genuinely cannot be shared:
   - **Legit-platform:** windowing/Compose-host wiring (AWT/Swing on desktop, Activity on Android), OS single-instance lock, file-storage backend, Ktor **engine** creation, installer/`Main`, platform permissions.
   - **Must-be-shared (never duplicate per platform):** repositories, view-state reducers, data mappers, formatters, caching/TTL/error-flow, request shaping.
-  - **Anti-pattern to reject in review:** a platform module re-implementing a `sharedLogic` interface (e.g. `IAgentRepository`) with its own logic. If you need a shared interface implemented, implement the platform-neutral core in `commonMain` and inject the platform bit (e.g. the Ktor `HttpClient` engine). Duplicated implementations across `desktop/` and `core/data`/`app/` WILL drift — that is the regression this rule prevents (audit 2026-06-13, beads `letta-mobile-mqzkc`/`8h463`).
+  - **Anti-pattern to reject in review:** a platform module re-implementing a `sharedLogic` interface (e.g. `IAgentRepository`) with its own logic. If you need a shared interface implemented, implement the platform-neutral core in `commonMain` and inject the platform bit (e.g. the Ktor `HttpClient` engine). Duplicated implementations across `desktop/` and `core/android-data`/`app/` WILL drift — that is the regression this rule prevents (audit 2026-06-13, beads `letta-mobile-mqzkc`/`8h463`).
   - The `shared-multiplatform` required check (`:sharedLogic:allTests` + `:desktop:test`) backstops this; keep it green.
 
 **When CI fails on your PR:**
@@ -318,7 +319,7 @@ The `.github/workflows/release.yml` workflow picks up the tag, builds the signed
 Use these rules for all new UI work and UI refactors in this repo. The app already uses Material 3 broadly; the goal is to use it **systematically**.
 
 For A2UI renderer or catalog-authoring work, read
-[`android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/ui/a2ui/README.md`](android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/ui/a2ui/README.md)
+[`android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/README.md`](android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/README.md)
 before changing widget payloads, catalog IDs, bindings, or renderer dispatch.
 
 ### 1. Stable chrome, expressive content

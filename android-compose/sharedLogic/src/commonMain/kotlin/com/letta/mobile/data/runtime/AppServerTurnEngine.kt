@@ -491,6 +491,45 @@ class AppServerTurnEngine(
     }
 
     /**
+     * letta-mobile folder-settings #2: reads the working directory the
+     * runtime currently uses for [agentId]/[conversationId] via `get_cwd_map`
+     * — the full per-conversation map plus the process boot directory as the
+     * fallback for scopes that were never customized. Returns null only on a
+     * transport/protocol failure (never fabricates a value).
+     */
+    suspend fun currentWorkingDirectory(agentId: String, conversationId: String): String? {
+        val response = client.getCwdMap(AppServerCommand.GetCwdMap(requestId = requestIdFactory()))
+        if (!response.success) return null
+        val scopeKey = WorkingDirectoryScopeKey.of(agentId, conversationId)
+        return response.cwdMap[scopeKey] ?: response.bootWorkingDirectory
+    }
+
+    /**
+     * letta-mobile folder-settings #2: changes the working directory for
+     * [agentId]/[conversationId] by re-issuing `runtime_start` with `cwd`
+     * set — the only client-facing mechanism the runtime supports for this
+     * (there is no dedicated `set_cwd` command upstream). Mirrors
+     * [ensureRuntime]'s command shape (same `clientInfo` / externalTools
+     * advertisement) so this doesn't clobber the connection's registered
+     * external tools with an empty list. Returns true on success.
+     */
+    suspend fun setWorkingDirectory(agentId: String, conversationId: String, cwd: String): Boolean {
+        val response = client.runtimeStart(
+            AppServerCommand.RuntimeStart(
+                requestId = requestIdFactory(),
+                agentId = agentId,
+                conversationId = conversationId,
+                cwd = cwd,
+                clientInfo = clientInfo,
+                recoverApprovals = true,
+                forceDeviceStatus = true,
+                externalTools = externalToolRegistry?.advertisedToolsCommandGroups(),
+            ),
+        )
+        return response.success
+    }
+
+    /**
      * letta-mobile-c4igq.3 / lgns8.22.2: causal liveness recovery.
      * Clears a dead owner ONLY after authoritative evidence, and only by
      * cancelling+joining that owner's job — never by Mutex.force-unlock.

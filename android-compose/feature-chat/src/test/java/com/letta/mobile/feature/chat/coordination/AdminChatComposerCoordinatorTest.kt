@@ -124,6 +124,25 @@ class AdminChatComposerCoordinatorTest {
     }
 
     @Test
+    fun `sendMessage clears a stale error banner from a prior failed turn`() {
+        // letta-mobile-aujte: a red 'turn failed' banner from a PREVIOUS turn
+        // must not survive into a new send — ChatBannerController.showError()
+        // is the only thing that ever sets ChatUiState.error on the failure
+        // path; sendMessagePayload() must be the counterpart that clears it.
+        uiState.value = ChatUiState(
+            conversationState = ConversationState.Ready("conv_123"),
+            error = "This turn failed before the assistant could reply.",
+        )
+        every { composerController.payloadForSend("hello") } returns
+            ComposerSendPayload(text = "hello", attachments = emptyList())
+
+        coordinator.sendMessage("hello")
+
+        verify { chatBannerController.clearError() }
+        verify { chatSendStrategySelector.send(eq("hello"), any(), any()) }
+    }
+
+    @Test
     fun `rerunMessage ignores non-user messages`() {
         val message = mockk<UiMessage> {
             every { role } returns "assistant"

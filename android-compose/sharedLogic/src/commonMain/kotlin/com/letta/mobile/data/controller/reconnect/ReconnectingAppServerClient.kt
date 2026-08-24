@@ -23,7 +23,7 @@ import kotlinx.coroutines.launch
 
 /**
  * One connection generation minted by [ReconnectingAppServerClient.connect]:
- * a live client bound to a single dual-socket generation, the generation's
+ * a live client bound to one connection generation, the generation's
  * readiness state, and a close handle that tears the generation down.
  */
 class AppServerClientGeneration(
@@ -101,6 +101,7 @@ class AppServerNotConnectedException(message: String) : IllegalStateException(me
 class ReconnectingAppServerClient(
     private val connect: suspend () -> AppServerClientGeneration,
     private val listener: ReconnectingClientListener = object : ReconnectingClientListener {},
+    private val telemetryComponent: String = "AppServerReconnect",
     private val backoff: FullJitterBackoff = FullJitterBackoff(),
     private val maxAttempts: Int = DEFAULT_MAX_ATTEMPTS,
     private val random: kotlin.random.Random = kotlin.random.Random.Default,
@@ -162,7 +163,7 @@ class ReconnectingAppServerClient(
                 val delayMs = backoff.delayMs(attempt, random)
                 _state.value = ReconnectingClientState.BackingOff(attempt, delayMs, outcome.reason)
                 Telemetry.event(
-                    "AppServerReconnect",
+                    telemetryComponent,
                     "backoff",
                     "attempt" to attempt,
                     "delayMs" to delayMs,
@@ -247,7 +248,7 @@ class ReconnectingAppServerClient(
         }
 
         _state.value = ReconnectingClientState.Ready
-        Telemetry.event("AppServerReconnect", "generation.ready", "attempt" to attempt)
+        Telemetry.event(telemetryComponent, "generation.ready", "attempt" to attempt)
 
         val failed = generation.connectionState.first { it is AppServerConnectionState.Failed }
             as AppServerConnectionState.Failed
@@ -263,7 +264,7 @@ class ReconnectingAppServerClient(
 
     private suspend fun giveUp(reason: String?) {
         _state.value = ReconnectingClientState.GaveUp(reason)
-        Telemetry.event("AppServerReconnect", "gave_up", "reason" to (reason ?: ""))
+        Telemetry.event(telemetryComponent, "gave_up", "reason" to (reason ?: ""))
         listener.onGaveUp(reason)
     }
 

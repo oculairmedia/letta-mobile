@@ -14,6 +14,9 @@ local.properties
 *.jks
 keystore.properties
 
+# Kotzilla — contains API key, per-developer, never committed
+kotzilla.json
+
 # OpenCode / IDE
 .vscode
 .opencode/
@@ -29,6 +32,9 @@ keystore.properties
 .dolt/
 *.db
 .beads-credential-key
+
+# Orphan KMP shared-ui build output (module is not in settings.gradle.kts)
+android-compose/shared-ui/
 
 # Kotlin compiler error logs
 android-compose/.kotlin/

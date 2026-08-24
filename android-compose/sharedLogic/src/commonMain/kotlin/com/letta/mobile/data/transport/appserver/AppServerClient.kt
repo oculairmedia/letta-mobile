@@ -2,6 +2,7 @@ package com.letta.mobile.data.transport.appserver
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,9 +17,10 @@ import kotlinx.coroutines.launch
  *
  * Upstream ≥ 0.29.7 exposes one bidirectional WebSocket per client. The shared
  * transport demuxes inbound frames into control vs stream flows by message type.
- * Use one direct client/transport as the session owner for a runtime process;
- * multi-client remote access needs an external fanout/arbitration layer instead
- * of several clients writing to the same process.
+ * App Server permits multiple independent clients, but runtime-scoped writes,
+ * approvals, tools, and channel ingress must remain on their owning connection.
+ * Use [DualLaneAppServerClient] when bulk management reads need a separate
+ * failure domain from the connection that owns live runtimes.
  */
 interface AppServerClient {
     val events: Flow<AppServerReceivedFrame>
@@ -145,6 +147,10 @@ interface AppServerClient {
     suspend fun setReflectionSettings(command: AppServerCommand.SetReflectionSettings): AppServerInboundFrame.SetReflectionSettingsResponse =
         throw UnsupportedOperationException("SetReflectionSettings is not supported by this client")
 
+    /** Reads the runtime's full per-conversation working-directory map (`get_cwd_map`). */
+    suspend fun getCwdMap(command: AppServerCommand.GetCwdMap): AppServerInboundFrame.GetCwdMapResponse =
+        throw UnsupportedOperationException("GetCwdMap is not supported by this client")
+
     // Channels host ownership (lgns8.23). CONTROLLER-INTERNAL: only
     // ChannelRestoreCoordinator calls these; the responses carry cleartext
     // plugin credentials and are never surfaced to viewers or diagnostics.
@@ -194,7 +200,7 @@ class DefaultAppServerClient(
         // the caller is responsible for starting the registry.
         parentScope?.let {
             registry.startRouting(it)
-            it.launch {
+            it.launch(start = CoroutineStart.UNDISPATCHED) {
                 // Fail pending requests only on a genuine connected -> disconnected
                 // transition. The transport StateFlow starts Disconnected(false),
                 // so the previous `dropWhile { it }` dropped nothing and fired
@@ -207,6 +213,11 @@ class DefaultAppServerClient(
                 registry.failAll(CancellationException("transport disconnected"))
             }
         }
+    }
+
+    /** Fails request waiters before the owner cancels this client's routing scope. */
+    fun failPendingRequests(reason: String) {
+        registry.failAll(CancellationException(reason))
     }
 
     override suspend fun auth(command: AppServerCommand.Auth): AppServerInboundFrame.AuthResponse =
@@ -353,6 +364,9 @@ class DefaultAppServerClient(
 
     override suspend fun setReflectionSettings(command: AppServerCommand.SetReflectionSettings): AppServerInboundFrame.SetReflectionSettingsResponse =
         registry.request(command.requestId, { it as? AppServerInboundFrame.SetReflectionSettingsResponse }) { transport.sendControl(command) }
+
+    override suspend fun getCwdMap(command: AppServerCommand.GetCwdMap): AppServerInboundFrame.GetCwdMapResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.GetCwdMapResponse }) { transport.sendControl(command) }
 
     override suspend fun channelsList(command: AppServerCommand.ChannelsList): AppServerInboundFrame.ChannelsListResponse =
         registry.request(command.requestId, { it as? AppServerInboundFrame.ChannelsListResponse }) { transport.sendControl(command) }

@@ -63,5 +63,7 @@ class ArchitectureGraphPluginTest {
     }
 
     private fun resource(name: String): String =
-        checkNotNull(javaClass.getResource("/fixtures/$name")) { "Missing fixture $name" }.readText()
+        checkNotNull(javaClass.getResource("/fixtures/$name")) { "Missing fixture $name" }
+            .readText()
+            .replace("\r\n", "\n")
 }

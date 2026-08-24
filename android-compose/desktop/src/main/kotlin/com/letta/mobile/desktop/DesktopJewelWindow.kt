@@ -2,7 +2,6 @@ package com.letta.mobile.desktop
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,6 +16,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -24,12 +24,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionOnScreen
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.WindowState
 import com.letta.mobile.data.lens.LensDestination
 import com.letta.mobile.data.lens.WorkPlayMode
+import com.letta.mobile.desktop.touch.DesktopTouchDragExclusion
+import com.letta.mobile.desktop.touch.screenExclusionRectOrNull
 import dev.nucleusframework.darkmodedetector.isSystemInDarkMode
 import dev.nucleusframework.window.AwtDecoratedWindowScope
 import dev.nucleusframework.window.BasicTitleBar
@@ -42,6 +48,7 @@ import dev.nucleusframework.window.styling.DecoratedWindowStyle
 import dev.nucleusframework.window.styling.TitleBarColors
 import dev.nucleusframework.window.styling.TitleBarMetrics
 import dev.nucleusframework.window.styling.TitleBarStyle
+import java.awt.Rectangle
 
 /** Overflow entry points surfaced next to the sidebar toggle while the
  * sidebar is collapsed — see [DesktopSidebarOverflowMenu]. */
@@ -73,6 +80,7 @@ internal data class DesktopHeaderChromeState(
     val activeConversationId: String? = null,
     val onSelectConversationTab: (String) -> Unit = {},
     val onCloseConversationTab: (String) -> Unit = {},
+    val onReorderConversationTab: (conversationId: String, targetIndex: Int) -> Unit = { _, _ -> },
 ) {
     companion object {
         val Empty = DesktopHeaderChromeState(
@@ -169,6 +177,41 @@ internal fun DesktopJewelWindow(
                     windowStyle = windowStyle,
                     titleBarStyle = titleBarStyle,
                 ) {
+                    // Windows touchscreens: DesktopWindowsTouchInput swallows every
+                    // touch drag and replays it as wheel-scroll, which would eat the
+                    // title bar's own drag-to-move gesture before Nucleus ever sees
+                    // it. Publishing these bounds tells the shim to leave gestures
+                    // that start here alone (letta-mobile touch-title-bar regression).
+                    // Screen coordinates sidestep both the density scaling between
+                    // Compose's px space and AWT's, and any offset between the AWT
+                    // component that receives the touch event and this content.
+                    //
+                    // X and width are measured from this Row -- our own content --
+                    // rather than from BasicTitleBar's own outer modifier, which was
+                    // tried first and reported a rectangle offset downward by exactly
+                    // one title bar height from where the title bar and tabs actually
+                    // render on screen.
+                    //
+                    // Y is deliberately NOT taken from this same measurement, even
+                    // though it lives in the same LayoutCoordinates: live probing
+                    // showed this Row's own onGloballyPositioned firing with two
+                    // different Y values across layout passes in the same run --
+                    // window-relative Y=0 on some passes, Y=TitleBarHeight (one full
+                    // title-bar height) on others -- while X and width stayed put.
+                    // That is consistent with Nucleus's native title-bar-height
+                    // plumbing (TitleBarLayoutPolicy's applyTitleBar callback and the
+                    // JNI nativeSetTitleBarHeight path) intermittently double-counting
+                    // its own inset when it recomputes the client-area offset, not
+                    // with anything this file controls -- so there is no "correct"
+                    // Y to read from this coordinate space at all, only two different
+                    // wrong-some-of-the-time ones. The title bar is always the top
+                    // TitleBarHeight of the window, full stop, so anchoring Y to the
+                    // window's own (stable) screen position sidesteps the flip
+                    // entirely instead of trying to pick the right transient sample.
+                    DisposableEffect(window) {
+                        onDispose { DesktopTouchDragExclusion.publish(window, null) }
+                    }
+                    val titleBarHeightPx = with(LocalDensity.current) { TitleBarHeight.roundToPx() }
                     BasicTitleBar(
                         style = titleBarStyle,
                         layoutPolicy = TitleBarLayoutPolicy.FillCenter,
@@ -176,7 +219,15 @@ internal fun DesktopJewelWindow(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(start = 8.dp),
+                                .padding(start = 8.dp)
+                                .onGloballyPositioned { coordinates ->
+                                    val bounds = titleBarScreenBoundsOrNull(
+                                        coordinates = coordinates,
+                                        windowOriginOnScreen = runCatching { window.locationOnScreen }.getOrNull(),
+                                        titleBarHeightPx = titleBarHeightPx,
+                                    )
+                                    DesktopTouchDragExclusion.publish(window, bounds)
+                                },
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             // Sidebar toggle: the one control that survives
@@ -203,10 +254,18 @@ internal fun DesktopJewelWindow(
                             val identity = header.identity
                             if (header.conversationTabs.isNotEmpty()) {
                                 // Keep the weighted container itself non-interactive: the tab strip
-                                // wraps its content until it reaches the available width minus the
-                                // reserved drag lane, then scrolls horizontally. Blank space inside
-                                // this box remains draggable and trailing controls stay fixed.
-                                BoxWithConstraints(
+                                // fills it edge to edge, reserving the drag lane as a trailing blank
+                                // item inside the LazyRow itself (see DesktopConversationTabRow's
+                                // dragLaneWidth) rather than shrinking the row's own width via
+                                // widthIn(max = ...). A width-constrained LazyRow left the row's
+                                // measured/virtualized viewport narrower than the space a tab could
+                                // be dragged into, clipping the dragged tab the moment it crossed
+                                // that boundary; letting the row use the full weighted width and
+                                // spending the reserved lane as real (if invisible) row content keeps
+                                // every dragged position inside the row's own bounds. Blank space
+                                // both inside the tab strip and past its last tab remains draggable;
+                                // trailing controls stay fixed.
+                                Box(
                                     modifier = Modifier
                                         .weight(1f)
                                         .fillMaxHeight(),
@@ -214,14 +273,13 @@ internal fun DesktopJewelWindow(
                                     DesktopConversationTabRow(
                                         tabs = header.conversationTabs,
                                         activeConversationId = header.activeConversationId,
-                                        onSelect = header.onSelectConversationTab,
-                                        onClose = header.onCloseConversationTab,
-                                        modifier = Modifier
-                                            .fillMaxHeight()
-                                            .widthIn(
-                                                max = (maxWidth - MinimumTitleBarDragWidth)
-                                                    .coerceAtLeast(0.dp),
-                                            ),
+                                        actions = DesktopConversationTabActions(
+                                            onSelect = header.onSelectConversationTab,
+                                            onClose = header.onCloseConversationTab,
+                                            onReorder = header.onReorderConversationTab,
+                                        ),
+                                        dragLaneWidth = MinimumTitleBarDragWidth,
+                                        modifier = Modifier.fillMaxHeight(),
                                     )
                                 }
                             } else if (identity != null) {
@@ -255,8 +313,9 @@ internal fun DesktopJewelWindow(
                                 }
                             }
                             // Without tabs, this is the only weighted element. With tabs, the
-                            // weighted BoxWithConstraints above doubles as the drag region around
-                            // its wrap-content tab strip. Either way, caption controls remain fixed.
+                            // weighted Box above doubles as the drag region around its tab strip
+                            // (a LazyRow filling the Box edge to edge). Either way, caption
+                            // controls remain fixed.
                             if (header.conversationTabs.isEmpty()) {
                                 Box(modifier = Modifier.weight(1f).fillMaxHeight())
                             }
@@ -270,4 +329,28 @@ internal fun DesktopJewelWindow(
             }
         }
     }
+}
+
+/**
+ * The title bar's screen-space bounds for [DesktopTouchDragExclusion], or
+ * null when [coordinates] cannot yet be resolved to a screen position (see
+ * [screenExclusionRectOrNull] for why that happens and why null — meaning
+ * "clear any previously published bounds" — is the deliberate fail-safe
+ * choice rather than a best-effort rectangle).
+ *
+ * X and width come from [coordinates] (Compose's own measurement of this
+ * Row, screen-relative). Y comes from [windowOriginOnScreen] instead of
+ * [coordinates] — see the call site's comment for why the latter is
+ * unreliable for Y specifically — falling back to the coordinates' own Y
+ * when the window's screen position isn't available yet (very first frames,
+ * before the AWT peer exists).
+ */
+private fun titleBarScreenBoundsOrNull(
+    coordinates: LayoutCoordinates,
+    windowOriginOnScreen: java.awt.Point?,
+    titleBarHeightPx: Int,
+): Rectangle? {
+    val topLeft = coordinates.positionOnScreen()
+    val y = windowOriginOnScreen?.y?.toFloat() ?: topLeft.y
+    return screenExclusionRectOrNull(topLeft.x, y, coordinates.size.width, titleBarHeightPx)
 }

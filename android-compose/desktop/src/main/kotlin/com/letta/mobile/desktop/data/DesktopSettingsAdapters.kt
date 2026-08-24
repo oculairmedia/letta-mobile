@@ -8,6 +8,8 @@ import com.letta.mobile.data.health.ServerHealthState
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import com.letta.mobile.data.storage.SecureSettingsStore
+import com.letta.mobile.data.transport.api.IChannelTransport
+import com.letta.mobile.data.transport.api.NoOpChannelTransport
 import java.io.InputStream
 import java.io.OutputStream
 import java.nio.file.Files
@@ -149,6 +151,17 @@ class DesktopLettaConfigStore(
             ?.takeIf { it.isNotBlank() }
             ?.let { settingsStore.putString(KEY_ACCESS_TOKEN, it) }
             ?: settingsStore.remove(KEY_ACCESS_TOKEN)
+        // letta-mobile-hhp6r: persist the parked remote backend (if any) so a
+        // switch to Local, followed by an app restart, still has something to
+        // restore from when the user switches back to a remote mode.
+        normalized.parkedServerUrl
+            ?.takeIf { it.isNotBlank() }
+            ?.let { settingsStore.putString(KEY_PARKED_SERVER_URL, it) }
+            ?: settingsStore.remove(KEY_PARKED_SERVER_URL)
+        normalized.parkedAccessToken
+            ?.takeIf { it.isNotBlank() }
+            ?.let { settingsStore.putString(KEY_PARKED_ACCESS_TOKEN, it) }
+            ?: settingsStore.remove(KEY_PARKED_ACCESS_TOKEN)
         rememberBackend(normalized.serverUrl)
         activeConfigState.value = normalized
     }
@@ -181,16 +194,53 @@ class DesktopLettaConfigStore(
 
     private fun readConfig(): LettaConfig {
         val fallback = defaultDesktopLettaConfig()
-        return LettaConfig(
-            id = settingsStore.getString(KEY_ID, fallback.id).orEmpty().ifBlank { fallback.id },
-            mode = settingsStore.getString(KEY_MODE)
-                ?.let { value -> runCatching { LettaConfig.Mode.valueOf(value) }.getOrNull() }
-                ?: fallback.mode,
-            serverUrl = settingsStore.getString(KEY_SERVER_URL, fallback.serverUrl).orEmpty().ifBlank {
-                fallback.serverUrl
-            },
-            accessToken = settingsStore.getString(KEY_ACCESS_TOKEN)?.takeIf { it.isNotBlank() },
-        )
+        val raw = readRawConfig(fallback)
+        val restored = BackendConfigPolicy.restoreParkedRemoteBackend(raw)
+        val withFallbackUrl = applyFallbackUrl(restored, fallback)
+        val migrated = BackendConfigPolicy.migrateStaleLocalServerUrl(withFallbackUrl)
+        persistMigrationIfNeeded(raw, restored, withFallbackUrl, migrated)
+        return migrated
+    }
+
+    private fun readRawConfig(fallback: LettaConfig): LettaConfig = LettaConfig(
+        id = settingsStore.getString(KEY_ID, fallback.id).orEmpty().ifBlank { fallback.id },
+        mode = settingsStore.getString(KEY_MODE)
+            ?.let { value -> runCatching { LettaConfig.Mode.valueOf(value) }.getOrNull() }
+            ?: fallback.mode,
+        serverUrl = settingsStore.getString(KEY_SERVER_URL).orEmpty(),
+        accessToken = settingsStore.getString(KEY_ACCESS_TOKEN)?.takeIf { it.isNotBlank() },
+        parkedServerUrl = settingsStore.getString(KEY_PARKED_SERVER_URL)?.takeIf { it.isNotBlank() },
+        parkedAccessToken = settingsStore.getString(KEY_PARKED_ACCESS_TOKEN)?.takeIf { it.isNotBlank() },
+    )
+
+    private fun applyFallbackUrl(restored: LettaConfig, fallback: LettaConfig): LettaConfig =
+        if (restored.mode == LettaConfig.Mode.LOCAL) {
+            restored.copy(serverUrl = restored.serverUrl.trim())
+        } else {
+            restored.copy(serverUrl = restored.serverUrl.trim().ifBlank { fallback.serverUrl.trim() })
+        }
+
+    private fun persistMigrationIfNeeded(
+        raw: LettaConfig,
+        restored: LettaConfig,
+        withFallbackUrl: LettaConfig,
+        migrated: LettaConfig,
+    ) {
+        if (restored !== raw || migrated !== withFallbackUrl) {
+            settingsStore.putString(KEY_SERVER_URL, migrated.serverUrl)
+        }
+        if (migrated.parkedServerUrl != raw.parkedServerUrl) {
+            migrated.parkedServerUrl
+                ?.takeIf { it.isNotBlank() }
+                ?.let { settingsStore.putString(KEY_PARKED_SERVER_URL, it) }
+                ?: settingsStore.remove(KEY_PARKED_SERVER_URL)
+        }
+        if (migrated.parkedAccessToken != raw.parkedAccessToken) {
+            migrated.parkedAccessToken
+                ?.takeIf { it.isNotBlank() }
+                ?.let { settingsStore.putString(KEY_PARKED_ACCESS_TOKEN, it) }
+                ?: settingsStore.remove(KEY_PARKED_ACCESS_TOKEN)
+        }
     }
 
     private fun rememberBackend(serverUrl: String) {
@@ -212,6 +262,8 @@ class DesktopLettaConfigStore(
         private const val KEY_MODE = "letta.config.mode"
         private const val KEY_SERVER_URL = "letta.config.serverUrl"
         private const val KEY_ACCESS_TOKEN = "letta.config.accessToken"
+        private const val KEY_PARKED_SERVER_URL = "letta.config.parkedServerUrl"
+        private const val KEY_PARKED_ACCESS_TOKEN = "letta.config.parkedAccessToken"
         private const val KEY_RECENT_BACKENDS = "letta.config.recentBackends"
         private const val RECENT_SEPARATOR = "\n"
     }
@@ -259,10 +311,14 @@ fun createDefaultDesktopDataBindings(
     secureSettingsStore: SecureSettingsStore = DesktopFileSecureSettingsStore(),
     configProvider: () -> LettaConfig? = { null },
     irohAgentDirectoryProvider: () -> IrohAdminRpcAgentDirectory? = { null },
+    channelTransportProvider: () -> IChannelTransport? = { null },
 ): DesktopDataBindings {
     val graphFactory = DesktopSessionGraphFactory(
         configProvider = configProvider,
-        repositoryAdaptersFactory = { config -> DesktopRepositoryAdapters(config, irohAgentDirectoryProvider) },
+        channelTransportFactory = {
+            channelTransportProvider() ?: NoOpChannelTransport()
+        },
+        irohAgentDirectoryProvider = irohAgentDirectoryProvider,
     )
     return DesktopDataBindings(
         secureSettingsStore = secureSettingsStore,

@@ -801,6 +801,46 @@ class ChatRenderModelBuilderTest {
     }
 
     @Test
+    fun `incremental cache scopes foreign messages before run id backfill`() {
+        val cache = IncrementalChatRenderItemsCache()
+        val messages = listOf(
+            UiMessage(
+                id = "u1",
+                role = "user",
+                content = "hi",
+                timestamp = "2026-04-19T12:00:00Z",
+                agentId = "agent-A",
+            ),
+            UiMessage(
+                id = "a-missing",
+                role = "assistant",
+                content = "active reply",
+                timestamp = "2026-04-19T12:00:10Z",
+                agentId = "agent-A",
+            ),
+            UiMessage(
+                id = "b-foreign",
+                role = "assistant",
+                content = "foreign reply",
+                timestamp = "2026-04-19T12:00:20Z",
+                runId = "run-B",
+                agentId = "agent-B",
+            ),
+        )
+
+        val incremental = cache.renderItems(
+            messages = messages,
+            mode = ChatDisplayMode.Interactive,
+            change = ChatMessageListChange.Full,
+            activeAgentId = "agent-A",
+        )
+        val full = buildChatRenderModel(messages, ChatDisplayMode.Interactive, activeAgentId = "agent-A")
+
+        assertEquals(full.renderItems, incremental)
+        assertTrue(incremental.none { it.key == "run-run-B" })
+    }
+
+    @Test
     fun `same-agent and null-agentId messages are never dropped by scoping c4igq4`() {
         val model = buildChatRenderModel(
             messages = listOf(

@@ -43,6 +43,40 @@ internal fun TimelineEvent.Confirmed.hasExplicitApprovalResponse(evidence: Appro
 }
 
 /**
+ * letta-mobile-c49of: the explicit decision carried by this response echo,
+ * or null when it resolves nothing (approve=null auto-approval echo). When
+ * both the top-level flag and per-call results are present, REJECTED wins —
+ * a mixed echo must never render as "Approved".
+ */
+internal fun ApprovalResponseMessage.approvalOutcome(): ApprovalDecision? {
+    val explicit = listOfNotNull(approve) + approvals.orEmpty().mapNotNull { it.approve }
+    return when {
+        explicit.any { !it } -> ApprovalDecision.REJECTED
+        explicit.any { it } -> ApprovalDecision.APPROVED
+        else -> null
+    }
+}
+
+/**
+ * Explicit decision for this event from snapshot/reconcile evidence, or null
+ * when only implicit resolution (tool returns / approve=null echo) exists.
+ */
+internal fun TimelineEvent.Confirmed.approvalOutcomeFromEvidence(
+    evidence: ApprovalTimelineEvidence,
+): ApprovalDecision? {
+    val requestId = approvalRequestId?.takeIf(String::isNotBlank) ?: return null
+    val outcomes = evidence.responsesByRequestId[requestId]
+        .orEmpty()
+        .filter { it.runId.isCompatibleRun(runId) }
+        .mapNotNull(ApprovalResponseMessage::approvalOutcome)
+    return when {
+        outcomes.contains(ApprovalDecision.REJECTED) -> ApprovalDecision.REJECTED
+        outcomes.contains(ApprovalDecision.APPROVED) -> ApprovalDecision.APPROVED
+        else -> null
+    }
+}
+
+/**
  * True if ANY approval-response echo exists for this request on a
  * compatible run — including the approve=null echo the Letta server sends
  * for auto-approved (bypassPermissions) tool calls. Unlike
@@ -94,8 +128,30 @@ internal fun TimelineEvent.Confirmed.willCompleteWith(returnedCallIds: Set<Strin
         callId.isNotBlank() && (callId in returnedCallIds || callId in toolReturnContentByCallId)
     }
 
+/**
+ * letta-mobile-hga00: deliberately NOT gated on [hasExplicitDecision] — the
+ * Letta server sends an `approve=null` response echo for auto-approved
+ * (bypassPermissions) tool calls (see [hasAnyApprovalResponse]), and that
+ * echo is the ONLY signal the LIVE stream reducer ([matchingApprovalEvent],
+ * used by TimelineStreamReducer) gets that the request is resolved. A
+ * long-running auto-approved tool (e.g. a multi-minute shell command) has
+ * no ToolReturnMessage yet to flip `approvalDecided` via `willCompleteWith`,
+ * so gating this match on an explicit decision left the approval-request
+ * card (and its Approve/Reject buttons) rendered for the tool's entire
+ * execution window even though it was already resolved server-side.
+ * Requiring an explicit decision here previously matched the historical
+ * intent (only real approve/reject responses should resolve the card), but
+ * it silently discarded the auto-approve echo instead — the snapshot/
+ * reconcile path (`applyReturnsAndResponsesFromSnapshot`) already treats any
+ * response echo as resolving evidence via [hasAnyApprovalResponse]; this
+ * keeps the live and snapshot paths consistent. The Approved/Rejected LABEL
+ * is unaffected: it is derived separately in [TimelineEventToUiMessage] from
+ * `approvalDecided` alone (never `null`-approve is never surfaced as
+ * "Rejected" — see that file's chip logic), so resolving the card here
+ * cannot mislabel an auto-approval as an explicit decision.
+ */
 internal fun TimelineEvent.Confirmed.matchesApprovalResponse(response: ApprovalResponseMessage): Boolean =
-    response.hasExplicitDecision() && approvalRequestId == response.approvalRequestId &&
+    approvalRequestId == response.approvalRequestId &&
         (runId.isNullOrBlank() || response.runId.isNullOrBlank() || runId == response.runId)
 
 internal fun Timeline.matchingApprovalEvent(response: ApprovalResponseMessage): TimelineEvent.Confirmed? =

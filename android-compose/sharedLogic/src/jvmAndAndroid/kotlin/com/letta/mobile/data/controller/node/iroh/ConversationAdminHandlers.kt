@@ -7,15 +7,33 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
 object ConversationAdminHandlers {
-    /** Newest-window page size for single-message projection. */
-    internal const val MESSAGE_GET_PAGE_LIMIT = 500
+    /**
+     * Newest-window page size for single-message projection.
+     *
+     * letta-mobile-leebr: walkMessagePages asks the real App Server for this
+     * many RAW, unprojected messages per page over the wrapper's own WS link
+     * to it (AppServerWebSocketLimits.MAX_FRAME_BYTES = 16 MiB, no chunking).
+     * message.list's size guards (MessageListPageGuard, MessageListWireProjection)
+     * only run on what the wrapper serves onward — they can't protect this
+     * inbound hop. A page of large tool-return bodies can itself exceed 16 MiB
+     * in one WS frame from the App Server, which kills that ENTIRE shared
+     * connection (not just this request) until it reconnects — every other
+     * admin_rpc route sharing it (agent_list, conversation_list, list_models,
+     * running turns) breaks simultaneously. Worse, message.get always walks
+     * from the newest page, so a message living on an oversized page kills the
+     * connection again on every future lookup of it — not a one-off blip.
+     * 500 was excessive for what's just a "find one message by id" scan;
+     * shrinking it lowers the odds any single page crosses that ceiling.
+     */
+    internal const val MESSAGE_GET_PAGE_LIMIT = 100
 
-    /** Max pages walked oldest-ward for message.get / tool_return.get. */
-    internal const val MESSAGE_GET_MAX_PAGES = 20
+    /** Preserve the pre-page-shrink searchable window while keeping each frame small. */
+    internal const val MESSAGE_GET_MAX_SEARCHABLE_MESSAGES = 10_000
 
     /**
      * Wall-clock budget for the whole multi-page walk. Per-page NativeAdmin
@@ -32,11 +50,9 @@ object ConversationAdminHandlers {
     @Volatile
     internal var messageGetBudgetMsForTest: Long? = null
 
-    private val messageGetPageLimit: Int
-        get() = messageGetPageLimitForTest ?: MESSAGE_GET_PAGE_LIMIT
+    private fun messageGetPageLimit(): Int = messageGetPageLimitForTest ?: MESSAGE_GET_PAGE_LIMIT
 
-    private val messageGetBudgetMs: Long
-        get() = messageGetBudgetMsForTest ?: MESSAGE_GET_BUDGET_MS
+    private fun messageGetBudgetMs(): Long = messageGetBudgetMsForTest ?: MESSAGE_GET_BUDGET_MS
 
     fun register(
         router: AdminRpcRouter,
@@ -44,7 +60,7 @@ object ConversationAdminHandlers {
         controller: com.letta.mobile.data.controller.AppServerController? = null,
     ) {
         val nativeClient = tiers.nativeClient
-        registerConversationReadRoutes(router, nativeClient)
+        registerConversationReadRoutes(router, nativeClient, tiers)
         registerConversationWriteRoutes(router, nativeClient, controller)
         registerMessageRoutes(router, nativeClient)
     }
@@ -52,7 +68,14 @@ object ConversationAdminHandlers {
     private fun registerConversationReadRoutes(
         router: AdminRpcRouter,
         nativeClient: AppServerClient?,
+        tiers: NativeReadTiers,
     ) {
+        registerConversationListRoute(router, nativeClient)
+        registerConversationAgentListRoute(router, tiers)
+        registerConversationGetRoute(router, nativeClient)
+    }
+
+    private fun registerConversationListRoute(router: AdminRpcRouter, nativeClient: AppServerClient?) {
         router.registerScoped("conversation.list") { params, context ->
             val agentId = param(params, AdminParamKey("agent_id"))
             val conversations = NativeAdmin.require(nativeClient, NativeAdminOp.ConversationList) { c ->
@@ -74,6 +97,18 @@ object ConversationAdminHandlers {
             }
             scopeConversationList(conversations, context)
         }
+    }
+
+    private fun registerConversationAgentListRoute(router: AdminRpcRouter, tiers: NativeReadTiers) {
+        router.registerScoped("conversation.list_agent") { params, context ->
+            val agentId = param(params, AdminParamKey("agent_id"))
+                ?: return@registerScoped adminError("missing_required: agent_id")
+            val request = AgentListRequest(params, context, tiers, agentId)
+            ConversationAgentListHelper.listAgentConversations(request, ::scopeConversationList)
+        }
+    }
+
+    private fun registerConversationGetRoute(router: AdminRpcRouter, nativeClient: AppServerClient?) {
         router.registerScoped("conversation.get") { params, context ->
             val id = params.requireParam(AdminParamKey("conversation_id"))
             requireConversationAccess(context, id)
@@ -212,6 +247,7 @@ object ConversationAdminHandlers {
             }
             MessageListPageGuard.bound(
                 MessageListWireProjection.projectMessageList(response, convId),
+                newestLast = param(params, AdminParamKey("order"))?.lowercase() != "desc",
             )
         }
         router.registerScoped("message.get") { params, context ->
@@ -230,7 +266,7 @@ object ConversationAdminHandlers {
 
     /**
      * Phase 2: project a single message from conversation_messages_list.
-     * Walks newest-first pages (up to [MESSAGE_GET_MAX_PAGES] × [MESSAGE_GET_PAGE_LIMIT])
+     * Walks newest-first pages up to [MESSAGE_GET_MAX_SEARCHABLE_MESSAGES].
      * via the `before` cursor; missing ids fail closed (no shim).
      *
      * Each page uses its own [NativeAdmin.require] timeout, and the whole walk
@@ -242,8 +278,8 @@ object ConversationAdminHandlers {
         messageId: String,
         op: NativeAdminOp,
     ): JsonElement {
-        return try {
-            kotlinx.coroutines.withTimeout(messageGetBudgetMs) {
+        val message = try {
+            kotlinx.coroutines.withTimeout(messageGetBudgetMs()) {
                 walkMessagePages(nativeClient, conversationId, messageId, op)
             }
         } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
@@ -251,6 +287,15 @@ object ConversationAdminHandlers {
                 "deadline_exceeded: message $messageId lookup exceeded searchable window budget",
             )
         }
+        // message.get is a generic single-message lookup, not the "give me the
+        // full tool output" pointer target that message.list's truncation
+        // stamps point at — that's tool_return.get, which must keep returning
+        // the untruncated body by design. Without this, a message.get on a row
+        // with a large tool_return/tool_returns/stdout body can blow the 1MiB
+        // admin_rpc frame the same way an unprojected message.list page used
+        // to (letta-mobile-fe51r), so apply the same projection here.
+        if (op != NativeAdminOp.MessageGet || message !is JsonObject) return message
+        return MessageListWireProjection.projectMessage(message, conversationId) ?: message
     }
 
     private suspend fun walkMessagePages(
@@ -260,8 +305,9 @@ object ConversationAdminHandlers {
         op: NativeAdminOp,
     ): JsonElement {
         var before: String? = null
-        val pageLimit = messageGetPageLimit
-        repeat(MESSAGE_GET_MAX_PAGES) {
+        val pageLimit = messageGetPageLimit()
+        val maxPages = (MESSAGE_GET_MAX_SEARCHABLE_MESSAGES + pageLimit - 1) / pageLimit
+        repeat(maxPages) {
             val messages = NativeAdmin.require(nativeClient, op) { c ->
                 val native = c.conversationMessagesList(
                     AppServerCommand.ConversationMessagesList(

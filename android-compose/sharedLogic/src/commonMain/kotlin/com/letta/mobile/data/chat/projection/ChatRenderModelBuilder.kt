@@ -48,17 +48,15 @@ fun buildChatRenderModel(
     // or unscoped history.
     activeAgentId: String? = null,
 ): ChatRenderModel {
-    val agentScoped = if (activeAgentId == null) {
-        messages
-    } else {
-        messages.filter { it.agentId == null || it.agentId == activeAgentId }
-    }
+    val agentScoped = scopeMessagesToAgent(messages, activeAgentId)
     val afterReasoningDedup = dedupeReasoningAssistantEchoes(agentScoped)
 
-    val visibleMessages = attachLatencyMetadata(
+    val visibleMessages = backfillMissingAssistantRunIds(
+        attachLatencyMetadata(
         filterMessagesForMode(
             messages = afterReasoningDedup,
             mode = mode,
+        )
         )
     )
 
@@ -84,6 +82,64 @@ fun buildChatRenderModel(
     )
 }
 
+private fun scopeMessagesToAgent(messages: List<UiMessage>, activeAgentId: String?): List<UiMessage> =
+    if (activeAgentId == null) messages else messages.filter { it.agentId == null || it.agentId == activeAgentId }
+
+/**
+ * Replayed tool frames can omit run_id even though the surrounding reasoning
+ * and final response carry it. Keep each assistant segment between user turns
+ * under one run so completion can collapse the entire tool sequence.
+ */
+fun backfillMissingAssistantRunIds(messages: List<UiMessage>): List<UiMessage> {
+    if (messages.none { it.role == "assistant" && it.runId.isNullOrBlank() }) return messages
+    val result = messages.toMutableList()
+    var segmentStart = 0
+    while (segmentStart < result.size) {
+        segmentStart = nextAssistantSegmentStart(result, segmentStart)
+        if (segmentStart >= result.size) break
+        val segmentEnd = nextUserMessageIndex(result, segmentStart)
+        backfillUnambiguousAssistantRun(result, segmentStart, segmentEnd)
+        segmentStart = segmentEnd
+    }
+    return result
+}
+
+private fun nextAssistantSegmentStart(messages: List<UiMessage>, from: Int): Int {
+    var index = from
+    while (index < messages.size && messages[index].role == "user") index++
+    return index
+}
+
+private fun nextUserMessageIndex(messages: List<UiMessage>, from: Int): Int {
+    var index = from
+    while (index < messages.size && messages[index].role != "user") index++
+    return index
+}
+
+private fun backfillUnambiguousAssistantRun(
+    messages: MutableList<UiMessage>,
+    start: Int,
+    end: Int,
+) {
+    val runId = uniqueAssistantRunId(messages.subList(start, end)) ?: return
+    for (index in start until end) {
+        val message = messages[index]
+        if (message.role == "assistant" && message.runId.isNullOrBlank()) {
+            messages[index] = message.copy(runId = runId)
+        }
+    }
+}
+
+private fun uniqueAssistantRunId(segment: List<UiMessage>): String? {
+    val runIds = segment.asSequence()
+        .filter { it.role == "assistant" }
+        .mapNotNull { it.runId?.takeIf(String::isNotBlank) }
+        .distinct()
+        .take(2)
+        .toList()
+    return runIds.singleOrNull()
+}
+
 class IncrementalChatRenderItemsCache {
     var fullBuildCount: Int = 0
         private set
@@ -107,19 +163,20 @@ class IncrementalChatRenderItemsCache {
         // buildChatRenderModel so foreign-agent messages are scoped out.
         activeAgentId: String? = null,
     ): List<ChatRenderItem> {
-        if (messages.isEmpty()) {
+        val normalizedMessages = backfillMissingAssistantRunIds(scopeMessagesToAgent(messages, activeAgentId))
+        if (normalizedMessages.isEmpty()) {
             cachedMode = mode
-            previousMessages = messages
+            previousMessages = normalizedMessages
             previousTailStartIndex = 0
             committedRenderItems = emptyList()
             previousResultByKey = emptyMap()
             return emptyList()
         }
 
-        val tailStartIndex = activeTailStartIndex(messages)
-        if (canReuseCommittedHistory(messages, mode, change, tailStartIndex)) {
+        val tailStartIndex = activeTailStartIndex(normalizedMessages)
+        if (canReuseCommittedHistory(normalizedMessages, mode, change, tailStartIndex)) {
             val tailRenderItems = buildChatRenderModel(
-                messages = messages.subList(tailStartIndex, messages.size),
+                messages = normalizedMessages.subList(tailStartIndex, normalizedMessages.size),
                 mode = mode,
                 activeAgentId = activeAgentId,
             ).renderItems
@@ -153,14 +210,14 @@ class IncrementalChatRenderItemsCache {
             // streaming tail whose text grew) gets a new instance.
             val next = reuseUnchangedInstances(rebuilt)
             cachedMode = mode
-            previousMessages = messages
+            previousMessages = normalizedMessages
             previousTailStartIndex = tailStartIndex
             previousResultByKey = next.associateBy { it.key }
             incrementalBuildCount++
             return next
         }
 
-        return rebuildFull(messages, mode, tailStartIndex, activeAgentId = activeAgentId)
+        return rebuildFull(normalizedMessages, mode, tailStartIndex, activeAgentId = activeAgentId)
     }
 
     private fun canReuseCommittedHistory(
@@ -396,7 +453,7 @@ fun dedupeGroupedMessagesForLazyKeys(
  * Optimistic-id prefixes minted by the Client Mode timeline reducer
  * (`ClientModeTimelineStreamReducer`), the conversation coordinator's
  * fresh-route bootstrap (`ChatConversationCoordinator`), and the
- * Letta `newOtid()` helper in `core/data/timeline/Timeline.kt`.
+ * Letta `newOtid()` helper in `sharedLogic` timeline (`Timeline.kt`).
  *
  * Anything bearing one of these prefixes is a candidate for fuzzy
  * collapse against an adjacent server-issued twin.

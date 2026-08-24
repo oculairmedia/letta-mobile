@@ -1,0 +1,232 @@
+package com.letta.mobile.data.runtime
+
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+
+class LocalRuntimeProviderConfigTest {
+    @Test
+    fun acceptsHttpAndHttpsBaseUrls() {
+        LocalRuntimeProviderConfig(baseUrl = "http://192.168.1.50:8000/v1")
+        LocalRuntimeProviderConfig(baseUrl = "https://proxy.example.com/v1")
+    }
+
+    @Test
+    fun rejectsBlankBaseUrl() {
+        assertFailsWith<IllegalArgumentException> { LocalRuntimeProviderConfig(baseUrl = "") }
+    }
+
+    @Test
+    fun rejectsBaseUrlWithoutScheme() {
+        assertFailsWith<IllegalArgumentException> { LocalRuntimeProviderConfig(baseUrl = "localhost:11434/v1") }
+    }
+
+    @Test
+    fun rejectsNonHttpScheme() {
+        assertFailsWith<IllegalArgumentException> { LocalRuntimeProviderConfig(baseUrl = "ftp://example.com") }
+    }
+
+    @Test
+    fun rejectsSchemeWithNoHost() {
+        assertFailsWith<IllegalArgumentException> { LocalRuntimeProviderConfig(baseUrl = "http://") }
+    }
+}
+
+class LocalRuntimeProviderAuthFileTest {
+    @Test
+    fun writesFreshFileWhenNoneExists() {
+        val result = merge(
+            baseUrl = "http://localhost:8000/v1",
+            apiKey = "sk-local",
+        )
+        val status = readLocalRuntimeProviderStatus(result)
+        assertEquals("http://localhost:8000/v1", status.baseUrl)
+        assertTrue(status.hasApiKey)
+        assertTrue(result.contains("\"lc-openai-compatible\""))
+        assertTrue(result.contains("\"provider_type\": \"openai\""))
+        assertTrue(result.contains("\"provider_category\": \"byok\""))
+        assertTrue(result.contains("\"id\": \"local-provider-lc-openai-compatible\""))
+        assertTrue(result.contains("\"version\": 1"))
+    }
+
+    @Test
+    fun writesBlankExistingJsonAsFreshFile() {
+        val result = merge(
+            existingJson = "   ",
+            baseUrl = "http://localhost:8000/v1",
+        )
+        assertEquals("http://localhost:8000/v1", readLocalRuntimeProviderStatus(result).baseUrl)
+    }
+
+    @Test
+    fun noApiKeyWritesSentinelNotBlank() {
+        val result = merge(
+            baseUrl = "http://localhost:11434/v1",
+            apiKey = null,
+        )
+        assertTrue(result.contains("\"key\": \"not-needed\""))
+        assertFalse(readLocalRuntimeProviderStatus(result).hasApiKey)
+    }
+
+    @Test
+    fun blankApiKeyIsTreatedAsNoKey() {
+        val result = merge(
+            baseUrl = "http://localhost:11434/v1",
+            apiKey = "   ",
+        )
+        assertFalse(readLocalRuntimeProviderStatus(result).hasApiKey)
+    }
+
+    @Test
+    fun preservesUnrelatedProvidersAndTopLevelFields() {
+        val existing = """
+            {
+              "version": 1,
+              "somethingLettaCodeAddsLater": true,
+              "providers": {
+                "ollama": {
+                  "id": "local-provider-ollama",
+                  "name": "ollama",
+                  "provider_type": "ollama",
+                  "provider_category": "byok",
+                  "auth": { "type": "api", "key": "not-needed" },
+                  "base_url": "http://localhost:11434/v1",
+                  "created_at": "2026-01-01T00:00:00Z",
+                  "updated_at": "2026-01-01T00:00:00Z"
+                }
+              }
+            }
+        """.trimIndent()
+
+        val result = merge(
+            existingJson = existing,
+            baseUrl = "https://proxy.example.com/v1",
+            apiKey = "sk-new",
+        )
+
+        assertTrue(result.contains("\"somethingLettaCodeAddsLater\": true"))
+        assertTrue(result.contains("\"ollama\""))
+        assertTrue(result.contains("http://localhost:11434/v1"))
+        assertEquals("https://proxy.example.com/v1", readLocalRuntimeProviderStatus(result).baseUrl)
+    }
+
+    @Test
+    fun preservesUnknownFieldsOnOwnProviderEntryAcrossUpdates() {
+        val existing = """
+            {
+              "version": 1,
+              "providers": {
+                "lc-openai-compatible": {
+                  "id": "local-provider-lc-openai-compatible",
+                  "name": "lc-openai-compatible",
+                  "provider_type": "openai",
+                  "provider_category": "byok",
+                  "auth": { "type": "api", "key": "sk-old" },
+                  "base_url": "http://old-host:8000/v1",
+                  "timeout": 45000,
+                  "created_at": "2026-01-01T00:00:00Z",
+                  "updated_at": "2026-01-01T00:00:00Z"
+                }
+              }
+            }
+        """.trimIndent()
+
+        val result = merge(
+            existingJson = existing,
+            baseUrl = "http://new-host:8000/v1",
+            apiKey = "sk-new",
+            nowIso = "2026-08-16T12:00:00Z",
+        )
+
+        assertTrue(result.contains("\"timeout\": 45000"))
+        assertTrue(result.contains("\"created_at\": \"2026-01-01T00:00:00Z\""))
+        assertTrue(result.contains("\"updated_at\": \"2026-08-16T12:00:00Z\""))
+        assertEquals("http://new-host:8000/v1", readLocalRuntimeProviderStatus(result).baseUrl)
+    }
+
+    @Test
+    fun secondUpdateKeepsOriginalCreatedAt() {
+        val first = merge(
+            nowIso = "2026-01-01T00:00:00Z",
+        )
+        val second = merge(
+            existingJson = first,
+            baseUrl = "http://localhost:9000/v1",
+            nowIso = "2026-02-01T00:00:00Z",
+        )
+        assertTrue(second.contains("\"created_at\": \"2026-01-01T00:00:00Z\""))
+        assertTrue(second.contains("\"updated_at\": \"2026-02-01T00:00:00Z\""))
+    }
+
+    @Test
+    fun corruptExistingJsonRefusesToMergeRatherThanDiscardingIt() {
+        assertFailsWith<LocalRuntimeProviderAuthFileCorruptException> {
+            merge(existingJson = "{ not valid json")
+        }
+    }
+
+    @Test
+    fun nonObjectJsonRootRefusesToMerge() {
+        assertFailsWith<LocalRuntimeProviderAuthFileCorruptException> {
+            merge(existingJson = "[1, 2, 3]")
+        }
+    }
+
+    @Test
+    fun statusReadForMissingFileIsUnconfigured() {
+        val status = readLocalRuntimeProviderStatus(null)
+        assertFalse(status.isConfigured)
+        assertFalse(status.hasApiKey)
+    }
+
+    @Test
+    fun statusReadForCorruptFileDegradesToUnconfiguredRatherThanThrowing() {
+        val status = readLocalRuntimeProviderStatus("{ not valid json")
+        assertFalse(status.isConfigured)
+    }
+
+    @Test
+    fun statusReadForUnexpectedJsonTypesReturnsUnconfiguredRatherThanThrowing() {
+        val jsonWithObjectBaseUrl = """
+            {
+              "providers": {
+                "lc-openai-compatible": {
+                  "base_url": { "nested": "invalid" },
+                  "auth": { "key": ["array", "invalid"] }
+                }
+              }
+            }
+        """.trimIndent()
+        val status = readLocalRuntimeProviderStatus(jsonWithObjectBaseUrl)
+        assertFalse(status.isConfigured)
+        assertFalse(status.hasApiKey)
+    }
+
+    @Test
+    fun customProviderNameParameterIsRespected() {
+        val result = mergeLocalRuntimeProviderAuth(
+            existingJson = null,
+            config = LocalRuntimeProviderConfig(baseUrl = "http://localhost:8000/v1"),
+            nowIso = "2026-08-16T00:00:00Z",
+            providerName = "custom-name",
+        )
+        assertTrue(result.contains("\"custom-name\""))
+        assertEquals(
+            "http://localhost:8000/v1",
+            readLocalRuntimeProviderStatus(result, providerName = "custom-name").baseUrl,
+        )
+    }
+
+    private fun merge(
+        existingJson: String? = null,
+        baseUrl: String = "http://localhost:8000/v1",
+        apiKey: String? = "sk-local",
+        nowIso: String = "2026-08-16T00:00:00Z",
+    ): String = mergeLocalRuntimeProviderAuth(
+        existingJson = existingJson,
+        config = LocalRuntimeProviderConfig(baseUrl = baseUrl, apiKey = apiKey),
+        nowIso = nowIso,
+    )
+}

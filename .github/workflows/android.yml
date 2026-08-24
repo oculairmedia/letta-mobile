@@ -135,7 +135,7 @@ jobs:
         run: |
           tasks=(
             :app:compileSideloadDebugKotlin
-            :core:data:testDebugUnitTest
+            :core:android-data:testDebugUnitTest
             :app:testRootDebugUnitTest
             :app:testScreenshot
             :architecture-tests:test

@@ -98,6 +98,28 @@ class KtorAppServerWebSocketTransportLifecycleTest {
     }
 
     @Test
+    fun closingManagementSocketLeavesIndependentRuntimeSocketReady() = runBlocking {
+        val received = Channel<String>(Channel.UNLIMITED)
+        val port = startServer {
+            for (frame in incoming) {
+                if (frame is Frame.Text) received.send(frame.readText())
+            }
+        }
+        val runtime = transport(port)
+        val management = transport(port)
+
+        withTimeout(TIMEOUT) { runtime.connectionState.first { it == AppServerConnectionState.Ready } }
+        withTimeout(TIMEOUT) { management.connectionState.first { it == AppServerConnectionState.Ready } }
+
+        management.close()
+        runtime.sendControl(AppServerCommand.Auth(requestId = "runtime-still-ready", token = ""))
+
+        assertEquals(AppServerConnectionState.Ready, runtime.connectionState.value)
+        assertTrue(withTimeout(TIMEOUT) { received.receive() }.contains("runtime-still-ready"))
+        runtime.close()
+    }
+
+    @Test
     fun malformedFrameIsToleratedWithoutTearingDownAReadyGeneration() = runBlocking {
         val port = startServer {
             sendRepeating("this-is-not-json")
@@ -337,7 +359,8 @@ class KtorAppServerWebSocketTransportLifecycleTest {
     private companion object {
         val TIMEOUT = 5.seconds
         const val STREAM_BURST_SIZE = 256
-        const val OVERFLOW_BURST_SIZE = 512
+        // Must exceed KtorAppServerWebSocketTransport's DELIVERY_QUEUE_CAPACITY (1_024).
+        const val OVERFLOW_BURST_SIZE = 2_048
         const val DRAIN_BURST_SIZE = 128
         const val AUTH_RESPONSE_FRAME =
             """{"type":"auth_response","request_id":"backpressure","success":true}"""

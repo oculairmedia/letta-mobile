@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
@@ -18,8 +19,13 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
 import com.letta.mobile.feature.chat.screen.ChatMessageItem
 import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.ui.theme.LocalChatIsPinching
@@ -33,16 +39,54 @@ internal fun MeasuredChatRenderItem(
     content: @Composable () -> Unit,
 ) {
     val isPinching = LocalChatIsPinching.current
+    // letta-mobile-geom-cache-wireup: read the cached height for this
+    // signature and seed the Box's measured height so Compose skips the
+    // initial measure pass when the cache hits. The cache is filled by
+    // `onSizeChanged` on the FIRST measure of a row; on subsequent
+    // compositions of the same row (scrolling, reducer re-render, the
+    // every-frame `foldedViaHolder` cycle of 176 events), the cached
+    // height is what we want to use. If the cache misses, Compose
+    // measures normally and the first `onSizeChanged` populates the cache.
+    //
+    // `heightIn(min=…)` instead of `height(…)` so a row whose actual
+    // measured height grew (e.g. streaming tail) can still expand — the
+    // new larger value overwrites the cache via `onSizeChanged`.
+    //
+    // First-render gate: the cache is in-memory only and loses everything
+    // when the activity is recreated (e.g. navigating to a different
+    // conversation and back). On the cold-cache "jump back to current
+    // feature" path every row is a miss, and the cache MISS path is the
+    // same cost as pre-fix — except the per-row `heightFor` lookup adds
+    // a tiny constant. To avoid amplifying the cold-path cost we
+    // DON'T apply the heightIn modifier on the row's first render in
+    // this composable instance. The row still measures normally and
+    // `onSizeChanged` still records the height; subsequent renders
+    // (within the same activity) use the cached height. The cost of
+    // recording the height on the first render is one Map.put — the
+    // savings on subsequent renders are the avoidance of re-measurement.
+    val hasMeasuredOnce = remember(signature) { mutableStateOf(false) }
+    // Expansion/collapse changes the signature. The old signature may carry
+    // a much taller cached minimum; never let that floor survive into the new
+    // visual state or a collapsed thought/run cannot shrink.
+    val cachedHeightPx = if (hasMeasuredOnce.value) geometryState.heightFor(signature) else null
+    val heightModifier = if (cachedHeightPx != null && cachedHeightPx > 0) {
+        val cachedHeightDp = with(LocalDensity.current) { cachedHeightPx.toDp() }
+        Modifier.heightIn(min = cachedHeightDp)
+    } else {
+        Modifier
+    }
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
+            .then(heightModifier)
             .onSizeChanged { size ->
                 if (!isPinching) {
                     geometryState.recordMeasuredHeight(
                         signature = signature,
                         heightPx = size.height,
                     )
+                    hasMeasuredOnce.value = true
                 }
             },
     ) {
@@ -57,11 +101,11 @@ internal fun RenderChatMessage(
     isStreaming: Boolean,
     rerunEnabled: Boolean,
     approvalInFlight: Boolean,
+    showTimestamp: Boolean = false,
     chatMode: String,
     highlightedMessageId: String?,
     callbacks: ChatMessageRenderCallbacks,
     reasoningCollapsed: Boolean = false,
-    showTimestamp: Boolean = true,
     onToggleReasoning: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {

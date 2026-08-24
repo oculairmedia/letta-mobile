@@ -45,6 +45,15 @@ class LettaHttpChatGatewayCredentialFilterTest {
     }
 
     @Test
+    fun fullProviderPageWithoutUsableCursorKeepsAllModels() = runTest {
+        val gateway = gateway(providersJson = fullProviderPageWithBlankFinalId())
+
+        val models = gateway.listLlmModels()
+
+        assertEquals(ALL_MODEL_IDS, models.map { it.id })
+    }
+
+    @Test
     fun providerFetchCancellationPropagates() = runTest {
         val gateway = gateway(providersJson = null, providersCancellation = true)
 
@@ -99,6 +108,14 @@ class LettaHttpChatGatewayCredentialFilterTest {
             """
                 {"id":"provider-$type","name":"$type","provider_type":"$type","api_key":"sk-test","base_url":"https://$type.example/v1"}
             """.trimIndent()
+        }
+        return "[$entries]"
+    }
+
+    private fun fullProviderPageWithBlankFinalId(): String {
+        val entries = (0 until 100).joinToString(",") { index ->
+            val id = if (index == 99) "" else "provider-$index"
+            """{"id":"$id","name":"provider-$index","provider_type":"type-$index"}"""
         }
         return "[$entries]"
     }

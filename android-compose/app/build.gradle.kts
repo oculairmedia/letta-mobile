@@ -27,6 +27,17 @@ plugins {
     id("org.jetbrains.kotlinx.kover") // version inherited from root
 }
 
+// Kotzilla observability — debug builds only, gated via Gradle property.
+// Applied conditionally after the plugins{} block so the SDK is not present
+// in release APKs at all (no ContentProvider, no startup overhead).
+//
+// Enable with: ./gradlew :app:assembleRootDebug -Pkotzilla=true
+// Disable with: omit the property (default — release builds stay clean).
+val kotzillaEnabled = providers.gradleProperty("kotzilla").orNull == "true"
+if (kotzillaEnabled) {
+    apply(plugin = "io.kotzilla.kotzilla-plugin")
+}
+
 kover {
     currentProject {
         createVariant("ci") {
@@ -34,6 +45,10 @@ kover {
         }
     }
 }
+
+// Kotzilla observability is configured after `computedVersionName` is resolved
+// (see below). The plugin is applied conditionally above; the extension
+// is configured there too.
 
 allOpen {
     annotation("javax.inject.Singleton")
@@ -150,6 +165,23 @@ val computedVersionName = computeVersionName().get() ?: "0.0.0-dev"
 val computedVersionCode = computeVersionCode(computedVersionName)
 
 logger.lifecycle("[versioning] versionName=$computedVersionName versionCode=$computedVersionCode")
+
+// Configure the Kotzilla extension once `computedVersionName` is in scope.
+// SDK 2.3.0+ supports Hilt natively (no Koin required) — see
+// https://doc.kotzilla.io/docs/getstartedCustom/setupNoKoin.
+// The `kotzilla.json` lives in :sharedLogic with `isDefault: true` so
+// only that module owns it; the app module applies the plugin for
+// ContentProvider auto-injection + Android-variant instrumentation.
+if (kotzillaEnabled) {
+    val kotzillaExt = extensions.getByName("kotzilla")
+    kotzillaExt.withGroovyBuilder {
+        setProperty("versionName", computedVersionName)
+        setProperty(
+            "displayLogs",
+            providers.gradleProperty("kotzilla.verbose").orNull.toBoolean(),
+        )
+    }
+}
 
 val embeddedLettaCodeVersion = "0.26.1"
 val embeddedLettaCodeIntegrity = "sha512-vI+UU6ZNyTLtKFqhvr5+AyGXj1/sF5oggjgwB6Q0y0t/Y6FaytIlzKhus/P9/LtziXZdbZmqItMGEbYSXk2/CQ=="
@@ -1346,12 +1378,12 @@ tasks.named("check") {
 
 android {
     namespace = "com.letta.mobile"
-    compileSdk = 37
+    compileSdk = libs.versions.compileSdk.get().toInt()
 
     defaultConfig {
         applicationId = "com.letta.mobile"
-        minSdk = 26
-        targetSdk = 36
+        minSdk = libs.versions.minSdk.get().toInt()
+        targetSdk = libs.versions.targetSdk.get().toInt()
         versionCode = computedVersionCode
         versionName = computedVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -1663,7 +1695,7 @@ kotlin {
 }
 
 dependencies {
-    implementation(project(":core:data"))
+    implementation(project(":core:android-data"))
     testImplementation(project(":core:testutil"))
     implementation(project(":designsystem"))
     implementation(project(":feature-chat"))
@@ -1695,14 +1727,13 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:2.9.7")
     implementation("androidx.hilt:hilt-navigation-compose:1.4.0-beta01")
 
-    // CameraX (letta-mobile-g2d2i: QR pairing scanner). No version catalog
-    // exists in this repo (see gradle/libs.versions.toml — absent), so these
-    // follow the file's existing convention of pinned literal versions.
-    // Deliberately ImageAnalysis + zxing:core (already a transitive
-    // sharedLogic dependency via core:data -> sharedLogic) instead of ML Kit
-    // barcode scanning: ML Kit either bundles a large model (APK bloat) or
-    // requires Google Play Services (unbundled), which the Root/Sideload
-    // flavors cannot assume.
+    // CameraX (letta-mobile-g2d2i: QR pairing scanner). Versions that are
+    // already centralized live in gradle/libs.versions.toml; CameraX stays
+    // pinned here until that catalog grows. Deliberately ImageAnalysis +
+    // zxing:core (already a transitive sharedLogic dependency via core:android-data
+    // -> sharedLogic) instead of ML Kit barcode scanning: ML Kit either
+    // bundles a large model (APK bloat) or requires Google Play Services
+    // (unbundled), which the Root/Sideload flavors cannot assume.
     val cameraxVersion = "1.4.2"
     implementation("androidx.camera:camera-core:$cameraxVersion")
     implementation("androidx.camera:camera-camera2:$cameraxVersion")
@@ -1710,16 +1741,16 @@ dependencies {
     implementation("androidx.camera:camera-view:$cameraxVersion")
 
     // Hilt DI
-    implementation("com.google.dagger:hilt-android:2.59.2")
-    ksp("com.google.dagger:hilt-compiler:2.59.2")
+    implementation(libs.hilt.android)
+    ksp(libs.hilt.compiler)
 
     // Ktor HTTP client
-    implementation("io.ktor:ktor-client-core:3.5.0")
-    implementation("io.ktor:ktor-client-okhttp:3.5.0")
-    implementation("io.ktor:ktor-client-content-negotiation:3.5.0")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:3.5.0")
-    implementation("io.ktor:ktor-client-logging:3.5.0")
-    implementation("io.ktor:ktor-client-auth:3.5.0")
+    implementation(libs.ktor.client.core)
+    implementation(libs.ktor.client.okhttp)
+    implementation(libs.ktor.client.content.negotiation)
+    implementation(libs.ktor.serialization.kotlinx.json)
+    implementation(libs.ktor.client.logging)
+    implementation(libs.ktor.client.auth)
 
     // Kotlinx Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
@@ -1736,7 +1767,7 @@ dependencies {
     implementation("io.coil-kt.coil3:coil-network-ktor3:3.5.0-beta01")
 
     // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
+    implementation(libs.kotlinx.coroutines.android)
 
     // On-device LLM inference for explicitly constructed .litertlm engines.
     implementation("com.google.ai.edge.litertlm:litertlm-android:0.13.1")
@@ -1779,8 +1810,8 @@ dependencies {
 
     // Testing
     testImplementation("junit:junit:4.13.2")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
-    testImplementation("io.ktor:ktor-client-mock:3.5.0")
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.ktor.client.mock)
     testImplementation("app.cash.turbine:turbine:1.2.1")
     testImplementation("io.mockk:mockk:1.14.9")
     testImplementation("io.kotest:kotest-runner-junit5:6.1.11")
@@ -1793,13 +1824,13 @@ dependencies {
     testImplementation("androidx.test.ext:junit-ktx:1.3.0")
 
     // Hilt testing
-    testImplementation("com.google.dagger:hilt-android-testing:2.59.2")
-    kspTest("com.google.dagger:hilt-compiler:2.59.2")
-    testRuntimeOnly("org.junit.vintage:junit-vintage-engine:6.1.0")
+    testImplementation(libs.hilt.android.testing)
+    kspTest(libs.hilt.compiler)
+    testRuntimeOnly(libs.junit.vintage.engine)
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
     androidTestImplementation("androidx.test:core-ktx:1.7.0")
-    androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
+    androidTestImplementation(libs.kotlinx.coroutines.android)
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
 

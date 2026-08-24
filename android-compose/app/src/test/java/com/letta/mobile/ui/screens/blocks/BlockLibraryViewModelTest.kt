@@ -6,6 +6,7 @@ import app.cash.turbine.test
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.BlockCreateParams
+import com.letta.mobile.data.model.BlockListParams
 import com.letta.mobile.data.model.BlockUpdateParams
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.api.IBlockRepository
@@ -246,11 +247,11 @@ class BlockLibraryViewModelTest {
         val attachedPairs = mutableListOf<Pair<String, String>>()
         val detachedPairs = mutableListOf<Pair<String, String>>()
 
-        override suspend fun listAllBlocks(label: String?, isTemplate: Boolean?): List<Block> {
+        override suspend fun listAllBlocks(params: BlockListParams): List<Block> {
             if (shouldFail) throw Exception("Failed to load blocks")
             return allBlocks.filter { block ->
-                (label == null || block.label == label) &&
-                (isTemplate == null || block.isTemplate == isTemplate)
+                (params.label == null || block.label == params.label) &&
+                (params.isTemplate == null || block.isTemplate == params.isTemplate)
             }
         }
 

@@ -1,6 +1,8 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
+import com.letta.mobile.desktop.shouldBindIrohTransport
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -8,7 +10,7 @@ import kotlin.test.assertTrue
 /**
  * letta-mobile-cq2ju: desktop selects the Iroh transport for iroh:// backends and
  * the WebSocket transport otherwise, mirroring the Android repository branch. This
- * guards the scheme-detection the DesktopAppServerControllerGatewayFactory uses to
+ * guards the scheme-detection the DesktopAppServerChatGatewayBuilder uses to
  * choose IrohAppServerTransportAdapter vs KtorAppServerWebSocketTransport.
  */
 class DesktopIrohTransportSelectionTest {
@@ -26,5 +28,74 @@ class DesktopIrohTransportSelectionTest {
         assertFalse(IrohChannelTransport.isIrohUrl("wss://example.com/shim"))
         assertFalse(IrohChannelTransport.isIrohUrl("https://example.com"))
         assertFalse(IrohChannelTransport.isIrohUrl(null))
+    }
+
+    /**
+     * letta-mobile-9v9nu regression: a real user config had `mode == LOCAL`
+     * plus a leftover `iroh://` serverUrl from a prior remote session. Before
+     * this fix, `rememberIrohTransport` keyed only on the URL and bound the
+     * remote Iroh transport in Local mode, so the agent rail showed the
+     * remote node's agents while the bundled local runtime never spawned.
+     * Mode must win regardless of what the (possibly stale) URL says.
+     */
+    @Test
+    fun `local mode never binds the iroh transport even with a stale iroh url`() {
+        val staleLocalConfig = LettaConfig(
+            id = "desktop-361c792e",
+            mode = LettaConfig.Mode.LOCAL,
+            serverUrl = "iroh://330415cc15c111596d0b18b730441be7717b92822b7517ccc09f92bb3946fa7f@192.168.50.90:4501",
+        )
+
+        assertFalse(shouldBindIrohTransport(staleLocalConfig))
+    }
+
+    @Test
+    fun `local mode with blank server url never binds the iroh transport`() {
+        val localConfig = LettaConfig(id = "local", mode = LettaConfig.Mode.LOCAL, serverUrl = "")
+
+        assertFalse(shouldBindIrohTransport(localConfig))
+    }
+
+    /**
+     * letta-mobile-hhp6r: after BackendConfigPolicy started parking a remote
+     * backend's serverUrl/accessToken (instead of discarding them) so they can
+     * be restored on a later switch back, a LOCAL config carries those details
+     * in `parkedServerUrl`/`parkedAccessToken` rather than `serverUrl`. Confirm
+     * the parked fields are inert for transport binding — only `serverUrl` (now
+     * always blank on LOCAL) and `mode` may influence this decision.
+     */
+    @Test
+    fun `local mode with parked iroh details never binds the iroh transport`() {
+        val localConfigWithParkedRemote = LettaConfig(
+            id = "local",
+            mode = LettaConfig.Mode.LOCAL,
+            serverUrl = "",
+            parkedServerUrl = "iroh://330415cc15c111596d0b18b730441be7717b92822b7517ccc09f92bb3946fa7f@192.168.50.90:4501",
+            parkedAccessToken = "remote-token",
+        )
+
+        assertFalse(shouldBindIrohTransport(localConfigWithParkedRemote))
+    }
+
+    @Test
+    fun `non-local mode with an iroh url binds the iroh transport`() {
+        val remoteConfig = LettaConfig(
+            id = "remote",
+            mode = LettaConfig.Mode.SELF_HOSTED,
+            serverUrl = "iroh://abc123@192.168.50.90:4501",
+        )
+
+        assertTrue(shouldBindIrohTransport(remoteConfig))
+    }
+
+    @Test
+    fun `non-local mode with an http url does not bind the iroh transport`() {
+        val remoteConfig = LettaConfig(
+            id = "remote",
+            mode = LettaConfig.Mode.SELF_HOSTED,
+            serverUrl = "http://localhost:8283",
+        )
+
+        assertFalse(shouldBindIrohTransport(remoteConfig))
     }
 }

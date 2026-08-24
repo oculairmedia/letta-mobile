@@ -102,6 +102,8 @@ class AppServerContractBaselineTest {
         assertEquals("app_server_v2", observed.requiredString("classification"))
         assertTrue(observed.requiredString("deprecation_claim").contains("deprecated"))
         assertTrue(upstream.requiredString("session_model").contains("one bidirectional WebSocket"))
+        assertTrue(upstream.requiredString("multiple_clients").contains("independent concurrent /ws clients"))
+        assertTrue(upstream.requiredString("multiple_clients").contains("connection-local"))
         assertTrue(upstream.requiredString("legacy_split_channel").contains("426"))
         assertEquals(false, upstream["capabilities_split_channels"]!!.jsonPrimitive.boolean)
         assertTrue(upstream.requiredString("official_client").contains("one socket"))

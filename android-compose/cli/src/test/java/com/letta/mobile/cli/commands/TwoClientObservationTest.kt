@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test
  */
 class TwoClientObservationTest {
     private fun user(content: String, otid: String = "o") = ServerFrame.UserMessage(
-        id = "cm-user-$otid", content = content, otid = otid, conversationId = "c",
+        id = "cm-user-$otid", contentRaw = kotlinx.serialization.json.JsonPrimitive(content), otid = otid, conversationId = "c",
     )
 
     private fun assistant(content: String, id: String = "cm-stream-x") = ServerFrame.AssistantMessage(

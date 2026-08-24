@@ -251,7 +251,7 @@ open class LettaHttpChatGateway(
      * offers models whose provider has credentials configured.
      *
      * FAIL-OPEN: every failure (HTTP error, parse error, empty response) maps to an
-     * empty set, which leaves the caller's model list unchanged — the picker must
+     * empty set, which leaves the caller's model list unchanged -- the picker must
      * never empty because the providers fetch failed. Pagination mirrors the shared
      * cursor shape (`limit` + `after` = last provider id), bounded to a small page
      * count; a server that ignores `after` and re-serves a page cannot spin.
@@ -260,11 +260,8 @@ open class LettaHttpChatGateway(
         return try {
             collectCredentialedProviderTypes()
         } catch (cancelled: CancellationException) {
-            // Never swallow a coroutine cancellation — the caller must observe
-            // it so the refresh can abort instead of publishing a filtered view.
             throw cancelled
         } catch (_: Exception) {
-            // Fail open: a provider-lookup failure must not empty the picker.
             emptySet()
         }
     }
@@ -286,12 +283,13 @@ open class LettaHttpChatGateway(
         target: MutableSet<String>,
     ): String? {
         if (providers.isEmpty()) return null
-        val fresh = providers.filter { p -> p.id?.value?.let(seenIds::add) ?: true }
+        val fresh = providers.filter { provider -> provider.id?.value?.let(seenIds::add) ?: true }
         if (fresh.isEmpty()) return null
         fresh.mapNotNull { it.providerType.trim().lowercase().takeIf(String::isNotBlank) }
             .forEach(target::add)
         if (providers.size < PROVIDER_PAGE_SIZE) return null
-        return providers.last().id?.value
+        return providers.last().id?.value?.takeIf(String::isNotBlank)
+            ?: error("Full provider page has no cursor ID")
     }
 
     private suspend fun fetchProvidersPage(after: String?): List<Provider> {

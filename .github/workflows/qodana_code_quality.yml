@@ -36,38 +36,26 @@ jobs:
       # also imports the vendored Overmorrow Flutter root (old Gradle/Groovy),
       # which produced the misleading JDK-25 classfile failure.
       #
-      # Qodana 2026.1 supports AGP through 9.0, while production uses AGP 9.2.
+      # Qodana 2026.1 supports AGP through 9.0, while production uses AGP 9.3.1.
       # Prepare an ignored CI-only source copy with only the model-import plugin
-      # version rewritten. Real builds/tests and checked-in sources stay on 9.2.
-      # Remove this step as soon as Qodana advertises AGP 9.2 support.
+      # version rewritten. Real builds/tests and checked-in sources stay on 9.3.1.
+      # Remove this step as soon as Qodana advertises AGP 9.3.1 support.
       - name: Prepare Qodana-compatible Android model
         run: |
           cp -a android-compose .qodana-android-compose
           python3 - <<'PY'
           from pathlib import Path
-          build = Path('.qodana-android-compose/build.gradle.kts')
-          source = build.read_text()
-          declarations = (
-              'id("com.android.application") version "9.3.1" apply false',
-              'id("com.android.library") version "9.3.1" apply false',
-              'id("com.android.kotlin.multiplatform.library") version "9.3.1" apply false',
-          )
-          for expected in declarations:
-              if source.count(expected) != 1:
-                  raise SystemExit(f'Expected exactly one AGP declaration: {expected}')
-              source = source.replace(expected, expected.replace('9.3.1', '9.0.0'))
-          build.write_text(source)
-          build_logic = Path('.qodana-android-compose/build-logic/build.gradle.kts')
-          build_logic_source = build_logic.read_text()
-          agp_dependency = 'implementation("com.android.tools.build:gradle:9.3.1")'
-          if build_logic_source.count(agp_dependency) != 1:
-              raise SystemExit(f'Expected exactly one build-logic AGP dependency: {agp_dependency}')
-          build_logic.write_text(build_logic_source.replace(agp_dependency, agp_dependency.replace('9.3.1', '9.0.0')))
-          # AGP 9.0 requires Gradle 9.4.1. Keep the production wrapper unchanged in
-          # the CI-only projection; downgrading it makes Qodana model import fail.
+          catalog = Path('.qodana-android-compose/gradle/libs.versions.toml')
+          source = catalog.read_text()
+          agp_version = 'agp = "9.3.1"'
+          if source.count(agp_version) != 1:
+              raise SystemExit(f'Expected exactly one AGP catalog declaration: {agp_version}')
+          catalog.write_text(source.replace(agp_version, 'agp = "9.0.0"'))
+          # Keep the production wrapper unchanged in the CI-only projection;
+          # downgrading it makes Qodana model import diverge from real builds.
           wrapper = Path('.qodana-android-compose/gradle/wrapper/gradle-wrapper.properties')
-          if 'gradle-9.4.1-' not in wrapper.read_text():
-              raise SystemExit('Expected the Qodana projection to retain Gradle 9.4.1')
+          if 'gradle-9.6.1-' not in wrapper.read_text():
+              raise SystemExit('Expected the Qodana projection to retain Gradle 9.6.1')
           PY
       - name: 'Qodana Scan'
         uses: JetBrains/qodana-action@v2026.1.3
@@ -147,6 +135,10 @@ jobs:
                       # with an explicit sentinel, never an absolute/escaping path.
                       path = "(no-location)"
                   rows.append((rule, level, path, line))
+          # Android variants/source sets can emit the same SARIF result more
+          # than once. Inventory counts represent unique rule/location findings,
+          # not the number of model contexts that rediscovered each finding.
+          rows = list(dict.fromkeys(rows))
           # Flat: rule_id,level,file,line ONLY. No message/code text.
           with open(flat_path, "w", newline="") as f:
               w = csv.writer(f); w.writerow(["rule_id","level","file","line"])

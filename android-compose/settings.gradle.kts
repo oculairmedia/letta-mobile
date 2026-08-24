@@ -12,6 +12,11 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // Kotzilla SDK artifacts (e.g. kotzilla-sdk-compose-jvm) are published
+        // to the Gradle Plugin Portal, not Maven Central. The plugin itself
+        // resolves via pluginManagement above; runtime SDK deps need this
+        // fallback to find their per-platform variants.
+        gradlePluginPortal()
         ivy("https://nodejs.org/dist/") {
             name = "Node.js distributions"
             patternLayout {
@@ -46,14 +51,14 @@ rootProject.name = "LettaMobile"
 include(":app")
 include(":core:ids")
 include(":core:runtime")
-include(":core:domain")
-include(":core:data")
+include(":core:android-data")
 include(":core:testutil")
 include(":avatar:core")
 include(":avatar:catalog")
 include(":avatar:asset-pipeline")
 include(":avatar:renderer-web")
 include(":sharedLogic")
+include(":sharedUI")
 include(":designsystem")
 include(":feature-chat")
 include(":feature-editagent")

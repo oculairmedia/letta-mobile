@@ -1,5 +1,7 @@
 package com.letta.mobile.data.transport
 
+import com.letta.mobile.data.transport.BridgeTurnStatus
+
 import com.letta.mobile.data.a2ui.A2uiFrameEvent
 import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.model.LettaMessage
@@ -204,6 +206,7 @@ sealed interface WsTimelineEvent {
         // this is always non-null. Mobile can safely treat null upstream as a
         // shim regression.
         val runId: String,
+        val isReplay: Boolean = false,
     ) : WsTimelineEvent
 
     /**
@@ -247,7 +250,7 @@ sealed interface WsTimelineEvent {
     data class TurnDone(
         val turnId: String,
         val runId: String,
-        val status: String, // "completed" | "cancelled" | "failed"
+        val status: BridgeTurnStatus,
         // lcp-srk: lossy=true when the shim dropped at least one frame at
         // its backpressure gate; mobile reconciles from disk only on lossy
         // turns. dropCount is informational telemetry.
@@ -304,6 +307,24 @@ sealed interface WsTimelineEvent {
     ) : WsTimelineEvent
 }
 
+sealed interface BridgeTurnStatus {
+    val wireValue: String
+
+    data object Completed : BridgeTurnStatus { override val wireValue = "completed" }
+    data object Cancelled : BridgeTurnStatus { override val wireValue = "cancelled" }
+    data object Failed : BridgeTurnStatus { override val wireValue = "failed" }
+    data class Unknown(val raw: String) : BridgeTurnStatus { override val wireValue = raw }
+
+    companion object {
+        fun fromWire(value: String): BridgeTurnStatus = when (value) {
+            Completed.wireValue -> Completed
+            Cancelled.wireValue -> Cancelled
+            Failed.wireValue -> Failed
+            else -> Unknown(value)
+        }
+    }
+}
+
 private fun TransportFrameEvent.toTimelineEvent(): WsTimelineEvent? {
     val event = frame.toTimelineEvent(isReplay)
     com.letta.mobile.util.Telemetry.event(
@@ -316,7 +337,7 @@ private fun TransportFrameEvent.toTimelineEvent(): WsTimelineEvent? {
 }
 
 private fun ServerFrame.toTimelineEvent(isReplay: Boolean = false): WsTimelineEvent? = when (this) {
-    is ServerFrame.TurnStarted,
+    is ServerFrame.TurnStarted -> turnStartedEvent(isReplay)
     is ServerFrame.TurnDone,
     is ServerFrame.StopReason,
     is ServerFrame.UsageStatistics,
@@ -362,18 +383,21 @@ private fun ServerFrame.toTimelineEvent(isReplay: Boolean = false): WsTimelineEv
     is ServerFrame.Unknown -> null
 }
 
-/** Turn-lifecycle bookends plus the bare stop/usage/subscribe envelopes. */
-private fun ServerFrame.turnLifecycleEvent(): WsTimelineEvent? = when (this) {
-    is ServerFrame.TurnStarted -> WsTimelineEvent.TurnStarted(
+private fun ServerFrame.TurnStarted.turnStartedEvent(isReplay: Boolean): WsTimelineEvent.TurnStarted =
+    WsTimelineEvent.TurnStarted(
         turnId = turnId,
         agentId = agentId,
         conversationId = conversationId,
         runId = runId,
+        isReplay = isReplay,
     )
+
+/** Turn-lifecycle bookends plus the bare stop/usage/subscribe envelopes. */
+private fun ServerFrame.turnLifecycleEvent(): WsTimelineEvent? = when (this) {
     is ServerFrame.TurnDone -> WsTimelineEvent.TurnDone(
         turnId = turnId,
         runId = runId,
-        status = status,
+        status = BridgeTurnStatus.fromWire(status),
         lossy = lossy,
         dropCount = dropCount,
     )

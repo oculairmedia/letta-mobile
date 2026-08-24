@@ -1,0 +1,124 @@
+package com.letta.mobile.data.transport
+
+import com.letta.mobile.data.model.AssistantMessage
+import com.letta.mobile.data.transport.BridgeTurnStatus
+import com.letta.mobile.testutil.FakeChannelTransport
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class WsChatBridgeTest {
+    @Test
+    fun `connection maps transport states without exposing ChannelTransport to consumers`() = runTest {
+        val transport = FakeChannelTransport(initialState = ChannelTransportState.Idle)
+        val bridge = WsChatBridge(transport)
+
+        assertEquals(WsConnectionState.Idle, bridge.connection.first())
+        assertFalse(bridge.isConnected())
+
+        transport.state.value = ChannelTransportState.Connecting()
+
+        assertEquals(WsConnectionState.Connecting, bridge.connection.first())
+        assertFalse(bridge.isConnected())
+
+        transport.state.value = ChannelTransportState.Connected(
+            serverId = "server",
+            sessionId = "session",
+            deviceId = "device",
+            a2uiEnabled = true,
+            a2uiCatalog = "catalog-v1",
+        )
+
+        assertEquals(
+            WsConnectionState.Connected(a2uiEnabled = true, catalog = "catalog-v1"),
+            bridge.connection.first(),
+        )
+        assertTrue(bridge.isConnected())
+
+        transport.state.value = ChannelTransportState.Disconnected(
+            code = 1008,
+            reason = "unauthorized",
+            isAuthFailure = true,
+        )
+
+        assertEquals(
+            WsConnectionState.Disconnected(code = 1008, reason = "unauthorized", isAuthFailure = true),
+            bridge.connection.first(),
+        )
+        assertFalse(bridge.isConnected())
+    }
+
+    @Test
+    fun `awaitConnected resumes with semantic connected state`() = runTest {
+        val transport = FakeChannelTransport(initialState = ChannelTransportState.Connecting())
+        val bridge = WsChatBridge(transport)
+
+        val connected = async { bridge.awaitConnected() }
+        transport.state.value = ChannelTransportState.Connected(
+            serverId = "server",
+            sessionId = "session",
+            deviceId = "device",
+            a2uiEnabled = false,
+            a2uiCatalog = null,
+        )
+
+        assertEquals(
+            WsConnectionState.Connected(a2uiEnabled = false, catalog = null),
+            connected.await(),
+        )
+    }
+
+    @Test
+    fun `turn done maps known and unknown wire statuses`() = runTest {
+        val transport = FakeChannelTransport()
+        val bridge = WsChatBridge(transport)
+        val completed = async { bridge.events.first { it is WsTimelineEvent.TurnDone } as WsTimelineEvent.TurnDone }
+        runCurrent()
+        transport.frameEvents.emit(
+            TransportFrameEvent(ServerFrame.TurnDone(id = "id", ts = "ts", turnId = "turn", runId = "run", status = "completed")),
+        )
+        assertEquals(BridgeTurnStatus.Completed, completed.await().status)
+
+        val unknown = async { bridge.events.first { it is WsTimelineEvent.TurnDone } as WsTimelineEvent.TurnDone }
+        runCurrent()
+        transport.frameEvents.emit(
+            TransportFrameEvent(ServerFrame.TurnDone(id = "id", ts = "ts", turnId = "turn", runId = "run", status = "future_status")),
+        )
+        assertEquals(BridgeTurnStatus.Unknown("future_status"), unknown.await().status)
+    }
+
+    @Test
+    fun `message deltas preserve replay metadata from transport frame events`() = runTest {
+        val transport = FakeChannelTransport()
+        val bridge = WsChatBridge(transport)
+        val received = async { bridge.events.first { it is WsTimelineEvent.MessageDelta } as WsTimelineEvent.MessageDelta }
+        runCurrent()
+
+        transport.frameEvents.emit(
+            TransportFrameEvent(
+                frame = ServerFrame.AssistantMessage(
+                    id = "cm-stream-old",
+                    ts = "t",
+                    agentId = "agent-1",
+                    conversationId = "conv-1",
+                    turnId = "turn-1",
+                    runId = "run-1",
+                    content = "old answer",
+                ),
+                isReplay = true,
+            )
+        )
+
+        val delta = received.await()
+        assertTrue(delta.isReplay)
+        val message = delta.message as AssistantMessage
+        assertEquals("cm-stream-old", message.id)
+        assertEquals("old answer", message.content)
+    }
+
+}

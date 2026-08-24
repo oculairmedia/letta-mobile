@@ -38,7 +38,7 @@ private fun desktopIrohConnectConfig(config: LettaConfig): IrohConnectConfig =
 /**
  * iroh:// backend: one QUIC channel transport shared by the chat gateway,
  * admin_rpc reads, and (once implemented server-side) registries. Selected
- * purely by URL scheme, same as Android's SessionGraphFactory; null for HTTP
+ * purely by URL scheme, same as Android's DefaultSessionRepositoryGraphFactory; null for HTTP
  * backends. Connects on entering composition and disconnects on dispose.
  */
 private fun createIrohTransport(config: LettaConfig): IrohChannelTransport =
@@ -141,13 +141,26 @@ private fun <T> DesktopTransportLifecycleEffect(request: DesktopTransportLifecyc
     }
 }
 
+/**
+ * letta-mobile-9v9nu: mode-authoritative Iroh transport gate.
+ *
+ * `Mode.LOCAL` always wins over `serverUrl`'s scheme. A persisted config can
+ * carry a stale `iroh://` ticket left over from a prior remote session (the
+ * store migrates this away on load — see `BackendConfigPolicy
+ * .migrateStaleLocalServerUrl` — but this gate is the last line of defense so
+ * an in-memory LOCAL config never binds the remote transport regardless of
+ * what its `serverUrl` still says).
+ */
+internal fun shouldBindIrohTransport(config: LettaConfig): Boolean =
+    config.mode != LettaConfig.Mode.LOCAL && IrohChannelTransport.isIrohUrl(config.serverUrl)
+
 @Composable
 internal fun rememberIrohTransport(
     activeConfig: LettaConfig,
     chatScope: CoroutineScope,
 ): IrohChannelTransport? {
     val irohTransport = remember(activeConfig) {
-        activeConfig.takeIf { IrohChannelTransport.isIrohUrl(it.serverUrl) }?.let(::createIrohTransport)
+        activeConfig.takeIf(::shouldBindIrohTransport)?.let(::createIrohTransport)
     }
     DesktopTransportLifecycleEffect(
         DesktopTransportLifecycleRequest(
@@ -161,6 +174,43 @@ internal fun rememberIrohTransport(
         ),
     )
     return irohTransport
+}
+
+/**
+ * Publishes the live channel transport into the session graph slot.
+ *
+ * Iroh mode reuses the main QUIC transport. HTTP backends create the lean WS
+ * side-channel (chat itself stays on SSE) so Cron/SelfTodo/Subagent and A2UI
+ * actions share one connected [IChannelTransport] with the graph.
+ */
+@Composable
+internal fun rememberAndPublishGraphChannelTransport(
+    activeConfig: LettaConfig,
+    irohTransport: IrohChannelTransport?,
+    chatScope: CoroutineScope,
+    publish: (com.letta.mobile.data.transport.api.IChannelTransport?) -> Unit,
+): com.letta.mobile.data.transport.api.IChannelTransport? {
+    val irohMode = irohTransport != null
+    val wsTransport = remember(activeConfig, irohMode) {
+        createSubagentTransport(activeConfig, irohMode, chatScope)
+    }
+    DesktopTransportLifecycleEffect(
+        DesktopTransportLifecycleRequest(
+            transport = wsTransport,
+            activeConfig = activeConfig,
+            chatScope = chatScope,
+            hooks = DesktopTransportLifecycleHooks(
+                onConnect = ::connectSubagentTransport,
+                onDisposeTransport = { it.close() },
+            ),
+        ),
+    )
+    val transport: com.letta.mobile.data.transport.api.IChannelTransport? =
+        irohTransport ?: wsTransport
+    androidx.compose.runtime.LaunchedEffect(transport) {
+        publish(transport)
+    }
+    return transport
 }
 
 internal data class DesktopChatRuntime(
@@ -245,7 +295,12 @@ private fun createSubagentTransport(
     irohMode: Boolean,
     chatScope: CoroutineScope,
 ): DesktopWsChannelTransport? =
-    activeConfig.takeIf { it.serverUrl.isNotBlank() && !it.accessToken.isNullOrBlank() && !irohMode }
+    activeConfig.takeIf {
+        it.mode != LettaConfig.Mode.LOCAL &&
+            it.serverUrl.isNotBlank() &&
+            !it.accessToken.isNullOrBlank() &&
+            !irohMode
+    }
         ?.let { DesktopWsChannelTransport(chatScope) }
 
 /** Inputs for the active-subagent registry. */
@@ -254,6 +309,8 @@ internal data class SubagentRegistryRequest(
     val irohMode: Boolean,
     val parentScope: SubagentParentScope?,
     val irohTransport: IrohChannelTransport? = null,
+    /** Phase 4c: prefer the session-graph repository when it is a real impl. */
+    val graphSubagentRepository: SubagentRepository? = null,
 )
 
 @Composable
@@ -265,20 +322,28 @@ internal fun rememberSubagentRegistry(
     val irohMode = request.irohMode
     val parentScope = request.parentScope
     val irohTransport = request.irohTransport
-    val subagentTransport = remember(activeConfig, irohMode) {
-        createSubagentTransport(activeConfig, irohMode, chatScope)
+    val graphSubagentRepository = request.graphSubagentRepository
+    // Graph owns Cron/SelfTodo/Subagent after Phase 4c. Keep the legacy
+    // side-channel only when the graph still exposes a non-concrete stub
+    // (early bootstrap / tests without adapters).
+    val subagentTransport = remember(activeConfig, irohMode, graphSubagentRepository) {
+        if (graphSubagentRepository != null) {
+            null
+        } else {
+            createSubagentTransport(activeConfig, irohMode, chatScope)
+        }
     }
-    // iroh:// now serves the registry natively (scoped subagent.list RPC), so
-    // the repository rides the main iroh transport there; HTTP backends keep
-    // the lean WS side-channel.
-    val subagentRepository = remember(subagentTransport, irohTransport) {
-        irohTransport?.let { SubagentRepository(it, includeAll = true) }
-            ?: subagentTransport?.let { SubagentRepository(it, includeAll = true) }
+    val ownedRepository = remember(subagentTransport, irohTransport, graphSubagentRepository) {
+        if (graphSubagentRepository != null) {
+            null
+        } else {
+            irohTransport?.let { SubagentRepository(it, includeAll = true) }
+                ?: subagentTransport?.let { SubagentRepository(it, includeAll = true) }
+        }
     }
-    // The repository launches push/reconnect collectors on construction; a
-    // replaced instance must be closed or they outlive it forever.
-    DisposableEffect(subagentRepository) {
-        onDispose { subagentRepository?.close() }
+    val subagentRepository = graphSubagentRepository ?: ownedRepository
+    DisposableEffect(ownedRepository) {
+        onDispose { ownedRepository?.close() }
     }
     DesktopTransportLifecycleEffect(
         DesktopTransportLifecycleRequest(

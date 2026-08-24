@@ -192,7 +192,13 @@ fun Timeline.mergeServerMessages(
             return@forEach
         }
         if (existingByServerId?.canReplaceIrohSyntheticLiveRow(confirmed) == true) {
-            timeline = timeline.replaceByServerId(confirmed)
+            // letta-mobile-9lgfu: terminal settlement fence. The synthetic live
+            // row may already hold deltas the reconciled snapshot predates; a
+            // stale, non-superset final must not shrink it. Keep the promotion
+            // (ids/run id come from `confirmed`) but fold the text so the
+            // accumulator can only keep-or-grow.
+            val settled = settleTerminalEvent(timeline.conversationId, existingByServerId, confirmed)
+            timeline = timeline.replaceByServerId(settled)
             merged++
         } else if (existingByServerId == null) {
             val prefixIndex = timeline.findRecentAssistantPrefixIndex(confirmed)

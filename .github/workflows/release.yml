@@ -158,6 +158,18 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-konan-
 
+      - name: Cache JetBrains Runtime (JBR 25.0.4) for packaged desktop runtime
+        # release.yml bundles JBR 25.0.4 in the EXE/MSI runtime image (see
+        # desktop/build.gradle.kts downloadDesktopJbr). The archive lands in
+        # the build downloads dir under D:\l. Cache the zip so subsequent
+        # release runs skip the ~180MB pull.
+        uses: actions/cache@v4
+        with:
+          path: D:\l\downloads
+          key: ${{ runner.os }}-jbr-${{ hashFiles('android-compose/desktop/build.gradle.kts') }}
+          restore-keys: |
+            ${{ runner.os }}-jbr-
+
       - name: Build Windows EXE + MSI installers
         env:
           # Match desktop CI's drive-root workspace so WiX source paths stay
@@ -166,9 +178,8 @@ jobs:
         # Output:
         #   D:\l\compose\binaries\main\exe\*.exe
         #   D:\l\compose\binaries\main\msi\*.msi
-        # Keep release packaging aligned with desktop CI: the bundled-runtime
-        # Exec tasks are deliberately outside Gradle's configuration cache.
-        run: ./gradlew --no-daemon --no-configuration-cache :desktop:packageDistributionForCurrentOS
+        # Same packaging configuration-cache hole as desktop.yml.
+        run: ./gradlew --no-configuration-cache :desktop:packageDistributionForCurrentOS
 
       - name: Upload desktop installers
         uses: actions/upload-artifact@v4

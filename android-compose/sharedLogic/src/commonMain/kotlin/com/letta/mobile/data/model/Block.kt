@@ -30,3 +30,21 @@ data class BlockUpdateParams(
     val limit: Int? = null,
     val description: String? = null,
 )
+
+/** Filter + offset pagination for `GET /v1/blocks` and `block.list` admin_rpc. */
+@Serializable
+data class BlockListParams(
+    val label: String? = null,
+    @SerialName("is_template") val isTemplate: Boolean? = null,
+    val limit: Int? = null,
+    val offset: Int? = null,
+)
+
+/** Cursor pagination for `GET /v1/blocks/{block_id}/agents`. */
+data class BlockAgentsListParams(
+    val blockId: BlockId,
+    val limit: Int? = null,
+    val before: String? = null,
+    val after: String? = null,
+    val order: String? = null,
+)

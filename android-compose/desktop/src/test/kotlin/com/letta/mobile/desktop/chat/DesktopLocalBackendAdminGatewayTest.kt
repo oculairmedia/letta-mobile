@@ -173,6 +173,44 @@ class DesktopLocalBackendAdminGatewayTest {
         assertEquals("desc", client.messagesCommand?.query?.get("order")?.jsonPrimitive?.content)
     }
 
+    @Test
+    fun `createAgent delegates through the shared local admin gateway`() = runTest {
+        val client = FakeAppServerClient(failedCreateResponse()).apply {
+            agentCreateResult = buildJsonObject {
+                put("id", "agent-new-1")
+                put("name", "Ada")
+            }
+        }
+        val gateway = DesktopLocalBackendAdminGateway(client)
+
+        val agent = gateway.createAgent(
+            com.letta.mobile.data.model.AgentCreateParams(name = "Ada", model = "openai/gpt-4o"),
+        )
+
+        assertEquals("agent-new-1", agent.id.value)
+        assertEquals("Ada", client.agentCreateCommand?.body?.get("name")?.jsonPrimitive?.content)
+    }
+
+    @Test
+    fun `listLlmModels delegates through the shared local admin gateway`() = runTest {
+        val client = FakeAppServerClient(failedCreateResponse()).apply {
+            modelEntries = kotlinx.serialization.json.JsonArray(
+                listOf(
+                    buildJsonObject {
+                        put("id", "litellm/gpt-4o")
+                        put("handle", "litellm/gpt-4o")
+                        put("label", "GPT-4o (litellm)")
+                    },
+                ),
+            )
+        }
+        val gateway = DesktopLocalBackendAdminGateway(client)
+
+        val models = gateway.listLlmModels()
+
+        assertEquals(listOf("litellm/gpt-4o"), models.map { it.handle })
+    }
+
     private fun failedCreateResponse() = AppServerInboundFrame.ConversationCreateResponse(
         requestId = "unused",
         success = false,
@@ -214,6 +252,29 @@ class DesktopLocalBackendAdminGatewayTest {
         var updateCommand: AppServerCommand.ConversationUpdate? = null
         var messagesCommand: AppServerCommand.ConversationMessagesList? = null
         var listedMessages: List<com.letta.mobile.data.model.LettaMessage> = emptyList()
+        var agentCreateCommand: AppServerCommand.AgentCreate? = null
+        var agentCreateResult: kotlinx.serialization.json.JsonObject? = null
+        var modelEntries: kotlinx.serialization.json.JsonArray = kotlinx.serialization.json.JsonArray(emptyList())
+
+        override suspend fun agentCreate(
+            command: AppServerCommand.AgentCreate,
+        ): AppServerInboundFrame.AgentCreateResponse {
+            agentCreateCommand = command
+            return AppServerInboundFrame.AgentCreateResponse(
+                requestId = command.requestId,
+                success = agentCreateResult != null,
+                agent = agentCreateResult,
+                error = if (agentCreateResult == null) "not stubbed" else null,
+            )
+        }
+
+        override suspend fun listModels(
+            command: AppServerCommand.ListModels,
+        ): AppServerInboundFrame.ListModelsResponse = AppServerInboundFrame.ListModelsResponse(
+            requestId = command.requestId,
+            success = true,
+            entries = modelEntries,
+        )
 
         override suspend fun conversationCreate(
             command: AppServerCommand.ConversationCreate,

@@ -26,6 +26,7 @@ import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.timeline.IngestedMessageListener
 import com.letta.mobile.data.timeline.TimelineRepository
+import com.letta.mobile.data.transport.appserver.BackgroundStreamBudget
 import com.letta.mobile.util.Telemetry
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -78,16 +79,22 @@ fun clearIngestedListenerIfActive(
 @AndroidEntryPoint
 class ChatPushService : Service() {
 
-    @Inject lateinit var timelineRepository: TimelineRepository
-    @Inject lateinit var conversationApi: ConversationApi
-    @Inject lateinit var agentRepository: IAgentRepository
-    @Inject lateinit var notificationDeliveryCoordinator: NotificationDeliveryCoordinator
-    @Inject lateinit var channelNotificationPublisher: ChannelNotificationPublisher
-    @Inject lateinit var currentConversationTracker: CurrentConversationTracker
+    /**
+     * Single field inject required by `@AndroidEntryPoint`. Collaborators live
+     * on [ChatPushServiceDependencies] via constructor injection.
+     */
+    @Inject lateinit var deps: ChatPushServiceDependencies
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var warmupJob: Job? = null
     private var installedIngestedListener: IngestedMessageListener? = null
+
+    private val timelineRepository get() = deps.timelineRepository
+    private val conversationApi get() = deps.conversationApi
+    private val agentRepository get() = deps.agentRepository
+    private val notificationDeliveryCoordinator get() = deps.notificationDeliveryCoordinator
+    private val channelNotificationPublisher get() = deps.channelNotificationPublisher
+    private val currentConversationTracker get() = deps.currentConversationTracker
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -277,7 +284,7 @@ class ChatPushService : Service() {
         // kicks in before the user opens any chat screen.
         //
         // letta-mobile-qv6d/jmzq.4: limit reduced from 20 →
-        // MAX_BACKGROUND_PERSISTENT_STREAMS (5) and made explicit. Each
+        // MAX_BACKGROUND_PERSISTENT_STREAMS (3, data-efficiency H4) and made explicit. Each
         // warmed conversation runs a permanent runStreamSubscriber coroutine
         // that polls /v1/conversations/{id}/stream on the idle backoff ladder
         // forever. At 20 convs and the prior 5s cap that produced ~4 RPS of
@@ -286,7 +293,7 @@ class ChatPushService : Service() {
         // and starving foreground SSE sends (Emmanuel's letta-mobile-kxsv
         // hang).
         //
-        // 5 proactively-created streams covers the realistic "I might tap any
+        // 3 proactively-created streams covers the realistic "I might tap any
         // of these recents next" window. The currently visible conversation,
         // when known, consumes the first warmup slot so it is never displaced
         // by recency ordering. Anything older incurs a one-shot getOrCreate
@@ -374,14 +381,18 @@ class ChatPushService : Service() {
          * Maximum number of persistent stream loops this foreground service
          * proactively creates during startup warmup.
          *
+         * letta-mobile data-efficiency Phase4: reduced from 5 → 3 (H4). Three
+         * slots cover current-conversation + top-2 by recency; anything older
+         * incurs a one-shot getOrCreate hydrate on first open (~500ms).
+         *
          * Keep this conservative: every warmed conversation owns a long-lived
          * resume-stream subscriber. The OkHttp dispatcher is currently tuned
          * in LettaApiClient with maxRequestsPerHost = 16, leaving headroom for
-         * these 5 background streams plus foreground sends/fetches. Do not
+         * these 3 background streams plus foreground sends/fetches. Do not
          * raise this without telemetry showing foreground requests are not
          * starved.
          */
-        private const val MAX_BACKGROUND_PERSISTENT_STREAMS = 5
+        private const val MAX_BACKGROUND_PERSISTENT_STREAMS = 3
 
         private enum class WarmupResult { Success, Failure }
 

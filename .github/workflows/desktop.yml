@@ -34,6 +34,9 @@ concurrency:
   group: desktop-installer-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   windows-installer:
     runs-on: windows-latest
@@ -68,6 +71,18 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-konan-
 
+      - name: Cache JetBrains Runtime (JBR 25.0.4) for packaged desktop runtime
+        # desktop.yml bundles JBR 25.0.4 in the EXE/MSI runtime image (see
+        # desktop/build.gradle.kts downloadDesktopJbr). The archive lands in
+        # the build downloads dir under D:\l (the WiX-friendly packaging
+        # workspace). Cache the zip so subsequent runs skip the ~180MB pull.
+        uses: actions/cache@v4
+        with:
+          path: D:\l\downloads
+          key: ${{ runner.os }}-jbr-${{ hashFiles('android-compose/desktop/build.gradle.kts') }}
+          restore-keys: |
+            ${{ runner.os }}-jbr-
+
       - name: Build Windows EXE + MSI installers
         env:
           # WiX still resolves source files through MAX_PATH-limited Win32 APIs.
@@ -82,11 +97,10 @@ jobs:
         # follow-up. Output:
         #   D:\l\compose\binaries\main\exe\*.exe
         #   D:\l\compose\binaries\main\msi\*.msi
-        # Runtime download/install Exec tasks intentionally perform external
-        # process work and are not configuration-cache serializable. Packaging
-        # already produces its own incremental outputs, so disable the cache
-        # rather than failing after EXE/MSI generation has completed.
-        run: ./gradlew --no-daemon --no-configuration-cache :desktop:packageDistributionForCurrentOS
+        # Packaging still captures Gradle script objects (Nucleus jpackage tasks
+        # plus JBR verify actions). :desktop:run is configuration-cache safe;
+        # this entry point is not, so keep the cache off here only.
+        run: ./gradlew --no-configuration-cache :desktop:packageDistributionForCurrentOS
 
       - name: Upload Windows installers
         uses: actions/upload-artifact@v4

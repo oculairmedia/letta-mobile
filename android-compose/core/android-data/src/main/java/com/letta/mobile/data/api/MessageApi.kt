@@ -1,0 +1,508 @@
+package com.letta.mobile.data.api
+
+import com.letta.mobile.data.model.*
+import com.letta.mobile.data.repository.api.MessageRemoteSource
+import io.ktor.client.call.*
+import io.ktor.client.plugins.HttpTimeoutConfig
+import io.ktor.client.plugins.timeout
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
+import io.ktor.http.*
+import io.ktor.utils.io.*
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import java.io.ByteArrayOutputStream
+import javax.inject.Inject
+import javax.inject.Singleton
+
+@Singleton
+open class MessageApi @Inject constructor(
+    private val apiClient: LettaApiClient
+) : MessageRemoteSource {
+    private val json = Json { ignoreUnknownKeys = true }
+
+    companion object {
+        /**
+         * The Letta API's `limit` parameter counts runs/steps, not individual messages.
+         * Each run can contain multiple messages (user, reasoning, assistant, tool calls, etc.).
+         * We over-fetch by this multiplier to ensure we get enough messages, then slice client-side.
+         */
+        private const val RUN_TO_MESSAGE_MULTIPLIER = 5
+        private const val MAX_OVER_FETCH_LIMIT = 200
+
+        /**
+         * Defense-in-depth cap on message-list response bodies (letta-mobile
+         * large-conversation OOM investigation). Every call site in this
+         * codebase already passes a bounded `limit`, and the Iroh admin_rpc
+         * transport (`IrohAdminRpcTimelineTransport` / `IrohRoutingTimelineTransport`)
+         * is preferred over this raw REST path whenever the active backend is
+         * `iroh://` — the LettaApiClient purity choke-point hard-fails raw
+         * HTTP calls in that mode, so this path can only be hit against a
+         * legacy non-Iroh HTTP/shim backend. A misbehaving server that
+         * ignores `limit` (or a shim that returns a full 90MB+ conversation
+         * regardless of the requested page) must not be able to materialize
+         * that entire body as one contiguous String — mirrors
+         * [AgentApi]'s `bodyAsTextAtMost` guard on the context-window read.
+         */
+        private const val MAX_MESSAGE_LIST_RESPONSE_BYTES = 2 * 1024 * 1024
+        private const val READ_BUFFER_BYTES = 8 * 1024
+    }
+
+    private suspend fun HttpResponse.bodyAsTextAtMost(maxBytes: Int): String {
+        val declaredLength = headers[HttpHeaders.ContentLength]?.toLongOrNull()
+        if (declaredLength != null && declaredLength > maxBytes) {
+            throw ResponseTooLargeException(maxBytes, declaredLength)
+        }
+
+        val output = ByteArrayOutputStream(minOf(maxBytes, declaredLength?.toInt() ?: READ_BUFFER_BYTES))
+        val buffer = ByteArray(READ_BUFFER_BYTES)
+        val channel = bodyAsChannel()
+        var totalBytes = 0
+
+        while (true) {
+            val bytesRead = channel.readAvailable(buffer, 0, minOf(buffer.size, maxBytes + 1 - totalBytes))
+            if (bytesRead == -1) break
+            if (bytesRead == 0) continue
+            totalBytes += bytesRead
+            if (totalBytes > maxBytes) {
+                throw ResponseTooLargeException(maxBytes, declaredLength)
+            }
+            output.write(buffer, 0, bytesRead)
+        }
+
+        return output.toString(Charsets.UTF_8.name())
+    }
+
+    private suspend fun HttpResponse.decodeMessagesAtMost(maxBytes: Int): List<LettaMessage> {
+        val text = bodyAsTextAtMost(maxBytes)
+        return json.decodeFromString(ListSerializer(LettaMessage.serializer()), text)
+    }
+
+    class ResponseTooLargeException(maxBytes: Int, declaredBytes: Long?) : ApiException(
+        HttpStatusCode.PayloadTooLarge.value,
+        "Message list response is too large for mobile (${declaredBytes ?: "more than $maxBytes"} bytes; cap is $maxBytes bytes)."
+    )
+
+    /**
+     * Fetch recent messages with a true message-count limit.
+     *
+     * The Letta API's `limit` counts runs/steps, not messages. This method over-fetches
+     * and slices to provide the expected behavior where `messageLimit` is the actual
+     * number of messages returned.
+     *
+     * @param conversationId The conversation to fetch messages from
+     * @param messageLimit Exact number of messages to return (default 20)
+     * @param beforeMessageId Fetch messages before this message ID (for pagination)
+     * @return List of messages in chronological order (oldest first), limited to messageLimit
+     */
+    open override suspend fun fetchRecentMessages(
+        conversationId: ConversationId,
+        messageLimit: Int,
+        beforeMessageId: String?,
+    ): List<LettaMessage> {
+        val (client, baseUrl) = apiClient.session()
+
+        // Over-fetch to account for runs containing multiple messages
+        val runLimit = ((messageLimit * RUN_TO_MESSAGE_MULTIPLIER) / 4).coerceIn(messageLimit, MAX_OVER_FETCH_LIMIT)
+
+        // Strategy: Use desc order to fetch the most recent messages,
+        // then sort the results in chronological order using a stable sort.
+        // 
+        // The problem with desc + reverse: within a single run, desc returns
+        // [reasoning, assistant] but chronologically it should be [reasoning, assistant]
+        // (reasoning happens before assistant). Reversing gives [assistant, reasoning]
+        // which is WRONG.
+        //
+        // Instead: fetch desc (to get recent messages), then sort by (date, otid)
+        // where otid is a string that increments monotonically within a run.
+        val allMessages: List<LettaMessage> = client.prepareGet("$baseUrl/v1/conversations/${conversationId.value}/messages") {
+            parameter("limit", runLimit)
+            parameter("before", beforeMessageId)
+            parameter("order", "desc")
+        }.execute { response ->
+            // NOTE: bounded read (decodeMessagesAtMost) MUST happen before the
+            // status check below can safely call bodyAsText() on an error
+            // response — both paths consume the same streamed body exactly
+            // once via `execute {}`, which (unlike plain client.get()) does
+            // not eagerly buffer the whole body ahead of our cap.
+            if (response.status.value !in 200..299) {
+                throw ApiException(response.status.value, response.bodyAsTextAtMost(MAX_MESSAGE_LIST_RESPONSE_BYTES))
+            }
+            response.decodeMessagesAtMost(MAX_MESSAGE_LIST_RESPONSE_BYTES)
+        }
+
+        // Take the most recent N messages (first N in desc order)
+        // Then sort chronologically by date, using otid as tiebreaker for same-date messages
+        return allMessages.take(messageLimit).sortedWith(
+            compareBy(
+                { it.date ?: "" },       // Primary: chronological date
+                { it.otid ?: it.id }      // Tiebreaker: otid (increments within a run) or id
+            )
+        )
+    }
+
+    open suspend fun fetchRecentMessages(
+        conversationId: String,
+        messageLimit: Int = 20,
+        beforeMessageId: String? = null,
+    ): List<LettaMessage> = fetchRecentMessages(ConversationId(conversationId), messageLimit, beforeMessageId)
+
+    open override suspend fun sendMessage(agentId: AgentId, request: MessageCreateRequest): LettaResponse {
+        val (client, baseUrl) = apiClient.session()
+
+        val response = client.post("$baseUrl/v1/agents/${agentId.value}/messages") {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
+        }
+        return response.body()
+    }
+
+    open suspend fun sendMessage(agentId: String, request: MessageCreateRequest): LettaResponse = sendMessage(AgentId(agentId), request)
+
+    open suspend fun sendConversationMessage(
+        conversationId: ConversationId,
+        request: MessageCreateRequest
+    ): ByteReadChannel {
+        val (client, baseUrl) = apiClient.session()
+
+        val response = client.post("$baseUrl/v1/conversations/${conversationId.value}/messages") {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+            // Message sends can stream responses for longer than the normal REST
+            // budget. Keep connect timeout bounded globally, but do not let the
+            // generic request/socket timeout own stream lifetime.
+            timeout {
+                requestTimeoutMillis = HttpTimeoutConfig.INFINITE_TIMEOUT_MS
+                socketTimeoutMillis = HttpTimeoutConfig.INFINITE_TIMEOUT_MS
+            }
+        }
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
+        }
+        return response.body()
+    }
+
+    open suspend fun sendConversationMessage(conversationId: String, request: MessageCreateRequest): ByteReadChannel =
+        sendConversationMessage(ConversationId(conversationId), request)
+
+    open suspend fun sendConversationMessageNoStream(
+        conversationId: ConversationId,
+        request: MessageCreateRequest,
+    ): LettaResponse {
+        val (client, baseUrl) = apiClient.session()
+
+        val response = client.post("$baseUrl/v1/conversations/${conversationId.value}/messages") {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
+        }
+        return response.body()
+    }
+
+    open suspend fun sendConversationMessageNoStream(conversationId: String, request: MessageCreateRequest): LettaResponse =
+        sendConversationMessageNoStream(ConversationId(conversationId), request)
+
+
+    /**
+     * Subscribe to the live SSE stream of the most-recent active run in a conversation.
+     *
+     * The Letta server exposes POST /v1/conversations/{conversation_id}/stream which
+     * "resumes the stream for the most recent active run." Crucially, this endpoint
+     * multiplexes events to EVERY subscribed client — not just the run originator —
+     * making it a real ambient realtime path for incoming messages produced by any
+     * client or server-side activity.
+     *
+     * Semantics:
+     *   - 200 with text/event-stream: returns the raw ByteReadChannel. Caller should
+     *     pipe into SseParser.parse() to get a Flow<LettaMessage>.
+     *   - 404 with detail containing "No active runs": throws NoActiveRunException.
+     *     Caller backs off and retries; a run will eventually start (any client
+     *     posting into the conversation triggers one).
+     *   - Other non-2xx: throws ApiException.
+     *
+     * Verified empirically 2026-04-18: a second client calling this endpoint while
+     * client A's run is in-flight receives the SAME events with the SAME run_id as
+     * client A, ~70ms later. See epic letta-mobile-mge5.
+     */
+    open suspend fun streamConversation(conversationId: ConversationId): ByteReadChannel {
+        val (client, baseUrl) = apiClient.session()
+
+        val response = client.post("$baseUrl/v1/conversations/${conversationId.value}/stream") {
+            contentType(ContentType.Application.Json)
+            setBody("{}")
+            header(HttpHeaders.Accept, "text/event-stream")
+            // Ambient SSE streams are intentionally long-lived. OkHttp PING
+            // helps HTTP/2 transport liveness; HTTP/1.1 SSE still needs server
+            // heartbeats and the explicit stale-stream watchdog to reconnect.
+            // Keep normal REST calls on the bounded global timeout policy.
+            timeout {
+                requestTimeoutMillis = HttpTimeoutConfig.INFINITE_TIMEOUT_MS
+                socketTimeoutMillis = HttpTimeoutConfig.INFINITE_TIMEOUT_MS
+            }
+        }
+        // The server has returned either 400 INVALID_ARGUMENT or 404 NOT_FOUND
+        // for "no active runs" depending on version/endpoint. Treat both the
+        // same — this is the normal idle path, not an error.
+        //
+        // letta-mobile-t8q7: "EXPIRED: Run was created more than 3 hours ago"
+        // (letta-mobile-gqz3) is also an idle signal — the previously-active
+        // run aged out without finishing and the next poll will see a fresh
+        // run. Route it through NoActiveRunException (stackless) here so the
+        // subscriber's hot-path doesn't allocate ApiException + stack on
+        // every idle cycle. Anything else stays a real ApiException.
+        if (response.status.value == 400 || response.status.value == 404) {
+            val body = response.bodyAsText()
+            val isIdle = body.contains("No active runs", ignoreCase = true) ||
+                body.contains("EXPIRED:", ignoreCase = true) ||
+                body.contains("is now expired", ignoreCase = true)
+            if (isIdle) {
+                throw NoActiveRunException(conversationId.value)
+            }
+            throw ApiException(response.status.value, body)
+        }
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
+        }
+        return response.body()
+    }
+
+
+    open suspend fun streamConversation(conversationId: String): ByteReadChannel = streamConversation(ConversationId(conversationId))
+    open override suspend fun listMessages(
+        agentId: AgentId,
+        limit: Int?,
+        before: String?,
+        after: String?,
+        order: String?,
+        conversationId: ConversationId?,
+    ): List<LettaMessage> {
+        val (client, baseUrl) = apiClient.session()
+
+        return client.prepareGet("$baseUrl/v1/agents/${agentId.value}/messages") {
+            parameter("limit", limit)
+            parameter("before", before)
+            parameter("after", after)
+            parameter("order", order)
+            conversationId?.let { parameter("conversation_id", it.value) }
+        }.execute { response ->
+            if (response.status.value !in 200..299) {
+                throw ApiException(response.status.value, response.bodyAsTextAtMost(MAX_MESSAGE_LIST_RESPONSE_BYTES))
+            }
+            response.decodeMessagesAtMost(MAX_MESSAGE_LIST_RESPONSE_BYTES)
+        }
+    }
+
+    open suspend fun listMessages(
+        agentId: String,
+        limit: Int? = null,
+        before: String? = null,
+        after: String? = null,
+        order: String? = null,
+        conversationId: String? = null,
+    ): List<LettaMessage> = listMessages(AgentId(agentId), limit, before, after, order, conversationId?.let(::ConversationId))
+
+    open override suspend fun listConversationMessages(
+        conversationId: ConversationId,
+        limit: Int?,
+        after: String?,
+        order: String?,
+    ): List<LettaMessage> {
+        val (client, baseUrl) = apiClient.session()
+
+        return client.prepareGet("$baseUrl/v1/conversations/${conversationId.value}/messages") {
+            parameter("limit", limit)
+            parameter("after", after)
+            parameter("order", order)
+        }.execute { response ->
+            if (response.status.value !in 200..299) {
+                throw ApiException(response.status.value, response.bodyAsTextAtMost(MAX_MESSAGE_LIST_RESPONSE_BYTES))
+            }
+            response.decodeMessagesAtMost(MAX_MESSAGE_LIST_RESPONSE_BYTES)
+        }
+    }
+
+    open suspend fun listConversationMessages(
+        conversationId: String,
+        limit: Int? = null,
+        after: String? = null,
+        order: String? = null,
+    ): List<LettaMessage> = listConversationMessages(ConversationId(conversationId), limit, after, order)
+
+    open override suspend fun resetMessages(agentId: AgentId) {
+        val (client, baseUrl) = apiClient.session()
+
+        val response = client.patch("$baseUrl/v1/agents/${agentId.value}/reset-messages") {
+            contentType(ContentType.Application.Json)
+        }
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
+        }
+    }
+
+    open suspend fun resetMessages(agentId: String) = resetMessages(AgentId(agentId))
+
+    open override suspend fun cancelMessage(agentId: AgentId, runIds: List<String>?): Map<String, String> {
+        val (client, baseUrl) = apiClient.session()
+
+        val response = client.post("$baseUrl/v1/agents/${agentId.value}/messages/cancel") {
+            contentType(ContentType.Application.Json)
+            setBody(CancelAgentRunRequest(runIds = runIds))
+        }
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
+        }
+        return response.body()
+    }
+
+    open suspend fun cancelMessage(agentId: String, runIds: List<String>? = null): Map<String, String> =
+        cancelMessage(AgentId(agentId), runIds)
+
+    open override suspend fun searchMessages(request: MessageSearchRequest): List<MessageSearchResult> {
+        val (client, baseUrl) = apiClient.session()
+
+        val response = client.post("$baseUrl/v1/messages/search") {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
+        }
+        return response.body<JsonElement>().jsonArray.map { it.toMessageSearchResult() }
+    }
+
+    private fun JsonElement.toMessageSearchResult(): MessageSearchResult {
+        val result = jsonObject
+        val wrappedMessage = result["message"] as? JsonObject
+        if (wrappedMessage != null) {
+            val embeddedText = (result["embedded_text"] as? JsonPrimitive)?.contentOrNull
+                ?: wrappedMessage.extractSearchText()
+                ?: ""
+            return MessageSearchResult(embeddedText = embeddedText, message = wrappedMessage)
+        }
+
+        return MessageSearchResult(
+            embeddedText = result.extractSearchText().orEmpty(),
+            message = result,
+        )
+    }
+
+    private fun JsonObject.extractSearchText(): String? {
+        return when (val content = this["content"]) {
+            is JsonPrimitive -> content.contentOrNull
+            is JsonArray -> content.mapNotNull { part ->
+                when (part) {
+                    is JsonPrimitive -> part.contentOrNull
+                    is JsonObject -> (part["text"] as? JsonPrimitive)?.contentOrNull
+                        ?: (part["content"] as? JsonPrimitive)?.contentOrNull
+                    else -> null
+                }
+            }.joinToString(" ").takeIf { it.isNotBlank() }
+            is JsonObject -> (content["text"] as? JsonPrimitive)?.contentOrNull
+                ?: (content["content"] as? JsonPrimitive)?.contentOrNull
+            else -> null
+        } ?: (this["text"] as? JsonPrimitive)?.contentOrNull
+            ?: (this["embedded_text"] as? JsonPrimitive)?.contentOrNull
+    }
+
+    open override suspend fun createBatch(request: CreateBatchMessagesRequest): Job {
+        val (client, baseUrl) = apiClient.session()
+
+        val response = client.post("$baseUrl/v1/messages/batches") {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
+        }
+        return response.body()
+    }
+
+    open override suspend fun retrieveBatch(batchId: String): Job {
+        val (client, baseUrl) = apiClient.session()
+
+        val response = client.get("$baseUrl/v1/messages/batches/$batchId")
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
+        }
+        return response.body()
+    }
+
+    open override suspend fun listBatches(
+        limit: Int?,
+        before: String?,
+        after: String?,
+        order: String?,
+    ): List<Job> {
+        val (client, baseUrl) = apiClient.session()
+
+        val response = client.get("$baseUrl/v1/messages/batches") {
+            parameter("limit", limit)
+            parameter("before", before)
+            parameter("after", after)
+            parameter("order", order)
+        }
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
+        }
+        return response.body()
+    }
+
+    open suspend fun listBatches(limit: Int? = null): List<Job> =
+        listBatches(limit = limit, before = null, after = null, order = null)
+
+    open override suspend fun listBatchMessages(
+        batchId: String,
+        limit: Int?,
+        before: String?,
+        after: String?,
+        order: String?,
+        agentId: String?,
+    ): BatchMessagesResponse {
+        val (client, baseUrl) = apiClient.session()
+
+        val response = client.get("$baseUrl/v1/messages/batches/$batchId/messages") {
+            parameter("limit", limit)
+            parameter("before", before)
+            parameter("after", after)
+            parameter("order", order)
+            parameter("agent_id", agentId)
+        }
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
+        }
+        return response.body()
+    }
+
+    open suspend fun listBatchMessages(
+        batchId: String,
+        agentId: String? = null,
+    ): BatchMessagesResponse = listBatchMessages(
+        batchId = batchId,
+        limit = null,
+        before = null,
+        after = null,
+        order = null,
+        agentId = agentId,
+    )
+
+    open override suspend fun cancelBatch(batchId: String) {
+        val (client, baseUrl) = apiClient.session()
+
+        val response = client.patch("$baseUrl/v1/messages/batches/$batchId/cancel")
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
+        }
+    }
+}

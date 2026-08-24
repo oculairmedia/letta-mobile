@@ -8,7 +8,7 @@ class ModelCatalogCredentialFilterTest {
     @Test
     fun filterByCredentialedProvidersKeepsMatchingHandlePrefixesAndDropsOthers() {
         val models = listOf(
-            LlmModel(id = "a", name = "gpt-4o", handle = "openai/gpt-4o", providerType = "openai"),
+            LlmModel(id = "a", name = "gpt-4o", handle = "openai/gpt-4o", providerType = ""),
             LlmModel(id = "b", name = "claude", handle = "anthropic/claude", providerType = "anthropic"),
             LlmModel(id = "c", name = "gemini", handle = "google/gemini", providerType = "google"),
             LlmModel(id = "d", name = "mistral", handle = "mistral/mixtral", providerType = "mistral"),

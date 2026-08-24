@@ -1,12 +1,15 @@
 package com.letta.mobile.channel
 
+import androidx.paging.PagingData
 import androidx.work.ListenableWorker
 import com.letta.mobile.data.channel.CurrentConversationTracker
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.model.ConversationCountEstimate
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.ConversationInspectorMessage
+import com.letta.mobile.data.repository.api.IAllConversationsRepository
 import com.letta.mobile.testutil.FakeAgentRepository
 import com.letta.mobile.testutil.FakeChannelNotificationPublisher
 import com.letta.mobile.testutil.FakeChannelSyncStateStore
@@ -14,6 +17,9 @@ import com.letta.mobile.testutil.FakeConversationApi
 import com.letta.mobile.testutil.FakeConversationInspectorMessageRepository
 import com.letta.mobile.testutil.FakeSettingsRepository
 import com.letta.mobile.testutil.TestData
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -271,6 +277,15 @@ class ChannelHeartbeatSyncTest {
         )
         messageRepository.messagesByConversation += messagesByConversation
 
+        // letta-mobile data-efficiency Phase4 (M1): ChannelHeartbeatSync
+        // now reads its conversation list from IAllConversationsRepository
+        // (the same cache ChatPushService keeps warm). Seed that cache with
+        // a copy of the conversation so hasFreshConversations() returns true
+        // and the heartbeat doesn't try to refresh() against the fake api.
+        val allConversationsRepository = FakeAllConversationsRepository(
+            conversationsProvider = { conversationApi.conversations.toList() },
+        )
+
         val coordinator = NotificationDeliveryCoordinator(
             currentConversationTracker = CurrentConversationTracker(),
             syncStateStore = stateStore,
@@ -279,11 +294,11 @@ class ChannelHeartbeatSyncTest {
 
         val sync = ChannelHeartbeatSync(
             settingsRepository = settingsRepository,
-            conversationApi = conversationApi,
             messageRepository = messageRepository,
             agentRepository = agentRepository,
             syncStateStore = stateStore,
             notificationDeliveryCoordinator = coordinator,
+            allConversationsRepository = allConversationsRepository,
         )
 
         return Fixture(
@@ -306,4 +321,46 @@ class ChannelHeartbeatSyncTest {
         val agentRepository: FakeAgentRepository,
         val messageRepository: FakeConversationInspectorMessageRepository,
     )
+}
+
+/**
+ * Minimal in-test fake for [IAllConversationsRepository]. Only the methods
+ * that [ChannelHeartbeatSync] actually touches are implemented; the rest
+ * throw [UnsupportedOperationException] so a future refactor that depends
+ * on them gets caught here first.
+ */
+private class FakeAllConversationsRepository(
+    private val conversationsProvider: () -> List<Conversation>,
+) : IAllConversationsRepository {
+    private val conversationsState = MutableStateFlow(conversationsProvider())
+    override val conversations: StateFlow<List<Conversation>> = conversationsState
+    override val hasMore: StateFlow<Boolean> = MutableStateFlow(false)
+
+    override fun hasFreshConversations(maxAgeMs: Long): Boolean {
+        // Tests mutate the backing conversation list between heartbeat runs.
+        // Production ChatPushService keeps this cache warm; here we re-seed
+        // from the provider before claiming freshness so the heartbeat sees
+        // those mutations without forcing a refresh() path.
+        conversationsState.value = conversationsProvider()
+        return true
+    }
+
+    override suspend fun refresh() {
+        conversationsState.value = conversationsProvider()
+    }
+
+    override suspend fun loadNextPage() = throw UnsupportedOperationException()
+    override suspend fun refreshIfStale(maxAgeMs: Long): Boolean = false
+    override fun handleOptimisticUpdate(conversation: Conversation) = throw UnsupportedOperationException()
+    override fun handleOptimisticDelete(conversationId: ConversationId) = throw UnsupportedOperationException()
+    override fun loadedCountEstimate(): ConversationCountEstimate? = null
+    override fun getConversationsPaged(
+        agentId: AgentId?,
+        archiveStatus: String?,
+        summarySearch: String?,
+    ): Flow<PagingData<Conversation>> =
+        throw UnsupportedOperationException()
+    @Deprecated("Used only to satisfy IAllConversationsRepository contract.")
+    @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
+    override suspend fun countConversations(): Int = conversations.value.size
 }

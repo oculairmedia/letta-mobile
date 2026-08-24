@@ -13,6 +13,7 @@ import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.IdentityRepository
 import com.letta.mobile.testutil.FakeAgentApi
 import com.letta.mobile.testutil.FakeIdentityApi
+import dagger.Lazy
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.Dispatchers
@@ -56,7 +57,7 @@ class IdentityListViewModelTest {
             )
         )
         repository = IdentityRepository(fakeApi)
-        agentRepository = AgentRepository(fakeAgentApi, FakeAgentDao())
+        agentRepository = AgentRepository(fakeAgentApi, dagger.Lazy { FakeAgentDao() })
         viewModel = IdentityListViewModel(repository, agentRepository)
     }
 

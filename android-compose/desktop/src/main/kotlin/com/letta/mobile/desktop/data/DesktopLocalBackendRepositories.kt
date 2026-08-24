@@ -15,7 +15,7 @@ internal data class DesktopLocalRepositoryBundle(
 
 internal fun buildDesktopLocalRepositories(): DesktopLocalRepositoryBundle {
     val transport = DefaultAppServerLocalRepositoryTransport(
-        clientProvider = DesktopLocalAppServerClientRegistry::currentClient,
+        clientProvider = DesktopLocalAppServerClientRegistry.shared::currentClient,
         requestId = { operation -> "desktop-local-$operation-${UUID.randomUUID()}" },
     )
     return DesktopLocalRepositoryBundle(

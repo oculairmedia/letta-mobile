@@ -3,6 +3,8 @@ package com.letta.mobile.data.timeline
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.model.UserMessage
+import com.letta.mobile.data.timeline.RecentMessagesReconcileOutcome.Applied
+import com.letta.mobile.data.timeline.RecentMessagesReconcileOutcome.Skipped
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
@@ -52,6 +54,145 @@ class TimelineRecentMessagesReconcilerTest {
         awaitAll(first, second)
 
         assertEquals(1, transport.listCalls)
+    }
+
+    @Test
+    fun forcedReconcileWithinDebounceWindowIsSkipped() = runTest(UnconfinedTestDispatcher()) {
+        val transport = RecordingTimelineTransport()
+        var now = 0L
+        val reconciler = TimelineRecentMessagesReconciler(
+            conversationId = "conv-1",
+            messageApi = transport,
+            eventQueue = Channel<TimelineGatewayEvent>(Channel.UNLIMITED).also { queue ->
+                backgroundScope.launch {
+                    for (event in queue) {
+                        if (event is TimelineGatewayEvent.RecentMessagesSnapshot) {
+                            event.ack.complete(event.serverMessages.size)
+                        }
+                    }
+                }
+            },
+            state = MutableStateFlow(Timeline("conv-1")),
+            streamSubscriberActive = MutableStateFlow(true),
+            writeMutex = Mutex(),
+            applyReturnsAndResponsesFromSnapshot = {},
+            nowMillis = { now },
+            minForcedReconcileIntervalMs = 4_000L,
+        )
+
+        assertEquals(Applied(1), reconciler.reconcileRecentMessages("post-send-750", forceRefresh = true))
+        now += 2_500L
+        assertEquals(Skipped("forcedReconcileDebounced"), reconciler.reconcileRecentMessages("post-send-2500", forceRefresh = true))
+        now += 3_500L
+        assertEquals(Applied(1), reconciler.reconcileRecentMessages("post-send-6000", forceRefresh = true))
+
+        // Only the first and third calls fall outside the 4s debounce window from
+        // the previous completed forced reconcile; the middle one (2.5s later) is
+        // redundant while the stream is already active and gets skipped.
+        assertEquals(2, transport.listCalls)
+    }
+
+    @Test
+    fun newConnectionGenerationBypassesPriorForcedReconcileDebounce() = runTest(UnconfinedTestDispatcher()) {
+        val transport = RecordingTimelineTransport()
+        var now = 0L
+        val reconciler = TimelineRecentMessagesReconciler(
+            conversationId = "conv-1",
+            messageApi = transport,
+            eventQueue = Channel<TimelineGatewayEvent>(Channel.UNLIMITED).also { queue ->
+                backgroundScope.launch {
+                    for (event in queue) {
+                        if (event is TimelineGatewayEvent.RecentMessagesSnapshot) {
+                            event.ack.complete(event.serverMessages.size)
+                        }
+                    }
+                }
+            },
+            state = MutableStateFlow(Timeline("conv-1")),
+            streamSubscriberActive = MutableStateFlow(true),
+            writeMutex = Mutex(),
+            applyReturnsAndResponsesFromSnapshot = {},
+            nowMillis = { now },
+            minForcedReconcileIntervalMs = 4_000L,
+        )
+
+        assertEquals(Applied(1), reconciler.reconcileRecentMessages("post-send", forceRefresh = true, connectionGeneration = 1L))
+        now += 1_000L
+        assertEquals(Applied(1), reconciler.reconcileRecentMessages("redial-recovery", forceRefresh = true, connectionGeneration = 2L))
+        assertEquals(Skipped("forcedReconcileDebounced"), reconciler.reconcileRecentMessages("duplicate", forceRefresh = true, connectionGeneration = 2L))
+
+        assertEquals(2, transport.listCalls)
+    }
+
+    @Test
+    fun forcedReconcileSlowerThanTheDebounceWindowStillDebouncesTheNextCall() = runTest(UnconfinedTestDispatcher()) {
+        val transport = RecordingTimelineTransport()
+        var now = 0L
+        val reconciler = TimelineRecentMessagesReconciler(
+            conversationId = "conv-1",
+            messageApi = transport,
+            eventQueue = Channel<TimelineGatewayEvent>(Channel.UNLIMITED).also { queue ->
+                backgroundScope.launch {
+                    for (event in queue) {
+                        if (event is TimelineGatewayEvent.RecentMessagesSnapshot) {
+                            event.ack.complete(event.serverMessages.size)
+                        }
+                    }
+                }
+            },
+            state = MutableStateFlow(Timeline("conv-1")),
+            streamSubscriberActive = MutableStateFlow(true),
+            writeMutex = Mutex(),
+            applyReturnsAndResponsesFromSnapshot = {},
+            nowMillis = { now },
+            minForcedReconcileIntervalMs = 4_000L,
+        )
+        // Simulate a reconcile round trip that itself takes longer than the
+        // debounce window (5s network call vs a 4s window).
+        transport.onListEntered = { now += 5_000L }
+
+        reconciler.reconcileRecentMessages("post-send-750", forceRefresh = true)
+        // No additional time has passed since the slow call completed.
+        reconciler.reconcileRecentMessages("post-send-2500", forceRefresh = true)
+
+        // The debounce timestamp must be stamped with the clock AFTER the round
+        // trip completes, not before it started — otherwise a reconcile slower
+        // than the window makes the debounce a no-op for exactly the calls it
+        // matters most for (letta-mobile fix/debounce-forced-reconcile review).
+        assertEquals(1, transport.listCalls)
+    }
+
+    @Test
+    fun forcedReconcileStillRunsWhenStreamIsNotActive() = runTest(UnconfinedTestDispatcher()) {
+        val transport = RecordingTimelineTransport()
+        var now = 0L
+        val reconciler = TimelineRecentMessagesReconciler(
+            conversationId = "conv-1",
+            messageApi = transport,
+            eventQueue = Channel<TimelineGatewayEvent>(Channel.UNLIMITED).also { queue ->
+                backgroundScope.launch {
+                    for (event in queue) {
+                        if (event is TimelineGatewayEvent.RecentMessagesSnapshot) {
+                            event.ack.complete(event.serverMessages.size)
+                        }
+                    }
+                }
+            },
+            state = MutableStateFlow(Timeline("conv-1")),
+            streamSubscriberActive = MutableStateFlow(false),
+            writeMutex = Mutex(),
+            applyReturnsAndResponsesFromSnapshot = {},
+            nowMillis = { now },
+            minForcedReconcileIntervalMs = 4_000L,
+        )
+
+        reconciler.reconcileRecentMessages("redial-recovery", forceRefresh = true)
+        now += 100L
+        reconciler.reconcileRecentMessages("redial-recovery", forceRefresh = true)
+
+        // The debounce only guards the "bypassing an active stream" path; when
+        // there's no live stream subscriber every call is already load-bearing.
+        assertEquals(2, transport.listCalls)
     }
 
     private class RecordingTimelineTransport : TimelineTransport {

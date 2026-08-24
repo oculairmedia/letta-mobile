@@ -14,33 +14,20 @@ import com.letta.mobile.data.model.ApprovalSubmission
 import com.letta.mobile.data.model.AskUserQuestion
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.AssistantMessage
-import com.letta.mobile.data.model.Block
-import com.letta.mobile.data.model.BlockCreateParams
-import com.letta.mobile.data.model.BlockUpdateParams
-import com.letta.mobile.data.model.ContextWindowOverview
 import com.letta.mobile.data.model.ErrorMessage
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.AppServerListModelsAdapter
-import com.letta.mobile.data.model.ScheduleCreateParams
-import com.letta.mobile.data.model.ScheduleListResponse
-import com.letta.mobile.data.model.ScheduledMessage
-import com.letta.mobile.data.model.Tool
-import com.letta.mobile.data.model.ToolCreateParams
-import com.letta.mobile.data.model.ToolUpdateParams
-import com.letta.mobile.data.commands.AgentSlashCommand
-import com.letta.mobile.data.commands.SlashCommandsResponse
-import com.letta.mobile.data.skills.Skill
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.runtime.TurnFailureNotices
 import com.letta.mobile.data.runtime.terminalReasonKind
 import com.letta.mobile.data.timeline.TimelineStreamFrame
 import com.letta.mobile.data.timeline.TimelineTransportHttpException
 import com.letta.mobile.data.transport.WsChatBridge
+import com.letta.mobile.data.transport.BridgeTurnStatus
 import com.letta.mobile.data.transport.WsTimelineEvent
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.util.Telemetry
@@ -57,15 +44,10 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.booleanOrNull
-import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import kotlinx.serialization.serializer
-
 import kotlin.time.Duration.Companion.milliseconds
+
 /**
  * [ChatGateway] served entirely over an Iroh [IChannelTransport] — no HTTP.
  *
@@ -84,29 +66,19 @@ import kotlin.time.Duration.Companion.milliseconds
  * subscription while the agent is idle (letta-mobile-yh92w).
  */
 class IrohAdminRpcChatGateway(
-    // letta-mobile-vilsn: ApprovalSubmittingGateway makes desktop-over-Iroh able
-    // to answer AskUserQuestion — it had no approval path, so submits were a no-op.
     private val transport: IChannelTransport,
-    private val deviceLabel: String = "iroh-chat-gateway",
+    deviceLabel: String = "iroh-chat-gateway",
     private val heartbeatIntervalMs: Long = STREAM_HEARTBEAT_INTERVAL_MS,
 ) : ChatGateway, ChatGatewayExtras, ConversationSummaryGateway, ApprovalSubmittingGateway, ConnectionStatusGateway {
 
-    // letta-mobile-wxy4s: expose the transport's connection state so UI
-    // controllers can surface a drop (and auto-recover after the redial) instead
-    // of silently rendering cached data across a dead connection.
+    private val deviceLabel: IrohDeviceLabel = IrohDeviceLabel(deviceLabel)
+
     override val connectionState: kotlinx.coroutines.flow.StateFlow<com.letta.mobile.data.transport.ChannelTransportState>
         get() = transport.state
-
 
     private val bridge = WsChatBridge(transport)
     private val json = lettaWireJson
 
-    // letta-mobile-vilsn: answer / dismiss a parked runtime approval (e.g.
-    // AskUserQuestion) over the same `admin_rpc` `approval.submit` path the
-    // Android/mobile client uses (IrohAdminRpcApprovalSource). Decodes an
-    // AskUserQuestion answer from the reason sentinel into the structured
-    // `updated_input` close payload; the server ApprovalAdminHandlers resolves
-    // the perm-* gate id from the tool_call_id.
     override suspend fun submitApproval(
         agentId: String,
         conversationId: String,
@@ -157,14 +129,15 @@ class IrohAdminRpcChatGateway(
             put("order", "desc")
             put("order_by", "last_message_at")
         }.toString()
-        val result = rpc(AdminRpcCall("conversation.list", "/v1/conversations", body)) ?: return emptyList()
-        // letta-mobile-w9k3f: unlike message.list this decode has NO object-unwrapping,
-        // so any object shape throws "Expected JsonArray, but had JsonObject" and the
-        // caller sees a decode error rather than a transport problem. scopeConversationList
-        // on the serve side likewise returns a non-array unchanged (`if (result !is
-        // JsonArray) return result`), so an odd shape travels the whole way silently.
-        // Log the shape (keys only — conversation metadata is content) before decoding.
-        if (result is kotlinx.serialization.json.JsonObject) {
+        val result = rpc(
+            AdminRpcCall.of(
+                method = AdminRpcMethod("conversation.list"),
+                path = AdminRpcPath("/v1/conversations"),
+                body = AdminRpcBody(body),
+            ),
+        ) ?: return emptyList()
+
+        if (result is JsonObject) {
             Telemetry.event(
                 "IrohGate", "conversation_list.unexpected_object_shape",
                 "keyCount" to result.size,
@@ -178,19 +151,57 @@ class IrohAdminRpcChatGateway(
             }
     }
 
+    override suspend fun listConversationsForAgent(
+        agentId: String,
+        limit: Int,
+    ): List<Conversation> {
+        val body = buildJsonObject {
+            put("agent_id", agentId)
+            put("limit", limit.toString())
+        }.toString()
+        val result = runCatching {
+            rpc(
+                AdminRpcCall.of(
+                    method = AdminRpcMethod("conversation.list_agent"),
+                    path = AdminRpcPath("/v1/conversations/list_agent"),
+                    body = AdminRpcBody(body),
+                ),
+            )
+        }.getOrNull() ?: return emptyList()
+        if (result !is JsonArray) {
+            if (result is JsonObject) {
+                Telemetry.event(
+                    "IrohGate", "conversation_list_agent.unexpected_object_shape",
+                    "keyCount" to result.size,
+                    level = Telemetry.Level.WARN,
+                )
+            }
+            return emptyList()
+        }
+        return runCatching {
+            json.decodeFromJsonElement(ListSerializer(Conversation.serializer()), result)
+                .also { conversations ->
+                    conversations.forEach { agentIdByConversation[it.id] = it.agentId }
+                }
+        }.getOrElse { emptyList() }
+    }
+
     override suspend fun getConversation(conversationId: String): Conversation {
-        val result = rpc(AdminRpcCall("conversation.get", "/v1/conversations/$conversationId"))
-            ?: throw TimelineTransportHttpException(502, "conversation.get returned no result over iroh admin_rpc")
+        val result = rpc(
+            AdminRpcCall.of(
+                method = AdminRpcMethod("conversation.get"),
+                path = AdminRpcPath("/v1/conversations/$conversationId"),
+            ),
+        ) ?: throw TimelineTransportHttpException(502, "conversation.get returned no result over iroh admin_rpc")
         return json.decodeFromJsonElement(Conversation.serializer(), result)
             .also { agentIdByConversation[it.id] = it.agentId }
     }
 
     override suspend fun deleteConversation(conversationId: String) {
-        // App Server v2 has no conversation_delete; archive is the supported lifecycle.
         rpc(
-            AdminRpcCall(
-                "conversation.archive",
-                "/v1/conversations/$conversationId",
+            AdminRpcCall.of(
+                method = AdminRpcMethod("conversation.archive"),
+                path = AdminRpcPath("/v1/conversations/$conversationId"),
             ),
         )
         agentIdByConversation.remove(ConversationId(conversationId))
@@ -209,20 +220,15 @@ class IrohAdminRpcChatGateway(
         ).joinToString("&")
         val path = "/v1/conversations/$conversationId/messages" +
             (if (query.isEmpty()) "" else "?$query")
-        val result = rpc(AdminRpcCall("message.list", path)) ?: return emptyList()
-        // letta-mobile-c4igq.9: the serve-side page guard returns a bare array when
-        // the page fits, or { messages: [...], has_more, next_before } when it had to
-        // trim an oversized window. Accept both so a bounded page still decodes and
-        // renders (older windows load via the existing before-cursor pager).
-        val messagesElement = (result as? kotlinx.serialization.json.JsonObject)
-            ?.get("messages") ?: result
-        // letta-mobile-w9k3f: if the body is an object WITHOUT a `messages` array, the
-        // `?: result` above hands the object itself to a ListSerializer, which throws
-        // "Expected JsonArray, but had JsonObject" — hydration then fails and the
-        // conversation renders empty with nothing naming the offending shape. Log the
-        // shape (keys only, never values — this is conversation content) before the
-        // decode so the producing tier is identifiable from a device log.
-        if (messagesElement is kotlinx.serialization.json.JsonObject) {
+        val result = rpc(
+            AdminRpcCall.of(
+                method = AdminRpcMethod("message.list"),
+                path = AdminRpcPath(path),
+            ),
+        ) ?: return emptyList()
+
+        val messagesElement = (result as? JsonObject)?.get("messages") ?: result
+        if (messagesElement is JsonObject) {
             Telemetry.event(
                 "IrohGate", "message_list.unexpected_object_shape",
                 "conversationId" to conversationId,
@@ -240,11 +246,6 @@ class IrohAdminRpcChatGateway(
         order: String?,
         conversationId: String?,
     ): List<LettaMessage> {
-        // No agent-scoped message.list handler exists server-side over Iroh.
-        // Degrade to empty (no reachable history) rather than throwing — a throw
-        // surfaces a "Message load failed" banner when a default-shim agent
-        // conversation is opened, whereas empty leaves it functional for live
-        // send/stream. Live turns still flow through the frame path.
         Telemetry.event(
             "IrohChatGateway", "listAgentMessages.gated",
             "agentId" to agentId,
@@ -254,8 +255,12 @@ class IrohAdminRpcChatGateway(
     }
 
     override suspend fun getToolReturn(conversationId: String, messageId: String): LettaMessage? {
-        val result = rpc(AdminRpcCall("tool_return.get", "/v1/conversations/$conversationId/messages/$messageId"))
-            ?: return null
+        val result = rpc(
+            AdminRpcCall.of(
+                method = AdminRpcMethod("tool_return.get"),
+                path = AdminRpcPath("/v1/conversations/$conversationId/messages/$messageId"),
+            ),
+        ) ?: return null
         return json.decodeFromJsonElement(LettaMessage.serializer(), result)
     }
 
@@ -268,42 +273,65 @@ class IrohAdminRpcChatGateway(
             put("agent_id", agentId)
             summary?.let { put("summary", it) }
         }.toString()
-        val result = rpc(AdminRpcCall("conversation.create", "/v1/conversations", body))
-            ?: throw TimelineTransportHttpException(502, "conversation.create returned no result over iroh admin_rpc")
+        val result = rpc(
+            AdminRpcCall.of(
+                method = AdminRpcMethod("conversation.create"),
+                path = AdminRpcPath("/v1/conversations"),
+                body = AdminRpcBody(body),
+            ),
+        ) ?: throw TimelineTransportHttpException(502, "conversation.create returned no result over iroh admin_rpc")
         return json.decodeFromJsonElement(Conversation.serializer(), result)
             .also { agentIdByConversation[it.id] = it.agentId }
     }
 
     override suspend fun createAgent(params: AgentCreateParams): Agent {
         val body = json.encodeToString(AgentCreateParams.serializer(), params)
-        val result = rpc(AdminRpcCall("agent.create", "/v1/agents", body))
-            ?: throw TimelineTransportHttpException(502, "agent.create returned no result over iroh admin_rpc")
+        val result = rpc(
+            AdminRpcCall.of(
+                method = AdminRpcMethod("agent.create"),
+                path = AdminRpcPath("/v1/agents"),
+                body = AdminRpcBody(body),
+            ),
+        ) ?: throw TimelineTransportHttpException(502, "agent.create returned no result over iroh admin_rpc")
         return json.decodeFromJsonElement(Agent.serializer(), result)
     }
 
     override suspend fun listLlmModels(): List<LlmModel> {
-        val result = rpc(AdminRpcCall("model.list", "/v1/models", "{}")) ?: return emptyList()
-        val array = result as? kotlinx.serialization.json.JsonArray ?: return emptyList()
-        // Never decode presentation entries as LlmModel — adapt explicitly.
+        val result = rpc(
+            AdminRpcCall.of(
+                method = AdminRpcMethod("model.list"),
+                path = AdminRpcPath("/v1/models"),
+                body = AdminRpcBody("{}"),
+            ),
+        ) ?: return emptyList()
+        val array = result as? JsonArray ?: return emptyList()
         return AppServerListModelsAdapter.toLlmModels(array)
     }
 
     override suspend fun setConversationSummary(update: ConversationSummaryUpdate): Conversation {
         val body = buildJsonObject { put("summary", update.summary.value) }.toString()
-        val result = rpc(AdminRpcCall("conversation.update", "/v1/conversations/${update.conversationId.value}", body))
-            ?: throw TimelineTransportHttpException(502, "conversation.update returned no result over iroh admin_rpc")
+        val result = rpc(
+            AdminRpcCall.of(
+                method = AdminRpcMethod("conversation.update"),
+                path = AdminRpcPath("/v1/conversations/${update.conversationId.value}"),
+                body = AdminRpcBody(body),
+            ),
+        ) ?: throw TimelineTransportHttpException(502, "conversation.update returned no result over iroh admin_rpc")
         return json.decodeFromJsonElement(Conversation.serializer(), result)
     }
 
     override suspend fun setConversationModel(conversationId: String, model: String): Conversation {
-        // No conversation-update admin_rpc handler is registered yet.
         throw UnsupportedOperationException("Per-conversation model override is not available over iroh:// yet")
     }
 
     override suspend fun setConversationArchived(conversationId: String, archived: Boolean): Conversation {
-        val method = if (archived) "conversation.archive" else "conversation.restore"
-        val result = rpc(AdminRpcCall(method, "/v1/conversations/$conversationId"))
-            ?: throw TimelineTransportHttpException(502, "$method returned no result over iroh admin_rpc")
+        val method = if (archived) AdminRpcMethod("conversation.archive") else AdminRpcMethod("conversation.restore")
+        val result = rpc(
+            AdminRpcCall.of(
+                method = method,
+                path = AdminRpcPath("/v1/conversations/$conversationId"),
+            ),
+        ) ?: throw TimelineTransportHttpException(502, "$method returned no result over iroh admin_rpc")
         return json.decodeFromJsonElement(Conversation.serializer(), result)
     }
 
@@ -320,8 +348,6 @@ class IrohAdminRpcChatGateway(
         val outbound = OutboundMessageCreate.decode(request)
         return channelFlow {
             val turn = SendTurn(conversation)
-            // UNDISPATCHED so the frame subscription is live before send()
-            // dispatches the turn — otherwise a fast turn_started could race past us.
             val collector = launch(start = CoroutineStart.UNDISPATCHED) {
                 bridge.events.collect { event -> turn.route(event) { message -> send(message) } }
             }
@@ -350,23 +376,12 @@ class IrohAdminRpcChatGateway(
             "conversationId" to conversationId.value,
             "agentId" to agentId.value,
             "otid" to (outbound.otid ?: "<null>"),
-            "device" to deviceLabel,
+            "device" to deviceLabel.value,
         )
     }
 
     override suspend fun streamConversation(conversationId: String): Flow<TimelineStreamFrame> {
         val frames = flow {
-            // letta-mobile-r3i1z: route each delta by the frame's OWN
-            // conversation_id when it carries one. Server-side fanout writes
-            // every turn frame to every registered viewer, and for a passive
-            // observer the user_message echo lands BEFORE turn_started — an
-            // active-turn gate alone would drop it (and, more generally, made
-            // ingestion depend on this client having initiated the turn).
-            // Frames that genuinely lack a conversation id fall back to the
-            // turn that most recently started (the same turn-scoped
-            // resolution ChatSendCoordinator uses on mobile); when the frame
-            // IS tagged, its tag is authoritative, so another conversation's
-            // fanned-out frames can never leak into this stream.
             var activeTurnConversationId: String? = null
             bridge.events.collect { event ->
                 when (event) {
@@ -385,17 +400,6 @@ class IrohAdminRpcChatGateway(
         return merge(frames, connectedHeartbeats())
     }
 
-    /**
-     * letta-mobile-wxy4s: SECONDARY MASKING FIX.
-     *
-     * Iroh emits no idle pings, so these synthesized heartbeats keep
-     * TimelineSyncLoop's silence watchdog from cycling an idle-but-healthy
-     * subscription. They used to emit UNCONDITIONALLY, which also told the loop
-     * "the stream is fine" across a long-dead connection — one of the two masks
-     * that hid the 2026-07-31 outage. Gated on the transport actually being
-     * Connected (same shape as DesktopHybridAppServerChatGateway), a dead
-     * connection now goes silent and the watchdog can do its job.
-     */
     private fun connectedHeartbeats(): Flow<TimelineStreamFrame> = flow {
         while (isTransportConnected()) {
             delay(heartbeatIntervalMs.milliseconds)
@@ -422,32 +426,13 @@ class IrohAdminRpcChatGateway(
         return response.result
     }
 
-    /**
-     * Tracks a single outbound turn over the shared frame stream: captures the
-     * turn id from the matching `turn_started`, forwards this conversation's
-     * message deltas to [emit], and completes [terminal] on turn_done / error /
-     * terminal disconnect. Extracted from [sendConversationMessage] so each
-     * frame case stays flat (one guarded statement per event).
-     */
     private class SendTurn(private val conversationId: ConversationId) {
-        private var turnId: String? = null
+        private var turnId: IrohTurnId? = null
         private val terminal = CompletableDeferred<Unit>()
-
-        /**
-         * letta-mobile-br5g0: whether this turn actually delivered assistant
-         * content. Read from observed frames, never inferred from timing.
-         */
         private var deliveredAssistantContent: Boolean = false
-
-        /** True after a non-error stop_reason for this turn (main reply finished). */
         private var mainReplyCompleted: Boolean = false
-
-        /** Last failure text observed for this turn, used only for classification. */
-        private var failureReason: String? = null
-        // letta-mobile-br5g0 (codex review): sanitized family carried on the
-        // wire in Error.code — preserved so the fixed copy in `message` is
-        // never reclassified (that downgraded content_filter to provider_error).
-        private var failureKind: String? = null
+        private var failureReason: IrohFailureReason? = null
+        private var failureKind: IrohFailureKind? = null
 
         suspend fun route(event: WsTimelineEvent, emit: suspend (LettaMessage) -> Unit) {
             when (event) {
@@ -465,22 +450,18 @@ class IrohAdminRpcChatGateway(
 
         private fun onTurnStarted(event: WsTimelineEvent.TurnStarted) {
             if (event.conversationId == conversationId.value && turnId == null) {
-                turnId = event.turnId
+                turnId = event.turnId?.let(::IrohTurnId)
             }
         }
 
         private fun onStopReason(event: WsTimelineEvent.StopReason) {
-            // Ignore foreign / premature stop frames until this send owns a turn.
             val ownedTurnId = turnId ?: return
-            if (event.turnId != ownedTurnId) return
+            if (event.turnId != ownedTurnId.value) return
             if (TurnFailureNotices.isCompletedMainReplyStopReason(event.stopReason)) {
                 mainReplyCompleted = true
             }
         }
 
-        // r3i1z: with server-side fanout, frames for OTHER conversations this
-        // client observes can arrive mid-turn. A conversation-tagged delta must
-        // match ours; untagged deltas keep the legacy own-turn scoping.
         private suspend fun onMessageDelta(event: WsTimelineEvent.MessageDelta, emit: suspend (LettaMessage) -> Unit) {
             val belongsToTurn = turnId != null &&
                 (event.conversationId == null || event.conversationId == conversationId.value)
@@ -493,59 +474,54 @@ class IrohAdminRpcChatGateway(
         }
 
         private suspend fun onTurnDone(event: WsTimelineEvent.TurnDone, emit: suspend (LettaMessage) -> Unit) {
-            if (turnId == null || event.turnId != turnId) return
-            if (event.status == "failed") {
-                failTurn(emit, "Iroh turn failed (turnId=$turnId)")
-            } else {
-                terminal.complete(Unit)
+            val ownedTurnId = turnId ?: return
+            if (event.turnId != ownedTurnId.value) return
+            when (event.status) {
+                BridgeTurnStatus.Failed ->
+                    failTurn(emit, IrohFailureDetail("Iroh turn failed (turnId=${ownedTurnId.value})"))
+                BridgeTurnStatus.Completed,
+                BridgeTurnStatus.Cancelled,
+                is BridgeTurnStatus.Unknown,
+                -> terminal.complete(Unit)
             }
         }
 
         private suspend fun onError(event: WsTimelineEvent.Error, emit: suspend (LettaMessage) -> Unit) {
             if (event.conversationId != null && event.conversationId != conversationId.value) return
-            if (event.turnId != null && turnId != null && event.turnId != turnId) return
-            // Untagged errors while we already own a turn are too ambiguous to
-            // attribute; only accept conversation-scoped or turn-scoped matches.
+            if (event.turnId != null && turnId != null && event.turnId != turnId?.value) return
             if (event.conversationId == null && event.turnId == null && turnId != null) return
-            failureReason = event.message.ifBlank { event.code }
-            failureKind = event.code.takeIf { TurnFailureNotices.isKnownKind(it) }
-            failTurn(emit, "Iroh turn error ${event.code}: ${event.message}")
+            val rawReason = event.message.ifBlank { event.code }
+            failureReason = IrohFailureReason(rawReason)
+            failureKind = event.code.takeIf { TurnFailureNotices.isKnownKind(it) }?.let(::IrohFailureKind)
+            failTurn(emit, IrohFailureDetail("Iroh turn error ${event.code}: ${event.message}"))
         }
 
-        /**
-         * letta-mobile-br5g0: a Failed terminal that lands AFTER the main reply
-         * completed is a trailing aux-step failure (title/summary generation),
-         * not a dead turn — the user already has their answer, so the send
-         * completes normally instead of throwing and painting the prompt red.
-         * Partial streamed content without a non-error stop_reason still gets a
-         * visible ERROR row.
-         */
-        private suspend fun failTurn(emit: suspend (LettaMessage) -> Unit, detail: String) {
+        private suspend fun failTurn(emit: suspend (LettaMessage) -> Unit, detail: IrohFailureDetail) {
             if (terminal.isCompleted) return
             val notice = TurnFailureNotices.forFailedTerminal(
-                reason = failureReason,
+                reason = failureReason?.value,
                 deliveredAssistantContent = deliveredAssistantContent,
                 mainReplyCompleted = mainReplyCompleted,
-                kindHint = failureKind,
+                kindHint = failureKind?.value,
             )
             if (notice == null) {
                 Telemetry.event(
                     "IrohChatGateway", "turn.failedAfterDelivery",
                     "conversationId" to conversationId.value,
-                    "turnId" to (turnId ?: ""),
-                    "reasonKind" to (failureKind ?: terminalReasonKind(failureReason) ?: "<none>"),
+                    "turnId" to (turnId?.value ?: ""),
+                    "reasonKind" to (failureKind?.value ?: terminalReasonKind(failureReason?.value) ?: "<none>"),
                 )
                 terminal.complete(Unit)
                 return
             }
             emit(
                 ErrorMessage(
-                    id = "turn-failed-${turnId ?: conversationId.value}",
+                    id = "turn-failed-${turnId?.value ?: conversationId.value}",
                     contentRaw = JsonPrimitive(notice.message),
                     code = notice.kind,
                 ),
             )
-            terminal.completeExceptionally(TimelineTransportHttpException(502, detail))
+            terminal.completeExceptionally(TimelineTransportHttpException(502, detail.value))
         }
 
         private fun onDisconnected(event: WsTimelineEvent.Disconnected) {
@@ -558,430 +534,6 @@ class IrohAdminRpcChatGateway(
     }
 
     companion object {
-        /**
-         * Iroh emits no idle pings; synthesize heartbeats under the timeline
-         * loop's stream-silence timeout so idle conversations don't cycle
-         * the subscriber.
-         */
         const val STREAM_HEARTBEAT_INTERVAL_MS = 15_000L
-    }
-}
-
-/**
- * Minimal agent directory over iroh admin_rpc — enough for the desktop
- * shell's agent-name/model lookups without the HTTP admin repositories.
- */
-class IrohAdminRpcAgentDirectory(
-    private val transport: IChannelTransport,
-) {
-    private val json = lettaWireJson
-
-    private suspend fun adminRpcResult(method: String, path: String, body: String? = null): JsonElement? {
-        val response = transport.adminRpc(method, path, body)
-        if (!response.success) {
-            throw TimelineTransportHttpException(502, response.error ?: "$method failed over iroh admin_rpc")
-        }
-        return response.result
-    }
-
-    private suspend fun adminRpcResultOrNull(method: String, path: String, body: String? = null): JsonElement? {
-        val response = transport.adminRpc(method, path, body)
-        if (!response.success) return null
-        return response.result
-    }
-
-    private suspend fun scheduleGetResultOrNull(path: String, body: String): JsonElement? {
-        val response = transport.adminRpc("schedule.get", path, body)
-        if (!response.success) {
-            val error = response.error
-            if (error != null && SCHEDULE_GET_NOT_FOUND.matches(error)) return null
-            throw TimelineTransportHttpException(502, error ?: "schedule.get failed over iroh admin_rpc")
-        }
-        return response.result
-            ?: throw TimelineTransportHttpException(502, "schedule.get returned no result over iroh admin_rpc")
-    }
-
-    private suspend inline fun <reified T> adminRpcDecoded(
-        method: String,
-        path: String,
-        body: String? = null,
-    ): T {
-        val result = adminRpcResult(method, path, body)
-            ?: throw TimelineTransportHttpException(502, "$method returned no result over iroh admin_rpc")
-        return json.decodeFromJsonElement(serializer<T>(), result)
-    }
-
-    private suspend inline fun <reified T> adminRpcDecodedList(
-        method: String,
-        path: String,
-        body: String? = null,
-    ): List<T> {
-        val result = adminRpcResult(method, path, body) ?: return emptyList()
-        return json.decodeFromJsonElement(ListSerializer(serializer<T>()), result)
-    }
-
-    /**
-     * letta-mobile-ulz2b.1: authoritative roster size over `agent.count`.
-     * Never derive this from [listAgents] — page caps / repeated pages can
-     * silently truncate, and a count computed from a partial sweep is the
-     * silent-truncation defect class. Null/unparseable results throw; never
-     * return 0 on failure.
-     */
-    suspend fun countAgents(): Int {
-        val result = adminRpcResult("agent.count", "/v1/agents/count", "{}")
-            ?: throw TimelineTransportHttpException(
-                502,
-                "agent.count returned no result over iroh admin_rpc",
-            )
-        return (result as? JsonPrimitive)?.intOrNull
-            ?: (result as? JsonObject)?.get("count")?.jsonPrimitive?.intOrNull
-            ?: error("agent.count returned unparseable result: $result")
-    }
-
-    /**
-     * True when the last [listAgents] stopped because the backend returned a
-     * REPEATED page (it ignores limit/offset), i.e. the roster is known to be
-     * truncated. Surfaces let the user see "N+" instead of a confident count.
-     */
-    @kotlin.concurrent.Volatile
-    var lastAgentListTruncated: Boolean = false
-        private set
-
-    suspend fun listAgents(limit: Int = AGENT_LIST_LIMIT): List<Agent> {
-        // agent.list returns FULL agent objects (each carries its whole system
-        // prompt + core-memory), so the complete set is multiple MB. A single
-        // limit=200 read blew past ADMIN_RPC_TIMEOUT on a slow/relayed link
-        // ("admin_rpc timed out" → agents never load). Page through in small
-        // chunks so every request stays small and fast, and accumulate up to
-        // `limit` — mirrors the REST cache-refresh paging (AgentRepository
-        // CACHE_REFRESH_PAGE_SIZE) and the message.list frame-cap paging.
-        val out = ArrayList<Agent>(minOf(limit, 64))
-        val seenIds = HashSet<String>()
-        var offset = 0
-        // Every exit that leaves agents unread must set this: a roster we
-        // stopped short of is exactly the "we don't know the real total" case
-        // the `N+` label exists for. Clearing it unconditionally reported a
-        // partial count as exact.
-        var truncated = false
-        while (out.size < limit) {
-            val pageLimit = minOf(AGENT_LIST_PAGE_SIZE, limit - out.size)
-            val body = buildJsonObject {
-                put("limit", pageLimit.toString())
-                put("offset", offset.toString())
-            }.toString()
-            val page: List<Agent> =
-                adminRpcDecodedList("agent.list", "/v1/agents?limit=$pageLimit&offset=$offset", body)
-            if (page.isEmpty()) break
-            // Only NEW ids count. The comment below used to claim a backend that
-            // ignores `limit` is "safe either way" — it is not. A backend that
-            // ignores BOTH limit and offset returns its first page forever, so
-            // the short-page test never fires and this loop ran to the 2500 cap:
-            // 125 round trips per refresh, each carrying full agent objects,
-            // accumulating the same page over and over. Observed in production.
-            val fresh = page.filter { seenIds.add(it.id.value) }
-            val room = limit - out.size
-            if (fresh.size > room) truncated = true
-            out += fresh.take(room)
-            // A page that contributes nothing new means the backend is not
-            // paginating; stop rather than hammer it. (Cost of a false positive
-            // is a truncated roster — the same outcome as the old heuristic, but
-            // reached in 2 requests instead of 125.)
-            if (fresh.isEmpty()) {
-                truncated = true
-                break
-            }
-            // A short page means we've reached the end.
-            if (page.size < pageLimit) break
-            offset += page.size
-        }
-        // Filling the accumulator to the cap means there may well be more.
-        if (out.size >= limit) truncated = true
-        lastAgentListTruncated = truncated
-        return out
-    }
-
-    suspend fun getAgent(agentId: String): Agent? {
-        val body = buildJsonObject { put("agent_id", agentId) }.toString()
-        val result = adminRpcResultOrNull("agent.get", "/v1/agents/$agentId", body) ?: return null
-        return json.decodeFromJsonElement(Agent.serializer(), result)
-    }
-
-    suspend fun updateAgent(agentId: String, params: AgentUpdateParams): Agent {
-        val paramsJson = json.encodeToJsonElement(AgentUpdateParams.serializer(), params).jsonObject
-        val body = buildJsonObject {
-            put("agent_id", agentId)
-            paramsJson.forEach { (key, value) -> put(key, value) }
-        }.toString()
-        return adminRpcDecoded("agent.update", "/v1/agents/$agentId", body)
-    }
-
-    suspend fun getContextWindow(agentId: String, conversationId: String? = null): ContextWindowOverview {
-        val body = buildJsonObject {
-            put("agent_id", agentId)
-            conversationId?.let { put("conversation_id", it) }
-        }.toString()
-        val path = buildString {
-            append("/v1/agents/")
-            append(agentId)
-            append("/context")
-            if (conversationId != null) append("?conversation_id=").append(conversationId)
-        }
-        return adminRpcDecoded("agent.context", path, body)
-    }
-
-    suspend fun listTools(limit: Int, offset: Int): List<Tool> {
-        val body = buildJsonObject {
-            put("limit", limit)
-            put("offset", offset)
-        }.toString()
-        return adminRpcDecodedList("tool.list", "/v1/tools?limit=$limit&offset=$offset", body)
-    }
-
-    suspend fun createTool(params: ToolCreateParams): Tool {
-        val body = json.encodeToString(ToolCreateParams.serializer(), params)
-        return adminRpcDecoded("tool.create", "/v1/tools", body)
-    }
-
-    suspend fun updateTool(toolId: String, params: ToolUpdateParams): Tool {
-        val paramsJson = json.encodeToJsonElement(ToolUpdateParams.serializer(), params).jsonObject
-        val body = buildJsonObject {
-            put("tool_id", toolId)
-            paramsJson.forEach { (key, value) -> put(key, value) }
-        }.toString()
-        return adminRpcDecoded("tool.update", "/v1/tools/$toolId", body)
-    }
-
-    suspend fun deleteTool(toolId: String) {
-        val body = buildJsonObject { put("tool_id", toolId) }.toString()
-        adminRpcResult("tool.delete", "/v1/tools/$toolId", body)
-    }
-
-    suspend fun setToolAttached(agentId: String, toolId: String, attached: Boolean) {
-        val body = buildJsonObject {
-            put("agent_id", agentId)
-            put("tool_id", toolId)
-        }.toString()
-        val method = if (attached) "tool.attach" else "tool.detach"
-        val action = if (attached) "attach" else "detach"
-        adminRpcResult(method, "/v1/agents/$agentId/tools/$action/$toolId", body)
-    }
-
-    suspend fun listSkills(agentId: String? = null): List<Skill> {
-        val body = buildJsonObject {
-            agentId?.let { put("agent_id", it) }
-        }.toString()
-        val method = if (agentId == null) "skill.list" else "skill.list_agent"
-        val path = agentId?.let { "/v1/agents/$it/skills" } ?: "/v1/skills"
-        val result = adminRpcResult(method, path, body) ?: return emptyList()
-        val skillsElement = (result as? kotlinx.serialization.json.JsonObject)?.get("skills") ?: result
-        return json.decodeFromJsonElement(ListSerializer(Skill.serializer()), skillsElement)
-    }
-
-    /** Per-agent slash commands (builtins + installed skills) over admin_rpc. */
-    suspend fun listAgentSlashCommands(agentId: String): List<AgentSlashCommand> {
-        val body = buildJsonObject { put("agent_id", agentId) }.toString()
-        val result = adminRpcResult(
-            "slash_command.list_agent",
-            "/v1/agents/$agentId/slash-commands",
-            body,
-        ) ?: return emptyList()
-        return json.decodeFromJsonElement(SlashCommandsResponse.serializer(), result).commands
-    }
-
-    suspend fun installSkill(agentId: String, skillName: String) {
-        val body = buildJsonObject {
-            put("agent_id", agentId)
-            put("name", skillName)
-            // Phase 2: native skill_enable is path-based; pass name as skill_path.
-            put("skill_path", skillName)
-        }.toString()
-        adminRpcResult("skill.install", "/v1/agents/$agentId/skills", body)
-    }
-
-    suspend fun uninstallSkill(agentId: String, skillName: String) {
-        val body = buildJsonObject {
-            put("agent_id", agentId)
-            put("name", skillName)
-        }.toString()
-        adminRpcResult("skill.uninstall", "/v1/agents/$agentId/skills/$skillName", body)
-    }
-
-    suspend fun getBlock(blockId: String): Block? {
-        val body = buildJsonObject { put("block_id", blockId) }.toString()
-        val result = adminRpcResultOrNull("block.get", "/v1/blocks/$blockId", body) ?: return null
-        return json.decodeFromJsonElement(Block.serializer(), result)
-    }
-
-    suspend fun listAgentBlocks(agentId: String): List<Block> {
-        require(agentId.isNotBlank()) { "agent_id must not be blank" }
-        // Mirror block.list paging: default page on the server, accumulate here.
-        // A bare array means the full agent set fit in one page; an envelope means
-        // more pages remain. Null result throws (never a false-empty).
-        val merged = mutableListOf<Block>()
-        val seenIds = HashSet<String>()
-        var offset = 0
-        repeat(AGENT_BLOCK_LIST_MAX_PAGES) {
-            val body = buildJsonObject {
-                put("agent_id", agentId)
-                put("limit", AGENT_BLOCK_LIST_PAGE_SIZE.toString())
-                put("offset", offset.toString())
-            }.toString()
-            val result = adminRpcResult(
-                "block.list_agent",
-                "/v1/agents/$agentId/core-memory/blocks?limit=$AGENT_BLOCK_LIST_PAGE_SIZE&offset=$offset",
-                body,
-            ) ?: throw TimelineTransportHttpException(
-                502,
-                "block.list_agent returned no result over iroh admin_rpc",
-            )
-            val page = decodeAgentBlockPage(result)
-            val fresh = page.blocks.filter { block -> seenIds.add(block.id.value) }
-            merged += fresh
-            if (page.blocks.isEmpty() || fresh.isEmpty()) return merged
-            if (!page.hasMore) return merged
-            offset += page.blocks.size
-        }
-        throw TimelineTransportHttpException(
-            502,
-            "block.list_agent exceeded $AGENT_BLOCK_LIST_MAX_PAGES pages while has_more remained true",
-        )
-    }
-
-    private fun decodeAgentBlockPage(result: JsonElement): AgentBlockPage = when (result) {
-        is JsonArray -> AgentBlockPage(
-            blocks = json.decodeFromJsonElement(ListSerializer(Block.serializer()), result),
-            hasMore = false,
-        )
-        is JsonObject -> AgentBlockPage(
-            blocks = result["blocks"]
-                ?.let { json.decodeFromJsonElement(ListSerializer(Block.serializer()), it) }
-                ?: throw TimelineTransportHttpException(502, "block.list_agent returned an object without blocks"),
-            hasMore = (result["has_more"] as? JsonPrimitive)
-                ?.takeUnless { it.isString }
-                ?.booleanOrNull
-                ?: throw TimelineTransportHttpException(502, "block.list_agent returned invalid has_more"),
-        )
-        else -> throw TimelineTransportHttpException(
-            502,
-            "block.list_agent returned an unsupported result: $result",
-        )
-    }
-
-    private data class AgentBlockPage(
-        val blocks: List<Block>,
-        val hasMore: Boolean,
-    )
-
-    suspend fun createBlock(params: BlockCreateParams): Block {
-        val body = json.encodeToString(BlockCreateParams.serializer(), params)
-        return adminRpcDecoded("block.create", "/v1/blocks", body)
-    }
-
-    suspend fun updateBlock(blockId: String, params: BlockUpdateParams): Block {
-        val body = buildJsonObject {
-            put("block_id", blockId)
-            params.value?.let { put("value", it) }
-            params.limit?.let { put("limit", it) }
-            params.description?.let { put("description", it) }
-        }.toString()
-        return adminRpcDecoded("block.update", "/v1/blocks/$blockId", body)
-    }
-
-    suspend fun deleteBlock(blockId: String) {
-        val body = buildJsonObject { put("block_id", blockId) }.toString()
-        adminRpcResult("block.delete", "/v1/blocks/$blockId", body)
-    }
-
-    suspend fun attachBlock(agentId: String, blockId: String) {
-        val body = buildJsonObject {
-            put("agent_id", agentId)
-            put("block_id", blockId)
-        }.toString()
-        adminRpcResult("block.attach", "/v1/agents/$agentId/core-memory/blocks/attach/$blockId", body)
-    }
-
-    suspend fun listSchedules(agentId: String? = null): List<ScheduledMessage> {
-        val body = buildJsonObject {
-            agentId?.let { put("agent_id", it) }
-        }.toString()
-        val path = agentId?.let { "/v1/agents/$it/schedule" } ?: "/v1/schedules"
-        val result = adminRpcResult("schedule.list", path, body)
-            ?: throw TimelineTransportHttpException(502, "schedule.list returned no result over iroh admin_rpc")
-        if (result is JsonObject && "scheduled_messages" !in result) {
-            throw TimelineTransportHttpException(502, "schedule.list returned a malformed result over iroh admin_rpc")
-        }
-        val schedules = json.decodeFromJsonElement(ScheduleListResponse.serializer(), result).scheduledMessages
-        if (agentId == null) return schedules
-
-        val scopedSchedules = schedules.filter { it.agentId == agentId }
-        val excludedCount = schedules.size - scopedSchedules.size
-        if (excludedCount > 0) {
-            Telemetry.event(
-                "IrohAdminRpcAgentDirectory",
-                "scheduleList.scopeMismatch",
-                "requestedAgentId" to agentId,
-                "excludedCount" to excludedCount,
-                level = Telemetry.Level.WARN,
-            )
-        }
-        return scopedSchedules
-    }
-
-    suspend fun getSchedule(scheduleId: String, agentId: String? = null): ScheduledMessage? {
-        val body = buildJsonObject {
-            put("schedule_id", scheduleId)
-            agentId?.let { put("agent_id", it) }
-        }.toString()
-        val path = agentId?.let { "/v1/agents/$it/schedule/$scheduleId" } ?: "/v1/schedules/$scheduleId"
-        val result = scheduleGetResultOrNull(path, body) ?: return null
-        return json.decodeFromJsonElement(ScheduledMessage.serializer(), result)
-    }
-
-    suspend fun createSchedule(agentId: String, params: ScheduleCreateParams): ScheduledMessage {
-        val paramsJson = json.encodeToJsonElement(ScheduleCreateParams.serializer(), params).jsonObject
-        val body = buildJsonObject {
-            put("agent_id", agentId)
-            paramsJson.forEach { (key, value) -> put(key, value) }
-        }.toString()
-        return adminRpcDecoded("schedule.create", "/v1/agents/$agentId/schedule", body)
-    }
-
-    suspend fun deleteSchedule(scheduleId: String, agentId: String? = null) {
-        val body = buildJsonObject {
-            put("schedule_id", scheduleId)
-            agentId?.let { put("agent_id", it) }
-        }.toString()
-        val path = agentId?.let { "/v1/agents/$it/schedule/$scheduleId" } ?: "/v1/schedules/$scheduleId"
-        adminRpcResult("schedule.delete", path, body)
-    }
-
-    companion object {
-        // Roster ceiling for the paged agent.list sweep, matching Android's
-        // 2500 cap. This is a runaway guard, not a page size — the sweep stops
-        // at the first short page, so small fleets still finish in a few
-        // requests. The old 200 cap silently truncated real deployments:
-        // agents past the first 200 never appeared in the rail, palette, or
-        // New Conversation directory.
-        const val AGENT_LIST_LIMIT = 2500
-        // Per-page size for the paged agent.list read. Kept small because each
-        // agent object is heavy (full system prompt + core memory): ~10 agents
-        // is a few hundred KB, well under the admin_rpc timeout on a slow link,
-        // whereas the full set is multiple MB and times out in one shot.
-        // Raised from 10 to 25 (letta-mobile-z6w): still 8x below the 200 that
-        // timed out, but cuts round trips at the 2500 cap from 250 to 100.
-        const val AGENT_LIST_PAGE_SIZE = 25
-
-        /** Matches ToolAdminHandlers.DEFAULT_BLOCK_LIST_LIMIT. */
-        const val AGENT_BLOCK_LIST_PAGE_SIZE = 50
-
-        /** Belt-and-braces bound for the agent-scoped block.list_agent sweep. */
-        const val AGENT_BLOCK_LIST_MAX_PAGES = 100
-
-        // Native schedule.get emits the first form; HTTP-backed protocol bridges
-        // may preserve a 404 status or canonical not_found code in the error.
-        private val SCHEDULE_GET_NOT_FOUND = Regex(
-            "^(?:scheduled message \\S+ not found|HTTP 404(?::.*)?|not_found(?::.*)?)$",
-            RegexOption.IGNORE_CASE,
-        )
     }
 }
