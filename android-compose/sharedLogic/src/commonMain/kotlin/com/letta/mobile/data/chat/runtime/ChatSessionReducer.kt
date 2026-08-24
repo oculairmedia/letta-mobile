@@ -165,6 +165,7 @@ object ChatSessionReducer {
         state: ChatSessionState,
         conversationId: String,
         remoteBacked: Boolean = state.isRemoteBacked,
+        hasSnapshot: Boolean = false,
     ): ChatSessionState {
         if (conversationId == state.selectedConversationId || state.conversations.none { it.id == conversationId }) {
             return state
@@ -187,8 +188,10 @@ object ChatSessionReducer {
             },
             composer = ChatComposerState(),
             isLoading = remoteBacked,
-            connectionState = if (remoteBacked) ChatConnectionState.Loading else state.connectionState,
-            statusMessage = if (remoteBacked) "Loading messages" else state.statusMessage,
+            connectionState = if (remoteBacked) ChatConnectionState.Live else state.connectionState,
+            snapshotAvailability = if (hasSnapshot) SnapshotAvailability.Persisted else SnapshotAvailability.None,
+            remoteSyncState = if (remoteBacked) RemoteSyncState.Refreshing else RemoteSyncState.Idle,
+            statusMessage = if (remoteBacked) "Syncing..." else state.statusMessage,
             errorMessage = null,
             selectionGeneration = nextGeneration,
         )
@@ -197,14 +200,14 @@ object ChatSessionReducer {
     fun beginSelectedConversationHydrate(
         state: ChatSessionState,
         generation: Long,
-        statusMessage: String = "Loading messages",
+        statusMessage: String = "Syncing...",
     ): ChatSessionState =
         if (!isCurrentSelection(state, generation)) {
             state
         } else {
             state.copy(
                 isLoading = true,
-                connectionState = ChatConnectionState.Loading,
+                remoteSyncState = RemoteSyncState.Refreshing,
                 statusMessage = statusMessage,
                 errorMessage = null,
             )
@@ -221,8 +224,27 @@ object ChatSessionReducer {
             state.copy(
                 isLoading = false,
                 connectionState = ChatConnectionState.Live,
+                snapshotAvailability = SnapshotAvailability.Live,
+                remoteSyncState = RemoteSyncState.Live,
                 statusMessage = statusMessage,
                 errorMessage = null,
+            )
+        }
+
+    fun hydrateFailed(
+        state: ChatSessionState,
+        generation: Long,
+        errorMessage: String,
+        statusMessage: String = "Sync failed",
+    ): ChatSessionState =
+        if (!isCurrentSelection(state, generation)) {
+            state
+        } else {
+            state.copy(
+                isLoading = false,
+                remoteSyncState = RemoteSyncState.Failed,
+                statusMessage = statusMessage,
+                errorMessage = errorMessage,
             )
         }
 
@@ -238,6 +260,7 @@ object ChatSessionReducer {
             state.copy(
                 isLoading = false,
                 connectionState = ChatConnectionState.StreamDisconnected,
+                remoteSyncState = RemoteSyncState.StreamDisconnected,
                 statusMessage = statusMessage,
                 errorMessage = errorMessage,
             )
@@ -335,13 +358,11 @@ object ChatSessionReducer {
     fun canSend(state: ChatSessionState): Boolean =
         state.isRemoteBacked &&
             !state.isSending &&
-            !state.isLoading &&
             state.connectionState in sendEnabledStates
 
     fun shouldShowStatePanel(state: ChatSessionState): Boolean =
-        state.selectedConversationId == null ||
-            (state.connectionState == ChatConnectionState.StreamDisconnected && state.selectedMessages.isEmpty()) ||
-            state.connectionState in panelStates
+        state.connectionState == ChatConnectionState.ConfigNeeded ||
+            (state.selectedConversationId == null && (state.connectionState == ChatConnectionState.Loading || state.connectionState == ChatConnectionState.Offline || state.connectionState == ChatConnectionState.NoConversations))
 
     fun isCurrentSelection(
         state: ChatSessionState,
@@ -363,7 +384,6 @@ object ChatSessionReducer {
     )
 
     private val panelStates = setOf(
-        ChatConnectionState.Loading,
         ChatConnectionState.ConfigNeeded,
         ChatConnectionState.Offline,
         ChatConnectionState.NoConversations,

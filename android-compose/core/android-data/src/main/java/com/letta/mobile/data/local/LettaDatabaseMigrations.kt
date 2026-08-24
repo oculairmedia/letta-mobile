@@ -180,6 +180,31 @@ object LettaDatabaseMigrations {
         }
     }
 
+    val MIGRATION_9_10 = object : Migration(9, 10) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `confirmed_timeline_snapshots` (
+                    `backend_id` TEXT NOT NULL,
+                    `conversation_id` TEXT NOT NULL,
+                    `agent_id` TEXT,
+                    `revision` INTEGER NOT NULL,
+                    `schema_version` INTEGER NOT NULL,
+                    `payload_json` TEXT NOT NULL,
+                    `written_at_millis` INTEGER NOT NULL,
+                    PRIMARY KEY(`backend_id`, `conversation_id`)
+                )
+                """.trimIndent(),
+            )
+            db.execSQL(
+                """
+                CREATE INDEX IF NOT EXISTS `index_confirmed_timeline_snapshots_backend_id_written_at_millis`
+                ON `confirmed_timeline_snapshots` (`backend_id`, `written_at_millis`)
+                """.trimIndent(),
+            )
+        }
+    }
+
     val ALL: Array<Migration> = arrayOf(
         MIGRATION_1_2,
         MIGRATION_2_3,
@@ -189,5 +214,6 @@ object LettaDatabaseMigrations {
         MIGRATION_6_7,
         MIGRATION_7_8,
         MIGRATION_8_9,
+        MIGRATION_9_10,
     )
 }

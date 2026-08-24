@@ -957,20 +957,38 @@ class DesktopChatController(
             it.withRuntimeState(ChatSessionReducer.beginSelectedConversationHydrate(it.runtimeState, generation))
         }
 
+        val selectionStart = System.currentTimeMillis()
         val loop = loopFactory(nextGateway, conversation, scope)
         activeLoop = loop
+        val snapshotEventCount = loop.state.value.events.size
+        val selectionToSnapshotMs = System.currentTimeMillis() - selectionStart
+        Telemetry.event(
+            "ChatPerformance", "selection_to_snapshot",
+            "conversationId" to conversationId,
+            "durationMs" to selectionToSnapshotMs,
+            "eventCount" to snapshotEventCount,
+            "hasSnapshot" to (snapshotEventCount > 0),
+        )
+
         timelineJob = scope.launch {
             loop.state.collect { timeline ->
                 updateTimelineMessages(conversationId, generation, timeline)
             }
         }
 
+        val refreshStart = System.currentTimeMillis()
         try {
             loop.hydrate(
                 DesktopTimelineHydrateRequest(
                     limit = TimelinePageLimit(50),
                     recordConversationCursor = true,
                 ),
+            )
+            val refreshDurationMs = System.currentTimeMillis() - refreshStart
+            Telemetry.event(
+                "ChatPerformance", "remote_refresh",
+                "conversationId" to conversationId,
+                "durationMs" to refreshDurationMs,
             )
             if (!isActiveSelection(generation)) return
             _state.update {

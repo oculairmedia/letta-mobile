@@ -3,6 +3,10 @@ package com.letta.mobile.data.timeline
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.session.BackendScopedCache
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
+import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore
+import com.letta.mobile.data.timeline.snapshot.NoOpConfirmedTimelineStore
+import com.letta.mobile.data.timeline.snapshot.TimelineScope
+import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
 import com.letta.mobile.util.Telemetry
 import kotlin.concurrent.Volatile
 import kotlinx.coroutines.CompletableDeferred
@@ -37,6 +41,8 @@ open class TimelineRepository(
     private val timelineTransport: TimelineTransport,
     private val pendingLocalStore: PendingLocalStore,
     private val conversationCursorStore: ConversationCursorStore,
+    private val confirmedTimelineStore: ConfirmedTimelineStore = NoOpConfirmedTimelineStore,
+    private val backendIdProvider: () -> String = { "default" },
     private val startLoopStreamSubscribers: Boolean = true,
 ) : TimelineExternalTransportWriter, BackendScopedCache {
     constructor(
@@ -259,6 +265,16 @@ open class TimelineRepository(
                 "agentId" to key.agentId.orEmpty(),
                 "conversationId" to key.conversationId,
             )
+
+            val timelineScope = TimelineScope(
+                backendId = backendIdProvider(),
+                conversationId = key.conversationId,
+                agentId = key.agentId,
+            )
+            val storedSnapshot = confirmedTimelineStore.readSnapshot(timelineScope)
+            val initialTimeline = storedSnapshot?.let { TimelineSnapshotCodec.storedEnvelopeToTimeline(it) }
+            val initialRevision = storedSnapshot?.revision ?: 0L
+
             val created = TimelineSyncLoop(
                 messageApi = timelineTransport,
                 conversationId = key.conversationId,
@@ -268,11 +284,27 @@ open class TimelineRepository(
                 pendingLocalStore = pendingLocalStore,
                 conversationCursorStore = conversationCursorStore,
                 startStreamSubscriber = startLoopStreamSubscribers,
+                confirmedTimelineStore = confirmedTimelineStore,
+                timelineScope = timelineScope,
+                initialTimeline = initialTimeline,
+                initialRevision = initialRevision,
             )
             loops[key] = created
             evictEldestLoopsIfNeededLocked()
             created
         }
+
+    /**
+     * Pre-warms likely/recent conversation timelines from persisted snapshots without blocking.
+     */
+    suspend fun warmConversations(conversationIds: List<Pair<String?, String>>) {
+        withContext(timelineIoDispatcher) {
+            conversationIds.take(maxCachedLoops).forEach { (agentId, conversationId) ->
+                val key = TimelineCacheKey(agentId = agentId, conversationId = conversationId)
+                getOrCreateLoopWithoutHydrate(key)
+            }
+        }
+    }
 
     /**
      * Number of cached sync loops currently owned by the singleton registry.

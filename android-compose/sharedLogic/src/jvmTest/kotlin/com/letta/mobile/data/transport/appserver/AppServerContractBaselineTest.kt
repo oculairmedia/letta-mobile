@@ -243,7 +243,7 @@ class AppServerContractBaselineTest {
 
     private fun fixtureText(name: String): String {
         val stream = assertNotNull(javaClass.getResourceAsStream("/appserver/$name"), "missing fixture $name")
-        return stream.bufferedReader(StandardCharsets.UTF_8).use { it.readText() }
+        return stream.bufferedReader(StandardCharsets.UTF_8).use { it.readText() }.replace("\r\n", "\n")
     }
 
     private fun typeOf(row: JsonObject): String = row.requiredString("type")
