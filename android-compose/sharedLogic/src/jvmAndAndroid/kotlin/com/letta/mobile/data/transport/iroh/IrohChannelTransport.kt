@@ -207,6 +207,29 @@ class IrohChannelTransport(
     override val hasAnyActiveChatTurn: Boolean
         get() = activeTurns.values.any { !it.terminalReached.isCompleted }
 
+    internal data class ActiveTurnSnapshot(
+        val turnId: String,
+        val runId: String,
+        val hasTerminal: Boolean,
+        val isTerminalCompleted: Boolean,
+    )
+
+    internal fun activeTurnSnapshot(conversationId: String): ActiveTurnSnapshot? {
+        val turn = activeTurns[conversationId] ?: return null
+        return ActiveTurnSnapshot(
+            turnId = turn.turnId,
+            runId = turn.runId,
+            hasTerminal = turn.hasTerminal,
+            isTerminalCompleted = turn.terminalReached.isCompleted,
+        )
+    }
+
+    internal fun activeSendJob(conversationId: String): Job? = activeSendJobs[conversationId]
+
+    internal fun activeTurnsCount(): Int = activeTurns.size
+
+    internal fun activeSendJobsCount(): Int = activeSendJobs.size
+
     /**
      * letta-mobile-m6oa1.1: the Kotlin App Server's own Agent-tool_call
      * correlation reducer — the Kotlin analogue of the shim's
@@ -976,19 +999,49 @@ class IrohChannelTransport(
             agentId = agentId,
             conversationId = conversationId,
         )
-        // letta-mobile-or40x: KEYED registration. Starting a turn on conversation
-        // B must never displace conversation A's turn — only a new turn on the
-        // SAME conversation supersedes the previous one, and that supersession is
-        // reported (SENSING b) instead of being silently absorbed.
-        val superseded = activeTurns.put(conversationId, turn)
-        if (superseded != null && !superseded.hasTerminal) {
+        // Atomic same-key registration: only register if no active turn is in flight for this conversation.
+        var busyOwner: ActiveTurn? = null
+        activeTurns.compute(conversationId) { _, existing ->
+            if (existing != null && !existing.terminalReached.isCompleted) {
+                busyOwner = existing
+                existing
+            } else {
+                turn
+            }
+        }
+        val collision = busyOwner
+        if (collision != null) {
             Telemetry.event(
-                "IrohTransport", "turn.superseded_nonterminal",
+                "IrohTransport", "turn.busy_same_conversation",
                 "conversationId" to conversationId,
-                "supersededTurnId" to superseded.turnId,
-                "supersededRunId" to superseded.runId,
-                "newTurnId" to turnId,
+                "activeTurnId" to collision.turnId,
+                "activeRunId" to collision.runId,
+                "rejectedTurnId" to turnId,
+                "rejectedRunId" to runId,
             )
+            scope.launch {
+                emitBoth(
+                    ServerFrame.Error(
+                        id = frameId("error"),
+                        ts = nowIso(),
+                        code = "iroh_turn_engine_busy",
+                        message = "Iroh App Server turn engine is already busy for conversation $conversationId.",
+                        conversationId = conversationId,
+                        turnId = turnId,
+                        runId = runId,
+                    )
+                )
+                emitBoth(
+                    ServerFrame.TurnDone(
+                        id = frameId("turn_done"),
+                        ts = nowIso(),
+                        turnId = turnId,
+                        runId = runId,
+                        status = "failed",
+                    )
+                )
+            }
+            return true
         }
         // SENSING (a): a turn is starting for THIS conversation while another
         // conversation still has a nonterminal turn in flight. Legal after or40x
