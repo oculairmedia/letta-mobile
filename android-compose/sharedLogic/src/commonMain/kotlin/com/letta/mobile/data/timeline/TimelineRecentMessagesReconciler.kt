@@ -3,9 +3,10 @@ package com.letta.mobile.data.timeline
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,8 +32,12 @@ class TimelineRecentMessagesReconciler(
     private val applyReturnsAndResponsesFromSnapshot: (List<LettaMessage>) -> Unit,
     private val nowMillis: () -> Long = { timelineCurrentTimeMillis() },
     private val minForcedReconcileIntervalMs: Long = DEFAULT_MIN_FORCED_RECONCILE_INTERVAL_MS,
+    scope: CoroutineScope? = null,
+    private val onSnapshotApplied: (() -> Unit)? = null,
 ) {
     val seenRunIds = TimelineSeenRunTracker()
+    private val reconcilerScope = scope ?: CoroutineScope(SupervisorJob())
+
     private data class InFlightFlight(
         val key: ReconcileFlightKey,
         val deferred: Deferred<RecentMessagesReconcileOutcome>,
@@ -48,13 +53,13 @@ class TimelineRecentMessagesReconciler(
     private val reconcileFlightMutex = Mutex()
     private val lastForcedReconcileCompletedAtMsByGeneration = mutableMapOf<Long, Long>()
     private var inFlight: InFlightFlight? = null
-    private var pendingStrongerFlight: Boolean = false
     private var lastSuccessfulReconcileTimeMs: Long = 0L
     private var lastSuccessfulReconcileGeneration: Long = -1L
     private var lastSuccessfulReconcileAppended: Int = 0
     private var lastSuccessfulReconcileServerCount: Int = 0
     private var freshnessInvalidationSeq: Long = 0L
     private var lastSuccessfulFreshnessSeq: Long = 0L
+    private var highestAppliedGeneration: Long = -1L
 
     fun invalidateFreshness() {
         freshnessInvalidationSeq++
@@ -64,7 +69,7 @@ class TimelineRecentMessagesReconciler(
         reason: String,
         forceRefresh: Boolean = false,
         connectionGeneration: Long = DEFAULT_CONNECTION_GENERATION,
-    ): RecentMessagesReconcileOutcome = coroutineScope {
+    ): RecentMessagesReconcileOutcome {
         val flightKey = ReconcileFlightKey(
             conversationId = conversationId,
             connectionGeneration = connectionGeneration,
@@ -72,26 +77,31 @@ class TimelineRecentMessagesReconciler(
         )
 
         // 1. Check if an equivalent recent reconcile (e.g. open) just completed successfully for this generation
-        val isEligibleForRecentCoalesce = (reason == "screen_resumed" || reason == "resumed") &&
-            !forceRefresh &&
-            lastSuccessfulReconcileGeneration == connectionGeneration &&
-            freshnessInvalidationSeq == lastSuccessfulFreshnessSeq &&
-            (nowMillis() - lastSuccessfulReconcileTimeMs < DEFAULT_FRESHNESS_WINDOW_MS)
-
-        if (isEligibleForRecentCoalesce) {
-            Telemetry.event(
-                "TimelineSync", "recentReconcile.coalesced",
-                "conversationId" to conversationId,
-                "reason" to reason,
-                "generation" to connectionGeneration,
-                "coalescedWith" to "recent_successful_reconcile",
-                "serverCount" to lastSuccessfulReconcileServerCount,
-                "appended" to lastSuccessfulReconcileAppended,
-            )
-            return@coroutineScope RecentMessagesReconcileOutcome.Applied(lastSuccessfulReconcileAppended)
+        val cachedOutcome = reconcileFlightMutex.withLock {
+            val isEligible = (reason == "screen_resumed" || reason == "resumed") &&
+                !forceRefresh &&
+                lastSuccessfulReconcileGeneration == connectionGeneration &&
+                freshnessInvalidationSeq == lastSuccessfulFreshnessSeq &&
+                (nowMillis() - lastSuccessfulReconcileTimeMs < DEFAULT_FRESHNESS_WINDOW_MS)
+            if (isEligible) {
+                Telemetry.event(
+                    "TimelineSync", "recentReconcile.coalesced",
+                    "conversationId" to conversationId,
+                    "reason" to reason,
+                    "generation" to connectionGeneration,
+                    "coalescedWith" to "recent_successful_reconcile",
+                    "serverCount" to lastSuccessfulReconcileServerCount,
+                    "appended" to lastSuccessfulReconcileAppended,
+                )
+                RecentMessagesReconcileOutcome.Applied(lastSuccessfulReconcileAppended)
+            } else {
+                null
+            }
         }
+        if (cachedOutcome != null) return cachedOutcome
 
         // 2. Coordinate in-flight flights with mutex protection
+        var mustRunTrailingStronger = false
         val sharedDeferred = reconcileFlightMutex.withLock {
             val current = inFlight
             if (current != null && current.deferred.isActive) {
@@ -104,19 +114,27 @@ class TimelineRecentMessagesReconciler(
                         "oldGeneration" to current.key.connectionGeneration,
                         "newGeneration" to connectionGeneration,
                     )
-                    // Launch new flight for the new generation
-                    val newDeferred = async {
+                    // Launch new flight in reconciler-owned scope
+                    val newDeferred = reconcilerScope.async {
                         executeReconcileFromServer(
                             reason = reason,
                             forceRefresh = forceRefresh,
                             connectionGeneration = connectionGeneration,
                         )
                     }
-                    inFlight = InFlightFlight(flightKey, newDeferred, forceRefresh)
+                    val flight = InFlightFlight(flightKey, newDeferred, forceRefresh)
+                    inFlight = flight
+                    newDeferred.invokeOnCompletion {
+                        reconcilerScope.async {
+                            reconcileFlightMutex.withLock {
+                                if (inFlight === flight) inFlight = null
+                            }
+                        }
+                    }
                     newDeferred
                 } else if (!current.isStronger && forceRefresh) {
-                    // Current is weaker (forceRefresh=false) and new is stronger (forceRefresh=true)
-                    pendingStrongerFlight = true
+                    // Current is weaker and this caller is stronger -> await current, then run trailing
+                    mustRunTrailingStronger = true
                     current.deferred
                 } else {
                     // Equivalent or weaker request -> coalesce into existing flight
@@ -130,38 +148,29 @@ class TimelineRecentMessagesReconciler(
                     current.deferred
                 }
             } else {
-                val newDeferred = async {
+                val newDeferred = reconcilerScope.async {
                     executeReconcileFromServer(
                         reason = reason,
                         forceRefresh = forceRefresh,
                         connectionGeneration = connectionGeneration,
                     )
                 }
-                inFlight = InFlightFlight(flightKey, newDeferred, forceRefresh)
+                val flight = InFlightFlight(flightKey, newDeferred, forceRefresh)
+                inFlight = flight
+                newDeferred.invokeOnCompletion {
+                    reconcilerScope.async {
+                        reconcileFlightMutex.withLock {
+                            if (inFlight === flight) inFlight = null
+                        }
+                    }
+                }
                 newDeferred
             }
         }
 
-        val outcome = try {
-            sharedDeferred.await()
-        } finally {
-            reconcileFlightMutex.withLock {
-                if (inFlight?.deferred === sharedDeferred) {
-                    inFlight = null
-                }
-            }
-        }
+        val outcome = sharedDeferred.await()
 
-        // 3. If a stronger flight was requested during a weaker in-flight run, execute it now
-        val needsStronger = reconcileFlightMutex.withLock {
-            if (pendingStrongerFlight && !forceRefresh) {
-                pendingStrongerFlight = false
-                true
-            } else {
-                false
-            }
-        }
-        if (needsStronger) {
+        return if (mustRunTrailingStronger) {
             reconcileRecentMessages(
                 reason = "$reason.trailingStronger",
                 forceRefresh = true,
@@ -205,8 +214,11 @@ class TimelineRecentMessagesReconciler(
         val skipReason = skipReasonFor(allowWhileStreamActive, isForcedWhileActive, connectionGeneration)
         if (skipReason != null) return skipReconcile(timer, telemetryName, telemetryAttrs, skipReason)
         return try {
-            val (serverCount, appended) = fetchAndApplySnapshot(telemetryName, telemetryAttrs)
+            val (serverCount, appended) = fetchAndApplySnapshot(telemetryName, telemetryAttrs, connectionGeneration)
             onForcedReconcileCompleted(isForcedWhileActive, connectionGeneration)
+            reconcileFlightMutex.withLock {
+                lastSuccessfulReconcileServerCount = serverCount
+            }
             timer.stop(*telemetryAttrs, "serverCount" to serverCount, "appended" to appended)
             dumpTimelineState("reconcile.$telemetryName", conversationId, state.value)
             RecentMessagesReconcileOutcome.Applied(appended)
@@ -216,14 +228,6 @@ class TimelineRecentMessagesReconciler(
         }
     }
 
-    /**
-     * A forced reconcile (post-send retries, redial recovery) is the one path
-     * that bypasses the streamSubscriberActive skip, so it's also the only path
-     * that can pile up admin_rpc traffic while the live stream is otherwise
-     * healthy. Debounce just that path: once a forced reconcile has actually
-     * run, further forced calls within minForcedReconcileIntervalMs are
-     * redundant — the stream is active and the prior reconcile just resynced it.
-     */
     private fun skipReasonFor(
         allowWhileStreamActive: Boolean,
         isForcedWhileActive: Boolean,
@@ -240,14 +244,6 @@ class TimelineRecentMessagesReconciler(
         return sinceLastForced < minForcedReconcileIntervalMs
     }
 
-    /**
-     * Stamped with a FRESH clock read taken after the round trip completes,
-     * not a timestamp from before it started — a reconcile slower than the
-     * debounce window must still get its own full window from actual
-     * completion, or the very next forced call would see an already-expired
-     * window and the debounce would be a no-op for exactly the slow calls it
-     * matters most for.
-     */
     private fun onForcedReconcileCompleted(isForcedWhileActive: Boolean, connectionGeneration: Long) {
         if (isForcedWhileActive) {
             lastForcedReconcileCompletedAtMsByGeneration[connectionGeneration] = nowMillis()
@@ -258,6 +254,7 @@ class TimelineRecentMessagesReconciler(
     private suspend fun fetchAndApplySnapshot(
         telemetryName: String,
         telemetryAttrs: Array<Pair<String, Any?>>,
+        connectionGeneration: Long,
     ): Pair<Int, Int> {
         val serverMessages = messageApi.listConversationMessages(
             conversationId = conversationId,
@@ -271,6 +268,7 @@ class TimelineRecentMessagesReconciler(
                 telemetryName = telemetryName,
                 telemetryAttrs = telemetryAttrs.toList(),
                 ack = ack,
+                generation = connectionGeneration,
             )
         )
         return serverMessages.size to ack.await()
@@ -303,11 +301,26 @@ class TimelineRecentMessagesReconciler(
     ) {
         try {
             val appended = writeMutex.withLock {
-                applyRecentMessagesSnapshotLocked(
-                    serverMessages = event.serverMessages,
-                    telemetryName = event.telemetryName,
-                    telemetryAttrs = event.telemetryAttrs.toTypedArray(),
-                )
+                if (event.generation < highestAppliedGeneration) {
+                    Telemetry.event(
+                        "TimelineSync", "recentReconcile.staleSnapshotDropped",
+                        "conversationId" to conversationId,
+                        "snapshotGeneration" to event.generation,
+                        "highestAppliedGeneration" to highestAppliedGeneration,
+                        level = Telemetry.Level.WARN,
+                    )
+                    0
+                } else {
+                    highestAppliedGeneration = maxOf(highestAppliedGeneration, event.generation)
+                    applyRecentMessagesSnapshotLocked(
+                        serverMessages = event.serverMessages,
+                        telemetryName = event.telemetryName,
+                        telemetryAttrs = event.telemetryAttrs.toTypedArray(),
+                    )
+                }
+            }
+            if (appended > 0) {
+                onSnapshotApplied?.invoke()
             }
             event.ack.complete(appended)
         } catch (t: Throwable) {

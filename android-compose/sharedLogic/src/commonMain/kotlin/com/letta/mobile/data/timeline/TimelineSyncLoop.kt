@@ -119,7 +119,12 @@ class TimelineSyncLoop(
         state = _state,
         streamSubscriberActive = _streamSubscriberActive.asStateFlow(),
         writeMutex = writeMutex,
-        applyReturnsAndResponsesFromSnapshot = { snapshot -> applyReturnsAndResponsesFromSnapshot(snapshot, _state) }
+        applyReturnsAndResponsesFromSnapshot = { snapshot ->
+            applyReturnsAndResponsesFromSnapshot(snapshot, _state)
+            scheduleSnapshotPersist(immediate = true)
+        },
+        scope = loopScope,
+        onSnapshotApplied = { scheduleSnapshotPersist(immediate = true) },
     )
 
     private val hydrator = TimelineHydrator(
@@ -164,31 +169,32 @@ class TimelineSyncLoop(
 
     private suspend fun persistCurrentSnapshot(snapshotScope: TimelineScope, prune: Boolean) {
         val currentTimeline = writeMutex.withLock { state.value }
-        val provisionalEnvelope = TimelineSnapshotCodec.timelineToStoredEnvelope(
-            timeline = currentTimeline,
-            scope = snapshotScope,
-            revision = snapshotRevision,
-            writtenAtMillis = timelineCurrentTimeMillis(),
-        )
-        val fingerprint = TimelineSnapshotCodec.computeStoredEnvelopeFingerprint(provisionalEnvelope)
-
-        if (fingerprint == lastPersistedFingerprint && lastPersistedFingerprint != 0L) {
-            Telemetry.event(
-                "TimelineSync", "snapshotPersist.identicalSkipped",
-                "conversationId" to conversationId,
-                "revision" to snapshotRevision,
-                "fingerprint" to fingerprint,
-                "eventCount" to provisionalEnvelope.events.size,
-            )
-            return
-        }
-
-        val revision = ++snapshotRevision
-        val envelope = provisionalEnvelope.copy(revision = revision)
+        val currentRevision = snapshotRevision
         val startedAtMs = timelineCurrentTimeMillis()
 
         try {
             withContext(ioDispatcher + NonCancellable) {
+                val provisionalEnvelope = TimelineSnapshotCodec.timelineToStoredEnvelope(
+                    timeline = currentTimeline,
+                    scope = snapshotScope,
+                    revision = currentRevision,
+                    writtenAtMillis = startedAtMs,
+                )
+                val fingerprint = TimelineSnapshotCodec.computeStoredEnvelopeFingerprint(provisionalEnvelope)
+
+                if (fingerprint == lastPersistedFingerprint && lastPersistedFingerprint != 0L) {
+                    Telemetry.event(
+                        "TimelineSync", "snapshotPersist.identicalSkipped",
+                        "conversationId" to conversationId,
+                        "revision" to currentRevision,
+                        "fingerprint" to fingerprint,
+                        "eventCount" to provisionalEnvelope.events.size,
+                    )
+                    return@withContext
+                }
+
+                val revision = ++snapshotRevision
+                val envelope = provisionalEnvelope.copy(revision = revision)
                 val written = confirmedTimelineStore.writeSnapshot(envelope)
                 if (prune) {
                     confirmedTimelineStore.prune(snapshotScope.backendId, MAX_RETAINED_SNAPSHOTS)
@@ -218,7 +224,7 @@ class TimelineSyncLoop(
             Telemetry.error(
                 "TimelineSync", "snapshotPersist.failed", error,
                 "conversationId" to conversationId,
-                "revision" to revision,
+                "revision" to snapshotRevision,
             )
         }
     }
@@ -454,7 +460,10 @@ class TimelineSyncLoop(
                         recentMessagesReconciler.invalidateFreshness()
                         externalTransportAppender.applyExternalTransportLocalAppend(event)
                     }
-                    is TimelineGatewayEvent.ReconcileAfterSendSnapshot -> applyReconcileAfterSendSnapshot(event)
+                    is TimelineGatewayEvent.ReconcileAfterSendSnapshot -> {
+                        applyReconcileAfterSendSnapshot(event)
+                        scheduleSnapshotPersist(immediate = true)
+                    }
                     is TimelineGatewayEvent.RecentMessagesSnapshot -> recentMessagesReconciler.applyRecentMessagesSnapshot(event)
                     is TimelineGatewayEvent.PostHandlerCollapse -> event.ack.complete(Unit)
                     is TimelineGatewayEvent.RetrySend -> {
@@ -559,6 +568,7 @@ class TimelineSyncLoop(
         writeMutex.withLock {
             applyReturnsAndResponsesFromSnapshot(listOf(message), _state)
         }
+        scheduleSnapshotPersist(immediate = true)
         Telemetry.event(
             "TimelineSync", "toolReturn.resolved",
             "conversationId" to conversationId,

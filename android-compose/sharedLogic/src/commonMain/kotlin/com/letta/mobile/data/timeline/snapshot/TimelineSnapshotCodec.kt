@@ -92,9 +92,10 @@ object TimelineSnapshotCodec {
         }
         fun mixString(s: String?) {
             if (s == null) {
-                mix(0L)
+                mix(-1L)
                 return
             }
+            mix(s.length.toLong())
             for (i in 0 until s.length) {
                 hash = (hash xor s[i].code.toLong()) * 1099511628211L
             }
@@ -130,20 +131,21 @@ object TimelineSnapshotCodec {
                 mixString(tc.arguments)
             }
             mix(event.toolReturnContentByCallId.size.toLong())
-            for ((k, v) in event.toolReturnContentByCallId) {
+            for (k in event.toolReturnContentByCallId.keys.sorted()) {
                 mixString(k)
-                mixString(v)
+                mixString(event.toolReturnContentByCallId[k])
             }
             mix(event.toolReturnIsErrorByCallId.size.toLong())
-            for ((k, v) in event.toolReturnIsErrorByCallId) {
+            for (k in event.toolReturnIsErrorByCallId.keys.sorted()) {
                 mixString(k)
-                mix(if (v) 1L else 0L)
+                mix(if (event.toolReturnIsErrorByCallId[k] == true) 1L else 0L)
             }
             mix(event.toolReturnTruncationByCallId.size.toLong())
-            for ((k, v) in event.toolReturnTruncationByCallId) {
+            for (k in event.toolReturnTruncationByCallId.keys.sorted()) {
+                val truncation = event.toolReturnTruncationByCallId[k]
                 mixString(k)
-                mixString(v.messageId)
-                mix(v.byteLen)
+                mixString(truncation?.messageId)
+                mix(truncation?.byteLen ?: 0L)
             }
             mix(event.attachments.size.toLong())
             for (att in event.attachments) {

@@ -264,7 +264,7 @@ class AdminChatParityTest {
             currentClientModeConversationId = { null },
             startTimelineObserver = {},
             stopTimelineObserver = {},
-            reconcileRecentMessages = { _, _ -> },
+            reconcileRecentMessages = { _, _, _ -> },
             sendMessageViaClientMode = {},
             sendMessageViaTimeline = {},
             markFollowingDuplicateInitialMessageInFlight = {},

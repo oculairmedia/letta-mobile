@@ -69,7 +69,7 @@ internal class ChatConversationCoordinator(
     // this the cached TimelineSyncLoop (warm-started by resume-most-
     // recent / notification paths) serves stale state until the user's
     // first send triggers the post-turn_done reconcile.
-    private val reconcileRecentMessages: suspend (String, String) -> Unit,
+    private val reconcileRecentMessages: suspend (String, String, Long) -> Unit,
     private val sendMessageViaClientMode: (String) -> Unit,
     private val sendMessageViaTimeline: (String) -> Unit,
     private val markFollowingDuplicateInitialMessageInFlight: () -> Unit,
@@ -79,6 +79,8 @@ internal class ChatConversationCoordinator(
     },
     private val hydrationGeneration: (String) -> ChatHydrationTrace.Generation? = ChatHydrationTrace::current,
 ) {
+    fun currentHydrationGeneration(conversationId: String): ChatHydrationTrace.Generation? = hydrationGeneration(conversationId)
+
     companion object {
         private const val CONVERSATION_CACHE_TTL_MS = 30_000L
     }
@@ -475,7 +477,7 @@ internal class ChatConversationCoordinator(
                 val generation = hydrationGeneration(requestedConversationId)
                 generation?.let { ChatHydrationTrace.reconcileStarted(it, reason = "open") }
                 runCatching {
-                    reconcileRecentMessages(requestedConversationId, "open")
+                    reconcileRecentMessages(requestedConversationId, "open", generation?.id ?: 0L)
                 }.onSuccess {
                     generation?.let { trace -> ChatHydrationTrace.reconcileCompleted(trace, reason = "open") }
                 }.onFailure {
