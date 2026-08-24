@@ -105,14 +105,14 @@ class IrohChannelTransportSameConversationSupersessionTest {
 
         val started = frames.filterIsInstance<ServerFrame.TurnStarted>().single()
         val job = assertNotNull(
-            transport.activeSendJob(CONV_1),
+            transport.privateMap<Job>("activeSendJobs")[CONV_1],
             "job for turn #1 must be registered in activeSendJobs",
         )
-        val turnSnapshot = assertNotNull(
-            transport.activeTurnSnapshot(CONV_1),
+        assertEquals(
+            started.turnId,
+            transport.activeTurnId(CONV_1),
             "active turn #1 must be registered in activeTurns",
         )
-        assertEquals(started.turnId, turnSnapshot.turnId)
         assertTrue(job.isActive, "job for turn #1 must be active")
         assertTrue(transport.hasActiveChatTurn(CONV_1), "transport must report active chat turn for conv-1")
         return RunningTurn(started.turnId, started.runId, job)
@@ -135,10 +135,8 @@ class IrohChannelTransportSameConversationSupersessionTest {
     }
 
     private fun assertFirstTurnOwnershipIsPreserved(transport: IrohChannelTransport, firstTurnId: String) {
-        val snapshot = transport.activeTurnSnapshot(CONV_1)
-        assertNotNull(snapshot, "activeTurns[CONV_1] must remain populated with turn #1")
-        assertEquals(firstTurnId, snapshot.turnId, "activeTurns must belong to turn #1")
-        val job = transport.activeSendJob(CONV_1)
+        assertEquals(firstTurnId, transport.activeTurnId(CONV_1), "activeTurns must belong to turn #1")
+        val job = transport.privateMap<Job>("activeSendJobs")[CONV_1]
         assertNotNull(job, "activeSendJobs[CONV_1] must remain populated with turn #1's job")
         assertTrue(job.isActive, "turn #1's job must remain active")
         assertTrue(
@@ -152,6 +150,7 @@ class IrohChannelTransportSameConversationSupersessionTest {
         client: ScriptedClient,
         firstTurnId: String,
     ) {
+        assertEquals(firstTurnId, transport.activeTurnId(CONV_1), "cancel must target turn #1")
         val cancelResult = transport.cancel(CONV_1)
         assertTrue(cancelResult, "cancel returns true")
         withTimeout(3.seconds) {
@@ -185,8 +184,8 @@ class IrohChannelTransportSameConversationSupersessionTest {
         firstTurnId: String,
         secondTurnId: String,
     ) {
-        assertEquals(0, transport.activeTurnsCount(), "activeTurns map must be empty after all turns complete")
-        assertEquals(0, transport.activeSendJobsCount(), "activeSendJobs map must be empty after all turns complete")
+        assertEquals(0, transport.privateMap<Any>("activeTurns").size, "activeTurns map must be empty after all turns complete")
+        assertEquals(0, transport.privateMap<Job>("activeSendJobs").size, "activeSendJobs map must be empty after all turns complete")
         assertFalse(transport.hasActiveChatTurn(CONV_1), "hasActiveChatTurn must be false after completion")
 
         val turnDoneFrames = frames.filterIsInstance<ServerFrame.TurnDone>()
@@ -196,6 +195,20 @@ class IrohChannelTransportSameConversationSupersessionTest {
         assertEquals(1, doneForTurn1.size, "turn #1 must receive exactly 1 terminal frame")
         assertEquals(1, doneForTurn2.size, "turn #2 must receive exactly 1 terminal frame (its busy rejection)")
         assertEquals("failed", doneForTurn2.single().status)
+    }
+
+    private fun IrohChannelTransport.activeTurnId(conversationId: String): String? {
+        val turn = privateMap<Any>("activeTurns")[conversationId] ?: return null
+        val field = turn.javaClass.getDeclaredField("turnId")
+        field.isAccessible = true
+        return field.get(turn) as String
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun <V> IrohChannelTransport.privateMap(fieldName: String): Map<String, V> {
+        val field = IrohChannelTransport::class.java.getDeclaredField(fieldName)
+        field.isAccessible = true
+        return field.get(this) as Map<String, V>
     }
 
     private data class RunningTurn(
