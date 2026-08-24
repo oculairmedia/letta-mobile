@@ -19,6 +19,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.NonCancellable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -216,8 +218,16 @@ internal class IrohObserverIngestor(
         }
         val terminal = projectedFrames.firstOrNull { it is ServerFrame.TurnDone }
         if (terminal is ServerFrame.TurnDone) {
-            if (turnRegistry.publishTerminal(localTurn, IrohTerminal(IrohTerminalStatus(terminal.status), IrohTerminalSource.Observer))) {
-                emitBoth(terminal)
+            val publication = IrohTerminalPublication(
+                turn = localTurn,
+                status = IrohTerminalStatus(terminal.status),
+                source = IrohTerminalSource.Observer,
+            )
+            if (turnRegistry.claimTerminal(publication)) {
+                withContext(NonCancellable) {
+                    emitBoth(terminal)
+                    turnRegistry.retireClaimed(publication)
+                }
             }
         }
     }

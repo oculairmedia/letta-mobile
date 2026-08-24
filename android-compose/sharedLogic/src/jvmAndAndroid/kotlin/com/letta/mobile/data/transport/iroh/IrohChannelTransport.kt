@@ -268,15 +268,31 @@ class IrohChannelTransport(
     // stream_delta frames into the SAME _events/_frameEvents seam the initiator
     // uses, so observer frames reduce identically.
     private val observerMapper = AppServerRuntimeEventMapper()
+
     // Own generation-bound observer and viewer re-subscription work in a typed
     // session so stale handles cannot mutate a successor connection.
     private val connectionSession = IrohConnectionSession(
         scope = scope,
-        ingestObserverFrame = ::ingestObserverFrame,
+        ingestObserverFrame = { received ->
+            observerIngestor.ingestObserverFrame(ObserverFrameRequest(received))
+        },
         resubscribe = { conversation ->
             adminRpc(method = "message.list", path = conversation.messageListPath, body = null)
         },
     )
+
+    private val observerIngestor: IrohObserverIngestor by lazy {
+        IrohObserverIngestor(
+            scope = scope,
+            turnRegistry = turnRegistry,
+            connectionGeneration = ::currentConnectionGeneration,
+            emitBoth = ::emitBoth,
+            adminRpc = { method, path, body -> adminRpc(method, path, body) },
+            recordFrameOwnership = ::recordFrameOwnership,
+        )
+    }
+
+    private fun currentConnectionGeneration(): Long = connectionSession.currentGeneration()
 
     private val turnDispatcher = IrohTurnDispatcher(
         IrohTurnDispatcherDependencies(
