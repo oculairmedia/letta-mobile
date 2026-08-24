@@ -1,7 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
 import com.letta.mobile.data.a2ui.A2uiAction
-import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.repository.subagent.ParentContext
 import com.letta.mobile.data.repository.subagent.SubagentCorrelator
 import com.letta.mobile.data.transport.A2uiActionDispatchResult
@@ -19,11 +18,8 @@ import com.letta.mobile.data.transport.appserver.AppServerEndpoint
 import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
 import com.letta.mobile.data.runtime.AppServerTurnEngine
 import com.letta.mobile.data.runtime.TurnContextPreflight
-import com.letta.mobile.runtime.BackendId
 import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.runtime.RuntimeEventPayload
-import com.letta.mobile.runtime.RuntimeId
-import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.runtime.TurnInput
 import computer.iroh.Endpoint
 import computer.iroh.EndpointOptions
@@ -31,7 +27,6 @@ import computer.iroh.RelayMode
 import com.letta.mobile.util.Telemetry
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -281,6 +276,14 @@ class IrohChannelTransport(
         },
     )
 
+    private val turnDispatcher = IrohTurnDispatcher(
+        scope = scope,
+        registry = turnRegistry,
+        ready = supervisor::ready,
+        emitTurnFrame = ::emitTurnFrame,
+        emitDraft = ::emitDraft,
+    )
+
     /**
      * Ingest ONE fanned-out stream frame the observer path owns.
      *
@@ -293,7 +296,7 @@ class IrohChannelTransport(
      * a frame only when NO local turn is active for that frame's conversation.
      *
      * letta-mobile-or40x — THE INVARIANT IS PER CONVERSATION. Ownership is decided
-     * by looking up the frame's own conversation_id in [activeTurns], a map keyed
+     * by looking up the frame's own conversation_id in [turnRegistry], keyed
      * by conversationId. It is therefore airtight per conversation: for a given
      * conversation a frame is engine-owned XOR observer-owned (no overlap), every
      * stream_delta is owned by exactly one side (no gap), and — critically — that
@@ -808,159 +811,16 @@ class IrohChannelTransport(
                 "concurrentTurnIds" to concurrent.joinToString(",") { it.turnId },
             )
         }
-        val sendJob = scope.launch {
-            Telemetry.event("IrohTrace", "transport.send.job_start", "turnId" to turnId, "runId" to turn.runId)
-            val handle = runCatching { supervisor.ready() }.getOrElse { error ->
-                Telemetry.event("IrohTransport", "turn.ready_failed", "error" to (error.message ?: error.toString()), "class" to error::class.simpleName)
-                emitTurnFrame(
-                    turn,
-                    ServerFrame.Error(
-                        id = IrohTransportSupport.frameId("error"),
-                        ts = IrohTransportSupport.nowIso(),
-                        code = "iroh_connection_not_ready",
-                        message = error.message ?: error.toString(),
-                        conversationId = conversationId,
-                        turnId = turnId,
-                        runId = turn.runId,
-                    ),
-                )
-                emitTurnFrame(
-                    turn,
-                    ServerFrame.TurnDone(
-                        id = IrohTransportSupport.frameId("turn_done"),
-                        ts = IrohTransportSupport.nowIso(),
-                        turnId = turnId,
-                        runId = turn.runId,
-                        status = "failed",
-                    ),
-                )
-                return@launch
-            }
-            val engine = handle.turnEngine ?: error("Iroh send requested without turn engine")
-            if (engine.isBusy(agentId, conversationId)) {
-                val owner = engine.activeTurnOwnerFor(agentId, conversationId)
-                val ownerAcquiredAtMs = owner?.acquiredAtMs
-                Telemetry.event(
-                    "IrohTransport", "turn.busy",
-                    "turnId" to turnId,
-                    "runId" to turn.runId,
-                    "sendAgentId" to agentId,
-                    "sendConversationId" to conversationId,
-                    "sendOtid" to otid,
-                    "ownerRunId" to owner?.runId,
-                    "ownerRuntimeId" to owner?.runtimeId,
-                    "ownerAgentId" to owner?.agentId,
-                    "ownerConversationId" to owner?.conversationId,
-                    "ownerAcquiredAtMs" to ownerAcquiredAtMs,
-                    "ownerHeldForMs" to ownerAcquiredAtMs?.let { System.currentTimeMillis() - it },
-                    "ownerLastTerminal" to owner?.lastTerminal,
-                    "ownerLastTerminalSource" to owner?.lastTerminalSource,
-                    "ownerLastTerminalAtMs" to owner?.lastTerminalAtMs,
-                    "ownerLastTerminalSeq" to owner?.lastTerminalSeq,
-                    "ownerLastTerminalScopeMatched" to owner?.lastTerminalScopeMatched,
-                    "ownerSettleDeadlineMs" to owner?.settleDeadlineMs,
-                    "ownerWatchdogDeadlineMs" to owner?.watchdogDeadlineMs,
-                    "ownerProcessRole" to owner?.processRole,
-                    "ownerReleaseReason" to owner?.releaseReason,
-                    "otherBusyKeys" to engine.busyRuntimeKeys()
-                        .filter { it.conversationId != conversationId || it.agentId != agentId }
-                        .joinToString(",") { it.toString() },
-                )
-                emitTurnFrame(
-                    turn,
-                    ServerFrame.Error(
-                        id = IrohTransportSupport.frameId("error"),
-                        ts = IrohTransportSupport.nowIso(),
-                        code = "iroh_turn_engine_busy",
-                        message = "Iroh App Server turn engine is already busy.",
-                        conversationId = conversationId,
-                        turnId = turnId,
-                        runId = turn.runId,
-                    ),
-                )
-                emitTurnFrame(
-                    turn,
-                    ServerFrame.TurnDone(
-                        id = IrohTransportSupport.frameId("turn_done"),
-                        ts = IrohTransportSupport.nowIso(),
-                        turnId = turnId,
-                        runId = turn.runId,
-                        status = "failed",
-                    ),
-                )
-                return@launch
-            }
-            emitTurnFrame(
-                turn,
-                ServerFrame.TurnStarted(
-                    id = IrohTransportSupport.frameId("turn_started"),
-                    ts = IrohTransportSupport.nowIso(),
-                    agentId = agentId,
-                    conversationId = conversationId,
-                    turnId = turnId,
-                    runId = turn.runId,
+        val sendJob = turnDispatcher.launch(
+            IrohTurnDispatch(
+                turn = turn,
+                input = TurnInput.UserMessage(
+                    localMessageId = otid ?: IrohTransportSupport.frameId("local"),
+                    text = text,
+                    contentPartsJson = contentParts?.toString(),
                 ),
-            )
-            runCatching {
-                engine.runTurn(
-                    TurnCommand(
-                        backendId = BackendId("iroh-app-server"),
-                        runtimeId = RuntimeId("iroh:${handle.sessionId}"),
-                        agentId = AgentId(agentId),
-                        conversationId = ConversationId(conversationId),
-                        input = TurnInput.UserMessage(
-                            localMessageId = otid ?: IrohTransportSupport.frameId("local"),
-                            text = text,
-                            contentPartsJson = contentParts?.toString(),
-                        ),
-                    ),
-                ).collect { draft ->
-                    draft.runId?.value?.let { realRunId ->
-                        if (turnRegistry.promoteRunId(IrohRunPromotion(turn.token, IrohRunId(realRunId)))) {
-                            emitBoth(
-                                ServerFrame.TurnStarted(
-                                    id = IrohTransportSupport.frameId("turn_started"),
-                                    ts = IrohTransportSupport.nowIso(),
-                                    agentId = agentId,
-                                    conversationId = conversationId,
-                                    turnId = turnId,
-                                    runId = realRunId,
-                                ),
-                            )
-                        }
-                    }
-                    emitDraft(draft, turn).forEach { emitTurnFrame(turn, it) }
-                }
-            }.onFailure { error ->
-                if (error is CancellationException) {
-                    Telemetry.event("IrohTransport", "turn.cancelled", "turnId" to turnId, "runId" to turn.runId)
-                    return@onFailure
-                }
-                Telemetry.event("IrohTransport", "turn.failed", "error" to (error.message ?: error.toString()), "class" to error::class.simpleName)
-                emitTurnFrame(
-                    turn,
-                    ServerFrame.Error(
-                        id = IrohTransportSupport.frameId("error"),
-                        ts = IrohTransportSupport.nowIso(),
-                        code = "iroh_app_server_error",
-                        message = error.message ?: error.toString(),
-                        conversationId = conversationId,
-                        turnId = turnId,
-                        runId = turn.runId,
-                    ),
-                )
-                emitTurnFrame(
-                    turn,
-                    ServerFrame.TurnDone(
-                        id = IrohTransportSupport.frameId("turn_done"),
-                        ts = IrohTransportSupport.nowIso(),
-                        turnId = turnId,
-                        runId = turn.runId,
-                        status = "failed",
-                    ),
-                )
-            }
-        }
+            ),
+        )
         turn.job = sendJob
         turnRegistry.registerSendJob(IrohSendJobRegistration(IrohConversationId(conversationId), sendJob))
         sendJob.invokeOnCompletion {
