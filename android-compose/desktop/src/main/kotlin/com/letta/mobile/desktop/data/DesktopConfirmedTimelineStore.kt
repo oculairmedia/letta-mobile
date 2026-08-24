@@ -127,46 +127,15 @@ class DesktopConfirmedTimelineStore(
         )
     }
 
-    override suspend fun clearForBackend(backendId: String): Unit = withContext(Dispatchers.IO) {
-        val backendDir = backendDirectory(backendId)
-        if (Files.exists(backendDir)) {
-            Files.walk(backendDir)
-                .sorted(Comparator.reverseOrder())
-                .forEach { Files.deleteIfExists(it) }
-        }
-        Telemetry.event(
-            "DesktopTimelineStore", "clearForBackend",
-            "backendId" to backendId,
+    override suspend fun clearForBackend(backendId: String): Unit =
+        DesktopTimelineSnapshotMaintenance.clear(backendDirectory(backendId), backendId)
+
+    override suspend fun prune(backendId: String, maxRetainedConversations: Int): Unit =
+        DesktopTimelineSnapshotMaintenance.prune(
+            backendDirectory = backendDirectory(backendId),
+            backendId = backendId,
+            maxRetainedConversations = maxRetainedConversations,
         )
-    }
-
-    override suspend fun prune(backendId: String, maxRetainedConversations: Int): Unit = withContext(Dispatchers.IO) {
-        if (maxRetainedConversations <= 0) return@withContext
-        val backendDir = backendDirectory(backendId)
-        if (!Files.exists(backendDir)) return@withContext
-
-        val snapshotFiles = Files.list(backendDir)
-            .filter { it.toString().endsWith(".json") }
-            .toList()
-
-        if (snapshotFiles.size > maxRetainedConversations) {
-            val sortedByTime = snapshotFiles.mapNotNull { file ->
-                val envelope = runCatching { TimelineSnapshotCodec.decode(Files.readString(file)) }.getOrNull()
-                envelope?.let { file to it.writtenAtMillis }
-            }.sortedByDescending { it.second }
-
-            if (sortedByTime.size > maxRetainedConversations) {
-                val excess = sortedByTime.drop(maxRetainedConversations)
-                excess.forEach { (file, _) -> Files.deleteIfExists(file) }
-                Telemetry.event(
-                    "DesktopTimelineStore", "prune",
-                    "backendId" to backendId,
-                    "prunedCount" to excess.size,
-                    "remainingCount" to maxRetainedConversations,
-                )
-            }
-        }
-    }
 
     private fun backendDirectory(backendId: String): Path {
         val safeBackend = sanitize(backendId)
