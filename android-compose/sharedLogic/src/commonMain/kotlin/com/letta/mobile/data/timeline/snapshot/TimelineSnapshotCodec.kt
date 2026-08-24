@@ -37,7 +37,7 @@ object TimelineSnapshotCodec {
         if (payload.isBlank()) return null
         return runCatching {
             val envelope = json.decodeFromString(StoredTimelineEnvelope.serializer(), payload)
-            migrateIfNeeded(envelope)
+            migrateIfNeeded(envelope) ?: return null
         }.onFailure { error ->
             Telemetry.error(
                 "TimelineSnapshotCodec", "decode.corruptPayload", error,
@@ -46,20 +46,17 @@ object TimelineSnapshotCodec {
         }.getOrNull()
     }
 
-    private fun migrateIfNeeded(envelope: StoredTimelineEnvelope): StoredTimelineEnvelope {
-        // Schema migrations start here as schemas evolve.
-        return when (envelope.schemaVersion) {
-            1 -> envelope
-            else -> {
-                Telemetry.event(
-                    "TimelineSnapshotCodec", "migrate.unknownSchemaVersion",
-                    "schemaVersion" to envelope.schemaVersion,
-                    "targetVersion" to StoredTimelineEnvelope.CURRENT_SCHEMA_VERSION,
-                    level = Telemetry.Level.WARN,
-                )
-                envelope.copy(schemaVersion = StoredTimelineEnvelope.CURRENT_SCHEMA_VERSION)
-            }
+    private fun migrateIfNeeded(envelope: StoredTimelineEnvelope): StoredTimelineEnvelope? {
+        if (envelope.schemaVersion > StoredTimelineEnvelope.CURRENT_SCHEMA_VERSION) {
+            Telemetry.event(
+                "TimelineSnapshotCodec", "decode.unsupportedFutureSchema",
+                "schemaVersion" to envelope.schemaVersion,
+                "targetVersion" to StoredTimelineEnvelope.CURRENT_SCHEMA_VERSION,
+                level = Telemetry.Level.WARN,
+            )
+            return null
         }
+        return envelope
     }
 
     fun timelineToStoredEnvelope(

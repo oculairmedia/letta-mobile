@@ -8,7 +8,9 @@ import com.letta.mobile.data.timeline.snapshot.StoredTimelineEnvelope
 import com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -92,7 +94,9 @@ class ConfirmedTimelineScenarioTest {
         )
         store.writeSnapshot(envelope)
 
+        val gate = CompletableDeferred<Unit>()
         val transport = FakeTimelineTransport(
+            delayCompletion = gate,
             messagesByConversation = mapOf(
                 "conv-persisted" to listOf(
                     UserMessage(id = "msg-1", contentRaw = kotlinx.serialization.json.JsonPrimitive("Hello from yesterday")),
@@ -111,10 +115,11 @@ class ConfirmedTimelineScenarioTest {
         )
 
         try {
-            val loop = repo.getOrCreate("conv-persisted")
-
-            // First frame must immediately contain the 2 persisted events!
-            val initialTimeline = loop.state.value
+            val creation = async { repo.getOrCreate("conv-persisted") }
+            runCurrent()
+            assertEquals(1, transport.listMessagesCallCount)
+            gate.complete(Unit)
+            val initialTimeline = creation.await().state.value
             assertEquals(2, initialTimeline.events.size)
             assertEquals("Hello from yesterday", initialTimeline.events[0].content)
             assertEquals("I remember you!", initialTimeline.events[1].content)

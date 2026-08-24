@@ -72,7 +72,6 @@ object TimelineHydrationReducer {
         val initialKeys = timelineBeforeFetch.events.flatMap { it.identityKeys() }.toHashSet()
         val olderConfirmed = timelineBeforeFetch.events.filterIsInstance<TimelineEvent.Confirmed>()
             .filter { it.identityKeys().none(convertedKeys::contains) }
-            .filter { it.position < (converted.firstOrNull()?.position ?: Double.MAX_VALUE) }
         val pendingLocals = currentTimeline.events.filterIsInstance<TimelineEvent.Local>()
             .filter { it.deliveryState.isPendingOrRestorable() }
             .filter { local -> converted.none { it.otid == local.otid } }
@@ -132,7 +131,7 @@ object TimelineHydrationReducer {
         val mergedApprovalDecision = serverEvent.approvalDecision ?: localEvent.approvalDecision
 
         val mergedToolReturnContentByCallId = (serverEvent.toolReturnContentByCallId + localEvent.toolReturnContentByCallId.filter { (callId, _) ->
-            callId !in serverEvent.toolReturnTruncationByCallId || callId !in localEvent.toolReturnTruncationByCallId
+            callId !in localEvent.toolReturnTruncationByCallId || callId in serverEvent.toolReturnTruncationByCallId
         }).toTimelinePersistentMap()
 
         val mergedTruncations = (serverEvent.toolReturnTruncationByCallId.filterKeys {

@@ -17,7 +17,8 @@ data class TimelineScope(
         require(conversationId.isNotBlank()) { "conversationId must not be blank" }
     }
 
-    /** Unique storage key for indexing in flat key-value or file-based stores. */
+    /** Unique, reversible storage key for indexing in flat key-value or file-based stores. */
     val storageKey: String
-        get() = "${backendId}|${agentId.orEmpty()}|${conversationId}"
+        get() = listOf(backendId, agentId.orEmpty(), conversationId)
+            .joinToString(separator = "") { value -> "${value.length}:$value" }
 }

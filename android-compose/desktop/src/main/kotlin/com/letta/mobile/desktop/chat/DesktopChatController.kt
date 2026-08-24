@@ -55,16 +55,12 @@ class DesktopChatController(
     // PATCHes the server so this lights up automatically once the backend lands.
     loadArchivedConversationIds: () -> Set<String> = { emptySet() },
     private val persistArchivedConversationIds: (Set<String>) -> Unit = {},
-    private val loopFactory: (
+    private val loopFactory: suspend (
         gateway: DesktopChatGateway,
         conversation: DesktopConversationSummary,
         scope: CoroutineScope,
     ) -> DesktopTimelineLoop = { gateway, conversation, loopScope ->
-        RealDesktopTimelineLoop(
-            gateway = gateway,
-            conversation = conversation,
-            scope = loopScope,
-        )
+        RealDesktopTimelineLoop.create(gateway, conversation, loopScope)
     },
 ) {
     private val initialState = initialLiveDesktopChatSurfaceState(bootstrapState)
@@ -1000,7 +996,7 @@ class DesktopChatController(
             if (!isActiveSelection(generation)) return
             _state.update {
                 it.withRuntimeState(
-                    ChatSessionReducer.streamDisconnected(
+                    ChatSessionReducer.hydrateFailed(
                         state = it.runtimeState,
                         generation = generation,
                         errorMessage = t.message ?: t::class.simpleName ?: "Message load failed",

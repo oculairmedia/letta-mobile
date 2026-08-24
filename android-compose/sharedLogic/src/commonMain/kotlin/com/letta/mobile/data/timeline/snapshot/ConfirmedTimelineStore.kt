@@ -84,7 +84,10 @@ class InMemoryConfirmedTimelineStore : ConfirmedTimelineStore {
     }
 
     override suspend fun prune(backendId: String, maxRetainedConversations: Int) {
-        if (maxRetainedConversations <= 0) return
+        if (maxRetainedConversations <= 0) {
+            clearForBackend(backendId)
+            return
+        }
         synchronized(lock) {
             val matching = store.values
                 .filter { it.scope.backendId == backendId }
