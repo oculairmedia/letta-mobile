@@ -115,82 +115,82 @@ internal class IrohObserverIngestor(
     }
 
     fun reSubscribeViewedConversation(generation: Long) {
-        val path = viewedMessageListPath ?: return
-        val conversationId = viewedConversationId
+        val subscription = viewedMessageListPath?.let { path ->
+            ObserverSubscription(path = path, conversationId = viewedConversationId, generation = generation)
+        } ?: return
         resubscribeJob?.cancel()
-        resubscribeJob = scope.launch {
-            if (connectionGeneration() != generation) return@launch
-            Telemetry.event(
-                "IrohObserver", "resubscribe.begin",
-                "conversationId" to (conversationId ?: ""),
-                "generation" to generation.toString(),
-            )
-            runCatching {
-                if (connectionGeneration() != generation) return@launch
-                adminRpc("message.list", path, null)
-            }.onFailure { error ->
-                if (error is CancellationException) throw error
-                Telemetry.event(
-                    "IrohObserver", "resubscribe.failed",
-                    "conversationId" to (conversationId ?: ""),
-                    "error" to (error.message ?: error.toString()),
-                    "class" to error::class.simpleName,
-                )
-            }
-        }
+        resubscribeJob = scope.launch { resubscribe(subscription) }
     }
 
     suspend fun ingestObserverFrame(received: AppServerReceivedFrame, expectedGeneration: Long? = null) {
         if (expectedGeneration != null && connectionGeneration() != expectedGeneration) return
-
         val streamDelta = received.frame as? AppServerInboundFrame.StreamDelta ?: return
-        val conversationId = streamDelta.runtime.conversationId
-        val agentId = streamDelta.runtime.agentId
-
-        val localTurn = turnRegistry.getActiveTurn(conversationId)
-        recordFrameOwnership(conversationId, localTurn)
-        if (localTurn != null) {
+        val scope = observerScope(streamDelta)
+        recordFrameOwnership(scope.conversationId, scope.localTurn)
+        if (scope.localTurn != null) {
             Telemetry.event(
                 "IrohObserver", "ingest.skip_engine_owned",
-                "conversationId" to conversationId,
-                "turnId" to localTurn.turnId,
+                "conversationId" to scope.conversationId,
+                "turnId" to scope.localTurn.turnId,
             )
-            projectEngineOwnedObserverDelta(
-                scope = ObserverProjectionScope(
-                    agentId = agentId,
-                    conversationId = conversationId,
-                    localTurn = localTurn,
-                ),
-                received = received,
-            )
+            projectEngineOwnedObserverDelta(scope, received)
             return
         }
-
-        val deltaObj = streamDelta.delta as? JsonObject
-        val frameRunId = deltaObj?.string("run_id") ?: deltaObj?.string("runId")
-        if (frameRunId != null && turnRegistry.isRetiredRun(frameRunId)) {
-            Telemetry.event(
-                "IrohObserver", "ingest.skip_already_retired",
-                "conversationId" to conversationId,
-                "runId" to frameRunId,
-            )
-            return
-        }
-
+        if (isRetiredObserverRun(streamDelta, scope.conversationId)) return
         correlateAgentFrame(streamDelta).forEach { emitBoth(it) }
+        projectPassiveObserverDelta(scope, received)
+    }
 
-        val command = observerTurnCommand(agentId, conversationId)
-        observerMapper.map(command, received).forEach { draft ->
-            val frames = RuntimeEventServerFrameMapper.map(
+    private suspend fun resubscribe(subscription: ObserverSubscription) {
+        if (connectionGeneration() != subscription.generation) return
+        Telemetry.event(
+            "IrohObserver", "resubscribe.begin",
+            "conversationId" to (subscription.conversationId ?: ""),
+            "generation" to subscription.generation.toString(),
+        )
+        runCatching {
+            if (connectionGeneration() != subscription.generation) return
+            adminRpc("message.list", subscription.path, null)
+        }.onFailure { error ->
+            if (error is CancellationException) throw error
+            Telemetry.event(
+                "IrohObserver", "resubscribe.failed",
+                "conversationId" to (subscription.conversationId ?: ""),
+                "error" to (error.message ?: error.toString()),
+                "class" to error::class.simpleName,
+            )
+        }
+    }
+
+    private fun observerScope(streamDelta: AppServerInboundFrame.StreamDelta): ObserverProjectionScope =
+        ObserverProjectionScope(
+            agentId = streamDelta.runtime.agentId,
+            conversationId = streamDelta.runtime.conversationId,
+            localTurn = turnRegistry.getActiveTurn(streamDelta.runtime.conversationId),
+        )
+
+    private fun isRetiredObserverRun(
+        streamDelta: AppServerInboundFrame.StreamDelta,
+        conversationId: String,
+    ): Boolean {
+        val delta = streamDelta.delta as? JsonObject
+        val runId = delta?.string("run_id") ?: delta?.string("runId") ?: return false
+        if (!turnRegistry.isRetiredRun(runId)) return false
+        Telemetry.event("IrohObserver", "ingest.skip_already_retired", "conversationId" to conversationId, "runId" to runId)
+        return true
+    }
+
+    private suspend fun projectPassiveObserverDelta(scope: ObserverProjectionScope, received: AppServerReceivedFrame) {
+        observerMapper.map(observerTurnCommand(scope.agentId, scope.conversationId), received).forEach { draft ->
+            RuntimeEventServerFrameMapper.map(
                 payload = draft.payload,
                 context = RuntimeEventServerFrameMapper.Context(
-                    agentId = draft.agentId?.value ?: agentId,
-                    conversationId = draft.conversationId?.value ?: conversationId,
-                    turnId = "iroh-observer-turn-$conversationId",
-                    runId = draft.runId?.value ?: "iroh-observer-run-$conversationId",
+                    agentId = draft.agentId?.value ?: scope.agentId,
+                    conversationId = draft.conversationId?.value ?: scope.conversationId,
+                    turnId = "iroh-observer-turn-${scope.conversationId}",
+                    runId = draft.runId?.value ?: "iroh-observer-run-${scope.conversationId}",
                 ),
-            )
-            frames.forEach { emitBoth(it) }
+            ).forEach { emitBoth(it) }
         }
     }
 
@@ -198,6 +198,7 @@ internal class IrohObserverIngestor(
         scope: ObserverProjectionScope,
         received: AppServerReceivedFrame,
     ) {
+        val localTurn = scope.localTurn ?: return
         val command = observerTurnCommand(scope.agentId, scope.conversationId)
         val projectedFrames = observerMapper.map(command, received).flatMap { draft ->
             RuntimeEventServerFrameMapper.map(
@@ -205,14 +206,14 @@ internal class IrohObserverIngestor(
                 context = RuntimeEventServerFrameMapper.Context(
                     agentId = draft.agentId?.value ?: scope.agentId,
                     conversationId = draft.conversationId?.value ?: scope.conversationId,
-                    turnId = scope.localTurn.turnId,
-                    runId = draft.runId?.value ?: scope.localTurn.runId,
+                    turnId = localTurn.turnId,
+                    runId = draft.runId?.value ?: localTurn.runId,
                 ),
             )
         }
         val terminal = projectedFrames.firstOrNull { it is ServerFrame.TurnDone }
         if (terminal is ServerFrame.TurnDone) {
-            if (turnRegistry.publishTerminal(scope.localTurn, terminal.status, source = "observer")) {
+            if (turnRegistry.publishTerminal(localTurn, terminal.status, source = "observer")) {
                 emitBoth(terminal)
             }
         }
@@ -303,10 +304,16 @@ internal class IrohObserverIngestor(
         return id.takeIf { it.isNotBlank() }
     }
 
+    private data class ObserverSubscription(
+        val path: String,
+        val conversationId: String?,
+        val generation: Long,
+    )
+
     private data class ObserverProjectionScope(
         val agentId: String,
         val conversationId: String,
-        val localTurn: IrohActiveTurn,
+        val localTurn: IrohActiveTurn?,
     )
 
     companion object {
