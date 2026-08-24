@@ -200,12 +200,37 @@ class IrohChannelTransport(
      * end of turn is not reported as a flip.
      */
     private val frameOwnershipPath = ConcurrentHashMap<String, String>()
+    private val recentlyRetiredRuns = ConcurrentHashMap<String, Long>()
+    private val connectionGeneration = atomic(0L)
+    @Volatile
+    private var resubscribeJob: Job? = null
 
     override fun hasActiveChatTurn(conversationId: String): Boolean =
         activeTurns[conversationId]?.terminalReached?.isCompleted == false
 
     override val hasAnyActiveChatTurn: Boolean
         get() = activeTurns.values.any { !it.terminalReached.isCompleted }
+
+    internal data class ActiveTurnSnapshot(
+        val turnId: String,
+        val runId: String,
+        val hasTerminal: Boolean,
+        val isTerminalCompleted: Boolean,
+    )
+
+    internal fun activeTurnSnapshot(conversationId: String): ActiveTurnSnapshot? {
+        val turn = activeTurns[conversationId] ?: return null
+        return ActiveTurnSnapshot(
+            turnId = turn.turnId,
+            runId = turn.runId,
+            hasTerminal = turn.hasTerminal,
+            isTerminalCompleted = turn.terminalReached.isCompleted,
+        )
+    }
+
+    internal fun activeSendJob(conversationId: String): Job? = activeSendJobs[conversationId]
+    internal fun activeTurnsCount(): Int = activeTurns.size
+    internal fun activeSendJobsCount(): Int = activeSendJobs.size
 
     /**
      * letta-mobile-m6oa1.1: the Kotlin App Server's own Agent-tool_call
@@ -240,7 +265,7 @@ class IrohChannelTransport(
         val conversationId: String,
     ) {
         private val runIdRef = atomic(initialRunId)
-        private val terminalClaimed = atomic(false)
+        private val terminalClaimed = atomic<String?>(null)
         /** Completes with the terminal status once the one terminal is emitted. */
         val terminalReached = CompletableDeferred<String>()
         @Volatile
@@ -263,9 +288,11 @@ class IrohChannelTransport(
             }
         }
 
-        /** Wins exactly once; the first terminal (server or synthetic) claims it. */
-        fun claimTerminal(): Boolean = terminalClaimed.compareAndSet(expect = false, update = true)
-        val hasTerminal: Boolean get() = terminalClaimed.value
+        /** Wins exactly once; the first terminal (server, observer, or synthetic cancel) claims it. */
+        fun tryClaimTerminal(source: String): Boolean = terminalClaimed.compareAndSet(expect = null, update = source)
+        fun claimTerminal(): Boolean = tryClaimTerminal("engine")
+        val hasTerminal: Boolean get() = terminalClaimed.value != null
+        val terminalSource: String? get() = terminalClaimed.value
     }
 
     private var explicitConfig: IrohConnectConfig? = null
@@ -278,28 +305,24 @@ class IrohChannelTransport(
         onStateChanged = { supervisorState ->
             _state.value = supervisorState.toChannelTransportState()
             if (supervisorState is IrohConnectionState.Ready) {
+                val generation = connectionGeneration.incrementAndGet()
                 notifyRedialIfTurnActive()
                 // letta-mobile-r3i1z: (re)start the passive observer ingestion loop
                 // bound to THIS connection generation. Any prior collector (tied to
                 // an older, now-dead flow) is cancelled first so a stale collector
                 // never ingests from a torn-down transport.
-                startObserverIngest(supervisorState.handle)
+                startObserverIngest(supervisorState.handle, generation)
                 // letta-mobile-r3i1z (A): on EVERY fresh Ready — including a silent
                 // redial after a QUIC timeout — re-register this connection as a
-                // viewer of the currently-viewed conversation. Server-side viewer
-                // registration only fires on runtime_start (send) or message.list
-                // (hydrate); a long-lived app that redials without doing either is
-                // invisible to the fanout (viewerCount drops to just the initiator).
-                // Re-issuing the hydrate's message.list both re-registers server-side
-                // AND reconciles frames missed during the dead window.
-                reSubscribeViewedConversation()
+                // viewer of the currently-viewed conversation.
+                reSubscribeViewedConversation(generation)
                 // letta-mobile-wxy4s: arm the application-level liveness probe for
-                // THIS connection generation. QUIC state alone cannot detect a
-                // black-holed peer (the unacked keepalive datagram keeps resetting
-                // the idle timer), so a periodic health.check over a FRESH bidi
-                // stream is the only thing that actually tests the path.
+                // THIS connection generation.
                 livenessProbe.start(supervisorState.handle)
             } else {
+                connectionGeneration.incrementAndGet()
+                resubscribeJob?.cancel()
+                resubscribeJob = null
                 // Snapshot turn identity before a degraded handle is closed and
                 // its send jobs drop their entries from activeTurns. Intentional
                 // disconnects and config replacement must not synthesize redial
@@ -361,23 +384,14 @@ class IrohChannelTransport(
     @Volatile
     private var observerJob: Job? = null
 
-    private fun startObserverIngest(handle: IrohConnectionHandle) {
+    private fun startObserverIngest(handle: IrohConnectionHandle, generation: Long) {
         val streamFrames = handle.effectiveObserverStreamFrames
         if (streamFrames == null) {
-            // A Ready handle with no observable stream must STILL invalidate any
-            // prior collector — a stale collector pinned to a superseded
-            // connection's flow can never be left running (r3i1z redial gap).
             stopObserverIngest("no_observer_stream")
             Telemetry.event("IrohObserver", "ingest.unavailable", "sessionId" to handle.sessionId)
             return
         }
-        // Bump the generation and cancel any prior collector: exactly one observer
-        // collector is ever live, and it is pinned to this handle's session.
-        val generation = observerGeneration.incrementAndGet()
         observerJob?.cancel()
-        // Log at ARM time (synchronously), not inside the launched job: if a racing
-        // teardown cancels the job before dispatch, telemetry still shows the
-        // (re)start happened — the r3i1z redial diagnosis relied on this signal.
         Telemetry.event(
             "IrohObserver", "ingest.start",
             "sessionId" to handle.sessionId,
@@ -386,8 +400,7 @@ class IrohChannelTransport(
         observerJob = scope.launch {
             runCatching {
                 streamFrames.collect { received ->
-                    // Guard against a stale collector that a redial has superseded.
-                    if (observerGeneration.value != generation) return@collect
+                    if (connectionGeneration.value != generation) return@collect
                     ingestObserverFrame(received)
                 }
             }.onFailure { error ->
@@ -404,45 +417,24 @@ class IrohChannelTransport(
     private fun stopObserverIngest(reason: String) {
         val job = observerJob ?: return
         observerJob = null
-        // Invalidate the generation so an in-flight collect body drops its frame.
         observerGeneration.incrementAndGet()
         job.cancel()
         Telemetry.event("IrohObserver", "ingest.stop", "reason" to reason)
     }
 
     // letta-mobile-r3i1z (A): RE-SUBSCRIBE ON RECONNECT.
-    //
-    // The "currently viewed conversation" is learned from the transport's OWN
-    // message.list admin_rpc traffic — the same hydrate that first registered
-    // this connection as a server-side viewer (path /v1/conversations/<id>/...).
-    // We record its (conversationId, path) and, on every fresh Ready, replay it.
-    // No new callback/provider is needed: the timeline layer already routes its
-    // hydrate through adminRpc(), so the transport already sees which
-    // conversation is being viewed.
     @Volatile
     private var viewedConversationId: String? = null
     @Volatile
     private var viewedMessageListPath: String? = null
 
-    /**
-     * Records the currently-viewed conversation from a message.list hydrate so a
-     * later reconnect can re-issue it. Called for every message.list adminRpc the
-     * transport handles. Non-message.list reads (agent.list, health.check, …) do
-     * not carry a viewed-conversation identity and are ignored.
-     */
     private fun recordViewedConversationFrom(method: String, path: String) {
         if (method != "message.list") return
         val conversationId = conversationIdFromMessageListPath(path) ?: return
-        // A conversation switch re-points the re-subscribe target (mirrors the
-        // server's Option A de-scope rule). The freshest message.list wins.
         viewedConversationId = conversationId
         viewedMessageListPath = path
     }
 
-    /**
-     * Extracts the conversation id from a message.list path of the shape
-     * `/v1/conversations/<id>/messages[?...]`. Returns null for any other shape.
-     */
     private fun conversationIdFromMessageListPath(path: String): String? {
         val marker = "/v1/conversations/"
         val start = path.indexOf(marker)
@@ -452,33 +444,29 @@ class IrohChannelTransport(
         return id.takeIf { it.isNotBlank() }
     }
 
-    /**
-     * On a fresh Ready, re-issue the recorded message.list for the viewed
-     * conversation so the (possibly brand-new, redialed) connection re-registers
-     * as a viewer server-side. Idempotent — fires on the FIRST Ready too, where
-     * the normal open/hydrate already registers, so a duplicate hydrate is
-     * harmless (message.list is read-only + the server viewer set is a Set).
-     * Fire-and-forget on [scope]; failures are swallowed (a dead connection just
-     * escalates through the normal admin_rpc retry path on the next real read).
-     */
-    private fun reSubscribeViewedConversation() {
+    private fun reSubscribeViewedConversation(generation: Long) {
         val path = viewedMessageListPath ?: return
         val conversationId = viewedConversationId
-        scope.launch {
+        resubscribeJob?.cancel()
+        resubscribeJob = scope.launch {
+            if (connectionGeneration.value != generation) return@launch
             Telemetry.event(
                 "IrohObserver", "resubscribe.begin",
                 "conversationId" to (conversationId ?: ""),
+                "generation" to generation.toString(),
             )
-            runCatching { adminRpc(method = "message.list", path = path, body = null) }
-                .onFailure { error ->
-                    if (error is CancellationException) throw error
-                    Telemetry.event(
-                        "IrohObserver", "resubscribe.failed",
-                        "conversationId" to (conversationId ?: ""),
-                        "error" to (error.message ?: error.toString()),
-                        "class" to error::class.simpleName,
-                    )
-                }
+            runCatching {
+                if (connectionGeneration.value != generation) return@launch
+                adminRpc(method = "message.list", path = path, body = null)
+            }.onFailure { error ->
+                if (error is CancellationException) throw error
+                Telemetry.event(
+                    "IrohObserver", "resubscribe.failed",
+                    "conversationId" to (conversationId ?: ""),
+                    "error" to (error.message ?: error.toString()),
+                    "class" to error::class.simpleName,
+                )
+            }
         }
     }
 
@@ -529,6 +517,17 @@ class IrohChannelTransport(
                     localTurn = localTurn,
                 ),
                 received = received,
+            )
+            return
+        }
+
+        val deltaObj = streamDelta.delta as? JsonObject
+        val frameRunId = deltaObj?.string("run_id") ?: deltaObj?.string("runId")
+        if (frameRunId != null && recentlyRetiredRuns.containsKey(frameRunId)) {
+            Telemetry.event(
+                "IrohObserver", "ingest.skip_already_retired",
+                "conversationId" to conversationId,
+                "runId" to frameRunId,
             )
             return
         }
@@ -590,7 +589,10 @@ class IrohChannelTransport(
         }
         val terminal = projectedFrames.firstOrNull { it is ServerFrame.TurnDone }
         if (terminal is ServerFrame.TurnDone) {
-            retireActiveTurn(scope.localTurn, terminal.status, source = "observer_terminal")
+            if (scope.localTurn.tryClaimTerminal("observer")) {
+                emitBoth(terminal)
+                retireActiveTurn(scope.localTurn, terminal.status, source = "observer_terminal")
+            }
         }
     }
 
@@ -968,28 +970,56 @@ class IrohChannelTransport(
             "textLength" to text.length,
             "state" to state.value::class.simpleName,
         )
-        val runId = "iroh-run-${UUID.randomUUID()}"
         val turnId = "iroh-turn-${UUID.randomUUID()}"
-        val turn = ActiveTurn(
+        val initialRunId = "iroh-run-${UUID.randomUUID()}"
+        val newTurn = ActiveTurn(
             turnId = turnId,
-            initialRunId = runId,
+            initialRunId = initialRunId,
             agentId = agentId,
             conversationId = conversationId,
         )
-        // letta-mobile-or40x: KEYED registration. Starting a turn on conversation
-        // B must never displace conversation A's turn — only a new turn on the
-        // SAME conversation supersedes the previous one, and that supersession is
-        // reported (SENSING b) instead of being silently absorbed.
-        val superseded = activeTurns.put(conversationId, turn)
-        if (superseded != null && !superseded.hasTerminal) {
-            Telemetry.event(
-                "IrohTransport", "turn.superseded_nonterminal",
-                "conversationId" to conversationId,
-                "supersededTurnId" to superseded.turnId,
-                "supersededRunId" to superseded.runId,
-                "newTurnId" to turnId,
-            )
+        var busyOwner: ActiveTurn? = null
+        activeTurns.compute(conversationId) { _, existing ->
+            if (existing != null && !existing.terminalReached.isCompleted) {
+                busyOwner = existing
+                existing
+            } else {
+                newTurn
+            }
         }
+        val currentActive = busyOwner
+        if (currentActive != null) {
+            Telemetry.event(
+                "IrohTransport", "send.rejected_same_conversation_busy",
+                "conversationId" to conversationId,
+                "activeTurnId" to currentActive.turnId,
+                "rejectedTurnId" to turnId,
+            )
+            scope.launch {
+                emitBoth(
+                    ServerFrame.Error(
+                        id = frameId("error"),
+                        ts = nowIso(),
+                        code = "iroh_turn_engine_busy",
+                        message = "a turn is already active for this conversation",
+                        conversationId = conversationId,
+                        turnId = turnId,
+                        runId = initialRunId,
+                    ),
+                )
+                emitBoth(
+                    ServerFrame.TurnDone(
+                        id = frameId("turn_done"),
+                        ts = nowIso(),
+                        turnId = turnId,
+                        runId = initialRunId,
+                        status = "failed",
+                    ),
+                )
+            }
+            return true
+        }
+        val turn = newTurn
         // SENSING (a): a turn is starting for THIS conversation while another
         // conversation still has a nonterminal turn in flight. Legal after or40x
         // (that is the whole point), but it is the precondition of the reported
@@ -1005,7 +1035,7 @@ class IrohChannelTransport(
             )
         }
         val sendJob = scope.launch {
-            Telemetry.event("IrohTrace", "transport.send.job_start", "turnId" to turnId, "runId" to runId)
+            Telemetry.event("IrohTrace", "transport.send.job_start", "turnId" to turnId, "runId" to turn.runId)
             val handle = runCatching { supervisor.ready() }.getOrElse { error ->
                 Telemetry.event("IrohTransport", "turn.ready_failed", "error" to (error.message ?: error.toString()), "class" to error::class.simpleName)
                 emitTurnFrame(
@@ -1053,7 +1083,7 @@ class IrohChannelTransport(
                 Telemetry.event(
                     "IrohTransport", "turn.busy",
                     "turnId" to turnId,
-                    "runId" to runId,
+                    "runId" to turn.runId,
                     "sendAgentId" to agentId,
                     "sendConversationId" to conversationId,
                     "sendOtid" to otid,
@@ -1204,7 +1234,7 @@ class IrohChannelTransport(
      */
     private suspend fun emitTurnFrame(turn: ActiveTurn, frame: ServerFrame) {
         if (frame is ServerFrame.TurnDone) {
-            if (!turn.claimTerminal()) {
+            if (!turn.tryClaimTerminal("engine")) {
                 Telemetry.event(
                     "IrohTrace", "transport.turn_done.duplicate_skipped",
                     "turnId" to turn.turnId,
@@ -1213,55 +1243,22 @@ class IrohChannelTransport(
                 )
                 return
             }
-            // The engine -> observer handover at end of turn is legitimate; drop the
-            // recorded ownership path so it is not reported as a mid-stream
-            // flip by [recordFrameOwnership]. [retireActiveTurn] handles the
-            // active-turns removal + telemetry with `source` to discriminate.
             emitBoth(frame)
-            turn.terminalReached.complete(frame.status)
-            // letta-mobile-dir4k: also remove the ActiveTurn entry NOW. The
-            // sendJob's [invokeOnCompletion] cleanup may not fire for a while
-            // (the engine's collect can linger, and a cancel path that has
-            // already removed the entry prevents the keyed remove from
-            // matching). Without this proactive removal, [hasActiveChatTurn]
-            // keeps returning true until that cleanup eventually runs and the
-            // composer's "Thinking…" indicator never settles.
             retireActiveTurn(turn, frame.status, source = "engine_terminal_emit")
             return
         }
         emitBoth(frame)
     }
 
-    /**
-     * letta-mobile-dir4k: retire an [ActiveTurn] without re-emitting a
-     * [ServerFrame.TurnDone]. Used by the observer path when it sees a
-     * terminal for a turn whose engine path may or may not fire (race / engine
-     * already returned / engine never saw the frame). Crucially this does NOT
-     * call [ActiveTurn.claimTerminal] — that atomic guard still belongs to the
-     * engine path's [emitTurnFrame] so an engine path that DOES fire later
-     * can still emit the terminal exactly once (and complete the deferred if
-     * it wasn't already). Here we just:
-     *  - complete [ActiveTurn.terminalReached] so any [cancel] awaiters wake;
-     *  - drop the entry from [activeTurns] so [hasActiveChatTurn] clears;
-     *  - clear matching interrupted / ownership state.
-     * If the engine path fires afterward, [emitTurnFrame] will emit the
-     * frame and the keyed remove will no-op (entry already gone). `source` is
-     * the telemetry discriminator (e.g. `"observer_terminal"`).
-     */
     private fun retireActiveTurn(turn: ActiveTurn, status: String, source: String) {
         if (interruptedTurns[turn.conversationId]?.turnId == turn.turnId) {
             interruptedTurns.remove(turn.conversationId)
         }
-        // The engine -> observer handover at end of turn is legitimate; drop
-        // the recorded ownership path so it is not reported as a mid-stream
-        // flip by [recordFrameOwnership].
         frameOwnershipPath.remove(turn.conversationId)
+        if (turn.runId.isNotBlank()) {
+            recentlyRetiredRuns[turn.runId] = System.currentTimeMillis()
+        }
         val removed = activeTurns.remove(turn.conversationId, turn)
-        // Complete the deferred LAST: any awaiter (e.g. the public cancel
-        // path's `terminalReached.await`) must see a fully-cleared state when
-        // it wakes. CompletableDeferred.complete returns false on a second
-        // call, so the engine path's later `terminalReached.complete` is a
-        // harmless no-op.
         turn.terminalReached.complete(status)
         Telemetry.event(
             "IrohTransport", "turn.terminal_retired",
@@ -1446,21 +1443,22 @@ class IrohChannelTransport(
             //    a cancelled one — routed through the SAME guard so exactly one
             //    terminal is ever emitted for the turn.
             if (serverTerminalStatus == null && !turn.hasTerminal) {
-                Telemetry.event(
-                    "IrohTransport", "cancel.synthetic_terminal",
-                    "turnId" to turn.turnId,
-                    "runId" to turn.runId,
-                )
-                emitTurnFrame(
-                    turn,
-                    ServerFrame.TurnDone(
+                if (turn.tryClaimTerminal("cancel_synthetic")) {
+                    Telemetry.event(
+                        "IrohTransport", "cancel.synthetic_terminal",
+                        "turnId" to turn.turnId,
+                        "runId" to turn.runId,
+                    )
+                    val cancelFrame = ServerFrame.TurnDone(
                         id = frameId("cancelled"),
                         ts = nowIso(),
                         turnId = turn.turnId,
                         runId = turn.runId,
                         status = "cancelled",
-                    ),
-                )
+                    )
+                    emitBoth(cancelFrame)
+                    retireActiveTurn(turn, "cancelled", source = "cancel_synthetic")
+                }
             }
             // 4. Terminal settled — tear down THIS conversation's streaming job
             //    only. Keyed removal: another conversation's in-flight job is
@@ -1621,7 +1619,20 @@ class IrohChannelTransport(
     private fun String.isReadOnlyAdminRpcMethod(): Boolean = this in READ_ONLY_ADMIN_RPC_METHODS
 
     override suspend fun disconnect() {
+        connectionGeneration.incrementAndGet()
+        resubscribeJob?.cancel()
+        resubscribeJob = null
         interruptedTurns.clear()
+        recentlyRetiredRuns.clear()
+        frameOwnershipPath.clear()
+        activeSendJobs.values.forEach { it.cancel() }
+        activeSendJobs.clear()
+        activeTurns.values.forEach { turn ->
+            turn.terminalReached.complete("disconnected")
+        }
+        activeTurns.clear()
+        subagentCorrelator.reset()
+        lastEmittedSubagentRevision = 0L
         stopObserverIngest("disconnect")
         livenessProbe.stop("disconnect")
         supervisor.disconnect("disconnect")

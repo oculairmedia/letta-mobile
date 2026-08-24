@@ -54,6 +54,12 @@ class SubagentCorrelator {
      */
     fun snapshot(): List<SubagentEntry> = entries.values.toList()
 
+    /** Resets all correlation state. */
+    fun reset() {
+        entries.clear()
+        revision = 0
+    }
+
     /**
      * Record (or backfill) a `running` [SubagentEntry] for a parent Agent
      * dispatch, keyed by [toolCallId].
