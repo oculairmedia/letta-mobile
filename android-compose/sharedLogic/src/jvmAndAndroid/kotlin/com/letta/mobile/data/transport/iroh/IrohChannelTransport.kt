@@ -1299,7 +1299,7 @@ class IrohChannelTransport(
         // the hydrate so a later reconnect can re-register this connection as a
         // server-side viewer with no user action. Recorded before the call so a
         // hydrate that only succeeds on retry/redial is still captured.
-        connectionSession.recordViewedConversation(method, path)
+        if (method == "message.list") connectionSession.recordViewedConversation(path)
         // letta-mobile-parg0: in-flight admin_rpc (even before completion) proves
         // openBi is progressing — the liveness probe must not declare-dead over it.
         val inFlightToken = adminRpcRetryState.beginAdminRpc()

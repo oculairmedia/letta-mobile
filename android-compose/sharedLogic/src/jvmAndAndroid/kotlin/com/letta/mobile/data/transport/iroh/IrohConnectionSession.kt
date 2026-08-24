@@ -28,8 +28,6 @@ internal class IrohConnectionSession(
     @Volatile
     private var resubscribeJob: Job? = null
     @Volatile
-    private var viewedConversationId: String? = null
-    @Volatile
     private var viewedMessageListPath: String? = null
 
     fun onReady(handle: IrohConnectionHandle) {
@@ -58,14 +56,13 @@ internal class IrohConnectionSession(
         return stopObserverIngest(reason)
     }
 
-    fun recordViewedConversation(method: String, path: String) {
-        if (method != "message.list") return
-        val conversationId = conversationIdFromMessageListPath(path) ?: return
-        viewedConversationId = conversationId
+    fun recordViewedConversation(path: String) {
+        if (conversationIdFromMessageListPath(path) == null) return
         viewedMessageListPath = path
     }
 
-    fun currentViewedConversationId(): String? = viewedConversationId
+    fun currentViewedConversationId(): String? =
+        viewedMessageListPath?.let(::conversationIdFromMessageListPath)
 
     private fun startObserverIngest(handle: IrohConnectionHandle, readyGeneration: Long) {
         val streamFrames = handle.effectiveObserverStreamFrames
@@ -111,13 +108,12 @@ internal class IrohConnectionSession(
 
     private data class ReSubscription(
         val path: String,
-        val conversationId: String?,
         val generation: Long,
     )
 
     private fun reSubscribeViewedConversation(readyGeneration: Long) {
         val path = viewedMessageListPath ?: return
-        val request = ReSubscription(path, viewedConversationId, readyGeneration)
+        val request = ReSubscription(path, readyGeneration)
         resubscribeJob?.cancel()
         resubscribeJob = scope.launch { runReSubscription(request) }
     }
@@ -126,7 +122,7 @@ internal class IrohConnectionSession(
         if (generation.value != request.generation) return
         Telemetry.event(
             "IrohObserver", "resubscribe.begin",
-            "conversationId" to (request.conversationId ?: ""),
+            "conversationId" to (conversationIdFromMessageListPath(request.path) ?: ""),
             "generation" to request.generation.toString(),
         )
         resubscribeIfCurrent(request)
@@ -142,7 +138,7 @@ internal class IrohConnectionSession(
         if (error is CancellationException) throw error
         Telemetry.event(
             "IrohObserver", "resubscribe.failed",
-            "conversationId" to (request.conversationId ?: ""),
+            "conversationId" to (conversationIdFromMessageListPath(request.path) ?: ""),
             "error" to (error.message ?: error.toString()),
             "class" to error::class.simpleName,
         )
