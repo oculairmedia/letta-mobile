@@ -7,7 +7,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
-import com.letta.mobile.R
+import ca.oculair.meridian.R
 import com.letta.mobile.data.model.ProjectSummary
 import com.letta.mobile.feature.chat.route.AgentChatRoute
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher

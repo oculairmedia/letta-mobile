@@ -4,7 +4,7 @@ import android.app.Service
 import android.content.Intent
 import android.os.IBinder
 import android.util.Log
-import com.letta.mobile.BuildConfig
+import ca.oculair.meridian.BuildConfig
 import java.io.File
 import kotlinx.coroutines.runBlocking
 
@@ -15,8 +15,8 @@ import kotlinx.coroutines.runBlocking
  *
  * Usage:
  *   adb shell am startservice \
- *     -n com.letta.mobile.dev/com.letta.mobile.runtime.sensors.DeviceSensorSelfTestService
- *   adb shell run-as com.letta.mobile.dev cat files/device-sensor-self-test.json
+ *     -n ca.oculair.meridian.dev/com.letta.mobile.runtime.sensors.DeviceSensorSelfTestService
+ *   adb shell run-as ca.oculair.meridian.dev cat files/device-sensor-self-test.json
  */
 class DeviceSensorSelfTestService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null

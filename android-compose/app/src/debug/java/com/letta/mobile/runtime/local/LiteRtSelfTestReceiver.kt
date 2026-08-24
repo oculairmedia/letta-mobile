@@ -10,8 +10,8 @@ import java.net.Socket
 
 /**
  * ADB usage:
- *   adb shell am broadcast -n com.letta.mobile.dev/com.letta.mobile.runtime.local.LiteRtSelfTestReceiver
- *   adb shell am broadcast -n com.letta.mobile.dev/com.letta.mobile.runtime.local.LiteRtSelfTestReceiver --es model google/gemma-3n-E2B-it-litert-lm
+ *   adb shell am broadcast -n ca.oculair.meridian.dev/com.letta.mobile.runtime.local.LiteRtSelfTestReceiver
+ *   adb shell am broadcast -n ca.oculair.meridian.dev/com.letta.mobile.runtime.local.LiteRtSelfTestReceiver --es model google/gemma-3n-E2B-it-litert-lm
  */
 class LiteRtSelfTestReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {

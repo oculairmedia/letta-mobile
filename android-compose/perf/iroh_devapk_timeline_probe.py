@@ -28,10 +28,10 @@ from pathlib import Path
 
 
 DEFAULT_ADB = "100.79.179.71:5555"
-DEFAULT_PACKAGE = "com.letta.mobile.dev"
+DEFAULT_PACKAGE = "ca.oculair.meridian.dev"
 DEFAULT_BACKEND = "http://127.0.0.1:8291"
 DEFAULT_APP_SERVER_WS = "ws://127.0.0.1:4500"
-DEFAULT_ACTIVITY = "com.letta.mobile.dev/com.letta.mobile.MainActivity"
+DEFAULT_ACTIVITY = "ca.oculair.meridian.dev/com.letta.mobile.MainActivity"
 DEFAULT_AGENT = "agent-ca46df7f-c16a-4599-8e2d-3dc145c3e433"
 DEFAULT_CONVERSATION = "conv-8d4b6225-a2f6-47a7-8f73-664d56143bbd"
 DEFAULT_JAVA_HOME = "/usr/lib/jvm/java-21-openjdk-amd64"

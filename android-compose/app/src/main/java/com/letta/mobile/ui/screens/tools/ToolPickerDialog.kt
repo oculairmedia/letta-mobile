@@ -22,7 +22,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.components.MultiFieldInputDialog
-import com.letta.mobile.R
+import ca.oculair.meridian.R
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.ui.preview.LettaPreviewFrame
 

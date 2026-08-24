@@ -1,7 +1,7 @@
 package com.letta.mobile.channel
 
 import androidx.test.core.app.ApplicationProvider
-import com.letta.mobile.R
+import ca.oculair.meridian.R
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith

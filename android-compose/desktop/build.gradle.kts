@@ -432,11 +432,11 @@ nucleus.application {
         } else {
             targetFormats(TargetFormat.Exe, TargetFormat.Msi)
         }
-        packageName = "Letta Desktop"
+        packageName = "Meridian Desktop"
         packageVersion = computeDesktopPackageVersion().get()
-        description = "Desktop client foundation for the Letta AI platform."
-        copyright = "Copyright (C) 2026 Letta"
-        vendor = "Letta"
+        description = "Desktop client foundation for the Meridian AI platform."
+        copyright = "Copyright (C) 2026 Oculair"
+        vendor = "Oculair"
         artifactName = $$"${name}-${version}-${os}-${arch}.${ext}"
         protocol("Meridian", "meridian")
 
@@ -453,7 +453,7 @@ nucleus.application {
         windows {
             // Preserve the existing installer identity and discoverability
             // while moving packaging from Compose Desktop to Nucleus.
-            menuGroup = "Letta"
+            menuGroup = "Meridian"
             menu = true
             shortcut = true
             perUserInstall = true
@@ -474,9 +474,9 @@ nucleus.application {
         }
 
         macOS {
-            bundleID = "com.letta.desktop"
+            bundleID = "ca.oculair.meridian.desktop"
             appCategory = "public.app-category.productivity"
-            dockName = "Letta"
+            dockName = "Meridian"
             providers.environmentVariable("APPLE_SIGNING_IDENTITY").orNull?.let { signingIdentity ->
                 signing {
                     sign.set(true)
@@ -497,7 +497,7 @@ nucleus.application {
 
         linux {
             appCategory = "Utility"
-            startupWMClass = "Letta Desktop"
+            startupWMClass = "Meridian Desktop"
         }
     }
 }
