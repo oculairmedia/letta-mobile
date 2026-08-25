@@ -99,6 +99,16 @@ sealed interface ProviderRpcClientResult<out Response> {
     data class Failure(val error: ProviderRpcClientError) : ProviderRpcClientResult<Nothing>
 }
 
+private sealed interface RpcStep<out Result> {
+    data class Value<Result>(val value: Result) : RpcStep<Result>
+    data class Failed(val error: ProviderRpcClientError) : RpcStep<Nothing>
+}
+
+private fun <Result> RpcStep<Result>.toClientResult(): ProviderRpcClientResult<Result> = when (this) {
+    is RpcStep.Value -> ProviderRpcClientResult.Success(value)
+    is RpcStep.Failed -> ProviderRpcClientResult.Failure(error)
+}
+
 class ProviderRpcCodec<Request, Response>(
     internal val requestSerializer: KSerializer<Request>,
     internal val responseSerializer: KSerializer<Response>,
@@ -129,18 +139,32 @@ class ProviderManagementRpcClient(
         availability: ProviderRpcAvailability,
         call: ProviderRpcCall<Request, Response>,
     ): ProviderRpcClientResult<Response> {
-        val preflightError = preflight(availability, call)
-        if (preflightError != null) return ProviderRpcClientResult.Failure(preflightError)
+        preflight(availability, call)?.let { return ProviderRpcClientResult.Failure(it) }
+        val payload = when (val encoded = encode(call)) {
+            is RpcStep.Value -> encoded.value
+            is RpcStep.Failed -> return ProviderRpcClientResult.Failure(encoded.error)
+        }
+        val response = when (val sent = send(call, payload)) {
+            is RpcStep.Value -> sent.value
+            is RpcStep.Failed -> return ProviderRpcClientResult.Failure(sent.error)
+        }
+        return decode(call, response).toClientResult()
+    }
 
-        val payload = try {
-            json.encodeToString(call.codec.requestSerializer, call.request)
+    private fun <Request, Response> encode(call: ProviderRpcCall<Request, Response>): RpcStep<String> =
+        try {
+            RpcStep.Value(json.encodeToString(call.codec.requestSerializer, call.request))
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Throwable) {
-            return ProviderRpcClientResult.Failure(ProviderRpcClientError.ValidationFailed(call.method))
+            RpcStep.Failed(ProviderRpcClientError.ValidationFailed(call.method))
         }
 
-        val response = try {
+    private suspend fun <Request, Response> send(
+        call: ProviderRpcCall<Request, Response>,
+        payload: String,
+    ): RpcStep<ProviderRpcTransportResponse> = try {
+        RpcStep.Value(
             transport.execute(
                 ProviderRpcTransportRequest(
                     contractName = ProviderRpcMethods.CONTRACT_NAME,
@@ -148,26 +172,29 @@ class ProviderManagementRpcClient(
                     method = call.method,
                     encodedPayload = payload,
                 ),
-            )
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (_: Throwable) {
-            return ProviderRpcClientResult.Failure(ProviderRpcClientError.TransportFailure(call.method))
-        }
+            ),
+        )
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Throwable) {
+        RpcStep.Failed(ProviderRpcClientError.TransportFailure(call.method))
+    }
 
-        val decoded = try {
-            json.decodeFromString(call.codec.responseSerializer, response.bodyForDecoding())
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (_: Throwable) {
-            return ProviderRpcClientResult.Failure(ProviderRpcClientError.MalformedResponse(call.method))
+    private fun <Request, Response> decode(
+        call: ProviderRpcCall<Request, Response>,
+        response: ProviderRpcTransportResponse,
+    ): RpcStep<Response> = try {
+        val decoded = json.decodeFromString(call.codec.responseSerializer, response.bodyForDecoding())
+        val responseVersion = call.codec.responseVersion(decoded)
+        if (responseVersion == call.requestedVersion) {
+            RpcStep.Value(decoded)
+        } else {
+            RpcStep.Failed(ProviderRpcClientError.UnsupportedContractVersion(call.method, responseVersion))
         }
-        if (call.codec.responseVersion(decoded) != call.requestedVersion) {
-            return ProviderRpcClientResult.Failure(
-                ProviderRpcClientError.UnsupportedContractVersion(call.method, call.codec.responseVersion(decoded)),
-            )
-        }
-        return ProviderRpcClientResult.Success(decoded)
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Throwable) {
+        RpcStep.Failed(ProviderRpcClientError.MalformedResponse(call.method))
     }
 
     private fun <Request, Response> preflight(
