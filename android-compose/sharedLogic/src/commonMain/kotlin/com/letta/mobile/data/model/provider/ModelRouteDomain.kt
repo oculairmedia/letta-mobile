@@ -18,6 +18,10 @@ import kotlinx.serialization.encoding.Encoder
 
 /**
  * Operational availability status for an individual model route.
+ *
+ * Decoding uses a one-way canonicalization policy: wire variations (e.g. whitespace,
+ * casing) parse into canonical singletons whose [wireValue] re-encodes to the canonical
+ * string. Unknown availability statuses are preserved in [Unknown].
  */
 @Serializable(with = ModelAvailabilitySerializer::class)
 sealed interface ModelAvailability {
@@ -74,6 +78,10 @@ object ModelAvailabilitySerializer : KSerializer<ModelAvailability> {
 
 /**
  * Visibility policy for a model route within user-facing picker projections.
+ *
+ * Decoding uses a one-way canonicalization policy: wire variations (e.g. whitespace,
+ * casing, aliases like "automatic") parse into canonical singletons whose [wireValue]
+ * re-encodes to the canonical string (e.g. "auto"). Unknown policies are preserved in [Unknown].
  */
 @Serializable(with = VisibilityPolicySerializer::class)
 sealed interface VisibilityPolicy {

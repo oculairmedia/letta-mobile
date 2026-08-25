@@ -2,15 +2,12 @@ package com.letta.mobile.data.model.provider
 
 import com.letta.mobile.data.model.HostId
 import com.letta.mobile.data.model.ImmutableListSerializer
-import com.letta.mobile.data.model.ImmutableMapSerializer
 import com.letta.mobile.data.model.ProviderDefinitionId
 import com.letta.mobile.data.model.ProviderFieldId
 import com.letta.mobile.data.model.ProviderInstanceId
 import com.letta.mobile.data.model.ProviderRevision
 import kotlinx.collections.immutable.ImmutableList
-import kotlinx.collections.immutable.ImmutableMap
 import kotlinx.collections.immutable.persistentListOf
-import kotlinx.collections.immutable.persistentMapOf
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -38,6 +35,66 @@ data class ProviderFieldSchema(
 )
 
 /**
+ * Typed protocol dialect supported by an LLM provider type.
+ *
+ * Decoding uses a one-way canonicalization policy: wire variations (e.g. whitespace,
+ * casing, aliases like "google_ai") parse into canonical singletons whose [wireValue]
+ * re-encodes to the canonical string. Unknown dialects are preserved in [Unknown].
+ */
+@Serializable(with = ProviderProtocolSerializer::class)
+sealed interface ProviderProtocol {
+    val wireValue: String
+
+    @Serializable(with = ProviderProtocolSerializer::class)
+    data object OpenAi : ProviderProtocol {
+        override val wireValue: String = "openai"
+    }
+
+    @Serializable(with = ProviderProtocolSerializer::class)
+    data object Anthropic : ProviderProtocol {
+        override val wireValue: String = "anthropic"
+    }
+
+    @Serializable(with = ProviderProtocolSerializer::class)
+    data object GoogleAi : ProviderProtocol {
+        override val wireValue: String = "google"
+    }
+
+    @Serializable(with = ProviderProtocolSerializer::class)
+    data object Ollama : ProviderProtocol {
+        override val wireValue: String = "ollama"
+    }
+
+    @Serializable(with = ProviderProtocolSerializer::class)
+    data class Unknown(val raw: String) : ProviderProtocol {
+        override val wireValue: String get() = raw
+    }
+
+    companion object {
+        fun fromWire(raw: String): ProviderProtocol = when (raw.trim().lowercase()) {
+            "openai" -> OpenAi
+            "anthropic" -> Anthropic
+            "google", "google_ai" -> GoogleAi
+            "ollama" -> Ollama
+            else -> Unknown(raw)
+        }
+    }
+}
+
+object ProviderProtocolSerializer : KSerializer<ProviderProtocol> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("ProviderProtocol", PrimitiveKind.STRING)
+
+    override fun serialize(encoder: Encoder, value: ProviderProtocol) {
+        encoder.encodeString(value.wireValue)
+    }
+
+    override fun deserialize(decoder: Decoder): ProviderProtocol {
+        return ProviderProtocol.fromWire(decoder.decodeString())
+    }
+}
+
+/**
  * Immutable metadata and schema definition for an LLM provider type supported by a host.
  */
 @Serializable
@@ -46,7 +103,7 @@ data class ProviderDefinition(
     @SerialName("display_name") val displayName: String,
     val description: String? = null,
     @Serializable(with = ImmutableListSerializer::class)
-    @SerialName("supported_protocols") val supportedProtocols: ImmutableList<String> = persistentListOf(),
+    @SerialName("supported_protocols") val supportedProtocols: ImmutableList<ProviderProtocol> = persistentListOf(),
     @Serializable(with = ImmutableListSerializer::class)
     val fields: ImmutableList<ProviderFieldSchema> = persistentListOf(),
     @SerialName("default_base_url") val defaultBaseUrl: String? = null,
@@ -54,6 +111,10 @@ data class ProviderDefinition(
 
 /**
  * Credential configuration state for a provider instance.
+ *
+ * Decoding uses a one-way canonicalization policy: wire variations (e.g. whitespace,
+ * casing) parse into canonical singletons whose [wireValue] re-encodes to the canonical
+ * string. Unknown states are preserved in [Unknown].
  */
 @Serializable(with = CredentialStatusSerializer::class)
 sealed interface CredentialStatus {
@@ -110,6 +171,10 @@ object CredentialStatusSerializer : KSerializer<CredentialStatus> {
 
 /**
  * Operational / health status for a provider instance.
+ *
+ * Decoding uses a one-way canonicalization policy: wire variations (e.g. whitespace,
+ * casing) parse into canonical singletons whose [wireValue] re-encodes to the canonical
+ * string. Unknown statuses are preserved in [Unknown].
  */
 @Serializable(with = OperationalStatusSerializer::class)
 sealed interface OperationalStatus {
@@ -168,7 +233,8 @@ object OperationalStatusSerializer : KSerializer<OperationalStatus> {
  * Immutable domain model for a configured provider instance on a host.
  *
  * This record is strictly secret-free: it contains ONLY public metadata, status indicators,
- * and the IDs of configured fields (indicating presence without exposing credentials).
+ * configured field IDs, and configured header names (indicating presence without exposing
+ * credential values or custom header values).
  */
 @Serializable
 data class RedactedProviderInstance(
@@ -182,6 +248,6 @@ data class RedactedProviderInstance(
     val revision: ProviderRevision? = null,
     @Serializable(with = ImmutableListSerializer::class)
     @SerialName("configured_field_ids") val configuredFieldIds: ImmutableList<ProviderFieldId> = persistentListOf(),
-    @Serializable(with = ImmutableMapSerializer::class)
-    @SerialName("custom_headers") val customHeaders: ImmutableMap<String, String> = persistentMapOf(),
+    @Serializable(with = ImmutableListSerializer::class)
+    @SerialName("configured_header_names") val configuredHeaderNames: ImmutableList<String> = persistentListOf(),
 )
