@@ -3,7 +3,9 @@ package com.letta.mobile.data.timeline
 import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore
 import com.letta.mobile.data.timeline.snapshot.InMemoryConfirmedTimelineStore
 import com.letta.mobile.data.timeline.snapshot.StoredTimelineEnvelope
+import com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
+import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
@@ -13,6 +15,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -126,9 +129,61 @@ class TimelineSnapshotPersistenceTest {
             writtenAtMillis = 9999L,
         )
 
-        val fp1 = com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec.computeStoredEnvelopeFingerprint(env1)
-        val fp2 = com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec.computeStoredEnvelopeFingerprint(env2)
+        val fp1 = TimelineSnapshotCodec.computeStoredEnvelopeFingerprint(env1)
+        val fp2 = TimelineSnapshotCodec.computeStoredEnvelopeFingerprint(env2)
         assertEquals(fp1, fp2)
+    }
+
+    @Test
+    fun envelopeFingerprintFramesAdjacentAndNullableStrings() {
+        val scope = TimelineScope(backendId = "test-backend", conversationId = "conv-hash-framing")
+        val event = StoredTimelineEvent(
+            position = 1.0,
+            otid = "ab",
+            content = "c",
+            serverId = "server",
+            messageType = "USER",
+            dateIso = "2026-08-24T12:00:00Z",
+        )
+        val envelope = StoredTimelineEnvelope(scope = scope, revision = 1L, events = listOf(event))
+
+        val adjacentBoundaryChanged = envelope.copy(events = listOf(event.copy(otid = "a", content = "bc")))
+        val nullCursor = envelope.copy(liveCursor = null)
+        val emptyCursor = envelope.copy(liveCursor = "")
+
+        assertNotEquals(
+            TimelineSnapshotCodec.computeStoredEnvelopeFingerprint(envelope),
+            TimelineSnapshotCodec.computeStoredEnvelopeFingerprint(adjacentBoundaryChanged),
+        )
+        assertNotEquals(
+            TimelineSnapshotCodec.computeStoredEnvelopeFingerprint(nullCursor),
+            TimelineSnapshotCodec.computeStoredEnvelopeFingerprint(emptyCursor),
+        )
+    }
+
+    @Test
+    fun envelopeFingerprintCanonicalizesMapIterationOrder() {
+        val scope = TimelineScope(backendId = "test-backend", conversationId = "conv-hash-maps")
+        val event = StoredTimelineEvent(
+            position = 1.0,
+            otid = "otid",
+            serverId = "server",
+            messageType = "TOOL_CALL",
+            dateIso = "2026-08-24T12:00:00Z",
+            toolReturnContentByCallId = linkedMapOf("a" to "first", "b" to "second"),
+        )
+        val reordered = event.copy(
+            toolReturnContentByCallId = linkedMapOf("b" to "second", "a" to "first"),
+        )
+
+        assertEquals(
+            TimelineSnapshotCodec.computeStoredEnvelopeFingerprint(
+                StoredTimelineEnvelope(scope = scope, revision = 1L, events = listOf(event)),
+            ),
+            TimelineSnapshotCodec.computeStoredEnvelopeFingerprint(
+                StoredTimelineEnvelope(scope = scope, revision = 2L, events = listOf(reordered)),
+            ),
+        )
     }
 
     @Test

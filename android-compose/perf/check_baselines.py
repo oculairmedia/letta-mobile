@@ -3,22 +3,15 @@
 Parse androidx.benchmark JSON output and compare against perf baselines.
 
 Usage:
-    python perf/check_baselines.py <outputs-dir>            # verify only
-    python perf/check_baselines.py <outputs-dir> --rebaseline  # seed/update baselines
-
-`outputs-dir` is typically
-    android-compose/macrobenchmark/build/outputs/connected_android_test_additional_output/<device>/
-
-where androidx.benchmark 1.3.x writes `*-benchmarkData.json` files.
+    python perf/check_baselines.py <outputs-dir>
+    python perf/check_baselines.py <outputs-dir> --rebaseline
 
 Exit codes:
     0 — all measured metrics within tolerance
     1 — at least one metric regressed
-    2 — malformed input or unseeded baselines in verify mode
+    2 — malformed, missing, undersampled, or unseeded gating input
     configured by --retryable-single-cold-start-exit-code — only the cold
         startup gate regressed, so CI may rerun once before failing hard
-
-See letta-mobile-o7ob.4.1.
 """
 from __future__ import annotations
 
@@ -36,11 +29,11 @@ COLD_START_METRIC_KEY = "startup.cold.p95_ms"
 
 
 def _load_baselines(baselines_path: pathlib.Path) -> dict:
-    return json.loads(baselines_path.read_text())
+    return json.loads(baselines_path.read_text(encoding="utf-8"))
 
 
 def _save_baselines(data: dict, baselines_path: pathlib.Path) -> None:
-    baselines_path.write_text(json.dumps(data, indent=2) + "\n")
+    baselines_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 
 
 def _ceiling(baseline: float, tolerance_pct: float, tolerance_abs: float | None) -> float:
@@ -66,7 +59,7 @@ def _iter_measurements(outputs_dir: pathlib.Path) -> Iterable[dict]:
         )
     for path in files:
         try:
-            payload = json.loads(path.read_text())
+            payload = json.loads(path.read_text(encoding="utf-8"))
         except json.JSONDecodeError as exc:
             raise SystemExit(f"[check_baselines] {path}: {exc}") from exc
         for bench in payload.get("benchmarks", []):
@@ -77,30 +70,26 @@ def _iter_measurements(outputs_dir: pathlib.Path) -> Iterable[dict]:
 
 def _pick_metric(bench: dict, metric: str, aggregation: str | None) -> float | None:
     """Best-effort metric extraction across benchmark JSON schema versions."""
-    metrics = bench.get("metrics", {})
-    entry = metrics.get(metric)
+    entry = bench.get("metrics", {}).get(metric)
     if entry is None:
         return None
-    # androidx.benchmark reports per-iteration + summary stats.
     if aggregation and aggregation in entry:
         return float(entry[aggregation])
-    # Fall back to p95 / median / mean depending on availability.
     for key in ("P95", "p95", "median", "P50", "p50", "mean"):
         if key in entry:
             return float(entry[key])
     runs = entry.get("runs")
     if isinstance(runs, list) and runs:
         ordered = sorted(runs)
-        idx = max(0, int(len(ordered) * 0.95) - 1)
-        return float(ordered[idx])
+        index = max(0, int(len(ordered) * 0.95) - 1)
+        return float(ordered[index])
     return None
 
 
 def _match_bench(bench: dict, source: str) -> bool:
-    cls = bench.get("className", "")
+    class_name = bench.get("className", "")
     name = bench.get("name", "")
-    fqn = f"{cls.rsplit('.', 1)[-1]}.{name}"
-    return fqn == source
+    return f"{class_name.rsplit('.', 1)[-1]}.{name}" == source
 
 
 def _format_optional_float(value: float | None) -> str:
@@ -109,7 +98,10 @@ def _format_optional_float(value: float | None) -> str:
 
 def _write_summary_json(path: pathlib.Path, rows: list[dict], exit_code: int) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"exit_code": exit_code, "metrics": rows}, indent=2) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps({"exit_code": exit_code, "metrics": rows}, indent=2) + "\n",
+        encoding="utf-8",
+    )
 
 
 def _write_summary_markdown(path: pathlib.Path, rows: list[dict], exit_code: int) -> None:
@@ -153,6 +145,109 @@ def _write_summaries(
         _write_summary_markdown(summary_md_path, summary_rows, exit_code)
 
 
+def _new_summary_row(key: str, spec: dict, gate_enabled: bool) -> dict:
+    return {
+        "key": key,
+        "status": "skip",
+        "gate": gate_enabled,
+        "source": spec.get("source"),
+        "metric": spec.get("metric"),
+        "aggregation": spec.get("aggregation"),
+        "observed": None,
+        "baseline": spec.get("baseline"),
+        "ceiling": None,
+        "delta_pct": None,
+        "source_path": None,
+    }
+
+
+def _find_observation(key: str, spec: dict, measurements: list[dict], gate_enabled: bool) -> tuple[dict | None, float | None, str | None]:
+    matches = [bench for bench in measurements if _match_bench(bench, spec["source"])]
+    if not matches:
+        message = f"{key}: missing benchmark {spec['source']}"
+        return None, None, message if gate_enabled else None
+
+    picked = [(bench, _pick_metric(bench, spec["metric"], spec.get("aggregation"))) for bench in matches]
+    has_invalid_value = any(value is None or not math.isfinite(value) for _, value in picked)
+    if has_invalid_value:
+        message = f"{key}: missing or non-finite metric {spec['metric']}"
+        return None, None, message if gate_enabled else None
+    values = [(bench, value) for bench, value in picked if value is not None]
+
+    minimum_samples = int(spec.get("min_samples", 0))
+    observed_samples = max(
+        (len(bench.get("metrics", {}).get(spec["metric"], {}).get("runs", [])) for bench, _ in values),
+        default=0,
+    )
+    if minimum_samples and observed_samples < minimum_samples:
+        return None, None, f"{key}: {observed_samples} samples reported, {minimum_samples} required"
+    return max(values, key=lambda item: item[1]) + (None,)
+
+
+def _evaluate_observation(key: str, spec: dict, row: dict, observed: float, rebaseline: bool) -> str | None:
+    row["observed"] = observed
+    baseline = spec.get("baseline")
+    if rebaseline:
+        spec["baseline"] = round(observed, 3)
+        row["baseline"] = spec["baseline"]
+        row["status"] = "seed"
+        return "updated"
+    if baseline is None:
+        row["status"] = "unseeded"
+        return "unseeded" if row["gate"] else None
+
+    baseline = float(baseline)
+    tolerance_pct = float(spec.get("tolerance_pct", 10))
+    tolerance_abs = spec.get("tolerance_abs")
+    tolerance_abs = float(tolerance_abs) if tolerance_abs is not None else None
+    ceiling = _ceiling(baseline, tolerance_pct, tolerance_abs)
+    row.update(
+        baseline=baseline,
+        ceiling=ceiling,
+        delta_pct=_delta_pct(observed, baseline),
+        status="info" if not row["gate"] else ("ok" if observed <= ceiling else "REGRESSION"),
+    )
+    return "failure" if row["status"] == "REGRESSION" else None
+
+
+def _evaluate_metric(key: str, spec: dict, measurements: list[dict], rebaseline: bool) -> tuple[dict, str | None]:
+    gate_enabled = bool(spec.get("gate", True))
+    row = _new_summary_row(key, spec, gate_enabled)
+    bench, observed, invalid = _find_observation(key, spec, measurements, gate_enabled)
+    if bench is None or observed is None:
+        row["status"] = "missing" if invalid else "skip"
+        print(f"[{row['status']}] {invalid or key}")
+        return row, "invalid" if invalid else None
+
+    row["source_path"] = bench.get("__source_path")
+    outcome = _evaluate_observation(key, spec, row, observed, rebaseline)
+    print(
+        f"[{row['status']}] {key}: observed={observed:.3f} "
+        f"baseline={_format_optional_float(row.get('baseline'))} "
+        f"ceiling={_format_optional_float(row.get('ceiling'))} "
+        f"source={spec['source']} metric={spec['metric']} json={row['source_path']}"
+    )
+    return row, outcome
+
+
+def _regression_exit_code(failures: list[dict], retryable_exit_code: int | None) -> int:
+    only_cold_start = [row["key"] for row in failures] == [COLD_START_METRIC_KEY]
+    if only_cold_start and retryable_exit_code is not None:
+        return retryable_exit_code
+    return 1
+
+
+def _report_problems(label: str, rows: list[dict]) -> None:
+    print(f"\n{label}:", file=sys.stderr)
+    for row in rows:
+        print(
+            f"  - {row['key']}: status={row['status']}; observed={row.get('observed')}; "
+            f"baseline={row.get('baseline')}; ceiling={row.get('ceiling')}; "
+            f"source={row['source']}; metric={row['metric']}; json={row.get('source_path')}",
+            file=sys.stderr,
+        )
+
+
 def check(
     outputs_dir: pathlib.Path,
     rebaseline: bool,
@@ -163,209 +258,53 @@ def check(
 ) -> int:
     baselines = _load_baselines(baselines_path)
     measurements = list(_iter_measurements(outputs_dir))
-    failures: list[dict] = []
-    unseeded: list[str] = []
-    summary_rows: list[dict] = []
-    updates = 0
-
-    has_gating = any(bool(spec.get("gate", True)) for spec in baselines["metrics"].values())
+    rows: list[dict] = []
+    outcomes: list[str | None] = []
 
     for key, spec in baselines["metrics"].items():
-        matches = [b for b in measurements if _match_bench(b, spec["source"])]
-        gate_enabled = bool(spec.get("gate", True))
-        row = {
-            "key": key,
-            "status": "skip",
-            "gate": gate_enabled,
-            "source": spec.get("source"),
-            "metric": spec.get("metric"),
-            "aggregation": spec.get("aggregation"),
-            "observed": None,
-            "baseline": spec.get("baseline"),
-            "ceiling": None,
-            "delta_pct": None,
-            "source_path": None,
-        }
-        if not matches:
-            if gate_enabled and not rebaseline:
-                print(f"[missing_source] {key}: no measurement for {spec['source']} (gated metric missing!)")
-                row["status"] = "missing_source"
-                failures.append(row)
-            else:
-                print(f"[skip] {key}: no measurement for {spec['source']}")
-            summary_rows.append(row)
-            continue
-        # If multiple iterations ran, take the worst (highest) — we gate
-        # on regressions, not best-cases.
-        picked_values = [
-            (b, _pick_metric(b, spec["metric"], spec.get("aggregation")))
-            for b in matches
-        ]
-        values = [(b, v) for b, v in picked_values if v is not None and math.isfinite(v)]
-        if not values:
-            if gate_enabled and not rebaseline:
-                print(f"[missing_metric] {key}: {spec['metric']} not reported or non-finite (gated metric missing!)")
-                row["status"] = "missing_metric"
-                failures.append(row)
-            else:
-                print(f"[skip] {key}: {spec['metric']} not reported")
-            summary_rows.append(row)
-            continue
-        worst_bench, observed = max(values, key=lambda item: item[1])
-        row["observed"] = observed
-        row["source_path"] = worst_bench.get("__source_path")
-        baseline = spec.get("baseline")
-        tolerance_pct = float(spec.get("tolerance_pct", 10))
-        tolerance_abs = spec.get("tolerance_abs")
-        if tolerance_abs is not None:
-            tolerance_abs = float(tolerance_abs)
+        row, outcome = _evaluate_metric(key, spec, measurements, rebaseline)
+        rows.append(row)
+        outcomes.append(outcome)
 
-        if rebaseline:
-            spec["baseline"] = round(observed, 3)
-            row["baseline"] = spec["baseline"]
-            row["status"] = "seed"
-            updates += 1
-            print(
-                f"[seed] {key}: baseline := {spec['baseline']} "
-                f"source={spec['source']} metric={spec['metric']} json={row['source_path']}"
-            )
-            summary_rows.append(row)
-            continue
-
-        if baseline is None:
-            print(
-                f"[unseeded] {key}: baseline is null, run with --rebaseline on the canonical CI device "
-                f"source={spec['source']} metric={spec['metric']} json={row['source_path']}"
-            )
-            row["status"] = "unseeded"
-            if gate_enabled:
-                unseeded.append(key)
-            summary_rows.append(row)
-            continue
-
-        baseline = float(baseline)
-        row["baseline"] = baseline
-        ceiling = _ceiling(baseline, tolerance_pct, tolerance_abs)
-        row["ceiling"] = ceiling
-        row["delta_pct"] = _delta_pct(observed, baseline)
-        if not gate_enabled:
-            status = "info"
-        else:
-            status = "ok" if observed <= ceiling else "REGRESSION"
-        row["status"] = status
-        tolerance_label = f"+{tolerance_pct:.0f}%"
-        if tolerance_abs is not None:
-            tolerance_label += f", +{tolerance_abs:.3f} abs"
-        gate_label = "gating" if gate_enabled else "informational"
-        print(
-            f"[{status}] {key}: observed={observed:.3f} "
-            f"baseline={baseline:.3f} ceiling={ceiling:.3f} "
-            f"delta={row['delta_pct']:.2f}% tolerance=({tolerance_label}) "
-            f"mode={gate_label} source={spec['source']} metric={spec['metric']} "
-            f"json={row['source_path']}"
-        )
-        if gate_enabled and observed > ceiling:
-            failures.append(row)
-        summary_rows.append(row)
-
-    if rebaseline and updates:
+    if rebaseline and "updated" in outcomes:
         _save_baselines(baselines, baselines_path)
-        print(f"[check_baselines] wrote {updates} updates to {baselines_path}")
-        _write_summaries(summary_rows, 0, summary_json_path, summary_md_path)
-        return 0
+        print(f"[check_baselines] wrote {outcomes.count('updated')} updates to {baselines_path}")
 
-    # Ensure at least one gated metric was evaluated if not rebaselining
-    if not rebaseline and has_gating and not any(r.get("observed") is not None for r in summary_rows if r.get("gate")):
-        print("\nNo gating metrics observed across benchmark outputs.", file=sys.stderr)
-        _write_summaries(summary_rows, 1, summary_json_path, summary_md_path)
-        return 1
+    invalid = [row for row, outcome in zip(rows, outcomes) if outcome == "invalid"]
+    unseeded = [row for row, outcome in zip(rows, outcomes) if outcome == "unseeded"]
+    failures = [row for row, outcome in zip(rows, outcomes) if outcome == "failure"]
+    if invalid or unseeded:
+        _report_problems("Invalid or unseeded perf measurement window", invalid + unseeded)
+        exit_code = 2
+    elif failures:
+        _report_problems("Perf regressions detected", failures)
+        exit_code = _regression_exit_code(failures, retryable_single_cold_start_exit_code)
+    else:
+        exit_code = 0
 
-    if failures:
-        failing_keys = [row["key"] for row in failures]
-        retryable_single_cold_start = failing_keys == [COLD_START_METRIC_KEY]
-        exit_code = (
-            retryable_single_cold_start_exit_code
-            if retryable_single_cold_start and retryable_single_cold_start_exit_code is not None
-            else 1
-        )
-        print("\nPerf regressions / missing gated metrics detected:", file=sys.stderr)
-        for row in failures:
-            observed_str = f"observed={row['observed']:.3f} > ceiling={row.get('ceiling', 0.0):.3f}" if row.get("observed") is not None else f"status={row.get('status')}"
-            print(
-                f"  - {row['key']}: {observed_str} "
-                f"(baseline={row.get('baseline')}; delta={row.get('delta_pct')}%; "
-                f"source={row['source']}; metric={row['metric']}; json={row.get('source_path')})",
-                file=sys.stderr,
-            )
-        if exit_code != 1:
-            print(
-                "\nOnly cold startup regressed. CI may rerun the benchmark once to distinguish "
-                "shared-emulator noise from a repeatable regression.",
-                file=sys.stderr,
-            )
-        _write_summaries(summary_rows, exit_code, summary_json_path, summary_md_path)
-        return exit_code
-
-    if unseeded:
-        print("\nUnseeded perf baselines detected:", file=sys.stderr)
-        for key in unseeded:
-            print(f"  - {key}", file=sys.stderr)
-        _write_summaries(summary_rows, 2, summary_json_path, summary_md_path)
-        return 2
-
-    _write_summaries(summary_rows, 0, summary_json_path, summary_md_path)
-    return 0
+    _write_summaries(rows, exit_code, summary_json_path, summary_md_path)
+    return exit_code
 
 
 def main(argv: list[str]) -> int:
     description = __doc__.splitlines()[0] if __doc__ else "Check benchmark perf baselines."
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument("outputs_dir", type=pathlib.Path)
-    parser.add_argument(
-        "--baselines",
-        type=pathlib.Path,
-        default=BASELINES_PATH,
-        help="Path to the baselines.json file to read/write.",
-    )
-    parser.add_argument(
-        "--rebaseline",
-        action="store_true",
-        help="Overwrite baselines in baselines.json with the measured values.",
-    )
-    parser.add_argument(
-        "--retryable-single-cold-start-exit-code",
-        type=int,
-        default=None,
-        help=(
-            "Return this exit code instead of 1 when the only regression is "
-            "startup.cold.p95_ms. CI uses this to rerun the benchmark once."
-        ),
-    )
-    parser.add_argument(
-        "--summary-json",
-        type=pathlib.Path,
-        default=None,
-        help="Optional path for a compact machine-readable perf summary.",
-    )
-    parser.add_argument(
-        "--summary-md",
-        type=pathlib.Path,
-        default=None,
-        help="Optional path for a markdown perf summary artifact.",
-    )
+    parser.add_argument("--baselines", type=pathlib.Path, default=BASELINES_PATH)
+    parser.add_argument("--rebaseline", action="store_true")
+    parser.add_argument("--retryable-single-cold-start-exit-code", type=int, default=None)
+    parser.add_argument("--summary-json", type=pathlib.Path, default=None)
+    parser.add_argument("--summary-md", type=pathlib.Path, default=None)
     args = parser.parse_args(argv)
-
-    baselines_path = args.baselines.resolve()
 
     if not args.outputs_dir.is_dir():
         print(f"Not a directory: {args.outputs_dir}", file=sys.stderr)
         return 2
-
     try:
         return check(
             args.outputs_dir,
             args.rebaseline,
-            baselines_path=baselines_path,
+            baselines_path=args.baselines.resolve(),
             retryable_single_cold_start_exit_code=args.retryable_single_cold_start_exit_code,
             summary_json_path=args.summary_json,
             summary_md_path=args.summary_md,

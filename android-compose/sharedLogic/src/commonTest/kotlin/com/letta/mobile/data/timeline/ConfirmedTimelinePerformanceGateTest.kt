@@ -2,14 +2,13 @@ package com.letta.mobile.data.timeline
 
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.ToolCall
-import com.letta.mobile.data.timeline.snapshot.StoredTimelineEnvelope
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
 import kotlinx.collections.immutable.toPersistentList
-import kotlinx.collections.immutable.toPersistentMap
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
 
 class ConfirmedTimelinePerformanceGateTest {
@@ -95,13 +94,13 @@ class ConfirmedTimelinePerformanceGateTest {
 
             assertTrue(fp != 0L)
             assertTrue(jsonLen > 0)
-            assertTrue(elapsedFingerprint.inWholeMilliseconds >= 0)
-            assertTrue(elapsedEncode.inWholeMilliseconds >= 0)
+            assertTrue(elapsedFingerprint < 10.seconds, "Fingerprinting $count events took $elapsedFingerprint")
+            assertTrue(elapsedEncode < 30.seconds, "Encoding $count events took $elapsedEncode")
         }
     }
 
     @Test
-    fun fingerprintIsStableAcrossEncodeDecodeRoundTrip() {
+    fun fingerprintRemainsStableAcrossSnapshotRoundTrip() {
         val timeline1 = createSyntheticConfirmedTimeline(150)
         val scope = TimelineScope(backendId = "test-backend", conversationId = "conv-perf")
         val envelope1 = TimelineSnapshotCodec.timelineToStoredEnvelope(timeline1, scope, revision = 1L)
@@ -113,39 +112,5 @@ class ConfirmedTimelinePerformanceGateTest {
         val fp2 = TimelineSnapshotCodec.computeStoredEnvelopeFingerprint(envelope2)
 
         assertEquals(fp1, fp2)
-    }
-
-    @Test
-    fun fingerprintIsIndependentOfMapIterationOrder() {
-        val scope = TimelineScope(backendId = "test-backend", conversationId = "conv-order")
-        val map1 = linkedMapOf("call-z" to "result-z", "call-a" to "result-a", "call-m" to "result-m")
-        val map2 = linkedMapOf("call-a" to "result-a", "call-m" to "result-m", "call-z" to "result-z")
-
-        val event1 = com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent(
-            position = 1.0,
-            otid = "otid-1",
-            content = "hello",
-            serverId = "srv-1",
-            messageType = "ASSISTANT",
-            dateIso = "2026-08-24T12:00:00Z",
-            toolReturnContentByCallId = map1,
-        )
-        val event2 = com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent(
-            position = 1.0,
-            otid = "otid-1",
-            content = "hello",
-            serverId = "srv-1",
-            messageType = "ASSISTANT",
-            dateIso = "2026-08-24T12:00:00Z",
-            toolReturnContentByCallId = map2,
-        )
-
-        val env1 = StoredTimelineEnvelope(schemaVersion = 1, scope = scope, revision = 1L, events = listOf(event1))
-        val env2 = StoredTimelineEnvelope(schemaVersion = 1, scope = scope, revision = 1L, events = listOf(event2))
-
-        assertEquals(
-            TimelineSnapshotCodec.computeStoredEnvelopeFingerprint(env1),
-            TimelineSnapshotCodec.computeStoredEnvelopeFingerprint(env2),
-        )
     }
 }
