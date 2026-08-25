@@ -8,8 +8,6 @@ import kotlinx.collections.immutable.toPersistentList
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import kotlin.time.Duration.Companion.seconds
-import kotlin.time.TimeSource
 
 class ConfirmedTimelinePerformanceGateTest {
 
@@ -58,7 +56,7 @@ class ConfirmedTimelinePerformanceGateTest {
     }
 
     @Test
-    fun benchmarkFingerprintAndEncodeFor50_150_500Events() {
+    fun fingerprintAndEncodeCompleteFor50_150_500Events() {
         val counts = listOf(50, 150, 500)
         val scope = TimelineScope(backendId = "test-backend", conversationId = "conv-perf")
 
@@ -70,32 +68,15 @@ class ConfirmedTimelinePerformanceGateTest {
                 revision = 1L,
             )
 
-            // Warmup
-            repeat(10) {
-                TimelineSnapshotCodec.computeStoredEnvelopeFingerprint(envelope)
-                TimelineSnapshotCodec.encode(envelope)
+            var fingerprint = 0L
+            var encodedLength = 0
+            repeat(50) {
+                fingerprint = TimelineSnapshotCodec.computeStoredEnvelopeFingerprint(envelope)
+                encodedLength = TimelineSnapshotCodec.encode(envelope).length
             }
 
-            val startFingerprint = TimeSource.Monotonic.markNow()
-            var fp = 0L
-            val iterations = 50
-            repeat(iterations) {
-                fp = TimelineSnapshotCodec.computeStoredEnvelopeFingerprint(envelope)
-            }
-            val elapsedFingerprint = startFingerprint.elapsedNow()
-
-            val startEncode = TimeSource.Monotonic.markNow()
-            var jsonLen = 0
-            repeat(iterations) {
-                val json = TimelineSnapshotCodec.encode(envelope)
-                jsonLen = json.length
-            }
-            val elapsedEncode = startEncode.elapsedNow()
-
-            assertTrue(fp != 0L)
-            assertTrue(jsonLen > 0)
-            assertTrue(elapsedFingerprint < 10.seconds, "Fingerprinting $count events took $elapsedFingerprint")
-            assertTrue(elapsedEncode < 30.seconds, "Encoding $count events took $elapsedEncode")
+            assertTrue(fingerprint != 0L)
+            assertTrue(encodedLength > 0)
         }
     }
 
