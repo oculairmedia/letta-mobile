@@ -1,11 +1,15 @@
 package com.letta.mobile.data.model
 
 import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.ImmutableMap
 import kotlinx.collections.immutable.toPersistentList
+import kotlinx.collections.immutable.toPersistentMap
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.listSerialDescriptor
+import kotlinx.serialization.descriptors.mapSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.Json
@@ -57,6 +61,24 @@ class ImmutableListSerializer<T>(
 
     override fun deserialize(decoder: Decoder): ImmutableList<T> =
         delegate.deserialize(decoder).toPersistentList()
+}
+
+/**
+ * KSerializer for kotlinx.collections.immutable.ImmutableMap<K, V>.
+ */
+class ImmutableMapSerializer<K, V>(
+    keySerializer: KSerializer<K>,
+    valueSerializer: KSerializer<V>,
+) : KSerializer<ImmutableMap<K, V>> {
+    private val delegate = MapSerializer(keySerializer, valueSerializer)
+    override val descriptor: SerialDescriptor = mapSerialDescriptor(keySerializer.descriptor, valueSerializer.descriptor)
+
+    override fun serialize(encoder: Encoder, value: ImmutableMap<K, V>) {
+        delegate.serialize(encoder, value.toMap())
+    }
+
+    override fun deserialize(decoder: Decoder): ImmutableMap<K, V> =
+        delegate.deserialize(decoder).toPersistentMap()
 }
 
 /**
