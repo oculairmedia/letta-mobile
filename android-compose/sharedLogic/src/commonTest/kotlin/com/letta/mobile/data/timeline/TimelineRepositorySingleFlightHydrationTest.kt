@@ -9,8 +9,11 @@ import kotlin.test.assertTrue
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
@@ -99,24 +102,37 @@ class TimelineRepositorySingleFlightHydrationTest {
     @Test
     fun concurrent_same_conversation_callers_join_one_hydration() = runTest {
         withContext(Dispatchers.Default) {
+            val testScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
             val transport = FakeHydrationTransport(gated = true)
-            val repo = newRepo(transport, backgroundScope)
+            val repo = newRepo(transport, testScope)
             try {
-                // Caller A runs eagerly (Unconfined) until hydrate hops to the
-                // IO dispatcher; by then it has REGISTERED the single flight
-                // for conv-sf-1. Callers B..D then observe the un-hydrated
-                // cached loop and must JOIN that flight (B/C same agent key,
-                // D aliased via agentId).
                 val target = HydrationTarget("conv-sf-1")
-                val callerA = async(Dispatchers.Unconfined) { repo.getOrCreate(target) }
-                val callerB = async(Dispatchers.Unconfined) { repo.getOrCreate(target) }
-                val callerC = async(Dispatchers.Unconfined) { repo.getOrCreate(target) }
-                val callerD = async(Dispatchers.Unconfined) { repo.getOrCreate(target.copy(agentId = "agent-x")) }
 
-                // Deterministic barrier: wait until the owner's hydrate is
-                // actually executing upstream (all callers already launched
-                // eagerly), THEN release.
+                // Establish the owner first and wait until its transport call is
+                // parked behind the gate before introducing any joiners.
+                val callerA = testScope.async(start = CoroutineStart.UNDISPATCHED) {
+                    repo.getOrCreate(target)
+                }
                 withTimeout(10_000) { transport.firstListStarted.await() }
+
+                // Start each joiner undispatched so it runs through cache lookup
+                // and flight claiming until it suspends on the owner's completion.
+                val callerB = testScope.async(start = CoroutineStart.UNDISPATCHED) {
+                    repo.getOrCreate(target)
+                }
+                val callerC = testScope.async(start = CoroutineStart.UNDISPATCHED) {
+                    repo.getOrCreate(target)
+                }
+                val callerD = testScope.async(start = CoroutineStart.UNDISPATCHED) {
+                    repo.getOrCreate(target.copy(agentId = "agent-x"))
+                }
+
+                assertEquals(1, transport.listCalls.value)
+                assertFalse(callerA.isCompleted)
+                assertFalse(callerB.isCompleted)
+                assertFalse(callerC.isCompleted)
+                assertFalse(callerD.isCompleted)
+
                 transport.releaseGate()
 
                 val loopA = callerA.await()
@@ -124,7 +140,6 @@ class TimelineRepositorySingleFlightHydrationTest {
                 val loopC = callerC.await()
                 val loopD = callerD.await()
 
-                // Exactly ONE hydration API call for four concurrent callers.
                 assertEquals(1, transport.listCalls.value)
                 assertTrue(loopA.hasHydratedSuccessfully)
                 assertSame(loopA, loopB)
@@ -132,6 +147,7 @@ class TimelineRepositorySingleFlightHydrationTest {
                 assertSame(loopA, loopD)
             } finally {
                 repo.clearAll()
+                testScope.cancel()
             }
         }
     }
@@ -139,8 +155,9 @@ class TimelineRepositorySingleFlightHydrationTest {
     @Test
     fun cancellingJoinerDoesNotCancelOwnedHydration() = runTest {
         withContext(Dispatchers.Default) {
+            val testScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
             val transport = FakeHydrationTransport(gated = true)
-            val repo = newRepo(transport, backgroundScope)
+            val repo = newRepo(transport, testScope)
             try {
                 val target = HydrationTarget("conv-cancel-joiner")
                 val owner = async(Dispatchers.Unconfined) { repo.getOrCreate(target) }
@@ -155,6 +172,7 @@ class TimelineRepositorySingleFlightHydrationTest {
                 assertEquals(1, transport.listCalls.value)
             } finally {
                 repo.clearAll()
+                testScope.cancel()
             }
         }
     }
@@ -163,7 +181,8 @@ class TimelineRepositorySingleFlightHydrationTest {
     fun same_conversation_with_conflicting_agents_hydrates_both_loops() = runTest {
         withContext(Dispatchers.Default) {
             val transport = FakeHydrationTransport(gated = true)
-            val repo = newRepo(transport, backgroundScope)
+            val testScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+            val repo = newRepo(transport, testScope)
             try {
                 val target = HydrationTarget("conv-scoped")
                 val callerA = async(Dispatchers.Unconfined) { repo.getOrCreate(target.copy(agentId = "agent-a")) }
@@ -183,6 +202,7 @@ class TimelineRepositorySingleFlightHydrationTest {
                 assertFalse(loopA === loopB)
             } finally {
                 repo.clearAll()
+                testScope.cancel()
             }
         }
     }
@@ -191,7 +211,8 @@ class TimelineRepositorySingleFlightHydrationTest {
     fun clear_during_hydration_does_not_bind_replacement_to_stale_flight() = runTest {
         withContext(Dispatchers.Default) {
             val transport = FakeHydrationTransport(gated = true)
-            val repo = newRepo(transport, backgroundScope)
+            val testScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+            val repo = newRepo(transport, testScope)
             try {
                 val target = HydrationTarget("conv-clear")
                 val original = async(Dispatchers.Unconfined) { repo.getOrCreate(target) }
@@ -209,6 +230,7 @@ class TimelineRepositorySingleFlightHydrationTest {
                 assertFalse(originalLoop === replacementLoop)
             } finally {
                 repo.clearAll()
+                testScope.cancel()
             }
         }
     }
@@ -217,7 +239,8 @@ class TimelineRepositorySingleFlightHydrationTest {
     fun different_conversations_get_independent_flights() = runTest {
         withContext(Dispatchers.Default) {
             val transport = FakeHydrationTransport(gated = true)
-            val repo = newRepo(transport, backgroundScope)
+            val testScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+            val repo = newRepo(transport, testScope)
             try {
                 val callerA = async(Dispatchers.Unconfined) { repo.getOrCreate(HydrationTarget("conv-sf-a")) }
                 val callerB = async(Dispatchers.Unconfined) { repo.getOrCreate(HydrationTarget("conv-sf-b")) }
@@ -237,6 +260,7 @@ class TimelineRepositorySingleFlightHydrationTest {
                 assertEquals(2, transport.listCalls.value)
             } finally {
                 repo.clearAll()
+                testScope.cancel()
             }
         }
     }
@@ -245,7 +269,8 @@ class TimelineRepositorySingleFlightHydrationTest {
     fun hydration_failure_permits_later_retry() = runTest {
         withContext(Dispatchers.Default) {
             val transport = FakeHydrationTransport(failFirstCall = true)
-            val repo = newRepo(transport, backgroundScope)
+            val testScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+            val repo = newRepo(transport, testScope)
             try {
                 val target = HydrationTarget("conv-sf-fail")
                 val loop1 = repo.getOrCreate(target)
@@ -257,6 +282,7 @@ class TimelineRepositorySingleFlightHydrationTest {
                 assertEquals(2, transport.listCalls.value)
             } finally {
                 repo.clearAll()
+                testScope.cancel()
             }
         }
     }

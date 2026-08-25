@@ -196,10 +196,9 @@ open class TimelineRepository(
     )
 
     private sealed interface HydrateFlightClaim {
-        val flight: HydrateFlight
-
-        data class Owner(override val flight: HydrateFlight) : HydrateFlightClaim
-        data class Joiner(override val flight: HydrateFlight) : HydrateFlightClaim
+        data object AlreadyHydrated : HydrateFlightClaim
+        data class Owner(val flight: HydrateFlight) : HydrateFlightClaim
+        data class Joiner(val flight: HydrateFlight) : HydrateFlightClaim
     }
 
     /** conversationId -> loop-owned in-flight hydration. Guarded by [hydrateFlightsMutex]. */
@@ -207,6 +206,7 @@ open class TimelineRepository(
 
     private suspend fun hydrateSingleFlight(loop: TimelineSyncLoop, key: TimelineCacheKey) {
         when (val claim = claimHydrationFlight(loop, key)) {
+            HydrateFlightClaim.AlreadyHydrated -> return
             is HydrateFlightClaim.Owner -> runOwnedHydration(claim.flight, key)
             is HydrateFlightClaim.Joiner -> joinHydration(claim.flight, key)
         }
@@ -216,13 +216,20 @@ open class TimelineRepository(
         loop: TimelineSyncLoop,
         key: TimelineCacheKey,
     ): HydrateFlightClaim = hydrateFlightsMutex.withLock {
-        val existing = hydrateFlights[key.conversationId]
-        if (existing?.loop === loop) {
-            HydrateFlightClaim.Joiner(existing)
+        // Re-check under the same mutex that guards flight removal. A caller
+        // may have observed false before waiting while the owner completed
+        // hydration and removed its flight.
+        if (loop.hasHydratedSuccessfully) {
+            HydrateFlightClaim.AlreadyHydrated
         } else {
-            val created = HydrateFlight(loop, CompletableDeferred())
-            hydrateFlights[key.conversationId] = created
-            HydrateFlightClaim.Owner(created)
+            val existing = hydrateFlights[key.conversationId]
+            if (existing?.loop === loop) {
+                HydrateFlightClaim.Joiner(existing)
+            } else {
+                val created = HydrateFlight(loop, CompletableDeferred())
+                hydrateFlights[key.conversationId] = created
+                HydrateFlightClaim.Owner(created)
+            }
         }
     }
 
