@@ -100,120 +100,145 @@ class RoomConfirmedTimelineStore(
 
     override suspend fun writeSnapshot(envelope: StoredTimelineEnvelope): Boolean {
         return withContext(Dispatchers.IO) {
-        val scope = envelope.scope
+        val plan = createWritePlan(envelope)
+        var published = false
+
+        try {
+            if (!stageAndValidate(plan)) return@withContext false
+            if (!publishHead(plan)) {
+                dao.deleteManifest(plan.manifestId)
+                reportStaleWrite(plan.scope, envelope.revision)
+                return@withContext false
+            }
+            published = true
+
+            // Delete only payloads not referenced by any active/fallback head, including abandoned stages.
+            dao.deleteOrphanManifestsForBackend(plan.scope.backendId)
+            reportWriteSuccess(plan)
+            true
+        } catch (cancelled: CancellationException) {
+            cleanupCancelledWrite(plan, published)
+            throw cancelled
+        } catch (failure: Throwable) {
+            handleWriteFailure(plan, published, failure)
+        }
+        }
+    }
+
+    private fun createWritePlan(envelope: StoredTimelineEnvelope): SnapshotWritePlan {
         val writtenAt = envelope.writtenAtMillis.takeIf { it > 0 } ?: timelineCurrentTimeMillis()
         val normalized = envelope.copy(writtenAtMillis = writtenAt)
         val payload = TimelineSnapshotCodec.encode(normalized).toByteArray(StandardCharsets.UTF_8)
         require(payload.isNotEmpty() && payload.size.toLong() <= MAX_PAYLOAD_BYTES) {
             "Snapshot exceeds bounded storage limit"
         }
-
         val manifestId = UUID.randomUUID().toString()
         val chunks = payload.asTimelineChunks(manifestId)
-        val manifest = ConfirmedTimelineSnapshotManifestEntity(
-            manifestId = manifestId,
-            backendId = scope.backendId,
-            conversationId = scope.conversationId,
-            agentId = scope.agentId,
-            revision = normalized.revision,
-            schemaVersion = normalized.schemaVersion,
-            byteLength = payload.size.toLong(),
-            chunkCount = chunks.size,
-            sha256 = sha256(payload),
-            writtenAtMillis = writtenAt,
+        return SnapshotWritePlan(
+            envelope = envelope,
+            normalized = normalized,
+            payload = payload,
+            chunks = chunks,
+            manifest = ConfirmedTimelineSnapshotManifestEntity(
+                manifestId = manifestId,
+                backendId = envelope.scope.backendId,
+                conversationId = envelope.scope.conversationId,
+                agentId = envelope.scope.agentId,
+                revision = normalized.revision,
+                schemaVersion = normalized.schemaVersion,
+                byteLength = payload.size.toLong(),
+                chunkCount = chunks.size,
+                sha256 = sha256(payload),
+                writtenAtMillis = writtenAt,
+            ),
         )
-        var published = false
+    }
 
-        try {
-            // Phase one: commit the complete body without making it visible to readers.
-            database.withTransaction {
-                dao.insertManifest(manifest)
-                chunks.chunked(CHUNK_INSERT_BATCH).forEach { batch ->
-                    coroutineContext.ensureActive()
-                    dao.insertChunks(batch)
-                }
+    private suspend fun stageAndValidate(plan: SnapshotWritePlan): Boolean {
+        database.withTransaction {
+            dao.insertManifest(plan.manifest)
+            plan.chunks.chunked(CHUNK_INSERT_BATCH).forEach { batch ->
+                coroutineContext.ensureActive()
+                dao.insertChunks(batch)
             }
-
-            // Validate exactly through the production bounded read path before publishing the head.
-            val staged = manifestReader.read(
-                RoomManifestRequest(
-                    scope = scope,
-                    manifestId = manifestId,
-                    maximumRevision = normalized.revision,
-                    revisionPolicy = RoomRevisionPolicy.EXACT,
-                )
+        }
+        val staged = manifestReader.read(
+            RoomManifestRequest(
+                scope = plan.scope,
+                manifestId = plan.manifestId,
+                maximumRevision = plan.normalized.revision,
+                revisionPolicy = RoomRevisionPolicy.EXACT,
             )
-            if (staged !is RoomManifestRead.Valid || staged.envelope != normalized) {
-                dao.deleteManifest(manifestId)
-                return@withContext false
-            }
+        )
+        if (staged is RoomManifestRead.Valid && staged.envelope == plan.normalized) return true
+        dao.deleteManifest(plan.manifestId)
+        return false
+    }
 
-            val observedHead = dao.getHeadMetadata(scope.backendId, scope.conversationId)
-            val retainedFallback = observedHead?.takeIf { it.matches(scope) }?.let { head ->
-                selectLastKnownGoodManifest(scope, head)
-            }
-
-            // Phase two: atomically retain the last-known-good body and swap only the metadata head.
-            val swapped = database.withTransaction {
-                val existing = dao.getHeadMetadata(scope.backendId, scope.conversationId)
-                if (existing != null && existing.highWaterRevision >= normalized.revision) {
-                    false
-                } else {
-                    val fallbackId = retainedFallback.takeIf { existing == observedHead }
-                    dao.replaceHead(
-                        ConfirmedTimelineSnapshotHeadEntity(
-                            backendId = scope.backendId,
-                            conversationId = scope.conversationId,
-                            agentId = scope.agentId,
-                            activeManifestId = manifestId,
-                            fallbackManifestId = fallbackId,
-                            highWaterRevision = normalized.revision,
-                            writtenAtMillis = writtenAt,
-                        )
+    private suspend fun publishHead(plan: SnapshotWritePlan): Boolean {
+        val observedHead = dao.getHeadMetadata(plan.scope.backendId, plan.scope.conversationId)
+        val retainedFallback = observedHead?.takeIf { it.matches(plan.scope) }?.let { head ->
+            selectLastKnownGoodManifest(plan.scope, head)
+        }
+        return database.withTransaction {
+            val existing = dao.getHeadMetadata(plan.scope.backendId, plan.scope.conversationId)
+            if (existing != null && existing.highWaterRevision >= plan.normalized.revision) {
+                false
+            } else {
+                dao.replaceHead(
+                    ConfirmedTimelineSnapshotHeadEntity(
+                        backendId = plan.scope.backendId,
+                        conversationId = plan.scope.conversationId,
+                        agentId = plan.scope.agentId,
+                        activeManifestId = plan.manifestId,
+                        fallbackManifestId = retainedFallback.takeIf { existing == observedHead },
+                        highWaterRevision = plan.normalized.revision,
+                        writtenAtMillis = plan.normalized.writtenAtMillis,
                     )
-                    true
-                }
+                )
+                true
             }
-            if (!swapped) {
-                dao.deleteManifest(manifestId)
-                reportStaleWrite(scope, envelope.revision)
-                return@withContext false
-            }
-            published = true
+        }
+    }
 
-            // Delete only payloads not referenced by any active/fallback head, including abandoned stages.
-            dao.deleteOrphanManifestsForBackend(scope.backendId)
-            Telemetry.event(
-                "RoomTimelineStore", "writeSnapshot.success",
-                "backendId" to scope.backendId,
-                "conversationId" to scope.conversationId,
-                "revision" to envelope.revision,
-                "eventCount" to envelope.events.size,
-                "byteSize" to payload.size,
-                "chunkCount" to chunks.size,
-            )
-            true
-        } catch (cancelled: CancellationException) {
-            withContext(NonCancellable) {
-                val isHead = dao.getHeadMetadata(scope.backendId, scope.conversationId)?.activeManifestId == manifestId
-                if (!published && !isHead) dao.deleteManifest(manifestId)
-            }
-            throw cancelled
-        } catch (failure: Throwable) {
-            val isHead = dao.getHeadMetadata(scope.backendId, scope.conversationId)?.activeManifestId == manifestId
-            if (!published && !isHead) {
-                dao.deleteManifest(manifestId)
-                throw failure
-            }
-            Telemetry.error(
-                "RoomTimelineStore", "writeSnapshot.postPublishCleanupFailed", failure,
-                "backendId" to scope.backendId,
-                "conversationId" to scope.conversationId,
-                "revision" to envelope.revision,
-            )
-            true
+    private suspend fun cleanupCancelledWrite(plan: SnapshotWritePlan, published: Boolean) {
+        withContext(NonCancellable) {
+            val isHead = dao.getHeadMetadata(plan.scope.backendId, plan.scope.conversationId)
+                ?.activeManifestId == plan.manifestId
+            if (!published && !isHead) dao.deleteManifest(plan.manifestId)
         }
+    }
+
+    private suspend fun handleWriteFailure(
+        plan: SnapshotWritePlan,
+        published: Boolean,
+        failure: Throwable,
+    ): Boolean {
+        val isHead = dao.getHeadMetadata(plan.scope.backendId, plan.scope.conversationId)
+            ?.activeManifestId == plan.manifestId
+        if (!published && !isHead) {
+            dao.deleteManifest(plan.manifestId)
+            throw failure
         }
+        Telemetry.error(
+            "RoomTimelineStore", "writeSnapshot.postPublishCleanupFailed", failure,
+            "backendId" to plan.scope.backendId,
+            "conversationId" to plan.scope.conversationId,
+            "revision" to plan.envelope.revision,
+        )
+        return true
+    }
+
+    private fun reportWriteSuccess(plan: SnapshotWritePlan) {
+        Telemetry.event(
+            "RoomTimelineStore", "writeSnapshot.success",
+            "backendId" to plan.scope.backendId,
+            "conversationId" to plan.scope.conversationId,
+            "revision" to plan.envelope.revision,
+            "eventCount" to plan.envelope.events.size,
+            "byteSize" to plan.payload.size,
+            "chunkCount" to plan.chunks.size,
+        )
     }
 
     override suspend fun deleteSnapshot(scope: TimelineScope) {
@@ -292,6 +317,17 @@ class RoomConfirmedTimelineStore(
             "attemptedRevision" to revision,
             level = Telemetry.Level.WARN,
         )
+    }
+
+    private data class SnapshotWritePlan(
+        val envelope: StoredTimelineEnvelope,
+        val normalized: StoredTimelineEnvelope,
+        val payload: ByteArray,
+        val chunks: List<ConfirmedTimelineSnapshotChunkEntity>,
+        val manifest: ConfirmedTimelineSnapshotManifestEntity,
+    ) {
+        val scope: TimelineScope get() = envelope.scope
+        val manifestId: String get() = manifest.manifestId
     }
 
     companion object {
