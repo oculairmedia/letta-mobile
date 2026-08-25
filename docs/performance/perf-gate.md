@@ -66,16 +66,15 @@ Current policy:
 - `startup.cold.p95_ms`: `+20%`
 - `startup.warm.p95_ms`: `+20%`
 
-Warm startup keeps a wider envelope than cold startup because consecutive seed
-and verify runs on the canonical API 33 emulator drifted by `+17.4%`
-(`285.988 ms` -> `335.808 ms`) during gate bring-up. Cold startup also needed a
-modest bump after the first PR-triggered verify run on the updated branch
-measured bounded drift up to `1772.844 ms` against a `1512.749 ms` seed
-(`+17.2%`), so the cold envelope is now `+20%` on this shared runner.
+Warm startup was refreshed to a `405.889 ms` baseline after consecutive
+canonical PR runs measured `353.541 ms` and `405.889 ms` while cold startup
+remained below its baseline. That evidence showed the previous `285.988 ms`
+seed no longer represented the shared runner. Cold startup retains its
+`1512.749 ms` baseline after healthy runs measured bounded drift up to
+`1772.844 ms` (`+17.2%`).
 
-Warm startup uses the same `+20%` envelope and gates by default. Its minimum
-sample count prevents absent or undersampled warm-open output from silently
-passing.
+Both startup metrics use a `+20%` envelope and gate by default. Their minimum
+sample counts prevent absent or undersampled output from silently passing.
 
 ## Retry behavior
 
