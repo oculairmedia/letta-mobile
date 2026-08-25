@@ -11,27 +11,26 @@ import com.letta.mobile.data.model.HostId
 data class ProviderRpcTelemetryEvent(
     val method: String,
     val hostId: HostId,
-    val peerId: String?,
     val outcome: String,
+    val peerId: String? = null,
     val errorCode: String? = null,
 ) {
     override fun toString(): String =
-        "ProviderRpcTelemetryEvent(method=$method, hostId=${hostId.value}, peerId=$peerId, " +
-            "outcome=$outcome, errorCode=$errorCode)"
+        "ProviderRpcTelemetryEvent(method=$method, hostId=${hostId.value}, outcome=$outcome, " +
+            "peerId=$peerId, errorCode=$errorCode)"
 }
 
 object ProviderManagementRpcTelemetry {
 
     fun createEvent(
+        auth: ProviderRpcAuthContext,
         method: String,
-        hostId: HostId,
-        peerId: String?,
         outcome: String,
         errorCode: String? = null,
     ): ProviderRpcTelemetryEvent = ProviderRpcTelemetryEvent(
         method = method,
-        hostId = hostId,
-        peerId = peerId,
+        hostId = auth.activeHostId,
+        peerId = auth.peerId,
         outcome = outcome,
         errorCode = errorCode,
     )

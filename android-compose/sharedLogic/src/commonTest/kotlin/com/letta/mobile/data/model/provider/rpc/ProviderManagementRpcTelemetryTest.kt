@@ -11,10 +11,13 @@ class ProviderManagementRpcTelemetryTest {
 
     @Test
     fun telemetryEventsNeverContainSecretValuesOrBodies() {
-        val event = ProviderManagementRpcTelemetry.createEvent(
-            method = ProviderRpcMethods.PROVIDER_CREDENTIAL_REPLACE,
-            hostId = HostId("host-1"),
+        val auth = ProviderRpcAuthContext(
+            activeHostId = HostId("host-1"),
             peerId = "peer-1",
+        )
+        val event = ProviderManagementRpcTelemetry.createEvent(
+            auth = auth,
+            method = ProviderRpcMethods.PROVIDER_CREDENTIAL_REPLACE,
             outcome = "denied",
             errorCode = "UNAUTHORIZED",
         )
