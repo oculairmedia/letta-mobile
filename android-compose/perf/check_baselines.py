@@ -164,6 +164,20 @@ def _new_summary_row(key: str, spec: dict, gate_enabled: bool) -> dict:
     }
 
 
+def _minimum_sample_error(key: str, spec: dict, values: list[tuple[dict, float]]) -> str | None:
+    minimum_samples = int(spec.get("min_samples", 0))
+    if not minimum_samples:
+        return None
+    sample_counts = [
+        len(bench.get("metrics", {}).get(spec["metric"], {}).get("runs", []))
+        for bench, _ in values
+    ]
+    undersampled = [count for count in sample_counts if count < minimum_samples]
+    if not undersampled:
+        return None
+    return f"{key}: {min(undersampled)} samples reported, {minimum_samples} required"
+
+
 def _find_observation(key: str, spec: dict, measurements: list[dict], gate_enabled: bool) -> tuple[dict | None, float | None, str | None]:
     matches = [bench for bench in measurements if _match_bench(bench, spec["source"])]
     if not matches:
@@ -177,15 +191,9 @@ def _find_observation(key: str, spec: dict, measurements: list[dict], gate_enabl
         return None, None, message if gate_enabled else None
     values = [(bench, value) for bench, value in picked if value is not None]
 
-    minimum_samples = int(spec.get("min_samples", 0))
-    sample_counts = [
-        len(bench.get("metrics", {}).get(spec["metric"], {}).get("runs", []))
-        for bench, _ in values
-    ]
-    undersampled = [count for count in sample_counts if count < minimum_samples]
-    if minimum_samples and undersampled:
-        message = f"{key}: {min(undersampled)} samples reported, {minimum_samples} required"
-        return None, None, message if gate_enabled else None
+    sample_error = _minimum_sample_error(key, spec, values)
+    if sample_error:
+        return None, None, sample_error if gate_enabled else None
     bench, value = max(values, key=lambda item: item[1])
     return bench, value, None
 
