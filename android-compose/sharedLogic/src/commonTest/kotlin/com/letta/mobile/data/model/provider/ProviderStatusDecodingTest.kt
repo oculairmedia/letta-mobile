@@ -11,14 +11,14 @@ class ProviderStatusDecodingTest {
 
     private val json = Json { prettyPrint = false; ignoreUnknownKeys = true }
 
-    private inline fun <reified T : Any> assertWireRoundTrip(pairs: List<Pair<T, String>>) {
+    private inline fun <reified T> assertWireRoundTrip(pairs: List<Pair<T, String>>) {
         for ((status, expectedJson) in pairs) {
             assertEquals(expectedJson, json.encodeToString<T>(status))
             assertEquals(status, json.decodeFromString<T>(expectedJson))
         }
     }
 
-    private inline fun <reified T : Any> assertUnknownWireDecoding(
+    private inline fun <reified T> assertUnknownWireDecoding(
         rawString: String,
         crossinline extractRaw: (T) -> String,
         crossinline extractWireValue: (T) -> String,

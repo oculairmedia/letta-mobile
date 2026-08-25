@@ -45,27 +45,22 @@ data class ProviderFieldSchema(
 sealed interface ProviderProtocol {
     val wireValue: String
 
-    @Serializable(with = ProviderProtocolSerializer::class)
     data object OpenAi : ProviderProtocol {
         override val wireValue: String = "openai"
     }
 
-    @Serializable(with = ProviderProtocolSerializer::class)
     data object Anthropic : ProviderProtocol {
         override val wireValue: String = "anthropic"
     }
 
-    @Serializable(with = ProviderProtocolSerializer::class)
     data object GoogleAi : ProviderProtocol {
         override val wireValue: String = "google"
     }
 
-    @Serializable(with = ProviderProtocolSerializer::class)
     data object Ollama : ProviderProtocol {
         override val wireValue: String = "ollama"
     }
 
-    @Serializable(with = ProviderProtocolSerializer::class)
     data class Unknown(val raw: String) : ProviderProtocol {
         override val wireValue: String get() = raw
     }
@@ -107,7 +102,13 @@ data class ProviderDefinition(
     @Serializable(with = ImmutableListSerializer::class)
     val fields: ImmutableList<ProviderFieldSchema> = persistentListOf(),
     @SerialName("default_base_url") val defaultBaseUrl: String? = null,
-)
+) {
+    init {
+        require(defaultBaseUrl == null || defaultBaseUrl.isCredentialFreeBaseUrl()) {
+            "Default provider base URL must not contain user info, query parameters, or a fragment"
+        }
+    }
+}
 
 /**
  * Credential configuration state for a provider instance.
@@ -120,27 +121,22 @@ data class ProviderDefinition(
 sealed interface CredentialStatus {
     val wireValue: String
 
-    @Serializable(with = CredentialStatusSerializer::class)
     data object Configured : CredentialStatus {
         override val wireValue: String = "configured"
     }
 
-    @Serializable(with = CredentialStatusSerializer::class)
     data object Missing : CredentialStatus {
         override val wireValue: String = "missing"
     }
 
-    @Serializable(with = CredentialStatusSerializer::class)
     data object Invalid : CredentialStatus {
         override val wireValue: String = "invalid"
     }
 
-    @Serializable(with = CredentialStatusSerializer::class)
     data object NotRequired : CredentialStatus {
         override val wireValue: String = "not_required"
     }
 
-    @Serializable(with = CredentialStatusSerializer::class)
     data class Unknown(val raw: String) : CredentialStatus {
         override val wireValue: String get() = raw
     }
@@ -180,27 +176,22 @@ object CredentialStatusSerializer : KSerializer<CredentialStatus> {
 sealed interface OperationalStatus {
     val wireValue: String
 
-    @Serializable(with = OperationalStatusSerializer::class)
     data object Active : OperationalStatus {
         override val wireValue: String = "active"
     }
 
-    @Serializable(with = OperationalStatusSerializer::class)
     data object Degraded : OperationalStatus {
         override val wireValue: String = "degraded"
     }
 
-    @Serializable(with = OperationalStatusSerializer::class)
     data object Disabled : OperationalStatus {
         override val wireValue: String = "disabled"
     }
 
-    @Serializable(with = OperationalStatusSerializer::class)
     data object Unavailable : OperationalStatus {
         override val wireValue: String = "unavailable"
     }
 
-    @Serializable(with = OperationalStatusSerializer::class)
     data class Unknown(val raw: String) : OperationalStatus {
         override val wireValue: String get() = raw
     }
@@ -229,6 +220,19 @@ object OperationalStatusSerializer : KSerializer<OperationalStatus> {
     }
 }
 
+private fun String.isCredentialFreeBaseUrl(): Boolean {
+    if ('?' in this || '#' in this) return false
+    val authorityStart = indexOf("://").let { if (it < 0) 0 else it + 3 }
+    val pathStart = indexOf('/', authorityStart).let { if (it < 0) length else it }
+    return '@' !in substring(authorityStart, pathStart)
+}
+
+private fun String.isHttpHeaderName(): Boolean =
+    isNotEmpty() && length <= 128 && all { character ->
+        character in 'a'..'z' || character in 'A'..'Z' || character in '0'..'9' ||
+            character in "!#$%&'*+-.^_`|~"
+    }
+
 /**
  * Immutable domain model for a configured provider instance on a host.
  *
@@ -250,4 +254,13 @@ data class RedactedProviderInstance(
     @SerialName("configured_field_ids") val configuredFieldIds: ImmutableList<ProviderFieldId> = persistentListOf(),
     @Serializable(with = ImmutableListSerializer::class)
     @SerialName("configured_header_names") val configuredHeaderNames: ImmutableList<String> = persistentListOf(),
-)
+) {
+    init {
+        require(baseUrl == null || baseUrl.isCredentialFreeBaseUrl()) {
+            "Provider base URL must not contain user info, query parameters, or a fragment"
+        }
+        require(configuredHeaderNames.all(String::isHttpHeaderName)) {
+            "Configured provider headers must contain names only"
+        }
+    }
+}

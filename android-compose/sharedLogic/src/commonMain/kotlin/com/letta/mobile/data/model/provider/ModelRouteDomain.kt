@@ -27,27 +27,22 @@ import kotlinx.serialization.encoding.Encoder
 sealed interface ModelAvailability {
     val wireValue: String
 
-    @Serializable(with = ModelAvailabilitySerializer::class)
     data object Available : ModelAvailability {
         override val wireValue: String = "available"
     }
 
-    @Serializable(with = ModelAvailabilitySerializer::class)
     data object Deprecated : ModelAvailability {
         override val wireValue: String = "deprecated"
     }
 
-    @Serializable(with = ModelAvailabilitySerializer::class)
     data object Disabled : ModelAvailability {
         override val wireValue: String = "disabled"
     }
 
-    @Serializable(with = ModelAvailabilitySerializer::class)
     data object QuotaExceeded : ModelAvailability {
         override val wireValue: String = "quota_exceeded"
     }
 
-    @Serializable(with = ModelAvailabilitySerializer::class)
     data class Unknown(val raw: String) : ModelAvailability {
         override val wireValue: String get() = raw
     }
@@ -87,22 +82,18 @@ object ModelAvailabilitySerializer : KSerializer<ModelAvailability> {
 sealed interface VisibilityPolicy {
     val wireValue: String
 
-    @Serializable(with = VisibilityPolicySerializer::class)
     data object Visible : VisibilityPolicy {
         override val wireValue: String = "visible"
     }
 
-    @Serializable(with = VisibilityPolicySerializer::class)
     data object Hidden : VisibilityPolicy {
         override val wireValue: String = "hidden"
     }
 
-    @Serializable(with = VisibilityPolicySerializer::class)
     data object Automatic : VisibilityPolicy {
         override val wireValue: String = "auto"
     }
 
-    @Serializable(with = VisibilityPolicySerializer::class)
     data class Unknown(val raw: String) : VisibilityPolicy {
         override val wireValue: String get() = raw
     }

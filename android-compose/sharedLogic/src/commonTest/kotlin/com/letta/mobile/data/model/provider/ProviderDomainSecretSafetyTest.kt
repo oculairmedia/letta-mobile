@@ -7,11 +7,15 @@ import com.letta.mobile.data.model.ProviderDefinitionId
 import com.letta.mobile.data.model.ProviderFieldId
 import com.letta.mobile.data.model.ProviderInstanceId
 import com.letta.mobile.data.model.ProviderRevision
+import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -20,20 +24,25 @@ class ProviderDomainSecretSafetyTest {
     private val json = Json { prettyPrint = false; ignoreUnknownKeys = true; encodeDefaults = true }
     private val secretSentinel = "sk-live-sentinel-xyz-987654321-DO-NOT-LEAK"
 
+    private fun providerInstance(
+        baseUrl: String? = "https://api.openai.com/v1",
+        headerNames: ImmutableList<String> = persistentListOf("OpenAI-Organization", "OpenAI-Project"),
+    ) = RedactedProviderInstance(
+        id = ProviderInstanceId("inst-openai-prod"),
+        hostId = HostId("host-primary"),
+        definitionId = ProviderDefinitionId("openai"),
+        displayName = "OpenAI Production",
+        baseUrl = baseUrl,
+        credentialStatus = CredentialStatus.Configured,
+        operationalStatus = OperationalStatus.Active,
+        revision = ProviderRevision("rev-42"),
+        configuredFieldIds = persistentListOf(ProviderFieldId("api_key"), ProviderFieldId("org_id")),
+        configuredHeaderNames = headerNames,
+    )
+
     @Test
     fun redactedProviderInstanceContainsOnlyMetadataAndNoSecretValues() {
-        val instance = RedactedProviderInstance(
-            id = ProviderInstanceId("inst-openai-prod"),
-            hostId = HostId("host-primary"),
-            definitionId = ProviderDefinitionId("openai"),
-            displayName = "OpenAI Production",
-            baseUrl = "https://api.openai.com/v1",
-            credentialStatus = CredentialStatus.Configured,
-            operationalStatus = OperationalStatus.Active,
-            revision = ProviderRevision("rev-42"),
-            configuredFieldIds = persistentListOf(ProviderFieldId("api_key"), ProviderFieldId("org_id")),
-            configuredHeaderNames = persistentListOf("OpenAI-Organization", "OpenAI-Project"),
-        )
+        val instance = providerInstance()
 
         val encoded = json.encodeToString(instance)
         val stringified = instance.toString()
@@ -53,6 +62,65 @@ class ProviderDomainSecretSafetyTest {
         val identicalCopy = instance.copy()
         assertEquals(instance, identicalCopy)
         assertEquals(instance.hashCode(), identicalCopy.hashCode())
+    }
+
+    @Test
+    fun redactedProviderInstanceSerializationSurfaceHasNoSecretBearingFields() {
+        val serializedFields = json.encodeToJsonElement(providerInstance()).jsonObject.keys
+
+        assertEquals(
+            setOf(
+                "id",
+                "host_id",
+                "definition_id",
+                "display_name",
+                "base_url",
+                "credential_status",
+                "operational_status",
+                "revision",
+                "configured_field_ids",
+                "configured_header_names",
+            ),
+            serializedFields,
+        )
+        assertFalse(serializedFields.any { it.contains("token", ignoreCase = true) })
+        assertFalse(serializedFields.any { it.contains("value", ignoreCase = true) })
+        assertFalse(serializedFields.any { it.contains("custom_headers", ignoreCase = true) })
+    }
+
+    @Test
+    fun rejectsHeaderValuesWithoutLeakingThemInErrors() {
+        val error = assertFailsWith<IllegalArgumentException> {
+            providerInstance(headerNames = persistentListOf("Authorization: Bearer $secretSentinel"))
+        }
+
+        assertFalse(error.toString().contains(secretSentinel))
+        assertEquals("Configured provider headers must contain names only", error.message)
+    }
+
+    @Test
+    fun rejectsCredentialsEmbeddedInProviderUrlsWithoutLeakingThemInErrors() {
+        val instanceError = assertFailsWith<IllegalArgumentException> {
+            providerInstance(baseUrl = "https://service-account:$secretSentinel@example.com/v1")
+        }
+        val definitionError = assertFailsWith<IllegalArgumentException> {
+            ProviderDefinition(
+                id = ProviderDefinitionId("custom"),
+                displayName = "Custom",
+                defaultBaseUrl = "https://example.com/v1?api_key=$secretSentinel",
+            )
+        }
+
+        assertFalse(instanceError.toString().contains(secretSentinel))
+        assertFalse(definitionError.toString().contains(secretSentinel))
+        assertEquals(
+            "Provider base URL must not contain user info, query parameters, or a fragment",
+            instanceError.message,
+        )
+        assertEquals(
+            "Default provider base URL must not contain user info, query parameters, or a fragment",
+            definitionError.message,
+        )
     }
 
     @Test

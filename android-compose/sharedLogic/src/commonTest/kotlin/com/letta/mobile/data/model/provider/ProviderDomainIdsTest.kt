@@ -11,7 +11,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotEquals
+import kotlin.test.assertFalse
 
 class ProviderDomainIdsTest {
 
@@ -56,11 +56,11 @@ class ProviderDomainIdsTest {
         val fieldId = ProviderFieldId(raw)
         val routeId = ModelRouteId(raw)
 
-        // Type safety: separate value classes must not equate across distinct types
-        assertNotEquals<Any>(hostId, defId)
-        assertNotEquals<Any>(defId, instanceId)
-        assertNotEquals<Any>(instanceId, fieldId)
-        assertNotEquals<Any>(fieldId, routeId)
+        // Type safety: separate value classes remain unequal without erasing their types.
+        assertFalse(hostId.equals(defId))
+        assertFalse(defId.equals(instanceId))
+        assertFalse(instanceId.equals(fieldId))
+        assertFalse(fieldId.equals(routeId))
     }
 
     @Test
