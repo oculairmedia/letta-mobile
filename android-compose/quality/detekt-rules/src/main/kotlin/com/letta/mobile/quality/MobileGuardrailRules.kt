@@ -9,14 +9,17 @@ import io.gitlab.arturbosch.detekt.api.Rule
 import io.gitlab.arturbosch.detekt.api.RuleSet
 import io.gitlab.arturbosch.detekt.api.RuleSetProvider
 import io.gitlab.arturbosch.detekt.api.Severity
+import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.KtAnnotationEntry
 import org.jetbrains.kotlin.psi.KtBinaryExpression
 import org.jetbrains.kotlin.psi.KtCallExpression
 import org.jetbrains.kotlin.psi.KtCatchClause
-import org.jetbrains.kotlin.psi.KtObjectDeclaration
+import org.jetbrains.kotlin.psi.KtClassBody
 import org.jetbrains.kotlin.psi.KtElement
 import org.jetbrains.kotlin.psi.KtFile
+import org.jetbrains.kotlin.psi.KtNameReferenceExpression
 import org.jetbrains.kotlin.psi.KtNamedFunction
+import org.jetbrains.kotlin.psi.KtObjectDeclaration
 import org.jetbrains.kotlin.psi.KtProperty
 import org.jetbrains.kotlin.psi.KtStringTemplateExpression
 import org.jetbrains.kotlin.psi.KtThrowExpression
@@ -105,22 +108,43 @@ internal class NoProcessGlobalMutableState(config: Config = Config.empty) : Mobi
 
     override fun visitProperty(property: KtProperty) {
         super.visitProperty(property)
-        val file = property.containingKtFile
-        if (file.isTestSource() || file.isGenerated()) return
-        val owner = property.parent
-        val isGlobal = owner is KtFile ||
-            (owner is org.jetbrains.kotlin.psi.KtClassBody && owner.parent is KtObjectDeclaration)
-        if (!isGlobal || property.hasModifier(org.jetbrains.kotlin.lexer.KtTokens.CONST_KEYWORD)) return
-        val type = property.typeReference?.text.orEmpty()
-        val factory = (property.initializer as? KtCallExpression)?.calleeExpression?.text
-        val mutableType = listOf(
+        val isViolation = listOf(
+            !property.containingKtFile.isIgnoredSource(),
+            property.hasProcessGlobalOwner(),
+            !property.hasModifier(KtTokens.CONST_KEYWORD),
+            property.holdsMutableState(),
+        ).all { it }
+        if (isViolation) report(property, "Move mutable state into an injected, lifecycle-owned instance.")
+    }
+
+    private fun KtFile.isIgnoredSource(): Boolean {
+        if (isTestSource()) return true
+        return isGenerated()
+    }
+
+    private fun KtProperty.hasProcessGlobalOwner(): Boolean = when (val owner = parent) {
+        is KtFile -> true
+        is KtClassBody -> owner.parent is KtObjectDeclaration
+        else -> false
+    }
+
+    private fun KtProperty.holdsMutableState(): Boolean {
+        val factory = (initializer as? KtCallExpression)?.calleeExpression?.text
+        val type = typeReference?.text.orEmpty()
+        val mutableVariableCollection = if (isVar) collectionTypes.any(type::contains) else false
+        val mutableSignals = listOf(
+            factory in mutableFactories,
+            mutableTypes.any(type::contains),
+            mutableVariableCollection,
+        )
+        return mutableSignals.any { it }
+    }
+
+    private companion object {
+        val mutableTypes = listOf(
             "MutableMap", "MutableList", "MutableSet", "MutableCollection", "MutableState", "MutableStateFlow",
-        ).any(type::contains)
-        val mutableVarCollection = property.isVar && listOf("Map", "List", "Set", "Collection", "StateFlow", "State")
-            .any(type::contains)
-        if (factory in mutableFactories || mutableType || mutableVarCollection) {
-            report(property, "Move mutable state into an injected, lifecycle-owned instance.")
-        }
+        )
+        val collectionTypes = listOf("Map", "List", "Set", "Collection", "StateFlow", "State")
     }
 }
 
@@ -135,38 +159,62 @@ internal class CancellationMustPropagate(config: Config = Config.empty) : Mobile
 
     override fun visitCatchSection(catchClause: KtCatchClause) {
         super.visitCatchSection(catchClause)
-        val caught = catchClause.catchParameter?.typeReference?.text?.removePrefix("kotlin.")
+        val caught = catchClause.caughtType()
         val parameter = catchClause.catchParameter?.name
         val body = catchClause.catchBody
-        if (caught in setOf("Exception", "Throwable")) {
-            if (parameter != null && body != null && isCoroutineContext(catchClause)) {
-                val propagates = body.collectDescendantsOfType<KtThrowExpression>().any { thrown ->
-                    val expression = thrown.thrownExpression?.text.orEmpty()
-                    expression == parameter || "CancellationException" in expression
-                } || cancellationHandledByEarlierCatch(catchClause)
-                if (!propagates) report(catchClause, "Rethrow CancellationException before handling $caught.")
-            }
+        val isViolation = listOf(
+            caught in genericExceptionTypes,
+            parameter != null,
+            body != null,
+            isCoroutineContext(catchClause),
+            body?.propagatesCancellation(parameter.orEmpty()) != true,
+            !cancellationHandledByEarlierCatch(catchClause),
+        ).all { it }
+        if (isViolation) {
+            report(catchClause, "Rethrow CancellationException before handling $caught.")
         }
+    }
+
+    private fun KtCatchClause.caughtType(): String? =
+        catchParameter?.typeReference?.text?.removePrefix("kotlin.")
+
+    private fun KtElement.propagatesCancellation(parameter: String): Boolean =
+        collectDescendantsOfType<KtThrowExpression>().any { it.propagatesCancellation(parameter) }
+
+    private fun KtThrowExpression.propagatesCancellation(parameter: String): Boolean {
+        val expression = thrownExpression?.text.orEmpty()
+        if (expression == parameter) return true
+        return "CancellationException" in expression
     }
 
     private fun cancellationHandledByEarlierCatch(catchClause: KtCatchClause): Boolean {
         val tryExpression = catchClause.parent as? KtTryExpression ?: return false
-        return tryExpression.catchClauses.takeWhile { it != catchClause }.any { earlier ->
-            val name = earlier.catchParameter?.name ?: return@any false
-            earlier.catchParameter?.typeReference?.text?.endsWith("CancellationException") == true &&
-                earlier.catchBody?.collectDescendantsOfType<KtThrowExpression>()
-                    ?.any { it.thrownExpression?.text == name } == true
-        }
+        return tryExpression.catchClauses
+            .takeWhile { it != catchClause }
+            .any { it.rethrowsCancellation() }
+    }
+
+    private fun KtCatchClause.rethrowsCancellation(): Boolean {
+        val name = catchParameter?.name
+        val type = catchParameter?.typeReference?.text
+        return listOf(
+            name != null,
+            type?.endsWith("CancellationException") == true,
+            catchBody?.propagatesCancellation(name.orEmpty()) == true,
+        ).all { it }
     }
 
     private fun isCoroutineContext(element: KtElement): Boolean {
         val function = element.getParentOfType<KtNamedFunction>(strict = true)
-        val insideSuspend = function?.hasModifier(org.jetbrains.kotlin.lexer.KtTokens.SUSPEND_KEYWORD) == true
-        val insideBuilder = generateSequence(element.parent) { it.parent }
+        if (function?.hasModifier(KtTokens.SUSPEND_KEYWORD) == true) return true
+        return generateSequence(element.parent) { it.parent }
             .takeWhile { it !is KtNamedFunction }
             .filterIsInstance<KtCallExpression>()
             .any { it.calleeExpression?.text in coroutineBuilders }
-        return insideSuspend || insideBuilder
+    }
+
+    private companion object {
+        val genericExceptionTypes = setOf("Exception", "Throwable")
     }
 }
 
@@ -177,35 +225,46 @@ internal class NoDetachedCoroutineLifecycle(config: Config = Config.empty) : Mob
 ) {
     override fun visitCallExpression(expression: KtCallExpression) {
         super.visitCallExpression(expression)
-        if (expression.containingKtFile.isTestSource() ||
-            expression.containingKtFile.isGenerated()
-        ) return
-        val callee = expression.calleeExpression?.text ?: return
-        if (callee == "CoroutineScope") {
-            report(expression, "Inject or receive a lifecycle-owned CoroutineScope; do not create one ad hoc.")
+        if (expression.containingKtFile.isTestSource()) return
+        if (expression.containingKtFile.isGenerated()) return
+        when (expression.calleeExpression?.text) {
+            "CoroutineScope" -> reportAdHocScope(expression)
+            "async" -> reportCompletionCallbackAsync(expression)
+            "shareIn", "stateIn" -> reportEagerExternalSharing(expression)
         }
-        if (callee == "async" && expression.parentsUntilFunction().filterIsInstance<KtCallExpression>()
-                .any { it.calleeExpression?.text == "invokeOnCompletion" }
-        ) {
-            report(expression, "Do not start async work from invokeOnCompletion; use structured concurrency.")
-        }
-        if (callee in setOf("shareIn", "stateIn")) {
-            val args = expression.valueArguments.mapNotNull { it.getArgumentExpression()?.text }
-            if (args.any { "SharingStarted.Eagerly" in it } && args.firstOrNull()?.let(::isExternalScope) == true) {
-                report(
-                    expression,
-                    "Do not eagerly share on an externally supplied scope; bind sharing to owned lifecycle policy.",
-                )
-            }
+    }
+
+    private fun reportAdHocScope(expression: KtCallExpression) {
+        report(expression, "Inject or receive a lifecycle-owned CoroutineScope; do not create one ad hoc.")
+    }
+
+    private fun reportCompletionCallbackAsync(expression: KtCallExpression) {
+        val enclosingCalls = expression.parentsUntilFunction().filterIsInstance<KtCallExpression>()
+        if (enclosingCalls.none { it.calleeExpression?.text == "invokeOnCompletion" }) return
+        report(expression, "Do not start async work from invokeOnCompletion; use structured concurrency.")
+    }
+
+    private fun reportEagerExternalSharing(expression: KtCallExpression) {
+        val arguments = expression.valueArguments.mapNotNull { it.getArgumentExpression()?.text }
+        val sharingScope = arguments.firstOrNull()
+        val isViolation = listOf(
+            arguments.any { "SharingStarted.Eagerly" in it },
+            sharingScope?.let(::isExternalScope) == true,
+        ).all { it }
+        if (isViolation) {
+            report(
+                expression,
+                "Do not eagerly share on an externally supplied scope; bind sharing to owned lifecycle policy.",
+            )
         }
     }
 
     override fun visitKtFile(file: KtFile) {
-        if (!file.isTestSource() && !file.isGenerated()) {
-            file.collectDescendantsOfType<org.jetbrains.kotlin.psi.KtNameReferenceExpression>()
-                .filter { it.getReferencedName() == "GlobalScope" }
-                .forEach { report(it, "GlobalScope detaches work from every lifecycle.") }
-        }
+        if (file.isTestSource()) return super.visitKtFile(file)
+        if (file.isGenerated()) return super.visitKtFile(file)
+        file.collectDescendantsOfType<KtNameReferenceExpression>()
+            .filter { it.getReferencedName() == "GlobalScope" }
+            .forEach { report(it, "GlobalScope detaches work from every lifecycle.") }
         super.visitKtFile(file)
     }
 
@@ -227,33 +286,66 @@ internal class CoroutineTestGuardrails(config: Config = Config.empty) : MobileRu
 
     override fun visitNamedFunction(function: KtNamedFunction) {
         super.visitNamedFunction(function)
-        val isTest = function.annotationEntries.any { it.shortName?.asString() == "Test" }
-        if (!isTest) return
+        if (!function.isTest()) return
         val calls = function.collectDescendantsOfType<KtCallExpression>()
-        if ((function.hasModifier(org.jetbrains.kotlin.lexer.KtTokens.SUSPEND_KEYWORD) ||
-                calls.any { it.calleeExpression?.text in coroutineCalls }) &&
-            calls.none { it.calleeExpression?.text.orEmpty().let(::isAssertion) }
-        ) {
-            report(function, "Coroutine test '${function.name}' has no observable assertion or verification.")
-        }
-        calls.filter { it.calleeExpression?.text in setOf("assertTrue", "assertThat") }.forEach { call ->
-            val binary = call.valueArguments.firstOrNull()?.getArgumentExpression() as? KtBinaryExpression
-                ?: return@forEach
-            val left = binary.left?.text.orEmpty()
-            val right = binary.right?.text.orEmpty()
-            if (binary.operationReference.text in setOf(">=", ">") && right.matches(Regex("0(?:[LlFfDd])?")) &&
-                listOf("time", "duration", "elapsed", "latency", "millis", "nanos").any(left.lowercase()::contains)
-            ) {
-                report(
-                    binary,
-                    "A non-negative timing assertion is tautological; assert a meaningful upper bound or behavior.",
-                )
-            }
+        reportMissingAssertion(function, calls)
+        calls.forEach(::reportTautologicalTimingAssertion)
+    }
+
+    private fun KtNamedFunction.isTest(): Boolean =
+        annotationEntries.any { it.shortName?.asString() == "Test" }
+
+    private fun reportMissingAssertion(function: KtNamedFunction, calls: List<KtCallExpression>) {
+        if (!function.isCoroutineTest(calls)) return
+        if (calls.any { it.isAssertion() }) return
+        report(function, "Coroutine test '${function.name}' has no observable assertion or verification.")
+    }
+
+    private fun KtNamedFunction.isCoroutineTest(calls: List<KtCallExpression>): Boolean {
+        if (hasModifier(KtTokens.SUSPEND_KEYWORD)) return true
+        return calls.any { it.calleeExpression?.text in coroutineCalls }
+    }
+
+    private fun KtCallExpression.isAssertion(): Boolean {
+        val name = calleeExpression?.text.orEmpty()
+        return listOf(
+            name.startsWith("assert"),
+            name.startsWith("verify"),
+            name.startsWith("expect"),
+            name in assertionNames,
+        ).any { it }
+    }
+
+    private fun reportTautologicalTimingAssertion(call: KtCallExpression) {
+        val binary = call.valueArguments.firstOrNull()?.getArgumentExpression() as? KtBinaryExpression
+        val isViolation = listOf(
+            call.calleeExpression?.text in timingAssertionCalls,
+            binary?.operationReference?.text in nonNegativeOperators,
+            binary?.right.isZeroLiteral(),
+            binary?.left.isTimingValue(),
+        ).all { it }
+        if (isViolation) {
+            report(
+                requireNotNull(binary),
+                "A non-negative timing assertion is tautological; assert a meaningful upper bound or behavior.",
+            )
         }
     }
 
-    private fun isAssertion(name: String): Boolean = name.startsWith("assert") || name.startsWith("verify") ||
-        name.startsWith("expect") || name == "fail" || name == "shouldBe" || name == "shouldEqual"
+    private fun org.jetbrains.kotlin.psi.KtExpression?.isZeroLiteral(): Boolean =
+        this?.text?.matches(Regex("0(?:[LlFfDd])?")) == true
+
+    private fun org.jetbrains.kotlin.psi.KtExpression?.isTimingValue(): Boolean {
+        val normalized = this?.text?.lowercase().orEmpty()
+        return timingTerms.any(normalized::contains)
+    }
+
+    private companion object {
+        val assertionNames = setOf("fail", "shouldBe", "shouldEqual")
+        val timingAssertionCalls = setOf("assertTrue", "assertThat")
+        val nonNegativeOperators = setOf(">=", ">")
+        val timingTerms = listOf("time", "duration", "elapsed", "latency", "millis", "nanos")
+    }
 }
 
 class MobileGuardrailProvider : RuleSetProvider {

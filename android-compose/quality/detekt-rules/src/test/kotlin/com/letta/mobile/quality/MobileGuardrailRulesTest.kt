@@ -30,9 +30,15 @@ class MobileGuardrailRulesTest {
 
     @Test
     fun `process global mutable state fails and instance ownership passes`() {
-        val bad = """object Cache { val values = mutableMapOf<String, String>() }"""
+        val bad = """
+            val values = mutableMapOf<String, String>()
+            object Cache {
+                val queue: MutableList<String> = listOf()
+                var snapshot: List<String> = listOf()
+            }
+        """.trimIndent()
         val good = """class Cache { private val values = mutableMapOf<String, String>() }"""
-        assertEquals(1, NoProcessGlobalMutableState().compileAndLint(bad).size)
+        assertEquals(3, NoProcessGlobalMutableState().compileAndLint(bad).size)
         assertEquals(0, NoProcessGlobalMutableState().compileAndLint(good).size)
     }
 
@@ -60,6 +66,16 @@ class MobileGuardrailRulesTest {
     }
 
     @Test
+    fun `generic catches inside coroutine builders require cancellation propagation`() {
+        val code = """
+            fun load() = runBlocking {
+                try { work() } catch (error: Throwable) { log(error) }
+            }
+        """.trimIndent()
+        assertEquals(1, CancellationMustPropagate().compileAndLint(code).size)
+    }
+
+    @Test
     fun `detached coroutine patterns fail and injected lifecycle scope passes`() {
         val bad = """
             fun start() {
@@ -75,6 +91,14 @@ class MobileGuardrailRulesTest {
         """.trimIndent()
         assertTrue(NoDetachedCoroutineLifecycle().compileAndLint(bad).size >= 3)
         assertEquals(0, NoDetachedCoroutineLifecycle().compileAndLint(good).size)
+    }
+
+    @Test
+    fun `eager sharing on an external scope fails`() {
+        val bad = """fun stream(flow: Flow<String>, scope: CoroutineScope) =
+            flow.shareIn(scope, SharingStarted.Eagerly, replay = 1)
+        """.trimIndent()
+        assertEquals(1, NoDetachedCoroutineLifecycle().compileAndLint(bad).size)
     }
 
     @Test
