@@ -16,61 +16,73 @@ object CanonicalCatalogComposer {
 
     fun compose(input: CatalogComposerInput): EffectiveCatalogProjection {
         validateInput(input)
-        val routesById = input.modelRoutes.associateBy(CanonicalModelRoute::id)
-        val bindingsByAliasId = input.aliasBindings.associateBy(CatalogAliasBinding::aliasRouteId)
-        val activeInstances = input.providerInstances
-            .filter { it.hostId == input.activeHostId }
-            .associateBy(RedactedProviderInstance::id)
-
-        val effective = mutableListOf<EffectiveModelRoute>()
-        val excluded = mutableListOf<ExcludedModelRoute>()
-        for (route in input.modelRoutes) {
-            if (route.id in bindingsByAliasId) continue
-            if (route.hostId != input.activeHostId) {
-                excluded.add(ExcludedModelRoute(route, ExclusionReason.HostMismatch))
-                continue
-            }
-
-            val instance = activeInstances[route.providerInstanceId]
-            val exclusionReason = evaluateExclusion(route, instance, input)
-            if (exclusionReason != null) {
-                excluded.add(ExcludedModelRoute(route, exclusionReason))
-                continue
-            }
-
-            val definition = instance?.let { input.providerDefinitions[it.definitionId] }
-            val aliases = buildAliases(route, input.aliasBindings, routesById)
-            effective.add(
-                EffectiveModelRoute(
-                    id = route.id,
-                    hostId = route.hostId,
-                    providerInstanceId = route.providerInstanceId,
-                    providerDisplayName = instance?.displayName ?: route.providerInstanceId.value,
-                    providerDefinitionId = definition?.id,
-                    providerDefinitionDisplayName = definition?.displayName,
-                    supportedProtocols = definition?.supportedProtocols ?: persistentListOf(),
-                    providerOperationalStatus = instance?.operationalStatus,
-                    modelHandle = route.modelHandle,
-                    displayName = route.displayName,
-                    contextWindowLimit = route.contextWindowLimit,
-                    availability = route.availability,
-                    sourceVisibility = route.visibility,
-                    userVisibilityOverride = input.userVisibilityOverrides[route.id],
-                    aliases = aliases,
-                    isAvailable = evaluateAvailability(route.availability, instance?.operationalStatus),
-                ),
-            )
-        }
-
-        val sortedRoutes = effective.sortedWith(routeComparator).toPersistentList()
+        val context = compositionContext(input)
+        val projections = input.modelRoutes.map { route -> projectRoute(route, context) }
+        val sortedRoutes = projections.filterIsInstance<RouteProjection.Included>()
+            .map(RouteProjection.Included::route)
+            .sortedWith(routeComparator)
+            .toPersistentList()
+        val sortedExcluded = projections.filterIsInstance<RouteProjection.Excluded>()
+            .map(RouteProjection.Excluded::route)
+            .sortedWith(excludedComparator)
+            .toPersistentList()
         validateSelectionIdentities(sortedRoutes)
         val candidate = EffectiveCatalogProjection(
             scope = CatalogScope(input.activeHostId, input.accountScopeId, input.sessionScopeId),
             routes = sortedRoutes,
-            excludedRoutes = excluded.sortedWith(excludedComparator).toPersistentList(),
+            excludedRoutes = sortedExcluded,
             selection = resolveSelection(input.selectedIdentity, sortedRoutes),
         )
-        return input.previousProjection?.takeIf { it == candidate } ?: candidate
+        return input.previousProjection?.takeIf(candidate::equals) ?: candidate
+    }
+
+    private fun compositionContext(input: CatalogComposerInput) = CompositionContext(
+        input = input,
+        routesById = input.modelRoutes.associateBy(CanonicalModelRoute::id),
+        aliasRouteIds = input.aliasBindings.map(CatalogAliasBinding::aliasRouteId).toSet(),
+        activeInstances = input.providerInstances
+            .filter { it.hostId == input.activeHostId }
+            .associateBy(RedactedProviderInstance::id),
+    )
+
+    private fun projectRoute(
+        route: CanonicalModelRoute,
+        context: CompositionContext,
+    ): RouteProjection {
+        if (route.id in context.aliasRouteIds) return RouteProjection.CollapsedAlias
+        if (route.hostId != context.input.activeHostId) {
+            return RouteProjection.Excluded(ExcludedModelRoute(route, ExclusionReason.HostMismatch))
+        }
+        val instance = context.activeInstances[route.providerInstanceId]
+        val exclusion = evaluateExclusion(route, instance, context.input)
+        if (exclusion != null) return RouteProjection.Excluded(ExcludedModelRoute(route, exclusion))
+        return RouteProjection.Included(effectiveRoute(route, instance, context))
+    }
+
+    private fun effectiveRoute(
+        route: CanonicalModelRoute,
+        instance: RedactedProviderInstance?,
+        context: CompositionContext,
+    ): EffectiveModelRoute {
+        val definition = instance?.let { context.input.providerDefinitions[it.definitionId] }
+        return EffectiveModelRoute(
+            id = route.id,
+            hostId = route.hostId,
+            providerInstanceId = route.providerInstanceId,
+            providerDisplayName = instance?.displayName ?: route.providerInstanceId.value,
+            providerDefinitionId = definition?.id,
+            providerDefinitionDisplayName = definition?.displayName,
+            supportedProtocols = definition?.supportedProtocols ?: persistentListOf(),
+            providerOperationalStatus = instance?.operationalStatus,
+            modelHandle = route.modelHandle,
+            displayName = route.displayName,
+            contextWindowLimit = route.contextWindowLimit,
+            availability = route.availability,
+            sourceVisibility = route.visibility,
+            userVisibilityOverride = context.input.userVisibilityOverrides[route.id],
+            aliases = buildAliases(route, context.input.aliasBindings, context.routesById),
+            isAvailable = evaluateAvailability(route.availability, instance?.operationalStatus),
+        )
     }
 
     private fun validateInput(input: CatalogComposerInput) {
@@ -184,6 +196,19 @@ object CanonicalCatalogComposer {
                 selectedIdentity in candidate.aliases
         } ?: return SelectionResolution.Unresolved
         return SelectionResolution.Resolved(route.id, selectedIdentity)
+    }
+
+    private data class CompositionContext(
+        val input: CatalogComposerInput,
+        val routesById: Map<ModelRouteId, CanonicalModelRoute>,
+        val aliasRouteIds: Set<ModelRouteId>,
+        val activeInstances: Map<ProviderInstanceId, RedactedProviderInstance>,
+    )
+
+    private sealed interface RouteProjection {
+        data class Included(val route: EffectiveModelRoute) : RouteProjection
+        data class Excluded(val route: ExcludedModelRoute) : RouteProjection
+        data object CollapsedAlias : RouteProjection
     }
 
     private val routeComparator = compareBy<EffectiveModelRoute>(
