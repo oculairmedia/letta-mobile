@@ -5,7 +5,6 @@ import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.core.main
 import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.parameters.arguments.argument
-import com.github.ajalt.clikt.parameters.arguments.optional
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.int
@@ -19,7 +18,6 @@ import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
 
 @Serializable
 data class LettaMessage(
@@ -45,7 +43,7 @@ class LettaCli : CliktCommand(name = "letta-cli") {
 class Messages : CliktCommand() {
     override fun help(context: Context) = "List messages for an agent"
 
-    private val baseUrl by option("--url", "-u", help = "Letta server URL")
+    private val baseUrl by option("--url", "-u", envvar = "LETTA_URL", help = "Letta server URL")
         .default("http://192.168.50.90:8289")
     private val agentId by argument(help = "Agent ID")
     private val conversationId by option("--conversation", "-c", help = "Conversation ID")
@@ -94,7 +92,7 @@ class Messages : CliktCommand() {
 class Count : CliktCommand() {
     override fun help(context: Context) = "Count agents, tools, blocks, or conversations"
 
-    private val baseUrl by option("--url", "-u", help = "Letta server URL")
+    private val baseUrl by option("--url", "-u", envvar = "LETTA_URL", help = "Letta server URL")
         .default("http://192.168.50.90:8289")
     private val resource by argument(help = "Resource: agents, tools, blocks")
 
@@ -125,7 +123,7 @@ class Count : CliktCommand() {
 class CheckNew : CliktCommand() {
     override fun help(context: Context) = "Check for new messages after a cursor"
 
-    private val baseUrl by option("--url", "-u", help = "Letta server URL")
+    private val baseUrl by option("--url", "-u", envvar = "LETTA_URL", help = "Letta server URL")
         .default("http://192.168.50.90:8289")
     private val agentId by argument(help = "Agent ID")
     private val afterId by argument(help = "Message ID to check after")
