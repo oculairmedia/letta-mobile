@@ -140,6 +140,7 @@ jobs:
             :app:testScreenshot
             :architecture-tests:test
             :architecture-tests:architectureTest
+            :quality:detekt-rules:check
           )
           if [[ -n "${ADDITIVE_TASKS}" ]]; then
             read -r -a additive_tasks <<< "${ADDITIVE_TASKS}"
