@@ -1,0 +1,17 @@
+build:
+  maxIssues: 0
+
+letta-mobile-guardrails:
+  active: true
+  NoAnyType:
+    active: true
+  NoSelectStarInRoomDao:
+    active: true
+  NoProcessGlobalMutableState:
+    active: true
+  CancellationMustPropagate:
+    active: true
+  NoDetachedCoroutineLifecycle:
+    active: true
+  CoroutineTestGuardrails:
+    active: true
