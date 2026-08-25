@@ -287,7 +287,9 @@ open class TimelineRepository(
 
     private suspend fun releaseHydrationFlight(key: TimelineCacheKey, flight: HydrateFlight) {
         hydrateFlightsMutex.withLock {
-            hydrateFlights.remove(key.conversationId, flight)
+            if (hydrateFlights[key.conversationId] === flight) {
+                hydrateFlights.remove(key.conversationId)
+            }
         }
     }
 

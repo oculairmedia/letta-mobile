@@ -17,7 +17,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.job
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
@@ -592,10 +591,10 @@ class ChannelTransport internal constructor(
             }
         }
 
-        scope.launch {
-            _events.emit(frame)
-            _frameEvents.emit(TransportFrameEvent(frame = frame, isReplay = isReplay))
-        }
+        // OkHttp delivers callbacks in wire order. Publish from that callback instead of
+        // launching one coroutine per frame, which allows later live frames to overtake replay.
+        _events.tryEmit(frame)
+        _frameEvents.tryEmit(TransportFrameEvent(frame = frame, isReplay = isReplay))
     }
 
     override fun sendA2uiAction(action: A2uiAction): A2uiActionDispatchResult {
