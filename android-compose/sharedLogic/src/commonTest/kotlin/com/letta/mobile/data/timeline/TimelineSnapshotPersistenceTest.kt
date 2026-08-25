@@ -1,6 +1,5 @@
 package com.letta.mobile.data.timeline
 
-import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineReadResult
 import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore
@@ -298,7 +297,9 @@ class TimelineSnapshotPersistenceTest {
                 highWaterRevision = 9L,
             )
         )
-        val transport = RecoveryTimelineTransport(failure = IllegalStateException("offline"))
+        val transport = SnapshotRecoveryTransport(
+            RecoveryTransportFixture(failure = IllegalStateException("offline")),
+        )
         val repository = TimelineRepository(
             timelineTransport = transport,
             pendingLocalStore = NoOpPendingLocalStore,
@@ -326,14 +327,16 @@ class TimelineSnapshotPersistenceTest {
                 highWaterRevision = 4L,
             )
         )
-        val transport = RecoveryTimelineTransport(
-            messages = listOf(
-                UserMessage(
-                    id = "remote-server",
-                    date = FIXTURE_DATE,
-                    contentRaw = JsonPrimitive("recovered remotely"),
-                )
-            )
+        val transport = SnapshotRecoveryTransport(
+            RecoveryTransportFixture(
+                messages = listOf(
+                    UserMessage(
+                        id = "remote-server",
+                        date = FIXTURE_DATE,
+                        contentRaw = JsonPrimitive("recovered remotely"),
+                    )
+                ),
+            ),
         )
         val repository = TimelineRepository(
             timelineTransport = transport,
@@ -368,24 +371,6 @@ class TimelineSnapshotPersistenceTest {
         override suspend fun deleteSnapshot(scope: TimelineScope) = Unit
         override suspend fun clearForBackend(backendId: String) = Unit
         override suspend fun prune(backendId: String, maxRetainedConversations: Int) = Unit
-    }
-
-    private class RecoveryTimelineTransport(
-        private val messages: List<LettaMessage> = emptyList(),
-        private val failure: Throwable? = null,
-    ) : TimelineTransport by EmptyTimelineTransport {
-        var remoteReads: Int = 0
-
-        override suspend fun listConversationMessages(
-            conversationId: String,
-            limit: Int?,
-            after: String?,
-            order: String?,
-        ): List<LettaMessage> {
-            remoteReads += 1
-            failure?.let { throw it }
-            return messages
-        }
     }
 
     private companion object {

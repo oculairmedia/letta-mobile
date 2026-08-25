@@ -10,6 +10,13 @@ import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.feature.chat.coordination.ChatConversationCoordinator
+import com.letta.mobile.feature.chat.coordination.ChatConversationCoordinatorConfig
+import com.letta.mobile.feature.chat.coordination.ChatConversationRoute
+import com.letta.mobile.feature.chat.coordination.ChatHydrationTrace
+import com.letta.mobile.feature.chat.coordination.ClientModeBootstrapConfig
+import com.letta.mobile.feature.chat.coordination.ConversationSendConfig
+import com.letta.mobile.feature.chat.coordination.HydrationRouteConfig
+import com.letta.mobile.feature.chat.coordination.TimelineObserverConfig
 import com.letta.mobile.feature.chat.coordination.ChatSessionResolver
 import com.letta.mobile.feature.chat.coordination.ConversationAccessMode
 import com.letta.mobile.feature.chat.coordination.RecentMessagesReconcileLauncher
@@ -301,30 +308,35 @@ class AdminChatParityTest {
 
         val coordinator by lazy {
             ChatConversationCoordinator(
-                scope = scope,
-                agentId = "agent-1",
-                initialMessage = null,
-                explicitConversationId = { routeConversationId },
-                pinnedExplicitConversationId = pinnedConversationId,
-                setRouteConversationId = { routeConversationId = it },
-                isFreshRoute = false,
-                chatSessionResolver = chatSessionResolver,
-                agentRepository = agentRepository,
-                currentConversationTracker = currentConversationTracker,
-                uiState = uiState,
-                updateSessionState = ::updateSessionState,
-                pendingClientModeBootstrapMessages = { pendingBootstrapMessages },
-                setPendingClientModeBootstrapUserMessage = { pendingBootstrapMessages = persistentListOf(it) },
-                currentClientModeConversationId = { null },
-                startTimelineObserver = {},
-                stopTimelineObserver = {},
-                recentMessagesReconcileLauncher = RecentMessagesReconcileLauncher(
+                ChatConversationCoordinatorConfig(
                     scope = scope,
-                    reconcile = { },
+                    route = ChatConversationRoute(
+                        agentId = "agent-1",
+                        initialMessage = null,
+                        explicitConversationId = { routeConversationId },
+                        pinnedExplicitConversationId = pinnedConversationId,
+                        setConversationId = { routeConversationId = it },
+                        isFresh = false,
+                    ),
+                    chatSessionResolver = chatSessionResolver,
+                    agentRepository = agentRepository,
+                    currentConversationTracker = currentConversationTracker,
+                    uiState = uiState,
+                    updateSessionState = ::updateSessionState,
+                    bootstrap = ClientModeBootstrapConfig(
+                        pendingMessages = { pendingBootstrapMessages },
+                        setPendingUserMessage = { pendingBootstrapMessages = persistentListOf(it) },
+                        currentConversationId = { null },
+                    ),
+                    observer = TimelineObserverConfig(start = {}, stop = {}),
+                    reconcileLauncher = RecentMessagesReconcileLauncher(scope = scope, reconcile = { }),
+                    send = ConversationSendConfig({}, {}, {}),
+                    hydration = HydrationRouteConfig(
+                        identity = { conversationId ->
+                            ChatHydrationTrace.Identity(agentId = "agent-1", conversationId = conversationId)
+                        },
+                    ),
                 ),
-                sendMessageViaClientMode = {},
-                sendMessageViaTimeline = {},
-                markFollowingDuplicateInitialMessageInFlight = {},
             )
         }
 

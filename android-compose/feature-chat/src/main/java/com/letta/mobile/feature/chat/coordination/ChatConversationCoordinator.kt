@@ -1,22 +1,17 @@
 package com.letta.mobile.feature.chat.coordination
 
-import com.letta.mobile.data.channel.CurrentConversationTracker
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.repository.RosterNameResolver
 import com.letta.mobile.data.repository.RosterNameTelemetry
-import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.util.Telemetry
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
-import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.data.chat.projection.ChatMessageListChange
 import com.letta.mobile.data.chat.runtime.ChatSessionReducer
 import com.letta.mobile.data.chat.runtime.ChatConversationSummary
@@ -44,44 +39,32 @@ private sealed interface ClientModeBootstrapState {
  * place so send/search/project collaborators can be wired around a stable seam.
  */
 internal class ChatConversationCoordinator(
-    private val scope: CoroutineScope,
-    private val agentId: String,
-    private val initialMessage: String?,
-    private val explicitConversationId: () -> String?,
-    // letta-mobile-9cb37: the conversation id the *route* explicitly asked for,
-    // snapshotted once at construction (see ChatRouteArgs.pinnedExplicitConversationId).
-    // Unlike explicitConversationId() — a live read of the shared CONVERSATION_ID_KEY
-    // that setRouteConversationId mutates and that Compose can restore stale across an
-    // agent switch — this is the authoritative "open exactly THIS conversation" signal.
-    // Null for fresh/blank routes so resume-recent / picker fallbacks are untouched.
-    private val pinnedExplicitConversationId: String? = null,
-    private val setRouteConversationId: (String?) -> Unit,
-    private val isFreshRoute: Boolean,
-    private val chatSessionResolver: ChatSessionResolver,
-    private val agentRepository: IAgentRepository,
-    private val currentConversationTracker: CurrentConversationTracker,
-    private val uiState: MutableStateFlow<ChatUiState>,
-    private val updateSessionState: ((ChatSessionState) -> ChatSessionState) -> Unit,
-    private val pendingClientModeBootstrapMessages: () -> kotlinx.collections.immutable.ImmutableList<UiMessage>,
-    private val setPendingClientModeBootstrapUserMessage: (UiMessage) -> Unit,
-    private val currentClientModeConversationId: () -> String?,
-    private val startTimelineObserver: (String) -> Unit,
-    private val stopTimelineObserver: () -> Unit,
-    // letta-mobile-ork1: invoked from loadMessagesInternal so opening a
-    // conversation pulls fresh recent messages from the server. Without
-    // this the cached TimelineSyncLoop (warm-started by resume-most-
-    // recent / notification paths) serves stale state until the user's
-    // first send triggers the post-turn_done reconcile.
-    private val recentMessagesReconcileLauncher: RecentMessagesReconcileLauncher,
-    private val sendMessageViaClientMode: (String) -> Unit,
-    private val sendMessageViaTimeline: (String) -> Unit,
-    private val markFollowingDuplicateInitialMessageInFlight: () -> Unit,
-    private val localRuntimeRouting: () -> LocalRuntimeRouting = { LocalRuntimeRouting.Remote },
-    private val hydrationIdentity: (String) -> ChatHydrationTrace.Identity = { conversationId ->
-        ChatHydrationTrace.Identity(agentId = agentId, conversationId = conversationId)
-    },
-    private val hydrationGeneration: (String) -> ChatHydrationTrace.Generation? = ChatHydrationTrace::current,
+    config: ChatConversationCoordinatorConfig,
 ) {
+    private val scope = config.scope
+    private val agentId = config.route.agentId
+    private val initialMessage = config.route.initialMessage
+    private val explicitConversationId = config.route.explicitConversationId
+    private val pinnedExplicitConversationId = config.route.pinnedExplicitConversationId
+    private val setRouteConversationId = config.route.setConversationId
+    private val isFreshRoute = config.route.isFresh
+    private val chatSessionResolver = config.chatSessionResolver
+    private val agentRepository = config.agentRepository
+    private val currentConversationTracker = config.currentConversationTracker
+    private val uiState = config.uiState
+    private val updateSessionState = config.updateSessionState
+    private val pendingClientModeBootstrapMessages = config.bootstrap.pendingMessages
+    private val setPendingClientModeBootstrapUserMessage = config.bootstrap.setPendingUserMessage
+    private val currentClientModeConversationId = config.bootstrap.currentConversationId
+    private val startTimelineObserver = config.observer.start
+    private val stopTimelineObserver = config.observer.stop
+    private val recentMessagesReconcileLauncher = config.reconcileLauncher
+    private val sendMessageViaClientMode = config.send.viaClientMode
+    private val sendMessageViaTimeline = config.send.viaTimeline
+    private val markFollowingDuplicateInitialMessageInFlight = config.send.markDuplicateInitialMessageInFlight
+    private val localRuntimeRouting = config.localRuntimeRouting
+    private val hydrationIdentity = config.hydration.identity
+    private val hydrationGeneration = config.hydration.generation
     fun currentHydrationGeneration(conversationId: String): ChatHydrationTrace.Generation? = hydrationGeneration(conversationId)
 
     companion object {

@@ -76,6 +76,12 @@ import com.letta.mobile.feature.chat.coordination.ChatComposerController
 import com.letta.mobile.feature.chat.coordination.ChatComposerEffect
 import com.letta.mobile.feature.chat.coordination.ChatComposerState
 import com.letta.mobile.feature.chat.coordination.ChatConversationCoordinator
+import com.letta.mobile.feature.chat.coordination.ChatConversationCoordinatorConfig
+import com.letta.mobile.feature.chat.coordination.ChatConversationRoute
+import com.letta.mobile.feature.chat.coordination.ClientModeBootstrapConfig
+import com.letta.mobile.feature.chat.coordination.ConversationSendConfig
+import com.letta.mobile.feature.chat.coordination.HydrationRouteConfig
+import com.letta.mobile.feature.chat.coordination.TimelineObserverConfig
 import com.letta.mobile.feature.chat.coordination.ChatHistoryPager
 import com.letta.mobile.feature.chat.coordination.ChatHydrationTrace
 import com.letta.mobile.feature.chat.coordination.ConversationAccessMode
@@ -557,55 +563,56 @@ internal class AdminChatViewModel @Inject constructor(
         hydrationIdentity = ::hydrationIdentity,
     )
     private val chatConversationCoordinator: ChatConversationCoordinator = ChatConversationCoordinator(
-        scope = viewModelScope,
-        agentId = agentId.value,
-        initialMessage = initialMessage,
-        explicitConversationId = { explicitConversationId },
-        // letta-mobile-9cb37: snapshot of the route's explicit conversation id so
-        // an agent switch can't lose it to a restored/stale CONVERSATION_ID_KEY.
-        pinnedExplicitConversationId = routeArgs.pinnedExplicitConversationId,
-        setRouteConversationId = routeArgs::setRouteConversationId,
-        isFreshRoute = isFreshRoute,
-        chatSessionResolver = chatSessionResolver,
-        agentRepository = agentRepository,
-        currentConversationTracker = currentConversationTracker,
-        uiState = _uiState,
-        updateSessionState = ::updateSessionState,
-        pendingClientModeBootstrapMessages = { persistentListOf() },
-        setPendingClientModeBootstrapUserMessage = { },
-        currentClientModeConversationId = { null },
-        startTimelineObserver = ::startTimelineObserver,
-        stopTimelineObserver = ::stopTimelineObserver,
-        recentMessagesReconcileLauncher = RecentMessagesReconcileLauncher(
+        config = ChatConversationCoordinatorConfig(
             scope = viewModelScope,
-            reconcile = { request ->
-                timelineRepository.reconcileRecentMessages(
-                    agentId = agentId.value,
-                    conversationId = request.conversationId,
-                    reason = request.reason,
-                    forceRefresh = false,
-                    connectionGeneration = request.connectionGeneration,
-                )
-            },
+            route = ChatConversationRoute(
+                agentId = agentId.value,
+                initialMessage = initialMessage,
+                explicitConversationId = { explicitConversationId },
+                pinnedExplicitConversationId = routeArgs.pinnedExplicitConversationId,
+                setConversationId = routeArgs::setRouteConversationId,
+                isFresh = isFreshRoute,
+            ),
+            chatSessionResolver = chatSessionResolver,
+            agentRepository = agentRepository,
+            currentConversationTracker = currentConversationTracker,
+            uiState = _uiState,
+            updateSessionState = ::updateSessionState,
+            bootstrap = ClientModeBootstrapConfig(
+                pendingMessages = { persistentListOf() },
+                setPendingUserMessage = { },
+                currentConversationId = { null },
+            ),
+            observer = TimelineObserverConfig(::startTimelineObserver, ::stopTimelineObserver),
+            reconcileLauncher = RecentMessagesReconcileLauncher(
+                scope = viewModelScope,
+                reconcile = { request ->
+                    timelineRepository.reconcileRecentMessages(
+                        agentId = agentId.value,
+                        conversationId = request.conversationId,
+                        reason = request.reason,
+                        forceRefresh = false,
+                        connectionGeneration = request.connectionGeneration,
+                    )
+                },
+            ),
+            send = ConversationSendConfig(
+                viaClientMode = ::sendCoordinatorMessage,
+                viaTimeline = ::sendCoordinatorMessage,
+                markDuplicateInitialMessageInFlight = { followingDuplicateInitialMessageInFlight = true },
+            ),
+            localRuntimeRouting = ::localRuntimeRouting,
+            hydration = HydrationRouteConfig(identity = { convId -> hydrationIdentity(agentId.value, convId) }),
         ),
-        sendMessageViaClientMode = { message ->
-            sendPipeline.timelineChatSendStrategy.send(
-                text = message,
-                attachments = emptyList(),
-                context = composerCoordinator.chatSendContext(),
-            )
-        },
-        sendMessageViaTimeline = { message ->
-            sendPipeline.timelineChatSendStrategy.send(
-                text = message,
-                attachments = emptyList(),
-                context = composerCoordinator.chatSendContext(),
-            )
-        },
-        markFollowingDuplicateInitialMessageInFlight = { followingDuplicateInitialMessageInFlight = true },
-        localRuntimeRouting = ::localRuntimeRouting,
-        hydrationIdentity = { convId -> hydrationIdentity(agentId.value, convId) },
     )
+
+    private fun sendCoordinatorMessage(message: String) {
+        sendPipeline.timelineChatSendStrategy.send(
+            text = message,
+            attachments = emptyList(),
+            context = composerCoordinator.chatSendContext(),
+        )
+    }
 
     private fun localRuntimeRouting(): LocalRuntimeRouting = resolveLocalRuntimeRouting(
         agent = activeAgent.value,
