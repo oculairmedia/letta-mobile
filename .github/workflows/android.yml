@@ -237,8 +237,10 @@ jobs:
         # suites, which forces compilation of commonMain/commonTest for every
         # configured target. This is the gate that would have caught the
         # native-only break fixed in b97bcf48. One invocation also avoids two
-        # extra configuration phases and exposes the full graph to Gradle.
-        run: ./gradlew :sharedLogic:allTests :desktop:test :appserver-cli:test :appserver-cli:distZip :iroh-wrapper-cli:test :iroh-wrapper-cli:installDist
+        # extra configuration phases and exposes the full graph to Gradle. Keep
+        # execution serial: concurrent desktop/native output can split Kotlin's
+        # TeamCity browser-test service messages and terminate Chrome mid-suite.
+        run: ./gradlew :sharedLogic:allTests :desktop:test :appserver-cli:test :appserver-cli:distZip :iroh-wrapper-cli:test :iroh-wrapper-cli:installDist --max-workers=1
 
   web-wasm:
     name: web-wasm
