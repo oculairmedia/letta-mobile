@@ -329,17 +329,15 @@ class RoomConfirmedTimelineStore(
         val scope: TimelineScope get() = envelope.scope
         val manifestId: String get() = manifest.manifestId
 
-        override fun equals(other: Any?): Boolean {
-            if (this === other) return true
-            if (other == null || this::class != other::class) return false
-            other as SnapshotWritePlan
-            if (envelope != other.envelope) return false
-            if (normalized != other.normalized) return false
-            if (!payload.contentEquals(other.payload)) return false
-            if (chunks != other.chunks) return false
-            if (manifest != other.manifest) return false
-            return true
-        }
+        override fun equals(other: Any?): Boolean =
+            this === other || (
+                other is SnapshotWritePlan &&
+                    envelope == other.envelope &&
+                    normalized == other.normalized &&
+                    chunks == other.chunks &&
+                    manifest == other.manifest &&
+                    payload.contentEquals(other.payload)
+            )
 
         override fun hashCode(): Int {
             var result = envelope.hashCode()

@@ -89,18 +89,16 @@ data class FolderFileUploadParams(
     val customName: String? = null,
     val contentType: ContentType = ContentType.Application.OctetStream,
 ) {
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (other == null || this::class != other::class) return false
-        other as FolderFileUploadParams
-        if (folderId != other.folderId) return false
-        if (fileName != other.fileName) return false
-        if (!fileBytes.contentEquals(other.fileBytes)) return false
-        if (duplicateHandling != other.duplicateHandling) return false
-        if (customName != other.customName) return false
-        if (contentType != other.contentType) return false
-        return true
-    }
+    override fun equals(other: Any?): Boolean =
+        this === other || (
+            other is FolderFileUploadParams &&
+                folderId == other.folderId &&
+                fileName == other.fileName &&
+                duplicateHandling == other.duplicateHandling &&
+                customName == other.customName &&
+                contentType == other.contentType &&
+                fileBytes.contentEquals(other.fileBytes)
+        )
 
     override fun hashCode(): Int {
         var result = folderId.hashCode()

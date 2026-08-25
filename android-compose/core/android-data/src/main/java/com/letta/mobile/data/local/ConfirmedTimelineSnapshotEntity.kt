@@ -63,15 +63,13 @@ data class ConfirmedTimelineSnapshotChunkEntity(
     @ColumnInfo(name = "chunk_index") val chunkIndex: Int,
     @ColumnInfo(name = "payload") val payload: ByteArray,
 ) {
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (other == null || this::class != other::class) return false
-        other as ConfirmedTimelineSnapshotChunkEntity
-        if (manifestId != other.manifestId) return false
-        if (chunkIndex != other.chunkIndex) return false
-        if (!payload.contentEquals(other.payload)) return false
-        return true
-    }
+    override fun equals(other: Any?): Boolean =
+        this === other || (
+            other is ConfirmedTimelineSnapshotChunkEntity &&
+                chunkIndex == other.chunkIndex &&
+                manifestId == other.manifestId &&
+                payload.contentEquals(other.payload)
+        )
 
     override fun hashCode(): Int {
         var result = manifestId.hashCode()
