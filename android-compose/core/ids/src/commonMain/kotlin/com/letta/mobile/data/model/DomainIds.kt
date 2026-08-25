@@ -72,3 +72,45 @@ value class McpServerId(val value: String) {
 value class GroupId(val value: String) {
     override fun toString(): String = value
 }
+
+@JvmInline
+@Serializable
+value class HostId(val value: String) {
+    override fun toString(): String = value
+}
+
+@JvmInline
+@Serializable
+value class ProviderDefinitionId(val value: String) {
+    override fun toString(): String = value
+}
+
+@JvmInline
+@Serializable
+value class ProviderInstanceId(val value: String) {
+    override fun toString(): String = value
+}
+
+@JvmInline
+@Serializable
+value class ProviderFieldId(val value: String) {
+    override fun toString(): String = value
+}
+
+@JvmInline
+@Serializable
+value class ModelRouteId(val value: String) {
+    override fun toString(): String = value
+}
+
+@JvmInline
+@Serializable
+value class CatalogRevision(val value: String) {
+    override fun toString(): String = value
+}
+
+@JvmInline
+@Serializable
+value class ProviderRevision(val value: String) {
+    override fun toString(): String = value
+}
