@@ -1,6 +1,5 @@
 package com.letta.mobile.feature.chat.screen.messagelist
 
-import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.runtime.ChatViewportFollowPolicy
 import com.letta.mobile.feature.chat.screen.ChatAutoScrollSignature
 import com.letta.mobile.feature.chat.screen.ChatFadeEdgeLength
@@ -18,18 +17,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import kotlinx.coroutines.flow.distinctUntilChanged
-
-internal data class ChatMessageListConversationResetParams(
-    val conversationId: String?,
-    val renderItems: List<ChatRenderItem>,
-    val listState: LazyListState,
-)
 
 internal data class ChatMessageListAutoScrollGate(
     val signature: ChatAutoScrollSignature,
@@ -44,17 +36,94 @@ internal data class ChatMessageListPerformAutoScrollParams(
     val lastStreamingSnapMs: Long,
 )
 
+internal data class ViewportAnchor(
+    val index: Int,
+    val scrollOffset: Int,
+    val followTail: Boolean,
+)
+
+private class ConversationViewportAnchorRegistry {
+    private val anchors = mutableMapOf<String, ViewportAnchor>()
+
+    fun get(conversationId: String): ViewportAnchor? = anchors[conversationId]
+
+    fun put(conversationId: String, anchor: ViewportAnchor) {
+        anchors[conversationId] = anchor
+    }
+}
+
+private val conversationViewportAnchorRegistry = ConversationViewportAnchorRegistry()
+
+internal enum class ChatRestorationState {
+    AwaitingSnapshot,
+    AwaitingFirstLayout,
+    Restored,
+    UserControlled,
+    FollowTail,
+}
+
+private class ChatViewportRestorationTracker(params: ChatMessageListEffectsParams) {
+    val conversationId = (params.state.conversationState as? ConversationState.Ready)?.conversationId
+    var restorationState by mutableStateOf(initialRestorationState(params.renderItems.isNotEmpty()))
+        private set
+    var followLatest by mutableStateOf(true)
+        private set
+    var lastStreamingSnapMs by mutableStateOf(0L)
+    var lastAutoScrollSignature by mutableStateOf<ChatAutoScrollSignature?>(null)
+
+    fun onSnapshotAvailable() {
+        if (restorationState == ChatRestorationState.AwaitingSnapshot) {
+            restorationState = ChatRestorationState.AwaitingFirstLayout
+        }
+    }
+
+    fun onInitialLayoutRestored(followTail: Boolean) {
+        restorationState = if (followTail) ChatRestorationState.Restored else ChatRestorationState.UserControlled
+        followLatest = followTail
+    }
+
+    fun onViewportFollowModeChanged(nextFollowMode: Boolean) {
+        followLatest = nextFollowMode
+        restorationState = nextRestorationStateAfterViewport(restorationState, nextFollowMode)
+    }
+
+    fun onUserMessageSent() {
+        followLatest = true
+        restorationState = ChatRestorationState.FollowTail
+    }
+
+    fun onUserInteraction() {
+        followLatest = false
+        restorationState = restorationStateAfterUserInteraction()
+    }
+
+    fun canAutoFollow(): Boolean = restorationState in AUTO_FOLLOW_STATES
+}
+
+internal fun initialRestorationState(hasItems: Boolean): ChatRestorationState =
+    if (hasItems) ChatRestorationState.AwaitingFirstLayout else ChatRestorationState.AwaitingSnapshot
+
+internal fun restorationStateAfterUserInteraction(): ChatRestorationState = ChatRestorationState.UserControlled
+
+internal fun nextRestorationStateAfterViewport(
+    current: ChatRestorationState,
+    followLatest: Boolean,
+): ChatRestorationState = when {
+    current == ChatRestorationState.AwaitingSnapshot -> current
+    current == ChatRestorationState.AwaitingFirstLayout -> current
+    !followLatest -> ChatRestorationState.UserControlled
+    current == ChatRestorationState.UserControlled -> ChatRestorationState.FollowTail
+    else -> current
+}
+
+private val AUTO_FOLLOW_STATES = setOf(ChatRestorationState.Restored, ChatRestorationState.FollowTail)
+private val PENDING_RESTORATION_STATES =
+    setOf(ChatRestorationState.AwaitingSnapshot, ChatRestorationState.AwaitingFirstLayout)
+
 @Composable
 internal fun ChatMessageListEffects(params: ChatMessageListEffectsParams) {
     ChatMessageListFocusClearEffect(params.listState)
-    ChatMessageListConversationResetEffect(
-        ChatMessageListConversationResetParams(
-            conversationId = (params.state.conversationState as? ConversationState.Ready)?.conversationId,
-            renderItems = params.renderItems,
-            listState = params.listState,
-        ),
-    )
-    ChatMessageListAutoScrollEffect(params)
+    ChatMessageListViewportRestorationEffect(params)
     ChatMessageListLoadOlderEffect(params)
     ChatMessageListReleaseOlderEffect(params)
     ChatMessageListScrollToMessageEffect(params)
@@ -73,79 +142,157 @@ private fun ChatMessageListFocusClearEffect(listState: LazyListState) {
 }
 
 @Composable
-private fun ChatMessageListConversationResetEffect(params: ChatMessageListConversationResetParams) {
-    LaunchedEffect(params.conversationId) {
-        if (params.renderItems.isNotEmpty()) {
-            params.listState.scrollToItem(0)
-        }
-        ChatHydrationTrace.current(params.conversationId)?.let { generation ->
-            ChatHydrationTrace.scrollInitialized(generation, correction = "conversation_reset")
+private fun ChatMessageListViewportRestorationEffect(params: ChatMessageListEffectsParams) {
+    val conversationId = (params.state.conversationState as? ConversationState.Ready)?.conversationId
+    val tracker = remember(conversationId) { ChatViewportRestorationTracker(params) }
+    val sendScrollOffset = with(LocalDensity.current) { -ChatFadeEdgeLength.roundToPx() }
+
+    ChatMessageListRestorationCancellationEffect(params.listState, tracker)
+    ChatMessageListSnapshotAvailabilityEffect(params, tracker)
+    ChatMessageListInitialLayoutEffect(params, tracker)
+    ChatMessageListViewportFollowEffect(params, tracker)
+    ChatMessageListAutoScrollEffect(params, sendScrollOffset, tracker)
+}
+
+@Composable
+private fun ChatMessageListRestorationCancellationEffect(
+    listState: LazyListState,
+    tracker: ChatViewportRestorationTracker,
+) {
+    LaunchedEffect(listState.interactionSource, tracker.conversationId) {
+        listState.interactionSource.interactions.collect { interaction ->
+            if (interaction is DragInteraction.Start) {
+                val cancelledPendingRestore = tracker.restorationState in PENDING_RESTORATION_STATES
+                tracker.onUserInteraction()
+                if (cancelledPendingRestore) {
+                    ChatHydrationTrace.current(tracker.conversationId)?.let { generation ->
+                        ChatHydrationTrace.scrollInitialized(generation, correction = "user_controlled")
+                    }
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun ChatMessageListAutoScrollEffect(params: ChatMessageListEffectsParams) {
-    val density = LocalDensity.current
-    val autoScrollSignature = newestMessageAutoScrollSignature(params.state.messages)
-    val isStreamingForAutoScroll by rememberUpdatedState(params.state.isStreaming)
-    val conversationId = (params.state.conversationState as? ConversationState.Ready)?.conversationId
-
-    var lastStreamingSnapMs by remember { mutableStateOf(0L) }
-    var followLatest by remember(conversationId) { mutableStateOf(true) }
-    val lastAutoScrollSignature = remember { mutableStateOf<ChatAutoScrollSignature?>(null) }
-
-    LaunchedEffect(conversationId) {
-        followLatest = true
-        if (params.renderItems.isNotEmpty()) {
-            params.listState.scrollToItem(0)
-        }
-        ChatHydrationTrace.current(conversationId)?.let { generation ->
-            ChatHydrationTrace.scrollInitialized(generation, correction = "follow_latest_reset")
-        }
+private fun ChatMessageListSnapshotAvailabilityEffect(
+    params: ChatMessageListEffectsParams,
+    tracker: ChatViewportRestorationTracker,
+) {
+    LaunchedEffect(params.renderItems.size, tracker.conversationId) {
+        if (params.renderItems.isNotEmpty()) tracker.onSnapshotAvailable()
     }
+}
 
-    LaunchedEffect(params.listState, params.isUserScrolling, params.renderItems.size) {
+@Composable
+private fun ChatMessageListInitialLayoutEffect(
+    params: ChatMessageListEffectsParams,
+    tracker: ChatViewportRestorationTracker,
+) {
+    LaunchedEffect(params.listState, params.renderItems.size, tracker.conversationId) {
+        snapshotFlow { params.listState.layoutInfo.totalItemsCount }
+            .distinctUntilChanged()
+            .collect { totalCount -> restoreInitialLayoutIfReady(params.listState, totalCount, tracker) }
+    }
+}
+
+private suspend fun restoreInitialLayoutIfReady(
+    listState: LazyListState,
+    totalCount: Int,
+    tracker: ChatViewportRestorationTracker,
+) {
+    if (totalCount <= 0 || tracker.restorationState != ChatRestorationState.AwaitingFirstLayout) return
+    val anchor = tracker.conversationId?.let(conversationViewportAnchorRegistry::get) ?: ViewportAnchor(0, 0, true)
+    val targetIndex = anchor.index.coerceAtMost(totalCount - 1)
+    if (listState.firstVisibleItemIndex != targetIndex || listState.firstVisibleItemScrollOffset != anchor.scrollOffset) {
+        listState.scrollToItem(targetIndex, anchor.scrollOffset)
+    }
+    if (tracker.restorationState != ChatRestorationState.AwaitingFirstLayout) return
+    tracker.onInitialLayoutRestored(anchor.followTail)
+    ChatHydrationTrace.current(tracker.conversationId)?.let { generation ->
+        ChatHydrationTrace.scrollInitialized(generation, correction = "initial_restore")
+    }
+}
+
+@Composable
+private fun ChatMessageListViewportFollowEffect(
+    params: ChatMessageListEffectsParams,
+    tracker: ChatViewportRestorationTracker,
+) {
+    LaunchedEffect(params.listState, params.isUserScrolling, params.renderItems.size, tracker.conversationId) {
         snapshotFlow { params.listState.toChatViewportSnapshot(params.isUserScrolling, params.renderItems.size) }
             .distinctUntilChanged()
             .collect { snapshot ->
-                followLatest = ChatViewportFollowPolicy.nextFollowModeAfterScroll(
-                    currentFollowMode = followLatest,
-                    snapshot = snapshot,
+                tracker.onViewportFollowModeChanged(
+                    ChatViewportFollowPolicy.nextFollowModeAfterScroll(
+                        currentFollowMode = tracker.followLatest,
+                        snapshot = snapshot,
+                    ),
                 )
+                persistViewportAnchorIfRestored(params.listState, tracker)
             }
     }
+}
 
-    LaunchedEffect(autoScrollSignature, isStreamingForAutoScroll, params.renderItems.size) {
-        val signature = autoScrollSignature ?: return@LaunchedEffect
-        val previousSignature = lastAutoScrollSignature.value
+private fun persistViewportAnchorIfRestored(
+    listState: LazyListState,
+    tracker: ChatViewportRestorationTracker,
+) {
+    val conversationId = tracker.conversationId ?: return
+    if (tracker.restorationState in PENDING_RESTORATION_STATES) return
+    conversationViewportAnchorRegistry.put(
+        conversationId,
+        ViewportAnchor(
+            index = listState.firstVisibleItemIndex,
+            scrollOffset = listState.firstVisibleItemScrollOffset,
+            followTail = tracker.followLatest,
+        ),
+    )
+}
 
-        if (shouldForceScrollOnUserSend(signature, previousSignature?.messageId)) {
-            followLatest = true
-            val sendScrollOffset = with(density) { -ChatFadeEdgeLength.roundToPx() }
-            params.listState.animateScrollToItem(0, sendScrollOffset)
-        } else if (
-            shouldAutoScrollToLatest(
-                ChatMessageListAutoScrollGate(
-                    signature = signature,
-                    previousSignature = previousSignature,
-                    followLatest = followLatest,
-                    renderItemCount = params.renderItems.size,
-                ),
-            )
-        ) {
-            lastStreamingSnapMs = performAutoScrollToLatest(
-                ChatMessageListPerformAutoScrollParams(
-                    listState = params.listState,
-                    isStreaming = isStreamingForAutoScroll,
-                    lastStreamingSnapMs = lastStreamingSnapMs,
-                ),
-            )
+@Composable
+private fun ChatMessageListAutoScrollEffect(
+    params: ChatMessageListEffectsParams,
+    sendScrollOffset: Int,
+    tracker: ChatViewportRestorationTracker,
+) {
+    val signature = newestMessageAutoScrollSignature(params.state.messages)
+    LaunchedEffect(signature, params.state.isStreaming, params.renderItems.size) {
+        signature ?: return@LaunchedEffect
+        val previousSignature = tracker.lastAutoScrollSignature
+        when {
+            !tracker.canAutoFollow() -> Unit
+            shouldForceScrollOnUserSend(signature, previousSignature?.messageId) -> {
+                tracker.onUserMessageSent()
+                params.listState.animateScrollToItem(0, sendScrollOffset)
+            }
+            shouldAutoScrollToLatest(signature, previousSignature, params, tracker) -> {
+                tracker.lastStreamingSnapMs = performAutoScrollToLatest(
+                    ChatMessageListPerformAutoScrollParams(
+                        listState = params.listState,
+                        isStreaming = params.state.isStreaming,
+                        lastStreamingSnapMs = tracker.lastStreamingSnapMs,
+                    ),
+                )
+            }
         }
-
-        lastAutoScrollSignature.value = signature
+        tracker.lastAutoScrollSignature = signature
     }
 }
+
+private fun shouldAutoScrollToLatest(
+    signature: ChatAutoScrollSignature,
+    previousSignature: ChatAutoScrollSignature?,
+    params: ChatMessageListEffectsParams,
+    tracker: ChatViewportRestorationTracker,
+): Boolean = shouldAutoScrollToLatest(
+    ChatMessageListAutoScrollGate(
+        signature = signature,
+        previousSignature = previousSignature,
+        followLatest = tracker.followLatest,
+        renderItemCount = params.renderItems.size,
+    ),
+)
 
 private fun shouldAutoScrollToLatest(gate: ChatMessageListAutoScrollGate): Boolean {
     if (!ChatViewportFollowPolicy.shouldAutoFollow(gate.followLatest, gate.renderItemCount)) return false

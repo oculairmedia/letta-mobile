@@ -74,7 +74,7 @@ class StartupBenchmark {
         // coexist on the same device. Macrobenchmark must target the
         // suffixed package — not the production one.
         const val TARGET_PACKAGE = "com.letta.mobile.benchmark"
-        const val DEFAULT_ITERATIONS = 5
+        const val DEFAULT_ITERATIONS = 10
         const val STARTUP_WAIT_MS = 10_000L
     }
 }

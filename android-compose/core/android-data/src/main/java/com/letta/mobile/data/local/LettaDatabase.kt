@@ -25,9 +25,11 @@ import com.letta.mobile.data.model.DomainIdConverters
         RuntimeEventEntity::class,
         MemFsFileEntity::class,
         MemFsCommitEntity::class,
-        ConfirmedTimelineSnapshotEntity::class,
+        ConfirmedTimelineSnapshotHeadEntity::class,
+        ConfirmedTimelineSnapshotManifestEntity::class,
+        ConfirmedTimelineSnapshotChunkEntity::class,
     ],
-    version = 10,
+    version = 11,
     exportSchema = true,
 )
 @androidx.room.TypeConverters(DomainIdConverters::class)

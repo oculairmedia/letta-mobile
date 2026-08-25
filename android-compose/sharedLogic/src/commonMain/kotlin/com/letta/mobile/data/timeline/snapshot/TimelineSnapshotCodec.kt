@@ -81,6 +81,13 @@ object TimelineSnapshotCodec {
         )
     }
 
+    /**
+     * Computes a deterministic 64-bit FNV-1a fingerprint of canonical timeline content.
+     * Excludes volatile revisions, written timestamps, UI models, and transient loaders.
+     */
+    fun computeStoredEnvelopeFingerprint(envelope: StoredTimelineEnvelope): Long =
+        StoredEnvelopeFingerprint.compute(envelope)
+
     fun storedEnvelopeToTimeline(envelope: StoredTimelineEnvelope): Timeline {
         val confirmedEvents = envelope.events.map { it.toConfirmedTimelineEvent() }
         return Timeline(
@@ -90,6 +97,111 @@ object TimelineSnapshotCodec {
             backfillCursor = envelope.backfillCursor,
             releasedOlderCount = envelope.releasedOlderCount,
         )
+    }
+}
+
+private object StoredEnvelopeFingerprint {
+    private const val OFFSET_BASIS = -3750763034362895579L
+    private const val PRIME = 1099511628211L
+    private const val NULL_STRING = -1L
+
+    fun compute(envelope: StoredTimelineEnvelope): Long = Hasher().apply {
+        mix(envelope.schemaVersion.toLong())
+        mixString(envelope.scope.backendId)
+        mixString(envelope.scope.agentId)
+        mixString(envelope.scope.conversationId)
+        mixString(envelope.liveCursor)
+        mixString(envelope.backfillCursor)
+        mix(envelope.releasedOlderCount.toLong())
+        mix(envelope.events.size.toLong())
+        envelope.events.forEach(::mixEvent)
+    }.value
+
+    private class Hasher {
+        var value: Long = OFFSET_BASIS
+            private set
+
+        fun mix(valueToAdd: Long) {
+            value = (value xor valueToAdd) * PRIME
+        }
+
+        fun mixString(valueToAdd: String?) {
+            if (valueToAdd == null) {
+                mix(NULL_STRING)
+                return
+            }
+            mix(valueToAdd.length.toLong())
+            valueToAdd.forEach { character -> mix(character.code.toLong()) }
+        }
+
+        fun mixEvent(event: StoredTimelineEvent) {
+            mix(event.position.toBits())
+            mixString(event.otid)
+            mixString(event.content)
+            mixString(event.serverId)
+            mixString(event.messageType)
+            mixString(event.dateIso)
+            mixString(event.runId)
+            mixString(event.stepId)
+            mixString(event.agentId)
+            mix(event.seqId?.toLong() ?: -1L)
+            mixBoolean(event.approvalDecided)
+            mixString(event.approvalRequestId)
+            mixString(event.approvalDecision)
+            mixString(event.toolReturnContent)
+            mixBoolean(event.toolReturnIsError)
+            mixToolCalls(event.toolCalls)
+            mixStringMap(event.toolReturnContentByCallId)
+            mixBooleanMap(event.toolReturnIsErrorByCallId)
+            mixTruncationMap(event.toolReturnTruncationByCallId)
+            mixAttachments(event.attachments)
+        }
+
+        private fun mixBoolean(valueToAdd: Boolean) = mix(if (valueToAdd) 1L else 0L)
+
+        private fun mixToolCalls(toolCalls: List<StoredToolCall>) {
+            mix(toolCalls.size.toLong())
+            toolCalls.forEach { toolCall ->
+                mixString(toolCall.id)
+                mixString(toolCall.name)
+                mixString(toolCall.arguments)
+            }
+        }
+
+        private fun mixStringMap(values: Map<String, String>) {
+            mix(values.size.toLong())
+            values.entries.sortedBy { it.key }.forEach { (key, mapValue) ->
+                mixString(key)
+                mixString(mapValue)
+            }
+        }
+
+        private fun mixBooleanMap(values: Map<String, Boolean>) {
+            mix(values.size.toLong())
+            values.entries.sortedBy { it.key }.forEach { (key, mapValue) ->
+                mixString(key)
+                mixBoolean(mapValue)
+            }
+        }
+
+        private fun mixTruncationMap(values: Map<String, StoredToolReturnTruncation>) {
+            mix(values.size.toLong())
+            values.entries.sortedBy { it.key }.forEach { (key, truncation) ->
+                mixString(key)
+                mixString(truncation.messageId)
+                mix(truncation.byteLen)
+            }
+        }
+
+        private fun mixAttachments(attachments: List<StoredImageAttachmentPointer>) {
+            mix(attachments.size.toLong())
+            attachments.forEach { attachment ->
+                mixString(attachment.mediaType)
+                mix(attachment.byteSize)
+                mixString(attachment.uriOrUrl)
+                mixString(attachment.thumbnailBase64)
+            }
+        }
     }
 }
 

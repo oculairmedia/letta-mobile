@@ -105,6 +105,24 @@ class ChatTimelineObserverTest {
     }
 
     @Test
+    fun `recoverable hydration failure keeps fallback rows without init error`() = runTest {
+        val harness = Harness(backgroundScope)
+        harness.seedTimeline(
+            "conv-fallback",
+            listOf(confirmed("assistant-fallback", "last known good", TimelineMessageType.ASSISTANT)),
+        )
+
+        harness.observer.start("conv-fallback")
+        runCurrent()
+        harness.emitSyncEvent(TimelineSyncEvent.HydrateFailed("active snapshot corrupt; remote offline"))
+        runCurrent()
+
+        assertEquals(listOf("assistant-fallback"), harness.uiState.value.messages.map { it.id })
+        assertFalse(harness.uiState.value.isLoadingMessages)
+        assertTrue(harness.uiState.value.error?.contains("Timeline init failed") != true)
+    }
+
+    @Test
     fun `switching conversations rebinds observer and tracker`() = runTest {
         val harness = Harness(backgroundScope)
         harness.seedTimeline("conv-1")
@@ -723,6 +741,31 @@ class ChatTimelineObserverTest {
 
         assertFalse(harness.uiState.value.isStreaming)
         assertTrue(harness.uiState.value.collapsedRunIds.contains("run-live"))
+    }
+
+    @Test
+    fun `reconcile error presence clear collapses the terminal run`() = runTest {
+        val harness = Harness(backgroundScope, activeReplyConversationIds = setOf("conv-1"))
+        harness.seedTimeline(
+            "conv-1",
+            listOf(
+                confirmed("e-10", "go"),
+                confirmed("e-20", "partial answer", TimelineMessageType.ASSISTANT, runId = "run-error"),
+            ),
+        )
+
+        harness.observer.start("conv-1")
+        runCurrent()
+        assertTrue(harness.uiState.value.isStreaming)
+        assertFalse(harness.uiState.value.collapsedRunIds.contains("run-error"))
+
+        harness.emitSyncEvent(TimelineSyncEvent.ReconcileError("sync failed"))
+        runCurrent()
+
+        assertFalse(harness.uiState.value.isStreaming)
+        assertFalse(harness.uiState.value.isAgentTyping)
+        assertEquals("Couldn't sync agent reply — pull to refresh", harness.uiState.value.error)
+        assertTrue(harness.uiState.value.collapsedRunIds.contains("run-error"))
     }
 
     @Test

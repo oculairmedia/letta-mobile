@@ -26,7 +26,7 @@ internal class CliWsSession(
     cursorStore: RunCursorStore = RunCursorStore.inMemory(),
     private val printEvents: Boolean = true,
 ) {
-    private val transport = ChannelTransport(cursorStore)
+    private val transport = ChannelTransport(scope, cursorStore)
     private val bridge = WsChatBridge(transport)
     private val activeConversationId = AtomicReference(initialConversationId)
     private val activeOtid = AtomicReference<String?>(null)

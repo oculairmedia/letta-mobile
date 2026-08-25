@@ -1,10 +1,14 @@
 package com.letta.mobile.data.transport
 
 import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.yield
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -26,10 +30,29 @@ private const val KEEPALIVE_CLOSE_TEST_TIMEOUT_MS = 5_000L
 
 class ChannelTransportKeepaliveCloseTest {
     @Test
+    fun `owner cancellation ends transport collectors and lifecycle`() = runBlocking {
+        val ownerJob = SupervisorJob()
+        val ownerScope = CoroutineScope(coroutineContext + ownerJob)
+        val transport = ChannelTransport(ownerScope, RunCursorStore.inMemory())
+        val collector = ownerScope.launch { transport.events.collect {} }
+        yield()
+
+        assertTrue(collector.isActive)
+        ownerJob.cancel()
+        collector.join()
+
+        assertTrue(collector.isCancelled)
+        assertEquals(
+            ChannelTransportState.Disconnected(1000, "session ended"),
+            transport.state.value,
+        )
+    }
+
+    @Test
     fun `after welcome resumes stored active run cursor`() = runBlocking {
         val shim = KeepaliveCloseShimServer()
         val cursorStore = RunCursorStore.inMemory().also { it.record("conv-1", "run-1", 7L) }
-        val transport = ChannelTransport(cursorStore)
+        val transport = ChannelTransport(this, cursorStore)
 
         try {
             transport.connect(
@@ -53,7 +76,7 @@ class ChannelTransportKeepaliveCloseTest {
     @Test
     fun `client normal close does not reconnect`() = runBlocking {
         val shim = KeepaliveCloseShimServer()
-        val transport = ChannelTransport(RunCursorStore.inMemory())
+        val transport = ChannelTransport(this, RunCursorStore.inMemory())
 
         try {
             transport.connect(
@@ -76,7 +99,7 @@ class ChannelTransportKeepaliveCloseTest {
     @Test
     fun `auth close does not reconnect`() = runBlocking {
         val shim = KeepaliveCloseShimServer()
-        val transport = ChannelTransport(RunCursorStore.inMemory())
+        val transport = ChannelTransport(this, RunCursorStore.inMemory())
 
         try {
             transport.connect(
@@ -119,7 +142,7 @@ class ChannelTransportKeepaliveCloseTest {
     fun `transient disconnect re-subscribes to active runs upon reconnection`() = runBlocking {
         val shim = KeepaliveCloseShimServer()
         val cursorStore = RunCursorStore.inMemory().also { it.record("conv-1", "run-1", 7L) }
-        val transport = ChannelTransport(cursorStore)
+        val transport = ChannelTransport(this, cursorStore)
 
         try {
             transport.connect(
@@ -150,7 +173,7 @@ class ChannelTransportKeepaliveCloseTest {
     @Test
     fun `redials when shim closes for protocol keepalive timeout`() = runBlocking {
         val shim = KeepaliveCloseShimServer()
-        val transport = ChannelTransport(RunCursorStore.inMemory())
+        val transport = ChannelTransport(this, RunCursorStore.inMemory())
 
         try {
             transport.connect(

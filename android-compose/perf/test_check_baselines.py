@@ -57,6 +57,18 @@ class CheckBaselinesTest(unittest.TestCase):
     def write_measurement(self, payload: dict, name: str = "sample-benchmarkData.json") -> None:
         (self.outputs_dir / name).write_text(json.dumps(payload, indent=2) + "\n")
 
+    def assert_fails_closed(self, key: str, spec: dict, measurement: dict) -> None:
+        self.write_baselines({key: spec})
+        self.write_measurement(measurement)
+        self.assertEqual(
+            check_baselines.check(
+                self.outputs_dir,
+                rebaseline=False,
+                baselines_path=self.baselines_path,
+            ),
+            2,
+        )
+
     def test_regression_exits_nonzero(self) -> None:
         self.write_baselines(
             {
@@ -161,6 +173,174 @@ class CheckBaselinesTest(unittest.TestCase):
                 "warmStartup",
                 {"timeToInitialDisplayMs": {"P95": 200.0}},
             )
+        )
+
+        result = check_baselines.check(
+            self.outputs_dir,
+            rebaseline=False,
+            baselines_path=self.baselines_path,
+        )
+
+        self.assertEqual(result, 2)
+
+    def test_invalid_gating_inputs_fail_closed(self) -> None:
+        scenarios = (
+            (
+                "selection.first_content.p95_ms",
+                {
+                    "baseline": 100.0,
+                    "source": "ConversationOpenBenchmark.coldOpen",
+                    "metric": "selectionToFirstContentMs",
+                },
+                make_benchmark(
+                    "com.letta.mobile.macrobenchmark.StartupBenchmark",
+                    "coldStartupCompilationPartial",
+                    {"timeToInitialDisplayMs": {"P95": 90.0}},
+                ),
+            ),
+            (
+                "selection.stable_viewport.p95_ms",
+                {
+                    "baseline": 100.0,
+                    "source": "ConversationOpenBenchmark.warmOpen",
+                    "metric": "selectionToStableViewportMs",
+                },
+                make_benchmark(
+                    "com.letta.mobile.macrobenchmark.ConversationOpenBenchmark",
+                    "warmOpen",
+                    {"timeToInitialDisplayMs": {"P95": 90.0}},
+                ),
+            ),
+            (
+                "startup.cold.p95_ms",
+                {
+                    "baseline": 100.0,
+                    "source": "StartupBenchmark.coldStartupCompilationPartial",
+                    "metric": "timeToInitialDisplayMs",
+                    "min_samples": 10,
+                },
+                make_benchmark(
+                    "com.letta.mobile.macrobenchmark.StartupBenchmark",
+                    "coldStartupCompilationPartial",
+                    {"timeToInitialDisplayMs": {"P95": 90.0, "runs": [90.0] * 5}},
+                ),
+            ),
+        )
+        for key, spec, measurement in scenarios:
+            with self.subTest(key=key):
+                for output in self.outputs_dir.iterdir():
+                    output.unlink()
+                self.assert_fails_closed(key, spec, measurement)
+
+    def test_mixed_valid_and_invalid_matches_fail_closed(self) -> None:
+        self.write_baselines(
+            {
+                "startup.cold.p95_ms": {
+                    "baseline": 100.0,
+                    "source": "StartupBenchmark.coldStartupCompilationPartial",
+                    "metric": "timeToInitialDisplayMs",
+                }
+            }
+        )
+        self.write_measurement(
+            make_benchmark(
+                "com.letta.mobile.macrobenchmark.StartupBenchmark",
+                "coldStartupCompilationPartial",
+                {"timeToInitialDisplayMs": {"P95": 90.0}},
+            ),
+            name="valid-benchmarkData.json",
+        )
+        self.write_measurement(
+            make_benchmark(
+                "com.letta.mobile.macrobenchmark.StartupBenchmark",
+                "coldStartupCompilationPartial",
+                {"otherMetric": {"P95": 1.0}},
+            ),
+            name="invalid-benchmarkData.json",
+        )
+
+        result = check_baselines.check(
+            self.outputs_dir,
+            rebaseline=False,
+            baselines_path=self.baselines_path,
+        )
+
+        self.assertEqual(result, 2)
+
+    def test_malformed_metric_values_fail_closed(self) -> None:
+        spec = {
+            "baseline": 100.0,
+            "source": "StartupBenchmark.warmStartup",
+            "metric": "timeToInitialDisplayMs",
+        }
+        for metric in (
+            {"P95": "not-a-number"},
+            {"P95": True},
+            {"runs": [90.0, "not-a-number"]},
+            {"runs": [90.0, float("inf")]},
+            {"runs": [True] * 10},
+            [90.0],
+        ):
+            with self.subTest(metric=metric):
+                for output in self.outputs_dir.iterdir():
+                    output.unlink()
+                self.assert_fails_closed(
+                    "startup.warm.p95_ms",
+                    spec,
+                    make_benchmark(
+                        "com.letta.mobile.macrobenchmark.StartupBenchmark",
+                        "warmStartup",
+                        {"timeToInitialDisplayMs": metric},
+                    ),
+                )
+
+    def test_null_runs_and_malformed_metrics_fail_closed(self) -> None:
+        spec = {
+            "baseline": 100.0,
+            "source": "StartupBenchmark.warmStartup",
+            "metric": "timeToInitialDisplayMs",
+            "min_samples": 10,
+        }
+        for metrics in (
+            {"timeToInitialDisplayMs": {"P95": 90.0, "runs": None}},
+            None,
+        ):
+            with self.subTest(metrics=metrics):
+                for output in self.outputs_dir.iterdir():
+                    output.unlink()
+                self.assert_fails_closed(
+                    "startup.warm.p95_ms",
+                    spec,
+                    make_benchmark(
+                        "com.letta.mobile.macrobenchmark.StartupBenchmark",
+                        "warmStartup",
+                        metrics,
+                    ),
+                )
+
+    def test_every_matching_gating_observation_meets_minimum_samples(self) -> None:
+        spec = {
+            "baseline": 100.0,
+            "source": "StartupBenchmark.warmStartup",
+            "metric": "timeToInitialDisplayMs",
+            "min_samples": 10,
+        }
+        self.write_baselines({"startup.warm.p95_ms": spec})
+        self.write_measurement(
+            make_benchmark(
+                "com.letta.mobile.macrobenchmark.StartupBenchmark",
+                "warmStartup",
+                {"timeToInitialDisplayMs": {"P95": 90.0, "runs": [90.0] * 10}},
+            ),
+            name="complete-benchmarkData.json",
+        )
+        self.write_measurement(
+            make_benchmark(
+                "com.letta.mobile.macrobenchmark.StartupBenchmark",
+                "warmStartup",
+                {"timeToInitialDisplayMs": {"P95": 120.0, "runs": [120.0] * 5}},
+            ),
+            name="undersampled-benchmarkData.json",
         )
 
         result = check_baselines.check(
@@ -278,7 +458,6 @@ class CheckBaselinesTest(unittest.TestCase):
         self.assertEqual(summary["metrics"][0]["source"], "StartupBenchmark.coldStartupCompilationPartial")
         self.assertIn("sample-benchmarkData.json", summary["metrics"][0]["source_path"])
         self.assertIn("startup.cold.p95_ms", summary_md.read_text())
-
 
 if __name__ == "__main__":
     unittest.main()
