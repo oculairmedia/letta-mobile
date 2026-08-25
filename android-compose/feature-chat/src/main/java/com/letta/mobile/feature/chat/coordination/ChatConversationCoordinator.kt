@@ -388,132 +388,134 @@ internal class ChatConversationCoordinator(
     suspend fun loadMessagesInternal(): Boolean {
         val loadTimer = Telemetry.startTimer("AdminChatVM", "loadMessages")
         val requestedConversationId = activeConversationId ?: explicitConversationId()
-        val currentConversationId = activeConversationId ?: explicitConversationId()
-        if (requestedConversationId == null) {
-            if (requestedConversationId == currentConversationId) {
-                updateSessionState { ChatSessionReducer.conversationsLoaded(it, emptyList()) }
-                uiState.value = uiState.value.copy(
-                    messages = persistentListOf(),
-                    messageListChange = ChatMessageListChange.Full,
-                    isLoadingOlderMessages = false,
-                    hasMoreOlderMessages = false,
-                )
-            }
-            loadTimer.stop("result" to "noConversation")
-            return true
-        }
+            ?: return completeEmptyConversationLoad(loadTimer)
         if (localRuntimeRouting() == LocalRuntimeRouting.LocalBound) {
-            val cachedAgent = agentRepository.getCachedAgent(AgentId(agentId))
-            reportNameFallbackIfUnresolved(cachedAgent?.name)
-            if (requestedConversationId == currentConversationId) {
-                val summary = ChatConversationSummary(
-                    id = requestedConversationId,
-                    title = cachedAgent?.name ?: uiState.value.agentName,
-                    agentName = cachedAgent?.name ?: uiState.value.agentName,
-                    updatedAtLabel = "",
-                    lastMessagePreview = "",
-                )
-                updateSessionState { current ->
-                    val next = ChatSessionReducer.conversationsLoaded(current, listOf(summary))
-                    ChatSessionReducer.hydrateCompleted(next, next.selectionGeneration)
-                }
-                uiState.value = uiState.value.copy(
-                    agentName = cachedAgent?.name ?: uiState.value.agentName,
-                    isLoadingOlderMessages = false,
-                    hasMoreOlderMessages = false,
-                )
-                hydratedConversationId = requestedConversationId
-                startTimelineObserver(requestedConversationId)
-            }
-            loadTimer.stop(
-                "conversationId" to requestedConversationId,
-                "mode" to "local",
-            )
-            return true
+            return loadLocalConversation(requestedConversationId, loadTimer)
         }
+        publishCachedConversation(requestedConversationId)
+        return loadRemoteConversation(requestedConversationId, loadTimer)
+    }
+
+    private fun completeEmptyConversationLoad(loadTimer: Telemetry.Timer): Boolean {
+        updateSessionState { ChatSessionReducer.conversationsLoaded(it, emptyList()) }
+        uiState.value = uiState.value.copy(
+            messages = persistentListOf(),
+            messageListChange = ChatMessageListChange.Full,
+            isLoadingOlderMessages = false,
+            hasMoreOlderMessages = false,
+        )
+        loadTimer.stop("result" to "noConversation")
+        return true
+    }
+
+    private fun loadLocalConversation(conversationId: String, loadTimer: Telemetry.Timer): Boolean {
         val cachedAgent = agentRepository.getCachedAgent(AgentId(agentId))
-        if (cachedAgent != null) {
-            if (requestedConversationId == currentConversationId) {
-                val summary = ChatConversationSummary(
-                    id = requestedConversationId,
-                    title = cachedAgent.name ?: uiState.value.agentName,
-                    agentName = cachedAgent.name ?: uiState.value.agentName,
-                    updatedAtLabel = "",
-                    lastMessagePreview = "",
-                )
-                updateSessionState { current ->
-                    hydrateOrShowLoading(current, summary, hydrationAvailability(summary))
-                }
-                uiState.value = uiState.value.copy(
-                    agentName = cachedAgent.name ?: uiState.value.agentName,
-                    messages = uiState.value.messages,
-                    messageListChange = ChatMessageListChange.Full,
-                )
-            }
-        } else {
-            if (requestedConversationId == currentConversationId) {
-                val summary = ChatConversationSummary(
-                    id = requestedConversationId,
-                    title = uiState.value.agentName,
-                    agentName = uiState.value.agentName,
-                    updatedAtLabel = "",
-                    lastMessagePreview = "",
-                )
-                updateSessionState { current ->
-                    hydrateOrShowLoading(current, summary, hydrationAvailability(summary))
-                }
-            }
-        }
-        try {
-            val agent = agentRepository.getAgent(AgentId(agentId)).first()
-            if (requestedConversationId != (activeConversationId ?: explicitConversationId())) {
-                loadTimer.stop("result" to "staleConversation")
-                return false
-            }
-            val summary = ChatConversationSummary(
-                id = requestedConversationId,
-                title = agent.name,
-                agentName = agent.name,
-                updatedAtLabel = "",
-                lastMessagePreview = "",
-            )
+        reportNameFallbackIfUnresolved(cachedAgent?.name)
+        if (isCurrentConversation(conversationId)) {
+            val agentName = cachedAgent?.name ?: uiState.value.agentName
+            val summary = conversationSummary(conversationId, agentName)
             updateSessionState { current ->
                 val next = ChatSessionReducer.conversationsLoaded(current, listOf(summary))
                 ChatSessionReducer.hydrateCompleted(next, next.selectionGeneration)
             }
             uiState.value = uiState.value.copy(
-                agentName = agent.name,
+                agentName = agentName,
                 isLoadingOlderMessages = false,
                 hasMoreOlderMessages = false,
             )
-            hydratedConversationId = requestedConversationId
-            startTimelineObserver(requestedConversationId)
-            recentMessagesReconcileLauncher.launch(ConversationOpenReconcileRequest(requestedConversationId))
-            loadTimer.stop(
-                "conversationId" to requestedConversationId,
-                "mode" to "timeline",
-            )
-            return true
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            loadTimer.stopError(e, "conversationId" to requestedConversationId)
-            if (requestedConversationId != (activeConversationId ?: explicitConversationId())) {
-                return false
-            }
-            updateSessionState { current ->
-                ChatSessionReducer.streamDisconnected(
-                    state = current,
-                    generation = current.selectionGeneration,
-                    errorMessage = e.message ?: "Failed to load messages",
-                )
-            }
+            hydratedConversationId = conversationId
+            startTimelineObserver(conversationId)
+        }
+        loadTimer.stop("conversationId" to conversationId, "mode" to "local")
+        return true
+    }
+
+    private fun publishCachedConversation(conversationId: String) {
+        if (!isCurrentConversation(conversationId)) return
+        val cachedAgent = agentRepository.getCachedAgent(AgentId(agentId))
+        val agentName = cachedAgent?.name ?: uiState.value.agentName
+        val summary = conversationSummary(conversationId, agentName)
+        updateSessionState { current ->
+            hydrateOrShowLoading(current, summary, hydrationAvailability(summary))
+        }
+        if (cachedAgent != null) {
             uiState.value = uiState.value.copy(
-                isLoadingOlderMessages = false,
+                agentName = agentName,
+                messageListChange = ChatMessageListChange.Full,
             )
-            return false
         }
     }
+
+    private suspend fun loadRemoteConversation(conversationId: String, loadTimer: Telemetry.Timer): Boolean =
+        try {
+            val agent = agentRepository.getAgent(AgentId(agentId)).first()
+            if (!isCurrentConversation(conversationId)) {
+                loadTimer.stop("result" to "staleConversation")
+                false
+            } else {
+                completeRemoteConversationLoad(
+                    conversationId,
+                    agent.name,
+                    loadTimer,
+                )
+                true
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            failRemoteConversationLoad(conversationId, error, loadTimer)
+        }
+
+    private fun completeRemoteConversationLoad(
+        conversationId: String,
+        agentName: String,
+        loadTimer: Telemetry.Timer,
+    ) {
+        val summary = conversationSummary(conversationId, agentName)
+        updateSessionState { current ->
+            val next = ChatSessionReducer.conversationsLoaded(current, listOf(summary))
+            ChatSessionReducer.hydrateCompleted(next, next.selectionGeneration)
+        }
+        uiState.value = uiState.value.copy(
+            agentName = agentName,
+            isLoadingOlderMessages = false,
+            hasMoreOlderMessages = false,
+        )
+        hydratedConversationId = conversationId
+        startTimelineObserver(conversationId)
+        recentMessagesReconcileLauncher.launch(ConversationOpenReconcileRequest(conversationId))
+        loadTimer.stop("conversationId" to conversationId, "mode" to "timeline")
+    }
+
+    private fun failRemoteConversationLoad(
+        conversationId: String,
+        error: Exception,
+        loadTimer: Telemetry.Timer,
+    ): Boolean {
+        loadTimer.stopError(error, "conversationId" to conversationId)
+        if (!isCurrentConversation(conversationId)) return false
+        updateSessionState { current ->
+            ChatSessionReducer.streamDisconnected(
+                state = current,
+                generation = current.selectionGeneration,
+                errorMessage = error.message ?: "Failed to load messages",
+            )
+        }
+        uiState.value = uiState.value.copy(isLoadingOlderMessages = false)
+        return false
+    }
+
+    private fun isCurrentConversation(conversationId: String): Boolean =
+        conversationId == (activeConversationId ?: explicitConversationId())
+
+    private fun conversationSummary(conversationId: String, agentName: String): ChatConversationSummary =
+        ChatConversationSummary(
+            id = conversationId,
+            title = agentName,
+            agentName = agentName,
+            updatedAtLabel = "",
+            lastMessagePreview = "",
+        )
 
     private fun consumeInitialMessageIfPresent(policy: DuplicateInitialMessagePolicy): String? {
         val message = initialMessage?.takeIf { it.isNotBlank() } ?: return null

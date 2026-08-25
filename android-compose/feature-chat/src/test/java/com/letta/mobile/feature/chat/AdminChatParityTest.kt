@@ -208,58 +208,32 @@ class AdminChatParityTest {
 
     @Test
     fun `messages from another conversation do not skip the Loading transition`() = runTest {
-        val harness = Harness(this)
-        harness.routeConversationId = "conversation-a"
-        harness.uiState.value = harness.uiState.value.copy(
-            messages = persistentListOf(
-                UiMessage(
-                    id = "m1",
-                    role = "assistant",
-                    content = "from conversation A",
-                    timestamp = "2026-05-16T00:00:00Z",
-                )
-            ),
-        )
-        val coordinator = harness.coordinator
-        harness.routeConversationId = "conversation-b"
+        for (mode in ConversationAccessMode.entries) {
+            val harness = Harness(this)
+            harness.routeConversationId = "conversation-a"
+            harness.uiState.value = harness.uiState.value.copy(
+                messages = persistentListOf(
+                    UiMessage(
+                        id = "m1",
+                        role = "assistant",
+                        content = "from conversation A",
+                        timestamp = "2026-05-16T00:00:00Z",
+                    )
+                ),
+            )
+            val coordinator = harness.coordinator
+            harness.routeConversationId = "conversation-b"
 
-        val seen = mutableListOf<ChatConnectionState>()
-        val collector = launch(UnconfinedTestDispatcher(testScheduler)) {
-            harness.sessionState.collect { seen += it.connectionState }
+            val seen = mutableListOf<ChatConnectionState>()
+            val collector = launch(UnconfinedTestDispatcher(testScheduler)) {
+                harness.sessionState.collect { seen += it.connectionState }
+            }
+            coordinator.resolveConversationAndLoad(mode)
+            advanceUntilIdle()
+            collector.cancel()
+
+            assertTrue("expected $mode hydration for conversation B, saw: $seen", ChatConnectionState.Loading in seen)
         }
-        coordinator.resolveConversationAndLoad(ConversationAccessMode.Timeline)
-        advanceUntilIdle()
-        collector.cancel()
-
-        assertTrue("expected Loading for a different conversation, saw: $seen", ChatConnectionState.Loading in seen)
-    }
-
-    @Test
-    fun `client mode does not treat another conversations rows as hydrated`() = runTest {
-        val harness = Harness(this)
-        harness.routeConversationId = "conversation-a"
-        harness.uiState.value = harness.uiState.value.copy(
-            messages = persistentListOf(
-                UiMessage(
-                    id = "m1",
-                    role = "assistant",
-                    content = "from conversation A",
-                    timestamp = "2026-05-16T00:00:00Z",
-                )
-            ),
-        )
-        val coordinator = harness.coordinator
-        harness.routeConversationId = "conversation-b"
-
-        val seen = mutableListOf<ChatConnectionState>()
-        val collector = launch(UnconfinedTestDispatcher(testScheduler)) {
-            harness.sessionState.collect { seen += it.connectionState }
-        }
-        coordinator.resolveConversationAndLoad(ConversationAccessMode.Client)
-        advanceUntilIdle()
-        collector.cancel()
-
-        assertTrue("expected client hydration for conversation B, saw: $seen", ChatConnectionState.Loading in seen)
     }
 
     @Test
