@@ -115,18 +115,22 @@ class RoomConfirmedTimelineStoreTest {
         val store = RoomConfirmedTimelineStore(db)
         val scope = TimelineScope(backendId = "b1", conversationId = "c1")
 
-        // Manually insert a corrupt row
-        db.confirmedTimelineSnapshotDao().insertOrReplace(
-            ConfirmedTimelineSnapshotEntity(
-                backendId = "b1",
-                conversationId = "c1",
-                agentId = null,
-                revision = 1L,
-                schemaVersion = 1,
-                payloadJson = "{corrupted json invalid syntax",
-                writtenAtMillis = 1000L,
-            )
+        assertTrue(store.writeSnapshot(StoredTimelineEnvelope(scope = scope, revision = 1L)))
+        val manifestId = db.confirmedTimelineSnapshotDao()
+            .getHeadMetadata(scope.backendId, scope.conversationId)
+            ?.activeManifestId
+        assertNotNull(manifestId)
+
+        val corruptChunk = db.openHelper.writableDatabase.compileStatement(
+            """
+            UPDATE confirmed_timeline_snapshot_chunks
+            SET payload = ?
+            WHERE manifest_id = ? AND chunk_index = 0
+            """.trimIndent(),
         )
+        corruptChunk.bindBlob(1, "{corrupted json invalid syntax".encodeToByteArray())
+        corruptChunk.bindString(2, requireNotNull(manifestId))
+        corruptChunk.executeUpdateDelete()
 
         val read = store.readSnapshot(scope)
         assertNull(read)

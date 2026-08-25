@@ -3,6 +3,37 @@ package com.letta.mobile.data.timeline.snapshot
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 
+enum class SnapshotReadFailure {
+    MISSING,
+    METADATA_INVALID,
+    MANIFEST_MISSING,
+    CHUNK_MISSING,
+    CHUNK_INVALID,
+    LENGTH_MISMATCH,
+    CHECKSUM_MISMATCH,
+    SCOPE_MISMATCH,
+    REVISION_MISMATCH,
+    SCHEMA_MISMATCH,
+    CORRUPT_ENCODING,
+}
+
+sealed interface ConfirmedTimelineReadResult {
+    val snapshot: StoredTimelineEnvelope?
+
+    data class Active(override val snapshot: StoredTimelineEnvelope) : ConfirmedTimelineReadResult
+
+    data class Fallback(
+        override val snapshot: StoredTimelineEnvelope,
+        val activeFailure: SnapshotReadFailure,
+    ) : ConfirmedTimelineReadResult
+
+    data class ReconciliationRequired(
+        val failure: SnapshotReadFailure,
+    ) : ConfirmedTimelineReadResult {
+        override val snapshot: StoredTimelineEnvelope? = null
+    }
+}
+
 /**
  * Common contract for persisting and reading confirmed timeline snapshots.
  *
@@ -13,8 +44,16 @@ import kotlinx.atomicfu.locks.synchronized
 interface ConfirmedTimelineStore {
     /**
      * Read the persisted snapshot for [scope], or null if none exists / if corrupt.
+     *
+     * Android's durable implementation also exposes [readSnapshotResult] so callers can
+     * distinguish an active snapshot from a last-known-good fallback. Existing callers keep
+     * the nullable API until reconciliation consumes the typed result in the next milestone.
      */
     suspend fun readSnapshot(scope: TimelineScope): StoredTimelineEnvelope?
+
+    suspend fun readSnapshotResult(scope: TimelineScope): ConfirmedTimelineReadResult =
+        readSnapshot(scope)?.let(ConfirmedTimelineReadResult::Active)
+            ?: ConfirmedTimelineReadResult.ReconciliationRequired(SnapshotReadFailure.MISSING)
 
     /**
      * Write [envelope] atomically.
