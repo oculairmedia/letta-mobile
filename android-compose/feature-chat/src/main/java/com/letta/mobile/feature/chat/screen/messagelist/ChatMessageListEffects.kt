@@ -44,6 +44,14 @@ internal data class ChatMessageListPerformAutoScrollParams(
     val lastStreamingSnapMs: Long,
 )
 
+internal data class ViewportAnchor(
+    val index: Int,
+    val scrollOffset: Int,
+    val followTail: Boolean,
+)
+
+internal val conversationViewportAnchors = mutableMapOf<String, ViewportAnchor>()
+
 internal enum class ChatRestorationState {
     AwaitingSnapshot,
     AwaitingFirstLayout,
@@ -112,17 +120,19 @@ private fun ChatMessageListViewportRestorationEffect(params: ChatMessageListEffe
         }
     }
 
-    // First layout anchoring: perform exactly ONE synchronous/non-animated restore
+    // First layout anchoring: perform exactly ONE synchronous/non-animated restore to the conversation-scoped anchor
     LaunchedEffect(params.listState, params.renderItems.size, conversationId) {
         snapshotFlow { params.listState.layoutInfo.totalItemsCount }
             .distinctUntilChanged()
             .collect { totalCount ->
                 if (totalCount > 0 && restorationState == ChatRestorationState.AwaitingFirstLayout) {
-                    if (params.listState.firstVisibleItemIndex != 0 || params.listState.firstVisibleItemScrollOffset != 0) {
-                        params.listState.scrollToItem(0)
+                    val savedAnchor = conversationId?.let { conversationViewportAnchors[it] } ?: ViewportAnchor(0, 0, true)
+                    val targetIndex = savedAnchor.index.coerceAtMost(totalCount - 1)
+                    if (params.listState.firstVisibleItemIndex != targetIndex || params.listState.firstVisibleItemScrollOffset != savedAnchor.scrollOffset) {
+                        params.listState.scrollToItem(targetIndex, savedAnchor.scrollOffset)
                     }
-                    restorationState = ChatRestorationState.Restored
-                    followLatest = true
+                    restorationState = if (savedAnchor.followTail) ChatRestorationState.Restored else ChatRestorationState.UserControlled
+                    followLatest = savedAnchor.followTail
                     ChatHydrationTrace.current(conversationId)?.let { generation ->
                         ChatHydrationTrace.scrollInitialized(generation, correction = "initial_restore")
                     }
@@ -130,8 +140,8 @@ private fun ChatMessageListViewportRestorationEffect(params: ChatMessageListEffe
             }
     }
 
-    // 2. Track user-controlled scrolling vs followTail
-    LaunchedEffect(params.listState, params.isUserScrolling, params.renderItems.size) {
+    // 2. Track user-controlled scrolling vs followTail and persist conversation anchor
+    LaunchedEffect(params.listState, params.isUserScrolling, params.renderItems.size, conversationId) {
         snapshotFlow { params.listState.toChatViewportSnapshot(params.isUserScrolling, params.renderItems.size) }
             .distinctUntilChanged()
             .collect { snapshot ->
@@ -144,6 +154,13 @@ private fun ChatMessageListViewportRestorationEffect(params: ChatMessageListEffe
                     restorationState = ChatRestorationState.UserControlled
                 } else if (nextFollowMode && restorationState == ChatRestorationState.UserControlled) {
                     restorationState = ChatRestorationState.FollowTail
+                }
+                if (conversationId != null && (restorationState == ChatRestorationState.Restored || restorationState == ChatRestorationState.UserControlled || restorationState == ChatRestorationState.FollowTail)) {
+                    conversationViewportAnchors[conversationId] = ViewportAnchor(
+                        index = params.listState.firstVisibleItemIndex,
+                        scrollOffset = params.listState.firstVisibleItemScrollOffset,
+                        followTail = followLatest,
+                    )
                 }
             }
     }

@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import pathlib
 import sys
 from typing import Iterable
@@ -108,7 +109,7 @@ def _format_optional_float(value: float | None) -> str:
 
 def _write_summary_json(path: pathlib.Path, rows: list[dict], exit_code: int) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"exit_code": exit_code, "metrics": rows}, indent=2) + "\n")
+    path.write_text(json.dumps({"exit_code": exit_code, "metrics": rows}, indent=2) + "\n", encoding="utf-8")
 
 
 def _write_summary_markdown(path: pathlib.Path, rows: list[dict], exit_code: int) -> None:
@@ -137,7 +138,7 @@ def _write_summary_markdown(path: pathlib.Path, rows: list[dict], exit_code: int
                 path=row.get("source_path", "n/a"),
             )
         )
-    path.write_text("\n".join(lines) + "\n")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def _write_summaries(
@@ -167,6 +168,8 @@ def check(
     summary_rows: list[dict] = []
     updates = 0
 
+    has_gating = any(bool(spec.get("gate", True)) for spec in baselines["metrics"].values())
+
     for key, spec in baselines["metrics"].items():
         matches = [b for b in measurements if _match_bench(b, spec["source"])]
         gate_enabled = bool(spec.get("gate", True))
@@ -184,7 +187,12 @@ def check(
             "source_path": None,
         }
         if not matches:
-            print(f"[skip] {key}: no measurement for {spec['source']}")
+            if gate_enabled and not rebaseline:
+                print(f"[missing_source] {key}: no measurement for {spec['source']} (gated metric missing!)")
+                row["status"] = "missing_source"
+                failures.append(row)
+            else:
+                print(f"[skip] {key}: no measurement for {spec['source']}")
             summary_rows.append(row)
             continue
         # If multiple iterations ran, take the worst (highest) — we gate
@@ -193,9 +201,14 @@ def check(
             (b, _pick_metric(b, spec["metric"], spec.get("aggregation")))
             for b in matches
         ]
-        values = [(b, v) for b, v in picked_values if v is not None]
+        values = [(b, v) for b, v in picked_values if v is not None and math.isfinite(v)]
         if not values:
-            print(f"[skip] {key}: {spec['metric']} not reported")
+            if gate_enabled and not rebaseline:
+                print(f"[missing_metric] {key}: {spec['metric']} not reported or non-finite (gated metric missing!)")
+                row["status"] = "missing_metric"
+                failures.append(row)
+            else:
+                print(f"[skip] {key}: {spec['metric']} not reported")
             summary_rows.append(row)
             continue
         worst_bench, observed = max(values, key=lambda item: item[1])
@@ -261,6 +274,12 @@ def check(
         _write_summaries(summary_rows, 0, summary_json_path, summary_md_path)
         return 0
 
+    # Ensure at least one gated metric was evaluated if not rebaselining
+    if not rebaseline and has_gating and not any(r.get("observed") is not None for r in summary_rows if r.get("gate")):
+        print("\nNo gating metrics observed across benchmark outputs.", file=sys.stderr)
+        _write_summaries(summary_rows, 1, summary_json_path, summary_md_path)
+        return 1
+
     if failures:
         failing_keys = [row["key"] for row in failures]
         retryable_single_cold_start = failing_keys == [COLD_START_METRIC_KEY]
@@ -269,12 +288,13 @@ def check(
             if retryable_single_cold_start and retryable_single_cold_start_exit_code is not None
             else 1
         )
-        print("\nPerf regressions detected:", file=sys.stderr)
+        print("\nPerf regressions / missing gated metrics detected:", file=sys.stderr)
         for row in failures:
+            observed_str = f"observed={row['observed']:.3f} > ceiling={row.get('ceiling', 0.0):.3f}" if row.get("observed") is not None else f"status={row.get('status')}"
             print(
-                f"  - {row['key']}: observed={row['observed']:.3f} > ceiling={row['ceiling']:.3f} "
-                f"(baseline={row['baseline']:.3f}; delta={row['delta_pct']:.2f}%; "
-                f"source={row['source']}; metric={row['metric']}; json={row['source_path']})",
+                f"  - {row['key']}: {observed_str} "
+                f"(baseline={row.get('baseline')}; delta={row.get('delta_pct')}%; "
+                f"source={row['source']}; metric={row['metric']}; json={row.get('source_path')})",
                 file=sys.stderr,
             )
         if exit_code != 1:

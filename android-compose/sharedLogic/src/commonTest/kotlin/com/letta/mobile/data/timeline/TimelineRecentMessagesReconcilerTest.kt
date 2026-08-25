@@ -454,6 +454,158 @@ class TimelineRecentMessagesReconcilerTest {
         assertEquals(2, transport.listCalls)
     }
 
+    @Test
+    fun multipleStrongerWaitersShareOneScopedSuccessor() = runTest(UnconfinedTestDispatcher()) {
+        val transport = RecordingTimelineTransport()
+        val queue = Channel<TimelineGatewayEvent>(Channel.UNLIMITED).also { q ->
+            backgroundScope.launch {
+                for (event in q) {
+                    if (event is TimelineGatewayEvent.RecentMessagesSnapshot) {
+                        event.ack.complete(event.serverMessages.size)
+                    }
+                }
+            }
+        }
+        val reconciler = TimelineRecentMessagesReconciler(
+            conversationId = "conv-1",
+            messageApi = transport,
+            eventQueue = queue,
+            state = MutableStateFlow(Timeline("conv-1")),
+            streamSubscriberActive = MutableStateFlow(false),
+            writeMutex = Mutex(),
+            applyReturnsAndResponsesFromSnapshot = {},
+            scope = backgroundScope,
+        )
+
+        val firstEntered = CompletableDeferred<Unit>()
+        val releaseFirst = CompletableDeferred<Unit>()
+        var callCount = 0
+        transport.onListEntered = {
+            callCount++
+            if (callCount == 1) {
+                firstEntered.complete(Unit)
+                releaseFirst.await()
+            }
+        }
+
+        // 1. Weak owner flight starts
+        val weakOwner = async { reconciler.reconcileRecentMessages("weak_open", forceRefresh = false, connectionGeneration = 1L) }
+        firstEntered.await()
+
+        // 2. Three forced waiters join concurrently
+        val strongWaiter1 = async { reconciler.reconcileRecentMessages("strong_1", forceRefresh = true, connectionGeneration = 1L) }
+        val strongWaiter2 = async { reconciler.reconcileRecentMessages("strong_2", forceRefresh = true, connectionGeneration = 1L) }
+        val strongWaiter3 = async { reconciler.reconcileRecentMessages("strong_3", forceRefresh = true, connectionGeneration = 1L) }
+
+        // 3. Release weak flight
+        releaseFirst.complete(Unit)
+
+        val rWeak = weakOwner.await()
+        val rStrong1 = strongWaiter1.await()
+        val rStrong2 = strongWaiter2.await()
+        val rStrong3 = strongWaiter3.await()
+
+        assertEquals(Applied(1), rWeak)
+        assertEquals(Applied(1), rStrong1)
+        assertEquals(Applied(1), rStrong2)
+        assertEquals(Applied(1), rStrong3)
+
+        // Exactly two network calls total: weak owner + single shared forced successor
+        assertEquals(2, transport.listCalls)
+    }
+
+    @Test
+    fun delayedOlderForcedRequestRejectedAndCannotDisplaceNewerGeneration() = runTest(UnconfinedTestDispatcher()) {
+        val transport = RecordingTimelineTransport()
+        val queue = Channel<TimelineGatewayEvent>(Channel.UNLIMITED)
+        val reconciler = TimelineRecentMessagesReconciler(
+            conversationId = "conv-1",
+            messageApi = transport,
+            eventQueue = queue,
+            state = MutableStateFlow(Timeline("conv-1")),
+            streamSubscriberActive = MutableStateFlow(false),
+            writeMutex = Mutex(),
+            applyReturnsAndResponsesFromSnapshot = {},
+            scope = backgroundScope,
+        )
+        backgroundScope.launch {
+            for (event in queue) {
+                if (event is TimelineGatewayEvent.RecentMessagesSnapshot) {
+                    reconciler.applyRecentMessagesSnapshot(event)
+                }
+            }
+        }
+
+        // 1. Run generation 2 request successfully
+        val gen2Outcome = reconciler.reconcileRecentMessages("gen2_open", forceRefresh = false, connectionGeneration = 2L)
+        assertEquals(Applied(1), gen2Outcome)
+        assertEquals(1, transport.listCalls)
+
+        // 2. Delayed generation 1 forced request arrives
+        val gen1Outcome = reconciler.reconcileRecentMessages("delayed_gen1", forceRefresh = true, connectionGeneration = 1L)
+        assertEquals(RecentMessagesReconcileOutcome.Skipped("staleGeneration"), gen1Outcome)
+
+        // No new network call was initiated for gen 1
+        assertEquals(1, transport.listCalls)
+
+        // 3. Subsequent generation 2 resume uses freshness
+        val gen2Resume = reconciler.reconcileRecentMessages("screen_resumed", forceRefresh = false, connectionGeneration = 2L)
+        assertEquals(Applied(1), gen2Resume)
+        assertEquals(1, transport.listCalls)
+    }
+
+    @Test
+    fun tableDrivenReconcileFlightKeyIsolation() {
+        val base = TimelineRecentMessagesReconciler.ReconcileFlightKey(
+            backendId = "b1",
+            agentId = "a1",
+            conversationId = "c1",
+            connectionGeneration = 1L,
+            limit = 250,
+            order = "desc",
+            allowWhileStreamActive = false,
+        )
+        val identical = base.copy()
+        assertEquals(base, identical)
+
+        val diffBackend = base.copy(backendId = "b2")
+        val diffAgent = base.copy(agentId = "a2")
+        val diffConv = base.copy(conversationId = "c2")
+        val diffGen = base.copy(connectionGeneration = 2L)
+        val diffLimit = base.copy(limit = 100)
+        val diffOrder = base.copy(order = "asc")
+        val diffForce = base.copy(allowWhileStreamActive = true)
+
+        assertTrue(base != diffBackend)
+        assertTrue(base != diffAgent)
+        assertTrue(base != diffConv)
+        assertTrue(base != diffGen)
+        assertTrue(base != diffLimit)
+        assertTrue(base != diffOrder)
+        assertTrue(base != diffForce)
+    }
+
+    @Test
+    fun concurrentFreshnessInvalidationsAtomic() = runTest(UnconfinedTestDispatcher()) {
+        val reconciler = TimelineRecentMessagesReconciler(
+            conversationId = "conv-1",
+            messageApi = RecordingTimelineTransport(),
+            eventQueue = Channel(),
+            state = MutableStateFlow(Timeline("conv-1")),
+            streamSubscriberActive = MutableStateFlow(false),
+            writeMutex = Mutex(),
+            applyReturnsAndResponsesFromSnapshot = {},
+            scope = backgroundScope,
+        )
+
+        val jobs = (1..50).map {
+            launch {
+                reconciler.invalidateFreshnessAtomic()
+            }
+        }
+        jobs.forEach { it.join() }
+    }
+
     private class RecordingTimelineTransport : TimelineTransport {
         var listCalls = 0
         var onListEntered: suspend () -> Unit = {}

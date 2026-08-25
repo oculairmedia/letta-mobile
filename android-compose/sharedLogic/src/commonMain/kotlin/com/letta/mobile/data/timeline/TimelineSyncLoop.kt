@@ -125,6 +125,8 @@ class TimelineSyncLoop(
         },
         scope = loopScope,
         onSnapshotApplied = { scheduleSnapshotPersist(immediate = true) },
+        backendId = timelineScope?.backendId ?: "default",
+        agentId = timelineScope?.agentId,
     )
 
     private val hydrator = TimelineHydrator(
@@ -455,10 +457,12 @@ class TimelineSyncLoop(
                     is TimelineGatewayEvent.LocalSendAppend -> {
                         recentMessagesReconciler.invalidateFreshness()
                         stateTransitionHandler.applyLocalSendAppend(event)
+                        scheduleSnapshotPersist(immediate = true)
                     }
                     is TimelineGatewayEvent.ExternalTransportLocalAppend -> {
                         recentMessagesReconciler.invalidateFreshness()
                         externalTransportAppender.applyExternalTransportLocalAppend(event)
+                        scheduleSnapshotPersist(immediate = true)
                     }
                     is TimelineGatewayEvent.ReconcileAfterSendSnapshot -> {
                         applyReconcileAfterSendSnapshot(event)
@@ -469,10 +473,20 @@ class TimelineSyncLoop(
                     is TimelineGatewayEvent.RetrySend -> {
                         recentMessagesReconciler.invalidateFreshness()
                         stateTransitionHandler.applyRetrySend(event)
+                        scheduleSnapshotPersist(immediate = true)
                     }
-                    is TimelineGatewayEvent.MarkSent -> stateTransitionHandler.applyMarkSent(event)
-                    is TimelineGatewayEvent.MarkFailed -> stateTransitionHandler.applyMarkFailed(event)
-                    is TimelineGatewayEvent.CleanupAbandonedAssistantFragments -> applyCleanupAbandonedAssistantFragments(event)
+                    is TimelineGatewayEvent.MarkSent -> {
+                        stateTransitionHandler.applyMarkSent(event)
+                        scheduleSnapshotPersist(immediate = true)
+                    }
+                    is TimelineGatewayEvent.MarkFailed -> {
+                        stateTransitionHandler.applyMarkFailed(event)
+                        scheduleSnapshotPersist(immediate = true)
+                    }
+                    is TimelineGatewayEvent.CleanupAbandonedAssistantFragments -> {
+                        applyCleanupAbandonedAssistantFragments(event)
+                        scheduleSnapshotPersist(immediate = true)
+                    }
                 }
             } catch (cancelled: CancellationException) {
                 completeGatewayEventExceptionally(event, cancelled)
