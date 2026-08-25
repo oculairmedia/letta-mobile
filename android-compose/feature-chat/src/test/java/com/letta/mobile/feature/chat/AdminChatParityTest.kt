@@ -11,6 +11,7 @@ import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.feature.chat.coordination.ChatConversationCoordinator
 import com.letta.mobile.feature.chat.coordination.ChatSessionResolver
+import com.letta.mobile.feature.chat.coordination.RecentMessagesReconcileLauncher
 import com.letta.mobile.testutil.TestData
 import io.mockk.coEvery
 import io.mockk.every
@@ -264,7 +265,10 @@ class AdminChatParityTest {
             currentClientModeConversationId = { null },
             startTimelineObserver = {},
             stopTimelineObserver = {},
-            reconcileRecentMessages = { _ -> },
+            recentMessagesReconcileLauncher = RecentMessagesReconcileLauncher(
+                scope = scope,
+                reconcile = { },
+            ),
             sendMessageViaClientMode = {},
             sendMessageViaTimeline = {},
             markFollowingDuplicateInitialMessageInFlight = {},

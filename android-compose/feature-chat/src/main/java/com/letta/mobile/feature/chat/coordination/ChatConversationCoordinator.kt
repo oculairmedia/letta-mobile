@@ -69,7 +69,7 @@ internal class ChatConversationCoordinator(
     // this the cached TimelineSyncLoop (warm-started by resume-most-
     // recent / notification paths) serves stale state until the user's
     // first send triggers the post-turn_done reconcile.
-    private val reconcileRecentMessages: suspend (RecentMessagesReconcileRequest) -> Unit,
+    private val recentMessagesReconcileLauncher: RecentMessagesReconcileLauncher,
     private val sendMessageViaClientMode: (String) -> Unit,
     private val sendMessageViaTimeline: (String) -> Unit,
     private val markFollowingDuplicateInitialMessageInFlight: () -> Unit,
@@ -466,7 +466,7 @@ internal class ChatConversationCoordinator(
                 hasMoreOlderMessages = false,
             )
             startTimelineObserver(requestedConversationId)
-            launchRecentMessagesReconcile()
+            recentMessagesReconcileLauncher.launch(ConversationOpenReconcileRequest(requestedConversationId))
             loadTimer.stop(
                 "conversationId" to requestedConversationId,
                 "mode" to "timeline",
@@ -486,30 +486,6 @@ internal class ChatConversationCoordinator(
             uiState.value = uiState.value.copy(
                 isLoadingOlderMessages = false,
             )
-        }
-    }
-
-    private fun launchRecentMessagesReconcile() {
-        val conversationId = activeConversationId ?: return
-        scope.launch {
-            val generation = hydrationGeneration(conversationId)
-            generation?.let { ChatHydrationTrace.reconcileStarted(it, reason = "open") }
-            runCatching {
-                reconcileRecentMessages(
-                    RecentMessagesReconcileRequest(
-                        conversationId = conversationId,
-                        reason = "open",
-                        connectionGeneration = generation?.id ?: 0L,
-                    ),
-                )
-            }.onSuccess {
-                generation?.let { ChatHydrationTrace.reconcileCompleted(it, reason = "open") }
-            }.onFailure { error ->
-                Telemetry.error(
-                    "AdminChatVM", "loadMessages.reconcileOnOpenFailed", error,
-                    "conversationId" to conversationId,
-                )
-            }
         }
     }
 
