@@ -77,6 +77,7 @@ import com.letta.mobile.feature.chat.coordination.ChatComposerState
 import com.letta.mobile.feature.chat.coordination.ChatConversationCoordinator
 import com.letta.mobile.feature.chat.coordination.ChatHistoryPager
 import com.letta.mobile.feature.chat.coordination.ChatHydrationTrace
+import com.letta.mobile.feature.chat.coordination.RecentMessagesReconcileLauncher
 import com.letta.mobile.feature.chat.coordination.ChatProjectBindings
 import com.letta.mobile.feature.chat.coordination.ChatRunExpansionState
 import com.letta.mobile.feature.chat.coordination.ChatSearchCoordinator
@@ -571,15 +572,18 @@ internal class AdminChatViewModel @Inject constructor(
         currentClientModeConversationId = { null },
         startTimelineObserver = ::startTimelineObserver,
         stopTimelineObserver = ::stopTimelineObserver,
-        reconcileRecentMessages = { request ->
-            timelineRepository.reconcileRecentMessages(
-                agentId = agentId.value,
-                conversationId = request.conversationId,
-                reason = request.reason,
-                forceRefresh = false,
-                connectionGeneration = request.connectionGeneration,
-            )
-        },
+        recentMessagesReconcileLauncher = RecentMessagesReconcileLauncher(
+            scope = viewModelScope,
+            reconcile = { request ->
+                timelineRepository.reconcileRecentMessages(
+                    agentId = agentId.value,
+                    conversationId = request.conversationId,
+                    reason = request.reason,
+                    forceRefresh = false,
+                    connectionGeneration = request.connectionGeneration,
+                )
+            },
+        ),
         sendMessageViaClientMode = { message ->
             sendPipeline.timelineChatSendStrategy.send(
                 text = message,
