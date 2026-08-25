@@ -295,4 +295,3 @@ object ModelCatalogNormalizer {
         return if (rank < 0) 0 else (PROVIDER_RANK.size - rank)
     }
 }
-

@@ -253,7 +253,6 @@ open class LettaHttpChatGateway(
             ?.takeIf { it.isNotBlank() }
             ?.let(::bearerAuth)
     }
-
 }
 
 private suspend fun HttpResponse.requireSuccess() {

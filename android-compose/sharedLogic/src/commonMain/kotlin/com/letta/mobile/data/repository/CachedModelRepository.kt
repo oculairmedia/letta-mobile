@@ -57,4 +57,3 @@ open class CachedModelRepository(
         _embeddingModels.update { remote.listEmbeddingModels() }
     }
 }
-

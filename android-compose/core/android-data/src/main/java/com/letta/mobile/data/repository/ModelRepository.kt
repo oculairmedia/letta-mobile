@@ -16,4 +16,3 @@ open class ModelRepository(
     settingsRepository = settingsRepository,
     irohModelSource = irohModelSource,
 )
-
