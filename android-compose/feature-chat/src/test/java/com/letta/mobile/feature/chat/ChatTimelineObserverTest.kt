@@ -744,6 +744,31 @@ class ChatTimelineObserverTest {
     }
 
     @Test
+    fun `reconcile error presence clear collapses the terminal run`() = runTest {
+        val harness = Harness(backgroundScope, activeReplyConversationIds = setOf("conv-1"))
+        harness.seedTimeline(
+            "conv-1",
+            listOf(
+                confirmed("e-10", "go"),
+                confirmed("e-20", "partial answer", TimelineMessageType.ASSISTANT, runId = "run-error"),
+            ),
+        )
+
+        harness.observer.start("conv-1")
+        runCurrent()
+        assertTrue(harness.uiState.value.isStreaming)
+        assertFalse(harness.uiState.value.collapsedRunIds.contains("run-error"))
+
+        harness.emitSyncEvent(TimelineSyncEvent.ReconcileError("sync failed"))
+        runCurrent()
+
+        assertFalse(harness.uiState.value.isStreaming)
+        assertFalse(harness.uiState.value.isAgentTyping)
+        assertEquals("Couldn't sync agent reply — pull to refresh", harness.uiState.value.error)
+        assertTrue(harness.uiState.value.collapsedRunIds.contains("run-error"))
+    }
+
+    @Test
     fun `terminal run collapses even when a newer turn starts before presence clears`() = runTest {
         // Ordering regression: run-1's terminal projection landed while the
         // streaming edge was consumed by a later turn. The old newest-run-only,

@@ -197,10 +197,14 @@ internal class ChatTimelineObserver(
                     // storm over every tool card. Telemetry was already emitted
                     // as uiProjection.suppressed by the presenter.
                     if (projection.noChange) {
-                        publishPresenceOnly(binding, projection, generation)
+                        publishPresenceOnly(binding, projection, generation)?.let {
+                            uiState.value = reconcileCollapsedRunsOnProjection(it.previous, it.next)
+                        }
                         return@collect
                     }
-                    publishProjection(binding, projection, generation)
+                    publishProjection(binding, projection, generation).let {
+                        uiState.value = reconcileCollapsedRunsOnProjection(it.previous, it.next)
+                    }
 
                     // letta-mobile-yflpp COALESCE: pace real updates to at most
                     // ~one per frame. conflate() already drops backlog while we
@@ -225,7 +229,22 @@ internal class ChatTimelineObserver(
         binding: TimelineObserverBinding,
         generation: ChatHydrationTrace.Generation?,
     ): Job = scope.launch {
-        loop.events.collect { event -> handleHydrationEvent(event, binding, generation) }
+        loop.events.collect { ev ->
+            when (ev) {
+                is TimelineSyncEvent.ReconcileError -> {
+                    val previous = uiState.value
+                    uiState.value = reconcileCollapsedRunsOnProjection(
+                        previous,
+                        previous.copy(
+                            error = "Couldn't sync agent reply — pull to refresh",
+                            isStreaming = false,
+                            isAgentTyping = false,
+                        ),
+                    )
+                }
+                else -> handleHydrationEvent(ev, binding, generation)
+            }
+        }
     }
 
     private fun handleHydrationEvent(
@@ -249,17 +268,6 @@ internal class ChatTimelineObserver(
                 awaitingProjectionAfterHydrate = false
                 uiState.value = uiState.value.copy(isLoadingMessages = false)
             }
-            is TimelineSyncEvent.ReconcileError -> {
-                val previous = uiState.value
-                uiState.value = reconcileCollapsedRunsOnProjection(
-                    previous,
-                    previous.copy(
-                        error = "Couldn't sync agent reply — pull to refresh",
-                        isStreaming = false,
-                        isAgentTyping = false,
-                    ),
-                )
-            }
             else -> Unit
         }
     }
@@ -268,7 +276,7 @@ internal class ChatTimelineObserver(
         binding: TimelineObserverBinding,
         projection: TimelineProjection,
         generation: ChatHydrationTrace.Generation?,
-    ) {
+    ): UiStatePublication {
         val ui = projection.ui
         val surfaces = syncA2uiHistorySnapshot(binding.conversationId, projection.a2uiMessages)
         val clearLoading = ui.isNotEmpty() || awaitingProjectionAfterHydrate
@@ -293,9 +301,9 @@ internal class ChatTimelineObserver(
         recordPresentation(
             PresentationRecord(generation, projection, previous, presentation.isStreaming, presentation.isAgentTyping),
         )
-        uiState.value = reconcileCollapsedRunsOnProjection(
-            previous,
-            previous.copy(
+        return UiStatePublication(
+            previous = previous,
+            next = previous.copy(
                 messages = ui,
                 messageListChange = projection.messageListChange,
                 a2uiSurfaces = surfaces.toPersistentMap(),
@@ -330,7 +338,7 @@ internal class ChatTimelineObserver(
         binding: TimelineObserverBinding,
         projection: TimelineProjection,
         generation: ChatHydrationTrace.Generation?,
-    ) {
+    ): UiStatePublication? {
         val previous = uiState.value
         if (isFollowingDuplicateInitialMessageInFlight() && projection.tailIsAssistant) {
             clearFollowingDuplicateInitialMessageInFlight()
@@ -350,7 +358,7 @@ internal class ChatTimelineObserver(
         )
         if (presentation.isStreaming == previous.isStreaming &&
             presentation.isAgentTyping == previous.isAgentTyping
-        ) return
+        ) return null
         generation?.let {
             ChatHydrationTrace.activityChanged(
                 it,
@@ -358,9 +366,9 @@ internal class ChatTimelineObserver(
                 reason = "presence_only",
             )
         }
-        uiState.value = reconcileCollapsedRunsOnProjection(
-            previous,
-            previous.copy(
+        return UiStatePublication(
+            previous = previous,
+            next = previous.copy(
                 isStreaming = presentation.isStreaming,
                 isAgentTyping = presentation.isAgentTyping,
             ),
@@ -415,6 +423,11 @@ internal class ChatTimelineObserver(
     /** Assistant-role reasoning or final-answer row (the model-output tail). */
     private fun UiMessage.isModelOutputRow(tailIsAssistant: Boolean): Boolean =
         role == "assistant" && (isReasoning || tailIsAssistant)
+
+    private data class UiStatePublication(
+        val previous: ChatUiState,
+        val next: ChatUiState,
+    )
 
     private data class PresentationRecord(
         val generation: ChatHydrationTrace.Generation?,
