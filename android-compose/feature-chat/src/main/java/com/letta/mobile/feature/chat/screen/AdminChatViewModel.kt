@@ -77,6 +77,7 @@ import com.letta.mobile.feature.chat.coordination.ChatComposerState
 import com.letta.mobile.feature.chat.coordination.ChatConversationCoordinator
 import com.letta.mobile.feature.chat.coordination.ChatHistoryPager
 import com.letta.mobile.feature.chat.coordination.ChatHydrationTrace
+import com.letta.mobile.feature.chat.coordination.ConversationAccessMode
 import com.letta.mobile.feature.chat.coordination.RecentMessagesReconcileLauncher
 import com.letta.mobile.feature.chat.coordination.ChatProjectBindings
 import com.letta.mobile.feature.chat.coordination.ChatRunExpansionState
@@ -212,7 +213,7 @@ internal class AdminChatViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Eagerly, shimBackendDetector.cachedActiveBackendKind())
     private var followingDuplicateInitialMessageInFlight = false
     val conversationId: ConversationId?
-        get() = chatConversationCoordinator.conversationId(false)?.let { ConversationId(it) }
+        get() = chatConversationCoordinator.conversationId(ConversationAccessMode.Timeline)?.let { ConversationId(it) }
     val projectContext: ProjectChatContext? = routeArgs.projectContext
 
     private val chatSessionResolver: ChatSessionResolver = ChatSessionResolver(
@@ -675,9 +676,11 @@ internal class AdminChatViewModel @Inject constructor(
 
     private fun resolveConversationAndLoad(
         useClientModeForResolve: Boolean = false,
-    ) = chatConversationCoordinator.resolveConversationAndLoad(useClientModeForResolve)
+    ) = chatConversationCoordinator.resolveConversationAndLoad(
+        if (useClientModeForResolve) ConversationAccessMode.Client else ConversationAccessMode.Timeline,
+    )
 
-    fun loadMessages() = chatConversationCoordinator.loadMessages(false)
+    fun loadMessages() = chatConversationCoordinator.loadMessages(ConversationAccessMode.Timeline)
 
     fun retryConversationLoad() {
         updateSessionState { current ->

@@ -4,6 +4,14 @@ import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
+internal enum class ConversationAccessMode { Client, Timeline }
+
+internal enum class ResolutionAttempt { Initial, Subsequent }
+
+internal enum class DuplicateInitialMessagePolicy { StageFreshClientDuplicate, SuppressDuplicate }
+
+internal enum class HydrationAvailability { Hydrated, NeedsLoading }
+
 internal data class RecentMessagesReconcileRequest(
     val conversationId: String,
     val reason: String,
