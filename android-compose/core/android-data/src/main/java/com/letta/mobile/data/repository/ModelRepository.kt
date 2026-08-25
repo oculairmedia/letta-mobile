@@ -10,11 +10,10 @@ open class ModelRepository(
     localModelSource: LocalRuntimeModelSource? = null,
     settingsRepository: ISettingsRepository? = null,
     irohModelSource: IrohAdminRpcModelSource? = null,
-    credentialedProviderTypes: (suspend () -> Set<String>)? = null,
 ) : CachedModelRepository(
     remote = modelApi,
     localModelSource = localModelSource,
     settingsRepository = settingsRepository,
     irohModelSource = irohModelSource,
-    credentialedProviderTypes = credentialedProviderTypes,
 )
+
