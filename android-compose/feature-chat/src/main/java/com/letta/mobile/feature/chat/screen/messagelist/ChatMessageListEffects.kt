@@ -52,8 +52,9 @@ internal enum class ChatRestorationState {
     FollowTail,
 }
 
-private class ChatViewportRestorationTracker(hasInitialItems: Boolean) {
-    var restorationState by mutableStateOf(initialRestorationState(hasInitialItems))
+private class ChatViewportRestorationTracker(params: ChatMessageListEffectsParams) {
+    val conversationId = (params.state.conversationState as? ConversationState.Ready)?.conversationId
+    var restorationState by mutableStateOf(initialRestorationState(params.renderItems.isNotEmpty()))
         private set
     var followLatest by mutableStateOf(true)
         private set
@@ -133,29 +134,28 @@ private fun ChatMessageListFocusClearEffect(listState: LazyListState) {
 @Composable
 private fun ChatMessageListViewportRestorationEffect(params: ChatMessageListEffectsParams) {
     val conversationId = (params.state.conversationState as? ConversationState.Ready)?.conversationId
-    val tracker = remember(conversationId) { ChatViewportRestorationTracker(params.renderItems.isNotEmpty()) }
+    val tracker = remember(conversationId) { ChatViewportRestorationTracker(params) }
     val sendScrollOffset = with(LocalDensity.current) { -ChatFadeEdgeLength.roundToPx() }
 
-    ChatMessageListRestorationCancellationEffect(params.listState, conversationId, tracker)
-    ChatMessageListSnapshotAvailabilityEffect(params, conversationId, tracker)
-    ChatMessageListInitialLayoutEffect(params, conversationId, tracker)
-    ChatMessageListViewportFollowEffect(params, conversationId, tracker)
+    ChatMessageListRestorationCancellationEffect(params.listState, tracker)
+    ChatMessageListSnapshotAvailabilityEffect(params, tracker)
+    ChatMessageListInitialLayoutEffect(params, tracker)
+    ChatMessageListViewportFollowEffect(params, tracker)
     ChatMessageListAutoScrollEffect(params, sendScrollOffset, tracker)
 }
 
 @Composable
 private fun ChatMessageListRestorationCancellationEffect(
     listState: LazyListState,
-    conversationId: String?,
     tracker: ChatViewportRestorationTracker,
 ) {
-    LaunchedEffect(listState.interactionSource, conversationId) {
+    LaunchedEffect(listState.interactionSource, tracker.conversationId) {
         listState.interactionSource.interactions.collect { interaction ->
             if (interaction is DragInteraction.Start) {
                 val cancelledPendingRestore = tracker.restorationState in PENDING_RESTORATION_STATES
                 tracker.onUserInteraction()
                 if (cancelledPendingRestore) {
-                    ChatHydrationTrace.current(conversationId)?.let { generation ->
+                    ChatHydrationTrace.current(tracker.conversationId)?.let { generation ->
                         ChatHydrationTrace.scrollInitialized(generation, correction = "user_controlled")
                     }
                 }
@@ -167,10 +167,9 @@ private fun ChatMessageListRestorationCancellationEffect(
 @Composable
 private fun ChatMessageListSnapshotAvailabilityEffect(
     params: ChatMessageListEffectsParams,
-    conversationId: String?,
     tracker: ChatViewportRestorationTracker,
 ) {
-    LaunchedEffect(params.renderItems.size, conversationId) {
+    LaunchedEffect(params.renderItems.size, tracker.conversationId) {
         if (params.renderItems.isNotEmpty()) tracker.onSnapshotAvailable()
     }
 }
@@ -178,30 +177,28 @@ private fun ChatMessageListSnapshotAvailabilityEffect(
 @Composable
 private fun ChatMessageListInitialLayoutEffect(
     params: ChatMessageListEffectsParams,
-    conversationId: String?,
     tracker: ChatViewportRestorationTracker,
 ) {
-    LaunchedEffect(params.listState, params.renderItems.size, conversationId) {
+    LaunchedEffect(params.listState, params.renderItems.size, tracker.conversationId) {
         snapshotFlow { params.listState.layoutInfo.totalItemsCount }
             .distinctUntilChanged()
-            .collect { totalCount -> restoreInitialLayoutIfReady(params.listState, totalCount, conversationId, tracker) }
+            .collect { totalCount -> restoreInitialLayoutIfReady(params.listState, totalCount, tracker) }
     }
 }
 
 private suspend fun restoreInitialLayoutIfReady(
     listState: LazyListState,
     totalCount: Int,
-    conversationId: String?,
     tracker: ChatViewportRestorationTracker,
 ) {
     if (totalCount <= 0 || tracker.restorationState != ChatRestorationState.AwaitingFirstLayout) return
-    val anchor = conversationId?.let(conversationViewportAnchors::get) ?: ViewportAnchor(0, 0, true)
+    val anchor = tracker.conversationId?.let(conversationViewportAnchors::get) ?: ViewportAnchor(0, 0, true)
     val targetIndex = anchor.index.coerceAtMost(totalCount - 1)
     if (listState.firstVisibleItemIndex != targetIndex || listState.firstVisibleItemScrollOffset != anchor.scrollOffset) {
         listState.scrollToItem(targetIndex, anchor.scrollOffset)
     }
     tracker.onInitialLayoutRestored(anchor.followTail)
-    ChatHydrationTrace.current(conversationId)?.let { generation ->
+    ChatHydrationTrace.current(tracker.conversationId)?.let { generation ->
         ChatHydrationTrace.scrollInitialized(generation, correction = "initial_restore")
     }
 }
@@ -209,10 +206,9 @@ private suspend fun restoreInitialLayoutIfReady(
 @Composable
 private fun ChatMessageListViewportFollowEffect(
     params: ChatMessageListEffectsParams,
-    conversationId: String?,
     tracker: ChatViewportRestorationTracker,
 ) {
-    LaunchedEffect(params.listState, params.isUserScrolling, params.renderItems.size, conversationId) {
+    LaunchedEffect(params.listState, params.isUserScrolling, params.renderItems.size, tracker.conversationId) {
         snapshotFlow { params.listState.toChatViewportSnapshot(params.isUserScrolling, params.renderItems.size) }
             .distinctUntilChanged()
             .collect { snapshot ->
@@ -222,17 +218,17 @@ private fun ChatMessageListViewportFollowEffect(
                         snapshot = snapshot,
                     ),
                 )
-                persistViewportAnchorIfRestored(params.listState, conversationId, tracker)
+                persistViewportAnchorIfRestored(params.listState, tracker)
             }
     }
 }
 
 private fun persistViewportAnchorIfRestored(
     listState: LazyListState,
-    conversationId: String?,
     tracker: ChatViewportRestorationTracker,
 ) {
-    if (conversationId == null || tracker.restorationState in PENDING_RESTORATION_STATES) return
+    val conversationId = tracker.conversationId ?: return
+    if (tracker.restorationState in PENDING_RESTORATION_STATES) return
     conversationViewportAnchors[conversationId] = ViewportAnchor(
         index = listState.firstVisibleItemIndex,
         scrollOffset = listState.firstVisibleItemScrollOffset,
