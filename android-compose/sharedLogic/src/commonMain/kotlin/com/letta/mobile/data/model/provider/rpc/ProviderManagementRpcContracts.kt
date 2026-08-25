@@ -5,6 +5,7 @@ package com.letta.mobile.data.model.provider.rpc
  */
 object ProviderRpcMethods {
     const val CONTRACT_NAME = "provider_management_v1"
+    const val CONTRACT_VERSION = 1
 
     const val PROVIDER_DEFINITION_LIST = "provider.definition.list"
     const val PROVIDER_INSTANCE_LIST = "provider.instance.list"

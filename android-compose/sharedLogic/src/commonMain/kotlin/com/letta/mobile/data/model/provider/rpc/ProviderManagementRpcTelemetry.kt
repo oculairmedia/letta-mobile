@@ -17,7 +17,7 @@ data class ProviderRpcTelemetryEvent(
 ) {
     override fun toString(): String =
         "ProviderRpcTelemetryEvent(method=$method, hostId=${hostId.value}, outcome=$outcome, " +
-            "peerId=$peerId, errorCode=$errorCode)"
+            "peerId=<redacted>, errorCode=$errorCode)"
 }
 
 object ProviderManagementRpcTelemetry {
@@ -28,10 +28,25 @@ object ProviderManagementRpcTelemetry {
         outcome: String,
         errorCode: String? = null,
     ): ProviderRpcTelemetryEvent = ProviderRpcTelemetryEvent(
-        method = method,
+        method = method.takeIf(ProviderRpcMethods.ALL_METHODS::contains) ?: "<unknown>",
         hostId = auth.activeHostId,
         peerId = auth.peerId,
-        outcome = outcome,
-        errorCode = errorCode,
+        outcome = outcome.takeIf(ALLOWED_OUTCOMES::contains) ?: "unknown",
+        errorCode = errorCode?.takeIf(::isSafeErrorCode) ?: errorCode?.let { "UNKNOWN" },
     )
+
+    private val ALLOWED_OUTCOMES = setOf("allowed", "denied", "unavailable", "failed", "succeeded")
+    private val ALLOWED_ERROR_CODES = setOf(
+        "UNAUTHORIZED",
+        "HOST_MISMATCH",
+        "UNKNOWN_METHOD",
+        "UNSUPPORTED_CONTRACT_VERSION",
+        "CAPABILITY_UNAVAILABLE",
+        "CAPABILITY_DENIED",
+        "VALIDATION_FAILED",
+        "MALFORMED_RESPONSE",
+        "TRANSPORT_FAILURE",
+    )
+
+    private fun isSafeErrorCode(value: String): Boolean = value in ALLOWED_ERROR_CODES
 }

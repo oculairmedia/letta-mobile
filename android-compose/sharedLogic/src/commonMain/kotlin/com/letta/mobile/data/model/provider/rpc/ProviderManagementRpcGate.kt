@@ -2,70 +2,67 @@ package com.letta.mobile.data.model.provider.rpc
 
 import com.letta.mobile.data.model.HostId
 
-/**
- * Reasons why an RPC request was rejected at the authorization/capability gate.
- */
+/** Reasons why an inbound RPC request was rejected before handler execution. */
 sealed interface RpcDenialReason {
     data object Unauthenticated : RpcDenialReason
     data class HostMismatch(val expectedHostId: HostId, val actualHostId: HostId) : RpcDenialReason
     data class MissingCapability(val required: ProviderManagementCapability) : RpcDenialReason
-    data class UnknownMethod(val method: String) : RpcDenialReason
+    data object UnknownMethod : RpcDenialReason
+    data class UnsupportedContractVersion(val requestedVersion: Int) : RpcDenialReason
+    data class CapabilityUnavailable(val method: String) : RpcDenialReason
 }
 
-/**
- * Result of evaluating an RPC request at the gate.
- */
 sealed interface RpcGateDecision {
     data class Denied(val reason: RpcDenialReason) : RpcGateDecision
-
-    /**
-     * Authorized peer and scope, but host has not yet mounted a concrete storage/execution handler.
-     * Guaranteed to return typed capability-unavailable rather than fabricating empty/success.
-     */
-    data class Unimplemented(
-        val method: String,
-        val errorCode: String = "CAPABILITY_UNAVAILABLE",
-        val message: String = "Method '$method' is declared in provider_management_v1 but unavailable on this host",
-    ) : RpcGateDecision
+    data class Allowed(val method: String, val contractVersion: Int) : RpcGateDecision
 }
 
-/**
- * Pure authorization and scope gate for the provider_management_v1 RPC protocol.
- */
+/** Pure authorization, version, capability, and handler-availability gate. */
 object ProviderManagementRpcGate {
 
     fun evaluate(
-        method: String,
-        targetHostId: HostId,
+        request: ProviderRpcGateRequest,
         auth: ProviderRpcAuthContext,
+        availableMethods: Set<String>,
     ): RpcGateDecision {
         if (!auth.isAuthenticated) {
             return RpcGateDecision.Denied(RpcDenialReason.Unauthenticated)
         }
-
-        if (targetHostId != auth.activeHostId) {
+        if (request.targetHostId != auth.activeHostId) {
             return RpcGateDecision.Denied(
                 RpcDenialReason.HostMismatch(
                     expectedHostId = auth.activeHostId,
-                    actualHostId = targetHostId,
+                    actualHostId = request.targetHostId,
                 ),
             )
         }
-
-        if (!ProviderRpcMethods.ALL_METHODS.contains(method)) {
-            return RpcGateDecision.Denied(RpcDenialReason.UnknownMethod(method))
+        if (request.method !in ProviderRpcMethods.ALL_METHODS) {
+            return RpcGateDecision.Denied(RpcDenialReason.UnknownMethod)
+        }
+        if (request.contractVersion != ProviderRpcMethods.CONTRACT_VERSION) {
+            return RpcGateDecision.Denied(
+                RpcDenialReason.UnsupportedContractVersion(request.contractVersion),
+            )
         }
 
-        val requiredCapability = if (ProviderRpcMethods.isWriteMethod(method)) {
+        val requiredCapability = if (ProviderRpcMethods.isWriteMethod(request.method)) {
             ProviderManagementCapability.Write
         } else {
             ProviderManagementCapability.Read
         }
-
         if (!auth.hasCapability(requiredCapability)) {
             return RpcGateDecision.Denied(RpcDenialReason.MissingCapability(requiredCapability))
         }
-
-        return RpcGateDecision.Unimplemented(method = method)
+        if (request.method !in availableMethods) {
+            return RpcGateDecision.Denied(RpcDenialReason.CapabilityUnavailable(request.method))
+        }
+        return RpcGateDecision.Allowed(request.method, request.contractVersion)
     }
 }
+
+/** Secret-free gate metadata parsed before any request body is decoded or handled. */
+data class ProviderRpcGateRequest(
+    val method: String,
+    val contractVersion: Int,
+    val targetHostId: HostId,
+)

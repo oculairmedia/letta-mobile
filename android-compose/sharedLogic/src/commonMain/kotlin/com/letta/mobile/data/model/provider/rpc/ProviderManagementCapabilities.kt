@@ -20,6 +20,8 @@ sealed interface ProviderManagementCapability {
 
     data class Unknown(val raw: String) : ProviderManagementCapability {
         override val wireName: String get() = raw
+
+        override fun toString(): String = "Unknown(<redacted>)"
     }
 
     companion object {
@@ -43,4 +45,8 @@ data class ProviderRpcAuthContext(
 
     fun hasCapability(capability: ProviderManagementCapability): Boolean =
         grantedCapabilities.contains(capability)
+
+    override fun toString(): String =
+        "ProviderRpcAuthContext(activeHostId=${activeHostId.value}, peerId=<redacted>, " +
+            "grantedCapabilityCount=${grantedCapabilities.size})"
 }

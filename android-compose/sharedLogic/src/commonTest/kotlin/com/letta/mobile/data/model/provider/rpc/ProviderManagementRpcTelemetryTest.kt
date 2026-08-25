@@ -26,7 +26,23 @@ class ProviderManagementRpcTelemetryTest {
         assertFalse(str.contains(secretSentinel))
         assertFalse(str.contains("apiKey", ignoreCase = true))
         assertFalse(str.contains("body", ignoreCase = true))
+        assertFalse(str.contains("peer-1"))
         assertTrue(str.contains("provider.credential.replace"))
         assertTrue(str.contains("UNAUTHORIZED"))
+    }
+
+    @Test
+    fun untrustedTelemetryLabelsAreCanonicalizedBeforeLogging() {
+        val event = ProviderManagementRpcTelemetry.createEvent(
+            auth = ProviderRpcAuthContext(HostId("host-1"), peerId = secretSentinel),
+            method = secretSentinel,
+            outcome = secretSentinel,
+            errorCode = secretSentinel,
+        )
+
+        val rendered = event.toString()
+        assertFalse(rendered.contains(secretSentinel))
+        assertTrue(rendered.contains("method=<unknown>"))
+        assertTrue(rendered.contains("errorCode=UNKNOWN"))
     }
 }

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.model.provider.rpc
 
+import com.letta.mobile.data.model.provider.wire.PROVIDER_MANAGEMENT_CONTRACT_VERSION
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -7,6 +8,12 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class ProviderManagementRpcInventoryTest {
+
+    @Test
+    fun rpcAndWireContractVersionsCannotDrift() {
+        assertEquals(PROVIDER_MANAGEMENT_CONTRACT_VERSION, ProviderRpcMethods.CONTRACT_VERSION)
+        assertEquals("provider_management_v1", ProviderRpcMethods.CONTRACT_NAME)
+    }
 
     @Test
     fun methodInventoryContainsExactExpectedMethods() {
