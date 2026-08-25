@@ -119,7 +119,7 @@ internal class ConnectCommand : AdminShimCommand(
             val resolvedConversationId = requireConversationId(conversation)
             cursorStore.record(resolvedConversationId, resolvedRunId, resumeCursor ?: 0)
         }
-        val transport = ChannelTransport(cursorStore)
+        val transport = ChannelTransport(this, cursorStore)
         val bridge = WsChatBridge(transport)
         val collector = launch {
             transport.events.collect { frame -> println("[frame] ${frame.typeName()}") }
@@ -494,7 +494,7 @@ internal class DisconnectCommand : AdminShimCommand(
     help = "Open the admin-shim WS and close it cleanly with bye.",
 ) {
     override fun run() = runBlocking {
-        val transport = ChannelTransport(RunCursorStore.inMemory())
+        val transport = ChannelTransport(this, RunCursorStore.inMemory())
         val bridge = WsChatBridge(transport)
         bridge.connect(baseUrl, token, deviceId, clientVersion)
         withTimeout(5.seconds) {
@@ -522,7 +522,7 @@ internal class ReconnectCommand : AdminShimCommand(
         if (conversationId != null && runId != null && cursor > 0) {
             cursorStore.record(conversationId, runId.orEmpty(), cursor)
         }
-        val transport = ChannelTransport(cursorStore)
+        val transport = ChannelTransport(this, cursorStore)
         val bridge = WsChatBridge(transport)
         val collector = launch {
             transport.events.collect { frame -> println("[frame] ${frame.typeName()}") }

@@ -7,8 +7,6 @@ import com.letta.mobile.data.timeline.NoOpConversationCursorStore
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,8 +29,6 @@ import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import java.time.Instant
 import java.util.UUID
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * client for the admin-shim's `/shim/v1/mobile` WebSocket.
@@ -42,30 +38,11 @@ import javax.inject.Singleton
  * - [CursorResumeCoordinator] (resuming runs, sequence cursor tracking)
  * - [WebSocketConnection] (OkHttp socket lifecycle & reconnect redialing)
  */
-internal fun defaultChannelTransportScope(): CoroutineScope =
-    CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
-@Singleton
-class ChannelTransport internal constructor(
+class ChannelTransport(
     private val scope: CoroutineScope,
     cursorStore: RunCursorStore,
-    conversationCursorStore: ConversationCursorStore,
+    conversationCursorStore: ConversationCursorStore = NoOpConversationCursorStore,
 ) : IChannelTransport {
-    @Inject
-    constructor(
-        cursorStore: RunCursorStore,
-        conversationCursorStore: ConversationCursorStore,
-    ) : this(
-        defaultChannelTransportScope(),
-        cursorStore,
-        conversationCursorStore,
-    )
-
-    constructor(cursorStore: RunCursorStore) : this(
-        defaultChannelTransportScope(),
-        cursorStore,
-        NoOpConversationCursorStore,
-    )
 
     private val json = Json {
         ignoreUnknownKeys = true
