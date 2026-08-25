@@ -571,8 +571,14 @@ internal class AdminChatViewModel @Inject constructor(
         currentClientModeConversationId = { null },
         startTimelineObserver = ::startTimelineObserver,
         stopTimelineObserver = ::stopTimelineObserver,
-        reconcileRecentMessages = { convId, reason, gen ->
-            timelineRepository.reconcileRecentMessages(agentId.value, convId, reason, forceRefresh = false, connectionGeneration = gen)
+        reconcileRecentMessages = { request ->
+            timelineRepository.reconcileRecentMessages(
+                agentId = agentId.value,
+                conversationId = request.conversationId,
+                reason = request.reason,
+                forceRefresh = false,
+                connectionGeneration = request.connectionGeneration,
+            )
         },
         sendMessageViaClientMode = { message ->
             sendPipeline.timelineChatSendStrategy.send(

@@ -40,6 +40,12 @@ private sealed interface ClientModeBootstrapState {
  * the fragile active-conversation/fresh-route/client-mode bootstrap state in one
  * place so send/search/project collaborators can be wired around a stable seam.
  */
+internal data class RecentMessagesReconcileRequest(
+    val conversationId: String,
+    val reason: String,
+    val connectionGeneration: Long,
+)
+
 internal class ChatConversationCoordinator(
     private val scope: CoroutineScope,
     private val agentId: String,
@@ -69,7 +75,7 @@ internal class ChatConversationCoordinator(
     // this the cached TimelineSyncLoop (warm-started by resume-most-
     // recent / notification paths) serves stale state until the user's
     // first send triggers the post-turn_done reconcile.
-    private val reconcileRecentMessages: suspend (String, String, Long) -> Unit,
+    private val reconcileRecentMessages: suspend (RecentMessagesReconcileRequest) -> Unit,
     private val sendMessageViaClientMode: (String) -> Unit,
     private val sendMessageViaTimeline: (String) -> Unit,
     private val markFollowingDuplicateInitialMessageInFlight: () -> Unit,
@@ -477,7 +483,13 @@ internal class ChatConversationCoordinator(
                 val generation = hydrationGeneration(requestedConversationId)
                 generation?.let { ChatHydrationTrace.reconcileStarted(it, reason = "open") }
                 runCatching {
-                    reconcileRecentMessages(requestedConversationId, "open", generation?.id ?: 0L)
+                    reconcileRecentMessages(
+                        RecentMessagesReconcileRequest(
+                            conversationId = requestedConversationId,
+                            reason = "open",
+                            connectionGeneration = generation?.id ?: 0L,
+                        ),
+                    )
                 }.onSuccess {
                     generation?.let { trace -> ChatHydrationTrace.reconcileCompleted(trace, reason = "open") }
                 }.onFailure {

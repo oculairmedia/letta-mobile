@@ -27,6 +27,7 @@
       "tolerance_pct": 20,
       "source": "StartupBenchmark.coldStartupCompilationPartial",
       "metric": "timeToInitialDisplayMs",
+      "min_samples": 10,
       "notes": [
         "Cold startup uses a +20% envelope on the shared GitHub Actions API 33 emulator because repeated healthy PR runs measured bounded cold-start drift up to +17.2% over seed (1512.749 ms -> 1772.844 ms)."
       ]
@@ -36,11 +37,11 @@
       "tolerance_pct": 20,
       "source": "StartupBenchmark.warmStartup",
       "metric": "timeToInitialDisplayMs",
-      "gate": false,
+      "min_samples": 10,
       "notes": [
         "Startup-only CI gate v1. FrameTimingMetric benchmarks stay non-gating until the app exposes a deterministic benchmark launch surface on the canonical emulator (letta-mobile-4ccv).",
-        "Warm startup remains informational-only on the shared GitHub Actions API 33 emulator because repeated verify runs varied too widely to support truthful per-PR blocking.",
-        "Keep collecting warm metrics for visibility, but do not fail PRs on this runner unless the gate moves to a more stable environment."
+        "Warm startup is gated from at least 10 samples so a missing or undersampled warm-open result fails closed.",
+        "The +20% envelope retains the established shared-emulator noise allowance while still blocking repeatable regressions."
       ]
     }
   }
