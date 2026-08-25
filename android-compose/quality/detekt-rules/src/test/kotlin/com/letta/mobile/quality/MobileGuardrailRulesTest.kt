@@ -10,13 +10,13 @@ class MobileGuardrailRulesTest {
     fun `Any and aliases fail while typed boundaries pass`() {
         val bad = """
             typealias Payload = Any?
-            fun send(value: Payload, values: Array<Any>, vararg rest: Any) = Unit
+            fun send(value: Payload, values: Array<Any>, metadata: Map<String, Any?>, vararg rest: Any) = Unit
         """.trimIndent()
         val good = """
             data class Payload(val id: String)
             fun send(value: Payload, values: Array<Payload>, vararg rest: Payload) = Unit
         """.trimIndent()
-        assertTrue(NoAnyType().compileAndLint(bad).size >= 3)
+        assertTrue(NoAnyType().compileAndLint(bad).size >= 5)
         assertEquals(0, NoAnyType().compileAndLint(good).size)
     }
 

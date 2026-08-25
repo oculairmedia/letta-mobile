@@ -60,7 +60,6 @@ internal class NoAnyType(config: Config = Config.empty) : MobileRule(
 
     override fun visitTypeReference(typeReference: KtTypeReference) {
         super.visitTypeReference(typeReference)
-        if (typeReference.getParentOfType<KtTypeAlias>(strict = false) != null) return
         val bannedAlias = typeReference.collectTypeNames().firstOrNull(anyTypeAliases::contains)
         if (typeReference.containsAnyType() || bannedAlias != null) {
             report(typeReference, "Replace '${typeReference.text}' with a typed model or boundary adapter.")
