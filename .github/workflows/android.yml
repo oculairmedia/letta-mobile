@@ -238,7 +238,7 @@ jobs:
         # configured target. This is the gate that would have caught the
         # native-only break fixed in b97bcf48. One invocation also avoids two
         # extra configuration phases and exposes the full graph to Gradle.
-        run: ./gradlew :sharedLogic:allTests :desktop:test :appserver-cli:test :appserver-cli:distZip :iroh-wrapper-cli:test :iroh-wrapper-cli:installDist
+        run: ./gradlew :sharedLogic:allTests :desktop:test :appserver-cli:test :appserver-cli:distZip :iroh-wrapper-cli:test :iroh-wrapper-cli:installDist && node sharedLogic/karma.config.test.cjs
 
   web-wasm:
     name: web-wasm

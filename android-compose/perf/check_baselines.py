@@ -71,18 +71,21 @@ def _iter_measurements(outputs_dir: pathlib.Path) -> Iterable[dict]:
 def _pick_metric(bench: dict, metric: str, aggregation: str | None) -> float | None:
     """Best-effort metric extraction across benchmark JSON schema versions."""
     entry = bench.get("metrics", {}).get(metric)
-    if entry is None:
+    if not isinstance(entry, dict):
         return None
-    if aggregation and aggregation in entry:
-        return float(entry[aggregation])
-    for key in ("P95", "p95", "median", "P50", "p50", "mean"):
-        if key in entry:
-            return float(entry[key])
-    runs = entry.get("runs")
-    if isinstance(runs, list) and runs:
-        ordered = sorted(runs)
-        index = max(0, int(len(ordered) * 0.95) - 1)
-        return float(ordered[index])
+    try:
+        if aggregation and aggregation in entry:
+            return float(entry[aggregation])
+        for key in ("P95", "p95", "median", "P50", "p50", "mean"):
+            if key in entry:
+                return float(entry[key])
+        runs = entry.get("runs")
+        if isinstance(runs, list) and runs:
+            ordered = sorted(float(run) for run in runs)
+            index = max(0, int(len(ordered) * 0.95) - 1)
+            return ordered[index]
+    except (TypeError, ValueError):
+        return None
     return None
 
 
@@ -175,13 +178,16 @@ def _find_observation(key: str, spec: dict, measurements: list[dict], gate_enabl
     values = [(bench, value) for bench, value in picked if value is not None]
 
     minimum_samples = int(spec.get("min_samples", 0))
-    observed_samples = max(
-        (len(bench.get("metrics", {}).get(spec["metric"], {}).get("runs", [])) for bench, _ in values),
-        default=0,
-    )
-    if minimum_samples and observed_samples < minimum_samples:
-        return None, None, f"{key}: {observed_samples} samples reported, {minimum_samples} required"
-    return max(values, key=lambda item: item[1]) + (None,)
+    sample_counts = [
+        len(bench.get("metrics", {}).get(spec["metric"], {}).get("runs", []))
+        for bench, _ in values
+    ]
+    undersampled = [count for count in sample_counts if count < minimum_samples]
+    if minimum_samples and undersampled:
+        message = f"{key}: {min(undersampled)} samples reported, {minimum_samples} required"
+        return None, None, message if gate_enabled else None
+    bench, value = max(values, key=lambda item: item[1])
+    return bench, value, None
 
 
 def _evaluate_observation(key: str, spec: dict, row: dict, observed: float, rebaseline: bool) -> str | None:

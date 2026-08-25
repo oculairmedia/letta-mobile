@@ -197,6 +197,7 @@ private suspend fun restoreInitialLayoutIfReady(
     if (listState.firstVisibleItemIndex != targetIndex || listState.firstVisibleItemScrollOffset != anchor.scrollOffset) {
         listState.scrollToItem(targetIndex, anchor.scrollOffset)
     }
+    if (tracker.restorationState != ChatRestorationState.AwaitingFirstLayout) return
     tracker.onInitialLayoutRestored(anchor.followTail)
     ChatHydrationTrace.current(tracker.conversationId)?.let { generation ->
         ChatHydrationTrace.scrollInitialized(generation, correction = "initial_restore")

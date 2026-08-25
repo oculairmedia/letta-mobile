@@ -33,10 +33,9 @@ The CI workflow runs the benchmark methods that back `perf/baselines.json`:
 - `StartupBenchmark#coldStartupCompilationPartial`
 - `StartupBenchmark#warmStartup`
 
-Only **cold startup is gating** on the shared GitHub Actions API 33 emulator.
-Warm startup is still collected and reported, but it is informational-only on
-this runner because repeated healthy benchmark runs showed wide warm variance
-that would make a blocking PR gate flaky rather than protective.
+Both **cold and warm startup are gating** on the shared GitHub Actions API 33
+emulator. Each metric must provide at least ten samples and remain within its
+configured tolerance.
 
 The repo still contains `ScrollJankBenchmark` and `ComposerTypingBenchmark`,
 but they are **not gating in CI yet**. On a fresh API 33 emulator the app
@@ -65,7 +64,7 @@ in the checker.
 Current policy:
 
 - `startup.cold.p95_ms`: `+20%`
-- `startup.warm.p95_ms`: informational only (`gate: false`)
+- `startup.warm.p95_ms`: `+20%`
 
 Warm startup keeps a wider envelope than cold startup because consecutive seed
 and verify runs on the canonical API 33 emulator drifted by `+17.4%`
@@ -74,10 +73,9 @@ modest bump after the first PR-triggered verify run on the updated branch
 measured bounded drift up to `1772.844 ms` against a `1512.749 ms` seed
 (`+17.2%`), so the cold envelope is now `+20%` on this shared runner.
 
-Warm startup is non-gating because later PR runs on the same healthy emulator
-showed one-sided warm spikes (for example `434.843 ms` against a `285.988 ms`
-seed) while cold startup simultaneously improved, which is a strong signal of
-shared-runner noise rather than a trustworthy per-PR regression detector.
+Warm startup uses the same `+20%` envelope and gates by default. Its minimum
+sample count prevents absent or undersampled warm-open output from silently
+passing.
 
 ## Retry behavior
 
@@ -98,9 +96,9 @@ Outcomes:
 - any non-retryable failure, malformed input, unseeded gating baseline, or
   benchmark task failure: job fails immediately
 
-This retry does **not** raise the `+20%` ceiling and does not make warm startup
-or future informational metrics gating. It exists only to separate a single
-shared-emulator cold-start spike from a repeatable regression.
+This retry does **not** raise the `+20%` ceiling or retry warm-start failures.
+It exists only to separate a single shared-emulator cold-start spike from a
+repeatable regression.
 
 ## Re-baselining
 

@@ -1,6 +1,7 @@
 package com.letta.mobile.feature.chat.coordination
 
 import com.letta.mobile.util.Telemetry
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -36,10 +37,11 @@ internal class RecentMessagesReconcileLauncher(
         val result = runCatching {
             reconcile(reconcileRequest(openRequest, generation))
         }
-        if (result.isSuccess) {
-            traceCompleted(generation)
-        } else {
-            reportFailure(openRequest, requireNotNull(result.exceptionOrNull()))
+        val error = result.exceptionOrNull()
+        when {
+            error == null -> traceCompleted(generation)
+            error is CancellationException -> throw error
+            else -> reportFailure(openRequest, error)
         }
     }
 
