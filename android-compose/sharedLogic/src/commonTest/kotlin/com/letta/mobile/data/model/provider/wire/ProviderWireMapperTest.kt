@@ -10,6 +10,7 @@ import com.letta.mobile.data.model.ProviderRevision
 import com.letta.mobile.data.model.provider.CredentialStatus
 import com.letta.mobile.data.model.provider.ModelAvailability
 import com.letta.mobile.data.model.provider.OperationalStatus
+import com.letta.mobile.data.model.provider.ProviderProtocol
 import com.letta.mobile.data.model.provider.VisibilityPolicy
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -41,7 +42,7 @@ class ProviderWireMapperTest {
         val domain = dto.toDomain()
         assertEquals(ProviderDefinitionId("anthropic"), domain.id)
         assertEquals("Anthropic", domain.displayName)
-        assertEquals(listOf("anthropic"), domain.supportedProtocols)
+        assertEquals(listOf<ProviderProtocol>(ProviderProtocol.Anthropic), domain.supportedProtocols)
         assertEquals(ProviderFieldId("api_key"), domain.fields.first().id)
         assertEquals(true, domain.fields.first().isSecret)
 
@@ -61,7 +62,7 @@ class ProviderWireMapperTest {
             operationalStatus = "active",
             revision = "rev-1",
             configuredFieldIds = listOf("api_key"),
-            customHeaders = mapOf("X-Env" to "prod"),
+            configuredHeaderNames = listOf("X-Custom-Header"),
         )
 
         // Successful mapping with matching host
@@ -71,6 +72,7 @@ class ProviderWireMapperTest {
         assertEquals(CredentialStatus.Configured, domain.credentialStatus)
         assertEquals(OperationalStatus.Active, domain.operationalStatus)
         assertEquals(ProviderRevision("rev-1"), domain.revision)
+        assertEquals(listOf("X-Custom-Header"), domain.configuredHeaderNames)
 
         val mappedBack = domain.toDto()
         assertEquals(dto, mappedBack)

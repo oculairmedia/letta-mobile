@@ -41,7 +41,7 @@ data class ProviderDefinitionsListResponseDto(
 )
 
 /**
- * Wire DTO for a configured provider instance. Strictly redacted: never contains secrets.
+ * Wire DTO for a configured provider instance. Strictly redacted: never contains secrets or header values.
  */
 @Serializable
 data class RedactedProviderInstanceDto(
@@ -54,7 +54,7 @@ data class RedactedProviderInstanceDto(
     @SerialName("operational_status") val operationalStatus: String = "active",
     @SerialName("revision") val revision: String? = null,
     @SerialName("configured_field_ids") val configuredFieldIds: List<String> = emptyList(),
-    @SerialName("custom_headers") val customHeaders: Map<String, String> = emptyMap(),
+    @SerialName("configured_header_names") val configuredHeaderNames: List<String> = emptyList(),
 )
 
 /**

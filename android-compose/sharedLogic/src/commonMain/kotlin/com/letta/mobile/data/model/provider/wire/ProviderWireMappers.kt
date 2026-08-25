@@ -13,10 +13,10 @@ import com.letta.mobile.data.model.provider.ModelAvailability
 import com.letta.mobile.data.model.provider.OperationalStatus
 import com.letta.mobile.data.model.provider.ProviderDefinition
 import com.letta.mobile.data.model.provider.ProviderFieldSchema
+import com.letta.mobile.data.model.provider.ProviderProtocol
 import com.letta.mobile.data.model.provider.RedactedProviderInstance
 import com.letta.mobile.data.model.provider.VisibilityPolicy
 import kotlinx.collections.immutable.toPersistentList
-import kotlinx.collections.immutable.toPersistentMap
 
 /**
  * Exception thrown when a wire payload's `host_id` does not match the active host context.
@@ -48,7 +48,7 @@ fun ProviderDefinitionDto.toDomain(): ProviderDefinition = ProviderDefinition(
     id = ProviderDefinitionId(id),
     displayName = displayName,
     description = description,
-    supportedProtocols = supportedProtocols.toPersistentList(),
+    supportedProtocols = supportedProtocols.map { ProviderProtocol.fromWire(it) }.toPersistentList(),
     fields = fields.map { it.toDomain() }.toPersistentList(),
     defaultBaseUrl = defaultBaseUrl,
 )
@@ -57,7 +57,7 @@ fun ProviderDefinition.toDto(): ProviderDefinitionDto = ProviderDefinitionDto(
     id = id.value,
     displayName = displayName,
     description = description,
-    supportedProtocols = supportedProtocols.toList(),
+    supportedProtocols = supportedProtocols.map { it.wireValue },
     fields = fields.map { it.toDto() },
     defaultBaseUrl = defaultBaseUrl,
 )
@@ -77,7 +77,7 @@ fun RedactedProviderInstanceDto.toDomain(expectedHostId: HostId? = null): Redact
         operationalStatus = OperationalStatus.fromWire(operationalStatus),
         revision = revision?.let { ProviderRevision(it) },
         configuredFieldIds = configuredFieldIds.map { ProviderFieldId(it) }.toPersistentList(),
-        customHeaders = customHeaders.toPersistentMap(),
+        configuredHeaderNames = configuredHeaderNames.toPersistentList(),
     )
 }
 
@@ -91,7 +91,7 @@ fun RedactedProviderInstance.toDto(): RedactedProviderInstanceDto = RedactedProv
     operationalStatus = operationalStatus.wireValue,
     revision = revision?.value,
     configuredFieldIds = configuredFieldIds.map { it.value },
-    customHeaders = customHeaders.toMap(),
+    configuredHeaderNames = configuredHeaderNames.toList(),
 )
 
 fun ModelRouteDto.toDomain(expectedHostId: HostId? = null): CanonicalModelRoute {

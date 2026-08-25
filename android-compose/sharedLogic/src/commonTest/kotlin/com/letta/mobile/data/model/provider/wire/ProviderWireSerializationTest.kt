@@ -58,7 +58,7 @@ class ProviderWireSerializationTest {
                     operationalStatus = "active",
                     revision = "rev-1",
                     configuredFieldIds = listOf("api_key"),
-                    customHeaders = mapOf("X-Env" to "prod"),
+                    configuredHeaderNames = listOf("X-Custom-Header"),
                 ),
             ),
         )
