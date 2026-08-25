@@ -183,35 +183,54 @@ class CheckBaselinesTest(unittest.TestCase):
 
         self.assertEqual(result, 2)
 
-    def test_missing_gating_benchmark_fails_closed(self) -> None:
-        self.assert_fails_closed(
-            "selection.first_content.p95_ms",
-            {
-                "baseline": 100.0,
-                "source": "ConversationOpenBenchmark.coldOpen",
-                "metric": "selectionToFirstContentMs",
-            },
-            make_benchmark(
-                "com.letta.mobile.macrobenchmark.StartupBenchmark",
-                "coldStartupCompilationPartial",
-                {"timeToInitialDisplayMs": {"P95": 90.0}},
+    def test_invalid_gating_inputs_fail_closed(self) -> None:
+        scenarios = (
+            (
+                "selection.first_content.p95_ms",
+                {
+                    "baseline": 100.0,
+                    "source": "ConversationOpenBenchmark.coldOpen",
+                    "metric": "selectionToFirstContentMs",
+                },
+                make_benchmark(
+                    "com.letta.mobile.macrobenchmark.StartupBenchmark",
+                    "coldStartupCompilationPartial",
+                    {"timeToInitialDisplayMs": {"P95": 90.0}},
+                ),
+            ),
+            (
+                "selection.stable_viewport.p95_ms",
+                {
+                    "baseline": 100.0,
+                    "source": "ConversationOpenBenchmark.warmOpen",
+                    "metric": "selectionToStableViewportMs",
+                },
+                make_benchmark(
+                    "com.letta.mobile.macrobenchmark.ConversationOpenBenchmark",
+                    "warmOpen",
+                    {"timeToInitialDisplayMs": {"P95": 90.0}},
+                ),
+            ),
+            (
+                "startup.cold.p95_ms",
+                {
+                    "baseline": 100.0,
+                    "source": "StartupBenchmark.coldStartupCompilationPartial",
+                    "metric": "timeToInitialDisplayMs",
+                    "min_samples": 10,
+                },
+                make_benchmark(
+                    "com.letta.mobile.macrobenchmark.StartupBenchmark",
+                    "coldStartupCompilationPartial",
+                    {"timeToInitialDisplayMs": {"P95": 90.0, "runs": [90.0] * 5}},
+                ),
             ),
         )
-
-    def test_missing_gating_metric_fails_closed(self) -> None:
-        self.assert_fails_closed(
-            "selection.stable_viewport.p95_ms",
-            {
-                "baseline": 100.0,
-                "source": "ConversationOpenBenchmark.warmOpen",
-                "metric": "selectionToStableViewportMs",
-            },
-            make_benchmark(
-                "com.letta.mobile.macrobenchmark.ConversationOpenBenchmark",
-                "warmOpen",
-                {"timeToInitialDisplayMs": {"P95": 90.0}},
-            ),
-        )
+        for key, spec, measurement in scenarios:
+            with self.subTest(key=key):
+                for output in self.outputs_dir.iterdir():
+                    output.unlink()
+                self.assert_fails_closed(key, spec, measurement)
 
     def test_mixed_valid_and_invalid_matches_fail_closed(self) -> None:
         self.write_baselines(
@@ -247,22 +266,6 @@ class CheckBaselinesTest(unittest.TestCase):
         )
 
         self.assertEqual(result, 2)
-
-    def test_insufficient_samples_fail_closed(self) -> None:
-        self.assert_fails_closed(
-            "startup.cold.p95_ms",
-            {
-                "baseline": 100.0,
-                "source": "StartupBenchmark.coldStartupCompilationPartial",
-                "metric": "timeToInitialDisplayMs",
-                "min_samples": 10,
-            },
-            make_benchmark(
-                "com.letta.mobile.macrobenchmark.StartupBenchmark",
-                "coldStartupCompilationPartial",
-                {"timeToInitialDisplayMs": {"P95": 90.0, "runs": [90.0] * 5}},
-            ),
-        )
 
     def test_non_gating_metric_does_not_fail_verify(self) -> None:
         self.write_baselines(
