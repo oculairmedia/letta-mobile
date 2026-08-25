@@ -57,7 +57,9 @@ class TimelineSyncLoop(
     private val ioDispatcher: kotlinx.coroutines.CoroutineDispatcher = timelineIoDispatcher,
 ) {
     private val loopJob = SupervisorJob(scope.coroutineContext[Job])
-    private val loopScope = CoroutineScope(scope.coroutineContext + loopJob)
+    private val loopScope = object : CoroutineScope {
+        override val coroutineContext = scope.coroutineContext + loopJob
+    }
 
     private val _state = MutableStateFlow(initialTimeline ?: Timeline(conversationId))
     val state: StateFlow<Timeline> = _state.asStateFlow()

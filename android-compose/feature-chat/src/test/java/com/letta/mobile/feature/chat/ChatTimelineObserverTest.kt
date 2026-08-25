@@ -105,6 +105,24 @@ class ChatTimelineObserverTest {
     }
 
     @Test
+    fun `recoverable hydration failure keeps fallback rows without init error`() = runTest {
+        val harness = Harness(backgroundScope)
+        harness.seedTimeline(
+            "conv-fallback",
+            listOf(confirmed("assistant-fallback", "last known good", TimelineMessageType.ASSISTANT)),
+        )
+
+        harness.observer.start("conv-fallback")
+        runCurrent()
+        harness.emitSyncEvent(TimelineSyncEvent.HydrateFailed("active snapshot corrupt; remote offline"))
+        runCurrent()
+
+        assertEquals(listOf("assistant-fallback"), harness.uiState.value.messages.map { it.id })
+        assertFalse(harness.uiState.value.isLoadingMessages)
+        assertTrue(harness.uiState.value.error?.contains("Timeline init failed") != true)
+    }
+
+    @Test
     fun `switching conversations rebinds observer and tracker`() = runTest {
         val harness = Harness(backgroundScope)
         harness.seedTimeline("conv-1")

@@ -21,7 +21,7 @@ sealed interface TimelineGatewayEvent {
     data class RecentMessagesSnapshot(
         val serverMessages: List<LettaMessage>,
         val telemetryName: String,
-        val telemetryAttrs: List<Pair<String, Any?>>,
+        val telemetryReason: String,
         val ack: CompletableDeferred<Int>,
         val generation: Long? = null,
     ) : TimelineGatewayEvent

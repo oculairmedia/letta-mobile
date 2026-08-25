@@ -42,6 +42,7 @@ import com.letta.mobile.util.Telemetry
 import com.letta.mobile.runtime.RuntimeEventOutbox
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -158,7 +159,7 @@ internal class AdminChatViewModel @Inject constructor(
     val activeSubagentSource: ActiveSubagentSource by lazy {
         val parentConversationId = _uiState
             .map { state -> (state.conversationState as? ConversationState.Ready)?.conversationId }
-            .stateIn(viewModelScope, SharingStarted.Eagerly, conversationId?.value)
+            .stateIn(viewModelScope, SharingStarted.Lazily, conversationId?.value)
         val localBound: StateFlow<Boolean> = activeAgent
             .map { AgentRuntimeBinding.isLocalBound(it) }
             .stateIn(
@@ -208,9 +209,9 @@ internal class AdminChatViewModel @Inject constructor(
      * returned true for Iroh, which is exactly the inversion this bead fixes.
      */
     private val usesChannelTransport: StateFlow<Boolean> = shimBackendDetector.activeUsesChannelTransport
-        .stateIn(viewModelScope, SharingStarted.Eagerly, shimBackendDetector.cachedActiveUsesChannelTransport())
+        .stateIn(viewModelScope, SharingStarted.Lazily, shimBackendDetector.cachedActiveUsesChannelTransport())
     private val backendKind: StateFlow<BackendKind> = shimBackendDetector.activeBackendKind
-        .stateIn(viewModelScope, SharingStarted.Eagerly, shimBackendDetector.cachedActiveBackendKind())
+        .stateIn(viewModelScope, SharingStarted.Lazily, shimBackendDetector.cachedActiveBackendKind())
     private var followingDuplicateInitialMessageInFlight = false
     val conversationId: ConversationId?
         get() = chatConversationCoordinator.conversationId(ConversationAccessMode.Timeline)?.let { ConversationId(it) }
@@ -389,10 +390,12 @@ internal class AdminChatViewModel @Inject constructor(
                     forceRefresh = false,
                     connectionGeneration = gen,
                 )
-            } catch (t: Throwable) {
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Throwable) {
                 Telemetry.event(
                     "AdminChatVM", "resume.sync.error",
-                    "error" to (t.message ?: "unknown"),
+                    "error" to (failure.message ?: "unknown"),
                     level = Telemetry.Level.WARN,
                 )
             }
@@ -748,8 +751,10 @@ internal class AdminChatViewModel @Inject constructor(
                     messages = persistentListOf(),
                     messageListChange = ChatMessageListChange.Full,
                 )
-            } catch (e: Exception) {
-                android.util.Log.w("AdminChatViewModel", "Failed to reset messages", e)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                android.util.Log.w("AdminChatViewModel", "Failed to reset messages", failure)
             }
         }
     }

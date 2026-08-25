@@ -1,7 +1,11 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.model.LettaMessage
+import com.letta.mobile.data.model.UserMessage
+import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineReadResult
 import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore
 import com.letta.mobile.data.timeline.snapshot.InMemoryConfirmedTimelineStore
+import com.letta.mobile.data.timeline.snapshot.SnapshotReadFailure
 import com.letta.mobile.data.timeline.snapshot.StoredTimelineEnvelope
 import com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
@@ -12,6 +16,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -244,5 +249,117 @@ class TimelineSnapshotPersistenceTest {
         assertNotNull(snapshot)
         assertEquals(1, snapshot.events.size)
         assertEquals("msg-persisted", snapshot.events.first().serverId)
+    }
+
+    @Test
+    fun repositoryKeepsFallbackVisibleWhenRemoteRecoveryFailsAndAdvancesFromHighWater() = runTest {
+        val timelineScope = TimelineScope("backend", "conv-fallback", "agent")
+        val fallback = StoredTimelineEnvelope(
+            scope = timelineScope,
+            revision = 5L,
+            events = listOf(
+                StoredTimelineEvent(
+                    position = 1.0,
+                    otid = "fallback-otid",
+                    serverId = "fallback-server",
+                    content = "last known good",
+                    messageType = "ASSISTANT",
+                    dateIso = "2026-08-24T12:00:00Z",
+                )
+            ),
+        )
+        val store = TypedRecoveryStore(
+            ConfirmedTimelineReadResult.Fallback(
+                snapshot = fallback,
+                activeFailure = SnapshotReadFailure.CHECKSUM_MISMATCH,
+                highWaterRevision = 9L,
+            )
+        )
+        val transport = RecoveryTimelineTransport(failure = IllegalStateException("offline"))
+        val repository = TimelineRepository(
+            timelineTransport = transport,
+            pendingLocalStore = NoOpPendingLocalStore,
+            conversationCursorStore = NoOpConversationCursorStore,
+            confirmedTimelineStore = store,
+            backendIdProvider = { "backend" },
+            startLoopStreamSubscribers = false,
+        )
+
+        val loop = repository.getOrCreate("agent", "conv-fallback")
+
+        assertEquals(1, transport.remoteReads)
+        assertEquals("last known good", (loop.state.value.events.single() as TimelineEvent.Confirmed).content)
+        loop.flushSnapshotNow()
+        assertEquals(10L, store.lastWrite?.revision)
+        repository.clearAll()
+    }
+
+    @Test
+    fun missingSnapshotTriggersTypedRemoteRecovery() = runTest {
+        val store = TypedRecoveryStore(
+            ConfirmedTimelineReadResult.ReconciliationRequired(
+                failure = SnapshotReadFailure.MISSING,
+                highWaterRevision = 4L,
+            )
+        )
+        val transport = RecoveryTimelineTransport(
+            messages = listOf(
+                UserMessage(
+                    id = "remote-server",
+                    date = "2026-08-24T12:00:00Z",
+                    contentRaw = JsonPrimitive("recovered remotely"),
+                )
+            )
+        )
+        val repository = TimelineRepository(
+            timelineTransport = transport,
+            pendingLocalStore = NoOpPendingLocalStore,
+            conversationCursorStore = NoOpConversationCursorStore,
+            confirmedTimelineStore = store,
+            backendIdProvider = { "backend" },
+            startLoopStreamSubscribers = false,
+        )
+
+        val loop = repository.getOrCreate("agent", "conv-missing")
+
+        assertEquals(1, transport.remoteReads)
+        assertEquals("recovered remotely", (loop.state.value.events.single() as TimelineEvent.Confirmed).content)
+        loop.flushSnapshotNow()
+        assertEquals(5L, store.lastWrite?.revision)
+        repository.clearAll()
+    }
+
+    private class TypedRecoveryStore(
+        private val readResult: ConfirmedTimelineReadResult,
+    ) : ConfirmedTimelineStore {
+        var lastWrite: StoredTimelineEnvelope? = null
+
+        override suspend fun readSnapshot(scope: TimelineScope): StoredTimelineEnvelope? = readResult.snapshot
+        override suspend fun readSnapshotResult(scope: TimelineScope): ConfirmedTimelineReadResult = readResult
+        override suspend fun writeSnapshot(envelope: StoredTimelineEnvelope): Boolean {
+            lastWrite = envelope
+            return true
+        }
+        override suspend fun deleteSnapshot(scope: TimelineScope) = Unit
+        override suspend fun clearForBackend(backendId: String) = Unit
+        override suspend fun prune(backendId: String, maxRetainedConversations: Int) = Unit
+    }
+
+    private class RecoveryTimelineTransport(
+        private val messages: List<LettaMessage> = emptyList(),
+        private val failure: Throwable? = null,
+    ) : TimelineTransport by EmptyTimelineTransport {
+        var remoteReads: Int = 0
+
+        override suspend fun listConversationMessages(
+            conversationId: String,
+            limit: Int?,
+            after: String?,
+            order: String?,
+        ): List<LettaMessage> {
+            remoteReads += 1
+            failure?.let { throw it }
+            return messages
+        }
     }
 }

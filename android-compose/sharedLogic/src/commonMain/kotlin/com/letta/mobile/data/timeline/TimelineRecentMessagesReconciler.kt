@@ -176,7 +176,7 @@ class TimelineRecentMessagesReconciler(
     private suspend fun executeReconcileFromServer(request: ReconcileRequest): RecentMessagesReconcileOutcome =
         reconcileRecentMessagesFromServer(
             telemetryName = "recentReconcile",
-            telemetryAttrs = arrayOf("reason" to request.reason),
+            telemetryReason = request.reason,
             allowWhileStreamActive = request.allowWhileStreamActive,
             connectionGeneration = request.connectionGeneration,
         )
@@ -220,26 +220,26 @@ class TimelineRecentMessagesReconciler(
 
     suspend fun reconcileRecentMessagesFromServer(
         telemetryName: String,
-        telemetryAttrs: Array<Pair<String, Any?>>,
+        telemetryReason: String,
         allowWhileStreamActive: Boolean = false,
         connectionGeneration: Long = DEFAULT_CONNECTION_GENERATION,
     ): RecentMessagesReconcileOutcome {
         val timer = Telemetry.startTimer("TimelineSync", telemetryName)
         val isForcedWhileActive = streamSubscriberActive.value && allowWhileStreamActive
         val skipReason = skipReasonFor(allowWhileStreamActive, isForcedWhileActive, connectionGeneration)
-        if (skipReason != null) return skipReconcile(timer, telemetryName, telemetryAttrs, skipReason)
+        if (skipReason != null) return skipReconcile(timer, telemetryName, telemetryReason, skipReason)
         return try {
-            val result = fetchAndApplySnapshot(telemetryName, telemetryAttrs, connectionGeneration)
-                ?: return skipReconcile(timer, telemetryName, telemetryAttrs, "supersededGeneration")
+            val result = fetchAndApplySnapshot(telemetryName, telemetryReason, connectionGeneration)
+                ?: return skipReconcile(timer, telemetryName, telemetryReason, "supersededGeneration")
             val (serverCount, appended) = result
             onForcedReconcileCompleted(isForcedWhileActive, connectionGeneration)
-            timer.stop(*telemetryAttrs, "serverCount" to serverCount, "appended" to appended)
+            timer.stop("reason" to telemetryReason, "serverCount" to serverCount, "appended" to appended)
             dumpTimelineState("reconcile.$telemetryName", conversationId, state.value)
             RecentMessagesReconcileOutcome.Applied(appended)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (t: Throwable) {
-            timer.stopError(t, *telemetryAttrs)
+            timer.stopError(t, "reason" to telemetryReason)
             RecentMessagesReconcileOutcome.Failed(t)
         }
     }
@@ -287,7 +287,7 @@ class TimelineRecentMessagesReconciler(
     /** Fetches the newest-window page and hands it to the write path. Returns (serverCount, appended). */
     private suspend fun fetchAndApplySnapshot(
         telemetryName: String,
-        telemetryAttrs: Array<Pair<String, Any?>>,
+        telemetryReason: String,
         connectionGeneration: Long,
     ): Pair<Int, Int>? {
         val serverMessages = messageApi.listConversationMessages(
@@ -301,7 +301,7 @@ class TimelineRecentMessagesReconciler(
             TimelineGatewayEvent.RecentMessagesSnapshot(
                 serverMessages = serverMessages,
                 telemetryName = telemetryName,
-                telemetryAttrs = telemetryAttrs.toList(),
+                telemetryReason = telemetryReason,
                 ack = ack,
                 generation = connectionGeneration.takeIf { it > DEFAULT_CONNECTION_GENERATION },
             )
@@ -312,17 +312,17 @@ class TimelineRecentMessagesReconciler(
     private fun skipReconcile(
         timer: Telemetry.Timer,
         telemetryName: String,
-        telemetryAttrs: Array<Pair<String, Any?>>,
+        telemetryReason: String,
         reason: String,
     ): RecentMessagesReconcileOutcome {
         Telemetry.event(
             "TimelineSync", "$telemetryName.skipped",
             "conversationId" to conversationId,
-            *telemetryAttrs,
+            "reconcileReason" to telemetryReason,
             "reason" to reason,
         )
         timer.stop(
-            *telemetryAttrs,
+            "reason" to telemetryReason,
             "serverCount" to 0,
             "appended" to 0,
             "skipped" to true,
@@ -344,11 +344,7 @@ class TimelineRecentMessagesReconciler(
                 } else {
                     if (generation != null) highestAppliedGeneration = maxOf(highestAppliedGeneration, generation)
                     val before = state.value
-                    val result = applyRecentMessagesSnapshotLocked(
-                        serverMessages = event.serverMessages,
-                        telemetryName = event.telemetryName,
-                        telemetryAttrs = event.telemetryAttrs.toTypedArray(),
-                    )
+                    val result = applyRecentMessagesSnapshotLocked(event.serverMessages)
                     snapshotChanged = state.value !== before
                     result
                 }
@@ -371,11 +367,7 @@ class TimelineRecentMessagesReconciler(
         )
     }
 
-    private fun applyRecentMessagesSnapshotLocked(
-        serverMessages: List<LettaMessage>,
-        telemetryName: String,
-        telemetryAttrs: Array<Pair<String, Any?>>,
-    ): Int {
+    private fun applyRecentMessagesSnapshotLocked(serverMessages: List<LettaMessage>): Int {
         val mergeResult = state.value.mergeServerMessages(serverMessages)
         state.value = mergeResult.first
         val appended = mergeResult.second

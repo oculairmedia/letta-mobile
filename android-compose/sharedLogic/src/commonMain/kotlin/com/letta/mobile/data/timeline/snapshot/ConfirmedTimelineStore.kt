@@ -5,6 +5,7 @@ import kotlinx.atomicfu.locks.synchronized
 
 enum class SnapshotReadFailure {
     MISSING,
+    STORAGE_FAILURE,
     METADATA_INVALID,
     MANIFEST_MISSING,
     CHUNK_MISSING,
@@ -19,16 +20,22 @@ enum class SnapshotReadFailure {
 
 sealed interface ConfirmedTimelineReadResult {
     val snapshot: StoredTimelineEnvelope?
+    val highWaterRevision: Long
 
-    data class Active(override val snapshot: StoredTimelineEnvelope) : ConfirmedTimelineReadResult
+    data class Active(
+        override val snapshot: StoredTimelineEnvelope,
+        override val highWaterRevision: Long = snapshot.revision,
+    ) : ConfirmedTimelineReadResult
 
     data class Fallback(
         override val snapshot: StoredTimelineEnvelope,
         val activeFailure: SnapshotReadFailure,
+        override val highWaterRevision: Long,
     ) : ConfirmedTimelineReadResult
 
     data class ReconciliationRequired(
         val failure: SnapshotReadFailure,
+        override val highWaterRevision: Long = 0L,
     ) : ConfirmedTimelineReadResult {
         override val snapshot: StoredTimelineEnvelope? = null
     }

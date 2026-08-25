@@ -36,34 +36,63 @@ internal object ChatHydrationTrace {
         var settled: Boolean = false,
     )
 
-    private var nextGeneration = 0L
-    private val active = linkedMapOf<Identity, State>()
+    private class Registry {
+        var nextGeneration = 0L
+        val active = linkedMapOf<Identity, State>()
+    }
+
+    private data class TraceDetails(
+        val commitReason: String = "unspecified",
+        val source: String = "none",
+        val sourceLatencyMs: Long = -1L,
+        val sourceCount: Int = -1,
+        val messageCount: Int = -1,
+        val missingOptionalSources: String = "none",
+        val activity: Boolean = false,
+        val renderItemCount: Int = -1,
+        val scrollCorrection: String = "none",
+        val isStale: Boolean = false,
+    )
+
+    private val registry = Registry()
 
     fun begin(identity: Identity, reuseIfActive: Boolean = false): Generation = synchronized(this) {
-        if (reuseIfActive) active[identity]?.generation?.let { return@synchronized it }
-        Generation(++nextGeneration, identity).also { generation ->
-            active[identity] = State(generation = generation, startedAtNs = System.nanoTime())
-            while (active.size > MAX_ACTIVE_TRACES) active.remove(active.entries.first().key)
-            emit(active.getValue(identity), "hydration.started", "commitReason" to "conversation_open")
+        if (reuseIfActive) registry.active[identity]?.generation?.let { return@synchronized it }
+        Generation(++registry.nextGeneration, identity).also { generation ->
+            registry.active[identity] = State(generation = generation, startedAtNs = System.nanoTime())
+            while (registry.active.size > MAX_ACTIVE_TRACES) registry.active.remove(registry.active.entries.first().key)
+            emit(registry.active.getValue(identity), "hydration.started", TraceDetails(commitReason = "conversation_open"))
         }
     }
 
     fun sourceReady(generation: Generation, source: String, count: Int) = mutate(generation) { state ->
         state.sourceReady = true
-        emit(state, "source_ready", "source" to safeValue(source), "sourceLatencyMs" to elapsedMs(state), "sourceCount" to count.coerceAtLeast(0))
+        emit(
+            state,
+            "source_ready",
+            TraceDetails(
+                source = safeValue(source),
+                sourceLatencyMs = elapsedMs(state),
+                sourceCount = count.coerceAtLeast(0),
+            ),
+        )
         settleIfReady(state)
     }
 
     fun sourceUnavailable(generation: Generation, source: String) = mutate(generation) { state ->
-        emit(state, "source_unavailable", "source" to safeValue(source), "sourceLatencyMs" to elapsedMs(state), "sourceCount" to 0)
+        emit(
+            state,
+            "source_unavailable",
+            TraceDetails(source = safeValue(source), sourceLatencyMs = elapsedMs(state), sourceCount = 0),
+        )
     }
 
     fun reconcileStarted(generation: Generation, reason: String) = mutate(generation) { state ->
-        emit(state, "reconcile_started", "commitReason" to safeValue(reason))
+        emit(state, "reconcile_started", TraceDetails(commitReason = safeValue(reason)))
     }
 
     fun reconcileCompleted(generation: Generation, reason: String) = mutate(generation) { state ->
-        emit(state, "reconcile_completed", "commitReason" to safeValue(reason))
+        emit(state, "reconcile_completed", TraceDetails(commitReason = safeValue(reason)))
         settleIfReady(state)
     }
 
@@ -77,9 +106,11 @@ internal object ChatHydrationTrace {
         emit(
             state,
             "presentation_published",
-            "commitReason" to safeValue(commitReason),
-            "messageCount" to messageCount.coerceAtLeast(0),
-            "missingOptionalSources" to safeValue(missingOptionalSources),
+            TraceDetails(
+                commitReason = safeValue(commitReason),
+                messageCount = messageCount.coerceAtLeast(0),
+                missingOptionalSources = safeValue(missingOptionalSources),
+            ),
         )
         settleIfReady(state)
     }
@@ -87,40 +118,51 @@ internal object ChatHydrationTrace {
     fun activityChanged(generation: Generation, active: Boolean, reason: String) = mutate(generation) { state ->
         state.thinkingTransitions++
         state.activity = active
-        emit(state, "activity_changed", "activity" to active, "commitReason" to safeValue(reason))
+        emit(state, "activity_changed", TraceDetails(activity = active, commitReason = safeValue(reason)))
         settleIfReady(state)
     }
 
     fun firstLayout(generation: Generation, renderItemCount: Int) = mutate(generation) { state ->
         state.layouts++
         if (state.layouts == 1) {
-            emit(state, "first_layout", "renderItemCount" to renderItemCount)
+            emit(state, "first_layout", TraceDetails(renderItemCount = renderItemCount))
         }
         settleIfReady(state)
     }
 
     fun scrollInitialized(generation: Generation, correction: String) = mutate(generation) { state ->
         state.scrolls++
-        emit(state, "scroll_initialized", "scrollCorrection" to safeValue(correction))
+        emit(state, "scroll_initialized", TraceDetails(scrollCorrection = safeValue(correction)))
         settleIfReady(state)
     }
 
     fun current(conversationId: String?): Generation? = synchronized(this) {
-        if (conversationId == null) null else active.entries.lastOrNull { it.key.conversationId == conversationId }?.value?.generation
+        if (conversationId == null) {
+            null
+        } else {
+            registry.active.entries.lastOrNull { it.key.conversationId == conversationId }?.value?.generation
+        }
     }
 
     internal fun clearForTest() = synchronized(this) {
-        active.clear()
-        nextGeneration = 0L
+        registry.active.clear()
+        registry.nextGeneration = 0L
     }
 
     private fun mutate(generation: Generation, block: (State) -> Unit) = synchronized(this) {
-        val state = active[generation.identity]
+        val state = registry.active[generation.identity]
         if (state == null || state.generation.id != generation.id) {
-            // A cancelled observer can still complete a dispatcher hop. Preserve its
-            // generation in the event so a trace can prove that it was stale.
             val staleState = State(generation, System.nanoTime(), stale = (state?.stale ?: 0) + 1)
-            emit(staleState, "presentation_published", "commitReason" to "stale_generation", "messageCount" to 0, "missingOptionalSources" to "none", "isStale" to true)
+            emit(
+                staleState,
+                "presentation_published",
+                TraceDetails(
+                    commitReason = "stale_generation",
+                    messageCount = 0,
+                    missingOptionalSources = "none",
+                    isStale = true,
+                ),
+            )
             return@synchronized
         }
         block(state)
@@ -129,16 +171,14 @@ internal object ChatHydrationTrace {
     private fun settleIfReady(state: State) {
         if (!state.canSettle()) return
         state.settled = true
-        emit(state, "settled", "commitReason" to "initial_frame_settled")
+        emit(state, "settled", TraceDetails(commitReason = "initial_frame_settled"))
     }
 
-    private fun State.canSettle(): Boolean =
-        !settled && hasInitialFrame() && !activity
+    private fun State.canSettle(): Boolean = !settled && hasInitialFrame() && !activity
 
-    private fun State.hasInitialFrame(): Boolean =
-        sourceReady && published > 0 && layouts > 0 && scrolls > 0
+    private fun State.hasInitialFrame(): Boolean = sourceReady && published > 0 && layouts > 0 && scrolls > 0
 
-    private fun emit(state: State, name: String, vararg attrs: Pair<String, Any?>) {
+    private fun emit(state: State, name: String, details: TraceDetails) {
         if (!Telemetry.isChatHydrationTraceEnabled()) return
         Telemetry.event(
             TAG,
@@ -154,9 +194,16 @@ internal object ChatHydrationTrace {
             "scrollCorrectionCount" to state.scrolls,
             "thinkingTransitionCount" to state.thinkingTransitions,
             "staleCount" to state.stale,
-            "missingOptionalSources" to "none",
-            "commitReason" to "unspecified",
-            *attrs,
+            "missingOptionalSources" to details.missingOptionalSources,
+            "commitReason" to details.commitReason,
+            "source" to details.source,
+            "sourceLatencyMs" to details.sourceLatencyMs,
+            "sourceCount" to details.sourceCount,
+            "messageCount" to details.messageCount,
+            "activity" to details.activity,
+            "renderItemCount" to details.renderItemCount,
+            "scrollCorrection" to details.scrollCorrection,
+            "isStale" to details.isStale,
             level = Telemetry.Level.DEBUG,
         )
     }

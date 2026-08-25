@@ -7,6 +7,7 @@ import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.timeline.TimelineRepository
 import com.letta.mobile.data.timeline.TimelineSyncEvent
 import kotlinx.collections.immutable.toPersistentMap
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -126,10 +127,12 @@ internal class ChatTimelineObserver(
         observerJob = scope.launch {
             val flow = try {
                 timelineRepository.observe(agentId, conversationId)
-            } catch (e: Exception) {
-                android.util.Log.e("AdminChatViewModel", "Timeline observe failed", e)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                android.util.Log.e("AdminChatViewModel", "Timeline observe failed", failure)
                 uiState.value = uiState.value.copy(
-                    error = "Timeline init failed: ${e.message}",
+                    error = "Couldn't sync conversation — pull to refresh",
                     isLoadingMessages = false,
                 )
                 return@launch

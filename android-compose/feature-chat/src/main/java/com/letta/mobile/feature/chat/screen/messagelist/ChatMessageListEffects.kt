@@ -42,7 +42,17 @@ internal data class ViewportAnchor(
     val followTail: Boolean,
 )
 
-internal val conversationViewportAnchors = mutableMapOf<String, ViewportAnchor>()
+private class ConversationViewportAnchorRegistry {
+    private val anchors = mutableMapOf<String, ViewportAnchor>()
+
+    fun get(conversationId: String): ViewportAnchor? = anchors[conversationId]
+
+    fun put(conversationId: String, anchor: ViewportAnchor) {
+        anchors[conversationId] = anchor
+    }
+}
+
+private val conversationViewportAnchorRegistry = ConversationViewportAnchorRegistry()
 
 internal enum class ChatRestorationState {
     AwaitingSnapshot,
@@ -192,7 +202,7 @@ private suspend fun restoreInitialLayoutIfReady(
     tracker: ChatViewportRestorationTracker,
 ) {
     if (totalCount <= 0 || tracker.restorationState != ChatRestorationState.AwaitingFirstLayout) return
-    val anchor = tracker.conversationId?.let(conversationViewportAnchors::get) ?: ViewportAnchor(0, 0, true)
+    val anchor = tracker.conversationId?.let(conversationViewportAnchorRegistry::get) ?: ViewportAnchor(0, 0, true)
     val targetIndex = anchor.index.coerceAtMost(totalCount - 1)
     if (listState.firstVisibleItemIndex != targetIndex || listState.firstVisibleItemScrollOffset != anchor.scrollOffset) {
         listState.scrollToItem(targetIndex, anchor.scrollOffset)
@@ -230,10 +240,13 @@ private fun persistViewportAnchorIfRestored(
 ) {
     val conversationId = tracker.conversationId ?: return
     if (tracker.restorationState in PENDING_RESTORATION_STATES) return
-    conversationViewportAnchors[conversationId] = ViewportAnchor(
-        index = listState.firstVisibleItemIndex,
-        scrollOffset = listState.firstVisibleItemScrollOffset,
-        followTail = tracker.followLatest,
+    conversationViewportAnchorRegistry.put(
+        conversationId,
+        ViewportAnchor(
+            index = listState.firstVisibleItemIndex,
+            scrollOffset = listState.firstVisibleItemScrollOffset,
+            followTail = tracker.followLatest,
+        ),
     )
 }
 
