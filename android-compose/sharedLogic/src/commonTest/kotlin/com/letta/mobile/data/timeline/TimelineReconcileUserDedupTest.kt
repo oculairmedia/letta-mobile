@@ -3,6 +3,7 @@ package com.letta.mobile.data.timeline
 import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.util.Telemetry
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.sync.Mutex
@@ -10,6 +11,9 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertSame
+import kotlin.test.assertTrue
 
 /**
  * letta-mobile-20tat (P1): Tests for user message deduplication during
@@ -164,5 +168,64 @@ class TimelineReconcileUserDedupTest {
 
         assertEquals(1, finalTimeline.events.size, "Duplicate by serverId should not re-insert")
         assertEquals(0, merged.second, "No messages should be appended")
+    }
+
+    @Test
+    fun reconcileAfterSendRethrowsCancellationWithoutErrorOrMutation() = runTest {
+        val initial = Timeline(
+            conversationId = "conv-cancel",
+            events = persistentListOf(
+                TimelineEvent.Local(
+                    position = 1.0,
+                    otid = "otid-cancel",
+                    content = "keep local",
+                    role = Role.USER,
+                    sentAt = timelineNow(),
+                    deliveryState = DeliveryState.SENT,
+                ),
+            ),
+        )
+        val state = MutableStateFlow(initial)
+        val events = MutableSharedFlow<TimelineSyncEvent>(replay = 1)
+        val cancellation = CancellationException("cancel reconcile")
+
+        val thrown = assertFailsWith<CancellationException> {
+            reconcileAfterSend(
+                otid = "otid-cancel",
+                conversationId = initial.conversationId,
+                writeMutex = Mutex(),
+                state = state,
+                events = events,
+                pendingLocalStore = NoOpPendingLocalStore,
+                listMessagesWithRetry = { throw cancellation },
+            )
+        }
+
+        assertSame(cancellation, thrown)
+        assertSame(initial, state.value)
+        assertTrue(events.replayCache.isEmpty(), "Cancellation must not emit ReconcileError")
+    }
+
+    @Test
+    fun reconcileAfterSendEmitsTypedErrorForOrdinaryFailureWithoutMutation() = runTest {
+        val initial = Timeline(conversationId = "conv-error")
+        val state = MutableStateFlow(initial)
+        val events = MutableSharedFlow<TimelineSyncEvent>(replay = 1)
+
+        reconcileAfterSend(
+            otid = "otid-error",
+            conversationId = initial.conversationId,
+            writeMutex = Mutex(),
+            state = state,
+            events = events,
+            pendingLocalStore = NoOpPendingLocalStore,
+            listMessagesWithRetry = { throw IllegalStateException("reconcile failed") },
+        )
+
+        assertSame(initial, state.value)
+        assertEquals(
+            listOf(TimelineSyncEvent.ReconcileError("reconcile failed")),
+            events.replayCache,
+        )
     }
 }

@@ -282,6 +282,7 @@ class TimelineSnapshotPersistenceTest {
             conversationCursorStore = NoOpConversationCursorStore,
             confirmedTimelineStore = store,
             backendIdProvider = { "backend" },
+            repositoryScope = backgroundScope,
             startLoopStreamSubscribers = false,
         )
 
@@ -317,6 +318,7 @@ class TimelineSnapshotPersistenceTest {
             conversationCursorStore = NoOpConversationCursorStore,
             confirmedTimelineStore = store,
             backendIdProvider = { "backend" },
+            repositoryScope = backgroundScope,
             startLoopStreamSubscribers = false,
         )
 

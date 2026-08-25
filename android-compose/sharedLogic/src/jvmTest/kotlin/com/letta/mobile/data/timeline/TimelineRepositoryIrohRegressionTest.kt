@@ -7,7 +7,10 @@ import com.letta.mobile.data.model.ToolCall
 import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.model.ToolReturnMessage
 import com.letta.mobile.util.Telemetry
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.emptyFlow
@@ -33,7 +36,12 @@ class TimelineRepositoryIrohRegressionTest {
 
     @Test
     fun `observe null conversation and scoped ingest share one StateFlow after split loops existed`() = runTest {
-        val repository = TimelineRepository(NoopTimelineTransport(), NoOpPendingLocalStore, NoOpConversationCursorStore)
+        val repository = TimelineRepository(
+            NoopTimelineTransport(),
+            NoOpPendingLocalStore,
+            NoOpConversationCursorStore,
+            repositoryScope = backgroundScope,
+        )
         val unscoped = repository.observe(agentId = null, conversationId = "conv-alias")
         val scopedLoopBeforeAlias = repository.getOrCreate(agentId = "agent-1", conversationId = "conv-alias")
         advanceUntilIdle()
@@ -56,6 +64,27 @@ class TimelineRepositoryIrohRegressionTest {
         assertEquals(1, unscoped.value.events.size)
         assertEquals("visible now", unscoped.value.events.single().content)
         assertEquals(1, repository.cachedLoopCount())
+    }
+
+    @Test
+    fun `cancelling repository scope stops loop stream collection`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val repositoryScope = CoroutineScope(Job() + dispatcher)
+        val transport = NoopTimelineTransport()
+        val repository = TimelineRepository(
+            transport,
+            NoOpPendingLocalStore,
+            NoOpConversationCursorStore,
+            repositoryScope = repositoryScope,
+        )
+
+        repository.getOrCreate("conv-lifecycle")
+        runCurrent()
+        assertEquals(1, transport.stream.subscriptionCount.value)
+
+        repositoryScope.cancel()
+        runCurrent()
+        assertEquals(0, transport.stream.subscriptionCount.value)
     }
 
     @Test
@@ -128,7 +157,7 @@ class TimelineRepositoryIrohRegressionTest {
     }
 
     private class NoopTimelineTransport : TimelineTransport {
-        private val stream = MutableSharedFlow<TimelineStreamFrame>()
+        val stream = MutableSharedFlow<TimelineStreamFrame>()
 
         override suspend fun sendConversationMessage(
             conversationId: String,

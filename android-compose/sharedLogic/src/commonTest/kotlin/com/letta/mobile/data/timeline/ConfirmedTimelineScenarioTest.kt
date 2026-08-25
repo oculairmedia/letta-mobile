@@ -10,6 +10,7 @@ import com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -62,12 +63,14 @@ class ConfirmedTimelineScenarioTest {
     private fun createTestRepo(
         transport: TimelineTransport,
         store: ConfirmedTimelineStore = InMemoryConfirmedTimelineStore(),
+        repositoryScope: CoroutineScope,
     ) = TimelineRepository(
         timelineTransport = transport,
         pendingLocalStore = NoOpPendingLocalStore,
         conversationCursorStore = NoOpConversationCursorStore,
         confirmedTimelineStore = store,
         backendIdProvider = { "test-backend" },
+        repositoryScope = repositoryScope,
         startLoopStreamSubscribers = false,
     )
 
@@ -160,7 +163,7 @@ class ConfirmedTimelineScenarioTest {
         val transport = FakeTimelineTransport(
             throwOnList = IllegalStateException("Network unreachable (offline)"),
         )
-        val repo = createTestRepo(transport, store)
+        val repo = createTestRepo(transport, store, backgroundScope)
 
         try {
             val loop = repo.getOrCreate("conv-offline")
@@ -234,7 +237,7 @@ class ConfirmedTimelineScenarioTest {
         )
 
         val transport = FakeTimelineTransport()
-        val repo = createTestRepo(transport, store)
+        val repo = createTestRepo(transport, store, backgroundScope)
 
         try {
             val loopA = repo.getOrCreate("conv-A")
@@ -253,7 +256,7 @@ class ConfirmedTimelineScenarioTest {
     fun neverSeenConversationOpensEmptyShellWithoutLoader() = runTest {
         val store = InMemoryConfirmedTimelineStore()
         val transport = FakeTimelineTransport()
-        val repo = createTestRepo(transport, store)
+        val repo = createTestRepo(transport, store, backgroundScope)
 
         try {
             val loop = repo.getOrCreate("conv-brand-new")
