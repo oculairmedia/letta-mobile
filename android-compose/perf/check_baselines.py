@@ -68,25 +68,36 @@ def _iter_measurements(outputs_dir: pathlib.Path) -> Iterable[dict]:
             yield enriched
 
 
+def _numeric_value(value: object) -> float | None:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _p95_run_value(runs: object) -> float | None:
+    if not isinstance(runs, list) or not runs:
+        return None
+    try:
+        ordered = sorted(float(run) for run in runs)
+    except (TypeError, ValueError):
+        return None
+    index = max(0, int(len(ordered) * 0.95) - 1)
+    return ordered[index]
+
+
 def _pick_metric(bench: dict, metric: str, aggregation: str | None) -> float | None:
     """Best-effort metric extraction across benchmark JSON schema versions."""
     entry = bench.get("metrics", {}).get(metric)
     if not isinstance(entry, dict):
         return None
-    try:
-        if aggregation and aggregation in entry:
-            return float(entry[aggregation])
-        for key in ("P95", "p95", "median", "P50", "p50", "mean"):
-            if key in entry:
-                return float(entry[key])
-        runs = entry.get("runs")
-        if isinstance(runs, list) and runs:
-            ordered = sorted(float(run) for run in runs)
-            index = max(0, int(len(ordered) * 0.95) - 1)
-            return ordered[index]
-    except (TypeError, ValueError):
-        return None
-    return None
+    preferred_keys = ((aggregation,) if aggregation else ()) + (
+        "P95", "p95", "median", "P50", "p50", "mean",
+    )
+    for key in preferred_keys:
+        if key in entry:
+            return _numeric_value(entry[key])
+    return _p95_run_value(entry.get("runs"))
 
 
 def _match_bench(bench: dict, source: str) -> bool:
