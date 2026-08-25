@@ -226,7 +226,7 @@ class TimelineHandlersIsolationTest {
             TimelineGatewayEvent.RecentMessagesSnapshot(
                 serverMessages = serverMsgs,
                 telemetryName = "test",
-                telemetryAttrs = emptyList(),
+                telemetryReason = "test",
                 ack = ack
             )
         )

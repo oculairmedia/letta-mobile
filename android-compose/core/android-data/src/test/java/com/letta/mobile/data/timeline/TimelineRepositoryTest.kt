@@ -9,8 +9,12 @@ import io.mockk.mockk
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -28,17 +32,22 @@ import kotlin.time.Duration.Companion.seconds
 @Tag("integration")
 class TimelineRepositoryTest {
     private val repositories = mutableListOf<TimelineRepository>()
+    private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     @After
     fun tearDown() = runBlocking {
-        repositories.forEach { it.clearAll() }
-        repositories.clear()
+        try {
+            repositories.forEach { it.clearAll() }
+        } finally {
+            repositories.clear()
+            repositoryScope.cancel()
+        }
     }
 
     @Test
     fun `clear cancels cached loop stream subscriber before removing it`() = runBlocking {
         val api = CancellableStreamApi()
-        val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, maxCachedLoops = 4)
+        val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, maxCachedLoops = 4, repositoryScope = repositoryScope)
         repositories += repository
 
         repository.getOrCreate("conv-clear")
@@ -55,7 +64,7 @@ class TimelineRepositoryTest {
     @Test
     fun `cache evicts least recently used loop and keeps recently accessed loop active`() = runBlocking {
         val api = CancellableStreamApi()
-        val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, maxCachedLoops = 2)
+        val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, maxCachedLoops = 2, repositoryScope = repositoryScope)
         repositories += repository
 
         repository.getOrCreate("conv-a")
@@ -78,7 +87,7 @@ class TimelineRepositoryTest {
     @Test
     fun `post handler collapse cache hit is synchronized and refreshes access order`() = runBlocking {
         val api = CancellableStreamApi()
-        val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, maxCachedLoops = 2)
+        val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, maxCachedLoops = 2, repositoryScope = repositoryScope)
         repositories += repository
 
         repository.getOrCreate("conv-a")
@@ -101,7 +110,7 @@ class TimelineRepositoryTest {
     @Test
     fun `getOrCreate hydrates on background dispatcher even when caller is main-like`() = runBlocking {
         val api = CancellableStreamApi()
-        val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, maxCachedLoops = 4)
+        val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, maxCachedLoops = 4, repositoryScope = repositoryScope)
         repositories += repository
         val callerDispatcher = Executors.newSingleThreadExecutor { runnable ->
             Thread(runnable, "caller-main-probe")
@@ -125,7 +134,7 @@ class TimelineRepositoryTest {
     @Test
     fun `scoped access reuses existing unscoped loop for same conversation`() = runBlocking {
         val api = CancellableStreamApi()
-        val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, maxCachedLoops = 4)
+        val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, maxCachedLoops = 4, repositoryScope = repositoryScope)
         repositories += repository
 
         val unscoped = repository.getOrCreate("conv-shared")
@@ -141,7 +150,7 @@ class TimelineRepositoryTest {
     @Test
     fun `unscoped access reuses existing scoped loop for same conversation`() = runBlocking {
         val api = CancellableStreamApi()
-        val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, maxCachedLoops = 4)
+        val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, maxCachedLoops = 4, repositoryScope = repositoryScope)
         repositories += repository
 
         val scoped = repository.getOrCreate("agent-a", "conv-shared")
@@ -157,7 +166,7 @@ class TimelineRepositoryTest {
     @Test
     fun `unscoped loop promoted to first scoped agent is not reused by different agent`() = runBlocking {
         val api = CancellableStreamApi()
-        val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, maxCachedLoops = 4)
+        val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, maxCachedLoops = 4, repositoryScope = repositoryScope)
         repositories += repository
 
         val unscoped = repository.getOrCreate("conv-shared")
@@ -175,7 +184,7 @@ class TimelineRepositoryTest {
     @Test
     fun `unscoped observer follows first scoped writer but not later different agent`() = runBlocking {
         val api = CancellableStreamApi()
-        val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, maxCachedLoops = 4)
+        val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, maxCachedLoops = 4, repositoryScope = repositoryScope)
         repositories += repository
 
         val agentA = repository.getOrCreate("agent-a", "conv-shared")
@@ -194,7 +203,7 @@ class TimelineRepositoryTest {
     fun `cursor repair hydrates the scoped loop when agent is present`() = runBlocking {
         val api = CancellableStreamApi()
         val cursorStore = RepositoryRecordingConversationCursorStore()
-        val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, cursorStore)
+        val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, cursorStore, repositoryScope = repositoryScope)
         repositories += repository
 
         repository.getOrCreate("agent-a", "default")
@@ -208,7 +217,7 @@ class TimelineRepositoryTest {
     @Test
     fun `cursor repair keeps reused conversation ids isolated by agent scope`() = runBlocking {
         val api = CancellableStreamApi()
-        val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, RepositoryRecordingConversationCursorStore())
+        val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, RepositoryRecordingConversationCursorStore(), repositoryScope = repositoryScope)
         repositories += repository
 
         val agentATimeline = repository.observe("agent-a", "default")
