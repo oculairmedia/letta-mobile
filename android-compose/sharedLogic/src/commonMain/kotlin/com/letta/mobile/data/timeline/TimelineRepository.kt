@@ -3,15 +3,17 @@ package com.letta.mobile.data.timeline
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.session.BackendScopedCache
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
+import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineReadResult
 import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore
 import com.letta.mobile.data.timeline.snapshot.NoOpConfirmedTimelineStore
+import com.letta.mobile.data.timeline.snapshot.SnapshotReadFailure
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
 import com.letta.mobile.util.Telemetry
 import kotlin.concurrent.Volatile
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -43,19 +45,23 @@ open class TimelineRepository(
     private val conversationCursorStore: ConversationCursorStore,
     private val confirmedTimelineStore: ConfirmedTimelineStore = NoOpConfirmedTimelineStore,
     private val backendIdProvider: () -> String = { "default" },
+    private val repositoryScope: CoroutineScope,
     private val startLoopStreamSubscribers: Boolean = true,
 ) : TimelineExternalTransportWriter, BackendScopedCache {
     constructor(
         timelineTransport: TimelineTransport,
         pendingLocalStore: PendingLocalStore,
         maxCachedLoops: Int,
-    ) : this(timelineTransport, pendingLocalStore, NoOpConversationCursorStore) {
+        repositoryScope: CoroutineScope,
+    ) : this(
+        timelineTransport,
+        pendingLocalStore,
+        NoOpConversationCursorStore,
+        repositoryScope = repositoryScope,
+    ) {
         require(maxCachedLoops > 0) { "maxCachedLoops must be positive" }
         this.maxCachedLoops = maxCachedLoops
     }
-
-    // Dedicated supervisor scope — child jobs fail in isolation.
-    private val scope = CoroutineScope(SupervisorJob() + timelineIoDispatcher)
 
     private var maxCachedLoops = DEFAULT_MAX_CACHED_LOOPS
 
@@ -189,64 +195,100 @@ open class TimelineRepository(
         val completion: CompletableDeferred<Unit>,
     )
 
+    private sealed interface HydrateFlightClaim {
+        data object AlreadyHydrated : HydrateFlightClaim
+        data class Owner(val flight: HydrateFlight) : HydrateFlightClaim
+        data class Joiner(val flight: HydrateFlight) : HydrateFlightClaim
+    }
+
     /** conversationId -> loop-owned in-flight hydration. Guarded by [hydrateFlightsMutex]. */
     private val hydrateFlights = LinkedHashMap<String, HydrateFlight>()
 
     private suspend fun hydrateSingleFlight(loop: TimelineSyncLoop, key: TimelineCacheKey) {
-        val created = HydrateFlight(loop, CompletableDeferred())
-        val joined = hydrateFlightsMutex.withLock {
+        when (val claim = claimHydrationFlight(loop, key)) {
+            HydrateFlightClaim.AlreadyHydrated -> return
+            is HydrateFlightClaim.Owner -> runOwnedHydration(claim.flight, key)
+            is HydrateFlightClaim.Joiner -> joinHydration(claim.flight, key)
+        }
+    }
+
+    private suspend fun claimHydrationFlight(
+        loop: TimelineSyncLoop,
+        key: TimelineCacheKey,
+    ): HydrateFlightClaim = hydrateFlightsMutex.withLock {
+        // Re-check under the same mutex that guards flight removal. A caller
+        // may have observed false before waiting while the owner completed
+        // hydration and removed its flight.
+        if (loop.hasHydratedSuccessfully) {
+            HydrateFlightClaim.AlreadyHydrated
+        } else {
             val existing = hydrateFlights[key.conversationId]
             if (existing?.loop === loop) {
-                existing
+                HydrateFlightClaim.Joiner(existing)
             } else {
+                val created = HydrateFlight(loop, CompletableDeferred())
                 hydrateFlights[key.conversationId] = created
-                null
+                HydrateFlightClaim.Owner(created)
             }
         }
-        if (joined != null) {
-            Telemetry.event(
-                "TimelineRepo", "hydrate.joined",
+    }
+
+    private suspend fun joinHydration(flight: HydrateFlight, key: TimelineCacheKey) {
+        Telemetry.event(
+            "TimelineRepo", "hydrate.joined",
+            "agentId" to key.agentId.orEmpty(),
+            "conversationId" to key.conversationId,
+        )
+        try {
+            flight.completion.await()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Throwable) {
+            Telemetry.error(
+                "TimelineRepo", "hydrate.joinedFailed", failure,
                 "agentId" to key.agentId.orEmpty(),
                 "conversationId" to key.conversationId,
             )
-            // Joiner swallows the shared outcome: the OWNER already emitted
-            // HydrateFailed on the loop's event queue on failure — re-emitting
-            // here would deliver duplicate events for one hydration attempt.
-            runCatching { joined.completion.await() }
-                .onFailure { t ->
-                    Telemetry.error(
-                        "TimelineRepo", "hydrate.joinedFailed", t,
-                        "agentId" to key.agentId.orEmpty(),
-                        "conversationId" to key.conversationId,
-                    )
-                }
-            return
         }
+    }
+
+    private suspend fun runOwnedHydration(flight: HydrateFlight, key: TimelineCacheKey) {
         try {
             withContext(timelineIoDispatcher) {
-                loop.hydrate()
+                flight.loop.hydrate()
             }
-            created.completion.complete(Unit)
-        } catch (t: Throwable) {
-            // Remove the flight BEFORE completing so a waiter that retries
-            // immediately isn't blocked by the dead flight.
-            hydrateFlightsMutex.withLock {
-                if (hydrateFlights[key.conversationId] === created) {
-                    hydrateFlights.remove(key.conversationId)
-                }
-            }
-            created.completion.completeExceptionally(t)
-            Telemetry.error(
-                "TimelineRepo", "hydrate.failed", t,
-                "agentId" to key.agentId.orEmpty(),
-                "conversationId" to key.conversationId,
-            )
-            runCatching { loop.emitHydrateFailed(t.message ?: "unknown") }
+            flight.completion.complete(Unit)
+        } catch (cancelled: CancellationException) {
+            releaseHydrationFlight(key, flight)
+            flight.completion.cancel(cancelled)
+            throw cancelled
+        } catch (failure: Throwable) {
+            handleOwnedHydrationFailure(flight, key, failure)
         } finally {
-            hydrateFlightsMutex.withLock {
-                if (hydrateFlights[key.conversationId] === created) {
-                    hydrateFlights.remove(key.conversationId)
-                }
+            releaseHydrationFlight(key, flight)
+        }
+    }
+
+    private suspend fun handleOwnedHydrationFailure(
+        flight: HydrateFlight,
+        key: TimelineCacheKey,
+        failure: Throwable,
+    ) {
+        // Release before completion so an immediate retry cannot join a dead flight.
+        releaseHydrationFlight(key, flight)
+        flight.completion.completeExceptionally(failure)
+        Telemetry.error(
+            "TimelineRepo", "hydrate.failed", failure,
+            "agentId" to key.agentId.orEmpty(),
+            "conversationId" to key.conversationId,
+        )
+        runCatching { flight.loop.emitHydrateFailed(failure.message ?: "unknown") }
+    }
+
+    private suspend fun releaseHydrationFlight(key: TimelineCacheKey, flight: HydrateFlight) {
+        hydrateFlightsMutex.withLock {
+            if (hydrateFlights[key.conversationId] === flight) {
+                hydrateFlights.remove(key.conversationId)
             }
         }
     }
@@ -258,25 +300,64 @@ open class TimelineRepository(
             conversationId = key.conversationId,
             agentId = key.agentId,
         )
-        val storedSnapshot = confirmedTimelineStore.readSnapshot(timelineScope)
+        val readResult = readStoredSnapshot(timelineScope)
         return loopsMutex.withLock {
-            getLoopLocked(key) ?: getAliasedLoopLocked(key) ?: createLoop(key, timelineScope, storedSnapshot)
+            getLoopLocked(key) ?: getAliasedLoopLocked(key) ?: createLoop(key, timelineScope, readResult)
         }
     }
+
+    private suspend fun readStoredSnapshot(timelineScope: TimelineScope): ConfirmedTimelineReadResult =
+        withContext(timelineIoDispatcher) {
+            try {
+                confirmedTimelineStore.readSnapshotResult(timelineScope)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Throwable) {
+                Telemetry.error(
+                    "TimelineRepo", "snapshot.readFailed", failure,
+                    "backendId" to timelineScope.backendId,
+                    "conversationId" to timelineScope.conversationId,
+                )
+                ConfirmedTimelineReadResult.ReconciliationRequired(SnapshotReadFailure.STORAGE_FAILURE)
+            }
+        }
 
     private fun createLoop(
         key: TimelineCacheKey,
         timelineScope: TimelineScope,
-        storedSnapshot: com.letta.mobile.data.timeline.snapshot.StoredTimelineEnvelope?,
+        readResult: ConfirmedTimelineReadResult,
     ): TimelineSyncLoop {
-        Telemetry.event("TimelineRepo", "getOrCreate.cacheMiss", "agentId" to key.agentId.orEmpty(), "conversationId" to key.conversationId)
+        val recoveryFailure = when (readResult) {
+            is ConfirmedTimelineReadResult.Active -> null
+            is ConfirmedTimelineReadResult.Fallback -> readResult.activeFailure
+            is ConfirmedTimelineReadResult.ReconciliationRequired -> readResult.failure
+        }
+        Telemetry.event(
+            "TimelineRepo", "getOrCreate.cacheMiss",
+            "agentId" to key.agentId.orEmpty(),
+            "conversationId" to key.conversationId,
+            "snapshotOutcome" to readResult::class.simpleName.orEmpty(),
+            "snapshotHighWaterRevision" to readResult.highWaterRevision,
+            "remoteReconciliationReason" to recoveryFailure?.name.orEmpty(),
+        )
+        if (recoveryFailure != null) {
+            Telemetry.event(
+                "TimelineRepo", "snapshot.remoteReconciliationRequested",
+                "agentId" to key.agentId.orEmpty(),
+                "conversationId" to key.conversationId,
+                "reason" to recoveryFailure.name,
+                "fallbackAvailable" to (readResult.snapshot != null),
+                level = Telemetry.Level.WARN,
+            )
+        }
+        val storedSnapshot = readResult.snapshot
         val created = TimelineSyncLoop(
-            messageApi = timelineTransport, conversationId = key.conversationId, agentId = key.agentId, scope = scope,
+            messageApi = timelineTransport, conversationId = key.conversationId, agentId = key.agentId, scope = repositoryScope,
             ingestedListenerProvider = { ingestedListener }, pendingLocalStore = pendingLocalStore,
             conversationCursorStore = conversationCursorStore, startStreamSubscriber = startLoopStreamSubscribers,
             confirmedTimelineStore = confirmedTimelineStore, timelineScope = timelineScope,
             initialTimeline = storedSnapshot?.let(TimelineSnapshotCodec::storedEnvelopeToTimeline),
-            initialRevision = storedSnapshot?.revision ?: 0L,
+            initialRevision = readResult.highWaterRevision,
         )
         loops[key] = created
         evictEldestLoopsIfNeededLocked()
@@ -683,7 +764,7 @@ open class TimelineRepository(
         while (loops.size > maxCachedLoops) {
             val eldestKey = loops.entries.firstOrNull()?.key ?: return
             loops.remove(eldestKey)?.let { loop ->
-                scope.launch { removeHydrateFlight(loop) }
+                repositoryScope.launch { removeHydrateFlight(loop) }
                 loop.close()
                 Telemetry.event(
                     "TimelineRepo", "loop.evicted",

@@ -42,6 +42,7 @@ import com.letta.mobile.util.Telemetry
 import com.letta.mobile.runtime.RuntimeEventOutbox
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -75,8 +76,16 @@ import com.letta.mobile.feature.chat.coordination.ChatComposerController
 import com.letta.mobile.feature.chat.coordination.ChatComposerEffect
 import com.letta.mobile.feature.chat.coordination.ChatComposerState
 import com.letta.mobile.feature.chat.coordination.ChatConversationCoordinator
+import com.letta.mobile.feature.chat.coordination.ChatConversationCoordinatorConfig
+import com.letta.mobile.feature.chat.coordination.ChatConversationRoute
+import com.letta.mobile.feature.chat.coordination.ClientModeBootstrapConfig
+import com.letta.mobile.feature.chat.coordination.ConversationSendConfig
+import com.letta.mobile.feature.chat.coordination.HydrationRouteConfig
+import com.letta.mobile.feature.chat.coordination.TimelineObserverConfig
 import com.letta.mobile.feature.chat.coordination.ChatHistoryPager
 import com.letta.mobile.feature.chat.coordination.ChatHydrationTrace
+import com.letta.mobile.feature.chat.coordination.ConversationAccessMode
+import com.letta.mobile.feature.chat.coordination.RecentMessagesReconcileLauncher
 import com.letta.mobile.feature.chat.coordination.ChatProjectBindings
 import com.letta.mobile.feature.chat.coordination.ChatRunExpansionState
 import com.letta.mobile.feature.chat.coordination.ChatSearchCoordinator
@@ -156,7 +165,7 @@ internal class AdminChatViewModel @Inject constructor(
     val activeSubagentSource: ActiveSubagentSource by lazy {
         val parentConversationId = _uiState
             .map { state -> (state.conversationState as? ConversationState.Ready)?.conversationId }
-            .stateIn(viewModelScope, SharingStarted.Eagerly, conversationId?.value)
+            .stateIn(viewModelScope, SharingStarted.Lazily, conversationId?.value)
         val localBound: StateFlow<Boolean> = activeAgent
             .map { AgentRuntimeBinding.isLocalBound(it) }
             .stateIn(
@@ -206,12 +215,12 @@ internal class AdminChatViewModel @Inject constructor(
      * returned true for Iroh, which is exactly the inversion this bead fixes.
      */
     private val usesChannelTransport: StateFlow<Boolean> = shimBackendDetector.activeUsesChannelTransport
-        .stateIn(viewModelScope, SharingStarted.Eagerly, shimBackendDetector.cachedActiveUsesChannelTransport())
+        .stateIn(viewModelScope, SharingStarted.Lazily, shimBackendDetector.cachedActiveUsesChannelTransport())
     private val backendKind: StateFlow<BackendKind> = shimBackendDetector.activeBackendKind
-        .stateIn(viewModelScope, SharingStarted.Eagerly, shimBackendDetector.cachedActiveBackendKind())
+        .stateIn(viewModelScope, SharingStarted.Lazily, shimBackendDetector.cachedActiveBackendKind())
     private var followingDuplicateInitialMessageInFlight = false
     val conversationId: ConversationId?
-        get() = chatConversationCoordinator.conversationId(false)?.let { ConversationId(it) }
+        get() = chatConversationCoordinator.conversationId(ConversationAccessMode.Timeline)?.let { ConversationId(it) }
     val projectContext: ProjectChatContext? = routeArgs.projectContext
 
     private val chatSessionResolver: ChatSessionResolver = ChatSessionResolver(
@@ -377,6 +386,7 @@ internal class AdminChatViewModel @Inject constructor(
 
     private fun triggerResumeSync() {
         val convId = conversationId?.value ?: chatConversationCoordinator.activeConversationId ?: return
+        val gen = chatConversationCoordinator.currentHydrationGeneration(convId)?.id ?: 0L
         viewModelScope.launch {
             try {
                 timelineRepository.reconcileRecentMessages(
@@ -384,11 +394,14 @@ internal class AdminChatViewModel @Inject constructor(
                     conversationId = convId,
                     reason = "screen_resumed",
                     forceRefresh = false,
+                    connectionGeneration = gen,
                 )
-            } catch (t: Throwable) {
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Throwable) {
                 Telemetry.event(
                     "AdminChatVM", "resume.sync.error",
-                    "error" to (t.message ?: "unknown"),
+                    "error" to (failure.message ?: "unknown"),
                     level = Telemetry.Level.WARN,
                 )
             }
@@ -550,46 +563,56 @@ internal class AdminChatViewModel @Inject constructor(
         hydrationIdentity = ::hydrationIdentity,
     )
     private val chatConversationCoordinator: ChatConversationCoordinator = ChatConversationCoordinator(
-        scope = viewModelScope,
-        agentId = agentId.value,
-        initialMessage = initialMessage,
-        explicitConversationId = { explicitConversationId },
-        // letta-mobile-9cb37: snapshot of the route's explicit conversation id so
-        // an agent switch can't lose it to a restored/stale CONVERSATION_ID_KEY.
-        pinnedExplicitConversationId = routeArgs.pinnedExplicitConversationId,
-        setRouteConversationId = routeArgs::setRouteConversationId,
-        isFreshRoute = isFreshRoute,
-        chatSessionResolver = chatSessionResolver,
-        agentRepository = agentRepository,
-        currentConversationTracker = currentConversationTracker,
-        uiState = _uiState,
-        updateSessionState = ::updateSessionState,
-        pendingClientModeBootstrapMessages = { persistentListOf() },
-        setPendingClientModeBootstrapUserMessage = { },
-        currentClientModeConversationId = { null },
-        startTimelineObserver = ::startTimelineObserver,
-        stopTimelineObserver = ::stopTimelineObserver,
-        reconcileRecentMessages = { convId, reason ->
-            timelineRepository.reconcileRecentMessages(agentId.value, convId, reason)
-        },
-        sendMessageViaClientMode = { message ->
-            sendPipeline.timelineChatSendStrategy.send(
-                text = message,
-                attachments = emptyList(),
-                context = composerCoordinator.chatSendContext(),
-            )
-        },
-        sendMessageViaTimeline = { message ->
-            sendPipeline.timelineChatSendStrategy.send(
-                text = message,
-                attachments = emptyList(),
-                context = composerCoordinator.chatSendContext(),
-            )
-        },
-        markFollowingDuplicateInitialMessageInFlight = { followingDuplicateInitialMessageInFlight = true },
-        localRuntimeRouting = ::localRuntimeRouting,
-        hydrationIdentity = { convId -> hydrationIdentity(agentId.value, convId) },
+        config = ChatConversationCoordinatorConfig(
+            scope = viewModelScope,
+            route = ChatConversationRoute(
+                agentId = agentId.value,
+                initialMessage = initialMessage,
+                explicitConversationId = { explicitConversationId },
+                pinnedExplicitConversationId = routeArgs.pinnedExplicitConversationId,
+                setConversationId = routeArgs::setRouteConversationId,
+                isFresh = isFreshRoute,
+            ),
+            chatSessionResolver = chatSessionResolver,
+            agentRepository = agentRepository,
+            currentConversationTracker = currentConversationTracker,
+            uiState = _uiState,
+            updateSessionState = ::updateSessionState,
+            bootstrap = ClientModeBootstrapConfig(
+                pendingMessages = { persistentListOf() },
+                setPendingUserMessage = { },
+                currentConversationId = { null },
+            ),
+            observer = TimelineObserverConfig(::startTimelineObserver, ::stopTimelineObserver),
+            reconcileLauncher = RecentMessagesReconcileLauncher(
+                scope = viewModelScope,
+                reconcile = { request ->
+                    timelineRepository.reconcileRecentMessages(
+                        agentId = agentId.value,
+                        conversationId = request.conversationId,
+                        reason = request.reason,
+                        forceRefresh = false,
+                        connectionGeneration = request.connectionGeneration,
+                    )
+                },
+            ),
+            send = ConversationSendConfig(
+                viaClientMode = ::sendCoordinatorMessage,
+                viaTimeline = ::sendCoordinatorMessage,
+                markDuplicateInitialMessageInFlight = { followingDuplicateInitialMessageInFlight = true },
+            ),
+            localRuntimeRouting = ::localRuntimeRouting,
+            hydration = HydrationRouteConfig(identity = { convId -> hydrationIdentity(agentId.value, convId) }),
+        ),
     )
+
+    private fun sendCoordinatorMessage(message: String) {
+        sendPipeline.timelineChatSendStrategy.send(
+            text = message,
+            attachments = emptyList(),
+            context = composerCoordinator.chatSendContext(),
+        )
+    }
 
     private fun localRuntimeRouting(): LocalRuntimeRouting = resolveLocalRuntimeRouting(
         agent = activeAgent.value,
@@ -663,9 +686,11 @@ internal class AdminChatViewModel @Inject constructor(
 
     private fun resolveConversationAndLoad(
         useClientModeForResolve: Boolean = false,
-    ) = chatConversationCoordinator.resolveConversationAndLoad(useClientModeForResolve)
+    ) = chatConversationCoordinator.resolveConversationAndLoad(
+        if (useClientModeForResolve) ConversationAccessMode.Client else ConversationAccessMode.Timeline,
+    )
 
-    fun loadMessages() = chatConversationCoordinator.loadMessages(false)
+    fun loadMessages() = chatConversationCoordinator.loadMessages(ConversationAccessMode.Timeline)
 
     fun retryConversationLoad() {
         updateSessionState { current ->
@@ -733,8 +758,10 @@ internal class AdminChatViewModel @Inject constructor(
                     messages = persistentListOf(),
                     messageListChange = ChatMessageListChange.Full,
                 )
-            } catch (e: Exception) {
-                android.util.Log.w("AdminChatViewModel", "Failed to reset messages", e)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                android.util.Log.w("AdminChatViewModel", "Failed to reset messages", failure)
             }
         }
     }

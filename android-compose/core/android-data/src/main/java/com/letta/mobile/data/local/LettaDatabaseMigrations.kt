@@ -205,6 +205,83 @@ object LettaDatabaseMigrations {
         }
     }
 
+    val MIGRATION_10_11 = object : Migration(10, 11) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            createSnapshotChunkTables(db)
+            migrateLegacySnapshotsInBoundedChunks(db)
+            db.execSQL("DROP TABLE `confirmed_timeline_snapshots`")
+            db.execSQL("ALTER TABLE `confirmed_timeline_snapshot_heads_new` RENAME TO `confirmed_timeline_snapshots`")
+            db.execSQL(
+                """
+                CREATE INDEX IF NOT EXISTS `index_confirmed_timeline_snapshots_backend_id_written_at_millis`
+                ON `confirmed_timeline_snapshots` (`backend_id`, `written_at_millis`)
+                """.trimIndent(),
+            )
+        }
+    }
+
+    private fun createSnapshotChunkTables(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `confirmed_timeline_snapshot_heads_new` (
+                `backend_id` TEXT NOT NULL,
+                `conversation_id` TEXT NOT NULL,
+                `agent_id` TEXT,
+                `active_manifest_id` TEXT,
+                `fallback_manifest_id` TEXT,
+                `high_water_revision` INTEGER NOT NULL,
+                `written_at_millis` INTEGER NOT NULL,
+                PRIMARY KEY(`backend_id`, `conversation_id`)
+            )
+            """.trimIndent(),
+        )
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `confirmed_timeline_snapshot_manifests` (
+                `manifest_id` TEXT NOT NULL,
+                `backend_id` TEXT NOT NULL,
+                `conversation_id` TEXT NOT NULL,
+                `agent_id` TEXT,
+                `revision` INTEGER NOT NULL,
+                `schema_version` INTEGER NOT NULL,
+                `byte_length` INTEGER NOT NULL,
+                `chunk_count` INTEGER NOT NULL,
+                `sha256` TEXT NOT NULL,
+                `written_at_millis` INTEGER NOT NULL,
+                PRIMARY KEY(`manifest_id`)
+            )
+            """.trimIndent(),
+        )
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `confirmed_timeline_snapshot_chunks` (
+                `manifest_id` TEXT NOT NULL,
+                `chunk_index` INTEGER NOT NULL,
+                `payload` BLOB NOT NULL,
+                PRIMARY KEY(`manifest_id`, `chunk_index`),
+                FOREIGN KEY(`manifest_id`) REFERENCES `confirmed_timeline_snapshot_manifests`(`manifest_id`)
+                    ON UPDATE NO ACTION ON DELETE CASCADE
+            )
+            """.trimIndent(),
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_confirmed_timeline_snapshot_manifests_backend_id_conversation_id_revision` " +
+                "ON `confirmed_timeline_snapshot_manifests` (`backend_id`, `conversation_id`, `revision`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_confirmed_timeline_snapshot_manifests_backend_id` " +
+                "ON `confirmed_timeline_snapshot_manifests` (`backend_id`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_confirmed_timeline_snapshot_chunks_manifest_id` " +
+                "ON `confirmed_timeline_snapshot_chunks` (`manifest_id`)",
+        )
+    }
+
+    private fun migrateLegacySnapshotsInBoundedChunks(db: SupportSQLiteDatabase) {
+        LegacySnapshotMigration(db).copyAll()
+    }
+
     val ALL: Array<Migration> = arrayOf(
         MIGRATION_1_2,
         MIGRATION_2_3,
@@ -215,5 +292,6 @@ object LettaDatabaseMigrations {
         MIGRATION_7_8,
         MIGRATION_8_9,
         MIGRATION_9_10,
+        MIGRATION_10_11,
     )
 }

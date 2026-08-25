@@ -28,6 +28,7 @@ class TimelineRecentMessagesReconcilerTest {
         val transport = RecordingTimelineTransport()
         val reconciler = TimelineRecentMessagesReconciler(
             conversationId = "conv-1",
+            scope = backgroundScope,
             messageApi = transport,
             eventQueue = Channel<TimelineGatewayEvent>(Channel.UNLIMITED).also { queue ->
                 backgroundScope.launch {
@@ -42,6 +43,7 @@ class TimelineRecentMessagesReconcilerTest {
             streamSubscriberActive = MutableStateFlow(false),
             writeMutex = Mutex(),
             applyReturnsAndResponsesFromSnapshot = {},
+            onSnapshotApplied = {},
         )
         val firstEntered = CompletableDeferred<Unit>()
         val release = CompletableDeferred<Unit>()
@@ -62,6 +64,7 @@ class TimelineRecentMessagesReconcilerTest {
         var now = 0L
         val reconciler = TimelineRecentMessagesReconciler(
             conversationId = "conv-1",
+            scope = backgroundScope,
             messageApi = transport,
             eventQueue = Channel<TimelineGatewayEvent>(Channel.UNLIMITED).also { queue ->
                 backgroundScope.launch {
@@ -76,6 +79,7 @@ class TimelineRecentMessagesReconcilerTest {
             streamSubscriberActive = MutableStateFlow(true),
             writeMutex = Mutex(),
             applyReturnsAndResponsesFromSnapshot = {},
+            onSnapshotApplied = {},
             nowMillis = { now },
             minForcedReconcileIntervalMs = 4_000L,
         )
@@ -98,6 +102,7 @@ class TimelineRecentMessagesReconcilerTest {
         var now = 0L
         val reconciler = TimelineRecentMessagesReconciler(
             conversationId = "conv-1",
+            scope = backgroundScope,
             messageApi = transport,
             eventQueue = Channel<TimelineGatewayEvent>(Channel.UNLIMITED).also { queue ->
                 backgroundScope.launch {
@@ -112,6 +117,7 @@ class TimelineRecentMessagesReconcilerTest {
             streamSubscriberActive = MutableStateFlow(true),
             writeMutex = Mutex(),
             applyReturnsAndResponsesFromSnapshot = {},
+            onSnapshotApplied = {},
             nowMillis = { now },
             minForcedReconcileIntervalMs = 4_000L,
         )
@@ -130,6 +136,7 @@ class TimelineRecentMessagesReconcilerTest {
         var now = 0L
         val reconciler = TimelineRecentMessagesReconciler(
             conversationId = "conv-1",
+            scope = backgroundScope,
             messageApi = transport,
             eventQueue = Channel<TimelineGatewayEvent>(Channel.UNLIMITED).also { queue ->
                 backgroundScope.launch {
@@ -144,6 +151,7 @@ class TimelineRecentMessagesReconcilerTest {
             streamSubscriberActive = MutableStateFlow(true),
             writeMutex = Mutex(),
             applyReturnsAndResponsesFromSnapshot = {},
+            onSnapshotApplied = {},
             nowMillis = { now },
             minForcedReconcileIntervalMs = 4_000L,
         )
@@ -168,6 +176,7 @@ class TimelineRecentMessagesReconcilerTest {
         var now = 0L
         val reconciler = TimelineRecentMessagesReconciler(
             conversationId = "conv-1",
+            scope = backgroundScope,
             messageApi = transport,
             eventQueue = Channel<TimelineGatewayEvent>(Channel.UNLIMITED).also { queue ->
                 backgroundScope.launch {
@@ -182,6 +191,7 @@ class TimelineRecentMessagesReconcilerTest {
             streamSubscriberActive = MutableStateFlow(false),
             writeMutex = Mutex(),
             applyReturnsAndResponsesFromSnapshot = {},
+            onSnapshotApplied = {},
             nowMillis = { now },
             minForcedReconcileIntervalMs = 4_000L,
         )

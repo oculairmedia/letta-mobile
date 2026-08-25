@@ -5,6 +5,7 @@ import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.util.Telemetry
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.collections.immutable.toPersistentSet
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.sync.Mutex
@@ -65,6 +66,8 @@ suspend fun reconcileAfterSend(
             "confirmedLocal" to confirmedLocal,
             "appendedMissing" to appendedMissing,
         )
+    } catch (cancellation: CancellationException) {
+        throw cancellation
     } catch (t: Throwable) {
         timer.stopError(t, "otid" to otid)
         events.emit(TimelineSyncEvent.ReconcileError(t.message ?: "unknown"))
@@ -565,11 +568,7 @@ fun Timeline.positionForServerMessageDate(message: LettaMessage): Double {
 
 suspend fun reconcileForExternalRun(
     runId: String,
-    reconcileRecentMessagesFromServer: suspend (String, Array<Pair<String, Any?>>, Boolean) -> Unit,
+    reconcileRecentMessagesFromServer: suspend (String, String, Boolean) -> Unit,
 ) {
-    reconcileRecentMessagesFromServer(
-        "externalRunReconcile",
-        arrayOf("runId" to runId),
-        true
-    )
+    reconcileRecentMessagesFromServer("externalRunReconcile", runId, true)
 }

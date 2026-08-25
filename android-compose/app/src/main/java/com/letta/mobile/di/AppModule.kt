@@ -1,5 +1,7 @@
 package com.letta.mobile.di
 
+import androidx.lifecycle.ProcessLifecycleOwner
+import androidx.lifecycle.lifecycleScope
 import com.letta.mobile.channel.NotificationDeliveryCoordinator
 import com.letta.mobile.channel.ChannelNotificationPublisher
 import com.letta.mobile.channel.ChannelSyncStateStore
@@ -196,6 +198,7 @@ abstract class AppModule {
                 conversationCursorStore = conversationCursorStore,
                 confirmedTimelineStore = confirmedTimelineStore,
                 backendIdProvider = { settingsRepository.activeConfig.value?.id ?: "default" },
+                repositoryScope = ProcessLifecycleOwner.get().lifecycleScope,
             )
         }
     }

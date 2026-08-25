@@ -203,12 +203,14 @@ class TimelineHandlersIsolationTest {
         val writeMutex = Mutex()
         val reconciler = TimelineRecentMessagesReconciler(
             conversationId = "conv1",
+            scope = this,
             messageApi = mockk(),
             eventQueue = eventQueue,
             state = state,
             streamSubscriberActive = MutableStateFlow(false),
             writeMutex = writeMutex,
-            applyReturnsAndResponsesFromSnapshot = {}
+            applyReturnsAndResponsesFromSnapshot = {},
+            onSnapshotApplied = {},
         )
 
         val serverMsgs = listOf(
@@ -224,7 +226,7 @@ class TimelineHandlersIsolationTest {
             TimelineGatewayEvent.RecentMessagesSnapshot(
                 serverMessages = serverMsgs,
                 telemetryName = "test",
-                telemetryAttrs = emptyList(),
+                telemetryReason = "test",
                 ack = ack
             )
         )

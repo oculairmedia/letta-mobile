@@ -9,6 +9,7 @@ import com.letta.mobile.data.timeline.snapshot.NoOpConfirmedTimelineStore
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
 import kotlin.concurrent.Volatile
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CompletableDeferred
@@ -53,9 +54,12 @@ class TimelineSyncLoop(
     private val timelineScope: TimelineScope? = null,
     initialTimeline: Timeline? = null,
     initialRevision: Long = 0L,
+    private val ioDispatcher: kotlinx.coroutines.CoroutineDispatcher = timelineIoDispatcher,
 ) {
     private val loopJob = SupervisorJob(scope.coroutineContext[Job])
-    private val loopScope = CoroutineScope(scope.coroutineContext + loopJob)
+    private val loopScope = object : CoroutineScope {
+        override val coroutineContext = scope.coroutineContext + loopJob
+    }
 
     private val _state = MutableStateFlow(initialTimeline ?: Timeline(conversationId))
     val state: StateFlow<Timeline> = _state.asStateFlow()
@@ -69,6 +73,7 @@ class TimelineSyncLoop(
     val events: SharedFlow<TimelineSyncEvent> = _events.asSharedFlow()
 
     private var snapshotRevision: Long = initialRevision
+    private var lastPersistedFingerprint: Long? = null
     private val persistRequests = Channel<SnapshotPersistRequest>(Channel.CONFLATED)
     private val persistMutex = Mutex()
     private val persistJob: Job
@@ -112,12 +117,14 @@ class TimelineSyncLoop(
 
     private val recentMessagesReconciler = TimelineRecentMessagesReconciler(
         conversationId = conversationId,
+        scope = loopScope,
         messageApi = messageApi,
         eventQueue = eventQueue,
         state = _state,
         streamSubscriberActive = _streamSubscriberActive.asStateFlow(),
         writeMutex = writeMutex,
-        applyReturnsAndResponsesFromSnapshot = { snapshot -> applyReturnsAndResponsesFromSnapshot(snapshot, _state) }
+        applyReturnsAndResponsesFromSnapshot = { snapshot -> applyReturnsAndResponsesFromSnapshot(snapshot, _state) },
+        onSnapshotApplied = { scheduleSnapshotPersist(immediate = true) },
     )
 
     private val hydrator = TimelineHydrator(
@@ -143,10 +150,10 @@ class TimelineSyncLoop(
     private suspend fun runSnapshotPersistence() {
         for (request in persistRequests) {
             if (request == SnapshotPersistRequest.Debounced) {
-                delay(SNAPSHOT_PERSIST_DEBOUNCE_MS)
+                delay(SNAPSHOT_PERSIST_DEBOUNCE)
             }
             while (persistRequests.tryReceive().isSuccess) {
-                // Coalesce all timeline changes received during the debounce window.
+                // Coalesce all timeline changes received during the debounce window into the latest state.
             }
             flushSnapshotNow(prune = true)
         }
@@ -162,25 +169,55 @@ class TimelineSyncLoop(
 
     private suspend fun persistCurrentSnapshot(snapshotScope: TimelineScope, prune: Boolean) {
         val currentTimeline = writeMutex.withLock { state.value }
+        val (provisionalEnvelope, fingerprint) = withContext(ioDispatcher) {
+            val envelope = TimelineSnapshotCodec.timelineToStoredEnvelope(
+                timeline = currentTimeline,
+                scope = snapshotScope,
+                revision = snapshotRevision,
+                writtenAtMillis = timelineCurrentTimeMillis(),
+            )
+            envelope to TimelineSnapshotCodec.computeStoredEnvelopeFingerprint(envelope)
+        }
+
+        if (fingerprint == lastPersistedFingerprint) {
+            Telemetry.event(
+                "TimelineSync", "snapshotPersist.identicalSkipped",
+                "conversationId" to conversationId,
+                "revision" to snapshotRevision,
+                "fingerprint" to fingerprint,
+                "eventCount" to provisionalEnvelope.events.size,
+            )
+            return
+        }
+
         val revision = ++snapshotRevision
-        val envelope = TimelineSnapshotCodec.timelineToStoredEnvelope(
-            timeline = currentTimeline,
-            scope = snapshotScope,
-            revision = revision,
-            writtenAtMillis = timelineCurrentTimeMillis(),
-        )
+        val envelope = provisionalEnvelope.copy(revision = revision)
+        val startedAtMs = timelineCurrentTimeMillis()
+
         try {
-            val written = confirmedTimelineStore.writeSnapshot(envelope)
-            if (prune) {
-                confirmedTimelineStore.prune(snapshotScope.backendId, MAX_RETAINED_SNAPSHOTS)
-            }
-            if (!written) {
-                Telemetry.event(
-                    "TimelineSync", "snapshotPersist.staleRejected",
-                    "conversationId" to conversationId,
-                    "revision" to revision,
-                    level = Telemetry.Level.WARN,
-                )
+            withContext(ioDispatcher + NonCancellable) {
+                val written = confirmedTimelineStore.writeSnapshot(envelope)
+                if (prune) {
+                    confirmedTimelineStore.prune(snapshotScope.backendId, MAX_RETAINED_SNAPSHOTS)
+                }
+                val durationMs = timelineCurrentTimeMillis() - startedAtMs
+                if (!written) {
+                    Telemetry.event(
+                        "TimelineSync", "snapshotPersist.staleRejected",
+                        "conversationId" to conversationId,
+                        "revision" to revision,
+                        level = Telemetry.Level.WARN,
+                    )
+                } else {
+                    lastPersistedFingerprint = fingerprint
+                    Telemetry.event(
+                        "TimelineSync", "snapshotPersist.written",
+                        "conversationId" to conversationId,
+                        "revision" to revision,
+                        "eventCount" to envelope.events.size,
+                        "durationMs" to durationMs,
+                    )
+                }
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
@@ -367,12 +404,15 @@ class TimelineSyncLoop(
         otid: String,
         content: String,
         attachments: List<MessageContentPart.Image> = emptyList(),
-    ): Boolean = stateTransitionHandler.appendOptimisticLocalSync(
-        otid = otid,
-        content = content,
-        attachments = attachments.toTimelinePersistentList(),
-        sentAt = timelineNow(),
-    )
+    ): Boolean {
+        recentMessagesReconciler.invalidateFreshness()
+        return stateTransitionHandler.appendOptimisticLocalSync(
+            otid = otid,
+            content = content,
+            attachments = attachments.toTimelinePersistentList(),
+            sentAt = timelineNow(),
+        )
+    }
 
     /** letta-mobile-mxwtn: synchronous SENT transition on a Local event. */
     suspend fun markOptimisticLocalSentSync(otid: String) {
@@ -408,18 +448,37 @@ class TimelineSyncLoop(
                         if (shouldDropDuplicateStreamMessage(event.message, event.source)) {
                             event.ack?.complete(Unit)
                         } else {
+                            recentMessagesReconciler.invalidateFreshness()
                             streamDispatcher.dispatch(event.message, event.source)
                             event.ack?.complete(Unit)
                         }
                     }
-                    is TimelineGatewayEvent.LocalSendAppend -> stateTransitionHandler.applyLocalSendAppend(event)
-                    is TimelineGatewayEvent.ExternalTransportLocalAppend -> externalTransportAppender.applyExternalTransportLocalAppend(event)
+                    is TimelineGatewayEvent.LocalSendAppend -> {
+                        recentMessagesReconciler.invalidateFreshness()
+                        stateTransitionHandler.applyLocalSendAppend(event)
+                        scheduleSnapshotPersist(immediate = true)
+                    }
+                    is TimelineGatewayEvent.ExternalTransportLocalAppend -> {
+                        recentMessagesReconciler.invalidateFreshness()
+                        externalTransportAppender.applyExternalTransportLocalAppend(event)
+                        scheduleSnapshotPersist(immediate = true)
+                    }
                     is TimelineGatewayEvent.ReconcileAfterSendSnapshot -> applyReconcileAfterSendSnapshot(event)
                     is TimelineGatewayEvent.RecentMessagesSnapshot -> recentMessagesReconciler.applyRecentMessagesSnapshot(event)
                     is TimelineGatewayEvent.PostHandlerCollapse -> event.ack.complete(Unit)
-                    is TimelineGatewayEvent.RetrySend -> stateTransitionHandler.applyRetrySend(event)
-                    is TimelineGatewayEvent.MarkSent -> stateTransitionHandler.applyMarkSent(event)
-                    is TimelineGatewayEvent.MarkFailed -> stateTransitionHandler.applyMarkFailed(event)
+                    is TimelineGatewayEvent.RetrySend -> {
+                        recentMessagesReconciler.invalidateFreshness()
+                        stateTransitionHandler.applyRetrySend(event)
+                        scheduleSnapshotPersist(immediate = true)
+                    }
+                    is TimelineGatewayEvent.MarkSent -> {
+                        stateTransitionHandler.applyMarkSent(event)
+                        scheduleSnapshotPersist(immediate = true)
+                    }
+                    is TimelineGatewayEvent.MarkFailed -> {
+                        stateTransitionHandler.applyMarkFailed(event)
+                        scheduleSnapshotPersist(immediate = true)
+                    }
                     is TimelineGatewayEvent.CleanupAbandonedAssistantFragments -> applyCleanupAbandonedAssistantFragments(event)
                 }
             } catch (cancelled: CancellationException) {
@@ -458,6 +517,7 @@ class TimelineSyncLoop(
         writeMutex.withLock {
             applyReturnsAndResponsesFromSnapshot(event.serverMessages, _state)
         }
+        scheduleSnapshotPersist(immediate = true)
         event.ack.complete(result)
     }
 
@@ -490,8 +550,11 @@ class TimelineSyncLoop(
             removed = result.suppressions.size
             _state.value = result.timeline
         }
-        if (removed > 0 && !event.runId.isNullOrBlank()) {
-            _events.emit(TimelineSyncEvent.OrphanAssistantFragmentsCleaned(event.runId, event.turnId, removed, event.reason))
+        if (removed > 0) {
+            scheduleSnapshotPersist(immediate = true)
+            if (!event.runId.isNullOrBlank()) {
+                _events.emit(TimelineSyncEvent.OrphanAssistantFragmentsCleaned(event.runId, event.turnId, removed, event.reason))
+            }
         }
         event.ack.complete(removed)
     }
@@ -516,6 +579,7 @@ class TimelineSyncLoop(
         writeMutex.withLock {
             applyReturnsAndResponsesFromSnapshot(listOf(message), _state)
         }
+        scheduleSnapshotPersist(immediate = true)
         Telemetry.event(
             "TimelineSync", "toolReturn.resolved",
             "conversationId" to conversationId,
@@ -526,12 +590,12 @@ class TimelineSyncLoop(
     }
 
     suspend fun reconcileForExternalRun(runId: String) {
-        reconcileForExternalRun(runId) { name, attrs, allowWhileActive ->
-            when (val outcome = recentMessagesReconciler.reconcileRecentMessagesFromServer(name, attrs, allowWhileActive)) {
-                is RecentMessagesReconcileOutcome.Applied -> outcome.appended
-                is RecentMessagesReconcileOutcome.Skipped -> 0
-                is RecentMessagesReconcileOutcome.Failed -> throw outcome.cause
-            }
+        reconcileForExternalRun(runId) { name, _, allowWhileActive ->
+            val outcome = recentMessagesReconciler.reconcileRecentMessages(
+                reason = name,
+                forceRefresh = allowWhileActive,
+            )
+            if (outcome is RecentMessagesReconcileOutcome.Failed) throw outcome.cause
         }
     }
 
@@ -641,7 +705,7 @@ class TimelineSyncLoop(
     }
 
     companion object {
-        private const val SNAPSHOT_PERSIST_DEBOUNCE_MS = 100L
+        private val SNAPSHOT_PERSIST_DEBOUNCE = 100.milliseconds
         private const val STREAM_HEARTBEAT_EXPECTED_MS = 30_000L
         // letta-mobile-5pi: 6x multiplier = 3 minute silence timeout.
         // Previously 12x (6 minutes) — a dead stream could go undetected

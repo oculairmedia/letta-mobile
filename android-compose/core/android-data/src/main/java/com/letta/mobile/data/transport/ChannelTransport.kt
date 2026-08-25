@@ -7,8 +7,6 @@ import com.letta.mobile.data.timeline.NoOpConversationCursorStore
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,7 +15,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.job
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
@@ -32,8 +29,6 @@ import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import java.time.Instant
 import java.util.UUID
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * client for the admin-shim's `/shim/v1/mobile` WebSocket.
@@ -43,30 +38,11 @@ import javax.inject.Singleton
  * - [CursorResumeCoordinator] (resuming runs, sequence cursor tracking)
  * - [WebSocketConnection] (OkHttp socket lifecycle & reconnect redialing)
  */
-internal fun defaultChannelTransportScope(): CoroutineScope =
-    CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
-@Singleton
-class ChannelTransport internal constructor(
+class ChannelTransport(
     private val scope: CoroutineScope,
     cursorStore: RunCursorStore,
-    conversationCursorStore: ConversationCursorStore,
+    conversationCursorStore: ConversationCursorStore = NoOpConversationCursorStore,
 ) : IChannelTransport {
-    @Inject
-    constructor(
-        cursorStore: RunCursorStore,
-        conversationCursorStore: ConversationCursorStore,
-    ) : this(
-        defaultChannelTransportScope(),
-        cursorStore,
-        conversationCursorStore,
-    )
-
-    constructor(cursorStore: RunCursorStore) : this(
-        defaultChannelTransportScope(),
-        cursorStore,
-        NoOpConversationCursorStore,
-    )
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -592,10 +568,10 @@ class ChannelTransport internal constructor(
             }
         }
 
-        scope.launch {
-            _events.emit(frame)
-            _frameEvents.emit(TransportFrameEvent(frame = frame, isReplay = isReplay))
-        }
+        // OkHttp delivers callbacks in wire order. Publish from that callback instead of
+        // launching one coroutine per frame, which allows later live frames to overtake replay.
+        _events.tryEmit(frame)
+        _frameEvents.tryEmit(TransportFrameEvent(frame = frame, isReplay = isReplay))
     }
 
     override fun sendA2uiAction(action: A2uiAction): A2uiActionDispatchResult {

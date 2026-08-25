@@ -10,7 +10,16 @@ import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.feature.chat.coordination.ChatConversationCoordinator
+import com.letta.mobile.feature.chat.coordination.ChatConversationCoordinatorConfig
+import com.letta.mobile.feature.chat.coordination.ChatConversationRoute
+import com.letta.mobile.feature.chat.coordination.ChatHydrationTrace
+import com.letta.mobile.feature.chat.coordination.ClientModeBootstrapConfig
+import com.letta.mobile.feature.chat.coordination.ConversationSendConfig
+import com.letta.mobile.feature.chat.coordination.HydrationRouteConfig
+import com.letta.mobile.feature.chat.coordination.TimelineObserverConfig
 import com.letta.mobile.feature.chat.coordination.ChatSessionResolver
+import com.letta.mobile.feature.chat.coordination.ConversationAccessMode
+import com.letta.mobile.feature.chat.coordination.RecentMessagesReconcileLauncher
 import com.letta.mobile.testutil.TestData
 import io.mockk.coEvery
 import io.mockk.every
@@ -61,7 +70,7 @@ class AdminChatParityTest {
         val harness = Harness(scope = this)
         coEvery { harness.chatSessionResolver.resolveMostRecentConversation("agent-1", any()) } throws RuntimeException("Network error")
 
-        harness.coordinator.resolveConversationAndLoad(useClientModeForResolve = false)
+        harness.coordinator.resolveConversationAndLoad(ConversationAccessMode.Timeline)
         advanceUntilIdle()
 
         // Verify KMP state transitioned to Offline
@@ -135,7 +144,7 @@ class AdminChatParityTest {
         val harness = Harness(this)
         harness.routeConversationId = "conversation-1"
 
-        harness.coordinator.resolveConversationAndLoad(useClientModeForResolve = false)
+        harness.coordinator.resolveConversationAndLoad(ConversationAccessMode.Timeline)
         advanceUntilIdle()
 
         assertEquals("Ada", harness.uiState.value.agentName)
@@ -148,7 +157,7 @@ class AdminChatParityTest {
         every { harness.agentRepository.getCachedAgent(AgentId("agent-1")) } returns
             TestData.agent(id = "agent-1", name = "Cached Ada")
 
-        harness.coordinator.resolveConversationAndLoad(useClientModeForResolve = false)
+        harness.coordinator.resolveConversationAndLoad(ConversationAccessMode.Timeline)
         advanceUntilIdle()
 
         // letta-mobile-xl1o2 AC: when the cache already has the agent, the
@@ -191,7 +200,7 @@ class AdminChatParityTest {
         val collector = launch(UnconfinedTestDispatcher(testScheduler)) {
             harness.sessionState.collect { seen += it.connectionState }
         }
-        harness.coordinator.resolveConversationAndLoad(useClientModeForResolve = false)
+        harness.coordinator.resolveConversationAndLoad(ConversationAccessMode.Timeline)
         advanceUntilIdle()
         collector.cancel()
 
@@ -205,6 +214,54 @@ class AdminChatParityTest {
     }
 
     @Test
+    fun `messages from another conversation do not skip the Loading transition`() = runTest {
+        for (mode in ConversationAccessMode.entries) {
+            val harness = Harness(this)
+            harness.routeConversationId = "conversation-a"
+            harness.uiState.value = harness.uiState.value.copy(
+                messages = persistentListOf(
+                    UiMessage(
+                        id = "m1",
+                        role = "assistant",
+                        content = "from conversation A",
+                        timestamp = "2026-05-16T00:00:00Z",
+                    )
+                ),
+            )
+            val coordinator = harness.coordinator
+            harness.routeConversationId = "conversation-b"
+
+            val seen = mutableListOf<ChatConnectionState>()
+            val collector = launch(UnconfinedTestDispatcher(testScheduler)) {
+                harness.sessionState.collect { seen += it.connectionState }
+            }
+            coordinator.resolveConversationAndLoad(mode)
+            advanceUntilIdle()
+            collector.cancel()
+
+            assertTrue("expected $mode hydration for conversation B, saw: $seen", ChatConnectionState.Loading in seen)
+        }
+    }
+
+    @Test
+    fun `failed initial resolution remains initial on retry`() = runTest {
+        val harness = Harness(this, pinnedConversationId = "pinned-conversation")
+        harness.routeConversationId = "stale-before-first-attempt"
+        coEvery { harness.agentRepository.getAgent(AgentId("agent-1")) } throws RuntimeException("Network error")
+
+        harness.coordinator.resolveConversationAndLoad(ConversationAccessMode.Timeline)
+        advanceUntilIdle()
+
+        harness.routeConversationId = "stale-before-retry"
+        coEvery { harness.agentRepository.getAgent(AgentId("agent-1")) } returns
+            flowOf(TestData.agent(id = "agent-1", name = "Ada"))
+        harness.coordinator.resolveConversationAndLoad(ConversationAccessMode.Timeline)
+        advanceUntilIdle()
+
+        assertEquals("pinned-conversation", harness.routeConversationId)
+    }
+
+    @Test
     fun `fresh conversation still shows the Loading flash`() = runTest {
         val harness = Harness(this)
         harness.routeConversationId = "conversation-1"
@@ -213,7 +270,7 @@ class AdminChatParityTest {
         val collector = launch(UnconfinedTestDispatcher(testScheduler)) {
             harness.sessionState.collect { seen += it.connectionState }
         }
-        harness.coordinator.resolveConversationAndLoad(useClientModeForResolve = false)
+        harness.coordinator.resolveConversationAndLoad(ConversationAccessMode.Timeline)
         advanceUntilIdle()
         collector.cancel()
 
@@ -223,7 +280,10 @@ class AdminChatParityTest {
         assertEquals(ChatConnectionState.Live, harness.sessionState.value.connectionState)
     }
 
-    private class Harness(scope: CoroutineScope) {
+    private class Harness(
+        scope: CoroutineScope,
+        private val pinnedConversationId: String? = null,
+    ) {
         val chatSessionResolver: ChatSessionResolver = mockk(relaxed = true)
         val agentRepository: IAgentRepository = mockk(relaxed = true)
         val currentConversationTracker = CurrentConversationTracker()
@@ -246,29 +306,39 @@ class AdminChatParityTest {
         var routeConversationId: String? = null
         var pendingBootstrapMessages = persistentListOf<UiMessage>()
 
-        val coordinator = ChatConversationCoordinator(
-            scope = scope,
-            agentId = "agent-1",
-            initialMessage = null,
-            explicitConversationId = { routeConversationId },
-            pinnedExplicitConversationId = null,
-            setRouteConversationId = { routeConversationId = it },
-            isFreshRoute = false,
-            chatSessionResolver = chatSessionResolver,
-            agentRepository = agentRepository,
-            currentConversationTracker = currentConversationTracker,
-            uiState = uiState,
-            updateSessionState = ::updateSessionState,
-            pendingClientModeBootstrapMessages = { pendingBootstrapMessages },
-            setPendingClientModeBootstrapUserMessage = { pendingBootstrapMessages = persistentListOf(it) },
-            currentClientModeConversationId = { null },
-            startTimelineObserver = {},
-            stopTimelineObserver = {},
-            reconcileRecentMessages = { _, _ -> },
-            sendMessageViaClientMode = {},
-            sendMessageViaTimeline = {},
-            markFollowingDuplicateInitialMessageInFlight = {},
-        )
+        val coordinator by lazy {
+            ChatConversationCoordinator(
+                ChatConversationCoordinatorConfig(
+                    scope = scope,
+                    route = ChatConversationRoute(
+                        agentId = "agent-1",
+                        initialMessage = null,
+                        explicitConversationId = { routeConversationId },
+                        pinnedExplicitConversationId = pinnedConversationId,
+                        setConversationId = { routeConversationId = it },
+                        isFresh = false,
+                    ),
+                    chatSessionResolver = chatSessionResolver,
+                    agentRepository = agentRepository,
+                    currentConversationTracker = currentConversationTracker,
+                    uiState = uiState,
+                    updateSessionState = ::updateSessionState,
+                    bootstrap = ClientModeBootstrapConfig(
+                        pendingMessages = { pendingBootstrapMessages },
+                        setPendingUserMessage = { pendingBootstrapMessages = persistentListOf(it) },
+                        currentConversationId = { null },
+                    ),
+                    observer = TimelineObserverConfig(start = {}, stop = {}),
+                    reconcileLauncher = RecentMessagesReconcileLauncher(scope = scope, reconcile = { }),
+                    send = ConversationSendConfig({}, {}, {}),
+                    hydration = HydrationRouteConfig(
+                        identity = { conversationId ->
+                            ChatHydrationTrace.Identity(agentId = "agent-1", conversationId = conversationId)
+                        },
+                    ),
+                ),
+            )
+        }
 
         init {
             every { agentRepository.getCachedAgent(AgentId("agent-1")) } returns null
