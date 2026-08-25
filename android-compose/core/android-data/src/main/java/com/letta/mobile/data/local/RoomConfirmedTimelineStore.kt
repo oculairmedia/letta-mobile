@@ -25,17 +25,20 @@ class RoomConfirmedTimelineStore(
     private val dao = database.confirmedTimelineSnapshotDao()
     private val manifestReader = RoomTimelineManifestReader(dao)
 
-    override suspend fun readSnapshot(scope: TimelineScope): StoredTimelineEnvelope? =
-        readSnapshotResult(scope).snapshot
+    override suspend fun readSnapshot(scope: TimelineScope): StoredTimelineEnvelope? {
+        return readSnapshotResult(scope).snapshot
+    }
 
-    override suspend fun readSnapshotResult(scope: TimelineScope): ConfirmedTimelineReadResult = withContext(Dispatchers.IO) {
+    override suspend fun readSnapshotResult(scope: TimelineScope): ConfirmedTimelineReadResult {
+        return withContext(Dispatchers.IO) {
         val startedAtMillis = timelineCurrentTimeMillis()
         val head = dao.getHeadMetadata(scope.backendId, scope.conversationId)
             ?: return@withContext ConfirmedTimelineReadResult.ReconciliationRequired(SnapshotReadFailure.MISSING)
         if (!head.matches(scope)) {
             return@withContext ConfirmedTimelineReadResult.ReconciliationRequired(SnapshotReadFailure.METADATA_INVALID)
         }
-        readFromHead(RoomSnapshotReadRequest(scope, head, startedAtMillis))
+            readFromHead(RoomSnapshotReadRequest(scope, head, startedAtMillis))
+        }
     }
 
     private suspend fun readFromHead(request: RoomSnapshotReadRequest): ConfirmedTimelineReadResult {
@@ -95,7 +98,8 @@ class RoomConfirmedTimelineStore(
         )
     }
 
-    override suspend fun writeSnapshot(envelope: StoredTimelineEnvelope): Boolean = withContext(Dispatchers.IO) {
+    override suspend fun writeSnapshot(envelope: StoredTimelineEnvelope): Boolean {
+        return withContext(Dispatchers.IO) {
         val scope = envelope.scope
         val writtenAt = envelope.writtenAtMillis.takeIf { it > 0 } ?: timelineCurrentTimeMillis()
         val normalized = envelope.copy(writtenAtMillis = writtenAt)
@@ -209,30 +213,37 @@ class RoomConfirmedTimelineStore(
             )
             true
         }
+        }
     }
 
-    override suspend fun deleteSnapshot(scope: TimelineScope) = withContext(Dispatchers.IO) {
+    override suspend fun deleteSnapshot(scope: TimelineScope) {
+        withContext(Dispatchers.IO) {
         database.withTransaction {
             dao.deleteHead(scope.backendId, scope.conversationId)
-            dao.deleteManifestsForScope(scope.backendId, scope.conversationId)
+                dao.deleteManifestsForScope(scope.backendId, scope.conversationId)
+            }
         }
     }
 
-    override suspend fun clearForBackend(backendId: String) = withContext(Dispatchers.IO) {
+    override suspend fun clearForBackend(backendId: String) {
+        withContext(Dispatchers.IO) {
         database.withTransaction {
             dao.clearHeadsForBackend(backendId)
-            dao.clearManifestsForBackend(backendId)
+                dao.clearManifestsForBackend(backendId)
+            }
         }
     }
 
-    override suspend fun prune(backendId: String, maxRetainedConversations: Int) = withContext(Dispatchers.IO) {
+    override suspend fun prune(backendId: String, maxRetainedConversations: Int) {
+        withContext(Dispatchers.IO) {
         database.withTransaction {
             if (maxRetainedConversations <= 0) {
                 dao.clearHeadsForBackend(backendId)
                 dao.clearManifestsForBackend(backendId)
             } else {
                 dao.pruneHeads(backendId, maxRetainedConversations)
-                dao.deleteOrphanManifestsForBackend(backendId)
+                    dao.deleteOrphanManifestsForBackend(backendId)
+                }
             }
         }
     }
