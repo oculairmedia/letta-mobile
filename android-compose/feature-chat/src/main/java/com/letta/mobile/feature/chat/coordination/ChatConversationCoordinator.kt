@@ -229,13 +229,12 @@ internal class ChatConversationCoordinator(
             } else {
                 null
             }
-        currentConversationTracker.setCurrent(clientConversationId)
         val typedAgentId = AgentId(agentId)
         val agent = agentRepository.getCachedAgent(typedAgentId)
             ?: runCatching { agentRepository.getAgent(typedAgentId).first() }.getOrNull()
         if (clientConversationId != null) {
-            hydratedConversationId = clientConversationId
-            startTimelineObserver(clientConversationId)
+            if (clientConversationId != (activeConversationId ?: explicitConversationId())) return false
+            currentConversationTracker.setCurrent(clientConversationId)
             val summary = ChatConversationSummary(
                 id = clientConversationId,
                 title = agent?.name ?: uiState.value.agentName,
@@ -243,9 +242,11 @@ internal class ChatConversationCoordinator(
                 updatedAtLabel = "",
                 lastMessagePreview = "",
             )
-            updateSessionState { current ->
-                val next = ChatSessionReducer.conversationsLoaded(current, listOf(summary))
-                ChatSessionReducer.hydrateCompleted(next, next.selectionGeneration)
+            val hydration = hydrationAvailability(summary)
+            updateSessionState { current -> hydrateOrShowLoading(current, summary, hydration) }
+            startTimelineObserver(clientConversationId)
+            if (hydration == HydrationAvailability.NeedsLoading && !loadMessagesInternal()) {
+                return false
             }
             uiState.value = uiState.value.copy(
                 agentName = agent?.name ?: uiState.value.agentName,
@@ -255,6 +256,7 @@ internal class ChatConversationCoordinator(
                 isAgentTyping = false,
             )
         } else {
+            currentConversationTracker.setCurrent(null)
             stopTimelineObserver()
             updateSessionState { ChatSessionReducer.conversationsLoaded(it, emptyList()) }
             uiState.value = uiState.value.copy(

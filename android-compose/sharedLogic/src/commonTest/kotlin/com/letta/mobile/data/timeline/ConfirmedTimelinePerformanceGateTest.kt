@@ -8,6 +8,8 @@ import kotlinx.collections.immutable.toPersistentList
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeSource
 
 class ConfirmedTimelinePerformanceGateTest {
 
@@ -57,10 +59,11 @@ class ConfirmedTimelinePerformanceGateTest {
 
     @Test
     fun fingerprintAndEncodeCompleteFor50_150_500Events() {
-        val counts = listOf(50, 150, 500)
+        val fingerprintBudgets = mapOf(50 to 2.seconds, 150 to 4.seconds, 500 to 10.seconds)
+        val encodeBudgets = mapOf(50 to 5.seconds, 150 to 12.seconds, 500 to 30.seconds)
         val scope = TimelineScope(backendId = "test-backend", conversationId = "conv-perf")
 
-        for (count in counts) {
+        for (count in fingerprintBudgets.keys) {
             val timeline = createSyntheticConfirmedTimeline(count)
             val envelope = TimelineSnapshotCodec.timelineToStoredEnvelope(
                 timeline = timeline,
@@ -68,15 +71,35 @@ class ConfirmedTimelinePerformanceGateTest {
                 revision = 1L,
             )
 
+            repeat(10) {
+                TimelineSnapshotCodec.computeStoredEnvelopeFingerprint(envelope)
+                TimelineSnapshotCodec.encode(envelope)
+            }
+
             var fingerprint = 0L
-            var encodedLength = 0
+            val fingerprintStarted = TimeSource.Monotonic.markNow()
             repeat(50) {
                 fingerprint = TimelineSnapshotCodec.computeStoredEnvelopeFingerprint(envelope)
+            }
+            val fingerprintElapsed = fingerprintStarted.elapsedNow()
+
+            var encodedLength = 0
+            val encodeStarted = TimeSource.Monotonic.markNow()
+            repeat(50) {
                 encodedLength = TimelineSnapshotCodec.encode(envelope).length
             }
+            val encodeElapsed = encodeStarted.elapsedNow()
 
             assertTrue(fingerprint != 0L)
             assertTrue(encodedLength > 0)
+            assertTrue(
+                fingerprintElapsed < fingerprintBudgets.getValue(count),
+                "Fingerprinting $count events took $fingerprintElapsed",
+            )
+            assertTrue(
+                encodeElapsed < encodeBudgets.getValue(count),
+                "Encoding $count events took $encodeElapsed",
+            )
         }
     }
 

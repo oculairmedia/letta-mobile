@@ -57,11 +57,17 @@ process.stdout.write = function (chunk, encoding, callback) {
   const completion = typeof encoding === 'function' ? encoding : callback
   const outputEncoding = typeof encoding === 'function' ? undefined : encoding
   const writes = framedWrites(chunk)
+  let acceptsMoreData = true
   writes.forEach((write, index) => {
-    originalStdoutWrite(write, outputEncoding, index === writes.length - 1 ? completion : undefined)
+    const accepted = originalStdoutWrite(
+      write,
+      outputEncoding,
+      index === writes.length - 1 ? completion : undefined,
+    )
+    if (accepted === false) acceptsMoreData = false
   })
   if (writes.length === 0 && typeof completion === 'function') queueMicrotask(completion)
-  return true
+  return acceptsMoreData
 }
 
 process.on('beforeExit', () => {

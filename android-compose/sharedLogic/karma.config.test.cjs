@@ -3,9 +3,10 @@ const path = require('node:path')
 
 const originalWrite = process.stdout.write
 const writes = []
+let applyBackpressure = false
 process.stdout.write = (chunk) => {
   writes.push(String(chunk))
-  return true
+  return !applyBackpressure
 }
 
 require(path.join(__dirname, 'karma.config.d', 'teamcity-newlines.js'))
@@ -24,6 +25,10 @@ assert.deepEqual(writes.splice(0), [
   "##teamcity[test name='escaped |] bracket']\n",
   ' suffix',
 ])
+
+applyBackpressure = true
+assert.equal(process.stdout.write('backpressure'), false)
+assert.deepEqual(writes.splice(0), ['backpressure'])
 
 process.stdout.write = originalWrite
 console.log('TeamCity stdout framing tests passed')

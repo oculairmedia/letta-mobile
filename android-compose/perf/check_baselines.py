@@ -69,26 +69,32 @@ def _iter_measurements(outputs_dir: pathlib.Path) -> Iterable[dict]:
 
 
 def _numeric_value(value: object) -> float | None:
+    if isinstance(value, bool):
+        return None
     try:
-        return float(value)
+        parsed = float(value)
     except (TypeError, ValueError):
         return None
+    return parsed if math.isfinite(parsed) else None
 
 
 def _p95_run_value(runs: object) -> float | None:
     if not isinstance(runs, list) or not runs:
         return None
-    try:
-        ordered = sorted(float(run) for run in runs)
-    except (TypeError, ValueError):
+    parsed = [_numeric_value(run) for run in runs]
+    if any(value is None for value in parsed):
         return None
+    ordered = sorted(value for value in parsed if value is not None)
     index = max(0, int(len(ordered) * 0.95) - 1)
     return ordered[index]
 
 
 def _pick_metric(bench: dict, metric: str, aggregation: str | None) -> float | None:
     """Best-effort metric extraction across benchmark JSON schema versions."""
-    entry = bench.get("metrics", {}).get(metric)
+    metrics = bench.get("metrics")
+    if not isinstance(metrics, dict):
+        return None
+    entry = metrics.get(metric)
     if not isinstance(entry, dict):
         return None
     preferred_keys = ((aggregation,) if aggregation else ()) + (
@@ -175,14 +181,22 @@ def _new_summary_row(key: str, spec: dict, gate_enabled: bool) -> dict:
     }
 
 
+def _run_count(bench: dict, metric: str) -> int:
+    metrics = bench.get("metrics")
+    if not isinstance(metrics, dict):
+        return 0
+    entry = metrics.get(metric)
+    if not isinstance(entry, dict):
+        return 0
+    runs = entry.get("runs")
+    return len(runs) if isinstance(runs, list) else 0
+
+
 def _minimum_sample_error(key: str, spec: dict, values: list[tuple[dict, float]]) -> str | None:
     minimum_samples = int(spec.get("min_samples", 0))
     if not minimum_samples:
         return None
-    sample_counts = [
-        len(bench.get("metrics", {}).get(spec["metric"], {}).get("runs", []))
-        for bench, _ in values
-    ]
+    sample_counts = [_run_count(bench, spec["metric"]) for bench, _ in values]
     undersampled = [count for count in sample_counts if count < minimum_samples]
     if not undersampled:
         return None

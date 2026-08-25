@@ -235,6 +235,34 @@ class AdminChatParityTest {
     }
 
     @Test
+    fun `client mode does not treat another conversations rows as hydrated`() = runTest {
+        val harness = Harness(this)
+        harness.routeConversationId = "conversation-a"
+        harness.uiState.value = harness.uiState.value.copy(
+            messages = persistentListOf(
+                UiMessage(
+                    id = "m1",
+                    role = "assistant",
+                    content = "from conversation A",
+                    timestamp = "2026-05-16T00:00:00Z",
+                )
+            ),
+        )
+        val coordinator = harness.coordinator
+        harness.routeConversationId = "conversation-b"
+
+        val seen = mutableListOf<ChatConnectionState>()
+        val collector = launch(UnconfinedTestDispatcher(testScheduler)) {
+            harness.sessionState.collect { seen += it.connectionState }
+        }
+        coordinator.resolveConversationAndLoad(ConversationAccessMode.Client)
+        advanceUntilIdle()
+        collector.cancel()
+
+        assertTrue("expected client hydration for conversation B, saw: $seen", ChatConnectionState.Loading in seen)
+    }
+
+    @Test
     fun `failed initial resolution remains initial on retry`() = runTest {
         val harness = Harness(this, pinnedConversationId = "pinned-conversation")
         harness.routeConversationId = "stale-before-first-attempt"

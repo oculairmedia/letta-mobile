@@ -275,7 +275,10 @@ class CheckBaselinesTest(unittest.TestCase):
         }
         for metric in (
             {"P95": "not-a-number"},
+            {"P95": True},
             {"runs": [90.0, "not-a-number"]},
+            {"runs": [90.0, float("inf")]},
+            {"runs": [True] * 10},
             [90.0],
         ):
             with self.subTest(metric=metric):
@@ -288,6 +291,30 @@ class CheckBaselinesTest(unittest.TestCase):
                         "com.letta.mobile.macrobenchmark.StartupBenchmark",
                         "warmStartup",
                         {"timeToInitialDisplayMs": metric},
+                    ),
+                )
+
+    def test_null_runs_and_malformed_metrics_fail_closed(self) -> None:
+        spec = {
+            "baseline": 100.0,
+            "source": "StartupBenchmark.warmStartup",
+            "metric": "timeToInitialDisplayMs",
+            "min_samples": 10,
+        }
+        for metrics in (
+            {"timeToInitialDisplayMs": {"P95": 90.0, "runs": None}},
+            None,
+        ):
+            with self.subTest(metrics=metrics):
+                for output in self.outputs_dir.iterdir():
+                    output.unlink()
+                self.assert_fails_closed(
+                    "startup.warm.p95_ms",
+                    spec,
+                    make_benchmark(
+                        "com.letta.mobile.macrobenchmark.StartupBenchmark",
+                        "warmStartup",
+                        metrics,
                     ),
                 )
 
