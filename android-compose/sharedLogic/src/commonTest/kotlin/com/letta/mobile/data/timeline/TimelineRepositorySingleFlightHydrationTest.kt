@@ -11,6 +11,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -129,6 +130,29 @@ class TimelineRepositorySingleFlightHydrationTest {
                 assertSame(loopA, loopB)
                 assertSame(loopA, loopC)
                 assertSame(loopA, loopD)
+            } finally {
+                repo.clearAll()
+            }
+        }
+    }
+
+    @Test
+    fun cancellingJoinerDoesNotCancelOwnedHydration() = runTest {
+        withContext(Dispatchers.Default) {
+            val transport = FakeHydrationTransport(gated = true)
+            val repo = newRepo(transport, backgroundScope)
+            try {
+                val target = HydrationTarget("conv-cancel-joiner")
+                val owner = async(Dispatchers.Unconfined) { repo.getOrCreate(target) }
+                withTimeout(10_000) { transport.firstListStarted.await() }
+                val joiner = async(Dispatchers.Unconfined) { repo.getOrCreate(target) }
+
+                joiner.cancelAndJoin()
+                assertFalse(owner.isCompleted)
+                transport.releaseGate()
+
+                assertTrue(owner.await().hasHydratedSuccessfully)
+                assertEquals(1, transport.listCalls.value)
             } finally {
                 repo.clearAll()
             }

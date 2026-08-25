@@ -1,5 +1,6 @@
 package com.letta.mobile.data.local
 
+import android.database.Cursor
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.sqlite.db.SupportSQLiteStatement
@@ -282,100 +283,125 @@ object LettaDatabaseMigrations {
     }
 
     private fun migrateLegacySnapshotsInBoundedChunks(db: SupportSQLiteDatabase) {
-        val insertManifest = db.compileStatement(
-            """
-            INSERT INTO confirmed_timeline_snapshot_manifests (
-                manifest_id, backend_id, conversation_id, agent_id, revision, schema_version,
-                byte_length, chunk_count, sha256, written_at_millis
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """.trimIndent(),
-        )
-        val insertChunk = db.compileStatement(
-            "INSERT INTO confirmed_timeline_snapshot_chunks (manifest_id, chunk_index, payload) VALUES (?, ?, ?)",
-        )
-        val updateChecksum = db.compileStatement(
-            "UPDATE confirmed_timeline_snapshot_manifests SET sha256 = ? WHERE manifest_id = ?",
-        )
-        val insertHead = db.compileStatement(
-            """
-            INSERT INTO confirmed_timeline_snapshot_heads_new (
-                backend_id, conversation_id, agent_id, active_manifest_id, fallback_manifest_id,
-                high_water_revision, written_at_millis
-            ) VALUES (?, ?, ?, ?, NULL, ?, ?)
-            """.trimIndent(),
-        )
-        val rows = db.query(
-            """
-            SELECT rowid, backend_id, conversation_id, agent_id, revision, schema_version,
-                   written_at_millis, length(CAST(payload_json AS BLOB)) AS byte_length
-            FROM confirmed_timeline_snapshots
-            """.trimIndent(),
-        )
-        rows.use { cursor ->
+        val copier = LegacySnapshotCopier(db)
+        db.query(LEGACY_SNAPSHOT_ROWS_QUERY).use { cursor ->
             while (cursor.moveToNext()) {
-                val legacyRowId = cursor.getLong(0)
-                val backendId = cursor.getString(1)
-                val conversationId = cursor.getString(2)
-                val agentId = if (cursor.isNull(3)) null else cursor.getString(3)
-                val revision = cursor.getLong(4)
-                val schemaVersion = cursor.getLong(5)
-                val writtenAt = cursor.getLong(6)
-                val byteLength = cursor.getLong(7)
-                val chunkCount = (byteLength + SNAPSHOT_CHUNK_BYTES - 1) / SNAPSHOT_CHUNK_BYTES
-                val manifestId = UUID.randomUUID().toString()
-                val digest = MessageDigest.getInstance("SHA-256")
-
-                insertManifest.clearBindings()
-                insertManifest.bindString(1, manifestId)
-                insertManifest.bindString(2, backendId)
-                insertManifest.bindString(3, conversationId)
-                insertManifest.bindNullableString(4, agentId)
-                insertManifest.bindLong(5, revision)
-                insertManifest.bindLong(6, schemaVersion)
-                insertManifest.bindLong(7, byteLength)
-                insertManifest.bindLong(8, chunkCount)
-                insertManifest.bindString(9, "pending")
-                insertManifest.bindLong(10, writtenAt)
-                insertManifest.executeInsert()
-
-                repeat(chunkCount.toInt()) { chunkIndex ->
-                    val offset = chunkIndex.toLong() * SNAPSHOT_CHUNK_BYTES + 1L
-                    db.query(
-                        """
-                        SELECT substr(CAST(payload_json AS BLOB), $offset, $SNAPSHOT_CHUNK_BYTES)
-                        FROM confirmed_timeline_snapshots
-                        WHERE rowid = $legacyRowId
-                        """.trimIndent(),
-                    ).use { chunkCursor ->
-                        check(chunkCursor.moveToFirst()) { "Legacy snapshot disappeared during migration" }
-                        val chunk = chunkCursor.getBlob(0)
-                        check(chunk.size <= SNAPSHOT_CHUNK_BYTES) { "Migration chunk exceeded bound" }
-                        digest.update(chunk)
-
-                        insertChunk.clearBindings()
-                        insertChunk.bindString(1, manifestId)
-                        insertChunk.bindLong(2, chunkIndex.toLong())
-                        insertChunk.bindBlob(3, chunk)
-                        insertChunk.executeInsert()
-                    }
-                }
-                val checksum = digest.digest().joinToString("") { byte ->
-                    (byte.toInt() and 0xff).toString(16).padStart(2, '0')
-                }
-                updateChecksum.clearBindings()
-                updateChecksum.bindString(1, checksum)
-                updateChecksum.bindString(2, manifestId)
-                updateChecksum.executeUpdateDelete()
-
-                insertHead.clearBindings()
-                insertHead.bindString(1, backendId)
-                insertHead.bindString(2, conversationId)
-                insertHead.bindNullableString(3, agentId)
-                insertHead.bindString(4, manifestId)
-                insertHead.bindLong(5, revision)
-                insertHead.bindLong(6, writtenAt)
-                insertHead.executeInsert()
+                copier.copy(LegacySnapshotRow.from(cursor))
             }
+        }
+    }
+
+    private data class LegacySnapshotRow(
+        val rowId: Long,
+        val backendId: String,
+        val conversationId: String,
+        val agentId: String?,
+        val revision: Long,
+        val schemaVersion: Long,
+        val writtenAtMillis: Long,
+        val byteLength: Long,
+    ) {
+        val chunkCount: Int
+            get() = ((byteLength + SNAPSHOT_CHUNK_BYTES - 1) / SNAPSHOT_CHUNK_BYTES).toInt()
+
+        companion object {
+            fun from(cursor: Cursor): LegacySnapshotRow = LegacySnapshotRow(
+                rowId = cursor.getLong(0),
+                backendId = cursor.getString(1),
+                conversationId = cursor.getString(2),
+                agentId = cursor.getStringOrNull(3),
+                revision = cursor.getLong(4),
+                schemaVersion = cursor.getLong(5),
+                writtenAtMillis = cursor.getLong(6),
+                byteLength = cursor.getLong(7),
+            )
+        }
+    }
+
+    private class LegacySnapshotCopier(
+        private val db: SupportSQLiteDatabase,
+    ) {
+        private val insertManifest = db.compileStatement(INSERT_MANIFEST_SQL)
+        private val insertChunk = db.compileStatement(INSERT_CHUNK_SQL)
+        private val updateChecksum = db.compileStatement(UPDATE_CHECKSUM_SQL)
+        private val insertHead = db.compileStatement(INSERT_HEAD_SQL)
+
+        fun copy(row: LegacySnapshotRow) {
+            val manifestId = UUID.randomUUID().toString()
+            insertManifest(row, manifestId)
+            val checksum = copyChunks(row, manifestId)
+            updateChecksum(manifestId, checksum)
+            insertHead(row, manifestId)
+        }
+
+        private fun insertManifest(row: LegacySnapshotRow, manifestId: String) = insertManifest.run {
+            clearBindings()
+            bindString(1, manifestId)
+            bindString(2, row.backendId)
+            bindString(3, row.conversationId)
+            bindNullableString(4, row.agentId)
+            bindLong(5, row.revision)
+            bindLong(6, row.schemaVersion)
+            bindLong(7, row.byteLength)
+            bindLong(8, row.chunkCount.toLong())
+            bindString(9, PENDING_CHECKSUM)
+            bindLong(10, row.writtenAtMillis)
+            executeInsert()
+            Unit
+        }
+
+        private fun copyChunks(row: LegacySnapshotRow, manifestId: String): String {
+            val digest = MessageDigest.getInstance(SHA_256)
+            repeat(row.chunkCount) { chunkIndex ->
+                val chunk = readChunk(row.rowId, chunkIndex)
+                digest.update(chunk)
+                insertChunk(manifestId, chunkIndex, chunk)
+            }
+            return digest.digest().toHex()
+        }
+
+        private fun readChunk(rowId: Long, chunkIndex: Int): ByteArray {
+            val offset = chunkIndex.toLong() * SNAPSHOT_CHUNK_BYTES + 1L
+            val query = """
+                SELECT substr(CAST(payload_json AS BLOB), $offset, $SNAPSHOT_CHUNK_BYTES)
+                FROM confirmed_timeline_snapshots
+                WHERE rowid = $rowId
+            """.trimIndent()
+            return db.query(query).use { cursor ->
+                check(cursor.moveToFirst()) { "Legacy snapshot disappeared during migration" }
+                cursor.getBlob(0).also { chunk ->
+                    check(chunk.size <= SNAPSHOT_CHUNK_BYTES) { "Migration chunk exceeded bound" }
+                }
+            }
+        }
+
+        private fun insertChunk(manifestId: String, chunkIndex: Int, payload: ByteArray) = insertChunk.run {
+            clearBindings()
+            bindString(1, manifestId)
+            bindLong(2, chunkIndex.toLong())
+            bindBlob(3, payload)
+            executeInsert()
+            Unit
+        }
+
+        private fun updateChecksum(manifestId: String, checksum: String) = updateChecksum.run {
+            clearBindings()
+            bindString(1, checksum)
+            bindString(2, manifestId)
+            executeUpdateDelete()
+            Unit
+        }
+
+        private fun insertHead(row: LegacySnapshotRow, manifestId: String) = insertHead.run {
+            clearBindings()
+            bindString(1, row.backendId)
+            bindString(2, row.conversationId)
+            bindNullableString(3, row.agentId)
+            bindString(4, manifestId)
+            bindLong(5, row.revision)
+            bindLong(6, row.writtenAtMillis)
+            executeInsert()
+            Unit
         }
     }
 
@@ -383,7 +409,36 @@ object LettaDatabaseMigrations {
         if (value == null) bindNull(index) else bindString(index, value)
     }
 
+    private fun Cursor.getStringOrNull(index: Int): String? = if (isNull(index)) null else getString(index)
+
+    private fun ByteArray.toHex(): String = joinToString("") { byte ->
+        (byte.toInt() and 0xff).toString(16).padStart(2, '0')
+    }
+
     private const val SNAPSHOT_CHUNK_BYTES = 128 * 1024
+    private const val SHA_256 = "SHA-256"
+    private const val PENDING_CHECKSUM = "pending"
+    private val LEGACY_SNAPSHOT_ROWS_QUERY = """
+        SELECT rowid, backend_id, conversation_id, agent_id, revision, schema_version,
+               written_at_millis, length(CAST(payload_json AS BLOB)) AS byte_length
+        FROM confirmed_timeline_snapshots
+    """.trimIndent()
+    private val INSERT_MANIFEST_SQL = """
+        INSERT INTO confirmed_timeline_snapshot_manifests (
+            manifest_id, backend_id, conversation_id, agent_id, revision, schema_version,
+            byte_length, chunk_count, sha256, written_at_millis
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """.trimIndent()
+    private const val INSERT_CHUNK_SQL =
+        "INSERT INTO confirmed_timeline_snapshot_chunks (manifest_id, chunk_index, payload) VALUES (?, ?, ?)"
+    private const val UPDATE_CHECKSUM_SQL =
+        "UPDATE confirmed_timeline_snapshot_manifests SET sha256 = ? WHERE manifest_id = ?"
+    private val INSERT_HEAD_SQL = """
+        INSERT INTO confirmed_timeline_snapshot_heads_new (
+            backend_id, conversation_id, agent_id, active_manifest_id, fallback_manifest_id,
+            high_water_revision, written_at_millis
+        ) VALUES (?, ?, ?, ?, NULL, ?, ?)
+    """.trimIndent()
 
     val ALL: Array<Migration> = arrayOf(
         MIGRATION_1_2,

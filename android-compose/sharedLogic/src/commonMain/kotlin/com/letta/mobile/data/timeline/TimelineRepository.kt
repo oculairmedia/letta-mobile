@@ -195,75 +195,92 @@ open class TimelineRepository(
         val completion: CompletableDeferred<Unit>,
     )
 
+    private sealed interface HydrateFlightClaim {
+        val flight: HydrateFlight
+
+        data class Owner(override val flight: HydrateFlight) : HydrateFlightClaim
+        data class Joiner(override val flight: HydrateFlight) : HydrateFlightClaim
+    }
+
     /** conversationId -> loop-owned in-flight hydration. Guarded by [hydrateFlightsMutex]. */
     private val hydrateFlights = LinkedHashMap<String, HydrateFlight>()
 
     private suspend fun hydrateSingleFlight(loop: TimelineSyncLoop, key: TimelineCacheKey) {
-        val created = HydrateFlight(loop, CompletableDeferred())
-        val joined = hydrateFlightsMutex.withLock {
-            val existing = hydrateFlights[key.conversationId]
-            if (existing?.loop === loop) {
-                existing
-            } else {
-                hydrateFlights[key.conversationId] = created
-                null
-            }
+        when (val claim = claimHydrationFlight(loop, key)) {
+            is HydrateFlightClaim.Owner -> runOwnedHydration(claim.flight, key)
+            is HydrateFlightClaim.Joiner -> joinHydration(claim.flight, key)
         }
-        if (joined != null) {
-            Telemetry.event(
-                "TimelineRepo", "hydrate.joined",
-                "agentId" to key.agentId.orEmpty(),
-                "conversationId" to key.conversationId,
-            )
-            // Joiner swallows an ordinary shared failure because the owner emits
-            // HydrateFailed once, but caller cancellation must always propagate.
-            try {
-                joined.completion.await()
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (failure: Throwable) {
-                Telemetry.error(
-                    "TimelineRepo", "hydrate.joinedFailed", failure,
-                    "agentId" to key.agentId.orEmpty(),
-                    "conversationId" to key.conversationId,
-                )
-            }
-            return
+    }
+
+    private suspend fun claimHydrationFlight(
+        loop: TimelineSyncLoop,
+        key: TimelineCacheKey,
+    ): HydrateFlightClaim = hydrateFlightsMutex.withLock {
+        val existing = hydrateFlights[key.conversationId]
+        if (existing?.loop === loop) {
+            HydrateFlightClaim.Joiner(existing)
+        } else {
+            val created = HydrateFlight(loop, CompletableDeferred())
+            hydrateFlights[key.conversationId] = created
+            HydrateFlightClaim.Owner(created)
         }
+    }
+
+    private suspend fun joinHydration(flight: HydrateFlight, key: TimelineCacheKey) {
+        Telemetry.event(
+            "TimelineRepo", "hydrate.joined",
+            "agentId" to key.agentId.orEmpty(),
+            "conversationId" to key.conversationId,
+        )
         try {
-            withContext(timelineIoDispatcher) {
-                loop.hydrate()
-            }
-            created.completion.complete(Unit)
+            flight.completion.await()
         } catch (cancelled: CancellationException) {
-            hydrateFlightsMutex.withLock {
-                if (hydrateFlights[key.conversationId] === created) {
-                    hydrateFlights.remove(key.conversationId)
-                }
-            }
-            created.completion.cancel(cancelled)
             throw cancelled
         } catch (failure: Throwable) {
-            // Remove the flight BEFORE completing so a waiter that retries
-            // immediately isn't blocked by the dead flight.
-            hydrateFlightsMutex.withLock {
-                if (hydrateFlights[key.conversationId] === created) {
-                    hydrateFlights.remove(key.conversationId)
-                }
-            }
-            created.completion.completeExceptionally(failure)
             Telemetry.error(
-                "TimelineRepo", "hydrate.failed", failure,
+                "TimelineRepo", "hydrate.joinedFailed", failure,
                 "agentId" to key.agentId.orEmpty(),
                 "conversationId" to key.conversationId,
             )
-            runCatching { loop.emitHydrateFailed(failure.message ?: "unknown") }
-        } finally {
-            hydrateFlightsMutex.withLock {
-                if (hydrateFlights[key.conversationId] === created) {
-                    hydrateFlights.remove(key.conversationId)
-                }
+        }
+    }
+
+    private suspend fun runOwnedHydration(flight: HydrateFlight, key: TimelineCacheKey) {
+        try {
+            withContext(timelineIoDispatcher) {
+                flight.loop.hydrate()
             }
+            flight.completion.complete(Unit)
+        } catch (cancelled: CancellationException) {
+            releaseHydrationFlight(key, flight)
+            flight.completion.cancel(cancelled)
+            throw cancelled
+        } catch (failure: Throwable) {
+            handleOwnedHydrationFailure(flight, key, failure)
+        } finally {
+            releaseHydrationFlight(key, flight)
+        }
+    }
+
+    private suspend fun handleOwnedHydrationFailure(
+        flight: HydrateFlight,
+        key: TimelineCacheKey,
+        failure: Throwable,
+    ) {
+        // Release before completion so an immediate retry cannot join a dead flight.
+        releaseHydrationFlight(key, flight)
+        flight.completion.completeExceptionally(failure)
+        Telemetry.error(
+            "TimelineRepo", "hydrate.failed", failure,
+            "agentId" to key.agentId.orEmpty(),
+            "conversationId" to key.conversationId,
+        )
+        runCatching { flight.loop.emitHydrateFailed(failure.message ?: "unknown") }
+    }
+
+    private suspend fun releaseHydrationFlight(key: TimelineCacheKey, flight: HydrateFlight) {
+        hydrateFlightsMutex.withLock {
+            hydrateFlights.remove(key.conversationId, flight)
         }
     }
 

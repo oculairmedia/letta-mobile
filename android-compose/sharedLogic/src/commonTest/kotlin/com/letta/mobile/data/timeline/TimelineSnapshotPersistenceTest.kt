@@ -11,6 +11,7 @@ import com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -26,6 +27,42 @@ import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TimelineSnapshotPersistenceTest {
+    private data class SnapshotIdentity(
+        val conversationId: String,
+        val backendId: String = "test-backend",
+    ) {
+        val scope = TimelineScope(backendId, conversationId)
+    }
+
+    private data class ConfirmedMessageFixture(
+        val serverId: String,
+        val content: String,
+    ) {
+        fun message() = UserMessage(
+            id = serverId,
+            date = FIXTURE_DATE,
+            contentRaw = JsonPrimitive(content),
+        )
+    }
+
+    private class SnapshotLoopFixture(
+        coroutineScope: CoroutineScope,
+        identity: SnapshotIdentity,
+        val store: ConfirmedTimelineStore = InMemoryConfirmedTimelineStore(),
+        ioDispatcher: kotlinx.coroutines.CoroutineDispatcher,
+    ) {
+        val scope = identity.scope
+        val loop = TimelineSyncLoop(
+            messageApi = EmptyTimelineTransport,
+            conversationId = scope.conversationId,
+            scope = coroutineScope,
+            startStreamSubscriber = false,
+            confirmedTimelineStore = store,
+            timelineScope = scope,
+            ioDispatcher = ioDispatcher,
+        )
+    }
+
     private class GatedConfirmedTimelineStore(
         private val delegate: ConfirmedTimelineStore = InMemoryConfirmedTimelineStore(),
     ) : ConfirmedTimelineStore by delegate {
@@ -50,53 +87,39 @@ class TimelineSnapshotPersistenceTest {
     @Test
     fun aChangeScheduledDuringPersistenceIsFlushedAfterTheInFlightWriteWhenMutated() = runTest {
         val store = GatedConfirmedTimelineStore()
-        val scope = TimelineScope(backendId = "test-backend", conversationId = "conv-pending")
-        val loop = TimelineSyncLoop(
-            messageApi = EmptyTimelineTransport,
-            conversationId = scope.conversationId,
-            scope = this,
-            startStreamSubscriber = false,
-            confirmedTimelineStore = store,
-            timelineScope = scope,
+        val fixture = SnapshotLoopFixture(
+            coroutineScope = this,
+            identity = SnapshotIdentity("conv-pending"),
+            store = store,
             ioDispatcher = kotlinx.coroutines.test.StandardTestDispatcher(testScheduler),
         )
 
-        loop.scheduleSnapshotPersist(immediate = true)
+        fixture.loop.scheduleSnapshotPersist(immediate = true)
         runCurrent()
         store.firstWriteStarted.await()
-        loop.ingestStreamEvent(
-            com.letta.mobile.data.model.UserMessage(
-                id = "msg-1",
-                date = "2026-08-24T12:00:00Z",
-                contentRaw = kotlinx.serialization.json.JsonPrimitive("confirmed hello"),
-            ),
-        )
-        loop.scheduleSnapshotPersist(immediate = false)
+        fixture.loop.ingestStreamEvent(ConfirmedMessageFixture("msg-1", "confirmed hello").message())
+        fixture.loop.scheduleSnapshotPersist(immediate = false)
         store.releaseFirstWrite.complete(Unit)
         advanceUntilIdle()
 
         assertTrue(store.writeCount >= 2)
-        val finalSnapshot = store.readSnapshot(scope)
+        val finalSnapshot = store.readSnapshot(fixture.scope)
         assertNotNull(finalSnapshot)
         assertEquals(1, finalSnapshot.events.size)
-        loop.closeAndJoin()
+        fixture.loop.closeAndJoin()
     }
 
     @Test
     fun duplicateOrNoOpMutationsDoNotWriteNewSnapshots() = runTest {
         val store = GatedConfirmedTimelineStore()
-        val scope = TimelineScope(backendId = "test-backend", conversationId = "conv-dedupe")
-        val loop = TimelineSyncLoop(
-            messageApi = EmptyTimelineTransport,
-            conversationId = scope.conversationId,
-            scope = this,
-            startStreamSubscriber = false,
-            confirmedTimelineStore = store,
-            timelineScope = scope,
+        val fixture = SnapshotLoopFixture(
+            coroutineScope = this,
+            identity = SnapshotIdentity("conv-dedupe"),
+            store = store,
             ioDispatcher = kotlinx.coroutines.test.StandardTestDispatcher(testScheduler),
         )
 
-        loop.scheduleSnapshotPersist(immediate = true)
+        fixture.loop.scheduleSnapshotPersist(immediate = true)
         runCurrent()
         store.firstWriteStarted.await()
         store.releaseFirstWrite.complete(Unit)
@@ -105,13 +128,13 @@ class TimelineSnapshotPersistenceTest {
 
         // Trigger 100 un-mutated persist schedules
         repeat(100) {
-            loop.scheduleSnapshotPersist(immediate = true)
+            fixture.loop.scheduleSnapshotPersist(immediate = true)
             advanceUntilIdle()
         }
 
         // writeCount must remain 1 because content was identical
         assertEquals(1, store.writeCount)
-        loop.closeAndJoin()
+        fixture.loop.closeAndJoin()
     }
 
     @Test
@@ -148,7 +171,7 @@ class TimelineSnapshotPersistenceTest {
             content = "c",
             serverId = "server",
             messageType = "USER",
-            dateIso = "2026-08-24T12:00:00Z",
+            dateIso = FIXTURE_DATE,
         )
         val envelope = StoredTimelineEnvelope(scope = scope, revision = 1L, events = listOf(event))
 
@@ -174,7 +197,7 @@ class TimelineSnapshotPersistenceTest {
             otid = "otid",
             serverId = "server",
             messageType = "TOOL_CALL",
-            dateIso = "2026-08-24T12:00:00Z",
+            dateIso = FIXTURE_DATE,
             toolReturnContentByCallId = linkedMapOf("a" to "first", "b" to "second"),
         )
         val reordered = event.copy(
@@ -237,7 +260,7 @@ class TimelineSnapshotPersistenceTest {
         loop1.ingestStreamEvent(
             com.letta.mobile.data.model.UserMessage(
                 id = "msg-persisted",
-                date = "2026-08-24T12:00:00Z",
+                date = FIXTURE_DATE,
                 contentRaw = kotlinx.serialization.json.JsonPrimitive("persisted data"),
             ),
         )
@@ -264,7 +287,7 @@ class TimelineSnapshotPersistenceTest {
                     serverId = "fallback-server",
                     content = "last known good",
                     messageType = "ASSISTANT",
-                    dateIso = "2026-08-24T12:00:00Z",
+                    dateIso = FIXTURE_DATE,
                 )
             ),
         )
@@ -307,7 +330,7 @@ class TimelineSnapshotPersistenceTest {
             messages = listOf(
                 UserMessage(
                     id = "remote-server",
-                    date = "2026-08-24T12:00:00Z",
+                    date = FIXTURE_DATE,
                     contentRaw = JsonPrimitive("recovered remotely"),
                 )
             )
@@ -363,5 +386,9 @@ class TimelineSnapshotPersistenceTest {
             failure?.let { throw it }
             return messages
         }
+    }
+
+    private companion object {
+        const val FIXTURE_DATE = "2026-08-24T12:00:00Z"
     }
 }

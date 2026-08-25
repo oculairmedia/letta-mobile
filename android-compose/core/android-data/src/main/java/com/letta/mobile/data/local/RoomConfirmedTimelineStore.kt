@@ -32,60 +32,70 @@ class RoomConfirmedTimelineStore(
         readSnapshotResult(scope).snapshot
 
     override suspend fun readSnapshotResult(scope: TimelineScope): ConfirmedTimelineReadResult = withContext(Dispatchers.IO) {
-        val start = timelineCurrentTimeMillis()
+        val startedAtMillis = timelineCurrentTimeMillis()
         val head = dao.getHeadMetadata(scope.backendId, scope.conversationId)
             ?: return@withContext ConfirmedTimelineReadResult.ReconciliationRequired(SnapshotReadFailure.MISSING)
         if (!head.matches(scope)) {
             return@withContext ConfirmedTimelineReadResult.ReconciliationRequired(SnapshotReadFailure.METADATA_INVALID)
         }
+        readFromHead(ReadRequest(scope, head, startedAtMillis))
+    }
 
-        val activeId = head.activeManifestId
-        if (activeId == null) {
-            val fallback = head.fallbackManifestId?.let {
-                readManifest(scope, it, head.highWaterRevision, requireHighWaterRevision = false)
-            }
-            if (fallback is ManifestRead.Valid) {
-                reportRead(scope, fallback.envelope, fallback.byteLength, start, fallback = true)
-                return@withContext ConfirmedTimelineReadResult.Fallback(
-                    snapshot = fallback.envelope,
-                    activeFailure = SnapshotReadFailure.MISSING,
-                    highWaterRevision = head.highWaterRevision,
-                )
-            }
-            return@withContext ConfirmedTimelineReadResult.ReconciliationRequired(
-                SnapshotReadFailure.MISSING,
-                head.highWaterRevision,
-            )
+    private suspend fun readFromHead(request: ReadRequest): ConfirmedTimelineReadResult {
+        val activeId = request.head.activeManifestId
+            ?: return readWithoutActiveManifest(request)
+        return when (val active = readManifest(request.activeManifest(activeId))) {
+            is ManifestRead.Valid -> activeResult(request, active)
+            is ManifestRead.Invalid -> fallbackOrReconcile(request, activeId, active.failure)
         }
-        when (val active = readManifest(scope, activeId, head.highWaterRevision, requireHighWaterRevision = true)) {
-            is ManifestRead.Valid -> {
-                reportRead(scope, active.envelope, active.byteLength, start, fallback = false)
-                ConfirmedTimelineReadResult.Active(active.envelope, head.highWaterRevision)
-            }
-            is ManifestRead.Invalid -> {
-                val fallbackId = head.fallbackManifestId
-                val fallback = fallbackId
-                    ?.takeUnless { it == activeId }
-                    ?.let { readManifest(scope, it, head.highWaterRevision, requireHighWaterRevision = false) }
-                if (fallback is ManifestRead.Valid) {
-                    reportRead(scope, fallback.envelope, fallback.byteLength, start, fallback = true)
-                    ConfirmedTimelineReadResult.Fallback(
-                        snapshot = fallback.envelope,
-                        activeFailure = active.failure,
-                        highWaterRevision = head.highWaterRevision,
-                    )
-                } else {
-                    Telemetry.event(
-                        "RoomTimelineStore", "readSnapshot.reconciliationRequired",
-                        "backendId" to scope.backendId,
-                        "conversationId" to scope.conversationId,
-                        "failure" to active.failure.name,
-                        level = Telemetry.Level.WARN,
-                    )
-                    ConfirmedTimelineReadResult.ReconciliationRequired(active.failure, head.highWaterRevision)
-                }
-            }
+    }
+
+    private suspend fun readWithoutActiveManifest(request: ReadRequest): ConfirmedTimelineReadResult {
+        val fallback = readFallbackManifest(request, excludedManifestId = null)
+        return if (fallback == null) {
+            request.reconciliation(SnapshotReadFailure.MISSING)
+        } else {
+            fallbackResult(request, fallback, SnapshotReadFailure.MISSING)
         }
+    }
+
+    private suspend fun fallbackOrReconcile(
+        request: ReadRequest,
+        activeManifestId: String,
+        activeFailure: SnapshotReadFailure,
+    ): ConfirmedTimelineReadResult {
+        val fallback = readFallbackManifest(request, excludedManifestId = activeManifestId)
+        if (fallback != null) return fallbackResult(request, fallback, activeFailure)
+        reportReconciliation(request.scope, activeFailure)
+        return request.reconciliation(activeFailure)
+    }
+
+    private suspend fun readFallbackManifest(
+        request: ReadRequest,
+        excludedManifestId: String?,
+    ): ManifestRead.Valid? {
+        val fallbackId = request.head.fallbackManifestId
+            ?.takeUnless { it == excludedManifestId }
+            ?: return null
+        return readManifest(request.fallbackManifest(fallbackId)) as? ManifestRead.Valid
+    }
+
+    private fun activeResult(request: ReadRequest, read: ManifestRead.Valid): ConfirmedTimelineReadResult {
+        reportRead(ReadObservation(request, read, ReadSource.ACTIVE))
+        return ConfirmedTimelineReadResult.Active(read.envelope, request.head.highWaterRevision)
+    }
+
+    private fun fallbackResult(
+        request: ReadRequest,
+        read: ManifestRead.Valid,
+        activeFailure: SnapshotReadFailure,
+    ): ConfirmedTimelineReadResult {
+        reportRead(ReadObservation(request, read, ReadSource.FALLBACK))
+        return ConfirmedTimelineReadResult.Fallback(
+            snapshot = read.envelope,
+            activeFailure = activeFailure,
+            highWaterRevision = request.head.highWaterRevision,
+        )
     }
 
     override suspend fun writeSnapshot(envelope: StoredTimelineEnvelope): Boolean = withContext(Dispatchers.IO) {
@@ -125,10 +135,12 @@ class RoomConfirmedTimelineStore(
 
             // Validate exactly through the production bounded read path before publishing the head.
             val staged = readManifest(
-                scope = scope,
-                manifestId = manifestId,
-                maximumRevision = normalized.revision,
-                requireHighWaterRevision = true,
+                ManifestRequest(
+                    scope = scope,
+                    manifestId = manifestId,
+                    maximumRevision = normalized.revision,
+                    revisionPolicy = RevisionPolicy.EXACT,
+                )
             )
             if (staged !is ManifestRead.Valid || staged.envelope != normalized) {
                 dao.deleteManifest(manifestId)
@@ -232,86 +244,78 @@ class RoomConfirmedTimelineStore(
         scope: TimelineScope,
         head: ConfirmedTimelineSnapshotHeadMetadata,
     ): String? {
+        val request = ReadRequest(scope, head, startedAtMillis = 0L)
         val activeId = head.activeManifestId
-        if (activeId != null && readManifest(
-                scope,
-                activeId,
-                head.highWaterRevision,
-                requireHighWaterRevision = true,
-            ) is ManifestRead.Valid
-        ) {
+        if (activeId != null && readManifest(request.activeManifest(activeId)) is ManifestRead.Valid) {
             return activeId
         }
-        val fallbackId = head.fallbackManifestId?.takeUnless { it == activeId } ?: return null
-        return fallbackId.takeIf {
-            readManifest(scope, it, head.highWaterRevision, requireHighWaterRevision = false) is ManifestRead.Valid
+        return head.fallbackManifestId
+            ?.takeUnless { it == activeId }
+            ?.takeIf { readManifest(request.fallbackManifest(it)) is ManifestRead.Valid }
+    }
+
+    private suspend fun readManifest(request: ManifestRequest): ManifestRead {
+        val manifest = dao.getManifest(request.manifestId)
+            ?: return ManifestRead.Invalid(SnapshotReadFailure.MANIFEST_MISSING)
+        ManifestValidator.validateMetadata(manifest, request)?.let { failure ->
+            return ManifestRead.Invalid(failure)
+        }
+        return when (val payload = readManifestPayload(manifest)) {
+            is ManifestPayload.Valid -> decodeManifest(request.scope, manifest, payload.bytes)
+            is ManifestPayload.Invalid -> ManifestRead.Invalid(payload.failure)
         }
     }
 
-    private suspend fun readManifest(
-        scope: TimelineScope,
-        manifestId: String,
-        maximumRevision: Long,
-        requireHighWaterRevision: Boolean,
-    ): ManifestRead {
-        val manifest = dao.getManifest(manifestId)
-            ?: return ManifestRead.Invalid(SnapshotReadFailure.MANIFEST_MISSING)
-        if (!manifest.matches(scope)) return ManifestRead.Invalid(SnapshotReadFailure.SCOPE_MISMATCH)
-        if (manifest.revision > maximumRevision || manifest.revision < 0L ||
-            (requireHighWaterRevision && manifest.revision != maximumRevision)
-        ) {
-            return ManifestRead.Invalid(SnapshotReadFailure.REVISION_MISMATCH)
-        }
-        if (manifest.schemaVersion !in 1..StoredTimelineEnvelope.CURRENT_SCHEMA_VERSION) {
-            return ManifestRead.Invalid(SnapshotReadFailure.SCHEMA_MISMATCH)
-        }
-        if (!manifest.hasBoundedShape()) return ManifestRead.Invalid(SnapshotReadFailure.METADATA_INVALID)
-
+    private suspend fun readManifestPayload(manifest: ConfirmedTimelineSnapshotManifestEntity): ManifestPayload {
         val output = ByteArrayOutputStream(manifest.byteLength.toInt())
         val digest = MessageDigest.getInstance(SHA_256)
         repeat(manifest.chunkCount) { index ->
             coroutineContext.ensureActive()
-            val chunk = dao.getChunk(manifestId, index)
-                ?: return ManifestRead.Invalid(SnapshotReadFailure.CHUNK_MISSING)
-            val expectedSize = manifest.expectedChunkSize(index)
-            if (chunk.size != expectedSize || chunk.size > CHUNK_SIZE_BYTES) {
-                return ManifestRead.Invalid(SnapshotReadFailure.CHUNK_INVALID)
+            val chunk = dao.getChunk(manifest.manifestId, index)
+                ?: return ManifestPayload.Invalid(SnapshotReadFailure.CHUNK_MISSING)
+            ManifestValidator.validateChunk(manifest, index, chunk)?.let { failure ->
+                return ManifestPayload.Invalid(failure)
             }
             digest.update(chunk)
             output.write(chunk)
         }
-        val bytes = output.toByteArray()
-        if (bytes.size.toLong() != manifest.byteLength) {
-            return ManifestRead.Invalid(SnapshotReadFailure.LENGTH_MISMATCH)
-        }
-        if (digest.digest().toHex() != manifest.sha256.lowercase()) {
-            return ManifestRead.Invalid(SnapshotReadFailure.CHECKSUM_MISMATCH)
-        }
-        val payload = bytes.decodeUtf8Strict()
-            ?: return ManifestRead.Invalid(SnapshotReadFailure.CORRUPT_ENCODING)
-        val decoded = TimelineSnapshotCodec.decode(payload)
-            ?: return ManifestRead.Invalid(SnapshotReadFailure.CORRUPT_ENCODING)
-        if (decoded.scope != scope) return ManifestRead.Invalid(SnapshotReadFailure.SCOPE_MISMATCH)
-        if (decoded.revision != manifest.revision) return ManifestRead.Invalid(SnapshotReadFailure.REVISION_MISMATCH)
-        if (decoded.schemaVersion != manifest.schemaVersion) return ManifestRead.Invalid(SnapshotReadFailure.SCHEMA_MISMATCH)
-        return ManifestRead.Valid(decoded, manifest.byteLength)
+        return ManifestValidator.validatePayload(manifest, output.toByteArray(), digest.digest())
     }
 
-    private fun reportRead(
+    private fun decodeManifest(
         scope: TimelineScope,
-        envelope: StoredTimelineEnvelope,
-        byteLength: Long,
-        start: Long,
-        fallback: Boolean,
-    ) {
+        manifest: ConfirmedTimelineSnapshotManifestEntity,
+        bytes: ByteArray,
+    ): ManifestRead {
+        val payload = bytes.decodeUtf8Strict()
+            ?: return ManifestRead.Invalid(SnapshotReadFailure.CORRUPT_ENCODING)
+        val envelope = TimelineSnapshotCodec.decode(payload)
+            ?: return ManifestRead.Invalid(SnapshotReadFailure.CORRUPT_ENCODING)
+        ManifestValidator.validateEnvelope(scope, manifest, envelope)?.let { failure ->
+            return ManifestRead.Invalid(failure)
+        }
+        return ManifestRead.Valid(envelope, manifest.byteLength)
+    }
+
+    private fun reportRead(observation: ReadObservation) {
         Telemetry.event(
-            "RoomTimelineStore", if (fallback) "readSnapshot.fallback" else "readSnapshot.success",
+            "RoomTimelineStore", observation.source.telemetryEvent,
+            "backendId" to observation.request.scope.backendId,
+            "conversationId" to observation.request.scope.conversationId,
+            "revision" to observation.read.envelope.revision,
+            "eventCount" to observation.read.envelope.events.size,
+            "byteSize" to observation.read.byteLength,
+            "readDurationMs" to (timelineCurrentTimeMillis() - observation.request.startedAtMillis),
+        )
+    }
+
+    private fun reportReconciliation(scope: TimelineScope, failure: SnapshotReadFailure) {
+        Telemetry.event(
+            "RoomTimelineStore", "readSnapshot.reconciliationRequired",
             "backendId" to scope.backendId,
             "conversationId" to scope.conversationId,
-            "revision" to envelope.revision,
-            "eventCount" to envelope.events.size,
-            "byteSize" to byteLength,
-            "readDurationMs" to (timelineCurrentTimeMillis() - start),
+            "failure" to failure.name,
+            level = Telemetry.Level.WARN,
         )
     }
 
@@ -325,9 +329,125 @@ class RoomConfirmedTimelineStore(
         )
     }
 
+    private data class ReadRequest(
+        val scope: TimelineScope,
+        val head: ConfirmedTimelineSnapshotHeadMetadata,
+        val startedAtMillis: Long,
+    ) {
+        fun activeManifest(manifestId: String) = manifest(manifestId, RevisionPolicy.EXACT)
+        fun fallbackManifest(manifestId: String) = manifest(manifestId, RevisionPolicy.AT_OR_BELOW)
+
+        fun reconciliation(failure: SnapshotReadFailure) = ConfirmedTimelineReadResult.ReconciliationRequired(
+            failure = failure,
+            highWaterRevision = head.highWaterRevision,
+        )
+
+        private fun manifest(manifestId: String, revisionPolicy: RevisionPolicy) = ManifestRequest(
+            scope = scope,
+            manifestId = manifestId,
+            maximumRevision = head.highWaterRevision,
+            revisionPolicy = revisionPolicy,
+        )
+    }
+
+    private data class ManifestRequest(
+        val scope: TimelineScope,
+        val manifestId: String,
+        val maximumRevision: Long,
+        val revisionPolicy: RevisionPolicy,
+    )
+
+    private enum class RevisionPolicy {
+        EXACT,
+        AT_OR_BELOW;
+
+        fun accepts(revision: Long, maximumRevision: Long): Boolean = when (this) {
+            EXACT -> revision == maximumRevision
+            AT_OR_BELOW -> revision <= maximumRevision
+        }
+    }
+
+    private enum class ReadSource(val telemetryEvent: String) {
+        ACTIVE("readSnapshot.success"),
+        FALLBACK("readSnapshot.fallback"),
+    }
+
+    private data class ReadObservation(
+        val request: ReadRequest,
+        val read: ManifestRead.Valid,
+        val source: ReadSource,
+    )
+
     private sealed interface ManifestRead {
         data class Valid(val envelope: StoredTimelineEnvelope, val byteLength: Long) : ManifestRead
         data class Invalid(val failure: SnapshotReadFailure) : ManifestRead
+    }
+
+    private sealed interface ManifestPayload {
+        data class Valid(val bytes: ByteArray) : ManifestPayload
+        data class Invalid(val failure: SnapshotReadFailure) : ManifestPayload
+    }
+
+    private object ManifestValidator {
+        fun validateMetadata(
+            manifest: ConfirmedTimelineSnapshotManifestEntity,
+            request: ManifestRequest,
+        ): SnapshotReadFailure? =
+            validateScope(manifest, request.scope)
+                ?: validateRevision(manifest, request)
+                ?: validateSchema(manifest)
+                ?: validateShape(manifest)
+
+        fun validateChunk(
+            manifest: ConfirmedTimelineSnapshotManifestEntity,
+            index: Int,
+            chunk: ByteArray,
+        ): SnapshotReadFailure? = SnapshotReadFailure.CHUNK_INVALID.takeIf {
+            chunk.size != manifest.expectedChunkSize(index) || chunk.size > CHUNK_SIZE_BYTES
+        }
+
+        fun validatePayload(
+            manifest: ConfirmedTimelineSnapshotManifestEntity,
+            bytes: ByteArray,
+            checksum: ByteArray,
+        ): ManifestPayload {
+            if (bytes.size.toLong() != manifest.byteLength) {
+                return ManifestPayload.Invalid(SnapshotReadFailure.LENGTH_MISMATCH)
+            }
+            if (checksum.toHex() != manifest.sha256.lowercase()) {
+                return ManifestPayload.Invalid(SnapshotReadFailure.CHECKSUM_MISMATCH)
+            }
+            return ManifestPayload.Valid(bytes)
+        }
+
+        fun validateEnvelope(
+            scope: TimelineScope,
+            manifest: ConfirmedTimelineSnapshotManifestEntity,
+            envelope: StoredTimelineEnvelope,
+        ): SnapshotReadFailure? =
+            SnapshotReadFailure.SCOPE_MISMATCH.takeIf { envelope.scope != scope }
+                ?: SnapshotReadFailure.REVISION_MISMATCH.takeIf { envelope.revision != manifest.revision }
+                ?: SnapshotReadFailure.SCHEMA_MISMATCH.takeIf { envelope.schemaVersion != manifest.schemaVersion }
+
+        private fun validateScope(
+            manifest: ConfirmedTimelineSnapshotManifestEntity,
+            scope: TimelineScope,
+        ): SnapshotReadFailure? = SnapshotReadFailure.SCOPE_MISMATCH.takeUnless { manifest.matches(scope) }
+
+        private fun validateRevision(
+            manifest: ConfirmedTimelineSnapshotManifestEntity,
+            request: ManifestRequest,
+        ): SnapshotReadFailure? = SnapshotReadFailure.REVISION_MISMATCH.takeIf {
+            manifest.revision < 0L || !request.revisionPolicy.accepts(manifest.revision, request.maximumRevision)
+        }
+
+        private fun validateSchema(manifest: ConfirmedTimelineSnapshotManifestEntity): SnapshotReadFailure? =
+            SnapshotReadFailure.SCHEMA_MISMATCH.takeUnless {
+                manifest.schemaVersion in 1..StoredTimelineEnvelope.CURRENT_SCHEMA_VERSION
+            }
+
+        private fun validateShape(manifest: ConfirmedTimelineSnapshotManifestEntity): SnapshotReadFailure? =
+            SnapshotReadFailure.METADATA_INVALID.takeUnless { manifest.hasBoundedShape() }
     }
 
     companion object {
@@ -346,13 +466,22 @@ private fun ConfirmedTimelineSnapshotHeadMetadata.matches(scope: TimelineScope):
 private fun ConfirmedTimelineSnapshotManifestEntity.matches(scope: TimelineScope): Boolean =
     backendId == scope.backendId && conversationId == scope.conversationId && agentId == scope.agentId
 
-private fun ConfirmedTimelineSnapshotManifestEntity.hasBoundedShape(): Boolean {
-    if (byteLength <= 0L || byteLength > RoomConfirmedTimelineStore.CHUNK_SIZE_BYTES.toLong() * 2048L) return false
+private fun ConfirmedTimelineSnapshotManifestEntity.hasBoundedShape(): Boolean =
+    hasBoundedByteLength() && hasExpectedChunkCount() && hasSha256Checksum()
+
+private fun ConfirmedTimelineSnapshotManifestEntity.hasBoundedByteLength(): Boolean =
+    byteLength in 1..RoomConfirmedTimelineStore.CHUNK_SIZE_BYTES.toLong() * MAX_SNAPSHOT_CHUNKS
+
+private fun ConfirmedTimelineSnapshotManifestEntity.hasExpectedChunkCount(): Boolean {
     val expectedCount = ((byteLength + RoomConfirmedTimelineStore.CHUNK_SIZE_BYTES - 1) /
         RoomConfirmedTimelineStore.CHUNK_SIZE_BYTES).toInt()
-    return chunkCount == expectedCount && chunkCount in 1..2048 &&
-        sha256.length == 64 && sha256.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }
+    return chunkCount == expectedCount && chunkCount in 1..MAX_SNAPSHOT_CHUNKS
 }
+
+private fun ConfirmedTimelineSnapshotManifestEntity.hasSha256Checksum(): Boolean =
+    sha256.length == SHA_256_HEX_LENGTH && sha256.all(Char::isHexDigit)
+
+private fun Char.isHexDigit(): Boolean = this in '0'..'9' || this in 'a'..'f' || this in 'A'..'F'
 
 private fun ConfirmedTimelineSnapshotManifestEntity.expectedChunkSize(index: Int): Int =
     if (index < chunkCount - 1) RoomConfirmedTimelineStore.CHUNK_SIZE_BYTES
@@ -378,3 +507,6 @@ private fun ByteArray.decodeUtf8Strict(): String? = runCatching {
 private fun sha256(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(bytes).toHex()
 
 private fun ByteArray.toHex(): String = joinToString(separator = "") { byte -> "%02x".format(byte) }
+
+private const val MAX_SNAPSHOT_CHUNKS = 2048
+private const val SHA_256_HEX_LENGTH = 64

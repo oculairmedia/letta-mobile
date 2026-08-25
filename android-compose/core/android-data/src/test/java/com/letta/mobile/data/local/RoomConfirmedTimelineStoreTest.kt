@@ -153,6 +153,26 @@ class RoomConfirmedTimelineStoreTest {
     }
 
     @Test
+    fun missingActiveManifestReadsFallbackWithoutLoweringHighWater() = runTest {
+        val db = inMemoryDatabase()
+        val store = RoomConfirmedTimelineStore(db)
+        val scope = TimelineScope(backendId = "b1", conversationId = "missing-active")
+        assertTrue(store.writeSnapshot(StoredTimelineEnvelope(scope = scope, revision = 1L)))
+        assertTrue(store.writeSnapshot(StoredTimelineEnvelope(scope = scope, revision = 2L)))
+
+        db.openHelper.writableDatabase.execSQL(
+            "UPDATE confirmed_timeline_snapshots SET active_manifest_id = NULL " +
+                "WHERE backend_id = ? AND conversation_id = ?",
+            arrayOf(scope.backendId, scope.conversationId),
+        )
+
+        val read = store.readSnapshotResult(scope) as ConfirmedTimelineReadResult.Fallback
+        assertEquals(1L, read.snapshot.revision)
+        assertEquals(2L, read.highWaterRevision)
+        assertEquals(SnapshotReadFailure.MISSING, read.activeFailure)
+    }
+
+    @Test
     fun oneFourAndEightMiBSnapshotsUseBoundedChunks() = runTest {
         val db = inMemoryDatabase()
         val store = RoomConfirmedTimelineStore(db)
@@ -192,28 +212,141 @@ class RoomConfirmedTimelineStoreTest {
     }
 
     @Test
-    fun migration10To11ChunksAndPreservesLegacySnapshot() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        val databaseName = "timeline-migration-${System.nanoTime()}.db"
-        val scope = TimelineScope(backendId = "legacy-backend", conversationId = "legacy-conversation", agentId = "agent")
-        val envelope = StoredTimelineEnvelope(
-            scope = scope,
-            revision = 7L,
-            events = listOf(
-                StoredTimelineEvent(
-                    position = 1.0,
-                    otid = "legacy",
-                    content = "z".repeat(1024 * 1024),
-                    serverId = "legacy-server",
-                    messageType = "USER",
-                    dateIso = "2026-08-24T00:00:00Z",
-                )
-            ),
-            writtenAtMillis = 1234L,
+    fun migration10To11CopiesEveryRowInBoundedChunks() {
+        val fixture = LegacyMigrationDatabase(ApplicationProvider.getApplicationContext())
+        val snapshots = listOf(
+            LegacySnapshotFixture.create("legacy-conversation", revision = 7L, contentBytes = 1024 * 1024),
+            LegacySnapshotFixture.create("chunk-boundary", revision = 8L, contentBytes = 128 * 1024),
         )
-        val payload = TimelineSnapshotCodec.encode(envelope)
+        try {
+            fixture.writeVersion10(snapshots)
+            val observations = fixture.migrateAndObserve(snapshots)
 
-        val version10 = sqliteHelper(context, databaseName, 10, onCreate = { db ->
+            observations.zip(snapshots).forEach { (observation, snapshot) ->
+                assertEquals(snapshot.envelope.revision, observation.highWaterRevision)
+                assertTrue(observation.maxChunkBytes <= RoomConfirmedTimelineStore.CHUNK_SIZE_BYTES)
+                assertEquals(snapshot.payload.encodeToByteArray().size.toLong(), observation.totalBytes)
+                assertTrue(observation.chunkCount >= 2)
+            }
+        } finally {
+            fixture.delete()
+        }
+    }
+
+    private data class LegacySnapshotFixture(
+        val envelope: StoredTimelineEnvelope,
+        val payload: String,
+    ) {
+        companion object {
+            fun create(conversationId: String, revision: Long, contentBytes: Int): LegacySnapshotFixture {
+                val scope = TimelineScope("legacy-backend", conversationId, "agent")
+                val envelope = StoredTimelineEnvelope(
+                    scope = scope,
+                    revision = revision,
+                    events = listOf(
+                        StoredTimelineEvent(
+                            position = 1.0,
+                            otid = "legacy-$conversationId",
+                            content = "z".repeat(contentBytes),
+                            serverId = "server-$conversationId",
+                            messageType = "USER",
+                            dateIso = "2026-08-24T00:00:00Z",
+                        )
+                    ),
+                    writtenAtMillis = 1234L,
+                )
+                return LegacySnapshotFixture(envelope, TimelineSnapshotCodec.encode(envelope))
+            }
+        }
+    }
+
+    private data class MigratedSnapshotObservation(
+        val highWaterRevision: Long,
+        val maxChunkBytes: Int,
+        val totalBytes: Long,
+        val chunkCount: Int,
+    )
+
+    private class LegacyMigrationDatabase(
+        private val context: Context,
+    ) {
+        private val name = "timeline-migration-${System.nanoTime()}.db"
+
+        fun writeVersion10(snapshots: List<LegacySnapshotFixture>) {
+            openHelper(LegacySchema).use { helper ->
+                snapshots.forEach { snapshot -> insertLegacySnapshot(helper.writableDatabase, snapshot) }
+            }
+        }
+
+        fun migrateAndObserve(snapshots: List<LegacySnapshotFixture>): List<MigratedSnapshotObservation> =
+            openHelper(ChunkedSchema).use { helper ->
+                snapshots.map { snapshot -> helper.writableDatabase.observe(snapshot.envelope.scope) }
+            }
+
+        fun delete() {
+            context.deleteDatabase(name)
+        }
+
+        private fun openHelper(schema: TestSchema): SupportSQLiteOpenHelper =
+            FrameworkSQLiteOpenHelperFactory().create(
+                SupportSQLiteOpenHelper.Configuration.builder(context)
+                    .name(name)
+                    .callback(schema.callback)
+                    .build(),
+            )
+
+        private fun insertLegacySnapshot(db: SupportSQLiteDatabase, snapshot: LegacySnapshotFixture) {
+            db.compileStatement("INSERT INTO confirmed_timeline_snapshots VALUES (?, ?, ?, ?, ?, ?, ?)").apply {
+                val envelope = snapshot.envelope
+                bindString(1, envelope.scope.backendId)
+                bindString(2, envelope.scope.conversationId)
+                bindString(3, requireNotNull(envelope.scope.agentId))
+                bindLong(4, envelope.revision)
+                bindLong(5, envelope.schemaVersion.toLong())
+                bindString(6, snapshot.payload)
+                bindLong(7, envelope.writtenAtMillis)
+                executeInsert()
+            }
+        }
+
+        private fun SupportSQLiteDatabase.observe(scope: TimelineScope): MigratedSnapshotObservation {
+            val head = query(
+                "SELECT high_water_revision, active_manifest_id FROM confirmed_timeline_snapshots " +
+                    "WHERE backend_id = ? AND conversation_id = ?",
+                arrayOf(scope.backendId, scope.conversationId),
+            ).use { cursor ->
+                check(cursor.moveToFirst())
+                cursor.getLong(0) to cursor.getString(1)
+            }
+            return query(
+                "SELECT MAX(length(payload)), SUM(length(payload)), COUNT(*) " +
+                    "FROM confirmed_timeline_snapshot_chunks WHERE manifest_id = ?",
+                arrayOf(head.second),
+            ).use { chunks ->
+                check(chunks.moveToFirst())
+                MigratedSnapshotObservation(
+                    highWaterRevision = head.first,
+                    maxChunkBytes = chunks.getInt(0),
+                    totalBytes = chunks.getLong(1),
+                    chunkCount = chunks.getInt(2),
+                )
+            }
+        }
+    }
+
+    private sealed class TestSchema(version: Int) {
+        val callback = object : SupportSQLiteOpenHelper.Callback(version) {
+            override fun onCreate(db: SupportSQLiteDatabase) = create(db)
+            override fun onUpgrade(db: SupportSQLiteDatabase, oldVersion: Int, newVersion: Int) =
+                upgrade(db, oldVersion, newVersion)
+        }
+
+        protected abstract fun create(db: SupportSQLiteDatabase)
+        protected open fun upgrade(db: SupportSQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+    }
+
+    private data object LegacySchema : TestSchema(10) {
+        override fun create(db: SupportSQLiteDatabase) {
             db.execSQL(
                 """
                 CREATE TABLE confirmed_timeline_snapshots (
@@ -224,72 +357,16 @@ class RoomConfirmedTimelineStoreTest {
                 )
                 """.trimIndent(),
             )
-        })
-        version10.writableDatabase.compileStatement(
-            "INSERT INTO confirmed_timeline_snapshots VALUES (?, ?, ?, ?, ?, ?, ?)",
-        ).apply {
-            bindString(1, scope.backendId)
-            bindString(2, scope.conversationId)
-            bindString(3, requireNotNull(scope.agentId))
-            bindLong(4, 7L)
-            bindLong(5, 1L)
-            bindString(6, payload)
-            bindLong(7, 1234L)
-            executeInsert()
         }
-        version10.close()
-
-        val version11 = sqliteHelper(
-            context = context,
-            name = databaseName,
-            version = 11,
-            onCreate = {},
-            onUpgrade = { db, oldVersion, newVersion ->
-                assertEquals(10, oldVersion)
-                assertEquals(11, newVersion)
-                LettaDatabaseMigrations.MIGRATION_10_11.migrate(db)
-            },
-        )
-        val migrated = version11.writableDatabase
-        migrated.query(
-            "SELECT high_water_revision, active_manifest_id FROM confirmed_timeline_snapshots " +
-                "WHERE backend_id = ? AND conversation_id = ?",
-            arrayOf(scope.backendId, scope.conversationId),
-        ).use { cursor ->
-            assertTrue(cursor.moveToFirst())
-            assertEquals(7L, cursor.getLong(0))
-            val manifestId = cursor.getString(1)
-            migrated.query(
-                "SELECT MAX(length(payload)), SUM(length(payload)), COUNT(*) " +
-                    "FROM confirmed_timeline_snapshot_chunks WHERE manifest_id = ?",
-                arrayOf(manifestId),
-            ).use { chunks ->
-                assertTrue(chunks.moveToFirst())
-                assertTrue(chunks.getInt(0) <= RoomConfirmedTimelineStore.CHUNK_SIZE_BYTES)
-                assertEquals(payload.encodeToByteArray().size.toLong(), chunks.getLong(1))
-                assertTrue(chunks.getInt(2) > 8)
-            }
-        }
-        version11.close()
-        context.deleteDatabase(databaseName)
     }
 
-    private fun sqliteHelper(
-        context: Context,
-        name: String,
-        version: Int,
-        onCreate: (SupportSQLiteDatabase) -> Unit,
-        onUpgrade: (SupportSQLiteDatabase, Int, Int) -> Unit = { _, _, _ -> },
-    ): SupportSQLiteOpenHelper = FrameworkSQLiteOpenHelperFactory().create(
-        SupportSQLiteOpenHelper.Configuration.builder(context)
-            .name(name)
-            .callback(
-                object : SupportSQLiteOpenHelper.Callback(version) {
-                    override fun onCreate(db: SupportSQLiteDatabase) = onCreate(db)
-                    override fun onUpgrade(db: SupportSQLiteDatabase, oldVersion: Int, newVersion: Int) =
-                        onUpgrade(db, oldVersion, newVersion)
-                }
-            )
-            .build(),
-    )
+    private data object ChunkedSchema : TestSchema(11) {
+        override fun create(db: SupportSQLiteDatabase) = Unit
+
+        override fun upgrade(db: SupportSQLiteDatabase, oldVersion: Int, newVersion: Int) {
+            assertEquals(10, oldVersion)
+            assertEquals(11, newVersion)
+            LettaDatabaseMigrations.MIGRATION_10_11.migrate(db)
+        }
+    }
 }
