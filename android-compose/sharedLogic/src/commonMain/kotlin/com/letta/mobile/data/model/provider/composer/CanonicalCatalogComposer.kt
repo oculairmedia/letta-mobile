@@ -1,29 +1,31 @@
 package com.letta.mobile.data.model.provider.composer
 
+import com.letta.mobile.data.model.ModelRouteId
+import com.letta.mobile.data.model.ProviderInstanceId
 import com.letta.mobile.data.model.provider.CanonicalModelRoute
 import com.letta.mobile.data.model.provider.ModelAvailability
 import com.letta.mobile.data.model.provider.OperationalStatus
 import com.letta.mobile.data.model.provider.RedactedProviderInstance
 import com.letta.mobile.data.model.provider.VisibilityPolicy
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toPersistentList
 
-/**
- * Pure, deterministic catalog composer that joins canonical model routes with provider instances,
- * enforces epic visibility/availability precedence, and guarantees fail-open availability.
- *
- * This function performs zero I/O and has zero UI dependencies.
- */
+/** Pure canonical catalog projection. All cache and selection state enters through [CatalogComposerInput]. */
 object CanonicalCatalogComposer {
 
     fun compose(input: CatalogComposerInput): EffectiveCatalogProjection {
+        validateInput(input)
+        val routesById = input.modelRoutes.associateBy(CanonicalModelRoute::id)
+        val bindingsByAliasId = input.aliasBindings.associateBy(CatalogAliasBinding::aliasRouteId)
         val activeInstances = input.providerInstances
             .filter { it.hostId == input.activeHostId }
-            .associateBy { it.id }
+            .associateBy(RedactedProviderInstance::id)
 
         val effective = mutableListOf<EffectiveModelRoute>()
         val excluded = mutableListOf<ExcludedModelRoute>()
-
         for (route in input.modelRoutes) {
+            if (route.id in bindingsByAliasId) continue
             if (route.hostId != input.activeHostId) {
                 excluded.add(ExcludedModelRoute(route, ExclusionReason.HostMismatch))
                 continue
@@ -36,63 +38,113 @@ object CanonicalCatalogComposer {
                 continue
             }
 
-            val providerDisplayName = instance?.displayName ?: route.providerInstanceId.value
-            val isAvailable = evaluateAvailability(route.availability, instance?.operationalStatus)
-
+            val definition = instance?.let { input.providerDefinitions[it.definitionId] }
+            val aliases = buildAliases(route, input.aliasBindings, routesById)
             effective.add(
                 EffectiveModelRoute(
                     id = route.id,
                     hostId = route.hostId,
                     providerInstanceId = route.providerInstanceId,
-                    providerDisplayName = providerDisplayName,
+                    providerDisplayName = instance?.displayName ?: route.providerInstanceId.value,
+                    providerDefinitionId = definition?.id,
+                    providerDefinitionDisplayName = definition?.displayName,
+                    supportedProtocols = definition?.supportedProtocols ?: persistentListOf(),
+                    providerOperationalStatus = instance?.operationalStatus,
                     modelHandle = route.modelHandle,
                     displayName = route.displayName,
                     contextWindowLimit = route.contextWindowLimit,
                     availability = route.availability,
-                    effectiveVisibility = VisibilityPolicy.Visible,
-                    aliases = route.aliases,
-                    isAvailable = isAvailable,
+                    sourceVisibility = route.visibility,
+                    userVisibilityOverride = input.userVisibilityOverrides[route.id],
+                    aliases = aliases,
+                    isAvailable = evaluateAvailability(route.availability, instance?.operationalStatus),
                 ),
             )
         }
 
-        return EffectiveCatalogProjection(
-            activeHostId = input.activeHostId,
-            routes = effective.sortedWith(routeComparator).toPersistentList(),
+        val sortedRoutes = effective.sortedWith(routeComparator).toPersistentList()
+        validateSelectionIdentities(sortedRoutes)
+        val candidate = EffectiveCatalogProjection(
+            scope = CatalogScope(input.activeHostId, input.accountScopeId, input.sessionScopeId),
+            routes = sortedRoutes,
             excludedRoutes = excluded.sortedWith(excludedComparator).toPersistentList(),
+            selection = resolveSelection(input.selectedIdentity, sortedRoutes),
         )
+        return input.previousProjection?.takeIf { it == candidate } ?: candidate
     }
+
+    private fun validateInput(input: CatalogComposerInput) {
+        require(input.activeHostId.value.isNotBlank()) { "Catalog host identity must not be blank" }
+        require(input.accountScopeId?.value?.isNotBlank() != false) { "Catalog account scope must not be blank" }
+        require(input.sessionScopeId?.value?.isNotBlank() != false) { "Catalog session scope must not be blank" }
+        require(input.modelRoutes.map(CanonicalModelRoute::id).distinct().size == input.modelRoutes.size) {
+            "Catalog contains duplicate route identities"
+        }
+        require(input.modelRoutes.all { it.id.value.isNotBlank() && it.modelHandle.isNotBlank() }) {
+            "Catalog route identities and handles must not be blank"
+        }
+
+        val activeProviderIds = input.providerInstances
+            .filter { it.hostId == input.activeHostId }
+            .map(RedactedProviderInstance::id)
+        require(activeProviderIds.distinct().size == activeProviderIds.size) {
+            "Catalog contains duplicate provider instance identities for the active host"
+        }
+        require(input.providerDefinitions.all { (key, definition) -> key == definition.id }) {
+            "Provider definition keys must match their typed identities"
+        }
+
+        val routesById = input.modelRoutes.associateBy(CanonicalModelRoute::id)
+        require(input.aliasBindings.map(CatalogAliasBinding::aliasRouteId).distinct().size == input.aliasBindings.size) {
+            "A route cannot be bound to multiple canonical routes"
+        }
+        require(input.aliasBindings.all { binding ->
+            val canonical = routesById[binding.canonicalRouteId]
+            val alias = routesById[binding.aliasRouteId]
+            canonical != null && alias != null &&
+                canonical.id != alias.id && canonical.hostId == alias.hostId &&
+                binding.legacyIdentity.isNotBlank()
+        }) { "Catalog alias bindings must reference distinct routes on the same host" }
+        val aliasIds = input.aliasBindings.map(CatalogAliasBinding::aliasRouteId).toSet()
+        require(input.aliasBindings.none { it.canonicalRouteId in aliasIds }) {
+            "Catalog alias bindings must be direct and acyclic"
+        }
+    }
+
+    private fun buildAliases(
+        canonical: CanonicalModelRoute,
+        bindings: ImmutableList<CatalogAliasBinding>,
+        routesById: Map<ModelRouteId, CanonicalModelRoute>,
+    ) = buildList {
+        addAll(canonical.aliases)
+        bindings.filter { it.canonicalRouteId == canonical.id }.forEach { binding ->
+            val aliasRoute = checkNotNull(routesById[binding.aliasRouteId])
+            add(binding.legacyIdentity)
+            add(aliasRoute.modelHandle)
+            addAll(aliasRoute.aliases)
+        }
+    }.filter(String::isNotBlank).distinct().sorted().toPersistentList()
 
     private fun evaluateExclusion(
         route: CanonicalModelRoute,
         instance: RedactedProviderInstance?,
         input: CatalogComposerInput,
     ): ExclusionReason? {
-        if (instance != null && instance.operationalStatus == OperationalStatus.Disabled) {
-            return ExclusionReason.ProviderDisabled
+        when (instance?.operationalStatus) {
+            OperationalStatus.Disabled -> return ExclusionReason.ProviderDisabled
+            OperationalStatus.Unavailable -> return ExclusionReason.ProviderUnavailable
+            else -> Unit
         }
-        if (route.availability == ModelAvailability.Disabled) {
-            return ExclusionReason.RouteDisabled
-        }
+        if (route.availability == ModelAvailability.Disabled) return ExclusionReason.RouteDisabled
 
-        val userOverride = input.userVisibilityOverrides[route.id]
-        if (userOverride == VisibilityPolicy.Hidden) {
-            return ExclusionReason.HiddenByUser
-        }
-        if (userOverride == VisibilityPolicy.Visible) {
-            return null // Explicit user visible overrides route/default hidden policy
-        }
-
-        // Inherit policy or default
-        return when (route.visibility) {
-            VisibilityPolicy.Hidden -> ExclusionReason.HiddenByPolicy
+        return when (input.userVisibilityOverrides[route.id]) {
+            VisibilityPolicy.Hidden -> ExclusionReason.HiddenByUser
             VisibilityPolicy.Visible -> null
-            VisibilityPolicy.Automatic, is VisibilityPolicy.Unknown -> {
-                if (input.defaultVisibility == VisibilityPolicy.Hidden) {
-                    ExclusionReason.HiddenByPolicy
-                } else {
-                    null
-                }
+            else -> when (route.visibility) {
+                VisibilityPolicy.Hidden -> ExclusionReason.HiddenByPolicy
+                VisibilityPolicy.Visible -> null
+                VisibilityPolicy.Automatic, is VisibilityPolicy.Unknown ->
+                    ExclusionReason.HiddenByPolicy.takeIf { input.defaultVisibility == VisibilityPolicy.Hidden }
             }
         }
     }
@@ -105,12 +157,33 @@ object CanonicalCatalogComposer {
             return false
         }
         return when (routeAvailability) {
-            ModelAvailability.Available -> true
-            ModelAvailability.Deprecated -> true
-            ModelAvailability.Disabled -> false
-            ModelAvailability.QuotaExceeded -> false
-            is ModelAvailability.Unknown -> true // Fail-open: unknown availability remains available
+            ModelAvailability.Available, ModelAvailability.Deprecated, is ModelAvailability.Unknown -> true
+            ModelAvailability.Disabled, ModelAvailability.QuotaExceeded -> false
         }
+    }
+
+    private fun validateSelectionIdentities(routes: ImmutableList<EffectiveModelRoute>) {
+        val owners = mutableMapOf<String, ModelRouteId>()
+        routes.forEach { route ->
+            (route.aliases + route.modelHandle + route.id.value).forEach { identity ->
+                val previous = owners.put(identity, route.id)
+                require(previous == null || previous == route.id) {
+                    "Catalog contains an ambiguous model selection identity"
+                }
+            }
+        }
+    }
+
+    private fun resolveSelection(
+        selectedIdentity: String?,
+        routes: ImmutableList<EffectiveModelRoute>,
+    ): SelectionResolution {
+        if (selectedIdentity == null) return SelectionResolution.None
+        val route = routes.firstOrNull { candidate ->
+            selectedIdentity == candidate.id.value || selectedIdentity == candidate.modelHandle ||
+                selectedIdentity in candidate.aliases
+        } ?: return SelectionResolution.Unresolved
+        return SelectionResolution.Resolved(route.id, selectedIdentity)
     }
 
     private val routeComparator = compareBy<EffectiveModelRoute>(
@@ -121,6 +194,7 @@ object CanonicalCatalogComposer {
     )
 
     private val excludedComparator = compareBy<ExcludedModelRoute>(
+        { it.route.hostId.value },
         { it.route.displayName.lowercase() },
         { it.route.modelHandle.lowercase() },
         { it.route.id.value },

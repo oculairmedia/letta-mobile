@@ -6,209 +6,199 @@ import com.letta.mobile.data.model.ProviderDefinitionId
 import com.letta.mobile.data.model.ProviderInstanceId
 import com.letta.mobile.data.model.provider.CanonicalModelRoute
 import com.letta.mobile.data.model.provider.CredentialStatus
-import com.letta.mobile.data.model.provider.ModelAvailability
-import com.letta.mobile.data.model.provider.OperationalStatus
 import com.letta.mobile.data.model.provider.ProviderDefinition
+import com.letta.mobile.data.model.provider.ProviderProtocol
 import com.letta.mobile.data.model.provider.RedactedProviderInstance
-import com.letta.mobile.data.model.provider.VisibilityPolicy
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.persistentMapOf
 import kotlinx.collections.immutable.toPersistentList
+import kotlinx.collections.immutable.toPersistentMap
+import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertIs
+import kotlin.test.assertFailsWith
+import kotlin.test.assertNotSame
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class CanonicalCatalogComposerTest {
-
-    private val hostPrimary = HostId("host-primary")
-    private val hostSecondary = HostId("host-secondary")
+    private val host = HostId("host-primary")
 
     @Test
-    fun twoInstancesSharingProtocolRemainDistinct() {
-        val inst1 = RedactedProviderInstance(
-            id = ProviderInstanceId("openai-official"),
-            hostId = hostPrimary,
-            definitionId = ProviderDefinitionId("openai"),
-            displayName = "OpenAI Official",
-            credentialStatus = CredentialStatus.Configured,
-        )
-        val inst2 = RedactedProviderInstance(
-            id = ProviderInstanceId("openai-azure"),
-            hostId = hostPrimary,
-            definitionId = ProviderDefinitionId("openai"),
-            displayName = "Azure OpenAI",
-            credentialStatus = CredentialStatus.Configured,
+    fun providerBrandProvenanceKeepsBrandsWithSharedProtocolDistinct() {
+        val protocol = persistentListOf(ProviderProtocol.OpenAi)
+        val firstDefinition = ProviderDefinition(ProviderDefinitionId("official"), "Official", supportedProtocols = protocol)
+        val secondDefinition = ProviderDefinition(ProviderDefinitionId("gateway"), "Gateway", supportedProtocols = protocol)
+        val first = provider("first", firstDefinition.id, "Official account")
+        val second = provider("second", secondDefinition.id, "Gateway account")
+
+        val result = compose(
+            routes = persistentListOf(route("r1", first.id, "official/model"), route("r2", second.id, "gateway/model")),
+            providers = persistentListOf(first, second),
+            definitions = persistentMapOf(firstDefinition.id to firstDefinition, secondDefinition.id to secondDefinition),
         )
 
-        val route1 = CanonicalModelRoute(
-            id = ModelRouteId("route-gpt4-official"),
-            hostId = hostPrimary,
-            providerInstanceId = inst1.id,
-            modelHandle = "gpt-4o",
-            displayName = "GPT-4o (Official)",
-        )
-        val route2 = CanonicalModelRoute(
-            id = ModelRouteId("route-gpt4-azure"),
-            hostId = hostPrimary,
-            providerInstanceId = inst2.id,
-            modelHandle = "gpt-4o",
-            displayName = "GPT-4o (Azure)",
-        )
-
-        val input = CatalogComposerInput(
-            activeHostId = hostPrimary,
-            modelRoutes = persistentListOf(route1, route2),
-            providerInstances = persistentListOf(inst1, inst2),
-        )
-
-        val result = CanonicalCatalogComposer.compose(input)
-        assertEquals(2, result.routes.size)
-        assertEquals("Azure OpenAI", result.routes[0].providerDisplayName)
-        assertEquals("OpenAI Official", result.routes[1].providerDisplayName)
-        assertTrue(result.excludedRoutes.isEmpty())
+        assertEquals(setOf(firstDefinition.id, secondDefinition.id), result.routes.mapNotNull { it.providerDefinitionId }.toSet())
+        assertTrue(result.routes.all { it.supportedProtocols == protocol })
     }
 
     @Test
-    fun mixedProviderFixtureSurvivesMissingProviderRecords() {
-        // Models exist from 5 different providers, but ONLY 1 provider record exists on host
-        val onlyProvider = RedactedProviderInstance(
-            id = ProviderInstanceId("openai-inst"),
-            hostId = hostPrimary,
-            definitionId = ProviderDefinitionId("openai"),
-            displayName = "OpenAI",
-        )
-
-        val routes = persistentListOf(
-            CanonicalModelRoute(ModelRouteId("r1"), hostPrimary, ProviderInstanceId("openai-inst"), "gpt-4o", "GPT-4o"),
-            CanonicalModelRoute(ModelRouteId("r2"), hostPrimary, ProviderInstanceId("anthropic-inst"), "claude-3-5-sonnet", "Claude 3.5 Sonnet"),
-            CanonicalModelRoute(ModelRouteId("r3"), hostPrimary, ProviderInstanceId("google-inst"), "gemini-2.0-flash", "Gemini 2.0 Flash"),
-            CanonicalModelRoute(ModelRouteId("r4"), hostPrimary, ProviderInstanceId("groq-inst"), "llama-3.3-70b", "Llama 3.3 70B"),
-            CanonicalModelRoute(ModelRouteId("r5"), hostPrimary, ProviderInstanceId("mistral-inst"), "mistral-large", "Mistral Large"),
-        )
-
-        val input = CatalogComposerInput(
-            activeHostId = hostPrimary,
-            modelRoutes = routes,
-            providerInstances = persistentListOf(onlyProvider),
-        )
-
-        val result = CanonicalCatalogComposer.compose(input)
-        // All 5 routes MUST be preserved, none dropped due to missing provider instances
-        assertEquals(5, result.routes.size)
-        assertTrue(result.excludedRoutes.isEmpty())
-    }
-
-    @Test
-    fun activeHostIsolationExcludesMismatchedHosts() {
-        val routePrimary = CanonicalModelRoute(ModelRouteId("r-p"), hostPrimary, ProviderInstanceId("p-inst"), "model-1", "Model 1")
-        val routeSecondary = CanonicalModelRoute(ModelRouteId("r-s"), hostSecondary, ProviderInstanceId("s-inst"), "model-2", "Model 2")
-
-        val input = CatalogComposerInput(
-            activeHostId = hostPrimary,
-            modelRoutes = persistentListOf(routePrimary, routeSecondary),
-        )
-
-        val result = CanonicalCatalogComposer.compose(input)
-        assertEquals(1, result.routes.size)
-        assertEquals(ModelRouteId("r-p"), result.routes[0].id)
-
-        assertEquals(1, result.excludedRoutes.size)
-        assertEquals(ModelRouteId("r-s"), result.excludedRoutes[0].route.id)
-        assertEquals(ExclusionReason.HostMismatch, result.excludedRoutes[0].reason)
-    }
-
-    @Test
-    fun unknownAvailabilityFailsOpenAsAvailable() {
-        val route = CanonicalModelRoute(
-            id = ModelRouteId("r-unknown"),
-            hostId = hostPrimary,
-            providerInstanceId = ProviderInstanceId("inst-1"),
-            modelHandle = "future-model",
-            displayName = "Future Model",
-            availability = ModelAvailability.Unknown("future_quota_provisional"),
-        )
-
-        val input = CatalogComposerInput(
-            activeHostId = hostPrimary,
-            modelRoutes = persistentListOf(route),
-        )
-
-        val result = CanonicalCatalogComposer.compose(input)
-        assertEquals(1, result.routes.size)
-        assertTrue(result.routes[0].isAvailable)
-    }
-
-    @Test
-    fun explicitVisibleCannotResurrectDisabledProviderOrRoute() {
-        val disabledInst = RedactedProviderInstance(
-            id = ProviderInstanceId("disabled-inst"),
-            hostId = hostPrimary,
-            definitionId = ProviderDefinitionId("openai"),
-            displayName = "Disabled OpenAI",
-            operationalStatus = OperationalStatus.Disabled,
-        )
-        val routeOnDisabledInst = CanonicalModelRoute(
-            id = ModelRouteId("r-disabled-inst"),
-            hostId = hostPrimary,
-            providerInstanceId = disabledInst.id,
-            modelHandle = "gpt-4",
-            displayName = "GPT-4",
-        )
-        val disabledRoute = CanonicalModelRoute(
-            id = ModelRouteId("r-disabled-route"),
-            hostId = hostPrimary,
-            providerInstanceId = ProviderInstanceId("active-inst"),
-            modelHandle = "gpt-3.5",
-            displayName = "GPT-3.5",
-            availability = ModelAvailability.Disabled,
-        )
-
-        val input = CatalogComposerInput(
-            activeHostId = hostPrimary,
-            modelRoutes = persistentListOf(routeOnDisabledInst, disabledRoute),
-            providerInstances = persistentListOf(disabledInst),
-            userVisibilityOverrides = persistentMapOf(
-                ModelRouteId("r-disabled-inst") to VisibilityPolicy.Visible,
-                ModelRouteId("r-disabled-route") to VisibilityPolicy.Visible,
+    fun authoritativeAliasCollapsesRouteAndPreservesSavedLegacySelection() {
+        val canonical = route("canonical", ProviderInstanceId("provider"), "openai/MiniMax-M3")
+        val legacy = route("legacy", ProviderInstanceId("provider"), "lmstudio/MiniMax-M3")
+        val result = CanonicalCatalogComposer.compose(
+            CatalogComposerInput(
+                activeHostId = host,
+                modelRoutes = persistentListOf(legacy, canonical),
+                aliasBindings = persistentListOf(CatalogAliasBinding(canonical.id, legacy.id, legacy.modelHandle)),
+                selectedIdentity = legacy.modelHandle,
             ),
         )
 
-        val result = CanonicalCatalogComposer.compose(input)
-        assertEquals(0, result.routes.size)
-        assertEquals(2, result.excludedRoutes.size)
-
-        val reasons = result.excludedRoutes.associate { it.route.id to it.reason }
-        assertEquals(ExclusionReason.ProviderDisabled, reasons[ModelRouteId("r-disabled-inst")])
-        assertEquals(ExclusionReason.RouteDisabled, reasons[ModelRouteId("r-disabled-route")])
+        assertEquals(1, result.routes.size)
+        assertEquals(canonical.id, result.routes.single().id)
+        assertEquals(listOf(legacy.modelHandle), result.routes.single().aliases)
+        assertEquals(SelectionResolution.Resolved(canonical.id, legacy.modelHandle), result.selection)
     }
 
     @Test
-    fun deterministicOutputUnderShuffledInputOrder() {
-        val routes = (1..20).map { i ->
-            CanonicalModelRoute(
-                id = ModelRouteId("route-$i"),
-                hostId = hostPrimary,
-                providerInstanceId = ProviderInstanceId("provider-${i % 3}"),
-                modelHandle = "handle-$i",
-                displayName = "Model $i",
-            )
+    fun shuffledInputsProduceCompleteIdenticalProjection() {
+        val definitions = (1..3).associate { index ->
+            val id = ProviderDefinitionId("definition-$index")
+            id to ProviderDefinition(id, "Brand $index", supportedProtocols = persistentListOf(ProviderProtocol.OpenAi))
+        }
+        val providers = (1..3).map { provider("provider-$it", ProviderDefinitionId("definition-$it"), "Provider") }
+        val routes = (1..12).map { index ->
+            route("route-$index", providers[index % providers.size].id, "handle-$index", "Model")
+        }
+        val normal = CatalogComposerInput(
+            activeHostId = host,
+            modelRoutes = routes.toPersistentList(),
+            providerInstances = providers.toPersistentList(),
+            providerDefinitions = definitions.toPersistentMap(),
+        )
+        val reversed = normal.copy(
+            modelRoutes = routes.reversed().toPersistentList(),
+            providerInstances = providers.reversed().toPersistentList(),
+            providerDefinitions = definitions.entries.reversed().associate { it.toPair() }.toPersistentMap(),
+        )
+
+        assertEquals(CanonicalCatalogComposer.compose(normal), CanonicalCatalogComposer.compose(reversed))
+    }
+
+    @Test
+    fun typedIdentityCollisionsAreRejectedIndependentOfOrder() {
+        val duplicateRoutes = listOf(
+            route("duplicate", ProviderInstanceId("provider-a"), "a"),
+            route("duplicate", ProviderInstanceId("provider-b"), "b"),
+        )
+        duplicateRoutes.indices.forEach { offset ->
+            assertFailsWith<IllegalArgumentException> {
+                compose(duplicateRoutes.drop(offset).plus(duplicateRoutes.take(offset)).toPersistentList())
+            }
         }
 
-        val inputNormal = CatalogComposerInput(
-            activeHostId = hostPrimary,
-            modelRoutes = routes.toPersistentList(),
+        val duplicateProviders = persistentListOf(
+            provider("duplicate", ProviderDefinitionId("a"), "A"),
+            provider("duplicate", ProviderDefinitionId("b"), "B"),
         )
-
-        val inputShuffled = CatalogComposerInput(
-            activeHostId = hostPrimary,
-            modelRoutes = routes.shuffled().toPersistentList(),
-        )
-
-        val resultNormal = CanonicalCatalogComposer.compose(inputNormal)
-        val resultShuffled = CanonicalCatalogComposer.compose(inputShuffled)
-
-        assertEquals(resultNormal.routes.map { it.id }, resultShuffled.routes.map { it.id })
+        assertFailsWith<IllegalArgumentException> {
+            compose(persistentListOf(route("r", ProviderInstanceId("duplicate"), "m")), duplicateProviders)
+        }
     }
+
+    @Test
+    fun ambiguousSelectionTokensAreRejectedRatherThanOrderResolved() {
+        val routes = persistentListOf(
+            route("one", ProviderInstanceId("a"), "shared"),
+            route("two", ProviderInstanceId("b"), "shared"),
+        )
+        assertFailsWith<IllegalArgumentException> { compose(routes) }
+        assertFailsWith<IllegalArgumentException> { compose(routes.reversed().toPersistentList()) }
+    }
+
+    @Test
+    fun previousProjectionReuseIsReferentialAndScopeIsolated() {
+        val routes = persistentListOf(route("r", ProviderInstanceId("provider"), "model"))
+        val firstInput = CatalogComposerInput(
+            activeHostId = host,
+            modelRoutes = routes,
+            accountScopeId = CatalogAccountScopeId("account-a"),
+            sessionScopeId = CatalogSessionScopeId("session-a"),
+        )
+        val first = CanonicalCatalogComposer.compose(firstInput)
+        val reused = CanonicalCatalogComposer.compose(firstInput.copy(previousProjection = first))
+        val otherAccount = CanonicalCatalogComposer.compose(
+            firstInput.copy(accountScopeId = CatalogAccountScopeId("account-b"), previousProjection = first),
+        )
+        val otherSession = CanonicalCatalogComposer.compose(
+            firstInput.copy(sessionScopeId = CatalogSessionScopeId("session-b"), previousProjection = first),
+        )
+
+        assertSame(first, reused)
+        assertNotSame(first, otherAccount)
+        assertNotSame(first, otherSession)
+        assertEquals(CatalogAccountScopeId("account-b"), otherAccount.scope.accountId)
+        assertEquals(CatalogSessionScopeId("session-b"), otherSession.scope.sessionId)
+    }
+
+    @Test
+    fun emptyNullAndUnresolvedSelectionBoundariesAreExplicit() {
+        val empty = CanonicalCatalogComposer.compose(CatalogComposerInput(host, persistentListOf()))
+        assertTrue(empty.routes.isEmpty())
+        assertEquals(SelectionResolution.None, empty.selection)
+
+        val unresolved = CanonicalCatalogComposer.compose(
+            CatalogComposerInput(host, persistentListOf(route("r", ProviderInstanceId("p"), "known")), selectedIdentity = "missing"),
+        )
+        assertEquals(SelectionResolution.Unresolved, unresolved.selection)
+        assertFailsWith<IllegalArgumentException> {
+            CanonicalCatalogComposer.compose(CatalogComposerInput(host, persistentListOf(route("r", ProviderInstanceId("p"), ""))))
+        }
+    }
+
+    @Test
+    fun projectionSnapshotCannotContainProviderConfigurationValues() {
+        val definition = ProviderDefinition(ProviderDefinitionId("definition"), "Brand")
+        val provider = RedactedProviderInstance(
+            id = ProviderInstanceId("provider"),
+            hostId = host,
+            definitionId = definition.id,
+            displayName = "Account",
+            baseUrl = "https://endpoint.example/v1",
+            credentialStatus = CredentialStatus.Configured,
+            configuredHeaderNames = persistentListOf("Authorization"),
+        )
+        val result = compose(
+            persistentListOf(route("r", provider.id, "model")),
+            persistentListOf(provider),
+            persistentMapOf(definition.id to definition),
+        )
+        val snapshot = Json.encodeToString(EffectiveCatalogProjection.serializer(), result)
+
+        assertTrue("endpoint.example" !in snapshot)
+        assertTrue("Authorization" !in snapshot)
+        assertTrue("credential" !in snapshot.lowercase())
+    }
+
+    private fun compose(
+        routes: kotlinx.collections.immutable.ImmutableList<CanonicalModelRoute>,
+        providers: kotlinx.collections.immutable.ImmutableList<RedactedProviderInstance> = persistentListOf(),
+        definitions: kotlinx.collections.immutable.ImmutableMap<ProviderDefinitionId, ProviderDefinition> = persistentMapOf(),
+    ) = CanonicalCatalogComposer.compose(
+        CatalogComposerInput(host, routes, providerInstances = providers, providerDefinitions = definitions),
+    )
+
+    private fun route(
+        id: String,
+        providerId: ProviderInstanceId,
+        handle: String,
+        displayName: String = id,
+    ) = CanonicalModelRoute(ModelRouteId(id), host, providerId, handle, displayName)
+
+    private fun provider(
+        id: String,
+        definitionId: ProviderDefinitionId,
+        displayName: String,
+    ) = RedactedProviderInstance(ProviderInstanceId(id), host, definitionId, displayName)
 }

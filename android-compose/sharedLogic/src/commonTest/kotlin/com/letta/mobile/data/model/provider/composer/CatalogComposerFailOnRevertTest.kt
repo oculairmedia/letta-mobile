@@ -7,43 +7,82 @@ import com.letta.mobile.data.model.ProviderInstanceId
 import com.letta.mobile.data.model.provider.CanonicalModelRoute
 import com.letta.mobile.data.model.provider.RedactedProviderInstance
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toPersistentList
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class CatalogComposerFailOnRevertTest {
-
-    private val hostId = HostId("host-1")
+    private val host = HostId("host")
 
     @Test
-    fun composerNeverFiltersByMissingProviderInstanceRecords() {
-        val singleProvider = RedactedProviderInstance(
-            id = ProviderInstanceId("openai-inst"),
-            hostId = hostId,
-            definitionId = ProviderDefinitionId("openai"),
-            displayName = "OpenAI",
+    fun productionShapedMixedCatalogSurvivesHistoricalProviderFilter() {
+        val fixture = mixedCatalogFixture()
+        val canonical = fixture.single { it.route.modelHandle == "openai/MiniMax-M3" }.route
+        val legacy = fixture.single { it.route.modelHandle == "lmstudio/MiniMax-M3" }.route
+        val configuredOpenAi = RedactedProviderInstance(
+            ProviderInstanceId("openai"),
+            host,
+            ProviderDefinitionId("openai"),
+            "OpenAI",
+        )
+        val projection = CanonicalCatalogComposer.compose(
+            CatalogComposerInput(
+                activeHostId = host,
+                modelRoutes = fixture.map(FixtureRoute::route).toPersistentList(),
+                providerInstances = persistentListOf(configuredOpenAi),
+                aliasBindings = persistentListOf(CatalogAliasBinding(canonical.id, legacy.id, legacy.modelHandle)),
+            ),
         )
 
-        val mixedRoutes = persistentListOf(
-            CanonicalModelRoute(ModelRouteId("r1"), hostId, ProviderInstanceId("openai-inst"), "gpt-4o", "GPT-4o"),
-            CanonicalModelRoute(ModelRouteId("r2"), hostId, ProviderInstanceId("anthropic-inst"), "claude-3-5-sonnet", "Claude 3.5 Sonnet"),
-            CanonicalModelRoute(ModelRouteId("r3"), hostId, ProviderInstanceId("google-inst"), "gemini-2.0-flash", "Gemini 2.0 Flash"),
+        assertEquals(11, projection.routes.size)
+        assertEquals(setOf(legacy.modelHandle), projection.routes.single { it.id == canonical.id }.aliases.toSet())
+
+        val providerTypeById = fixture.associate { it.route.id to it.providerType }
+        val historicalCredentialedTypes = setOf("openai")
+        val oldFiltered = projection.routes.filter { route ->
+            providerTypeById[route.id] in historicalCredentialedTypes ||
+                providerPrefix(route.modelHandle) in historicalCredentialedTypes ||
+                route.aliases.any { providerPrefix(it) in historicalCredentialedTypes }
+        }
+        assertEquals(
+            setOf("openai/gpt-4o", "custom-openai/my-model", "openai/MiniMax-M3"),
+            oldFiltered.map(EffectiveModelRoute::modelHandle).toSet(),
         )
-
-        val input = CatalogComposerInput(
-            activeHostId = hostId,
-            modelRoutes = mixedRoutes,
-            providerInstances = persistentListOf(singleProvider),
-        )
-
-        val result = CanonicalCatalogComposer.compose(input)
-
-        // Control assertion: All 3 routes preserved
-        assertEquals(3, result.routes.size)
-
-        // Negative regression control: Proves that naive provider filtering would drop 2 routes
-        val naiveFiltered = mixedRoutes.filter { r -> r.providerInstanceId == singleProvider.id }
-        assertEquals(1, naiveFiltered.size)
-        assertTrue(result.routes.size > naiveFiltered.size)
+        assertTrue("anthropic/claude-3-5-sonnet" in projection.routes.map(EffectiveModelRoute::modelHandle))
+        assertTrue("google/gemini-1.5-pro" in projection.routes.map(EffectiveModelRoute::modelHandle))
     }
+
+    private fun mixedCatalogFixture(): List<FixtureRoute> = listOf(
+        fixture("openai/gpt-4o", "openai"),
+        fixture("anthropic/claude-3-5-sonnet", "anthropic"),
+        fixture("google/gemini-1.5-pro", "google"),
+        fixture("xai/grok-2", "xai"),
+        fixture("zai/glm-4", "zai"),
+        fixture("minimax/minimax-01", "minimax"),
+        fixture("moonshot/moonshot-v1-8k", "moonshot"),
+        fixture("bedrock/anthropic.claude-3-sonnet", "bedrock"),
+        fixture("lmstudio/llama-3.1-8b", "lmstudio"),
+        fixture("custom-openai/my-model", "openai"),
+        fixture("openai/MiniMax-M3", "openai"),
+        fixture("lmstudio/MiniMax-M3", "lmstudio"),
+    )
+
+    private fun fixture(handle: String, providerType: String): FixtureRoute {
+        val prefix = providerPrefix(handle)
+        return FixtureRoute(
+            CanonicalModelRoute(
+                id = ModelRouteId(handle),
+                hostId = host,
+                providerInstanceId = ProviderInstanceId(prefix),
+                modelHandle = handle,
+                displayName = handle.substringAfter('/'),
+            ),
+            providerType,
+        )
+    }
+
+    private fun providerPrefix(identity: String): String = identity.substringBefore('/').trim().lowercase()
+
+    private data class FixtureRoute(val route: CanonicalModelRoute, val providerType: String)
 }
