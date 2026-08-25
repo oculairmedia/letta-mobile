@@ -1,6 +1,8 @@
 package com.letta.cli
 
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.Context
+import com.github.ajalt.clikt.core.main
 import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.optional
@@ -40,7 +42,9 @@ class LettaCli : CliktCommand(name = "letta-cli") {
     override fun run() = Unit
 }
 
-class Messages : CliktCommand(help = "List messages for an agent") {
+class Messages : CliktCommand() {
+    override fun help(context: Context) = "List messages for an agent"
+
     private val baseUrl by option("--url", "-u", help = "Letta server URL")
         .default("http://192.168.50.90:8289")
     private val agentId by argument(help = "Agent ID")
@@ -87,7 +91,9 @@ class Messages : CliktCommand(help = "List messages for an agent") {
     }
 }
 
-class Count : CliktCommand(help = "Count agents, tools, blocks, or conversations") {
+class Count : CliktCommand() {
+    override fun help(context: Context) = "Count agents, tools, blocks, or conversations"
+
     private val baseUrl by option("--url", "-u", help = "Letta server URL")
         .default("http://192.168.50.90:8289")
     private val resource by argument(help = "Resource: agents, tools, blocks")
@@ -116,7 +122,9 @@ class Count : CliktCommand(help = "Count agents, tools, blocks, or conversations
     }
 }
 
-class CheckNew : CliktCommand(help = "Check for new messages after a cursor") {
+class CheckNew : CliktCommand() {
+    override fun help(context: Context) = "Check for new messages after a cursor"
+
     private val baseUrl by option("--url", "-u", help = "Letta server URL")
         .default("http://192.168.50.90:8289")
     private val agentId by argument(help = "Agent ID")
