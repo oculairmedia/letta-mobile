@@ -157,7 +157,7 @@ class DefaultSessionRepositoryGraphFactoryTest {
     }
 
     @Test
-    fun `create wires credentialed provider filter into model repository`() = runTest {
+    fun `create wires model repository that refreshes full catalog without calling listProviders`() = runTest {
         val modelApi = FakeModelApi().apply {
             llmModels += model("openai/gpt-4o")
             llmModels += model("anthropic/claude-sonnet")
@@ -173,13 +173,11 @@ class DefaultSessionRepositoryGraphFactoryTest {
 
         graph.modelRepository.refreshLlmModels()
 
-        assertTrue(providerApi.calls.contains("listProviders"))
-        assertEquals(listOf("openai/gpt-4o"), graph.modelRepository.llmModels.value.map { it.handle })
-        val listProviderCalls = providerApi.calls.count { it == "listProviders" }
-
-        graph.modelRepository.refreshLlmModels()
-
-        assertEquals(listProviderCalls, providerApi.calls.count { it == "listProviders" })
+        assertFalse(providerApi.calls.contains("listProviders"))
+        assertEquals(
+            setOf("openai/gpt-4o", "anthropic/claude-sonnet"),
+            graph.modelRepository.llmModels.value.map { it.handle }.toSet(),
+        )
         graph.close()
     }
 

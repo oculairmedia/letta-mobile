@@ -15,7 +15,6 @@ import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.model.ModelCatalogNormalizer
-import com.letta.mobile.data.model.Provider
 import com.letta.mobile.data.stream.SseFrame
 import com.letta.mobile.data.stream.SseParser
 import com.letta.mobile.data.timeline.TimelineNoActiveRunException
@@ -42,7 +41,6 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.buildJsonObject
@@ -62,6 +60,13 @@ open class LettaHttpChatGateway(
     private val httpClient: HttpClient,
 ) : ChatGateway, ChatGatewayExtras, ConversationSummaryGateway, AutoCloseable {
     private val baseUrl = config.serverUrl.trimEnd('/')
+
+    private data class MessageListQuery(
+        val limit: Int?,
+        val order: String?,
+        val after: String? = null,
+        val conversationId: String? = null,
+    )
 
     override suspend fun listConversations(limit: Int, archiveStatus: String?): List<Conversation> {
         val response = httpClient.get("$baseUrl/v1/conversations") {
@@ -134,28 +139,28 @@ open class LettaHttpChatGateway(
         limit: Int?,
         after: String?,
         order: String?,
-    ): List<LettaMessage> {
-        val response = httpClient.get("$baseUrl/v1/conversations/$conversationId/messages") {
-            applyAuth()
-            parameter("limit", limit)
-            parameter("after", after)
-            parameter("order", order)
-        }
-        response.requireSuccess()
-        return response.body()
-    }
+    ): List<LettaMessage> = listMessages(
+        path = "/v1/conversations/$conversationId/messages",
+        query = MessageListQuery(limit = limit, order = order, after = after),
+    )
 
     override suspend fun listAgentMessages(
         agentId: String,
         limit: Int?,
         order: String?,
         conversationId: String?,
-    ): List<LettaMessage> {
-        val response = httpClient.get("$baseUrl/v1/agents/$agentId/messages") {
+    ): List<LettaMessage> = listMessages(
+        path = "/v1/agents/$agentId/messages",
+        query = MessageListQuery(limit = limit, order = order, conversationId = conversationId),
+    )
+
+    private suspend fun listMessages(path: String, query: MessageListQuery): List<LettaMessage> {
+        val response = httpClient.get("$baseUrl$path") {
             applyAuth()
-            parameter("limit", limit)
-            parameter("order", order)
-            parameter("conversation_id", conversationId)
+            parameter("limit", query.limit)
+            parameter("order", query.order)
+            parameter("after", query.after)
+            parameter("conversation_id", query.conversationId)
         }
         response.requireSuccess()
         return response.body()
@@ -202,9 +207,7 @@ open class LettaHttpChatGateway(
             applyAuth()
         }
         response.requireSuccess()
-        val normalized = ModelCatalogNormalizer.normalize(response.body())
-        val credentialedTypes = fetchCredentialedProviderTypes()
-        return ModelCatalogNormalizer.filterByCredentialedProviders(normalized, credentialedTypes)
+        return ModelCatalogNormalizer.normalize(response.body())
     }
 
     /** Set the model override for an existing conversation. */
@@ -244,74 +247,11 @@ open class LettaHttpChatGateway(
         httpClient.close()
     }
 
-    /**
-     * Fetch the lowercased `provider_type` values that have a credentialed provider
-     * record on the backend (`GET /v1/providers`), driving
-     * [ModelCatalogNormalizer.filterByCredentialedProviders] so the model picker only
-     * offers models whose provider has credentials configured.
-     *
-     * FAIL-OPEN: every failure (HTTP error, parse error, empty response) maps to an
-     * empty set, which leaves the caller's model list unchanged -- the picker must
-     * never empty because the providers fetch failed. Pagination mirrors the shared
-     * cursor shape (`limit` + `after` = last provider id), bounded to a small page
-     * count; a server that ignores `after` and re-serves a page cannot spin.
-     */
-    private suspend fun fetchCredentialedProviderTypes(): Set<String> {
-        return try {
-            collectCredentialedProviderTypes()
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (_: Exception) {
-            emptySet()
-        }
-    }
-
-    private suspend fun collectCredentialedProviderTypes(): Set<String> {
-        val credentialedTypes = mutableSetOf<String>()
-        val seenIds = HashSet<String>()
-        var after: String? = null
-        for (page in 0 until PROVIDER_PAGE_MAX) {
-            val providers = fetchProvidersPage(after)
-            after = ingestProviderPage(providers, seenIds, credentialedTypes) ?: break
-        }
-        return credentialedTypes
-    }
-
-    private fun ingestProviderPage(
-        providers: List<Provider>,
-        seenIds: MutableSet<String>,
-        target: MutableSet<String>,
-    ): String? {
-        if (providers.isEmpty()) return null
-        val fresh = providers.filter { provider -> provider.id?.value?.let(seenIds::add) ?: true }
-        if (fresh.isEmpty()) return null
-        fresh.mapNotNull { it.providerType.trim().lowercase().takeIf(String::isNotBlank) }
-            .forEach(target::add)
-        if (providers.size < PROVIDER_PAGE_SIZE) return null
-        return providers.last().id?.value?.takeIf(String::isNotBlank)
-            ?: error("Full provider page has no cursor ID")
-    }
-
-    private suspend fun fetchProvidersPage(after: String?): List<Provider> {
-        val response = httpClient.get("$baseUrl/v1/providers") {
-            applyAuth()
-            parameter("limit", PROVIDER_PAGE_SIZE)
-            parameter("after", after)
-        }
-        response.requireSuccess()
-        return response.body<List<Provider>>()
-    }
-
     private fun HttpRequestBuilder.applyAuth() {
         config.accessToken
             ?.trim()
             ?.takeIf { it.isNotBlank() }
             ?.let(::bearerAuth)
-    }
-
-    private companion object {
-        const val PROVIDER_PAGE_SIZE = 100
-        const val PROVIDER_PAGE_MAX = 10
     }
 }
 
