@@ -40,12 +40,6 @@ private sealed interface ClientModeBootstrapState {
  * the fragile active-conversation/fresh-route/client-mode bootstrap state in one
  * place so send/search/project collaborators can be wired around a stable seam.
  */
-internal data class RecentMessagesReconcileRequest(
-    val conversationId: String,
-    val reason: String,
-    val connectionGeneration: Long,
-)
-
 internal class ChatConversationCoordinator(
     private val scope: CoroutineScope,
     private val agentId: String,
@@ -472,33 +466,7 @@ internal class ChatConversationCoordinator(
                 hasMoreOlderMessages = false,
             )
             startTimelineObserver(requestedConversationId)
-            // letta-mobile-ork1: kick off a server pull so the cached
-            // TimelineSyncLoop catches up on any messages that landed
-            // outside this process (other devices, agent runs between
-            // sessions). Fire-and-forget — the observer above will pick
-            // up the updated state when the reconcile lands. We don't
-            // await it here because the user can still send / scroll
-            // against the cached view while the fetch is in flight.
-            scope.launch {
-                val generation = hydrationGeneration(requestedConversationId)
-                generation?.let { ChatHydrationTrace.reconcileStarted(it, reason = "open") }
-                runCatching {
-                    reconcileRecentMessages(
-                        RecentMessagesReconcileRequest(
-                            conversationId = requestedConversationId,
-                            reason = "open",
-                            connectionGeneration = generation?.id ?: 0L,
-                        ),
-                    )
-                }.onSuccess {
-                    generation?.let { trace -> ChatHydrationTrace.reconcileCompleted(trace, reason = "open") }
-                }.onFailure {
-                    Telemetry.error(
-                        "AdminChatVM", "loadMessages.reconcileOnOpenFailed", it,
-                        "conversationId" to requestedConversationId,
-                    )
-                }
-            }
+            launchRecentMessagesReconcile(requestedConversationId)
             loadTimer.stop(
                 "conversationId" to requestedConversationId,
                 "mode" to "timeline",
@@ -518,6 +486,29 @@ internal class ChatConversationCoordinator(
             uiState.value = uiState.value.copy(
                 isLoadingOlderMessages = false,
             )
+        }
+    }
+
+    private fun launchRecentMessagesReconcile(conversationId: String) {
+        scope.launch {
+            val generation = hydrationGeneration(conversationId)
+            generation?.let { ChatHydrationTrace.reconcileStarted(it, reason = "open") }
+            runCatching {
+                reconcileRecentMessages(
+                    RecentMessagesReconcileRequest(
+                        conversationId = conversationId,
+                        reason = "open",
+                        connectionGeneration = generation?.id ?: 0L,
+                    ),
+                )
+            }.onSuccess {
+                generation?.let { ChatHydrationTrace.reconcileCompleted(it, reason = "open") }
+            }.onFailure { error ->
+                Telemetry.error(
+                    "AdminChatVM", "loadMessages.reconcileOnOpenFailed", error,
+                    "conversationId" to conversationId,
+                )
+            }
         }
     }
 
