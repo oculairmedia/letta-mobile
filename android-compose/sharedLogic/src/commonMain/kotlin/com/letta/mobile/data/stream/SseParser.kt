@@ -86,7 +86,7 @@ object SseParser {
                 if (dataBuilder == null) {
                     dataBuilder = StringBuilder(dataStr)
                 } else {
-                    dataBuilder?.append('\n')?.append(dataStr)
+                    dataBuilder.append('\n').append(dataStr)
                 }
             } else if (line.startsWith("event:")) {
                 if (eventName == null) {
@@ -100,12 +100,12 @@ object SseParser {
         }
 
         if (dataBuilder == null) return null
-        val data = dataBuilder?.toString()?.trim()
+        val data = dataBuilder.toString().trim()
         if (data == "[DONE]") return null
 
         return SseFrame.RawEvent(
             event = eventName,
-            data = data ?: "",
+            data = data,
             id = id,
         )
     }
@@ -124,7 +124,7 @@ object SseParser {
                 if (dataBuilder == null) {
                     dataBuilder = StringBuilder(dataStr)
                 } else {
-                    dataBuilder?.append('\n')?.append(dataStr)
+                    dataBuilder.append('\n').append(dataStr)
                 }
             }
         }
@@ -137,7 +137,7 @@ object SseParser {
             }
         }
 
-        val data = dataBuilder?.toString()?.trim() ?: ""
+        val data = dataBuilder.toString().trim()
 
         if (data == "[DONE]") {
             return ProcessedEvent(frame = SseFrame.Done, isDone = true)

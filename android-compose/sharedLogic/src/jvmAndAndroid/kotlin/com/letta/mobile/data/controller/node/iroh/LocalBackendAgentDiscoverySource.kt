@@ -31,7 +31,7 @@ class LocalBackendAgentDiscoverySource(
             val cached = cachedAgents
             if (cached != null && nowMillis() - cachedAtMs < cacheTtlMs) return cached
         }
-        val fresh = (store.listAgentsProjected(limit = null, offset = 0) as? JsonArray)
+        val fresh = store.listAgentsProjected(limit = null, offset = 0)
             ?.mapNotNull { (it as? JsonObject)?.toDiscoverableAgent() }
             ?: return null
         cacheMutex.withLock {

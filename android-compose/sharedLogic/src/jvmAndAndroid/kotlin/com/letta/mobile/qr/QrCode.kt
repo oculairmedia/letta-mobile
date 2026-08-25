@@ -60,7 +60,7 @@ object QrCode {
                 BarcodeFormat.QR_CODE,
                 0, // width — auto from version
                 0, // height — auto from version
-                mapOf<EncodeHintType, Any>(
+                mapOf(
                     EncodeHintType.CHARACTER_SET to "UTF-8",
                     EncodeHintType.ERROR_CORRECTION to errorCorrection,
                     EncodeHintType.MARGIN to 1,

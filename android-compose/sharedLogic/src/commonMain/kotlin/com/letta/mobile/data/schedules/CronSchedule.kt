@@ -20,6 +20,7 @@ import kotlin.time.Instant
  * `kotlinx-datetime` because calendar-aware stepping (months of varying
  * length, day-of-week, time zones) can't be done with `java.time` here.
  */
+@ConsistentCopyVisibility
 data class CronExpr internal constructor(
     val minutes: Set<Int>,
     val hours: Set<Int>,

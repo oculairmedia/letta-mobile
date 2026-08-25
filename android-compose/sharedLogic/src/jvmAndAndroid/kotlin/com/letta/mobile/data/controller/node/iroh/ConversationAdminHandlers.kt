@@ -138,7 +138,7 @@ object ConversationAdminHandlers {
         val authorized = context.authorizedConversationIds ?: return result
         if (result !is JsonArray) return result
         val filtered = result.filter { element ->
-            val id = (element as? JsonObject)?.get("id")?.let { it as? JsonPrimitive }?.contentOrNull
+            val id = (element as? JsonObject)?.get("id")?.jsonPrimitive?.contentOrNull
             id != null && id in authorized
         }
         return JsonArray(filtered)
@@ -320,7 +320,7 @@ object ConversationAdminHandlers {
                         ),
                     ),
                 )
-                if (!native.success) null else native.messages as? JsonArray
+                if (!native.success) null else native.messages
             }
             if (messages.isEmpty()) {
                 adminError("not_found: message $messageId not in conversation history")
