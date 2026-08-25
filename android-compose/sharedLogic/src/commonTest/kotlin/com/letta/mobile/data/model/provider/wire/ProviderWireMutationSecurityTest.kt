@@ -1,109 +1,150 @@
 package com.letta.mobile.data.model.provider.wire
 
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
+import com.letta.mobile.data.model.HostId
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 class ProviderWireMutationSecurityTest {
-
-    private val json = Json { prettyPrint = false; ignoreUnknownKeys = true }
-    private val secretSentinel = "sk-live-sentinel-xyz-987654321-DO-NOT-LEAK"
+    private val secret = "sk-live-sentinel-xyz-987654321-DO-NOT-LEAK"
 
     @Test
-    fun createCommandMasksSecretInToString() {
-        val cmd = CreateProviderInstanceCommandDto(
+    fun secretExistsOnlyInOutboundCreateBody() {
+        val command = CreateProviderInstanceCommandDto(
             hostId = "host-1",
             definitionId = "openai",
             displayName = "OpenAI Production",
-            initialApiKey = secretSentinel,
+            initialApiKey = SecretWriteValue(secret),
+            customHeaders = SecretHeadersWriteValue(mapOf("Authorization" to secret)),
+        )
+        val sameInputs = CreateProviderInstanceCommandDto(
+            hostId = "host-1",
+            definitionId = "openai",
+            displayName = "OpenAI Production",
+            initialApiKey = SecretWriteValue(secret),
         )
 
-        val str = cmd.toString()
-        assertFalse(str.contains(secretSentinel))
-        assertTrue(str.contains("<secret withheld>"))
+        val outboundBody = ProviderManagementWireCodec.encode(command)
+
+        assertTrue(outboundBody.contains(secret))
+        assertEquals(2, outboundBody.windowed(secret.length).count { it == secret })
+        assertNotEquals(command, sameInputs)
+        assertSecretAbsent(command.toString(), sameInputs.toString(), command.hashCode().toString())
+        assertTrue(command.toString().contains("withheld"))
     }
 
     @Test
-    fun replaceCredentialCommandMasksSecretInToString() {
-        val cmd = ReplaceProviderCredentialCommandDto(
+    fun replacementHasIdentitySemanticsAndClearIsStructurallyDistinct() {
+        val replace = ReplaceProviderCredentialCommandDto(
             hostId = "host-1",
             instanceId = "inst-1",
             expectedRevision = "rev-1",
-            apiKey = secretSentinel,
+            apiKey = SecretWriteValue(secret),
         )
-
-        val str = cmd.toString()
-        assertFalse(str.contains(secretSentinel))
-        assertTrue(str.contains("<secret withheld>"))
-    }
-
-    @Test
-    fun updateCommandHasNoCredentialField() {
-        val cmd = UpdateProviderInstanceCommandDto(
+        val equivalentInput = ReplaceProviderCredentialCommandDto(
             hostId = "host-1",
             instanceId = "inst-1",
             expectedRevision = "rev-1",
-            displayName = "Updated Display Name",
-            baseUrl = "https://custom.endpoint.com",
-            customHeaders = mapOf("X-Key" to "val"),
+            apiKey = SecretWriteValue(secret),
         )
-
-        val encoded = json.encodeToString(cmd)
-        assertFalse(encoded.contains("apiKey", ignoreCase = true))
-        assertFalse(encoded.contains("secret", ignoreCase = true))
-        assertFalse(encoded.contains("credential", ignoreCase = true))
-    }
-
-    @Test
-    fun replaceAndClearCommandsAreStructurallyDistinct() {
-        val replaceCmd = ReplaceProviderCredentialCommandDto(
-            hostId = "host-1",
-            instanceId = "inst-1",
-            expectedRevision = "rev-1",
-            apiKey = secretSentinel,
-        )
-
-        val clearCmd = ClearProviderCredentialCommandDto(
+        val clear = ClearProviderCredentialCommandDto(
             hostId = "host-1",
             instanceId = "inst-1",
             expectedRevision = "rev-1",
         )
 
-        val encodedReplace = json.encodeToString(replaceCmd)
-        val encodedClear = json.encodeToString(clearCmd)
+        val replaceBody = ProviderManagementWireCodec.encode(replace)
+        val clearBody = ProviderManagementWireCodec.encode(clear)
 
-        assertTrue(encodedReplace.contains("\"api_key\""))
-        assertFalse(encodedClear.contains("\"api_key\""))
+        assertTrue(replaceBody.contains(secret))
+        assertFalse(clearBody.contains("api_key"))
+        assertFalse(clearBody.contains(secret))
+        assertNotEquals(replace, equivalentInput)
+        assertSecretAbsent(replace.toString(), equivalentInput.toString(), replace.hashCode().toString())
     }
 
     @Test
-    fun mutationResponseContainsOnlyRedactedStateAndNoSecrets() {
-        val response = ProviderMutationResponseDto(
-            contractVersion = 1,
-            success = true,
-            revision = "rev-2",
-            instance = RedactedProviderInstanceDto(
-                id = "inst-1",
+    fun ordinaryUpdateCannotCarryCredentialOrHeaderValues() {
+        val update = UpdateProviderInstanceCommandDto(
+            hostId = "host-1",
+            instanceId = "inst-1",
+            displayName = "Updated",
+            baseUrl = "https://example.invalid/v1",
+        )
+
+        val body = ProviderManagementWireCodec.encode(update)
+
+        assertSecretAbsent(body, update.toString())
+        assertFalse(body.contains("api_key"))
+        assertFalse(body.contains("custom_headers"))
+    }
+
+    @Test
+    fun echoedSecretIsDiscardedFromTypedErrorsAndDiagnostics() {
+        val payload = """{
+            "contract_version":1,
+            "success":false,
+            "error":{
+                "code":"FUTURE_${secret}",
+                "message":"${secret}\ncontrol",
+                "target_id":"${secret}",
+                "expected_revision":"${secret}",
+                "current_revision":"${secret}"
+            }
+        }"""
+
+        val response = ProviderManagementWireCodec.decodeMutationResponse(payload, HostId("host-1"))
+        val error = requireNotNull(response.error)
+        val snapshot = ProviderManagementWireCodec.encodeErrorForTest(error)
+
+        assertEquals(ProviderErrorCode.Unknown, error.code)
+        assertSecretAbsent(response.toString(), error.toString(), snapshot)
+        assertFalse(error.message.contains("control"))
+        assertFalse(snapshot.contains("target_id"))
+    }
+
+    @Test
+    fun credentialBearingBaseUrlsAreRejectedWithoutEchoingValues() {
+        val createFailure = assertFailsWith<IllegalArgumentException> {
+            CreateProviderInstanceCommandDto(
                 hostId = "host-1",
                 definitionId = "openai",
-                displayName = "OpenAI Prod",
-                credentialStatus = "configured",
-                operationalStatus = "active",
-                revision = "rev-2",
-                configuredFieldIds = listOf("api_key"),
-            ),
+                displayName = "OpenAI",
+                baseUrl = "https://user:$secret@example.invalid/v1",
+            )
+        }
+        val updateFailure = assertFailsWith<IllegalArgumentException> {
+            UpdateProviderInstanceCommandDto(
+                hostId = "host-1",
+                instanceId = "inst-1",
+                baseUrl = "https://example.invalid/v1?token=$secret",
+            )
+        }
+
+        assertSecretAbsent(createFailure.toString(), updateFailure.toString())
+    }
+
+    @Test
+    fun malformedAndEncodingFailuresDoNotEchoSecrets() {
+        val malformed = assertFailsWith<ProviderWireContractException> {
+            ProviderManagementWireCodec.decodeMutationResponse(secret, HostId("host-1"))
+        }
+        val unknownVisibility = SetModelVisibilityCommandDto(
+            hostId = "host-1",
+            routeId = "route-1",
+            visibility = ModelVisibilityWireValue.Unknown,
         )
+        val encoding = assertFailsWith<ProviderWireEncodingException> {
+            ProviderManagementWireCodec.encode(unknownVisibility)
+        }
 
-        val encoded = json.encodeToString(response)
-        val str = response.toString()
+        assertSecretAbsent(malformed.toString(), malformed.message.orEmpty(), encoding.toString())
+    }
 
-        assertFalse(encoded.contains(secretSentinel))
-        assertFalse(str.contains(secretSentinel))
-        assertFalse(encoded.contains("apiKey", ignoreCase = true))
-        assertFalse(encoded.contains("secretValue", ignoreCase = true))
-        assertTrue(encoded.contains("\"configured\""))
+    private fun assertSecretAbsent(vararg surfaces: String) {
+        surfaces.forEach { surface -> assertFalse(surface.contains(secret), surface) }
     }
 }

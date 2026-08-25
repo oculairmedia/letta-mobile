@@ -1,59 +1,63 @@
 package com.letta.mobile.data.model.provider.wire
 
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
+import com.letta.mobile.data.model.HostId
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertIs
 
 class ProviderWireErrorDecodingTest {
-
-    private val json = Json { prettyPrint = false; ignoreUnknownKeys = true }
-
     @Test
-    fun knownErrorCodesSerializeAndDeserialize() {
+    fun stableErrorCodesRoundTripThroughSecretSafeCodec() {
         val codes = listOf(
-            ProviderErrorCode.IdempotencyConflict to "\"IDEMPOTENCY_CONFLICT\"",
-            ProviderErrorCode.RevisionConflict to "\"REVISION_CONFLICT\"",
-            ProviderErrorCode.Unauthorized to "\"UNAUTHORIZED\"",
-            ProviderErrorCode.ProviderNotFound to "\"PROVIDER_NOT_FOUND\"",
-            ProviderErrorCode.ModelNotFound to "\"MODEL_NOT_FOUND\"",
-            ProviderErrorCode.ValidationFailed to "\"VALIDATION_FAILED\"",
-            ProviderErrorCode.DependencyViolation to "\"DEPENDENCY_VIOLATION\"",
-            ProviderErrorCode.HostMismatch to "\"HOST_MISMATCH\"",
+            ProviderErrorCode.IdempotencyConflict,
+            ProviderErrorCode.RevisionConflict,
+            ProviderErrorCode.Unauthorized,
+            ProviderErrorCode.CapabilityDenied,
+            ProviderErrorCode.ProviderNotFound,
+            ProviderErrorCode.ModelNotFound,
+            ProviderErrorCode.ValidationFailed,
+            ProviderErrorCode.DependencyViolation,
+            ProviderErrorCode.HostMismatch,
+            ProviderErrorCode.UnsupportedContractVersion,
         )
 
-        for ((code, expectedJson) in codes) {
-            assertEquals(expectedJson, json.encodeToString<ProviderErrorCode>(code))
-            assertEquals(code, json.decodeFromString<ProviderErrorCode>(expectedJson))
+        codes.forEach { code ->
+            val encoded = ProviderManagementWireCodec.encodeErrorForTest(ProviderManagementErrorDto(code))
+            val decoded = ProviderManagementWireCodec.decodeErrorForTest(encoded)
+            assertEquals(code, decoded.code)
         }
     }
 
     @Test
-    fun unknownErrorCodeDecodesWithoutThrowing() {
-        val decoded = json.decodeFromString<ProviderErrorCode>("\"RATE_LIMIT_EXCEEDED\"")
-        assertIs<ProviderErrorCode.Unknown>(decoded)
-        assertEquals("RATE_LIMIT_EXCEEDED", decoded.raw)
-        assertEquals("RATE_LIMIT_EXCEEDED", decoded.wireValue)
-        assertEquals("\"RATE_LIMIT_EXCEEDED\"", json.encodeToString<ProviderErrorCode>(decoded))
+    fun unknownErrorsDecodeToNonReflectiveTypedValue() {
+        val decoded = ProviderManagementWireCodec.decodeErrorForTest(
+            """{"code":"FUTURE_ERROR","message":"server detail","extra":true}""",
+        )
+
+        assertEquals(ProviderErrorCode.Unknown, decoded.code)
+        assertEquals("Unknown provider error", decoded.message)
+        assertFalse(decoded.toString().contains("server detail"))
     }
 
     @Test
-    fun errorDtoRoundTripAndSecretSafety() {
-        val errorDto = ProviderManagementErrorDto(
-            code = ProviderErrorCode.RevisionConflict,
-            message = "Stale revision: expected rev-1, found rev-2",
-            targetId = "inst-1",
-            expectedRevision = "rev-1",
-            currentRevision = "rev-2",
+    fun capabilityIsFailClosedWhenMissingOrUnknown() {
+        val missing = ProviderManagementWireCodec.decodeMutationResponse(
+            """{"contract_version":1,"success":true}""",
+            HostId("host-1"),
+        )
+        val unknown = ProviderManagementWireCodec.decodeMutationResponse(
+            """{"contract_version":1,"success":true,"mutation_capability":"future-value"}""",
+            HostId("host-1"),
+        )
+        val allowed = ProviderManagementWireCodec.decodeMutationResponse(
+            """{"contract_version":1,"success":true,"mutation_capability":"allowed"}""",
+            HostId("host-1"),
         )
 
-        val encoded = json.encodeToString(errorDto)
-        val decoded = json.decodeFromString<ProviderManagementErrorDto>(encoded)
-
-        assertEquals(errorDto, decoded)
-        assertFalse(encoded.contains("secret", ignoreCase = true))
-        assertFalse(encoded.contains("key", ignoreCase = true))
+        assertEquals(ProviderMutationCapability.Denied, missing.mutationCapability)
+        assertFalse(missing.mutationCapability.isAllowed)
+        assertEquals(ProviderMutationCapability.Unknown, unknown.mutationCapability)
+        assertFalse(unknown.mutationCapability.isAllowed)
+        assertEquals(ProviderMutationCapability.Allowed, allowed.mutationCapability)
     }
 }

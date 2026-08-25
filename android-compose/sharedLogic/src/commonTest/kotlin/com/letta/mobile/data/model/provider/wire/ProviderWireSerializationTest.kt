@@ -1,108 +1,149 @@
 package com.letta.mobile.data.model.provider.wire
 
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
+import com.letta.mobile.data.model.HostId
+import com.letta.mobile.data.model.ProviderInstanceId
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class ProviderWireSerializationTest {
-
-    private val json = Json { prettyPrint = false; ignoreUnknownKeys = true; encodeDefaults = true }
+    private val host = HostId("host-primary")
 
     @Test
-    fun providerDefinitionsListRoundTrip() {
-        val dto = ProviderDefinitionsListResponseDto(
+    fun definitionsRoundTripUsesStableSerialNames() {
+        val response = ProviderDefinitionsListResponseDto(
             contractVersion = 1,
             definitions = listOf(
                 ProviderDefinitionDto(
                     id = "openai",
                     displayName = "OpenAI",
-                    description = "OpenAI platform",
                     supportedProtocols = listOf("openai"),
-                    fields = listOf(
-                        ProviderFieldSchemaDto(
-                            id = "api_key",
-                            label = "API Key",
-                            isSecret = true,
-                            isRequired = true,
-                        ),
-                    ),
-                    defaultBaseUrl = "https://api.openai.com/v1",
+                    fields = listOf(ProviderFieldSchemaDto("api_key", "API Key", isSecret = true)),
                 ),
             ),
         )
 
-        val encoded = json.encodeToString(dto)
+        val encoded = ProviderManagementWireCodec.encodeDefinitionsForTest(response)
+        val decoded = ProviderManagementWireCodec.decodeDefinitions(encoded)
+
         assertTrue(encoded.contains("\"contract_version\":1"))
         assertTrue(encoded.contains("\"display_name\":\"OpenAI\""))
         assertTrue(encoded.contains("\"is_secret\":true"))
-
-        val decoded = json.decodeFromString<ProviderDefinitionsListResponseDto>(encoded)
-        assertEquals(dto, decoded)
+        assertEquals("openai", decoded.single().id.value)
     }
 
     @Test
-    fun redactedProviderInstancesListRoundTrip() {
-        val dto = ProviderInstancesListResponseDto(
+    fun instancesAndRoutesRoundTripThroughProductionCodec() {
+        val instances = ProviderInstancesListResponseDto(
             contractVersion = 1,
-            hostId = "host-primary",
+            hostId = host.value,
             instances = listOf(
                 RedactedProviderInstanceDto(
                     id = "inst-1",
-                    hostId = "host-primary",
+                    hostId = host.value,
                     definitionId = "openai",
                     displayName = "Primary OpenAI",
-                    baseUrl = "https://api.openai.com/v1",
                     credentialStatus = "configured",
-                    operationalStatus = "active",
-                    revision = "rev-1",
-                    configuredFieldIds = listOf("api_key"),
-                    configuredHeaderNames = listOf("X-Custom-Header"),
                 ),
             ),
         )
-
-        val encoded = json.encodeToString(dto)
-        val decoded = json.decodeFromString<ProviderInstancesListResponseDto>(encoded)
-        assertEquals(dto, decoded)
-    }
-
-    @Test
-    fun modelRoutesListRoundTrip() {
-        val dto = ModelRoutesListResponseDto(
+        val routes = ModelRoutesListResponseDto(
             contractVersion = 1,
-            hostId = "host-primary",
+            hostId = host.value,
             routes = listOf(
                 ModelRouteDto(
-                    id = "route-gpt-4o",
-                    hostId = "host-primary",
+                    id = "route-1",
+                    hostId = host.value,
                     providerInstanceId = "inst-1",
                     modelHandle = "gpt-4o",
                     displayName = "GPT-4o",
-                    contextWindowLimit = 128000,
-                    availability = "available",
-                    visibility = "visible",
-                    aliases = listOf("gpt-4o-2024-08-06"),
-                    revision = "cat-rev-1",
                 ),
             ),
         )
 
-        val encoded = json.encodeToString(dto)
-        val decoded = json.decodeFromString<ModelRoutesListResponseDto>(encoded)
-        assertEquals(dto, decoded)
+        val decodedInstances = ProviderManagementWireCodec.decodeInstances(
+            ProviderManagementWireCodec.encodeInstancesForTest(instances),
+            host,
+        )
+        val decodedRoutes = ProviderManagementWireCodec.decodeRoutes(
+            ProviderManagementWireCodec.encodeRoutesForTest(routes),
+            host,
+        )
+
+        assertEquals(ProviderInstanceId("inst-1"), decodedInstances.single().id)
+        assertEquals(ProviderInstanceId("inst-1"), decodedRoutes.single().providerInstanceId)
     }
 
     @Test
-    fun revisionsRoundTrip() {
-        val catRev = CatalogRevisionDto(hostId = "host-primary", revision = "rev-42")
-        val provRev = ProviderRevisionDto(instanceId = "inst-1", revision = "rev-99")
+    fun additiveUnknownFieldsAreAcceptedAndMissingOptionalFieldsUseDefaults() {
+        val payload = """{
+            "contract_version":1,
+            "host_id":"host-primary",
+            "future_envelope_field":{"nested":true},
+            "instances":[{
+                "id":"inst-1",
+                "host_id":"host-primary",
+                "definition_id":"openai",
+                "display_name":"OpenAI",
+                "future_instance_field":42
+            }]
+        }"""
 
-        val encCat = json.encodeToString(catRev)
-        val encProv = json.encodeToString(provRev)
+        val decoded = ProviderManagementWireCodec.decodeInstances(payload, host).single()
 
-        assertEquals(catRev, json.decodeFromString<CatalogRevisionDto>(encCat))
-        assertEquals(provRev, json.decodeFromString<ProviderRevisionDto>(encProv))
+        assertEquals("OpenAI", decoded.displayName)
+        assertEquals("not_required", decoded.credentialStatus.wireValue)
+    }
+
+    @Test
+    fun missingMalformedAndUnsupportedVersionsFailWithTypedSafeReasons() {
+        val missing = assertFailsWith<ProviderWireContractException> {
+            ProviderManagementWireCodec.decodeDefinitions("""{"definitions":[]}""")
+        }
+        val malformed = assertFailsWith<ProviderWireContractException> {
+            ProviderManagementWireCodec.decodeDefinitions("""{"contract_version":"one","definitions":[]}""")
+        }
+        val unsupported = assertFailsWith<ProviderWireContractException> {
+            ProviderManagementWireCodec.decodeDefinitions("""{"contract_version":2,"definitions":[]}""")
+        }
+
+        assertEquals(ProviderWireContractException.Reason.MalformedPayload, missing.reason)
+        assertEquals(ProviderWireContractException.Reason.MalformedPayload, malformed.reason)
+        assertEquals(ProviderWireContractException.Reason.UnsupportedVersion, unsupported.reason)
+    }
+
+    @Test
+    fun everyMutationCommandEmitsContractVersion() {
+        val bodies = listOf(
+            ProviderManagementWireCodec.encode(
+                ClearProviderCredentialCommandDto(hostId = host.value, instanceId = "inst-1"),
+            ),
+            ProviderManagementWireCodec.encode(
+                SetProviderEnabledCommandDto(hostId = host.value, instanceId = "inst-1", enabled = true),
+            ),
+            ProviderManagementWireCodec.encode(
+                DeleteProviderInstanceCommandDto(hostId = host.value, instanceId = "inst-1"),
+            ),
+            ProviderManagementWireCodec.encode(
+                SetModelVisibilityCommandDto(
+                    hostId = host.value,
+                    routeId = "route-1",
+                    visibility = ModelVisibilityWireValue.Visible,
+                ),
+            ),
+        )
+
+        bodies.forEach { assertTrue(it.contains("\"contract_version\":1"), it) }
+
+        assertFailsWith<ProviderWireEncodingException> {
+            ProviderManagementWireCodec.encode(
+                DeleteProviderInstanceCommandDto(
+                    contractVersion = 2,
+                    hostId = host.value,
+                    instanceId = "inst-1",
+                ),
+            )
+        }
     }
 }

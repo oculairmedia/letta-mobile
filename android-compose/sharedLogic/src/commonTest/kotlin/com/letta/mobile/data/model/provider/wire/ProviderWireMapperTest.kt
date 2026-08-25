@@ -1,15 +1,10 @@
 package com.letta.mobile.data.model.provider.wire
 
-import com.letta.mobile.data.model.CatalogRevision
 import com.letta.mobile.data.model.HostId
-import com.letta.mobile.data.model.ModelRouteId
 import com.letta.mobile.data.model.ProviderDefinitionId
-import com.letta.mobile.data.model.ProviderFieldId
 import com.letta.mobile.data.model.ProviderInstanceId
-import com.letta.mobile.data.model.ProviderRevision
 import com.letta.mobile.data.model.provider.CredentialStatus
 import com.letta.mobile.data.model.provider.ModelAvailability
-import com.letta.mobile.data.model.provider.OperationalStatus
 import com.letta.mobile.data.model.provider.ProviderProtocol
 import com.letta.mobile.data.model.provider.VisibilityPolicy
 import kotlin.test.Test
@@ -18,105 +13,84 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 
 class ProviderWireMapperTest {
-
-    private val primaryHost = HostId("host-primary")
+    private val host = HostId("host-primary")
 
     @Test
-    fun providerDefinitionRoundTripMapping() {
+    fun providerDefinitionUsesTypedIdentifiersAndCanonicalProtocols() {
         val dto = ProviderDefinitionDto(
             id = "anthropic",
             displayName = "Anthropic",
-            description = "Claude models",
-            supportedProtocols = listOf("anthropic"),
-            fields = listOf(
-                ProviderFieldSchemaDto(
-                    id = "api_key",
-                    label = "API Key",
-                    isSecret = true,
-                    isRequired = true,
-                ),
-            ),
-            defaultBaseUrl = "https://api.anthropic.com",
+            supportedProtocols = listOf(" ANTHROPIC ", "future-protocol"),
+            fields = listOf(ProviderFieldSchemaDto("api_key", "API Key", isSecret = true)),
         )
 
         val domain = dto.toDomain()
+
         assertEquals(ProviderDefinitionId("anthropic"), domain.id)
-        assertEquals("Anthropic", domain.displayName)
-        assertEquals(listOf<ProviderProtocol>(ProviderProtocol.Anthropic), domain.supportedProtocols)
-        assertEquals(ProviderFieldId("api_key"), domain.fields.first().id)
-        assertEquals(true, domain.fields.first().isSecret)
-
-        val mappedBack = domain.toDto()
-        assertEquals(dto, mappedBack)
+        assertEquals(ProviderProtocol.Anthropic, domain.supportedProtocols.first())
+        assertEquals("unknown", assertIs<ProviderProtocol.Unknown>(domain.supportedProtocols.last()).raw)
+        assertEquals(dto.id, domain.toDto().id)
     }
 
     @Test
-    fun redactedProviderInstanceMappingWithHostValidation() {
-        val dto = RedactedProviderInstanceDto(
-            id = "inst-1",
-            hostId = "host-primary",
-            definitionId = "openai",
-            displayName = "OpenAI Production",
-            baseUrl = "https://api.openai.com/v1",
-            credentialStatus = "configured",
-            operationalStatus = "active",
-            revision = "rev-1",
-            configuredFieldIds = listOf("api_key"),
-            configuredHeaderNames = listOf("X-Custom-Header"),
-        )
+    fun hostScopedRecordsRequireActiveHost() {
+        val instance = redactedInstance(hostId = host.value)
+        val route = modelRoute(hostId = host.value)
 
-        // Successful mapping with matching host
-        val domain = dto.toDomain(expectedHostId = primaryHost)
-        assertEquals(ProviderInstanceId("inst-1"), domain.id)
-        assertEquals(primaryHost, domain.hostId)
-        assertEquals(CredentialStatus.Configured, domain.credentialStatus)
-        assertEquals(OperationalStatus.Active, domain.operationalStatus)
-        assertEquals(ProviderRevision("rev-1"), domain.revision)
-        assertEquals(listOf("X-Custom-Header"), domain.configuredHeaderNames)
-
-        val mappedBack = domain.toDto()
-        assertEquals(dto, mappedBack)
-
-        // Throws HostMismatchException on mismatched host
-        assertFailsWith<HostMismatchException> {
-            dto.toDomain(expectedHostId = HostId("host-other"))
-        }
+        assertEquals(ProviderInstanceId("inst-1"), instance.toDomain(host).id)
+        assertEquals(ProviderInstanceId("inst-1"), route.toDomain(host).providerInstanceId)
+        assertFailsWith<HostMismatchException> { instance.toDomain(HostId("other")) }
+        assertFailsWith<HostMismatchException> { route.toDomain(HostId("other")) }
     }
 
     @Test
-    fun modelRouteMappingWithUnknownEnumsAndHostValidation() {
-        val dto = ModelRouteDto(
-            id = "route-claude-3-5-sonnet",
-            hostId = "host-primary",
-            providerInstanceId = "inst-anthropic-1",
-            modelHandle = "claude-3-5-sonnet-20241022",
-            displayName = "Claude 3.5 Sonnet",
-            contextWindowLimit = 200000,
-            availability = "future_tier_status",
-            visibility = "future_visibility_mode",
-            aliases = listOf("claude-3-5-sonnet"),
-            revision = "cat-rev-1",
+    fun listHostValidationIsAtomicAcrossEnvelopeAndChildren() {
+        val mismatchedChild = ProviderInstancesListResponseDto(
+            contractVersion = 1,
+            hostId = host.value,
+            instances = listOf(redactedInstance(host.value), redactedInstance("other", "inst-2")),
+        )
+        val mismatchedEnvelope = ModelRoutesListResponseDto(
+            contractVersion = 1,
+            hostId = "other",
+            routes = listOf(modelRoute(host.value)),
         )
 
-        val domain = dto.toDomain(expectedHostId = primaryHost)
-        assertEquals(ModelRouteId("route-claude-3-5-sonnet"), domain.id)
-        assertEquals(primaryHost, domain.hostId)
-        assertEquals(ProviderInstanceId("inst-anthropic-1"), domain.providerInstanceId)
-        assertEquals(CatalogRevision("cat-rev-1"), domain.revision)
-
-        // Unknown wire enum values map safely to Unknown(raw)
-        assertIs<ModelAvailability.Unknown>(domain.availability)
-        assertEquals("future_tier_status", (domain.availability as ModelAvailability.Unknown).raw)
-
-        assertIs<VisibilityPolicy.Unknown>(domain.visibility)
-        assertEquals("future_visibility_mode", (domain.visibility as VisibilityPolicy.Unknown).raw)
-
-        val mappedBack = domain.toDto()
-        assertEquals(dto, mappedBack)
-
-        // Throws HostMismatchException on mismatched host
-        assertFailsWith<HostMismatchException> {
-            dto.toDomain(expectedHostId = HostId("host-different"))
-        }
+        assertFailsWith<HostMismatchException> { mismatchedChild.toDomain(host) }
+        assertFailsWith<HostMismatchException> { mismatchedEnvelope.toDomain(host) }
     }
+
+    @Test
+    fun unknownStatusesDecodeWithoutRetainingUntrustedRawText() {
+        val sentinel = "sk-secret-unknown-enum"
+        val instance = redactedInstance(host.value).copy(
+            credentialStatus = sentinel,
+            operationalStatus = sentinel,
+        ).toDomain(host)
+        val route = modelRoute(host.value).copy(
+            availability = sentinel,
+            visibility = sentinel,
+        ).toDomain(host)
+
+        assertEquals("unknown", assertIs<CredentialStatus.Unknown>(instance.credentialStatus).raw)
+        assertEquals("unknown", assertIs<ModelAvailability.Unknown>(route.availability).raw)
+        assertEquals("unknown", assertIs<VisibilityPolicy.Unknown>(route.visibility).raw)
+        assertEquals(ModelVisibilityWireValue.Unknown, ModelVisibilityWireValue.fromWire(sentinel))
+    }
+
+    private fun redactedInstance(hostId: String, id: String = "inst-1") = RedactedProviderInstanceDto(
+        id = id,
+        hostId = hostId,
+        definitionId = "openai",
+        displayName = "OpenAI",
+        credentialStatus = "configured",
+    )
+
+    private fun modelRoute(hostId: String) = ModelRouteDto(
+        id = "route-1",
+        hostId = hostId,
+        providerInstanceId = "inst-1",
+        modelHandle = "gpt-4o",
+        displayName = "GPT-4o",
+    )
 }

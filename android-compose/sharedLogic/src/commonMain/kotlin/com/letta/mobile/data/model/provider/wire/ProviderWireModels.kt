@@ -5,9 +5,6 @@ import kotlinx.serialization.Serializable
 
 const val PROVIDER_MANAGEMENT_CONTRACT_VERSION = 1
 
-/**
- * Wire DTO for a provider field definition schema.
- */
 @Serializable
 data class ProviderFieldSchemaDto(
     @SerialName("id") val id: String,
@@ -18,9 +15,6 @@ data class ProviderFieldSchemaDto(
     @SerialName("placeholder") val placeholder: String? = null,
 )
 
-/**
- * Wire DTO for an LLM provider definition.
- */
 @Serializable
 data class ProviderDefinitionDto(
     @SerialName("id") val id: String,
@@ -31,18 +25,13 @@ data class ProviderDefinitionDto(
     @SerialName("default_base_url") val defaultBaseUrl: String? = null,
 )
 
-/**
- * Wire response envelope for listing provider definitions.
- */
 @Serializable
 data class ProviderDefinitionsListResponseDto(
-    @SerialName("contract_version") val contractVersion: Int = PROVIDER_MANAGEMENT_CONTRACT_VERSION,
+    @SerialName("contract_version") val contractVersion: Int,
     @SerialName("definitions") val definitions: List<ProviderDefinitionDto> = emptyList(),
 )
 
-/**
- * Wire DTO for a configured provider instance. Strictly redacted: never contains secrets or header values.
- */
+/** Strictly redacted provider state: values and credential material are not representable. */
 @Serializable
 data class RedactedProviderInstanceDto(
     @SerialName("id") val id: String,
@@ -57,28 +46,19 @@ data class RedactedProviderInstanceDto(
     @SerialName("configured_header_names") val configuredHeaderNames: List<String> = emptyList(),
 )
 
-/**
- * Wire response envelope for listing provider instances on a host.
- */
 @Serializable
 data class ProviderInstancesListResponseDto(
-    @SerialName("contract_version") val contractVersion: Int = PROVIDER_MANAGEMENT_CONTRACT_VERSION,
+    @SerialName("contract_version") val contractVersion: Int,
     @SerialName("host_id") val hostId: String,
     @SerialName("instances") val instances: List<RedactedProviderInstanceDto> = emptyList(),
 )
 
-/**
- * Wire response envelope for a single provider instance.
- */
 @Serializable
 data class ProviderInstanceResponseDto(
-    @SerialName("contract_version") val contractVersion: Int = PROVIDER_MANAGEMENT_CONTRACT_VERSION,
+    @SerialName("contract_version") val contractVersion: Int,
     @SerialName("instance") val instance: RedactedProviderInstanceDto,
 )
 
-/**
- * Wire DTO for a canonical model route on a provider instance.
- */
 @Serializable
 data class ModelRouteDto(
     @SerialName("id") val id: String,
@@ -93,28 +73,19 @@ data class ModelRouteDto(
     @SerialName("revision") val revision: String? = null,
 )
 
-/**
- * Wire response envelope for listing model routes on a host.
- */
 @Serializable
 data class ModelRoutesListResponseDto(
-    @SerialName("contract_version") val contractVersion: Int = PROVIDER_MANAGEMENT_CONTRACT_VERSION,
+    @SerialName("contract_version") val contractVersion: Int,
     @SerialName("host_id") val hostId: String,
     @SerialName("routes") val routes: List<ModelRouteDto> = emptyList(),
 )
 
-/**
- * Wire DTO for catalog revision tracking.
- */
 @Serializable
 data class CatalogRevisionDto(
     @SerialName("host_id") val hostId: String,
     @SerialName("revision") val revision: String,
 )
 
-/**
- * Wire DTO for provider instance revision tracking.
- */
 @Serializable
 data class ProviderRevisionDto(
     @SerialName("instance_id") val instanceId: String,
