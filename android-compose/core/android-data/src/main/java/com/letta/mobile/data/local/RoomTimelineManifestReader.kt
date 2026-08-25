@@ -60,6 +60,39 @@ internal class RoomTimelineManifestReader(
     }
 }
 
+internal data class RoomSnapshotReadRequest(
+    val scope: TimelineScope,
+    val head: ConfirmedTimelineSnapshotHeadMetadata,
+    val startedAtMillis: Long,
+) {
+    fun activeManifest(manifestId: String) = manifest(manifestId, RoomRevisionPolicy.EXACT)
+    fun fallbackManifest(manifestId: String) = manifest(manifestId, RoomRevisionPolicy.AT_OR_BELOW)
+
+    fun reconciliation(failure: SnapshotReadFailure) =
+        com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineReadResult.ReconciliationRequired(
+            failure = failure,
+            highWaterRevision = head.highWaterRevision,
+        )
+
+    private fun manifest(manifestId: String, policy: RoomRevisionPolicy) = RoomManifestRequest(
+        scope = scope,
+        manifestId = manifestId,
+        maximumRevision = head.highWaterRevision,
+        revisionPolicy = policy,
+    )
+}
+
+internal enum class RoomReadSource(val telemetryEvent: String) {
+    ACTIVE("readSnapshot.success"),
+    FALLBACK("readSnapshot.fallback"),
+}
+
+internal data class RoomReadObservation(
+    val request: RoomSnapshotReadRequest,
+    val read: RoomManifestRead.Valid,
+    val source: RoomReadSource,
+)
+
 internal data class RoomManifestRequest(
     val scope: TimelineScope,
     val manifestId: String,

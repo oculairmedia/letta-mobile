@@ -148,7 +148,7 @@ internal class ChatTimelineObserver(
 
             val loop = timelineRepository.getOrCreate(agentId, conversationId)
             currentConversationTracker.setCurrent(conversationId)
-            hydrateSignalJob = launchHydrationCollector(loop, conversationId, generation)
+            hydrateSignalJob = launchHydrationCollector(loop, binding, generation)
 
             try {
                 // letta-mobile-yflpp COALESCE: during streaming the
@@ -197,10 +197,10 @@ internal class ChatTimelineObserver(
                     // storm over every tool card. Telemetry was already emitted
                     // as uiProjection.suppressed by the presenter.
                     if (projection.noChange) {
-                        publishPresenceOnly(conversationId, projection, generation)
+                        publishPresenceOnly(binding, projection, generation)
                         return@collect
                     }
-                    publishProjection(conversationId, projection, generation)
+                    publishProjection(binding, projection, generation)
 
                     // letta-mobile-yflpp COALESCE: pace real updates to at most
                     // ~one per frame. conflate() already drops backlog while we
@@ -222,15 +222,15 @@ internal class ChatTimelineObserver(
 
     private fun launchHydrationCollector(
         loop: TimelineSyncLoop,
-        conversationId: String,
+        binding: TimelineObserverBinding,
         generation: ChatHydrationTrace.Generation?,
     ): Job = scope.launch {
-        loop.events.collect { event -> handleHydrationEvent(event, conversationId, generation) }
+        loop.events.collect { event -> handleHydrationEvent(event, binding, generation) }
     }
 
     private fun handleHydrationEvent(
         event: TimelineSyncEvent,
-        conversationId: String,
+        binding: TimelineObserverBinding,
         generation: ChatHydrationTrace.Generation?,
     ) {
         when (event) {
@@ -238,7 +238,7 @@ internal class ChatTimelineObserver(
                 generation?.let { ChatHydrationTrace.sourceReady(it, source = "timeline", count = event.messageCount) }
                 android.util.Log.i(
                     "AdminChatViewModel",
-                    "Timeline ready conv=$conversationId count=${event.messageCount}",
+                    "Timeline ready conv=${binding.conversationId} count=${event.messageCount}",
                 )
                 val previous = uiState.value
                 awaitingProjectionAfterHydrate = event.messageCount > 0 && previous.messages.isEmpty()
@@ -265,12 +265,12 @@ internal class ChatTimelineObserver(
     }
 
     private fun publishProjection(
-        conversationId: String,
+        binding: TimelineObserverBinding,
         projection: TimelineProjection,
         generation: ChatHydrationTrace.Generation?,
     ) {
         val ui = projection.ui
-        val surfaces = syncA2uiHistorySnapshot(conversationId, projection.a2uiMessages)
+        val surfaces = syncA2uiHistorySnapshot(binding.conversationId, projection.a2uiMessages)
         val clearLoading = ui.isNotEmpty() || awaitingProjectionAfterHydrate
         if (clearLoading) awaitingProjectionAfterHydrate = false
         if (isFollowingDuplicateInitialMessageInFlight() && projection.tailIsAssistant) {
@@ -284,11 +284,15 @@ internal class ChatTimelineObserver(
         if (responseArrived) clearA2uiThinkingOnResponse()
         val presentation = presenter.present(
             projection = projection,
-            signals = presenceSignals(conversationId, projection, previous, thinkingStart, responseArrived),
+            signals = presenceSignals(
+                PresenceRequest(binding, projection, previous, thinkingStart, responseArrived),
+            ),
             previousIsStreaming = previous.isStreaming,
             previousIsAgentTyping = previous.isAgentTyping,
         )
-        recordPresentation(generation, projection, previous, presentation.isStreaming, presentation.isAgentTyping)
+        recordPresentation(
+            PresentationRecord(generation, projection, previous, presentation.isStreaming, presentation.isAgentTyping),
+        )
         uiState.value = reconcileCollapsedRunsOnProjection(
             previous,
             previous.copy(
@@ -303,31 +307,27 @@ internal class ChatTimelineObserver(
         )
     }
 
-    private fun recordPresentation(
-        generation: ChatHydrationTrace.Generation?,
-        projection: TimelineProjection,
-        previous: ChatUiState,
-        isStreaming: Boolean,
-        isAgentTyping: Boolean,
-    ) {
-        generation ?: return
+    private fun recordPresentation(record: PresentationRecord) {
+        val generation = record.generation ?: return
         ChatHydrationTrace.presentationPublished(
             generation,
-            commitReason = projection.messageListChange::class.simpleName ?: "unknown",
-            messageCount = projection.ui.size,
-            missingOptionalSources = if (projection.a2uiMessages.isEmpty()) "a2ui" else "none",
+            commitReason = record.projection.messageListChange::class.simpleName ?: "unknown",
+            messageCount = record.projection.ui.size,
+            missingOptionalSources = if (record.projection.a2uiMessages.isEmpty()) "a2ui" else "none",
         )
-        if (isStreaming != previous.isStreaming || isAgentTyping != previous.isAgentTyping) {
+        if (record.isStreaming != record.previous.isStreaming ||
+            record.isAgentTyping != record.previous.isAgentTyping
+        ) {
             ChatHydrationTrace.activityChanged(
                 generation,
-                active = isStreaming || isAgentTyping,
+                active = record.isStreaming || record.isAgentTyping,
                 reason = "projection_presence",
             )
         }
     }
 
     private fun publishPresenceOnly(
-        conversationId: String,
+        binding: TimelineObserverBinding,
         projection: TimelineProjection,
         generation: ChatHydrationTrace.Generation?,
     ) {
@@ -342,7 +342,9 @@ internal class ChatTimelineObserver(
         if (responseArrived) clearA2uiThinkingOnResponse()
         val presentation = presenter.present(
             projection = projection,
-            signals = presenceSignals(conversationId, projection, previous, thinkingStart, responseArrived),
+            signals = presenceSignals(
+                PresenceRequest(binding, projection, previous, thinkingStart, responseArrived),
+            ),
             previousIsStreaming = previous.isStreaming,
             previousIsAgentTyping = previous.isAgentTyping,
         )
@@ -365,17 +367,11 @@ internal class ChatTimelineObserver(
         )
     }
 
-    private fun presenceSignals(
-        conversationId: String,
-        projection: TimelineProjection,
-        previous: ChatUiState,
-        thinkingStart: Int?,
-        responseArrived: Boolean,
-    ) = ChatPresenceSignals(
-        replyStreaming = activeReplyStreams.value.contains(conversationId) ||
-            projection.hasGrowingPassiveModelTail(previous),
+    private fun presenceSignals(request: PresenceRequest) = ChatPresenceSignals(
+        replyStreaming = activeReplyStreams.value.contains(request.binding.conversationId) ||
+            request.projection.hasGrowingPassiveModelTail(request.previous),
         clientModeStreamInFlight = isClientModeStreamInFlight(),
-        a2uiThinkingActive = thinkingStart != null && !responseArrived,
+        a2uiThinkingActive = request.thinkingStart != null && !request.responseArrived,
         duplicateInitialMessageInFlight = isFollowingDuplicateInitialMessageInFlight(),
         turnInFlight = hasActiveChatTurn(),
     )
@@ -419,6 +415,22 @@ internal class ChatTimelineObserver(
     /** Assistant-role reasoning or final-answer row (the model-output tail). */
     private fun UiMessage.isModelOutputRow(tailIsAssistant: Boolean): Boolean =
         role == "assistant" && (isReasoning || tailIsAssistant)
+
+    private data class PresentationRecord(
+        val generation: ChatHydrationTrace.Generation?,
+        val projection: TimelineProjection,
+        val previous: ChatUiState,
+        val isStreaming: Boolean,
+        val isAgentTyping: Boolean,
+    )
+
+    private data class PresenceRequest(
+        val binding: TimelineObserverBinding,
+        val projection: TimelineProjection,
+        val previous: ChatUiState,
+        val thinkingStart: Int?,
+        val responseArrived: Boolean,
+    )
 
     private data class TimelineObserverBinding(
         val agentId: String?,

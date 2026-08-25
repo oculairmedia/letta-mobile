@@ -35,10 +35,10 @@ class RoomConfirmedTimelineStore(
         if (!head.matches(scope)) {
             return@withContext ConfirmedTimelineReadResult.ReconciliationRequired(SnapshotReadFailure.METADATA_INVALID)
         }
-        readFromHead(ReadRequest(scope, head, startedAtMillis))
+        readFromHead(RoomSnapshotReadRequest(scope, head, startedAtMillis))
     }
 
-    private suspend fun readFromHead(request: ReadRequest): ConfirmedTimelineReadResult {
+    private suspend fun readFromHead(request: RoomSnapshotReadRequest): ConfirmedTimelineReadResult {
         val activeId = request.head.activeManifestId
             ?: return readWithoutActiveManifest(request)
         return when (val active = manifestReader.read(request.activeManifest(activeId))) {
@@ -47,7 +47,7 @@ class RoomConfirmedTimelineStore(
         }
     }
 
-    private suspend fun readWithoutActiveManifest(request: ReadRequest): ConfirmedTimelineReadResult {
+    private suspend fun readWithoutActiveManifest(request: RoomSnapshotReadRequest): ConfirmedTimelineReadResult {
         val fallback = readFallbackManifest(request, excludedManifestId = null)
         return if (fallback == null) {
             request.reconciliation(SnapshotReadFailure.MISSING)
@@ -57,7 +57,7 @@ class RoomConfirmedTimelineStore(
     }
 
     private suspend fun fallbackOrReconcile(
-        request: ReadRequest,
+        request: RoomSnapshotReadRequest,
         activeManifestId: String,
         activeFailure: SnapshotReadFailure,
     ): ConfirmedTimelineReadResult {
@@ -68,7 +68,7 @@ class RoomConfirmedTimelineStore(
     }
 
     private suspend fun readFallbackManifest(
-        request: ReadRequest,
+        request: RoomSnapshotReadRequest,
         excludedManifestId: String?,
     ): RoomManifestRead.Valid? {
         val fallbackId = request.head.fallbackManifestId
@@ -77,17 +77,17 @@ class RoomConfirmedTimelineStore(
         return manifestReader.read(request.fallbackManifest(fallbackId)) as? RoomManifestRead.Valid
     }
 
-    private fun activeResult(request: ReadRequest, read: RoomManifestRead.Valid): ConfirmedTimelineReadResult {
-        reportRead(ReadObservation(request, read, ReadSource.ACTIVE))
+    private fun activeResult(request: RoomSnapshotReadRequest, read: RoomManifestRead.Valid): ConfirmedTimelineReadResult {
+        reportRead(RoomReadObservation(request, read, RoomReadSource.ACTIVE))
         return ConfirmedTimelineReadResult.Active(read.envelope, request.head.highWaterRevision)
     }
 
     private fun fallbackResult(
-        request: ReadRequest,
+        request: RoomSnapshotReadRequest,
         read: RoomManifestRead.Valid,
         activeFailure: SnapshotReadFailure,
     ): ConfirmedTimelineReadResult {
-        reportRead(ReadObservation(request, read, ReadSource.FALLBACK))
+        reportRead(RoomReadObservation(request, read, RoomReadSource.FALLBACK))
         return ConfirmedTimelineReadResult.Fallback(
             snapshot = read.envelope,
             activeFailure = activeFailure,
@@ -241,7 +241,7 @@ class RoomConfirmedTimelineStore(
         scope: TimelineScope,
         head: ConfirmedTimelineSnapshotHeadMetadata,
     ): String? {
-        val request = ReadRequest(scope, head, startedAtMillis = 0L)
+        val request = RoomSnapshotReadRequest(scope, head, startedAtMillis = 0L)
         val activeId = head.activeManifestId
         if (activeId != null && manifestReader.read(request.activeManifest(activeId)) is RoomManifestRead.Valid) {
             return activeId
@@ -251,7 +251,7 @@ class RoomConfirmedTimelineStore(
             ?.takeIf { manifestReader.read(request.fallbackManifest(it)) is RoomManifestRead.Valid }
     }
 
-    private fun reportRead(observation: ReadObservation) {
+    private fun reportRead(observation: RoomReadObservation) {
         Telemetry.event(
             "RoomTimelineStore", observation.source.telemetryEvent,
             "backendId" to observation.request.scope.backendId,
@@ -282,38 +282,6 @@ class RoomConfirmedTimelineStore(
             level = Telemetry.Level.WARN,
         )
     }
-
-    private data class ReadRequest(
-        val scope: TimelineScope,
-        val head: ConfirmedTimelineSnapshotHeadMetadata,
-        val startedAtMillis: Long,
-    ) {
-        fun activeManifest(manifestId: String) = manifest(manifestId, RoomRevisionPolicy.EXACT)
-        fun fallbackManifest(manifestId: String) = manifest(manifestId, RoomRevisionPolicy.AT_OR_BELOW)
-
-        fun reconciliation(failure: SnapshotReadFailure) = ConfirmedTimelineReadResult.ReconciliationRequired(
-            failure = failure,
-            highWaterRevision = head.highWaterRevision,
-        )
-
-        private fun manifest(manifestId: String, revisionPolicy: RoomRevisionPolicy) = RoomManifestRequest(
-            scope = scope,
-            manifestId = manifestId,
-            maximumRevision = head.highWaterRevision,
-            revisionPolicy = revisionPolicy,
-        )
-    }
-
-    private enum class ReadSource(val telemetryEvent: String) {
-        ACTIVE("readSnapshot.success"),
-        FALLBACK("readSnapshot.fallback"),
-    }
-
-    private data class ReadObservation(
-        val request: ReadRequest,
-        val read: RoomManifestRead.Valid,
-        val source: ReadSource,
-    )
 
     companion object {
         const val CHUNK_SIZE_BYTES = 128 * 1024

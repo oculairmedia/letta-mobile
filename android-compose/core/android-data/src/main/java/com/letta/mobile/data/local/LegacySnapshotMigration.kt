@@ -52,20 +52,20 @@ private class LegacySnapshotRowCopier(
     private val statements = MigrationStatements(database)
 
     fun copy(row: LegacySnapshotRow) {
-        val manifestId = UUID.randomUUID().toString()
+        val manifestId = MigrationManifestId(UUID.randomUUID().toString())
         statements.insertManifest(row, manifestId)
         statements.updateChecksum(manifestId, copyChunks(row, manifestId))
         statements.insertHead(row, manifestId)
     }
 
-    private fun copyChunks(row: LegacySnapshotRow, manifestId: String): String {
+    private fun copyChunks(row: LegacySnapshotRow, manifestId: MigrationManifestId): MigrationChecksum {
         val digest = MessageDigest.getInstance(SHA_256)
         repeat(row.chunkCount) { index ->
             val chunk = readChunk(MigrationChunk(row.rowId, index))
             digest.update(chunk)
             statements.insertChunk(manifestId, index, chunk)
         }
-        return digest.digest().toMigrationHex()
+        return MigrationChecksum(digest.digest().toMigrationHex())
     }
 
     private fun readChunk(chunk: MigrationChunk): ByteArray {
@@ -84,6 +84,12 @@ private class LegacySnapshotRowCopier(
     }
 }
 
+@JvmInline
+private value class MigrationManifestId(val value: String)
+
+@JvmInline
+private value class MigrationChecksum(val value: String)
+
 private data class MigrationChunk(val rowId: Long, val index: Int)
 
 private class MigrationStatements(database: SupportSQLiteDatabase) {
@@ -92,9 +98,9 @@ private class MigrationStatements(database: SupportSQLiteDatabase) {
     private val updateChecksum = database.compileStatement(UPDATE_CHECKSUM_SQL)
     private val insertHead = database.compileStatement(INSERT_HEAD_SQL)
 
-    fun insertManifest(row: LegacySnapshotRow, manifestId: String) = insertManifest.run {
+    fun insertManifest(row: LegacySnapshotRow, manifestId: MigrationManifestId) = insertManifest.run {
         clearBindings()
-        bindString(1, manifestId)
+        bindString(1, manifestId.value)
         bindString(2, row.backendId)
         bindString(3, row.conversationId)
         bindNullableString(4, row.agentId)
@@ -108,29 +114,29 @@ private class MigrationStatements(database: SupportSQLiteDatabase) {
         Unit
     }
 
-    fun insertChunk(manifestId: String, chunkIndex: Int, payload: ByteArray) = insertChunk.run {
+    fun insertChunk(manifestId: MigrationManifestId, chunkIndex: Int, payload: ByteArray) = insertChunk.run {
         clearBindings()
-        bindString(1, manifestId)
+        bindString(1, manifestId.value)
         bindLong(2, chunkIndex.toLong())
         bindBlob(3, payload)
         executeInsert()
         Unit
     }
 
-    fun updateChecksum(manifestId: String, checksum: String) = updateChecksum.run {
+    fun updateChecksum(manifestId: MigrationManifestId, checksum: MigrationChecksum) = updateChecksum.run {
         clearBindings()
-        bindString(1, checksum)
-        bindString(2, manifestId)
+        bindString(1, checksum.value)
+        bindString(2, manifestId.value)
         executeUpdateDelete()
         Unit
     }
 
-    fun insertHead(row: LegacySnapshotRow, manifestId: String) = insertHead.run {
+    fun insertHead(row: LegacySnapshotRow, manifestId: MigrationManifestId) = insertHead.run {
         clearBindings()
         bindString(1, row.backendId)
         bindString(2, row.conversationId)
         bindNullableString(3, row.agentId)
-        bindString(4, manifestId)
+        bindString(4, manifestId.value)
         bindLong(5, row.revision)
         bindLong(6, row.writtenAtMillis)
         executeInsert()
