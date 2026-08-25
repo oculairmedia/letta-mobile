@@ -10,6 +10,7 @@ import com.letta.mobile.runtime.ToolExecutionStatus
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonElement
@@ -413,7 +414,7 @@ internal class ConversationTurnFanout(
             // already absorbed by writeToViewerIsolated (which de-registers on
             // persistent failure); the launch is enough.
             observerWrites.forEach { viewer ->
-                async { writeToViewerIsolated(viewer, delta, isInitiator = false) }
+                launch { writeToViewerIsolated(viewer, delta, isInitiator = false) }
             }
             // Initiator (0 or 1 writes): await. This is the join the
             // dispatcher thread blocks on; we want it back as fast as the

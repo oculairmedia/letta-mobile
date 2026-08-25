@@ -88,7 +88,30 @@ data class FolderFileUploadParams(
     val duplicateHandling: String? = null,
     val customName: String? = null,
     val contentType: ContentType = ContentType.Application.OctetStream,
-)
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other == null || this::class != other::class) return false
+        other as FolderFileUploadParams
+        if (folderId != other.folderId) return false
+        if (fileName != other.fileName) return false
+        if (!fileBytes.contentEquals(other.fileBytes)) return false
+        if (duplicateHandling != other.duplicateHandling) return false
+        if (customName != other.customName) return false
+        if (contentType != other.contentType) return false
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = folderId.hashCode()
+        result = 31 * result + fileName.hashCode()
+        result = 31 * result + fileBytes.contentHashCode()
+        result = 31 * result + (duplicateHandling?.hashCode() ?: 0)
+        result = 31 * result + (customName?.hashCode() ?: 0)
+        result = 31 * result + contentType.hashCode()
+        return result
+    }
+}
 
 @Serializable
 data class FileMetadata(

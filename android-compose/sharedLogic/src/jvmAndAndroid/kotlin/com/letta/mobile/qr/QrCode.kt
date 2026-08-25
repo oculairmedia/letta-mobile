@@ -33,6 +33,26 @@ object QrCode {
 
     data class Matrix(val size: Int, val darkRows: Array<BooleanArray>) {
         operator fun get(r: Int, c: Int): Boolean = darkRows[r][c]
+
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (other == null || this::class != other::class) return false
+            other as Matrix
+            if (size != other.size) return false
+            if (darkRows.size != other.darkRows.size) return false
+            for (i in darkRows.indices) {
+                if (!darkRows[i].contentEquals(other.darkRows[i])) return false
+            }
+            return true
+        }
+
+        override fun hashCode(): Int {
+            var result = size
+            for (row in darkRows) {
+                result = 31 * result + row.contentHashCode()
+            }
+            return result
+        }
     }
 
     /**

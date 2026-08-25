@@ -14,9 +14,9 @@ import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
-import kotlin.coroutines.coroutineContext
 
 /** CursorWindow-safe Room persistence using metadata heads and bounded BLOB chunks. */
 class RoomConfirmedTimelineStore(
@@ -158,7 +158,7 @@ class RoomConfirmedTimelineStore(
         database.withTransaction {
             dao.insertManifest(plan.manifest)
             plan.chunks.chunked(CHUNK_INSERT_BATCH).forEach { batch ->
-                coroutineContext.ensureActive()
+                currentCoroutineContext().ensureActive()
                 dao.insertChunks(batch)
             }
         }
@@ -328,6 +328,27 @@ class RoomConfirmedTimelineStore(
     ) {
         val scope: TimelineScope get() = envelope.scope
         val manifestId: String get() = manifest.manifestId
+
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (other == null || this::class != other::class) return false
+            other as SnapshotWritePlan
+            if (envelope != other.envelope) return false
+            if (normalized != other.normalized) return false
+            if (!payload.contentEquals(other.payload)) return false
+            if (chunks != other.chunks) return false
+            if (manifest != other.manifest) return false
+            return true
+        }
+
+        override fun hashCode(): Int {
+            var result = envelope.hashCode()
+            result = 31 * result + normalized.hashCode()
+            result = 31 * result + payload.contentHashCode()
+            result = 31 * result + chunks.hashCode()
+            result = 31 * result + manifest.hashCode()
+            return result
+        }
     }
 
     companion object {

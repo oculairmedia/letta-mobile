@@ -9,8 +9,8 @@ import java.nio.ByteBuffer
 import java.nio.charset.CodingErrorAction
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
-import kotlin.coroutines.coroutineContext
 
 /** Performs bounded, cancellation-aware manifest reads and typed validation. */
 internal class RoomTimelineManifestReader(
@@ -32,7 +32,7 @@ internal class RoomTimelineManifestReader(
         val output = ByteArrayOutputStream(manifest.byteLength.toInt())
         val digest = MessageDigest.getInstance(SHA_256)
         repeat(manifest.chunkCount) { index ->
-            coroutineContext.ensureActive()
+            currentCoroutineContext().ensureActive()
             val chunk = dao.getChunk(manifest.manifestId, index)
                 ?: return RoomManifestPayload.Invalid(SnapshotReadFailure.CHUNK_MISSING)
             RoomManifestValidator.validateChunk(manifest, RoomChunk(index, chunk))?.let {
@@ -116,11 +116,35 @@ internal sealed interface RoomManifestRead {
 }
 
 private sealed interface RoomManifestPayload {
-    data class Valid(val bytes: ByteArray) : RoomManifestPayload
+    data class Valid(val bytes: ByteArray) : RoomManifestPayload {
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (other == null || this::class != other::class) return false
+            other as Valid
+            return bytes.contentEquals(other.bytes)
+        }
+
+        override fun hashCode(): Int = bytes.contentHashCode()
+    }
+
     data class Invalid(val failure: SnapshotReadFailure) : RoomManifestPayload
 }
 
-private data class RoomChunk(val index: Int, val payload: ByteArray)
+private data class RoomChunk(val index: Int, val payload: ByteArray) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other == null || this::class != other::class) return false
+        other as RoomChunk
+        if (index != other.index) return false
+        return payload.contentEquals(other.payload)
+    }
+
+    override fun hashCode(): Int {
+        var result = index
+        result = 31 * result + payload.contentHashCode()
+        return result
+    }
+}
 
 private object RoomManifestValidator {
     fun validateMetadata(
