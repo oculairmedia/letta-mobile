@@ -466,7 +466,7 @@ internal class ChatConversationCoordinator(
                 hasMoreOlderMessages = false,
             )
             startTimelineObserver(requestedConversationId)
-            launchRecentMessagesReconcile(requestedConversationId)
+            launchRecentMessagesReconcile()
             loadTimer.stop(
                 "conversationId" to requestedConversationId,
                 "mode" to "timeline",
@@ -489,7 +489,8 @@ internal class ChatConversationCoordinator(
         }
     }
 
-    private fun launchRecentMessagesReconcile(conversationId: String) {
+    private fun launchRecentMessagesReconcile() {
+        val conversationId = activeConversationId ?: return
         scope.launch {
             val generation = hydrationGeneration(conversationId)
             generation?.let { ChatHydrationTrace.reconcileStarted(it, reason = "open") }
