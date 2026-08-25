@@ -13,6 +13,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.data.chat.projection.ChatMessageListChange
 import com.letta.mobile.data.chat.runtime.ChatSessionReducer
@@ -97,8 +99,8 @@ internal class ChatConversationCoordinator(
         source = "ChatConversationCoordinator",
     )
 
-    fun conversationId(useClientMode: Boolean): String? =
-        activeConversationId ?: if (useClientMode) currentClientModeConversationId() else null
+    fun conversationId(mode: ConversationAccessMode): String? =
+        activeConversationId ?: if (mode == ConversationAccessMode.Client) currentClientModeConversationId() else null
 
     /** Records a route-open only when the route already supplies a stable conversation id. */
     fun recordOpenRequested() {
@@ -119,6 +121,13 @@ internal class ChatConversationCoordinator(
     private val isConversationAlreadyHydrated: Boolean
         get() = uiState.value.messages.isNotEmpty()
 
+    private val hydrationAvailability: HydrationAvailability
+        get() = if (isConversationAlreadyHydrated) {
+            HydrationAvailability.Hydrated
+        } else {
+            HydrationAvailability.NeedsLoading
+        }
+
     /**
      * letta-mobile-6bqi1: mark the selected conversation loaded without
      * re-entering Loading when its messages are already on screen. Both reducers
@@ -129,20 +138,20 @@ internal class ChatConversationCoordinator(
     private fun hydrateOrShowLoading(
         current: ChatSessionState,
         summary: ChatConversationSummary,
-        hydrated: Boolean,
+        hydration: HydrationAvailability,
     ): ChatSessionState {
         val next = ChatSessionReducer.conversationsLoaded(current, listOf(summary))
-        return if (hydrated) {
+        return if (hydration == HydrationAvailability.Hydrated) {
             ChatSessionReducer.hydrateCompleted(next, next.selectionGeneration)
         } else {
             ChatSessionReducer.beginSelectedConversationHydrate(next, next.selectionGeneration)
         }
     }
 
-    fun resolveConversationAndLoad(useClientModeForResolve: Boolean) {
-        val isFirstResolve = !hasResolvedConversationOnce
+    fun resolveConversationAndLoad(mode: ConversationAccessMode) {
+        val attempt = if (hasResolvedConversationOnce) ResolutionAttempt.Subsequent else ResolutionAttempt.Initial
         hasResolvedConversationOnce = true
-        if (isFreshRoute && isFirstResolve && explicitConversationId() == null) {
+        if (isFreshRoute && attempt == ResolutionAttempt.Initial && explicitConversationId() == null) {
             setRouteConversationId(null)
         }
         scope.launch {
@@ -156,12 +165,12 @@ internal class ChatConversationCoordinator(
             }
 
             try {
-                if (useClientModeForResolve) {
-                    resolveClientModeConversation(isFirstResolve)
+                if (mode == ConversationAccessMode.Client) {
+                    resolveClientModeConversation(attempt)
                     return@launch
                 }
 
-                resolveTimelineConversation(isFirstResolve)
+                resolveTimelineConversation(attempt)
             } catch (e: Exception) {
                 android.util.Log.w("AdminChatViewModel", "Failed to resolve conversation", e)
                 updateSessionState { ChatSessionReducer.conversationLoadFailed(it, e.message ?: "Failed to load conversation") }
@@ -177,7 +186,8 @@ internal class ChatConversationCoordinator(
         }
     }
 
-    private suspend fun resolveClientModeConversation(isFirstResolve: Boolean) {
+    private suspend fun resolveClientModeConversation(attempt: ResolutionAttempt) {
+        val isFirstResolve = attempt == ResolutionAttempt.Initial
         // letta-mobile-9cb37: honor the route's explicit conversation request on
         // the first resolve before any cached/most-recent fallback (mirrors the
         // timeline path) so an agent switch with an explicit conversationId opens
@@ -207,7 +217,7 @@ internal class ChatConversationCoordinator(
             }
             ?: if (!suppressFreshRouteFallbackClient) {
                 runCatching {
-                    resolveMostRecentConversation(CONVERSATION_CACHE_TTL_MS)
+                    resolveMostRecentConversation(CONVERSATION_CACHE_TTL_MS.milliseconds)
                 }.getOrNull()?.also { resolved ->
                     setRouteConversationId(resolved)
                     clientModeBootstrapState = ClientModeBootstrapState.Ready(resolved)
@@ -252,16 +262,17 @@ internal class ChatConversationCoordinator(
                 isAgentTyping = false,
             )
         }
-        consumeInitialMessageIfPresent(stageFreshClientModeDuplicate = true)?.let { message ->
+        consumeInitialMessageIfPresent(DuplicateInitialMessagePolicy.StageFreshClientDuplicate)?.let { message ->
             sendMessageViaClientMode(message)
         }
     }
 
-    private suspend fun resolveTimelineConversation(isFirstResolve: Boolean) {
+    private suspend fun resolveTimelineConversation(attempt: ResolutionAttempt) {
+        val isFirstResolve = attempt == ResolutionAttempt.Initial
         when (val route = localRuntimeRouting()) {
             LocalRuntimeRouting.Remote -> Unit
             LocalRuntimeRouting.LocalBound -> {
-                resolveClientModeConversation(isFirstResolve)
+                resolveClientModeConversation(attempt)
                 return
             }
             is LocalRuntimeRouting.Blocked -> {
@@ -300,7 +311,7 @@ internal class ChatConversationCoordinator(
             activeConversationId == null &&
             explicitConversationId() == null
         ) {
-            resolveMostRecentConversation(CONVERSATION_CACHE_TTL_MS)
+            resolveMostRecentConversation(CONVERSATION_CACHE_TTL_MS.milliseconds)
         }
 
         val conversationId = pinnedExplicit
@@ -330,13 +341,13 @@ internal class ChatConversationCoordinator(
                 lastMessagePreview = "",
             )
             updateSessionState { current ->
-                hydrateOrShowLoading(current, summary, isConversationAlreadyHydrated)
+                hydrateOrShowLoading(current, summary, hydrationAvailability)
             }
             agent?.name?.let { uiState.value = uiState.value.copy(agentName = it) }
             loadMessagesInternal()
         }
 
-        consumeInitialMessageIfPresent(stageFreshClientModeDuplicate = false)?.let { message ->
+        consumeInitialMessageIfPresent(DuplicateInitialMessagePolicy.SuppressDuplicate)?.let { message ->
             sendMessageViaTimeline(message)
         }
     }
@@ -360,8 +371,8 @@ internal class ChatConversationCoordinator(
 
     internal val rosterNameResolverForTest get() = rosterNameResolver
 
-    private suspend fun resolveMostRecentConversation(maxAgeMs: Long): String? {
-        return chatSessionResolver.resolveMostRecentConversation(agentId, maxAgeMs)
+    private suspend fun resolveMostRecentConversation(maxAge: Duration): String? {
+        return chatSessionResolver.resolveMostRecentConversation(agentId, maxAge.inWholeMilliseconds)
             ?.also { setRouteConversationId(it) }
     }
 
@@ -421,7 +432,7 @@ internal class ChatConversationCoordinator(
                     lastMessagePreview = "",
                 )
                 updateSessionState { current ->
-                    hydrateOrShowLoading(current, summary, isConversationAlreadyHydrated)
+                    hydrateOrShowLoading(current, summary, hydrationAvailability)
                 }
                 uiState.value = uiState.value.copy(
                     agentName = cachedAgent.name ?: uiState.value.agentName,
@@ -439,7 +450,7 @@ internal class ChatConversationCoordinator(
                     lastMessagePreview = "",
                 )
                 updateSessionState { current ->
-                    hydrateOrShowLoading(current, summary, isConversationAlreadyHydrated)
+                    hydrateOrShowLoading(current, summary, hydrationAvailability)
                 }
             }
         }
@@ -489,7 +500,7 @@ internal class ChatConversationCoordinator(
         }
     }
 
-    private fun consumeInitialMessageIfPresent(stageFreshClientModeDuplicate: Boolean): String? {
+    private fun consumeInitialMessageIfPresent(policy: DuplicateInitialMessagePolicy): String? {
         val message = initialMessage?.takeIf { it.isNotBlank() } ?: return null
         if (!initialMessageConsumed.compareAndSet(false, true)) return null
 
@@ -508,7 +519,7 @@ internal class ChatConversationCoordinator(
                     "messageHash=${message.hashCode()}",
             )
             markFollowingDuplicateInitialMessageInFlight()
-            if (stageFreshClientModeDuplicate && isFreshRoute) {
+            if (policy == DuplicateInitialMessagePolicy.StageFreshClientDuplicate && isFreshRoute) {
                 val alreadyVisible = pendingClientModeBootstrapMessages().any {
                     it.role == "user" && it.content == message
                 } || uiState.value.messages.any {
@@ -541,9 +552,9 @@ internal class ChatConversationCoordinator(
         }
     }
 
-    fun loadMessages(useClientModeForCurrentRoute: Boolean) {
-        if (!useClientModeForCurrentRoute && activeConversationId == null) {
-            resolveConversationAndLoad(useClientModeForResolve = false)
+    fun loadMessages(mode: ConversationAccessMode) {
+        if (mode == ConversationAccessMode.Timeline && activeConversationId == null) {
+            resolveConversationAndLoad(ConversationAccessMode.Timeline)
             return
         }
         scope.launch { loadMessagesInternal() }

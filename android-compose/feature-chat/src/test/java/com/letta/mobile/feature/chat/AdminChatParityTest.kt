@@ -11,6 +11,7 @@ import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.feature.chat.coordination.ChatConversationCoordinator
 import com.letta.mobile.feature.chat.coordination.ChatSessionResolver
+import com.letta.mobile.feature.chat.coordination.ConversationAccessMode
 import com.letta.mobile.feature.chat.coordination.RecentMessagesReconcileLauncher
 import com.letta.mobile.testutil.TestData
 import io.mockk.coEvery
@@ -62,7 +63,7 @@ class AdminChatParityTest {
         val harness = Harness(scope = this)
         coEvery { harness.chatSessionResolver.resolveMostRecentConversation("agent-1", any()) } throws RuntimeException("Network error")
 
-        harness.coordinator.resolveConversationAndLoad(useClientModeForResolve = false)
+        harness.coordinator.resolveConversationAndLoad(ConversationAccessMode.Timeline)
         advanceUntilIdle()
 
         // Verify KMP state transitioned to Offline
@@ -136,7 +137,7 @@ class AdminChatParityTest {
         val harness = Harness(this)
         harness.routeConversationId = "conversation-1"
 
-        harness.coordinator.resolveConversationAndLoad(useClientModeForResolve = false)
+        harness.coordinator.resolveConversationAndLoad(ConversationAccessMode.Timeline)
         advanceUntilIdle()
 
         assertEquals("Ada", harness.uiState.value.agentName)
@@ -149,7 +150,7 @@ class AdminChatParityTest {
         every { harness.agentRepository.getCachedAgent(AgentId("agent-1")) } returns
             TestData.agent(id = "agent-1", name = "Cached Ada")
 
-        harness.coordinator.resolveConversationAndLoad(useClientModeForResolve = false)
+        harness.coordinator.resolveConversationAndLoad(ConversationAccessMode.Timeline)
         advanceUntilIdle()
 
         // letta-mobile-xl1o2 AC: when the cache already has the agent, the
@@ -192,7 +193,7 @@ class AdminChatParityTest {
         val collector = launch(UnconfinedTestDispatcher(testScheduler)) {
             harness.sessionState.collect { seen += it.connectionState }
         }
-        harness.coordinator.resolveConversationAndLoad(useClientModeForResolve = false)
+        harness.coordinator.resolveConversationAndLoad(ConversationAccessMode.Timeline)
         advanceUntilIdle()
         collector.cancel()
 
@@ -214,7 +215,7 @@ class AdminChatParityTest {
         val collector = launch(UnconfinedTestDispatcher(testScheduler)) {
             harness.sessionState.collect { seen += it.connectionState }
         }
-        harness.coordinator.resolveConversationAndLoad(useClientModeForResolve = false)
+        harness.coordinator.resolveConversationAndLoad(ConversationAccessMode.Timeline)
         advanceUntilIdle()
         collector.cancel()
 
