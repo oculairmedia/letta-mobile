@@ -158,4 +158,36 @@ class TimelineSnapshotPersistenceTest {
         assertTrue(store.firstWriteCompleted.isCompleted)
         assertNotNull(store.readSnapshot(scope))
     }
+
+    @Test
+    fun mutationsPersistImmediatelyAndRestoreAccuratelyAfterClose() = runTest {
+        val store = InMemoryConfirmedTimelineStore()
+        val scope = TimelineScope(backendId = "test-backend", conversationId = "conv-restore")
+        val loop1 = TimelineSyncLoop(
+            messageApi = EmptyTimelineTransport,
+            conversationId = scope.conversationId,
+            scope = this,
+            startStreamSubscriber = false,
+            confirmedTimelineStore = store,
+            timelineScope = scope,
+            ioDispatcher = kotlinx.coroutines.test.StandardTestDispatcher(testScheduler),
+        )
+
+        // Ingest message and flush
+        loop1.ingestStreamEvent(
+            com.letta.mobile.data.model.UserMessage(
+                id = "msg-persisted",
+                date = "2026-08-24T12:00:00Z",
+                contentRaw = kotlinx.serialization.json.JsonPrimitive("persisted data"),
+            ),
+        )
+        loop1.flushSnapshotNow()
+        loop1.closeAndJoin()
+
+        // Restart loop2 and verify snapshot read
+        val snapshot = store.readSnapshot(scope)
+        assertNotNull(snapshot)
+        assertEquals(1, snapshot.events.size)
+        assertEquals("msg-persisted", snapshot.events.first().serverId)
+    }
 }

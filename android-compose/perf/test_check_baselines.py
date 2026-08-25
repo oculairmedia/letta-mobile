@@ -279,6 +279,84 @@ class CheckBaselinesTest(unittest.TestCase):
         self.assertIn("sample-benchmarkData.json", summary["metrics"][0]["source_path"])
         self.assertIn("startup.cold.p95_ms", summary_md.read_text())
 
+    def test_missing_gated_source_fails_closed(self) -> None:
+        self.write_baselines(
+            {
+                "startup.cold.p95_ms": {
+                    "baseline": 100.0,
+                    "tolerance_pct": 10,
+                    "source": "NonExistentBenchmark.someMethod",
+                    "metric": "timeToInitialDisplayMs",
+                    "gate": True,
+                }
+            }
+        )
+        self.write_measurement(
+            make_benchmark(
+                "com.letta.mobile.macrobenchmark.StartupBenchmark",
+                "coldStartupCompilationPartial",
+                {"timeToInitialDisplayMs": {"P95": 100.0}},
+            )
+        )
+
+        result = check_baselines.check(
+            self.outputs_dir,
+            rebaseline=False,
+            baselines_path=self.baselines_path,
+        )
+
+        self.assertEqual(result, 1)
+
+    def test_missing_gated_metric_fails_closed(self) -> None:
+        self.write_baselines(
+            {
+                "startup.cold.p95_ms": {
+                    "baseline": 100.0,
+                    "tolerance_pct": 10,
+                    "source": "StartupBenchmark.coldStartupCompilationPartial",
+                    "metric": "nonExistentMetric",
+                    "gate": True,
+                }
+            }
+        )
+        self.write_measurement(
+            make_benchmark(
+                "com.letta.mobile.macrobenchmark.StartupBenchmark",
+                "coldStartupCompilationPartial",
+                {"timeToInitialDisplayMs": {"P95": 100.0}},
+            )
+        )
+
+        result = check_baselines.check(
+            self.outputs_dir,
+            rebaseline=False,
+            baselines_path=self.baselines_path,
+        )
+
+        self.assertEqual(result, 1)
+
+    def test_empty_outputs_fails_closed(self) -> None:
+        self.write_baselines(
+            {
+                "startup.cold.p95_ms": {
+                    "baseline": 100.0,
+                    "tolerance_pct": 10,
+                    "source": "StartupBenchmark.coldStartupCompilationPartial",
+                    "metric": "timeToInitialDisplayMs",
+                    "gate": True,
+                }
+            }
+        )
+        self.write_measurement({"benchmarks": []})
+
+        result = check_baselines.check(
+            self.outputs_dir,
+            rebaseline=False,
+            baselines_path=self.baselines_path,
+        )
+
+        self.assertEqual(result, 1)
+
 
 if __name__ == "__main__":
     unittest.main()

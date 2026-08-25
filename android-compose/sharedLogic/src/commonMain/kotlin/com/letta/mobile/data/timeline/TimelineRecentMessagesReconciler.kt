@@ -34,6 +34,8 @@ class TimelineRecentMessagesReconciler(
     private val minForcedReconcileIntervalMs: Long = DEFAULT_MIN_FORCED_RECONCILE_INTERVAL_MS,
     scope: CoroutineScope? = null,
     private val onSnapshotApplied: (() -> Unit)? = null,
+    private val backendId: String = "default",
+    private val agentId: String? = null,
 ) {
     val seenRunIds = TimelineSeenRunTracker()
     private val reconcilerScope = scope ?: CoroutineScope(SupervisorJob())
@@ -42,11 +44,16 @@ class TimelineRecentMessagesReconciler(
         val key: ReconcileFlightKey,
         val deferred: Deferred<RecentMessagesReconcileOutcome>,
         val isStronger: Boolean,
+        var sharedTrailingStronger: Deferred<RecentMessagesReconcileOutcome>? = null,
     )
 
     data class ReconcileFlightKey(
+        val backendId: String,
+        val agentId: String?,
         val conversationId: String,
         val connectionGeneration: Long,
+        val limit: Int,
+        val order: String,
         val allowWhileStreamActive: Boolean,
     )
 
@@ -65,19 +72,43 @@ class TimelineRecentMessagesReconciler(
         freshnessInvalidationSeq++
     }
 
+    suspend fun invalidateFreshnessAtomic() {
+        reconcileFlightMutex.withLock {
+            freshnessInvalidationSeq++
+        }
+    }
+
     suspend fun reconcileRecentMessages(
         reason: String,
         forceRefresh: Boolean = false,
         connectionGeneration: Long = DEFAULT_CONNECTION_GENERATION,
     ): RecentMessagesReconcileOutcome {
         val flightKey = ReconcileFlightKey(
+            backendId = backendId,
+            agentId = agentId,
             conversationId = conversationId,
             connectionGeneration = connectionGeneration,
+            limit = RECONCILE_LIMIT,
+            order = "desc",
             allowWhileStreamActive = forceRefresh,
         )
 
-        // 1. Check if an equivalent recent reconcile (e.g. open) just completed successfully for this generation
-        val cachedOutcome = reconcileFlightMutex.withLock {
+        var awaitTarget: Deferred<RecentMessagesReconcileOutcome>? = null
+        val earlyOutcome = reconcileFlightMutex.withLock {
+            // Check if request is for an older generation that has already been superseded
+            if (connectionGeneration < highestAppliedGeneration && highestAppliedGeneration != -1L) {
+                Telemetry.event(
+                    "TimelineSync", "recentReconcile.staleGenerationRejected",
+                    "conversationId" to conversationId,
+                    "reason" to reason,
+                    "generation" to connectionGeneration,
+                    "highestAppliedGeneration" to highestAppliedGeneration,
+                    level = Telemetry.Level.WARN,
+                )
+                return@withLock RecentMessagesReconcileOutcome.Skipped("staleGeneration")
+            }
+
+            // 1. Check if an equivalent recent reconcile just completed successfully for this generation
             val isEligible = (reason == "screen_resumed" || reason == "resumed") &&
                 !forceRefresh &&
                 lastSuccessfulReconcileGeneration == connectionGeneration &&
@@ -93,16 +124,10 @@ class TimelineRecentMessagesReconciler(
                     "serverCount" to lastSuccessfulReconcileServerCount,
                     "appended" to lastSuccessfulReconcileAppended,
                 )
-                RecentMessagesReconcileOutcome.Applied(lastSuccessfulReconcileAppended)
-            } else {
-                null
+                return@withLock RecentMessagesReconcileOutcome.Applied(lastSuccessfulReconcileAppended)
             }
-        }
-        if (cachedOutcome != null) return cachedOutcome
 
-        // 2. Coordinate in-flight flights with mutex protection
-        var mustRunTrailingStronger = false
-        val sharedDeferred = reconcileFlightMutex.withLock {
+            // 2. Coordinate in-flight flights with mutex protection
             val current = inFlight
             if (current != null && current.deferred.isActive) {
                 if (current.key.connectionGeneration < connectionGeneration) {
@@ -114,7 +139,6 @@ class TimelineRecentMessagesReconciler(
                         "oldGeneration" to current.key.connectionGeneration,
                         "newGeneration" to connectionGeneration,
                     )
-                    // Launch new flight in reconciler-owned scope
                     val newDeferred = reconcilerScope.async {
                         executeReconcileFromServer(
                             reason = reason,
@@ -131,11 +155,35 @@ class TimelineRecentMessagesReconciler(
                             }
                         }
                     }
-                    newDeferred
+                    awaitTarget = newDeferred
+                    null
+                } else if (current.key.connectionGeneration > connectionGeneration) {
+                    // Current in flight is for a NEWER generation -> reject this stale call
+                    Telemetry.event(
+                        "TimelineSync", "recentReconcile.staleGenerationRejected",
+                        "conversationId" to conversationId,
+                        "reason" to reason,
+                        "generation" to connectionGeneration,
+                        "inFlightGeneration" to current.key.connectionGeneration,
+                        level = Telemetry.Level.WARN,
+                    )
+                    return@withLock RecentMessagesReconcileOutcome.Skipped("staleGeneration")
                 } else if (!current.isStronger && forceRefresh) {
-                    // Current is weaker and this caller is stronger -> await current, then run trailing
-                    mustRunTrailingStronger = true
-                    current.deferred
+                    // Current is weaker and this caller is stronger -> share a single scoped successor
+                    val successor = current.sharedTrailingStronger ?: run {
+                        val newSuccessor = reconcilerScope.async {
+                            current.deferred.await()
+                            executeReconcileFromServer(
+                                reason = "$reason.trailingStronger",
+                                forceRefresh = true,
+                                connectionGeneration = connectionGeneration,
+                            )
+                        }
+                        current.sharedTrailingStronger = newSuccessor
+                        newSuccessor
+                    }
+                    awaitTarget = successor
+                    null
                 } else {
                     // Equivalent or weaker request -> coalesce into existing flight
                     Telemetry.event(
@@ -145,7 +193,8 @@ class TimelineRecentMessagesReconciler(
                         "generation" to connectionGeneration,
                         "inFlightReason" to current.key.allowWhileStreamActive,
                     )
-                    current.deferred
+                    awaitTarget = current.deferred
+                    null
                 }
             } else {
                 val newDeferred = reconcilerScope.async {
@@ -164,21 +213,13 @@ class TimelineRecentMessagesReconciler(
                         }
                     }
                 }
-                newDeferred
+                awaitTarget = newDeferred
+                null
             }
         }
 
-        val outcome = sharedDeferred.await()
-
-        return if (mustRunTrailingStronger) {
-            reconcileRecentMessages(
-                reason = "$reason.trailingStronger",
-                forceRefresh = true,
-                connectionGeneration = connectionGeneration,
-            )
-        } else {
-            outcome
-        }
+        if (earlyOutcome != null) return earlyOutcome
+        return checkNotNull(awaitTarget).await()
     }
 
     private suspend fun executeReconcileFromServer(
@@ -194,10 +235,13 @@ class TimelineRecentMessagesReconciler(
         )
         if (outcome is RecentMessagesReconcileOutcome.Applied) {
             reconcileFlightMutex.withLock {
-                lastSuccessfulReconcileTimeMs = nowMillis()
-                lastSuccessfulReconcileGeneration = connectionGeneration
-                lastSuccessfulReconcileAppended = outcome.appended
-                lastSuccessfulFreshnessSeq = freshnessInvalidationSeq
+                if (connectionGeneration >= highestAppliedGeneration) {
+                    lastSuccessfulReconcileTimeMs = nowMillis()
+                    lastSuccessfulReconcileGeneration = connectionGeneration
+                    lastSuccessfulReconcileAppended = outcome.appended
+                    lastSuccessfulFreshnessSeq = freshnessInvalidationSeq
+                    highestAppliedGeneration = maxOf(highestAppliedGeneration, connectionGeneration)
+                }
             }
         }
         return outcome
@@ -342,7 +386,7 @@ class TimelineRecentMessagesReconciler(
     }
 
     companion object {
-        private const val RECONCILE_LIMIT = 250
+        const val RECONCILE_LIMIT = 250
         private const val DEFAULT_CONNECTION_GENERATION = 0L
         const val DEFAULT_MIN_FORCED_RECONCILE_INTERVAL_MS = 4_000L
         const val DEFAULT_FRESHNESS_WINDOW_MS = 4_000L
