@@ -50,13 +50,14 @@ import org.junit.Test
 class SessionScopedModelSchedulePassageRepositoryTest {
 
     @Test
-    fun `model repository proxy switches caches to rebuilt graph`() = runTest {
+    fun `model repository proxy clears account scoped caches when token changes`() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         val fakeModelApi = FakeModelApi().apply {
             llmModels = mutableListOf(sampleLlmModel("llm-a"))
             embeddingModels = mutableListOf(sampleEmbeddingModel("embedding-a"))
         }
-        val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
+        val accountA = sessionTestConfig("shared-backend").copy(accessToken = "account-a")
+        val settingsRepository = FakeSettingsRepository(initialActiveConfig = accountA)
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
             sessionGraphFactory = createTestDefaultSessionRepositoryGraphFactory {
@@ -77,7 +78,7 @@ class SessionScopedModelSchedulePassageRepositoryTest {
 
         fakeModelApi.llmModels = mutableListOf(sampleLlmModel("llm-b"))
         fakeModelApi.embeddingModels = mutableListOf(sampleEmbeddingModel("embedding-b"))
-        settingsRepository.activeConfigState.value = sessionTestConfig("backend-b")
+        settingsRepository.activeConfigState.value = accountA.copy(accessToken = "account-b")
         advanceUntilIdle()
 
         assertEquals(emptyList<String>(), modelProxy.llmModels.value.map { it.id })

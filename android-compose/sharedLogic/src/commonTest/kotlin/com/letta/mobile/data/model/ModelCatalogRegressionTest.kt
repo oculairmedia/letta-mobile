@@ -101,6 +101,19 @@ class ModelCatalogRegressionTest {
     }
 
     @Test
+    fun repeatedNormalizationPreservesStoredAliasSelectionWithoutDuplicates() {
+        val once = ModelCatalogNormalizer.normalize(mixedCatalogFixture())
+        val twice = ModelCatalogNormalizer.normalize(once)
+
+        assertEquals(once, twice)
+        assertEquals(once.map { it.handle }.toSet().size, once.size)
+        assertEquals(
+            "lmstudio/MiniMax-M3",
+            ModelCatalog.transportValue(twice, "lmstudio/MiniMax-M3"),
+        )
+    }
+
+    @Test
     fun failOnRevertProvesOldFilterDropsNonOpenAiRoutes() {
         val raw = mixedCatalogFixture()
         val normalized = ModelCatalogNormalizer.normalize(raw)

@@ -13,35 +13,34 @@ import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 
-class LettaHttpChatGatewayCredentialFilterTest {
+class LettaHttpChatGatewayModelCatalogTest {
     @Test
-    fun returnsFullNormalizedCatalogWithoutCallingProviders() = runTest {
-        var providersCalled = false
-        val gateway = gateway(onProvidersRequested = { providersCalled = true })
+    fun returnsAccountScopedModelResponseWithoutCallingProviders() = runTest {
+        val requestedPaths = mutableListOf<String>()
+        var authorization: String? = null
+        val gateway = gateway { path, auth ->
+            requestedPaths += path
+            authorization = auth
+        }
 
         val models = gateway.listLlmModels()
 
         assertEquals(ALL_MODEL_IDS, models.map { it.id })
-        assertFalse(providersCalled, "listLlmModels must not query /v1/providers")
+        assertEquals(listOf("/v1/models"), requestedPaths)
+        assertEquals("Bearer account-token", authorization)
     }
 
-    private fun gateway(onProvidersRequested: () -> Unit = {}): DesktopLettaHttpChatGateway {
+    private fun gateway(onRequest: (String, String?) -> Unit): DesktopLettaHttpChatGateway {
         val client = HttpClient(MockEngine { request ->
-            when (request.url.encodedPath) {
+            val path = request.url.encodedPath
+            onRequest(path, request.headers[HttpHeaders.Authorization])
+            when (path) {
                 "/v1/models" -> respond(
                     content = MODELS_JSON,
                     status = HttpStatusCode.OK,
                     headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
                 )
-                "/v1/providers" -> {
-                    onProvidersRequested()
-                    respond(
-                        content = "server error",
-                        status = HttpStatusCode.InternalServerError,
-                    )
-                }
                 else -> respond("not found", HttpStatusCode.NotFound)
             }
         }) {
@@ -54,6 +53,7 @@ class LettaHttpChatGatewayCredentialFilterTest {
                 id = "local",
                 mode = LettaConfig.Mode.LOCAL,
                 serverUrl = "http://localhost:8283",
+                accessToken = "account-token",
             ),
             httpClient = client,
         )

@@ -61,6 +61,13 @@ open class LettaHttpChatGateway(
 ) : ChatGateway, ChatGatewayExtras, ConversationSummaryGateway, AutoCloseable {
     private val baseUrl = config.serverUrl.trimEnd('/')
 
+    private data class MessageListQuery(
+        val limit: Int?,
+        val order: String?,
+        val after: String? = null,
+        val conversationId: String? = null,
+    )
+
     override suspend fun listConversations(limit: Int, archiveStatus: String?): List<Conversation> {
         val response = httpClient.get("$baseUrl/v1/conversations") {
             applyAuth()
@@ -132,28 +139,28 @@ open class LettaHttpChatGateway(
         limit: Int?,
         after: String?,
         order: String?,
-    ): List<LettaMessage> {
-        val response = httpClient.get("$baseUrl/v1/conversations/$conversationId/messages") {
-            applyAuth()
-            parameter("limit", limit)
-            parameter("after", after)
-            parameter("order", order)
-        }
-        response.requireSuccess()
-        return response.body()
-    }
+    ): List<LettaMessage> = listMessages(
+        path = "/v1/conversations/$conversationId/messages",
+        query = MessageListQuery(limit = limit, order = order, after = after),
+    )
 
     override suspend fun listAgentMessages(
         agentId: String,
         limit: Int?,
         order: String?,
         conversationId: String?,
-    ): List<LettaMessage> {
-        val response = httpClient.get("$baseUrl/v1/agents/$agentId/messages") {
+    ): List<LettaMessage> = listMessages(
+        path = "/v1/agents/$agentId/messages",
+        query = MessageListQuery(limit = limit, order = order, conversationId = conversationId),
+    )
+
+    private suspend fun listMessages(path: String, query: MessageListQuery): List<LettaMessage> {
+        val response = httpClient.get("$baseUrl$path") {
             applyAuth()
-            parameter("limit", limit)
-            parameter("order", order)
-            parameter("conversation_id", conversationId)
+            parameter("limit", query.limit)
+            parameter("order", query.order)
+            parameter("after", query.after)
+            parameter("conversation_id", query.conversationId)
         }
         response.requireSuccess()
         return response.body()
