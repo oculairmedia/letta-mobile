@@ -48,6 +48,9 @@ internal class IrohObserverIngestor(
     private val recordFrameOwnership: (conversationId: String, localTurn: IrohActiveTurn?) -> Unit,
     private val observerMapper: AppServerRuntimeEventMapper = AppServerRuntimeEventMapper(),
     internal val subagentCorrelator: SubagentCorrelator = SubagentCorrelator(),
+    // letta-mobile-p0gc: per-turn aggregated skip telemetry + cheap engine-owned
+    // terminal gating; injectable sink keeps the aggregation deterministic under test.
+    internal val engineOwnedSkipTelemetry: EngineOwnedSkipTelemetry = EngineOwnedSkipTelemetry(),
 ) {
     private val observerGeneration = atomic(0)
 
@@ -133,17 +136,64 @@ internal class IrohObserverIngestor(
         val scope = observerScope(streamDelta)
         recordFrameOwnership(scope.conversationId, scope.localTurn)
         if (scope.localTurn != null) {
-            Telemetry.event(
-                "IrohObserver", "ingest.skip_engine_owned",
-                "conversationId" to scope.conversationId,
-                "turnId" to scope.localTurn.turnId,
+            // letta-mobile-p0gc: ONE aggregated skip event per turn (delta types +
+            // counts) instead of one log line per frame.
+            engineOwnedSkipTelemetry.record(
+                conversationId = scope.conversationId,
+                turnId = scope.localTurn.turnId,
+                deltaType = engineOwnedDeltaType(streamDelta),
             )
-            projectEngineOwnedObserverDelta(scope, received)
+            projectEngineOwnedObserverDeltaIfTerminalCandidate(scope, streamDelta, received)
             return
         }
         if (isRetiredObserverRun(streamDelta, scope.conversationId)) return
         correlateAgentFrame(streamDelta).forEach { emitBoth(it) }
         projectPassiveObserverDelta(scope, received)
+    }
+
+    /**
+     * letta-mobile-p0gc (causal slice C): the ONLY thing the observer does with
+     * an engine-owned delta is look for the local turn's [ServerFrame.TurnDone]
+     * terminal fallback. Full mapping is therefore worth running ONLY for delta
+     * shapes that can ever produce a TurnDone through
+     * [AppServerRuntimeEventMapper] + [RuntimeEventServerFrameMapper]:
+     * `stop_reason` (terminal stop reasons → Completed/Cancelled/Failed),
+     * `loop_error` / `error_message` (→ Failed). Everything else maps to
+     * RemoteStreamFrame / ToolCallObserved / ToolReturnObserved payloads —
+     * never a TurnDone — so we skip the mapping entirely instead of
+     * project-mapping every streaming token only to discard the result.
+     *
+     * Safety: an UNCLASSIFIABLE shape (non-object delta or missing
+     * `message_type`) conservatively falls back to FULL mapping, preserving
+     * exactly the pre-change behavior for anything this cheap predicate cannot
+     * prove non-terminal. The observer terminal fallback itself is untouched:
+     * candidates still run the full mapper pipeline and claim/emit path.
+     */
+    private suspend fun projectEngineOwnedObserverDeltaIfTerminalCandidate(
+        scope: ObserverProjectionScope,
+        streamDelta: AppServerInboundFrame.StreamDelta,
+        received: AppServerReceivedFrame,
+    ) {
+        if (scope.localTurn == null) return
+        if (!isTerminalCandidate(streamDelta)) return
+        projectEngineOwnedObserverDelta(scope, received)
+        // A terminal candidate ends the observer's interest in this turn —
+        // flush the per-turn skip aggregate now rather than at some later turn.
+        engineOwnedSkipTelemetry.endTurn()
+    }
+
+    private fun isTerminalCandidate(streamDelta: AppServerInboundFrame.StreamDelta): Boolean {
+        val delta = streamDelta.delta as? JsonObject ?: return true
+        return when (delta.string("message_type")) {
+            null -> true
+            "stop_reason", "loop_error", "error_message" -> true
+            else -> false
+        }
+    }
+
+    private fun engineOwnedDeltaType(streamDelta: AppServerInboundFrame.StreamDelta): String {
+        val delta = streamDelta.delta as? JsonObject ?: return "<non-object>"
+        return delta.string("message_type") ?: "<untyped>"
     }
 
     private suspend fun resubscribe(subscription: ObserverSubscription) {
@@ -305,6 +355,7 @@ internal class IrohObserverIngestor(
         resubscribeJob?.cancel()
         resubscribeJob = null
         subagentCorrelator.reset()
+        engineOwnedSkipTelemetry.endTurn()
         lastEmittedSubagentRevision = 0L
     }
 

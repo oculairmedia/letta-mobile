@@ -4,6 +4,7 @@ import androidx.compose.runtime.Immutable
 import com.letta.mobile.data.model.SyntheticSkillEnvelopeDetector
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.common.GroupPosition
+import kotlinx.atomicfu.atomic
 
 /** LazyColumn-stable identity: prefer client otid across Pending → Confirmed. */
 internal fun UiMessage.stableListKey(): String {
@@ -191,6 +192,29 @@ fun groupMessagesForRender(
         runIdCounts[rid] = (runIdCounts[rid] ?: 0) + 1
     }
 
+    // letta-mobile-p0gc (ANR fix): echo compaction used to rebuild the
+    // "older plain assistant text" set from scratch for EVERY run block,
+    // regex-normalizing each older message once per block — superlinear
+    // O(blocks × messages) on long conversations (Pixel ANR:
+    // runPanelEchoKey → compactRunBlockEchoes with 1k+ history). Now:
+    //
+    //   1. Each message's echo key is normalized AT MOST ONCE per build
+    //      into [echoKeys] (single-pass whitespace normalization — no Regex).
+    //   2. [lastEchoKeyIndex] records the LAST index each key occurs at.
+    //      For a block spanning [i, j), a key is shadowed by older history
+    //      iff `lastEchoKeyIndex[key] >= j` — exactly equivalent to
+    //      membership in the old per-block `olderPlainAssistantText` set,
+    //      but computed with ONE pre-pass instead of one set-build per block.
+    //
+    // Total cost: O(n) normalizations + O(n) map operations per build.
+    val echoKeys = arrayOfNulls<String>(reversed.size)
+    val lastEchoKeyIndex = HashMap<String, Int>()
+    for ((index, entry) in reversed.withIndex()) {
+        val key = entry.first.runPanelEchoKey()
+        echoKeys[index] = key
+        if (key != null) lastEchoKeyIndex[key] = index
+    }
+
     val out = ArrayList<ChatRenderItem>(reversed.size)
     var i = 0
     while (i < reversed.size) {
@@ -231,8 +255,10 @@ fun groupMessagesForRender(
         }
         val compactedAcc = compactRunBlockEchoes(
             accumulator = acc,
-            reversed = reversed,
+            blockStartIndex = i,
             olderStartIndex = j,
+            echoKeys = echoKeys,
+            lastEchoKeyIndex = lastEchoKeyIndex,
         )
         if (compactedAcc.size == 1) {
             // Adopt the future RunBlock key when this runId is unique in the
@@ -380,29 +406,115 @@ fun deduplicateRenderKeys(items: List<ChatRenderItem>): List<ChatRenderItem> {
 }
 
 private const val MinRunPanelEchoLength = 24
-private val RunPanelWhitespaceRegex = Regex("\\s+")
 
+/**
+ * letta-mobile-p0gc (ANR fix): per-build instrumentation for the echo-key
+ * hot path. [normalizationCount] counts how many times a message's content
+ * was whitespace-normalized into a [runPanelEchoKey] during
+ * [groupMessagesForRender] builds since the last reset. The linear
+ * implementation normalizes each eligible message AT MOST ONCE per build,
+ * so the count is bounded by the number of eligible messages; the retired
+ * per-block implementation re-normalized every older plain assistant once
+ * PER RUN BLOCK (superlinear). Test-only hook — never read on production
+ * render paths.
+ */
+internal object EchoCompactionInstrumentation {
+    private val normalizationCount = atomic(0L)
+
+    fun recordNormalization() {
+        normalizationCount.incrementAndGet()
+    }
+
+    val normalizations: Long get() = normalizationCount.value
+
+    fun resetForTest() {
+        normalizationCount.value = 0L
+    }
+}
+
+/**
+ * Collapse duplicate "echoed" plain assistant text inside one run block.
+ *
+ * A message is an echo candidate when [runPanelEchoKey] yields a key (plain
+ * assistant prose ≥ 24 normalized chars, no tools/reasoning/errors/…).
+ * Within the block the FIRST occurrence (newest, because input is reversed)
+ * is kept; any later duplicate is dropped — as is any candidate whose text
+ * already appears in OLDER history (indices ≥ [olderStartIndex]).
+ *
+ * letta-mobile-p0gc (ANR fix): signature changed to consume the build-scoped
+ * [echoKeys] memo + [lastEchoKeyIndex] map computed ONCE per
+ * [groupMessagesForRender] call. `lastEchoKeyIndex[key] >= olderStartIndex`
+ * is logically identical to `key in olderPlainAssistantText` from the
+ * previous implementation: the key occurs somewhere at index ≥
+ * olderStartIndex iff its LAST occurrence is at index ≥ olderStartIndex.
+ */
 private fun compactRunBlockEchoes(
     accumulator: List<Pair<UiMessage, GroupPosition>>,
-    reversed: List<Pair<UiMessage, GroupPosition>>,
+    blockStartIndex: Int,
     olderStartIndex: Int,
+    echoKeys: Array<String?>,
+    lastEchoKeyIndex: Map<String, Int>,
 ): List<Pair<UiMessage, GroupPosition>> {
     if (accumulator.size < 2) return accumulator
 
-    val olderPlainAssistantText = buildSet {
-        for (index in olderStartIndex until reversed.size) {
-            reversed[index].first.runPanelEchoKey()?.let(::add)
-        }
-    }
     val seenInBlock = HashSet<String>()
-    return accumulator.filter { (message, _) ->
-        val key = message.runPanelEchoKey() ?: return@filter true
-        seenInBlock.add(key) && key !in olderPlainAssistantText
-    }.ifEmpty {
+    var droppedAny = false
+    val out = ArrayList<Pair<UiMessage, GroupPosition>>(accumulator.size)
+    for ((offset, entry) in accumulator.withIndex()) {
+        val key = echoKeys[blockStartIndex + offset]
+        if (key == null) {
+            out.add(entry)
+            continue
+        }
+        if (!seenInBlock.add(key) || (lastEchoKeyIndex[key] ?: -1) >= olderStartIndex) {
+            droppedAny = true
+            continue
+        }
+        out.add(entry)
+    }
+    return if (!droppedAny) accumulator else out.ifEmpty {
         // Never erase an entire run. If the server sent only duplicate text
         // frames, keep the newest one so the conversation still has an anchor.
         listOf(accumulator.first())
     }
+}
+
+/**
+ * The exact set of chars JVM `Regex("\\s+")` matches without
+ * UNICODE_CHARACTER_CLASS: space, tab, LF, VT, FF, CR. Kept explicit (instead
+ * of Char.isWhitespace()) so normalization output stays byte-identical to the
+ * retired regex implementation across platforms.
+ */
+private fun isJvmRegexWhitespace(c: Char): Boolean =
+    c == ' ' || c == '\t' || c == '\n' || c == '\u000B' || c == '\u000C' || c == '\r'
+
+/**
+ * Equivalent to `content.trim().replace(RunPanelWhitespaceRegex, " ")`
+ * (`\s+` → single space after trimming), but single-pass with NO Regex
+ * allocation — this runs once per eligible assistant message per render-model
+ * build on the Main thread (letta-mobile-p0gc ANR fix).
+ */
+internal fun normalizeRunPanelEchoText(content: String): String {
+    var start = 0
+    val len = content.length
+    var end = len
+    while (start < end && content[start].isWhitespace()) start++
+    while (end > start && content[end - 1].isWhitespace()) end--
+    var sb: StringBuilder? = null
+    var i = start
+    while (i < end) {
+        val c = content[i]
+        if (isJvmRegexWhitespace(c)) {
+            if (sb == null) sb = StringBuilder(end - start).append(content, start, i)
+            // Consume the whole whitespace run; emit exactly one space.
+            while (i < end && isJvmRegexWhitespace(content[i])) i++
+            sb.append(' ')
+        } else {
+            sb?.append(c)
+            i++
+        }
+    }
+    return sb?.toString() ?: content.substring(start, end)
 }
 
 private fun UiMessage.runPanelEchoKey(): String? {
@@ -411,7 +523,8 @@ private fun UiMessage.runPanelEchoKey(): String? {
     if (!toolCalls.isNullOrEmpty()) return null
     if (generatedUi != null || approvalRequest != null || approvalResponse != null) return null
     if (attachments.isNotEmpty()) return null
-    val normalized = content.trim().replace(RunPanelWhitespaceRegex, " ")
+    EchoCompactionInstrumentation.recordNormalization()
+    val normalized = normalizeRunPanelEchoText(content)
     return normalized.takeIf { it.length >= MinRunPanelEchoLength }
 }
 
