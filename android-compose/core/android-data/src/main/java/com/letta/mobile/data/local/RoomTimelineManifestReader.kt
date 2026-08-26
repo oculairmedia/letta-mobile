@@ -116,30 +116,11 @@ internal sealed interface RoomManifestRead {
 }
 
 private sealed interface RoomManifestPayload {
-    data class Valid(val bytes: ByteArray) : RoomManifestPayload {
-        override fun equals(other: Any?): Boolean =
-            this === other || (other is Valid && bytes.contentEquals(other.bytes))
-
-        override fun hashCode(): Int = bytes.contentHashCode()
-    }
-
+    class Valid(val bytes: ByteArray) : RoomManifestPayload
     data class Invalid(val failure: SnapshotReadFailure) : RoomManifestPayload
 }
 
-private data class RoomChunk(val index: Int, val payload: ByteArray) {
-    override fun equals(other: Any?): Boolean =
-        this === other || (
-            other is RoomChunk &&
-                index == other.index &&
-                payload.contentEquals(other.payload)
-        )
-
-    override fun hashCode(): Int {
-        var result = index
-        result = 31 * result + payload.contentHashCode()
-        return result
-    }
-}
+private class RoomChunk(val index: Int, val payload: ByteArray)
 
 private object RoomManifestValidator {
     fun validateMetadata(

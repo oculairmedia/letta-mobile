@@ -13,10 +13,7 @@ class MobileGuardrailRulesTest {
             fun send(value: Payload, values: Array<Any>, metadata: Map<String, Any?>, vararg rest: Any) = Unit
         """.trimIndent()
         val good = """
-            data class Payload(val id: String) {
-                override fun equals(other: Any?): Boolean = other is Payload && other.id == id
-                override fun hashCode(): Int = id.hashCode()
-            }
+            data class Payload(val id: String)
             fun send(value: Payload, values: Array<Payload>, vararg rest: Payload) = Unit
         """.trimIndent()
         assertTrue(NoAnyType().compileAndLint(bad).size >= 5)

@@ -60,28 +60,24 @@ internal class InMemoryRunCursorStore : RunCursorStore {
 
     override fun ensureLoaded() { /* no-op */ }
 
-    override fun record(conversationId: String, runId: String, seq: Long, isTerminal: Boolean) {
-        synchronized(lock) {
-            if (conversationId.isEmpty() || runId.isEmpty() || seq <= 0L) return
-            if (isTerminal) {
-                active[conversationId]?.remove(runId)
-                if (active[conversationId]?.isEmpty() == true) active.remove(conversationId)
-                terminal.getOrPut(conversationId) { mutableSetOf() }.add(runId)
-                return
-            }
-            if (terminal[conversationId]?.contains(runId) == true) return
-            val perConversation = active.getOrPut(conversationId) { mutableMapOf() }
-            val existing = perConversation[runId]
-            if (existing == null || seq > existing) {
-                perConversation[runId] = seq
-            }
+    override fun record(conversationId: String, runId: String, seq: Long, isTerminal: Boolean) = synchronized(lock) {
+        if (conversationId.isEmpty() || runId.isEmpty() || seq <= 0L) return
+        if (isTerminal) {
+            active[conversationId]?.remove(runId)
+            if (active[conversationId]?.isEmpty() == true) active.remove(conversationId)
+            terminal.getOrPut(conversationId) { mutableSetOf() }.add(runId)
+            return
+        }
+        if (terminal[conversationId]?.contains(runId) == true) return
+        val perConversation = active.getOrPut(conversationId) { mutableMapOf() }
+        val existing = perConversation[runId]
+        if (existing == null || seq > existing) {
+            perConversation[runId] = seq
         }
     }
 
-    override fun clear(conversationId: String, runId: String) {
-        synchronized(lock) {
-            clearLocked(conversationId, runId)
-        }
+    override fun clear(conversationId: String, runId: String) = synchronized(lock) {
+        clearLocked(conversationId, runId)
     }
 
     private fun clearLocked(conversationId: String, runId: String) {
@@ -91,13 +87,11 @@ internal class InMemoryRunCursorStore : RunCursorStore {
         if (perConversation.isEmpty()) active.remove(conversationId)
     }
 
-    override fun clearTerminal(conversationId: String, runId: String) {
-        synchronized(lock) {
-            if (conversationId.isEmpty() || runId.isEmpty()) return
-            clearLocked(conversationId, runId)
-            terminal[conversationId]?.remove(runId)
-            if (terminal[conversationId]?.isEmpty() == true) terminal.remove(conversationId)
-        }
+    override fun clearTerminal(conversationId: String, runId: String) = synchronized(lock) {
+        if (conversationId.isEmpty() || runId.isEmpty()) return
+        clearLocked(conversationId, runId)
+        terminal[conversationId]?.remove(runId)
+        if (terminal[conversationId]?.isEmpty() == true) terminal.remove(conversationId)
     }
 
     override fun allActiveRuns(): Map<String, Map<String, Long>> = synchronized(lock) {

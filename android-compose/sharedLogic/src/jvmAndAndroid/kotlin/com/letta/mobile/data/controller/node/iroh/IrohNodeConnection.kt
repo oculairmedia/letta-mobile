@@ -227,6 +227,8 @@ class IrohNodeConnection(
             adminRpcAcceptJob.cancelAndJoin()
             streamJob.cancelAndJoin()
             runCatching { streamSend.finish() }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Telemetry.event(
                 "IrohNode", "connection.error",
@@ -354,6 +356,8 @@ class IrohNodeConnection(
                     """{"type":"sync_response","request_id":"$requestId","success":false,"error":"$error"}"""
                 }
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             val error = e.message?.replace("\"", "\\\"") ?: "sync error"
             """{"type":"sync_response","request_id":"$requestId","success":false,"error":"$error"}"""
@@ -367,6 +371,7 @@ class IrohNodeConnection(
         val sendStream = biStream.send()
         val activeTurnJobs = LinkedHashSet<Job>()
         val activeTurnJobsMutex = Mutex()
+        val observerWrites = ObserverWriteQueue(this)
 
         try {
             val recvStream = biStream.recv()
@@ -392,6 +397,7 @@ class IrohNodeConnection(
                         streamSend = streamSend,
                         activeTurnJobs = activeTurnJobs,
                         activeTurnJobsMutex = activeTurnJobsMutex,
+                        observerWrites = observerWrites,
                     )
                     if (response != null) {
                         IrohFrameCodec.write(sendStream, response, MAX_FRAME_BYTES, allowFrameParts = peerSupportsFrameParts())
@@ -418,6 +424,7 @@ class IrohNodeConnection(
         streamSend: SendStream,
         activeTurnJobs: LinkedHashSet<Job>,
         activeTurnJobsMutex: Mutex,
+        observerWrites: ObserverWriteQueue,
     ): String? {
         return try {
             val json = Json { ignoreUnknownKeys = true }
@@ -441,6 +448,7 @@ class IrohNodeConnection(
                         streamSend = streamSend,
                         activeTurnJobs = activeTurnJobs,
                         activeTurnJobsMutex = activeTurnJobsMutex,
+                        observerWrites = observerWrites,
                     )
                     null
                     }
@@ -468,9 +476,10 @@ class IrohNodeConnection(
         streamSend: SendStream,
         activeTurnJobs: LinkedHashSet<Job>,
         activeTurnJobsMutex: Mutex,
+        observerWrites: ObserverWriteQueue,
     ) {
         val job = launch(start = CoroutineStart.LAZY) {
-            handleInput(frameJson, streamSend)
+            handleInput(frameJson, streamSend, observerWrites)
         }
         activeTurnJobsMutex.withLock { activeTurnJobs += job }
         job.invokeOnCompletion { cause ->
@@ -735,6 +744,8 @@ class IrohNodeConnection(
                 // its turn frames fan out to it (and, via S4, to co-viewers).
                 registerAsViewer(runtime.scope.conversationId)
                 """{"type":"runtime_start_response","request_id":"$requestId","success":true,"runtime":{"agent_id":"${runtime.scope.agentId}","conversation_id":"${runtime.scope.conversationId}"}}"""
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 """{"type":"runtime_start_response","request_id":"$requestId","success":false,"error":"${e.message?.replace("\"", "\\\"")}"}"""
             }
@@ -774,6 +785,7 @@ class IrohNodeConnection(
     private suspend fun handleInput(
         frameJson: String,
         streamSend: SendStream,
+        observerWrites: ObserverWriteQueue,
     ) {
         val input = AppServerProtocol.json.decodeFromString(AppServerCommand.serializer(), frameJson) as AppServerCommand.Input
         val userMsg = (input.payload as? AppServerInputPayload.CreateMessage)
@@ -863,6 +875,7 @@ class IrohNodeConnection(
             unregisterViewer = { conv, viewer ->
                 connectionRegistry?.unregister(conv, viewer)
             },
+            observerWrites = observerWrites,
         )
         try {
             // eaczz.5: live user-echo fanout. Before the assistant stream, emit a

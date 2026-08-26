@@ -108,6 +108,7 @@ object MessageListPageGuard {
             is JsonObject -> "object"
             is JsonArray -> "array"
             is JsonPrimitive -> if (isString) "string" else "primitive"
+            else -> "unknown"
         }
         val keys = (this as? JsonObject)?.keys.orEmpty().sorted().take(MAX_LOGGED_KEYS)
         Telemetry.event(

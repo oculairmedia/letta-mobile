@@ -81,35 +81,14 @@ data class FolderFilesListParams(
 )
 
 /** Multipart upload payload for `POST /v1/folders/{folder_id}/upload`. */
-data class FolderFileUploadParams(
+class FolderFileUploadParams(
     val folderId: FolderId,
     val fileName: String,
     val fileBytes: ByteArray,
     val duplicateHandling: String? = null,
     val customName: String? = null,
     val contentType: ContentType = ContentType.Application.OctetStream,
-) {
-    override fun equals(other: Any?): Boolean =
-        this === other || (
-            other is FolderFileUploadParams &&
-                folderId == other.folderId &&
-                fileName == other.fileName &&
-                duplicateHandling == other.duplicateHandling &&
-                customName == other.customName &&
-                contentType == other.contentType &&
-                fileBytes.contentEquals(other.fileBytes)
-        )
-
-    override fun hashCode(): Int {
-        var result = folderId.hashCode()
-        result = 31 * result + fileName.hashCode()
-        result = 31 * result + fileBytes.contentHashCode()
-        result = 31 * result + (duplicateHandling?.hashCode() ?: 0)
-        result = 31 * result + (customName?.hashCode() ?: 0)
-        result = 31 * result + contentType.hashCode()
-        return result
-    }
-}
+)
 
 @Serializable
 data class FileMetadata(

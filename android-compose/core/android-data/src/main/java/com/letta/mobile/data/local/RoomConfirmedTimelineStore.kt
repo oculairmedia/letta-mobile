@@ -319,7 +319,7 @@ class RoomConfirmedTimelineStore(
         )
     }
 
-    private data class SnapshotWritePlan(
+    private class SnapshotWritePlan(
         val envelope: StoredTimelineEnvelope,
         val normalized: StoredTimelineEnvelope,
         val payload: ByteArray,
@@ -328,25 +328,6 @@ class RoomConfirmedTimelineStore(
     ) {
         val scope: TimelineScope get() = envelope.scope
         val manifestId: String get() = manifest.manifestId
-
-        override fun equals(other: Any?): Boolean =
-            this === other || (
-                other is SnapshotWritePlan &&
-                    envelope == other.envelope &&
-                    normalized == other.normalized &&
-                    chunks == other.chunks &&
-                    manifest == other.manifest &&
-                    payload.contentEquals(other.payload)
-            )
-
-        override fun hashCode(): Int {
-            var result = envelope.hashCode()
-            result = 31 * result + normalized.hashCode()
-            result = 31 * result + payload.contentHashCode()
-            result = 31 * result + chunks.hashCode()
-            result = 31 * result + manifest.hashCode()
-            return result
-        }
     }
 
     companion object {

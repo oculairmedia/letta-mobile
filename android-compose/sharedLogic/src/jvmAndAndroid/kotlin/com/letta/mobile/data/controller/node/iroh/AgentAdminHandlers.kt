@@ -104,7 +104,7 @@ object AgentAdminHandlers {
                 val response = c.agentDelete(
                     AppServerCommand.AgentDelete(requestId = NativeAdmin.requestId(), agentId = id),
                 )
-                if (response.success) buildJsonObject { put("deleted", true) } else null
+                if (response.success) buildJsonObject { put("deleted", true) } as JsonObject else null
             }
         }
         // letta-mobile-ulz2b.1: authoritative scalar roster size from the on-disk

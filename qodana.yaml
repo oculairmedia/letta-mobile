@@ -49,6 +49,7 @@ exclude:
       - cli/src/main/java/com/letta/mobile/cli/runtime/CliImageAttachments.kt
       - core/android-data/src/main/java/com/letta/mobile/data/transport/ChannelTransport.kt
       - core/android-data/src/main/java/com/letta/mobile/util/RelativeTimeFormatter.kt
+      - core/testutil/src/main/java/com/letta/mobile/testutil/FakeMcpServerApi.kt
       - core/testutil/src/main/java/com/letta/mobile/testutil/FakeToolApi.kt
       - feature-chat/src/main/java/com/letta/mobile/feature/chat/coordination/ChatTimelineObserver.kt
       - feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/AgentScaffoldPickers.kt
@@ -56,19 +57,6 @@ exclude:
       - feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/RunBlock.kt
       - sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/ConversationAdminHandlers.kt
       - sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/ConversationAgentListHelper.kt
-  # Same Nothing-type mis-propagation in Qodana 2026.1 causes false-positive
-  # constant condition warnings on downstream assertions following Elvis returns.
-  - name: KotlinConstantConditions
-    paths:
-      - app/src/debug/java/com/letta/mobile/debug/AutomationAuthBootstrap.kt
-      - app/src/main/java/com/letta/mobile/channel/ChannelHeartbeatSync.kt
-      - app/src/main/java/com/letta/mobile/runtime/local/AndroidNetworkBridge.kt
-      - app/src/main/java/com/letta/mobile/runtime/mobileactions
-      - app/src/main/java/com/letta/mobile/ui/navigation/AppNavGraph.kt
-      - app/src/main/java/com/letta/mobile/ui/screens/pairing/QrScanScreen.kt
-      - app/src/main/java/com/letta/mobile/ui/screens/schedules/ScheduleListViewModel.kt
-      - feature-chat/src/main/java/com/letta/mobile/feature/chat/screen
-      - sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/LocalBackendMessageProjection.kt
   # Material HCT harmonization intentionally uses @RestrictTo APIs rather than
   # reimplementing color math. Both files already carry source suppressions and
   # focused tests; Qodana's Android model ignores those suppressions.
@@ -154,14 +142,11 @@ exclude:
   - name: AndroidLintDiscouragedApi
     paths:
       - app/src/main/java/com/letta/mobile/crash/SentryInitializer.kt
-  # Baseline Profile non-shipping merge-manifest and headless theme DOM inspections;
-  # Qodana's Android model does not resolve MainActivity for synthetic variants
-  # or Android platform themes without full SDK platform schema context.
+  # Baseline Profile non-shipping merge-manifest; Qodana's Android model does
+  # not resolve MainActivity for this synthetic variant even with an FQCN.
   - name: AndroidDomInspection
     paths:
       - app/src/playNonMinifiedRelease/AndroidManifest.xml
-      - app/src/main/res/values/themes.xml
-      - app/src/main/res/values-night/themes.xml
   # Gradle incubating APIs (dependencyResolutionManagement / externalNativeBuild)
   # are required by current AGP/Gradle DSL; tracked via Gradle upgrades, not this gate.
   - name: UnstableApiUsage
@@ -197,11 +182,6 @@ exclude:
   - name: ExpensiveKeepRuleInspection
     paths:
       - app/proguard-rules.pro
-  # ProGuard keep rules referencing JNI/JNA bridge symbols that are resolved
-  # dynamically at runtime by native shared libraries.
-  - name: ShrinkerUnresolvedReference
-    paths:
-      - app/proguard-rules.pro
   # JCEF Compose OSR bridge must subclass package-private CefBrowser_N.
   - name: ClassEscapesItsScope
     paths:
@@ -217,4 +197,3 @@ exclude:
       - cli/src/main/java/com/letta/mobile/cli/runtime
       - core/data/src/main/java/com/letta/mobile/data/api/AgentApi.kt
       - app/src/main/java/com/letta/mobile/runtime/local/modelcatalog/EmbeddedModelRepository.kt
-      - desktop/src/main/kotlin/com/letta/mobile/desktop/data/DesktopTimelineSnapshotMaintenance.kt

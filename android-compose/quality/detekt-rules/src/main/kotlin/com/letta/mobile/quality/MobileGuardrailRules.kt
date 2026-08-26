@@ -20,7 +20,6 @@ import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtNameReferenceExpression
 import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.KtObjectDeclaration
-import org.jetbrains.kotlin.psi.KtParameter
 import org.jetbrains.kotlin.psi.KtProperty
 import org.jetbrains.kotlin.psi.KtStringTemplateExpression
 import org.jetbrains.kotlin.psi.KtThrowExpression
@@ -64,19 +63,10 @@ internal class NoAnyType(config: Config = Config.empty) : MobileRule(
 
     override fun visitTypeReference(typeReference: KtTypeReference) {
         super.visitTypeReference(typeReference)
-        if (typeReference.isEqualsOverrideParameter()) return
         val bannedAlias = typeReference.collectTypeNames().firstOrNull(anyTypeAliases::contains)
         if (typeReference.containsAnyType() || bannedAlias != null) {
             report(typeReference, "Replace '${typeReference.text}' with a typed model or boundary adapter.")
         }
-    }
-
-    private fun KtTypeReference.isEqualsOverrideParameter(): Boolean {
-        val param = parent as? KtParameter ?: return false
-        val func = param.ownerFunction as? KtNamedFunction ?: return false
-        return func.name == "equals" &&
-            func.hasModifier(KtTokens.OVERRIDE_KEYWORD) &&
-            func.valueParameters.size == 1
     }
 
     private fun KtTypeReference.containsAnyType(): Boolean =

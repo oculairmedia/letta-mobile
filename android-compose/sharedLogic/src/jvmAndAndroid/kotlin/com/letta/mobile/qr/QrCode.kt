@@ -31,17 +31,8 @@ import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
  */
 object QrCode {
 
-    data class Matrix(val size: Int, val darkRows: Array<BooleanArray>) {
+    class Matrix(val size: Int, val darkRows: Array<BooleanArray>) {
         operator fun get(r: Int, c: Int): Boolean = darkRows[r][c]
-
-        override fun equals(other: Any?): Boolean =
-            this === other || (
-                other is Matrix &&
-                    size == other.size &&
-                    darkRows.contentDeepEquals(other.darkRows)
-            )
-
-        override fun hashCode(): Int = 31 * size + darkRows.contentDeepHashCode()
     }
 
     /**

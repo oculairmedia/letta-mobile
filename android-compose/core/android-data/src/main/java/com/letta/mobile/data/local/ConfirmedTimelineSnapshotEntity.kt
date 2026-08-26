@@ -58,26 +58,11 @@ data class ConfirmedTimelineSnapshotManifestEntity(
     ],
     indices = [Index(value = ["manifest_id"])],
 )
-data class ConfirmedTimelineSnapshotChunkEntity(
+class ConfirmedTimelineSnapshotChunkEntity(
     @ColumnInfo(name = "manifest_id") val manifestId: String,
     @ColumnInfo(name = "chunk_index") val chunkIndex: Int,
     @ColumnInfo(name = "payload") val payload: ByteArray,
-) {
-    override fun equals(other: Any?): Boolean =
-        this === other || (
-            other is ConfirmedTimelineSnapshotChunkEntity &&
-                chunkIndex == other.chunkIndex &&
-                manifestId == other.manifestId &&
-                payload.contentEquals(other.payload)
-        )
-
-    override fun hashCode(): Int {
-        var result = manifestId.hashCode()
-        result = 31 * result + chunkIndex
-        result = 31 * result + payload.contentHashCode()
-        return result
-    }
-}
+)
 
 data class ConfirmedTimelineSnapshotHeadMetadata(
     @ColumnInfo(name = "backend_id") val backendId: String,
