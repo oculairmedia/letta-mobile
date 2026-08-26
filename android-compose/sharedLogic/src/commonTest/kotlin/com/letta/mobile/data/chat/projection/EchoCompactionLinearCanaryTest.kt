@@ -37,7 +37,7 @@ class EchoCompactionLinearCanaryTest {
         samples.forEach { sample ->
             assertEquals(
                 sample.trim().replace(retiredWhitespace, " "),
-                normalizeRunPanelEchoText(sample),
+                sample.normalizeRunPanelEchoText(),
                 "normalization changed for ${sample.toCharArray().map(Char::code)}",
             )
         }

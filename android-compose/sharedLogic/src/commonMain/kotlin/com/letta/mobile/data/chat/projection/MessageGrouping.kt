@@ -248,9 +248,7 @@ fun groupMessagesForRender(
             }
         }
         val compactedAcc = compactRunBlockEchoes(
-            accumulator = acc,
-            blockStartIndex = i,
-            olderStartIndex = j,
+            block = EchoBlock(accumulator = acc, startIndex = i, olderStartIndex = j),
             echoIndex = echoIndex,
         )
         if (compactedAcc.size == 1) {
@@ -459,31 +457,38 @@ internal object EchoCompactionInstrumentation {
  * previous implementation: the key occurs somewhere at index ≥
  * olderStartIndex iff its LAST occurrence is at index ≥ olderStartIndex.
  */
+private data class EchoBlock(
+    val accumulator: List<Pair<UiMessage, GroupPosition>>,
+    val startIndex: Int,
+    val olderStartIndex: Int,
+)
+
 private fun compactRunBlockEchoes(
-    accumulator: List<Pair<UiMessage, GroupPosition>>,
-    blockStartIndex: Int,
-    olderStartIndex: Int,
+    block: EchoBlock,
     echoIndex: EchoCompactionIndex,
 ): List<Pair<UiMessage, GroupPosition>> {
-    if (accumulator.size < 2) return accumulator
+    if (block.accumulator.size < 2) return block.accumulator
 
-    val seenInBlock = HashSet<String>()
-    val out = accumulator.filterIndexed { offset, _ ->
-        val key = echoIndex.keys[blockStartIndex + offset]
-        key == null || shouldKeepEcho(key, seenInBlock, olderStartIndex, echoIndex)
+    val context = EchoFilterContext(HashSet(), block.olderStartIndex, echoIndex)
+    val out = block.accumulator.filterIndexed { offset, _ ->
+        val key = echoIndex.keys[block.startIndex + offset]
+        key == null || key.shouldKeepEcho(context)
     }
-    if (out.size == accumulator.size) return accumulator
+    if (out.size == block.accumulator.size) return block.accumulator
     // Never erase an entire run. If the server sent only duplicate text frames,
     // retain the newest one so the conversation still has an anchor.
-    return out.ifEmpty { listOf(accumulator.first()) }
+    return out.ifEmpty { listOf(block.accumulator.first()) }
 }
 
-private fun shouldKeepEcho(
-    key: String,
-    seenInBlock: MutableSet<String>,
-    olderStartIndex: Int,
-    echoIndex: EchoCompactionIndex,
-): Boolean = seenInBlock.add(key) && (echoIndex.lastIndexByKey[key] ?: -1) < olderStartIndex
+private data class EchoFilterContext(
+    val seenInBlock: MutableSet<String>,
+    val olderStartIndex: Int,
+    val echoIndex: EchoCompactionIndex,
+)
+
+private fun String.shouldKeepEcho(context: EchoFilterContext): Boolean =
+    context.seenInBlock.add(this) &&
+        (context.echoIndex.lastIndexByKey[this] ?: -1) < context.olderStartIndex
 
 /**
  * The exact set of chars JVM `Regex("\\s+")` matches without
@@ -491,8 +496,8 @@ private fun shouldKeepEcho(
  * of Char.isWhitespace()) so normalization output stays byte-identical to the
  * retired regex implementation across platforms.
  */
-private fun isJvmRegexWhitespace(c: Char): Boolean =
-    c == ' ' || c == '\t' || c == '\n' || c == '\u000B' || c == '\u000C' || c == '\r'
+private fun Char.isJvmRegexWhitespace(): Boolean =
+    this == ' ' || this == '\t' || this == '\n' || this == '\u000B' || this == '\u000C' || this == '\r'
 
 /**
  * Equivalent to `content.trim().replace(RunPanelWhitespaceRegex, " ")`
@@ -500,13 +505,13 @@ private fun isJvmRegexWhitespace(c: Char): Boolean =
  * allocation — this runs once per eligible assistant message per render-model
  * build on the Main thread (letta-mobile-p0gc ANR fix).
  */
-internal fun normalizeRunPanelEchoText(content: String): String {
-    val trimmed = content.trim()
-    if (trimmed.none(::isJvmRegexWhitespace)) return trimmed
+internal fun String.normalizeRunPanelEchoText(): String {
+    val trimmed = trim()
+    if (trimmed.none { it.isJvmRegexWhitespace() }) return trimmed
     return buildString(trimmed.length) {
         var previousWasWhitespace = false
         trimmed.forEach { character ->
-            val isWhitespace = isJvmRegexWhitespace(character)
+            val isWhitespace = character.isJvmRegexWhitespace()
             if (!isWhitespace) append(character)
             if (isWhitespace && !previousWasWhitespace) append(' ')
             previousWasWhitespace = isWhitespace
@@ -521,7 +526,7 @@ private fun UiMessage.runPanelEchoKey(): String? {
     if (generatedUi != null || approvalRequest != null || approvalResponse != null) return null
     if (attachments.isNotEmpty()) return null
     EchoCompactionInstrumentation.recordNormalization()
-    val normalized = normalizeRunPanelEchoText(content)
+    val normalized = content.normalizeRunPanelEchoText()
     return normalized.takeIf { it.length >= MinRunPanelEchoLength }
 }
 
