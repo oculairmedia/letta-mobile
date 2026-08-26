@@ -11,8 +11,7 @@ import kotlinx.serialization.json.put
 
 /** Shared fail-closed projection policy for child-attributed parent stream frames. */
 object SubagentParentProjection {
-    @JvmInline
-    private value class Utf8ByteLimit(val value: Int)
+    private data class Utf8ByteLimit(val value: Int)
 
     private data class ProjectionLimits(
         val terminalSummary: Utf8ByteLimit,
@@ -145,8 +144,7 @@ object SubagentParentProjection {
         val messageId: String?,
     )
 
-    @JvmInline
-    private value class AgentReturnBody(val value: String)
+    private data class AgentReturnBody(val value: String)
 
     private data class AgentReturnContent(
         val body: AgentReturnBody,
