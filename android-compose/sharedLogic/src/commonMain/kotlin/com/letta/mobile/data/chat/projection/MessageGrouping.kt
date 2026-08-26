@@ -207,13 +207,7 @@ fun groupMessagesForRender(
     //      but computed with ONE pre-pass instead of one set-build per block.
     //
     // Total cost: O(n) normalizations + O(n) map operations per build.
-    val echoKeys = arrayOfNulls<String>(reversed.size)
-    val lastEchoKeyIndex = HashMap<String, Int>()
-    for ((index, entry) in reversed.withIndex()) {
-        val key = entry.first.runPanelEchoKey()
-        echoKeys[index] = key
-        if (key != null) lastEchoKeyIndex[key] = index
-    }
+    val echoIndex = buildEchoCompactionIndex(reversed)
 
     val out = ArrayList<ChatRenderItem>(reversed.size)
     var i = 0
@@ -257,8 +251,8 @@ fun groupMessagesForRender(
             accumulator = acc,
             blockStartIndex = i,
             olderStartIndex = j,
-            echoKeys = echoKeys,
-            lastEchoKeyIndex = lastEchoKeyIndex,
+            echoKeys = echoIndex.keys,
+            lastEchoKeyIndex = echoIndex.lastIndexByKey,
         )
         if (compactedAcc.size == 1) {
             // Adopt the future RunBlock key when this runId is unique in the
@@ -406,6 +400,24 @@ fun deduplicateRenderKeys(items: List<ChatRenderItem>): List<ChatRenderItem> {
 }
 
 private const val MinRunPanelEchoLength = 24
+
+private data class EchoCompactionIndex(
+    val keys: Array<String?>,
+    val lastIndexByKey: Map<String, Int>,
+)
+
+private fun buildEchoCompactionIndex(
+    reversed: List<Pair<UiMessage, GroupPosition>>,
+): EchoCompactionIndex {
+    val keys = arrayOfNulls<String>(reversed.size)
+    val lastIndexByKey = HashMap<String, Int>()
+    reversed.forEachIndexed { index, entry ->
+        val key = entry.first.runPanelEchoKey()
+        keys[index] = key
+        if (key != null) lastIndexByKey[key] = index
+    }
+    return EchoCompactionIndex(keys, lastIndexByKey)
+}
 
 /**
  * letta-mobile-p0gc (ANR fix): per-build instrumentation for the echo-key

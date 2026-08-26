@@ -216,107 +216,123 @@ class IrohFrameFlowDropTest {
         job2.cancelAndJoin()
     }
 
-    /**
-     * letta-mobile-p0gc (causal slice B): a stalled subscriber must NEVER
-     * silently evict frames — under the retired DROP_OLDEST + tryEmit
-     * publisher, stalling one consumer past the 64-slot buffer dropped the
-     * active run's ToolCall/ToolReturn frames for everyone downstream of the
-     * buffer with zero signal. With suspending emit, the producer backs up
-     * (on its own background dispatcher) and every distinct tool call/return
-     * arrives EXACTLY ONCE, in order, call→return correlation intact, once
-     * the stalled consumer resumes. Deterministic: virtual-time scheduler,
-     * no real delays; the stall is an explicit gate.
-     */
     @Test
-    fun slowSubscriberBeyondBufferCapacityNeverDropsToolCallOrReturnFrames() =
-        runTest(UnconfinedTestDispatcher()) {
-            val publisher = IrohFramePublisher() // DEFAULT_BUFFER_CAPACITY = 64
-            val stallGate = CompletableDeferred<Unit>()
-
-            val total = 200 // well beyond the 64-slot bounded buffer (100 call→return pairs)
-            val expectedIds = List(total) { i ->
-                val c = i / 2
-                if (i % 2 == 0) "toolcall-call-$c" else "toolreturn-call-$c"
-            }
-
-            val fastReceived = mutableListOf<String>()
-            val fastJob = launch(start = CoroutineStart.UNDISPATCHED) {
-                publisher.events.collect { fastReceived += it.id }
-            }
-
-            val slowReceived = mutableListOf<String>()
-            val stallAfter = 8 // consume 8 events, then stall like a Main thread awaiting a timeline ack
-            val slowJob = launch(start = CoroutineStart.UNDISPATCHED) {
+    fun stalledCollectorCannotBlockPublisherOrHealthyCollector() = runTest(UnconfinedTestDispatcher()) {
+        val publisher = IrohFramePublisher(bufferCapacity = 2)
+        val stallGate = CompletableDeferred<Unit>()
+        val slowReceived = mutableListOf<String>()
+        val slowJob = launch(start = CoroutineStart.UNDISPATCHED) {
+            kotlin.test.assertFailsWith<FrameCollectorOverflowException> {
                 publisher.frameEvents.collect { event ->
                     slowReceived += event.frame.id
-                    if (slowReceived.size == stallAfter) stallGate.await()
+                    if (slowReceived.size == 1) stallGate.await()
                 }
             }
-
-            val producerFinished = launch(start = CoroutineStart.UNDISPATCHED) {
-                repeat(total) { i ->
-                    val c = i / 2
-                    publisher.publish(
-                        if (i % 2 == 0) {
-                            ServerFrame.ToolCallMessage(
-                                id = "toolcall-call-$c",
-                                ts = "2026-08-23T00:00:00Z",
-                                agentId = "agent-1",
-                                conversationId = "conv-1",
-                                turnId = "turn-1",
-                                runId = "run-1",
-                                toolCall = com.letta.mobile.data.transport.ToolCallPayload(
-                                    toolCallId = "call-$c",
-                                    name = "Bash",
-                                    arguments = "{}",
-                                ),
-                            )
-                        } else {
-                            ServerFrame.ToolReturnMessage(
-                                id = "toolreturn-call-$c",
-                                ts = "2026-08-23T00:00:01Z",
-                                conversationId = "conv-1",
-                                runId = "run-1",
-                                toolCallId = "call-$c",
-                            )
-                        },
-                    )
-                }
-            }
-
-            // Producer ran UNDISPATCHED until first suspension.
-            runCurrent()
-            assertFalse(producerFinished.isCompleted, "producer must suspend on backpressure, not drop")
-            assertTrue(
-                slowReceived.size < total,
-                "slow subscriber is still stalled at this point (received ${slowReceived.size})",
-            )
-            assertEquals(
-                expectedIds.take(slowReceived.size),
-                slowReceived,
-                "frames received before the stall must already be in order",
-            )
-
-            // Release the stall: everything buffered plus everything still to
-            // be produced must flow through, losslessly.
-            stallGate.complete(Unit)
-            producerFinished.join()
-
-            assertEquals(expectedIds, fastReceived, "fast subscriber receives all $total frames in order")
-            assertEquals(expectedIds, slowReceived, "slow subscriber receives ALL $total frames exactly once, in order")
-
-            // Tool correlation: each return immediately follows its own call.
-            slowReceived.chunked(2).forEachIndexed { pairIndex, pair ->
-                assertEquals(2, pair.size)
-                assertTrue(pair[0].startsWith("toolcall-") && pair[1].startsWith("toolreturn-"))
-                assertEquals(
-                    pair[0].removePrefix("toolcall-"),
-                    pair[1].removePrefix("toolreturn-"),
-                    "return must correlate to its call (pair $pairIndex)",
-                )
-            }
-
-            fastJob.cancelAndJoin()
-            slowJob.cancelAndJoin()
         }
+        val healthyReceived = mutableListOf<String>()
+        val healthyJob = launch(start = CoroutineStart.UNDISPATCHED) {
+            publisher.events.collect { healthyReceived += it.id }
+        }
+
+        val expected = (1..6).map { "msg-$it" }
+        expected.forEach { id ->
+            publisher.publish(assistantFrame(id))
+            runCurrent()
+        }
+
+        assertEquals(expected, healthyReceived)
+        assertEquals(listOf("msg-1"), slowReceived)
+        assertTrue(slowJob.isActive, "overflow is observed after the stalled callback resumes")
+
+        stallGate.complete(Unit)
+        slowJob.join()
+        healthyJob.cancelAndJoin()
+    }
+
+    @Test
+    fun overflowFailsExplicitlyWithoutDroppingFromHealthyDestination() = runTest(UnconfinedTestDispatcher()) {
+        val publisher = IrohFramePublisher(bufferCapacity = 1)
+        val stallGate = CompletableDeferred<Unit>()
+        val overflowObserved = CompletableDeferred<Unit>()
+        val stalledJob = launch(start = CoroutineStart.UNDISPATCHED) {
+            kotlin.test.assertFailsWith<FrameCollectorOverflowException> {
+                publisher.events.collect {
+                    stallGate.await()
+                }
+            }
+            overflowObserved.complete(Unit)
+        }
+        val healthy = mutableListOf<String>()
+        val healthyJob = launch(start = CoroutineStart.UNDISPATCHED) {
+            publisher.frameEvents.collect { healthy += it.frame.id }
+        }
+
+        (1..3).forEach { index ->
+            publisher.publish(assistantFrame("frame-$index"))
+            runCurrent()
+        }
+        assertEquals(listOf("frame-1", "frame-2", "frame-3"), healthy)
+        assertFalse(overflowObserved.isCompleted)
+
+        stallGate.complete(Unit)
+        overflowObserved.await()
+        stalledJob.join()
+        healthyJob.cancelAndJoin()
+    }
+
+    @Test
+    fun cancellationAndReconnectHaveNoReplayDuplicatesOrRegistrationRace() = runTest(UnconfinedTestDispatcher()) {
+        val publisher = IrohFramePublisher(bufferCapacity = 2)
+        val first = mutableListOf<String>()
+        val firstJob = launch(start = CoroutineStart.UNDISPATCHED) {
+            publisher.events.collect { first += it.id }
+        }
+        publisher.publish(assistantFrame("before-disconnect"))
+        runCurrent()
+        firstJob.cancelAndJoin()
+
+        publisher.publish(assistantFrame("during-gap"))
+        val reconnected = mutableListOf<String>()
+        val reconnectJob = launch(start = CoroutineStart.UNDISPATCHED) {
+            publisher.events.collect { reconnected += it.id }
+        }
+        publisher.publish(assistantFrame("after-reconnect"))
+        runCurrent()
+
+        assertEquals(listOf("before-disconnect"), first)
+        assertEquals(listOf("after-reconnect"), reconnected)
+        reconnectJob.cancelAndJoin()
+    }
+
+    @Test
+    fun bothDestinationsReceiveIdenticalOrderAcrossInterleavedPublishers() = runTest(UnconfinedTestDispatcher()) {
+        val publisher = IrohFramePublisher(bufferCapacity = 16)
+        val first = mutableListOf<String>()
+        val second = mutableListOf<String>()
+        val firstJob = launch(start = CoroutineStart.UNDISPATCHED) {
+            publisher.events.collect { first += it.id }
+        }
+        val secondJob = launch(start = CoroutineStart.UNDISPATCHED) {
+            publisher.frameEvents.collect { second += it.frame.id }
+        }
+
+        val odd = launch { (1..9 step 2).forEach { publisher.publish(assistantFrame("msg-$it")) } }
+        val even = launch { (2..10 step 2).forEach { publisher.publish(assistantFrame("msg-$it")) } }
+        odd.join()
+        even.join()
+        runCurrent()
+
+        assertEquals(10, first.size)
+        assertEquals(first, second, "the publication mutex defines one order shared by every destination")
+        assertEquals(10, first.toSet().size, "no duplicate frame is delivered")
+        firstJob.cancelAndJoin()
+        secondJob.cancelAndJoin()
+    }
+
+    private fun assistantFrame(id: String) = ServerFrame.AssistantMessage(
+        id = id,
+        ts = "2026-08-23T00:00:00Z",
+        conversationId = "conv-1",
+        content = id,
+    )
 }
