@@ -79,6 +79,7 @@ import kotlin.time.Duration.Companion.milliseconds
  * This keeps the existing mobile send coordinator and [WsChatBridge] path intact while
  * swapping only the transport underneath it. The embedded/local runtime path is not touched.
  */
+@Suppress("NoDetachedCoroutineLifecycle") // Compatibility default; production injects its session-owned scope.
 class IrohChannelTransport(
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
     private val onConnect: () -> Unit = {},

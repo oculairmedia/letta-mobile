@@ -39,11 +39,15 @@ data class AppServerSubagentSnapshot(
  * Maps an upstream App Server `SubagentSnapshot` into the mobile [SubagentEntry]
  * projection. Host modules remain binding-only.
  */
+data class SubagentParentIdentity(
+    val conversationId: String,
+    val agentId: String?,
+)
+
 object AppServerSubagentSnapshotAdapter {
     fun toEntry(
         snapshot: AppServerSubagentSnapshot,
-        parentConversationId: String,
-        parentAgentId: String?,
+        parent: SubagentParentIdentity,
     ): SubagentEntry? {
         val identity = snapshot.toolCallId?.takeIf { it.isNotBlank() }
             ?: snapshot.subagentId?.takeIf { it.isNotBlank() }
@@ -57,55 +61,46 @@ object AppServerSubagentSnapshotAdapter {
             subagentAgentId = snapshot.agentId,
             subagentConversationId = snapshot.conversationId,
             parentRunId = snapshot.parentRunId,
-            parentAgentId = snapshot.parentAgentId ?: parentAgentId,
-            parentConversationId = snapshot.parentConversationId ?: parentConversationId,
+            parentAgentId = snapshot.parentAgentId ?: parent.agentId,
+            parentConversationId = snapshot.parentConversationId ?: parent.conversationId,
             startedAt = startedAt(snapshot),
             activity = snapshot.activity?.bounded(),
         )
     }
 
-    fun toEntry(
-        raw: JsonObject,
-        parentConversationId: String,
-        parentAgentId: String?,
-    ): SubagentEntry? {
-        // Strict snake_case decode often "succeeds" while ignoring camelCase keys
-        // (unknown keys). Prefer that result only when identity fields are present;
-        // otherwise rebuild from snake_case + camelCase aliases.
+    fun toEntry(raw: JsonObject, parent: SubagentParentIdentity): SubagentEntry? =
+        toEntry(decodeSnapshot(raw), parent)
+
+    private fun decodeSnapshot(raw: JsonObject): AppServerSubagentSnapshot {
+        // Strict snake_case decode often "succeeds" while ignoring camelCase keys.
         val decoded = runCatching {
             AppServerProtocol.json.decodeFromJsonElement(AppServerSubagentSnapshot.serializer(), raw)
         }.getOrNull()
-        val snapshot = if (hasIdentity(decoded)) {
-            decoded!!
-        } else {
-            AppServerSubagentSnapshot(
-                subagentId = firstString(raw, "subagent_id", "subagentId", "id")
-                    ?: decoded?.subagentId,
-                toolCallId = firstString(raw, "tool_call_id", "toolCallId")
-                    ?: decoded?.toolCallId,
-                conversationId = firstString(raw, "conversation_id", "conversationId", "subagent_conversation_id")
-                    ?: decoded?.conversationId,
-                agentId = firstString(raw, "agent_id", "agentId", "subagent_agent_id")
-                    ?: decoded?.agentId,
-                description = firstString(raw, "description") ?: decoded?.description,
-                subagentType = firstString(raw, "subagent_type", "subagentType")
-                    ?: decoded?.subagentType,
-                status = firstString(raw, "status") ?: decoded?.status,
-                error = firstString(raw, "error") ?: decoded?.error,
-                taskId = firstString(raw, "task_id", "taskId") ?: decoded?.taskId,
-                parentRunId = firstString(raw, "parent_run_id", "parentRunId")
-                    ?: decoded?.parentRunId,
-                parentAgentId = firstString(raw, "parent_agent_id", "parentAgentId")
-                    ?: decoded?.parentAgentId,
-                parentConversationId = firstString(raw, "parent_conversation_id", "parentConversationId")
-                    ?: decoded?.parentConversationId,
-                startTime = raw["start_time"] ?: raw["started_at_ms"] ?: decoded?.startTime,
-                startedAt = firstString(raw, "started_at", "startedAt") ?: decoded?.startedAt,
-                activity = decodeActivity(raw["activity"]) ?: decoded?.activity,
-            )
-        }
-        return toEntry(snapshot, parentConversationId, parentAgentId)
+        return decoded?.takeIf(::hasIdentity) ?: snapshotFromAliases(raw, decoded)
     }
+
+    private fun snapshotFromAliases(
+        raw: JsonObject,
+        decoded: AppServerSubagentSnapshot?,
+    ): AppServerSubagentSnapshot = AppServerSubagentSnapshot(
+        subagentId = firstString(raw, "subagent_id", "subagentId", "id") ?: decoded?.subagentId,
+        toolCallId = firstString(raw, "tool_call_id", "toolCallId") ?: decoded?.toolCallId,
+        conversationId = firstString(raw, "conversation_id", "conversationId", "subagent_conversation_id")
+            ?: decoded?.conversationId,
+        agentId = firstString(raw, "agent_id", "agentId", "subagent_agent_id") ?: decoded?.agentId,
+        description = firstString(raw, "description") ?: decoded?.description,
+        subagentType = firstString(raw, "subagent_type", "subagentType") ?: decoded?.subagentType,
+        status = firstString(raw, "status") ?: decoded?.status,
+        error = firstString(raw, "error") ?: decoded?.error,
+        taskId = firstString(raw, "task_id", "taskId") ?: decoded?.taskId,
+        parentRunId = firstString(raw, "parent_run_id", "parentRunId") ?: decoded?.parentRunId,
+        parentAgentId = firstString(raw, "parent_agent_id", "parentAgentId") ?: decoded?.parentAgentId,
+        parentConversationId = firstString(raw, "parent_conversation_id", "parentConversationId")
+            ?: decoded?.parentConversationId,
+        startTime = raw["start_time"] ?: raw["started_at_ms"] ?: decoded?.startTime,
+        startedAt = firstString(raw, "started_at", "startedAt") ?: decoded?.startedAt,
+        activity = decodeActivity(raw["activity"]) ?: decoded?.activity,
+    )
 
     private fun hasIdentity(snapshot: AppServerSubagentSnapshot?): Boolean {
         if (snapshot == null) return false
@@ -168,25 +163,27 @@ private fun sanitizeSubagentActivityLine(raw: String): String {
     val singleLine = raw.lineSequence().firstOrNull().orEmpty().trim()
     if (singleLine.isBlank()) return ""
     val lowered = singleLine.lowercase()
-    if (lowered.startsWith("<") ||
-        lowered.contains("hidden reasoning") ||
-        lowered.startsWith("prompt:") ||
-        lowered.startsWith("context:") ||
-        lowered.startsWith("arguments:")
-    ) return ""
+    if (isPrivateSubagentLine(lowered)) return ""
     return singleLine.takeUtf8Bytes(SUBAGENT_ACTIVITY_MAX_LINE_BYTES)
 }
 
+private fun isPrivateSubagentLine(line: String): Boolean =
+    line.startsWith("<") ||
+        line.contains("hidden reasoning") ||
+        listOf("prompt:", "context:", "arguments:").any(line::startsWith)
+
 private fun String.takeUtf8Bytes(maxBytes: Int): String {
     var used = 0
-    val out = StringBuilder()
-    for (char in this) {
-        val bytes = char.toString().encodeToByteArray().size
+    var index = 0
+    while (index < length) {
+        val char = this[index]
+        val charCount = if (char.isHighSurrogate() && getOrNull(index + 1)?.isLowSurrogate() == true) 2 else 1
+        val bytes = substring(index, index + charCount).encodeToByteArray().size
         if (used + bytes > maxBytes) break
-        out.append(char)
         used += bytes
+        index += charCount
     }
-    return out.toString()
+    return substring(0, index)
 }
 
 const val SUBAGENT_ACTIVITY_MAX_LINES: Int = 4

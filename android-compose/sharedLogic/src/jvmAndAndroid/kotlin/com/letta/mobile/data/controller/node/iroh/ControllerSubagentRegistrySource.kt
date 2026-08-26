@@ -2,6 +2,8 @@ package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.model.AppServerSubagentSnapshotAdapter
 import com.letta.mobile.data.model.SubagentEntry
+import com.letta.mobile.data.model.SubagentParentIdentity
+import com.letta.mobile.data.model.SubagentStatus
 import com.letta.mobile.data.subagents.DurableSubagentRegistry
 import com.letta.mobile.data.subagents.SubagentChipObservation
 import com.letta.mobile.data.subagents.SubagentChipSource
@@ -46,7 +48,11 @@ class ControllerSubagentRegistrySource(
         val activityTodos = activityLines.mapIndexed { index, line ->
             com.letta.mobile.data.model.SubagentTodo(
                 content = line,
-                status = if (index == activityLines.lastIndex && activity?.truncated != true) {
+                status = if (
+                    entry.status == SubagentStatus.RUNNING &&
+                    index == activityLines.lastIndex &&
+                    activity?.truncated != true
+                ) {
                     "in_progress"
                 } else {
                     "completed"
@@ -139,9 +145,8 @@ class ControllerSubagentRegistrySource(
 
     private fun decodeEntry(raw: JsonObject, parents: ParentIds): SubagentEntry? =
         AppServerSubagentSnapshotAdapter.toEntry(
-            raw = raw,
-            parentConversationId = parents.conversationId,
-            parentAgentId = parents.agentId,
+            raw,
+            SubagentParentIdentity(parents.conversationId, parents.agentId),
         )
 
     companion object {

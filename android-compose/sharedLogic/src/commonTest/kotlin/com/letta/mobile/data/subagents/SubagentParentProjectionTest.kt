@@ -40,6 +40,17 @@ class SubagentParentProjectionTest {
     }
 
     @Test
+    fun activityByteLimitNeverSplitsEmojiSurrogatePair() {
+        val line = SubagentParentProjection.activityLine(buildJsonObject {
+            put("message_type", "progress_message")
+            put("status_text", "a".repeat(239) + "😀")
+        })
+
+        assertEquals("a".repeat(239), line)
+        assertFalse(line.orEmpty().contains('\uFFFD'))
+    }
+
+    @Test
     fun agentReturnDropsTranscriptBodyAndKeepsSummaryPointer() {
         val sentinel = "CHILD_TRANSCRIPT_MUST_NOT_REACH_PARENT"
         val body = """

@@ -74,6 +74,15 @@ class DurableSubagentRegistryTest {
     }
 
     @Test
+    fun replayedOlderSequenceCannotReplaceUntimestampedActivity() {
+        val reg = registry(InMemorySubagentRegistryStore())
+        reg.observe(observation(generation = 2, activity = SubagentActivitySnapshot(listOf("new"))))
+        reg.observe(observation(generation = 1, activity = SubagentActivitySnapshot(listOf("old"))))
+
+        assertEquals(listOf("new"), reg.record("conv-a", "agent-1", "tool/1")?.activity?.lines)
+    }
+
+    @Test
     fun restartThenReconcileAgainstLiveStateKeepsLiveAndOrphansTheRest() {
         val store = InMemorySubagentRegistryStore()
         val first = registry(store)

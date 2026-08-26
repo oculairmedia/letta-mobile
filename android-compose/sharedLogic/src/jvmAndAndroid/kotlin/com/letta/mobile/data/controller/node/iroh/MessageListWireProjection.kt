@@ -56,41 +56,46 @@ object MessageListWireProjection {
     }
 
     private fun projectElements(messages: JsonArray, conversationId: String): List<JsonElement> {
-        val agentCallIds = messages.mapNotNull { element ->
-            val message = element as? JsonObject ?: return@mapNotNull null
-            if (messageType(message) !in setOf("tool_call_message", "tool_call")) return@mapNotNull null
-            val call = message["tool_call"] as? JsonObject
-            val name = string(call, "name") ?: string(message, "name")
-            if (name != "Agent") return@mapNotNull null
-            string(call, "tool_call_id") ?: string(message, "tool_call_id")
-        }.toSet()
-        return messages.mapNotNull { element ->
-            val message = element as? JsonObject
-            val callId = message?.let { string(it, "tool_call_id") }
-            val body = message?.get("tool_return")?.let {
-                if (it is JsonPrimitive && it.isString) it.content else it.toString()
-            }.orEmpty()
-            val explicitSubagentReturn = body.contains("<task-notification", ignoreCase = true) ||
-                message?.get("subagent_id") != null || message?.get("task_id") != null
-            val sanitized = if (
-                message != null &&
-                messageType(message) in TOOL_RETURN_MESSAGE_TYPES &&
-                (callId in agentCallIds || explicitSubagentReturn)
-            ) {
-                SubagentParentProjection.sanitizedAgentReturn(
-                    message,
-                    conversationId,
-                    string(message, "id"),
-                )
-            } else {
-                message
-            }
-            if (sanitized == null) element else projectElement(sanitized, conversationId)
-        }
+        val context = ProjectionContext(conversationId, agentCallIds(messages))
+        return messages.mapNotNull { projectElementWithContext(it, context) }
     }
 
-    private fun projectElement(element: JsonElement, conversationId: String): JsonElement? =
-        if (element is JsonObject) projectMessage(element, conversationId) else element
+    private fun agentCallIds(messages: JsonArray): Set<String> = messages.mapNotNull { element ->
+        val message = element as? JsonObject ?: return@mapNotNull null
+        if (message.messageType !in setOf("tool_call_message", "tool_call")) return@mapNotNull null
+        val call = message["tool_call"] as? JsonObject
+        val name = call?.name ?: message.name
+        if (name != "Agent") return@mapNotNull null
+        call?.toolCallId ?: message.toolCallId
+    }.toSet()
+
+    private fun projectElementWithContext(element: JsonElement, context: ProjectionContext): JsonElement? {
+        val message = element as? JsonObject ?: return element
+        val sanitized = message.takeIf { isSubagentReturn(it, context.agentCallIds) }?.let {
+            SubagentParentProjection.sanitizedAgentReturn(it, context.conversationId, it.messageId)
+        } ?: message
+        return projectElement(sanitized, context)
+    }
+
+    private fun isSubagentReturn(message: JsonObject, agentCallIds: Set<String>): Boolean {
+        if (message.messageType !in TOOL_RETURN_MESSAGE_TYPES) return false
+        val callId = message.toolCallId
+        return callId in agentCallIds || hasExplicitSubagentMarker(message)
+    }
+
+    private fun hasExplicitSubagentMarker(message: JsonObject): Boolean {
+        val body = message["tool_return"]?.let(::bodyString).orEmpty()
+        return body.contains("<task-notification", ignoreCase = true) ||
+            message["subagent_id"] != null || message["task_id"] != null
+    }
+
+    private data class ProjectionContext(
+        val conversationId: String,
+        val agentCallIds: Set<String>,
+    )
+
+    private fun projectElement(element: JsonElement, context: ProjectionContext): JsonElement? =
+        if (element is JsonObject) projectMessage(element, context.conversationId) else element
 
     /** Projects a single message object for a list response. Returns null for suppressed messages. */
     fun projectMessage(message: JsonObject, conversationId: String): JsonObject? {
@@ -115,10 +120,17 @@ object MessageListWireProjection {
         return SyntheticSkillEnvelopeDetector.isSyntheticSkillEnvelope(role, content)
     }
 
-    private fun messageType(message: JsonObject): String? = string(message, "message_type")
+    private val JsonObject.messageType: String?
+        get() = (this["message_type"] as? JsonPrimitive)?.contentOrNull
 
-    private fun string(message: JsonObject?, key: String): String? =
-        (message?.get(key) as? JsonPrimitive)?.contentOrNull
+    private val JsonObject.name: String?
+        get() = (this["name"] as? JsonPrimitive)?.contentOrNull
+
+    private val JsonObject.toolCallId: String?
+        get() = (this["tool_call_id"] as? JsonPrimitive)?.contentOrNull
+
+    private val JsonObject.messageId: String?
+        get() = (this["id"] as? JsonPrimitive)?.contentOrNull
 
     private fun projectToolReturnMessage(message: JsonObject, conversationId: String): JsonObject {
         val out = message.toMutableMap()

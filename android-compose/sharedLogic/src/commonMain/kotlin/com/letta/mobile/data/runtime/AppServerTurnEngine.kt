@@ -284,6 +284,19 @@ class AppServerTurnEngine(
         }
     }
 
+    private fun suppressChildFrame(received: AppServerReceivedFrame): Boolean {
+        val childDelta = received.frame as? AppServerInboundFrame.StreamDelta ?: return false
+        val subagentId = childDelta.subagentId ?: return false
+        val activity = com.letta.mobile.data.subagents.SubagentParentProjection.activityLine(childDelta.delta)
+        Telemetry.event(
+            "AppServerTurnEngine", "subagent.frame_suppressed",
+            "subagentId" to subagentId,
+            "conversationId" to childDelta.runtime.conversationId,
+            "activityBytes" to (activity?.encodeToByteArray()?.size ?: 0),
+        )
+        return true
+    }
+
     /**
      * lgns8.17(d): answer an `external_tool_call_request` that NO turn lease owns.
      *
@@ -568,6 +581,8 @@ class AppServerTurnEngine(
                 level = Telemetry.Level.WARN,
             )
             return false
+        } catch (t: CancellationException) {
+            throw t
         } catch (t: Throwable) {
             Telemetry.error(
                 "AppServerTurnEngine", "activeTurn.reconcileLivenessFailed", t,
@@ -1064,6 +1079,7 @@ class AppServerTurnEngine(
      * still trips — checking only inside `collect` would never fire during
      * silence, which is exactly the c0qm0 hang.
      */
+    @Suppress("NoDetachedCoroutineLifecycle") // Bounded responses deliberately outlive a completed turn.
     private suspend fun collectTurnWithIdleWatchdog(
         scope: AppServerRuntimeScope,
         command: TurnCommand,
@@ -1294,18 +1310,7 @@ class AppServerTurnEngine(
                 // controller's update_subagent_state snapshot carries the bounded
                 // latest activity; forwarding these raw deltas recreates the full
                 // child trajectory in the parent and saturates Iroh.
-                val childDelta = received.frame as? AppServerInboundFrame.StreamDelta
-                if (childDelta?.subagentId != null) {
-                    val activity = com.letta.mobile.data.subagents.SubagentParentProjection
-                        .activityLine(childDelta.delta)
-                    Telemetry.event(
-                        "AppServerTurnEngine", "subagent.frame_suppressed",
-                        "subagentId" to childDelta.subagentId,
-                        "conversationId" to childDelta.runtime.conversationId,
-                        "activityBytes" to (activity?.encodeToByteArray()?.size ?: 0),
-                    )
-                    return@collect
-                }
+                if (suppressChildFrame(received)) return@collect
                 // letta-mobile-kyqdt: P1b RUN-ID PROMOTION (TELEMETRY-ONLY).
                 // Once the mapper reveals the server run id for this active turn,
                 // promote it into the owner via a pure copy(runId=…). This is the

@@ -27,26 +27,35 @@ class IrohObserverIngestorTest {
     private val testDispatcher = UnconfinedTestDispatcher()
     private val testScope = TestScope(testDispatcher)
 
+    private fun streamDelta(spec: StreamDeltaSpec): AppServerReceivedFrame {
+        val body = """
+            {
+              "type": "stream_delta",
+              "runtime": {"agent_id": "${spec.agentId}", "conversation_id": "${spec.conversationId}"},
+              "event_seq": ${spec.seq},
+              "emitted_at": "2026-07-09T00:00:0${spec.seq}Z",
+              "idempotency_key": "obs-evt-${spec.conversationId}-${spec.seq}",
+              ${spec.subagentId?.let { "\"subagent_id\": \"$it\"," } ?: ""}
+              "delta": ${spec.delta}
+            }
+        """.trimIndent()
+        return AppServerProtocol.decodeFrame(body, AppServerChannel.Stream)
+    }
+
+    private data class StreamDeltaSpec(
+        val agentId: String,
+        val conversationId: String,
+        val seq: Long,
+        val delta: String,
+        val subagentId: String? = null,
+    )
+
     private fun streamDelta(
         agentId: String,
         conversationId: String,
         seq: Long,
         delta: String,
-        subagentId: String? = null,
-    ): AppServerReceivedFrame {
-        val body = """
-            {
-              "type": "stream_delta",
-              "runtime": {"agent_id": "$agentId", "conversation_id": "$conversationId"},
-              "event_seq": $seq,
-              "emitted_at": "2026-07-09T00:00:0${seq}Z",
-              "idempotency_key": "obs-evt-$conversationId-$seq",
-              ${subagentId?.let { "\"subagent_id\": \"$it\"," } ?: ""}
-              "delta": $delta
-            }
-        """.trimIndent()
-        return AppServerProtocol.decodeFrame(body, AppServerChannel.Stream)
-    }
+    ): AppServerReceivedFrame = streamDelta(StreamDeltaSpec(agentId, conversationId, seq, delta))
 
     private fun resubscribeFixture(currentGeneration: Long): ResubscribeFixture {
         val adminRpcCalls = CopyOnWriteArrayList<Pair<String, String>>()
@@ -180,7 +189,7 @@ class IrohObserverIngestorTest {
             """{"message_type":"tool_call_message","tool_call":{"name":"Bash","tool_call_id":"inner"}}""",
         ).forEachIndexed { index, delta ->
             ingestor.ingestObserverFrame(
-                ObserverFrameRequest(streamDelta("parent", "conv-parent", index + 1L, delta, "child-1"), 1L),
+                ObserverFrameRequest(streamDelta(StreamDeltaSpec("parent", "conv-parent", index + 1L, delta, "child-1")), 1L),
             )
         }
 
@@ -215,7 +224,7 @@ class IrohObserverIngestorTest {
             """{"message_type":"error_message","message":"child failed"}""",
         ).forEachIndexed { index, delta ->
             ingestor.ingestObserverFrame(
-                ObserverFrameRequest(streamDelta("parent", "conv-parent", index + 1L, delta, "child-1"), 1L),
+                ObserverFrameRequest(streamDelta(StreamDeltaSpec("parent", "conv-parent", index + 1L, delta, "child-1")), 1L),
             )
         }
 

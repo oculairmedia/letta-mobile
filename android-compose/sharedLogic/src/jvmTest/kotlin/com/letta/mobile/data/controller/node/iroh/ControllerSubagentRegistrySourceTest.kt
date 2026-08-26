@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.model.SubagentActivitySnapshot
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentStatus
 import com.letta.mobile.data.subagents.DurableSubagentRegistry
@@ -75,6 +76,24 @@ class ControllerSubagentRegistrySourceTest {
         assertEquals(2, snapshot.todos.size)
         assertEquals("Running focused tests", snapshot.todos.last().activeForm)
         assertEquals("in_progress", snapshot.todos.last().status)
+    }
+
+    @Test
+    fun terminalActivityDoesNotRemainInProgress() = runTest {
+        val source = ControllerSubagentRegistrySource()
+        source.replaceConversation(
+            "conv-a",
+            listOf(
+                SubagentEntry(
+                    toolCallId = "done",
+                    status = SubagentStatus.COMPLETED,
+                    parentConversationId = "conv-a",
+                    activity = SubagentActivitySnapshot(lines = listOf("Finished focused tests")),
+                ),
+            ),
+        )
+
+        assertEquals("completed", source.todos("conv-a", "done")!!.todos.single().status)
     }
 
     @Test
