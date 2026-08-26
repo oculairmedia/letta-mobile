@@ -251,8 +251,7 @@ fun groupMessagesForRender(
             accumulator = acc,
             blockStartIndex = i,
             olderStartIndex = j,
-            echoKeys = echoIndex.keys,
-            lastEchoKeyIndex = echoIndex.lastIndexByKey,
+            echoIndex = echoIndex,
         )
         if (compactedAcc.size == 1) {
             // Adopt the future RunBlock key when this runId is unique in the
@@ -464,32 +463,27 @@ private fun compactRunBlockEchoes(
     accumulator: List<Pair<UiMessage, GroupPosition>>,
     blockStartIndex: Int,
     olderStartIndex: Int,
-    echoKeys: Array<String?>,
-    lastEchoKeyIndex: Map<String, Int>,
+    echoIndex: EchoCompactionIndex,
 ): List<Pair<UiMessage, GroupPosition>> {
     if (accumulator.size < 2) return accumulator
 
     val seenInBlock = HashSet<String>()
-    var droppedAny = false
-    val out = ArrayList<Pair<UiMessage, GroupPosition>>(accumulator.size)
-    for ((offset, entry) in accumulator.withIndex()) {
-        val key = echoKeys[blockStartIndex + offset]
-        if (key == null) {
-            out.add(entry)
-            continue
-        }
-        if (!seenInBlock.add(key) || (lastEchoKeyIndex[key] ?: -1) >= olderStartIndex) {
-            droppedAny = true
-            continue
-        }
-        out.add(entry)
+    val out = accumulator.filterIndexed { offset, _ ->
+        val key = echoIndex.keys[blockStartIndex + offset]
+        key == null || shouldKeepEcho(key, seenInBlock, olderStartIndex, echoIndex)
     }
-    return if (!droppedAny) accumulator else out.ifEmpty {
-        // Never erase an entire run. If the server sent only duplicate text
-        // frames, keep the newest one so the conversation still has an anchor.
-        listOf(accumulator.first())
-    }
+    if (out.size == accumulator.size) return accumulator
+    // Never erase an entire run. If the server sent only duplicate text frames,
+    // retain the newest one so the conversation still has an anchor.
+    return out.ifEmpty { listOf(accumulator.first()) }
 }
+
+private fun shouldKeepEcho(
+    key: String,
+    seenInBlock: MutableSet<String>,
+    olderStartIndex: Int,
+    echoIndex: EchoCompactionIndex,
+): Boolean = seenInBlock.add(key) && (echoIndex.lastIndexByKey[key] ?: -1) < olderStartIndex
 
 /**
  * The exact set of chars JVM `Regex("\\s+")` matches without
@@ -507,26 +501,17 @@ private fun isJvmRegexWhitespace(c: Char): Boolean =
  * build on the Main thread (letta-mobile-p0gc ANR fix).
  */
 internal fun normalizeRunPanelEchoText(content: String): String {
-    var start = 0
-    val len = content.length
-    var end = len
-    while (start < end && content[start].isWhitespace()) start++
-    while (end > start && content[end - 1].isWhitespace()) end--
-    var sb: StringBuilder? = null
-    var i = start
-    while (i < end) {
-        val c = content[i]
-        if (isJvmRegexWhitespace(c)) {
-            if (sb == null) sb = StringBuilder(end - start).append(content, start, i)
-            // Consume the whole whitespace run; emit exactly one space.
-            while (i < end && isJvmRegexWhitespace(content[i])) i++
-            sb.append(' ')
-        } else {
-            sb?.append(c)
-            i++
+    val trimmed = content.trim()
+    if (trimmed.none(::isJvmRegexWhitespace)) return trimmed
+    return buildString(trimmed.length) {
+        var previousWasWhitespace = false
+        trimmed.forEach { character ->
+            val isWhitespace = isJvmRegexWhitespace(character)
+            if (!isWhitespace) append(character)
+            if (isWhitespace && !previousWasWhitespace) append(' ')
+            previousWasWhitespace = isWhitespace
         }
     }
-    return sb?.toString() ?: content.substring(start, end)
 }
 
 private fun UiMessage.runPanelEchoKey(): String? {
