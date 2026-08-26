@@ -48,15 +48,10 @@ class ControllerSubagentRegistrySource(
         val activityTodos = activityLines.mapIndexed { index, line ->
             com.letta.mobile.data.model.SubagentTodo(
                 content = line,
-                status = if (
-                    entry.status == SubagentStatus.RUNNING &&
-                    index == activityLines.lastIndex &&
-                    activity?.truncated != true
-                ) {
-                    "in_progress"
-                } else {
-                    "completed"
-                },
+                status = activityTodoStatus(
+                    entry,
+                    ActivityTodoPosition(index, activityLines.lastIndex, activity?.truncated == true),
+                ),
                 activeForm = line,
             )
         }
@@ -139,6 +134,18 @@ class ControllerSubagentRegistrySource(
             entries = entries,
             source = SubagentChipSource.CONTROLLER_NATIVE,
         )
+    }
+
+    private data class ActivityTodoPosition(
+        val index: Int,
+        val lastIndex: Int,
+        val truncated: Boolean,
+    )
+
+    private fun activityTodoStatus(entry: SubagentEntry, position: ActivityTodoPosition): String {
+        if (entry.status != SubagentStatus.RUNNING) return "completed"
+        if (position.truncated) return "completed"
+        return if (position.index == position.lastIndex) "in_progress" else "completed"
     }
 
     private data class ParentIds(val conversationId: String, val agentId: String?)

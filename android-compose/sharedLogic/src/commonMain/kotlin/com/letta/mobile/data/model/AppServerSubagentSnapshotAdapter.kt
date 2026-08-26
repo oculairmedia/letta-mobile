@@ -45,6 +45,19 @@ data class SubagentParentIdentity(
 )
 
 object AppServerSubagentSnapshotAdapter {
+    private val normalizedStatuses = mapOf(
+        "pending" to SubagentStatus.RUNNING,
+        "in_progress" to SubagentStatus.RUNNING,
+        "running" to SubagentStatus.RUNNING,
+        "error" to SubagentStatus.FAILED,
+        "failed" to SubagentStatus.FAILED,
+        "cancelled" to SubagentStatus.CANCELLED,
+        "canceled" to SubagentStatus.CANCELLED,
+        "completed" to SubagentStatus.COMPLETED,
+        "complete" to SubagentStatus.COMPLETED,
+        "done" to SubagentStatus.COMPLETED,
+    )
+
     fun toEntry(
         snapshot: AppServerSubagentSnapshot,
         parent: SubagentParentIdentity,
@@ -83,23 +96,32 @@ object AppServerSubagentSnapshotAdapter {
         raw: JsonObject,
         decoded: AppServerSubagentSnapshot?,
     ): AppServerSubagentSnapshot = AppServerSubagentSnapshot(
-        subagentId = firstString(raw, "subagent_id", "subagentId", "id") ?: decoded?.subagentId,
-        toolCallId = firstString(raw, "tool_call_id", "toolCallId") ?: decoded?.toolCallId,
-        conversationId = firstString(raw, "conversation_id", "conversationId", "subagent_conversation_id")
-            ?: decoded?.conversationId,
-        agentId = firstString(raw, "agent_id", "agentId", "subagent_agent_id") ?: decoded?.agentId,
-        description = firstString(raw, "description") ?: decoded?.description,
-        subagentType = firstString(raw, "subagent_type", "subagentType") ?: decoded?.subagentType,
-        status = firstString(raw, "status") ?: decoded?.status,
-        error = firstString(raw, "error") ?: decoded?.error,
-        taskId = firstString(raw, "task_id", "taskId") ?: decoded?.taskId,
-        parentRunId = firstString(raw, "parent_run_id", "parentRunId") ?: decoded?.parentRunId,
-        parentAgentId = firstString(raw, "parent_agent_id", "parentAgentId") ?: decoded?.parentAgentId,
-        parentConversationId = firstString(raw, "parent_conversation_id", "parentConversationId")
-            ?: decoded?.parentConversationId,
-        startTime = raw["start_time"] ?: raw["started_at_ms"] ?: decoded?.startTime,
-        startedAt = firstString(raw, "started_at", "startedAt") ?: decoded?.startedAt,
-        activity = decodeActivity(raw["activity"]) ?: decoded?.activity,
+        subagentId = alias(raw, decoded?.subagentId, "subagent_id", "subagentId", "id"),
+        toolCallId = alias(raw, decoded?.toolCallId, "tool_call_id", "toolCallId"),
+        conversationId = alias(
+            raw,
+            decoded?.conversationId,
+            "conversation_id",
+            "conversationId",
+            "subagent_conversation_id",
+        ),
+        agentId = alias(raw, decoded?.agentId, "agent_id", "agentId", "subagent_agent_id"),
+        description = alias(raw, decoded?.description, "description"),
+        subagentType = alias(raw, decoded?.subagentType, "subagent_type", "subagentType"),
+        status = alias(raw, decoded?.status, "status"),
+        error = alias(raw, decoded?.error, "error"),
+        taskId = alias(raw, decoded?.taskId, "task_id", "taskId"),
+        parentRunId = alias(raw, decoded?.parentRunId, "parent_run_id", "parentRunId"),
+        parentAgentId = alias(raw, decoded?.parentAgentId, "parent_agent_id", "parentAgentId"),
+        parentConversationId = alias(
+            raw,
+            decoded?.parentConversationId,
+            "parent_conversation_id",
+            "parentConversationId",
+        ),
+        startTime = listOfNotNull(raw["start_time"], raw["started_at_ms"], decoded?.startTime).firstOrNull(),
+        startedAt = alias(raw, decoded?.startedAt, "started_at", "startedAt"),
+        activity = listOfNotNull(decodeActivity(raw["activity"]), decoded?.activity).firstOrNull(),
     )
 
     private fun hasIdentity(snapshot: AppServerSubagentSnapshot?): Boolean {
@@ -108,35 +130,34 @@ object AppServerSubagentSnapshotAdapter {
     }
 
     private fun normalizeStatus(rawStatus: String?, error: String?): String {
-        val status = rawStatus?.lowercase()
-        return when {
-            !error.isNullOrBlank() -> SubagentStatus.FAILED
-            status == null || status == "pending" || status == "in_progress" ->
-                SubagentStatus.RUNNING
-            status == "error" || status == "failed" -> SubagentStatus.FAILED
-            status == "cancelled" || status == "canceled" -> SubagentStatus.CANCELLED
-            status == "completed" || status == "complete" || status == "done" ->
-                SubagentStatus.COMPLETED
-            status == "running" -> SubagentStatus.RUNNING
-            else -> status
-        }
+        if (!error.isNullOrBlank()) return SubagentStatus.FAILED
+        val status = rawStatus?.lowercase() ?: "pending"
+        return normalizedStatuses[status] ?: status
     }
 
     private fun startedAt(snapshot: AppServerSubagentSnapshot): String? {
-        snapshot.startedAt?.takeIf { it.isNotBlank() }?.let { return it }
-        val element = snapshot.startTime ?: return null
-        val primitive = element as? JsonPrimitive ?: return null
-        val numeric = primitive.longOrNull
-            ?: primitive.doubleOrNull?.toLong()
-            ?: primitive.contentOrNull?.toLongOrNull()
-            ?: return primitive.contentOrNull
-        val epochMs = if (numeric < 1_000_000_000_000L) numeric * 1_000L else numeric
-        return epochMs.toString()
+        snapshot.startedAt?.takeIf(String::isNotBlank)?.let { return it }
+        val primitive = snapshot.startTime as? JsonPrimitive ?: return null
+        val numeric = numericTimestamp(primitive) ?: return primitive.contentOrNull
+        return normalizeEpochMillis(numeric).toString()
     }
+
+    private fun numericTimestamp(primitive: JsonPrimitive): Long? =
+        listOfNotNull(
+            primitive.longOrNull,
+            primitive.doubleOrNull?.toLong(),
+            primitive.contentOrNull?.toLongOrNull(),
+        ).firstOrNull()
+
+    private fun normalizeEpochMillis(timestamp: Long): Long =
+        if (timestamp < 1_000_000_000_000L) timestamp * 1_000L else timestamp
+
+    private fun alias(raw: JsonObject, fallback: String?, vararg keys: String): String? =
+        listOfNotNull(firstString(raw, *keys), fallback).firstOrNull()
 
     private fun firstString(raw: JsonObject, vararg keys: String): String? =
         keys.firstNotNullOfOrNull { key ->
-            (raw[key] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
+            (raw[key] as? JsonPrimitive)?.contentOrNull?.takeIf(String::isNotBlank)
         }
 
     private fun decodeActivity(element: JsonElement?): SubagentActivitySnapshot? = runCatching {
