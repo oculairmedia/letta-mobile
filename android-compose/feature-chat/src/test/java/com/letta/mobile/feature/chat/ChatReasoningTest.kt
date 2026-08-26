@@ -1,10 +1,15 @@
 package com.letta.mobile.feature.chat
 
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.data.model.UiMessage
@@ -244,5 +249,83 @@ class ChatReasoningTest {
         }
 
         composeRule.onNodeWithTag(ChatReasoningTestTags.Content).assertIsDisplayed()
+    }
+
+    @Test
+    fun collapseStateSurvivesContentUpdatesAndStreamingCompletion() {
+        val messageState = mutableStateOf(
+            UiMessage(
+                id = "reasoning-lifecycle",
+                role = "assistant",
+                content = "Initial reasoning",
+                timestamp = "2026-07-26T12:00:00Z",
+                isReasoning = true,
+            ),
+        )
+        val streamingState = mutableStateOf(false)
+        val collapsedState = mutableStateOf(true)
+
+        composeRule.setContent {
+            LettaTheme(AppTheme.LIGHT, ThemePreset.DEFAULT, false) {
+                LettaChatTheme {
+                    MessageReasoning(
+                        message = messageState.value,
+                        isStreaming = streamingState.value,
+                        collapsed = collapsedState.value,
+                        onToggleCollapsed = { collapsedState.value = !collapsedState.value },
+                    )
+                }
+            }
+        }
+
+        val header = composeRule.onNodeWithTag(ChatReasoningTestTags.Header)
+        val content = composeRule.onNodeWithTag(ChatReasoningTestTags.Content)
+        header.assert(reasoningState("Reasoning collapsed", actionLabel = "Expand reasoning"))
+        content.assertDoesNotExist()
+
+        header.performClick()
+        composeRule.mainClock.advanceTimeBy(1_000)
+        composeRule.waitForIdle()
+        header.assert(reasoningState("Reasoning expanded", actionLabel = "Collapse reasoning"))
+        content.assertIsDisplayed()
+
+        composeRule.runOnIdle {
+            messageState.value = messageState.value.copy(content = "Initial reasoning with more tokens")
+        }
+        content.assertIsDisplayed()
+
+        header.performClick()
+        composeRule.mainClock.advanceTimeBy(1_000)
+        composeRule.waitForIdle()
+        content.assertDoesNotExist()
+
+        composeRule.runOnIdle {
+            streamingState.value = true
+            messageState.value = messageState.value.copy(content = "Streaming reasoning")
+        }
+        composeRule.mainClock.advanceTimeBy(1_000)
+        header.assert(reasoningState("Reasoning in progress", actionLabel = null))
+        content.assertIsDisplayed()
+
+        composeRule.runOnIdle {
+            messageState.value = messageState.value.copy(content = "Streaming reasoning completed", isError = true)
+            streamingState.value = false
+        }
+        composeRule.mainClock.advanceTimeBy(1_000)
+        composeRule.waitForIdle()
+        header.assert(reasoningState("Reasoning collapsed", actionLabel = "Expand reasoning"))
+        content.assertDoesNotExist()
+    }
+
+    private fun reasoningState(state: String, actionLabel: String?): SemanticsMatcher {
+        val stateMatcher = SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, state)
+        val actionMatcher = if (actionLabel == null) {
+            SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick)
+        } else {
+            SemanticsMatcher("onClick label=$actionLabel") { node ->
+                runCatching { node.config[SemanticsActions.OnClick] }.getOrNull()?.label == actionLabel
+            }
+        }
+        return stateMatcher.and(actionMatcher)
     }
 }

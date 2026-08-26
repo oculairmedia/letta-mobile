@@ -84,9 +84,14 @@ internal fun ChatMessageList(
     val isUserScrolling by listState.interactionSource.collectIsDraggedAsState()
     val scope = rememberCoroutineScope()
     val currentRenderItems by rememberUpdatedState(renderItems)
-    val itemGeometryState = remember { ChatMessageGeometryState() }
-    var highlightedMessageId by remember { mutableStateOf<String?>(null) }
-    var hasScrolledToTarget by remember { mutableStateOf(false) }
+    val conversationId = (state.conversationState as? com.letta.mobile.ui.chat.render.ConversationState.Ready)
+        ?.conversationId
+    // Geometry signatures intentionally omit conversation identity. Scope the
+    // cache itself so an equal server message/run id in another conversation
+    // cannot inherit a stale minimum height or hide content after navigation.
+    val itemGeometryState = remember(conversationId) { ChatMessageGeometryState() }
+    var highlightedMessageId by remember(conversationId) { mutableStateOf<String?>(null) }
+    var hasScrolledToTarget by remember(conversationId, scrollToMessageId) { mutableStateOf(false) }
     var showFontIndicator by remember { mutableStateOf(false) }
     var pinchTick by remember { mutableStateOf(0L) }
     var pinchAnimationSuppressionTick by remember { mutableStateOf(0L) }

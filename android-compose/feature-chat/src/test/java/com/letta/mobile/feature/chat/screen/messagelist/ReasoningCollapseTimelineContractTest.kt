@@ -279,6 +279,15 @@ class ReasoningCollapseTimelineContractTest {
     }
 
     @Test
+    fun `message geometry cache is scoped to the active conversation`() {
+        val source = messageListSource()
+        assertTrue(
+            "equal message or run ids in another conversation must not inherit stale row heights",
+            source.contains("remember(conversationId) { ChatMessageGeometryState() }"),
+        )
+    }
+
+    @Test
     fun `RenderChatMessage routes row spacing through the reasoning-aware padding policy`() {
         val source = itemsSource()
         assertTrue(
@@ -305,6 +314,11 @@ class ReasoningCollapseTimelineContractTest {
     private fun lazyColumnSource(): String = sourceFromCandidates(
         "src/main/java/com/letta/mobile/feature/chat/screen/messagelist/ChatMessageListLazyColumn.kt",
         "feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/messagelist/ChatMessageListLazyColumn.kt",
+    )
+
+    private fun messageListSource(): String = sourceFromCandidates(
+        "src/main/java/com/letta/mobile/feature/chat/screen/ChatMessageList.kt",
+        "feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/ChatMessageList.kt",
     )
 
     private fun sourceFromCandidates(vararg relativePaths: String): String {

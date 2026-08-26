@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.letta.mobile.data.model.AppTheme
@@ -15,6 +16,7 @@ import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiSubagentDispatch
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.feature.chat.screen.MessageToolCalls
+import com.letta.mobile.feature.chat.screen.RunActivityDisclosureTestTags
 import com.letta.mobile.feature.chat.screen.RunBlock
 import kotlinx.collections.immutable.persistentListOf
 import com.letta.mobile.ui.theme.LettaChatTheme
@@ -80,6 +82,57 @@ class ProjectedToolTimelineTest {
         composeRule.onNodeWithText("Worked").assertIsDisplayed()
         composeRule.onNodeWithText("4 tools").assertIsDisplayed()
         composeRule.onNodeWithText("Done").assertDoesNotExist()
+    }
+
+    @Test
+    fun runExpansionSurvivesMessageListUpdatesAndCanCollapseAgain() {
+        val collapsedState = androidx.compose.runtime.mutableStateOf(true)
+        val messagesState = androidx.compose.runtime.mutableStateOf(
+            listOf(
+                runMessage("step-1", "First step"),
+                runMessage("step-2", "Second step"),
+            ),
+        )
+
+        composeRule.setContent {
+            LettaTheme(AppTheme.LIGHT, ThemePreset.DEFAULT, false) {
+                LettaChatTheme {
+                    RunBlock(
+                        messages = messagesState.value,
+                        collapsed = collapsedState.value,
+                        onToggleCollapsed = { collapsedState.value = !collapsedState.value },
+                    ) { message, _, rowModifier ->
+                        Text(text = message.id, modifier = rowModifier)
+                    }
+                }
+            }
+        }
+
+        composeRule.onNodeWithText("step-1").assertDoesNotExist()
+        composeRule.onNodeWithText("step-2").assertIsDisplayed()
+
+        composeRule.onNodeWithTag(RunActivityDisclosureTestTags.Header).performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("step-1").assertIsDisplayed()
+
+        composeRule.runOnIdle {
+            messagesState.value = messagesState.value + runMessage("step-3", "Third step")
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("step-1").assertIsDisplayed()
+        composeRule.onNodeWithText("step-3").assertIsDisplayed()
+
+        composeRule.onNodeWithTag(RunActivityDisclosureTestTags.Header).performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("step-1").assertDoesNotExist()
+        composeRule.onNodeWithText("step-3").assertIsDisplayed()
+
+        composeRule.runOnIdle {
+            messagesState.value = messagesState.value + runMessage("step-4", "Fourth step")
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("step-1").assertDoesNotExist()
+        composeRule.onNodeWithText("step-4").assertIsDisplayed()
     }
 
     @Test
@@ -551,6 +604,14 @@ class ProjectedToolTimelineTest {
         // The projected row family renders the projector's summary label.
         composeRule.onNodeWithText("Bash(pwd)").assertIsDisplayed()
     }
+
+    private fun runMessage(id: String, content: String) = UiMessage(
+        id = id,
+        role = "assistant",
+        content = content,
+        timestamp = "2026-05-09T00:00:00Z",
+        runId = "run-state",
+    )
 
     private fun toolMessage(
         id: String,

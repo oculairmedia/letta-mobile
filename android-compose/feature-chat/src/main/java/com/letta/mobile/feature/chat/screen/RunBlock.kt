@@ -11,10 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.UiApprovalRequest
@@ -84,27 +81,15 @@ internal fun RunBlock(
     // auto-collapse flag until completion without mutating the caller-owned
     // expansion state.
     val collapsible = messages.size > 1
-    // letta-mobile-tz1sp (refined Simple projection): Aether's post-turn shape
-    // collapses the disclosure once the run has settled so the assistant prose
-    // is the primary surface. We track the user's "I want this expanded"
-    // override locally so the Simple auto-fold defaults new runs while still
-    // honouring an explicit tap-to-expand. Interactive/Debug keep the prior
-    // caller-owned `collapsed` semantics across the same boundary.
-    var userExpandedOverride by remember(messages) { mutableStateOf(false) }
+    // Expansion is caller-owned. Keeping a second remembered override here used
+    // to reset whenever streaming replaced the messages list, unexpectedly
+    // re-collapsing a run after the user expanded it. The persisted run-id state
+    // now remains the single source of truth across recomposition and appends.
     val effectiveCollapsed = when {
         !collapsible -> false
         activity.isActive -> false
         !showCompletedDisclosure -> false
-        showCompletedDisclosure && collapsed -> !userExpandedOverride
-        chatMode == "simple" && collapsed -> !userExpandedOverride
         else -> collapsed
-    }
-    val toggleCollapsed: () -> Unit = {
-        if ((chatMode == "simple" || showCompletedDisclosure) && collapsed) {
-            userExpandedOverride = !userExpandedOverride
-        } else {
-            onToggleCollapsed()
-        }
     }
     val latestCompletedDisclosure = !activity.isActive && showCompletedDisclosure
 
@@ -121,7 +106,7 @@ internal fun RunBlock(
                 activity = activity,
                 collapsed = effectiveCollapsed,
                 collapsible = collapsible,
-                onToggleCollapsed = toggleCollapsed,
+                onToggleCollapsed = onToggleCollapsed,
                 chatMode = chatMode,
             )
         }
