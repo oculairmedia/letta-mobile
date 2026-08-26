@@ -144,9 +144,12 @@ private fun ChatMessageListRenderItem(params: ChatMessageListRenderItemParams) {
         LocalChatFontScale provides perItemFontScale,
         LocalToolCardBodyParentVisible provides itemSeesLiveScale,
     ) {
+        // Reasoning rows animate their own size; a cached minimum can pin the
+        // row at an intermediate expanded height while it collapses.
         MeasuredChatRenderItem(
             signature = geometrySignature,
             geometryState = context.itemGeometryState,
+            applyCachedMinHeight = !renderItem.includesReasoningRow(),
         ) {
             ChatMessageListRenderItemBody(
                 params = ChatMessageListRenderItemBodyParams(
