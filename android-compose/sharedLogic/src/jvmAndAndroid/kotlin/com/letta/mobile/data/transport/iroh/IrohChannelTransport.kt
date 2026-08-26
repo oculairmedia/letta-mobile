@@ -8,10 +8,10 @@ import com.letta.mobile.data.transport.A2uiActionDispatchResult
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.TransportFrameEvent
-import com.letta.mobile.data.transport.api.IChannelTransport
-import com.letta.mobile.data.transport.api.LivenessProbingChannelTransport
 import com.letta.mobile.data.transport.api.FrameCollectorOverflowAwareChannelTransport
 import com.letta.mobile.data.transport.api.FrameCollectorOverflowIncident
+import com.letta.mobile.data.transport.api.IChannelTransport
+import com.letta.mobile.data.transport.api.LivenessProbingChannelTransport
 import com.letta.mobile.data.transport.api.RedialAwareChannelTransport
 import com.letta.mobile.data.transport.api.RedialWhileTurnActive
 import com.letta.mobile.data.controller.node.iroh.EphemeralIrohSecretKeyStore
@@ -124,11 +124,9 @@ class IrohChannelTransport(
         get() = currentConnectionGeneration()
     override fun isFrameCollectorOverflowCancellation(
         subscriptionIdentity: String,
-        connectionGeneration: Long,
         cancellation: CancellationException,
     ): Boolean = cancellation is FrameCollectorDetachedCancellation &&
-        cancellation.subscriptionIdentity == subscriptionIdentity &&
-        cancellation.connectionGeneration == connectionGeneration
+        cancellation.subscriptionIdentity == subscriptionIdentity
 
     private val _redialWhileTurnActive = MutableSharedFlow<RedialWhileTurnActive>(extraBufferCapacity = 8)
     override val redialWhileTurnActive: SharedFlow<RedialWhileTurnActive> = _redialWhileTurnActive.asSharedFlow()

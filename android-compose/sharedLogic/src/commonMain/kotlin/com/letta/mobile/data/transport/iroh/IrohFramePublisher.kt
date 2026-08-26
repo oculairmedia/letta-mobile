@@ -3,6 +3,7 @@ package com.letta.mobile.data.transport.iroh
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.TransportFrameEvent
 import com.letta.mobile.data.transport.api.FrameCollectorOverflowIncident
+import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalForInheritanceCoroutinesApi
 import kotlinx.coroutines.NonCancellable
@@ -83,18 +84,18 @@ private class BoundedOverflowBroadcast(
 ) : SharedFlow<FrameCollectorOverflowEvent> {
     private val mutex = Mutex()
     private val subscriptions = mutableListOf<Channel<FrameCollectorOverflowEvent>>()
-    private var latest: FrameCollectorOverflowEvent? = null
+    private val latest = atomic<FrameCollectorOverflowEvent?>(null)
 
     init {
         require(bufferCapacity > 0) { "bufferCapacity must be positive" }
     }
 
     override val replayCache: List<FrameCollectorOverflowEvent>
-        get() = latest?.let(::listOf).orEmpty()
+        get() = latest.value?.let(::listOf).orEmpty()
 
     suspend fun publish(event: FrameCollectorOverflowEvent) {
         val overflowed = mutex.withLock {
-            latest = event
+            latest.value = event
             val failed = subscriptions.filter { it.trySend(event).isFailure }
             subscriptions.removeAll(failed)
             failed
@@ -105,7 +106,7 @@ private class BoundedOverflowBroadcast(
     override suspend fun collect(collector: FlowCollector<FrameCollectorOverflowEvent>): Nothing {
         val subscription = Channel<FrameCollectorOverflowEvent>(bufferCapacity)
         mutex.withLock {
-            latest?.let { subscription.trySend(it) }
+            latest.value?.let { subscription.trySend(it) }
             subscriptions += subscription
         }
         try {
@@ -181,20 +182,22 @@ private class BoundedFrameBroadcast(
             subscriptions.removeAll(failed)
             failed
         }
-        overflowed.forEach { subscription ->
-            try {
-                onOverflow(
-                    FrameCollectorOverflowEvent(
-                        subscriptionId = subscription.id,
-                        subscriptionIdentity = subscription.identity,
-                        capacity = bufferCapacity,
-                        frameType = event.frame.overflowFrameType(),
-                        conversationId = event.frame.overflowConversationId(),
-                        connectionGeneration = subscription.connectionGeneration,
-                    ),
-                )
-            } finally {
-                subscription.frames.close()
+        withContext(NonCancellable) {
+            overflowed.forEach { subscription ->
+                try {
+                    onOverflow(
+                        FrameCollectorOverflowEvent(
+                            subscriptionId = subscription.id,
+                            subscriptionIdentity = subscription.identity,
+                            capacity = bufferCapacity,
+                            frameType = event.frame.overflowFrameType(),
+                            conversationId = event.frame.overflowConversationId(),
+                            connectionGeneration = subscription.connectionGeneration,
+                        ),
+                    )
+                } finally {
+                    subscription.frames.close()
+                }
             }
         }
     }

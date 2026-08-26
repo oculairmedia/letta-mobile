@@ -13,7 +13,7 @@ sealed interface FrameCollectorOverflowRecoveryOutcome {
     data class Reconciled(val appended: Int) : FrameCollectorOverflowRecoveryOutcome
     data class NotApplied(val result: RecentMessagesReconcileOutcome) : FrameCollectorOverflowRecoveryOutcome
     data class InvalidIncident(val reason: String) : FrameCollectorOverflowRecoveryOutcome
-    data class Failed(val cause: Throwable) : FrameCollectorOverflowRecoveryOutcome
+    data object Failed : FrameCollectorOverflowRecoveryOutcome
     data object Superseded : FrameCollectorOverflowRecoveryOutcome
 }
 
@@ -33,6 +33,7 @@ interface FrameCollectorOverflowRecoveryMonitor {
 
 internal fun FrameCollectorOverflowIncident.toRecoveryEvent(
     graphId: Long,
+    attempt: Int,
     outcome: FrameCollectorOverflowRecoveryOutcome,
 ): FrameCollectorOverflowRecoveryEvent = FrameCollectorOverflowRecoveryEvent(
     graphId = graphId,
@@ -40,6 +41,6 @@ internal fun FrameCollectorOverflowIncident.toRecoveryEvent(
     subscriptionIdentity = subscriptionIdentity,
     conversationId = conversationId,
     connectionGeneration = connectionGeneration,
-    attempt = 1,
+    attempt = attempt,
     outcome = outcome,
 )

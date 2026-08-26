@@ -129,7 +129,6 @@ interface FrameCollectorOverflowAwareChannelTransport {
     /** True only when [cancellation] was produced by this projection's overflow detach. */
     fun isFrameCollectorOverflowCancellation(
         subscriptionIdentity: String,
-        connectionGeneration: Long,
         cancellation: kotlinx.coroutines.CancellationException,
     ): Boolean
 }

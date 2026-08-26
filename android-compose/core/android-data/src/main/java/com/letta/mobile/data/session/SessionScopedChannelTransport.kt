@@ -14,25 +14,25 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.shareIn
-import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonArray
@@ -61,8 +61,9 @@ class SessionScopedChannelTransport internal constructor(
     override val state: StateFlow<ChannelTransportState> = _state
 
     private val seenIncidents = mutableSetOf<Pair<Long, Long>>()
+    private val seenIncidentOrder = ArrayDeque<Pair<Long, Long>>()
     private val seenIncidentsMutex = Mutex()
-    private val conversationLocks = mutableMapOf<Pair<Long, String>, Mutex>()
+    private val conversationLocks = mutableMapOf<Pair<Long, String>, ConversationRecoveryLock>()
     private val conversationLocksMutex = Mutex()
     private val _recoveryEvents = MutableSharedFlow<FrameCollectorOverflowRecoveryEvent>(
         extraBufferCapacity = 32,
@@ -99,7 +100,6 @@ class SessionScopedChannelTransport internal constructor(
             .launchIn(proxyScope)
     }
 
-
     private fun <T> retryProjection(
         graph: SessionRepositoryGraph,
         subscriptionIdentity: String,
@@ -107,15 +107,18 @@ class SessionScopedChannelTransport internal constructor(
     ) = flow {
         while (kotlin.coroutines.coroutineContext.isActive) {
             val overflowAware = graph.channelTransport as? FrameCollectorOverflowAwareChannelTransport
-            val generationAtAttach = overflowAware?.frameCollectorConnectionGeneration
             try {
                 source().collect { emit(it) }
             } catch (cancelled: CancellationException) {
                 if (!kotlin.coroutines.coroutineContext.isActive || sessionManager.currentGraph.value.id != graph.id) {
                     throw cancelled
                 }
-                val detachedByOverflow = generationAtAttach != null && overflowAware
-                    .isFrameCollectorOverflowCancellation(subscriptionIdentity, generationAtAttach, cancelled)
+                // Match the transport-owned cancellation itself rather than a generation
+                // sampled before collection. A redial may advance the generation while
+                // the subscription is registering, but the typed detach still requires
+                // this projection to reattach.
+                val detachedByOverflow = overflowAware
+                    ?.isFrameCollectorOverflowCancellation(subscriptionIdentity, cancelled) == true
                 if (!detachedByOverflow) throw cancelled
                 // Reattach before reconciliation. The recovery job yields once
                 // before fetching canonical state, so frames arriving after the
@@ -129,78 +132,138 @@ class SessionScopedChannelTransport internal constructor(
     private suspend fun recoverOverflow(graph: SessionRepositoryGraph, incident: FrameCollectorOverflowIncident) {
         val graphId = graph.id
         val overflowAware = graph.channelTransport as? FrameCollectorOverflowAwareChannelTransport ?: return
-        if (sessionManager.currentGraph.value.id != graphId) return
-        if (incident.connectionGeneration != overflowAware.frameCollectorConnectionGeneration) {
-            publishRecovery(incident, graphId, FrameCollectorOverflowRecoveryOutcome.InvalidIncident("stale_connection_generation"))
-            return
-        }
-        val key = graphId to incident.subscriptionId
-        if (!seenIncidentsMutex.withLock { seenIncidents.add(key) }) return
-        publishRecovery(incident, graphId, FrameCollectorOverflowRecoveryOutcome.Started)
+        if (!validateIncident(graphId, overflowAware, incident)) return
+
+        publishRecovery(incident, graphId, attempt = 0, FrameCollectorOverflowRecoveryOutcome.Started)
         if (incident.conversationId.isBlank()) {
-            publishRecovery(incident, graphId, FrameCollectorOverflowRecoveryOutcome.InvalidIncident("blank_conversation_id"))
+            publishRecovery(
+                incident,
+                graphId,
+                attempt = 0,
+                FrameCollectorOverflowRecoveryOutcome.InvalidIncident("blank_conversation_id"),
+            )
             return
         }
-        val lock = conversationLocksMutex.withLock {
-            conversationLocks.getOrPut(graphId to incident.conversationId) { Mutex() }
-        }
-        lock.withLock {
-            if (sessionManager.currentGraph.value.id != graphId ||
-                incident.connectionGeneration != overflowAware.frameCollectorConnectionGeneration
-            ) {
-                publishRecovery(incident, graphId, FrameCollectorOverflowRecoveryOutcome.Superseded)
-                return@withLock
+
+        val key = graphId to incident.conversationId
+        val recoveryLock = acquireConversationLock(key)
+        try {
+            recoveryLock.mutex.withLock {
+                recoverUnderLock(graphId, overflowAware, incident)
             }
-            val outcome = try {
-                kotlinx.coroutines.yield()
-                reconcileWithRetry(incident)
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (failure: Throwable) {
-                FrameCollectorOverflowRecoveryOutcome.Failed(failure)
-            }
-            if (sessionManager.currentGraph.value.id != graphId ||
-                incident.connectionGeneration != overflowAware.frameCollectorConnectionGeneration
-            ) {
-                publishRecovery(incident, graphId, FrameCollectorOverflowRecoveryOutcome.Superseded)
-            } else {
-                publishRecovery(incident, graphId, outcome)
-            }
+        } finally {
+            releaseConversationLock(key, recoveryLock)
         }
     }
 
+    private suspend fun validateIncident(
+        graphId: Long,
+        overflowAware: FrameCollectorOverflowAwareChannelTransport,
+        incident: FrameCollectorOverflowIncident,
+    ): Boolean {
+        if (sessionManager.currentGraph.value.id != graphId) return false
+        if (!rememberIncident(graphId to incident.subscriptionId)) return false
+        if (incident.connectionGeneration != overflowAware.frameCollectorConnectionGeneration) {
+            publishRecovery(
+                incident,
+                graphId,
+                attempt = 0,
+                FrameCollectorOverflowRecoveryOutcome.InvalidIncident("stale_connection_generation"),
+            )
+            return false
+        }
+        return true
+    }
+
+    private suspend fun recoverUnderLock(
+        graphId: Long,
+        overflowAware: FrameCollectorOverflowAwareChannelTransport,
+        incident: FrameCollectorOverflowIncident,
+    ) {
+        if (!isCurrentRecovery(graphId, overflowAware, incident)) {
+            publishRecovery(incident, graphId, attempt = 0, FrameCollectorOverflowRecoveryOutcome.Superseded)
+            return
+        }
+        kotlinx.coroutines.yield()
+        val completed = reconcileWithRetry(incident)
+        val terminal = if (isCurrentRecovery(graphId, overflowAware, incident)) {
+            completed.outcome
+        } else {
+            FrameCollectorOverflowRecoveryOutcome.Superseded
+        }
+        publishRecovery(incident, graphId, completed.attempt, terminal)
+    }
+
+    private fun isCurrentRecovery(
+        graphId: Long,
+        overflowAware: FrameCollectorOverflowAwareChannelTransport,
+        incident: FrameCollectorOverflowIncident,
+    ): Boolean = sessionManager.currentGraph.value.id == graphId &&
+        incident.connectionGeneration == overflowAware.frameCollectorConnectionGeneration
+
     private suspend fun reconcileWithRetry(
         incident: FrameCollectorOverflowIncident,
-    ): FrameCollectorOverflowRecoveryOutcome {
+    ): CompletedReconciliation {
         var last: com.letta.mobile.data.timeline.RecentMessagesReconcileOutcome? = null
-        repeat(MAX_RECONCILE_ATTEMPTS) { attempt ->
-            val result = overflowReconciler.reconcile(
-                incident.conversationId,
-                incident.connectionGeneration,
-            )
-            last = result
-            when (result) {
-                is com.letta.mobile.data.timeline.RecentMessagesReconcileOutcome.Applied ->
-                    return FrameCollectorOverflowRecoveryOutcome.Reconciled(result.appended)
-                is com.letta.mobile.data.timeline.RecentMessagesReconcileOutcome.Failed,
-                is com.letta.mobile.data.timeline.RecentMessagesReconcileOutcome.Skipped,
-                -> if (attempt + 1 < MAX_RECONCILE_ATTEMPTS) delay(RECONCILE_RETRY_DELAY_MS)
+        repeat(MAX_RECONCILE_ATTEMPTS) { index ->
+            val attempt = index + 1
+            val result = try {
+                overflowReconciler.reconcile(incident.conversationId, incident.connectionGeneration)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Throwable) {
+                return CompletedReconciliation(attempt, FrameCollectorOverflowRecoveryOutcome.Failed)
             }
+            last = result
+            if (result is com.letta.mobile.data.timeline.RecentMessagesReconcileOutcome.Applied) {
+                return CompletedReconciliation(
+                    attempt,
+                    FrameCollectorOverflowRecoveryOutcome.Reconciled(result.appended),
+                )
+            }
+            if (attempt < MAX_RECONCILE_ATTEMPTS) delay(RECONCILE_RETRY_DELAY_MS)
         }
-        return FrameCollectorOverflowRecoveryOutcome.NotApplied(checkNotNull(last))
+        return CompletedReconciliation(
+            MAX_RECONCILE_ATTEMPTS,
+            FrameCollectorOverflowRecoveryOutcome.NotApplied(checkNotNull(last)),
+        )
+    }
+
+    private suspend fun rememberIncident(key: Pair<Long, Long>): Boolean = seenIncidentsMutex.withLock {
+        if (!seenIncidents.add(key)) return@withLock false
+        seenIncidentOrder.addLast(key)
+        if (seenIncidentOrder.size > MAX_RETAINED_INCIDENTS) {
+            seenIncidents.remove(seenIncidentOrder.removeFirst())
+        }
+        true
+    }
+
+    private suspend fun acquireConversationLock(key: Pair<Long, String>): ConversationRecoveryLock =
+        conversationLocksMutex.withLock {
+            conversationLocks.getOrPut(key) { ConversationRecoveryLock() }.also { it.users++ }
+        }
+
+    private suspend fun releaseConversationLock(key: Pair<Long, String>, lock: ConversationRecoveryLock) {
+        conversationLocksMutex.withLock {
+            lock.users--
+            if (lock.users == 0 && conversationLocks[key] === lock) conversationLocks.remove(key)
+        }
     }
 
     private fun publishRecovery(
         incident: FrameCollectorOverflowIncident,
         graphId: Long,
+        attempt: Int,
         outcome: FrameCollectorOverflowRecoveryOutcome,
     ) {
-        _recoveryEvents.tryEmit(incident.toRecoveryEvent(graphId, outcome))
+        _recoveryEvents.tryEmit(incident.toRecoveryEvent(graphId, attempt, outcome))
     }
 
     private suspend fun clearRecoveryStateExcept(graphId: Long?) {
-        seenIncidentsMutex.withLock { seenIncidents.removeAll { it.first != graphId } }
-        conversationLocksMutex.withLock { conversationLocks.keys.removeAll { it.first != graphId } }
+        seenIncidentsMutex.withLock {
+            seenIncidents.removeAll { it.first != graphId }
+            seenIncidentOrder.removeAll { it.first != graphId }
+        }
     }
 
     private val current: IChannelTransport
@@ -284,8 +347,19 @@ class SessionScopedChannelTransport internal constructor(
         proxyScope.cancel()
     }
 
+    private data class CompletedReconciliation(
+        val attempt: Int,
+        val outcome: FrameCollectorOverflowRecoveryOutcome,
+    )
+
+    private data class ConversationRecoveryLock(
+        val mutex: Mutex = Mutex(),
+        var users: Int = 0,
+    )
+
     private companion object {
         const val MAX_RECONCILE_ATTEMPTS = 2
+        const val MAX_RETAINED_INCIDENTS = 256
         const val RECONCILE_RETRY_DELAY_MS = 50L
         const val EVENTS_SUBSCRIPTION = "events"
         const val FRAME_EVENTS_SUBSCRIPTION = "frameEvents"

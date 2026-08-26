@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -56,10 +57,36 @@ class SessionScopedChannelTransportRecoveryTest {
         assertEquals(2, transport.eventsProjection.collectCount)
 
         // The retained incident is replayed when the graph collection is rebuilt.
-        fixture.graphFlow.value = fixture.graph
+        fixture.graphFlow.value = graph(id = 1L, transport = transport)
         runCurrent()
         assertEquals(1, fixture.reconcileCalls.size)
 
+        projection.cancelAndJoin()
+        fixture.proxy.close()
+    }
+
+    @Test
+    fun `generation advancing during subscription registration still reattaches after overflow`() = runTest {
+        val transport = OverflowAwareFakeTransport()
+        transport.eventsProjection.onCollect = {
+            if (transport.eventsProjection.collectCount == 0) {
+                transport.frameCollectorConnectionGeneration = 2L
+            }
+        }
+        val fixture = fixture(transport, this) { _, _ -> RecentMessagesReconcileOutcome.Applied(0) }
+        val received = mutableListOf<String>()
+        val projection = backgroundScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            fixture.proxy.events.collect { received += it.id }
+        }
+
+        transport.overflow(EVENTS, conversationId = "conv-race")
+        runCurrent()
+        transport.emitFrame(assistantFrame("after-race"))
+        runCurrent()
+
+        assertEquals(2L, transport.frameCollectorConnectionGeneration)
+        assertEquals(2, transport.eventsProjection.collectCount)
+        assertEquals(listOf("after-race"), received)
         projection.cancelAndJoin()
         fixture.proxy.close()
     }
@@ -154,17 +181,19 @@ class SessionScopedChannelTransportRecoveryTest {
     @Test
     fun `invalid stale failed skipped and thrown incidents are bounded`() = runTest {
         val transport = OverflowAwareFakeTransport()
-        val outcomes = ArrayDeque<Any>(listOf(
-            RecentMessagesReconcileOutcome.Skipped("busy"),
-            RecentMessagesReconcileOutcome.Failed(IllegalStateException("server failed")),
-            RecentMessagesReconcileOutcome.Failed(IllegalStateException("server failed again")),
-            RecentMessagesReconcileOutcome.Failed(IllegalStateException("server still failed")),
-            IllegalArgumentException("throwing"),
-        ))
-        val fixture = fixture(transport, this) { _, _ ->
-            when (val next = outcomes.removeFirst()) {
-                is Throwable -> throw next
-                else -> next as RecentMessagesReconcileOutcome
+        val attemptsByConversation = mutableMapOf<String, Int>()
+        val fixture = fixture(transport, this) { conversationId, _ ->
+            val attempt = attemptsByConversation.getOrDefault(conversationId, 0) + 1
+            attemptsByConversation[conversationId] = attempt
+            when (conversationId) {
+                "conv-skip" -> if (attempt == 1) {
+                    RecentMessagesReconcileOutcome.Skipped("busy")
+                } else {
+                    RecentMessagesReconcileOutcome.Failed(IllegalStateException("server failed"))
+                }
+                "conv-failed" -> RecentMessagesReconcileOutcome.Failed(IllegalStateException("server failed"))
+                "conv-throw" -> throw IllegalArgumentException("throwing")
+                else -> error("unexpected conversation")
             }
         }
         val observed = mutableListOf<FrameCollectorOverflowRecoveryEvent>()
@@ -177,14 +206,25 @@ class SessionScopedChannelTransportRecoveryTest {
         transport.emitIncident(incident(id = 3L, conversationId = "conv-skip"))
         transport.emitIncident(incident(id = 4L, conversationId = "conv-failed"))
         transport.emitIncident(incident(id = 5L, conversationId = "conv-throw"))
-        advanceUntilIdle()
+        runCurrent()
+        advanceTimeBy(51)
+        runCurrent()
+        transport.emitIncident(incident(id = 1L, conversationId = ""))
+        transport.emitIncident(incident(id = 2L, conversationId = "conv-stale", generation = 0L))
+        runCurrent()
 
-        assertEquals(6, fixture.reconcileCalls.size)
+        assertEquals(5, fixture.reconcileCalls.size)
         assertTrue(observed.any { it.subscriptionId == 1L && it.outcome is FrameCollectorOverflowRecoveryOutcome.InvalidIncident })
         assertTrue(observed.any { it.subscriptionId == 2L && it.outcome is FrameCollectorOverflowRecoveryOutcome.InvalidIncident })
-        val terminals = observed.filter { it.outcome !is FrameCollectorOverflowRecoveryOutcome.Started }
-            .associateBy { it.subscriptionId }
-        assertTrue(terminals.keys.containsAll(setOf(1L, 2L)))
+        val terminalEvents = observed.filter { it.outcome !is FrameCollectorOverflowRecoveryOutcome.Started }
+        assertEquals(terminalEvents.size, terminalEvents.map { it.subscriptionId }.toSet().size)
+        val terminals = terminalEvents.associateBy { it.subscriptionId }
+        assertEquals(setOf(1L, 2L, 3L, 4L, 5L), terminals.keys)
+        assertEquals(0, terminals.getValue(1L).attempt)
+        assertEquals(0, terminals.getValue(2L).attempt)
+        assertEquals(2, terminals.getValue(3L).attempt)
+        assertEquals(2, terminals.getValue(4L).attempt)
+        assertEquals(1, terminals.getValue(5L).attempt)
 
         monitor.cancelAndJoin()
         fixture.proxy.close()
@@ -241,7 +281,7 @@ class SessionScopedChannelTransportRecoveryTest {
             },
         )
         testScope.runCurrent()
-        return Fixture(proxy, graph, graphFlow, reconcileCalls)
+        return Fixture(proxy, graphFlow, reconcileCalls)
     }
 
     private fun graph(id: Long, transport: OverflowAwareFakeTransport): SessionGraph =
@@ -273,7 +313,6 @@ class SessionScopedChannelTransportRecoveryTest {
 
     private data class Fixture(
         val proxy: SessionScopedChannelTransport,
-        val graph: SessionGraph,
         val graphFlow: MutableStateFlow<SessionGraph>,
         val reconcileCalls: MutableList<Pair<String, Long>>,
     )
@@ -286,12 +325,14 @@ class SessionScopedChannelTransportRecoveryTest {
     @OptIn(kotlinx.coroutines.ExperimentalForInheritanceCoroutinesApi::class)
     private class RestartableProjection<T> : SharedFlow<T> {
         private var current = ProjectionGeneration<T>()
+        var onCollect: (() -> Unit)? = null
         var collectCount: Int = 0
             private set
 
         override val replayCache: List<T> get() = emptyList()
 
         override suspend fun collect(collector: kotlinx.coroutines.flow.FlowCollector<T>): Nothing {
+            onCollect?.invoke()
             val generation = current
             collectCount++
             channelFlow {
@@ -334,11 +375,9 @@ class SessionScopedChannelTransportRecoveryTest {
 
         override fun isFrameCollectorOverflowCancellation(
             subscriptionIdentity: String,
-            connectionGeneration: Long,
             cancellation: CancellationException,
         ): Boolean = cancellation is FakeOverflowCancellation &&
-            cancellation.identity == subscriptionIdentity &&
-            cancellation.generation == connectionGeneration
+            cancellation.identity == subscriptionIdentity
 
         fun emitFrame(frame: ServerFrame) = eventsProjection.emit(frame)
         fun emitIncident(incident: FrameCollectorOverflowIncident) {
