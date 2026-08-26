@@ -19,6 +19,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -110,24 +111,28 @@ class SessionScopedChannelTransport internal constructor(
             try {
                 source().collect { emit(it) }
             } catch (cancelled: CancellationException) {
-                if (!kotlin.coroutines.coroutineContext.isActive || sessionManager.currentGraph.value.id != graph.id) {
+                kotlin.coroutines.coroutineContext.ensureActive()
+                if (!isCurrentOverflowDetach(graph.id, overflowAware, subscriptionIdentity, cancelled)) {
                     throw cancelled
                 }
-                // Match the transport-owned cancellation itself rather than a generation
-                // sampled before collection. A redial may advance the generation while
-                // the subscription is registering, but the typed detach still requires
-                // this projection to reattach.
-                val detachedByOverflow = overflowAware
-                    ?.isFrameCollectorOverflowCancellation(subscriptionIdentity, cancelled) == true
-                if (!detachedByOverflow) throw cancelled
                 // Reattach before reconciliation. The recovery job yields once
                 // before fetching canonical state, so frames arriving after the
                 // replacement subscription starts are either streamed or folded
                 // by the reconcile, never stranded in a detach/replay-zero gap.
-                continue
             }
         }
     }
+
+    // Match the transport-owned cancellation itself rather than a generation
+    // sampled before collection. A redial may advance the generation while the
+    // subscription is registering, but the typed detach still requires reattachment.
+    private fun isCurrentOverflowDetach(
+        graphId: Long,
+        overflowAware: FrameCollectorOverflowAwareChannelTransport?,
+        subscriptionIdentity: String,
+        cancellation: CancellationException,
+    ): Boolean = sessionManager.currentGraph.value.id == graphId &&
+        overflowAware?.isFrameCollectorOverflowCancellation(subscriptionIdentity, cancellation) == true
 
     private suspend fun recoverOverflow(graph: SessionRepositoryGraph, incident: FrameCollectorOverflowIncident) {
         val graphId = graph.id
