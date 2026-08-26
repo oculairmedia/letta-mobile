@@ -275,7 +275,7 @@ class IrohFrameFlowDropTest {
         assertEquals(1, overflowEvents.size)
         assertEquals(IrohFramePublisher.EVENTS_SUBSCRIPTION, overflowEvents.single().subscriptionIdentity)
         assertEquals(IrohFramePublisher.DEFAULT_BUFFER_CAPACITY, overflowEvents.single().capacity)
-        assertEquals("AssistantMessage", overflowEvents.single().frameType)
+        assertEquals("assistant_message", overflowEvents.single().frameType)
         assertEquals("conv-1", overflowEvents.single().conversationId)
 
         stallGate.complete(Unit)

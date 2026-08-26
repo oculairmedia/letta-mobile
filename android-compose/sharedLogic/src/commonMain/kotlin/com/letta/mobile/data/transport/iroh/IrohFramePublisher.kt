@@ -2,6 +2,7 @@ package com.letta.mobile.data.transport.iroh
 
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.TransportFrameEvent
+import com.letta.mobile.data.transport.api.FrameCollectorOverflowIncident
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalForInheritanceCoroutinesApi
 import kotlinx.coroutines.NonCancellable
@@ -11,6 +12,12 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+
+internal class FrameCollectorDetachedCancellation(
+    val subscriptionId: Long,
+    val subscriptionIdentity: String,
+    val connectionGeneration: Long,
+) : CancellationException("Iroh frame collector detached after overflow")
 
 /**
  * Single-source canonical publisher for Iroh transport frames.
@@ -28,11 +35,13 @@ import kotlinx.coroutines.withContext
  */
 internal class IrohFramePublisher(
     bufferCapacity: Int = DEFAULT_BUFFER_CAPACITY,
+    private val connectionGeneration: () -> Long = { 0L },
 ) {
     private val overflowEvents = BoundedOverflowBroadcast(DEFAULT_OVERFLOW_EVENT_CAPACITY)
     private val canonicalEvents = BoundedFrameBroadcast(
         bufferCapacity = bufferCapacity,
         onOverflow = overflowEvents::publish,
+        connectionGeneration = connectionGeneration,
     )
 
     val collectorOverflows: SharedFlow<FrameCollectorOverflowEvent> = overflowEvents
@@ -58,13 +67,7 @@ internal class IrohFramePublisher(
 }
 
 /** Recovery provenance emitted once when a corrupt bounded subscription is detached. */
-internal data class FrameCollectorOverflowEvent(
-    val subscriptionId: Long,
-    val subscriptionIdentity: String,
-    val capacity: Int,
-    val frameType: String,
-    val conversationId: String,
-)
+internal typealias FrameCollectorOverflowEvent = FrameCollectorOverflowIncident
 
 /**
  * Bounded recovery provenance with a retained latest incident.
@@ -133,6 +136,19 @@ private fun ServerFrame.overflowConversationId(): String = (when (this) {
     else -> null
 }).orEmpty()
 
+private fun ServerFrame.overflowFrameType(): String = when (this) {
+    is ServerFrame.A2ui -> type
+    is ServerFrame.UserActionOutcome -> type
+    is ServerFrame.Error -> type
+    is ServerFrame.TurnStarted -> type
+    is ServerFrame.UserMessage -> type
+    is ServerFrame.AssistantMessage -> type
+    is ServerFrame.ReasoningMessage -> type
+    is ServerFrame.ToolCallMessage -> type
+    is ServerFrame.ToolReturnMessage -> type
+    else -> this::class.simpleName ?: "server_frame"
+}
+
 /**
  * A replay-zero broadcast with one bounded channel per collector.
  *
@@ -144,6 +160,7 @@ private fun ServerFrame.overflowConversationId(): String = (when (this) {
 private class BoundedFrameBroadcast(
     private val bufferCapacity: Int,
     private val onOverflow: suspend (FrameCollectorOverflowEvent) -> Unit,
+    private val connectionGeneration: () -> Long,
 ) : SharedFlow<TransportFrameEvent> {
     private val mutex = Mutex()
     private val subscriptions = mutableListOf<FrameSubscription>()
@@ -171,8 +188,9 @@ private class BoundedFrameBroadcast(
                         subscriptionId = subscription.id,
                         subscriptionIdentity = subscription.identity,
                         capacity = bufferCapacity,
-                        frameType = event.frame::class.simpleName ?: "ServerFrame",
+                        frameType = event.frame.overflowFrameType(),
                         conversationId = event.frame.overflowConversationId(),
+                        connectionGeneration = subscription.connectionGeneration,
                     ),
                 )
             } finally {
@@ -189,6 +207,7 @@ private class BoundedFrameBroadcast(
             FrameSubscription(
                 id = nextSubscriptionId++,
                 identity = identity,
+                connectionGeneration = connectionGeneration(),
                 frames = Channel(bufferCapacity),
             ).also { subscriptions += it }
         }
@@ -199,7 +218,11 @@ private class BoundedFrameBroadcast(
                 if (event != null) {
                     collector.emit(event)
                 } else {
-                    throw CancellationException("Iroh frame collector detached after overflow")
+                    throw FrameCollectorDetachedCancellation(
+                        subscriptionId = subscription.id,
+                        subscriptionIdentity = subscription.identity,
+                        connectionGeneration = subscription.connectionGeneration,
+                    )
                 }
             }
         } finally {
@@ -216,6 +239,7 @@ private class BoundedFrameBroadcast(
     private class FrameSubscription(
         val id: Long,
         val identity: String,
+        val connectionGeneration: Long,
         val frames: Channel<TransportFrameEvent>,
     )
 }
