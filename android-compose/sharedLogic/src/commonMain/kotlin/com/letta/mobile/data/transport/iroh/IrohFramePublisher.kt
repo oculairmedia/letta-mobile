@@ -19,8 +19,8 @@ import kotlinx.coroutines.withContext
  * so every attached collector observes the same order, while a stalled
  * collector cannot backpressure healthy collectors or the ingest path. A queue
  * that fills is detached and failed explicitly instead of silently evicting an
- * older frame. The collector can then restart and reconcile through the normal
- * message-list hydration path.
+ * older frame. The retained overflow event gives the session lifecycle owner
+ * the exact subscription and conversation provenance required to reconcile.
  *
  * Replay remains zero: registering after a frame was published never receives
  * that old frame. Registration, publication, overflow removal, and cancellation
@@ -29,12 +29,20 @@ import kotlinx.coroutines.withContext
 internal class IrohFramePublisher(
     bufferCapacity: Int = DEFAULT_BUFFER_CAPACITY,
 ) {
-    private val canonicalEvents = BoundedFrameBroadcast(bufferCapacity)
+    private val overflowEvents = BoundedOverflowBroadcast(DEFAULT_OVERFLOW_EVENT_CAPACITY)
+    private val canonicalEvents = BoundedFrameBroadcast(
+        bufferCapacity = bufferCapacity,
+        onOverflow = overflowEvents::publish,
+    )
 
-    val frameEvents: SharedFlow<TransportFrameEvent> = canonicalEvents
+    val collectorOverflows: SharedFlow<FrameCollectorOverflowEvent> = overflowEvents
+
+    val frameEvents: SharedFlow<TransportFrameEvent> =
+        NamedTransportFrameSharedFlow(FRAME_EVENTS_SUBSCRIPTION, canonicalEvents)
 
     /** A synchronous projection; collecting it directly collects [canonicalEvents]. */
-    val events: SharedFlow<ServerFrame> = ServerFrameSharedFlow(canonicalEvents)
+    val events: SharedFlow<ServerFrame> =
+        ServerFrameSharedFlow(EVENTS_SUBSCRIPTION, canonicalEvents)
 
     /** Publishes once to every currently attached collector without awaiting one collector's drain. */
     suspend fun publish(frame: ServerFrame) {
@@ -43,30 +51,103 @@ internal class IrohFramePublisher(
 
     companion object {
         const val DEFAULT_BUFFER_CAPACITY = 64
+        const val DEFAULT_OVERFLOW_EVENT_CAPACITY = 64
+        const val EVENTS_SUBSCRIPTION = "events"
+        const val FRAME_EVENTS_SUBSCRIPTION = "frameEvents"
     }
 }
 
-/**
- * Explicit collector-local cancellation signal: the collector must restart and reconcile,
- * but overflow must never fail the transport publisher or its lifecycle owner.
- */
-internal class FrameCollectorOverflowException : CancellationException(
-    "Iroh frame collector exceeded its bounded queue; reconnect and reconcile",
+/** Recovery provenance emitted once when a corrupt bounded subscription is detached. */
+internal data class FrameCollectorOverflowEvent(
+    val subscriptionId: Long,
+    val subscriptionIdentity: String,
+    val capacity: Int,
+    val frameType: String,
+    val conversationId: String,
 )
+
+/**
+ * Bounded recovery provenance with a retained latest incident.
+ *
+ * Unlike a replay-zero MutableSharedFlow, an incident published before the
+ * lifecycle owner attaches cannot disappear. Slow telemetry observers are
+ * disconnected rather than backpressuring frame ingest; provenance remains
+ * queryable through [replayCache] for reconciliation.
+ */
+@OptIn(ExperimentalForInheritanceCoroutinesApi::class)
+private class BoundedOverflowBroadcast(
+    private val bufferCapacity: Int,
+) : SharedFlow<FrameCollectorOverflowEvent> {
+    private val mutex = Mutex()
+    private val subscriptions = mutableListOf<Channel<FrameCollectorOverflowEvent>>()
+    private var latest: FrameCollectorOverflowEvent? = null
+
+    init {
+        require(bufferCapacity > 0) { "bufferCapacity must be positive" }
+    }
+
+    override val replayCache: List<FrameCollectorOverflowEvent>
+        get() = latest?.let(::listOf).orEmpty()
+
+    suspend fun publish(event: FrameCollectorOverflowEvent) {
+        val overflowed = mutex.withLock {
+            latest = event
+            val failed = subscriptions.filter { it.trySend(event).isFailure }
+            subscriptions.removeAll(failed)
+            failed
+        }
+        overflowed.forEach { it.close() }
+    }
+
+    override suspend fun collect(collector: FlowCollector<FrameCollectorOverflowEvent>): Nothing {
+        val subscription = Channel<FrameCollectorOverflowEvent>(bufferCapacity)
+        mutex.withLock {
+            latest?.let { subscription.trySend(it) }
+            subscriptions += subscription
+        }
+        try {
+            while (true) {
+                val event = subscription.receiveCatching().getOrNull()
+                    ?: throw CancellationException("Iroh overflow observer detached")
+                collector.emit(event)
+            }
+        } finally {
+            withContext(NonCancellable) {
+                mutex.withLock { subscriptions.remove(subscription) }
+                subscription.cancel()
+            }
+        }
+    }
+}
+
+private fun ServerFrame.overflowConversationId(): String = (when (this) {
+    is ServerFrame.A2ui -> conversationId
+    is ServerFrame.UserActionOutcome -> conversationId
+    is ServerFrame.Error -> conversationId
+    is ServerFrame.TurnStarted -> conversationId
+    is ServerFrame.UserMessage -> conversationId
+    is ServerFrame.AssistantMessage -> conversationId
+    is ServerFrame.ReasoningMessage -> conversationId
+    is ServerFrame.ToolCallMessage -> conversationId
+    is ServerFrame.ToolReturnMessage -> conversationId
+    else -> null
+}).orEmpty()
 
 /**
  * A replay-zero broadcast with one bounded channel per collector.
  *
  * [publish] never suspends on a destination channel. Full destinations are
- * atomically detached before their channel is failed, preventing subsequent
+ * atomically detached before their channel is closed, preventing subsequent
  * frames from entering an already-invalid stream.
  */
 @OptIn(ExperimentalForInheritanceCoroutinesApi::class)
 private class BoundedFrameBroadcast(
     private val bufferCapacity: Int,
+    private val onOverflow: suspend (FrameCollectorOverflowEvent) -> Unit,
 ) : SharedFlow<TransportFrameEvent> {
     private val mutex = Mutex()
     private val subscriptions = mutableListOf<FrameSubscription>()
+    private var nextSubscriptionId = 1L
 
     init {
         require(bufferCapacity > 0) { "bufferCapacity must be positive" }
@@ -84,13 +165,33 @@ private class BoundedFrameBroadcast(
             failed
         }
         overflowed.forEach { subscription ->
-            subscription.frames.close(FrameCollectorOverflowException())
+            try {
+                onOverflow(
+                    FrameCollectorOverflowEvent(
+                        subscriptionId = subscription.id,
+                        subscriptionIdentity = subscription.identity,
+                        capacity = bufferCapacity,
+                        frameType = event.frame::class.simpleName ?: "ServerFrame",
+                        conversationId = event.frame.overflowConversationId(),
+                    ),
+                )
+            } finally {
+                subscription.frames.close()
+            }
         }
     }
 
-    override suspend fun collect(collector: FlowCollector<TransportFrameEvent>): Nothing {
-        val subscription = FrameSubscription(Channel(bufferCapacity))
-        mutex.withLock { subscriptions += subscription }
+    suspend fun collect(
+        identity: String,
+        collector: FlowCollector<TransportFrameEvent>,
+    ): Nothing {
+        val subscription = mutex.withLock {
+            FrameSubscription(
+                id = nextSubscriptionId++,
+                identity = identity,
+                frames = Channel(bufferCapacity),
+            ).also { subscriptions += it }
+        }
         try {
             while (true) {
                 val result = subscription.frames.receiveCatching()
@@ -98,8 +199,7 @@ private class BoundedFrameBroadcast(
                 if (event != null) {
                     collector.emit(event)
                 } else {
-                    throw result.exceptionOrNull()
-                        ?: CancellationException("Iroh frame collector closed")
+                    throw CancellationException("Iroh frame collector detached after overflow")
                 }
             }
         } finally {
@@ -110,19 +210,42 @@ private class BoundedFrameBroadcast(
         }
     }
 
+    override suspend fun collect(collector: FlowCollector<TransportFrameEvent>): Nothing =
+        collect("canonical", collector)
+
     private class FrameSubscription(
+        val id: Long,
+        val identity: String,
         val frames: Channel<TransportFrameEvent>,
     )
+}
+
+/** Names a canonical projection without adding another queue. */
+@OptIn(ExperimentalForInheritanceCoroutinesApi::class)
+private class NamedTransportFrameSharedFlow(
+    private val identity: String,
+    private val canonicalEvents: BoundedFrameBroadcast,
+) : SharedFlow<TransportFrameEvent> {
+    override val replayCache: List<TransportFrameEvent>
+        get() = canonicalEvents.replayCache
+
+    override suspend fun collect(collector: FlowCollector<TransportFrameEvent>): Nothing =
+        canonicalEvents.collect(identity, collector)
 }
 
 /** Maps the canonical flow inline without owning a coroutine, buffer, or queue. */
 @OptIn(ExperimentalForInheritanceCoroutinesApi::class)
 internal class ServerFrameSharedFlow(
+    private val identity: String = IrohFramePublisher.EVENTS_SUBSCRIPTION,
     private val canonicalEvents: SharedFlow<TransportFrameEvent>,
 ) : SharedFlow<ServerFrame> {
     override val replayCache: List<ServerFrame>
         get() = canonicalEvents.replayCache.map(TransportFrameEvent::frame)
 
     override suspend fun collect(collector: FlowCollector<ServerFrame>): Nothing =
-        canonicalEvents.collect { event -> collector.emit(event.frame) }
+        if (canonicalEvents is BoundedFrameBroadcast) {
+            canonicalEvents.collect(identity) { event -> collector.emit(event.frame) }
+        } else {
+            canonicalEvents.collect { event -> collector.emit(event.frame) }
+        }
 }
