@@ -1,5 +1,6 @@
 package com.letta.mobile.data.session
 
+import com.letta.mobile.data.timeline.RecentMessagesReconcileOutcome
 import com.letta.mobile.testutil.FakeChannelTransport
 import io.mockk.every
 import io.mockk.mockk
@@ -36,6 +37,9 @@ class SessionScopedChannelTransportOwnershipTest {
         return SessionScopedChannelTransport(
             sessionManager = sessionManager,
             proxyScope = CoroutineScope(SupervisorJob() + StandardTestDispatcher()),
+            overflowReconciler = FrameCollectorOverflowReconciler { _, _ ->
+                RecentMessagesReconcileOutcome.Applied(0)
+            },
         )
     }
 

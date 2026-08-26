@@ -14,7 +14,6 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -27,7 +26,7 @@ class IrohFrameFlowDropTest {
     @Test
     fun synchronousProjectionMapsCanonicalReplayCache() {
         val canonical = MutableSharedFlow<TransportFrameEvent>(replay = 1)
-        val projection = ServerFrameSharedFlow(canonical)
+        val projection = ServerFrameSharedFlow(canonicalEvents = canonical)
         val frame = ServerFrame.AssistantMessage(
             id = "replayed-msg",
             ts = "2026-08-23T00:00:00Z",
@@ -218,16 +217,14 @@ class IrohFrameFlowDropTest {
     }
 
     @Test
-    fun stalledCollectorCannotBlockPublisherOrHealthyCollector() = runTest(UnconfinedTestDispatcher()) {
+    fun stalledCollectorDetachesNormallyWithoutBlockingHealthyCollector() = runTest(UnconfinedTestDispatcher()) {
         val publisher = IrohFramePublisher(bufferCapacity = 2)
         val stallGate = CompletableDeferred<Unit>()
         val slowReceived = mutableListOf<String>()
         val slowJob = launch(start = CoroutineStart.UNDISPATCHED) {
-            kotlin.test.assertFailsWith<FrameCollectorOverflowException> {
-                publisher.frameEvents.collect { event ->
-                    slowReceived += event.frame.id
-                    if (slowReceived.size == 1) stallGate.await()
-                }
+            publisher.frameEvents.collect { event ->
+                slowReceived += event.frame.id
+                if (slowReceived.size == 1) stallGate.await()
             }
         }
         val healthyReceived = mutableListOf<String>()
@@ -243,42 +240,12 @@ class IrohFrameFlowDropTest {
 
         assertEquals(expected, healthyReceived)
         assertEquals(listOf("msg-1"), slowReceived)
-        assertTrue(slowJob.isActive, "overflow is observed after the stalled callback resumes")
+        assertTrue(slowJob.isActive, "detachment completes after the stalled callback resumes")
 
         stallGate.complete(Unit)
         slowJob.join()
+        assertTrue(slowJob.isCancelled, "detachment uses normal coroutine cancellation")
         assertTrue(coroutineContext.isActive, "collector-local overflow must not cancel the publisher owner")
-        healthyJob.cancelAndJoin()
-    }
-
-    @Test
-    fun overflowFailsExplicitlyWithoutDroppingFromHealthyDestination() = runTest(UnconfinedTestDispatcher()) {
-        val publisher = IrohFramePublisher(bufferCapacity = 1)
-        val stallGate = CompletableDeferred<Unit>()
-        val overflowObserved = CompletableDeferred<Unit>()
-        val stalledJob = launch(start = CoroutineStart.UNDISPATCHED) {
-            kotlin.test.assertFailsWith<FrameCollectorOverflowException> {
-                publisher.events.collect {
-                    stallGate.await()
-                }
-            }
-            overflowObserved.complete(Unit)
-        }
-        val healthy = mutableListOf<String>()
-        val healthyJob = launch(start = CoroutineStart.UNDISPATCHED) {
-            publisher.frameEvents.collect { healthy += it.frame.id }
-        }
-
-        (1..3).forEach { index ->
-            publisher.publish(assistantFrame("frame-$index"))
-            runCurrent()
-        }
-        assertEquals(listOf("frame-1", "frame-2", "frame-3"), healthy)
-        assertFalse(overflowObserved.isCompleted)
-
-        stallGate.complete(Unit)
-        overflowObserved.await()
-        stalledJob.join()
         healthyJob.cancelAndJoin()
     }
 

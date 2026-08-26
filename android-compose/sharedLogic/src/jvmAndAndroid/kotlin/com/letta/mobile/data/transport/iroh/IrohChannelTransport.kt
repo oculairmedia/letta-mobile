@@ -8,6 +8,8 @@ import com.letta.mobile.data.transport.A2uiActionDispatchResult
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.TransportFrameEvent
+import com.letta.mobile.data.transport.api.FrameCollectorOverflowAwareChannelTransport
+import com.letta.mobile.data.transport.api.FrameCollectorOverflowIncident
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.api.LivenessProbingChannelTransport
 import com.letta.mobile.data.transport.api.RedialAwareChannelTransport
@@ -109,13 +111,22 @@ class IrohChannelTransport(
     // expire young-in-flight protection without waiting the production 45s window.
     private val livenessCongestionGraceMs: Long = IrohLivenessProbe.CONGESTION_GRACE_MS,
     private val livenessMaxDetectionMs: Long = IrohLivenessProbe.MAX_DETECTION_MS,
-) : IChannelTransport, RedialAwareChannelTransport, LivenessProbingChannelTransport {
+) : IChannelTransport, RedialAwareChannelTransport, LivenessProbingChannelTransport,
+    FrameCollectorOverflowAwareChannelTransport {
     private val _state = MutableStateFlow<ChannelTransportState>(ChannelTransportState.Idle)
     override val state: StateFlow<ChannelTransportState> = _state.asStateFlow()
 
-    private val framePublisher = IrohFramePublisher()
+    private val framePublisher = IrohFramePublisher(connectionGeneration = ::currentConnectionGeneration)
     override val events: SharedFlow<ServerFrame> = framePublisher.events
     override val frameEvents: SharedFlow<TransportFrameEvent> = framePublisher.frameEvents
+    override val collectorOverflows: SharedFlow<FrameCollectorOverflowIncident> = framePublisher.collectorOverflows
+    override val frameCollectorConnectionGeneration: Long
+        get() = currentConnectionGeneration()
+    override fun isFrameCollectorOverflowCancellation(
+        subscriptionIdentity: String,
+        cancellation: CancellationException,
+    ): Boolean = cancellation is FrameCollectorDetachedCancellation &&
+        cancellation.subscriptionIdentity == subscriptionIdentity
 
     private val _redialWhileTurnActive = MutableSharedFlow<RedialWhileTurnActive>(extraBufferCapacity = 8)
     override val redialWhileTurnActive: SharedFlow<RedialWhileTurnActive> = _redialWhileTurnActive.asSharedFlow()
