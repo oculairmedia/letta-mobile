@@ -972,7 +972,7 @@ class AppServerTurnEngine(
     private fun trackToolCallAndApprovalIds(
         draft: RuntimeEventDraft,
         key: TurnRuntimeKey,
-        ledger: ToolCallLedger,
+        ledger: TurnToolCallLedger,
     ) {
         when (val payload = draft.payload) {
             is RuntimeEventPayload.ToolCallObserved -> ledger.emitted.add(payload.toolCallId.value)
@@ -1033,7 +1033,7 @@ class AppServerTurnEngine(
     private fun resolveStreamedToolReturn(
         payload: RuntimeEventPayload.RemoteStreamFrame,
         key: TurnRuntimeKey,
-        ledger: ToolCallLedger,
+        ledger: TurnToolCallLedger,
     ) {
         if (payload.messageType != "tool_return_message") return
         extractToolCallId(payload.body)?.let {
@@ -1064,12 +1064,6 @@ class AppServerTurnEngine(
         approvals.record(key, ApprovalRegistry.Gate(callId, approval.requestId))
     }
 
-    /** tool_call_ids observed for one turn (letta-mobile-oqfbj settlement). */
-    private class ToolCallLedger {
-        val emitted = mutableSetOf<String>()
-        val returned = mutableSetOf<String>()
-    }
-
     private inner class TurnIdleWatchdog(private val key: TurnRuntimeKey) {
         private val lastFrameAt = atomic(currentTimeMs())
 
@@ -1092,14 +1086,6 @@ class AppServerTurnEngine(
         }
     }
 
-    private data class TurnDraftContext(
-        val runtimeScope: AppServerRuntimeScope,
-        val command: TurnCommand,
-        val permissionMode: AppServerPermissionMode,
-        val lease: LeaseRef,
-        val emit: suspend (RuntimeEventDraft) -> Unit,
-    )
-
     private data class TurnFrameContext(
         val runtimeScope: AppServerRuntimeScope,
         val command: TurnCommand,
@@ -1109,138 +1095,6 @@ class AppServerTurnEngine(
         val externalToolDispatchScope: CoroutineScope,
         val emit: suspend (RuntimeEventDraft) -> Unit,
     )
-
-    private inner class TurnDraftProcessor(
-        private val context: TurnDraftContext,
-        private val coroutineScope: CoroutineScope,
-    ) {
-        val ledger = ToolCallLedger()
-        private val slot = context.lease.slot
-        private var pendingCompleted: RuntimeEventDraft? = null
-        private var pendingStop: RuntimeEventDraft? = null
-        private var pendingUsage: RuntimeEventDraft? = null
-        private var terminalArmed = false
-        private var speculativeCompletionArmed = false
-        private var sawToolReturn = false
-        private var sawAssistantAfterToolReturn = false
-        private var pendingCompletedSeq: Long? = null
-        var terminalSettleJob: Job? = null
-            private set
-
-        suspend fun flushTail() {
-            approvals.clearKey(slot.key)
-            pendingStop?.let { context.emit(it) }
-            pendingStop = null
-            pendingUsage?.let { context.emit(it) }
-            pendingUsage = null
-        }
-
-        suspend fun process(draft: RuntimeEventDraft, frameSeq: Long?) {
-            if (emitAutoApproved(draft)) return
-            trackToolCallAndApprovalIds(draft, slot.key, ledger)
-            observeContinuedActivity(draft)
-            if (bufferTail(draft, frameSeq)) return
-            if (draft.isCompletedLifecycle()) {
-                pendingCompleted = draft
-                armCompletedTerminalOnce()
-                return
-            }
-            if (draft.isTerminalLifecycle()) {
-                emitTerminal(draft, frameSeq)
-                return
-            }
-            context.emit(draft)
-            armCompletedTerminalOnce()
-        }
-
-        private suspend fun emitAutoApproved(draft: RuntimeEventDraft): Boolean {
-            val approved = autoApprovedToolCallDraft(
-                context.runtimeScope,
-                context.permissionMode,
-                context.command,
-                draft,
-            ) ?: return false
-            ledger.emitted.add(approved.toolCallId.value)
-            context.emit(context.command.draftFor(runId = draft.runId, payload = approved))
-            armCompletedTerminalOnce()
-            return true
-        }
-
-        private fun observeContinuedActivity(draft: RuntimeEventDraft) {
-            val continued = draft.isToolCallFrame() || draft.isToolReturnFrame() || draft.isAssistantFrame()
-            if (speculativeCompletionArmed && continued) cancelSpeculativeCompletion()
-            if (draft.isToolReturnFrame()) sawToolReturn = true
-            if (sawToolReturn && draft.isAssistantFrame()) sawAssistantAfterToolReturn = true
-        }
-
-        private fun bufferTail(draft: RuntimeEventDraft, frameSeq: Long?): Boolean {
-            if (draft.isStopReasonFrame()) {
-                pendingStop = draft
-                return true
-            }
-            if (!draft.isUsageStatisticsFrame()) return false
-            if (pendingUsage == null) pendingUsage = draft
-            armSpeculativeCompletionAfterUsage(draft, frameSeq)
-            return true
-        }
-
-        private fun armSpeculativeCompletionAfterUsage(draft: RuntimeEventDraft, frameSeq: Long?) {
-            if (!sawAssistantAfterToolReturn) return
-            if (pendingCompleted == null) {
-                pendingCompleted = context.command.completedDraft(draft.runId)
-                pendingCompletedSeq = frameSeq
-            }
-            sawAssistantAfterToolReturn = false
-            sawToolReturn = false
-            speculativeCompletionArmed = true
-            armCompletedTerminalOnce()
-        }
-
-        private suspend fun emitTerminal(draft: RuntimeEventDraft, frameSeq: Long?) {
-            if (draft.isAbnormalTerminal()) {
-                settleDanglingToolCalls(
-                    context.command,
-                    ledger.emitted,
-                    ledger.returned,
-                    context.emit,
-                    "Tool execution interrupted by turn termination",
-                )
-            }
-            flushTail()
-            recordTerminalLifecycle(draft, context.command, frameSeq, context.lease)
-            context.emit(draft)
-            throw TurnCompleted
-        }
-
-        private fun cancelSpeculativeCompletion() {
-            if (!speculativeCompletionArmed) return
-            terminalSettleJob?.cancel()
-            terminalSettleJob = null
-            terminalArmed = false
-            speculativeCompletionArmed = false
-            pendingCompleted = null
-            pendingCompletedSeq = null
-        }
-
-        private fun armCompletedTerminalOnce() {
-            if (terminalArmed || pendingCompleted == null) return
-            terminalArmed = true
-            terminalSettleJob = coroutineScope.launch {
-                delay(terminalSettleQuietMs.milliseconds)
-                val terminal = pendingCompleted ?: return@launch
-                flushTail()
-                noteOwnerTerminal(
-                    RuntimeRunStatus.Completed,
-                    source = "completed_settle",
-                    seq = pendingCompletedSeq,
-                    scopeMatched = true,
-                    lease = context.lease,
-                )
-                context.emit(terminal)
-                throw TurnCompleted
-            }
-        }
-    }
 
     private suspend fun processReceivedFrame(received: AppServerReceivedFrame, context: TurnFrameContext) {
         if (isConnectionGenerationSuperseded(context.lease)) {
@@ -1317,7 +1171,34 @@ class AppServerTurnEngine(
         val idleWatchdog = TurnIdleWatchdog(slot.key)
         val watchdog = idleWatchdog.launchIn(this)
         val draftProcessor = TurnDraftProcessor(
-            context = TurnDraftContext(scope, command, turnPermissionMode, lease, emitDraft),
+            callbacks = TurnDraftCallbacks(
+                autoApprovedDraft = { draft ->
+                    autoApprovedToolCallDraft(scope, turnPermissionMode, command, draft)?.let { approved ->
+                        command.draftFor(runId = draft.runId, payload = approved)
+                    }
+                },
+                track = { draft, ledger -> trackToolCallAndApprovalIds(draft, slot.key, ledger) },
+                clearApprovals = { approvals.clearKey(slot.key) },
+                emit = emitDraft,
+                settle = { ledger, reason ->
+                    settleDanglingToolCalls(command, ledger.emitted, ledger.returned, emitDraft, reason)
+                },
+                completedDraft = { runId -> command.completedDraft(runId) },
+                recordTerminal = { draft, frameSeq ->
+                    recordTerminalLifecycle(draft, command, frameSeq, lease)
+                },
+                noteCompleted = { frameSeq ->
+                    noteOwnerTerminal(
+                        RuntimeRunStatus.Completed,
+                        source = "completed_settle",
+                        seq = frameSeq,
+                        scopeMatched = true,
+                        lease = lease,
+                    )
+                },
+                complete = { throw TurnCompleted },
+                settleDelayMs = terminalSettleQuietMs,
+            ),
             coroutineScope = this,
         )
         val emittedToolCallIds = draftProcessor.ledger.emitted
@@ -1731,78 +1612,6 @@ class AppServerTurnEngine(
             source = RuntimeEventSource.LocalRuntime,
             payload = RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Cancelled, reason = reason),
         )
-
-    private fun RuntimeEventDraft.isTerminalLifecycle(): Boolean {
-        val lifecycle = payload as? RuntimeEventPayload.RunLifecycleChanged ?: return false
-        return lifecycle.status == RuntimeRunStatus.Completed ||
-            lifecycle.status == RuntimeRunStatus.Failed ||
-            lifecycle.status == RuntimeRunStatus.Cancelled
-    }
-
-    private fun RuntimeEventDraft.isCompletedLifecycle(): Boolean {
-        val lifecycle = payload as? RuntimeEventPayload.RunLifecycleChanged ?: return false
-        return lifecycle.status == RuntimeRunStatus.Completed
-    }
-
-    /**
-     * fix(no-settle-on-clean-completion): true only for Failed/Cancelled
-     * terminal lifecycles — i.e. an ABNORMAL end. [isTerminalLifecycle] is
-     * still used for flow control (both clean and abnormal terminals end the
-     * collect loop the same way); this narrower check gates whether dangling
-     * tool calls should be settled with a synthetic Failed return. See
-     * [settleDanglingToolCalls] for why Completed must never settle.
-     */
-    private fun RuntimeEventDraft.isAbnormalTerminal(): Boolean {
-        val lifecycle = payload as? RuntimeEventPayload.RunLifecycleChanged ?: return false
-        return lifecycle.status == RuntimeRunStatus.Failed ||
-            lifecycle.status == RuntimeRunStatus.Cancelled
-    }
-
-    private fun RuntimeEventDraft.isToolReturnFrame(): Boolean = when (val event = payload) {
-        is RuntimeEventPayload.ToolReturnObserved -> true
-        is RuntimeEventPayload.RemoteStreamFrame -> event.messageType == "client_tool_end" ||
-            event.messageType == "tool_return_message" ||
-            frameMessageType(event.body) in setOf("client_tool_end", "tool_return_message")
-        else -> false
-    }
-
-    private fun RuntimeEventDraft.isAssistantFrame(): Boolean = when (val event = payload) {
-        is RuntimeEventPayload.RemoteStreamFrame -> event.messageType == "assistant_message" ||
-            frameMessageType(event.body) == "assistant_message"
-        else -> false
-    }
-
-    // letta-mobile-c4igq.6: a tool_call announcement (used to detect a new tool
-    // round continuing after a speculative post-tool usage completion was armed).
-    private fun RuntimeEventDraft.isToolCallFrame(): Boolean = when (val event = payload) {
-        is RuntimeEventPayload.ToolCallObserved -> true
-        is RuntimeEventPayload.ApprovalRequested -> true
-        is RuntimeEventPayload.RemoteStreamFrame -> event.messageType == "client_tool_start" ||
-            event.messageType == "tool_call_message" ||
-            frameMessageType(event.body) in setOf("client_tool_start", "tool_call_message")
-        else -> false
-    }
-
-    private fun RuntimeEventDraft.isUsageStatisticsFrame(): Boolean = when (val event = payload) {
-        is RuntimeEventPayload.RemoteStreamFrame -> event.messageType == "usage_statistics" ||
-            frameMessageType(event.body) == "usage_statistics"
-        is RuntimeEventPayload.ExternalTransportFrame -> event.body.startsWith("usage:") ||
-            frameMessageType(event.body) == "usage_statistics"
-        else -> false
-    }
-
-    private fun RuntimeEventDraft.isStopReasonFrame(): Boolean = when (val event = payload) {
-        is RuntimeEventPayload.RemoteStreamFrame -> event.messageType == "stop_reason" ||
-            frameMessageType(event.body) == "stop_reason"
-        is RuntimeEventPayload.ExternalTransportFrame -> frameMessageType(event.body) == "stop_reason"
-        else -> false
-    }
-
-    private fun frameMessageType(body: String): String? = runCatching {
-        val raw = AppServerProtocol.json.parseToJsonElement(body).jsonObject
-        val delta = raw["delta"]?.jsonObject ?: raw
-        delta.string("message_type")
-    }.getOrNull()
 
     private fun AppServerReceivedFrame.matches(
         scope: AppServerRuntimeScope,
