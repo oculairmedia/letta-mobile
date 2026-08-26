@@ -32,7 +32,6 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.shareIn
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -106,20 +105,27 @@ class SessionScopedChannelTransport internal constructor(
         subscriptionIdentity: String,
         source: () -> SharedFlow<T>,
     ) = flow {
-        while (kotlin.coroutines.coroutineContext.isActive) {
-            val overflowAware = graph.channelTransport as? FrameCollectorOverflowAwareChannelTransport
-            try {
-                source().collect { emit(it) }
-            } catch (cancelled: CancellationException) {
-                kotlin.coroutines.coroutineContext.ensureActive()
-                if (!isCurrentOverflowDetach(graph.id, overflowAware, subscriptionIdentity, cancelled)) {
-                    throw cancelled
-                }
-                // Reattach before reconciliation. The recovery job yields once
-                // before fetching canonical state, so frames arriving after the
-                // replacement subscription starts are either streamed or folded
-                // by the reconcile, never stranded in a detach/replay-zero gap.
+        while (true) {
+            collectProjectionOnce(graph, subscriptionIdentity, source) { emit(it) }
+        }
+    }
+
+    private suspend fun <T> collectProjectionOnce(
+        graph: SessionRepositoryGraph,
+        subscriptionIdentity: String,
+        source: () -> SharedFlow<T>,
+        emit: suspend (T) -> Unit,
+    ) {
+        val overflowAware = graph.channelTransport as? FrameCollectorOverflowAwareChannelTransport
+        try {
+            source().collect { emit(it) }
+        } catch (cancelled: CancellationException) {
+            kotlin.coroutines.coroutineContext.ensureActive()
+            if (!isCurrentOverflowDetach(graph.id, overflowAware, subscriptionIdentity, cancelled)) {
+                throw cancelled
             }
+            // Reattach before reconciliation. The recovery job yields once before
+            // fetching canonical state, so no frame is stranded in a replay-zero gap.
         }
     }
 
