@@ -325,7 +325,7 @@ internal fun SubagentDispatchCard(
                 SubagentMetaChip(text = dispatch.subagentType)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                status?.let { SubagentMetaChip(text = it) }
+                status?.let { SubagentMetaChip(text = subagentDispatchStatus(it)) }
                 executionTimeMs?.let(::formatToolExecutionTime)?.let { SubagentMetaChip(text = it) }
                 dispatch.taskId?.let { SubagentMetaChip(text = it) }
             }
@@ -366,6 +366,12 @@ internal fun SubagentDispatchCard(
             }
         }
     }
+}
+
+internal fun subagentDispatchStatus(toolStatus: String): String = when (toolStatus.lowercase()) {
+    "success", "succeeded", "completed", "complete", "done" -> "Sub-agent dispatched"
+    "error", "failed" -> "Dispatch failed"
+    else -> "Sub-agent dispatching"
 }
 
 @Composable

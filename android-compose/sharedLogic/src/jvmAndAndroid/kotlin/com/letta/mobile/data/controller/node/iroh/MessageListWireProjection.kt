@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.model.SyntheticSkillEnvelopeDetector
+import com.letta.mobile.data.subagents.SubagentParentProjection
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -45,13 +46,47 @@ object MessageListWireProjection {
      * shape is returned untouched.
      */
     fun projectMessageList(response: JsonElement, conversationId: String): JsonElement = when (response) {
-        is JsonArray -> JsonArray(response.mapNotNull { projectElement(it, conversationId) })
+        is JsonArray -> JsonArray(projectElements(response, conversationId))
         is JsonObject if response["messages"] is JsonArray -> JsonObject(
             response.toMutableMap().apply {
-                this["messages"] = JsonArray((response["messages"] as JsonArray).mapNotNull { projectElement(it, conversationId) })
+                this["messages"] = JsonArray(projectElements(response["messages"] as JsonArray, conversationId))
             },
         )
         else -> response
+    }
+
+    private fun projectElements(messages: JsonArray, conversationId: String): List<JsonElement> {
+        val agentCallIds = messages.mapNotNull { element ->
+            val message = element as? JsonObject ?: return@mapNotNull null
+            if (messageType(message) !in setOf("tool_call_message", "tool_call")) return@mapNotNull null
+            val call = message["tool_call"] as? JsonObject
+            val name = string(call, "name") ?: string(message, "name")
+            if (name != "Agent") return@mapNotNull null
+            string(call, "tool_call_id") ?: string(message, "tool_call_id")
+        }.toSet()
+        return messages.mapNotNull { element ->
+            val message = element as? JsonObject
+            val callId = message?.let { string(it, "tool_call_id") }
+            val body = message?.get("tool_return")?.let {
+                if (it is JsonPrimitive && it.isString) it.content else it.toString()
+            }.orEmpty()
+            val explicitSubagentReturn = body.contains("<task-notification", ignoreCase = true) ||
+                message?.get("subagent_id") != null || message?.get("task_id") != null
+            val sanitized = if (
+                message != null &&
+                messageType(message) in TOOL_RETURN_MESSAGE_TYPES &&
+                (callId in agentCallIds || explicitSubagentReturn)
+            ) {
+                SubagentParentProjection.sanitizedAgentReturn(
+                    message,
+                    conversationId,
+                    string(message, "id"),
+                )
+            } else {
+                message
+            }
+            if (sanitized == null) element else projectElement(sanitized, conversationId)
+        }
     }
 
     private fun projectElement(element: JsonElement, conversationId: String): JsonElement? =
@@ -79,6 +114,11 @@ object MessageListWireProjection {
         val content = (message["content"] as? JsonPrimitive)?.contentOrNull ?: return false
         return SyntheticSkillEnvelopeDetector.isSyntheticSkillEnvelope(role, content)
     }
+
+    private fun messageType(message: JsonObject): String? = string(message, "message_type")
+
+    private fun string(message: JsonObject?, key: String): String? =
+        (message?.get(key) as? JsonPrimitive)?.contentOrNull
 
     private fun projectToolReturnMessage(message: JsonObject, conversationId: String): JsonObject {
         val out = message.toMutableMap()

@@ -181,6 +181,7 @@ class DurableSubagentRegistry(
             subagentConversationId = observation.subagentConversationId,
             parentRunId = observation.parentRunId,
             startedAt = observation.startedAt,
+            activity = observation.activity,
             generation = observation.generation,
             firstSeenEpochMs = now,
             lastSeenEpochMs = now,
@@ -211,11 +212,29 @@ class DurableSubagentRegistry(
         subagentConversationId = subagentConversationId ?: observation.subagentConversationId,
         parentRunId = parentRunId ?: observation.parentRunId,
         startedAt = startedAt ?: observation.startedAt,
+        activity = newerActivity(activity, observation.activity),
         generation = maxOf(generation, observation.generation),
         lastSeenEpochMs = now,
         terminalAtEpochMs = terminalAtEpochMs
             ?: now.takeIf { observation.state.isTerminal },
     )
+
+    private fun newerActivity(
+        current: com.letta.mobile.data.model.SubagentActivitySnapshot?,
+        incoming: com.letta.mobile.data.model.SubagentActivitySnapshot?,
+    ): com.letta.mobile.data.model.SubagentActivitySnapshot? {
+        if (incoming == null) return current
+        if (current == null) return incoming
+        val currentAt = current.updatedAt
+        val incomingAt = incoming.updatedAt
+        return when {
+            currentAt == null && incomingAt == null -> incoming
+            currentAt == null -> incoming
+            incomingAt == null -> current
+            incomingAt >= currentAt -> incoming
+            else -> current
+        }
+    }
 
     // ------------------------------------------------------------- reconcile
 

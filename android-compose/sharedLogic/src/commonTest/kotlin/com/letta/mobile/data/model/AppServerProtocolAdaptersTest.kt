@@ -6,10 +6,12 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.add
 
 class AppServerSubagentSnapshotAdapterTest {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
@@ -63,6 +65,30 @@ class AppServerSubagentSnapshotAdapterTest {
         }
         val entry = AppServerSubagentSnapshotAdapter.toEntry(raw, "c", "a")
         assertEquals("tool/1", entry!!.toolCallId)
+    }
+
+    @Test
+    fun activityIsSanitizedDeduplicatedAndBoundedToLatestFourLines() {
+        val raw = buildJsonObject {
+            put("tool_call_id", "tool/activity")
+            put("status", "running")
+            put("activity", buildJsonObject {
+                put("lines", buildJsonArray {
+                    add("first")
+                    add("second")
+                    add("second")
+                    add("Prompt: secret child context")
+                    add("third")
+                    add("x".repeat(500))
+                    add("fourth")
+                })
+            })
+        }
+
+        val activity = AppServerSubagentSnapshotAdapter.toEntry(raw, "c", "a")!!.activity!!
+        assertEquals(listOf("second", "third", "x".repeat(240), "fourth"), activity.lines)
+        assertTrue(activity.truncated)
+        assertTrue(activity.lines.all { it.encodeToByteArray().size <= SUBAGENT_ACTIVITY_MAX_LINE_BYTES })
     }
 }
 

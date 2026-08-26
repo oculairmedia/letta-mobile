@@ -3,6 +3,7 @@ package com.letta.mobile.data.transport.iroh
 import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.repository.subagent.ParentContext
 import com.letta.mobile.data.repository.subagent.SubagentCorrelator
+import com.letta.mobile.data.subagents.SubagentParentProjection
 import com.letta.mobile.data.transport.A2uiActionDispatchResult
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
@@ -390,6 +391,17 @@ class IrohChannelTransport(
      */
     private suspend fun ingestObserverFrame(received: AppServerReceivedFrame) {
         val streamDelta = received.frame as? AppServerInboundFrame.StreamDelta ?: return
+        if (!streamDelta.subagentId.isNullOrBlank()) {
+            SubagentParentProjection.activityLine(streamDelta.delta)?.let { line ->
+                Telemetry.event(
+                    "IrohObserver", "subagent.activity_suppressed",
+                    "subagentId" to streamDelta.subagentId,
+                    "conversationId" to streamDelta.runtime.conversationId,
+                    "activityBytes" to line.encodeToByteArray().size,
+                )
+            }
+            return
+        }
         val engineScope = engineOwnedProjectionScope(streamDelta)
         if (engineScope != null) {
             recordEngineOwnedObserverFrame(engineScope, received)
@@ -418,7 +430,7 @@ class IrohChannelTransport(
         val agentId = streamDelta.runtime.agentId
         if (isRetiredObserverFrame(streamDelta, conversationId)) return
         correlateAgentFrame(streamDelta).forEach { emitBoth(it) }
-        emitObserverProjection(streamDelta, received, agentId, conversationId)
+        emitObserverProjection(streamDelta, sanitizeAgentReturn(streamDelta, received), agentId, conversationId)
     }
 
     private fun isRetiredObserverFrame(
@@ -568,14 +580,14 @@ class IrohChannelTransport(
             }
             "tool_return_message" -> {
                 // Returns don't carry the tool name; correlate purely by id.
-                // onAgentReturn ignores ids it never recorded as an Agent
+                // onDispatchReturn ignores ids it never recorded as an Agent
                 // dispatch, so passing every return id here is safe — a
                 // non-Agent tool's return simply no-ops (revision unchanged).
                 val toolCallId = toolCall?.string("tool_call_id")
                     ?: delta.string("tool_call_id") ?: return@runCatching emptyList()
-                subagentCorrelator.onAgentReturn(toolCallId, parent)
+                subagentCorrelator.onDispatchReturn(toolCallId, parent)
                 changedToolCallId = toolCallId
-                reason = SUBAGENT_REASON_COMPLETED
+                reason = SUBAGENT_REASON_DISPATCHED
             }
             else -> return@runCatching emptyList()
         }
@@ -610,6 +622,30 @@ class IrohChannelTransport(
                 subagentsActive = snapshot,
                 at = nowIso,
             ),
+        )
+    }
+
+    private fun sanitizeAgentReturn(
+        streamDelta: AppServerInboundFrame.StreamDelta,
+        received: AppServerReceivedFrame,
+    ): AppServerReceivedFrame {
+        val delta = streamDelta.delta as? JsonObject ?: return received
+        if (delta.string("message_type") != "tool_return_message") return received
+        val toolCallId = delta.string("tool_call_id") ?: return received
+        val body = listOf("tool_return", "output", "result")
+            .firstNotNullOfOrNull { key -> delta[key]?.toString() }
+            .orEmpty()
+        val explicitlySubagent = body.contains("<task-notification", ignoreCase = true) ||
+            delta["subagent_id"] != null || delta["task_id"] != null
+        if (!explicitlySubagent && subagentCorrelator.snapshot().none { it.toolCallId == toolCallId }) return received
+        val sanitized = SubagentParentProjection.sanitizedAgentReturn(
+            delta,
+            streamDelta.runtime.conversationId,
+            delta.string("id"),
+        )
+        return received.copy(
+            frame = streamDelta.copy(delta = sanitized),
+            raw = JsonObject(received.raw.toMutableMap().apply { this["delta"] = sanitized }),
         )
     }
 
@@ -1298,7 +1334,7 @@ class IrohChannelTransport(
         private const val OWNERSHIP_OBSERVER = "observer"
 
         internal const val SUBAGENT_REASON_STARTED = "started"
-        internal const val SUBAGENT_REASON_COMPLETED = "completed"
+        internal const val SUBAGENT_REASON_DISPATCHED = "dispatched"
         // Bounded window to let the server's own terminal (from abort) arrive
         // before falling back to a synthetic cancelled TurnDone.
         internal const val SERVER_TERMINAL_WAIT_MS = 3_000L

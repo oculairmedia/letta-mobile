@@ -19,7 +19,8 @@ import kotlinx.serialization.json.jsonPrimitive
  *    NOT here. This reducer never scrapes identity from a body.
  *  - Terminal / lifecycle / log / PID detection (the reaper-style
  *    `cancelled` nuance, failure classification) is m6oa1.4 — NOT here.
- *    A return is treated as a single COMPLETED transition.
+ *    A return only acknowledges dispatch; child lifecycle is authoritative
+ *    through `update_subagent_state`.
  *
  * This is a PURE reducer: no coroutines, no IO, no platform APIs, and no
  * `java.*`. It holds an in-memory [Map] keyed by the parent Agent
@@ -108,10 +109,11 @@ class SubagentCorrelator {
     }
 
     /**
-     * Mark the entry for [toolCallId] terminal ([SubagentStatus.COMPLETED]).
+     * Observe that the parent Agent invocation returned successfully.
      *
-     * Minimal by design: full failure / lifecycle nuance is m6oa1.4. A return
-     * is a single COMPLETED transition here.
+     * The return settles the launch request, not the spawned child. Keep the
+     * child nonterminal until the App Server's authoritative
+     * `update_subagent_state` reports completed, failed, or cancelled.
      *
      * Correlates purely by [toolCallId]: a `tool_return_message` does NOT carry
      * the tool name, so the only returns this reducer can attribute to an
@@ -123,14 +125,13 @@ class SubagentCorrelator {
      *
      * Does NOT scrape identity from any return body.
      */
-    fun onAgentReturn(
+    fun onDispatchReturn(
         toolCallId: String,
         parent: ParentContext,
     ) {
         val existing = entries[toolCallId] ?: return
 
         val next = existing.copy(
-            status = SubagentStatus.COMPLETED,
             parentRunId = existing.parentRunId ?: parent.runId,
             parentAgentId = existing.parentAgentId ?: parent.agentId,
             parentConversationId = existing.parentConversationId ?: parent.conversationId,

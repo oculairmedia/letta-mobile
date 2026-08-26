@@ -1,6 +1,7 @@
 package com.letta.mobile.data.subagents
 
 import com.letta.mobile.data.model.SubagentStatus
+import com.letta.mobile.data.model.SubagentActivitySnapshot
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -30,6 +31,7 @@ class DurableSubagentRegistryTest {
         source: SubagentChipSource = SubagentChipSource.CONTROLLER_NATIVE,
         description: String = "",
         generation: Long = 0,
+        activity: SubagentActivitySnapshot? = null,
     ) = SubagentChipObservation(
         conversationId = conversationId,
         agentId = agentId,
@@ -38,6 +40,7 @@ class DurableSubagentRegistryTest {
         source = source,
         description = description,
         generation = generation,
+        activity = activity,
     )
 
     // -------------------------------------------------- (a) restart survival
@@ -59,6 +62,15 @@ class DurableSubagentRegistryTest {
         assertNotNull(rehydrated)
         assertEquals("ship fix", rehydrated.description)
         assertEquals(SubagentChipState.RUNNING, rehydrated.state)
+    }
+
+    @Test
+    fun staleActivitySnapshotCannotRollLatestFourBackward() {
+        val reg = registry(InMemorySubagentRegistryStore())
+        reg.observe(observation(activity = SubagentActivitySnapshot(listOf("new"), "2026-08-26T13:00:00Z")))
+        reg.observe(observation(activity = SubagentActivitySnapshot(listOf("old"), "2026-08-26T12:00:00Z")))
+
+        assertEquals(listOf("new"), reg.record("conv-a", "agent-1", "tool/1")?.activity?.lines)
     }
 
     @Test

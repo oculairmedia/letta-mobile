@@ -1289,6 +1289,23 @@ class AppServerTurnEngine(
                 // carries request_id (toToolCallDraft discards it) and the client
                 // is in scope. Runs BEFORE the mapper so the UI draft is unchanged.
                 answerExternalToolCallIfPresent(received, lease, externalToolDispatchScope)
+                // Child-attributed frames are lifecycle/activity evidence for the
+                // subagent chip, never ordinary parent timeline content. The
+                // controller's update_subagent_state snapshot carries the bounded
+                // latest activity; forwarding these raw deltas recreates the full
+                // child trajectory in the parent and saturates Iroh.
+                val childDelta = received.frame as? AppServerInboundFrame.StreamDelta
+                if (childDelta?.subagentId != null) {
+                    val activity = com.letta.mobile.data.subagents.SubagentParentProjection
+                        .activityLine(childDelta.delta)
+                    Telemetry.event(
+                        "AppServerTurnEngine", "subagent.frame_suppressed",
+                        "subagentId" to childDelta.subagentId,
+                        "conversationId" to childDelta.runtime.conversationId,
+                        "activityBytes" to (activity?.encodeToByteArray()?.size ?: 0),
+                    )
+                    return@collect
+                }
                 // letta-mobile-kyqdt: P1b RUN-ID PROMOTION (TELEMETRY-ONLY).
                 // Once the mapper reveals the server run id for this active turn,
                 // promote it into the owner via a pure copy(runId=…). This is the

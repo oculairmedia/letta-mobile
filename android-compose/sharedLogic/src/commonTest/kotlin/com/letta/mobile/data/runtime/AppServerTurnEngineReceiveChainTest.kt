@@ -111,6 +111,31 @@ class AppServerTurnEngineReceiveChainTest {
         }
     }
 
+    @Test
+    fun childAttributedFrameIsNotEmittedIntoParentTurn() = runTest {
+        val client = FakeReceiveClient()
+        val engine = AppServerTurnEngine(client = client, requestIdFactory = { "runtime-start-1" })
+
+        engine.runTurn(command).test {
+            assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+            client.emit(
+                assistantStreamDelta(
+                    messageId = "child-message",
+                    content = "CHILD_TRAJECTORY_MUST_NOT_PROJECT",
+                    subagentId = "child-1",
+                ),
+            )
+            expectNoEvents()
+
+            client.emit(assistantStreamDelta(messageId = "parent-message", content = ASSISTANT_TEXT))
+            assertEquals("parent-message", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).messageId)
+            client.emit(stopReasonDelta(runId = "run-1"))
+            assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload)
+            assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+            awaitComplete()
+        }
+    }
+
     companion object {
         const val ASSISTANT_TEXT = "Ack: live iroh receive chain works."
         val runtime = AppServerRuntimeScope("agent-1", "conv-1")
@@ -173,12 +198,14 @@ private fun assistantStreamDelta(
     messageId: String,
     content: String,
     runtime: AppServerRuntimeScope = AppServerTurnEngineReceiveChainTest.runtime,
+    subagentId: String? = null,
 ): AppServerInboundFrame.StreamDelta =
     AppServerInboundFrame.StreamDelta(
         runtime = runtime,
         eventSeq = 1,
         emittedAt = "2026-07-01T00:00:00Z",
         idempotencyKey = "evt-$messageId",
+        subagentId = subagentId,
         delta = buildJsonObject {
             put("id", messageId)
             put("message_type", "assistant_message")

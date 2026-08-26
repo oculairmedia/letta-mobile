@@ -10,6 +10,8 @@ import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.add
 import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -42,6 +44,37 @@ class ControllerSubagentRegistrySourceTest {
         assertEquals(listOf("tool/1"), running.map { it.toolCallId })
         assertEquals("Ship fix", running.single().description)
         assertEquals(emptyList(), source.list("conv-other", includeTerminal = true))
+    }
+
+    @Test
+    fun controllerActivityFeedsBoundedChipMenuWithoutTranscriptReplay() = runTest {
+        val source = ControllerSubagentRegistrySource()
+        source.ingest(
+            AppServerInboundFrame.UpdateSubagentState(
+                runtime = AppServerRuntimeScope(agentId = "agent-1", conversationId = "conv-a"),
+                eventSeq = 1,
+                emittedAt = "t",
+                idempotencyKey = "activity",
+                subagents = listOf(
+                    buildJsonObject {
+                        put("tool_call_id", "tool/1")
+                        put("status", "running")
+                        put("activity", buildJsonObject {
+                            put("lines", buildJsonArray {
+                                add("Reading the repository")
+                                add("Running focused tests")
+                            })
+                        })
+                    },
+                ),
+            ),
+        )
+
+        val snapshot = source.todos("conv-a", "tool/1")!!
+        assertTrue(snapshot.todosFound)
+        assertEquals(2, snapshot.todos.size)
+        assertEquals("Running focused tests", snapshot.todos.last().activeForm)
+        assertEquals("in_progress", snapshot.todos.last().status)
     }
 
     @Test

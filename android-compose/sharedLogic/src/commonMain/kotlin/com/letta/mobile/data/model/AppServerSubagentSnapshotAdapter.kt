@@ -32,6 +32,7 @@ data class AppServerSubagentSnapshot(
     /** Epoch seconds or milliseconds; may also arrive as a string. */
     @SerialName("start_time") val startTime: JsonElement? = null,
     @SerialName("started_at") val startedAt: String? = null,
+    val activity: SubagentActivitySnapshot? = null,
 )
 
 /**
@@ -59,6 +60,7 @@ object AppServerSubagentSnapshotAdapter {
             parentAgentId = snapshot.parentAgentId ?: parentAgentId,
             parentConversationId = snapshot.parentConversationId ?: parentConversationId,
             startedAt = startedAt(snapshot),
+            activity = snapshot.activity?.bounded(),
         )
     }
 
@@ -99,6 +101,7 @@ object AppServerSubagentSnapshotAdapter {
                     ?: decoded?.parentConversationId,
                 startTime = raw["start_time"] ?: raw["started_at_ms"] ?: decoded?.startTime,
                 startedAt = firstString(raw, "started_at", "startedAt") ?: decoded?.startedAt,
+                activity = decodeActivity(raw["activity"]) ?: decoded?.activity,
             )
         }
         return toEntry(snapshot, parentConversationId, parentAgentId)
@@ -140,4 +143,51 @@ object AppServerSubagentSnapshotAdapter {
         keys.firstNotNullOfOrNull { key ->
             (raw[key] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
         }
+
+    private fun decodeActivity(element: JsonElement?): SubagentActivitySnapshot? = runCatching {
+        element ?: return@runCatching null
+        AppServerProtocol.json.decodeFromJsonElement<SubagentActivitySnapshot>(element)
+    }.getOrNull()
 }
+
+fun SubagentActivitySnapshot.bounded(): SubagentActivitySnapshot {
+    val normalized = lines.asSequence()
+        .map(::sanitizeSubagentActivityLine)
+        .filter { it.isNotBlank() }
+        .fold(mutableListOf<String>()) { acc, line ->
+            if (acc.lastOrNull() != line) acc += line
+            acc
+        }
+    return copy(
+        lines = normalized.takeLast(SUBAGENT_ACTIVITY_MAX_LINES),
+        truncated = truncated || normalized.size > SUBAGENT_ACTIVITY_MAX_LINES,
+    )
+}
+
+private fun sanitizeSubagentActivityLine(raw: String): String {
+    val singleLine = raw.lineSequence().firstOrNull().orEmpty().trim()
+    if (singleLine.isBlank()) return ""
+    val lowered = singleLine.lowercase()
+    if (lowered.startsWith("<") ||
+        lowered.contains("hidden reasoning") ||
+        lowered.startsWith("prompt:") ||
+        lowered.startsWith("context:") ||
+        lowered.startsWith("arguments:")
+    ) return ""
+    return singleLine.takeUtf8Bytes(SUBAGENT_ACTIVITY_MAX_LINE_BYTES)
+}
+
+private fun String.takeUtf8Bytes(maxBytes: Int): String {
+    var used = 0
+    val out = StringBuilder()
+    for (char in this) {
+        val bytes = char.toString().encodeToByteArray().size
+        if (used + bytes > maxBytes) break
+        out.append(char)
+        used += bytes
+    }
+    return out.toString()
+}
+
+const val SUBAGENT_ACTIVITY_MAX_LINES: Int = 4
+const val SUBAGENT_ACTIVITY_MAX_LINE_BYTES: Int = 240

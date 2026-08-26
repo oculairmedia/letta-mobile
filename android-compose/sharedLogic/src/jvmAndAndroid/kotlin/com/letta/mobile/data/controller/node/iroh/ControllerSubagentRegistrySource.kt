@@ -40,7 +40,25 @@ class ControllerSubagentRegistrySource(
     override suspend fun todos(conversationId: String, toolCallId: String): SubagentTodosSnapshot? {
         // Todo snapshots are not yet projected from App Server events (m6oa1).
         val record = registry.findByToolCall(conversationId, toolCallId) ?: return null
-        return SubagentTodosSnapshot(subagent = record.toEntry(), todos = emptyList(), todosFound = false)
+        val entry = record.toEntry()
+        val activity = entry.activity
+        val activityLines = activity?.lines.orEmpty()
+        val activityTodos = activityLines.mapIndexed { index, line ->
+            com.letta.mobile.data.model.SubagentTodo(
+                content = line,
+                status = if (index == activityLines.lastIndex && activity?.truncated != true) {
+                    "in_progress"
+                } else {
+                    "completed"
+                },
+                activeForm = line,
+            )
+        }
+        return SubagentTodosSnapshot(
+            subagent = entry,
+            todos = activityTodos,
+            todosFound = activityTodos.isNotEmpty(),
+        )
     }
 
     /**
