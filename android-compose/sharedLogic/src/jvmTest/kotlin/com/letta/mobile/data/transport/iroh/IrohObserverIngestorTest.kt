@@ -1,5 +1,7 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.data.model.SubagentStatus
+
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.appserver.AppServerChannel
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
@@ -15,6 +17,7 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -24,24 +27,35 @@ class IrohObserverIngestorTest {
     private val testDispatcher = UnconfinedTestDispatcher()
     private val testScope = TestScope(testDispatcher)
 
+    private fun streamDelta(spec: StreamDeltaSpec): AppServerReceivedFrame {
+        val body = """
+            {
+              "type": "stream_delta",
+              "runtime": {"agent_id": "${spec.agentId}", "conversation_id": "${spec.conversationId}"},
+              "event_seq": ${spec.seq},
+              "emitted_at": "2026-07-09T00:00:0${spec.seq}Z",
+              "idempotency_key": "obs-evt-${spec.conversationId}-${spec.seq}",
+              ${spec.subagentId?.let { "\"subagent_id\": \"$it\"," } ?: ""}
+              "delta": ${spec.delta}
+            }
+        """.trimIndent()
+        return AppServerProtocol.decodeFrame(body, AppServerChannel.Stream)
+    }
+
+    private data class StreamDeltaSpec(
+        val agentId: String,
+        val conversationId: String,
+        val seq: Long,
+        val delta: String,
+        val subagentId: String? = null,
+    )
+
     private fun streamDelta(
         agentId: String,
         conversationId: String,
         seq: Long,
         delta: String,
-    ): AppServerReceivedFrame {
-        val body = """
-            {
-              "type": "stream_delta",
-              "runtime": {"agent_id": "$agentId", "conversation_id": "$conversationId"},
-              "event_seq": $seq,
-              "emitted_at": "2026-07-09T00:00:0${seq}Z",
-              "idempotency_key": "obs-evt-$conversationId-$seq",
-              "delta": $delta
-            }
-        """.trimIndent()
-        return AppServerProtocol.decodeFrame(body, AppServerChannel.Stream)
-    }
+    ): AppServerReceivedFrame = streamDelta(StreamDeltaSpec(agentId, conversationId, seq, delta))
 
     private fun resubscribeFixture(currentGeneration: Long): ResubscribeFixture {
         val adminRpcCalls = CopyOnWriteArrayList<Pair<String, String>>()
@@ -158,6 +172,67 @@ class IrohObserverIngestorTest {
     }
 
     @Test
+    fun childAttributedFramesNeverProjectIntoParentTimeline() = testScope.runTest {
+        val emitted = CopyOnWriteArrayList<ServerFrame>()
+        val ingestor = IrohObserverIngestor(
+            scope = testScope,
+            turnRegistry = IrohTurnRegistry(),
+            connectionGeneration = { 1L },
+            emitBoth = { emitted.add(it) },
+            adminRpc = { _, _, _ -> error("unexpected") },
+            recordFrameOwnership = { _, _ -> },
+        )
+
+        listOf(
+            """{"message_type":"assistant_message","content":"public child progress"}""",
+            """{"message_type":"reasoning_message","reasoning":"hidden child reasoning"}""",
+            """{"message_type":"tool_call_message","tool_call":{"name":"Bash","tool_call_id":"inner"}}""",
+        ).forEachIndexed { index, delta ->
+            ingestor.ingestObserverFrame(
+                ObserverFrameRequest(streamDelta(StreamDeltaSpec("parent", "conv-parent", index + 1L, delta, "child-1")), 1L),
+            )
+        }
+
+        assertTrue(emitted.isEmpty(), "child trajectory must not append any parent timeline frame")
+    }
+
+    @Test
+    fun activeChildTerminalShapesNeverCompleteParentTurn() = testScope.runTest {
+        val emitted = CopyOnWriteArrayList<ServerFrame>()
+        val registry = IrohTurnRegistry()
+        val active = assertIs<IrohTryStartResult.Started>(
+            registry.tryStart(
+                IrohTurnRequest(
+                    IrohTurnToken(IrohConversationId("conv-parent"), 1L, IrohTurnId("turn-parent")),
+                    IrohRunId("run-parent"),
+                    IrohAgentId("parent"),
+                ),
+            ),
+        ).turn
+        val ingestor = IrohObserverIngestor(
+            scope = testScope,
+            turnRegistry = registry,
+            connectionGeneration = { 1L },
+            emitBoth = { emitted.add(it) },
+            adminRpc = { _, _, _ -> error("unexpected") },
+            recordFrameOwnership = { _, _ -> },
+        )
+
+        listOf(
+            """{"message_type":"stop_reason","stop_reason":"end_turn"}""",
+            """{"message_type":"loop_error","message":"child failed"}""",
+            """{"message_type":"error_message","message":"child failed"}""",
+        ).forEachIndexed { index, delta ->
+            ingestor.ingestObserverFrame(
+                ObserverFrameRequest(streamDelta(StreamDeltaSpec("parent", "conv-parent", index + 1L, delta, "child-1")), 1L),
+            )
+        }
+
+        assertTrue(emitted.none { it is ServerFrame.TurnDone })
+        assertFalse(active.hasTerminal)
+    }
+
+    @Test
     fun testRetiredRunIdIsSkipped() = testScope.runTest {
         val emittedFrames = CopyOnWriteArrayList<ServerFrame>()
         val turnRegistry = IrohTurnRegistry()
@@ -253,9 +328,9 @@ class IrohObserverIngestorTest {
         )
         ingestor.ingestObserverFrame(ObserverFrameRequest(returnDelta, 1L))
 
-        val subagentUpdate2 = emittedFrames.filterIsInstance<ServerFrame.SubagentsUpdated>().lastOrNull()
-        assertNotNull(subagentUpdate2, "SubagentsUpdated must be emitted on Agent return")
-        assertEquals(IrohObserverIngestor.SUBAGENT_REASON_COMPLETED, subagentUpdate2.reason)
+        val updates = emittedFrames.filterIsInstance<ServerFrame.SubagentsUpdated>()
+        assertEquals(1, updates.size, "dispatch acknowledgement must not emit a child terminal")
+        assertEquals(SubagentStatus.RUNNING, updates.single().subagent?.status)
     }
 
     @Test

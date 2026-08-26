@@ -1,6 +1,7 @@
 package com.letta.mobile.data.subagents
 
 import com.letta.mobile.data.model.SubagentEntry
+import com.letta.mobile.data.model.SubagentActivitySnapshot
 import com.letta.mobile.data.model.SubagentStatus
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -149,6 +150,7 @@ data class SubagentChipRecord(
     @SerialName("subagent_conversation_id") val subagentConversationId: String? = null,
     @SerialName("parent_run_id") val parentRunId: String? = null,
     @SerialName("started_at") val startedAt: String? = null,
+    val activity: SubagentActivitySnapshot? = null,
     /**
      * Controller connection generation that last touched this chip. Data, not
      * identity: reconciliation uses it to tell "seen on the current connection"
@@ -173,6 +175,7 @@ data class SubagentChipRecord(
         parentAgentId = agentId,
         parentConversationId = conversationId,
         startedAt = startedAt,
+        activity = activity,
         terminalAtEpochMs = terminalAtEpochMs,
     )
 }
@@ -213,6 +216,7 @@ data class SubagentChipObservation(
     val subagentConversationId: String? = null,
     val parentRunId: String? = null,
     val startedAt: String? = null,
+    val activity: SubagentActivitySnapshot? = null,
     val generation: Long = 0,
 ) {
     val key: SubagentChipKey get() = SubagentChipKey(conversationId, agentId, toolCallId)
@@ -238,6 +242,7 @@ data class SubagentChipObservation(
             subagentConversationId = entry.subagentConversationId,
             parentRunId = entry.parentRunId,
             startedAt = entry.startedAt,
+            activity = entry.activity,
             generation = generation,
         )
     }

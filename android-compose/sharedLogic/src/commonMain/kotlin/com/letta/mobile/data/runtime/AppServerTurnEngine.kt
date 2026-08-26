@@ -284,6 +284,19 @@ class AppServerTurnEngine(
         }
     }
 
+    private fun suppressChildFrame(received: AppServerReceivedFrame): Boolean {
+        val childDelta = received.frame as? AppServerInboundFrame.StreamDelta ?: return false
+        val subagentId = childDelta.subagentId ?: return false
+        val activity = com.letta.mobile.data.subagents.SubagentParentProjection.activityLine(childDelta.delta)
+        Telemetry.event(
+            "AppServerTurnEngine", "subagent.frame_suppressed",
+            "subagentId" to subagentId,
+            "conversationId" to childDelta.runtime.conversationId,
+            "activityBytes" to (activity?.encodeToByteArray()?.size ?: 0),
+        )
+        return true
+    }
+
     /**
      * lgns8.17(d): answer an `external_tool_call_request` that NO turn lease owns.
      *
@@ -547,44 +560,47 @@ class AppServerTurnEngine(
         }
         val runId = ownerLease.runId?.takeIf { it.isNotBlank() }
             ?: slot.owner?.runId?.takeIf { it.isNotBlank() }
-        val dead = try {
-            withTimeout(LIVENESS_PROBE_TIMEOUT_MS.milliseconds) {
-                when {
-                    runId != null -> probeRunDead(runId)
-                    ownerLease.isLocallyAliveWithoutRun -> {
-                        // Preflight / starting — do not treat empty run.list as death.
-                        false
-                    }
-                    else -> conversationHasNoActiveRun(ownerLease.agentId, ownerLease.conversationId)
-                }
+        val dead = probeOwnerDead(slot, ownerLease, runId) ?: return false
+        if (dead) return releaseDeadOwnerLease(slot, ownerLease, runId)
+        Telemetry.event(
+            "AppServerTurnEngine", "activeTurn.reconciledAlive",
+            "runId" to (runId ?: "<none>"),
+            "key" to slot.key.toString(),
+        )
+        return false
+    }
+
+    private suspend fun probeOwnerDead(
+        slot: TurnLeaseSlot,
+        ownerLease: TurnLease,
+        runId: String?,
+    ): Boolean? = try {
+        withTimeout(LIVENESS_PROBE_TIMEOUT_MS.milliseconds) {
+            when {
+                runId != null -> probeRunDead(runId)
+                ownerLease.isLocallyAliveWithoutRun -> false
+                else -> conversationHasNoActiveRun(ownerLease.agentId, ownerLease.conversationId)
             }
-        } catch (t: TimeoutCancellationException) {
-            Telemetry.event(
-                "AppServerTurnEngine",
-                "activeTurn.reconcileLivenessTimedOut",
-                "runId" to (runId ?: "<none>"),
-                "timeoutMs" to LIVENESS_PROBE_TIMEOUT_MS,
-                "key" to slot.key.toString(),
-                level = Telemetry.Level.WARN,
-            )
-            return false
-        } catch (t: Throwable) {
-            Telemetry.error(
-                "AppServerTurnEngine", "activeTurn.reconcileLivenessFailed", t,
-                "runId" to (runId ?: "<none>"),
-                "key" to slot.key.toString(),
-            )
-            return false
         }
-        if (!dead) {
-            Telemetry.event(
-                "AppServerTurnEngine", "activeTurn.reconciledAlive",
-                "runId" to (runId ?: "<none>"),
-                "key" to slot.key.toString(),
-            )
-            return false
-        }
-        return releaseDeadOwnerLease(slot, ownerLease, runId)
+    } catch (t: TimeoutCancellationException) {
+        Telemetry.event(
+            "AppServerTurnEngine",
+            "activeTurn.reconcileLivenessTimedOut",
+            "runId" to (runId ?: "<none>"),
+            "timeoutMs" to LIVENESS_PROBE_TIMEOUT_MS,
+            "key" to slot.key.toString(),
+            level = Telemetry.Level.WARN,
+        )
+        null
+    } catch (t: CancellationException) {
+        throw t
+    } catch (t: Throwable) {
+        Telemetry.error(
+            "AppServerTurnEngine", "activeTurn.reconcileLivenessFailed", t,
+            "runId" to (runId ?: "<none>"),
+            "key" to slot.key.toString(),
+        )
+        null
     }
 
     private suspend fun releaseDeadOwnerLease(
@@ -956,7 +972,7 @@ class AppServerTurnEngine(
     private fun trackToolCallAndApprovalIds(
         draft: RuntimeEventDraft,
         key: TurnRuntimeKey,
-        ledger: ToolCallLedger,
+        ledger: TurnToolCallLedger,
     ) {
         when (val payload = draft.payload) {
             is RuntimeEventPayload.ToolCallObserved -> ledger.emitted.add(payload.toolCallId.value)
@@ -1017,7 +1033,7 @@ class AppServerTurnEngine(
     private fun resolveStreamedToolReturn(
         payload: RuntimeEventPayload.RemoteStreamFrame,
         key: TurnRuntimeKey,
-        ledger: ToolCallLedger,
+        ledger: TurnToolCallLedger,
     ) {
         if (payload.messageType != "tool_return_message") return
         extractToolCallId(payload.body)?.let {
@@ -1048,10 +1064,88 @@ class AppServerTurnEngine(
         approvals.record(key, ApprovalRegistry.Gate(callId, approval.requestId))
     }
 
-    /** tool_call_ids observed for one turn (letta-mobile-oqfbj settlement). */
-    private class ToolCallLedger {
-        val emitted = mutableSetOf<String>()
-        val returned = mutableSetOf<String>()
+    private inner class TurnIdleWatchdog(private val key: TurnRuntimeKey) {
+        private val lastFrameAt = atomic(currentTimeMs())
+
+        fun markFrame() {
+            lastFrameAt.value = currentTimeMs()
+        }
+
+        fun launchIn(scope: CoroutineScope): Job = scope.launch {
+            val pauseRecheckMs = minOf(turnIdleTimeoutMs, WATCHDOG_PAUSE_RECHECK_MS)
+            while (true) {
+                if (approvals.hasOutstanding(key)) {
+                    markFrame()
+                    delay(pauseRecheckMs.milliseconds)
+                    continue
+                }
+                val remaining = turnIdleTimeoutMs - (currentTimeMs() - lastFrameAt.value)
+                if (remaining <= 0) throw TurnIdleTimedOut
+                delay(remaining.milliseconds)
+            }
+        }
+    }
+
+    private data class TurnFrameContext(
+        val runtimeScope: AppServerRuntimeScope,
+        val command: TurnCommand,
+        val lease: LeaseRef,
+        val idleWatchdog: TurnIdleWatchdog,
+        val draftProcessor: TurnDraftProcessor,
+        val externalToolDispatchScope: CoroutineScope,
+        val emit: suspend (RuntimeEventDraft) -> Unit,
+    )
+
+    private suspend fun processReceivedFrame(received: AppServerReceivedFrame, context: TurnFrameContext) {
+        if (isConnectionGenerationSuperseded(context.lease)) {
+            completeSupersededTurn(context)
+        }
+        if (received.isStaleGenerationForLease(context.lease)) return
+        if (!received.matches(context.runtimeScope, context.lease)) {
+            completeScopeRejectedTurn(received, context)
+            return
+        }
+        val slot = context.lease.slot
+        if (!slot.runIdGate.accepts(received, context.lease.token)) return
+        context.idleWatchdog.markFrame()
+        answerExternalToolCallIfPresent(received, context.lease, context.externalToolDispatchScope)
+        if (suppressChildFrame(received)) return
+        val frameSeq = received.eventSeqOrNull()
+        val drafts = mapper.map(context.command, received)
+        drafts.firstOrNull { it.runId != null }?.runId?.value?.let { runId ->
+            slot.runIdGate.promote(runId, context.lease.token)
+        }
+        drafts.forEach { draft -> context.draftProcessor.process(draft, frameSeq) }
+    }
+
+    private suspend fun completeSupersededTurn(context: TurnFrameContext): Nothing {
+        val ledger = context.draftProcessor.ledger
+        settleDanglingToolCalls(
+            context.command,
+            ledger.emitted,
+            ledger.returned,
+            context.emit,
+            "Connection generation superseded during turn",
+        )
+        context.draftProcessor.flushTail()
+        context.emit(context.command.failedDraft("Connection generation superseded during turn"))
+        throw TurnCompleted
+    }
+
+    private suspend fun completeScopeRejectedTurn(
+        received: AppServerReceivedFrame,
+        context: TurnFrameContext,
+    ) {
+        val status = handleScopeRejectedFrame(received, context.runtimeScope, context.lease) ?: return
+        val reason = when (status) {
+            RuntimeRunStatus.Cancelled -> "Tool execution interrupted by mismatched-scope cancellation"
+            else -> "Tool execution interrupted by mismatched-scope failure"
+        }
+        val ledger = context.draftProcessor.ledger
+        settleDanglingToolCalls(context.command, ledger.emitted, ledger.returned, context.emit, reason)
+        context.draftProcessor.flushTail()
+        context.emit(context.command.draftForScopeRejectedTerminal(status))
+        throw TurnCompleted
     }
 
     /**
@@ -1064,6 +1158,7 @@ class AppServerTurnEngine(
      * still trips — checking only inside `collect` would never fire during
      * silence, which is exactly the c0qm0 hang.
      */
+    @Suppress("NoDetachedCoroutineLifecycle") // Bounded responses deliberately outlive a completed turn.
     private suspend fun collectTurnWithIdleWatchdog(
         scope: AppServerRuntimeScope,
         command: TurnCommand,
@@ -1073,136 +1168,41 @@ class AppServerTurnEngine(
         emitDraft: suspend (RuntimeEventDraft) -> Unit,
     ) = coroutineScope {
         val slot = lease.slot
-        val lastFrameAt = atomic(currentTimeMs())
-        // letta-mobile-vilsn.6: the idle watchdog is PAUSED while ANY surfaced
-        // (non-auto-approved) runtime user-input approval gate is outstanding
-        // (AskUserQuestion / ExitPlanMode parked awaiting the user's answer). An
-        // unanswered question legitimately parks the turn far longer than the idle
-        // window, so the watchdog MUST NOT fail it. The outstanding gates are the
-        // gate set held by [ApprovalRegistry] for THIS runtime key: a gate is
-        // ADDED when the approval is surfaced (below) and cleared ONLY when THAT
-        // specific gate is genuinely resolved — the submit path consumes it via
-        // [clearUserInputApprovalId], a matching tool_return is observed, or a
-        // terminal/settle path clears everything. Crucially it is NOT lifted by an
-        // arbitrary inbound frame: a side-channel status frame (UpdateDeviceStatus /
-        // UpdateQueue / UpdateSubagentState) that merely passes matches(scope) must
-        // never resume the watchdog while the user still owes an answer.
-        fun hasOutstandingUserInputGate(): Boolean = approvals.hasOutstanding(slot.key)
-        val watchdog = this.launch {
-            // Short recheck cadence while paused so the watchdog resumes PROMPTLY
-            // once the last gate clears (from ANY source — collect-loop tool_return,
-            // the submit path's consume, or a terminal), never sleeping a full stale
-            // window. Re-stamp lastFrameAt on each paused tick so a resumed watchdog
-            // starts a FULL idle window instead of instantly firing on a stale
-            // timestamp left over from when the approval was surfaced.
-            val pauseRecheckMs = minOf(turnIdleTimeoutMs, WATCHDOG_PAUSE_RECHECK_MS)
-            while (true) {
-                if (hasOutstandingUserInputGate()) {
-                    lastFrameAt.value = currentTimeMs()
-                    delay(pauseRecheckMs.milliseconds)
-                    continue
-                }
-                val idleFor = currentTimeMs() - lastFrameAt.value
-                val remaining = turnIdleTimeoutMs - idleFor
-                if (remaining <= 0) {
-                    throw TurnIdleTimedOut
-                }
-                delay(remaining.milliseconds)
-            }
-        }
-        var pendingCompleted: RuntimeEventDraft? = null
-        var pendingStop: RuntimeEventDraft? = null
-        var pendingUsage: RuntimeEventDraft? = null
-        var terminalSettleJob: Job? = null
-        // letta-mobile-kyqdt: once a completed lifecycle is observed and the
-        // settle timer is armed, it must NOT be re-armed by subsequent frames.
-        // The prior code cancel+rescheduled the quiet window on EVERY later
-        // matching frame, so on the shared server-side engine a steady trickle
-        // of matching frames (cross-device viewer traffic / late fanout deltas)
-        // deferred the completed terminal — and the activeTurn unlock that fires
-        // with it — indefinitely, leaving the run "busy" long after it was
-        // terminal and rejecting the next cross-device send. Arm-once makes the
-        // terminal release bounded and monotonic: the completed run always
-        // frees busy ownership within terminalSettleQuietMs of the completion.
-        var terminalArmed = false
-        var speculativeCompletionArmed = false
-        var sawToolReturn = false
-        var sawAssistantAfterToolReturn = false
-        // letta-mobile-kyqdt: TELEMETRY-ONLY. Seq of the frame that produced
-        // the pending completed terminal, so the delayed settle can record it.
-        var pendingCompletedSeq: Long? = null
-        
-        // letta-mobile-oqfbj: track emitted and returned tool_call_ids for settlement
-        val ledger = ToolCallLedger()
-        val emittedToolCallIds = ledger.emitted
-        val returnedToolCallIds = ledger.returned
-
-        suspend fun flushTail() {
-            // letta-mobile-vilsn.6: a terminal/settle path is a definitive end to
-            // ANY parked user-input approval gate — clear every outstanding gate so
-            // the watchdog resumes normal behavior and no stale gate leaks into a
-            // later turn.
-            approvals.clearKey(slot.key)
-            pendingStop?.let { emitDraft(it) }
-            pendingStop = null
-            pendingUsage?.let { emitDraft(it) }
-            pendingUsage = null
-        }
-
-        // letta-mobile-kyqdt: arm the completed-terminal quiet timer AT MOST ONCE.
-        // Formerly this cancelled + rescheduled the settle job on every later
-        // matching frame, so any post-completion frame trickle deferred the
-        // terminal (and the activeTurn unlock) without bound. Arming once anchors
-        // the settle deadline to the first observed completion, so the terminal —
-        // and busy release — always fires within terminalSettleQuietMs. Later
-        // frames are still emitted downstream (below); they simply cannot push
-        // the terminal out. The settle body reads pendingCompleted at fire time,
-        // so a completion refined by an intervening frame still uses the latest
-        // terminal draft, just on the original, bounded deadline.
-        // letta-mobile-c4igq.6: the post-tool usage-tail completion is SPECULATIVE —
-        // the turn may still continue into another tool round. If genuine activity
-        // arrives after arming (a new tool_call / assistant / tool_return), cancel
-        // the pending speculative completion and allow re-arming on the next
-        // post-tool usage tail. Real stop_reason / terminal-lifecycle frames still
-        // complete the turn via their own branches; this only unwinds a SPECULATIVE
-        // arm, never a real terminal. No-op when nothing is armed speculatively.
-        fun cancelSpeculativeCompletion() {
-            if (!speculativeCompletionArmed) return
-            terminalSettleJob?.cancel()
-            terminalSettleJob = null
-            terminalArmed = false
-            speculativeCompletionArmed = false
-            pendingCompleted = null
-            pendingCompletedSeq = null
-        }
-
-        fun armCompletedTerminalOnce() {
-            if (terminalArmed) return
-            if (pendingCompleted == null) return
-            terminalArmed = true
-            terminalSettleJob = launch {
-                delay(terminalSettleQuietMs.milliseconds)
-                val terminal = pendingCompleted ?: return@launch
-                // letta-mobile-oqfbj / fix(no-settle-on-clean-completion): do NOT
-                // synthesize Failed returns here. This is a CLEAN Completed
-                // terminal — with async/parallel tool execution a second tool's
-                // real return can legitimately arrive after this quiet window.
-                // See settleDanglingToolCalls() KDoc for the full rationale.
-                flushTail()
-                // letta-mobile-kyqdt: telemetry-only. This terminal was accepted
-                // by matches(scope) (it reached the collect body); record the
-                // decision as passed along with its source + seq.
-                noteOwnerTerminal(
-                    RuntimeRunStatus.Completed,
-                    source = "completed_settle",
-                    seq = pendingCompletedSeq,
-                    scopeMatched = true,
-                    lease = lease,
-                )
-                emitDraft(terminal)
-                throw TurnCompleted
-            }
-        }
+        val idleWatchdog = TurnIdleWatchdog(slot.key)
+        val watchdog = idleWatchdog.launchIn(this)
+        val draftProcessor = TurnDraftProcessor(
+            callbacks = TurnDraftCallbacks(
+                autoApprovedDraft = { draft ->
+                    autoApprovedToolCallDraft(scope, turnPermissionMode, command, draft)?.let { approved ->
+                        command.draftFor(runId = draft.runId, payload = approved)
+                    }
+                },
+                track = { draft, ledger -> trackToolCallAndApprovalIds(draft, slot.key, ledger) },
+                clearApprovals = { approvals.clearKey(slot.key) },
+                emit = emitDraft,
+                settle = { ledger, reason ->
+                    settleDanglingToolCalls(command, ledger.emitted, ledger.returned, emitDraft, reason)
+                },
+                completedDraft = { runId -> command.completedDraft(runId) },
+                recordTerminal = { draft, frameSeq ->
+                    recordTerminalLifecycle(draft, command, frameSeq, lease)
+                },
+                noteCompleted = { frameSeq ->
+                    noteOwnerTerminal(
+                        RuntimeRunStatus.Completed,
+                        source = "completed_settle",
+                        seq = frameSeq,
+                        scopeMatched = true,
+                        lease = lease,
+                    )
+                },
+                complete = { throw TurnCompleted },
+                settleDelayMs = terminalSettleQuietMs,
+            ),
+            coroutineScope = this,
+        )
+        val emittedToolCallIds = draftProcessor.ledger.emitted
+        val returnedToolCallIds = draftProcessor.ledger.returned
 
         var turnEndReason: String? = null
         // lgns8.17(c): external-tool invocations run HERE, not on the collect loop.
@@ -1220,185 +1220,18 @@ class AppServerTurnEngine(
         // prior ids are superseded and must not complete/mutate this lease.
         slot.runIdGate.beginLease(lease.token)
         val (fanoutSubscriberId, inboundEvents) = inboundSource.subscribe(scope)
+        val frameContext = TurnFrameContext(
+            runtimeScope = scope,
+            command = command,
+            lease = lease,
+            idleWatchdog = idleWatchdog,
+            draftProcessor = draftProcessor,
+            externalToolDispatchScope = externalToolDispatchScope,
+            emit = emitDraft,
+        )
         try {
             collectorReady.complete(Unit)
-            inboundEvents.collect { received ->
-                if (isConnectionGenerationSuperseded(lease)) {
-                    // Settle before TurnCompleted — clean-completion markers skip
-                    // the cancel/finally settlement path intentionally.
-                    // Transport generation rolled over mid-turn — end immediately
-                    // so recovered frames are not ignored until the idle watchdog
-                    // (or forever, if a user-input gate paused it).
-                    settleDanglingToolCalls(
-                        command,
-                        emittedToolCallIds,
-                        returnedToolCallIds,
-                        emitDraft,
-                        "Connection generation superseded during turn",
-                    )
-                    flushTail()
-                    emitDraft(
-                        command.failedDraft("Connection generation superseded during turn"),
-                    )
-                    throw TurnCompleted
-                }
-                if (received.isStaleGenerationForLease(lease)) {
-                    return@collect
-                }
-                if (!received.matches(scope, lease)) {
-                    handleScopeRejectedFrame(received, scope, lease)?.let { status ->
-                        // Same abnormal-terminal settlement as the exact-scope path:
-                        // TurnCompleted skips cancel/finally settlement intentionally.
-                        settleDanglingToolCalls(
-                            command,
-                            emittedToolCallIds,
-                            returnedToolCallIds,
-                            emitDraft,
-                            when (status) {
-                                RuntimeRunStatus.Cancelled ->
-                                    "Tool execution interrupted by mismatched-scope cancellation"
-                                else ->
-                                    "Tool execution interrupted by mismatched-scope failure"
-                            },
-                        )
-                        flushTail()
-                        emitDraft(command.draftForScopeRejectedTerminal(status))
-                        throw TurnCompleted
-                    }
-                    return@collect
-                }
-                if (!slot.runIdGate.accepts(received, lease.token)) {
-                    return@collect
-                }
-                lastFrameAt.value = currentTimeMs()
-                // letta-mobile-vilsn.6: the idle-watchdog pause is intentionally NOT
-                // lifted here. An arbitrary inbound frame that merely passes
-                // matches(scope) — including a side-channel status frame
-                // (UpdateDeviceStatus / UpdateQueue / UpdateSubagentState) — must NOT
-                // resume the watchdog while a user-input gate is still outstanding.
-                // A gate is lifted only when THAT gate is genuinely resolved (its
-                // tool_return below, the submit path's consume, or a terminal/settle
-                // path), so an unanswered question can never be force-failed by a
-                // stray frame, and a real answer can never leave the watchdog wedged.
-                // lgns8.17: GUARANTEE a matched external_tool_call_response. The
-                // App Server blocks the turn until every external_tool_call_request
-                // is answered by request_id; the mapper below only turns it into a
-                // UI ToolCallObserved draft and never replies, so an unanswered
-                // request hangs the turn (0 deltas until the idle watchdog fails
-                // it). Reply here — this is the one place the raw frame still
-                // carries request_id (toToolCallDraft discards it) and the client
-                // is in scope. Runs BEFORE the mapper so the UI draft is unchanged.
-                answerExternalToolCallIfPresent(received, lease, externalToolDispatchScope)
-                // letta-mobile-kyqdt: P1b RUN-ID PROMOTION (TELEMETRY-ONLY).
-                // Once the mapper reveals the server run id for this active turn,
-                // promote it into the owner via a pure copy(runId=…). This is the
-                // same place the engine learns the real run id (frames carry
-                // run_id → draft.runId); we do not alter that promotion flow.
-                val frameSeq = received.eventSeqOrNull()
-                val drafts = mapper.map(command, received)
-                drafts.firstOrNull { it.runId != null }?.runId?.value?.let { newRunId ->
-                    slot.runIdGate.promote(newRunId, lease.token)
-                }
-                drafts.forEach { draft ->
-                    val autoApproved = autoApprovedToolCallDraft(scope, turnPermissionMode, command, draft)
-                    if (autoApproved != null) {
-                        // letta-mobile toolchip-live: auto-approving must not
-                        // swallow the tool-call announcement. Over Iroh the
-                        // approval_request_message IS the tool call frame; the
-                        // shim path still renders a tool card when it
-                        // auto-allows, so emit a ToolCallObserved draft here
-                        // (suppressing only the approval CARD, not the call).
-                        emittedToolCallIds.add(autoApproved.toolCallId.value)
-                        emitDraft(
-                            command.draftFor(
-                                runId = draft.runId,
-                                payload = autoApproved,
-                            ),
-                        )
-                        armCompletedTerminalOnce()
-                        return@forEach
-                    }
-                    
-                    // letta-mobile-oqfbj: track tool_call emissions and returns
-                    trackToolCallAndApprovalIds(draft, slot.key, ledger)
-                    
-                    // letta-mobile-c4igq.6: a tool_call / tool_return / assistant
-                    // frame arriving after we speculatively armed a post-tool usage
-                    // completion means the turn is genuinely continuing (another tool
-                    // round). Cancel the speculative completion so it cannot fire and
-                    // prematurely end the turn. Real terminals are unaffected.
-                    if (speculativeCompletionArmed &&
-                        (draft.isToolCallFrame() || draft.isToolReturnFrame() || draft.isAssistantFrame())
-                    ) {
-                        cancelSpeculativeCompletion()
-                    }
-                    if (draft.isToolReturnFrame()) sawToolReturn = true
-                    if (sawToolReturn && draft.isAssistantFrame()) sawAssistantAfterToolReturn = true
-                    if (draft.isStopReasonFrame()) {
-                        pendingStop = draft
-                        return@forEach
-                    }
-                    if (draft.isUsageStatisticsFrame()) {
-                        if (pendingUsage == null) pendingUsage = draft
-                        if (sawAssistantAfterToolReturn) {
-                            // letta-mobile-c4igq.6: a usage_statistics frame after a
-                            // post-tool assistant message is the synthesized-completion
-                            // FALLBACK for turns whose real terminal never arrives — BUT
-                            // a multi-step agentic turn also emits a usage tail BETWEEN
-                            // tool rounds. Throwing here immediately killed the turn
-                            // before the next round (Iroh: "stops after a tool call,
-                            // needs a user nudge"). Instead, arm a SPECULATIVE deferred
-                            // completion on the same bounded quiet window the clean
-                            // Completed path uses. If another tool round follows within
-                            // the window, cancelSpeculativeCompletion() (above) unwinds
-                            // it and the turn proceeds; if the window elapses quietly,
-                            // the deferred completion fires — preserving the single-
-                            // round fallback. Reset the post-tool latch so a fresh round
-                            // must re-observe tool_return -> assistant before re-arming.
-                            if (pendingCompleted == null) {
-                                pendingCompleted = command.completedDraft(draft.runId)
-                                pendingCompletedSeq = frameSeq
-                            }
-                            sawAssistantAfterToolReturn = false
-                            sawToolReturn = false
-                            speculativeCompletionArmed = true
-                            armCompletedTerminalOnce()
-                        }
-                        return@forEach
-                    }
-                    if (draft.isCompletedLifecycle()) {
-                        pendingCompleted = draft
-                        armCompletedTerminalOnce()
-                        return@forEach
-                    }
-                    // letta-mobile-oqfbj: settle dangling calls BEFORE the tail +
-                    // terminal lifecycle so tool cards resolve to error instead of
-                    // spinning and the transcript keeps matched call/return pairs.
-                    // fix(no-settle-on-clean-completion): only for ABNORMAL
-                    // terminals (Failed/Cancelled). A clean Completed terminal
-                    // must NOT synthesize Failed returns — see
-                    // settleDanglingToolCalls() KDoc.
-                    if (draft.isTerminalLifecycle()) {
-                        if (draft.isAbnormalTerminal()) {
-                            settleDanglingToolCalls(command, emittedToolCallIds, returnedToolCallIds, emitDraft, "Tool execution interrupted by turn termination")
-                        }
-                        flushTail()
-                        // letta-mobile-kyqdt: telemetry-only. Record the terminal
-                        // status carried by this lifecycle draft. This frame was
-                        // accepted by matches(scope), so the scope decision passed.
-                        recordTerminalLifecycle(
-                            draft = draft,
-                            command = command,
-                            frameSeq = frameSeq,
-                            lease = lease,
-                        )
-                        emitDraft(draft)
-                        throw TurnCompleted
-                    }
-                    emitDraft(draft)
-                    armCompletedTerminalOnce()
-                }
-            }
+            inboundEvents.collect { received -> processReceivedFrame(received, frameContext) }
         } catch (idle: TurnIdleTimedOutMarker) {
             // letta-mobile-oqfbj: settle before emitting the failed draft
             settleDanglingToolCalls(command, emittedToolCallIds, returnedToolCallIds, emitDraft, "Tool execution interrupted by turn timeout")
@@ -1429,7 +1262,7 @@ class AppServerTurnEngine(
             if (turnEndReason != null) {
                 settleDanglingToolCalls(command, emittedToolCallIds, returnedToolCallIds, emitDraft, turnEndReason)
             }
-            terminalSettleJob?.cancel()
+            draftProcessor.terminalSettleJob?.cancel()
             watchdog.cancel()
             // letta-mobile-vilsn.6: the collect loop has ended (terminal, idle
             // timeout, cancellation, or stream error) — clear every outstanding
@@ -1779,78 +1612,6 @@ class AppServerTurnEngine(
             source = RuntimeEventSource.LocalRuntime,
             payload = RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Cancelled, reason = reason),
         )
-
-    private fun RuntimeEventDraft.isTerminalLifecycle(): Boolean {
-        val lifecycle = payload as? RuntimeEventPayload.RunLifecycleChanged ?: return false
-        return lifecycle.status == RuntimeRunStatus.Completed ||
-            lifecycle.status == RuntimeRunStatus.Failed ||
-            lifecycle.status == RuntimeRunStatus.Cancelled
-    }
-
-    private fun RuntimeEventDraft.isCompletedLifecycle(): Boolean {
-        val lifecycle = payload as? RuntimeEventPayload.RunLifecycleChanged ?: return false
-        return lifecycle.status == RuntimeRunStatus.Completed
-    }
-
-    /**
-     * fix(no-settle-on-clean-completion): true only for Failed/Cancelled
-     * terminal lifecycles — i.e. an ABNORMAL end. [isTerminalLifecycle] is
-     * still used for flow control (both clean and abnormal terminals end the
-     * collect loop the same way); this narrower check gates whether dangling
-     * tool calls should be settled with a synthetic Failed return. See
-     * [settleDanglingToolCalls] for why Completed must never settle.
-     */
-    private fun RuntimeEventDraft.isAbnormalTerminal(): Boolean {
-        val lifecycle = payload as? RuntimeEventPayload.RunLifecycleChanged ?: return false
-        return lifecycle.status == RuntimeRunStatus.Failed ||
-            lifecycle.status == RuntimeRunStatus.Cancelled
-    }
-
-    private fun RuntimeEventDraft.isToolReturnFrame(): Boolean = when (val event = payload) {
-        is RuntimeEventPayload.ToolReturnObserved -> true
-        is RuntimeEventPayload.RemoteStreamFrame -> event.messageType == "client_tool_end" ||
-            event.messageType == "tool_return_message" ||
-            frameMessageType(event.body) in setOf("client_tool_end", "tool_return_message")
-        else -> false
-    }
-
-    private fun RuntimeEventDraft.isAssistantFrame(): Boolean = when (val event = payload) {
-        is RuntimeEventPayload.RemoteStreamFrame -> event.messageType == "assistant_message" ||
-            frameMessageType(event.body) == "assistant_message"
-        else -> false
-    }
-
-    // letta-mobile-c4igq.6: a tool_call announcement (used to detect a new tool
-    // round continuing after a speculative post-tool usage completion was armed).
-    private fun RuntimeEventDraft.isToolCallFrame(): Boolean = when (val event = payload) {
-        is RuntimeEventPayload.ToolCallObserved -> true
-        is RuntimeEventPayload.ApprovalRequested -> true
-        is RuntimeEventPayload.RemoteStreamFrame -> event.messageType == "client_tool_start" ||
-            event.messageType == "tool_call_message" ||
-            frameMessageType(event.body) in setOf("client_tool_start", "tool_call_message")
-        else -> false
-    }
-
-    private fun RuntimeEventDraft.isUsageStatisticsFrame(): Boolean = when (val event = payload) {
-        is RuntimeEventPayload.RemoteStreamFrame -> event.messageType == "usage_statistics" ||
-            frameMessageType(event.body) == "usage_statistics"
-        is RuntimeEventPayload.ExternalTransportFrame -> event.body.startsWith("usage:") ||
-            frameMessageType(event.body) == "usage_statistics"
-        else -> false
-    }
-
-    private fun RuntimeEventDraft.isStopReasonFrame(): Boolean = when (val event = payload) {
-        is RuntimeEventPayload.RemoteStreamFrame -> event.messageType == "stop_reason" ||
-            frameMessageType(event.body) == "stop_reason"
-        is RuntimeEventPayload.ExternalTransportFrame -> frameMessageType(event.body) == "stop_reason"
-        else -> false
-    }
-
-    private fun frameMessageType(body: String): String? = runCatching {
-        val raw = AppServerProtocol.json.parseToJsonElement(body).jsonObject
-        val delta = raw["delta"]?.jsonObject ?: raw
-        delta.string("message_type")
-    }.getOrNull()
 
     private fun AppServerReceivedFrame.matches(
         scope: AppServerRuntimeScope,

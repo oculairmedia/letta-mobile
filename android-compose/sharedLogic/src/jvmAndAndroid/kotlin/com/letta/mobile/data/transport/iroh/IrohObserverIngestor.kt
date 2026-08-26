@@ -4,6 +4,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.repository.subagent.ParentContext
 import com.letta.mobile.data.repository.subagent.SubagentCorrelator
 import com.letta.mobile.data.runtime.AppServerRuntimeEventMapper
+import com.letta.mobile.data.subagents.SubagentParentProjection
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
@@ -133,6 +134,10 @@ internal class IrohObserverIngestor(
         if (request.expectedGeneration != null && connectionGeneration() != request.expectedGeneration) return
         val received = request.received
         val streamDelta = received.frame as? AppServerInboundFrame.StreamDelta ?: return
+        if (!streamDelta.subagentId.isNullOrBlank()) {
+            observeChildActivity(streamDelta)
+            return
+        }
         val scope = observerScope(streamDelta)
         recordFrameOwnership(scope.conversationId, scope.localTurn)
         if (scope.localTurn != null) {
@@ -148,7 +153,7 @@ internal class IrohObserverIngestor(
         }
         if (isRetiredObserverRun(streamDelta, scope.conversationId)) return
         correlateAgentFrame(streamDelta).forEach { emitBoth(it) }
-        projectPassiveObserverDelta(scope, received)
+        projectPassiveObserverDelta(scope, sanitizeAgentReturn(streamDelta, received))
     }
 
     /**
@@ -319,8 +324,42 @@ internal class IrohObserverIngestor(
         parent: ParentContext,
     ): List<ServerFrame> {
         val toolCallId = toolCall?.string("tool_call_id") ?: delta.string("tool_call_id") ?: return emptyList()
-        subagentCorrelator.onAgentReturn(toolCallId, parent)
-        return buildSubagentsUpdatedIfChanged(toolCallId, SUBAGENT_REASON_COMPLETED)
+        subagentCorrelator.onDispatchReturn(toolCallId, parent)
+        return buildSubagentsUpdatedIfChanged(toolCallId, SUBAGENT_REASON_DISPATCHED)
+    }
+
+    private suspend fun observeChildActivity(streamDelta: AppServerInboundFrame.StreamDelta) {
+        val line = SubagentParentProjection.activityLine(streamDelta.delta) ?: return
+        Telemetry.event(
+            "IrohObserver",
+            "subagent.activity_suppressed",
+            "subagentId" to streamDelta.subagentId.orEmpty(),
+            "conversationId" to streamDelta.runtime.conversationId,
+            "activityBytes" to line.encodeToByteArray().size,
+        )
+    }
+
+    private fun sanitizeAgentReturn(
+        streamDelta: AppServerInboundFrame.StreamDelta,
+        received: AppServerReceivedFrame,
+    ): AppServerReceivedFrame {
+        val delta = streamDelta.delta as? JsonObject ?: return received
+        if (delta.string("message_type") != "tool_return_message") return received
+        val toolCallId = delta.string("tool_call_id") ?: return received
+        val body = listOf("tool_return", "output", "result")
+            .firstNotNullOfOrNull { key -> delta[key]?.toString() }
+            .orEmpty()
+        val explicitlySubagent = body.contains("<task-notification", ignoreCase = true) ||
+            delta["subagent_id"] != null || delta["task_id"] != null
+        if (!explicitlySubagent && subagentCorrelator.snapshot().none { it.toolCallId == toolCallId }) return received
+        val sanitized = SubagentParentProjection.sanitizedAgentReturn(
+            delta = delta,
+            conversationId = streamDelta.runtime.conversationId,
+            messageId = delta.string("id"),
+        )
+        val frame = streamDelta.copy(delta = sanitized)
+        val raw = JsonObject(received.raw.toMutableMap().apply { this["delta"] = sanitized })
+        return received.copy(frame = frame, raw = raw)
     }
 
     private fun buildSubagentsUpdatedIfChanged(
@@ -382,7 +421,7 @@ internal class IrohObserverIngestor(
 
     companion object {
         internal const val SUBAGENT_REASON_STARTED = "started"
-        internal const val SUBAGENT_REASON_COMPLETED = "completed"
+        internal const val SUBAGENT_REASON_DISPATCHED = "dispatched"
 
         private fun frameId(prefix: String): String = "$prefix-${UUID.randomUUID()}"
         private fun nowIso(): String = Instant.now().toString()

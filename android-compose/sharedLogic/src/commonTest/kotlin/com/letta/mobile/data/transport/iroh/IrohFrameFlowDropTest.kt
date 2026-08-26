@@ -7,6 +7,7 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runCurrent
@@ -246,6 +247,7 @@ class IrohFrameFlowDropTest {
 
         stallGate.complete(Unit)
         slowJob.join()
+        assertTrue(coroutineContext.isActive, "collector-local overflow must not cancel the publisher owner")
         healthyJob.cancelAndJoin()
     }
 

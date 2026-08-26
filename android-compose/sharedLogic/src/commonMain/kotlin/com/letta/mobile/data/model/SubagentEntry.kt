@@ -48,6 +48,13 @@ data class SubagentTodoProgressWire(
 )
 
 @Serializable
+data class SubagentActivitySnapshot(
+    val lines: List<String> = emptyList(),
+    @SerialName("updated_at") val updatedAt: String? = null,
+    val truncated: Boolean = false,
+)
+
+@Serializable
 data class SubagentEntry(
     @SerialName("toolCallId") val toolCallId: String,
     val description: String = "",
@@ -62,6 +69,7 @@ data class SubagentEntry(
     @SerialName("parentAgentId") val parentAgentId: String? = null,
     @SerialName("parentConversationId") val parentConversationId: String? = null,
     @SerialName("startedAt") val startedAt: String? = null,
+    val activity: SubagentActivitySnapshot? = null,
     @SerialName("todo_progress") val todoProgress: SubagentTodoProgressWire? = null,
     /** Client-owned lifecycle timestamp; never encoded onto the wire. */
     @Transient val terminalAtEpochMs: Long? = null,

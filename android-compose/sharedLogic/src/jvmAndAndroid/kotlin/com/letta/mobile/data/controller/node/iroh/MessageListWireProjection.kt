@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.model.SyntheticSkillEnvelopeDetector
+import com.letta.mobile.data.subagents.SubagentParentProjection
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -45,17 +46,56 @@ object MessageListWireProjection {
      * shape is returned untouched.
      */
     fun projectMessageList(response: JsonElement, conversationId: String): JsonElement = when (response) {
-        is JsonArray -> JsonArray(response.mapNotNull { projectElement(it, conversationId) })
+        is JsonArray -> JsonArray(projectElements(response, conversationId))
         is JsonObject if response["messages"] is JsonArray -> JsonObject(
             response.toMutableMap().apply {
-                this["messages"] = JsonArray((response["messages"] as JsonArray).mapNotNull { projectElement(it, conversationId) })
+                this["messages"] = JsonArray(projectElements(response["messages"] as JsonArray, conversationId))
             },
         )
         else -> response
     }
 
-    private fun projectElement(element: JsonElement, conversationId: String): JsonElement? =
-        if (element is JsonObject) projectMessage(element, conversationId) else element
+    private fun projectElements(messages: JsonArray, conversationId: String): List<JsonElement> {
+        val context = ProjectionContext(conversationId, agentCallIds(messages))
+        return messages.mapNotNull { projectElementWithContext(it, context) }
+    }
+
+    private fun agentCallIds(messages: JsonArray): Set<String> = messages.mapNotNull { element ->
+        val message = element as? JsonObject ?: return@mapNotNull null
+        if (message.messageType !in setOf("tool_call_message", "tool_call")) return@mapNotNull null
+        val call = message["tool_call"] as? JsonObject
+        val name = call?.name ?: message.name
+        if (name != "Agent") return@mapNotNull null
+        call?.toolCallId ?: message.toolCallId
+    }.toSet()
+
+    private fun projectElementWithContext(element: JsonElement, context: ProjectionContext): JsonElement? {
+        val message = element as? JsonObject ?: return element
+        val sanitized = message.takeIf { isSubagentReturn(it, context.agentCallIds) }?.let {
+            SubagentParentProjection.sanitizedAgentReturn(it, context.conversationId, it.messageId)
+        } ?: message
+        return projectElement(sanitized, context)
+    }
+
+    private fun isSubagentReturn(message: JsonObject, agentCallIds: Set<String>): Boolean {
+        if (message.messageType !in TOOL_RETURN_MESSAGE_TYPES) return false
+        val callId = message.toolCallId
+        return callId in agentCallIds || hasExplicitSubagentMarker(message)
+    }
+
+    private fun hasExplicitSubagentMarker(message: JsonObject): Boolean {
+        val body = message["tool_return"]?.let(::bodyString).orEmpty()
+        return body.contains("<task-notification", ignoreCase = true) ||
+            message["subagent_id"] != null || message["task_id"] != null
+    }
+
+    private data class ProjectionContext(
+        val conversationId: String,
+        val agentCallIds: Set<String>,
+    )
+
+    private fun projectElement(element: JsonElement, context: ProjectionContext): JsonElement? =
+        if (element is JsonObject) projectMessage(element, context.conversationId) else element
 
     /** Projects a single message object for a list response. Returns null for suppressed messages. */
     fun projectMessage(message: JsonObject, conversationId: String): JsonObject? {
@@ -79,6 +119,18 @@ object MessageListWireProjection {
         val content = (message["content"] as? JsonPrimitive)?.contentOrNull ?: return false
         return SyntheticSkillEnvelopeDetector.isSyntheticSkillEnvelope(role, content)
     }
+
+    private val JsonObject.messageType: String?
+        get() = (this["message_type"] as? JsonPrimitive)?.contentOrNull
+
+    private val JsonObject.name: String?
+        get() = (this["name"] as? JsonPrimitive)?.contentOrNull
+
+    private val JsonObject.toolCallId: String?
+        get() = (this["tool_call_id"] as? JsonPrimitive)?.contentOrNull
+
+    private val JsonObject.messageId: String?
+        get() = (this["id"] as? JsonPrimitive)?.contentOrNull
 
     private fun projectToolReturnMessage(message: JsonObject, conversationId: String): JsonObject {
         val out = message.toMutableMap()

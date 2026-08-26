@@ -156,6 +156,59 @@ class MessageListWireProjectionTest {
     }
 
     @Test
+    fun agentReturnHydratesAsPointerOnlyWithoutChildTranscriptBody() {
+        val sentinel = "CHILD_TRAJECTORY_SENTINEL"
+        val page = buildJsonArray {
+            add(buildJsonObject {
+                put("id", "call-message")
+                put("message_type", "tool_call_message")
+                put("tool_call", buildJsonObject {
+                    put("name", "Agent")
+                    put("tool_call_id", "call-agent")
+                    put("arguments", "{}")
+                })
+            })
+            add(buildJsonObject {
+                put("id", "return-message")
+                put("message_type", "tool_return_message")
+                put("tool_call_id", "call-agent")
+                put("status", "success")
+                put("tool_return", sentinel + "x".repeat(threshold * 4))
+            })
+        }
+
+        val projected = MessageListWireProjection.projectMessageList(page, "conv-1").jsonArray
+        val result = projected[1].jsonObject
+        assertEquals("Sub-agent dispatched", result.getValue("tool_return").jsonPrimitive.content)
+        assertFalse(result.toString().contains(sentinel))
+        assertEquals(
+            "tool_return.get",
+            result.getValue("subagent_transcript_pointer").jsonObject.getValue("method").jsonPrimitive.content,
+        )
+    }
+
+    @Test
+    fun explicitTaskNotificationIsSanitizedWithoutSamePageCall() {
+        val sentinel = "SPLIT_PAGE_CHILD_TRANSCRIPT"
+        val page = buildJsonArray {
+            add(buildJsonObject {
+                put("id", "return-only")
+                put("message_type", "tool_return_message")
+                put("tool_call_id", "call-from-prior-page")
+                put("status", "success")
+                put(
+                    "tool_return",
+                    "<task-notification><summary>Done</summary><result>$sentinel</result></task-notification>",
+                )
+            })
+        }
+
+        val projected = MessageListWireProjection.projectMessageList(page, "conv-1").jsonArray.single().jsonObject
+        assertFalse(projected.toString().contains(sentinel))
+        assertEquals("Done", projected.getValue("tool_return").jsonPrimitive.content)
+    }
+
+    @Test
     fun wrappedMessagesObjectShapeIsProjected() {
         val response = buildJsonObject {
             put("messages", buildJsonArray { add(toolReturnMessage("q".repeat(threshold * 2))) })

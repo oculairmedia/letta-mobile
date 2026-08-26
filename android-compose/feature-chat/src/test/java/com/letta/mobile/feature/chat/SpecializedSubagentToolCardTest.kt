@@ -1,7 +1,9 @@
 package com.letta.mobile.feature.chat
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.letta.mobile.data.model.AppTheme
@@ -9,11 +11,14 @@ import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.data.model.UiSubagentDispatch
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.feature.chat.screen.MessageToolCalls
+import com.letta.mobile.feature.chat.screen.subagentDispatchStatus
 import com.letta.mobile.ui.theme.LettaChatTheme
 import com.letta.mobile.ui.theme.LettaTheme
 import kotlinx.collections.immutable.persistentListOf
 import org.junit.Rule
 import org.junit.Test
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -60,10 +65,49 @@ class SpecializedSubagentToolCardTest {
         composeRule.onNodeWithText("Dispatched: Investigate restore").assertIsDisplayed()
         composeRule.onNodeWithText("researcher").assertIsDisplayed()
         composeRule.onNodeWithText("background").assertIsDisplayed()
-        composeRule.onNodeWithText("running").assertIsDisplayed()
+        composeRule.onNodeWithText("Sub-agent dispatching").assertIsDisplayed()
         composeRule.onNodeWithText("task-9").assertIsDisplayed()
         composeRule.onNodeWithText("Show prompt").assertIsDisplayed().performClick()
         composeRule.onNodeWithText("look carefully").assertIsDisplayed()
+    }
+
+    @Test
+    fun successfulAgentToolReturnReadsAsDispatchedNotChildCompleted() {
+        assertEquals("Sub-agent dispatched", subagentDispatchStatus("success"))
+        assertNotEquals("Subagent completed", subagentDispatchStatus("success"))
+        composeRule.setContent {
+            LettaTheme(
+                appTheme = AppTheme.LIGHT,
+                themePreset = ThemePreset.DEFAULT,
+                dynamicColor = false,
+            ) {
+                LettaChatTheme {
+                    MessageToolCalls(
+                        toolCalls = persistentListOf(
+                            UiToolCall(
+                                name = "Agent",
+                                arguments = "{\"description\":\"Investigate restore\"}",
+                                result = "{\"task_id\":\"task-9\"}",
+                                status = "success",
+                                toolCallId = "tool-agent-1",
+                                subagentDispatch = UiSubagentDispatch(
+                                    toolCallId = "tool-agent-1",
+                                    description = "Investigate restore",
+                                    subagentType = "researcher",
+                                    runInBackground = true,
+                                    prompt = "",
+                                    taskId = "task-9",
+                                ),
+                            ),
+                        ),
+                        messageId = "msg-dispatched",
+                    )
+                }
+            }
+        }
+
+        composeRule.onAllNodesWithText("Sub-agent dispatched", substring = true).assertCountEquals(1)
+        composeRule.onAllNodesWithText("Subagent completed").assertCountEquals(0)
     }
 
     @Test

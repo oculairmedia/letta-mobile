@@ -46,8 +46,11 @@ internal class IrohFramePublisher(
     }
 }
 
-/** Explicit signal that a collector must reconnect/reconcile; no frame is silently dropped. */
-internal class FrameCollectorOverflowException : IllegalStateException(
+/**
+ * Explicit collector-local cancellation signal: the collector must restart and reconcile,
+ * but overflow must never fail the transport publisher or its lifecycle owner.
+ */
+internal class FrameCollectorOverflowException : CancellationException(
     "Iroh frame collector exceeded its bounded queue; reconnect and reconcile",
 )
 
