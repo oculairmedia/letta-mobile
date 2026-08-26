@@ -37,10 +37,12 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonArray
 
+@Suppress("NoDetachedCoroutineLifecycle") // Compatibility factory; the wrapper closes this owned scope.
 internal fun defaultSessionScopedChannelTransportScope(): CoroutineScope =
     CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+@Suppress("NoDetachedCoroutineLifecycle") // The wrapper owns proxyScope and cancels it in close().
 @Singleton
 class SessionScopedChannelTransport internal constructor(
     private val sessionManager: SessionManager,
