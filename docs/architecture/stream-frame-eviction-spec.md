@@ -268,3 +268,185 @@ Existing tests that must be revisited rather than assumed:
   cleanest structural fix, but Letta Code ≥ 0.29.7 deprecated per-channel sockets
   in favour of the single `/ws` endpoint, as documented in the transport's class
   doc. That constraint would have to be revisited upstream first.
+
+---
+
+# Amendment 2026-08-25 — the drain is the defect, not the queue
+
+Evidence gathered from the wrapper boot of 2026-08-24 11:26 (2d uptime at time
+of writing). **This amendment re-sequences the proposal above: Phase 1 is at the
+wrong layer to go first.** Nothing here is implemented.
+
+## What the current boot shows
+
+| Signal | Value |
+|---|---|
+| Overflow teardowns | **41** |
+| Connection losses from any *other* cause | **0** (41 of 41 were this overflow) |
+| Turns ended `releasedWithoutTerminal` | 22 |
+| Recoveries (`reattached runtimes:` 0 / 2 / 3) | 6 / 28 / 12 |
+| Conversations sharing the path | 4 (`local-conv-190` 162k broadcasts, `-176` 25k, `conv-8d4b…` 612, `-210` 364) |
+
+The App Server itself was healthy throughout: stall probe 5–8 ms, RSS ~320 MB,
+no process restarts, no kernel OOM kills, **3** probe failures in two days
+against **41** teardowns. Host swap pressure explains the 3, not the 41.
+This failure is wrapper-side.
+
+## The drain chain
+
+```
+WS socket ─▶ receiveAndDemuxFrames            one sequential loop, all conversations
+                │ trySend, cap 1024            ← overflow THROWS, kills generation
+                ▼
+             streamDeliveryQueue
+                │ for (f in q) streamFrameFlow.emit(f)
+                ▼
+             MutableSharedFlow(extraBufferCapacity = 64, onBufferOverflow = SUSPEND)
+                │ emit() SUSPENDS on the slowest subscriber
+                ▼
+             mergedFrames() = channelFlow { control.collect{send}; stream.collect{send} }
+                │ ONE channel, default 64, send() suspends
+                ▼
+             AppServerClient.events ─▶ turn engine ─▶ ConversationTurnFanout
+                │   observers → async, fire-and-forget, 5s timeout   OK
+                │   initiator → awaitAll(...), NO timeout            BLOCKS
+                ▼
+             IrohViewerHandle.writeFrame
+                └─ streamWriteMutex.withLock { sink.writeAll(...) }  ← QUIC network write
+```
+
+**Drain rate is gated by one awaited QUIC write to the initiator viewer, per
+frame.**
+
+## This answers the prerequisite question
+
+The section above makes measuring drain throughput a blocking prerequisite, and
+asks whether the consumer can sustain ~350 events/sec. **The question is
+malformed as posed.** The consumer is not CPU-bound; it is bound to a network
+round-trip to an unbounded external party. So the second branch of that question
+already applies: *"no queue size fixes anything… the fix would then have to be on
+the drain side."* Confirmed. `DELIVERY_QUEUE_CAPACITY` is not the variable.
+
+## There is no isolation anywhere on the inbound path
+
+One drain coroutine serves every conversation and, transitively, every viewer.
+The slowest single write *anywhere in the system* stalls the drain for
+*everything*. Two independent faults compound:
+
+1. **No isolation** — one sequential drain, N conversations × M viewers.
+2. **The overflow policy for that stall is a global teardown** — `enqueueOrFail`
+   throws and fails the whole generation, control included.
+
+Either alone is survivable. Together, one slow writer on one conversation
+degrades every surface — desktop included, which is how this was reported.
+
+**Scoping note on the evidence.** Per-event `stream.job.done … generation
+superseded` names only 0–2 endpoints (11 lines total across 3 distinct
+endpoints), because only peers holding an *active stream job* at that instant are
+superseded. The all-surface impact is structural — there is exactly one App
+Server connection for the entire wrapper, and teardown closes the shared control
+command queue — not something that appears in the log as simultaneous per-peer
+supersession. Do not expect to see it there.
+
+## Open question #3 now has an answer
+
+The question asked whether anything else consumes `streamFrames` and assumes
+completeness, flagging the Iroh fanout path, and called this "the largest open
+question". **The fanout is not a co-consumer — it *is* the consumer, and it is
+the bottleneck.** Transport-level eviction would therefore drop precisely the
+frames the slow viewers had not yet taken, resync the local timeline, and leave
+remote viewers stale. That is the failure the question anticipated. Isolation has
+to land first.
+
+## The control/stream isolation invariant is re-coupled downstream
+
+`streamBackpressureCannotBlockControlDeliveryOnTheSharedSocket` holds *inside*
+the transport — two queues, two delivery coroutines. But `mergedFrames()`
+(`AppServerTransport.kt:25`) immediately merges both into **one** `channelFlow`
+with a default 64-slot buffer, and that is what `AppServerClient.events`
+(`AppServerClient.kt:185`) consumes. A blocked stream collector fills that shared
+channel and suspends the control `send` behind it.
+
+Control is therefore **not** insulated from stream backpressure in production,
+only in the unit test's view of the transport. Phase 1 changes only the stream
+queue's overflow policy and leaves this untouched.
+
+## Separate defect: the App Server never answers `channels_list`
+
+**First, a misleading signal to disregard.** In the wrapper log
+`list_channels_failed` *always* precedes `App Server connection recovered`, which
+reads like the restore is being issued against the dying generation and racing
+the reconnect. **It is not.** `restoreChannels` runs *inside*
+`ReconnectingClientListener.onRecovered` (`AppServerServeIrohCommand.kt:717`), on
+that generation's own client, and the "connection recovered" line is printed at
+the *end* of `onRecovered`. The ordering is just where the `println` sits. This
+trap is easy to fall into from the log alone — the diagnosis below came from
+probing the running App Server instead.
+
+The real cause, confirmed by direct probe against the live App Server rather
+than inferred from log ordering:
+
+```
+ws://127.0.0.1:4500/ws
+  -> {"type":"app_server_info","request_id":"diag-info-1"}      REPLY in ~3 ms
+  -> {"type":"channels_list",  "request_id":"diag-channels-1"}  NO REPLY in 15 s
+```
+
+Both are logged by the App Server as `Received`; only the first is answered.
+**letta-code 0.29.12 accepts `channels_list` and silently never responds.** Same
+class of wire gap already documented for skills enumeration on this version
+(`letta-mobile-7dm1q`).
+
+That explains the entire failure distribution. Every restore blocks until either
+the 120 s request timeout expires (10 of 47 — including `channel-restore-1` on
+the very first connect, `attempt=0`, with no teardown anywhere near it) or the
+overflow churn tears the generation down under it first (36 of 47, `transport
+disconnected`). The two reasons are one bug, not two, and the `transport
+disconnected` majority is the *drain* defect masking this one.
+
+**Operational consequence.** `LETTA_CHANNELS_HOST=1` is set in
+`/etc/meridian/iroh-wrapper.env` and the ownership banner has printed 6 times, so
+the channels-host cutover was performed; lettashim now sits in
+`/etc/systemd/system/disabled-units/` with `SHIM_CHANNELS_ENABLED=0`. Since the
+wrapper's restore has never once succeeded (47/47, `channels=0 started=0`),
+**no process is currently hosting channel accounts.** That is an operator
+decision, not a code change, and it is independent of the drain work.
+
+## Re-sequenced plan
+
+- **Layer 0 (independent; needs a decision, not a patch).** The App Server does
+  not implement `channels_list`, so `--channels-host` cannot work on letta-code
+  0.29.12. Either roll the cutover back (lettashim resumes as channels host) or
+  carry the gap upstream. Until then the wrapper should detect the unanswered
+  command and degrade loudly rather than burn a 120 s timeout on every
+  reconnect.
+- **Layer 1 (the real fix).** The inbound drain must not be a single global
+  sequential loop. Demux by runtime scope into per-conversation lanes, each with
+  its own bounded queue and drain coroutine, feeding per-viewer outbound queues
+  with their own writer coroutines. A slow viewer then backs up exactly one
+  viewer's queue; a slow conversation backs up one lane; neither reaches control
+  or another surface. Per-viewer serial writers preserve the frame ordering and
+  `event_seq` monotonicity that the initiator `awaitAll` exists to protect
+  (`ConversationTurnFanout.kt:370`) — ordering comes from the queue rather than
+  from lock acquisition order. What is lost is implicit end-to-end backpressure
+  toward the App Server; the per-viewer queue bound replaces it, and overflow
+  there is a *viewer-scoped* resync, which is the correct blast radius.
+- **Layer 2.** Phase 1 above (`DROP_OLDEST` + conflated `streamResyncRequests`)
+  as the safety net it was designed to be. Once backpressure is contained
+  per-lane, eviction is exceptional again — which is the assumption Phase 1 rests
+  on and which the "Scale" section correctly observes is false today.
+- **Layer 3.** Conflation of the four absolute-state types at the **viewer
+  queue**, not the transport. The mutex-guarded `ArrayDeque` that Phase 2 says it
+  needs already exists there once Layer 1 lands, so conflation becomes a keyed
+  replace on insert — and it applies per slow viewer, which is where the pressure
+  is.
+- **Layer 4.** Collapse the `mergedFrames()` re-coupling, or the isolation
+  invariant stays fictional at the only call site that matters.
+
+## Still unexplained — settle before building
+
+The ratio of `releasedWithoutTerminal` to overflow events was 6/28 in the
+2026-08-23 boot and is 22/41 here. The drain mechanism above does not explain
+either figure or the change between them. The "Scale" section already flags this
+as unexplained; it still is, and it should be settled before committing to an
+implementation.
