@@ -58,7 +58,7 @@ data class ConfirmedTimelineSnapshotManifestEntity(
     ],
     indices = [Index(value = ["manifest_id"])],
 )
-data class ConfirmedTimelineSnapshotChunkEntity(
+class ConfirmedTimelineSnapshotChunkEntity(
     @ColumnInfo(name = "manifest_id") val manifestId: String,
     @ColumnInfo(name = "chunk_index") val chunkIndex: Int,
     @ColumnInfo(name = "payload") val payload: ByteArray,

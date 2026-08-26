@@ -31,7 +31,7 @@ import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
  */
 object QrCode {
 
-    data class Matrix(val size: Int, val darkRows: Array<BooleanArray>) {
+    class Matrix(val size: Int, val darkRows: Array<BooleanArray>) {
         operator fun get(r: Int, c: Int): Boolean = darkRows[r][c]
     }
 
@@ -51,7 +51,7 @@ object QrCode {
                 BarcodeFormat.QR_CODE,
                 0, // width — auto from version
                 0, // height — auto from version
-                mapOf<EncodeHintType, Any>(
+                mapOf(
                     EncodeHintType.CHARACTER_SET to "UTF-8",
                     EncodeHintType.ERROR_CORRECTION to errorCorrection,
                     EncodeHintType.MARGIN to 1,

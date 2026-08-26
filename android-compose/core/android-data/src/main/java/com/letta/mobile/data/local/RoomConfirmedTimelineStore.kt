@@ -14,9 +14,9 @@ import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
-import kotlin.coroutines.coroutineContext
 
 /** CursorWindow-safe Room persistence using metadata heads and bounded BLOB chunks. */
 class RoomConfirmedTimelineStore(
@@ -158,7 +158,7 @@ class RoomConfirmedTimelineStore(
         database.withTransaction {
             dao.insertManifest(plan.manifest)
             plan.chunks.chunked(CHUNK_INSERT_BATCH).forEach { batch ->
-                coroutineContext.ensureActive()
+                currentCoroutineContext().ensureActive()
                 dao.insertChunks(batch)
             }
         }
@@ -319,7 +319,7 @@ class RoomConfirmedTimelineStore(
         )
     }
 
-    private data class SnapshotWritePlan(
+    private class SnapshotWritePlan(
         val envelope: StoredTimelineEnvelope,
         val normalized: StoredTimelineEnvelope,
         val payload: ByteArray,

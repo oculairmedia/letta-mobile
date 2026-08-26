@@ -102,6 +102,7 @@ class ConversationTurnFanoutFaultIsolationTest {
         registry: ConnectionRegistry,
         initiator: ViewerHandle?,
         observerWriteTimeoutMs: Long = 200L,
+        observerWrites: ObserverWriteQueue? = null,
     ) = ConversationTurnFanout(
         conversationId = conversationId,
         runtime = runtime,
@@ -111,6 +112,7 @@ class ConversationTurnFanoutFaultIsolationTest {
         trackInitiatorFrame = {},
         unregisterViewer = { conv, v -> registry.unregister(conv, v) },
         observerWriteTimeoutMs = observerWriteTimeoutMs,
+        observerWrites = observerWrites,
     )
 
     private fun countTerminals(frames: List<String>): Int = frames.count {
@@ -155,7 +157,7 @@ class ConversationTurnFanoutFaultIsolationTest {
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     @Test
-    fun slowObserverDoesNotDelayInitiatorTerminalBeyondABound() = runTest {
+    fun stalledObserverDoesNotDelayLaterInitiatorFrames() = runTest {
         val registry = ConnectionRegistry()
         val sinkInit = FakeSink()
         // Observer stalls far longer than the (short) observer write timeout.
@@ -166,7 +168,12 @@ class ConversationTurnFanoutFaultIsolationTest {
         registry.register(conversationId, observer)
 
         // Short observer timeout; runTest virtual clock makes the bound explicit.
-        val fanout = fanoutFor(registry, initiator, observerWriteTimeoutMs = 200L)
+        val fanout = fanoutFor(
+            registry,
+            initiator,
+            observerWriteTimeoutMs = 200L,
+            observerWrites = ObserverWriteQueue(backgroundScope),
+        )
 
         val start = testScheduler.currentTime
         fanout.onDraft(assistantDelta("Hel"))       // first delta: observer times out -> dropped
@@ -179,9 +186,13 @@ class ConversationTurnFanoutFaultIsolationTest {
         assertEquals(listOf("Hel", "Hello world"), assistantContents(frames))
         assertEquals(1, countTerminals(frames))
 
-        // The dead observer is de-registered after the first stall, so the
-        // WHOLE turn is bounded by ~one timeout window (not one per delta).
-        assertTrue(elapsed <= 1_000L, "turn must not stall beyond a bound; elapsed=$elapsed")
+        // None of the later initiator frames waits for the observer timeout.
+        assertEquals(0L, elapsed, "observer stall must not delay later initiator frames")
+
+        // The connection-owned queue still applies the timeout and removes the
+        // observer asynchronously after preserving its per-viewer write order.
+        testScheduler.advanceTimeBy(1_000L)
+        testScheduler.runCurrent()
         assertFalse(
             registry.viewersFor(conversationId).any { it.connectionId == "conn-obs" },
             "slow observer de-registered",

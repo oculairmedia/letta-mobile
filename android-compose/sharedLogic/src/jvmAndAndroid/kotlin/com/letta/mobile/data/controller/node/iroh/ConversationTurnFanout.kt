@@ -8,9 +8,11 @@ import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeRunStatus
 import com.letta.mobile.runtime.ToolExecutionStatus
 import com.letta.mobile.util.Telemetry
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.supervisorScope
+import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -21,6 +23,29 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 
 import kotlin.time.Duration.Companion.milliseconds
+
+/** Serializes asynchronous writes per observer while allowing different observers to progress independently. */
+internal class ObserverWriteQueue(
+    private val scope: CoroutineScope,
+) {
+    private val tails = ConcurrentHashMap<String, Job>()
+
+    /** Enqueues [write] after earlier writes for the same viewer without blocking the caller. */
+    fun enqueue(viewer: ViewerHandle, write: suspend () -> Unit) {
+        val next = requireNotNull(
+            tails.compute(viewer.connectionId) { _, previous ->
+                scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                    previous?.join()
+                    write()
+                }
+            },
+        )
+        next.invokeOnCompletion {
+            tails.remove(viewer.connectionId, next)
+        }
+    }
+}
+
 /**
  * eaczz.4 — the fanout core. Owns a single turn's per-connection frame-shaping
  * state (cumulative assistant text + open-tool_call tracking + terminal-dedup)
@@ -99,7 +124,9 @@ internal class ConversationTurnFanout(
      * to this timeout (it must receive every frame). Injectable for tests.
      */
     private val observerWriteTimeoutMs: Long = OBSERVER_WRITE_TIMEOUT_MS,
+    observerWrites: ObserverWriteQueue? = null,
 ) {
+    private val observerWrites = observerWrites
     private val openToolCalls = OpenToolCallTracker()
     private val cumulativeText = CumulativeStreamText()
     private val broadcastToolSignatures = mutableSetOf<String>()
@@ -365,22 +392,12 @@ internal class ConversationTurnFanout(
      * deterministically from the (redial-resent) input rather than from live
      * turn frames — so it must not consume a parking slot.
      *
-     * eaczz.6 — NON-BLOCKING FANOUT + FAULT ISOLATION. Every viewer is written
-     * CONCURRENTLY inside a [supervisorScope]: a per-viewer failure (thrown
-     * exception, false-return, or observer timeout) can NEVER cancel a sibling
-     * write or propagate to the caller's collect loop / controller.runTurn — the
-     * initiator turn always completes.
-     *
-     * Concurrency (not per-viewer serial) is the chosen non-blocking strategy:
-     * a wedged QUIC observer stream cannot serially-block the others because
-     * writes proceed in parallel. It is ALSO bounded by [observerWriteTimeoutMs]
-     * for OBSERVERS only — a dead peer that never completes a write is timed out,
-     * de-registered on the FIRST stall, and skipped on every subsequent delta, so
-     * the total delay it can add to the turn is at most one timeout window (a
-     * bound), not one-per-delta. Tradeoff vs. a pure fire-and-forget scheme: we
-     * join each delta before the next so per-viewer frame ORDERING + event_seq
-     * monotonicity are preserved (a viewer's mutex still serializes its writes),
-     * at the cost of that single bounded wait; ordering correctness is worth it.
+     * eaczz.6 — NON-BLOCKING FANOUT + FAULT ISOLATION. Observer writes enter the
+     * connection-owned [ObserverWriteQueue], so this call waits only for the
+     * initiator. Each viewer has one ordered job chain, preserving frame order and
+     * event-sequence monotonicity while a stalled observer is timed out and removed.
+     * Failures are absorbed by [writeToViewerIsolated] and cannot cancel sibling
+     * viewers or the initiator turn.
      *
      * The INITIATOR viewer is written with NO timeout and its failure is NOT
      * de-registered here — it must receive EVERY frame, and its stream death is
@@ -407,20 +424,21 @@ internal class ConversationTurnFanout(
         // the slowest observer block the next delta — the user-perceptible
         // hitch on send. Fire-and-forget observer writes so the call site
         // returns as soon as the initiator's write commits.
-        val (initiatorWrite, observerWrites) = partitionViewersByInitiator(viewers)
-        supervisorScope {
-            // Observers: launch in parallel, do NOT await. Their failures are
-            // already absorbed by writeToViewerIsolated (which de-registers on
-            // persistent failure); the launch is enough.
-            observerWrites.forEach { viewer ->
-                async { writeToViewerIsolated(viewer, delta, isInitiator = false) }
+        val (initiatorWrite, observerViewers) = partitionViewersByInitiator(viewers)
+        observerViewers.forEach { viewer ->
+            val queue = observerWrites
+            if (queue == null) {
+                writeToViewerIsolated(viewer, delta, isInitiator = false)
+            } else {
+                queue.enqueue(viewer) {
+                    writeToViewerIsolated(viewer, delta, isInitiator = false)
+                }
             }
-            // Initiator (0 or 1 writes): await. This is the join the
-            // dispatcher thread blocks on; we want it back as fast as the
-            // initiator's write can commit.
-            initiatorWrite.map { viewer ->
-                async { writeToViewerIsolated(viewer, delta, isInitiator = true) }
-            }.awaitAll()
+        }
+        // Initiator (0 or 1 writes): await. This is the only write the
+        // dispatcher blocks on, so observer stalls cannot delay later frames.
+        initiatorWrite.forEach { viewer ->
+            writeToViewerIsolated(viewer, delta, isInitiator = true)
         }
     }
 

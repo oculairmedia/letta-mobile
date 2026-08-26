@@ -81,7 +81,7 @@ data class FolderFilesListParams(
 )
 
 /** Multipart upload payload for `POST /v1/folders/{folder_id}/upload`. */
-data class FolderFileUploadParams(
+class FolderFileUploadParams(
     val folderId: FolderId,
     val fileName: String,
     val fileBytes: ByteArray,

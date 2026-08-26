@@ -50,6 +50,19 @@ import java.util.concurrent.atomic.AtomicBoolean
 import com.letta.mobile.util.Telemetry
 
 import kotlin.time.Duration.Companion.milliseconds
+
+/** Converts ordinary operation failures while preserving structured cancellation. */
+private suspend fun <T> recoverUnlessCancelled(
+    action: suspend () -> T,
+    recover: (Exception) -> T,
+): T = try {
+    action()
+} catch (error: CancellationException) {
+    throw error
+} catch (error: Exception) {
+    recover(error)
+}
+
 /**
  * Handles a single Iroh connection serving the App Server protocol.
  *
@@ -107,6 +120,7 @@ class IrohNodeConnection(
     // connections/threads (P3).
     private val eventSeq = IrohEventSeqAllocator.newConnectionSeq()
     private val streamWriteMutex = Mutex()
+    private lateinit var observerWrites: ObserverWriteQueue
     // Pre-authenticated only when the explicit policy requires no token:
     // InsecureAnonymousForTestOnly, or PeerAllowlist (the endpoint's accept
     // loop has already vetted the peer identity before constructing this).
@@ -227,6 +241,8 @@ class IrohNodeConnection(
             adminRpcAcceptJob.cancelAndJoin()
             streamJob.cancelAndJoin()
             runCatching { streamSend.finish() }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Telemetry.event(
                 "IrohNode", "connection.error",
@@ -335,7 +351,7 @@ class IrohNodeConnection(
     private suspend fun handleControlSync(obj: JsonObject): String {
         val requestId = obj["request_id"]?.jsonPrimitive?.content
             ?: return """{"type":"sync_response","success":false,"error":"request_id is required"}"""
-        return try {
+        return recoverUnlessCancelled(action = {
             val agentId = obj["agent_id"]?.jsonPrimitive?.content
             val conversationId = obj["conversation_id"]?.jsonPrimitive?.content
             if (agentId == null || conversationId == null) {
@@ -354,10 +370,10 @@ class IrohNodeConnection(
                     """{"type":"sync_response","request_id":"$requestId","success":false,"error":"$error"}"""
                 }
             }
-        } catch (e: Exception) {
-            val error = e.message?.replace("\"", "\\\"") ?: "sync error"
-            """{"type":"sync_response","request_id":"$requestId","success":false,"error":"$error"}"""
-        }
+        }, recover = { error ->
+            val message = error.message?.replace("\"", "\\\"") ?: "sync error"
+            """{"type":"sync_response","request_id":"$requestId","success":false,"error":"$message"}"""
+        })
     }
 
     private suspend fun serveControlChannel(
@@ -367,6 +383,7 @@ class IrohNodeConnection(
         val sendStream = biStream.send()
         val activeTurnJobs = LinkedHashSet<Job>()
         val activeTurnJobsMutex = Mutex()
+        observerWrites = ObserverWriteQueue(this)
 
         try {
             val recvStream = biStream.recv()
@@ -721,7 +738,7 @@ class IrohNodeConnection(
         } else if (modeName != null && mode == null) {
             """{"type":"runtime_start_response","request_id":"$requestId","success":false,"error":"unsupported permission mode"}"""
         } else {
-            try {
+            recoverUnlessCancelled(action = {
                 val runtime = controller.startRuntime(
                     agentId = AgentId(agentId),
                     conversationId = ConversationId(conversationId),
@@ -735,9 +752,9 @@ class IrohNodeConnection(
                 // its turn frames fan out to it (and, via S4, to co-viewers).
                 registerAsViewer(runtime.scope.conversationId)
                 """{"type":"runtime_start_response","request_id":"$requestId","success":true,"runtime":{"agent_id":"${runtime.scope.agentId}","conversation_id":"${runtime.scope.conversationId}"}}"""
-            } catch (e: Exception) {
-                """{"type":"runtime_start_response","request_id":"$requestId","success":false,"error":"${e.message?.replace("\"", "\\\"")}"}"""
-            }
+            }, recover = { error ->
+                """{"type":"runtime_start_response","request_id":"$requestId","success":false,"error":"${error.message?.replace("\"", "\\\"")}"}"""
+            })
         }
     }
 
@@ -770,6 +787,21 @@ class IrohNodeConnection(
             )
         }
     }
+
+    /** Builds one turn fanout with connection-owned observer ordering and initiator parking. */
+    private fun createTurnFanout(
+        input: AppServerCommand.Input,
+        streamSend: SendStream,
+    ) = ConversationTurnFanout(
+        conversationId = input.runtime.conversationId,
+        runtime = input.runtime,
+        remoteEndpointId = remoteEndpointId,
+        viewersFor = { conversationId -> connectionRegistry?.viewersFor(conversationId) ?: emptySet() },
+        initiatorViewer = ensureSelfViewer(streamSend),
+        trackInitiatorFrame = { deltaJson -> activeTurnTracking.get()?.tracker?.track(deltaJson) },
+        unregisterViewer = { conversationId, viewer -> connectionRegistry?.unregister(conversationId, viewer) },
+        observerWrites = observerWrites,
+    )
 
     private suspend fun handleInput(
         frameJson: String,
@@ -838,32 +870,7 @@ class IrohNodeConnection(
         if (clientMsgId != null) {
             activeTurnTracking.set(ActiveTurnTracking(clientMessageId = clientMsgId))
         }
-        // eaczz.4: the fanout core. Owns this turn's per-connection frame-shaping
-        // state (cumulative text + open-tool_call tracking + terminal-dedup) and
-        // publishes each cumulated+tagged delta body to EVERY viewer of the
-        // conversation via each viewer's own writeBroadcastFrame — the initiator
-        // (its selfViewer) is just one viewer in that set. Parking stays
-        // INITIATOR-ONLY through [trackInitiatorFrame].
-        val fanout = ConversationTurnFanout(
-            conversationId = input.runtime.conversationId,
-            runtime = input.runtime,
-            remoteEndpointId = remoteEndpointId,
-            viewersFor = { conv -> connectionRegistry?.viewersFor(conv) ?: emptySet() },
-            initiatorViewer = ensureSelfViewer(streamSend),
-            trackInitiatorFrame = { deltaJson ->
-                // INITIATOR-ONLY: matches the pre-fanout writeStreamDelta, which
-                // tracked the delta it was handed for redial replay. Never runs
-                // per-observer.
-                activeTurnTracking.get()?.tracker?.track(deltaJson)
-            },
-            // eaczz.6 fault isolation: drop a wedged/failed OBSERVER from the SAME
-            // registry the fanout reads from, so the broadcaster stops writing to
-            // a dead peer on later deltas. The initiator is never de-registered
-            // here (it follows the parking path).
-            unregisterViewer = { conv, viewer ->
-                connectionRegistry?.unregister(conv, viewer)
-            },
-        )
+        val fanout = createTurnFanout(input, streamSend)
         try {
             // eaczz.5: live user-echo fanout. Before the assistant stream, emit a
             // snapshot `user_message` delta so OBSERVERS see the sender's prompt
