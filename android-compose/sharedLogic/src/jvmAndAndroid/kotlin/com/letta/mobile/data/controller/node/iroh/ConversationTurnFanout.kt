@@ -44,6 +44,16 @@ internal class ObserverWriteQueue(
             tails.remove(viewer.connectionId, next)
         }
     }
+
+    /**
+     * Await this viewer's currently-queued writes. Frames enqueued after this
+     * call are NOT waited for — the point is to flush what is already pending,
+     * which is what the terminal-frame guarantee needs (see
+     * [ConversationTurnFanout.broadcastDeltaBodyNoPark]).
+     */
+    suspend fun drain(viewer: ViewerHandle) {
+        tails[viewer.connectionId]?.join()
+    }
 }
 
 /**
@@ -392,17 +402,25 @@ internal class ConversationTurnFanout(
      * deterministically from the (redial-resent) input rather than from live
      * turn frames — so it must not consume a parking slot.
      *
-     * eaczz.6 — NON-BLOCKING FANOUT + FAULT ISOLATION. Observer writes enter the
-     * connection-owned [ObserverWriteQueue], so this call waits only for the
-     * initiator. Each viewer has one ordered job chain, preserving frame order and
-     * event-sequence monotonicity while a stalled observer is timed out and removed.
-     * Failures are absorbed by [writeToViewerIsolated] and cannot cancel sibling
-     * viewers or the initiator turn.
+     * eaczz.6 — NON-BLOCKING FANOUT + FAULT ISOLATION. EVERY viewer's writes,
+     * initiator included (letta-mobile-aggeh), enter the connection-owned
+     * [ObserverWriteQueue], so a normal delta does not wait on any network write
+     * at all. Each viewer has one ordered job chain, preserving frame order and
+     * event-sequence monotonicity while a stalled observer is timed out and
+     * removed. Failures are absorbed by [writeToViewerIsolated] and cannot cancel
+     * sibling viewers or the initiator turn.
+     *
+     * A TERMINAL delta additionally drains the initiator's chain before
+     * returning, so a turn never completes with its terminal frame still queued.
+     * That is one join per turn, not per frame.
      *
      * The INITIATOR viewer is written with NO timeout and its failure is NOT
      * de-registered here — it must receive EVERY frame, and its stream death is
      * handled by the existing parking path in [IrohNodeConnection]. Timeout +
      * drop is observer-only.
+     *
+     * When there is no queue (legacy/test construction) every write stays
+     * synchronous, preserving the pre-queue behaviour exactly.
      */
     private suspend fun broadcastDeltaBodyNoPark(delta: JsonObject) {
         val viewers = snapshotViewers()
@@ -435,10 +453,35 @@ internal class ConversationTurnFanout(
                 }
             }
         }
-        // Initiator (0 or 1 writes): await. This is the only write the
-        // dispatcher blocks on, so observer stalls cannot delay later frames.
+        // letta-mobile-aggeh: the initiator goes through the SAME per-viewer
+        // ordered chain as observers. Awaiting its QUIC write per frame was the
+        // last synchronous network hop in the App Server drain path: every hop
+        // from the socket to here is a suspending send over a bounded buffer, so
+        // a slow initiator link propagated backpressure all the way to
+        // KtorAppServerWebSocketTransport's 1024-frame stream queue and tore the
+        // whole shared generation down on overflow (41 times in one production
+        // boot, taking every surface with it).
+        //
+        // Nothing is lost by not awaiting: writeToViewerIsolated DISCARDS the
+        // initiator's write result (`if (isInitiator) return`), and parking is
+        // recorded by trackInitiatorFrame BEFORE the write regardless of its
+        // outcome. Ordering and event_seq monotonicity are preserved because the
+        // chain serializes the whole write lambda -- seq is assigned inside it.
+        //
+        // The one guarantee awaiting DID provide is that a terminal frame
+        // reaches the wire before the turn completes; that is now explicit, and
+        // costs one join per TURN instead of one per frame (a median turn is
+        // ~5,500 frames).
+        val queue = observerWrites
         initiatorWrite.forEach { viewer ->
-            writeToViewerIsolated(viewer, delta, isInitiator = true)
+            if (queue == null) {
+                writeToViewerIsolated(viewer, delta, isInitiator = true)
+            } else {
+                queue.enqueue(viewer) {
+                    writeToViewerIsolated(viewer, delta, isInitiator = true)
+                }
+                if (deltaIsTerminal(delta)) queue.drain(viewer)
+            }
         }
     }
 
