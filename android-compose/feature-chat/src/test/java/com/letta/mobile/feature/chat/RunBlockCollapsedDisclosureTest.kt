@@ -2,6 +2,7 @@ package com.letta.mobile.feature.chat
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.Text
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertHasClickAction
@@ -39,6 +40,7 @@ class RunBlockCollapsedDisclosureTest {
 
     @Test
     fun collapsedCompletedRunHidesToolRowsButKeepsDisclosureTappable() {
+        val collapsedState = mutableStateOf(true)
         composeRule.setContent {
             LettaTheme(
                 appTheme = AppTheme.LIGHT,
@@ -52,8 +54,8 @@ class RunBlockCollapsedDisclosureTest {
                             toolMessage(id = "tool-1", command = "collapse-check"),
                             message(id = "final-1", content = "All done."),
                         ),
-                        collapsed = true,
-                        onToggleCollapsed = {},
+                        collapsed = collapsedState.value,
+                        onToggleCollapsed = { collapsedState.value = !collapsedState.value },
                         showCompletedDisclosure = true,
                     ) { message, _, rowModifier ->
                         Box(

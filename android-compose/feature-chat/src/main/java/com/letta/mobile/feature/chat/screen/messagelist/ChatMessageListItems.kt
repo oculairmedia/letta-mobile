@@ -1,10 +1,11 @@
 package com.letta.mobile.feature.chat.screen.messagelist
 
-import com.letta.mobile.ui.theme.LettaCodeFont
+import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.chat.render.ChatMessageGeometryState
 import com.letta.mobile.ui.chat.render.ChatRenderItemGeometrySignature
+import com.letta.mobile.ui.theme.LettaCodeFont
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,6 +37,7 @@ import com.letta.mobile.ui.theme.chatShapes
 internal fun MeasuredChatRenderItem(
     signature: ChatRenderItemGeometrySignature,
     geometryState: ChatMessageGeometryState,
+    applyCachedMinHeight: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val isPinching = LocalChatIsPinching.current
@@ -68,7 +70,15 @@ internal fun MeasuredChatRenderItem(
     // Expansion/collapse changes the signature. The old signature may carry
     // a much taller cached minimum; never let that floor survive into the new
     // visual state or a collapsed thought/run cannot shrink.
-    val cachedHeightPx = if (hasMeasuredOnce.value) geometryState.heightFor(signature) else null
+    //
+    // Reasoning rows bypass the floor entirely because their content animates
+    // its own size. Re-reading a mid-animation height would pin the row and
+    // prevent a collapse from finishing.
+    val cachedHeightPx = if (applyCachedMinHeight && hasMeasuredOnce.value) {
+        geometryState.heightFor(signature)
+    } else {
+        null
+    }
     val heightModifier = if (cachedHeightPx != null && cachedHeightPx > 0) {
         val cachedHeightDp = with(LocalDensity.current) { cachedHeightPx.toDp() }
         Modifier.heightIn(min = cachedHeightDp)
@@ -109,11 +119,15 @@ internal fun RenderChatMessage(
     onToggleReasoning: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
-    val spacingBelow = when {
-        position == GroupPosition.Middle || position == GroupPosition.Last -> MaterialTheme.chatDimens.groupedMessageSpacing
-        else -> MaterialTheme.chatDimens.ungroupedMessageSpacing
-    }
-    val spacingAbove = if (message.isReasoning) LettaSpacing.INNER_PADDING_SMALL else LettaSpacing.NONE
+    // Thinking rows are run steps like projected tool calls: keep their
+    // compact grouped rhythm and avoid adding a second bottom inset on top of
+    // MessageReasoning's own padding.
+    val rowPadding = chatMessageRowVerticalPadding(
+        isReasoning = message.isReasoning,
+        position = position,
+        groupedMessageSpacingDp = MaterialTheme.chatDimens.groupedMessageSpacing.value,
+        ungroupedMessageSpacingDp = MaterialTheme.chatDimens.ungroupedMessageSpacing.value,
+    )
     val isHighlighted = message.id == highlightedMessageId
     val highlightModifier = if (isHighlighted) {
         Modifier.background(
@@ -126,7 +140,9 @@ internal fun RenderChatMessage(
     if (chatMode == "debug") {
         DebugMessageCard(
             message = message,
-            modifier = modifier.then(highlightModifier).padding(top = spacingBelow, bottom = spacingAbove),
+            modifier = modifier
+                .then(highlightModifier)
+                .padding(top = rowPadding.topDp.dp, bottom = rowPadding.bottomDp.dp),
         )
     } else {
         ChatMessageItem(
@@ -144,9 +160,55 @@ internal fun RenderChatMessage(
             approvalInFlight = approvalInFlight,
             showTimestamp = showTimestamp,
             onAttachmentImageTap = callbacks.onAttachmentImageTap,
-            modifier = modifier.then(highlightModifier).padding(top = spacingBelow, bottom = spacingAbove),
+            modifier = modifier
+                .then(highlightModifier)
+                .padding(top = rowPadding.topDp.dp, bottom = rowPadding.bottomDp.dp),
         )
     }
+}
+
+/** Vertical item padding (in dp) applied by [RenderChatMessage] to one row. */
+internal data class ChatRowVerticalPadding(
+    val topDp: Float,
+    val bottomDp: Float,
+)
+
+/**
+ * Vertical item-padding policy for one chat timeline message row.
+ *
+ * Non-reasoning rows keep the historical editorial rhythm: grouped beat for
+ * Middle/Last siblings, ungrouped section break for First/None (role
+ * transitions). Reasoning rows are intra-run steps like the projected
+ * tool-call rows, so they always take the compact grouped beat and carry NO
+ * bottom inset — [MessageReasoning] self-pads (4dp outer + 4dp header), and
+ * adding an item-level bottom inset double-pads every collapsed "Thought"
+ * row.
+ */
+internal fun chatMessageRowVerticalPadding(
+    isReasoning: Boolean,
+    position: GroupPosition,
+    groupedMessageSpacingDp: Float,
+    ungroupedMessageSpacingDp: Float,
+): ChatRowVerticalPadding {
+    val topDp = when {
+        isReasoning -> groupedMessageSpacingDp
+        position == GroupPosition.Middle || position == GroupPosition.Last -> groupedMessageSpacingDp
+        else -> ungroupedMessageSpacingDp
+    }
+    return ChatRowVerticalPadding(topDp = topDp, bottomDp = 0f)
+}
+
+/**
+ * Whether any row inside this render item hosts [MessageReasoning].
+ *
+ * The geometry cache's `heightIn(min=cached)` floor must never apply to these
+ * rows (see [MeasuredChatRenderItem]): their content animates its own size on
+ * expand/collapse, so a reactively re-read cached height freezes the row at
+ * its expanded height when collapsing.
+ */
+internal fun ChatRenderItem.includesReasoningRow(): Boolean = when (this) {
+    is ChatRenderItem.Single -> message.isReasoning
+    is ChatRenderItem.RunBlock -> messages.any { it.first.isReasoning }
 }
 
 @Composable
