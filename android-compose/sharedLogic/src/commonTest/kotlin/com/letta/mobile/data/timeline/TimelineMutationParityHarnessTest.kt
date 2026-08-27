@@ -10,6 +10,8 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class TimelineMutationParityHarnessTest {
@@ -21,11 +23,10 @@ class TimelineMutationParityHarnessTest {
         owner.enqueue(TimelineMutation.StreamFrame(1, assistant("reply", "hello")))
         val entry = owner.drainOne()!!
 
-        // Exact trace prevents event-count parity from false-passing reordered, duplicated, or content-drifted effects.
         assertEquals(4, entry.trace().size)
         assertTrue(entry.trace()[0].startsWith("state:events=[confirmed:reply:"))
-        assertEquals("effect:event:StreamEventIngested(serverId=reply, messageType=assistant_message)", entry.trace()[1])
-        assertEquals("effect:notification:reply:assistant_message:hello", entry.trace()[2])
+        assertEquals("sync-event:StreamEventIngested(serverId=reply, messageType=assistant_message)", entry.trace()[1])
+        assertEquals("notification:reply:assistant_message:hello", entry.trace()[2])
         assertEquals("ack:COMPLETED", entry.trace()[3])
     }
 
@@ -44,7 +45,6 @@ class TimelineMutationParityHarnessTest {
             it.drain()
         }
 
-        // Full event semantics catch a dropped mutation even when both schedules retain the same event count.
         val firstEvents = hydrateThenStream.currentState().timeline.events.filterIsInstance<TimelineEvent.Confirmed>()
         val secondEvents = streamThenHydrate.currentState().timeline.events.filterIsInstance<TimelineEvent.Confirmed>()
         assertEquals(firstEvents.map { listOf(it.serverId, it.otid, it.content, it.messageType, it.runId) }, secondEvents.map { listOf(it.serverId, it.otid, it.content, it.messageType, it.runId) })
@@ -62,28 +62,47 @@ class TimelineMutationParityHarnessTest {
         owner.drain()
 
         val state = owner.currentState()
-        val call = state.timeline.events.filterIsInstance<TimelineEvent.Confirmed>().single { it.serverId == "call-message" }
-        // Pending-map and attached body assertions fail if rebase clears pending returns or applies one twice.
-        assertEquals("result", call.toolReturnContentByCallId["call-id"])
+        val calls = state.timeline.events.filterIsInstance<TimelineEvent.Confirmed>()
+            .filter { it.serverId == "call-message" }
+        assertEquals(1, calls.size)
+        assertEquals(mapOf("call-id" to "result"), calls.single().toolReturnContentByCallId)
         assertTrue(state.pendingToolReturnsByCallId.isEmpty())
-        assertEquals(1, owner.journal.flatMap { it.orderedEffects }.count { it.contains("call-message") })
+        assertEquals(1, state.timeline.events.count { it.otid == calls.single().otid })
+        assertEquals(1, state.timeline.events.filterIsInstance<TimelineEvent.Confirmed>().count { it.serverId == calls.single().serverId })
     }
 
     @Test
-    fun staleGenerationCannotReplaceStateOrEmitSideEffects() {
+    fun staleGenerationCannotReplaceStateEmitSideEffectsOrClaimAcceptance() {
         val owner = owner()
         owner.enqueue(TimelineMutation.HydrateSnapshot(1, 2, listOf(UserMessage("new", JsonPrimitive("new")))))
         owner.enqueue(TimelineMutation.HydrateSnapshot(2, 1, listOf(UserMessage("old", JsonPrimitive("old")))))
         owner.drain()
 
-        // The negative control fails if an older seed replaces newer state or leaks any effect.
+        val rejected = owner.journal.last()
         assertEquals(listOf("new"), owner.currentState().timeline.events.filterIsInstance<TimelineEvent.Confirmed>().map { it.serverId })
-        assertEquals(TestAckOutcome.REJECTED, owner.journal.last().ack)
-        assertTrue(owner.journal.last().orderedEffects.isEmpty())
+        assertEquals(1L, owner.currentState().lastAppliedMutationSequence)
+        assertEquals(2L, rejected.attemptedSequence)
+        assertNull(rejected.acceptedSequence)
+        assertEquals(TestAckOutcome.REJECTED, rejected.ack)
+        assertTrue(rejected.orderedEffects.isEmpty())
     }
 
     @Test
-    fun cleanupSuppressionIsDurableAcrossReplayAndReconcile() {
+    fun staleSequenceCannotAdvanceLastAppliedOrClaimAcceptance() {
+        val owner = owner()
+        owner.enqueue(TimelineMutation.StreamFrame(2, assistant("new", "new")))
+        owner.enqueue(TimelineMutation.StreamFrame(1, assistant("old", "old")))
+        owner.drain()
+
+        val rejected = owner.journal.last()
+        assertEquals(2L, owner.currentState().lastAppliedMutationSequence)
+        assertEquals(1L, rejected.attemptedSequence)
+        assertNull(rejected.acceptedSequence)
+        assertEquals(TestAckOutcome.REJECTED, rejected.ack)
+    }
+
+    @Test
+    fun cleanupSuppressionIsDurableAcrossRealReplayMergeAndAllowsControlRow() {
         val full = confirmed("full", "complete assistant answer", 1.0)
         val fragment = confirmed("fragment", "pa", 2.0)
         val owner = TimelineMutationParityOwner(TimelineReducerState(Timeline("conversation", persistentListOf(full, fragment))))
@@ -91,13 +110,44 @@ class TimelineMutationParityHarnessTest {
         owner.drain()
         val suppressionAfterCleanup = owner.currentState().timeline.abandonedAssistantFragmentSuppressions
         assertEquals(listOf("full"), owner.currentState().timeline.events.filterIsInstance<TimelineEvent.Confirmed>().map { it.serverId })
-        owner.enqueue(TimelineMutation.ReconcileSnapshot(2, 1, listOf(assistant("fragment", "pa"))))
+
+        owner.enqueue(TimelineMutation.ReconcileSnapshot(2, 1, listOf(
+            assistant("fragment", "pa", runId = "run", otid = "otid-fragment"),
+            assistant("control", "new complete row", runId = "run-control", otid = "otid-control"),
+        )))
         owner.drain()
 
-        // IDs plus durable suppression metadata catch omitted cleanup even when reconcile itself is enrichment-only.
-        assertEquals(listOf("full"), owner.currentState().timeline.events.filterIsInstance<TimelineEvent.Confirmed>().map { it.serverId })
+        assertEquals(listOf("full", "control"), owner.currentState().timeline.events.filterIsInstance<TimelineEvent.Confirmed>().map { it.serverId })
         assertFalse(suppressionAfterCleanup.isEmpty())
         assertEquals(suppressionAfterCleanup, owner.currentState().timeline.abandonedAssistantFragmentSuppressions)
+    }
+
+    @Test
+    fun duplicateHydrateAndReconcileReportNoChange() {
+        val message = UserMessage("user", JsonPrimitive("hello"), date = "2026-01-01T00:00:00Z")
+        val hydrateOwner = owner()
+        hydrateOwner.enqueue(TimelineMutation.HydrateSnapshot(1, 1, listOf(message)))
+        hydrateOwner.enqueue(TimelineMutation.HydrateSnapshot(2, 1, listOf(message)))
+        hydrateOwner.drain()
+        assertIs<TimelineReductionResult.NoChange>(hydrateOwner.journal.last().result)
+
+        val reconcileOwner = TimelineMutationParityOwner(hydrateOwner.currentState().copy(lastAppliedMutationSequence = 0))
+        reconcileOwner.enqueue(TimelineMutation.ReconcileSnapshot(1, 0, listOf(message)))
+        reconcileOwner.drain()
+        assertIs<TimelineReductionResult.NoChange>(reconcileOwner.journal.last().result)
+    }
+
+    @Test
+    fun lifecycleResetPreservesBufferedToolReturns() {
+        val owner = owner()
+        owner.enqueue(TimelineMutation.StreamFrame(1, toolReturn()))
+        owner.enqueue(TimelineMutation.LifecycleReset(2, 1))
+        owner.enqueue(TimelineMutation.StreamFrame(3, toolCall()))
+        owner.drain()
+
+        val call = owner.currentState().timeline.events.filterIsInstance<TimelineEvent.Confirmed>().single { it.serverId == "call-message" }
+        assertEquals("result", call.toolReturnContentByCallId["call-id"])
+        assertTrue(owner.currentState().pendingToolReturnsByCallId.isEmpty())
     }
 
     @Test
@@ -108,7 +158,6 @@ class TimelineMutationParityHarnessTest {
         owner.close("cancelled")
         val afterClose = owner.enqueue(TimelineMutation.StreamFrame(3, assistant("three", "three")))
 
-        // PENDING is the hanging-ack negative control; an empty journal proves close emits no side channel.
         assertEquals(listOf(TestAckOutcome.FAILED, TestAckOutcome.FAILED, TestAckOutcome.FAILED), listOf(first.outcome, second.outcome, afterClose.outcome))
         assertTrue(owner.journal.isEmpty())
         assertTrue(owner.currentState().timeline.events.isEmpty())
@@ -125,7 +174,6 @@ class TimelineMutationParityHarnessTest {
             listOf(UserMessage("server", JsonPrimitive("hello"), otid = "client", date = "2026-01-01T00:00:01Z")),
         )
 
-        // Identity, cursor, resident dedup metadata, and exact effects catch local/server double rows and incomplete persistence state.
         assertEquals("client", reduction.next.timeline.events.single().otid)
         assertEquals("server", (reduction.next.timeline.events.single() as TimelineEvent.Confirmed).serverId)
         assertEquals("server", reduction.next.timeline.liveCursor)
@@ -135,11 +183,16 @@ class TimelineMutationParityHarnessTest {
 
     private fun owner() = TimelineMutationParityOwner(TimelineReducerState(Timeline("conversation")))
 
-    private fun assistant(id: String, content: String) = AssistantMessage(
+    private fun assistant(
+        id: String,
+        content: String,
+        runId: String = "run-$id",
+        otid: String = "otid-$id",
+    ) = AssistantMessage(
         id = id,
         contentRaw = JsonPrimitive(content),
-        otid = "otid-$id",
-        runId = "run-$id",
+        otid = otid,
+        runId = runId,
         date = "2026-01-01T00:00:01Z",
     )
 
