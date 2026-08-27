@@ -101,7 +101,6 @@ class TimelineSyncLoop(
             conversationId = conversationId,
             agentId = agentId,
             processor = timelineProcessor,
-            conversationCursorStore = conversationCursorStore,
             onStreamFrameIngested = { scheduleSnapshotPersist(immediate = false) },
         )
     }
@@ -288,7 +287,11 @@ class TimelineSyncLoop(
             override fun synchronizeSeed(processorState: TimelineReducerState): TimelineReducerState =
                 processorState.copy(
                     timeline = _state.value,
-                    pendingToolReturnsByCallId = pendingToolReturnsByCallId.toTimelinePersistentMap(),
+                    // The processor owns returns learned from stream frames. Legacy
+                    // writers can still add deferred returns through the bridge.
+                    pendingToolReturnsByCallId = (
+                        processorState.pendingToolReturnsByCallId + pendingToolReturnsByCallId
+                    ).toTimelinePersistentMap(),
                 )
 
             override fun publish(state: TimelineReducerState) {
@@ -312,9 +315,8 @@ class TimelineSyncLoop(
                     ),
                 )
                 is TimelineReductionEffect.DeletePendingLocal -> pendingLocalStore.delete(effect.otid)
-                // Cursor-string persistence is a deferred mutation family. The
-                // reducer state already owns liveCursor; its store remains with
-                // the existing reconcile/stream paths in this slice.
+                is TimelineReductionEffect.RecordStreamSequence ->
+                    conversationCursorStore.recordFrame(conversationId, effect.sequence)
                 is TimelineReductionEffect.AdvanceCursor -> Unit
             }
         },

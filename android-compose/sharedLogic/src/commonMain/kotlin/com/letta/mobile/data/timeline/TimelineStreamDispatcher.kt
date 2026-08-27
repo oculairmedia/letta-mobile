@@ -10,7 +10,6 @@ internal class TimelineStreamDispatcher(
     private val conversationId: String,
     private val agentId: String? = null,
     private val processor: TimelineProcessor,
-    private val conversationCursorStore: ConversationCursorStore,
     private val onStreamFrameIngested: (() -> Unit)? = null,
 ) {
     suspend fun dispatch(message: LettaMessage, source: String = "unknown") {
@@ -18,12 +17,7 @@ internal class TimelineStreamDispatcher(
             TimelineMutation.StreamFrame(message = message, agentId = agentId),
         )
         when (acknowledgement) {
-            is TimelineProcessorAck.Applied -> {
-                message.seqId?.takeIf { it >= 0 }?.let { seq ->
-                    conversationCursorStore.recordFrame(conversationId, seq.toLong())
-                }
-                onStreamFrameIngested?.invoke()
-            }
+            is TimelineProcessorAck.Applied -> onStreamFrameIngested?.invoke()
             is TimelineProcessorAck.Rejected -> throw TimelineProcessorMutationException(
                 "stream frame rejected from $source: ${acknowledgement.reason}",
             )
