@@ -82,6 +82,45 @@ data class ReconcileAfterSendResult(
     val shouldDeletePendingLocal: Boolean,
 )
 
+data class PureReconcileAfterSendResult(
+    val timeline: Timeline,
+    val result: ReconcileAfterSendResult,
+)
+
+fun reconcileAfterSendSnapshot(
+    initial: Timeline,
+    otid: String,
+    serverMessages: List<LettaMessage>,
+): PureReconcileAfterSendResult {
+    var timeline = initial
+    var confirmedLocal = false
+    var confirmedServerId: String? = null
+    var shouldDeletePendingLocal = false
+    val existing = timeline.findByOtid(otid)
+    if (existing is TimelineEvent.Local) {
+        val match = serverMessages.firstOrNull { it.otid == otid } ?: if (existing.role == Role.USER) {
+            serverMessages.firstOrNull { message ->
+                val confirmed = message.toTimelineEvent(position = 0.0)
+                confirmed?.messageType == TimelineMessageType.USER && confirmed.content.trim() == existing.content.trim()
+            }
+        } else null
+        val confirmed = match?.toTimelineEvent(position = existing.position)
+        if (confirmed != null) {
+            timeline = timeline.replaceLocal(otid, confirmed)
+            confirmedServerId = match.id
+            confirmedLocal = true
+            shouldDeletePendingLocal = true
+        }
+    }
+    val mergeResult = timeline.mergeServerMessages(serverMessages)
+    timeline = mergeResult.first
+    serverMessages.lastOrNull()?.id?.let { timeline = timeline.copy(liveCursor = it) }
+    return PureReconcileAfterSendResult(
+        timeline,
+        ReconcileAfterSendResult(confirmedLocal, mergeResult.second, confirmedServerId, shouldDeletePendingLocal),
+    )
+}
+
 suspend fun applyReconcileAfterSendSnapshot(
     otid: String,
     conversationId: String,
@@ -89,74 +128,12 @@ suspend fun applyReconcileAfterSendSnapshot(
     writeMutex: Mutex,
     state: MutableStateFlow<Timeline>,
 ): ReconcileAfterSendResult {
-    var confirmedLocal = false
-    var appendedMissing = 0
-    var confirmedServerId: String? = null
-    var shouldDeletePendingLocal = false
-
+    var result: PureReconcileAfterSendResult? = null
     writeMutex.withLock {
-        // 1. Swap Local→Confirmed for our outbound message
-        val myMatch = serverMessages.firstOrNull { it.otid == otid }
-        if (myMatch != null) {
-            val existing = state.value.findByOtid(otid)
-            if (existing is TimelineEvent.Local) {
-                val confirmed = myMatch.toTimelineEvent(position = existing.position)
-                if (confirmed != null) {
-                    state.value = state.value.replaceLocal(otid, confirmed)
-                    confirmedServerId = myMatch.id
-                    confirmedLocal = true
-                    // mge5.24: server echoed our send back, so any
-                    // disk-persisted Local for this otid is now obsolete.
-                    // (For text sends nothing was persisted; for images
-                    // this branch will rarely fire today because the
-                    // server drops them — but if/when it does, clean up.)
-                    shouldDeletePendingLocal = true
-                }
-            }
-        } else {
-            // letta-mobile-20tat (P1): when the server message.list response
-            // does NOT echo the client otid (common over Iroh if the serve path
-            // doesn't persist/echo client_message_id), fall back to content+
-            // recency matching: find the Local user row we're trying to confirm,
-            // and swap it with the reconciled server copy. This ensures the
-            // optimistic send row and its disk twin collapse into one confirmed
-            // event instead of rendering twice.
-            val existing = state.value.findByOtid(otid)
-            if (existing is TimelineEvent.Local && existing.role == Role.USER) {
-                val contentMatch = serverMessages.firstOrNull { msg ->
-                    val confirmed = msg.toTimelineEvent(position = 0.0)
-                    confirmed?.messageType == TimelineMessageType.USER &&
-                        confirmed.content.trim() == existing.content.trim()
-                }
-                if (contentMatch != null) {
-                    val confirmed = contentMatch.toTimelineEvent(position = existing.position)
-                    if (confirmed != null) {
-                        state.value = state.value.replaceLocal(otid, confirmed)
-                        confirmedServerId = contentMatch.id
-                        confirmedLocal = true
-                        shouldDeletePendingLocal = true
-                    }
-                }
-            }
-        }
-
-        // 2. Pull in any server messages we don't yet have (missed stream events)
-        val mergeResult = state.value.mergeServerMessages(serverMessages)
-        state.value = mergeResult.first
-        appendedMissing = mergeResult.second
-
-        // 3. Advance liveCursor
-        serverMessages.lastOrNull()?.id?.let {
-            state.value = state.value.copy(liveCursor = it)
-        }
+        result = reconcileAfterSendSnapshot(state.value, otid, serverMessages)
+        state.value = result!!.timeline
     }
-
-    return ReconcileAfterSendResult(
-        confirmedLocal = confirmedLocal,
-        appendedMissing = appendedMissing,
-        confirmedServerId = confirmedServerId,
-        shouldDeletePendingLocal = shouldDeletePendingLocal,
-    )
+    return result!!.result
 }
 
 fun Timeline.mergeServerMessages(
