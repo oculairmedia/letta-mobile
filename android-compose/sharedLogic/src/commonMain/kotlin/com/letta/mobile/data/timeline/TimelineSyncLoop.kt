@@ -582,16 +582,15 @@ class TimelineSyncLoop(
     }
 
     private suspend fun applyReconcileAfterSendSnapshot(event: TimelineGatewayEvent.ReconcileAfterSendSnapshot) {
-        val before = _state.value
         val applied = timelineProcessor.submit(
             TimelineMutation.ReconcileAfterSendSnapshot(event.otid, event.serverMessages),
         )
         when (applied) {
             is TimelineProcessorAck.Applied -> {
-                scheduleSnapshotPersist(immediate = true)
-                event.ack.complete(
-                    reconcileAfterSendSnapshot(before, event.otid, event.serverMessages).result,
-                )
+                val result = applied.result as? TimelineReductionResult.ReconcileAfterSendApplied
+                    ?: error("post-send acknowledgement did not carry reconcile result")
+                if (result.changed) scheduleSnapshotPersist(immediate = true)
+                event.ack.complete(result.result)
             }
             is TimelineProcessorAck.Rejected,
             is TimelineProcessorAck.Failed -> event.ack.completeExceptionally(

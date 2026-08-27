@@ -96,6 +96,14 @@ sealed interface TimelineReductionResult {
         val visibleEventCount: Int,
         override val changed: Boolean,
     ) : TimelineReductionResult
+    data class RecentMessagesApplied(
+        val appended: Int,
+        override val changed: Boolean,
+    ) : TimelineReductionResult
+    data class ReconcileAfterSendApplied(
+        val result: ReconcileAfterSendResult,
+        override val changed: Boolean,
+    ) : TimelineReductionResult
 }
 
 enum class TimelineChangeKind { LOCAL_APPENDED, LOCAL_RETRIED, LOCAL_SENT, LOCAL_FAILED, SNAPSHOT_ENRICHED, CLEANED, RECONCILED }
@@ -232,8 +240,14 @@ fun reducePostSendReconcile(
         if (reconciled.result.shouldDeletePendingLocal) add(TimelineReductionEffect.DeletePendingLocal(otid))
         serverMessages.lastOrNull()?.id?.let { add(TimelineReductionEffect.AdvanceCursor(it)) }
     }.toTimelinePersistentList()
-    return if (next == state) unchanged(state)
-    else TimelineReduction(next, effects, TimelineReductionResult.Changed(TimelineChangeKind.RECONCILED))
+    return TimelineReduction(
+        next = next,
+        effects = effects,
+        result = TimelineReductionResult.ReconcileAfterSendApplied(
+            result = reconciled.result,
+            changed = next != state,
+        ),
+    )
 }
 
 private fun deliveryReduction(state: TimelineReducerState, timeline: Timeline, kind: TimelineChangeKind): TimelineReduction =
@@ -347,9 +361,13 @@ private fun reduceRecentMessagesMutation(
         highestAppliedReconcileGeneration = maxOf(state.highestAppliedReconcileGeneration, mutation.generation),
         freshnessSequence = maxOf(state.freshnessSequence, mutation.freshnessSequence),
     )
-    val result = if (next == state) TimelineReductionResult.NoChange
-    else TimelineReductionResult.Changed(TimelineChangeKind.RECONCILED)
-    return TimelineReduction(next, result = result)
+    return TimelineReduction(
+        next = next,
+        result = TimelineReductionResult.RecentMessagesApplied(
+            appended = merge.second,
+            changed = next.timeline != state.timeline,
+        ),
+    )
 }
 
 private fun reduceReconcileMutation(

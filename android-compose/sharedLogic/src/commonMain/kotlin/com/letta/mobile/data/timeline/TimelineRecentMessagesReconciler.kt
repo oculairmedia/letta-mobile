@@ -337,7 +337,6 @@ class TimelineRecentMessagesReconciler(
         event: TimelineGatewayEvent.RecentMessagesSnapshot,
     ) {
         try {
-            val before = processor.state.value.timeline
             val applied = processor.submit(
                 TimelineMutation.RecentMessagesSnapshot(
                     generation = event.generation ?: DEFAULT_CONNECTION_GENERATION,
@@ -347,8 +346,10 @@ class TimelineRecentMessagesReconciler(
             )
             when (applied) {
                 is TimelineProcessorAck.Applied -> {
-                    if (applied.result.changed) onSnapshotApplied()
-                    event.ack.complete(appendedServerMessageCount(before, processor.state.value.timeline, event.serverMessages))
+                    val result = applied.result as? TimelineReductionResult.RecentMessagesApplied
+                        ?: error("recent snapshot acknowledgement did not carry recent result")
+                    if (result.changed) onSnapshotApplied()
+                    event.ack.complete(result.appended)
                 }
                 is TimelineProcessorAck.Rejected -> {
                     reportStaleSnapshot(event)
@@ -360,15 +361,6 @@ class TimelineRecentMessagesReconciler(
             event.ack.completeExceptionally(t)
             throw t
         }
-    }
-
-    private fun appendedServerMessageCount(
-        before: Timeline,
-        after: Timeline,
-        serverMessages: List<LettaMessage>,
-    ): Int = serverMessages.count { message ->
-        val type = message.toTimelineEvent(0.0)?.messageType ?: return@count false
-        before.findByServerId(message.id, type) == null && after.findByServerId(message.id, type) != null
     }
 
     private fun reportStaleSnapshot(event: TimelineGatewayEvent.RecentMessagesSnapshot) {
