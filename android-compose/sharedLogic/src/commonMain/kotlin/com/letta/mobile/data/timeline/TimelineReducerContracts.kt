@@ -36,7 +36,13 @@ sealed interface TimelineMutation {
         val agentId: String? = null,
     ) : TimelineMutation
     data class SnapshotEnrichment(val messages: List<LettaMessage>) : TimelineMutation
-    data class HydrateSnapshot(val generation: Long, val messages: List<LettaMessage>) : TimelineMutation
+    data class HydrateSnapshot(
+        val generation: Long,
+        val messages: List<LettaMessage>,
+        val timelineBeforeFetch: Timeline,
+        val diskRecords: List<PendingLocalRecord>,
+        val cursorSequence: Long? = null,
+    ) : TimelineMutation
     data class ReconcileSnapshot(val generation: Long, val messages: List<LettaMessage>) : TimelineMutation
     data class CleanupAbandonedFragments(
         val runId: String?,
@@ -67,6 +73,8 @@ sealed interface TimelineReductionEffect {
     data class DeletePendingLocal(val otid: String) : TimelineReductionEffect
     /** Persist the SSE resume sequence; this is distinct from Timeline.liveCursor. */
     data class RecordStreamSequence(val sequence: Long) : TimelineReductionEffect
+    /** Repair the SSE resume sequence from an accepted hydration snapshot. */
+    data class RepairHydrationCursor(val sequence: Long) : TimelineReductionEffect
     data class AdvanceCursor(val cursor: String) : TimelineReductionEffect
 }
 
@@ -75,6 +83,10 @@ sealed interface TimelineReductionResult {
 
     data object NoChange : TimelineReductionResult { override val changed: Boolean = false }
     data class Changed(val kind: TimelineChangeKind) : TimelineReductionResult { override val changed: Boolean = true }
+    data class Hydrated(
+        val visibleEventCount: Int,
+        override val changed: Boolean,
+    ) : TimelineReductionResult
 }
 
 enum class TimelineChangeKind { LOCAL_APPENDED, LOCAL_RETRIED, LOCAL_SENT, LOCAL_FAILED, SNAPSHOT_ENRICHED, CLEANED, RECONCILED }
@@ -289,13 +301,21 @@ private fun reduceHydrateMutation(
     val hydrated = TimelineHydrationReducer.reduce(
         state.timeline.conversationId,
         normalizeHydratedMessageOrder(mutation.messages),
+        mutation.timelineBeforeFetch,
         state.timeline,
-        state.timeline,
-        emptyList(),
+        mutation.diskRecords,
     )
-    return changedIfNeeded(
-        state,
-        state.copy(timeline = hydrated.timeline, hydrateGeneration = mutation.generation),
+    val next = state.copy(timeline = hydrated.timeline, hydrateGeneration = mutation.generation)
+    val effects = buildList {
+        mutation.cursorSequence?.let { add(TimelineReductionEffect.RepairHydrationCursor(it)) }
+    }.toTimelinePersistentList()
+    return TimelineReduction(
+        next = next,
+        effects = effects,
+        result = TimelineReductionResult.Hydrated(
+            visibleEventCount = hydrated.visibleEventCount,
+            changed = next != state,
+        ),
     )
 }
 

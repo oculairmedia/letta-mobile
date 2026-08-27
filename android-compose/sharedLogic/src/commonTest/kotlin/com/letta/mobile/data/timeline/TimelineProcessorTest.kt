@@ -97,6 +97,8 @@ class TimelineProcessorTest {
                 TimelineMutation.HydrateSnapshot(
                     generation = 9,
                     messages = listOf(UserMessage("new", JsonPrimitive("new"))),
+                    timelineBeforeFetch = Timeline("conversation"),
+                    diskRecords = emptyList(),
                 ),
             ),
         )
@@ -106,6 +108,8 @@ class TimelineProcessorTest {
                 TimelineMutation.HydrateSnapshot(
                     generation = 8,
                     messages = listOf(UserMessage("old", JsonPrimitive("old"))),
+                    timelineBeforeFetch = Timeline("conversation"),
+                    diskRecords = emptyList(),
                 ),
             ),
         )

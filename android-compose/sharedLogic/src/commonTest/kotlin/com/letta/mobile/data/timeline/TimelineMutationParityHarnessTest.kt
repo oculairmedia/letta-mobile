@@ -39,13 +39,13 @@ class TimelineMutationParityHarnessTest {
         val user = UserMessage("user", JsonPrimitive("hello"), date = "2026-01-01T00:00:00Z")
         val reply = assistantReplyWorld()
         val hydrateThenStream = owner(backgroundScope).also {
-            it.enqueue(TimelineMutation.HydrateSnapshot(1, listOf(user)))
+            it.enqueue(hydrationMutation(1, listOf(user)))
             it.enqueue(TimelineMutation.StreamFrame(reply))
             it.drain()
         }
         val streamThenHydrate = owner(backgroundScope).also {
             it.enqueue(TimelineMutation.StreamFrame(reply))
-            it.enqueue(TimelineMutation.HydrateSnapshot(1, listOf(user)))
+            it.enqueue(hydrationMutation(1, listOf(user)))
             it.drain()
         }
 
@@ -61,7 +61,7 @@ class TimelineMutationParityHarnessTest {
     fun returnBeforeCallSurvivesRebaseAndAttachesExactlyOnce() = runTest {
         val owner = owner(backgroundScope)
         owner.enqueue(TimelineMutation.StreamFrame(toolReturn()))
-        owner.enqueue(TimelineMutation.HydrateSnapshot(1, listOf(UserMessage("user", JsonPrimitive("seed")))))
+        owner.enqueue(hydrationMutation(1, listOf(UserMessage("user", JsonPrimitive("seed")))))
         owner.enqueue(TimelineMutation.StreamFrame(toolCall()))
         owner.drain()
 
@@ -78,8 +78,8 @@ class TimelineMutationParityHarnessTest {
     @Test
     fun staleGenerationCannotReplaceStateEmitSideEffectsOrClaimAcceptance() = runTest {
         val owner = owner(backgroundScope)
-        owner.enqueue(TimelineMutation.HydrateSnapshot(2, listOf(UserMessage("new", JsonPrimitive("new")))))
-        owner.enqueue(TimelineMutation.HydrateSnapshot(1, listOf(UserMessage("old", JsonPrimitive("old")))))
+        owner.enqueue(hydrationMutation(2, listOf(UserMessage("new", JsonPrimitive("new")))))
+        owner.enqueue(hydrationMutation(1, listOf(UserMessage("old", JsonPrimitive("old")))))
         owner.drain()
 
         val rejected = owner.journal.last()
@@ -140,10 +140,11 @@ class TimelineMutationParityHarnessTest {
     fun duplicateHydrateAndReconcileReportNoChange() = runTest {
         val message = UserMessage("user", JsonPrimitive("hello"), date = "2026-01-01T00:00:00Z")
         val hydrateOwner = owner(backgroundScope)
-        hydrateOwner.enqueue(TimelineMutation.HydrateSnapshot(1, listOf(message)))
-        hydrateOwner.enqueue(TimelineMutation.HydrateSnapshot(1, listOf(message)))
+        hydrateOwner.enqueue(hydrationMutation(1, listOf(message)))
+        hydrateOwner.enqueue(hydrationMutation(1, listOf(message)))
         hydrateOwner.drain()
-        assertIs<TimelineReductionResult.NoChange>(hydrateOwner.journal.last().result)
+        val duplicateHydration = assertIs<TimelineReductionResult.Hydrated>(hydrateOwner.journal.last().result)
+        assertFalse(duplicateHydration.changed)
 
         val reconcileOwner = TimelineMutationParityOwner(
             hydrateOwner.currentState().copy(lastAppliedMutationSequence = 0),
@@ -287,9 +288,9 @@ class TimelineMutationParityHarnessTest {
                     processorState.copy(hydrateGeneration = 0)
             },
         )
-        mutant.submit(TimelineMutation.HydrateSnapshot(2, emptyList()))
+        mutant.submit(hydrationMutation(2))
 
-        val incorrectlyAccepted = mutant.submit(TimelineMutation.HydrateSnapshot(1, emptyList()))
+        val incorrectlyAccepted = mutant.submit(hydrationMutation(1))
 
         assertIs<TimelineProcessorAck.Applied>(incorrectlyAccepted)
         assertEquals(2L, incorrectlyAccepted.sequence)
@@ -353,6 +354,16 @@ class TimelineMutationParityHarnessTest {
         owner.drain()
         return owner.currentState()
     }
+
+    private fun hydrationMutation(
+        generation: Long,
+        messages: List<com.letta.mobile.data.model.LettaMessage> = emptyList(),
+    ) = TimelineMutation.HydrateSnapshot(
+        generation = generation,
+        messages = messages,
+        timelineBeforeFetch = Timeline("conversation"),
+        diskRecords = emptyList(),
+    )
 
     private fun assistantReplyHello() = AssistantMessage(
         id = "reply", contentRaw = JsonPrimitive("hello"), otid = "otid-reply", runId = "run-reply", date = "2026-01-01T00:00:01Z",

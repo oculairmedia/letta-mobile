@@ -48,6 +48,9 @@ internal fun TimelineReductionEffect.semanticFingerprint(): String = semanticEnc
         is TimelineReductionEffect.RecordStreamSequence -> objectValue(label("RecordStreamSequence")) {
             scalar(label("sequence"), effect.sequence)
         }
+        is TimelineReductionEffect.RepairHydrationCursor -> objectValue(label("RepairHydrationCursor")) {
+            scalar(label("sequence"), effect.sequence)
+        }
         is TimelineReductionEffect.AdvanceCursor -> objectValue(label("AdvanceCursor")) {
             scalar(label("cursor"), effect.cursor)
         }
