@@ -11,6 +11,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -151,6 +152,14 @@ class TimelineMutationParityHarnessTest {
     }
 
     @Test
+    fun semanticFingerprintCannotCollideOnPendingReturnDelimiters() {
+        val single = pendingReturnState("a", "b", "c,d:e")
+        val delimiterShift = pendingReturnState("a:b", "c", "d:e")
+
+        assertNotEquals(single.semanticFingerprint(), delimiterShift.semanticFingerprint())
+    }
+
+    @Test
     fun closeFailsQueuedAcksAndExposesNoSideChannel() {
         val owner = owner()
         val first = owner.enqueue(TimelineMutation.StreamFrame(1, assistant("one", "one")))
@@ -182,6 +191,18 @@ class TimelineMutationParityHarnessTest {
     }
 
     private fun owner() = TimelineMutationParityOwner(TimelineReducerState(Timeline("conversation")))
+
+    private fun pendingReturnState(callId: String, id: String, response: String): TimelineReducerState {
+        val owner = owner()
+        owner.enqueue(TimelineMutation.StreamFrame(1, ToolReturnMessage(
+            id = id,
+            toolCallId = callId,
+            toolReturnRaw = JsonPrimitive(response),
+            status = "success",
+        )))
+        owner.drain()
+        return owner.currentState()
+    }
 
     private fun assistant(
         id: String,

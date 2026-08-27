@@ -195,7 +195,10 @@ internal fun TimelineReducerState.semanticFingerprint(): String = buildString {
         .joinToString(",") { "${it.serverId ?: "<null>"}:${it.runId ?: "<null>"}:${it.contentFingerprint}" })
     append(";residentOtids=${timeline.residentOtids.sorted().joinToString(",")}")
     append(";residentServerIds=${timeline.events.filterIsInstance<TimelineEvent.Confirmed>().map { it.serverId }.sorted().joinToString(",")}")
-    append(";pending=${pendingToolReturnsByCallId.entries.sortedBy { it.key }.joinToString(",") { "${it.key}:${it.value.id}:${it.value.toolReturn.funcResponse}" }}")
+    append(";pending=")
+    append(pendingToolReturnsByCallId.entries.sortedBy { it.key }.joinToString { (callId, message) ->
+        listOf(callId, message.id, message.toolReturn.funcResponse.orEmpty()).joinToString(prefix = "[", postfix = "]") { it.lengthPrefixed() }
+    })
     append(";generations=$hydrateGeneration,$highestRequestedReconcileGeneration,$highestAppliedReconcileGeneration")
     append(";epoch=$lifecycleEpoch;freshness=$freshnessSequence;sequence=$lastAppliedMutationSequence")
 }
@@ -204,7 +207,11 @@ private fun List<MessageContentPart.Image>.stableFingerprint(): String =
     joinToString(",") { "${it.mediaType}:${it.base64}" }
 
 private fun Map<*, *>.stableEntries(): String =
-    entries.sortedBy { it.key.toString() }.joinToString(",") { "${it.key}=${it.value}" }
+    entries.sortedBy { it.key.toString() }.joinToString { entry ->
+        listOf(entry.key.toString(), entry.value.toString()).joinToString(prefix = "[", postfix = "]") { it.lengthPrefixed() }
+    }
+
+private fun String.lengthPrefixed(): String = "${length}:$this"
 
 private fun effectFingerprint(effect: TimelineReductionEffect): String = when (effect) {
     is TimelineReductionEffect.EmitSyncEvent -> "sync-event:${effect.event}"
