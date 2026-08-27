@@ -2,10 +2,8 @@ package com.letta.mobile.data.timeline
 
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.util.Telemetry
+import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 
 /**
  * Handles the hydration (initial history load) of a timeline from the Letta server.
@@ -14,18 +12,17 @@ internal class TimelineHydrator(
     private val conversationId: String,
     private val messageApi: TimelineTransport,
     private val pendingLocalStore: PendingLocalStore,
-    private val conversationCursorStore: ConversationCursorStore,
-    private val writeMutex: Mutex,
-    private val state: MutableStateFlow<Timeline>,
     private val events: MutableSharedFlow<TimelineSyncEvent>,
-    private val holderHydrationSeed: MutableStateFlow<Timeline>,
+    private val timelineProcessor: TimelineProcessor,
     private val onHydrationCommitted: (() -> Unit)? = null,
 ) {
+    private val nextGeneration = atomic(timelineProcessor.state.value.hydrateGeneration)
+
     suspend fun hydrate(
         limit: Int = 50,
         recordConversationCursor: Boolean = false,
         fallbackCursorSeq: Long? = null,
-    ) {
+    ): TimelineHydrationOutcome {
         val timer = Telemetry.startTimer("TimelineSync", "hydrate")
         if (conversationId.startsWith(DEFAULT_SHIM_CONVERSATION_PREFIX)) {
             Telemetry.event(
@@ -43,30 +40,53 @@ internal class TimelineHydrator(
                 "skipped" to true,
                 "skipReason" to "defaultShimConversation",
             )
-            return
+            return TimelineHydrationOutcome.DefaultShimAccepted
         }
-        val timelineBeforeFetch = writeMutex.withLock { state.value }
+
+        val generation = nextGeneration.incrementAndGet()
+        val timelineBeforeFetch = timelineProcessor.state.value.timeline
         try {
             val response = fetchChronologicalMessages(limit)
-            val hydrateEndSeq = response.cursorSequence(recordConversationCursor, fallbackCursorSeq)
-            val hydrated = commitHydration(response, timelineBeforeFetch)
-            notifyHydrationCommitted()
-            if (recordConversationCursor && hydrateEndSeq != null) {
-                conversationCursorStore.recordFrame(conversationId, hydrateEndSeq)
-                Telemetry.event(
-                    "TimelineSync", "hydrate.cursorRepaired",
-                    "conversationId" to conversationId,
-                    "cursorSeq" to hydrateEndSeq,
+            val cursorSequence = response.cursorSequence(recordConversationCursor, fallbackCursorSeq)
+            val diskRecords = runCatching { pendingLocalStore.load(conversationId) }.getOrDefault(emptyList())
+            when (val acknowledgement = timelineProcessor.submit(
+                TimelineMutation.HydrateSnapshot(
+                    generation = generation,
+                    messages = response,
+                    timelineBeforeFetch = timelineBeforeFetch,
+                    diskRecords = diskRecords,
+                    cursorSequence = cursorSequence,
+                ),
+            )) {
+                is TimelineProcessorAck.Applied -> {
+                    val hydrated = acknowledgement.result as? TimelineReductionResult.Hydrated
+                        ?: error("hydrate acknowledgement did not carry hydration result")
+                    notifyHydrationCommitted()
+                    events.emit(TimelineSyncEvent.Hydrated(hydrated.visibleEventCount))
+                    timer.stop(
+                        "conversationId" to conversationId,
+                        "rawCount" to response.size,
+                        "eventCount" to hydrated.visibleEventCount,
+                        "cursorSeq" to (cursorSequence ?: -1L),
+                    )
+                    dumpTimelineState("hydrate", conversationId, timelineProcessor.state.value.timeline)
+                    return TimelineHydrationOutcome.Accepted
+                }
+                is TimelineProcessorAck.Rejected -> {
+                    Telemetry.event(
+                        "TimelineSync", "hydrate.rejected",
+                        "conversationId" to conversationId,
+                        "generation" to generation,
+                        "reason" to acknowledgement.reason.toString(),
+                        level = Telemetry.Level.WARN,
+                    )
+                    timer.stop("conversationId" to conversationId, "rejected" to true)
+                    return TimelineHydrationOutcome.Rejected
+                }
+                is TimelineProcessorAck.Failed -> throw TimelineProcessorMutationException(
+                    "timeline hydration mutation failed: ${acknowledgement.reason}",
                 )
             }
-            events.emit(TimelineSyncEvent.Hydrated(hydrated.visibleEventCount))
-            timer.stop(
-                "conversationId" to conversationId,
-                "rawCount" to response.size,
-                "eventCount" to hydrated.visibleEventCount,
-                "cursorSeq" to (hydrateEndSeq ?: -1L),
-            )
-            dumpTimelineState("hydrate", conversationId, state.value)
         } catch (t: Throwable) {
             timer.stopError(t, "conversationId" to conversationId)
             throw t
@@ -87,25 +107,6 @@ internal class TimelineHydrator(
     ): Long? =
         if (shouldRecord) mapNotNull { it.seqId?.toLong() }.plus(listOfNotNull(fallbackCursorSeq)).maxOrNull() else null
 
-    private suspend fun commitHydration(
-        response: List<LettaMessage>,
-        timelineBeforeFetch: Timeline,
-    ): HydratedTimelineResult {
-        val diskRecords = runCatching { pendingLocalStore.load(conversationId) }.getOrDefault(emptyList())
-        return writeMutex.withLock {
-            TimelineHydrationReducer.reduce(
-                conversationId = conversationId,
-                serverMessagesChronological = response,
-                timelineBeforeFetch = timelineBeforeFetch,
-                currentTimeline = state.value,
-                diskRecords = diskRecords,
-            ).also { result ->
-                state.value = result.timeline
-                holderHydrationSeed.value = result.timeline
-            }
-        }
-    }
-
     private fun notifyHydrationCommitted() {
         onHydrationCommitted?.invoke()
     }
@@ -113,4 +114,10 @@ internal class TimelineHydrator(
     private companion object {
         const val DEFAULT_SHIM_CONVERSATION_PREFIX = "conv-default-"
     }
+}
+
+internal enum class TimelineHydrationOutcome {
+    Accepted,
+    Rejected,
+    DefaultShimAccepted,
 }

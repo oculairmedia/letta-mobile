@@ -86,7 +86,6 @@ class TimelineSyncLoop(
     private val seenStreamMessageLock = SynchronizedObject()
     private val seenStreamMessageKeys = ArrayDeque<String>()
     private val seenStreamMessageKeySet = mutableSetOf<String>()
-    private val holderHydrationSeed = MutableStateFlow(initialTimeline ?: Timeline(conversationId))
 
     private val ingestNotificationDispatcher = TimelineIngestNotificationDispatcher(
         conversationId = conversationId,
@@ -117,17 +116,16 @@ class TimelineSyncLoop(
         onSnapshotApplied = { scheduleSnapshotPersist(immediate = true) },
     )
 
-    private val hydrator = TimelineHydrator(
-        conversationId = conversationId,
-        messageApi = messageApi,
-        pendingLocalStore = pendingLocalStore,
-        conversationCursorStore = conversationCursorStore,
-        writeMutex = writeMutex,
-        state = _state,
-        events = _events,
-        holderHydrationSeed = holderHydrationSeed,
-        onHydrationCommitted = { scheduleSnapshotPersist(immediate = true) },
-    )
+    private val hydrator by lazy {
+        TimelineHydrator(
+            conversationId = conversationId,
+            messageApi = messageApi,
+            pendingLocalStore = pendingLocalStore,
+            events = _events,
+            timelineProcessor = timelineProcessor,
+            onHydrationCommitted = { scheduleSnapshotPersist(immediate = true) },
+        )
+    }
 
     internal fun scheduleSnapshotPersist(immediate: Boolean = false) {
         timelineScope ?: return
@@ -315,8 +313,17 @@ class TimelineSyncLoop(
                     ),
                 )
                 is TimelineReductionEffect.DeletePendingLocal -> pendingLocalStore.delete(effect.otid)
-                is TimelineReductionEffect.RecordStreamSequence ->
+                is TimelineReductionEffect.RecordStreamSequence -> {
                     conversationCursorStore.recordFrame(conversationId, effect.sequence)
+                }
+                is TimelineReductionEffect.RepairHydrationCursor -> {
+                    conversationCursorStore.recordFrame(conversationId, effect.sequence)
+                    Telemetry.event(
+                        "TimelineSync", "hydrate.cursorRepaired",
+                        "conversationId" to conversationId,
+                        "cursorSeq" to effect.sequence,
+                    )
+                }
                 is TimelineReductionEffect.AdvanceCursor -> Unit
             }
         },
@@ -378,13 +385,19 @@ class TimelineSyncLoop(
         private set
 
     suspend fun hydrate(limit: Int = 50, recordConversationCursor: Boolean = false, fallbackCursorSeq: Long? = null) {
-        hydrator.hydrate(limit, recordConversationCursor, fallbackCursorSeq)
-        hasHydratedSuccessfully = true
-        // letta-mobile-dangling-tool: heal stale spinners that survived an
-        // app restart or a dropped stream. Escalates to the same bounded
-        // backoff sweep as turnEnded if the immediate reconcile alone
-        // doesn't resolve everything, so there's always a terminal outcome.
-        danglingToolCallResolver.runHydrationGuardIfIdle(turnActive)
+        when (hydrator.hydrate(limit, recordConversationCursor, fallbackCursorSeq)) {
+            TimelineHydrationOutcome.Rejected -> Unit
+            TimelineHydrationOutcome.Accepted,
+            TimelineHydrationOutcome.DefaultShimAccepted,
+            -> {
+                hasHydratedSuccessfully = true
+                // letta-mobile-dangling-tool: heal stale spinners that survived an
+                // app restart or a dropped stream. Escalates to the same bounded
+                // backoff sweep as turnEnded if the immediate reconcile alone
+                // doesn't resolve everything, so there's always a terminal outcome.
+                danglingToolCallResolver.runHydrationGuardIfIdle(turnActive)
+            }
+        }
     }
 
     /**
