@@ -192,6 +192,10 @@ open class CachedAgentRepository(
         }
         _agents.update { fresh }
         lastRefreshAtMillis = nowMillis()
+        persistRefreshedAgents(fresh)
+    }
+
+    private suspend fun persistRefreshedAgents(fresh: List<Agent>) {
         try {
             val cache = localCache?.invoke() ?: return
             cache.insertAll(fresh)
