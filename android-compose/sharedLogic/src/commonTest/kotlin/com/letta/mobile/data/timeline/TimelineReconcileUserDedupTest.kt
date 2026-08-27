@@ -83,6 +83,7 @@ class TimelineReconcileUserDedupTest {
         val otid = "cm-android-test-456"
         val conversationId = "conv-1"
         val content = "that's my bad we're on the wrong network"
+        val sentAt = parseTimelineInstant("2026-07-08T16:15:30Z")
 
         val timeline = Timeline(
             conversationId = conversationId,
@@ -92,7 +93,7 @@ class TimelineReconcileUserDedupTest {
                     otid = otid,
                     content = content,
                     role = Role.USER,
-                    sentAt = timelineNow(),
+                    sentAt = sentAt,
                     deliveryState = DeliveryState.SENT,
                 ),
             ),

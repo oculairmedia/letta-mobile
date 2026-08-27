@@ -90,6 +90,26 @@ class TimelineReducerContractsTest {
         assertTrue(reduction.effects.any { it is TimelineReductionEffect.AdvanceCursor && it.cursor == "other-server" })
     }
 
+    @Test
+    fun postSendContentFallbackRejectsOlderAndConflictingMatches() {
+        val local = TimelineEvent.Local(1.0, "client", "OK", Role.USER, instant, DeliveryState.SENT)
+        val state = TimelineReducerState(Timeline("conversation", persistentListOf(local)))
+        val server = listOf(
+            UserMessage("old", JsonPrimitive("OK"), date = "2025-12-31T23:50:00Z"),
+            UserMessage("conflict", JsonPrimitive("OK"), otid = "another-client", date = "2026-01-01T00:00:30Z"),
+            UserMessage("recent", JsonPrimitive("OK"), date = "2026-01-01T00:01:00Z"),
+        )
+
+        val reduction = reducePostSendReconcile(state, "client", server)
+
+        assertEquals("recent", reduction.effects.filterIsInstance<TimelineReductionEffect.EmitSyncEvent>()
+            .mapNotNull { (it.event as? TimelineSyncEvent.LocalConfirmed)?.serverId }
+            .single())
+        assertFalse(reduction.next.timeline.events.any {
+            it is TimelineEvent.Confirmed && it.serverId == "conflict" && it.otid == "client"
+        })
+    }
+
     private fun toolEvent() = TimelineEvent.Confirmed(
         position = 1.0,
         otid = "tool-otid",

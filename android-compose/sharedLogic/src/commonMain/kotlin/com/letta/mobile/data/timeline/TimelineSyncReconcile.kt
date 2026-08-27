@@ -98,12 +98,8 @@ fun reconcileAfterSendSnapshot(
     var shouldDeletePendingLocal = false
     val existing = timeline.findByOtid(otid)
     if (existing is TimelineEvent.Local) {
-        val match = serverMessages.firstOrNull { it.otid == otid } ?: if (existing.role == Role.USER) {
-            serverMessages.firstOrNull { message ->
-                val confirmed = message.toTimelineEvent(position = 0.0)
-                confirmed?.messageType == TimelineMessageType.USER && confirmed.content.trim() == existing.content.trim()
-            }
-        } else null
+        val match = serverMessages.firstOrNull { it.otid == otid }
+            ?: serverMessages.lastOrNull { it.matchesRecentLocalUser(existing) }
         val confirmed = match?.toTimelineEvent(position = existing.position)
         if (confirmed != null) {
             timeline = timeline.replaceLocal(otid, confirmed)
@@ -119,6 +115,17 @@ fun reconcileAfterSendSnapshot(
         timeline,
         ReconcileAfterSendResult(confirmedLocal, mergeResult.second, confirmedServerId, shouldDeletePendingLocal),
     )
+}
+
+private fun LettaMessage.matchesRecentLocalUser(local: TimelineEvent.Local): Boolean {
+    if (local.role != Role.USER || !otid.isNullOrBlank()) return false
+    val confirmed = toTimelineEvent(position = 0.0)
+        ?.takeIf { it.messageType == TimelineMessageType.USER }
+        ?: return false
+    if (confirmed.content.trim() != local.content.trim()) return false
+    val messageDate = date?.let(::parseTimelineInstantOrNull) ?: return false
+    val ageMillis = timelineInstantDurationMillis(local.sentAt, messageDate)
+    return ageMillis in 0..CONTENT_FALLBACK_RECENCY_MS
 }
 
 suspend fun applyReconcileAfterSendSnapshot(
@@ -246,6 +253,8 @@ fun Timeline.mergeServerMessages(
     }
     return timeline to merged
 }
+
+private const val CONTENT_FALLBACK_RECENCY_MS = 2 * 60 * 1000L
 
 private fun Timeline.replaceEventAt(index: Int, event: TimelineEvent.Confirmed): Timeline {
     val updated = events.toMutableList()
