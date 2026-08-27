@@ -77,6 +77,8 @@ class TimelineSyncLoop(
     private val persistRequests = Channel<SnapshotPersistRequest>(Channel.CONFLATED)
     private val persistMutex = Mutex()
     private val persistJob: Job
+    private val eventProcessorJob: Job
+    private val streamSubscriberJob: Job?
 
     private val pendingToolReturnsByCallId = LinkedHashMap<String, ToolReturnMessage>()
     private val seenStreamMessageLock = SynchronizedObject()
@@ -346,9 +348,11 @@ class TimelineSyncLoop(
 
     init {
         persistJob = loopScope.launch { runSnapshotPersistence() }
-        loopScope.launch { processEventQueue() }
-        if (startStreamSubscriber) {
+        eventProcessorJob = loopScope.launch { processEventQueue() }
+        streamSubscriberJob = if (startStreamSubscriber) {
             loopScope.launch { runStreamSubscriber() }
+        } else {
+            null
         }
     }
 
@@ -366,7 +370,11 @@ class TimelineSyncLoop(
 
     suspend fun closeAndJoin() {
         persistRequests.close()
+        eventQueue.close()
+        streamSubscriberJob?.cancel(CancellationException("TimelineSyncLoop draining"))
         withContext(NonCancellable) {
+            streamSubscriberJob?.join()
+            eventProcessorJob.join()
             timelineProcessor.closeAndJoin()
             persistJob.join()
             flushSnapshotNow(prune = true)

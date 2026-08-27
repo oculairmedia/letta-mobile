@@ -112,34 +112,57 @@ class TimelineExternalTransportAppender(
         externalConversationId: String,
         otid: String,
     ): List<LettaMessage> {
-        var lastError: Throwable? = null
-        for (attempt in 0 until RECONCILE_RETRY_ATTEMPTS) {
-            try {
-                return messageApi.listAgentMessages(
-                    agentId = agentId,
-                    limit = RECONCILE_LIMIT,
-                    order = "desc",
-                    conversationId = externalConversationId,
-                )
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (t: Throwable) {
-                if (!isRetryableReconcileError(t) || attempt == RECONCILE_RETRY_ATTEMPTS - 1) {
-                    throw t
-                }
-                lastError = t
-                Telemetry.error(
-                    "TimelineSync", "reconcile.ws.retry", t,
-                    "otid" to otid,
-                    "agentId" to agentId,
-                    "conversationId" to externalConversationId,
-                    "attempt" to attempt + 1,
-                )
-                delay((RECONCILE_RETRY_BACKOFF_MS shl attempt).milliseconds)
-            }
+        val request = ReconcileRequest(agentId, externalConversationId, otid)
+        repeat(RECONCILE_RETRY_ATTEMPTS) { attempt ->
+            val result = fetchAgentMessages(request)
+            result.getOrNull()?.let { return it }
+            val failure = checkNotNull(result.exceptionOrNull())
+            if (!shouldRetryReconcile(failure, attempt)) throw failure
+            logReconcileRetry(failure, request, attempt)
+            delay((RECONCILE_RETRY_BACKOFF_MS shl attempt).milliseconds)
         }
-        throw lastError ?: IllegalStateException("listAgentMessagesWithRetry exhausted without error")
+        error("reconcile retry loop exhausted")
     }
+
+    private suspend fun fetchAgentMessages(
+        request: ReconcileRequest,
+    ): Result<List<LettaMessage>> = try {
+        Result.success(
+            messageApi.listAgentMessages(
+                agentId = request.agentId,
+                limit = RECONCILE_LIMIT,
+                order = "desc",
+                conversationId = request.externalConversationId,
+            ),
+        )
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (failure: Throwable) {
+        Result.failure(failure)
+    }
+
+    private fun shouldRetryReconcile(failure: Throwable, attempt: Int): Boolean =
+        isRetryableReconcileError(failure) && attempt < RECONCILE_RETRY_ATTEMPTS - 1
+
+    private fun logReconcileRetry(
+        failure: Throwable,
+        request: ReconcileRequest,
+        attempt: Int,
+    ) {
+        Telemetry.error(
+            "TimelineSync", "reconcile.ws.retry", failure,
+            "otid" to request.otid,
+            "agentId" to request.agentId,
+            "conversationId" to request.externalConversationId,
+            "attempt" to attempt + 1,
+        )
+    }
+
+    private data class ReconcileRequest(
+        val agentId: String,
+        val externalConversationId: String,
+        val otid: String,
+    )
 
     companion object {
         private const val RECONCILE_LIMIT = 250

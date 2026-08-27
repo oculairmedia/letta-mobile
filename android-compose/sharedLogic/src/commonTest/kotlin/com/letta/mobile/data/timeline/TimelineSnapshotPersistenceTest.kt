@@ -242,6 +242,33 @@ class TimelineSnapshotPersistenceTest {
     }
 
     @Test
+    fun closeDrainsQueuedStreamIngressBeforeFinalSnapshot() = runTest {
+        val store = InMemoryConfirmedTimelineStore()
+        val scope = TimelineScope(backendId = "test-backend", conversationId = "conv-close-race")
+        val loop = TimelineSyncLoop(
+            messageApi = EmptyTimelineTransport,
+            conversationId = scope.conversationId,
+            scope = this,
+            startStreamSubscriber = false,
+            confirmedTimelineStore = store,
+            timelineScope = scope,
+            ioDispatcher = kotlinx.coroutines.test.StandardTestDispatcher(testScheduler),
+        )
+        loop.submitStreamEvent(
+            com.letta.mobile.data.model.UserMessage(
+                id = "queued-before-close",
+                date = FIXTURE_DATE,
+                contentRaw = kotlinx.serialization.json.JsonPrimitive("must persist"),
+            ),
+        )
+
+        loop.closeAndJoin()
+
+        val snapshot = assertNotNull(store.readSnapshot(scope))
+        assertEquals(listOf("queued-before-close"), snapshot.events.map { it.serverId })
+    }
+
+    @Test
     fun mutationsPersistImmediatelyAndRestoreAccuratelyAfterClose() = runTest {
         val store = InMemoryConfirmedTimelineStore()
         val scope = TimelineScope(backendId = "test-backend", conversationId = "conv-restore")

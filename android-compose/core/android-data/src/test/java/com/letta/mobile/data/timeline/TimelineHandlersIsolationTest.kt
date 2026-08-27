@@ -43,29 +43,14 @@ class TimelineHandlersIsolationTest {
 
     @Test
     fun `TimelineReturnsResponsesProcessor updates approval status and tool returns`() {
-        val initialTimeline = Timeline("conv1")
-            .append(
-                TimelineEvent.Confirmed(
-                    position = 1.0,
-                    otid = "otid-tc",
-                    content = "",
-                    serverId = "tc-1",
-                    messageType = TimelineMessageType.TOOL_CALL,
-                    date = Instant.now(),
-                    runId = "run-1",
-                    stepId = "step-1",
-                    toolCalls = persistentListOf(
-                        com.letta.mobile.data.model.ToolCall(
-                            id = "call-id-1",
-                            name = "test_tool",
-                            arguments = ""
-                        )
-                    ),
-                    approvalRequestId = "req-1"
-                )
-            )
-
-        val state = MutableStateFlow(initialTimeline)
+        val state = toolCallState(
+            serverId = "tc-1",
+            toolCall = com.letta.mobile.data.model.ToolCall(
+                id = "call-id-1",
+                name = "test_tool",
+                arguments = "",
+            ),
+        )
         val snapshot = listOf(
             ToolReturnMessage(
                 id = "tr-1",
@@ -86,28 +71,13 @@ class TimelineHandlersIsolationTest {
 
     @Test
     fun `TimelineReturnsResponsesProcessor ignores blank tool return ids`() {
-        val initialTimeline = Timeline("conv1")
-            .append(
-                TimelineEvent.Confirmed(
-                    position = 1.0,
-                    otid = "otid-tc",
-                    content = "",
-                    serverId = "tc-blank",
-                    messageType = TimelineMessageType.TOOL_CALL,
-                    date = Instant.now(),
-                    runId = "run-1",
-                    stepId = "step-1",
-                    toolCalls = persistentListOf(
-                        com.letta.mobile.data.model.ToolCall(
-                            name = "synthetic_tool",
-                            arguments = ""
-                        )
-                    ),
-                    approvalRequestId = "req-1"
-                )
-            )
-
-        val state = MutableStateFlow(initialTimeline)
+        val state = toolCallState(
+            serverId = "tc-blank",
+            toolCall = com.letta.mobile.data.model.ToolCall(
+                name = "synthetic_tool",
+                arguments = "",
+            ),
+        )
         val snapshot = listOf(
             ToolReturnMessage(
                 id = "tr-blank",
@@ -198,6 +168,26 @@ class TimelineHandlersIsolationTest {
         assertEquals(MessageSource.LETTA_SERVER, local.source)
         processor.closeAndJoin()
     }
+
+    private fun toolCallState(
+        serverId: String,
+        toolCall: com.letta.mobile.data.model.ToolCall,
+    ): MutableStateFlow<Timeline> = MutableStateFlow(
+        Timeline("conv1").append(
+            TimelineEvent.Confirmed(
+                position = 1.0,
+                otid = "otid-tc",
+                content = "",
+                serverId = serverId,
+                messageType = TimelineMessageType.TOOL_CALL,
+                date = Instant.now(),
+                runId = "run-1",
+                stepId = "step-1",
+                toolCalls = persistentListOf(toolCall),
+                approvalRequestId = "req-1",
+            ),
+        ),
+    )
 
     private fun CoroutineScope.timelineProcessor(
         state: MutableStateFlow<Timeline>,
