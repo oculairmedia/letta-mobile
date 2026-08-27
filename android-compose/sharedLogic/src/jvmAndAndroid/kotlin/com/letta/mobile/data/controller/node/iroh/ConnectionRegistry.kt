@@ -35,20 +35,20 @@ interface ViewerHandle {
  */
 class ConnectionRegistry {
     private val mutex = Mutex()
-    // conversationId -> viewer handles
-    private val viewersByConversation = mutableMapOf<String, MutableSet<ViewerHandle>>()
+    // conversationId -> stable connection identity -> latest live handle
+    private val viewersByConversation = mutableMapOf<String, MutableMap<String, ViewerHandle>>()
 
     suspend fun register(conversationId: String, viewer: ViewerHandle) {
         mutex.withLock {
-            viewersByConversation.getOrPut(conversationId) { mutableSetOf() }.add(viewer)
+            viewersByConversation.getOrPut(conversationId) { mutableMapOf() }[viewer.connectionId] = viewer
         }
     }
 
     suspend fun unregister(conversationId: String, viewer: ViewerHandle) {
         mutex.withLock {
-            viewersByConversation[conversationId]?.let { set ->
-                set.remove(viewer)
-                if (set.isEmpty()) viewersByConversation.remove(conversationId)
+            viewersByConversation[conversationId]?.let { viewers ->
+                viewers.remove(viewer.connectionId, viewer)
+                if (viewers.isEmpty()) viewersByConversation.remove(conversationId)
             }
         }
     }
@@ -57,9 +57,9 @@ class ConnectionRegistry {
     suspend fun unregisterAll(connectionId: String) {
         mutex.withLock {
             val emptied = mutableListOf<String>()
-            viewersByConversation.forEach { (conv, set) ->
-                set.removeAll { it.connectionId == connectionId }
-                if (set.isEmpty()) emptied.add(conv)
+            viewersByConversation.forEach { (conv, viewers) ->
+                viewers.remove(connectionId)
+                if (viewers.isEmpty()) emptied.add(conv)
             }
             emptied.forEach { viewersByConversation.remove(it) }
         }
@@ -67,7 +67,7 @@ class ConnectionRegistry {
 
     /** Snapshot of viewers for a conversation (defensive copy — safe to iterate + write outside the lock). */
     suspend fun viewersFor(conversationId: String): Set<ViewerHandle> =
-        mutex.withLock { viewersByConversation[conversationId]?.toSet() ?: emptySet() }
+        mutex.withLock { viewersByConversation[conversationId]?.values?.toSet() ?: emptySet() }
 
     /** Test/telemetry: total distinct conversations currently viewed. */
     suspend fun conversationCount(): Int = mutex.withLock { viewersByConversation.size }

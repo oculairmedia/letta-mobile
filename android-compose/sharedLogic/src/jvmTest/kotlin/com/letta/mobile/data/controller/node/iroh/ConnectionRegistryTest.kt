@@ -34,6 +34,28 @@ class ConnectionRegistryTest {
     }
 
     @Test
+    fun reconnectReplacesPriorHandleForTheSameEndpoint() = runTest {
+        val reg = ConnectionRegistry()
+        val stale = FakeViewer("conn-a")
+        val live = FakeViewer("conn-a")
+
+        reg.register("conv-1", stale)
+        reg.register("conv-1", live)
+
+        assertEquals(
+            setOf<ViewerHandle>(live),
+            reg.viewersFor("conv-1"),
+            "one endpoint must have exactly one live fan-out handle",
+        )
+        reg.unregister("conv-1", stale)
+        assertEquals(
+            setOf<ViewerHandle>(live),
+            reg.viewersFor("conv-1"),
+            "late cleanup from the replaced connection must not remove its successor",
+        )
+    }
+
+    @Test
     fun unregisterRemovesOnlyThatViewer() = runTest {
         val reg = ConnectionRegistry()
         val a = FakeViewer("conn-a")
