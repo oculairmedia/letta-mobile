@@ -3,6 +3,7 @@ package com.letta.mobile.data.timeline
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.util.Telemetry
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -98,6 +99,8 @@ class TimelineExternalTransportAppender(
                 "confirmedLocal" to result.confirmedLocal,
                 "appendedMissing" to result.appendedMissing,
             )
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (t: Throwable) {
             timer.stopError(t, "otid" to otid)
             events.emit(TimelineSyncEvent.ReconcileError(t.message ?: "unknown"))
@@ -118,6 +121,8 @@ class TimelineExternalTransportAppender(
                     order = "desc",
                     conversationId = externalConversationId,
                 )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (t: Throwable) {
                 if (!isRetryableReconcileError(t) || attempt == RECONCILE_RETRY_ATTEMPTS - 1) {
                     throw t

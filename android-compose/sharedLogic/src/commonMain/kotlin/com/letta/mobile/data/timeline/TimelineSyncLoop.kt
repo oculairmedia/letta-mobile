@@ -367,6 +367,7 @@ class TimelineSyncLoop(
     suspend fun closeAndJoin() {
         persistRequests.close()
         withContext(NonCancellable) {
+            timelineProcessor.closeAndJoin()
             persistJob.join()
             flushSnapshotNow(prune = true)
         }

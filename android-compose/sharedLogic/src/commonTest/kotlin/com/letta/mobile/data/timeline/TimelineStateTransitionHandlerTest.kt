@@ -10,6 +10,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 
 class TimelineStateTransitionHandlerTest {
@@ -105,6 +106,35 @@ class TimelineStateTransitionHandlerTest {
         assertEquals(1, harness.state.value.events.size)
     }
 
+    @Test
+    fun synchronousLifecycleTreatsNormalProcessorClosureAsNoOp() = runTest {
+        val local = TimelineEvent.Local(
+            1.0,
+            "otid",
+            "body",
+            Role.USER,
+            timelineNow(),
+            DeliveryState.SENDING,
+        )
+        val harness = harness(Timeline("c1", listOf(local).toTimelinePersistentList()), backgroundScope)
+        harness.processor.close()
+        runCurrent()
+
+        assertEquals(
+            false,
+            harness.handler.appendOptimisticLocalSync(
+                otid = "closed",
+                content = "ignored",
+                attachments = kotlinx.collections.immutable.persistentListOf(),
+                sentAt = timelineNow(),
+            ),
+        )
+        harness.handler.markOptimisticLocalFailedSync("otid")
+        harness.handler.markOptimisticLocalSentSync("otid")
+
+        assertEquals(DeliveryState.SENDING, (harness.state.value.events.single() as TimelineEvent.Local).deliveryState)
+    }
+
     private fun harness(initial: Timeline, scope: CoroutineScope): HandlerHarness {
         val state = MutableStateFlow(initial)
         val events = MutableSharedFlow<TimelineSyncEvent>(replay = 10)
@@ -130,12 +160,13 @@ class TimelineStateTransitionHandlerTest {
                 }
             },
         )
-        return HandlerHarness(state, sendQueue, TimelineStateTransitionHandler("c1", processor))
+        return HandlerHarness(state, sendQueue, TimelineStateTransitionHandler("c1", processor), processor)
     }
 
     private data class HandlerHarness(
         val state: MutableStateFlow<Timeline>,
         val sendQueue: Channel<PendingSend>,
         val handler: TimelineStateTransitionHandler,
+        val processor: TimelineProcessor,
     )
 }

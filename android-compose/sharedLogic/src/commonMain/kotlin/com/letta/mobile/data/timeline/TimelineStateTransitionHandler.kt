@@ -63,13 +63,15 @@ class TimelineStateTransitionHandler(
         attachments: PersistentList<MessageContentPart.Image>,
         sentAt: TimelineInstant,
     ): Boolean {
-        val appended = processor.submit(
+        val ack = processor.submit(
             TimelineMutation.LocalAppend(
                 pending = PendingSend(otid, content, attachments),
                 sentAt = sentAt,
                 mode = TimelineLocalAppendMode.OPTIMISTIC,
             ),
-        ).appliedResultOrThrow().changed
+        )
+        if (ack.isClosedRejection()) return false
+        val appended = ack.appliedResultOrThrow().changed
         if (appended) {
             Telemetry.event(
                 "TimelineSync", "send.optimisticLocalAppended",
@@ -82,14 +84,15 @@ class TimelineStateTransitionHandler(
     }
 
     /**
-     * letta-mobile-mxwtn: synchronous FAILED transition. Mirrors
-     * [applyMarkFailed] but takes the write mutex directly so the caller's
-     * failure handler can flip the bubble's deliveryState in the same frame
-     * the HTTP error is surfaced, without round-tripping through the event
-     * queue. A no-op when no Local event with that otid exists.
+     * letta-mobile-mxwtn: synchronous FAILED transition. Submits to the
+     * processor so the caller's failure handler can observe the serialized
+     * delivery-state update without round-tripping through the event queue.
+     * A no-op when the processor is closed or no Local event exists.
      */
     suspend fun markOptimisticLocalFailedSync(otid: String) {
-        processor.submit(TimelineMutation.MarkLocalFailed(otid)).appliedResultOrThrow()
+        val ack = processor.submit(TimelineMutation.MarkLocalFailed(otid))
+        if (ack.isClosedRejection()) return
+        ack.appliedResultOrThrow()
         Telemetry.event(
             "TimelineSync", "send.optimisticLocalFailed",
             "otid" to otid,
@@ -99,9 +102,15 @@ class TimelineStateTransitionHandler(
 
     /**
      * letta-mobile-mxwtn: synchronous SENT transition (delivery acknowledged
-     * by the transport but no Confirmed echo yet). Mirrors [applyMarkSent].
+     * by the transport but no Confirmed echo yet). Submits to the processor
+     * for serialized processing and no-ops after normal processor closure.
      */
     suspend fun markOptimisticLocalSentSync(otid: String) {
-        processor.submit(TimelineMutation.MarkLocalSent(otid)).appliedResultOrThrow()
+        val ack = processor.submit(TimelineMutation.MarkLocalSent(otid))
+        if (ack.isClosedRejection()) return
+        ack.appliedResultOrThrow()
     }
 }
+
+private fun TimelineProcessorAck.isClosedRejection(): Boolean =
+    this is TimelineProcessorAck.Rejected && reason == TimelineProcessorRejectionReason.Closed
