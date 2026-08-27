@@ -128,12 +128,12 @@ suspend fun applyReconcileAfterSendSnapshot(
     writeMutex: Mutex,
     state: MutableStateFlow<Timeline>,
 ): ReconcileAfterSendResult {
-    var result: PureReconcileAfterSendResult? = null
-    writeMutex.withLock {
-        result = reconcileAfterSendSnapshot(state.value, otid, serverMessages)
-        state.value = result!!.timeline
+    val result = writeMutex.withLock {
+        reconcileAfterSendSnapshot(state.value, otid, serverMessages).also {
+            state.value = it.timeline
+        }
     }
-    return result!!.result
+    return result.result
 }
 
 fun Timeline.mergeServerMessages(
