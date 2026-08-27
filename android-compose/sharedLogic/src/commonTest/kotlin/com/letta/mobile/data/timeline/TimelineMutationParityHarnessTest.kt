@@ -9,6 +9,7 @@ import kotlinx.collections.immutable.persistentListOf
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
@@ -26,8 +27,8 @@ class TimelineMutationParityHarnessTest {
 
         assertEquals(4, entry.trace().size)
         assertTrue(entry.trace()[0].startsWith("state:events=[confirmed:reply:"))
-        assertEquals("sync-event:StreamEventIngested(serverId=reply, messageType=assistant_message)", entry.trace()[1])
-        assertEquals("notification:reply:assistant_message:hello", entry.trace()[2])
+        assertEquals("event:StreamEventIngested(serverId=reply, messageType=assistant_message)", entry.trace()[1])
+        assertEquals("notification:reply:assistant_message:len=5,hash=5e918d2", entry.trace()[2])
         assertEquals("ack:COMPLETED", entry.trace()[3])
     }
 
@@ -188,6 +189,36 @@ class TimelineMutationParityHarnessTest {
         assertEquals("server", reduction.next.timeline.liveCursor)
         assertTrue(reduction.next.timeline.residentOtids.contains("client"))
         assertEquals(3, reduction.effects.size)
+    }
+
+    @Test
+    fun generatedLocalMutationSequencesMatchIndependentSemanticModel() {
+        val verifier = LocalMutationParityVerifier()
+        repeat(LocalMutationCaseGenerator.DEFAULT_CASES) { seed ->
+            verifier.verify(seed.toLong(), LocalMutationCaseGenerator.generate(seed.toLong()))
+        }
+    }
+
+    @Test
+    fun controlledEffectMutantIsDetectedAndShrunkWithSeed() {
+        val mutant = LocalMutationParityVerifier { state, mutation ->
+            val reduction = reduceProductionMutation(state, mutation)
+            if (mutation is TimelineMutation.LocalAppend) reduction.copy(effects = persistentListOf()) else reduction
+        }
+        val error = assertFailsWith<AssertionError> {
+            mutant.verify(
+                seed = 73L,
+                operations = listOf(
+                    LocalSemanticMutation.Reset(1),
+                    LocalSemanticMutation.Append("synthetic-id", "synthetic-value"),
+                    LocalSemanticMutation.MarkFailed("synthetic-id"),
+                ),
+            )
+        }
+
+        assertTrue(error.message.orEmpty().contains("seed=73"))
+        assertTrue(error.message.orEmpty().contains("shrunk=[Append"))
+        assertFalse(error.message.orEmpty().contains("synthetic-value"))
     }
 
     private fun owner() = TimelineMutationParityOwner(TimelineReducerState(Timeline("conversation")))
