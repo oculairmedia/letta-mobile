@@ -132,7 +132,8 @@ class TimelineHandlersIsolationTest {
         val events = MutableSharedFlow<TimelineSyncEvent>(extraBufferCapacity = 8)
         val sendQueue = Channel<PendingSend>(Channel.UNLIMITED)
         val writeMutex = Mutex()
-        val handler = TimelineStateTransitionHandler("conv1", state, events, sendQueue, writeMutex)
+        val processor = timelineProcessor(state, events, sendQueue, writeMutex)
+        val handler = TimelineStateTransitionHandler("conv1", processor)
 
         // 1. Local Append
         val pending = PendingSend("otid-1", "hello")
@@ -159,6 +160,7 @@ class TimelineHandlersIsolationTest {
         assertTrue(failedAck.isCompleted)
         val failed = state.value.events.single() as TimelineEvent.Local
         assertEquals(DeliveryState.FAILED, failed.deliveryState)
+        processor.closeAndJoin()
     }
 
     @Test
@@ -168,13 +170,13 @@ class TimelineHandlersIsolationTest {
         val eventQueue = Channel<TimelineGatewayEvent>(Channel.UNLIMITED)
         val writeMutex = Mutex()
         val pendingLocalStore = NoOpPendingLocalStore
+        val processor = timelineProcessor(state, events, Channel(Channel.UNLIMITED), writeMutex)
         val appender = TimelineExternalTransportAppender(
             conversationId = "conv1",
             messageApi = mockk(),
             eventQueue = eventQueue,
-            state = state,
             events = events,
-            writeMutex = writeMutex,
+            processor = processor,
             pendingLocalStore = pendingLocalStore,
             submitReconcileAfterSendSnapshot = { _, _ -> mockk() }
         )
@@ -194,7 +196,34 @@ class TimelineHandlersIsolationTest {
         val local = state.value.events.single() as TimelineEvent.Local
         assertEquals("external msg", local.content)
         assertEquals(MessageSource.LETTA_SERVER, local.source)
+        processor.closeAndJoin()
     }
+
+    private fun CoroutineScope.timelineProcessor(
+        state: MutableStateFlow<Timeline>,
+        events: MutableSharedFlow<TimelineSyncEvent>,
+        sendQueue: Channel<PendingSend>,
+        writeMutex: Mutex,
+    ) = TimelineProcessor(
+        initialState = TimelineReducerState(state.value),
+        scope = this,
+        writeMutex = writeMutex,
+        stateBridge = object : TimelineProcessorStateBridge {
+            override fun synchronizeSeed(processorState: TimelineReducerState) =
+                processorState.copy(timeline = state.value)
+
+            override fun publish(stateValue: TimelineReducerState) {
+                state.value = stateValue.timeline
+            }
+        },
+        effectHandler = { effect ->
+            when (effect) {
+                is TimelineReductionEffect.Send -> sendQueue.send(effect.pending)
+                is TimelineReductionEffect.EmitSyncEvent -> events.emit(effect.event)
+                else -> Unit
+            }
+        },
+    )
 
     @Test
     fun `TimelineRecentMessagesReconciler merges snapshot correctly`() = runTest {
