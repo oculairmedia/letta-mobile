@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UserMessage
 import kotlin.test.Test
@@ -219,6 +220,45 @@ class TimelineProcessorTest {
         assertEquals(2L, later.sequence)
         assertEquals(listOf("good"), delivered)
         assertEquals(listOf("bad", "good"), processor.state.value.timeline.events.map { it.otid })
+    }
+
+    @Test
+    fun streamAckWaitsForOrderedSequencePersistence() = runTest {
+        val sequenceEffectEntered = CompletableDeferred<Unit>()
+        val releaseSequenceEffect = CompletableDeferred<Unit>()
+        val effects = mutableListOf<TimelineReductionEffect>()
+        val processor = TimelineProcessor(
+            initialState = TimelineReducerState(Timeline("conversation")),
+            scope = backgroundScope,
+            effectHandler = { effect ->
+                effects += effect
+                if (effect is TimelineReductionEffect.RecordStreamSequence) {
+                    sequenceEffectEntered.complete(Unit)
+                    releaseSequenceEffect.await()
+                }
+            },
+        )
+        val acknowledgement = async {
+            processor.submitWithBackpressure(
+                TimelineMutation.StreamFrame(
+                    AssistantMessage(
+                        id = "assistant-sequenced",
+                        contentRaw = JsonPrimitive("Hello"),
+                        runId = "run-sequenced",
+                        seqId = 42,
+                    ),
+                ),
+            )
+        }
+
+        sequenceEffectEntered.await()
+
+        assertEquals("Hello", processor.state.value.timeline.events.single().content)
+        assertFalse(acknowledgement.isCompleted)
+        assertEquals(42L, assertIs<TimelineReductionEffect.RecordStreamSequence>(effects.last()).sequence)
+
+        releaseSequenceEffect.complete(Unit)
+        assertIs<TimelineProcessorAck.Applied>(acknowledgement.await())
     }
 
     @Test

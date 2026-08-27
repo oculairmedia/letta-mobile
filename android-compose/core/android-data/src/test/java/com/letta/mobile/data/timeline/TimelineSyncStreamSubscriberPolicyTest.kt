@@ -18,6 +18,18 @@ class TimelineSyncStreamSubscriberPolicyTest {
         assertFalse(source.contains("postApprovalReconcile"))
     }
 
+    @Test
+    fun `production stream ingest has no shadow holder fanout`() {
+        val loopSource = timelineSource("TimelineSyncLoop.kt")
+        val dispatcherSource = timelineSource("TimelineStreamDispatcher.kt")
+
+        listOf(loopSource, dispatcherSource).forEach { source ->
+            assertFalse(source.contains("holderFramesIn"))
+            assertFalse(source.contains("foldedViaHolder"))
+            assertFalse(source.contains("ConversationStateHolder"))
+        }
+    }
+
     private fun timelineSource(fileName: String): String = repositoryRoot()
         .resolve("sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/timeline")
         .resolve(fileName)

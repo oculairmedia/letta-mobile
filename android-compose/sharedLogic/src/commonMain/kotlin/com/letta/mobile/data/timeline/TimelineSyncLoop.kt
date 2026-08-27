@@ -80,19 +80,13 @@ class TimelineSyncLoop(
     private val eventProcessorJob: Job
     private val streamSubscriberJob: Job?
 
+    // Deferred migration families still synchronize through this bridge; stream
+    // frames themselves are processor-owned and never fan out through a holder.
     private val pendingToolReturnsByCallId = LinkedHashMap<String, ToolReturnMessage>()
     private val seenStreamMessageLock = SynchronizedObject()
     private val seenStreamMessageKeys = ArrayDeque<String>()
     private val seenStreamMessageKeySet = mutableSetOf<String>()
-    private val holderFramesIn = MutableSharedFlow<LettaMessage>(extraBufferCapacity = 64)
     private val holderHydrationSeed = MutableStateFlow(initialTimeline ?: Timeline(conversationId))
-    
-    private val holder = com.letta.mobile.data.timeline.experimental.ConversationStateHolder(
-        conversationId = conversationId,
-        scope = loopScope,
-        frames = holderFramesIn.asSharedFlow(),
-        hydrationSeed = holderHydrationSeed,
-    )
 
     private val ingestNotificationDispatcher = TimelineIngestNotificationDispatcher(
         conversationId = conversationId,
@@ -102,20 +96,14 @@ class TimelineSyncLoop(
 
     private val wsSubscription = TimelineWsSubscription(conversationId)
 
-    private val streamDispatcher = TimelineStreamDispatcher(
-        conversationId = conversationId,
-        agentId = agentId,
-        writeMutex = writeMutex,
-        state = _state,
-        events = _events,
-        pendingToolReturnsByCallId = pendingToolReturnsByCallId,
-        conversationCursorStore = conversationCursorStore,
-        loopScope = loopScope,
-        ingestNotificationDispatcher = ingestNotificationDispatcher,
-        holderFramesIn = holderFramesIn,
-        getHolderEventCount = { holder.state.value.events.size },
-        onStreamFrameIngested = { scheduleSnapshotPersist(immediate = false) },
-    )
+    private val streamDispatcher by lazy {
+        TimelineStreamDispatcher(
+            conversationId = conversationId,
+            agentId = agentId,
+            processor = timelineProcessor,
+            onStreamFrameIngested = { scheduleSnapshotPersist(immediate = false) },
+        )
+    }
 
     private val recentMessagesReconciler = TimelineRecentMessagesReconciler(
         conversationId = conversationId,
@@ -299,7 +287,11 @@ class TimelineSyncLoop(
             override fun synchronizeSeed(processorState: TimelineReducerState): TimelineReducerState =
                 processorState.copy(
                     timeline = _state.value,
-                    pendingToolReturnsByCallId = pendingToolReturnsByCallId.toTimelinePersistentMap(),
+                    // The processor owns returns learned from stream frames. Legacy
+                    // writers can still add deferred returns through the bridge.
+                    pendingToolReturnsByCallId = (
+                        processorState.pendingToolReturnsByCallId + pendingToolReturnsByCallId
+                    ).toTimelinePersistentMap(),
                 )
 
             override fun publish(state: TimelineReducerState) {
@@ -323,9 +315,8 @@ class TimelineSyncLoop(
                     ),
                 )
                 is TimelineReductionEffect.DeletePendingLocal -> pendingLocalStore.delete(effect.otid)
-                // Cursor-string persistence is a deferred mutation family. The
-                // reducer state already owns liveCursor; its store remains with
-                // the existing reconcile/stream paths in this slice.
+                is TimelineReductionEffect.RecordStreamSequence ->
+                    conversationCursorStore.recordFrame(conversationId, effect.sequence)
                 is TimelineReductionEffect.AdvanceCursor -> Unit
             }
         },

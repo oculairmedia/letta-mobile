@@ -65,6 +65,8 @@ sealed interface TimelineReductionEffect {
     data class Send(val pending: PendingSend) : TimelineReductionEffect
     data class PersistPendingLocal(val pending: PendingSend, val sentAt: TimelineInstant) : TimelineReductionEffect
     data class DeletePendingLocal(val otid: String) : TimelineReductionEffect
+    /** Persist the SSE resume sequence; this is distinct from Timeline.liveCursor. */
+    data class RecordStreamSequence(val sequence: Long) : TimelineReductionEffect
     data class AdvanceCursor(val cursor: String) : TimelineReductionEffect
 }
 
@@ -263,6 +265,9 @@ private fun reduceStreamMutation(
     val effects = buildList {
         output.emittedEvents.forEach { add(TimelineReductionEffect.EmitSyncEvent(it)) }
         output.notification?.let { add(TimelineReductionEffect.Notify(it)) }
+        mutation.message.seqId?.takeIf { it >= 0 }?.let { seq ->
+            add(TimelineReductionEffect.RecordStreamSequence(seq.toLong()))
+        }
     }.toTimelinePersistentList()
     val didChange = output.next != state.timeline ||
         output.updatedPendingToolReturnsByCallId != state.pendingToolReturnsByCallId
