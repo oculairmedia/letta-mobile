@@ -197,9 +197,10 @@ internal data class ActiveTurnTracking(
  */
 internal class ConversationViewerSubscription(
     private val registry: ConnectionRegistry,
-    private val viewer: ViewerHandle,
+    private val registration: ViewerRegistration,
 ) {
     private val mutex = Mutex()
+    private val viewer: ViewerHandle = registration.viewer
     private var viewed: String? = null
 
     /** The conversation currently viewed (test/telemetry). */
@@ -216,16 +217,11 @@ internal class ConversationViewerSubscription(
             if (previous != null && previous != conversationId) {
                 runCatching { registry.unregister(previous, viewer) }
             }
-            // ALWAYS (re-)register. register() is an idempotent Set.add, so a
-            // repeat signal for the SAME conversation is a no-op when we're still
-            // present, but re-adds this viewer when it was evicted from the
-            // registry by a fan-out dead-viewer drop or a redial teardown
-            // unregisterAll (both key on NodeId and can drop a live viewer). Fixes
-            // the desync where `viewed` still names the conversation but the
-            // registry no longer holds us — the cause of passive viewers silently
-            // dropping out of realtime fan-out.
-            runCatching { registry.register(conversationId, viewer) }
-            viewed = conversationId
+            // ALWAYS (re-)register while this connection still owns the endpoint
+            // claim. A stale generation is rejected atomically, so late polling
+            // from an overlapped reconnect cannot reclaim or evict its successor.
+            val registered = runCatching { registry.register(conversationId, registration) }.getOrDefault(false)
+            viewed = conversationId.takeIf { registered }
         }
     }
 }

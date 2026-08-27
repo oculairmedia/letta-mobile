@@ -6,115 +6,121 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
-/**
- * eaczz.1 (S1-T): pure unit tests for [ConnectionRegistry] — no QUIC, no
- * controller. Covers register/unregister/viewersFor, a connection viewing
- * multiple conversations, unregisterAll on disconnect, and concurrent
- * register/unregister safety.
- */
+/** Deterministic endpoint-identity and connection-generation coverage for [ConnectionRegistry]. */
 class ConnectionRegistryTest {
 
-    private class FakeViewer(override val connectionId: String) : ViewerHandle {
+    private data class FakeViewer(override val connectionId: String) : ViewerHandle {
         override suspend fun writeFrame(frame: String): Boolean = true
     }
 
     @Test
-    fun registerAndViewersFor() = runTest {
-        val reg = ConnectionRegistry()
-        val a = FakeViewer("conn-a")
-        val b = FakeViewer("conn-b")
-        reg.register("conv-1", a)
-        reg.register("conv-1", b)
+    fun distinctCanonicalEndpointsNeverCollapseEvenWithSharedPrefix() = runTest {
+        val registry = ConnectionRegistry()
+        val first = FakeViewer("0123456789ab-endpoint-a")
+        val second = FakeViewer("0123456789ab-endpoint-b")
 
-        val viewers = reg.viewersFor("conv-1")
-        assertEquals(setOf(a, b), viewers)
-        assertTrue(reg.viewersFor("conv-2").isEmpty())
+        registry.register("conv-1", first)
+        registry.register("conv-1", second)
+
+        assertEquals(setOf(first, second), registry.viewersFor("conv-1"))
     }
 
     @Test
-    fun reconnectReplacesPriorHandleForTheSameEndpoint() = runTest {
-        val reg = ConnectionRegistry()
-        val stale = FakeViewer("conn-a")
-        val live = FakeViewer("conn-a")
+    fun reconnectAtomicallyReplacesTheSameEndpoint() = runTest {
+        val registry = ConnectionRegistry()
+        val stale = FakeViewer("endpoint-a")
+        val live = FakeViewer("endpoint-a")
 
-        reg.register("conv-1", stale)
-        reg.register("conv-1", live)
+        val staleRegistration = registry.register("conv-1", stale)
+        val liveRegistration = registry.register("conv-1", live)
 
-        assertEquals(
-            setOf<ViewerHandle>(live),
-            reg.viewersFor("conv-1"),
-            "one endpoint must have exactly one live fan-out handle",
-        )
-        reg.unregister("conv-1", stale)
-        assertEquals(
-            setOf<ViewerHandle>(live),
-            reg.viewersFor("conv-1"),
-            "late cleanup from the replaced connection must not remove its successor",
+        assertNotEquals(staleRegistration.generation, liveRegistration.generation)
+        assertSame(live, registry.viewersFor("conv-1").single())
+        registry.unregister("conv-1", stale)
+        registry.release(staleRegistration)
+        assertSame(
+            live,
+            registry.viewersFor("conv-1").single(),
+            "stale per-conversation and disconnect cleanup must preserve the successor",
         )
     }
 
     @Test
-    fun unregisterRemovesOnlyThatViewer() = runTest {
-        val reg = ConnectionRegistry()
-        val a = FakeViewer("conn-a")
-        val b = FakeViewer("conn-b")
-        reg.register("conv-1", a)
-        reg.register("conv-1", b)
+    fun equalButDistinctStaleHandleCannotRemoveReplacement() = runTest {
+        val registry = ConnectionRegistry()
+        val stale = FakeViewer("endpoint-a")
+        val replacement = stale.copy()
+        assertEquals(stale, replacement, "test requires structural equality")
 
-        reg.unregister("conv-1", a)
-        assertEquals(setOf(b), reg.viewersFor("conv-1"))
+        registry.register("conv-1", stale)
+        registry.register("conv-1", replacement)
+        registry.unregister("conv-1", stale)
 
-        reg.unregister("conv-1", b)
-        assertTrue(reg.viewersFor("conv-1").isEmpty())
-        assertEquals(0, reg.conversationCount())
+        assertSame(replacement, registry.viewersFor("conv-1").single())
     }
 
     @Test
-    fun connectionCanViewMultipleConversations() = runTest {
-        val reg = ConnectionRegistry()
-        val a = FakeViewer("conn-a")
-        reg.register("conv-1", a)
-        reg.register("conv-2", a)
+    fun staleGenerationCannotRegisterOrReleaseAfterConcurrentReplacement() = runTest {
+        val registry = ConnectionRegistry()
+        val stale = FakeViewer("endpoint-a")
+        val live = FakeViewer("endpoint-a")
+        val staleRegistration = registry.claim(stale)
+        val liveRegistration = registry.claim(live)
 
-        assertEquals(setOf(a), reg.viewersFor("conv-1"))
-        assertEquals(setOf(a), reg.viewersFor("conv-2"))
-        assertEquals(2, reg.conversationCount())
+        val results = listOf(
+            async { registry.register("conv-1", staleRegistration) },
+            async { registry.register("conv-1", liveRegistration) },
+        ).awaitAll()
+
+        assertEquals(listOf(false, true), results)
+        registry.release(staleRegistration)
+        assertEquals(setOf<ViewerHandle>(live), registry.viewersFor("conv-1"))
     }
 
     @Test
-    fun unregisterAllRemovesEveryEntryForConnection() = runTest {
-        val reg = ConnectionRegistry()
-        val a = FakeViewer("conn-a")
-        val b = FakeViewer("conn-b")
-        // conn-a views two conversations; conn-b shares one of them.
-        reg.register("conv-1", a)
-        reg.register("conv-2", a)
-        reg.register("conv-1", b)
+    fun reconnectClaimReleasesPriorEndpointLifecycleAcrossConversations() = runTest {
+        val registry = ConnectionRegistry()
+        val stale = FakeViewer("endpoint-a")
+        val staleRegistration = registry.register("conv-1", stale)
+        registry.register("conv-2", stale)
 
-        reg.unregisterAll("conn-a")
+        val live = FakeViewer("endpoint-a")
+        val liveRegistration = registry.claim(live)
 
-        // conn-a gone from both; conn-b still present in conv-1.
-        assertEquals(setOf(b), reg.viewersFor("conv-1"))
-        assertTrue(reg.viewersFor("conv-2").isEmpty())
-        assertFalse(reg.viewersFor("conv-1").any { it.connectionId == "conn-a" })
+        assertTrue(registry.viewersFor("conv-1").isEmpty())
+        assertTrue(registry.viewersFor("conv-2").isEmpty())
+        assertFalse(registry.register("conv-stale", staleRegistration))
+        assertTrue(registry.register("conv-2", liveRegistration))
+        registry.release(staleRegistration)
+        assertEquals(setOf<ViewerHandle>(live), registry.viewersFor("conv-2"))
     }
 
     @Test
-    fun concurrentRegisterUnregisterIsSafe() = runTest {
-        val reg = ConnectionRegistry()
-        // Hammer register/unregister across many coroutines; must not throw
-        // ConcurrentModificationException and must end consistent.
-        val jobs = (0 until 200).map { i ->
-            async {
-                val v = FakeViewer("conn-$i")
-                reg.register("conv-shared", v)
-                reg.unregister("conv-shared", v)
-            }
-        }
-        jobs.awaitAll()
-        assertTrue(reg.viewersFor("conv-shared").isEmpty())
-        assertEquals(0, reg.conversationCount())
+    fun releasingCurrentGenerationRemovesOnlyItsSharedEndpointLifecycle() = runTest {
+        val registry = ConnectionRegistry()
+        val first = FakeViewer("endpoint-a")
+        val second = FakeViewer("endpoint-b")
+        val firstRegistration = registry.register("conv-1", first)
+        registry.register("conv-2", first)
+        registry.register("conv-1", second)
+
+        registry.release(firstRegistration)
+
+        assertEquals(setOf<ViewerHandle>(second), registry.viewersFor("conv-1"))
+        assertTrue(registry.viewersFor("conv-2").isEmpty())
+        assertEquals(1, registry.conversationCount())
+    }
+
+    @Test
+    fun blankEndpointIdentityIsRejectedInsteadOfCollapsingUnknownViewers() = runTest {
+        val registry = ConnectionRegistry()
+        val result = runCatching { registry.claim(FakeViewer("")) }
+
+        assertTrue(result.isFailure)
+        assertEquals(0, registry.conversationCount())
     }
 }

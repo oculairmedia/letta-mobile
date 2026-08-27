@@ -28,12 +28,15 @@ import kotlin.time.Duration.Companion.milliseconds
 internal class ObserverWriteQueue(
     private val scope: CoroutineScope,
 ) {
-    private val tails = ConcurrentHashMap<String, Job>()
+    // Key by the handle generation, not endpoint identity. During reconnect the
+    // old and new streams share an endpoint but must never inherit each other's
+    // stalled tail.
+    private val tails = ConcurrentHashMap<ViewerHandle, Job>()
 
     /** Enqueues [write] after earlier writes for the same viewer without blocking the caller. */
     fun enqueue(viewer: ViewerHandle, write: suspend () -> Unit) {
         val next = requireNotNull(
-            tails.compute(viewer.connectionId) { _, previous ->
+            tails.compute(viewer) { _, previous ->
                 scope.launch(start = CoroutineStart.UNDISPATCHED) {
                     previous?.join()
                     write()
@@ -41,7 +44,7 @@ internal class ObserverWriteQueue(
             },
         )
         next.invokeOnCompletion {
-            tails.remove(viewer.connectionId, next)
+            tails.remove(viewer, next)
         }
     }
 
@@ -52,7 +55,7 @@ internal class ObserverWriteQueue(
      * [ConversationTurnFanout.broadcastDeltaBodyNoPark]).
      */
     suspend fun drain(viewer: ViewerHandle) {
-        tails[viewer.connectionId]?.join()
+        tails[viewer]?.join()
     }
 }
 
@@ -103,7 +106,6 @@ internal class ObserverWriteQueue(
 internal class ConversationTurnFanout(
     private val conversationId: String,
     private val runtime: AppServerRuntimeScope,
-    private val remoteEndpointId: String,
     /** Snapshot source of every viewer of [conversationId] (incl. the initiator). */
     private val viewersFor: suspend (conversationId: String) -> Set<ViewerHandle>,
     /**
@@ -288,7 +290,6 @@ internal class ConversationTurnFanout(
         if (openIds.isEmpty()) return
         Telemetry.event(
             "IrohNode", "stream.dangling_tool_calls_synthesized",
-            "remoteEndpointId" to remoteEndpointId,
             "count" to openIds.size,
         )
         openIds.forEach { toolCallId ->
@@ -424,16 +425,13 @@ internal class ConversationTurnFanout(
      */
     private suspend fun broadcastDeltaBodyNoPark(delta: JsonObject) {
         val viewers = snapshotViewers()
-        // eaczz observability: the fanout write path emits no stream.write
-        // telemetry, so multi-client delivery was invisible in the wrapper log.
-        // Log the viewer count + ids per broadcast so a turn reaching every
-        // viewer is greppable (fanout.broadcast).
+        // Endpoint identities are stable public keys and therefore correlatable.
+        // Emit only aggregate delivery state; never copy endpoint values into fanout telemetry.
         Telemetry.event(
             "IrohNode", "fanout.broadcast",
             "conversationId" to conversationId,
             "viewerCount" to viewers.size,
-            "viewerIds" to viewers.joinToString(",") { it.connectionId.take(12) },
-            "initiatorId" to (initiatorViewer?.connectionId?.take(12) ?: "none"),
+            "hasInitiator" to (initiatorViewer != null),
         )
         if (viewers.isEmpty()) return
         // tg7b8: split the join. The initiator MUST receive every frame for
@@ -535,8 +533,6 @@ internal class ConversationTurnFanout(
         if (ok != true) {
             Telemetry.event(
                 "IrohNode", "fanout.observer_dropped",
-                "remoteEndpointId" to remoteEndpointId,
-                "connectionId" to viewer.connectionId,
                 "conversationId" to conversationId,
                 "reason" to if (ok == null) "write_timeout" else "write_failed",
                 level = Telemetry.Level.WARN,

@@ -107,7 +107,6 @@ class IrohFanoutFrameShapeParityTest {
         ConversationTurnFanout(
             conversationId = conversationId,
             runtime = runtime,
-            remoteEndpointId = initiator.connectionId,
             viewersFor = { conv -> registry.viewersFor(conv) },
             initiatorViewer = initiator,
             trackInitiatorFrame = {},
