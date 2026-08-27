@@ -19,9 +19,8 @@ class TimelineHydrationProcessorIntegrationTest {
     @Test
     fun delayedHydrationRebasesStreamAndPendingDiskRecordsAndRepairsCursorAfterPublication() = runTest {
         val gate = CompletableDeferred<Unit>()
-        val transport = DelayedTransport(
-            messages = listOf(UserMessage("server", JsonPrimitive("history"), seqId = 7)),
-            gate = gate,
+        val transport = SequencedDelayedTransport(
+            listOf(DelayedResponse(listOf(UserMessage("server", JsonPrimitive("history"), seqId = 7)), gate)),
         )
         lateinit var loop: TimelineSyncLoop
         val cursorStore = RecordingCursorStore { sequence ->
@@ -52,7 +51,7 @@ class TimelineHydrationProcessorIntegrationTest {
 
         try {
             val hydration = async { loop.hydrate(recordConversationCursor = true) }
-            transport.started.await()
+            transport.started.single().await()
             loop.ingestStreamEvent(AssistantMessage("stream", JsonPrimitive("arrived while fetching")))
             gate.complete(Unit)
             hydration.await()
@@ -113,13 +112,12 @@ class TimelineHydrationProcessorIntegrationTest {
     @Test
     fun delayedHydrationPreservesInitialMetadataAndConcurrentLocalMutation() = runTest {
         val gate = CompletableDeferred<Unit>()
-        val transport = DelayedTransport(
-            messages = listOf(UserMessage("server", JsonPrimitive("fresh history"), seqId = 9)),
-            gate = gate,
+        val transport = SequencedDelayedTransport(
+            listOf(DelayedResponse(listOf(UserMessage("server", JsonPrimitive("fresh history"), seqId = 9)), gate)),
         )
         val initial = Timeline(
             conversationId = "conversation",
-            events = persistentListOf(confirmedEvent("persisted", "persisted content", 1.0)),
+            events = persistentListOf(persistedEvent()),
             liveCursor = "persisted-live",
             backfillCursor = "persisted-backfill",
             releasedOlderCount = 11,
@@ -134,7 +132,7 @@ class TimelineHydrationProcessorIntegrationTest {
         )
 
         val hydration = async { hydrator.hydrate() }
-        transport.started.await()
+        transport.started.single().await()
         val localAck = processor.submit(
             TimelineMutation.LocalAppend(
                 pending = PendingSend("local-otid", "local while fetching", persistentListOf()),
@@ -170,34 +168,16 @@ class TimelineHydrationProcessorIntegrationTest {
     private fun confirmedServerIds(timeline: Timeline): List<String> =
         timeline.events.filterIsInstance<TimelineEvent.Confirmed>().map { it.serverId }
 
-    private fun confirmedEvent(serverId: String, content: String, position: Double) = TimelineEvent.Confirmed(
-        position = position,
-        otid = "server-$serverId-user",
-        content = content,
-        serverId = serverId,
+    private fun persistedEvent() = TimelineEvent.Confirmed(
+        position = 1.0,
+        otid = "server-persisted-user",
+        content = "persisted content",
+        serverId = "persisted",
         messageType = TimelineMessageType.USER,
         date = parseTimelineInstant("2026-01-01T00:00:00Z"),
         runId = null,
         stepId = null,
     )
-
-    private class DelayedTransport(
-        private val messages: List<LettaMessage>,
-        private val gate: CompletableDeferred<Unit>,
-    ) : TimelineTransport by EmptyTimelineTransport {
-        val started = CompletableDeferred<Unit>()
-
-        override suspend fun listConversationMessages(
-            conversationId: String,
-            limit: Int?,
-            after: String?,
-            order: String?,
-        ): List<LettaMessage> {
-            started.complete(Unit)
-            gate.await()
-            return if (order == "desc") messages.reversed() else messages
-        }
-    }
 
     private data class DelayedResponse(
         val messages: List<LettaMessage>,
