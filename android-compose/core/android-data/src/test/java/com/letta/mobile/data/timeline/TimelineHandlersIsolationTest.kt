@@ -42,8 +42,8 @@ class TimelineHandlersIsolationTest {
     }
 
     @Test
-    fun `TimelineReturnsResponsesProcessor updates approval status and tool returns`() {
-        val state = toolCallState(
+    fun `TimelineReturnsResponsesProcessor handles identified and blank tool returns`() {
+        val identifiedState = toolCallState(
             serverId = "tc-1",
             toolCall = com.letta.mobile.data.model.ToolCall(
                 id = "call-id-1",
@@ -51,46 +51,43 @@ class TimelineHandlersIsolationTest {
                 arguments = "",
             ),
         )
-        val snapshot = listOf(
-            ToolReturnMessage(
-                id = "tr-1",
-                toolCallId = "call-id-1",
-                toolReturnRaw = JsonPrimitive("success_response"),
-                isErr = false,
-                runId = "run-1",
-            )
+        applyReturnsAndResponsesFromSnapshot(
+            listOf(
+                ToolReturnMessage(
+                    id = "tr-1",
+                    toolCallId = "call-id-1",
+                    toolReturnRaw = JsonPrimitive("success_response"),
+                    isErr = false,
+                    runId = "run-1",
+                ),
+            ),
+            identifiedState,
         )
-
-        applyReturnsAndResponsesFromSnapshot(snapshot, state)
-
-        val updated = state.value.events.single() as TimelineEvent.Confirmed
+        val updated = identifiedState.value.events.single() as TimelineEvent.Confirmed
         assertTrue(updated.approvalDecided)
         assertEquals("success_response", updated.toolReturnContent)
         assertEquals("success_response", updated.toolReturnContentByCallId["call-id-1"])
-    }
 
-    @Test
-    fun `TimelineReturnsResponsesProcessor ignores blank tool return ids`() {
-        val state = toolCallState(
+        val blankState = toolCallState(
             serverId = "tc-blank",
             toolCall = com.letta.mobile.data.model.ToolCall(
                 name = "synthetic_tool",
                 arguments = "",
             ),
         )
-        val snapshot = listOf(
-            ToolReturnMessage(
-                id = "tr-blank",
-                toolCallId = "",
-                toolReturnRaw = JsonPrimitive("should_not_attach"),
-                isErr = true,
-                status = "error"
-            )
+        applyReturnsAndResponsesFromSnapshot(
+            listOf(
+                ToolReturnMessage(
+                    id = "tr-blank",
+                    toolCallId = "",
+                    toolReturnRaw = JsonPrimitive("should_not_attach"),
+                    isErr = true,
+                    status = "error",
+                ),
+            ),
+            blankState,
         )
-
-        applyReturnsAndResponsesFromSnapshot(snapshot, state)
-
-        val unchanged = state.value.events.single() as TimelineEvent.Confirmed
+        val unchanged = blankState.value.events.single() as TimelineEvent.Confirmed
         assertFalse(unchanged.approvalDecided)
         assertEquals(null, unchanged.toolReturnContent)
         assertTrue(unchanged.toolReturnContentByCallId.isEmpty())

@@ -478,7 +478,9 @@ class TimelineSyncLoop(
     }
 
     suspend fun appendExternalTransportLocal(content: String, otid: String, attachments: List<MessageContentPart.Image> = emptyList()): String {
-        return externalTransportAppender.appendExternalTransportLocal(content, otid, attachments)
+        return externalTransportAppender.appendExternalTransportLocal(
+            TimelineExternalAppendRequest(content, TimelineExternalOtid(otid), attachments),
+        )
     }
 
     suspend fun postHandlerCollapse() {
@@ -676,15 +678,17 @@ class TimelineSyncLoop(
     }
 
     suspend fun markExternalTransportLocalSent(otid: String) {
-        externalTransportAppender.markExternalTransportLocalSent(otid)
+        externalTransportAppender.markExternalTransportLocalSent(TimelineExternalOtid(otid))
     }
 
     suspend fun markExternalTransportLocalFailed(otid: String) {
-        externalTransportAppender.markExternalTransportLocalFailed(otid)
+        externalTransportAppender.markExternalTransportLocalFailed(TimelineExternalOtid(otid))
     }
 
     suspend fun reconcileExternalTransportSend(agentId: String, externalConversationId: String, otid: String) {
-        externalTransportAppender.reconcileExternalTransportSend(agentId, externalConversationId, otid)
+        externalTransportAppender.reconcileExternalTransportSend(
+            TimelineExternalReconcileRequest(agentId, externalConversationId, TimelineExternalOtid(otid)),
+        )
     }
 
     private suspend fun runStreamSubscriber() {

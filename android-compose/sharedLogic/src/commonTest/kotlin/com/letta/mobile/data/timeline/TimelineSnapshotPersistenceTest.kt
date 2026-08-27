@@ -242,34 +242,7 @@ class TimelineSnapshotPersistenceTest {
     }
 
     @Test
-    fun closeDrainsQueuedStreamIngressBeforeFinalSnapshot() = runTest {
-        val store = InMemoryConfirmedTimelineStore()
-        val scope = TimelineScope(backendId = "test-backend", conversationId = "conv-close-race")
-        val loop = TimelineSyncLoop(
-            messageApi = EmptyTimelineTransport,
-            conversationId = scope.conversationId,
-            scope = this,
-            startStreamSubscriber = false,
-            confirmedTimelineStore = store,
-            timelineScope = scope,
-            ioDispatcher = kotlinx.coroutines.test.StandardTestDispatcher(testScheduler),
-        )
-        loop.submitStreamEvent(
-            com.letta.mobile.data.model.UserMessage(
-                id = "queued-before-close",
-                date = FIXTURE_DATE,
-                contentRaw = kotlinx.serialization.json.JsonPrimitive("must persist"),
-            ),
-        )
-
-        loop.closeAndJoin()
-
-        val snapshot = assertNotNull(store.readSnapshot(scope))
-        assertEquals(listOf("queued-before-close"), snapshot.events.map { it.serverId })
-    }
-
-    @Test
-    fun mutationsPersistImmediatelyAndRestoreAccuratelyAfterClose() = runTest {
+    fun closeDrainsQueuedIngressAndRestoresPersistedMutations() = runTest {
         val store = InMemoryConfirmedTimelineStore()
         val scope = TimelineScope(backendId = "test-backend", conversationId = "conv-restore")
         val loop1 = TimelineSyncLoop(
@@ -298,6 +271,29 @@ class TimelineSnapshotPersistenceTest {
         assertNotNull(snapshot)
         assertEquals(1, snapshot.events.size)
         assertEquals("msg-persisted", snapshot.events.first().serverId)
+
+        val closeRaceStore = InMemoryConfirmedTimelineStore()
+        val closeRaceScope = TimelineScope(backendId = "test-backend", conversationId = "conv-close-race")
+        val closeRaceLoop = TimelineSyncLoop(
+            messageApi = EmptyTimelineTransport,
+            conversationId = closeRaceScope.conversationId,
+            scope = this,
+            startStreamSubscriber = false,
+            confirmedTimelineStore = closeRaceStore,
+            timelineScope = closeRaceScope,
+            ioDispatcher = kotlinx.coroutines.test.StandardTestDispatcher(testScheduler),
+        )
+        closeRaceLoop.submitStreamEvent(
+            com.letta.mobile.data.model.UserMessage(
+                id = "queued-before-close",
+                date = FIXTURE_DATE,
+                contentRaw = kotlinx.serialization.json.JsonPrimitive("must persist"),
+            ),
+        )
+        closeRaceLoop.closeAndJoin()
+
+        val closeRaceSnapshot = assertNotNull(closeRaceStore.readSnapshot(closeRaceScope))
+        assertEquals(listOf("queued-before-close"), closeRaceSnapshot.events.map { it.serverId })
     }
 
     @Test
