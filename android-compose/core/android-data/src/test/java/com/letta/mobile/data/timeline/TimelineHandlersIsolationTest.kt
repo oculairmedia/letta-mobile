@@ -262,5 +262,6 @@ class TimelineHandlersIsolationTest {
         val confirmed = state.value.events.single() as TimelineEvent.Confirmed
         assertEquals("server-1", confirmed.serverId)
         assertEquals("hi from server", confirmed.content)
+        processor.closeAndJoin()
     }
 }
