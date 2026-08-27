@@ -93,6 +93,14 @@ object NoOpTimelineProcessorStateBridge : TimelineProcessorStateBridge
  * accepted requests. Cancellation is preemptive and fails the active and buffered
  * acknowledgements, so no caller is left waiting on a stranded deferred.
  */
+@JvmInline
+private value class TimelineSequence(val value: Long) {
+    fun next() = TimelineSequence(value + 1L)
+}
+
+@JvmInline
+private value class TimelineEffectIndex(val value: Int)
+
 class TimelineProcessor(
     initialState: TimelineReducerState,
     scope: CoroutineScope,
@@ -108,7 +116,9 @@ class TimelineProcessor(
     private val terminalReason = atomic<TerminalReason?>(null)
     private val _state = MutableStateFlow(initialState)
     val state: StateFlow<TimelineReducerState> = _state.asStateFlow()
-    private val consumer: Job = scope.launch { consume(initialState.lastAppliedMutationSequence + 1L) }
+    private val consumer: Job = scope.launch {
+        consume(TimelineSequence(initialState.lastAppliedMutationSequence + 1L))
+    }
 
     /** Enqueue without tying processor progress to caller cancellation or blocking a producer. */
     fun enqueue(mutation: TimelineMutation): Deferred<TimelineProcessorAck> {
@@ -146,13 +156,14 @@ class TimelineProcessor(
         consumer.join()
     }
 
-    private suspend fun consume(initialNextSequence: Long) {
+    private suspend fun consume(initialNextSequence: TimelineSequence) {
         var nextSequence = initialNextSequence
         var active: ProcessorRequest? = null
         try {
             for (request in requests) {
                 active = request
-                process(request, nextSequence++)
+                process(request, nextSequence)
+                nextSequence = nextSequence.next()
                 active = null
             }
         } catch (cancelled: CancellationException) {
@@ -167,7 +178,7 @@ class TimelineProcessor(
         }
     }
 
-    private suspend fun process(request: ProcessorRequest, sequence: Long) {
+    private suspend fun process(request: ProcessorRequest, sequence: TimelineSequence) {
         val prepared = try {
             prepareMutation(request.mutation, sequence)
         } catch (cancelled: CancellationException) {
@@ -176,7 +187,7 @@ class TimelineProcessor(
         } catch (failure: Throwable) {
             request.ack.complete(
                 TimelineProcessorAck.Failed(
-                    sequence,
+                    sequence.value,
                     TimelineProcessorFailureReason.StatePublicationFailure(failure),
                 ),
             )
@@ -185,13 +196,16 @@ class TimelineProcessor(
 
         when (prepared) {
             is PreparedMutation.Rejected -> request.ack.complete(
-                TimelineProcessorAck.Rejected(sequence, prepared.reason),
+                TimelineProcessorAck.Rejected(sequence.value, prepared.reason),
             )
             is PreparedMutation.Committed -> executeEffects(request, sequence, prepared.reduction)
         }
     }
 
-    private suspend fun prepareMutation(mutation: TimelineMutation, sequence: Long): PreparedMutation =
+    private suspend fun prepareMutation(
+        mutation: TimelineMutation,
+        sequence: TimelineSequence,
+    ): PreparedMutation =
         writeMutex.withLock {
             val synchronized = stateBridge.synchronizeSeed(_state.value)
             val rejection = rejectionReason(sequence, mutation, synchronized)
@@ -201,7 +215,7 @@ class TimelineProcessor(
             } else {
                 val reduced = reducer(synchronized, mutation)
                 val committed = reduced.copy(
-                    next = reduced.next.copy(lastAppliedMutationSequence = sequence),
+                    next = reduced.next.copy(lastAppliedMutationSequence = sequence.value),
                 )
                 stateBridge.publish(committed.next)
                 _state.value = committed.next
@@ -211,21 +225,21 @@ class TimelineProcessor(
 
     private suspend fun executeEffects(
         request: ProcessorRequest,
-        sequence: Long,
+        sequence: TimelineSequence,
         committed: TimelineReduction,
     ) {
         committed.effects.forEachIndexed { index, effect ->
-            val failure = runEffect(effect, sequence, index, request) ?: return@forEachIndexed
+            val failure = runEffect(effect, sequence, TimelineEffectIndex(index), request) ?: return@forEachIndexed
             request.ack.complete(failure)
             return
         }
-        request.ack.complete(TimelineProcessorAck.Applied(sequence, committed.result))
+        request.ack.complete(TimelineProcessorAck.Applied(sequence.value, committed.result))
     }
 
     private suspend fun runEffect(
         effect: TimelineReductionEffect,
-        sequence: Long,
-        index: Int,
+        sequence: TimelineSequence,
+        index: TimelineEffectIndex,
         request: ProcessorRequest,
     ): TimelineProcessorAck.Failed? = try {
         effectHandler(effect)
@@ -235,8 +249,8 @@ class TimelineProcessor(
         throw cancelled
     } catch (failure: Throwable) {
         TimelineProcessorAck.Failed(
-            sequence,
-            TimelineProcessorFailureReason.EffectFailure(index, effect, failure),
+            sequence.value,
+            TimelineProcessorFailureReason.EffectFailure(index.value, effect, failure),
         )
     }
 
@@ -255,8 +269,8 @@ class TimelineProcessor(
         )
     }
 
-    private fun cancelledAck(sequence: Long? = null) = TimelineProcessorAck.Failed(
-        sequence = sequence,
+    private fun cancelledAck(sequence: TimelineSequence? = null) = TimelineProcessorAck.Failed(
+        sequence = sequence?.value,
         reason = TimelineProcessorFailureReason.Cancelled,
     )
 
@@ -282,31 +296,39 @@ class TimelineProcessor(
 }
 
 private fun rejectionReason(
-    sequence: Long,
+    sequence: TimelineSequence,
     mutation: TimelineMutation,
     state: TimelineReducerState,
 ): TimelineProcessorRejectionReason? = when {
-    sequence <= state.lastAppliedMutationSequence -> TimelineProcessorRejectionReason.StaleSequence(
-        attempted = sequence,
+    sequence.value <= state.lastAppliedMutationSequence -> TimelineProcessorRejectionReason.StaleSequence(
+        attempted = sequence.value,
         lastApplied = state.lastAppliedMutationSequence,
     )
     mutation is TimelineMutation.HydrateSnapshot && mutation.generation < state.hydrateGeneration ->
-        staleGeneration("HydrateSnapshot", mutation.generation, state.hydrateGeneration)
+        staleGeneration(GenerationWindow("HydrateSnapshot", mutation.generation, state.hydrateGeneration))
     mutation is TimelineMutation.ReconcileSnapshot &&
         mutation.generation < state.highestRequestedReconcileGeneration ->
         staleGeneration(
-            "ReconcileSnapshot",
-            mutation.generation,
-            state.highestRequestedReconcileGeneration,
+            GenerationWindow(
+                "ReconcileSnapshot",
+                mutation.generation,
+                state.highestRequestedReconcileGeneration,
+            ),
         )
     else -> null
 }
 
-private fun staleGeneration(
-    mutationFamily: String,
-    attempted: Long,
-    current: Long,
-) = TimelineProcessorRejectionReason.StaleGeneration(mutationFamily, attempted, current)
+private data class GenerationWindow(
+    val mutationFamily: String,
+    val attempted: Long,
+    val current: Long,
+)
+
+private fun staleGeneration(window: GenerationWindow) = TimelineProcessorRejectionReason.StaleGeneration(
+    window.mutationFamily,
+    window.attempted,
+    window.current,
+)
 
 internal fun TimelineProcessorAck.appliedResultOrThrow(): TimelineReductionResult = when (this) {
     is TimelineProcessorAck.Applied -> result
