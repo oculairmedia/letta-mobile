@@ -43,9 +43,11 @@ internal class TimelineHydrator(
                 ),
                 ),
                 timer = timer,
-                generation = generation,
-                responseCount = response.size,
-                cursorSequence = cursorSequence,
+                context = HydrationAckContext(
+                    generation = generation,
+                    responseCount = response.size,
+                    cursorSequence = cursorSequence,
+                ),
             )
         } catch (t: Throwable) {
             timer.stopError(t, "conversationId" to conversationId)
@@ -75,12 +77,10 @@ internal class TimelineHydrator(
     private suspend fun handleAcknowledgement(
         acknowledgement: TimelineProcessorAck,
         timer: Telemetry.Timer,
-        generation: Long,
-        responseCount: Int,
-        cursorSequence: Long?,
+        context: HydrationAckContext,
     ): TimelineHydrationOutcome = when (acknowledgement) {
-        is TimelineProcessorAck.Applied -> acceptApplied(acknowledgement, timer, responseCount, cursorSequence)
-        is TimelineProcessorAck.Rejected -> rejectStale(acknowledgement, timer, generation)
+        is TimelineProcessorAck.Applied -> acceptApplied(acknowledgement, timer, context)
+        is TimelineProcessorAck.Rejected -> rejectStale(acknowledgement, timer, context.generation)
         is TimelineProcessorAck.Failed -> throw TimelineProcessorMutationException(
             "timeline hydration mutation failed: ${acknowledgement.reason}",
         )
@@ -89,8 +89,7 @@ internal class TimelineHydrator(
     private suspend fun acceptApplied(
         acknowledgement: TimelineProcessorAck.Applied,
         timer: Telemetry.Timer,
-        responseCount: Int,
-        cursorSequence: Long?,
+        context: HydrationAckContext,
     ): TimelineHydrationOutcome {
         val hydrated = acknowledgement.result as? TimelineReductionResult.Hydrated
             ?: error("hydrate acknowledgement did not carry hydration result")
@@ -98,9 +97,9 @@ internal class TimelineHydrator(
         events.emit(TimelineSyncEvent.Hydrated(hydrated.visibleEventCount))
         timer.stop(
             "conversationId" to conversationId,
-            "rawCount" to responseCount,
+            "rawCount" to context.responseCount,
             "eventCount" to hydrated.visibleEventCount,
-            "cursorSeq" to (cursorSequence ?: -1L),
+            "cursorSeq" to (context.cursorSequence ?: -1L),
         )
         dumpTimelineState("hydrate", conversationId, timelineProcessor.state.value.timeline)
         return TimelineHydrationOutcome.Accepted
@@ -143,6 +142,12 @@ internal class TimelineHydrator(
     private companion object {
         const val DEFAULT_SHIM_CONVERSATION_PREFIX = "conv-default-"
     }
+
+    private data class HydrationAckContext(
+        val generation: Long,
+        val responseCount: Int,
+        val cursorSequence: Long?,
+    )
 }
 
 internal enum class TimelineHydrationOutcome {
