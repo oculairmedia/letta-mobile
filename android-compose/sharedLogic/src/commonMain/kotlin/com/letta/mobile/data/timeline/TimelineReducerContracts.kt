@@ -44,6 +44,15 @@ sealed interface TimelineMutation {
         val cursorSequence: Long? = null,
     ) : TimelineMutation
     data class ReconcileSnapshot(val generation: Long, val messages: List<LettaMessage>) : TimelineMutation
+    data class RecentMessagesSnapshot(
+        val generation: Long,
+        val freshnessSequence: Long,
+        val messages: List<LettaMessage>,
+    ) : TimelineMutation
+    data class ReconcileAfterSendSnapshot(
+        val otid: String,
+        val messages: List<LettaMessage>,
+    ) : TimelineMutation
     data class CleanupAbandonedFragments(
         val runId: String?,
         val turnId: String?,
@@ -211,14 +220,20 @@ fun reducePostSendReconcile(
     otid: String,
     serverMessages: List<LettaMessage>,
 ): TimelineReduction {
-    val pure = reconcileAfterSendSnapshot(state.timeline, otid, serverMessages)
+    val reconciled = reconcileAfterSendSnapshot(state.timeline, otid, serverMessages)
+    // Enrich tool calls before publishing the snapshot so every after-send
+    // observer sees one complete, atomically reconciled timeline.
+    val enrichedTimeline = enrichTimelineFromSnapshot(reconciled.timeline, serverMessages)
+    val next = state.copy(timeline = enrichedTimeline)
     val effects = buildList {
-        pure.result.confirmedServerId?.let { add(TimelineReductionEffect.EmitSyncEvent(TimelineSyncEvent.LocalConfirmed(otid, it))) }
-        if (pure.result.shouldDeletePendingLocal) add(TimelineReductionEffect.DeletePendingLocal(otid))
+        reconciled.result.confirmedServerId?.let {
+            add(TimelineReductionEffect.EmitSyncEvent(TimelineSyncEvent.LocalConfirmed(otid, it)))
+        }
+        if (reconciled.result.shouldDeletePendingLocal) add(TimelineReductionEffect.DeletePendingLocal(otid))
         serverMessages.lastOrNull()?.id?.let { add(TimelineReductionEffect.AdvanceCursor(it)) }
     }.toTimelinePersistentList()
-    return if (pure.timeline == state.timeline) unchanged(state)
-    else TimelineReduction(state.copy(timeline = pure.timeline), effects, TimelineReductionResult.Changed(TimelineChangeKind.RECONCILED))
+    return if (next == state) unchanged(state)
+    else TimelineReduction(next, effects, TimelineReductionResult.Changed(TimelineChangeKind.RECONCILED))
 }
 
 private fun deliveryReduction(state: TimelineReducerState, timeline: Timeline, kind: TimelineChangeKind): TimelineReduction =
@@ -251,6 +266,8 @@ fun reduceProductionMutation(state: TimelineReducerState, mutation: TimelineMuta
     is TimelineMutation.SnapshotEnrichment -> reduceSnapshotEnrichment(state, mutation.messages)
     is TimelineMutation.HydrateSnapshot -> reduceHydrateMutation(state, mutation)
     is TimelineMutation.ReconcileSnapshot -> reduceReconcileMutation(state, mutation)
+    is TimelineMutation.RecentMessagesSnapshot -> reduceRecentMessagesMutation(state, mutation)
+    is TimelineMutation.ReconcileAfterSendSnapshot -> reducePostSendReconcile(state, mutation.otid, mutation.messages)
     is TimelineMutation.CleanupAbandonedFragments -> reduceCleanup(
         state,
         mutation.runId,
@@ -317,6 +334,22 @@ private fun reduceHydrateMutation(
             changed = next != state,
         ),
     )
+}
+
+private fun reduceRecentMessagesMutation(
+    state: TimelineReducerState,
+    mutation: TimelineMutation.RecentMessagesSnapshot,
+): TimelineReduction {
+    val enriched = reduceSnapshotEnrichment(state, mutation.messages)
+    val merge = enriched.next.timeline.mergeServerMessages(mutation.messages)
+    val next = enriched.next.copy(
+        timeline = merge.first,
+        highestAppliedReconcileGeneration = maxOf(state.highestAppliedReconcileGeneration, mutation.generation),
+        freshnessSequence = maxOf(state.freshnessSequence, mutation.freshnessSequence),
+    )
+    val result = if (next == state) TimelineReductionResult.NoChange
+    else TimelineReductionResult.Changed(TimelineChangeKind.RECONCILED)
+    return TimelineReduction(next, result = result)
 }
 
 private fun reduceReconcileMutation(

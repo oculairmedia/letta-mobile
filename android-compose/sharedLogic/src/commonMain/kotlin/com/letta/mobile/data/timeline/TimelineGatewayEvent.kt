@@ -24,6 +24,7 @@ sealed interface TimelineGatewayEvent {
         val telemetryReason: String,
         val ack: CompletableDeferred<Int>,
         val generation: Long? = null,
+        val freshnessSequence: Long = 0L,
     ) : TimelineGatewayEvent
     data class ExternalTransportLocalAppend(val content: String, val otid: String, val attachments: PersistentList<MessageContentPart.Image>, val sentAt: TimelineInstant, val ack: CompletableDeferred<String>) : TimelineGatewayEvent
     data class PostHandlerCollapse(val ack: CompletableDeferred<Unit>) : TimelineGatewayEvent

@@ -220,8 +220,10 @@ class TimelineRecentMessagesFlightTest {
             eventQueue = eventQueue,
             state = MutableStateFlow(Timeline("conv-1")),
             streamSubscriberActive = MutableStateFlow(false),
-            writeMutex = Mutex(),
-            applyReturnsAndResponsesFromSnapshot = {},
+            processor = TimelineProcessor(
+                initialState = TimelineReducerState(Timeline("conv-1")),
+                scope = eventScope,
+            ),
             onSnapshotApplied = { snapshotAppliedCount++ },
             nowMillis = nowMillis,
         )
