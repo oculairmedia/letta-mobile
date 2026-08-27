@@ -89,7 +89,9 @@ class TimelineRecentMessagesReconciler(
         forceRefresh: Boolean = false,
         connectionGeneration: Long = DEFAULT_CONNECTION_GENERATION,
     ): RecentMessagesReconcileOutcome {
-        val request = ReconcileRequest(reason, connectionGeneration, forceRefresh)
+        val resolvedGeneration = connectionGeneration.takeIf { it > DEFAULT_CONNECTION_GENERATION }
+            ?: processor.state.value.highestAppliedReconcileGeneration
+        val request = ReconcileRequest(reason, resolvedGeneration, forceRefresh)
         recentSuccessFor(request)?.let { return it }
 
         while (true) {

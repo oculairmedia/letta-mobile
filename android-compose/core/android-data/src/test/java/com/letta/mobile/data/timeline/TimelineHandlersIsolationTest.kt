@@ -216,7 +216,18 @@ class TimelineHandlersIsolationTest {
     fun `TimelineRecentMessagesReconciler merges snapshot correctly`() = runTest {
         val state = MutableStateFlow(Timeline("conv1"))
         val eventQueue = Channel<TimelineGatewayEvent>(Channel.UNLIMITED)
-        val writeMutex = Mutex()
+        val processor = TimelineProcessor(
+            initialState = TimelineReducerState(state.value),
+            scope = this,
+            stateBridge = object : TimelineProcessorStateBridge {
+                override fun synchronizeSeed(processorState: TimelineReducerState) =
+                    processorState.copy(timeline = state.value)
+
+                override fun publish(stateValue: TimelineReducerState) {
+                    state.value = stateValue.timeline
+                }
+            },
+        )
         val reconciler = TimelineRecentMessagesReconciler(
             conversationId = "conv1",
             scope = this,
@@ -224,8 +235,7 @@ class TimelineHandlersIsolationTest {
             eventQueue = eventQueue,
             state = state,
             streamSubscriberActive = MutableStateFlow(false),
-            writeMutex = writeMutex,
-            applyReturnsAndResponsesFromSnapshot = {},
+            processor = processor,
             onSnapshotApplied = {},
         )
 
