@@ -221,22 +221,6 @@ internal class LocalMutationParityVerifier(
     }
 }
 
-internal data class AssistantFixture(
-    val id: String,
-    val content: String,
-    val runId: String = "run-$id",
-    val otid: String = "otid-$id",
-)
-
-internal data class ConfirmedFixture(
-    val id: String,
-    val content: String,
-    val position: Double,
-    val stepId: String? = "turn",
-)
-
-internal data class PendingReturnFixture(val callId: String, val id: String, val response: String)
-
 internal sealed interface LocalSemanticMutation {
     data class Append(val otid: String, val content: String) : LocalSemanticMutation
     data class Retry(val otid: String) : LocalSemanticMutation
