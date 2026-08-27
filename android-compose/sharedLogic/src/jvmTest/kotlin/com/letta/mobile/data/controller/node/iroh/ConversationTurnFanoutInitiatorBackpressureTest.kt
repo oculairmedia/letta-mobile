@@ -4,8 +4,10 @@ import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.transport.iroh.IrohFrameCodec
 import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeRunStatus
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -100,7 +102,6 @@ class ConversationTurnFanoutInitiatorBackpressureTest {
     ) = ConversationTurnFanout(
         conversationId = conversationId,
         runtime = runtime,
-        remoteEndpointId = "conn-init",
         viewersFor = { conv -> registry.viewersFor(conv) },
         initiatorViewer = initiator,
         trackInitiatorFrame = {},
@@ -192,6 +193,23 @@ class ConversationTurnFanoutInitiatorBackpressureTest {
         val seqs = eventSeqs(frames)
         assertEquals(seqs.sorted(), seqs, "event_seq must be monotonic in wire order")
         assertEquals(seqs.distinct().size, seqs.size, "event_seq must not repeat")
+    }
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Test
+    fun reconnectWithSameEndpointDoesNotInheritStalledGenerationTail() = runTest {
+        val queue = ObserverWriteQueue(backgroundScope)
+        val stale = viewer("shared-endpoint", FakeSink())
+        val replacement = viewer("shared-endpoint", FakeSink())
+        val staleGate = CompletableDeferred<Unit>()
+        val replacementWritten = CompletableDeferred<Unit>()
+
+        queue.enqueue(stale) { staleGate.await() }
+        queue.enqueue(replacement) { replacementWritten.complete(Unit) }
+        runCurrent()
+
+        assertTrue(replacementWritten.isCompleted, "replacement generation must have an independent ordered queue")
+        staleGate.complete(Unit)
     }
 
     @Test

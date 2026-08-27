@@ -96,7 +96,6 @@ internal class IrohViewerHandle(
     } catch (e: Exception) {
         Telemetry.event(
             "IrohNode", "viewer.write.failed",
-            "connectionId" to connectionId,
             "error" to (e.message ?: e.toString()),
             level = Telemetry.Level.WARN,
         )

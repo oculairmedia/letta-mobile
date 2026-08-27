@@ -106,7 +106,6 @@ class ConversationTurnFanoutFaultIsolationTest {
     ) = ConversationTurnFanout(
         conversationId = conversationId,
         runtime = runtime,
-        remoteEndpointId = "conn-init",
         viewersFor = { conv -> registry.viewersFor(conv) },
         initiatorViewer = initiator,
         trackInitiatorFrame = {},
@@ -237,13 +236,13 @@ class ConversationTurnFanoutFaultIsolationTest {
         val initiator = viewer("conn-init", sinkInit)
         val observer = viewer("conn-obs", sinkObs)
         registry.register(conversationId, initiator)
-        registry.register(conversationId, observer)
+        val observerRegistration = registry.register(conversationId, observer)
 
         val fanout = fanoutFor(registry, initiator)
         fanout.onDraft(assistantDelta("Hel"))
 
-        // Observer disconnects mid-stream (eaczz.1 unregisterAll on disconnect).
-        registry.unregisterAll("conn-obs")
+        // Observer disconnects mid-stream and releases its exact generation.
+        registry.release(observerRegistration)
         assertFalse(
             registry.viewersFor(conversationId).any { it.connectionId == "conn-obs" },
             "disconnected observer removed from viewersFor",

@@ -159,6 +159,7 @@ class IrohNodeConnection(
      * seq + serialized writes, exactly like the single-viewer path.
      */
     private var selfViewer: IrohViewerHandle? = null
+    private var viewerRegistration: ViewerRegistration? = null
 
     /**
      * eaczz.3: this connection's viewer subscription state (Option A de-scope
@@ -186,9 +187,6 @@ class IrohNodeConnection(
             maxFrameBytes = MAX_FRAME_BYTES,
         )
         selfViewer = handle
-        connectionRegistry?.let { registry ->
-            viewerSubscription = ConversationViewerSubscription(registry, handle)
-        }
         return handle
     }
 
@@ -223,7 +221,12 @@ class IrohNodeConnection(
             // stream is open, so both subscription signals (runtime_start on the
             // control channel, message.list on an admin_rpc stream) can register
             // it as a conversation viewer.
-            ensureSelfViewer(streamSend)
+            val viewer = ensureSelfViewer(streamSend)
+            connectionRegistry?.let { registry ->
+                val registration = registry.claim(viewer)
+                viewerRegistration = registration
+                viewerSubscription = ConversationViewerSubscription(registry, registration)
+            }
 
             val controlJob = launch {
                 serveControlChannel(controlBiStream, streamSend)
@@ -251,9 +254,11 @@ class IrohNodeConnection(
                 "class" to e::class.simpleName,
             )
         } finally {
-            // eaczz.1: drop every viewer entry this connection registered so a
-            // disconnected client stops receiving fanned-out frames.
-            runCatching { connectionRegistry?.unregisterAll(remoteEndpointId) }
+            // Release only this connection generation. An overlapped reconnect
+            // may already own the same endpoint identity and must survive stale close.
+            viewerRegistration?.let { registration ->
+                runCatching { connectionRegistry?.release(registration) }
+            }
             Telemetry.event(
                 "IrohNode", "connection.closed",
                 "remoteEndpointId" to remoteEndpointId,
@@ -795,7 +800,6 @@ class IrohNodeConnection(
     ) = ConversationTurnFanout(
         conversationId = input.runtime.conversationId,
         runtime = input.runtime,
-        remoteEndpointId = remoteEndpointId,
         viewersFor = { conversationId -> connectionRegistry?.viewersFor(conversationId) ?: emptySet() },
         initiatorViewer = ensureSelfViewer(streamSend),
         trackInitiatorFrame = { deltaJson -> activeTurnTracking.get()?.tracker?.track(deltaJson) },
