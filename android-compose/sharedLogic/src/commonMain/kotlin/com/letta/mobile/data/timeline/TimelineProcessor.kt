@@ -328,6 +328,24 @@ private fun rejectionReason(
                 state.highestRequestedReconcileGeneration,
             ),
         )
+    mutation is TimelineMutation.RecentMessagesSnapshot &&
+        mutation.generation < state.highestAppliedReconcileGeneration ->
+        staleGeneration(
+            GenerationWindow(
+                "RecentMessagesSnapshot.generation",
+                mutation.generation,
+                state.highestAppliedReconcileGeneration,
+            ),
+        )
+    mutation is TimelineMutation.RecentMessagesSnapshot &&
+        mutation.freshnessSequence < state.freshnessSequence ->
+        staleGeneration(
+            GenerationWindow(
+                "RecentMessagesSnapshot.freshness",
+                mutation.freshnessSequence,
+                state.freshnessSequence,
+            ),
+        )
     else -> null
 }
 

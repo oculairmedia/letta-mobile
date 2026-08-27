@@ -32,8 +32,7 @@ class TimelineRecentMessagesReconciler(
     private val eventQueue: Channel<TimelineGatewayEvent>,
     private val state: MutableStateFlow<Timeline>,
     private val streamSubscriberActive: StateFlow<Boolean>,
-    private val writeMutex: Mutex,
-    private val applyReturnsAndResponsesFromSnapshot: (List<LettaMessage>) -> Unit,
+    private val processor: TimelineProcessor,
     private val onSnapshotApplied: () -> Unit,
     private val nowMillis: () -> Long = { timelineCurrentTimeMillis() },
     private val minForcedReconcileIntervalMs: Long = DEFAULT_MIN_FORCED_RECONCILE_INTERVAL_MS,
@@ -73,7 +72,6 @@ class TimelineRecentMessagesReconciler(
     private val lastForcedReconcileCompletedAtMsByGeneration = mutableMapOf<Long, Long>()
     private var inFlight: ReconcileFlight? = null
     private var latestRequestedGeneration: Long = DEFAULT_CONNECTION_GENERATION
-    private var highestAppliedGeneration: Long = DEFAULT_CONNECTION_GENERATION
 
     fun invalidateFreshness() {
         updateFreshnessState { current -> current.copy(sequence = current.sequence + 1L) }
@@ -91,7 +89,9 @@ class TimelineRecentMessagesReconciler(
         forceRefresh: Boolean = false,
         connectionGeneration: Long = DEFAULT_CONNECTION_GENERATION,
     ): RecentMessagesReconcileOutcome {
-        val request = ReconcileRequest(reason, connectionGeneration, forceRefresh)
+        val resolvedGeneration = connectionGeneration.takeIf { it > DEFAULT_CONNECTION_GENERATION }
+            ?: processor.state.value.highestAppliedReconcileGeneration
+        val request = ReconcileRequest(reason, resolvedGeneration, forceRefresh)
         recentSuccessFor(request)?.let { return it }
 
         while (true) {
@@ -290,6 +290,9 @@ class TimelineRecentMessagesReconciler(
         telemetryReason: String,
         connectionGeneration: Long,
     ): Pair<Int, Int>? {
+        // Capture freshness before starting I/O: an invalidation while fetching
+        // makes this snapshot stale rather than allowing it to overwrite newer data.
+        val freshnessSequence = freshnessState.value.sequence
         val serverMessages = messageApi.listConversationMessages(
             conversationId = conversationId,
             limit = RECONCILE_LIMIT,
@@ -304,6 +307,7 @@ class TimelineRecentMessagesReconciler(
                 telemetryReason = telemetryReason,
                 ack = ack,
                 generation = connectionGeneration.takeIf { it > DEFAULT_CONNECTION_GENERATION },
+                freshnessSequence = freshnessSequence,
             )
         )
         return serverMessages.size to ack.await()
@@ -335,22 +339,26 @@ class TimelineRecentMessagesReconciler(
         event: TimelineGatewayEvent.RecentMessagesSnapshot,
     ) {
         try {
-            var snapshotChanged = false
-            val appended = writeMutex.withLock {
-                val generation = event.generation
-                if (generation != null && generation < highestAppliedGeneration) {
-                    reportStaleSnapshot(event)
-                    0
-                } else {
-                    if (generation != null) highestAppliedGeneration = maxOf(highestAppliedGeneration, generation)
-                    val before = state.value
-                    val result = applyRecentMessagesSnapshotLocked(event.serverMessages)
-                    snapshotChanged = state.value !== before
-                    result
+            val applied = processor.submit(
+                TimelineMutation.RecentMessagesSnapshot(
+                    generation = event.generation ?: DEFAULT_CONNECTION_GENERATION,
+                    freshnessSequence = event.freshnessSequence,
+                    messages = event.serverMessages,
+                ),
+            )
+            when (applied) {
+                is TimelineProcessorAck.Applied -> {
+                    val result = applied.result as? TimelineReductionResult.RecentMessagesApplied
+                        ?: error("recent snapshot acknowledgement did not carry recent result")
+                    if (result.changed) onSnapshotApplied()
+                    event.ack.complete(result.appended)
                 }
+                is TimelineProcessorAck.Rejected -> {
+                    reportStaleSnapshot(event)
+                    event.ack.complete(0)
+                }
+                is TimelineProcessorAck.Failed -> applied.appliedResultOrThrow()
             }
-            if (snapshotChanged) onSnapshotApplied()
-            event.ack.complete(appended)
         } catch (t: Throwable) {
             event.ack.completeExceptionally(t)
             throw t
@@ -362,17 +370,9 @@ class TimelineRecentMessagesReconciler(
             "TimelineSync", "recentReconcile.staleSnapshotDropped",
             "conversationId" to conversationId,
             "snapshotGeneration" to event.generation,
-            "highestAppliedGeneration" to highestAppliedGeneration,
+            "highestAppliedGeneration" to processor.state.value.highestAppliedReconcileGeneration,
             level = Telemetry.Level.WARN,
         )
-    }
-
-    private fun applyRecentMessagesSnapshotLocked(serverMessages: List<LettaMessage>): Int {
-        val mergeResult = state.value.mergeServerMessages(serverMessages)
-        state.value = mergeResult.first
-        val appended = mergeResult.second
-        applyReturnsAndResponsesFromSnapshot(serverMessages)
-        return appended
     }
 
     companion object {

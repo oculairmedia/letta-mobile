@@ -104,17 +104,18 @@ class TimelineSyncLoop(
         )
     }
 
-    private val recentMessagesReconciler = TimelineRecentMessagesReconciler(
+    private val recentMessagesReconciler by lazy {
+        TimelineRecentMessagesReconciler(
         conversationId = conversationId,
         scope = loopScope,
         messageApi = messageApi,
         eventQueue = eventQueue,
         state = _state,
         streamSubscriberActive = _streamSubscriberActive.asStateFlow(),
-        writeMutex = writeMutex,
-        applyReturnsAndResponsesFromSnapshot = { snapshot -> applyReturnsAndResponsesFromSnapshot(snapshot, _state) },
-        onSnapshotApplied = { scheduleSnapshotPersist(immediate = true) },
-    )
+        processor = timelineProcessor,
+            onSnapshotApplied = { scheduleSnapshotPersist(immediate = true) },
+        )
+    }
 
     private val hydrator by lazy {
         TimelineHydrator(
@@ -581,18 +582,21 @@ class TimelineSyncLoop(
     }
 
     private suspend fun applyReconcileAfterSendSnapshot(event: TimelineGatewayEvent.ReconcileAfterSendSnapshot) {
-        val result = applyReconcileAfterSendSnapshot(
-            otid = event.otid,
-            conversationId = conversationId,
-            serverMessages = event.serverMessages,
-            writeMutex = writeMutex,
-            state = _state,
+        val applied = timelineProcessor.submit(
+            TimelineMutation.ReconcileAfterSendSnapshot(event.otid, event.serverMessages),
         )
-        writeMutex.withLock {
-            applyReturnsAndResponsesFromSnapshot(event.serverMessages, _state)
+        when (applied) {
+            is TimelineProcessorAck.Applied -> {
+                val result = applied.result as? TimelineReductionResult.ReconcileAfterSendApplied
+                    ?: error("post-send acknowledgement did not carry reconcile result")
+                if (result.changed) scheduleSnapshotPersist(immediate = true)
+                event.ack.complete(result.result)
+            }
+            is TimelineProcessorAck.Rejected,
+            is TimelineProcessorAck.Failed -> event.ack.completeExceptionally(
+                TimelineProcessorMutationException("post-send reconciliation was not applied: $applied"),
+            )
         }
-        scheduleSnapshotPersist(immediate = true)
-        event.ack.complete(result)
     }
 
     private suspend fun submitReconcileAfterSendSnapshot(otid: String, serverMessages: List<LettaMessage>): ReconcileAfterSendResult {

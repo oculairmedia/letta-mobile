@@ -187,6 +187,25 @@ class TimelineRecentMessagesFlightTest {
     }
 
     @Test
+    fun generationlessExternalReconcileUsesHighestAppliedGeneration() = runTest(UnconfinedTestDispatcher()) {
+        val fixture = ReconcileFixture(backgroundScope)
+
+        assertEquals(Applied(1), fixture.reconciler.reconcileRecentMessages("open", connectionGeneration = 1L))
+        fixture.transport.messageIdProvider = { "external-message" }
+        fixture.transport.contentProvider = { "external hello" }
+        fixture.reconciler.invalidateFreshness()
+
+        assertEquals(
+            Applied(1),
+            fixture.reconciler.reconcileRecentMessages("external-run", forceRefresh = true),
+        )
+        assertEquals(
+            "external-message",
+            (fixture.processor.state.value.timeline.events.last() as TimelineEvent.Confirmed).serverId,
+        )
+    }
+
+    @Test
     fun openFailureReleasesClaimAndAllowsSubsequentRetry() = runTest(UnconfinedTestDispatcher()) {
         val fixture = ReconcileFixture(backgroundScope)
         var shouldFail = true
@@ -213,6 +232,10 @@ class TimelineRecentMessagesFlightTest {
         var snapshotAppliedCount = 0
         private var requestedGeneration = 0L
         private val eventQueue = Channel<TimelineGatewayEvent>(Channel.UNLIMITED)
+        val processor = TimelineProcessor(
+            initialState = TimelineReducerState(Timeline("conv-1")),
+            scope = eventScope,
+        )
         val reconciler = TimelineRecentMessagesReconciler(
             conversationId = "conv-1",
             scope = eventScope,
@@ -220,8 +243,7 @@ class TimelineRecentMessagesFlightTest {
             eventQueue = eventQueue,
             state = MutableStateFlow(Timeline("conv-1")),
             streamSubscriberActive = MutableStateFlow(false),
-            writeMutex = Mutex(),
-            applyReturnsAndResponsesFromSnapshot = {},
+            processor = processor,
             onSnapshotApplied = { snapshotAppliedCount++ },
             nowMillis = nowMillis,
         )
@@ -244,6 +266,7 @@ class TimelineRecentMessagesFlightTest {
         var onListEntered: suspend () -> Unit = {}
         var onGenerationRequested: (Long) -> Unit = {}
         var messageIdProvider: () -> String = { "m-$listCalls" }
+        var contentProvider: () -> String = { "hello" }
 
         override suspend fun sendConversationMessage(
             conversationId: String,
@@ -261,7 +284,7 @@ class TimelineRecentMessagesFlightTest {
             listCalls += 1
             onGenerationRequested(listCalls.toLong())
             onListEntered()
-            return listOf(UserMessage(id = messageIdProvider(), contentRaw = JsonPrimitive("hello")))
+            return listOf(UserMessage(id = messageIdProvider(), contentRaw = JsonPrimitive(contentProvider())))
         }
 
         override suspend fun listAgentMessages(
