@@ -279,9 +279,7 @@ class TimelineProcessorTest {
                 }
             },
         )
-        val active = overflowProcessor.enqueue(
-            TimelineMutation.LocalAppend(PendingSend("active", "active"), instant),
-        )
+        val active = overflowProcessor.enqueue(TimelineMutation.LocalAppend(PendingSend("active", "active"), instant))
         overflowGate.await()
         val buffered = overflowProcessor.enqueue(
             TimelineMutation.LocalAppend(PendingSend("buffered", "buffered"), instant),
@@ -333,10 +331,7 @@ class TimelineProcessorTest {
         assertIs<TimelineProcessorAck.Applied>(held.await())
         assertIs<TimelineProcessorAck.Applied>(queued.await())
         backpressureProcessor.closeAndJoin()
-        assertEquals(
-            listOf("held", "queued", "waiting"),
-            backpressureProcessor.state.value.timeline.events.map { it.otid },
-        )
+        assertEquals(listOf("held", "queued", "waiting"), backpressureProcessor.state.value.timeline.events.map { it.otid })
     }
 
     @Test
