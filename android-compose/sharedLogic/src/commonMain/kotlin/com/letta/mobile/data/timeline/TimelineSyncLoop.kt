@@ -77,6 +77,8 @@ class TimelineSyncLoop(
     private val persistRequests = Channel<SnapshotPersistRequest>(Channel.CONFLATED)
     private val persistMutex = Mutex()
     private val persistJob: Job
+    private val eventProcessorJob: Job
+    private val streamSubscriberJob: Job?
 
     private val pendingToolReturnsByCallId = LinkedHashMap<String, ToolReturnMessage>()
     private val seenStreamMessageLock = SynchronizedObject()
@@ -282,30 +284,75 @@ class TimelineSyncLoop(
         onTurnEnded = ::turnEnded,
     )
 
+    /**
+     * Temporary migration bridge: deferred stream/hydrate/reconcile/cleanup
+     * writers keep using [_state] under [writeMutex]. Before every migrated
+     * local mutation the processor pulls that canonical state, then publishes
+     * its committed timeline and pending-return map back while holding the same
+     * mutex. No legacy write can be overwritten by a stale processor seed.
+     */
+    private val timelineProcessor = TimelineProcessor(
+        initialState = TimelineReducerState(initialTimeline ?: Timeline(conversationId)),
+        scope = loopScope,
+        writeMutex = writeMutex,
+        stateBridge = object : TimelineProcessorStateBridge {
+            override fun synchronizeSeed(processorState: TimelineReducerState): TimelineReducerState =
+                processorState.copy(
+                    timeline = _state.value,
+                    pendingToolReturnsByCallId = pendingToolReturnsByCallId.toTimelinePersistentMap(),
+                )
+
+            override fun publish(state: TimelineReducerState) {
+                _state.value = state.timeline
+                pendingToolReturnsByCallId.clear()
+                pendingToolReturnsByCallId.putAll(state.pendingToolReturnsByCallId)
+            }
+        },
+        effectHandler = { effect ->
+            when (effect) {
+                is TimelineReductionEffect.EmitSyncEvent -> _events.emit(effect.event)
+                is TimelineReductionEffect.Notify -> ingestNotificationDispatcher.dispatch(effect.notification)
+                is TimelineReductionEffect.Send -> outboundSendProcessor.sendQueue.send(effect.pending)
+                is TimelineReductionEffect.PersistPendingLocal -> pendingLocalStore.save(
+                    PendingLocalRecord(
+                        otid = effect.pending.otid,
+                        conversationId = conversationId,
+                        content = effect.pending.content,
+                        attachments = effect.pending.attachments,
+                        sentAt = effect.sentAt,
+                    ),
+                )
+                is TimelineReductionEffect.DeletePendingLocal -> pendingLocalStore.delete(effect.otid)
+                // Cursor-string persistence is a deferred mutation family. The
+                // reducer state already owns liveCursor; its store remains with
+                // the existing reconcile/stream paths in this slice.
+                is TimelineReductionEffect.AdvanceCursor -> Unit
+            }
+        },
+    )
+
     private val stateTransitionHandler = TimelineStateTransitionHandler(
         conversationId = conversationId,
-        state = _state,
-        events = _events,
-        sendQueue = outboundSendProcessor.sendQueue,
-        writeMutex = writeMutex
+        processor = timelineProcessor,
     )
 
     private val externalTransportAppender = TimelineExternalTransportAppender(
         conversationId = conversationId,
         messageApi = messageApi,
         eventQueue = eventQueue,
-        state = _state,
         events = _events,
-        writeMutex = writeMutex,
+        processor = timelineProcessor,
         pendingLocalStore = pendingLocalStore,
         submitReconcileAfterSendSnapshot = ::submitReconcileAfterSendSnapshot
     )
 
     init {
         persistJob = loopScope.launch { runSnapshotPersistence() }
-        loopScope.launch { processEventQueue() }
-        if (startStreamSubscriber) {
+        eventProcessorJob = loopScope.launch { processEventQueue() }
+        streamSubscriberJob = if (startStreamSubscriber) {
             loopScope.launch { runStreamSubscriber() }
+        } else {
+            null
         }
     }
 
@@ -317,12 +364,18 @@ class TimelineSyncLoop(
         persistRequests.close()
         eventQueue.close(CancellationException("TimelineSyncLoop closed"))
         outboundSendProcessor.sendQueue.close(CancellationException("TimelineSyncLoop closed"))
+        timelineProcessor.close()
         loopJob.cancel(CancellationException("TimelineSyncLoop closed"))
     }
 
     suspend fun closeAndJoin() {
         persistRequests.close()
+        eventQueue.close()
+        streamSubscriberJob?.cancel(CancellationException("TimelineSyncLoop draining"))
         withContext(NonCancellable) {
+            streamSubscriberJob?.join()
+            eventProcessorJob.join()
+            timelineProcessor.closeAndJoin()
             persistJob.join()
             flushSnapshotNow(prune = true)
         }
@@ -425,7 +478,9 @@ class TimelineSyncLoop(
     }
 
     suspend fun appendExternalTransportLocal(content: String, otid: String, attachments: List<MessageContentPart.Image> = emptyList()): String {
-        return externalTransportAppender.appendExternalTransportLocal(content, otid, attachments)
+        return externalTransportAppender.appendExternalTransportLocal(
+            TimelineExternalAppendRequest(content, TimelineExternalOtid(otid), attachments),
+        )
     }
 
     suspend fun postHandlerCollapse() {
@@ -455,29 +510,44 @@ class TimelineSyncLoop(
                     }
                     is TimelineGatewayEvent.LocalSendAppend -> {
                         recentMessagesReconciler.invalidateFreshness()
-                        stateTransitionHandler.applyLocalSendAppend(event)
-                        scheduleSnapshotPersist(immediate = true)
+                        try {
+                            stateTransitionHandler.applyLocalSendAppend(event)
+                        } finally {
+                            scheduleSnapshotPersist(immediate = true)
+                        }
                     }
                     is TimelineGatewayEvent.ExternalTransportLocalAppend -> {
                         recentMessagesReconciler.invalidateFreshness()
-                        externalTransportAppender.applyExternalTransportLocalAppend(event)
-                        scheduleSnapshotPersist(immediate = true)
+                        try {
+                            externalTransportAppender.applyExternalTransportLocalAppend(event)
+                        } finally {
+                            scheduleSnapshotPersist(immediate = true)
+                        }
                     }
                     is TimelineGatewayEvent.ReconcileAfterSendSnapshot -> applyReconcileAfterSendSnapshot(event)
                     is TimelineGatewayEvent.RecentMessagesSnapshot -> recentMessagesReconciler.applyRecentMessagesSnapshot(event)
                     is TimelineGatewayEvent.PostHandlerCollapse -> event.ack.complete(Unit)
                     is TimelineGatewayEvent.RetrySend -> {
                         recentMessagesReconciler.invalidateFreshness()
-                        stateTransitionHandler.applyRetrySend(event)
-                        scheduleSnapshotPersist(immediate = true)
+                        try {
+                            stateTransitionHandler.applyRetrySend(event)
+                        } finally {
+                            scheduleSnapshotPersist(immediate = true)
+                        }
                     }
                     is TimelineGatewayEvent.MarkSent -> {
-                        stateTransitionHandler.applyMarkSent(event)
-                        scheduleSnapshotPersist(immediate = true)
+                        try {
+                            stateTransitionHandler.applyMarkSent(event)
+                        } finally {
+                            scheduleSnapshotPersist(immediate = true)
+                        }
                     }
                     is TimelineGatewayEvent.MarkFailed -> {
-                        stateTransitionHandler.applyMarkFailed(event)
-                        scheduleSnapshotPersist(immediate = true)
+                        try {
+                            stateTransitionHandler.applyMarkFailed(event)
+                        } finally {
+                            scheduleSnapshotPersist(immediate = true)
+                        }
                     }
                     is TimelineGatewayEvent.CleanupAbandonedAssistantFragments -> applyCleanupAbandonedAssistantFragments(event)
                 }
@@ -608,15 +678,17 @@ class TimelineSyncLoop(
     }
 
     suspend fun markExternalTransportLocalSent(otid: String) {
-        externalTransportAppender.markExternalTransportLocalSent(otid)
+        externalTransportAppender.markExternalTransportLocalSent(TimelineExternalOtid(otid))
     }
 
     suspend fun markExternalTransportLocalFailed(otid: String) {
-        externalTransportAppender.markExternalTransportLocalFailed(otid)
+        externalTransportAppender.markExternalTransportLocalFailed(TimelineExternalOtid(otid))
     }
 
     suspend fun reconcileExternalTransportSend(agentId: String, externalConversationId: String, otid: String) {
-        externalTransportAppender.reconcileExternalTransportSend(agentId, externalConversationId, otid)
+        externalTransportAppender.reconcileExternalTransportSend(
+            TimelineExternalReconcileRequest(agentId, externalConversationId, TimelineExternalOtid(otid)),
+        )
     }
 
     private suspend fun runStreamSubscriber() {
