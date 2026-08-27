@@ -26,6 +26,7 @@ import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.async
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -225,6 +226,8 @@ class ConversationsViewModel @Inject constructor(
                     agents = displayAgents.toImmutableList(),
                     isRefreshing = false,
                 )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(isRefreshing = false)
             }
@@ -241,6 +244,8 @@ class ConversationsViewModel @Inject constructor(
                     selectedConversation = if (_uiState.value.selectedConversation?.conversation?.id == conversationId) null else _uiState.value.selectedConversation,
                 )
                 conversationRepository.deleteConversation(conversationId, display.conversation.agentId)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 Log.w("ConversationsVM", "Delete failed", e)
                 loadConversations()
@@ -287,6 +292,8 @@ class ConversationsViewModel @Inject constructor(
                         ?.copy(conversation = selectedConversation.conversation.copy(summary = newName))
                         ?: selectedConversation,
                 )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 Log.w("ConversationsVM", "Rename failed", e)
             }
@@ -299,6 +306,8 @@ class ConversationsViewModel @Inject constructor(
                 val forked = conversationRepository.forkConversation(conversationId, agentId)
                 onSuccess(forked.id)
                 loadConversations()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 Log.w("ConversationsVM", "Fork failed", e)
             }
@@ -325,6 +334,8 @@ class ConversationsViewModel @Inject constructor(
                     inspectorError = inspectorResult.exceptionOrNull()?.message,
                     isInspectorLoading = false,
                 )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 Log.w("ConversationsVM", "Admin detail load failed", e)
                 _uiState.value = _uiState.value.copy(
@@ -364,6 +375,8 @@ class ConversationsViewModel @Inject constructor(
                         } else selected
                     },
                 )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 Log.w("ConversationsVM", "Archive toggle failed", e)
             }
@@ -374,6 +387,8 @@ class ConversationsViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 conversationRepository.cancelConversation(display.conversation.id, display.conversation.agentId)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 Log.w("ConversationsVM", "Cancel failed", e)
             }
@@ -385,6 +400,8 @@ class ConversationsViewModel @Inject constructor(
             try {
                 val result = conversationRepository.recompileConversation(display.conversation.id, false, display.conversation.agentId)
                 _uiState.value = _uiState.value.copy(recompilePreview = result)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 Log.w("ConversationsVM", "Recompile failed", e)
             }
@@ -401,6 +418,8 @@ class ConversationsViewModel @Inject constructor(
                     conversations = applyPinnedState(_uiState.value.conversations + conversation.toDisplay()).toImmutableList(),
                     createConversationError = null,
                 )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 Log.e("ConversationsVM", "Create conversation failed for agent ${agentId.value}", e)
                 _uiState.value = _uiState.value.copy(

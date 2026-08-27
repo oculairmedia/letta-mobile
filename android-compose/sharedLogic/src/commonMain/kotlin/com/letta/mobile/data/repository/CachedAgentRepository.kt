@@ -41,6 +41,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
+@Suppress("NoDetachedCoroutineLifecycle")
 fun defaultCachedAgentRepositoryScope(): CoroutineScope =
     CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -199,6 +200,8 @@ open class CachedAgentRepository(
             } else {
                 cache.deleteExcept(fresh.map { it.id.value })
             }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             Telemetry.event("CachedAgentRepository", "Failed to cache agents to Room", "error" to (e.message ?: e.toString()), level = Telemetry.Level.WARN)
         }
