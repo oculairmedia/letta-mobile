@@ -165,7 +165,7 @@ class TimelineMutationParityHarnessTest {
         val owner = owner()
         val first = owner.enqueue(TimelineMutation.StreamFrame(1, assistantOne()))
         val second = owner.enqueue(TimelineMutation.StreamFrame(2, assistantTwo()))
-        owner.close("cancelled")
+        owner.close(TestAckReason.CANCELLED)
         val afterClose = owner.enqueue(TimelineMutation.StreamFrame(3, assistantThree()))
 
         assertEquals(listOf(TestAckOutcome.FAILED, TestAckOutcome.FAILED, TestAckOutcome.FAILED), listOf(first.outcome, second.outcome, afterClose.outcome))

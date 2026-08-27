@@ -13,7 +13,7 @@ internal class TimelineMutationParityOwner(
 
     fun enqueue(mutation: TimelineMutation): TestMutationAck {
         val ack = TestMutationAck()
-        if (closed) ack.fail("owner closed") else queued.addLast(QueuedMutation(mutation, ack))
+        if (closed) ack.fail(TestAckReason.OWNER_CLOSED) else queued.addLast(QueuedMutation(mutation, ack))
         return ack
     }
 
@@ -36,7 +36,7 @@ internal class TimelineMutationParityOwner(
         while (queued.isNotEmpty()) drainOne()
     }
 
-    fun close(reason: String = "owner closed") {
+    fun close(reason: TestAckReason = TestAckReason.OWNER_CLOSED) {
         closed = true
         while (queued.isNotEmpty()) queued.removeFirst().ack.fail(reason)
     }
@@ -59,10 +59,10 @@ internal class TimelineMutationParityOwner(
     ).also(journal::add)
 }
 
-private fun rejectionReason(mutation: TimelineMutation, state: TimelineReducerState): String? = when {
-    mutation.sequence <= state.lastAppliedMutationSequence -> "stale sequence"
-    mutation is TimelineMutation.HydrateSnapshot && mutation.generation < state.hydrateGeneration -> "stale generation"
-    mutation is TimelineMutation.ReconcileSnapshot && mutation.generation < state.highestRequestedReconcileGeneration -> "stale generation"
+private fun rejectionReason(mutation: TimelineMutation, state: TimelineReducerState): TestAckReason? = when {
+    mutation.sequence <= state.lastAppliedMutationSequence -> TestAckReason.STALE_SEQUENCE
+    mutation is TimelineMutation.HydrateSnapshot && mutation.generation < state.hydrateGeneration -> TestAckReason.STALE_GENERATION
+    mutation is TimelineMutation.ReconcileSnapshot && mutation.generation < state.highestRequestedReconcileGeneration -> TestAckReason.STALE_GENERATION
     else -> null
 }
 
@@ -158,16 +158,17 @@ internal data class TimelineMutationJournalEntry(
 }
 
 internal enum class TestAckOutcome { PENDING, COMPLETED, REJECTED, FAILED }
+internal enum class TestAckReason { OWNER_CLOSED, CANCELLED, STALE_SEQUENCE, STALE_GENERATION }
 
 internal class TestMutationAck {
     var outcome: TestAckOutcome = TestAckOutcome.PENDING
         private set
-    var reason: String? = null
+    var reason: TestAckReason? = null
         private set
 
     fun complete() { outcome = TestAckOutcome.COMPLETED }
-    fun reject(value: String) { outcome = TestAckOutcome.REJECTED; reason = value }
-    fun fail(value: String) { outcome = TestAckOutcome.FAILED; reason = value }
+    fun reject(value: TestAckReason) { outcome = TestAckOutcome.REJECTED; reason = value }
+    fun fail(value: TestAckReason) { outcome = TestAckOutcome.FAILED; reason = value }
 }
 
 private data class QueuedMutation(val mutation: TimelineMutation, val ack: TestMutationAck)
