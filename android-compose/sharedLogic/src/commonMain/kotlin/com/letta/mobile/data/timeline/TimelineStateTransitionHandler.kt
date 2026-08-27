@@ -12,7 +12,7 @@ class TimelineStateTransitionHandler(
     private val processor: TimelineProcessor,
 ) {
     suspend fun applyLocalSendAppend(event: TimelineGatewayEvent.LocalSendAppend) {
-        val result = processor.submit(
+        val result = processor.submitWithBackpressure(
             TimelineMutation.LocalAppend(event.pending, event.sentAt, TimelineLocalAppendMode.SEND),
         ).appliedResultOrThrow()
         Telemetry.event(
@@ -26,17 +26,17 @@ class TimelineStateTransitionHandler(
     }
 
     suspend fun applyRetrySend(event: TimelineGatewayEvent.RetrySend) {
-        processor.submit(TimelineMutation.RetryLocal(event.otid)).appliedResultOrThrow()
+        processor.submitWithBackpressure(TimelineMutation.RetryLocal(event.otid)).appliedResultOrThrow()
         event.ack.complete(Unit)
     }
 
     suspend fun applyMarkSent(event: TimelineGatewayEvent.MarkSent) {
-        processor.submit(TimelineMutation.MarkLocalSent(event.otid)).appliedResultOrThrow()
+        processor.submitWithBackpressure(TimelineMutation.MarkLocalSent(event.otid)).appliedResultOrThrow()
         event.ack.complete(Unit)
     }
 
     suspend fun applyMarkFailed(event: TimelineGatewayEvent.MarkFailed) {
-        processor.submit(TimelineMutation.MarkLocalFailed(event.otid)).appliedResultOrThrow()
+        processor.submitWithBackpressure(TimelineMutation.MarkLocalFailed(event.otid)).appliedResultOrThrow()
         event.ack.complete(Unit)
     }
 
@@ -63,7 +63,7 @@ class TimelineStateTransitionHandler(
         attachments: PersistentList<MessageContentPart.Image>,
         sentAt: TimelineInstant,
     ): Boolean {
-        val ack = processor.submit(
+        val ack = processor.submitWithBackpressure(
             TimelineMutation.LocalAppend(
                 pending = PendingSend(otid, content, attachments),
                 sentAt = sentAt,
@@ -90,7 +90,7 @@ class TimelineStateTransitionHandler(
      * A no-op when the processor is closed or no Local event exists.
      */
     suspend fun markOptimisticLocalFailedSync(otid: String) {
-        val ack = processor.submit(TimelineMutation.MarkLocalFailed(otid))
+        val ack = processor.submitWithBackpressure(TimelineMutation.MarkLocalFailed(otid))
         if (ack.isClosedRejection()) return
         ack.appliedResultOrThrow()
         Telemetry.event(
@@ -106,7 +106,7 @@ class TimelineStateTransitionHandler(
      * for serialized processing and no-ops after normal processor closure.
      */
     suspend fun markOptimisticLocalSentSync(otid: String) {
-        val ack = processor.submit(TimelineMutation.MarkLocalSent(otid))
+        val ack = processor.submitWithBackpressure(TimelineMutation.MarkLocalSent(otid))
         if (ack.isClosedRejection()) return
         ack.appliedResultOrThrow()
     }

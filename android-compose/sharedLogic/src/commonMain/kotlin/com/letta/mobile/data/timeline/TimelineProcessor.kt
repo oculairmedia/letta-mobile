@@ -143,6 +143,13 @@ class TimelineProcessor(
 
     suspend fun submit(mutation: TimelineMutation): TimelineProcessorAck = enqueue(mutation).await()
 
+    suspend fun submitWithBackpressure(mutation: TimelineMutation): TimelineProcessorAck {
+        val acknowledgement = CompletableDeferred<TimelineProcessorAck>()
+        if (!accepting.value) return terminalAck()
+        requests.send(ProcessorRequest(mutation, acknowledgement))
+        return acknowledgement.await()
+    }
+
     /** Stop accepting new work and drain every request already accepted. */
     fun close() {
         if (accepting.compareAndSet(expect = true, update = false)) {
