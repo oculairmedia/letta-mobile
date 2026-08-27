@@ -13,49 +13,53 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
 /** Complete raw semantic encoding. Never place this value in failure diagnostics. */
-internal fun TimelineReducerState.semanticFingerprint(): String = semanticEncoding("TimelineReducerState") {
-    timeline("timeline", timeline)
-    map("pendingToolReturnsByCallId", pendingToolReturnsByCallId) { lettaMessage(it) }
-    scalar("lifecycleEpoch", lifecycleEpoch)
-    scalar("lastAppliedMutationSequence", lastAppliedMutationSequence)
-    scalar("hydrateGeneration", hydrateGeneration)
-    scalar("highestRequestedReconcileGeneration", highestRequestedReconcileGeneration)
-    scalar("highestAppliedReconcileGeneration", highestAppliedReconcileGeneration)
-    scalar("freshnessSequence", freshnessSequence)
+internal fun TimelineReducerState.semanticFingerprint(): String = semanticEncoding(label("TimelineReducerState")) {
+    timeline(label("timeline"), timeline)
+    map(label("pendingToolReturnsByCallId"), pendingToolReturnsByCallId) { lettaMessage(it) }
+    scalar(label("lifecycleEpoch"), lifecycleEpoch)
+    scalar(label("lastAppliedMutationSequence"), lastAppliedMutationSequence)
+    scalar(label("hydrateGeneration"), hydrateGeneration)
+    scalar(label("highestRequestedReconcileGeneration"), highestRequestedReconcileGeneration)
+    scalar(label("highestAppliedReconcileGeneration"), highestAppliedReconcileGeneration)
+    scalar(label("freshnessSequence"), freshnessSequence)
 }
 
 /** Complete raw effect encoding used for exact order assertions. */
-internal fun TimelineReductionEffect.semanticFingerprint(): String = semanticEncoding("TimelineReductionEffect") {
+internal fun TimelineReductionEffect.semanticFingerprint(): String = semanticEncoding(label("TimelineReductionEffect")) {
     when (val effect = this@semanticFingerprint) {
-        is TimelineReductionEffect.EmitSyncEvent -> objectValue("EmitSyncEvent") {
-            syncEvent("event", effect.event)
+        is TimelineReductionEffect.EmitSyncEvent -> objectValue(label("EmitSyncEvent")) {
+            syncEvent(label("event"), effect.event)
         }
-        is TimelineReductionEffect.Notify -> objectValue("Notify") {
-            scalar("serverId", effect.notification.serverId)
-            scalar("messageType", effect.notification.messageType)
-            nullableScalar("contentPreview", effect.notification.contentPreview)
+        is TimelineReductionEffect.Notify -> objectValue(label("Notify")) {
+            scalar(label("serverId"), effect.notification.serverId)
+            scalar(label("messageType"), effect.notification.messageType)
+            nullableScalar(label("contentPreview"), effect.notification.contentPreview)
         }
-        is TimelineReductionEffect.Send -> objectValue("Send") {
-            pending("pending", effect.pending)
+        is TimelineReductionEffect.Send -> objectValue(label("Send")) {
+            pending(label("pending"), effect.pending)
         }
-        is TimelineReductionEffect.PersistPendingLocal -> objectValue("PersistPendingLocal") {
-            pending("pending", effect.pending)
-            scalar("sentAt", effect.sentAt.toString())
+        is TimelineReductionEffect.PersistPendingLocal -> objectValue(label("PersistPendingLocal")) {
+            pending(label("pending"), effect.pending)
+            scalar(label("sentAt"), effect.sentAt.toString())
         }
-        is TimelineReductionEffect.DeletePendingLocal -> objectValue("DeletePendingLocal") {
-            scalar("otid", effect.otid)
+        is TimelineReductionEffect.DeletePendingLocal -> objectValue(label("DeletePendingLocal")) {
+            scalar(label("otid"), effect.otid)
         }
-        is TimelineReductionEffect.AdvanceCursor -> objectValue("AdvanceCursor") {
-            scalar("cursor", effect.cursor)
+        is TimelineReductionEffect.AdvanceCursor -> objectValue(label("AdvanceCursor")) {
+            scalar(label("cursor"), effect.cursor)
         }
     }
 }
 
 internal fun semanticLengthPrefixed(value: String): String = "${value.length}:$value"
 
-private fun semanticEncoding(root: String, block: SemanticEncoder.() -> Unit): String =
+private data class SemanticLabel(val value: String)
+
+private fun label(value: String) = SemanticLabel(value)
+
+private fun semanticEncoding(root: SemanticLabel, block: SemanticEncoder.() -> Unit): String =
     SemanticEncoder().apply {
-        token(root)
+        token(root.value)
         token("{")
         block()
         token("}")
@@ -68,13 +72,13 @@ private class SemanticEncoder {
         output.append(semanticLengthPrefixed(value))
     }
 
-    fun scalar(name: String, value: Any) {
-        token(name)
+    fun <T> scalar(name: SemanticLabel, value: T) {
+        token(name.value)
         token(value.toString())
     }
 
-    fun nullableScalar(name: String, value: Any?) {
-        token(name)
+    fun <T> nullableScalar(name: SemanticLabel, value: T?) {
+        token(name.value)
         if (value == null) {
             token("null")
         } else {
@@ -83,15 +87,15 @@ private class SemanticEncoder {
         }
     }
 
-    fun objectValue(name: String, block: SemanticEncoder.() -> Unit) {
-        token(name)
+    fun objectValue(name: SemanticLabel, block: SemanticEncoder.() -> Unit) {
+        token(name.value)
         token("{")
         block()
         token("}")
     }
 
-    fun <T> list(name: String, values: List<T>, encode: SemanticEncoder.(T) -> Unit) {
-        token(name)
+    fun <T> list(name: SemanticLabel, values: List<T>, encode: SemanticEncoder.(T) -> Unit) {
+        token(name.value)
         token(values.size.toString())
         values.forEach { value ->
             token("[")
@@ -100,33 +104,34 @@ private class SemanticEncoder {
         }
     }
 
-    fun <T> nullableList(name: String, values: List<T>?, encode: SemanticEncoder.(T) -> Unit) {
+    fun <T> nullableList(name: SemanticLabel, values: List<T>?, encode: SemanticEncoder.(T) -> Unit) {
         if (values == null) {
-            nullableScalar(name, null)
+            token(name.value)
+            token("null")
         } else {
-            token(name)
+            token(name.value)
             token("value")
-            list("items", values, encode)
+            list(label("items"), values, encode)
         }
     }
 
-    fun <V> map(name: String, values: Map<String, V>, encode: SemanticEncoder.(V) -> Unit) {
-        token(name)
+    fun <V> map(name: SemanticLabel, values: Map<String, V>, encode: SemanticEncoder.(V) -> Unit) {
+        token(name.value)
         token(values.size.toString())
         values.entries.sortedBy { it.key }.forEach { (key, value) ->
             token("entry")
-            scalar("key", key)
+            scalar(label("key"), key)
             encode(value)
         }
     }
 
-    fun timeline(name: String, value: Timeline) = objectValue(name) {
-        scalar("conversationId", value.conversationId)
-        list("events", value.events) { timelineEvent(it) }
-        nullableScalar("liveCursor", value.liveCursor)
-        nullableScalar("backfillCursor", value.backfillCursor)
+    fun timeline(name: SemanticLabel, value: Timeline) = objectValue(name) {
+        scalar(label("conversationId"), value.conversationId)
+        list(label("events"), value.events) { timelineEvent(it) }
+        nullableScalar(label("liveCursor"), value.liveCursor)
+        nullableScalar(label("backfillCursor"), value.backfillCursor)
         list(
-            "abandonedAssistantFragmentSuppressions",
+            label("abandonedAssistantFragmentSuppressions"),
             value.abandonedAssistantFragmentSuppressions.sortedWith(
                 compareBy(
                     { it.serverId ?: "" },
@@ -135,134 +140,134 @@ private class SemanticEncoder {
                 ),
             ),
         ) { suppression ->
-            nullableScalar("serverId", suppression.serverId)
-            nullableScalar("runId", suppression.runId)
-            scalar("contentFingerprint", suppression.contentFingerprint)
+            nullableScalar(label("serverId"), suppression.serverId)
+            nullableScalar(label("runId"), suppression.runId)
+            scalar(label("contentFingerprint"), suppression.contentFingerprint)
         }
-        scalar("stablePrefixVersion", value.stablePrefixVersion)
-        scalar("visibleRevision", value.visibleRevision)
-        scalar("releasedOlderCount", value.releasedOlderCount)
-        list("residentOtids", value.residentOtids.sorted()) { scalar("otid", it) }
-        scalar("invariantsKnown", value.invariantsKnown)
+        scalar(label("stablePrefixVersion"), value.stablePrefixVersion)
+        scalar(label("visibleRevision"), value.visibleRevision)
+        scalar(label("releasedOlderCount"), value.releasedOlderCount)
+        list(label("residentOtids"), value.residentOtids.sorted()) { scalar(label("otid"), it) }
+        scalar(label("invariantsKnown"), value.invariantsKnown)
     }
 
     fun timelineEvent(value: TimelineEvent) {
         when (value) {
-            is TimelineEvent.Local -> objectValue("Local") {
-                scalar("position", value.position)
-                scalar("otid", value.otid)
-                scalar("content", value.content)
-                scalar("role", value.role)
-                scalar("sentAt", value.sentAt.toString())
-                scalar("deliveryState", value.deliveryState)
-                attachments("attachments", value.attachments)
-                scalar("source", value.source)
-                scalar("messageType", value.messageType)
-                toolCalls("toolCalls", value.toolCalls)
-                nullableScalar("approvalRequestId", value.approvalRequestId)
-                scalar("approvalDecided", value.approvalDecided)
-                nullableScalar("toolReturnContent", value.toolReturnContent)
-                scalar("toolReturnIsError", value.toolReturnIsError)
-                map("toolReturnContentByCallId", value.toolReturnContentByCallId) { scalar("value", it) }
-                map("toolReturnIsErrorByCallId", value.toolReturnIsErrorByCallId) { scalar("value", it) }
-                map("toolStartedAtByCallId", value.toolStartedAtByCallId) { scalar("value", it.toString()) }
-                map("toolCompletedAtByCallId", value.toolCompletedAtByCallId) { scalar("value", it.toString()) }
-                map("toolBatchIdByCallId", value.toolBatchIdByCallId) { scalar("value", it) }
-                nullableScalar("reasoningContent", value.reasoningContent)
+            is TimelineEvent.Local -> objectValue(label("Local")) {
+                scalar(label("position"), value.position)
+                scalar(label("otid"), value.otid)
+                scalar(label("content"), value.content)
+                scalar(label("role"), value.role)
+                scalar(label("sentAt"), value.sentAt.toString())
+                scalar(label("deliveryState"), value.deliveryState)
+                attachments(label("attachments"), value.attachments)
+                scalar(label("source"), value.source)
+                scalar(label("messageType"), value.messageType)
+                toolCalls(label("toolCalls"), value.toolCalls)
+                nullableScalar(label("approvalRequestId"), value.approvalRequestId)
+                scalar(label("approvalDecided"), value.approvalDecided)
+                nullableScalar(label("toolReturnContent"), value.toolReturnContent)
+                scalar(label("toolReturnIsError"), value.toolReturnIsError)
+                map(label("toolReturnContentByCallId"), value.toolReturnContentByCallId) { scalar(label("value"), it) }
+                map(label("toolReturnIsErrorByCallId"), value.toolReturnIsErrorByCallId) { scalar(label("value"), it) }
+                map(label("toolStartedAtByCallId"), value.toolStartedAtByCallId) { scalar(label("value"), it.toString()) }
+                map(label("toolCompletedAtByCallId"), value.toolCompletedAtByCallId) { scalar(label("value"), it.toString()) }
+                map(label("toolBatchIdByCallId"), value.toolBatchIdByCallId) { scalar(label("value"), it) }
+                nullableScalar(label("reasoningContent"), value.reasoningContent)
             }
-            is TimelineEvent.Confirmed -> objectValue("Confirmed") {
-                scalar("position", value.position)
-                scalar("otid", value.otid)
-                scalar("content", value.content)
-                scalar("serverId", value.serverId)
-                scalar("messageType", value.messageType)
-                scalar("date", value.date.toString())
-                nullableScalar("runId", value.runId)
-                nullableScalar("stepId", value.stepId)
-                nullableScalar("agentId", value.agentId)
-                attachments("attachments", value.attachments)
-                toolCalls("toolCalls", value.toolCalls)
-                nullableScalar("approvalRequestId", value.approvalRequestId)
-                scalar("approvalDecided", value.approvalDecided)
-                nullableScalar("approvalDecision", value.approvalDecision)
-                nullableScalar("toolReturnContent", value.toolReturnContent)
-                scalar("toolReturnIsError", value.toolReturnIsError)
-                map("toolReturnContentByCallId", value.toolReturnContentByCallId) { scalar("value", it) }
-                map("toolReturnIsErrorByCallId", value.toolReturnIsErrorByCallId) { scalar("value", it) }
-                map("toolReturnTruncationByCallId", value.toolReturnTruncationByCallId) {
-                    scalar("messageId", it.messageId)
-                    scalar("byteLen", it.byteLen)
+            is TimelineEvent.Confirmed -> objectValue(label("Confirmed")) {
+                scalar(label("position"), value.position)
+                scalar(label("otid"), value.otid)
+                scalar(label("content"), value.content)
+                scalar(label("serverId"), value.serverId)
+                scalar(label("messageType"), value.messageType)
+                scalar(label("date"), value.date.toString())
+                nullableScalar(label("runId"), value.runId)
+                nullableScalar(label("stepId"), value.stepId)
+                nullableScalar(label("agentId"), value.agentId)
+                attachments(label("attachments"), value.attachments)
+                toolCalls(label("toolCalls"), value.toolCalls)
+                nullableScalar(label("approvalRequestId"), value.approvalRequestId)
+                scalar(label("approvalDecided"), value.approvalDecided)
+                nullableScalar(label("approvalDecision"), value.approvalDecision)
+                nullableScalar(label("toolReturnContent"), value.toolReturnContent)
+                scalar(label("toolReturnIsError"), value.toolReturnIsError)
+                map(label("toolReturnContentByCallId"), value.toolReturnContentByCallId) { scalar(label("value"), it) }
+                map(label("toolReturnIsErrorByCallId"), value.toolReturnIsErrorByCallId) { scalar(label("value"), it) }
+                map(label("toolReturnTruncationByCallId"), value.toolReturnTruncationByCallId) {
+                    scalar(label("messageId"), it.messageId)
+                    scalar(label("byteLen"), it.byteLen)
                 }
-                scalar("source", value.source)
-                nullableScalar("seqId", value.seqId)
+                scalar(label("source"), value.source)
+                nullableScalar(label("seqId"), value.seqId)
             }
         }
     }
 
-    fun pending(name: String, value: PendingSend) = objectValue(name) {
-        scalar("otid", value.otid)
-        scalar("content", value.content)
-        attachments("attachments", value.attachments)
+    fun pending(name: SemanticLabel, value: PendingSend) = objectValue(name) {
+        scalar(label("otid"), value.otid)
+        scalar(label("content"), value.content)
+        attachments(label("attachments"), value.attachments)
     }
 
-    fun attachments(name: String, values: List<MessageContentPart.Image>) = list(name, values) {
-        scalar("mediaType", it.mediaType)
-        scalar("base64", it.base64)
+    fun attachments(name: SemanticLabel, values: List<MessageContentPart.Image>) = list(name, values) {
+        scalar(label("mediaType"), it.mediaType)
+        scalar(label("base64"), it.base64)
     }
 
-    fun toolCalls(name: String, values: List<ToolCall>) = list(name, values) {
-        nullableScalar("id", it.id)
-        nullableScalar("toolCallId", it.toolCallId)
-        nullableScalar("name", it.name)
-        nullableScalar("arguments", it.arguments)
-        scalar("type", it.type)
+    fun toolCalls(name: SemanticLabel, values: List<ToolCall>) = list(name, values) {
+        nullableScalar(label("id"), it.id)
+        nullableScalar(label("toolCallId"), it.toolCallId)
+        nullableScalar(label("name"), it.name)
+        nullableScalar(label("arguments"), it.arguments)
+        scalar(label("type"), it.type)
     }
 
     fun lettaMessage(value: LettaMessage) {
         // Serialization includes every declared field for every LettaMessage
         // subtype. Canonical JSON key ordering removes map insertion-order noise.
         val raw = fingerprintJson.encodeToString(LettaMessage.serializer(), value)
-        scalar("message", canonicalJson(fingerprintJson.parseToJsonElement(raw)))
+        scalar(label("message"), canonicalJson(fingerprintJson.parseToJsonElement(raw)))
         if (value is ToolReturnMessage) {
             // Include the derived normalized return as semantic state too; its
             // fields can differ even when legacy raw shapes normalize similarly.
-            objectValue("normalizedToolReturn") {
-                scalar("toolCallId", value.toolReturn.toolCallId)
-                scalar("status", value.toolReturn.status)
-                nullableScalar("funcResponse", value.toolReturn.funcResponse)
-                nullableList("stdout", value.toolReturn.stdout) { scalar("line", it) }
-                nullableList("stderr", value.toolReturn.stderr) { scalar("line", it) }
+            objectValue(label("normalizedToolReturn")) {
+                scalar(label("toolCallId"), value.toolReturn.toolCallId)
+                scalar(label("status"), value.toolReturn.status)
+                nullableScalar(label("funcResponse"), value.toolReturn.funcResponse)
+                nullableList(label("stdout"), value.toolReturn.stdout) { scalar(label("line"), it) }
+                nullableList(label("stderr"), value.toolReturn.stderr) { scalar(label("line"), it) }
             }
         }
     }
 
-    fun syncEvent(name: String, value: TimelineSyncEvent) = objectValue(name) {
+    fun syncEvent(name: SemanticLabel, value: TimelineSyncEvent) = objectValue(name) {
         when (value) {
-            is TimelineSyncEvent.Hydrated -> objectValue("Hydrated") { scalar("messageCount", value.messageCount) }
-            is TimelineSyncEvent.LocalAppended -> objectValue("LocalAppended") { scalar("otid", value.otid) }
-            is TimelineSyncEvent.LocalConfirmed -> objectValue("LocalConfirmed") {
-                scalar("otid", value.otid)
-                scalar("serverId", value.serverId)
+            is TimelineSyncEvent.Hydrated -> objectValue(label("Hydrated")) { scalar(label("messageCount"), value.messageCount) }
+            is TimelineSyncEvent.LocalAppended -> objectValue(label("LocalAppended")) { scalar(label("otid"), value.otid) }
+            is TimelineSyncEvent.LocalConfirmed -> objectValue(label("LocalConfirmed")) {
+                scalar(label("otid"), value.otid)
+                scalar(label("serverId"), value.serverId)
             }
-            is TimelineSyncEvent.ServerEvent -> objectValue("ServerEvent") { lettaMessage(value.message) }
-            is TimelineSyncEvent.StreamError -> objectValue("StreamError") {
-                scalar("type", value.type)
-                scalar("message", value.message)
+            is TimelineSyncEvent.ServerEvent -> objectValue(label("ServerEvent")) { lettaMessage(value.message) }
+            is TimelineSyncEvent.StreamError -> objectValue(label("StreamError")) {
+                scalar(label("type"), value.type)
+                scalar(label("message"), value.message)
             }
-            is TimelineSyncEvent.StreamEventIngested -> objectValue("StreamEventIngested") {
-                scalar("serverId", value.serverId)
-                nullableScalar("messageType", value.messageType)
+            is TimelineSyncEvent.StreamEventIngested -> objectValue(label("StreamEventIngested")) {
+                scalar(label("serverId"), value.serverId)
+                nullableScalar(label("messageType"), value.messageType)
             }
-            is TimelineSyncEvent.OrphanAssistantFragmentsCleaned -> objectValue("OrphanAssistantFragmentsCleaned") {
-                scalar("runId", value.runId)
-                nullableScalar("turnId", value.turnId)
-                scalar("count", value.count)
-                scalar("reason", value.reason)
+            is TimelineSyncEvent.OrphanAssistantFragmentsCleaned -> objectValue(label("OrphanAssistantFragmentsCleaned")) {
+                scalar(label("runId"), value.runId)
+                nullableScalar(label("turnId"), value.turnId)
+                scalar(label("count"), value.count)
+                scalar(label("reason"), value.reason)
             }
             TimelineSyncEvent.StreamSubscriberOpened -> token("StreamSubscriberOpened")
             TimelineSyncEvent.StreamSubscriberClosed -> token("StreamSubscriberClosed")
-            is TimelineSyncEvent.ReconcileError -> objectValue("ReconcileError") { scalar("message", value.message) }
-            is TimelineSyncEvent.HydrateFailed -> objectValue("HydrateFailed") { scalar("message", value.message) }
+            is TimelineSyncEvent.ReconcileError -> objectValue(label("ReconcileError")) { scalar(label("message"), value.message) }
+            is TimelineSyncEvent.HydrateFailed -> objectValue(label("HydrateFailed")) { scalar(label("message"), value.message) }
         }
     }
 

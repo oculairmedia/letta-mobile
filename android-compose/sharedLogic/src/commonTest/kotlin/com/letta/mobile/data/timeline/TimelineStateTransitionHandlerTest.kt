@@ -2,6 +2,7 @@ package com.letta.mobile.data.timeline
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
@@ -10,7 +11,6 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 
 class TimelineStateTransitionHandlerTest {
@@ -107,7 +107,7 @@ class TimelineStateTransitionHandlerTest {
     }
 
     @Test
-    fun synchronousLifecycleTreatsNormalProcessorClosureAsNoOp() = runTest {
+    fun synchronousLifecycleCallsTreatClosedProcessorAsNormalShutdown() = runTest {
         val local = TimelineEvent.Local(
             1.0,
             "otid",
@@ -117,11 +117,9 @@ class TimelineStateTransitionHandlerTest {
             DeliveryState.SENDING,
         )
         val harness = harness(Timeline("c1", listOf(local).toTimelinePersistentList()), backgroundScope)
-        harness.processor.close()
-        runCurrent()
+        harness.processor.closeAndJoin()
 
-        assertEquals(
-            false,
+        assertFalse(
             harness.handler.appendOptimisticLocalSync(
                 otid = "closed",
                 content = "ignored",
@@ -160,7 +158,12 @@ class TimelineStateTransitionHandlerTest {
                 }
             },
         )
-        return HandlerHarness(state, sendQueue, TimelineStateTransitionHandler("c1", processor), processor)
+        return HandlerHarness(
+            state = state,
+            sendQueue = sendQueue,
+            handler = TimelineStateTransitionHandler("c1", processor),
+            processor = processor,
+        )
     }
 
     private data class HandlerHarness(

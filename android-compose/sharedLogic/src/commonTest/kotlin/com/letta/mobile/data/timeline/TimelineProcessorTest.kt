@@ -11,6 +11,8 @@ import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -70,6 +72,20 @@ class TimelineProcessorTest {
         assertIs<TimelineReductionResult.NoChange>(assertIs<TimelineProcessorAck.Applied>(markUnknown).result)
         assertEquals(3L, processor.state.value.lastAppliedMutationSequence)
         assertEquals("first", processor.state.value.timeline.events.single().content)
+    }
+
+    @Test
+    fun streamFramePreservesAgentScopeThroughProcessorReducer() = runTest {
+        val processor = processor(backgroundScope)
+        processor.submit(
+            TimelineMutation.StreamFrame(
+                message = UserMessage("server", JsonPrimitive("body")),
+                agentId = "agent-scope",
+            ),
+        ).appliedResultOrThrow()
+
+        val confirmed = assertIs<TimelineEvent.Confirmed>(processor.state.value.timeline.events.single())
+        assertEquals("agent-scope", confirmed.agentId)
     }
 
     @Test
@@ -246,6 +262,142 @@ class TimelineProcessorTest {
         assertEquals("client", local.otid)
         assertEquals(persistentListOf(image), local.attachments)
         assertEquals(canonical, processor.state.value.timeline)
+    }
+
+    @Test
+    fun boundedMailboxRejectsOverflowWithoutSuspendingProducer() = runTest {
+        val effectEntered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val processor = TimelineProcessor(
+            initialState = TimelineReducerState(Timeline("conversation")),
+            scope = backgroundScope,
+            mailboxCapacity = 1,
+            effectHandler = { effect ->
+                if (effect is TimelineReductionEffect.Send && effect.pending.otid == "active") {
+                    effectEntered.complete(Unit)
+                    release.await()
+                }
+            },
+        )
+        val active = processor.enqueue(TimelineMutation.LocalAppend(PendingSend("active", "active"), instant))
+        effectEntered.await()
+        val buffered = processor.enqueue(TimelineMutation.LocalAppend(PendingSend("buffered", "buffered"), instant))
+
+        val overflow = assertIs<TimelineProcessorAck.Rejected>(
+            processor.enqueue(TimelineMutation.LocalAppend(PendingSend("overflow", "overflow"), instant)).await(),
+        )
+        assertEquals(TimelineProcessorRejectionReason.MailboxFull(1), overflow.reason)
+        assertFalse(active.isCompleted)
+        assertFalse(buffered.isCompleted)
+
+        release.complete(Unit)
+        assertIs<TimelineProcessorAck.Applied>(active.await())
+        assertIs<TimelineProcessorAck.Applied>(buffered.await())
+        assertEquals(listOf("active", "buffered"), processor.state.value.timeline.events.map { it.otid })
+    }
+
+    @Test
+    fun concurrentProducersAreLinearizedExactlyOnceInAcknowledgedOrder() = runTest {
+        val processor = TimelineProcessor(
+            initialState = TimelineReducerState(Timeline("conversation")),
+            scope = backgroundScope,
+            mailboxCapacity = 32,
+        )
+        val submissions = (0 until 24).map { index ->
+            async {
+                val otid = "producer-$index"
+                otid to assertIs<TimelineProcessorAck.Applied>(
+                    processor.submit(TimelineMutation.LocalAppend(PendingSend(otid, otid), instant)),
+                )
+            }
+        }.awaitAll()
+
+        val acknowledgedOrder = submissions.sortedBy { it.second.sequence }.map { it.first }
+        val stateOrder = processor.state.value.timeline.events.map { it.otid }
+        assertEquals(acknowledgedOrder, stateOrder)
+        assertEquals(24, stateOrder.toSet().size)
+        assertEquals((1L..24L).toList(), submissions.map { it.second.sequence }.sorted())
+    }
+
+    @Test
+    fun closeBoundaryGivesEverySubmissionOneTerminalOutcome() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val processor = TimelineProcessor(
+            initialState = TimelineReducerState(Timeline("conversation")),
+            scope = backgroundScope,
+            mailboxCapacity = 8,
+            effectHandler = { effect ->
+                if (effect is TimelineReductionEffect.Send && effect.pending.otid == "accepted") gate.await()
+            },
+        )
+        val accepted = processor.enqueue(
+            TimelineMutation.LocalAppend(PendingSend("accepted", "accepted"), instant),
+        )
+        runCurrent()
+
+        processor.close()
+        val rejected = (0 until 8).map { index ->
+            processor.enqueue(TimelineMutation.MarkLocalFailed("after-close-$index"))
+        }
+        gate.complete(Unit)
+        processor.closeAndJoin()
+
+        assertIs<TimelineProcessorAck.Applied>(accepted.await())
+        rejected.forEach { deferred ->
+            assertEquals(
+                TimelineProcessorRejectionReason.Closed,
+                assertIs<TimelineProcessorAck.Rejected>(deferred.await()).reason,
+            )
+        }
+        assertEquals(listOf("accepted"), processor.state.value.timeline.events.map { it.otid })
+    }
+
+    @Test
+    fun failedMutationCanBeReplayedAfterRestartFromLastCommittedState() = runTest {
+        var failReduction = true
+        val first = TimelineProcessor(
+            initialState = TimelineReducerState(Timeline("conversation")),
+            scope = backgroundScope,
+            reducer = { state, mutation ->
+                if (failReduction) error("synthetic reducer failure")
+                reduceProductionMutation(state, mutation)
+            },
+        )
+        val mutation = TimelineMutation.LocalAppend(PendingSend("replay", "replay"), instant)
+        assertIs<TimelineProcessorAck.Failed>(first.submit(mutation))
+        assertEquals(0L, first.state.value.lastAppliedMutationSequence)
+        assertTrue(first.state.value.timeline.events.isEmpty())
+        first.closeAndJoin()
+
+        failReduction = false
+        val restarted = TimelineProcessor(
+            initialState = first.state.value,
+            scope = backgroundScope,
+            reducer = { state, replayed -> reduceProductionMutation(state, replayed) },
+        )
+        val applied = assertIs<TimelineProcessorAck.Applied>(restarted.submit(mutation))
+        assertEquals(1L, applied.sequence)
+        assertEquals(listOf("replay"), restarted.state.value.timeline.events.map { it.otid })
+    }
+
+    @Test
+    fun publicationFailureDoesNotExposeUncommittedProcessorState() = runTest {
+        val processor = TimelineProcessor(
+            initialState = TimelineReducerState(Timeline("conversation")),
+            scope = backgroundScope,
+            stateBridge = object : TimelineProcessorStateBridge {
+                override fun publish(state: TimelineReducerState) {
+                    error("synthetic publication failure")
+                }
+            },
+        )
+
+        val failed = assertIs<TimelineProcessorAck.Failed>(
+            processor.submit(TimelineMutation.LocalAppend(PendingSend("hidden", "hidden"), instant)),
+        )
+        assertIs<TimelineProcessorFailureReason.StatePublicationFailure>(failed.reason)
+        assertEquals(0L, processor.state.value.lastAppliedMutationSequence)
+        assertTrue(processor.state.value.timeline.events.isEmpty())
     }
 
     private fun processor(scope: CoroutineScope) = TimelineProcessor(

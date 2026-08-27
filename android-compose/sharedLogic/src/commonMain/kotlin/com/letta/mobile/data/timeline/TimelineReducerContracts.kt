@@ -31,7 +31,10 @@ sealed interface TimelineMutation {
     data class RetryLocal(val otid: String) : TimelineMutation
     data class MarkLocalSent(val otid: String) : TimelineMutation
     data class MarkLocalFailed(val otid: String) : TimelineMutation
-    data class StreamFrame(val message: LettaMessage) : TimelineMutation
+    data class StreamFrame(
+        val message: LettaMessage,
+        val agentId: String? = null,
+    ) : TimelineMutation
     data class SnapshotEnrichment(val messages: List<LettaMessage>) : TimelineMutation
     data class HydrateSnapshot(val generation: Long, val messages: List<LettaMessage>) : TimelineMutation
     data class ReconcileSnapshot(val generation: Long, val messages: List<LettaMessage>) : TimelineMutation
@@ -250,10 +253,11 @@ private fun reduceStreamMutation(
 ): TimelineReduction {
     val output = reduceStreamFrame(
         TimelineReducerInput(
-            state.timeline,
-            mutation.message,
-            state.pendingToolReturnsByCallId,
-            "timeline-processor",
+            prev = state.timeline,
+            frame = mutation.message,
+            pendingToolReturnsByCallId = state.pendingToolReturnsByCallId,
+            source = "timeline-processor",
+            agentId = mutation.agentId,
         ),
     )
     val effects = buildList {

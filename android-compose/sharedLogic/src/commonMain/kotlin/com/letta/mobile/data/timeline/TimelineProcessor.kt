@@ -43,6 +43,9 @@ sealed interface TimelineProcessorRejectionReason {
         val current: Long,
     ) : TimelineProcessorRejectionReason
 
+    /** The bounded mailbox was full. The mutation was not accepted or sequenced. */
+    data class MailboxFull(val capacity: Int) : TimelineProcessorRejectionReason
+
     data object Closed : TimelineProcessorRejectionReason
 }
 
@@ -64,7 +67,8 @@ sealed interface TimelineProcessorFailureReason {
  * Both callbacks run under the processor's [Mutex]. Legacy writers must use the
  * same mutex. That makes "read legacy seed -> reduce -> publish both states" one
  * atomic operation without moving stream, hydrate, reconcile, or cleanup logic
- * into this slice.
+ * into this slice. Implementations of [publish] must publish atomically and must
+ * not suspend; processor state is advanced only after it returns successfully.
  */
 interface TimelineProcessorStateBridge {
     fun synchronizeSeed(processorState: TimelineReducerState): TimelineReducerState = processorState
@@ -76,11 +80,18 @@ object NoOpTimelineProcessorStateBridge : TimelineProcessorStateBridge
 /**
  * Serial owner for timeline mutations.
  *
- * A single channel consumer assigns sequence numbers, publishes immutable state
- * before running effects, and completes the typed ack only after ordered effects
- * finish. A failed effect fails only its mutation; the consumer continues with
- * later work. Graceful close drains accepted work, while owner cancellation
- * fails the current and all buffered acknowledgements instead of stranding them.
+ * A single channel consumer assigns sequence numbers in accepted mailbox order,
+ * commits immutable state atomically, then runs effects in reducer order. The
+ * acknowledgement is terminal: [TimelineProcessorAck.Applied] means every effect
+ * completed, while [TimelineProcessorAck.Failed] means state committed but the
+ * named effect did not complete. A failed effect is isolated to its mutation and
+ * later mutations continue.
+ *
+ * The mailbox is bounded and producers never suspend while enqueueing. When it
+ * is full, [TimelineProcessorRejectionReason.MailboxFull] is returned immediately;
+ * callers may retry explicitly. [close] atomically stops admission and drains all
+ * accepted requests. Cancellation is preemptive and fails the active and buffered
+ * acknowledgements, so no caller is left waiting on a stranded deferred.
  */
 class TimelineProcessor(
     initialState: TimelineReducerState,
@@ -89,23 +100,33 @@ class TimelineProcessor(
     private val stateBridge: TimelineProcessorStateBridge = NoOpTimelineProcessorStateBridge,
     private val reducer: (TimelineReducerState, TimelineMutation) -> TimelineReduction = ::reduceProductionMutation,
     private val effectHandler: suspend (TimelineReductionEffect) -> Unit = {},
+    mailboxCapacity: Int = DEFAULT_MAILBOX_CAPACITY,
 ) {
-    private val requests = Channel<ProcessorRequest>(Channel.UNLIMITED)
+    private val capacity = mailboxCapacity.also { require(it > 0) { "mailboxCapacity must be positive" } }
+    private val requests = Channel<ProcessorRequest>(capacity)
     private val accepting = atomic(true)
     private val terminalReason = atomic<TerminalReason?>(null)
     private val _state = MutableStateFlow(initialState)
     val state: StateFlow<TimelineReducerState> = _state.asStateFlow()
     private val consumer: Job = scope.launch { consume(initialState.lastAppliedMutationSequence + 1L) }
 
-    /** Enqueue without tying processor progress to the caller's cancellation. */
+    /** Enqueue without tying processor progress to caller cancellation or blocking a producer. */
     fun enqueue(mutation: TimelineMutation): Deferred<TimelineProcessorAck> {
         val ack = CompletableDeferred<TimelineProcessorAck>()
-        if (!accepting.value) {
-            ack.complete(terminalAck())
-            return ack
-        }
+        if (!accepting.value) return ack.completedWith(terminalAck())
+
         val sent = requests.trySend(ProcessorRequest(mutation, ack))
-        if (sent.isFailure) ack.complete(terminalAck())
+        if (sent.isFailure) {
+            val rejected = if (sent.isClosed || !accepting.value) {
+                terminalAck()
+            } else {
+                TimelineProcessorAck.Rejected(
+                    sequence = null,
+                    reason = TimelineProcessorRejectionReason.MailboxFull(capacity),
+                )
+            }
+            ack.complete(rejected)
+        }
         return ack
     }
 
@@ -119,6 +140,7 @@ class TimelineProcessor(
         }
     }
 
+    /** Gracefully close admission and wait until all accepted work has a terminal acknowledgement. */
     suspend fun closeAndJoin() {
         close()
         consumer.join()
@@ -130,53 +152,26 @@ class TimelineProcessor(
         try {
             for (request in requests) {
                 active = request
-                val sequence = nextSequence++
-                process(request, sequence)
+                process(request, nextSequence++)
                 active = null
             }
         } catch (cancelled: CancellationException) {
             terminalReason.value = TerminalReason.CANCELLED
-            active?.ack?.complete(
-                TimelineProcessorAck.Failed(
-                    sequence = null,
-                    reason = TimelineProcessorFailureReason.Cancelled,
-                ),
-            )
+            active?.ack?.complete(cancelledAck())
             throw cancelled
         } finally {
             accepting.value = false
             if (terminalReason.value == null) terminalReason.value = TerminalReason.CANCELLED
             requests.close()
-            while (true) {
-                val request = requests.tryReceive().getOrNull() ?: break
-                request.ack.complete(terminalAck())
-            }
+            drainBufferedAcks()
         }
     }
 
     private suspend fun process(request: ProcessorRequest, sequence: Long) {
-        var reduction: TimelineReduction? = null
-        var rejection: TimelineProcessorRejectionReason? = null
-        try {
-            writeMutex.withLock {
-                val synchronized = stateBridge.synchronizeSeed(_state.value)
-                rejection = rejectionReason(sequence, request.mutation, synchronized)
-                if (rejection == null) {
-                    val reduced = reducer(synchronized, request.mutation)
-                    val committed = reduced.copy(
-                        next = reduced.next.copy(lastAppliedMutationSequence = sequence),
-                    )
-                    _state.value = committed.next
-                    stateBridge.publish(committed.next)
-                    reduction = committed
-                } else if (_state.value != synchronized) {
-                    _state.value = synchronized
-                }
-            }
+        val prepared = try {
+            prepareMutation(request.mutation, sequence)
         } catch (cancelled: CancellationException) {
-            request.ack.complete(
-                TimelineProcessorAck.Failed(sequence, TimelineProcessorFailureReason.Cancelled),
-            )
+            request.ack.complete(cancelledAck(sequence))
             throw cancelled
         } catch (failure: Throwable) {
             request.ack.complete(
@@ -188,42 +183,90 @@ class TimelineProcessor(
             return
         }
 
-        rejection?.let { reason ->
-            request.ack.complete(TimelineProcessorAck.Rejected(sequence, reason))
-            return
+        when (prepared) {
+            is PreparedMutation.Rejected -> request.ack.complete(
+                TimelineProcessorAck.Rejected(sequence, prepared.reason),
+            )
+            is PreparedMutation.Committed -> executeEffects(request, sequence, prepared.reduction)
+        }
+    }
+
+    private suspend fun prepareMutation(mutation: TimelineMutation, sequence: Long): PreparedMutation =
+        writeMutex.withLock {
+            val synchronized = stateBridge.synchronizeSeed(_state.value)
+            val rejection = rejectionReason(sequence, mutation, synchronized)
+            if (rejection != null) {
+                if (_state.value != synchronized) _state.value = synchronized
+                PreparedMutation.Rejected(rejection)
+            } else {
+                val reduced = reducer(synchronized, mutation)
+                val committed = reduced.copy(
+                    next = reduced.next.copy(lastAppliedMutationSequence = sequence),
+                )
+                stateBridge.publish(committed.next)
+                _state.value = committed.next
+                PreparedMutation.Committed(committed)
+            }
         }
 
-        val committed = checkNotNull(reduction)
+    private suspend fun executeEffects(
+        request: ProcessorRequest,
+        sequence: Long,
+        committed: TimelineReduction,
+    ) {
         committed.effects.forEachIndexed { index, effect ->
-            try {
-                effectHandler(effect)
-            } catch (cancelled: CancellationException) {
-                request.ack.complete(
-                    TimelineProcessorAck.Failed(sequence, TimelineProcessorFailureReason.Cancelled),
-                )
-                throw cancelled
-            } catch (failure: Throwable) {
-                request.ack.complete(
-                    TimelineProcessorAck.Failed(
-                        sequence,
-                        TimelineProcessorFailureReason.EffectFailure(index, effect, failure),
-                    ),
-                )
-                return
-            }
+            val failure = runEffect(effect, sequence, index, request) ?: return@forEachIndexed
+            request.ack.complete(failure)
+            return
         }
         request.ack.complete(TimelineProcessorAck.Applied(sequence, committed.result))
     }
 
-    private fun terminalAck(): TimelineProcessorAck = when (terminalReason.value) {
-        TerminalReason.CANCELLED -> TimelineProcessorAck.Failed(
-            sequence = null,
-            reason = TimelineProcessorFailureReason.Cancelled,
+    private suspend fun runEffect(
+        effect: TimelineReductionEffect,
+        sequence: Long,
+        index: Int,
+        request: ProcessorRequest,
+    ): TimelineProcessorAck.Failed? = try {
+        effectHandler(effect)
+        null
+    } catch (cancelled: CancellationException) {
+        request.ack.complete(cancelledAck(sequence))
+        throw cancelled
+    } catch (failure: Throwable) {
+        TimelineProcessorAck.Failed(
+            sequence,
+            TimelineProcessorFailureReason.EffectFailure(index, effect, failure),
         )
+    }
+
+    private fun drainBufferedAcks() {
+        while (true) {
+            val request = requests.tryReceive().getOrNull() ?: return
+            request.ack.complete(terminalAck())
+        }
+    }
+
+    private fun terminalAck(): TimelineProcessorAck = when (terminalReason.value) {
+        TerminalReason.CANCELLED -> cancelledAck()
         TerminalReason.CLOSED, null -> TimelineProcessorAck.Rejected(
             sequence = null,
             reason = TimelineProcessorRejectionReason.Closed,
         )
+    }
+
+    private fun cancelledAck(sequence: Long? = null) = TimelineProcessorAck.Failed(
+        sequence = sequence,
+        reason = TimelineProcessorFailureReason.Cancelled,
+    )
+
+    private fun CompletableDeferred<TimelineProcessorAck>.completedWith(
+        acknowledgement: TimelineProcessorAck,
+    ): CompletableDeferred<TimelineProcessorAck> = apply { complete(acknowledgement) }
+
+    private sealed interface PreparedMutation {
+        data class Rejected(val reason: TimelineProcessorRejectionReason) : PreparedMutation
+        data class Committed(val reduction: TimelineReduction) : PreparedMutation
     }
 
     private enum class TerminalReason { CLOSED, CANCELLED }
@@ -232,6 +275,10 @@ class TimelineProcessor(
         val mutation: TimelineMutation,
         val ack: CompletableDeferred<TimelineProcessorAck>,
     )
+
+    companion object {
+        const val DEFAULT_MAILBOX_CAPACITY = 64
+    }
 }
 
 private fun rejectionReason(
@@ -244,20 +291,22 @@ private fun rejectionReason(
         lastApplied = state.lastAppliedMutationSequence,
     )
     mutation is TimelineMutation.HydrateSnapshot && mutation.generation < state.hydrateGeneration ->
-        TimelineProcessorRejectionReason.StaleGeneration(
-            mutationFamily = "HydrateSnapshot",
-            attempted = mutation.generation,
-            current = state.hydrateGeneration,
-        )
+        staleGeneration("HydrateSnapshot", mutation.generation, state.hydrateGeneration)
     mutation is TimelineMutation.ReconcileSnapshot &&
         mutation.generation < state.highestRequestedReconcileGeneration ->
-        TimelineProcessorRejectionReason.StaleGeneration(
-            mutationFamily = "ReconcileSnapshot",
-            attempted = mutation.generation,
-            current = state.highestRequestedReconcileGeneration,
+        staleGeneration(
+            "ReconcileSnapshot",
+            mutation.generation,
+            state.highestRequestedReconcileGeneration,
         )
     else -> null
 }
+
+private fun staleGeneration(
+    mutationFamily: String,
+    attempted: Long,
+    current: Long,
+) = TimelineProcessorRejectionReason.StaleGeneration(mutationFamily, attempted, current)
 
 internal fun TimelineProcessorAck.appliedResultOrThrow(): TimelineReductionResult = when (this) {
     is TimelineProcessorAck.Applied -> result

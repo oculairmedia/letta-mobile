@@ -241,29 +241,15 @@ class TimelineMutationParityHarnessTest {
 
     @Test
     fun droppedStateMutantIsDetected() = runTest {
-        val mutant = LocalMutationParityVerifier { state, mutation ->
-            val reduction = reduceProductionMutation(state, mutation)
-            if (mutation is TimelineMutation.LocalAppend) reduction.copy(next = state) else reduction
-        }
-
-        assertFailsWith<AssertionError> {
-            mutant.verify(11, listOf(LocalSemanticMutation.Append("id", "body")))
+        assertAppendMutantDetected(seed = 11) { state, reduction ->
+            reduction.copy(next = state)
         }
     }
 
     @Test
     fun reorderedEffectMutantIsDetected() = runTest {
-        val mutant = LocalMutationParityVerifier { state, mutation ->
-            val reduction = reduceProductionMutation(state, mutation)
-            if (mutation is TimelineMutation.LocalAppend) {
-                reduction.copy(effects = reduction.effects.reversed().toTimelinePersistentList())
-            } else {
-                reduction
-            }
-        }
-
-        assertFailsWith<AssertionError> {
-            mutant.verify(12, listOf(LocalSemanticMutation.Append("id", "body")))
+        assertAppendMutantDetected(seed = 12) { _, reduction ->
+            reduction.copy(effects = reduction.effects.reversed().toTimelinePersistentList())
         }
     }
 
@@ -331,6 +317,19 @@ class TimelineMutationParityHarnessTest {
         val call = mutant.currentState().timeline.events.filterIsInstance<TimelineEvent.Confirmed>()
             .single { it.serverId == "call-message" }
         assertTrue(call.toolReturnContentByCallId.isEmpty())
+    }
+
+    private suspend fun assertAppendMutantDetected(
+        seed: Long,
+        mutate: (TimelineReducerState, TimelineReduction) -> TimelineReduction,
+    ) {
+        val mutant = LocalMutationParityVerifier { state, mutation ->
+            val reduction = reduceProductionMutation(state, mutation)
+            if (mutation is TimelineMutation.LocalAppend) mutate(state, reduction) else reduction
+        }
+        assertFailsWith<AssertionError> {
+            mutant.verify(seed, listOf(LocalSemanticMutation.Append("id", "body")))
+        }
     }
 
     private fun owner(scope: CoroutineScope) = TimelineMutationParityOwner(
