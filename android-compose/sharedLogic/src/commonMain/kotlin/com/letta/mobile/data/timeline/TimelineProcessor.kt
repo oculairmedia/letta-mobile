@@ -8,6 +8,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.ClosedSendChannelException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -146,7 +147,11 @@ class TimelineProcessor(
     suspend fun submitWithBackpressure(mutation: TimelineMutation): TimelineProcessorAck {
         val acknowledgement = CompletableDeferred<TimelineProcessorAck>()
         if (!accepting.value) return terminalAck()
-        requests.send(ProcessorRequest(mutation, acknowledgement))
+        try {
+            requests.send(ProcessorRequest(mutation, acknowledgement))
+        } catch (_: ClosedSendChannelException) {
+            return terminalAck()
+        }
         return acknowledgement.await()
     }
 

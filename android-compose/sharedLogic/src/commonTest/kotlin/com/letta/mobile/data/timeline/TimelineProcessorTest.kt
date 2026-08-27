@@ -297,6 +297,40 @@ class TimelineProcessorTest {
     }
 
     @Test
+    fun backpressuredSubmissionAcceptedBeforeCloseIsDrained() = runTest {
+        val effectEntered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val processor = TimelineProcessor(
+            initialState = TimelineReducerState(Timeline("conversation")),
+            scope = backgroundScope,
+            mailboxCapacity = 1,
+            effectHandler = { effect ->
+                if (effect is TimelineReductionEffect.Send && effect.pending.otid == "active") {
+                    effectEntered.complete(Unit)
+                    release.await()
+                }
+            },
+        )
+        val active = processor.enqueue(TimelineMutation.LocalAppend(PendingSend("active", "active"), instant))
+        effectEntered.await()
+        val buffered = processor.enqueue(TimelineMutation.LocalAppend(PendingSend("buffered", "buffered"), instant))
+        val waiting = async {
+            processor.submitWithBackpressure(TimelineMutation.LocalAppend(PendingSend("waiting", "waiting"), instant))
+        }
+        runCurrent()
+        assertFalse(waiting.isCompleted)
+
+        processor.close()
+        release.complete(Unit)
+
+        assertIs<TimelineProcessorAck.Applied>(waiting.await())
+        assertIs<TimelineProcessorAck.Applied>(active.await())
+        assertIs<TimelineProcessorAck.Applied>(buffered.await())
+        processor.closeAndJoin()
+        assertEquals(listOf("active", "buffered", "waiting"), processor.state.value.timeline.events.map { it.otid })
+    }
+
+    @Test
     fun concurrentProducersAreLinearizedExactlyOnceInAcknowledgedOrder() = runTest {
         val processor = TimelineProcessor(
             initialState = TimelineReducerState(Timeline("conversation")),
