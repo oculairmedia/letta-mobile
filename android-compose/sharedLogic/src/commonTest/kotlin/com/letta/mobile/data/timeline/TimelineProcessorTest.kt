@@ -265,69 +265,78 @@ class TimelineProcessorTest {
     }
 
     @Test
-    fun boundedMailboxRejectsOverflowWithoutSuspendingProducer() = runTest {
-        val effectEntered = CompletableDeferred<Unit>()
-        val release = CompletableDeferred<Unit>()
-        val processor = TimelineProcessor(
+    fun boundedMailboxRejectsOverflowAndDrainsAcceptedBackpressure() = runTest {
+        val overflowGate = CompletableDeferred<Unit>()
+        val overflowRelease = CompletableDeferred<Unit>()
+        val overflowProcessor = TimelineProcessor(
             initialState = TimelineReducerState(Timeline("conversation")),
             scope = backgroundScope,
             mailboxCapacity = 1,
             effectHandler = { effect ->
                 if (effect is TimelineReductionEffect.Send && effect.pending.otid == "active") {
-                    effectEntered.complete(Unit)
-                    release.await()
+                    overflowGate.complete(Unit)
+                    overflowRelease.await()
                 }
             },
         )
-        val active = processor.enqueue(TimelineMutation.LocalAppend(PendingSend("active", "active"), instant))
-        effectEntered.await()
-        val buffered = processor.enqueue(TimelineMutation.LocalAppend(PendingSend("buffered", "buffered"), instant))
-
+        val active = overflowProcessor.enqueue(
+            TimelineMutation.LocalAppend(PendingSend("active", "active"), instant),
+        )
+        overflowGate.await()
+        val buffered = overflowProcessor.enqueue(
+            TimelineMutation.LocalAppend(PendingSend("buffered", "buffered"), instant),
+        )
         val overflow = assertIs<TimelineProcessorAck.Rejected>(
-            processor.enqueue(TimelineMutation.LocalAppend(PendingSend("overflow", "overflow"), instant)).await(),
+            overflowProcessor.enqueue(
+                TimelineMutation.LocalAppend(PendingSend("overflow", "overflow"), instant),
+            ).await(),
         )
         assertEquals(TimelineProcessorRejectionReason.MailboxFull(1), overflow.reason)
         assertFalse(active.isCompleted)
         assertFalse(buffered.isCompleted)
-
-        release.complete(Unit)
+        overflowRelease.complete(Unit)
         assertIs<TimelineProcessorAck.Applied>(active.await())
         assertIs<TimelineProcessorAck.Applied>(buffered.await())
-        assertEquals(listOf("active", "buffered"), processor.state.value.timeline.events.map { it.otid })
-    }
+        overflowProcessor.closeAndJoin()
+        assertEquals(listOf("active", "buffered"), overflowProcessor.state.value.timeline.events.map { it.otid })
 
-    @Test
-    fun backpressuredSubmissionAcceptedBeforeCloseIsDrained() = runTest {
-        val effectEntered = CompletableDeferred<Unit>()
-        val release = CompletableDeferred<Unit>()
-        val processor = TimelineProcessor(
+        val backpressureGate = CompletableDeferred<Unit>()
+        val backpressureRelease = CompletableDeferred<Unit>()
+        val backpressureProcessor = TimelineProcessor(
             initialState = TimelineReducerState(Timeline("conversation")),
             scope = backgroundScope,
             mailboxCapacity = 1,
             effectHandler = { effect ->
-                if (effect is TimelineReductionEffect.Send && effect.pending.otid == "active") {
-                    effectEntered.complete(Unit)
-                    release.await()
+                if (effect is TimelineReductionEffect.Send && effect.pending.otid == "held") {
+                    backpressureGate.complete(Unit)
+                    backpressureRelease.await()
                 }
             },
         )
-        val active = processor.enqueue(TimelineMutation.LocalAppend(PendingSend("active", "active"), instant))
-        effectEntered.await()
-        val buffered = processor.enqueue(TimelineMutation.LocalAppend(PendingSend("buffered", "buffered"), instant))
+        val held = backpressureProcessor.enqueue(
+            TimelineMutation.LocalAppend(PendingSend("held", "held"), instant),
+        )
+        backpressureGate.await()
+        val queued = backpressureProcessor.enqueue(
+            TimelineMutation.LocalAppend(PendingSend("queued", "queued"), instant),
+        )
         val waiting = async {
-            processor.submitWithBackpressure(TimelineMutation.LocalAppend(PendingSend("waiting", "waiting"), instant))
+            backpressureProcessor.submitWithBackpressure(
+                TimelineMutation.LocalAppend(PendingSend("waiting", "waiting"), instant),
+            )
         }
         runCurrent()
         assertFalse(waiting.isCompleted)
-
-        processor.close()
-        release.complete(Unit)
-
+        backpressureProcessor.close()
+        backpressureRelease.complete(Unit)
         assertIs<TimelineProcessorAck.Applied>(waiting.await())
-        assertIs<TimelineProcessorAck.Applied>(active.await())
-        assertIs<TimelineProcessorAck.Applied>(buffered.await())
-        processor.closeAndJoin()
-        assertEquals(listOf("active", "buffered", "waiting"), processor.state.value.timeline.events.map { it.otid })
+        assertIs<TimelineProcessorAck.Applied>(held.await())
+        assertIs<TimelineProcessorAck.Applied>(queued.await())
+        backpressureProcessor.closeAndJoin()
+        assertEquals(
+            listOf("held", "queued", "waiting"),
+            backpressureProcessor.state.value.timeline.events.map { it.otid },
+        )
     }
 
     @Test
