@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentRuntimeBinding
+import com.letta.mobile.data.model.isLettaCodeEphemeralWorker
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.repository.ConversationInspectorMessage
 import com.letta.mobile.data.repository.RosterNameTelemetry
@@ -467,9 +468,10 @@ class ConversationsViewModel @Inject constructor(
         agents: List<Agent>,
         activeConfigIsLocalRuntime: Boolean = AgentRuntimeBinding.isLocalRuntime(settingsRepository.activeConfig.value),
     ): List<Conversation> {
-        if (!activeConfigIsLocalRuntime) return conversations
+        val nonEphemeralConversations = conversations.filterNot { it.agentId.isLettaCodeEphemeralWorker() }
+        if (!activeConfigIsLocalRuntime) return nonEphemeralConversations
         val localAgentIds = agents.map { it.id }.toSet()
-        return conversations.filter { conversation ->
+        return nonEphemeralConversations.filter { conversation ->
             conversation.id.value.startsWith("local-conv-") || conversation.agentId in localAgentIds
         }
     }

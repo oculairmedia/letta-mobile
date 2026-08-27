@@ -298,6 +298,70 @@ class ConversationsViewModelTest {
     }
 
     @Test
+    fun `remote list hides ephemeral workers without requiring a roster entry`() = runTest {
+        settingsRepository.saveConfig(remoteConfig())
+        fakeAgentRepo.setAgents(listOf(Agent(id = AgentId("regular-agent"), name = "Regular Agent")))
+        fakeAllRepo.setConversations(
+            listOf(
+                TestData.conversation(id = "regular-conversation", agentId = "regular-agent"),
+                TestData.conversation(id = "worker-conversation", agentId = "agent-local-worker-123"),
+                TestData.conversation(id = "unknown-conversation", agentId = "missing-agent"),
+            ),
+        )
+
+        viewModel.loadConversations()
+
+        assertEquals(
+            setOf(ConversationId("regular-conversation"), ConversationId("unknown-conversation")),
+            viewModel.uiState.value.conversations.map { it.conversation.id }.toSet(),
+        )
+    }
+
+    @Test
+    fun `local agent prefix remains visible while ephemeral worker prefix is hidden`() = runTest {
+        settingsRepository.saveConfig(localConfig())
+        val localAgent = localAgent(id = "local-agent-device-123", name = "Local Agent")
+        fakeAgentRepo.setAgents(listOf(localAgent))
+        fakeAllRepo.setConversations(
+            listOf(
+                TestData.conversation(id = "local-conv-visible", agentId = localAgent.id.value),
+                TestData.conversation(id = "local-conv-worker", agentId = "agent-local-worker-123"),
+            ),
+        )
+        viewModel = newViewModel()
+
+        viewModel.loadConversations()
+
+        assertEquals(
+            listOf(ConversationId("local-conv-visible")),
+            viewModel.uiState.value.conversations.map { it.conversation.id },
+        )
+    }
+
+    @Test
+    fun `archive search and refresh cannot reveal ephemeral workers`() = runTest {
+        settingsRepository.saveConfig(remoteConfig())
+        val visible = TestData.conversation(id = "visible", agentId = "regular-agent", summary = "worker query")
+        val ephemeral = TestData.conversation(id = "ephemeral", agentId = "agent-local-worker-123", summary = "worker query")
+            .copy(archived = true)
+        fakeAllRepo.setConversations(listOf(visible, ephemeral))
+
+        viewModel.loadConversations()
+        viewModel.updateSearchQuery("worker query")
+        viewModel.toggleShowArchived()
+        assertTrue(viewModel.getFilteredConversations().isEmpty())
+
+        fakeAllRepo.setConversations(listOf(visible, ephemeral))
+        viewModel.refresh()
+
+        assertEquals(
+            listOf(ConversationId("visible")),
+            viewModel.uiState.value.conversations.map { it.conversation.id },
+        )
+        assertTrue(viewModel.getFilteredConversations().isEmpty())
+    }
+
+    @Test
     fun `backend switch auto-refresh refetches agents so names resolve`() = runTest {
         fakeAllRepo.setConversations(listOf(TestData.conversation(id = "1", agentId = "a1")))
         fakeAgentRepo.setAgents(listOf(Agent(id = AgentId("a1"), name = "Agent One")))

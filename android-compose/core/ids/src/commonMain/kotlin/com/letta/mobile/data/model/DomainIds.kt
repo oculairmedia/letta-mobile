@@ -19,6 +19,12 @@ value class AgentId(val value: String) {
     override fun toString(): String = value
 }
 
+/** Classifies transient workers created by Letta Code during a run. */
+fun AgentId.isLettaCodeEphemeralWorker(): Boolean =
+    value.startsWith(LETTA_CODE_EPHEMERAL_WORKER_ID_PREFIX)
+
+private const val LETTA_CODE_EPHEMERAL_WORKER_ID_PREFIX = "agent-local-"
+
 @JvmInline
 @Serializable
 value class ProjectId(val value: String) {
