@@ -2,6 +2,7 @@ package com.letta.mobile.data.repository
 
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.isLettaCodeEphemeralWorker
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentRuntimeBinding
 import com.letta.mobile.data.model.AgentSummary
@@ -40,6 +41,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
+@Suppress("NoDetachedCoroutineLifecycle")
 fun defaultCachedAgentRepositoryScope(): CoroutineScope =
     CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -190,6 +192,10 @@ open class CachedAgentRepository(
         }
         _agents.update { fresh }
         lastRefreshAtMillis = nowMillis()
+        persistRefreshedAgents(fresh)
+    }
+
+    private suspend fun persistRefreshedAgents(fresh: List<Agent>) {
         try {
             val cache = localCache?.invoke() ?: return
             cache.insertAll(fresh)
@@ -198,6 +204,8 @@ open class CachedAgentRepository(
             } else {
                 cache.deleteExcept(fresh.map { it.id.value })
             }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             Telemetry.event("CachedAgentRepository", "Failed to cache agents to Room", "error" to (e.message ?: e.toString()), level = Telemetry.Level.WARN)
         }
@@ -373,7 +381,7 @@ open class CachedAgentRepository(
             // don't issue a per-agent GET for each one — they are not part of
             // the human agent list and the next bulk refresh reconciles them
             // (letta-mobile-vcmin).
-            if (isEphemeralSubagentId(agentId)) return@collect
+            if (agentId.isLettaCodeEphemeralWorker()) return@collect
             refreshAgent(agentId)
                 .onFailure { e -> Telemetry.event("CachedAgentRepository", "agent_updated refresh failed for ${frame.agentId}", "detail" to e.message, level = Telemetry.Level.WARN) }
         }
@@ -395,9 +403,6 @@ open class CachedAgentRepository(
             wasConnected = nowConnected
         }
     }
-
-    private fun isEphemeralSubagentId(id: AgentId): Boolean =
-        id.value.startsWith(EPHEMERAL_SUBAGENT_ID_PREFIX)
 
     override suspend fun getContextWindow(agentId: AgentId, conversationId: ConversationId?): ContextWindowOverview {
         val localSource = localAgentSource
@@ -606,14 +611,6 @@ open class CachedAgentRepository(
     private companion object {
         const val CACHE_REFRESH_PAGE_SIZE = 50
         const val FALLBACK_FULL_FETCH_LIMIT = 5_000
-
-        /**
-         * Id prefix letta-code mints for ephemeral subagent workers (the
-         * transient "Letta Code" agents that fan out during a run). Distinct
-         * from the on-device `local-agent-*` prefix used by
-         * [createLocalAgent].
-         */
-        const val EPHEMERAL_SUBAGENT_ID_PREFIX = "agent-local-"
 
         /**
          * H5 (data-efficiency-audit): if the bulk agent list was refreshed
