@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import kotlin.jvm.JvmInline
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
