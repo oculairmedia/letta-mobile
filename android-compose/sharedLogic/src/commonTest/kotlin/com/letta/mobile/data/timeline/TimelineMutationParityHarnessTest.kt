@@ -22,7 +22,7 @@ class TimelineMutationParityHarnessTest {
     @Test
     fun exactStateEffectNotificationAckTraceIsOrdered() {
         val owner = owner()
-        owner.enqueue(TimelineMutation.StreamFrame(1, assistant("reply", "hello")))
+        owner.enqueue(TimelineMutation.StreamFrame(1, assistant(AssistantFixture("reply", "hello"))))
         val entry = owner.drainOne()!!
 
         assertEquals(4, entry.trace().size)
@@ -35,7 +35,7 @@ class TimelineMutationParityHarnessTest {
     @Test
     fun hydrationAndStreamSchedulesConvergeWithoutLossOrDoubleApply() {
         val user = UserMessage("user", JsonPrimitive("hello"), date = "2026-01-01T00:00:00Z")
-        val reply = assistant("reply", "world")
+        val reply = assistant(AssistantFixture("reply", "world"))
         val hydrateThenStream = owner().also {
             it.enqueue(TimelineMutation.HydrateSnapshot(1, 1, listOf(user)))
             it.enqueue(TimelineMutation.StreamFrame(2, reply))
@@ -92,8 +92,8 @@ class TimelineMutationParityHarnessTest {
     @Test
     fun staleSequenceCannotAdvanceLastAppliedOrClaimAcceptance() {
         val owner = owner()
-        owner.enqueue(TimelineMutation.StreamFrame(2, assistant("new", "new")))
-        owner.enqueue(TimelineMutation.StreamFrame(1, assistant("old", "old")))
+        owner.enqueue(TimelineMutation.StreamFrame(2, assistant(AssistantFixture("new", "new"))))
+        owner.enqueue(TimelineMutation.StreamFrame(1, assistant(AssistantFixture("old", "old"))))
         owner.drain()
 
         val rejected = owner.journal.last()
@@ -105,8 +105,8 @@ class TimelineMutationParityHarnessTest {
 
     @Test
     fun cleanupSuppressionIsDurableAcrossRealReplayMergeAndAllowsControlRow() {
-        val full = confirmed("full", "complete assistant answer", 1.0)
-        val fragment = confirmed("fragment", "pa", 2.0)
+        val full = confirmed(ConfirmedFixture("full", "complete assistant answer", 1.0))
+        val fragment = confirmed(ConfirmedFixture("fragment", "pa", 2.0))
         val owner = TimelineMutationParityOwner(TimelineReducerState(Timeline("conversation", persistentListOf(full, fragment))))
         owner.enqueue(TimelineMutation.CleanupAbandonedFragments(1, "run", "turn", "test"))
         owner.drain()
@@ -114,8 +114,8 @@ class TimelineMutationParityHarnessTest {
         assertEquals(listOf("full"), owner.currentState().timeline.events.filterIsInstance<TimelineEvent.Confirmed>().map { it.serverId })
 
         owner.enqueue(TimelineMutation.ReconcileSnapshot(2, 1, listOf(
-            assistant("fragment", "pa", runId = "run", otid = "otid-fragment"),
-            assistant("control", "new complete row", runId = "run-control", otid = "otid-control"),
+            assistant(AssistantFixture("fragment", "pa", runId = "run", otid = "otid-fragment")),
+            assistant(AssistantFixture("control", "new complete row", runId = "run-control", otid = "otid-control")),
         )))
         owner.drain()
 
@@ -154,8 +154,8 @@ class TimelineMutationParityHarnessTest {
 
     @Test
     fun semanticFingerprintCannotCollideOnPendingReturnDelimiters() {
-        val single = pendingReturnState("a", "b", "c,d:e")
-        val delimiterShift = pendingReturnState("a:b", "c", "d:e")
+        val single = pendingReturnState(PendingReturnFixture("a", "b", "c,d:e"))
+        val delimiterShift = pendingReturnState(PendingReturnFixture("a:b", "c", "d:e"))
 
         assertNotEquals(single.semanticFingerprint(), delimiterShift.semanticFingerprint())
     }
@@ -163,10 +163,10 @@ class TimelineMutationParityHarnessTest {
     @Test
     fun closeFailsQueuedAcksAndExposesNoSideChannel() {
         val owner = owner()
-        val first = owner.enqueue(TimelineMutation.StreamFrame(1, assistant("one", "one")))
-        val second = owner.enqueue(TimelineMutation.StreamFrame(2, assistant("two", "two")))
+        val first = owner.enqueue(TimelineMutation.StreamFrame(1, assistant(AssistantFixture("one", "one"))))
+        val second = owner.enqueue(TimelineMutation.StreamFrame(2, assistant(AssistantFixture("two", "two"))))
         owner.close("cancelled")
-        val afterClose = owner.enqueue(TimelineMutation.StreamFrame(3, assistant("three", "three")))
+        val afterClose = owner.enqueue(TimelineMutation.StreamFrame(3, assistant(AssistantFixture("three", "three"))))
 
         assertEquals(listOf(TestAckOutcome.FAILED, TestAckOutcome.FAILED, TestAckOutcome.FAILED), listOf(first.outcome, second.outcome, afterClose.outcome))
         assertTrue(owner.journal.isEmpty())
@@ -223,28 +223,23 @@ class TimelineMutationParityHarnessTest {
 
     private fun owner() = TimelineMutationParityOwner(TimelineReducerState(Timeline("conversation")))
 
-    private fun pendingReturnState(callId: String, id: String, response: String): TimelineReducerState {
+    private fun pendingReturnState(fixture: PendingReturnFixture): TimelineReducerState {
         val owner = owner()
         owner.enqueue(TimelineMutation.StreamFrame(1, ToolReturnMessage(
-            id = id,
-            toolCallId = callId,
-            toolReturnRaw = JsonPrimitive(response),
+            id = fixture.id,
+            toolCallId = fixture.callId,
+            toolReturnRaw = JsonPrimitive(fixture.response),
             status = "success",
         )))
         owner.drain()
         return owner.currentState()
     }
 
-    private fun assistant(
-        id: String,
-        content: String,
-        runId: String = "run-$id",
-        otid: String = "otid-$id",
-    ) = AssistantMessage(
-        id = id,
-        contentRaw = JsonPrimitive(content),
-        otid = otid,
-        runId = runId,
+    private fun assistant(fixture: AssistantFixture) = AssistantMessage(
+        id = fixture.id,
+        contentRaw = JsonPrimitive(fixture.content),
+        otid = fixture.otid,
+        runId = fixture.runId,
         date = "2026-01-01T00:00:01Z",
     )
 
@@ -262,14 +257,14 @@ class TimelineMutationParityHarnessTest {
         runId = "run-tool",
     )
 
-    private fun confirmed(id: String, content: String, position: Double, stepId: String? = "turn") = TimelineEvent.Confirmed(
-        position = position,
-        otid = "otid-$id",
-        content = content,
-        serverId = id,
+    private fun confirmed(fixture: ConfirmedFixture) = TimelineEvent.Confirmed(
+        position = fixture.position,
+        otid = "otid-${fixture.id}",
+        content = fixture.content,
+        serverId = fixture.id,
         messageType = TimelineMessageType.ASSISTANT,
         date = instant,
         runId = "run",
-        stepId = stepId,
+        stepId = fixture.stepId,
     )
 }
