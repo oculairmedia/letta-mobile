@@ -7,9 +7,6 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 
 import kotlin.time.Duration.Companion.milliseconds
 /**
@@ -20,9 +17,8 @@ class TimelineExternalTransportAppender(
     private val conversationId: String,
     private val messageApi: TimelineTransport,
     private val eventQueue: Channel<TimelineGatewayEvent>,
-    private val state: MutableStateFlow<Timeline>,
     private val events: MutableSharedFlow<TimelineSyncEvent>,
-    private val writeMutex: Mutex,
+    private val processor: TimelineProcessor,
     private val pendingLocalStore: PendingLocalStore,
     private val submitReconcileAfterSendSnapshot: suspend (String, List<LettaMessage>) -> ReconcileAfterSendResult,
 ) {
@@ -48,25 +44,19 @@ class TimelineExternalTransportAppender(
     suspend fun applyExternalTransportLocalAppend(
         event: TimelineGatewayEvent.ExternalTransportLocalAppend,
     ) {
-        writeMutex.withLock {
-            val local = TimelineEvent.Local(
-                position = state.value.nextLocalPosition(),
-                otid = event.otid,
-                content = event.content,
-                role = Role.USER,
+        val result = processor.submit(
+            TimelineMutation.LocalAppend(
+                pending = PendingSend(event.otid, event.content, event.attachments),
                 sentAt = event.sentAt,
-                deliveryState = DeliveryState.SENDING,
-                attachments = event.attachments,
-                source = MessageSource.LETTA_SERVER,
-            )
-            state.value = state.value.append(local)
-        }
-        events.emit(TimelineSyncEvent.LocalAppended(event.otid))
+                mode = TimelineLocalAppendMode.EXTERNAL_TRANSPORT,
+            ),
+        ).appliedResultOrThrow()
         Telemetry.event(
             "TimelineSync", "send.externalTransportLocalAppended",
             "otid" to event.otid,
             "conversationId" to conversationId,
             "contentLength" to event.content.length,
+            "changed" to result.changed,
         )
         event.ack.complete(event.otid)
     }

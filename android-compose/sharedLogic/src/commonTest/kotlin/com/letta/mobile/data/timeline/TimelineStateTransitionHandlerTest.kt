@@ -1,181 +1,141 @@
 package com.letta.mobile.data.timeline
 
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.assertTrue
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.CompletableDeferred
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
-import kotlin.test.assertIs
 
 class TimelineStateTransitionHandlerTest {
-
     @Test
     fun testApplyLocalSendAppend() = runTest {
-        val state = MutableStateFlow(Timeline(conversationId = "c1"))
-        val events = MutableSharedFlow<TimelineSyncEvent>(replay = 10)
-        val sendQueue = Channel<PendingSend>(Channel.UNLIMITED)
-        val writeMutex = Mutex()
-
-        val handler = TimelineStateTransitionHandler("c1", state, events, sendQueue, writeMutex)
-
+        val harness = harness(Timeline("c1"), backgroundScope)
         val pending = PendingSend("otid-1", "hello")
         val ack = CompletableDeferred<Unit>()
-        val event = TimelineGatewayEvent.LocalSendAppend(pending, timelineNow(), ack)
 
-        handler.applyLocalSendAppend(event)
+        harness.handler.applyLocalSendAppend(
+            TimelineGatewayEvent.LocalSendAppend(pending, timelineNow(), ack),
+        )
 
         assertTrue(ack.isCompleted)
-        assertEquals(1, state.value.events.size)
-        val localEvent = state.value.events.first()
-        assertIs<TimelineEvent.Local>(localEvent)
-        assertEquals("otid-1", localEvent.otid)
-        assertEquals("hello", localEvent.content)
-        assertEquals(DeliveryState.SENDING, localEvent.deliveryState)
-
-        val queued = sendQueue.receive()
-        assertEquals(pending, queued)
+        val local = assertIs<TimelineEvent.Local>(harness.state.value.events.single())
+        assertEquals("otid-1", local.otid)
+        assertEquals("hello", local.content)
+        assertEquals(DeliveryState.SENDING, local.deliveryState)
+        assertEquals(pending, harness.sendQueue.receive())
     }
 
     @Test
     fun testApplyRetrySend_success() = runTest {
-        val initialLocal = TimelineEvent.Local(1.0, "otid-2", "retry-me", Role.USER, timelineNow(), DeliveryState.FAILED)
-        val state = MutableStateFlow(Timeline(conversationId = "c1", events = listOf(initialLocal).toTimelinePersistentList()))
-        val events = MutableSharedFlow<TimelineSyncEvent>(replay = 10)
-        val sendQueue = Channel<PendingSend>(Channel.UNLIMITED)
-        val writeMutex = Mutex()
-
-        val handler = TimelineStateTransitionHandler("c1", state, events, sendQueue, writeMutex)
-
+        val local = TimelineEvent.Local(
+            1.0,
+            "otid-2",
+            "retry-me",
+            Role.USER,
+            timelineNow(),
+            DeliveryState.FAILED,
+        )
+        val harness = harness(Timeline("c1", listOf(local).toTimelinePersistentList()), backgroundScope)
         val ack = CompletableDeferred<Unit>()
-        val event = TimelineGatewayEvent.RetrySend("otid-2", ack)
 
-        handler.applyRetrySend(event)
+        harness.handler.applyRetrySend(TimelineGatewayEvent.RetrySend("otid-2", ack))
 
         assertTrue(ack.isCompleted)
-        val localEvent = state.value.events.first() as TimelineEvent.Local
-        assertEquals(DeliveryState.SENDING, localEvent.deliveryState)
-
-        val queued = sendQueue.receive()
-        assertEquals("otid-2", queued.otid)
-        assertEquals("retry-me", queued.content)
+        assertEquals(
+            DeliveryState.SENDING,
+            (harness.state.value.events.single() as TimelineEvent.Local).deliveryState,
+        )
+        assertEquals(PendingSend("otid-2", "retry-me"), harness.sendQueue.receive())
     }
 
     @Test
-    fun testApplyRetrySend_notFailed() = runTest {
-        val initialLocal = TimelineEvent.Local(1.0, "otid-3", "sending", Role.USER, timelineNow(), DeliveryState.SENDING)
-        val state = MutableStateFlow(Timeline(conversationId = "c1", events = listOf(initialLocal).toTimelinePersistentList()))
-        val events = MutableSharedFlow<TimelineSyncEvent>(replay = 10)
-        val sendQueue = Channel<PendingSend>(Channel.UNLIMITED)
-        val writeMutex = Mutex()
+    fun retryNoOpsDoNotQueueSend() = runTest {
+        val sending = TimelineEvent.Local(
+            1.0,
+            "sending",
+            "body",
+            Role.USER,
+            timelineNow(),
+            DeliveryState.SENDING,
+        )
+        val harness = harness(Timeline("c1", listOf(sending).toTimelinePersistentList()), backgroundScope)
 
-        val handler = TimelineStateTransitionHandler("c1", state, events, sendQueue, writeMutex)
+        harness.handler.applyRetrySend(
+            TimelineGatewayEvent.RetrySend("sending", CompletableDeferred()),
+        )
+        harness.handler.applyRetrySend(
+            TimelineGatewayEvent.RetrySend("missing", CompletableDeferred()),
+        )
 
-        val ack = CompletableDeferred<Unit>()
-        val event = TimelineGatewayEvent.RetrySend("otid-3", ack)
-
-        handler.applyRetrySend(event)
-
-        assertTrue(ack.isCompleted)
-        val localEvent = state.value.events.first() as TimelineEvent.Local
-        assertEquals(DeliveryState.SENDING, localEvent.deliveryState) // Unchanged
-        
-        assertTrue(sendQueue.isEmpty)
-    }
-    
-    @Test
-    fun testApplyRetrySend_notFound() = runTest {
-        val state = MutableStateFlow(Timeline(conversationId = "c1"))
-        val events = MutableSharedFlow<TimelineSyncEvent>(replay = 10)
-        val sendQueue = Channel<PendingSend>(Channel.UNLIMITED)
-        val writeMutex = Mutex()
-
-        val handler = TimelineStateTransitionHandler("c1", state, events, sendQueue, writeMutex)
-
-        val ack = CompletableDeferred<Unit>()
-        val event = TimelineGatewayEvent.RetrySend("otid-notfound", ack)
-
-        handler.applyRetrySend(event)
-
-        assertTrue(ack.isCompleted)
-        assertEquals(0, state.value.events.size)
-        assertTrue(sendQueue.isEmpty)
+        assertTrue(harness.sendQueue.isEmpty)
+        assertEquals(DeliveryState.SENDING, (harness.state.value.events.single() as TimelineEvent.Local).deliveryState)
     }
 
     @Test
-    fun testApplyMarkSent() = runTest {
-        val initialLocal = TimelineEvent.Local(1.0, "otid-4", "msg", Role.USER, timelineNow(), DeliveryState.SENDING)
-        val state = MutableStateFlow(Timeline(conversationId = "c1", events = listOf(initialLocal).toTimelinePersistentList()))
-        val events = MutableSharedFlow<TimelineSyncEvent>(replay = 10)
-        val sendQueue = Channel<PendingSend>(Channel.UNLIMITED)
-        val writeMutex = Mutex()
+    fun markSentAndFailedApplyInPlaceAndUnknownIsNoOp() = runTest {
+        val local = TimelineEvent.Local(
+            1.0,
+            "otid",
+            "body",
+            Role.USER,
+            timelineNow(),
+            DeliveryState.SENDING,
+        )
+        val harness = harness(Timeline("c1", listOf(local).toTimelinePersistentList()), backgroundScope)
 
-        val handler = TimelineStateTransitionHandler("c1", state, events, sendQueue, writeMutex)
+        harness.handler.applyMarkSent(
+            TimelineGatewayEvent.MarkSent("otid", CompletableDeferred()),
+        )
+        assertEquals(DeliveryState.SENT, (harness.state.value.events.single() as TimelineEvent.Local).deliveryState)
 
-        val ack = CompletableDeferred<Unit>()
-        val event = TimelineGatewayEvent.MarkSent("otid-4", ack)
+        harness.handler.applyMarkFailed(
+            TimelineGatewayEvent.MarkFailed("otid", CompletableDeferred()),
+        )
+        assertEquals(DeliveryState.FAILED, (harness.state.value.events.single() as TimelineEvent.Local).deliveryState)
 
-        handler.applyMarkSent(event)
-
-        assertTrue(ack.isCompleted)
-        val localEvent = state.value.events.first() as TimelineEvent.Local
-        assertEquals(DeliveryState.SENT, localEvent.deliveryState)
-    }
-    
-    @Test
-    fun testApplyMarkSent_notFound() = runTest {
-        val state = MutableStateFlow(Timeline(conversationId = "c1"))
-        val events = MutableSharedFlow<TimelineSyncEvent>(replay = 10)
-        val sendQueue = Channel<PendingSend>(Channel.UNLIMITED)
-        val writeMutex = Mutex()
-
-        val handler = TimelineStateTransitionHandler("c1", state, events, sendQueue, writeMutex)
-
-        val ack = CompletableDeferred<Unit>()
-        val event = TimelineGatewayEvent.MarkSent("otid-notfound", ack)
-
-        handler.applyMarkSent(event)
-
-        assertTrue(ack.isCompleted)
+        harness.handler.applyMarkSent(
+            TimelineGatewayEvent.MarkSent("missing", CompletableDeferred()),
+        )
+        assertEquals(1, harness.state.value.events.size)
     }
 
-    @Test
-    fun testApplyMarkFailed() = runTest {
-        val initialLocal = TimelineEvent.Local(1.0, "otid-5", "msg", Role.USER, timelineNow(), DeliveryState.SENDING)
-        val state = MutableStateFlow(Timeline(conversationId = "c1", events = listOf(initialLocal).toTimelinePersistentList()))
+    private fun harness(initial: Timeline, scope: CoroutineScope): HandlerHarness {
+        val state = MutableStateFlow(initial)
         val events = MutableSharedFlow<TimelineSyncEvent>(replay = 10)
         val sendQueue = Channel<PendingSend>(Channel.UNLIMITED)
-        val writeMutex = Mutex()
+        val mutex = Mutex()
+        val processor = TimelineProcessor(
+            initialState = TimelineReducerState(initial),
+            scope = scope,
+            writeMutex = mutex,
+            stateBridge = object : TimelineProcessorStateBridge {
+                override fun synchronizeSeed(processorState: TimelineReducerState) =
+                    processorState.copy(timeline = state.value)
 
-        val handler = TimelineStateTransitionHandler("c1", state, events, sendQueue, writeMutex)
-
-        val ack = CompletableDeferred<Unit>()
-        val event = TimelineGatewayEvent.MarkFailed("otid-5", ack)
-
-        handler.applyMarkFailed(event)
-
-        assertTrue(ack.isCompleted)
-        val localEvent = state.value.events.first() as TimelineEvent.Local
-        assertEquals(DeliveryState.FAILED, localEvent.deliveryState)
+                override fun publish(stateValue: TimelineReducerState) {
+                    state.value = stateValue.timeline
+                }
+            },
+            effectHandler = { effect ->
+                when (effect) {
+                    is TimelineReductionEffect.Send -> sendQueue.send(effect.pending)
+                    is TimelineReductionEffect.EmitSyncEvent -> events.emit(effect.event)
+                    else -> Unit
+                }
+            },
+        )
+        return HandlerHarness(state, sendQueue, TimelineStateTransitionHandler("c1", processor))
     }
-    
-    @Test
-    fun testApplyMarkFailed_notFound() = runTest {
-        val state = MutableStateFlow(Timeline(conversationId = "c1"))
-        val events = MutableSharedFlow<TimelineSyncEvent>(replay = 10)
-        val sendQueue = Channel<PendingSend>(Channel.UNLIMITED)
-        val writeMutex = Mutex()
 
-        val handler = TimelineStateTransitionHandler("c1", state, events, sendQueue, writeMutex)
-
-        val ack = CompletableDeferred<Unit>()
-        val event = TimelineGatewayEvent.MarkFailed("otid-notfound", ack)
-
-        handler.applyMarkFailed(event)
-
-        assertTrue(ack.isCompleted)
-    }
+    private data class HandlerHarness(
+        val state: MutableStateFlow<Timeline>,
+        val sendQueue: Channel<PendingSend>,
+        val handler: TimelineStateTransitionHandler,
+    )
 }

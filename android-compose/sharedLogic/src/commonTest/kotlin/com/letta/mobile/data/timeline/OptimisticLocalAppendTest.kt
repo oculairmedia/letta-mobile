@@ -11,8 +11,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlinx.collections.immutable.persistentListOf
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.test.runTest
@@ -56,7 +55,7 @@ class OptimisticLocalAppendTest {
     @Test
     fun `appendOptimisticLocalSync is visible in state synchronously_letmamxwtn`() = runTest {
         val state = MutableStateFlow(Timeline("conv-sync"))
-        val handler = newHandler(state)
+        val handler = newHandler(state, backgroundScope)
         val otid = "ot-uuid-1"
 
         val appended = handler.appendOptimisticLocalSync(
@@ -77,7 +76,7 @@ class OptimisticLocalAppendTest {
     @Test
     fun `appendOptimisticLocalSync is idempotent on the same otid_letmamxwtn`() = runTest {
         val state = MutableStateFlow(Timeline("conv-sync"))
-        val handler = newHandler(state)
+        val handler = newHandler(state, backgroundScope)
         val otid = "ot-uuid-2"
 
         handler.appendOptimisticLocalSync(otid, "first", persistentListOf(), timelineNow())
@@ -106,7 +105,7 @@ class OptimisticLocalAppendTest {
         // them into one Confirmed row with the otid preserved — not two
         // rows (one Local, one Confirmed) and not a copy with a fresh otid.
         val state = MutableStateFlow(Timeline("conv-sync"))
-        val handler = newHandler(state)
+        val handler = newHandler(state, backgroundScope)
         val otid = "ot-uuid-3"
         handler.appendOptimisticLocalSync(otid, "hello", persistentListOf(), timelineNow())
 
@@ -141,7 +140,7 @@ class OptimisticLocalAppendTest {
     @Test
     fun `markOptimisticLocalFailedSync flips SENDING to FAILED in place_letmamxwtn`() = runTest {
         val state = MutableStateFlow(Timeline("conv-sync"))
-        val handler = newHandler(state)
+        val handler = newHandler(state, backgroundScope)
         val otid = "ot-uuid-4"
         handler.appendOptimisticLocalSync(otid, "hello", persistentListOf(), timelineNow())
 
@@ -162,7 +161,7 @@ class OptimisticLocalAppendTest {
         // and failure) the mark call must not throw, must not grow the
         // timeline, and must not synthesise a phantom FAILED bubble.
         val state = MutableStateFlow(Timeline("conv-sync"))
-        val handler = newHandler(state)
+        val handler = newHandler(state, backgroundScope)
 
         handler.markOptimisticLocalFailedSync("ot-uuid-doesnt-exist")
 
@@ -172,7 +171,7 @@ class OptimisticLocalAppendTest {
     @Test
     fun `markOptimisticLocalSentSync flips SENDING to SENT in place_letmamxwtn`() = runTest {
         val state = MutableStateFlow(Timeline("conv-sync"))
-        val handler = newHandler(state)
+        val handler = newHandler(state, backgroundScope)
         val otid = "ot-uuid-5"
         handler.appendOptimisticLocalSync(otid, "hello", persistentListOf(), timelineNow())
 
@@ -186,7 +185,7 @@ class OptimisticLocalAppendTest {
     @Test
     fun `appendOptimisticLocalSync telemetry fires once per real insert_letmamxwtn`() = runTest {
         val state = MutableStateFlow(Timeline("conv-sync"))
-        val handler = newHandler(state)
+        val handler = newHandler(state, backgroundScope)
         val otid = "ot-uuid-6"
 
         handler.appendOptimisticLocalSync(otid, "hello", persistentListOf(), timelineNow())
@@ -198,11 +197,21 @@ class OptimisticLocalAppendTest {
 
     private fun newHandler(
         state: MutableStateFlow<Timeline>,
+        scope: CoroutineScope,
     ): TimelineStateTransitionHandler = TimelineStateTransitionHandler(
         conversationId = "conv-sync",
-        state = state,
-        events = MutableSharedFlow(replay = 1, extraBufferCapacity = 64),
-        sendQueue = Channel(Channel.UNLIMITED),
-        writeMutex = Mutex(),
+        processor = TimelineProcessor(
+            initialState = TimelineReducerState(state.value),
+            scope = scope,
+            writeMutex = Mutex(),
+            stateBridge = object : TimelineProcessorStateBridge {
+                override fun synchronizeSeed(processorState: TimelineReducerState) =
+                    processorState.copy(timeline = state.value)
+
+                override fun publish(stateValue: TimelineReducerState) {
+                    state.value = stateValue.timeline
+                }
+            },
+        ),
     )
 }

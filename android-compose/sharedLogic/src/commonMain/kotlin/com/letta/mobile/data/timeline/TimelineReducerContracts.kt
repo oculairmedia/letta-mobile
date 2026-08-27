@@ -8,7 +8,7 @@ import kotlinx.collections.immutable.PersistentMap
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.persistentMapOf
 
-/** Platform-neutral state contract for a future single-owner timeline reducer. */
+/** Platform-neutral immutable state owned by [TimelineProcessor]. */
 data class TimelineReducerState(
     val timeline: Timeline,
     val pendingToolReturnsByCallId: PersistentMap<String, ToolReturnMessage> = persistentMapOf(),
@@ -20,31 +20,40 @@ data class TimelineReducerState(
     val freshnessSequence: Long = 0L,
 )
 
-/** Payload-only names for timeline mutation families; no variant performs work. */
+/** Payload-only mutation families. Ordering is assigned internally by [TimelineProcessor]. */
 sealed interface TimelineMutation {
-    val sequence: Long
-
     data class LocalAppend(
-        override val sequence: Long,
         val pending: PendingSend,
         val sentAt: TimelineInstant,
+        val mode: TimelineLocalAppendMode = TimelineLocalAppendMode.SEND,
     ) : TimelineMutation
 
-    data class RetryLocal(override val sequence: Long, val otid: String) : TimelineMutation
-    data class MarkLocalSent(override val sequence: Long, val otid: String) : TimelineMutation
-    data class MarkLocalFailed(override val sequence: Long, val otid: String) : TimelineMutation
-    data class StreamFrame(override val sequence: Long, val message: LettaMessage) : TimelineMutation
-    data class SnapshotEnrichment(override val sequence: Long, val messages: List<LettaMessage>) : TimelineMutation
-    data class HydrateSnapshot(override val sequence: Long, val generation: Long, val messages: List<LettaMessage>) : TimelineMutation
-    data class ReconcileSnapshot(override val sequence: Long, val generation: Long, val messages: List<LettaMessage>) : TimelineMutation
+    data class RetryLocal(val otid: String) : TimelineMutation
+    data class MarkLocalSent(val otid: String) : TimelineMutation
+    data class MarkLocalFailed(val otid: String) : TimelineMutation
+    data class StreamFrame(val message: LettaMessage) : TimelineMutation
+    data class SnapshotEnrichment(val messages: List<LettaMessage>) : TimelineMutation
+    data class HydrateSnapshot(val generation: Long, val messages: List<LettaMessage>) : TimelineMutation
+    data class ReconcileSnapshot(val generation: Long, val messages: List<LettaMessage>) : TimelineMutation
     data class CleanupAbandonedFragments(
-        override val sequence: Long,
         val runId: String?,
         val turnId: String?,
         val reason: String,
         val candidateRunIds: Set<String> = emptySet(),
     ) : TimelineMutation
-    data class LifecycleReset(override val sequence: Long, val epoch: Long) : TimelineMutation
+    data class LifecycleReset(val epoch: Long) : TimelineMutation
+}
+
+/** Local append variants currently migrated to the processor. */
+enum class TimelineLocalAppendMode {
+    /** Append, enqueue the transport send, then emit LocalAppended. */
+    SEND,
+
+    /** The caller queues transport separately; append only for same-frame UI visibility. */
+    OPTIMISTIC,
+
+    /** Append a local observed from the external transport and emit LocalAppended. */
+    EXTERNAL_TRANSPORT,
 }
 
 sealed interface TimelineReductionEffect {
@@ -96,6 +105,23 @@ fun reduceLocalAppend(state: TimelineReducerState, payload: LocalAppendPayload):
         TimelineReductionEffect.Send(pending),
         TimelineReductionEffect.EmitSyncEvent(TimelineSyncEvent.LocalAppended(payload.otid)),
     )
+}
+
+fun reduceLocalAppend(
+    state: TimelineReducerState,
+    payload: LocalAppendPayload,
+    mode: TimelineLocalAppendMode,
+): TimelineReduction {
+    val reduction = reduceLocalAppend(state, payload)
+    if (!reduction.result.changed || mode == TimelineLocalAppendMode.SEND) return reduction
+    val effects = when (mode) {
+        TimelineLocalAppendMode.SEND -> reduction.effects
+        TimelineLocalAppendMode.OPTIMISTIC -> persistentListOf()
+        TimelineLocalAppendMode.EXTERNAL_TRANSPORT -> persistentListOf(
+            TimelineReductionEffect.EmitSyncEvent(TimelineSyncEvent.LocalAppended(payload.otid)),
+        )
+    }
+    return reduction.copy(effects = effects)
 }
 
 fun reduceRetryLocal(state: TimelineReducerState, otid: String): TimelineReduction {
@@ -188,3 +214,104 @@ private fun changed(
     kind: TimelineChangeKind,
     vararg effects: TimelineReductionEffect,
 ) = TimelineReduction(state, effects.toList().toTimelinePersistentList(), TimelineReductionResult.Changed(kind))
+
+/** Production reducer used by both [TimelineProcessor] and the parity harness. */
+fun reduceProductionMutation(state: TimelineReducerState, mutation: TimelineMutation): TimelineReduction = when (mutation) {
+    is TimelineMutation.LocalAppend -> reduceLocalAppend(
+        state,
+        LocalAppendPayload(
+            mutation.pending.otid,
+            mutation.pending.content,
+            mutation.pending.attachments,
+            mutation.sentAt,
+        ),
+        mutation.mode,
+    )
+    is TimelineMutation.RetryLocal -> reduceRetryLocal(state, mutation.otid)
+    is TimelineMutation.MarkLocalSent -> reduceMarkLocalSent(state, mutation.otid)
+    is TimelineMutation.MarkLocalFailed -> reduceMarkLocalFailed(state, mutation.otid)
+    is TimelineMutation.StreamFrame -> reduceStreamMutation(state, mutation)
+    is TimelineMutation.SnapshotEnrichment -> reduceSnapshotEnrichment(state, mutation.messages)
+    is TimelineMutation.HydrateSnapshot -> reduceHydrateMutation(state, mutation)
+    is TimelineMutation.ReconcileSnapshot -> reduceReconcileMutation(state, mutation)
+    is TimelineMutation.CleanupAbandonedFragments -> reduceCleanup(
+        state,
+        mutation.runId,
+        mutation.turnId,
+        mutation.reason,
+        mutation.candidateRunIds,
+    )
+    is TimelineMutation.LifecycleReset -> changedIfNeeded(state, state.copy(lifecycleEpoch = mutation.epoch))
+}
+
+private fun reduceStreamMutation(
+    state: TimelineReducerState,
+    mutation: TimelineMutation.StreamFrame,
+): TimelineReduction {
+    val output = reduceStreamFrame(
+        TimelineReducerInput(
+            state.timeline,
+            mutation.message,
+            state.pendingToolReturnsByCallId,
+            "timeline-processor",
+        ),
+    )
+    val effects = buildList {
+        output.emittedEvents.forEach { add(TimelineReductionEffect.EmitSyncEvent(it)) }
+        output.notification?.let { add(TimelineReductionEffect.Notify(it)) }
+    }.toTimelinePersistentList()
+    val didChange = output.next != state.timeline ||
+        output.updatedPendingToolReturnsByCallId != state.pendingToolReturnsByCallId
+    return TimelineReduction(
+        state.copy(
+            timeline = output.next,
+            pendingToolReturnsByCallId = output.updatedPendingToolReturnsByCallId,
+        ),
+        effects,
+        if (didChange) TimelineReductionResult.Changed(TimelineChangeKind.RECONCILED)
+        else TimelineReductionResult.NoChange,
+    )
+}
+
+private fun reduceHydrateMutation(
+    state: TimelineReducerState,
+    mutation: TimelineMutation.HydrateSnapshot,
+): TimelineReduction {
+    val hydrated = TimelineHydrationReducer.reduce(
+        state.timeline.conversationId,
+        normalizeHydratedMessageOrder(mutation.messages),
+        state.timeline,
+        state.timeline,
+        emptyList(),
+    )
+    return changedIfNeeded(
+        state,
+        state.copy(timeline = hydrated.timeline, hydrateGeneration = mutation.generation),
+    )
+}
+
+private fun reduceReconcileMutation(
+    state: TimelineReducerState,
+    mutation: TimelineMutation.ReconcileSnapshot,
+): TimelineReduction {
+    val enriched = reduceSnapshotEnrichment(state, mutation.messages)
+    val merged = enriched.next.timeline.mergeServerMessages(mutation.messages).first
+    val next = enriched.next.copy(
+        timeline = merged,
+        highestRequestedReconcileGeneration = maxOf(
+            state.highestRequestedReconcileGeneration,
+            mutation.generation,
+        ),
+        highestAppliedReconcileGeneration = mutation.generation,
+    )
+    return changedIfNeeded(state, next)
+}
+
+private fun changedIfNeeded(
+    state: TimelineReducerState,
+    next: TimelineReducerState,
+): TimelineReduction = TimelineReduction(
+    next,
+    result = if (next == state) TimelineReductionResult.NoChange
+    else TimelineReductionResult.Changed(TimelineChangeKind.RECONCILED),
+)

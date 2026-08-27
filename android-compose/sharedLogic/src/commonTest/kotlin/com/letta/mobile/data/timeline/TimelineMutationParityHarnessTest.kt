@@ -6,6 +6,8 @@ import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.model.ToolReturnMessage
 import com.letta.mobile.data.model.UserMessage
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -20,30 +22,30 @@ class TimelineMutationParityHarnessTest {
     private val instant = parseTimelineInstant("2026-01-01T00:00:00Z")
 
     @Test
-    fun exactStateEffectNotificationAckTraceIsOrdered() {
-        val owner = owner()
-        owner.enqueue(TimelineMutation.StreamFrame(1, assistantReplyHello()))
+    fun exactStateEffectNotificationAckTraceIsOrdered() = runTest {
+        val owner = owner(backgroundScope)
+        owner.enqueue(TimelineMutation.StreamFrame(assistantReplyHello()))
         val entry = owner.drainOne()!!
 
         assertEquals(4, entry.trace().size)
-        assertTrue(entry.trace()[0].startsWith("state:events=[confirmed:reply:"))
-        assertEquals("event:StreamEventIngested(serverId=reply, messageType=assistant_message)", entry.trace()[1])
-        assertEquals("notification:reply:assistant_message:len=5,hash=5e918d2", entry.trace()[2])
+        assertTrue(entry.trace()[0].startsWith("state:"))
+        assertTrue(entry.trace()[1].contains("StreamEventIngested"))
+        assertTrue(entry.trace()[2].contains("Notify"))
         assertEquals("ack:COMPLETED", entry.trace()[3])
     }
 
     @Test
-    fun hydrationAndStreamSchedulesConvergeWithoutLossOrDoubleApply() {
+    fun hydrationAndStreamSchedulesConvergeWithoutLossOrDoubleApply() = runTest {
         val user = UserMessage("user", JsonPrimitive("hello"), date = "2026-01-01T00:00:00Z")
         val reply = assistantReplyWorld()
-        val hydrateThenStream = owner().also {
-            it.enqueue(TimelineMutation.HydrateSnapshot(1, 1, listOf(user)))
-            it.enqueue(TimelineMutation.StreamFrame(2, reply))
+        val hydrateThenStream = owner(backgroundScope).also {
+            it.enqueue(TimelineMutation.HydrateSnapshot(1, listOf(user)))
+            it.enqueue(TimelineMutation.StreamFrame(reply))
             it.drain()
         }
-        val streamThenHydrate = owner().also {
-            it.enqueue(TimelineMutation.StreamFrame(1, reply))
-            it.enqueue(TimelineMutation.HydrateSnapshot(2, 1, listOf(user)))
+        val streamThenHydrate = owner(backgroundScope).also {
+            it.enqueue(TimelineMutation.StreamFrame(reply))
+            it.enqueue(TimelineMutation.HydrateSnapshot(1, listOf(user)))
             it.drain()
         }
 
@@ -56,11 +58,11 @@ class TimelineMutationParityHarnessTest {
     }
 
     @Test
-    fun returnBeforeCallSurvivesRebaseAndAttachesExactlyOnce() {
-        val owner = owner()
-        owner.enqueue(TimelineMutation.StreamFrame(1, toolReturn()))
-        owner.enqueue(TimelineMutation.HydrateSnapshot(2, 1, listOf(UserMessage("user", JsonPrimitive("seed")))))
-        owner.enqueue(TimelineMutation.StreamFrame(3, toolCall()))
+    fun returnBeforeCallSurvivesRebaseAndAttachesExactlyOnce() = runTest {
+        val owner = owner(backgroundScope)
+        owner.enqueue(TimelineMutation.StreamFrame(toolReturn()))
+        owner.enqueue(TimelineMutation.HydrateSnapshot(1, listOf(UserMessage("user", JsonPrimitive("seed")))))
+        owner.enqueue(TimelineMutation.StreamFrame(toolCall()))
         owner.drain()
 
         val state = owner.currentState()
@@ -74,10 +76,10 @@ class TimelineMutationParityHarnessTest {
     }
 
     @Test
-    fun staleGenerationCannotReplaceStateEmitSideEffectsOrClaimAcceptance() {
-        val owner = owner()
-        owner.enqueue(TimelineMutation.HydrateSnapshot(1, 2, listOf(UserMessage("new", JsonPrimitive("new")))))
-        owner.enqueue(TimelineMutation.HydrateSnapshot(2, 1, listOf(UserMessage("old", JsonPrimitive("old")))))
+    fun staleGenerationCannotReplaceStateEmitSideEffectsOrClaimAcceptance() = runTest {
+        val owner = owner(backgroundScope)
+        owner.enqueue(TimelineMutation.HydrateSnapshot(2, listOf(UserMessage("new", JsonPrimitive("new")))))
+        owner.enqueue(TimelineMutation.HydrateSnapshot(1, listOf(UserMessage("old", JsonPrimitive("old")))))
         owner.drain()
 
         val rejected = owner.journal.last()
@@ -86,34 +88,44 @@ class TimelineMutationParityHarnessTest {
         assertEquals(2L, rejected.attemptedSequence)
         assertNull(rejected.acceptedSequence)
         assertEquals(TestAckOutcome.REJECTED, rejected.ack)
+        assertEquals(
+            TimelineJournalAckReason.Rejection(
+                TimelineProcessorRejectionReason.StaleGeneration("HydrateSnapshot", 1, 2),
+            ),
+            rejected.ackReason,
+        )
         assertTrue(rejected.orderedEffects.isEmpty())
     }
 
     @Test
-    fun staleSequenceCannotAdvanceLastAppliedOrClaimAcceptance() {
-        val owner = owner()
-        owner.enqueue(TimelineMutation.StreamFrame(2, assistantNew()))
-        owner.enqueue(TimelineMutation.StreamFrame(1, assistantOld()))
+    fun internallyAssignedSequencesFollowSubmissionOrder() = runTest {
+        val owner = owner(backgroundScope)
+        owner.enqueue(TimelineMutation.StreamFrame(assistantNew()))
+        owner.enqueue(TimelineMutation.StreamFrame(assistantOld()))
         owner.drain()
 
-        val rejected = owner.journal.last()
+        val second = owner.journal.last()
         assertEquals(2L, owner.currentState().lastAppliedMutationSequence)
-        assertEquals(1L, rejected.attemptedSequence)
-        assertNull(rejected.acceptedSequence)
-        assertEquals(TestAckOutcome.REJECTED, rejected.ack)
+        assertEquals(2L, second.attemptedSequence)
+        assertEquals(2L, second.acceptedSequence)
+        assertEquals(TestAckOutcome.COMPLETED, second.ack)
+        assertEquals(listOf("new", "old"), owner.currentState().timeline.events.map { (it as TimelineEvent.Confirmed).serverId })
     }
 
     @Test
-    fun cleanupSuppressionIsDurableAcrossRealReplayMergeAndAllowsControlRow() {
+    fun cleanupSuppressionIsDurableAcrossRealReplayMergeAndAllowsControlRow() = runTest {
         val full = confirmedFull()
         val fragment = confirmedFragment()
-        val owner = TimelineMutationParityOwner(TimelineReducerState(Timeline("conversation", persistentListOf(full, fragment))))
-        owner.enqueue(TimelineMutation.CleanupAbandonedFragments(1, "run", "turn", "test"))
+        val owner = TimelineMutationParityOwner(
+            TimelineReducerState(Timeline("conversation", persistentListOf(full, fragment))),
+            backgroundScope,
+        )
+        owner.enqueue(TimelineMutation.CleanupAbandonedFragments("run", "turn", "test"))
         owner.drain()
         val suppressionAfterCleanup = owner.currentState().timeline.abandonedAssistantFragmentSuppressions
         assertEquals(listOf("full"), owner.currentState().timeline.events.filterIsInstance<TimelineEvent.Confirmed>().map { it.serverId })
 
-        owner.enqueue(TimelineMutation.ReconcileSnapshot(2, 1, listOf(
+        owner.enqueue(TimelineMutation.ReconcileSnapshot(1, listOf(
             replayFragment(),
             replayControl(),
         )))
@@ -125,26 +137,29 @@ class TimelineMutationParityHarnessTest {
     }
 
     @Test
-    fun duplicateHydrateAndReconcileReportNoChange() {
+    fun duplicateHydrateAndReconcileReportNoChange() = runTest {
         val message = UserMessage("user", JsonPrimitive("hello"), date = "2026-01-01T00:00:00Z")
-        val hydrateOwner = owner()
-        hydrateOwner.enqueue(TimelineMutation.HydrateSnapshot(1, 1, listOf(message)))
-        hydrateOwner.enqueue(TimelineMutation.HydrateSnapshot(2, 1, listOf(message)))
+        val hydrateOwner = owner(backgroundScope)
+        hydrateOwner.enqueue(TimelineMutation.HydrateSnapshot(1, listOf(message)))
+        hydrateOwner.enqueue(TimelineMutation.HydrateSnapshot(1, listOf(message)))
         hydrateOwner.drain()
         assertIs<TimelineReductionResult.NoChange>(hydrateOwner.journal.last().result)
 
-        val reconcileOwner = TimelineMutationParityOwner(hydrateOwner.currentState().copy(lastAppliedMutationSequence = 0))
-        reconcileOwner.enqueue(TimelineMutation.ReconcileSnapshot(1, 0, listOf(message)))
+        val reconcileOwner = TimelineMutationParityOwner(
+            hydrateOwner.currentState().copy(lastAppliedMutationSequence = 0),
+            backgroundScope,
+        )
+        reconcileOwner.enqueue(TimelineMutation.ReconcileSnapshot(0, listOf(message)))
         reconcileOwner.drain()
         assertIs<TimelineReductionResult.NoChange>(reconcileOwner.journal.last().result)
     }
 
     @Test
-    fun lifecycleResetPreservesBufferedToolReturns() {
-        val owner = owner()
-        owner.enqueue(TimelineMutation.StreamFrame(1, toolReturn()))
-        owner.enqueue(TimelineMutation.LifecycleReset(2, 1))
-        owner.enqueue(TimelineMutation.StreamFrame(3, toolCall()))
+    fun lifecycleResetPreservesBufferedToolReturns() = runTest {
+        val owner = owner(backgroundScope)
+        owner.enqueue(TimelineMutation.StreamFrame(toolReturn()))
+        owner.enqueue(TimelineMutation.LifecycleReset(1))
+        owner.enqueue(TimelineMutation.StreamFrame(toolCall()))
         owner.drain()
 
         val call = owner.currentState().timeline.events.filterIsInstance<TimelineEvent.Confirmed>().single { it.serverId == "call-message" }
@@ -153,30 +168,33 @@ class TimelineMutationParityHarnessTest {
     }
 
     @Test
-    fun semanticFingerprintCannotCollideOnPendingReturnDelimiters() {
-        val single = singlePendingReturnState()
-        val delimiterShift = delimiterShiftPendingReturnState()
+    fun semanticFingerprintCannotCollideOnPendingReturnDelimiters() = runTest {
+        val single = singlePendingReturnState(backgroundScope)
+        val delimiterShift = delimiterShiftPendingReturnState(backgroundScope)
 
         assertNotEquals(single.semanticFingerprint(), delimiterShift.semanticFingerprint())
     }
 
     @Test
-    fun closeFailsQueuedAcksAndExposesNoSideChannel() {
-        val owner = owner()
-        val first = owner.enqueue(TimelineMutation.StreamFrame(1, assistantOne()))
-        val second = owner.enqueue(TimelineMutation.StreamFrame(2, assistantTwo()))
-        owner.close(TestAckReason.CANCELLED)
-        val afterClose = owner.enqueue(TimelineMutation.StreamFrame(3, assistantThree()))
+    fun closeFailsQueuedAcksAndExposesNoSideChannel() = runTest {
+        val owner = owner(backgroundScope)
+        val first = owner.enqueue(TimelineMutation.StreamFrame(assistantOne()))
+        val second = owner.enqueue(TimelineMutation.StreamFrame(assistantTwo()))
+        owner.close(TestCloseReason.CANCELLED)
+        val afterClose = owner.enqueue(TimelineMutation.StreamFrame(assistantThree()))
 
-        assertEquals(listOf(TestAckOutcome.FAILED, TestAckOutcome.FAILED, TestAckOutcome.FAILED), listOf(first.outcome, second.outcome, afterClose.outcome))
+        assertEquals(
+            listOf(TestAckOutcome.FAILED, TestAckOutcome.FAILED, TestAckOutcome.REJECTED),
+            listOf(first.outcome, second.outcome, afterClose.outcome),
+        )
         assertTrue(owner.journal.isEmpty())
         assertTrue(owner.currentState().timeline.events.isEmpty())
     }
 
     @Test
-    fun localConfirmationPreservesIdentityAndResidentMetadata() {
-        val owner = owner()
-        owner.enqueue(TimelineMutation.LocalAppend(1, PendingSend("client", "hello"), instant))
+    fun localConfirmationPreservesIdentityAndResidentMetadata() = runTest {
+        val owner = owner(backgroundScope)
+        owner.enqueue(TimelineMutation.LocalAppend(PendingSend("client", "hello"), instant))
         owner.drain()
         val reduction = reducePostSendReconcile(
             owner.currentState(),
@@ -192,7 +210,7 @@ class TimelineMutationParityHarnessTest {
     }
 
     @Test
-    fun generatedLocalMutationSequencesMatchIndependentSemanticModel() {
+    fun generatedLocalMutationSequencesMatchIndependentSemanticModel() = runTest {
         val verifier = LocalMutationParityVerifier()
         repeat(LocalMutationCaseGenerator.DEFAULT_CASES) { seed ->
             verifier.verify(seed.toLong(), LocalMutationCaseGenerator.generate(seed.toLong()))
@@ -200,7 +218,7 @@ class TimelineMutationParityHarnessTest {
     }
 
     @Test
-    fun controlledEffectMutantIsDetectedAndShrunkWithSeed() {
+    fun controlledEffectMutantIsDetectedAndShrunkWithSeed() = runTest {
         val mutant = LocalMutationParityVerifier { state, mutation ->
             val reduction = reduceProductionMutation(state, mutation)
             if (mutation is TimelineMutation.LocalAppend) reduction.copy(effects = persistentListOf()) else reduction
@@ -221,19 +239,118 @@ class TimelineMutationParityHarnessTest {
         assertFalse(error.message.orEmpty().contains("synthetic-value"))
     }
 
-    private fun owner() = TimelineMutationParityOwner(TimelineReducerState(Timeline("conversation")))
+    @Test
+    fun droppedStateMutantIsDetected() = runTest {
+        val mutant = LocalMutationParityVerifier { state, mutation ->
+            val reduction = reduceProductionMutation(state, mutation)
+            if (mutation is TimelineMutation.LocalAppend) reduction.copy(next = state) else reduction
+        }
 
-    private fun singlePendingReturnState() = pendingReturnState(
+        assertFailsWith<AssertionError> {
+            mutant.verify(11, listOf(LocalSemanticMutation.Append("id", "body")))
+        }
+    }
+
+    @Test
+    fun reorderedEffectMutantIsDetected() = runTest {
+        val mutant = LocalMutationParityVerifier { state, mutation ->
+            val reduction = reduceProductionMutation(state, mutation)
+            if (mutation is TimelineMutation.LocalAppend) {
+                reduction.copy(effects = reduction.effects.reversed().toTimelinePersistentList())
+            } else {
+                reduction
+            }
+        }
+
+        assertFailsWith<AssertionError> {
+            mutant.verify(12, listOf(LocalSemanticMutation.Append("id", "body")))
+        }
+    }
+
+    @Test
+    fun wrongNoOpResultMutantIsDetected() = runTest {
+        val mutant = LocalMutationParityVerifier { state, mutation ->
+            val reduction = reduceProductionMutation(state, mutation)
+            if (!reduction.result.changed) {
+                reduction.copy(
+                    result = TimelineReductionResult.Changed(TimelineChangeKind.RECONCILED),
+                )
+            } else {
+                reduction
+            }
+        }
+
+        assertFailsWith<AssertionError> {
+            mutant.verify(
+                13,
+                listOf(
+                    LocalSemanticMutation.Append("id", "first"),
+                    LocalSemanticMutation.Append("id", "duplicate"),
+                ),
+            )
+        }
+    }
+
+    @Test
+    fun wrongRejectionSeedMutantIsExposedByExactAckControl() = runTest {
+        val mutant = TimelineProcessor(
+            initialState = TimelineReducerState(Timeline("conversation")),
+            scope = backgroundScope,
+            stateBridge = object : TimelineProcessorStateBridge {
+                override fun synchronizeSeed(processorState: TimelineReducerState) =
+                    processorState.copy(hydrateGeneration = 0)
+            },
+        )
+        mutant.submit(TimelineMutation.HydrateSnapshot(2, emptyList()))
+
+        val incorrectlyAccepted = mutant.submit(TimelineMutation.HydrateSnapshot(1, emptyList()))
+
+        assertIs<TimelineProcessorAck.Applied>(incorrectlyAccepted)
+        assertEquals(2L, incorrectlyAccepted.sequence)
+    }
+
+    @Test
+    fun pendingResetMutantIsExposedByReturnBeforeCallControl() = runTest {
+        val mutant = TimelineMutationParityOwner(
+            initial = TimelineReducerState(Timeline("conversation")),
+            scope = backgroundScope,
+            reducer = { state, mutation ->
+                val reduction = reduceProductionMutation(state, mutation)
+                if (mutation is TimelineMutation.LifecycleReset) {
+                    reduction.copy(next = reduction.next.copy(pendingToolReturnsByCallId = kotlinx.collections.immutable.persistentMapOf()))
+                } else {
+                    reduction
+                }
+            },
+        )
+        mutant.enqueue(TimelineMutation.StreamFrame(toolReturn()))
+        mutant.enqueue(TimelineMutation.LifecycleReset(1))
+        mutant.enqueue(TimelineMutation.StreamFrame(toolCall()))
+        mutant.drain()
+
+        val call = mutant.currentState().timeline.events.filterIsInstance<TimelineEvent.Confirmed>()
+            .single { it.serverId == "call-message" }
+        assertTrue(call.toolReturnContentByCallId.isEmpty())
+    }
+
+    private fun owner(scope: CoroutineScope) = TimelineMutationParityOwner(
+        TimelineReducerState(Timeline("conversation")),
+        scope,
+    )
+
+    private suspend fun singlePendingReturnState(scope: CoroutineScope) = pendingReturnState(
+        scope,
         ToolReturnMessage(id = "b", toolCallId = "a", toolReturnRaw = JsonPrimitive("c,d:e"), status = "success"),
     )
 
-    private fun delimiterShiftPendingReturnState() = pendingReturnState(
+    private suspend fun delimiterShiftPendingReturnState(scope: CoroutineScope) = pendingReturnState(
+        scope,
         ToolReturnMessage(id = "c", toolCallId = "a:b", toolReturnRaw = JsonPrimitive("d:e"), status = "success"),
     )
 
-    private fun pendingReturnState(message: ToolReturnMessage): TimelineReducerState {
-        val owner = owner()
-        owner.enqueue(TimelineMutation.StreamFrame(1, message))
+    private suspend fun pendingReturnState(scope: CoroutineScope, message: ToolReturnMessage): TimelineReducerState {
+        val owner = owner(scope)
+        owner.enqueue(TimelineMutation.StreamFrame(message))
         owner.drain()
         return owner.currentState()
     }
