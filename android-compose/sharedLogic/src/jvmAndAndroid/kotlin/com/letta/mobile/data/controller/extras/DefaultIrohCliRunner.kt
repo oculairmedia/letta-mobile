@@ -118,6 +118,9 @@ class DefaultIrohCliRunner(
             process.outputStream.bufferedWriter(Charsets.UTF_8).use { writer ->
                 writer.write(body)
             }
+        } catch (e: CancellationException) {
+            process.destroyForcibly()
+            throw e
         } catch (e: Exception) {
             process.destroyForcibly()
             return@withContext IrohCliSendResult.Failed(
