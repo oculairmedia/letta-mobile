@@ -17,6 +17,7 @@ import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.transport.iroh.HostEndpointAddressStore
 import com.letta.mobile.data.transport.iroh.IdentityMigrationAction
 import com.letta.mobile.data.transport.iroh.IrohAgentAddress
+import com.letta.mobile.data.transport.iroh.IrohAgentAddressResolver
 import com.letta.mobile.data.transport.iroh.IrohAgentIdentity
 import com.letta.mobile.data.transport.iroh.IrohAgentMessage
 import com.letta.mobile.data.transport.iroh.DeliveryOutcome
@@ -561,26 +562,20 @@ internal suspend fun handleCreateAndDeliver(
         )
         return inputOnConversation(client, message, createdId)
     } else {
+        val dropAttrs = mutableListOf<Pair<String, Any?>>(
+            "fromAgentId" to message.fromAgentId,
+            "toAgentId" to message.toAgentId,
+            "msgId" to message.msgId,
+            "reason" to "no_conversation_create_path",
+        )
         if (!appServerError.isNullOrBlank()) {
-            Telemetry.event(
-                "A2aHost", "a2a.drop",
-                "fromAgentId" to message.fromAgentId,
-                "toAgentId" to message.toAgentId,
-                "msgId" to message.msgId,
-                "reason" to "no_conversation_create_path",
-                "error" to appServerError,
-                level = Telemetry.Level.WARN,
-            )
-        } else {
-            Telemetry.event(
-                "A2aHost", "a2a.drop",
-                "fromAgentId" to message.fromAgentId,
-                "toAgentId" to message.toAgentId,
-                "msgId" to message.msgId,
-                "reason" to "no_conversation_create_path",
-                level = Telemetry.Level.WARN,
-            )
+            dropAttrs.add("error" to appServerError)
         }
+        Telemetry.event(
+            "A2aHost", "a2a.drop",
+            *dropAttrs.toTypedArray(),
+            level = Telemetry.Level.WARN,
+        )
     }
     return DeliveryOutcome(false, "conversation_create_failure")
 }
