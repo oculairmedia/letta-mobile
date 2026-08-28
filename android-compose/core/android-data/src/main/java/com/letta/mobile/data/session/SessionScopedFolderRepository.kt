@@ -21,6 +21,8 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 
+// The singleton repository owns this scope and cancels it explicitly in close().
+@Suppress("NoDetachedCoroutineLifecycle")
 internal fun defaultSessionScopedFolderRepositoryScope(): CoroutineScope =
     CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
