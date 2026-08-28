@@ -8,6 +8,7 @@ import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Boot/reconnect restore of the App Server's channel accounts (lgns8.23).
@@ -109,7 +110,7 @@ class ChannelRestoreCoordinator(
     private val maxAttemptsPerAccount: Int = DEFAULT_MAX_ATTEMPTS,
     private val baseBackoffMs: Long = DEFAULT_BASE_BACKOFF_MS,
     private val maxBackoffMs: Long = DEFAULT_MAX_BACKOFF_MS,
-    private val sleep: suspend (Long) -> Unit = { delay(it) },
+    private val sleep: suspend (Long) -> Unit = { delay(it.milliseconds) },
     /**
      * Diagnostic sink. Receives ids and outcomes only — never config bodies.
      * Defaults to a no-op so library use is silent; the CLI passes a printer.
