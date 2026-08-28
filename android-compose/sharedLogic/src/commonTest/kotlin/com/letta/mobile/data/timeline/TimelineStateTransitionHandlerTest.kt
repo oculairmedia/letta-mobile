@@ -9,8 +9,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.runTest
 
 class TimelineStateTransitionHandlerTest {
@@ -25,7 +24,7 @@ class TimelineStateTransitionHandlerTest {
         )
 
         assertTrue(ack.isCompleted)
-        val local = assertIs<TimelineEvent.Local>(harness.state.value.events.single())
+        val local = assertIs<TimelineEvent.Local>(harness.state.value.timeline.events.single())
         assertEquals("otid-1", local.otid)
         assertEquals("hello", local.content)
         assertEquals(DeliveryState.SENDING, local.deliveryState)
@@ -50,7 +49,7 @@ class TimelineStateTransitionHandlerTest {
         assertTrue(ack.isCompleted)
         assertEquals(
             DeliveryState.SENDING,
-            (harness.state.value.events.single() as TimelineEvent.Local).deliveryState,
+            (harness.state.value.timeline.events.single() as TimelineEvent.Local).deliveryState,
         )
         assertEquals(PendingSend("otid-2", "retry-me"), harness.sendQueue.receive())
     }
@@ -75,7 +74,7 @@ class TimelineStateTransitionHandlerTest {
         )
 
         assertTrue(harness.sendQueue.isEmpty)
-        assertEquals(DeliveryState.SENDING, (harness.state.value.events.single() as TimelineEvent.Local).deliveryState)
+        assertEquals(DeliveryState.SENDING, (harness.state.value.timeline.events.single() as TimelineEvent.Local).deliveryState)
     }
 
     @Test
@@ -93,17 +92,17 @@ class TimelineStateTransitionHandlerTest {
         harness.handler.applyMarkSent(
             TimelineGatewayEvent.MarkSent("otid", CompletableDeferred()),
         )
-        assertEquals(DeliveryState.SENT, (harness.state.value.events.single() as TimelineEvent.Local).deliveryState)
+        assertEquals(DeliveryState.SENT, (harness.state.value.timeline.events.single() as TimelineEvent.Local).deliveryState)
 
         harness.handler.applyMarkFailed(
             TimelineGatewayEvent.MarkFailed("otid", CompletableDeferred()),
         )
-        assertEquals(DeliveryState.FAILED, (harness.state.value.events.single() as TimelineEvent.Local).deliveryState)
+        assertEquals(DeliveryState.FAILED, (harness.state.value.timeline.events.single() as TimelineEvent.Local).deliveryState)
 
         harness.handler.applyMarkSent(
             TimelineGatewayEvent.MarkSent("missing", CompletableDeferred()),
         )
-        assertEquals(1, harness.state.value.events.size)
+        assertEquals(1, harness.state.value.timeline.events.size)
     }
 
     @Test
@@ -130,26 +129,15 @@ class TimelineStateTransitionHandlerTest {
         harness.handler.markOptimisticLocalFailedSync("otid")
         harness.handler.markOptimisticLocalSentSync("otid")
 
-        assertEquals(DeliveryState.SENDING, (harness.state.value.events.single() as TimelineEvent.Local).deliveryState)
+        assertEquals(DeliveryState.SENDING, (harness.state.value.timeline.events.single() as TimelineEvent.Local).deliveryState)
     }
 
     private fun harness(initial: Timeline, scope: CoroutineScope): HandlerHarness {
-        val state = MutableStateFlow(initial)
         val events = MutableSharedFlow<TimelineSyncEvent>(replay = 10)
         val sendQueue = Channel<PendingSend>(Channel.UNLIMITED)
-        val mutex = Mutex()
         val processor = TimelineProcessor(
             initialState = TimelineReducerState(initial),
             scope = scope,
-            writeMutex = mutex,
-            stateBridge = object : TimelineProcessorStateBridge {
-                override fun synchronizeSeed(processorState: TimelineReducerState) =
-                    processorState.copy(timeline = state.value)
-
-                override fun publish(stateValue: TimelineReducerState) {
-                    state.value = stateValue.timeline
-                }
-            },
             effectHandler = { effect ->
                 when (effect) {
                     is TimelineReductionEffect.Send -> sendQueue.send(effect.pending)
@@ -159,7 +147,7 @@ class TimelineStateTransitionHandlerTest {
             },
         )
         return HandlerHarness(
-            state = state,
+            state = processor.state,
             sendQueue = sendQueue,
             handler = TimelineStateTransitionHandler("c1", processor),
             processor = processor,
@@ -167,7 +155,7 @@ class TimelineStateTransitionHandlerTest {
     }
 
     private data class HandlerHarness(
-        val state: MutableStateFlow<Timeline>,
+        val state: StateFlow<TimelineReducerState>,
         val sendQueue: Channel<PendingSend>,
         val handler: TimelineStateTransitionHandler,
         val processor: TimelineProcessor,

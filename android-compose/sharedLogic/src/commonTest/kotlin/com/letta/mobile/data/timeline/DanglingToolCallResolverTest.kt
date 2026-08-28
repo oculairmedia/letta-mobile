@@ -33,20 +33,12 @@ class DanglingToolCallResolverTest {
     }
 
 
-    private fun bridgedProcessor(
+    private fun processor(
         state: MutableStateFlow<Timeline>,
         scope: kotlinx.coroutines.CoroutineScope,
     ) = TimelineProcessor(
         initialState = TimelineReducerState(state.value),
         scope = scope,
-        stateBridge = object : TimelineProcessorStateBridge {
-            override fun synchronizeSeed(processorState: TimelineReducerState) =
-                processorState.copy(timeline = state.value)
-
-            override fun publish(processorState: TimelineReducerState) {
-                state.value = processorState.timeline
-            }
-        },
     )
 
     private fun toolCallEvent(
@@ -94,7 +86,7 @@ class DanglingToolCallResolverTest {
         var reconcileCalls = 0
         val resolver = DanglingToolCallResolver(
             conversationId = "c1",
-            processor = bridgedProcessor(state, backgroundScope),
+            processor = processor(state, backgroundScope),
             state = state,
             scope = backgroundScope,
             reconcile = { _, _ ->
@@ -128,7 +120,7 @@ class DanglingToolCallResolverTest {
         var reconcileCalls = 0
         val resolver = DanglingToolCallResolver(
             conversationId = "c1",
-            processor = bridgedProcessor(state, backgroundScope),
+            processor = processor(state, backgroundScope),
             state = state,
             scope = backgroundScope,
             reconcile = { _, _ ->
@@ -163,7 +155,7 @@ class DanglingToolCallResolverTest {
         var reconcileCalls = 0
         val resolver = DanglingToolCallResolver(
             conversationId = "c1",
-            processor = bridgedProcessor(state, backgroundScope),
+            processor = processor(state, backgroundScope),
             state = state,
             scope = backgroundScope,
             reconcile = { _, _ -> reconcileCalls++; 0 },
@@ -199,7 +191,7 @@ class DanglingToolCallResolverTest {
         var reconcileCalls = 0
         val resolver = DanglingToolCallResolver(
             conversationId = "c1",
-            processor = bridgedProcessor(state, backgroundScope),
+            processor = processor(state, backgroundScope),
             state = state,
             scope = backgroundScope,
             reconcile = { _, _ ->
@@ -224,7 +216,7 @@ class DanglingToolCallResolverTest {
         var reconcileCalls = 0
         val resolver = DanglingToolCallResolver(
             conversationId = "c1",
-            processor = bridgedProcessor(state, backgroundScope),
+            processor = processor(state, backgroundScope),
             state = state,
             scope = backgroundScope,
             reconcile = { _, _ -> reconcileCalls++; 0 },
@@ -242,7 +234,7 @@ class DanglingToolCallResolverTest {
         var reconcileCalls = 0
         val resolver = DanglingToolCallResolver(
             conversationId = "c1",
-            processor = bridgedProcessor(state, backgroundScope),
+            processor = processor(state, backgroundScope),
             state = state,
             scope = backgroundScope,
             reconcile = { reason, forceRefresh ->
@@ -271,7 +263,7 @@ class DanglingToolCallResolverTest {
         var reconcileCalls = 0
         val resolver = DanglingToolCallResolver(
             conversationId = "c1",
-            processor = bridgedProcessor(state, backgroundScope),
+            processor = processor(state, backgroundScope),
             state = state,
             scope = backgroundScope,
             reconcile = { _, _ ->
@@ -304,7 +296,7 @@ class DanglingToolCallResolverTest {
         var reconcileCalls = 0
         val resolver = DanglingToolCallResolver(
             conversationId = "c1",
-            processor = bridgedProcessor(state, backgroundScope),
+            processor = processor(state, backgroundScope),
             state = state,
             scope = backgroundScope,
             reconcile = { _, _ ->
@@ -330,7 +322,7 @@ class DanglingToolCallResolverTest {
         var reconcileCalls = 0
         val resolver = DanglingToolCallResolver(
             conversationId = "c1",
-            processor = bridgedProcessor(state, backgroundScope),
+            processor = processor(state, backgroundScope),
             state = state,
             scope = backgroundScope,
             reconcile = { _, _ -> reconcileCalls++; 0 },
@@ -346,7 +338,7 @@ class DanglingToolCallResolverTest {
         var reconcileCalls = 0
         val resolver = DanglingToolCallResolver(
             conversationId = "c1",
-            processor = bridgedProcessor(state, backgroundScope),
+            processor = processor(state, backgroundScope),
             state = state,
             scope = backgroundScope,
             reconcile = { _, _ -> reconcileCalls++; 0 },

@@ -45,9 +45,8 @@ internal fun MeasuredChatRenderItem(
     // signature and seed the Box's measured height so Compose skips the
     // initial measure pass when the cache hits. The cache is filled by
     // `onSizeChanged` on the FIRST measure of a row; on subsequent
-    // compositions of the same row (scrolling, reducer re-render, the
-    // every-frame `foldedViaHolder` cycle of 176 events), the cached
-    // height is what we want to use. If the cache misses, Compose
+    // compositions of the same row (scrolling or reducer re-render), the
+    // cached height is what we want to use. If the cache misses, Compose
     // measures normally and the first `onSizeChanged` populates the cache.
     //
     // `heightIn(min=…)` instead of `height(…)` so a row whose actual

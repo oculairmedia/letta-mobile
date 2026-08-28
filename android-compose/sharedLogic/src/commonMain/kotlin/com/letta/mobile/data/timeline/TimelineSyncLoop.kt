@@ -25,7 +25,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -61,13 +64,9 @@ class TimelineSyncLoop(
         override val coroutineContext = scope.coroutineContext + loopJob
     }
 
-    private val _state = MutableStateFlow(initialTimeline ?: Timeline(conversationId))
-    val state: StateFlow<Timeline> = _state.asStateFlow()
-
     private val _streamSubscriberActive = MutableStateFlow(false)
     val streamSubscriberActive: StateFlow<Boolean> = _streamSubscriberActive.asStateFlow()
 
-    private val writeMutex = Mutex()
     internal val eventQueue = Channel<TimelineGatewayEvent>(GATEWAY_EVENT_CAPACITY)
     private val _events = MutableSharedFlow<TimelineSyncEvent>(replay = 1, extraBufferCapacity = 64)
     val events: SharedFlow<TimelineSyncEvent> = _events.asSharedFlow()
@@ -80,9 +79,6 @@ class TimelineSyncLoop(
     private val eventProcessorJob: Job
     private val streamSubscriberJob: Job?
 
-    // Deferred migration families still synchronize through this bridge; stream
-    // frames themselves are processor-owned and never fan out through a holder.
-    private val pendingToolReturnsByCallId = LinkedHashMap<String, ToolReturnMessage>()
     private val seenStreamMessageLock = SynchronizedObject()
     private val seenStreamMessageKeys = ArrayDeque<String>()
     private val seenStreamMessageKeySet = mutableSetOf<String>()
@@ -110,7 +106,7 @@ class TimelineSyncLoop(
         scope = loopScope,
         messageApi = messageApi,
         eventQueue = eventQueue,
-        state = _state,
+        state = state,
         streamSubscriberActive = _streamSubscriberActive.asStateFlow(),
         processor = timelineProcessor,
             onSnapshotApplied = { scheduleSnapshotPersist(immediate = true) },
@@ -157,10 +153,11 @@ class TimelineSyncLoop(
     }
 
     private suspend fun persistCurrentSnapshot(snapshotScope: TimelineScope, prune: Boolean) {
-        val currentTimeline = writeMutex.withLock { state.value }
+        // Capture one immutable processor commit so content and sequence cannot race.
+        val committedState = timelineProcessor.state.value
         val (provisionalEnvelope, fingerprint) = withContext(ioDispatcher) {
             val envelope = TimelineSnapshotCodec.timelineToStoredEnvelope(
-                timeline = currentTimeline,
+                timeline = committedState.timeline,
                 scope = snapshotScope,
                 revision = snapshotRevision,
                 writtenAtMillis = timelineCurrentTimeMillis(),
@@ -242,63 +239,9 @@ class TimelineSyncLoop(
     @Volatile
     private var turnActive: Boolean = false
 
-    private val outboundSendProcessor = TimelineOutboundSendProcessor(
-        conversationId = conversationId,
-        messageApi = messageApi,
-        eventQueue = eventQueue,
-        state = _state,
-        events = _events,
-        pendingLocalStore = pendingLocalStore,
-        logTag = logTag,
-        scope = loopScope,
-        ingestStreamEvent = ::ingestStreamEvent,
-        // letta-mobile-r3i1z: every ingestStreamEvent above marks the ws/external-
-        // transport latch active (correct WHILE our own turn streams through the
-        // send flow — the persistent subscriber sees the same frames and must not
-        // double-ingest). Clear it when the send stream ends, or the subscriber
-        // stays muted forever and fanned-out turns from OTHER clients (Iroh
-        // observer frames) are dropped at submitStreamEvent as skippedDualIngest:
-        // the desktop rendered the prompt (via the external-run reconcile) but
-        // never the reply. ChatSendCoordinator clears the same latch at turn end
-        // on the WS/iroh coordinator path; this is the loop-owned send's mirror.
-        onSendStreamEnded = { wsSubscription.clear() },
-        // letta-mobile-dangling-tool (Codex #902 finding 1): the REST/timeline-
-        // transport send path never went through ChatSendCoordinator's
-        // turnStarted/turnEnded hooks, so a dangling tool_call streamed here
-        // never got a sweep scheduled. Mirror the WS path's semantics directly
-        // around this loop-owned send stream.
-        onTurnStarted = ::turnStarted,
-        onTurnEnded = ::turnEnded,
-    )
-
-    /**
-     * Temporary migration bridge: deferred stream/hydrate/reconcile/cleanup
-     * writers keep using [_state] under [writeMutex]. Before every migrated
-     * local mutation the processor pulls that canonical state, then publishes
-     * its committed timeline and pending-return map back while holding the same
-     * mutex. No legacy write can be overwritten by a stale processor seed.
-     */
     private val timelineProcessor = TimelineProcessor(
         initialState = TimelineReducerState(initialTimeline ?: Timeline(conversationId)),
         scope = loopScope,
-        writeMutex = writeMutex,
-        stateBridge = object : TimelineProcessorStateBridge {
-            override fun synchronizeSeed(processorState: TimelineReducerState): TimelineReducerState =
-                processorState.copy(
-                    timeline = _state.value,
-                    // The processor owns returns learned from stream frames. Legacy
-                    // writers can still add deferred returns through the bridge.
-                    pendingToolReturnsByCallId = (
-                        processorState.pendingToolReturnsByCallId + pendingToolReturnsByCallId
-                    ).toTimelinePersistentMap(),
-                )
-
-            override fun publish(state: TimelineReducerState) {
-                _state.value = state.timeline
-                pendingToolReturnsByCallId.clear()
-                pendingToolReturnsByCallId.putAll(state.pendingToolReturnsByCallId)
-            }
-        },
         effectHandler = { effect ->
             when (effect) {
                 is TimelineReductionEffect.EmitSyncEvent -> _events.emit(effect.event)
@@ -328,6 +271,25 @@ class TimelineSyncLoop(
                 is TimelineReductionEffect.AdvanceCursor -> Unit
             }
         },
+    )
+
+    val state: StateFlow<Timeline> = timelineProcessor.state
+        .map { it.timeline }
+        .stateIn(loopScope, SharingStarted.Eagerly, timelineProcessor.state.value.timeline)
+
+    private val outboundSendProcessor = TimelineOutboundSendProcessor(
+        conversationId = conversationId,
+        messageApi = messageApi,
+        eventQueue = eventQueue,
+        state = state,
+        events = _events,
+        pendingLocalStore = pendingLocalStore,
+        logTag = logTag,
+        scope = loopScope,
+        ingestStreamEvent = ::ingestStreamEvent,
+        onSendStreamEnded = { wsSubscription.clear() },
+        onTurnStarted = ::turnStarted,
+        onTurnEnded = ::turnEnded,
     )
 
     private val stateTransitionHandler = TimelineStateTransitionHandler(

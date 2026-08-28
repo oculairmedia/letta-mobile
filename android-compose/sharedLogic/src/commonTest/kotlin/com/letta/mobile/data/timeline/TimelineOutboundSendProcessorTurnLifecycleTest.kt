@@ -148,10 +148,6 @@ class TimelineOutboundSendProcessorTurnLifecycleTest {
             processor = TimelineProcessor(
                 initialState = TimelineReducerState(state.value),
                 scope = backgroundScope,
-                stateBridge = object : TimelineProcessorStateBridge {
-                    override fun synchronizeSeed(processorState: TimelineReducerState) = processorState.copy(timeline = state.value)
-                    override fun publish(processorState: TimelineReducerState) { state.value = processorState.timeline }
-                },
             ),
             state = state,
             scope = backgroundScope,

@@ -18,8 +18,6 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonPrimitive
@@ -268,29 +266,11 @@ class TimelineProcessorTest {
     }
 
     @Test
-    fun temporaryBridgePreservesLegacyStateAndFullLocalPayload() = runTest {
-        val mutex = Mutex()
-        var canonical = Timeline("conversation")
-        val bridge = object : TimelineProcessorStateBridge {
-            override fun synchronizeSeed(processorState: TimelineReducerState) =
-                processorState.copy(timeline = canonical)
-
-            override fun publish(state: TimelineReducerState) {
-                canonical = state.timeline
-            }
-        }
+    fun processorCommitsAcceptedMutationWithoutExternalStateSynchronization() = runTest {
         val processor = TimelineProcessor(
-            initialState = TimelineReducerState(canonical),
+            initialState = TimelineReducerState(Timeline("conversation")),
             scope = backgroundScope,
-            writeMutex = mutex,
-            stateBridge = bridge,
         )
-        val legacy = UserMessage(
-            id = "legacy-server",
-            contentRaw = JsonPrimitive("legacy"),
-            date = "2026-01-01T00:00:00Z",
-        ).toTimelineEvent(1.0)!!
-        mutex.withLock { canonical = canonical.append(legacy) }
         val image = MessageContentPart.Image(base64 = "Aa/BB==", mediaType = "image/png")
 
         processor.submit(
@@ -301,13 +281,11 @@ class TimelineProcessorTest {
             ),
         ).appliedResultOrThrow()
 
-        assertEquals("legacy-server", (canonical.events.first() as TimelineEvent.Confirmed).serverId)
-        assertEquals("client", canonical.events.last().otid)
-        val local = assertIs<TimelineEvent.Local>(canonical.events.last())
+        val local = assertIs<TimelineEvent.Local>(processor.state.value.timeline.events.single())
         assertEquals(instant, local.sentAt)
         assertEquals("client", local.otid)
         assertEquals(persistentListOf(image), local.attachments)
-        assertEquals(canonical, processor.state.value.timeline)
+        assertEquals(1L, processor.state.value.lastAppliedMutationSequence)
     }
 
     @Test
@@ -465,27 +443,7 @@ class TimelineProcessorTest {
     }
 
     @Test
-    fun publicationFailureDoesNotExposeUncommittedProcessorState() = runTest {
-        val processor = TimelineProcessor(
-            initialState = TimelineReducerState(Timeline("conversation")),
-            scope = backgroundScope,
-            stateBridge = object : TimelineProcessorStateBridge {
-                override fun publish(state: TimelineReducerState) {
-                    error("synthetic publication failure")
-                }
-            },
-        )
-
-        val failed = assertIs<TimelineProcessorAck.Failed>(
-            processor.submit(TimelineMutation.LocalAppend(PendingSend("hidden", "hidden"), instant)),
-        )
-        assertIs<TimelineProcessorFailureReason.StatePublicationFailure>(failed.reason)
-        assertEquals(0L, processor.state.value.lastAppliedMutationSequence)
-        assertTrue(processor.state.value.timeline.events.isEmpty())
-    }
-
-    @Test
-    fun maintenancePublicationFailureRetriesWithoutOverwritingNewerState() = runTest {
+    fun maintenanceMutationRepairsTruncatedReturnWithoutExternalPublication() = runTest {
         val truncated = TimelineEvent.Confirmed(
             position = 1.0,
             otid = "tool-otid",
@@ -501,16 +459,9 @@ class TimelineProcessorTest {
                 "call" to ToolReturnTruncation("return", 1_024),
             ),
         )
-        var publicationAttempts = 0
         val processor = TimelineProcessor(
             initialState = TimelineReducerState(Timeline("conversation", persistentListOf(truncated))),
             scope = backgroundScope,
-            stateBridge = object : TimelineProcessorStateBridge {
-                override fun publish(state: TimelineReducerState) {
-                    publicationAttempts += 1
-                    if (publicationAttempts == 1) error("transient publication failure")
-                }
-            },
         )
         val repair = TimelineMutation.RepairFullToolReturn(
             ToolReturnMessage(
@@ -523,9 +474,8 @@ class TimelineProcessorTest {
 
         val applied = assertIs<TimelineProcessorAck.Applied>(processor.submitMaintenanceMutation(repair))
 
-        assertEquals(2L, applied.sequence)
-        assertEquals(2, publicationAttempts)
-        assertEquals(2L, processor.state.value.lastAppliedMutationSequence)
+        assertEquals(1L, applied.sequence)
+        assertEquals(1L, processor.state.value.lastAppliedMutationSequence)
         val event = processor.state.value.timeline.events.single() as TimelineEvent.Confirmed
         assertEquals("full body", event.toolReturnContentByCallId["call"])
         assertFalse("call" in event.toolReturnTruncationByCallId)

@@ -13,8 +13,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 
 /** Result of one mutation submitted to [TimelineProcessor]. */
 sealed interface TimelineProcessorAck {
@@ -64,22 +62,6 @@ sealed interface TimelineProcessorFailureReason {
 }
 
 /**
- * Synchronizes the processor-owned immutable seed with temporary legacy writers.
- *
- * Both callbacks run under the processor's [Mutex]. Legacy writers must use the
- * same mutex. That makes "read legacy seed -> reduce -> publish both states" one
- * atomic operation without moving stream, hydrate, reconcile, or cleanup logic
- * into this slice. Implementations of [publish] must publish atomically and must
- * not suspend; processor state is advanced only after it returns successfully.
- */
-interface TimelineProcessorStateBridge {
-    fun synchronizeSeed(processorState: TimelineReducerState): TimelineReducerState = processorState
-    fun publish(state: TimelineReducerState) = Unit
-}
-
-object NoOpTimelineProcessorStateBridge : TimelineProcessorStateBridge
-
-/**
  * Serial owner for timeline mutations.
  *
  * A single channel consumer assigns sequence numbers in accepted mailbox order,
@@ -106,8 +88,6 @@ private value class TimelineEffectIndex(val value: Int)
 class TimelineProcessor(
     initialState: TimelineReducerState,
     scope: CoroutineScope,
-    private val writeMutex: Mutex = Mutex(),
-    private val stateBridge: TimelineProcessorStateBridge = NoOpTimelineProcessorStateBridge,
     private val reducer: (TimelineReducerState, TimelineMutation) -> TimelineReduction = ::reduceProductionMutation,
     private val effectHandler: suspend (TimelineReductionEffect) -> Unit = {},
     mailboxCapacity: Int = DEFAULT_MAILBOX_CAPACITY,
@@ -215,26 +195,21 @@ class TimelineProcessor(
         }
     }
 
-    private suspend fun prepareMutation(
+    private fun prepareMutation(
         mutation: TimelineMutation,
         sequence: TimelineSequence,
-    ): PreparedMutation =
-        writeMutex.withLock {
-            val synchronized = stateBridge.synchronizeSeed(_state.value)
-            val rejection = rejectionReason(sequence, mutation, synchronized)
-            if (rejection != null) {
-                if (_state.value != synchronized) _state.value = synchronized
-                PreparedMutation.Rejected(rejection)
-            } else {
-                val reduced = reducer(synchronized, mutation)
-                val committed = reduced.copy(
-                    next = reduced.next.copy(lastAppliedMutationSequence = sequence.value),
-                )
-                stateBridge.publish(committed.next)
-                _state.value = committed.next
-                PreparedMutation.Committed(committed)
-            }
-        }
+    ): PreparedMutation {
+        val current = _state.value
+        val rejection = rejectionReason(sequence, mutation, current)
+        if (rejection != null) return PreparedMutation.Rejected(rejection)
+
+        val reduced = reducer(current, mutation)
+        val committed = reduced.copy(
+            next = reduced.next.copy(lastAppliedMutationSequence = sequence.value),
+        )
+        _state.value = committed.next
+        return PreparedMutation.Committed(committed)
+    }
 
     private suspend fun executeEffects(
         request: ProcessorRequest,

@@ -279,24 +279,6 @@ class TimelineMutationParityHarnessTest {
     }
 
     @Test
-    fun wrongRejectionSeedMutantIsExposedByExactAckControl() = runTest {
-        val mutant = TimelineProcessor(
-            initialState = TimelineReducerState(Timeline("conversation")),
-            scope = backgroundScope,
-            stateBridge = object : TimelineProcessorStateBridge {
-                override fun synchronizeSeed(processorState: TimelineReducerState) =
-                    processorState.copy(hydrateGeneration = 0)
-            },
-        )
-        mutant.submit(hydrationMutation(2))
-
-        val incorrectlyAccepted = mutant.submit(hydrationMutation(1))
-
-        assertIs<TimelineProcessorAck.Applied>(incorrectlyAccepted)
-        assertEquals(2L, incorrectlyAccepted.sequence)
-    }
-
-    @Test
     fun pendingResetMutantIsExposedByReturnBeforeCallControl() = runTest {
         val mutant = TimelineMutationParityOwner(
             initial = TimelineReducerState(Timeline("conversation")),
