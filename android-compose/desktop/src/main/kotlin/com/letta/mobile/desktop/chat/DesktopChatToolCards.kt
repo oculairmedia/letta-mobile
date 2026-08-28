@@ -208,6 +208,7 @@ private fun ToolCardHeader(
     val rowHoverSource = remember { MutableInteractionSource() }
     val rowHovered by rowHoverSource.collectIsHoveredAsState()
     val disclosureState = if (expanded) "Expanded" else "Collapsed"
+    val showCollapsedSummary = !expanded && collapsedSummary.isNotBlank()
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -234,7 +235,7 @@ private fun ToolCardHeader(
             fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.onSurface,
         )
-        if (!expanded && collapsedSummary.isNotBlank()) {
+        if (showCollapsedSummary) {
             Text(
                 text = collapsedSummary,
                 style = MaterialTheme.typography.labelSmall,
@@ -261,20 +262,21 @@ private fun ToolCardHeader(
 
 @Composable
 private fun ToolCardBody(toolCall: UiToolCall, isError: Boolean) {
+    // Decided before the layout: inside the let-lambda below, this branch was
+    // one CodeScene could not attribute to any function.
+    val provenance = toolCall.agentMessageProvenance
+    val provenanceTint = if (provenance?.deliveryState == com.letta.mobile.data.messaging.AgentMessageDeliveryState.FAILED) {
+        MaterialTheme.colorScheme.error
+    } else {
+        MaterialTheme.colorScheme.tertiary
+    }
     Column(
         modifier = Modifier
             .testTag("tool-card-body")
             .padding(start = 31.dp, end = 10.dp, top = 2.dp, bottom = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        toolCall.agentMessageProvenance?.let { provenance ->
-            val tint = if (provenance.deliveryState == com.letta.mobile.data.messaging.AgentMessageDeliveryState.FAILED) {
-                MaterialTheme.colorScheme.error
-            } else {
-                MaterialTheme.colorScheme.tertiary
-            }
-            AgentMessageProvenanceMetadata(provenance, tint)
-        }
+        provenance?.let { AgentMessageProvenanceMetadata(it, provenanceTint) }
         toolCall.arguments.takeIf { it.isNotBlank() }?.let { args ->
             SelectionContainer {
                 Text(
@@ -478,28 +480,8 @@ internal fun DesktopAskUserQuestionCard(
                 otherValue = otherText[question.question].orEmpty(),
             )
             val actions = DesktopAskUserQuestionAnswerActions(
-                onToggleOption = { label ->
-                    val current = selections.getOrPut(question.question) { mutableListOf() }
-                    if (question.multiSelect) {
-                        if (!current.remove(label)) current.add(label)
-                    } else {
-                        current.clear()
-                        current.add(label)
-                        // Single-select is mutually exclusive with "Other": picking a
-                        // chip clears any free-text answer for this question.
-                        otherText[question.question] = ""
-                    }
-                    // trigger recomposition (SnapshotStateMap tracks value identity)
-                    selections[question.question] = current.toMutableList()
-                },
-                onOtherChanged = { text ->
-                    otherText[question.question] = text
-                    if (!question.multiSelect && text.isNotBlank()) {
-                        // Single-select is mutually exclusive with chips: typing in
-                        // "Other" clears any picked option for this question.
-                        selections[question.question] = mutableListOf()
-                    }
-                },
+                onToggleOption = { label -> toggleAskUserQuestionOption(question, label, selections, otherText) },
+                onOtherChanged = { text -> setAskUserQuestionOther(question, text, selections, otherText) },
             )
             DesktopAskUserQuestionBlock(
                 question = question,
@@ -510,6 +492,7 @@ internal fun DesktopAskUserQuestionCard(
 
         val answers = buildAskUserQuestionAnswers(spec.questions, selections, otherText)
         val canSubmit = answers.isNotEmpty() && answers.size == spec.questions.count { it.question.isNotBlank() }
+        val submitLabel = if (isSubmitting) "Sending…" else "Send answer"
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(
@@ -527,7 +510,7 @@ internal fun DesktopAskUserQuestionCard(
                     )
                 },
                 enabled = !isSubmitting && canSubmit && onDecision != null,
-            ) { Text(if (isSubmitting) "Sending…" else "Send answer") }
+            ) { Text(submitLabel) }
         }
     }
     return true
@@ -601,6 +584,47 @@ private fun DesktopAskUserQuestionBlock(
  * questions are mutually exclusive (enforced upstream), so at most one value is
  * ever present here.
  */
+/**
+ * Answering is state, not layout: these two ran inside the card's composition
+ * lambdas, which buried the single/multi-select rules among the widgets that
+ * happened to trigger them.
+ *
+ * Toggling an option in a multi-select flips its membership; in a single-select
+ * it replaces the selection and clears any free-text answer, since the two are
+ * mutually exclusive.
+ */
+private fun toggleAskUserQuestionOption(
+    question: AskUserQuestionItem,
+    label: String,
+    selections: MutableMap<String, MutableList<String>>,
+    otherText: MutableMap<String, String>,
+) {
+    val current = selections.getOrPut(question.question) { mutableListOf() }
+    if (question.multiSelect) {
+        if (!current.remove(label)) current.add(label)
+    } else {
+        current.clear()
+        current.add(label)
+        otherText[question.question] = ""
+    }
+    // Reassigned rather than mutated in place: a SnapshotStateMap tracks value
+    // identity, so an in-place edit would not recompose.
+    selections[question.question] = current.toMutableList()
+}
+
+/** The mirror of [toggleAskUserQuestionOption]: typing "Other" clears a single-select's chip. */
+private fun setAskUserQuestionOther(
+    question: AskUserQuestionItem,
+    text: String,
+    selections: MutableMap<String, MutableList<String>>,
+    otherText: MutableMap<String, String>,
+) {
+    otherText[question.question] = text
+    if (!question.multiSelect && text.isNotBlank()) {
+        selections[question.question] = mutableListOf()
+    }
+}
+
 private fun buildAskUserQuestionAnswers(
     questions: List<AskUserQuestionItem>,
     selections: Map<String, List<String>>,
@@ -625,13 +649,17 @@ private fun buildAskUserQuestionAnswers(
 
 @Composable
 internal fun ApprovalResponseCard(approvalResponse: UiApprovalResponse) {
-    val label = when (approvalResponse.approved) {
-        true -> "Approved"
-        false -> "Rejected"
-        null -> "Approval response"
+    // One decision on the verdict, yielding both the word and the glyph, rather
+    // than a `when` for the label and a separate `if` for the icon.
+    val (label, glyph) = when (approvalResponse.approved) {
+        true -> "Approved" to Icons.Outlined.CheckCircle
+        false -> "Rejected" to Icons.Outlined.ErrorOutline
+        null -> "Approval response" to Icons.Outlined.CheckCircle
     }
+    val toolDecisionCount = approvalResponse.approvals.size
+    val hasToolDecisions = toolDecisionCount > 0
     ArtifactCard(
-        icon = if (approvalResponse.approved == false) Icons.Outlined.ErrorOutline else Icons.Outlined.CheckCircle,
+        icon = glyph,
         title = label,
         status = ToolStatusToken(approvalResponse.requestId ?: "response"),
     ) {
@@ -641,9 +669,9 @@ internal fun ApprovalResponseCard(approvalResponse: UiApprovalResponse) {
                 style = MaterialTheme.typography.bodySmall,
             )
         }
-        if (approvalResponse.approvals.isNotEmpty()) {
+        if (hasToolDecisions) {
             Text(
-                text = "${approvalResponse.approvals.size} tool decisions",
+                text = "$toolDecisionCount tool decisions",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
