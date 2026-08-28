@@ -71,7 +71,12 @@ internal fun ComposerBar(
                 matchedCommands = autocomplete.matchedCommands,
             ),
         )
-        ComposerHintRow()
+        ComposerHintRow(
+            visible = composerHintVisible(
+                text = state.text,
+                hasAttachments = state.pendingImageAttachments.isNotEmpty(),
+            ),
+        )
     }
 }
 

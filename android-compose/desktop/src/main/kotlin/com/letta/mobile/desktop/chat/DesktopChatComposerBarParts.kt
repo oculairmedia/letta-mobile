@@ -46,6 +46,7 @@ import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
@@ -138,13 +139,36 @@ private fun ComposerCommandSuggestionRow(
     }
 }
 
+/**
+ * Whether the keyboard-affordance strip under the composer is showing.
+ *
+ * The strip is discovery copy: it tells you `@` and `/` exist and which key
+ * sends. Once you are mid-message you have already used or ignored all of it,
+ * so it stops being help and becomes a line of permanent chrome pinned under
+ * every conversation. It shows while the composer is empty and fades as soon
+ * as there is something to send — then returns for the next message.
+ */
+internal fun composerHintVisible(text: String, hasAttachments: Boolean): Boolean =
+    text.isBlank() && !hasAttachments
+
 @Composable
-internal fun ComposerHintRow() {
+internal fun ComposerHintRow(visible: Boolean) {
+    // Faded rather than removed: the strip keeps its space in the layout, so
+    // typing the first character dims a line instead of yanking the whole
+    // composer down by its height.
+    val alpha by animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = tween(durationMillis = 180),
+        label = "composerHintAlpha",
+    )
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .widthIn(max = 760.dp)
-            .padding(start = 8.dp, top = 2.dp, bottom = 2.dp),
+            .padding(start = 8.dp, top = 2.dp, bottom = 2.dp)
+            .graphicsLayer { this.alpha = alpha }
+            // Hidden copy must not be announced or hit-tested.
+            .clearAndSetSemantics { },
     ) {
         Text(
             text = "@ add files   ·   / commands   ·   Enter or Ctrl+Enter send   ·   Shift+Enter newline",

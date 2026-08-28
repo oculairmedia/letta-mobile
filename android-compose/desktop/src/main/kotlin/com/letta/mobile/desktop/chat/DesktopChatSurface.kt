@@ -10,6 +10,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -303,6 +305,7 @@ private fun DesktopWorkingDirectoryRow(
  * (persona / channel / skills), and "or just start chatting" starter prompts.
  * Copy + tasks come from the shared [AgentOnboarding].
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun NewConversationWelcome(
     agentName: String?,
@@ -367,7 +370,14 @@ private fun NewConversationWelcome(
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            // Wraps: a fixed Row ran the three chips off the edge of a narrow
+            // chat pane (sidebar open on a small window), clipping the last one
+            // out of reach entirely.
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
                 AgentOnboarding.starterPrompts.forEach { prompt ->
                     Surface(
                         onClick = { onStarterPrompt(prompt) },
