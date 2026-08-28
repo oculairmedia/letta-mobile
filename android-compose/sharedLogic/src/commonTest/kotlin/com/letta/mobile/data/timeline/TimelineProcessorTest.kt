@@ -443,6 +443,23 @@ class TimelineProcessorTest {
     }
 
     @Test
+    fun timelineProjectionReadsTheCanonicalCommitWithoutASecondaryPublication() = runTest {
+        val processor = processor(backgroundScope)
+        val timeline = processor.timeline
+
+        val applied = assertIs<TimelineProcessorAck.Applied>(
+            processor.submit(
+                TimelineMutation.LocalAppend(PendingSend("projected", "visible immediately"), instant),
+            ),
+        )
+
+        assertEquals(1L, applied.sequence)
+        assertEquals(processor.state.value.timeline, timeline.value)
+        assertEquals(listOf("projected"), timeline.value.events.map { it.otid })
+        assertEquals(listOf(timeline.value), timeline.replayCache)
+    }
+
+    @Test
     fun maintenanceMutationRepairsTruncatedReturnWithoutExternalPublication() = runTest {
         val truncated = TimelineEvent.Confirmed(
             position = 1.0,

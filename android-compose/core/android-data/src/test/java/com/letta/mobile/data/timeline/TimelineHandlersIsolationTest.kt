@@ -1,24 +1,16 @@
 package com.letta.mobile.data.timeline
 
-import com.letta.mobile.data.api.MessageApi
 import com.letta.mobile.data.model.AssistantMessage
-import com.letta.mobile.data.model.LettaMessage
-import com.letta.mobile.data.model.MessageContentPart
-import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.model.ToolReturnMessage
 import io.mockk.mockk
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -95,11 +87,10 @@ class TimelineHandlersIsolationTest {
 
     @Test
     fun `TimelineStateTransitionHandler transitions local event states`() = runTest {
-        val state = MutableStateFlow(Timeline("conv1"))
         val events = MutableSharedFlow<TimelineSyncEvent>(extraBufferCapacity = 8)
         val sendQueue = Channel<PendingSend>(Channel.UNLIMITED)
-        val writeMutex = Mutex()
-        val processor = timelineProcessor(state, events, sendQueue, writeMutex)
+        val processor = timelineProcessor(Timeline("conv1"), events, sendQueue)
+        val state = processor.timeline
         val handler = TimelineStateTransitionHandler("conv1", processor)
 
         // 1. Local Append
@@ -132,12 +123,11 @@ class TimelineHandlersIsolationTest {
 
     @Test
     fun `TimelineExternalTransportAppender appends external messages`() = runTest {
-        val state = MutableStateFlow(Timeline("conv1"))
         val events = MutableSharedFlow<TimelineSyncEvent>(extraBufferCapacity = 8)
         val eventQueue = Channel<TimelineGatewayEvent>(Channel.UNLIMITED)
-        val writeMutex = Mutex()
         val pendingLocalStore = NoOpPendingLocalStore
-        val processor = timelineProcessor(state, events, Channel(Channel.UNLIMITED), writeMutex)
+        val processor = timelineProcessor(Timeline("conv1"), events, Channel(Channel.UNLIMITED))
+        val state = processor.timeline
         val appender = TimelineExternalTransportAppender(
             conversationId = "conv1",
             messageApi = mockk(),
@@ -187,22 +177,12 @@ class TimelineHandlersIsolationTest {
     )
 
     private fun CoroutineScope.timelineProcessor(
-        state: MutableStateFlow<Timeline>,
+        initial: Timeline,
         events: MutableSharedFlow<TimelineSyncEvent>,
         sendQueue: Channel<PendingSend>,
-        writeMutex: Mutex,
     ) = TimelineProcessor(
-        initialState = TimelineReducerState(state.value),
+        initialState = TimelineReducerState(initial),
         scope = this,
-        writeMutex = writeMutex,
-        stateBridge = object : TimelineProcessorStateBridge {
-            override fun synchronizeSeed(processorState: TimelineReducerState) =
-                processorState.copy(timeline = state.value)
-
-            override fun publish(stateValue: TimelineReducerState) {
-                state.value = stateValue.timeline
-            }
-        },
         effectHandler = { effect ->
             when (effect) {
                 is TimelineReductionEffect.Send -> sendQueue.send(effect.pending)
@@ -214,20 +194,12 @@ class TimelineHandlersIsolationTest {
 
     @Test
     fun `TimelineRecentMessagesReconciler merges snapshot correctly`() = runTest {
-        val state = MutableStateFlow(Timeline("conv1"))
         val eventQueue = Channel<TimelineGatewayEvent>(Channel.UNLIMITED)
         val processor = TimelineProcessor(
-            initialState = TimelineReducerState(state.value),
+            initialState = TimelineReducerState(Timeline("conv1")),
             scope = this,
-            stateBridge = object : TimelineProcessorStateBridge {
-                override fun synchronizeSeed(processorState: TimelineReducerState) =
-                    processorState.copy(timeline = state.value)
-
-                override fun publish(stateValue: TimelineReducerState) {
-                    state.value = stateValue.timeline
-                }
-            },
         )
+        val state = processor.timeline
         val reconciler = TimelineRecentMessagesReconciler(
             conversationId = "conv1",
             scope = this,

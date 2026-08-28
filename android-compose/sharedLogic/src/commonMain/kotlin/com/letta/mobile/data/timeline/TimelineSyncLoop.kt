@@ -25,10 +25,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -273,9 +270,7 @@ class TimelineSyncLoop(
         },
     )
 
-    val state: StateFlow<Timeline> = timelineProcessor.state
-        .map { it.timeline }
-        .stateIn(loopScope, SharingStarted.Eagerly, timelineProcessor.state.value.timeline)
+    val state: StateFlow<Timeline> = timelineProcessor.timeline
 
     private val outboundSendProcessor = TimelineOutboundSendProcessor(
         conversationId = conversationId,
@@ -415,8 +410,8 @@ class TimelineSyncLoop(
 
     /**
      * letta-mobile-mxwtn: synchronous optimistic Local append. Writes a
-     * `TimelineEvent.Local` with the given otid directly into the timeline
-     * state (under the write mutex) and returns `true`. Idempotent: returns
+     * `TimelineEvent.Local` with the given otid through [TimelineProcessor]
+     * and returns `true`. Idempotent: returns
      * `false` if an event with the same otid is already present, so a
      * duplicate caller cannot fork the timeline.
      */

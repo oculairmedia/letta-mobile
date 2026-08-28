@@ -70,15 +70,18 @@ class TimelineSnapshotPersistenceTest {
         val firstWriteCompleted = CompletableDeferred<Unit>()
         var writeCount = 0
             private set
+        val writes = mutableListOf<StoredTimelineEnvelope>()
 
         override suspend fun writeSnapshot(envelope: StoredTimelineEnvelope): Boolean {
             writeCount += 1
-            if (writeCount == 1) {
+            val writeIndex = writeCount
+            if (writeIndex == 1) {
                 firstWriteStarted.complete(Unit)
                 releaseFirstWrite.await()
             }
             return delegate.writeSnapshot(envelope).also {
-                if (writeCount == 1) firstWriteCompleted.complete(Unit)
+                writes += envelope
+                if (writeIndex == 1) firstWriteCompleted.complete(Unit)
             }
         }
     }
@@ -101,7 +104,10 @@ class TimelineSnapshotPersistenceTest {
         store.releaseFirstWrite.complete(Unit)
         advanceUntilIdle()
 
-        assertTrue(store.writeCount >= 2)
+        assertEquals(2, store.writeCount)
+        assertEquals(listOf(1L, 2L), store.writes.map { it.revision })
+        assertTrue(store.writes.first().events.isEmpty())
+        assertEquals(listOf("msg-1"), store.writes.last().events.map { it.serverId })
         val finalSnapshot = store.readSnapshot(fixture.scope)
         assertNotNull(finalSnapshot)
         assertEquals(1, finalSnapshot.events.size)

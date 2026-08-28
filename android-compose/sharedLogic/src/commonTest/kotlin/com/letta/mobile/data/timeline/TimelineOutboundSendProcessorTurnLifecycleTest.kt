@@ -12,7 +12,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -141,14 +140,15 @@ class TimelineOutboundSendProcessorTurnLifecycleTest {
         // and run its bounded sweep — exactly as it already does for the
         // WS/iroh path.
         val transport = SingleToolCallSendTransport(fail = false)
-        val state = MutableStateFlow(Timeline("conv-send-dangle"))
+        val timelineProcessor = TimelineProcessor(
+            initialState = TimelineReducerState(Timeline("conv-send-dangle")),
+            scope = backgroundScope,
+        )
+        val state = timelineProcessor.timeline
         var reconcileCalls = 0
         val resolver = DanglingToolCallResolver(
             conversationId = "conv-send-dangle",
-            processor = TimelineProcessor(
-                initialState = TimelineReducerState(state.value),
-                scope = backgroundScope,
-            ),
+            processor = timelineProcessor,
             state = state,
             scope = backgroundScope,
             reconcile = { _, _ -> reconcileCalls++; 0 },
@@ -156,7 +156,7 @@ class TimelineOutboundSendProcessorTurnLifecycleTest {
         val harness = newProcessor(
             transport = transport,
             scope = backgroundScope,
-            state = state,
+            timelineProcessor = timelineProcessor,
             onTurnStarted = { resolver.cancelPendingSweep() },
             onTurnEnded = { clean -> resolver.scheduleSweepIfUnresolved(clean) },
         )
@@ -184,7 +184,10 @@ class TimelineOutboundSendProcessorTurnLifecycleTest {
     private fun newProcessor(
         transport: SingleToolCallSendTransport,
         scope: kotlinx.coroutines.CoroutineScope,
-        state: MutableStateFlow<Timeline> = MutableStateFlow(Timeline("conv-send-dangle")),
+        timelineProcessor: TimelineProcessor = TimelineProcessor(
+            initialState = TimelineReducerState(Timeline("conv-send-dangle")),
+            scope = scope,
+        ),
         onTurnStarted: suspend () -> Unit,
         onTurnEnded: suspend (Boolean) -> Unit,
     ): ProcessorHarness {
@@ -220,30 +223,14 @@ class TimelineOutboundSendProcessorTurnLifecycleTest {
             conversationId = "conv-send-dangle",
             messageApi = transport,
             eventQueue = eventQueue,
-            state = state,
+            state = timelineProcessor.timeline,
             events = MutableSharedFlow(replay = 1, extraBufferCapacity = 64),
             pendingLocalStore = NoOpPendingLocalStore,
             logTag = "TestSend",
             scope = scope,
             ingestStreamEvent = { message ->
-                if (message is ToolCallMessage) {
-                    val toolCall = requireNotNull(message.toolCall)
-                    state.value = state.value.append(
-                        TimelineEvent.Confirmed(
-                            position = (state.value.events.size + 1).toDouble(),
-                            otid = "otc-send-1",
-                            content = "tool call",
-                            serverId = message.id,
-                            messageType = TimelineMessageType.TOOL_CALL,
-                            date = timelineNow(),
-                            runId = message.runId,
-                            stepId = null,
-                            toolCalls = kotlinx.collections.immutable.persistentListOf(toolCall),
-                            toolReturnContentByCallId = kotlinx.collections.immutable.persistentMapOf(),
-                            toolReturnIsErrorByCallId = kotlinx.collections.immutable.persistentMapOf(),
-                        )
-                    )
-                }
+                val acknowledgement = timelineProcessor.submit(TimelineMutation.StreamFrame(message))
+                assertTrue(acknowledgement is TimelineProcessorAck.Applied)
             },
             onSendStreamEnded = {},
             onTurnStarted = onTurnStarted,

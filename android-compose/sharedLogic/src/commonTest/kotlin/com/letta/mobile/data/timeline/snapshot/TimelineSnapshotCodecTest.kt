@@ -139,6 +139,39 @@ class TimelineSnapshotCodecTest {
     }
 
     @Test
+    fun schemaOneSnapshotFromBeforeProcessorOwnershipRestoresWithoutMigrationLoss() {
+        val legacyFixture = """
+            {
+                "schemaVersion": 1,
+                "scope": {"backendId": "legacy", "conversationId": "conversation"},
+                "revision": 17,
+                "liveCursor": "server-2",
+                "backfillCursor": "server-1",
+                "releasedOlderCount": 3,
+                "events": [
+                    {
+                        "position": 1.0,
+                        "otid": "otid-1",
+                        "content": "persisted before bridge retirement",
+                        "serverId": "server-1",
+                        "messageType": "USER",
+                        "dateIso": "2026-08-24T00:00:00Z"
+                    }
+                ]
+            }
+        """.trimIndent()
+
+        val envelope = assertNotNull(TimelineSnapshotCodec.decode(legacyFixture))
+        val timeline = TimelineSnapshotCodec.storedEnvelopeToTimeline(envelope)
+
+        assertEquals(17L, envelope.revision)
+        assertEquals("server-2", timeline.liveCursor)
+        assertEquals("server-1", timeline.backfillCursor)
+        assertEquals(3, timeline.releasedOlderCount)
+        assertEquals("persisted before bridge retirement", timeline.events.single().content)
+    }
+
+    @Test
     fun corruptPayloadReturnsNullSafely() {
         assertNull(TimelineSnapshotCodec.decode(""))
         assertNull(TimelineSnapshotCodec.decode("   "))

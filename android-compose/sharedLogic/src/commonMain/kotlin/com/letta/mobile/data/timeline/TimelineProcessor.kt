@@ -6,9 +6,11 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.ExperimentalForInheritanceCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ClosedSendChannelException
+import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -98,6 +100,9 @@ class TimelineProcessor(
     private val terminalReason = atomic<TerminalReason?>(null)
     private val _state = MutableStateFlow(initialState)
     val state: StateFlow<TimelineReducerState> = _state.asStateFlow()
+
+    /** Canonical timeline projection backed directly by [state], without a second publication. */
+    val timeline: StateFlow<Timeline> = ProcessorTimelineStateFlow(state)
     private val consumer: Job = scope.launch {
         consume(TimelineSequence(initialState.lastAppliedMutationSequence + 1L))
     }
@@ -281,6 +286,25 @@ class TimelineProcessor(
     companion object {
         const val DEFAULT_MAILBOX_CAPACITY = 64
     }
+}
+
+/**
+ * Read-only timeline view of processor state with no independent cache, queue, or coroutine.
+ * [value] therefore observes the same immutable commit that processor acknowledgements and
+ * effects observe, while collectors receive the processor's publication order unchanged.
+ */
+@OptIn(ExperimentalForInheritanceCoroutinesApi::class)
+private class ProcessorTimelineStateFlow(
+    private val processorState: StateFlow<TimelineReducerState>,
+) : StateFlow<Timeline> {
+    override val value: Timeline
+        get() = processorState.value.timeline
+
+    override val replayCache: List<Timeline>
+        get() = listOf(value)
+
+    override suspend fun collect(collector: FlowCollector<Timeline>): Nothing =
+        processorState.collect { state -> collector.emit(state.timeline) }
 }
 
 private fun rejectionReason(

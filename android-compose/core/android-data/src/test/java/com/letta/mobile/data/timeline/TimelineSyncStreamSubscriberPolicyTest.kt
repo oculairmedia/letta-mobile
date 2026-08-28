@@ -19,15 +19,20 @@ class TimelineSyncStreamSubscriberPolicyTest {
     }
 
     @Test
-    fun `production stream ingest has no shadow holder fanout`() {
+    fun `production timeline has no shadow state bridge or holder fanout`() {
         val loopSource = timelineSource("TimelineSyncLoop.kt")
+        val processorSource = timelineSource("TimelineProcessor.kt")
         val dispatcherSource = timelineSource("TimelineStreamDispatcher.kt")
 
-        listOf(loopSource, dispatcherSource).forEach { source ->
+        listOf(loopSource, processorSource, dispatcherSource).forEach { source ->
             assertFalse(source.contains("holderFramesIn"))
             assertFalse(source.contains("foldedViaHolder"))
             assertFalse(source.contains("ConversationStateHolder"))
+            assertFalse(source.contains("TimelineProcessorStateBridge"))
+            assertFalse(source.contains("stateBridge"))
         }
+        assertFalse(loopSource.contains("stateIn("))
+        assertFalse(loopSource.contains("MutableStateFlow<Timeline>"))
     }
 
     private fun timelineSource(fileName: String): String = repositoryRoot()
