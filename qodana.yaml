@@ -142,11 +142,15 @@ exclude:
   - name: AndroidLintDiscouragedApi
     paths:
       - app/src/main/java/com/letta/mobile/crash/SentryInitializer.kt
-  # Baseline Profile non-shipping merge-manifest; Qodana's Android model does
-  # not resolve MainActivity for this synthetic variant even with an FQCN.
+  # Baseline Profile non-shipping merge-manifest and headless theme DOM
+  # inspections. Qodana's CI-only AGP 9.0 model does not resolve MainActivity
+  # for the synthetic variant or Android platform theme symbols, while AAPT and
+  # the production AGP 9.3.1 model resolve them normally.
   - name: AndroidDomInspection
     paths:
       - app/src/playNonMinifiedRelease/AndroidManifest.xml
+      - app/src/main/res/values/themes.xml
+      - app/src/main/res/values-night/themes.xml
   # Gradle incubating APIs (dependencyResolutionManagement / externalNativeBuild)
   # are required by current AGP/Gradle DSL; tracked via Gradle upgrades, not this gate.
   - name: UnstableApiUsage
@@ -180,6 +184,13 @@ exclude:
   # ProGuard keep rules for kotlinx.serialization / reflective models; narrowing
   # them breaks release minification. Tracked with R8/full-mode work separately.
   - name: ExpensiveKeepRuleInspection
+    paths:
+      - app/proguard-rules.pro
+  # These keep rules preserve framework logging plus JNI/JNA bridge symbols
+  # resolved dynamically by native libraries. Release regressions established
+  # that they are required; Qodana's partial Android/native model cannot resolve
+  # the framework class, generated @JvmStatic members, or transitive JNA types.
+  - name: ShrinkerUnresolvedReference
     paths:
       - app/proguard-rules.pro
   # JCEF Compose OSR bridge must subclass package-private CefBrowser_N.
