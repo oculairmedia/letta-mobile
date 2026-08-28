@@ -142,7 +142,7 @@ internal fun TimelineEvent.Confirmed.willCompleteWith(returnedCallIds: Set<Strin
  * Requiring an explicit decision here previously matched the historical
  * intent (only real approve/reject responses should resolve the card), but
  * it silently discarded the auto-approve echo instead — the snapshot/
- * reconcile path (`applyReturnsAndResponsesFromSnapshot`) already treats any
+ * reconcile enrichment reducer already treats any
  * response echo as resolving evidence via [hasAnyApprovalResponse]; this
  * keeps the live and snapshot paths consistent. The Approved/Rejected LABEL
  * is unaffected: it is derived separately in [TimelineEventToUiMessage] from

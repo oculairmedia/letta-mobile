@@ -68,7 +68,7 @@ class TimelineSyncLoop(
     val streamSubscriberActive: StateFlow<Boolean> = _streamSubscriberActive.asStateFlow()
 
     private val writeMutex = Mutex()
-    internal val eventQueue = Channel<TimelineGatewayEvent>(Channel.UNLIMITED)
+    internal val eventQueue = Channel<TimelineGatewayEvent>(GATEWAY_EVENT_CAPACITY)
     private val _events = MutableSharedFlow<TimelineSyncEvent>(replay = 1, extraBufferCapacity = 64)
     val events: SharedFlow<TimelineSyncEvent> = _events.asSharedFlow()
 
@@ -235,6 +235,7 @@ class TimelineSyncLoop(
                 is RecentMessagesReconcileOutcome.Failed -> throw outcome.cause
             }
         },
+        onSettlementCommitted = { scheduleSnapshotPersist(immediate = true) },
     ) }
 
     /** True while a turn is believed active for this conversation. Toggled by [turnStarted]/[turnEnded]. */
@@ -245,7 +246,6 @@ class TimelineSyncLoop(
         conversationId = conversationId,
         messageApi = messageApi,
         eventQueue = eventQueue,
-        writeMutex = writeMutex,
         state = _state,
         events = _events,
         pendingLocalStore = pendingLocalStore,
@@ -617,7 +617,7 @@ class TimelineSyncLoop(
     }
 
     private suspend fun applyCleanupAbandonedAssistantFragments(event: TimelineGatewayEvent.CleanupAbandonedAssistantFragments) {
-        when (val ack = timelineProcessor.submit(
+        when (val ack = timelineProcessor.submitMaintenanceMutation(
             TimelineMutation.CleanupAbandonedFragments(
                 runId = event.runId,
                 turnId = event.turnId,
@@ -662,7 +662,7 @@ class TimelineSyncLoop(
             }
             .getOrNull() as? ToolReturnMessage ?: return false
         if (message.toolReturnTruncated == true) return false
-        val applied = timelineProcessor.submit(TimelineMutation.RepairFullToolReturn(message))
+        val applied = timelineProcessor.submitMaintenanceMutation(TimelineMutation.RepairFullToolReturn(message))
         val result = (applied as? TimelineProcessorAck.Applied)?.result as? TimelineReductionResult.FullToolReturnRepaired
             ?: return false
         if (!result.changed) return false
@@ -801,6 +801,7 @@ class TimelineSyncLoop(
         // for too long. 6x still tolerates 6 missed heartbeats (plenty of
         // margin for network jitter) while detecting stuck streams faster.
         private const val STREAM_SILENCE_TIMEOUT_MS = STREAM_HEARTBEAT_EXPECTED_MS * 6
+        private const val GATEWAY_EVENT_CAPACITY = 64
         private const val MAX_SEEN_STREAM_MESSAGES = 512
         private const val MAX_RETAINED_SNAPSHOTS = 50
         private val activeStreamCount = TimelineAtomicCounter(0)

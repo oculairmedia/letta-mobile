@@ -9,7 +9,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -30,7 +29,7 @@ class TimelineRecentMessagesReconciler(
     private val scope: CoroutineScope,
     private val messageApi: TimelineTransport,
     private val eventQueue: Channel<TimelineGatewayEvent>,
-    private val state: MutableStateFlow<Timeline>,
+    private val state: StateFlow<Timeline>,
     private val streamSubscriberActive: StateFlow<Boolean>,
     private val processor: TimelineProcessor,
     private val onSnapshotApplied: () -> Unit,

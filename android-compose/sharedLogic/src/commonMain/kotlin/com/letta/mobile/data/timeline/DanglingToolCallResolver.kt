@@ -40,6 +40,7 @@ class DanglingToolCallResolver(
     private val scope: CoroutineScope,
     private val reconcile: suspend (reason: String, forceRefresh: Boolean) -> Int,
     private val backoffMs: List<Long> = DEFAULT_BACKOFF_MS,
+    private val onSettlementCommitted: () -> Unit = {},
 ) {
     @Volatile
     private var sweepJob: Job? = null
@@ -60,7 +61,9 @@ class DanglingToolCallResolver(
             sweepGeneration += 1L
             sweepJob?.cancel()
             sweepJob = null
-            processor.submitWithBackpressure(TimelineMutation.AdvanceDanglingSweep(sweepGeneration)).appliedResultOrThrow()
+            processor.submitMaintenanceMutation(
+                TimelineMutation.AdvanceDanglingSweep(sweepGeneration),
+            ).appliedResultOrThrow()
         }
     }
 
@@ -174,11 +177,12 @@ class DanglingToolCallResolver(
     private suspend fun settleAsFailed(generation: Long, lifecycleEpoch: Long, callIds: Set<String>) {
         val ack = sweepMutationMutex.withLock {
             if (generation != sweepGeneration) return
-            processor.submitWithBackpressure(
+            processor.submitMaintenanceMutation(
                 TimelineMutation.SettleDanglingToolCalls(generation, lifecycleEpoch, callIds),
             ) as? TimelineProcessorAck.Applied ?: return
         }
         val result = ack.result as? TimelineReductionResult.DanglingToolCallsSettled ?: return
+        if (result.changed) onSettlementCommitted()
         result.callIds.forEach { id ->
             Telemetry.event(
                 "TimelineSync", "danglingToolResolve.settledFailed",

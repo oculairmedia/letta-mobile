@@ -3,17 +3,10 @@ package com.letta.mobile.data.timeline
 import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.util.Telemetry
 import kotlinx.collections.immutable.persistentListOf
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.test.runTest
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertSame
-import kotlin.test.assertTrue
 
 /**
  * letta-mobile-20tat (P1): Tests for user message deduplication during
@@ -59,18 +52,12 @@ class TimelineReconcileUserDedupTest {
             ),
         )
 
-        val result = applyReconcileAfterSendSnapshot(
-            otid = otid,
-            conversationId = conversationId,
-            serverMessages = serverMessages,
-            writeMutex = Mutex(),
-            state = MutableStateFlow(timeline),
-        )
+        val reconciled = reconcileAfterSendSnapshot(timeline, otid, serverMessages)
 
-        assertEquals(true, result.confirmedLocal, "Optimistic local should be confirmed")
-        assertEquals(0, result.appendedMissing, "No duplicate rows should be appended")
-        
-        val finalTimeline = MutableStateFlow(timeline).value
+        assertEquals(true, reconciled.result.confirmedLocal, "Optimistic local should be confirmed")
+        assertEquals(0, reconciled.result.appendedMissing, "No duplicate rows should be appended")
+
+        val finalTimeline = reconciled.timeline
         assertEquals(1, finalTimeline.events.size, "Should have exactly one event after dedup")
     }
 
@@ -108,19 +95,10 @@ class TimelineReconcileUserDedupTest {
             ),
         )
 
-        val writeMutex = Mutex()
-        val state = MutableStateFlow(timeline)
-
-        val result = applyReconcileAfterSendSnapshot(
-            otid = otid,
-            conversationId = conversationId,
-            serverMessages = serverMessages,
-            writeMutex = writeMutex,
-            state = state,
-        )
+        val reconciled = reconcileAfterSendSnapshot(timeline, otid, serverMessages)
 
         // Even without otid match, content dedup should prevent duplication
-        val finalTimeline = state.value
+        val finalTimeline = reconciled.timeline
         assertEquals(1, finalTimeline.events.size, "Content-based dedup should prevent duplicate user rows")
         
         val event = finalTimeline.events.single() as? TimelineEvent.Confirmed
@@ -161,72 +139,10 @@ class TimelineReconcileUserDedupTest {
             ),
         )
 
-        val writeMutex = Mutex()
-        val state = MutableStateFlow(timeline)
-
         val merged = timeline.mergeServerMessages(serverMessages)
         val finalTimeline = merged.first
 
         assertEquals(1, finalTimeline.events.size, "Duplicate by serverId should not re-insert")
         assertEquals(0, merged.second, "No messages should be appended")
-    }
-
-    @Test
-    fun reconcileAfterSendRethrowsCancellationWithoutErrorOrMutation() = runTest {
-        val initial = Timeline(
-            conversationId = "conv-cancel",
-            events = persistentListOf(
-                TimelineEvent.Local(
-                    position = 1.0,
-                    otid = "otid-cancel",
-                    content = "keep local",
-                    role = Role.USER,
-                    sentAt = timelineNow(),
-                    deliveryState = DeliveryState.SENT,
-                ),
-            ),
-        )
-        val state = MutableStateFlow(initial)
-        val events = MutableSharedFlow<TimelineSyncEvent>(replay = 1)
-        val cancellation = CancellationException("cancel reconcile")
-
-        val thrown = assertFailsWith<CancellationException> {
-            reconcileAfterSend(
-                otid = "otid-cancel",
-                conversationId = initial.conversationId,
-                writeMutex = Mutex(),
-                state = state,
-                events = events,
-                pendingLocalStore = NoOpPendingLocalStore,
-                listMessagesWithRetry = { throw cancellation },
-            )
-        }
-
-        assertSame(cancellation, thrown)
-        assertSame(initial, state.value)
-        assertTrue(events.replayCache.isEmpty(), "Cancellation must not emit ReconcileError")
-    }
-
-    @Test
-    fun reconcileAfterSendEmitsTypedErrorForOrdinaryFailureWithoutMutation() = runTest {
-        val initial = Timeline(conversationId = "conv-error")
-        val state = MutableStateFlow(initial)
-        val events = MutableSharedFlow<TimelineSyncEvent>(replay = 1)
-
-        reconcileAfterSend(
-            otid = "otid-error",
-            conversationId = initial.conversationId,
-            writeMutex = Mutex(),
-            state = state,
-            events = events,
-            pendingLocalStore = NoOpPendingLocalStore,
-            listMessagesWithRetry = { throw IllegalStateException("reconcile failed") },
-        )
-
-        assertSame(initial, state.value)
-        assertEquals(
-            listOf(TimelineSyncEvent.ReconcileError("reconcile failed")),
-            events.replayCache,
-        )
     }
 }

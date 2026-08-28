@@ -12,9 +12,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.serialization.json.JsonPrimitive
 
 import kotlin.time.Duration.Companion.milliseconds
@@ -28,8 +27,7 @@ internal class TimelineOutboundSendProcessor(
     private val conversationId: String,
     private val messageApi: TimelineTransport,
     private val eventQueue: Channel<TimelineGatewayEvent>,
-    private val writeMutex: Mutex,
-    private val state: MutableStateFlow<Timeline>,
+    private val state: StateFlow<Timeline>,
     private val events: MutableSharedFlow<TimelineSyncEvent>,
     private val pendingLocalStore: PendingLocalStore,
     private val logTag: String,
@@ -65,7 +63,7 @@ internal class TimelineOutboundSendProcessor(
      */
     private val onTurnEnded: suspend (clean: Boolean) -> Unit = {},
 ) {
-    val sendQueue = Channel<PendingSend>(Channel.UNLIMITED)
+    val sendQueue = Channel<PendingSend>(SEND_QUEUE_CAPACITY)
 
     init {
         scope.launch { processSendQueue() }
@@ -233,15 +231,30 @@ internal class TimelineOutboundSendProcessor(
     }
 
     private suspend fun reconcileAfterSend(otid: String) {
-        reconcileAfterSend(
-            otid = otid,
-            conversationId = conversationId,
-            writeMutex = writeMutex,
-            state = state,
-            events = events,
-            pendingLocalStore = pendingLocalStore,
-            listMessagesWithRetry = ::listMessagesWithRetry
-        )
+        val timer = Telemetry.startTimer("TimelineSync", "reconcile")
+        try {
+            val serverMessages = listMessagesWithRetry(otid).reversed()
+            val acknowledgement = CompletableDeferred<ReconcileAfterSendResult>()
+            eventQueue.send(
+                TimelineGatewayEvent.ReconcileAfterSendSnapshot(
+                    otid = otid,
+                    serverMessages = serverMessages,
+                    ack = acknowledgement,
+                ),
+            )
+            val result = acknowledgement.await()
+            timer.stop(
+                "otid" to otid,
+                "serverCount" to serverMessages.size,
+                "confirmedLocal" to result.confirmedLocal,
+                "appendedMissing" to result.appendedMissing,
+            )
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Throwable) {
+            timer.stopError(failure, "otid" to otid)
+            events.emit(TimelineSyncEvent.ReconcileError(failure.message ?: "unknown"))
+        }
     }
 
     private suspend fun listMessagesWithRetry(otid: String): List<LettaMessage> {
@@ -282,6 +295,7 @@ internal class TimelineOutboundSendProcessor(
     }
 
     companion object {
+        private const val SEND_QUEUE_CAPACITY = 64
         private const val RECONCILE_LIMIT = 250
         private const val RECONCILE_RETRY_ATTEMPTS = 3
         private const val RECONCILE_RETRY_BACKOFF_MS = 200L

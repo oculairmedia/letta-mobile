@@ -16,7 +16,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -215,6 +214,9 @@ class TimelineOutboundSendProcessorTurnLifecycleTest {
                     }
                     is TimelineGatewayEvent.MarkSent -> event.ack.complete(Unit)
                     is TimelineGatewayEvent.MarkFailed -> event.ack.complete(Unit)
+                    is TimelineGatewayEvent.ReconcileAfterSendSnapshot -> event.ack.complete(
+                        ReconcileAfterSendResult(false, 0, null, false),
+                    )
                     else -> error("Unexpected gateway event in send-path test: $event")
                 }
             }
@@ -223,7 +225,6 @@ class TimelineOutboundSendProcessorTurnLifecycleTest {
             conversationId = "conv-send-dangle",
             messageApi = transport,
             eventQueue = eventQueue,
-            writeMutex = Mutex(),
             state = state,
             events = MutableSharedFlow(replay = 1, extraBufferCapacity = 64),
             pendingLocalStore = NoOpPendingLocalStore,

@@ -4,9 +4,13 @@ import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.model.ToolCall
 import com.letta.mobile.data.model.ToolCallMessage
+import com.letta.mobile.data.timeline.snapshot.InMemoryConfirmedTimelineStore
+import com.letta.mobile.data.timeline.snapshot.TimelineScope
+import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -23,11 +27,14 @@ import kotlinx.coroutines.test.runTest
  * transcript never produces a return (see letta-mobile-dangling-tool /
  * DanglingToolCallResolver, Codex #902 review finding 2).
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class TimelineSyncLoopDanglingToolTest {
 
     @Test
     fun hydrate_escalates_to_sweep_and_settles_failed_when_server_never_resolves_the_call() = runTest(UnconfinedTestDispatcher()) {
         val transport = DanglingToolTransport()
+        val store = InMemoryConfirmedTimelineStore()
+        val snapshotScope = TimelineScope("backend", "conv-dangle-1")
         val loop = TimelineSyncLoop(
             messageApi = transport,
             conversationId = "conv-dangle-1",
@@ -35,6 +42,9 @@ class TimelineSyncLoopDanglingToolTest {
             pendingLocalStore = NoOpPendingLocalStore,
             conversationCursorStore = NoOpConversationCursorStore,
             startStreamSubscriber = false,
+            confirmedTimelineStore = store,
+            timelineScope = snapshotScope,
+            ioDispatcher = UnconfinedTestDispatcher(testScheduler),
         )
 
         loop.hydrate()
@@ -57,6 +67,10 @@ class TimelineSyncLoopDanglingToolTest {
         assertEquals("No tool result recorded", event.toolReturnContentByCallId["call-1"])
         assertTrue(event.toolReturnIsErrorByCallId["call-1"] == true)
         loop.closeAndJoin()
+        val persisted = requireNotNull(store.readSnapshot(snapshotScope))
+        val restored = TimelineSnapshotCodec.storedEnvelopeToTimeline(persisted)
+        val persistedEvent = restored.events.single() as TimelineEvent.Confirmed
+        assertEquals("No tool result recorded", persistedEvent.toolReturnContentByCallId["call-1"])
     }
 
     @Test

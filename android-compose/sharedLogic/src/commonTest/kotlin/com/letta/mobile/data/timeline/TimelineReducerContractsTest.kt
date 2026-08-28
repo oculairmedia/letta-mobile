@@ -104,6 +104,45 @@ class TimelineReducerContractsTest {
     }
 
     @Test
+    fun fullToolReturnRepairOnlyReplacesTheStillTruncatedVersion() {
+        val truncated = toolEvent().copy(
+            toolReturnContentByCallId = kotlinx.collections.immutable.persistentMapOf("call" to "preview"),
+            toolReturnIsErrorByCallId = kotlinx.collections.immutable.persistentMapOf("call" to false),
+            toolReturnTruncationByCallId = kotlinx.collections.immutable.persistentMapOf(
+                "call" to ToolReturnTruncation("return", 1_024),
+            ),
+        )
+        val fetched = ToolReturnMessage(
+            id = "return",
+            toolCallId = "call",
+            toolReturnRaw = JsonPrimitive("fetched full body"),
+            toolReturnTruncated = false,
+        )
+        val repaired = reduceProductionMutation(
+            TimelineReducerState(Timeline("conversation", persistentListOf(truncated))),
+            TimelineMutation.RepairFullToolReturn(fetched),
+        )
+        val repairedEvent = repaired.next.timeline.events.single() as TimelineEvent.Confirmed
+        assertTrue(repaired.result.changed)
+        assertEquals("fetched full body", repairedEvent.toolReturnContentByCallId["call"])
+        assertFalse("call" in repairedEvent.toolReturnTruncationByCallId)
+
+        val newer = repairedEvent.copy(
+            toolReturnContentByCallId = kotlinx.collections.immutable.persistentMapOf("call" to "newer stream body"),
+            toolReturnTruncationByCallId = kotlinx.collections.immutable.persistentMapOf(),
+        )
+        val staleRepair = reduceProductionMutation(
+            TimelineReducerState(Timeline("conversation", persistentListOf(newer))),
+            TimelineMutation.RepairFullToolReturn(fetched),
+        )
+        assertFalse(staleRepair.result.changed)
+        assertEquals(
+            "newer stream body",
+            (staleRepair.next.timeline.events.single() as TimelineEvent.Confirmed).toolReturnContentByCallId["call"],
+        )
+    }
+
+    @Test
     fun danglingSettlementRequiresCurrentGenerationAndPreservesLateReturn() {
         val unresolved = TimelineEvent.Confirmed(
             position = 1.0,
