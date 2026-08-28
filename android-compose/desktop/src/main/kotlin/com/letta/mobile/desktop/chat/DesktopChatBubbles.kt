@@ -510,14 +510,25 @@ internal value class IsoTimestamp(val value: String)
 internal fun messageClockLabel(iso: String): String? =
     messageClockLabel(IsoTimestamp(iso))
 
-internal fun messageClockLabel(iso: IsoTimestamp): String? {
+internal fun messageClockLabel(iso: IsoTimestamp): String? =
+    parseMessageTimestamp(iso, java.time.ZoneId.systemDefault())
+        ?.format(java.time.format.DateTimeFormatter.ofPattern("h:mm a"))
+
+/**
+ * Resolves a message's ISO timestamp into [zone]. Accepts the three shapes the
+ * backends actually emit — instant (`…Z`), offset date-time, and a bare local
+ * date-time — and returns null for blank or unparseable input rather than
+ * throwing, so a malformed timestamp costs one label, not the row.
+ */
+internal fun parseMessageTimestamp(
+    iso: IsoTimestamp,
+    zone: java.time.ZoneId,
+): java.time.ZonedDateTime? {
     if (iso.value.isBlank()) return null
-    val zone = java.time.ZoneId.systemDefault()
-    val zoned = runCatching { java.time.Instant.parse(iso.value).atZone(zone) }
+    return runCatching { java.time.Instant.parse(iso.value).atZone(zone) }
         .recoverCatching { java.time.OffsetDateTime.parse(iso.value).atZoneSameInstant(zone) }
         .recoverCatching { java.time.LocalDateTime.parse(iso.value).atZone(zone) }
-        .getOrNull() ?: return null
-    return zoned.format(java.time.format.DateTimeFormatter.ofPattern("h:mm a"))
+        .getOrNull()
 }
 
 /**

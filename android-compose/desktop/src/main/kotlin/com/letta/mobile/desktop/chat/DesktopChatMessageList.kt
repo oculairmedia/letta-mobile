@@ -46,6 +46,7 @@ import com.letta.mobile.desktop.fadingEdges
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
+import java.time.LocalDate
 
 internal data class MessageListParams(
     val conversationId: String?,
@@ -81,16 +82,17 @@ internal fun MessageList(
     // Consecutive tool-only messages fold into one collapsed "N tool calls"
     // row — six near-identical Bash cards with six timestamps drowned the
     // agent's prose. Folded HERE (not in the column) because the scroll
-    // arithmetic below must count the rows the LazyColumn actually holds.
-    val rows = remember(renderItems) { groupDesktopChatRows(renderItems) }
+    // arithmetic below must count the rows the LazyColumn actually holds — which
+    // is also why the day dividers ("Today" / "Yesterday" / "March 4") are
+    // inserted here rather than emitted inline in the column.
+    val rows = remember(renderItems) { withDesktopDayDividers(groupDesktopChatRows(renderItems)) }
 
-    // The LazyColumn is laid out as [ "__today__" header, ...rows,
-    // ("__thinking__" while sending)? ]. The leading header offsets every render
-    // row by one, so the last row is at index rows.size (not size - 1),
-    // and the thinking row at size + 1. The scroll targets below must use this
-    // header-aware index — latestIndex(rows.size) landed one row short,
-    // which is why a fresh prompt/reply needed a manual nudge to the bottom.
-    val chatBottomIndex = (rows.size + if (isSending) 1 else 0).coerceAtLeast(0)
+    // The LazyColumn is laid out as [ ...rows, ("__thinking__" while sending)? ],
+    // where rows already includes the day dividers. So the bottom-most row is at
+    // rows.size - 1, and the thinking row (when sending) one past it. The scroll
+    // targets below must use this index — landing one row short is why a fresh
+    // prompt/reply once needed a manual nudge to the bottom.
+    val chatBottomIndex = (rows.size - 1 + if (isSending) 1 else 0).coerceAtLeast(0)
     val tailContentLength = remember(renderItems) { renderItems.tailContentLength() }
 
     MessageListFollowEffects(
@@ -306,15 +308,6 @@ private fun MessageListColumn(params: MessageListColumnParams) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            item(key = "__today__") {
-                Text(
-                    text = "Today",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                    modifier = Modifier.widthIn(max = ChatColumnMaxWidth).fillMaxWidth(),
-                    textAlign = TextAlign.Center,
-                )
-            }
             // User prompts are sticky headers: the question stays pinned to the
             // top of the viewport while its (usually much taller) answer scrolls
             // underneath, so you never lose track of what was asked. Everything
@@ -322,6 +315,18 @@ private fun MessageListColumn(params: MessageListColumnParams) {
             // consecutive tool-only messages render as one collapsed "N tool
             // calls" card instead of a stack of near-identical Bash cards.
             rows.forEach { row ->
+                if (row is DesktopChatRow.DayDivider) {
+                    item(key = row.key) {
+                        Text(
+                            text = desktopDayLabel(row.date, LocalDate.now()),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            modifier = Modifier.widthIn(max = ChatColumnMaxWidth).fillMaxWidth(),
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                    return@forEach
+                }
                 if (row is DesktopChatRow.ToolGroup) {
                     item(key = row.key) {
                         Column(modifier = Modifier.widthIn(max = ChatColumnMaxWidth).fillMaxWidth()) {

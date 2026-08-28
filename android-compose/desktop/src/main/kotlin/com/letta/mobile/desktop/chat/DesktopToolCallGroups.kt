@@ -52,6 +52,16 @@ sealed interface DesktopChatRow {
     }
 
     /**
+     * A "Today" / "Yesterday" / "March 4" heading marking where a new local day
+     * starts. Inserted by [withDesktopDayDividers] after grouping, so the row
+     * indices the message list scrolls to already account for them.
+     */
+    @Immutable
+    data class DayDivider(val date: java.time.LocalDate) : DesktopChatRow {
+        override val key: String = "__day__$date"
+    }
+
+    /**
      * Two or more consecutive tool-only messages, rendered as one collapsed
      * "N tool calls" card. [singles] preserves list order.
      */
