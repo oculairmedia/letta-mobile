@@ -58,7 +58,6 @@ import com.letta.mobile.data.repository.StepRepository
 import com.letta.mobile.data.repository.SubagentRepository
 import com.letta.mobile.data.repository.ToolRepository
 import com.letta.mobile.data.repository.VibesyncEventStreamRepository
-import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.api.LocalRuntimeAgentSource
 import com.letta.mobile.data.repository.api.LocalRuntimeConversationSource
 import com.letta.mobile.data.repository.api.LocalRuntimeModelSource
@@ -71,7 +70,6 @@ import com.letta.mobile.runtime.BackendDescriptor
 import dagger.Lazy
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.CoroutineScope
 
 /**
  * Hilt-owned assembler that wires session-scoped repositories onto a
