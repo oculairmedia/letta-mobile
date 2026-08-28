@@ -9,7 +9,6 @@ import com.letta.mobile.data.model.FolderUpdateParams
 import com.letta.mobile.data.model.OrganizationSourcesStats
 import com.letta.mobile.data.model.Passage
 import com.letta.mobile.data.repository.api.IFolderRepository
-import io.ktor.http.ContentType
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
