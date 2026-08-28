@@ -48,6 +48,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
@@ -63,6 +65,7 @@ import com.letta.mobile.data.model.AskUserQuestionItem
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiApprovalResponse
 import com.letta.mobile.data.model.UiGeneratedComponent
+import com.letta.mobile.data.messaging.AgentMessageProvenance
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.data.messaging.compactLabel
 import com.letta.mobile.data.messaging.displayLabel
@@ -109,61 +112,91 @@ internal fun ToolCard(
     }
 }
 
+/**
+ * letta-mobile-slqfp: `agent_message_send` gets a distinct compact
+ * sender -> recipient label instead of the generic tool-name row — the whole
+ * point of structured provenance is that this reads as an agent message, not
+ * an anonymous tool invocation.
+ *
+ * Split out of [ToolCardHeader]: the two headers share only their toggle, and
+ * carrying both shapes plus the generic row's collapsed-summary and hover
+ * affordances in one function made it the file's most complex method.
+ */
+@Composable
+private fun ToolCardProvenanceHeader(
+    provenance: AgentMessageProvenance,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+) {
+    val presentation = LocalDesktopAgentMessageContext.current
+    val isFailed = provenance.deliveryState == com.letta.mobile.data.messaging.AgentMessageDeliveryState.FAILED
+    // Both colours resolved here rather than at their use sites: one branch on
+    // delivery state for the whole row, decided before the layout is described.
+    val errorColor = MaterialTheme.colorScheme.error
+    val tint = if (isFailed) errorColor else MaterialTheme.colorScheme.tertiary
+    val stateColor = if (isFailed) errorColor else MaterialTheme.colorScheme.onSurfaceVariant
+    val label = provenance.compactLabel(presentation.resolveName)
+    val stateLabel = provenance.deliveryState.displayLabel()
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("tool-card-toggle")
+            .clickable(onClick = onToggle)
+            .padding(horizontal = 10.dp, vertical = 5.dp)
+            .semantics { contentDescription = "$label, ${stateLabel.lowercase()}" },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.CallMade,
+            contentDescription = null,
+            modifier = Modifier.size(13.dp),
+            tint = tint.copy(alpha = 0.85f),
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Medium,
+            color = tint,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = stateLabel,
+            style = MaterialTheme.typography.labelSmall,
+            color = stateColor,
+        )
+        ToolCardDisclosureIcon(expanded)
+    }
+}
+
+/** The shared open/closed chevron, named for screen readers. */
+@Composable
+private fun ToolCardDisclosureIcon(expanded: Boolean) {
+    // One decision, not two parallel ones: the glyph and its name always agree.
+    val (glyph, label) = if (expanded) {
+        Icons.Outlined.KeyboardArrowUp to "Collapse"
+    } else {
+        Icons.Outlined.KeyboardArrowDown to "Expand"
+    }
+    Icon(
+        imageVector = glyph,
+        contentDescription = label,
+        modifier = Modifier.size(14.dp),
+        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
 @Composable
 private fun ToolCardHeader(
     toolCall: UiToolCall,
     expanded: Boolean,
     onToggle: () -> Unit,
 ) {
-    // letta-mobile-slqfp: `agent_message_send` gets a distinct compact
-    // sender -> recipient label instead of the generic tool-name row — the
-    // whole point of structured provenance is that this reads as an agent
-    // message, not an anonymous tool invocation.
     val provenance = toolCall.agentMessageProvenance
     if (provenance != null) {
-        val presentation = LocalDesktopAgentMessageContext.current
-        val isFailed = provenance.deliveryState == com.letta.mobile.data.messaging.AgentMessageDeliveryState.FAILED
-        val tint = if (isFailed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("tool-card-toggle")
-                .clickable(onClick = onToggle)
-                .padding(horizontal = 10.dp, vertical = 5.dp)
-                .semantics {
-                    contentDescription = provenance.compactLabel(presentation.resolveName) +
-                        ", ${provenance.deliveryState.displayLabel().lowercase()}"
-                },
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.CallMade,
-                contentDescription = null,
-                modifier = Modifier.size(13.dp),
-                tint = tint.copy(alpha = 0.85f),
-            )
-            Text(
-                text = provenance.compactLabel(presentation.resolveName),
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Medium,
-                color = tint,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-            Text(
-                text = provenance.deliveryState.displayLabel(),
-                style = MaterialTheme.typography.labelSmall,
-                color = if (isFailed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Icon(
-                imageVector = if (expanded) Icons.Outlined.KeyboardArrowUp else Icons.Outlined.KeyboardArrowDown,
-                contentDescription = if (expanded) "Collapse" else "Expand",
-                modifier = Modifier.size(14.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        ToolCardProvenanceHeader(provenance = provenance, expanded = expanded, onToggle = onToggle)
         return
     }
     val collapsedSummary = toolCall.stepLabel()
@@ -174,11 +207,17 @@ private fun ToolCardHeader(
     // reveal on hover of this activity-log row.
     val rowHoverSource = remember { MutableInteractionSource() }
     val rowHovered by rowHoverSource.collectIsHoveredAsState()
+    val disclosureState = if (expanded) "Expanded" else "Collapsed"
+    val showCollapsedSummary = !expanded && collapsedSummary.isNotBlank()
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .testTag("tool-card-toggle")
-            .clickable(onClick = onToggle)
+            .clickable(onClick = onToggle, role = Role.Button)
+            // The row's name comes from the tool name beside the icon; what a
+            // screen reader could not tell was that the row expands, or whether
+            // it currently is.
+            .semantics { stateDescription = disclosureState }
             .hoverable(rowHoverSource)
             .padding(horizontal = 10.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -196,7 +235,7 @@ private fun ToolCardHeader(
             fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.onSurface,
         )
-        if (!expanded && collapsedSummary.isNotBlank()) {
+        if (showCollapsedSummary) {
             Text(
                 text = collapsedSummary,
                 style = MaterialTheme.typography.labelSmall,
@@ -217,31 +256,27 @@ private fun ToolCardHeader(
                 visible = rowHovered,
             )
         }
-        Icon(
-            imageVector = if (expanded) Icons.Outlined.KeyboardArrowUp else Icons.Outlined.KeyboardArrowDown,
-            contentDescription = if (expanded) "Collapse" else "Expand",
-            modifier = Modifier.size(14.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        ToolCardDisclosureIcon(expanded)
     }
 }
 
 @Composable
 private fun ToolCardBody(toolCall: UiToolCall, isError: Boolean) {
+    // Decided before the layout: inside the let-lambda below, this branch was
+    // one CodeScene could not attribute to any function.
+    val provenance = toolCall.agentMessageProvenance
+    val provenanceTint = if (provenance?.deliveryState == com.letta.mobile.data.messaging.AgentMessageDeliveryState.FAILED) {
+        MaterialTheme.colorScheme.error
+    } else {
+        MaterialTheme.colorScheme.tertiary
+    }
     Column(
         modifier = Modifier
             .testTag("tool-card-body")
             .padding(start = 31.dp, end = 10.dp, top = 2.dp, bottom = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        toolCall.agentMessageProvenance?.let { provenance ->
-            val tint = if (provenance.deliveryState == com.letta.mobile.data.messaging.AgentMessageDeliveryState.FAILED) {
-                MaterialTheme.colorScheme.error
-            } else {
-                MaterialTheme.colorScheme.tertiary
-            }
-            AgentMessageProvenanceMetadata(provenance, tint)
-        }
+        provenance?.let { AgentMessageProvenanceMetadata(it, provenanceTint) }
         toolCall.arguments.takeIf { it.isNotBlank() }?.let { args ->
             SelectionContainer {
                 Text(
@@ -445,28 +480,8 @@ internal fun DesktopAskUserQuestionCard(
                 otherValue = otherText[question.question].orEmpty(),
             )
             val actions = DesktopAskUserQuestionAnswerActions(
-                onToggleOption = { label ->
-                    val current = selections.getOrPut(question.question) { mutableListOf() }
-                    if (question.multiSelect) {
-                        if (!current.remove(label)) current.add(label)
-                    } else {
-                        current.clear()
-                        current.add(label)
-                        // Single-select is mutually exclusive with "Other": picking a
-                        // chip clears any free-text answer for this question.
-                        otherText[question.question] = ""
-                    }
-                    // trigger recomposition (SnapshotStateMap tracks value identity)
-                    selections[question.question] = current.toMutableList()
-                },
-                onOtherChanged = { text ->
-                    otherText[question.question] = text
-                    if (!question.multiSelect && text.isNotBlank()) {
-                        // Single-select is mutually exclusive with chips: typing in
-                        // "Other" clears any picked option for this question.
-                        selections[question.question] = mutableListOf()
-                    }
-                },
+                onToggleOption = { label -> toggleAskUserQuestionOption(question, label, selections, otherText) },
+                onOtherChanged = { text -> setAskUserQuestionOther(question, text, selections, otherText) },
             )
             DesktopAskUserQuestionBlock(
                 question = question,
@@ -477,6 +492,7 @@ internal fun DesktopAskUserQuestionCard(
 
         val answers = buildAskUserQuestionAnswers(spec.questions, selections, otherText)
         val canSubmit = answers.isNotEmpty() && answers.size == spec.questions.count { it.question.isNotBlank() }
+        val submitLabel = if (isSubmitting) "Sending…" else "Send answer"
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(
@@ -494,7 +510,7 @@ internal fun DesktopAskUserQuestionCard(
                     )
                 },
                 enabled = !isSubmitting && canSubmit && onDecision != null,
-            ) { Text(if (isSubmitting) "Sending…" else "Send answer") }
+            ) { Text(submitLabel) }
         }
     }
     return true
@@ -568,6 +584,47 @@ private fun DesktopAskUserQuestionBlock(
  * questions are mutually exclusive (enforced upstream), so at most one value is
  * ever present here.
  */
+/**
+ * Answering is state, not layout: these two ran inside the card's composition
+ * lambdas, which buried the single/multi-select rules among the widgets that
+ * happened to trigger them.
+ *
+ * Toggling an option in a multi-select flips its membership; in a single-select
+ * it replaces the selection and clears any free-text answer, since the two are
+ * mutually exclusive.
+ */
+private fun toggleAskUserQuestionOption(
+    question: AskUserQuestionItem,
+    label: String,
+    selections: MutableMap<String, MutableList<String>>,
+    otherText: MutableMap<String, String>,
+) {
+    val current = selections.getOrPut(question.question) { mutableListOf() }
+    if (question.multiSelect) {
+        if (!current.remove(label)) current.add(label)
+    } else {
+        current.clear()
+        current.add(label)
+        otherText[question.question] = ""
+    }
+    // Reassigned rather than mutated in place: a SnapshotStateMap tracks value
+    // identity, so an in-place edit would not recompose.
+    selections[question.question] = current.toMutableList()
+}
+
+/** The mirror of [toggleAskUserQuestionOption]: typing "Other" clears a single-select's chip. */
+private fun setAskUserQuestionOther(
+    question: AskUserQuestionItem,
+    text: String,
+    selections: MutableMap<String, MutableList<String>>,
+    otherText: MutableMap<String, String>,
+) {
+    otherText[question.question] = text
+    if (!question.multiSelect && text.isNotBlank()) {
+        selections[question.question] = mutableListOf()
+    }
+}
+
 private fun buildAskUserQuestionAnswers(
     questions: List<AskUserQuestionItem>,
     selections: Map<String, List<String>>,
@@ -592,13 +649,17 @@ private fun buildAskUserQuestionAnswers(
 
 @Composable
 internal fun ApprovalResponseCard(approvalResponse: UiApprovalResponse) {
-    val label = when (approvalResponse.approved) {
-        true -> "Approved"
-        false -> "Rejected"
-        null -> "Approval response"
+    // One decision on the verdict, yielding both the word and the glyph, rather
+    // than a `when` for the label and a separate `if` for the icon.
+    val (label, glyph) = when (approvalResponse.approved) {
+        true -> "Approved" to Icons.Outlined.CheckCircle
+        false -> "Rejected" to Icons.Outlined.ErrorOutline
+        null -> "Approval response" to Icons.Outlined.CheckCircle
     }
+    val toolDecisionCount = approvalResponse.approvals.size
+    val hasToolDecisions = toolDecisionCount > 0
     ArtifactCard(
-        icon = if (approvalResponse.approved == false) Icons.Outlined.ErrorOutline else Icons.Outlined.CheckCircle,
+        icon = glyph,
         title = label,
         status = ToolStatusToken(approvalResponse.requestId ?: "response"),
     ) {
@@ -608,9 +669,9 @@ internal fun ApprovalResponseCard(approvalResponse: UiApprovalResponse) {
                 style = MaterialTheme.typography.bodySmall,
             )
         }
-        if (approvalResponse.approvals.isNotEmpty()) {
+        if (hasToolDecisions) {
             Text(
-                text = "${approvalResponse.approvals.size} tool decisions",
+                text = "$toolDecisionCount tool decisions",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

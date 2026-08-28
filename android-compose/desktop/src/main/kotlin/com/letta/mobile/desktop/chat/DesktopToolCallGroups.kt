@@ -25,6 +25,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -49,6 +52,16 @@ sealed interface DesktopChatRow {
     @Immutable
     data class Item(val item: ChatRenderItem) : DesktopChatRow {
         override val key: String = item.key
+    }
+
+    /**
+     * A "Today" / "Yesterday" / "March 4" heading marking where a new local day
+     * starts. Inserted by [withDesktopDayDividers] after grouping, so the row
+     * indices the message list scrolls to already account for them.
+     */
+    @Immutable
+    data class DayDivider(val date: java.time.LocalDate) : DesktopChatRow {
+        override val key: String = "__day__$date"
     }
 
     /**
@@ -176,7 +189,8 @@ internal fun DesktopToolGroupCard(group: DesktopChatRow.ToolGroup) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable { expanded = !expanded }
+                .clickable(role = Role.Button) { expanded = !expanded }
+                .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" }
                 .padding(horizontal = 10.dp, vertical = 5.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),

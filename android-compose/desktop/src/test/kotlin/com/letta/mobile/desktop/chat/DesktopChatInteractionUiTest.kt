@@ -313,6 +313,16 @@ class DesktopChatInteractionUiTest {
         placeholder = "Message",
     )
 
+    @Test
+    fun composerHintShowsOnlyWhileThereIsNothingToSend() {
+        // Discovery copy for @ / Enter, not a permanent strip under every chat.
+        assertTrue(composerHintVisible(text = "", hasAttachments = false))
+        assertTrue(composerHintVisible(text = "   ", hasAttachments = false), "whitespace is not a message")
+        assertFalse(composerHintVisible(text = "hello", hasAttachments = false))
+        // An image alone is sendable, so the hint has already done its job.
+        assertFalse(composerHintVisible(text = "", hasAttachments = true))
+    }
+
     private fun composerActions(
         onTextChanged: (String) -> Unit = {},
         onSend: () -> Unit = {},

@@ -70,3 +70,43 @@ private fun DrawScope.drawFadeBand(lengthPx: Float, alpha: Float, fromTop: Boole
         blendMode = BlendMode.DstIn,
     )
 }
+
+/**
+ * The horizontal counterpart of [fadingEdges], for rows that scroll sideways.
+ *
+ * A horizontally scrolling strip that hard-clips at the pane edge reads as a
+ * layout bug — the last item looks broken rather than scrollable. Ramping the
+ * edge out says "there is more this way" with no extra chrome.
+ */
+internal fun Modifier.horizontalFadingEdges(
+    startFadeAlpha: Float,
+    endFadeAlpha: Float,
+    fadeLength: Dp,
+): Modifier {
+    if (startFadeAlpha <= 0f && endFadeAlpha <= 0f) return this
+    return this
+        .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+        .drawWithContent {
+            drawContent()
+            drawHorizontalFadeBand(fadeLength.toPx(), startFadeAlpha, fromStart = true)
+            drawHorizontalFadeBand(fadeLength.toPx(), endFadeAlpha, fromStart = false)
+        }
+}
+
+/** As [drawFadeBand], along x. */
+private fun DrawScope.drawHorizontalFadeBand(lengthPx: Float, alpha: Float, fromStart: Boolean) {
+    val band = lengthPx.coerceAtMost(size.width / 2f)
+    if (alpha <= 0f || band <= 0f) return
+    val startX = if (fromStart) 0f else size.width - band
+    val faded = Color.Black.copy(alpha = 1f - alpha)
+    drawRect(
+        brush = Brush.horizontalGradient(
+            colors = if (fromStart) listOf(faded, Color.Black) else listOf(Color.Black, faded),
+            startX = startX,
+            endX = startX + band,
+        ),
+        topLeft = Offset(startX, 0f),
+        size = Size(band, size.height),
+        blendMode = BlendMode.DstIn,
+    )
+}

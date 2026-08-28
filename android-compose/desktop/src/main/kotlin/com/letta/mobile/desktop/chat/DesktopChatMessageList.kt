@@ -5,6 +5,10 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -46,6 +50,7 @@ import com.letta.mobile.desktop.fadingEdges
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
+import java.time.LocalDate
 
 internal data class MessageListParams(
     val conversationId: String?,
@@ -81,16 +86,17 @@ internal fun MessageList(
     // Consecutive tool-only messages fold into one collapsed "N tool calls"
     // row — six near-identical Bash cards with six timestamps drowned the
     // agent's prose. Folded HERE (not in the column) because the scroll
-    // arithmetic below must count the rows the LazyColumn actually holds.
-    val rows = remember(renderItems) { groupDesktopChatRows(renderItems) }
+    // arithmetic below must count the rows the LazyColumn actually holds — which
+    // is also why the day dividers ("Today" / "Yesterday" / "March 4") are
+    // inserted here rather than emitted inline in the column.
+    val rows = remember(renderItems) { withDesktopDayDividers(groupDesktopChatRows(renderItems)) }
 
-    // The LazyColumn is laid out as [ "__today__" header, ...rows,
-    // ("__thinking__" while sending)? ]. The leading header offsets every render
-    // row by one, so the last row is at index rows.size (not size - 1),
-    // and the thinking row at size + 1. The scroll targets below must use this
-    // header-aware index — latestIndex(rows.size) landed one row short,
-    // which is why a fresh prompt/reply needed a manual nudge to the bottom.
-    val chatBottomIndex = (rows.size + if (isSending) 1 else 0).coerceAtLeast(0)
+    // The LazyColumn is laid out as [ ...rows, ("__thinking__" while sending)? ],
+    // where rows already includes the day dividers. So the bottom-most row is at
+    // rows.size - 1, and the thinking row (when sending) one past it. The scroll
+    // targets below must use this index — landing one row short is why a fresh
+    // prompt/reply once needed a manual nudge to the bottom.
+    val chatBottomIndex = (rows.size - 1 + if (isSending) 1 else 0).coerceAtLeast(0)
     val tailContentLength = remember(renderItems) { renderItems.tailContentLength() }
 
     MessageListFollowEffects(
@@ -143,7 +149,7 @@ internal fun MessageList(
             ScrollToLatestButton(
                 onClick = {
                     followLatest = true
-                    scope.launch { listState.animateScrollToItem(chatBottomIndex) }
+                    scope.launch { listState.animateScrollToChatBottom(chatBottomIndex) }
                 },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -151,6 +157,33 @@ internal fun MessageList(
             )
         }
     }
+}
+
+
+/**
+ * Scrolling "to the latest message" must land on the BOTTOM of the transcript,
+ * not the top of its last row.
+ *
+ * `scrollToItem(index)` aligns that item's TOP edge with the top of the
+ * viewport. For a short row those coincide, but the last row is usually the
+ * agent's long reply — so the list stopped with the reply's first line at the
+ * top of the viewport and the rest of it, plus the bottom content padding,
+ * still below the fold. It read as "scroll to latest stops just short".
+ *
+ * Passing a scroll offset larger than any row can be asks the list to keep
+ * going past that item; LazyColumn clamps at the end of its content, which is
+ * the actual bottom — bottom contentPadding included.
+ */
+private const val ChatBottomOverscrollPx = 1_000_000
+
+private suspend fun LazyListState.scrollToChatBottom(index: Int) {
+    scrollToItem(index, ChatBottomOverscrollPx)
+}
+
+private suspend fun LazyListState.animateScrollToChatBottom(index: Int) {
+    // animateScrollToItem already snaps across long distances and animates only
+    // the approach, so the offset rides along without flinging the whole way.
+    animateScrollToItem(index, ChatBottomOverscrollPx)
 }
 
 /**
@@ -214,7 +247,8 @@ private data class MessageListFollowParams(
     val conversationId: String?,
     val renderItems: List<ChatRenderItem>,
     val isSending: Boolean,
-    val latestItemKey: Any?,
+    /** The tail row's LazyColumn key — [ChatRenderItem.key], so a String. */
+    val latestItemKey: String?,
     val tailContentLength: Int,
     val chatBottomIndex: Int,
     val listState: LazyListState,
@@ -232,7 +266,7 @@ private fun MessageListFollowEffects(params: MessageListFollowParams) {
     LaunchedEffect(params.conversationId) {
         onFollowLatestChange(true)
         if (params.renderItems.isNotEmpty()) {
-            listState.scrollToItem(chatBottomIndex)
+            listState.scrollToChatBottom(chatBottomIndex)
         }
     }
 
@@ -256,7 +290,7 @@ private fun MessageListFollowEffects(params: MessageListFollowParams) {
         params.isSending,
     ) {
         if (ChatViewportFollowPolicy.shouldAutoFollow(params.followLatest(), params.renderItems.size)) {
-            listState.scrollToItem(chatBottomIndex)
+            listState.scrollToChatBottom(chatBottomIndex)
         }
     }
 
@@ -266,7 +300,7 @@ private fun MessageListFollowEffects(params: MessageListFollowParams) {
     LaunchedEffect(params.isSending) {
         if (params.isSending) {
             onFollowLatestChange(true)
-            listState.animateScrollToItem(chatBottomIndex)
+            listState.animateScrollToChatBottom(chatBottomIndex)
         }
     }
 }
@@ -288,6 +322,8 @@ private fun MessageListColumn(params: MessageListColumnParams) {
     val rows = params.rows
     val streamingMessageId = params.streamingMessageId
     val isSending = params.isSending
+    // Hoisted: one midnight watcher for the whole list, not one per divider.
+    val today = rememberCurrentDate()
     val selectionColors = TextSelectionColors(
         handleColor = MaterialTheme.colorScheme.primary,
         backgroundColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.32f),
@@ -306,15 +342,6 @@ private fun MessageListColumn(params: MessageListColumnParams) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            item(key = "__today__") {
-                Text(
-                    text = "Today",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                    modifier = Modifier.widthIn(max = ChatColumnMaxWidth).fillMaxWidth(),
-                    textAlign = TextAlign.Center,
-                )
-            }
             // User prompts are sticky headers: the question stays pinned to the
             // top of the viewport while its (usually much taller) answer scrolls
             // underneath, so you never lose track of what was asked. Everything
@@ -322,6 +349,10 @@ private fun MessageListColumn(params: MessageListColumnParams) {
             // consecutive tool-only messages render as one collapsed "N tool
             // calls" card instead of a stack of near-identical Bash cards.
             rows.forEach { row ->
+                if (row is DesktopChatRow.DayDivider) {
+                    item(key = row.key) { DesktopDayDividerRow(row.date, today) }
+                    return@forEach
+                }
                 if (row is DesktopChatRow.ToolGroup) {
                     item(key = row.key) {
                         Column(modifier = Modifier.widthIn(max = ChatColumnMaxWidth).fillMaxWidth()) {
@@ -380,6 +411,38 @@ private fun MessageListColumn(params: MessageListColumnParams) {
             }
         }
     }
+}
+
+/**
+ * A day boundary in the message list.
+ *
+ * A bare centered word was enough when there was exactly one of these at the
+ * top of the list. Repeated down a long history it reads as another stray
+ * label among the messages, so the rules carry the boundary and the word only
+ * names it.
+ */
+@Composable
+private fun DesktopDayDividerRow(date: LocalDate, today: LocalDate) {
+    val ruleColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+    Row(
+        modifier = Modifier.widthIn(max = ChatColumnMaxWidth).fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        DayDividerRule(ruleColor, Modifier.weight(1f))
+        Text(
+            text = desktopDayLabel(date, today),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            textAlign = TextAlign.Center,
+        )
+        DayDividerRule(ruleColor, Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun DayDividerRule(color: Color, modifier: Modifier = Modifier) {
+    Box(modifier = modifier.height(1.dp).background(color))
 }
 
 @Composable

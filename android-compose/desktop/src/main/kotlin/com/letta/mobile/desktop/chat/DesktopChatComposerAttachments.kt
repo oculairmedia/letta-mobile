@@ -302,7 +302,9 @@ internal fun DesktopAttachmentImage(
         if (imageBitmap != null) {
             Image(
                 bitmap = imageBitmap,
-                contentDescription = null,
+                // The only cue that an image is attached: unnamed, it is
+                // invisible to a screen reader rather than decorative.
+                contentDescription = "Attached image",
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
             )
