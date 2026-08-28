@@ -12,6 +12,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * letta-mobile-bn008-phase2-custom-tool (1vuec): the JVM/Android [IrohCliRunner]
@@ -153,7 +154,7 @@ class DefaultIrohCliRunner(
                 // 50ms poll granularity — coarse enough to avoid pegging
                 // a CPU, fine enough that destroyForcibly lands within one
                 // poll of the deadline.
-                delay(50)
+                delay(50.milliseconds)
             }
             process.exitValue()
         }
