@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Ktor-backed App Server transport (letta-mobile-lgns8.21.1: one bidirectional
@@ -57,6 +58,8 @@ class KtorAppServerWebSocketTransport(
 
     // One generation: its own Job so tearing it down never cancels the caller's scope.
     private val generationJob = Job(scope.coroutineContext.job)
+    // The child scope is bound to generationJob and cancelled by coordinator teardown.
+    @Suppress("NoDetachedCoroutineLifecycle")
     private val genScope = CoroutineScope(scope.coroutineContext + generationJob)
 
     private val coordinator = AppServerConnectionGeneration(
@@ -171,7 +174,7 @@ class KtorAppServerWebSocketTransport(
             return true
         }
 
-        val drained = withTimeoutOrNull(DELIVERY_DRAIN_TIMEOUT_MILLIS) {
+        val drained = withTimeoutOrNull(DELIVERY_DRAIN_TIMEOUT_MILLIS.milliseconds) {
             jobs.forEach { it.join() }
         } != null
         if (!drained) {
