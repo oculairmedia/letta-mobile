@@ -29,6 +29,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -132,6 +133,35 @@ class ChatTimelineObserverTest {
 
         assertTrue(harness.uiState.value.messages.isEmpty())
         assertTrue(harness.uiState.value.isLoadingMessages)
+    }
+
+    @Test
+    fun `delayed old binding cannot replace newer warm selection`() = runTest {
+        val oldObserveStarted = CompletableDeferred<Unit>()
+        val releaseOldObserve = CompletableDeferred<Unit>()
+        val harness = Harness(backgroundScope)
+        harness.seedTimeline("conv-old", listOf(confirmed("assistant-old", "old")))
+        harness.seedTimeline("conv-new", listOf(confirmed("assistant-new", "new")))
+        coEvery { harness.timelineRepository.observe(null, "conv-old") } coAnswers {
+            oldObserveStarted.complete(Unit)
+            releaseOldObserve.await()
+            harness.timelineFlows.getValue(TimelineHarnessKey(null, "conv-old"))
+        }
+
+        harness.observer.start("conv-old")
+        oldObserveStarted.await()
+        harness.observer.start("conv-new")
+        runCurrent()
+
+        assertEquals(listOf("assistant-new"), harness.uiState.value.messages.map { it.id })
+        assertEquals("conv-new", harness.currentConversationTracker.current)
+
+        releaseOldObserve.complete(Unit)
+        runCurrent()
+
+        assertEquals(listOf("assistant-new"), harness.uiState.value.messages.map { it.id })
+        assertEquals("conv-new", harness.currentConversationTracker.current)
+        coVerify(exactly = 0) { harness.timelineRepository.getOrCreate(null, "conv-old") }
     }
 
     @Test
