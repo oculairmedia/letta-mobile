@@ -161,7 +161,8 @@ class AppServerRestartReplayProbe(private val config: Config) {
     )
 
     // A tiny helper that provides a connected client bound to a fresh scope, closing it after.
-    @Suppress("NoDetachedCoroutineLifecycle") // Independent transport scope is always cancelled in this function's finally block.
+    // The independent transport scope is always cancelled in this function's finally block.
+    @Suppress("NoDetachedCoroutineLifecycle")
     private suspend fun <T> withClient(block: suspend (DefaultAppServerClient) -> T): T = coroutineScope {
         // Independent scope for the transport I/O jobs so cancelling it never
         // propagates to the caller's job hierarchy.
