@@ -130,17 +130,20 @@ private fun ToolCardProvenanceHeader(
 ) {
     val presentation = LocalDesktopAgentMessageContext.current
     val isFailed = provenance.deliveryState == com.letta.mobile.data.messaging.AgentMessageDeliveryState.FAILED
-    val tint = if (isFailed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary
+    // Both colours resolved here rather than at their use sites: one branch on
+    // delivery state for the whole row, decided before the layout is described.
+    val errorColor = MaterialTheme.colorScheme.error
+    val tint = if (isFailed) errorColor else MaterialTheme.colorScheme.tertiary
+    val stateColor = if (isFailed) errorColor else MaterialTheme.colorScheme.onSurfaceVariant
+    val label = provenance.compactLabel(presentation.resolveName)
+    val stateLabel = provenance.deliveryState.displayLabel()
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .testTag("tool-card-toggle")
             .clickable(onClick = onToggle)
             .padding(horizontal = 10.dp, vertical = 5.dp)
-            .semantics {
-                contentDescription = provenance.compactLabel(presentation.resolveName) +
-                    ", ${provenance.deliveryState.displayLabel().lowercase()}"
-            },
+            .semantics { contentDescription = "$label, ${stateLabel.lowercase()}" },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -151,7 +154,7 @@ private fun ToolCardProvenanceHeader(
             tint = tint.copy(alpha = 0.85f),
         )
         Text(
-            text = provenance.compactLabel(presentation.resolveName),
+            text = label,
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Medium,
             color = tint,
@@ -160,9 +163,9 @@ private fun ToolCardProvenanceHeader(
             modifier = Modifier.weight(1f),
         )
         Text(
-            text = provenance.deliveryState.displayLabel(),
+            text = stateLabel,
             style = MaterialTheme.typography.labelSmall,
-            color = if (isFailed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+            color = stateColor,
         )
         ToolCardDisclosureIcon(expanded)
     }
@@ -171,9 +174,15 @@ private fun ToolCardProvenanceHeader(
 /** The shared open/closed chevron, named for screen readers. */
 @Composable
 private fun ToolCardDisclosureIcon(expanded: Boolean) {
+    // One decision, not two parallel ones: the glyph and its name always agree.
+    val (glyph, label) = if (expanded) {
+        Icons.Outlined.KeyboardArrowUp to "Collapse"
+    } else {
+        Icons.Outlined.KeyboardArrowDown to "Expand"
+    }
     Icon(
-        imageVector = if (expanded) Icons.Outlined.KeyboardArrowUp else Icons.Outlined.KeyboardArrowDown,
-        contentDescription = if (expanded) "Collapse" else "Expand",
+        imageVector = glyph,
+        contentDescription = label,
         modifier = Modifier.size(14.dp),
         tint = MaterialTheme.colorScheme.onSurfaceVariant,
     )
@@ -198,6 +207,7 @@ private fun ToolCardHeader(
     // reveal on hover of this activity-log row.
     val rowHoverSource = remember { MutableInteractionSource() }
     val rowHovered by rowHoverSource.collectIsHoveredAsState()
+    val disclosureState = if (expanded) "Expanded" else "Collapsed"
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -206,7 +216,7 @@ private fun ToolCardHeader(
             // The row's name comes from the tool name beside the icon; what a
             // screen reader could not tell was that the row expands, or whether
             // it currently is.
-            .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" }
+            .semantics { stateDescription = disclosureState }
             .hoverable(rowHoverSource)
             .padding(horizontal = 10.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
