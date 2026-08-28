@@ -364,36 +364,59 @@ private fun reduceDanglingToolSettlement(
 ): TimelineReduction {
     if (mutation.callIds.isEmpty()) return danglingSettlementNoOp(state)
     if (!mutation.matchesDanglingFence(state)) return danglingSettlementNoOp(state)
-    val settled = linkedSetOf<String>()
-    val events = state.timeline.events.map { event ->
-        if (event !is TimelineEvent.Confirmed || event.messageType != TimelineMessageType.TOOL_CALL) return@map event
-        val targets = event.toolCalls.mapNotNull { call ->
-            call.effectiveId.takeIf { it.isNotBlank() && it in mutation.callIds && it !in event.toolReturnContentByCallId }
-        }
-        if (targets.isEmpty()) return@map event
-        settled += targets
-        val content = event.toolReturnContentByCallId.toMutableMap()
-        val errors = event.toolReturnIsErrorByCallId.toMutableMap()
-        targets.forEach { callId ->
-            content[callId] = DanglingToolCallResolver.NO_RESULT_MESSAGE
-            errors[callId] = true
-        }
-        val first = targets.first()
-        event.copy(
-            toolReturnContent = event.toolReturnContent ?: content[first],
-            toolReturnIsError = if (event.toolReturnContent == null) true else event.toolReturnIsError,
-            toolReturnContentByCallId = content.toTimelinePersistentMap(),
-            toolReturnIsErrorByCallId = errors.toTimelinePersistentMap(),
+    val settlements = state.timeline.events.map { event ->
+        settleDanglingEvent(event, mutation.callIds)
+    }
+    val settled = buildSet {
+        settlements.forEach { addAll(it.callIds) }
+    }
+    val nextTimeline = if (settled.isEmpty()) state.timeline else {
+        val events = settlements.map { it.event }.toTimelinePersistentList()
+        state.timeline.copy(
+            events = events,
+            stablePrefixVersion = events.stablePrefixFingerprint(),
         )
-    }.toTimelinePersistentList()
-    val nextTimeline = if (settled.isEmpty()) state.timeline else state.timeline.copy(
-        events = events,
-        stablePrefixVersion = events.stablePrefixFingerprint(),
-    )
+    }
     return TimelineReduction(
         next = state.copy(timeline = nextTimeline),
         result = TimelineReductionResult.DanglingToolCallsSettled(settled, settled.isNotEmpty()),
     )
+}
+
+private data class DanglingEventSettlement(
+    val event: TimelineEvent,
+    val callIds: Set<String> = emptySet(),
+)
+
+private fun settleDanglingEvent(event: TimelineEvent, requestedCallIds: Set<String>): DanglingEventSettlement {
+    val confirmed = event as? TimelineEvent.Confirmed ?: return DanglingEventSettlement(event)
+    if (confirmed.messageType != TimelineMessageType.TOOL_CALL) return DanglingEventSettlement(event)
+    val targets = confirmed.unreturnedCallIds(requestedCallIds)
+    if (targets.isEmpty()) return DanglingEventSettlement(event)
+
+    val content = confirmed.toolReturnContentByCallId.toMutableMap()
+    val errors = confirmed.toolReturnIsErrorByCallId.toMutableMap()
+    targets.forEach { callId ->
+        content[callId] = DanglingToolCallResolver.NO_RESULT_MESSAGE
+        errors[callId] = true
+    }
+    val repaired = confirmed.copy(
+        toolReturnContent = confirmed.toolReturnContent ?: content[targets.first()],
+        toolReturnIsError = if (confirmed.toolReturnContent == null) true else confirmed.toolReturnIsError,
+        toolReturnContentByCallId = content.toTimelinePersistentMap(),
+        toolReturnIsErrorByCallId = errors.toTimelinePersistentMap(),
+    )
+    return DanglingEventSettlement(repaired, targets.toSet())
+}
+
+private fun TimelineEvent.Confirmed.unreturnedCallIds(requestedCallIds: Set<String>): List<String> = buildList {
+    toolCalls.forEach { call ->
+        val callId = call.effectiveId
+        if (callId.isBlank()) return@forEach
+        if (callId !in requestedCallIds) return@forEach
+        if (callId in toolReturnContentByCallId) return@forEach
+        add(callId)
+    }
 }
 
 private fun TimelineMutation.SettleDanglingToolCalls.matchesDanglingFence(state: TimelineReducerState): Boolean {

@@ -234,15 +234,7 @@ internal class TimelineOutboundSendProcessor(
         val timer = Telemetry.startTimer("TimelineSync", "reconcile")
         try {
             val serverMessages = listMessagesWithRetry(otid).reversed()
-            val acknowledgement = CompletableDeferred<ReconcileAfterSendResult>()
-            eventQueue.send(
-                TimelineGatewayEvent.ReconcileAfterSendSnapshot(
-                    otid = otid,
-                    serverMessages = serverMessages,
-                    ack = acknowledgement,
-                ),
-            )
-            val result = acknowledgement.await()
+            val result = submitReconcileSnapshot(otid, serverMessages)
             timer.stop(
                 "otid" to otid,
                 "serverCount" to serverMessages.size,
@@ -255,6 +247,21 @@ internal class TimelineOutboundSendProcessor(
             timer.stopError(failure, "otid" to otid)
             events.emit(TimelineSyncEvent.ReconcileError(failure.message ?: "unknown"))
         }
+    }
+
+    private suspend fun submitReconcileSnapshot(
+        otid: String,
+        serverMessages: List<LettaMessage>,
+    ): ReconcileAfterSendResult {
+        val acknowledgement = CompletableDeferred<ReconcileAfterSendResult>()
+        eventQueue.send(
+            TimelineGatewayEvent.ReconcileAfterSendSnapshot(
+                otid = otid,
+                serverMessages = serverMessages,
+                ack = acknowledgement,
+            ),
+        )
+        return acknowledgement.await()
     }
 
     private suspend fun listMessagesWithRetry(otid: String): List<LettaMessage> {
