@@ -13,7 +13,6 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -260,7 +259,7 @@ class TimelineOutboundSendProcessorTurnLifecycleTest {
     private class SingleToolCallSendTransport(
         private val fail: Boolean,
         private val afterToolCall: suspend () -> Unit = {},
-    ) : TimelineTransport {
+    ) : TimelineTransport by EmptyTimelineTransport {
         override suspend fun sendConversationMessage(
             conversationId: String,
             request: MessageCreateRequest,
@@ -275,25 +274,5 @@ class TimelineOutboundSendProcessorTurnLifecycleTest {
             afterToolCall()
             if (fail) throw IllegalStateException("stream dropped")
         }
-
-        override suspend fun streamConversation(conversationId: String): Flow<TimelineStreamFrame> = emptyFlow()
-
-        // reconcileAfterSend's post-stream GET is irrelevant to the
-        // turnStarted/turnEnded wiring under test here; an empty result
-        // keeps its merge a no-op against the TOOL_CALL event this test
-        // appends directly via ingestStreamEvent below.
-        override suspend fun listConversationMessages(
-            conversationId: String,
-            limit: Int?,
-            after: String?,
-            order: String?,
-        ): List<LettaMessage> = emptyList()
-
-        override suspend fun listAgentMessages(
-            agentId: String,
-            limit: Int?,
-            order: String?,
-            conversationId: String?,
-        ): List<LettaMessage> = emptyList()
     }
 }
