@@ -19,6 +19,8 @@ import kotlinx.serialization.json.JsonPrimitive
 
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 /**
  * Handles serializing, sending, streaming, and post-send reconciliation of outbound messages.
  */
@@ -198,9 +200,9 @@ internal class TimelineOutboundSendProcessor(
         // turn-lifecycle hooks the WS/iroh coordinator path uses, scoped to
         // exactly this stream so a dangling tool_call streamed here gets a
         // sweep scheduled instead of spinning forever.
-        onTurnStarted()
         var streamCompletedCleanly = false
         try {
+            onTurnStarted()
             stream.collect { message ->
                 eventCount++
                 if (!firstEventLogged) {
@@ -215,8 +217,10 @@ internal class TimelineOutboundSendProcessor(
             // r3i1z: the turn's send stream is over (terminal or failure) — re-arm
             // the persistent stream subscriber so externally-initiated turns
             // (fanned-out observer frames) are ingested again.
-            onSendStreamEnded()
-            onTurnEnded(streamCompletedCleanly)
+            withContext(NonCancellable) {
+                onSendStreamEnded()
+                onTurnEnded(streamCompletedCleanly)
+            }
         }
 
         streamTimer.stop("otid" to otid, "eventCount" to eventCount)

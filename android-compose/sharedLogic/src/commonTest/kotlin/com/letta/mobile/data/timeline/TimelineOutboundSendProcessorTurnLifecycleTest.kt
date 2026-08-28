@@ -8,6 +8,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -79,6 +81,57 @@ class TimelineOutboundSendProcessorTurnLifecycleTest {
 
         assertEquals(1, turnStartedCalls.size)
         assertEquals(listOf(false), turnEndedCalls)
+    }
+
+    @Test
+    fun `cancellation during turn start still completes end transition before propagating`() = runTest(UnconfinedTestDispatcher()) {
+        val startEntered = CompletableDeferred<Unit>()
+        val releaseStart = CompletableDeferred<Unit>()
+        val ended = CompletableDeferred<Boolean>()
+        val harness = newProcessor(
+            transport = SingleToolCallSendTransport(fail = false),
+            scope = backgroundScope,
+            onTurnStarted = {
+                startEntered.complete(Unit)
+                releaseStart.await()
+            },
+            onTurnEnded = { clean -> ended.complete(clean) },
+        )
+
+        harness.processor.send("hello")
+        runCurrent()
+        startEntered.await()
+        backgroundScope.coroutineContext[kotlinx.coroutines.Job]?.cancel(CancellationException("test cancellation"))
+        runCurrent()
+
+        assertEquals(false, ended.await())
+    }
+
+    @Test
+    fun `cancellation while collecting runs end transition in non cancellable context`() = runTest(UnconfinedTestDispatcher()) {
+        val streamEntered = CompletableDeferred<Unit>()
+        val neverComplete = CompletableDeferred<Unit>()
+        val ended = CompletableDeferred<Boolean>()
+        val harness = newProcessor(
+            transport = SingleToolCallSendTransport(
+                fail = false,
+                afterToolCall = {
+                    streamEntered.complete(Unit)
+                    neverComplete.await()
+                },
+            ),
+            scope = backgroundScope,
+            onTurnStarted = {},
+            onTurnEnded = { clean -> ended.complete(clean) },
+        )
+
+        harness.processor.send("hello")
+        runCurrent()
+        streamEntered.await()
+        backgroundScope.coroutineContext[kotlinx.coroutines.Job]?.cancel(CancellationException("test cancellation"))
+        runCurrent()
+
+        assertEquals(false, ended.await())
     }
 
     @Test
@@ -203,7 +256,10 @@ class TimelineOutboundSendProcessorTurnLifecycleTest {
         return ProcessorHarness(processor)
     }
 
-    private class SingleToolCallSendTransport(private val fail: Boolean) : TimelineTransport {
+    private class SingleToolCallSendTransport(
+        private val fail: Boolean,
+        private val afterToolCall: suspend () -> Unit = {},
+    ) : TimelineTransport {
         override suspend fun sendConversationMessage(
             conversationId: String,
             request: MessageCreateRequest,
@@ -215,6 +271,7 @@ class TimelineOutboundSendProcessorTurnLifecycleTest {
                     runId = "run-send-1",
                 )
             )
+            afterToolCall()
             if (fail) throw IllegalStateException("stream dropped")
         }
 

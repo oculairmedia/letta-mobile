@@ -7,6 +7,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 import kotlin.time.Duration.Companion.milliseconds
 /**
@@ -45,6 +47,8 @@ class DanglingToolCallResolver(
     @Volatile
     private var sweepGeneration: Long = 0L
 
+    private val sweepMutationMutex = Mutex()
+
     /**
      * Cancel any pending sweep. Called when a new turn starts on this
      * conversation — a fresh turn supersedes whatever the previous turn
@@ -52,10 +56,12 @@ class DanglingToolCallResolver(
      * its own sweep if needed via [scheduleSweepIfUnresolved]).
      */
     suspend fun cancelPendingSweep() {
-        sweepGeneration += 1L
-        sweepJob?.cancel()
-        sweepJob = null
-        processor.submitWithBackpressure(TimelineMutation.AdvanceDanglingSweep(sweepGeneration)).appliedResultOrThrow()
+        sweepMutationMutex.withLock {
+            sweepGeneration += 1L
+            sweepJob?.cancel()
+            sweepJob = null
+            processor.submitWithBackpressure(TimelineMutation.AdvanceDanglingSweep(sweepGeneration)).appliedResultOrThrow()
+        }
     }
 
     /**
@@ -166,10 +172,12 @@ class DanglingToolCallResolver(
 
     /** Submit terminal settlement; the reducer rechecks unresolved calls at commit time. */
     private suspend fun settleAsFailed(generation: Long, lifecycleEpoch: Long, callIds: Set<String>) {
-        if (generation != sweepGeneration) return
-        val ack = processor.submit(
-            TimelineMutation.SettleDanglingToolCalls(generation, lifecycleEpoch, callIds),
-        ) as? TimelineProcessorAck.Applied ?: return
+        val ack = sweepMutationMutex.withLock {
+            if (generation != sweepGeneration) return
+            processor.submitWithBackpressure(
+                TimelineMutation.SettleDanglingToolCalls(generation, lifecycleEpoch, callIds),
+            ) as? TimelineProcessorAck.Applied ?: return
+        }
         val result = ack.result as? TimelineReductionResult.DanglingToolCallsSettled ?: return
         result.callIds.forEach { id ->
             Telemetry.event(
