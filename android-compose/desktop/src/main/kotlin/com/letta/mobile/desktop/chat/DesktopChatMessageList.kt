@@ -5,6 +5,10 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -316,15 +320,7 @@ private fun MessageListColumn(params: MessageListColumnParams) {
             // calls" card instead of a stack of near-identical Bash cards.
             rows.forEach { row ->
                 if (row is DesktopChatRow.DayDivider) {
-                    item(key = row.key) {
-                        Text(
-                            text = desktopDayLabel(row.date, LocalDate.now()),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                            modifier = Modifier.widthIn(max = ChatColumnMaxWidth).fillMaxWidth(),
-                            textAlign = TextAlign.Center,
-                        )
-                    }
+                    item(key = row.key) { DesktopDayDividerRow(row.date) }
                     return@forEach
                 }
                 if (row is DesktopChatRow.ToolGroup) {
@@ -385,6 +381,38 @@ private fun MessageListColumn(params: MessageListColumnParams) {
             }
         }
     }
+}
+
+/**
+ * A day boundary in the message list.
+ *
+ * A bare centered word was enough when there was exactly one of these at the
+ * top of the list. Repeated down a long history it reads as another stray
+ * label among the messages, so the rules carry the boundary and the word only
+ * names it.
+ */
+@Composable
+private fun DesktopDayDividerRow(date: LocalDate) {
+    val ruleColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+    Row(
+        modifier = Modifier.widthIn(max = ChatColumnMaxWidth).fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        DayDividerRule(ruleColor, Modifier.weight(1f))
+        Text(
+            text = desktopDayLabel(date, LocalDate.now()),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            textAlign = TextAlign.Center,
+        )
+        DayDividerRule(ruleColor, Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun DayDividerRule(color: Color, modifier: Modifier = Modifier) {
+    Box(modifier = modifier.height(1.dp).background(color))
 }
 
 @Composable
