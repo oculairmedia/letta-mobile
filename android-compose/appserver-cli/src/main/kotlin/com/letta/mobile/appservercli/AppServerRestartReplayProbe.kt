@@ -22,10 +22,7 @@ import java.util.UUID
 import kotlin.io.path.exists
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -159,11 +156,8 @@ class AppServerRestartReplayProbe(private val config: Config) {
         val recreatedConversation: Boolean,
     )
 
-    // A tiny helper that provides a connected client bound to a fresh scope, closing it after.
+    // A tiny helper that provides a connected client bound to this call's lifecycle, closing it after.
     private suspend fun <T> withClient(block: suspend (DefaultAppServerClient) -> T): T = coroutineScope {
-        // Independent scope for the transport I/O jobs so cancelling it never
-        // propagates to the caller's job hierarchy.
-        val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         val http = HttpClient(CIO) {
             install(WebSockets) { applyAppServerDefaults() }
             install(HttpTimeout) {
@@ -175,13 +169,12 @@ class AppServerRestartReplayProbe(private val config: Config) {
         val transport = KtorAppServerWebSocketTransport(
             httpClient = http,
             baseUrl = "ws://127.0.0.1:${config.port}",
-            scope = ioScope,
+            scope = this,
         )
         try {
             block(DefaultAppServerClient(transport, requestTimeoutMs = TURN_TIMEOUT_MS))
         } finally {
             runCatching { transport.close() }
-            ioScope.cancel()
             http.close()
         }
     }

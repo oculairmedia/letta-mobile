@@ -561,20 +561,26 @@ internal suspend fun handleCreateAndDeliver(
         )
         return inputOnConversation(client, message, createdId)
     } else {
-        val dropAttrs = mutableListOf<Pair<String, Any?>>(
-            "fromAgentId" to message.fromAgentId,
-            "toAgentId" to message.toAgentId,
-            "msgId" to message.msgId,
-            "reason" to "no_conversation_create_path",
-        )
         if (!appServerError.isNullOrBlank()) {
-            dropAttrs.add("error" to appServerError)
+            Telemetry.event(
+                "A2aHost", "a2a.drop",
+                "fromAgentId" to message.fromAgentId,
+                "toAgentId" to message.toAgentId,
+                "msgId" to message.msgId,
+                "reason" to "no_conversation_create_path",
+                "error" to appServerError,
+                level = Telemetry.Level.WARN,
+            )
+        } else {
+            Telemetry.event(
+                "A2aHost", "a2a.drop",
+                "fromAgentId" to message.fromAgentId,
+                "toAgentId" to message.toAgentId,
+                "msgId" to message.msgId,
+                "reason" to "no_conversation_create_path",
+                level = Telemetry.Level.WARN,
+            )
         }
-        Telemetry.event(
-            "A2aHost", "a2a.drop",
-            *dropAttrs.toTypedArray(),
-            level = Telemetry.Level.WARN,
-        )
     }
     return DeliveryOutcome(false, "conversation_create_failure")
 }
