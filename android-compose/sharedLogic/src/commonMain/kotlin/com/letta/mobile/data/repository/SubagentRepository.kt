@@ -21,19 +21,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-
-/**
- * Long-lived coroutine scope SubagentRepository uses for its push observer and
- * reconnect watcher. Defaults to [Dispatchers.Default] + a fresh
- * [SupervisorJob]. Exposed as a factory so tests can substitute a
- * `kotlinx.coroutines.test.TestScope`.
- *
- * (Common code can't reference `Dispatchers.IO`; the scope only collects flows
- * and launches transport round-trips, so [Dispatchers.Default] is appropriate —
- * the actual socket I/O happens inside the platform [IChannelTransport].)
- */
-internal fun defaultSubagentScope(): CoroutineScope =
-    CoroutineScope(SupervisorJob() + Dispatchers.Default)
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * letta-mobile-73o2h.3: single source of truth for the active-subagent
@@ -43,6 +31,9 @@ internal fun defaultSubagentScope(): CoroutineScope =
  * Platform-neutral: it depends only on the common [IChannelTransport] surface,
  * so the same registry logic backs both the mobile WS transport and (once it
  * exists) a desktop WS transport (letta-mobile-0yf7o).
+ * An injected [CoroutineScope] remains caller-owned; otherwise the repository
+ * owns a fresh [SupervisorJob] on [Dispatchers.Default] and cancels it in
+ * [close].
  *
  * The registry is per-socket (NOT per-agent), so unlike CronRepository there is
  * exactly one shared [MutableStateFlow] snapshot rather than a map keyed by
@@ -68,7 +59,7 @@ internal fun defaultSubagentScope(): CoroutineScope =
  */
 open class SubagentRepository(
     private val transport: IChannelTransport,
-    private val scope: CoroutineScope = defaultSubagentScope(),
+    scope: CoroutineScope? = null,
     // Mobile shows only active subagents (all=false). The desktop Background
     // tasks panel also has a "Finished" section, so it requests all=true to
     // include recently-terminal entries in the initial snapshot.
@@ -76,6 +67,13 @@ open class SubagentRepository(
     private val clock: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
     private val streamTimeoutSweepIntervalMs: Long = STREAM_TIMEOUT_SWEEP_INTERVAL_MS,
 ) : ISubagentRepository {
+    private val ownedScopeJob = if (scope == null) SupervisorJob() else null
+
+    // A repository-created scope is owned here and cancelled by close().
+    // An injected scope remains caller-owned.
+    @Suppress("NoDetachedCoroutineLifecycle")
+    private val repositoryScope = scope ?: CoroutineScope(requireNotNull(ownedScopeJob) + Dispatchers.Default)
+
     private val state = MutableStateFlow<List<SubagentEntry>>(emptyList())
     private val inFlightRefresh = atomic<CompletableDeferred<Result<List<SubagentEntry>>>?>(null)
     // Whether the initial subagent_list has been dispatched. Repeated
@@ -92,33 +90,33 @@ open class SubagentRepository(
     private val runningAbsentSince = atomic<Map<String, Long>>(emptyMap())
     private val stateMutex = Mutex()
 
-    private val pushJob = scope.launch { observePushEvents() }
-    private val reconnectJob = scope.launch { observeReconnects() }
+    private val pushJob = repositoryScope.launch { observePushEvents() }
+    private val reconnectJob = repositoryScope.launch { observeReconnects() }
     // letta-mobile-ve08r AC#4: stream-timeout watchdog. Periodic sweep that flips
     // RUNNING entries to FAILED once they have been silent (no observed progress)
     // for STREAM_TIMEOUT_MS. Coarser than the typical push cadence but finer than
     // the threshold; cheap O(N) over the snapshot.
-    private val watchdogJob = scope.launch { observeStreamTimeout() }
+    private val watchdogJob = repositoryScope.launch { observeStreamTimeout() }
 
     /** Stops the periodic stream-timeout sweep. */
     private suspend fun observeStreamTimeout() {
         while (true) {
-            kotlinx.coroutines.delay(streamTimeoutSweepIntervalMs)
+            kotlinx.coroutines.delay(streamTimeoutSweepIntervalMs.milliseconds)
             sweepStreamTimeouts()
         }
     }
 
     /**
      * Stops this registry's collectors. Required when the owner replaces the
-     * repository (transport/backend switch): without it the two collectors
-     * above run for the life of [scope], which for the default scope means
-     * forever. Idempotent, and deliberately does NOT cancel a caller-supplied
-     * [scope] — that belongs to the caller.
+     * repository (transport/backend switch). Idempotent, and deliberately does
+     * not cancel a caller-supplied scope — that belongs to the caller. A
+     * repository-created scope is cancelled here.
      */
     fun close() {
         pushJob.cancel()
         reconnectJob.cancel()
         watchdogJob.cancel()
+        ownedScopeJob?.cancel()
     }
 
     /**
@@ -128,7 +126,7 @@ open class SubagentRepository(
      */
     override fun activeSubagentsFlow(scope: SubagentParentScope): Flow<List<SubagentEntry>> {
         if (initialized.compareAndSet(expect = false, update = true)) {
-            this.scope.launch { refresh() }
+            repositoryScope.launch { refresh() }
         }
         return state.asStateFlow().map { entries -> entries.inParentScope(scope) }
     }
