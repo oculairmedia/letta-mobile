@@ -1,10 +1,12 @@
 package com.letta.mobile.data.timeline
 
 import com.letta.mobile.data.model.ToolCall
+import com.letta.mobile.data.model.ToolReturnMessage
 import com.letta.mobile.util.Telemetry
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -33,21 +35,38 @@ class DanglingToolCallResolverTest {
     }
 
 
-    private fun bridgedProcessor(
-        state: MutableStateFlow<Timeline>,
-        scope: kotlinx.coroutines.CoroutineScope,
-    ) = TimelineProcessor(
-        initialState = TimelineReducerState(state.value),
-        scope = scope,
-        stateBridge = object : TimelineProcessorStateBridge {
-            override fun synchronizeSeed(processorState: TimelineReducerState) =
-                processorState.copy(timeline = state.value)
-
-            override fun publish(processorState: TimelineReducerState) {
-                state.value = processorState.timeline
-            }
-        },
+    private data class ProcessorFixture(
+        val processor: TimelineProcessor,
+        val state: StateFlow<Timeline>,
     )
+
+    private fun processor(
+        initial: Timeline,
+        scope: CoroutineScope,
+    ): ProcessorFixture {
+        val processor = TimelineProcessor(
+            initialState = TimelineReducerState(initial),
+            scope = scope,
+        )
+        return ProcessorFixture(processor, processor.timeline)
+    }
+
+    private fun toolCallFixture(scope: CoroutineScope, returned: Boolean = false): ProcessorFixture =
+        processor(Timeline("c1").append(toolCallEvent(callId = "call-1", returned = returned)), scope)
+
+    private suspend fun ProcessorFixture.attachSuccessfulReturn(callId: String = "call-1") {
+        val acknowledgement = processor.submit(
+            TimelineMutation.StreamFrame(
+                ToolReturnMessage(
+                    id = "return-$callId",
+                    toolReturnRaw = JsonPrimitive("ok"),
+                    toolCallId = callId,
+                    isErr = false,
+                ),
+            ),
+        )
+        assertTrue(acknowledgement is TimelineProcessorAck.Applied)
+    }
 
     private fun toolCallEvent(
         otid: String = "otc-1",
@@ -90,17 +109,18 @@ class DanglingToolCallResolverTest {
 
     @Test
     fun `resolve on first poll stops the sweep without settling failed`() = runTest {
-        val state = MutableStateFlow(Timeline("c1").append(toolCallEvent(callId = "call-1", returned = false)))
+        val fixture = toolCallFixture(backgroundScope)
+        val state = fixture.state
         var reconcileCalls = 0
         val resolver = DanglingToolCallResolver(
             conversationId = "c1",
-            processor = bridgedProcessor(state, backgroundScope),
+            processor = fixture.processor,
             state = state,
             scope = backgroundScope,
             reconcile = { _, _ ->
                 reconcileCalls++
                 // The canonical record now has the real successful return.
-                state.value = Timeline("c1").append(toolCallEvent(callId = "call-1", returned = true))
+                fixture.attachSuccessfulReturn()
                 1
             },
         )
@@ -124,11 +144,12 @@ class DanglingToolCallResolverTest {
 
     @Test
     fun `exhaustion settles an honest failed return - never guessing mid-sweep`() = runTest {
-        val state = MutableStateFlow(Timeline("c1").append(toolCallEvent(callId = "call-1", returned = false)))
+        val fixture = toolCallFixture(backgroundScope)
+        val state = fixture.state
         var reconcileCalls = 0
         val resolver = DanglingToolCallResolver(
             conversationId = "c1",
-            processor = bridgedProcessor(state, backgroundScope),
+            processor = fixture.processor,
             state = state,
             scope = backgroundScope,
             reconcile = { _, _ ->
@@ -159,11 +180,12 @@ class DanglingToolCallResolverTest {
 
     @Test
     fun `a new turn starting cancels the pending sweep`() = runTest {
-        val state = MutableStateFlow(Timeline("c1").append(toolCallEvent(callId = "call-1", returned = false)))
+        val fixture = toolCallFixture(backgroundScope)
+        val state = fixture.state
         var reconcileCalls = 0
         val resolver = DanglingToolCallResolver(
             conversationId = "c1",
-            processor = bridgedProcessor(state, backgroundScope),
+            processor = fixture.processor,
             state = state,
             scope = backgroundScope,
             reconcile = { _, _ -> reconcileCalls++; 0 },
@@ -195,16 +217,17 @@ class DanglingToolCallResolverTest {
         // scheduling. This is safe because the sweep only trusts the
         // canonical record; an abnormal turn's OWN calls are already
         // settled synchronously elsewhere and never show up here.
-        val state = MutableStateFlow(Timeline("c1").append(toolCallEvent(callId = "call-1", returned = false)))
+        val fixture = toolCallFixture(backgroundScope)
+        val state = fixture.state
         var reconcileCalls = 0
         val resolver = DanglingToolCallResolver(
             conversationId = "c1",
-            processor = bridgedProcessor(state, backgroundScope),
+            processor = fixture.processor,
             state = state,
             scope = backgroundScope,
             reconcile = { _, _ ->
                 reconcileCalls++
-                state.value = Timeline("c1").append(toolCallEvent(callId = "call-1", returned = true))
+                fixture.attachSuccessfulReturn()
                 1
             },
         )
@@ -220,11 +243,12 @@ class DanglingToolCallResolverTest {
 
     @Test
     fun `no unresolved calls means scheduleSweepIfUnresolved is a no-op`() = runTest {
-        val state = MutableStateFlow(Timeline("c1").append(toolCallEvent(callId = "call-1", returned = true)))
+        val fixture = toolCallFixture(backgroundScope, returned = true)
+        val state = fixture.state
         var reconcileCalls = 0
         val resolver = DanglingToolCallResolver(
             conversationId = "c1",
-            processor = bridgedProcessor(state, backgroundScope),
+            processor = fixture.processor,
             state = state,
             scope = backgroundScope,
             reconcile = { _, _ -> reconcileCalls++; 0 },
@@ -238,11 +262,12 @@ class DanglingToolCallResolverTest {
 
     @Test
     fun `hydration guard fires exactly one immediate reconcile per invocation before any backoff`() = runTest {
-        val state = MutableStateFlow(Timeline("c1").append(toolCallEvent(callId = "call-1", returned = false)))
+        val fixture = toolCallFixture(backgroundScope)
+        val state = fixture.state
         var reconcileCalls = 0
         val resolver = DanglingToolCallResolver(
             conversationId = "c1",
-            processor = bridgedProcessor(state, backgroundScope),
+            processor = fixture.processor,
             state = state,
             scope = backgroundScope,
             reconcile = { reason, forceRefresh ->
@@ -267,11 +292,12 @@ class DanglingToolCallResolverTest {
 
     @Test
     fun `hydration guard escalates to the bounded sweep and settles failed on exhaustion - not just one reconcile`() = runTest {
-        val state = MutableStateFlow(Timeline("c1").append(toolCallEvent(callId = "call-1", returned = false)))
+        val fixture = toolCallFixture(backgroundScope)
+        val state = fixture.state
         var reconcileCalls = 0
         val resolver = DanglingToolCallResolver(
             conversationId = "c1",
-            processor = bridgedProcessor(state, backgroundScope),
+            processor = fixture.processor,
             state = state,
             scope = backgroundScope,
             reconcile = { _, _ ->
@@ -300,16 +326,17 @@ class DanglingToolCallResolverTest {
 
     @Test
     fun `hydration guard does not escalate to a sweep when the immediate reconcile already resolved everything`() = runTest {
-        val state = MutableStateFlow(Timeline("c1").append(toolCallEvent(callId = "call-1", returned = false)))
+        val fixture = toolCallFixture(backgroundScope)
+        val state = fixture.state
         var reconcileCalls = 0
         val resolver = DanglingToolCallResolver(
             conversationId = "c1",
-            processor = bridgedProcessor(state, backgroundScope),
+            processor = fixture.processor,
             state = state,
             scope = backgroundScope,
             reconcile = { _, _ ->
                 reconcileCalls++
-                state.value = Timeline("c1").append(toolCallEvent(callId = "call-1", returned = true))
+                fixture.attachSuccessfulReturn()
                 1
             },
         )
@@ -326,11 +353,12 @@ class DanglingToolCallResolverTest {
 
     @Test
     fun `hydration guard is skipped while a turn is active`() = runTest {
-        val state = MutableStateFlow(Timeline("c1").append(toolCallEvent(callId = "call-1", returned = false)))
+        val fixture = toolCallFixture(backgroundScope)
+        val state = fixture.state
         var reconcileCalls = 0
         val resolver = DanglingToolCallResolver(
             conversationId = "c1",
-            processor = bridgedProcessor(state, backgroundScope),
+            processor = fixture.processor,
             state = state,
             scope = backgroundScope,
             reconcile = { _, _ -> reconcileCalls++; 0 },
@@ -342,11 +370,12 @@ class DanglingToolCallResolverTest {
 
     @Test
     fun `hydration guard is a no-op when nothing is unresolved`() = runTest {
-        val state = MutableStateFlow(Timeline("c1").append(toolCallEvent(callId = "call-1", returned = true)))
+        val fixture = toolCallFixture(backgroundScope, returned = true)
+        val state = fixture.state
         var reconcileCalls = 0
         val resolver = DanglingToolCallResolver(
             conversationId = "c1",
-            processor = bridgedProcessor(state, backgroundScope),
+            processor = fixture.processor,
             state = state,
             scope = backgroundScope,
             reconcile = { _, _ -> reconcileCalls++; 0 },

@@ -13,7 +13,7 @@ import kotlin.test.assertTrue
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 
 /**
@@ -198,20 +198,14 @@ class OptimisticLocalAppendTest {
     private fun newHandler(
         state: MutableStateFlow<Timeline>,
         scope: CoroutineScope,
-    ): TimelineStateTransitionHandler = TimelineStateTransitionHandler(
-        conversationId = "conv-sync",
-        processor = TimelineProcessor(
+    ): TimelineStateTransitionHandler {
+        val processor = TimelineProcessor(
             initialState = TimelineReducerState(state.value),
             scope = scope,
-            writeMutex = Mutex(),
-            stateBridge = object : TimelineProcessorStateBridge {
-                override fun synchronizeSeed(processorState: TimelineReducerState) =
-                    processorState.copy(timeline = state.value)
-
-                override fun publish(stateValue: TimelineReducerState) {
-                    state.value = stateValue.timeline
-                }
-            },
-        ),
-    )
+        )
+        scope.launch {
+            processor.state.collect { state.value = it.timeline }
+        }
+        return TimelineStateTransitionHandler("conv-sync", processor)
+    }
 }

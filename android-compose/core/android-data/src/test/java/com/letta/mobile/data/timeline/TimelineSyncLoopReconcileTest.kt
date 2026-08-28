@@ -473,12 +473,9 @@ class TimelineSyncLoopReconcileTest {
 
     @Test
     fun `retry on non-FAILED event is a no-op`() = runTest {
-        // letta-mobile-lbmy: the fix moves the read of findByOtid inside
-        // writeMutex.withLock. The test here is a behavioural check that
-        // retry() on a non-existent otid returns without mutating state —
-        // enforcing the read-inside-lock pattern would require instrumenting
-        // the mutex which is out of scope; we trust the code review for the
-        // TOCTOU property itself.
+        // The processor serializes the find-by-otid read with every timeline
+        // commit. This behavioural check proves a retry for a missing event is
+        // a no-op instead of resurrecting stale state.
         val api = FakeSyncApi()
         api.nextStreamMessages = emptyList()
         val dispatcher = StandardTestDispatcher(testScheduler)

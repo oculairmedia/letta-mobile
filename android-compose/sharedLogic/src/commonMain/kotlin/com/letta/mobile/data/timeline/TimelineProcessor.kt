@@ -6,15 +6,15 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.ExperimentalForInheritanceCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ClosedSendChannelException
+import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 
 /** Result of one mutation submitted to [TimelineProcessor]. */
 sealed interface TimelineProcessorAck {
@@ -64,22 +64,6 @@ sealed interface TimelineProcessorFailureReason {
 }
 
 /**
- * Synchronizes the processor-owned immutable seed with temporary legacy writers.
- *
- * Both callbacks run under the processor's [Mutex]. Legacy writers must use the
- * same mutex. That makes "read legacy seed -> reduce -> publish both states" one
- * atomic operation without moving stream, hydrate, reconcile, or cleanup logic
- * into this slice. Implementations of [publish] must publish atomically and must
- * not suspend; processor state is advanced only after it returns successfully.
- */
-interface TimelineProcessorStateBridge {
-    fun synchronizeSeed(processorState: TimelineReducerState): TimelineReducerState = processorState
-    fun publish(state: TimelineReducerState) = Unit
-}
-
-object NoOpTimelineProcessorStateBridge : TimelineProcessorStateBridge
-
-/**
  * Serial owner for timeline mutations.
  *
  * A single channel consumer assigns sequence numbers in accepted mailbox order,
@@ -106,8 +90,6 @@ private value class TimelineEffectIndex(val value: Int)
 class TimelineProcessor(
     initialState: TimelineReducerState,
     scope: CoroutineScope,
-    private val writeMutex: Mutex = Mutex(),
-    private val stateBridge: TimelineProcessorStateBridge = NoOpTimelineProcessorStateBridge,
     private val reducer: (TimelineReducerState, TimelineMutation) -> TimelineReduction = ::reduceProductionMutation,
     private val effectHandler: suspend (TimelineReductionEffect) -> Unit = {},
     mailboxCapacity: Int = DEFAULT_MAILBOX_CAPACITY,
@@ -118,6 +100,9 @@ class TimelineProcessor(
     private val terminalReason = atomic<TerminalReason?>(null)
     private val _state = MutableStateFlow(initialState)
     val state: StateFlow<TimelineReducerState> = _state.asStateFlow()
+
+    /** Canonical timeline projection backed directly by [state], without a second publication. */
+    val timeline: StateFlow<Timeline> = ProcessorTimelineStateFlow(state)
     private val consumer: Job = scope.launch {
         consume(TimelineSequence(initialState.lastAppliedMutationSequence + 1L))
     }
@@ -215,26 +200,21 @@ class TimelineProcessor(
         }
     }
 
-    private suspend fun prepareMutation(
+    private fun prepareMutation(
         mutation: TimelineMutation,
         sequence: TimelineSequence,
-    ): PreparedMutation =
-        writeMutex.withLock {
-            val synchronized = stateBridge.synchronizeSeed(_state.value)
-            val rejection = rejectionReason(sequence, mutation, synchronized)
-            if (rejection != null) {
-                if (_state.value != synchronized) _state.value = synchronized
-                PreparedMutation.Rejected(rejection)
-            } else {
-                val reduced = reducer(synchronized, mutation)
-                val committed = reduced.copy(
-                    next = reduced.next.copy(lastAppliedMutationSequence = sequence.value),
-                )
-                stateBridge.publish(committed.next)
-                _state.value = committed.next
-                PreparedMutation.Committed(committed)
-            }
-        }
+    ): PreparedMutation {
+        val current = _state.value
+        val rejection = rejectionReason(sequence, mutation, current)
+        if (rejection != null) return PreparedMutation.Rejected(rejection)
+
+        val reduced = reducer(current, mutation)
+        val committed = reduced.copy(
+            next = reduced.next.copy(lastAppliedMutationSequence = sequence.value),
+        )
+        _state.value = committed.next
+        return PreparedMutation.Committed(committed)
+    }
 
     private suspend fun executeEffects(
         request: ProcessorRequest,
@@ -306,6 +286,25 @@ class TimelineProcessor(
     companion object {
         const val DEFAULT_MAILBOX_CAPACITY = 64
     }
+}
+
+/**
+ * Read-only timeline view of processor state with no independent cache, queue, or coroutine.
+ * [value] therefore observes the same immutable commit that processor acknowledgements and
+ * effects observe, while collectors receive the processor's publication order unchanged.
+ */
+@OptIn(ExperimentalForInheritanceCoroutinesApi::class)
+private class ProcessorTimelineStateFlow(
+    private val processorState: StateFlow<TimelineReducerState>,
+) : StateFlow<Timeline> {
+    override val value: Timeline
+        get() = processorState.value.timeline
+
+    override val replayCache: List<Timeline>
+        get() = listOf(value)
+
+    override suspend fun collect(collector: FlowCollector<Timeline>): Nothing =
+        processorState.collect { state -> collector.emit(state.timeline) }
 }
 
 private fun rejectionReason(
