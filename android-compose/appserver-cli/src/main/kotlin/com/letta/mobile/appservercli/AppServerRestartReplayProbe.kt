@@ -161,6 +161,7 @@ class AppServerRestartReplayProbe(private val config: Config) {
     )
 
     // A tiny helper that provides a connected client bound to a fresh scope, closing it after.
+    @Suppress("NoDetachedCoroutineLifecycle") // Independent transport scope is always cancelled in this function's finally block.
     private suspend fun <T> withClient(block: suspend (DefaultAppServerClient) -> T): T = coroutineScope {
         // Independent scope for the transport I/O jobs so cancelling it never
         // propagates to the caller's job hierarchy.
@@ -242,7 +243,7 @@ class AppServerRestartReplayProbe(private val config: Config) {
             }
         }
         // Let the shared-flow collector subscribe before the (multi-second) turn starts.
-        delay(SUBSCRIBE_GRACE_MS)
+        delay(SUBSCRIBE_GRACE_MS.milliseconds)
         client.input(
             AppServerCommand.Input(
                 runtime = runtime,
