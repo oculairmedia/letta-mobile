@@ -9,7 +9,6 @@ import com.letta.mobile.data.model.FolderUpdateParams
 import com.letta.mobile.data.model.OrganizationSourcesStats
 import com.letta.mobile.data.model.Passage
 import com.letta.mobile.data.repository.api.IFolderRepository
-import io.ktor.http.ContentType
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
@@ -22,6 +21,8 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 
+// The singleton repository owns this scope and cancels it explicitly in close().
+@Suppress("NoDetachedCoroutineLifecycle")
 internal fun defaultSessionScopedFolderRepositoryScope(): CoroutineScope =
     CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
