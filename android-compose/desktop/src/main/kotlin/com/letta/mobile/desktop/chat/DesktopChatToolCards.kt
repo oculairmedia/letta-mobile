@@ -1,3 +1,9 @@
+// FlowRow is used by the AskUserQuestion chips below. Opted in at file level
+// rather than per function: stacking @OptIn above @Composable left those two
+// composables unattributed to any function by CodeScene's parser, which then
+// counted their branches as "global code outside of functions".
+@file:OptIn(ExperimentalLayoutApi::class)
+
 package com.letta.mobile.desktop.chat
 
 import androidx.compose.foundation.BorderStroke
@@ -445,7 +451,6 @@ internal fun ApprovalRequestCard(approvalRequest: UiApprovalRequest) {
  * Returns false (renders nothing) when the approval is not an AskUserQuestion —
  * callers fall back to the generic approval card.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun DesktopAskUserQuestionCard(
     approval: UiApprovalRequest,
@@ -528,7 +533,6 @@ private data class DesktopAskUserQuestionAnswerActions(
     val onOtherChanged: (String) -> Unit,
 )
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun DesktopAskUserQuestionBlock(
     question: AskUserQuestionItem,
