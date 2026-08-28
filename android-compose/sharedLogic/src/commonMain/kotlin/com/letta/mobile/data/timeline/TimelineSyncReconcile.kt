@@ -5,74 +5,6 @@ import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.util.Telemetry
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.collections.immutable.toPersistentSet
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-
-/**
- * Reconcile timeline state after sending a message. Swaps Local→Confirmed
- * for the outbound message, pulls in any server messages we don't yet have,
- * and advances liveCursor.
- */
-suspend fun reconcileAfterSend(
-    otid: String,
-    conversationId: String,
-    writeMutex: Mutex,
-    state: MutableStateFlow<Timeline>,
-    events: MutableSharedFlow<TimelineSyncEvent>,
-    pendingLocalStore: PendingLocalStore,
-    listMessagesWithRetry: suspend (String) -> List<LettaMessage>,
-) {
-    val timer = Telemetry.startTimer("TimelineSync", "reconcile")
-    var confirmedLocal: Boolean
-    var appendedMissing: Int
-    var confirmedServerId: String?
-    var shouldDeletePendingLocal: Boolean
-    try {
-        // letta-mobile-j44j: retry the GET on transient failures before
-        // surfacing a user-visible error. The stream already landed the
-        // assistant reply as Confirmed events (see streamAndReconcile),
-        // so reconcile's job here is the lower-stakes work of swapping
-        // the Local user bubble to Confirmed and picking up anything
-        // the SSE missed. A network blip on that GET shouldn't leave
-        // the bubble stuck in SENT forever. Keep this fetch outside the
-        // write mutex so timeline mutation/rendering is not blocked by
-        // network latency.
-        val serverMessages = listMessagesWithRetry(otid).reversed()
-
-        val result = applyReconcileAfterSendSnapshot(
-            otid = otid,
-            conversationId = conversationId,
-            serverMessages = serverMessages,
-            writeMutex = writeMutex,
-            state = state,
-        )
-        confirmedLocal = result.confirmedLocal
-        appendedMissing = result.appendedMissing
-        confirmedServerId = result.confirmedServerId
-        shouldDeletePendingLocal = result.shouldDeletePendingLocal
-
-        confirmedServerId?.let { serverId ->
-            events.emit(TimelineSyncEvent.LocalConfirmed(otid, serverId))
-        }
-        if (shouldDeletePendingLocal) {
-            runCatching { pendingLocalStore.delete(otid) }
-        }
-        timer.stop(
-            "otid" to otid,
-            "serverCount" to serverMessages.size,
-            "confirmedLocal" to confirmedLocal,
-            "appendedMissing" to appendedMissing,
-        )
-    } catch (cancellation: CancellationException) {
-        throw cancellation
-    } catch (t: Throwable) {
-        timer.stopError(t, "otid" to otid)
-        events.emit(TimelineSyncEvent.ReconcileError(t.message ?: "unknown"))
-    }
-}
 
 @Immutable
 data class ReconcileAfterSendResult(
@@ -126,21 +58,6 @@ private fun LettaMessage.matchesRecentLocalUser(local: TimelineEvent.Local): Boo
     val messageDate = date?.let(::parseTimelineInstantOrNull) ?: return false
     val ageMillis = timelineInstantDurationMillis(local.sentAt, messageDate)
     return ageMillis in 0..CONTENT_FALLBACK_RECENCY_MS
-}
-
-suspend fun applyReconcileAfterSendSnapshot(
-    otid: String,
-    conversationId: String,
-    serverMessages: List<LettaMessage>,
-    writeMutex: Mutex,
-    state: MutableStateFlow<Timeline>,
-): ReconcileAfterSendResult {
-    val result = writeMutex.withLock {
-        reconcileAfterSendSnapshot(state.value, otid, serverMessages).also {
-            state.value = it.timeline
-        }
-    }
-    return result.result
 }
 
 fun Timeline.mergeServerMessages(

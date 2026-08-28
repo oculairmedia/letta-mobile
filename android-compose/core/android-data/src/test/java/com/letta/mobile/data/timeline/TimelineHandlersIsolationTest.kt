@@ -51,7 +51,8 @@ class TimelineHandlersIsolationTest {
                 arguments = "",
             ),
         )
-        applyReturnsAndResponsesFromSnapshot(
+        identifiedState.value = enrichTimelineFromSnapshot(
+            identifiedState.value,
             listOf(
                 ToolReturnMessage(
                     id = "tr-1",
@@ -61,7 +62,6 @@ class TimelineHandlersIsolationTest {
                     runId = "run-1",
                 ),
             ),
-            identifiedState,
         )
         val updated = identifiedState.value.events.single() as TimelineEvent.Confirmed
         assertTrue(updated.approvalDecided)
@@ -75,7 +75,8 @@ class TimelineHandlersIsolationTest {
                 arguments = "",
             ),
         )
-        applyReturnsAndResponsesFromSnapshot(
+        blankState.value = enrichTimelineFromSnapshot(
+            blankState.value,
             listOf(
                 ToolReturnMessage(
                     id = "tr-blank",
@@ -85,7 +86,6 @@ class TimelineHandlersIsolationTest {
                     status = "error",
                 ),
             ),
-            blankState,
         )
         val unchanged = blankState.value.events.single() as TimelineEvent.Confirmed
         assertFalse(unchanged.approvalDecided)

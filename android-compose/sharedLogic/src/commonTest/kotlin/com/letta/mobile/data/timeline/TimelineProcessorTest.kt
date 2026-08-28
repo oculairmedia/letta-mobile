@@ -2,6 +2,8 @@ package com.letta.mobile.data.timeline
 
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.MessageContentPart
+import com.letta.mobile.data.model.ToolCall
+import com.letta.mobile.data.model.ToolReturnMessage
 import com.letta.mobile.data.model.UserMessage
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -480,6 +482,78 @@ class TimelineProcessorTest {
         assertIs<TimelineProcessorFailureReason.StatePublicationFailure>(failed.reason)
         assertEquals(0L, processor.state.value.lastAppliedMutationSequence)
         assertTrue(processor.state.value.timeline.events.isEmpty())
+    }
+
+    @Test
+    fun maintenancePublicationFailureRetriesWithoutOverwritingNewerState() = runTest {
+        val truncated = TimelineEvent.Confirmed(
+            position = 1.0,
+            otid = "tool-otid",
+            content = "tool",
+            serverId = "tool-message",
+            messageType = TimelineMessageType.TOOL_CALL,
+            date = instant,
+            runId = "run",
+            stepId = null,
+            toolCalls = persistentListOf(ToolCall(id = "call", name = "tool")),
+            toolReturnContentByCallId = kotlinx.collections.immutable.persistentMapOf("call" to "preview"),
+            toolReturnTruncationByCallId = kotlinx.collections.immutable.persistentMapOf(
+                "call" to ToolReturnTruncation("return", 1_024),
+            ),
+        )
+        var publicationAttempts = 0
+        val processor = TimelineProcessor(
+            initialState = TimelineReducerState(Timeline("conversation", persistentListOf(truncated))),
+            scope = backgroundScope,
+            stateBridge = object : TimelineProcessorStateBridge {
+                override fun publish(state: TimelineReducerState) {
+                    publicationAttempts += 1
+                    if (publicationAttempts == 1) error("transient publication failure")
+                }
+            },
+        )
+        val repair = TimelineMutation.RepairFullToolReturn(
+            ToolReturnMessage(
+                id = "return",
+                toolCallId = "call",
+                toolReturnRaw = JsonPrimitive("full body"),
+                toolReturnTruncated = false,
+            ),
+        )
+
+        val applied = assertIs<TimelineProcessorAck.Applied>(processor.submitMaintenanceMutation(repair))
+
+        assertEquals(2L, applied.sequence)
+        assertEquals(2, publicationAttempts)
+        assertEquals(2L, processor.state.value.lastAppliedMutationSequence)
+        val event = processor.state.value.timeline.events.single() as TimelineEvent.Confirmed
+        assertEquals("full body", event.toolReturnContentByCallId["call"])
+        assertFalse("call" in event.toolReturnTruncationByCallId)
+    }
+
+    @Test
+    fun failedMaintenanceDoesNotStarveFollowingUserMutation() = runTest {
+        val processor = TimelineProcessor(
+            initialState = TimelineReducerState(Timeline("conversation")),
+            scope = backgroundScope,
+            reducer = { state, mutation ->
+                if (mutation is TimelineMutation.CleanupAbandonedFragments) error("synthetic maintenance failure")
+                reduceProductionMutation(state, mutation)
+            },
+        )
+        val failed = processor.submitMaintenanceMutation(
+            TimelineMutation.CleanupAbandonedFragments("run", "turn", "test"),
+        )
+        assertIs<TimelineProcessorAck.Failed>(failed)
+
+        val local = assertIs<TimelineProcessorAck.Applied>(
+            processor.submitWithBackpressure(
+                TimelineMutation.LocalAppend(PendingSend("user", "still accepted"), instant),
+            ),
+        )
+
+        assertEquals(3L, local.sequence)
+        assertEquals("user", processor.state.value.timeline.events.single().otid)
     }
 
     private fun processor(scope: CoroutineScope) = TimelineProcessor(

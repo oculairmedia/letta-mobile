@@ -18,6 +18,7 @@ data class TimelineReducerState(
     val highestRequestedReconcileGeneration: Long = 0L,
     val highestAppliedReconcileGeneration: Long = 0L,
     val freshnessSequence: Long = 0L,
+    val danglingSweepGeneration: Long = 0L,
 )
 
 /** Payload-only mutation families. Ordering is assigned internally by [TimelineProcessor]. */
@@ -58,6 +59,13 @@ sealed interface TimelineMutation {
         val turnId: String?,
         val reason: String,
         val candidateRunIds: Set<String> = emptySet(),
+    ) : TimelineMutation
+    data class RepairFullToolReturn(val message: ToolReturnMessage) : TimelineMutation
+    data class AdvanceDanglingSweep(val generation: Long) : TimelineMutation
+    data class SettleDanglingToolCalls(
+        val generation: Long,
+        val lifecycleEpoch: Long,
+        val callIds: Set<String>,
     ) : TimelineMutation
     data class LifecycleReset(val epoch: Long) : TimelineMutation
 }
@@ -102,6 +110,18 @@ sealed interface TimelineReductionResult {
     ) : TimelineReductionResult
     data class ReconcileAfterSendApplied(
         val result: ReconcileAfterSendResult,
+        override val changed: Boolean,
+    ) : TimelineReductionResult
+    data class CleanupApplied(
+        val removed: Int,
+        override val changed: Boolean,
+    ) : TimelineReductionResult
+    data class FullToolReturnRepaired(
+        val messageId: String,
+        override val changed: Boolean,
+    ) : TimelineReductionResult
+    data class DanglingToolCallsSettled(
+        val callIds: Set<String>,
         override val changed: Boolean,
     ) : TimelineReductionResult
 }
@@ -219,8 +239,13 @@ fun reduceCleanup(
     candidateRunIds: Set<String> = emptySet(),
 ): TimelineReduction {
     val cleanup = state.timeline.cleanupAbandonedAssistantFragments(runId, turnId, reason, candidateRunIds)
-    if (cleanup.timeline == state.timeline) return unchanged(state)
-    return changed(state.copy(timeline = cleanup.timeline), TimelineChangeKind.CLEANED)
+    return TimelineReduction(
+        next = state.copy(timeline = cleanup.timeline),
+        result = TimelineReductionResult.CleanupApplied(
+            removed = cleanup.suppressions.size,
+            changed = cleanup.timeline != state.timeline,
+        ),
+    )
 }
 
 fun reducePostSendReconcile(
@@ -289,8 +314,121 @@ fun reduceProductionMutation(state: TimelineReducerState, mutation: TimelineMuta
         mutation.reason,
         mutation.candidateRunIds,
     )
+    is TimelineMutation.RepairFullToolReturn -> reduceFullToolReturnRepair(state, mutation.message)
+    is TimelineMutation.AdvanceDanglingSweep -> changedIfNeeded(
+        state,
+        state.copy(danglingSweepGeneration = maxOf(state.danglingSweepGeneration, mutation.generation)),
+    )
+    is TimelineMutation.SettleDanglingToolCalls -> reduceDanglingToolSettlement(state, mutation)
     is TimelineMutation.LifecycleReset -> changedIfNeeded(state, state.copy(lifecycleEpoch = mutation.epoch))
 }
+
+private fun reduceFullToolReturnRepair(
+    state: TimelineReducerState,
+    message: ToolReturnMessage,
+): TimelineReduction {
+    val callId = message.toolCallId
+    if (message.toolReturnTruncated == true || callId.isNullOrBlank()) return fullToolReturnRepairNoOp(state, message.id)
+
+    val eligibleServerIds = state.timeline.events.mapNotNullTo(mutableSetOf()) { event ->
+        val confirmed = event as? TimelineEvent.Confirmed ?: return@mapNotNullTo null
+        confirmed.serverId.takeIf {
+            confirmed.toolReturnTruncationByCallId[callId]?.messageId == message.id
+        }
+    }
+    if (eligibleServerIds.isEmpty()) return fullToolReturnRepairNoOp(state, message.id)
+
+    val enriched = enrichTimelineFromSnapshot(state.timeline, listOf(message))
+    val events = state.timeline.events.zip(enriched.events) { current, repaired ->
+        val serverId = (current as? TimelineEvent.Confirmed)?.serverId
+        if (serverId in eligibleServerIds) repaired else current
+    }.toTimelinePersistentList()
+    val nextTimeline = if (events == state.timeline.events) state.timeline else state.timeline.copy(
+        events = events,
+        stablePrefixVersion = events.stablePrefixFingerprint(),
+    )
+    return TimelineReduction(
+        next = state.copy(timeline = nextTimeline),
+        result = TimelineReductionResult.FullToolReturnRepaired(message.id, nextTimeline != state.timeline),
+    )
+}
+
+private fun fullToolReturnRepairNoOp(state: TimelineReducerState, messageId: String) = TimelineReduction(
+    state,
+    result = TimelineReductionResult.FullToolReturnRepaired(messageId, false),
+)
+
+private fun reduceDanglingToolSettlement(
+    state: TimelineReducerState,
+    mutation: TimelineMutation.SettleDanglingToolCalls,
+): TimelineReduction {
+    if (mutation.callIds.isEmpty()) return danglingSettlementNoOp(state)
+    if (!mutation.matchesDanglingFence(state)) return danglingSettlementNoOp(state)
+    val settlements = state.timeline.events.map { event ->
+        settleDanglingEvent(event, mutation.callIds)
+    }
+    val settled = buildSet {
+        settlements.forEach { addAll(it.callIds) }
+    }
+    val nextTimeline = if (settled.isEmpty()) state.timeline else {
+        val events = settlements.map { it.event }.toTimelinePersistentList()
+        state.timeline.copy(
+            events = events,
+            stablePrefixVersion = events.stablePrefixFingerprint(),
+        )
+    }
+    return TimelineReduction(
+        next = state.copy(timeline = nextTimeline),
+        result = TimelineReductionResult.DanglingToolCallsSettled(settled, settled.isNotEmpty()),
+    )
+}
+
+private data class DanglingEventSettlement(
+    val event: TimelineEvent,
+    val callIds: Set<String> = emptySet(),
+)
+
+private fun settleDanglingEvent(event: TimelineEvent, requestedCallIds: Set<String>): DanglingEventSettlement {
+    val confirmed = event as? TimelineEvent.Confirmed ?: return DanglingEventSettlement(event)
+    if (confirmed.messageType != TimelineMessageType.TOOL_CALL) return DanglingEventSettlement(event)
+    val targets = confirmed.unreturnedCallIds(requestedCallIds)
+    if (targets.isEmpty()) return DanglingEventSettlement(event)
+
+    val content = confirmed.toolReturnContentByCallId.toMutableMap()
+    val errors = confirmed.toolReturnIsErrorByCallId.toMutableMap()
+    targets.forEach { callId ->
+        content[callId] = DanglingToolCallResolver.NO_RESULT_MESSAGE
+        errors[callId] = true
+    }
+    val repaired = confirmed.copy(
+        toolReturnContent = confirmed.toolReturnContent ?: content[targets.first()],
+        toolReturnIsError = if (confirmed.toolReturnContent == null) true else confirmed.toolReturnIsError,
+        toolReturnContentByCallId = content.toTimelinePersistentMap(),
+        toolReturnIsErrorByCallId = errors.toTimelinePersistentMap(),
+    )
+    return DanglingEventSettlement(repaired, targets.toSet())
+}
+
+private fun TimelineEvent.Confirmed.unreturnedCallIds(requestedCallIds: Set<String>): List<String> = buildList {
+    toolCalls.forEach { call ->
+        val callId = call.effectiveId
+        if (callId.isBlank()) return@forEach
+        if (callId !in requestedCallIds) return@forEach
+        if (callId in toolReturnContentByCallId) return@forEach
+        add(callId)
+    }
+}
+
+private fun TimelineMutation.SettleDanglingToolCalls.matchesDanglingFence(state: TimelineReducerState): Boolean {
+    if (generation != state.danglingSweepGeneration) return false
+    if (lifecycleEpoch != state.lifecycleEpoch) return false
+    return true
+}
+
+private fun danglingSettlementNoOp(state: TimelineReducerState) = TimelineReduction(
+    state,
+    result = TimelineReductionResult.DanglingToolCallsSettled(emptySet(), false),
+)
 
 private fun reduceStreamMutation(
     state: TimelineReducerState,

@@ -5,7 +5,7 @@ import kotlin.concurrent.Volatile
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -35,14 +35,20 @@ import kotlin.time.Duration.Companion.milliseconds
  */
 class DanglingToolCallResolver(
     private val conversationId: String,
-    private val state: MutableStateFlow<Timeline>,
-    private val writeMutex: Mutex,
+    private val processor: TimelineProcessor,
+    private val state: StateFlow<Timeline>,
     private val scope: CoroutineScope,
     private val reconcile: suspend (reason: String, forceRefresh: Boolean) -> Int,
     private val backoffMs: List<Long> = DEFAULT_BACKOFF_MS,
+    private val onSettlementCommitted: () -> Unit = {},
 ) {
     @Volatile
     private var sweepJob: Job? = null
+
+    @Volatile
+    private var sweepGeneration: Long = 0L
+
+    private val sweepMutationMutex = Mutex()
 
     /**
      * Cancel any pending sweep. Called when a new turn starts on this
@@ -50,9 +56,15 @@ class DanglingToolCallResolver(
      * left dangling (the new turn's own end-of-turn handling will schedule
      * its own sweep if needed via [scheduleSweepIfUnresolved]).
      */
-    fun cancelPendingSweep() {
-        sweepJob?.cancel()
-        sweepJob = null
+    suspend fun cancelPendingSweep() {
+        sweepMutationMutex.withLock {
+            sweepGeneration += 1L
+            sweepJob?.cancel()
+            sweepJob = null
+            processor.submitMaintenanceMutation(
+                TimelineMutation.AdvanceDanglingSweep(sweepGeneration),
+            ).appliedResultOrThrow()
+        }
     }
 
     /**
@@ -78,9 +90,11 @@ class DanglingToolCallResolver(
      * resolver instance (per conversation) at a time — calling this again
      * (or [cancelPendingSweep]) supersedes any job already in flight.
      */
-    fun scheduleSweepIfUnresolved(clean: Boolean = true) {
+    suspend fun scheduleSweepIfUnresolved(clean: Boolean = true) {
         cancelPendingSweep()
         if (state.value.unresolvedToolCallIds().isEmpty()) return
+        val generation = sweepGeneration
+        val lifecycleEpoch = processor.state.value.lifecycleEpoch
         Telemetry.event(
             "TimelineSync", "danglingToolResolve.sweepScheduled",
             "conversationId" to conversationId,
@@ -121,7 +135,7 @@ class DanglingToolCallResolver(
                     "conversationId" to conversationId,
                     "count" to exhausted.size,
                 )
-                settleAsFailed(exhausted)
+                settleAsFailed(generation, lifecycleEpoch, exhausted)
             }
         }
     }
@@ -159,46 +173,17 @@ class DanglingToolCallResolver(
         }
     }
 
-    /**
-     * Settle every call id in [callIds] that is STILL unresolved (re-checked
-     * here, under [writeMutex], in case a late reconcile snuck in between the
-     * caller's check and this call) as a Failed return with an honest,
-     * non-committal body. Mirrors the shape
-     * [applyReturnsAndResponsesFromSnapshot] uses to attach real returns so
-     * the UI's read path is unchanged.
-     */
-    private suspend fun settleAsFailed(callIds: Set<String>) = writeMutex.withLock {
-        val newEvents = state.value.events.map { ev ->
-            if (ev !is TimelineEvent.Confirmed || ev.messageType != TimelineMessageType.TOOL_CALL) return@map ev
-            val targets = ev.toolCalls.mapNotNull { tc ->
-                val id = tc.effectiveId.takeIf { it.isNotBlank() } ?: return@mapNotNull null
-                if (id !in callIds) return@mapNotNull null
-                if (ev.toolReturnContentByCallId.containsKey(id)) return@mapNotNull null
-                id
-            }
-            if (targets.isEmpty()) return@map ev
-            val contentByCallId = ev.toolReturnContentByCallId.toMutableMap()
-            val isErrorByCallId = ev.toolReturnIsErrorByCallId.toMutableMap()
-            targets.forEach { id ->
-                contentByCallId[id] = NO_RESULT_MESSAGE
-                isErrorByCallId[id] = true
-            }
-            val firstTarget = targets.firstOrNull()
-            ev.copy(
-                toolReturnContent = ev.toolReturnContent ?: firstTarget?.let { contentByCallId[it] },
-                toolReturnIsError = ev.toolReturnContent?.let { ev.toolReturnIsError } ?: true,
-                toolReturnContentByCallId = contentByCallId.toTimelinePersistentMap(),
-                toolReturnIsErrorByCallId = isErrorByCallId.toTimelinePersistentMap(),
-            )
+    /** Submit terminal settlement; the reducer rechecks unresolved calls at commit time. */
+    private suspend fun settleAsFailed(generation: Long, lifecycleEpoch: Long, callIds: Set<String>) {
+        val ack = sweepMutationMutex.withLock {
+            if (generation != sweepGeneration) return
+            processor.submitMaintenanceMutation(
+                TimelineMutation.SettleDanglingToolCalls(generation, lifecycleEpoch, callIds),
+            ) as? TimelineProcessorAck.Applied ?: return
         }
-        if (newEvents !== state.value.events) {
-            val persisted = newEvents.toTimelinePersistentList()
-            state.value = state.value.copy(
-                events = persisted,
-                stablePrefixVersion = persisted.stablePrefixFingerprint(),
-            )
-        }
-        callIds.forEach { id ->
+        val result = ack.result as? TimelineReductionResult.DanglingToolCallsSettled ?: return
+        if (result.changed) onSettlementCommitted()
+        result.callIds.forEach { id ->
             Telemetry.event(
                 "TimelineSync", "danglingToolResolve.settledFailed",
                 "conversationId" to conversationId,

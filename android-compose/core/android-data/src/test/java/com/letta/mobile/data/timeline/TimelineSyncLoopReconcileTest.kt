@@ -28,7 +28,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
@@ -108,9 +107,9 @@ class TimelineSyncLoopReconcileTest {
                 )
         )
 
-        applyReconcileAfterSendSnapshot(
+        state.value = reconcileAfterSendSnapshot(
+            initial = state.value,
             otid = "unmatched-local",
-            conversationId = "conv-order",
             serverMessages = listOf(
                 AssistantMessage(
                     id = "missed-server",
@@ -119,9 +118,7 @@ class TimelineSyncLoopReconcileTest {
                     date = "2026-05-19T06:10:00Z",
                 )
             ),
-            writeMutex = Mutex(),
-            state = state,
-        )
+        ).timeline
 
         val confirmed = state.value.events.filterIsInstance<TimelineEvent.Confirmed>()
         assertEquals(listOf("older-server", "missed-server", "newer-server"), confirmed.map { it.serverId })

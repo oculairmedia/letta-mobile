@@ -64,12 +64,118 @@ class TimelineReducerContractsTest {
     fun cleanupReportsNoOpAndChangeUsingTimelineCleanupSemantics() {
         val full = assistant("full", "Hello", 1.0)
         val fragment = assistant("fragment", "Hi", 2.0)
-        val state = TimelineReducerState(Timeline("conversation", persistentListOf(full, fragment)))
+        val fragmentTwo = assistant("fragment-two", "Yo", 3.0)
+        val state = TimelineReducerState(Timeline("conversation", persistentListOf(full, fragment, fragmentTwo)))
 
         assertFalse(reduceCleanup(state, "other", null, "test").result.changed)
         val cleanup = reduceCleanup(state, "run", "turn", "test")
         assertTrue(cleanup.result.changed)
+        assertEquals(2, assertIs<TimelineReductionResult.CleanupApplied>(cleanup.result).removed)
         assertEquals(listOf("full"), cleanup.next.timeline.events.map { (it as TimelineEvent.Confirmed).serverId })
+    }
+
+    @Test
+    fun fullToolReturnRepairCannotDowngradeCanonicalBody() {
+        val call = TimelineEvent.Confirmed(
+            position = 1.0,
+            otid = "otid",
+            content = "tool",
+            serverId = "call-message",
+            messageType = TimelineMessageType.TOOL_CALL,
+            date = instant,
+            runId = null,
+            stepId = null,
+            toolCalls = persistentListOf(ToolCall(id = "call", name = "tool")),
+            toolReturnContentByCallId = kotlinx.collections.immutable.persistentMapOf("call" to "full body"),
+            toolReturnIsErrorByCallId = kotlinx.collections.immutable.persistentMapOf("call" to false),
+        )
+        val state = TimelineReducerState(Timeline("conversation", persistentListOf(call)))
+        val preview = ToolReturnMessage(
+            id = "return",
+            toolCallId = "call",
+            toolReturnRaw = JsonPrimitive("preview"),
+            toolReturnTruncated = true,
+        )
+
+        val reduction = reduceProductionMutation(state, TimelineMutation.RepairFullToolReturn(preview))
+
+        assertFalse(reduction.result.changed)
+        assertEquals("full body", (reduction.next.timeline.events.single() as TimelineEvent.Confirmed).toolReturnContentByCallId["call"])
+    }
+
+    @Test
+    fun fullToolReturnRepairOnlyReplacesTheStillTruncatedVersion() {
+        val truncated = toolEvent().copy(
+            toolReturnContentByCallId = kotlinx.collections.immutable.persistentMapOf("call" to "preview"),
+            toolReturnIsErrorByCallId = kotlinx.collections.immutable.persistentMapOf("call" to false),
+            toolReturnTruncationByCallId = kotlinx.collections.immutable.persistentMapOf(
+                "call" to ToolReturnTruncation("return", 1_024),
+            ),
+        )
+        val fetched = ToolReturnMessage(
+            id = "return",
+            toolCallId = "call",
+            toolReturnRaw = JsonPrimitive("fetched full body"),
+            toolReturnTruncated = false,
+        )
+        val repaired = reduceProductionMutation(
+            TimelineReducerState(Timeline("conversation", persistentListOf(truncated))),
+            TimelineMutation.RepairFullToolReturn(fetched),
+        )
+        val repairedEvent = repaired.next.timeline.events.single() as TimelineEvent.Confirmed
+        assertTrue(repaired.result.changed)
+        assertEquals("fetched full body", repairedEvent.toolReturnContentByCallId["call"])
+        assertFalse("call" in repairedEvent.toolReturnTruncationByCallId)
+
+        val newer = repairedEvent.copy(
+            toolReturnContentByCallId = kotlinx.collections.immutable.persistentMapOf("call" to "newer stream body"),
+            toolReturnTruncationByCallId = kotlinx.collections.immutable.persistentMapOf(),
+        )
+        val staleRepair = reduceProductionMutation(
+            TimelineReducerState(Timeline("conversation", persistentListOf(newer))),
+            TimelineMutation.RepairFullToolReturn(fetched),
+        )
+        assertFalse(staleRepair.result.changed)
+        assertEquals(
+            "newer stream body",
+            (staleRepair.next.timeline.events.single() as TimelineEvent.Confirmed).toolReturnContentByCallId["call"],
+        )
+    }
+
+    @Test
+    fun danglingSettlementRequiresCurrentGenerationAndPreservesLateReturn() {
+        val unresolved = TimelineEvent.Confirmed(
+            position = 1.0,
+            otid = "otid",
+            content = "tool",
+            serverId = "call-message",
+            messageType = TimelineMessageType.TOOL_CALL,
+            date = instant,
+            runId = null,
+            stepId = null,
+            toolCalls = persistentListOf(ToolCall(id = "call", name = "tool")),
+        )
+        val state = TimelineReducerState(
+            timeline = Timeline("conversation", persistentListOf(unresolved)),
+            lifecycleEpoch = 2,
+            danglingSweepGeneration = 4,
+        )
+        val stale = reduceProductionMutation(state, TimelineMutation.SettleDanglingToolCalls(3, 2, setOf("call")))
+        assertFalse(stale.result.changed)
+
+        val returned = state.copy(
+            timeline = state.timeline.copy(
+                events = persistentListOf(
+                    unresolved.copy(
+                        toolReturnContentByCallId = kotlinx.collections.immutable.persistentMapOf("call" to "canonical"),
+                        toolReturnIsErrorByCallId = kotlinx.collections.immutable.persistentMapOf("call" to false),
+                    ),
+                ),
+            ),
+        )
+        val late = reduceProductionMutation(returned, TimelineMutation.SettleDanglingToolCalls(4, 2, setOf("call")))
+        assertFalse(late.result.changed)
+        assertEquals("canonical", (late.next.timeline.events.single() as TimelineEvent.Confirmed).toolReturnContentByCallId["call"])
     }
 
     @Test

@@ -361,6 +361,19 @@ private fun staleGeneration(window: GenerationWindow) = TimelineProcessorRejecti
     window.current,
 )
 
+internal suspend fun TimelineProcessor.submitMaintenanceMutation(
+    mutation: TimelineMutation,
+    maxAttempts: Int = 2,
+): TimelineProcessorAck {
+    require(maxAttempts > 0) { "maxAttempts must be positive" }
+    repeat(maxAttempts - 1) {
+        val acknowledgement = submitWithBackpressure(mutation)
+        val failed = acknowledgement as? TimelineProcessorAck.Failed ?: return acknowledgement
+        if (failed.reason !is TimelineProcessorFailureReason.StatePublicationFailure) return failed
+    }
+    return submitWithBackpressure(mutation)
+}
+
 internal fun TimelineProcessorAck.appliedResultOrThrow(): TimelineReductionResult = when (this) {
     is TimelineProcessorAck.Applied -> result
     is TimelineProcessorAck.Rejected -> throw TimelineProcessorMutationException("timeline mutation rejected: $reason")
