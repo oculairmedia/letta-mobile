@@ -65,6 +65,7 @@ import com.letta.mobile.data.model.AskUserQuestionItem
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiApprovalResponse
 import com.letta.mobile.data.model.UiGeneratedComponent
+import com.letta.mobile.data.messaging.AgentMessageProvenance
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.data.messaging.compactLabel
 import com.letta.mobile.data.messaging.displayLabel
@@ -111,61 +112,82 @@ internal fun ToolCard(
     }
 }
 
+/**
+ * letta-mobile-slqfp: `agent_message_send` gets a distinct compact
+ * sender -> recipient label instead of the generic tool-name row — the whole
+ * point of structured provenance is that this reads as an agent message, not
+ * an anonymous tool invocation.
+ *
+ * Split out of [ToolCardHeader]: the two headers share only their toggle, and
+ * carrying both shapes plus the generic row's collapsed-summary and hover
+ * affordances in one function made it the file's most complex method.
+ */
+@Composable
+private fun ToolCardProvenanceHeader(
+    provenance: AgentMessageProvenance,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+) {
+    val presentation = LocalDesktopAgentMessageContext.current
+    val isFailed = provenance.deliveryState == com.letta.mobile.data.messaging.AgentMessageDeliveryState.FAILED
+    val tint = if (isFailed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("tool-card-toggle")
+            .clickable(onClick = onToggle)
+            .padding(horizontal = 10.dp, vertical = 5.dp)
+            .semantics {
+                contentDescription = provenance.compactLabel(presentation.resolveName) +
+                    ", ${provenance.deliveryState.displayLabel().lowercase()}"
+            },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.CallMade,
+            contentDescription = null,
+            modifier = Modifier.size(13.dp),
+            tint = tint.copy(alpha = 0.85f),
+        )
+        Text(
+            text = provenance.compactLabel(presentation.resolveName),
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Medium,
+            color = tint,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = provenance.deliveryState.displayLabel(),
+            style = MaterialTheme.typography.labelSmall,
+            color = if (isFailed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        ToolCardDisclosureIcon(expanded)
+    }
+}
+
+/** The shared open/closed chevron, named for screen readers. */
+@Composable
+private fun ToolCardDisclosureIcon(expanded: Boolean) {
+    Icon(
+        imageVector = if (expanded) Icons.Outlined.KeyboardArrowUp else Icons.Outlined.KeyboardArrowDown,
+        contentDescription = if (expanded) "Collapse" else "Expand",
+        modifier = Modifier.size(14.dp),
+        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
 @Composable
 private fun ToolCardHeader(
     toolCall: UiToolCall,
     expanded: Boolean,
     onToggle: () -> Unit,
 ) {
-    // letta-mobile-slqfp: `agent_message_send` gets a distinct compact
-    // sender -> recipient label instead of the generic tool-name row — the
-    // whole point of structured provenance is that this reads as an agent
-    // message, not an anonymous tool invocation.
     val provenance = toolCall.agentMessageProvenance
     if (provenance != null) {
-        val presentation = LocalDesktopAgentMessageContext.current
-        val isFailed = provenance.deliveryState == com.letta.mobile.data.messaging.AgentMessageDeliveryState.FAILED
-        val tint = if (isFailed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("tool-card-toggle")
-                .clickable(onClick = onToggle)
-                .padding(horizontal = 10.dp, vertical = 5.dp)
-                .semantics {
-                    contentDescription = provenance.compactLabel(presentation.resolveName) +
-                        ", ${provenance.deliveryState.displayLabel().lowercase()}"
-                },
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.CallMade,
-                contentDescription = null,
-                modifier = Modifier.size(13.dp),
-                tint = tint.copy(alpha = 0.85f),
-            )
-            Text(
-                text = provenance.compactLabel(presentation.resolveName),
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Medium,
-                color = tint,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-            Text(
-                text = provenance.deliveryState.displayLabel(),
-                style = MaterialTheme.typography.labelSmall,
-                color = if (isFailed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Icon(
-                imageVector = if (expanded) Icons.Outlined.KeyboardArrowUp else Icons.Outlined.KeyboardArrowDown,
-                contentDescription = if (expanded) "Collapse" else "Expand",
-                modifier = Modifier.size(14.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        ToolCardProvenanceHeader(provenance = provenance, expanded = expanded, onToggle = onToggle)
         return
     }
     val collapsedSummary = toolCall.stepLabel()
@@ -223,12 +245,7 @@ private fun ToolCardHeader(
                 visible = rowHovered,
             )
         }
-        Icon(
-            imageVector = if (expanded) Icons.Outlined.KeyboardArrowUp else Icons.Outlined.KeyboardArrowDown,
-            contentDescription = if (expanded) "Collapse" else "Expand",
-            modifier = Modifier.size(14.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        ToolCardDisclosureIcon(expanded)
     }
 }
 
