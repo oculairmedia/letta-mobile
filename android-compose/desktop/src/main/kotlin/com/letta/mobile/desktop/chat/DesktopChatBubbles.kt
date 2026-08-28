@@ -72,6 +72,7 @@ import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.desktop.DesktopTooltip
 import com.letta.mobile.ui.chat.provenance.AgentMessageProvenanceLabel
+import com.letta.mobile.ui.theme.customColors
 import com.letta.mobile.ui.chat.render.rememberSmoothedStreamingText
 import kotlinx.coroutines.delay
 
@@ -239,7 +240,7 @@ private fun CopyButtonVisual(
         Icon(
             imageVector = if (state.copied) Icons.Outlined.Check else Icons.Outlined.ContentCopy,
             contentDescription = null,
-            tint = if (state.copied) Color(0xFF34C759) else style.tint,
+            tint = if (state.copied) MaterialTheme.customColors.successColor else style.tint,
             modifier = Modifier.size(14.dp),
         )
     }
