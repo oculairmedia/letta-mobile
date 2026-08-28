@@ -186,6 +186,13 @@ exclude:
   - name: ExpensiveKeepRuleInspection
     paths:
       - app/proguard-rules.pro
+  # These keep rules preserve framework logging plus JNI/JNA bridge symbols
+  # resolved dynamically by native libraries. Release regressions established
+  # that they are required; Qodana's partial Android/native model cannot resolve
+  # the framework class, generated @JvmStatic members, or transitive JNA types.
+  - name: ShrinkerUnresolvedReference
+    paths:
+      - app/proguard-rules.pro
   # JCEF Compose OSR bridge must subclass package-private CefBrowser_N.
   - name: ClassEscapesItsScope
     paths:
