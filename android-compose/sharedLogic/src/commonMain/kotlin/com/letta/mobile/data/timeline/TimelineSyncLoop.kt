@@ -223,10 +223,10 @@ class TimelineSyncLoop(
     // hydration guard for tool-call cards left unresolved after PR #900
     // removed the guess-based settle-on-clean-completion behavior. See
     // DanglingToolCallResolver's kdoc for the never-guess principle.
-    private val danglingToolCallResolver = DanglingToolCallResolver(
+    private val danglingToolCallResolver by lazy { DanglingToolCallResolver(
         conversationId = conversationId,
-        state = _state,
-        writeMutex = writeMutex,
+        processor = timelineProcessor,
+        state = state,
         scope = loopScope,
         reconcile = { reason, forceRefresh ->
             when (val outcome = reconcileRecentMessages(reason, forceRefresh)) {
@@ -235,7 +235,7 @@ class TimelineSyncLoop(
                 is RecentMessagesReconcileOutcome.Failed -> throw outcome.cause
             }
         },
-    )
+    ) }
 
     /** True while a turn is believed active for this conversation. Toggled by [turnStarted]/[turnEnded]. */
     @Volatile
@@ -406,7 +406,7 @@ class TimelineSyncLoop(
      * supersedes whatever the previous turn's sweep left pending — see
      * [DanglingToolCallResolver.cancelPendingSweep].
      */
-    fun turnStarted() {
+    suspend fun turnStarted() {
         turnActive = true
         danglingToolCallResolver.cancelPendingSweep()
     }
@@ -427,7 +427,7 @@ class TimelineSyncLoop(
      * settled synchronously by AppServerTurnEngine, so they never appear in
      * [Timeline.unresolvedToolCallIds] to begin with.
      */
-    fun turnEnded(clean: Boolean) {
+    suspend fun turnEnded(clean: Boolean) {
         turnActive = false
         danglingToolCallResolver.scheduleSweepIfUnresolved(clean)
     }
@@ -617,24 +617,32 @@ class TimelineSyncLoop(
     }
 
     private suspend fun applyCleanupAbandonedAssistantFragments(event: TimelineGatewayEvent.CleanupAbandonedAssistantFragments) {
-        var removed = 0
-        writeMutex.withLock {
-            val result = _state.value.cleanupAbandonedAssistantFragments(
+        when (val ack = timelineProcessor.submit(
+            TimelineMutation.CleanupAbandonedFragments(
                 runId = event.runId,
                 turnId = event.turnId,
                 reason = event.reason,
                 candidateRunIds = event.candidateRunIds,
-            )
-            removed = result.suppressions.size
-            _state.value = result.timeline
-        }
-        if (removed > 0) {
-            scheduleSnapshotPersist(immediate = true)
-            if (!event.runId.isNullOrBlank()) {
-                _events.emit(TimelineSyncEvent.OrphanAssistantFragmentsCleaned(event.runId, event.turnId, removed, event.reason))
+            ),
+        )) {
+            is TimelineProcessorAck.Applied -> {
+                val result = ack.result as? TimelineReductionResult.CleanupApplied
+                val removed = result?.removed ?: 0
+                if (result?.changed == true) {
+                    scheduleSnapshotPersist(immediate = true)
+                    if (!event.runId.isNullOrBlank()) {
+                        _events.emit(TimelineSyncEvent.OrphanAssistantFragmentsCleaned(event.runId, event.turnId, removed, event.reason))
+                    }
+                }
+                event.ack.complete(removed)
             }
+            is TimelineProcessorAck.Rejected -> event.ack.completeExceptionally(
+                TimelineProcessorMutationException("cleanup was not applied: $ack"),
+            )
+            is TimelineProcessorAck.Failed -> event.ack.completeExceptionally(
+                TimelineProcessorMutationException("cleanup was not applied: $ack"),
+            )
         }
-        event.ack.complete(removed)
     }
 
     /**
@@ -654,9 +662,10 @@ class TimelineSyncLoop(
             }
             .getOrNull() as? ToolReturnMessage ?: return false
         if (message.toolReturnTruncated == true) return false
-        writeMutex.withLock {
-            applyReturnsAndResponsesFromSnapshot(listOf(message), _state)
-        }
+        val applied = timelineProcessor.submit(TimelineMutation.RepairFullToolReturn(message))
+        val result = (applied as? TimelineProcessorAck.Applied)?.result as? TimelineReductionResult.FullToolReturnRepaired
+            ?: return false
+        if (!result.changed) return false
         scheduleSnapshotPersist(immediate = true)
         Telemetry.event(
             "TimelineSync", "toolReturn.resolved",

@@ -56,7 +56,7 @@ class TimelineSyncLoopDanglingToolTest {
         val event = loop.state.value.events.single() as TimelineEvent.Confirmed
         assertEquals("No tool result recorded", event.toolReturnContentByCallId["call-1"])
         assertTrue(event.toolReturnIsErrorByCallId["call-1"] == true)
-        loop.close()
+        loop.closeAndJoin()
     }
 
     @Test
@@ -106,7 +106,7 @@ class TimelineSyncLoopDanglingToolTest {
         val event = loop.state.value.events.single() as TimelineEvent.Confirmed
         assertEquals("No tool result recorded", event.toolReturnContentByCallId["call-1"])
         assertTrue(event.toolReturnIsErrorByCallId["call-1"] == true)
-        loop.close()
+        loop.closeAndJoin()
     }
 
     @Test
@@ -127,7 +127,7 @@ class TimelineSyncLoopDanglingToolTest {
         // Only the bootstrap fetch — no hydration-guard reconcile while a
         // turn is believed active for this conversation.
         assertEquals(1, transport.listCalls)
-        loop.close()
+        loop.closeAndJoin()
     }
 
     private class DanglingToolTransport : TimelineTransport {

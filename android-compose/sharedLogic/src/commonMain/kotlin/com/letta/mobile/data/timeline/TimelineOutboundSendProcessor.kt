@@ -18,6 +18,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.serialization.json.JsonPrimitive
 
 import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.coroutines.CancellationException
 /**
  * Handles serializing, sending, streaming, and post-send reconciliation of outbound messages.
  */
@@ -54,13 +55,13 @@ internal class TimelineOutboundSendProcessor(
      * Called when the outbound send stream begins; mirrors
      * [TimelineSyncLoop.turnStarted].
      */
-    private val onTurnStarted: () -> Unit = {},
+    private val onTurnStarted: suspend () -> Unit = {},
     /**
      * Called when the outbound send stream ends, with [clean] reflecting
      * whether it completed without throwing. Mirrors
      * [TimelineSyncLoop.turnEnded].
      */
-    private val onTurnEnded: (clean: Boolean) -> Unit = {},
+    private val onTurnEnded: suspend (clean: Boolean) -> Unit = {},
 ) {
     val sendQueue = Channel<PendingSend>(Channel.UNLIMITED)
 
@@ -143,6 +144,8 @@ internal class TimelineOutboundSendProcessor(
             try {
                 streamAndReconcile(pending.content, pending.otid, pending.attachments)
                 roundtrip.stop("otid" to pending.otid)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (t: Throwable) {
                 Telemetry.error(
                     "TimelineSync", "send.failed", t,

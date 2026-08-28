@@ -94,8 +94,15 @@ class TimelineOutboundSendProcessorTurnLifecycleTest {
         var reconcileCalls = 0
         val resolver = DanglingToolCallResolver(
             conversationId = "conv-send-dangle",
+            processor = TimelineProcessor(
+                initialState = TimelineReducerState(state.value),
+                scope = backgroundScope,
+                stateBridge = object : TimelineProcessorStateBridge {
+                    override fun synchronizeSeed(processorState: TimelineReducerState) = processorState.copy(timeline = state.value)
+                    override fun publish(processorState: TimelineReducerState) { state.value = processorState.timeline }
+                },
+            ),
             state = state,
-            writeMutex = Mutex(),
             scope = backgroundScope,
             reconcile = { _, _ -> reconcileCalls++; 0 },
         )
@@ -131,8 +138,8 @@ class TimelineOutboundSendProcessorTurnLifecycleTest {
         transport: SingleToolCallSendTransport,
         scope: kotlinx.coroutines.CoroutineScope,
         state: MutableStateFlow<Timeline> = MutableStateFlow(Timeline("conv-send-dangle")),
-        onTurnStarted: () -> Unit,
-        onTurnEnded: (Boolean) -> Unit,
+        onTurnStarted: suspend () -> Unit,
+        onTurnEnded: suspend (Boolean) -> Unit,
     ): ProcessorHarness {
         val eventQueue = Channel<TimelineGatewayEvent>(Channel.UNLIMITED)
         lateinit var processor: TimelineOutboundSendProcessor
