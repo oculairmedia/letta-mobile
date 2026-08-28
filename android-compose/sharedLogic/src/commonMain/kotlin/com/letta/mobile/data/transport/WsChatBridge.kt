@@ -1,6 +1,5 @@
 package com.letta.mobile.data.transport
 
-import com.letta.mobile.data.transport.BridgeTurnStatus
 
 import com.letta.mobile.data.a2ui.A2uiFrameEvent
 import com.letta.mobile.data.a2ui.A2uiAction

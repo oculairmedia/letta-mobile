@@ -1,6 +1,5 @@
 package com.letta.mobile.data.timeline
 
-import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.util.Telemetry
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CancellationException
