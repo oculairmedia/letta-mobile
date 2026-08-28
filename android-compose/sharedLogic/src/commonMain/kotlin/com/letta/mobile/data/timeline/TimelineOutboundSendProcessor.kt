@@ -142,7 +142,7 @@ internal class TimelineOutboundSendProcessor(
                 "conversationId" to conversationId,
             )
             try {
-                streamAndReconcile(pending.content, pending.otid, pending.attachments)
+                streamAndReconcile(pending)
                 roundtrip.stop("otid" to pending.otid)
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -160,11 +160,10 @@ internal class TimelineOutboundSendProcessor(
         }
     }
 
-    private suspend fun streamAndReconcile(
-        content: String,
-        otid: String,
-        attachments: List<MessageContentPart.Image> = emptyList(),
-    ) {
+    private suspend fun streamAndReconcile(pending: PendingSend) {
+        val content = pending.content
+        val otid = pending.otid
+        val attachments = pending.attachments
         val contentElement: kotlinx.serialization.json.JsonElement = if (attachments.isEmpty()) {
             JsonPrimitive(content)
         } else {
@@ -227,14 +226,15 @@ internal class TimelineOutboundSendProcessor(
         eventQueue.send(TimelineGatewayEvent.MarkSent(otid, markSentAck))
         markSentAck.await()
 
-        reconcileAfterSend(otid)
+        reconcileAfterSend(pending)
     }
 
-    private suspend fun reconcileAfterSend(otid: String) {
+    private suspend fun reconcileAfterSend(pending: PendingSend) {
+        val otid = pending.otid
         val timer = Telemetry.startTimer("TimelineSync", "reconcile")
         try {
-            val serverMessages = listMessagesWithRetry(otid).reversed()
-            val result = submitReconcileSnapshot(otid, serverMessages)
+            val serverMessages = listMessagesWithRetry(pending).reversed()
+            val result = submitReconcileSnapshot(pending, serverMessages)
             timer.stop(
                 "otid" to otid,
                 "serverCount" to serverMessages.size,
@@ -250,13 +250,13 @@ internal class TimelineOutboundSendProcessor(
     }
 
     private suspend fun submitReconcileSnapshot(
-        otid: String,
+        pending: PendingSend,
         serverMessages: List<LettaMessage>,
     ): ReconcileAfterSendResult {
         val acknowledgement = CompletableDeferred<ReconcileAfterSendResult>()
         eventQueue.send(
             TimelineGatewayEvent.ReconcileAfterSendSnapshot(
-                otid = otid,
+                otid = pending.otid,
                 serverMessages = serverMessages,
                 ack = acknowledgement,
             ),
@@ -264,7 +264,8 @@ internal class TimelineOutboundSendProcessor(
         return acknowledgement.await()
     }
 
-    private suspend fun listMessagesWithRetry(otid: String): List<LettaMessage> {
+    private suspend fun listMessagesWithRetry(pending: PendingSend): List<LettaMessage> {
+        val otid = pending.otid
         // #827 review (P2): the `after` cursor MUST be a backend message id. Over
         // Iroh the streamed row's serverId (stored in liveCursor) is now an
         // optimistic `cm-stream-*` / `cm-reason-*` id (so mobile can dedupe it
