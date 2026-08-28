@@ -2,8 +2,6 @@ package com.letta.mobile.data.mapper
 
 import com.letta.mobile.data.chat.projection.extractSubagentDispatch
 import com.letta.mobile.data.model.AppMessage
-import com.letta.mobile.data.mapper.extractGeneratedUi
-import com.letta.mobile.data.mapper.extractGeneratedUiFromString
 import com.letta.mobile.data.model.MessageType
 import com.letta.mobile.data.model.UiApprovalDecision
 import com.letta.mobile.data.model.UiApprovalRequest
@@ -13,10 +11,6 @@ import com.letta.mobile.data.model.UiGeneratedComponent
 import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.contentOrNull
 
 internal val generatedUiToolNames = setOf(
     "render_summary_card",
