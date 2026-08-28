@@ -323,7 +323,7 @@ private fun NewConversationWelcome(
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp),
-            modifier = Modifier.widthIn(max = 620.dp),
+            modifier = Modifier.widthIn(max = ChatColumnMaxWidth),
         ) {
             AgentSphere(size = 72.dp)
             Text(
@@ -338,7 +338,7 @@ private fun NewConversationWelcome(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.widthIn(max = 480.dp),
+                modifier = Modifier.widthIn(max = ChatProseMaxWidth),
             )
             // First-run 2×2 action grid (Phase 5), category-colored. Each card
             // pre-fills the composer so a fresh agent has an obvious first move.
@@ -522,28 +522,47 @@ internal fun ChatStatePanel(
             .padding(horizontal = 40.dp, vertical = 28.dp),
         contentAlignment = Alignment.Center,
     ) {
+        val failureHeadline = failureHeadline(screenStatus, state.errorMessage)
         Column(
-            modifier = Modifier.widthIn(max = 680.dp),
+            modifier = Modifier.widthIn(max = ChatColumnMaxWidth),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Text(
-                text = "LETTA DESKTOP",
-                style = MaterialTheme.typography.displayLarge.copy(
-                    fontFamily = FontFamily.Serif,
+            // The wordmark is a welcome, not a diagnosis. When the pane is here
+            // because something BROKE, a display-size brand lockup on top pushes
+            // the one line that says what happened into second place — so a
+            // failure leads with its own headline and drops the wordmark.
+            if (failureHeadline != null) {
+                Text(
+                    text = failureHeadline,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
-                    letterSpacing = 0.sp,
-                ),
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+                    textAlign = TextAlign.Center,
+                )
+            } else {
+                Text(
+                    text = "LETTA DESKTOP",
+                    style = MaterialTheme.typography.displayLarge.copy(
+                        fontFamily = FontFamily.Serif,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        letterSpacing = 0.sp,
+                    ),
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
             Text(
                 text = state.errorMessage ?: screenStatus.heroBody(),
                 style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (failureHeadline != null) {
+                    MaterialTheme.colorScheme.onSurface
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
                 textAlign = TextAlign.Center,
-                modifier = Modifier.widthIn(max = 520.dp),
+                modifier = Modifier.widthIn(max = ChatProseMaxWidth),
             )
             if (screenStatus.isConnectionRetryable) {
                 DesktopDefaultButton(
@@ -558,6 +577,21 @@ internal fun ChatStatePanel(
             }
         }
     }
+}
+
+
+/**
+ * The headline for a pane that is showing a FAILURE, or null when the pane is
+ * simply idle/loading and the brand wordmark is the right thing to show.
+ *
+ * A carried [errorMessage] means something failed even when the status itself
+ * reads as ordinary, so it counts as a failure regardless of [status].
+ */
+internal fun failureHeadline(status: ChatScreenStatus, errorMessage: String?): String? = when {
+    status is ChatScreenStatus.BackendOffline -> "Can't reach the backend"
+    status is ChatScreenStatus.SendFailed -> "Message wasn't sent"
+    errorMessage != null -> "Something went wrong"
+    else -> null
 }
 
 private fun ChatScreenStatus.heroBody(): String = when (this) {

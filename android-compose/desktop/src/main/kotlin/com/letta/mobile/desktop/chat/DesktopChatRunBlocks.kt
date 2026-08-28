@@ -262,6 +262,14 @@ internal fun StepStatusCircle(state: StepState) {
 
 internal val ChatColumnMaxWidth = 760.dp
 
+/**
+ * Readable measure for centred prose in the pane's full-width states (the
+ * welcome copy, the status hero's body). Narrower than [ChatColumnMaxWidth] on
+ * purpose — a 760dp line of centred text is hard to track — but shared, so the
+ * pane has exactly two widths rather than a different magic number per state.
+ */
+internal val ChatProseMaxWidth = 520.dp
+
 /** A composer slash-command (shown when the message starts with "/"). */
 data class ComposerCommand(
     val label: String,
