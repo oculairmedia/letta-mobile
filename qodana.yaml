@@ -142,11 +142,15 @@ exclude:
   - name: AndroidLintDiscouragedApi
     paths:
       - app/src/main/java/com/letta/mobile/crash/SentryInitializer.kt
-  # Baseline Profile non-shipping merge-manifest; Qodana's Android model does
-  # not resolve MainActivity for this synthetic variant even with an FQCN.
+  # Baseline Profile non-shipping merge-manifest and headless theme DOM
+  # inspections. Qodana's CI-only AGP 9.0 model does not resolve MainActivity
+  # for the synthetic variant or Android platform theme symbols, while AAPT and
+  # the production AGP 9.3.1 model resolve them normally.
   - name: AndroidDomInspection
     paths:
       - app/src/playNonMinifiedRelease/AndroidManifest.xml
+      - app/src/main/res/values/themes.xml
+      - app/src/main/res/values-night/themes.xml
   # Gradle incubating APIs (dependencyResolutionManagement / externalNativeBuild)
   # are required by current AGP/Gradle DSL; tracked via Gradle upgrades, not this gate.
   - name: UnstableApiUsage
