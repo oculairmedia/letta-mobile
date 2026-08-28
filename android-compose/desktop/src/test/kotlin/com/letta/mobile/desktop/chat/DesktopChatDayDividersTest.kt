@@ -5,6 +5,7 @@ import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.common.GroupPosition
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.ZonedDateTime
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -100,6 +101,21 @@ class DesktopChatDayDividersTest {
         )
         val keys = rows.map { it.key }
         assertEquals(keys.size, keys.toSet().size, "duplicate LazyColumn keys crash the list")
+    }
+
+    @Test
+    fun midnightWaitEndsExactlyAtTheDayBoundary() {
+        val justBefore = ZonedDateTime.of(2026, 3, 4, 23, 59, 59, 0, utc)
+        assertEquals(1_000L, millisUntilNextMidnight(justBefore))
+        val justAfter = ZonedDateTime.of(2026, 3, 5, 0, 0, 0, 0, utc)
+        assertEquals(86_400_000L, millisUntilNextMidnight(justAfter))
+    }
+
+    @Test
+    fun midnightWaitNeverReturnsZero() {
+        // A zero wait would spin the loop; the floor keeps it yielding.
+        val boundary = ZonedDateTime.of(2026, 3, 4, 23, 59, 59, 999_999_999, utc)
+        assertTrue(millisUntilNextMidnight(boundary) >= 1L)
     }
 
     @Test

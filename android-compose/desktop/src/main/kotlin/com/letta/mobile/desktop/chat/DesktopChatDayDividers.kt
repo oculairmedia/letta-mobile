@@ -1,7 +1,16 @@
 package com.letta.mobile.desktop.chat
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
+import java.time.Duration
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 
@@ -56,4 +65,34 @@ internal fun desktopDayLabel(date: LocalDate, today: LocalDate): String {
         date.year == today.year -> date.format(DateTimeFormatter.ofPattern("MMMM d"))
         else -> date.format(DateTimeFormatter.ofPattern("MMMM d, yyyy"))
     }
+}
+
+/**
+ * The current local date, recomputed when the day actually turns over.
+ *
+ * The day labels are relative ("Today" / "Yesterday"), so reading the clock
+ * once at composition is not enough: a desktop window left open overnight kept
+ * calling yesterday's messages today until something unrelated forced a
+ * recomposition. This sleeps until the next local midnight and re-reads.
+ */
+@Composable
+internal fun rememberCurrentDate(zone: ZoneId = ZoneId.systemDefault()): LocalDate {
+    var today by remember(zone) { mutableStateOf(LocalDate.now(zone)) }
+    LaunchedEffect(zone) {
+        while (true) {
+            delay(millisUntilNextMidnight(ZonedDateTime.now(zone)))
+            today = LocalDate.now(zone)
+        }
+    }
+    return today
+}
+
+/**
+ * Milliseconds from [now] to the start of its next local day. Floored at 1 so a
+ * clock sitting exactly on midnight (or a backwards DST shift landing us past
+ * the boundary) still yields, instead of spinning the wait loop.
+ */
+internal fun millisUntilNextMidnight(now: ZonedDateTime): Long {
+    val nextMidnight = now.toLocalDate().plusDays(1).atStartOfDay(now.zone)
+    return Duration.between(now, nextMidnight).toMillis().coerceAtLeast(1L)
 }

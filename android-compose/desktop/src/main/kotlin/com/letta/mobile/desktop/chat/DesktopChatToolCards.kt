@@ -48,6 +48,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
@@ -178,7 +180,11 @@ private fun ToolCardHeader(
         modifier = Modifier
             .fillMaxWidth()
             .testTag("tool-card-toggle")
-            .clickable(onClick = onToggle)
+            .clickable(onClick = onToggle, role = Role.Button)
+            // The row's name comes from the tool name beside the icon; what a
+            // screen reader could not tell was that the row expands, or whether
+            // it currently is.
+            .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" }
             .hoverable(rowHoverSource)
             .padding(horizontal = 10.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,

@@ -294,6 +294,8 @@ private fun MessageListColumn(params: MessageListColumnParams) {
     val rows = params.rows
     val streamingMessageId = params.streamingMessageId
     val isSending = params.isSending
+    // Hoisted: one midnight watcher for the whole list, not one per divider.
+    val today = rememberCurrentDate()
     val selectionColors = TextSelectionColors(
         handleColor = MaterialTheme.colorScheme.primary,
         backgroundColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.32f),
@@ -320,7 +322,7 @@ private fun MessageListColumn(params: MessageListColumnParams) {
             // calls" card instead of a stack of near-identical Bash cards.
             rows.forEach { row ->
                 if (row is DesktopChatRow.DayDivider) {
-                    item(key = row.key) { DesktopDayDividerRow(row.date) }
+                    item(key = row.key) { DesktopDayDividerRow(row.date, today) }
                     return@forEach
                 }
                 if (row is DesktopChatRow.ToolGroup) {
@@ -392,7 +394,7 @@ private fun MessageListColumn(params: MessageListColumnParams) {
  * names it.
  */
 @Composable
-private fun DesktopDayDividerRow(date: LocalDate) {
+private fun DesktopDayDividerRow(date: LocalDate, today: LocalDate) {
     val ruleColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
     Row(
         modifier = Modifier.widthIn(max = ChatColumnMaxWidth).fillMaxWidth(),
@@ -401,7 +403,7 @@ private fun DesktopDayDividerRow(date: LocalDate) {
     ) {
         DayDividerRule(ruleColor, Modifier.weight(1f))
         Text(
-            text = desktopDayLabel(date, LocalDate.now()),
+            text = desktopDayLabel(date, today),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
             textAlign = TextAlign.Center,

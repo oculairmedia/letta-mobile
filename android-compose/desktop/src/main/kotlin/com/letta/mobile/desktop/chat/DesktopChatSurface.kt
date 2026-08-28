@@ -515,7 +515,10 @@ internal fun ChatStatePanel(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface)
+            // Same ground as the message list and the welcome pane (both paint
+            // `background`): this hero sits over the ambient glow beside them,
+            // and `surface` made the connect/error state a shade off its own pane.
+            .background(MaterialTheme.colorScheme.background)
             .padding(horizontal = 40.dp, vertical = 28.dp),
         contentAlignment = Alignment.Center,
     ) {
