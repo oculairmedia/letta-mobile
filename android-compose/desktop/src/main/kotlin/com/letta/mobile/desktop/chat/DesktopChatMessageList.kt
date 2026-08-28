@@ -247,7 +247,8 @@ private data class MessageListFollowParams(
     val conversationId: String?,
     val renderItems: List<ChatRenderItem>,
     val isSending: Boolean,
-    val latestItemKey: Any?,
+    /** The tail row's LazyColumn key — [ChatRenderItem.key], so a String. */
+    val latestItemKey: String?,
     val tailContentLength: Int,
     val chatBottomIndex: Int,
     val listState: LazyListState,
