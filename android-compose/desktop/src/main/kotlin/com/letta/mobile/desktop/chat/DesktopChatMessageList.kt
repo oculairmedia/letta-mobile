@@ -149,7 +149,7 @@ internal fun MessageList(
             ScrollToLatestButton(
                 onClick = {
                     followLatest = true
-                    scope.launch { listState.animateScrollToItem(chatBottomIndex) }
+                    scope.launch { listState.animateScrollToChatBottom(chatBottomIndex) }
                 },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -157,6 +157,33 @@ internal fun MessageList(
             )
         }
     }
+}
+
+
+/**
+ * Scrolling "to the latest message" must land on the BOTTOM of the transcript,
+ * not the top of its last row.
+ *
+ * `scrollToItem(index)` aligns that item's TOP edge with the top of the
+ * viewport. For a short row those coincide, but the last row is usually the
+ * agent's long reply — so the list stopped with the reply's first line at the
+ * top of the viewport and the rest of it, plus the bottom content padding,
+ * still below the fold. It read as "scroll to latest stops just short".
+ *
+ * Passing a scroll offset larger than any row can be asks the list to keep
+ * going past that item; LazyColumn clamps at the end of its content, which is
+ * the actual bottom — bottom contentPadding included.
+ */
+private const val ChatBottomOverscrollPx = 1_000_000
+
+private suspend fun LazyListState.scrollToChatBottom(index: Int) {
+    scrollToItem(index, ChatBottomOverscrollPx)
+}
+
+private suspend fun LazyListState.animateScrollToChatBottom(index: Int) {
+    // animateScrollToItem already snaps across long distances and animates only
+    // the approach, so the offset rides along without flinging the whole way.
+    animateScrollToItem(index, ChatBottomOverscrollPx)
 }
 
 /**
@@ -238,7 +265,7 @@ private fun MessageListFollowEffects(params: MessageListFollowParams) {
     LaunchedEffect(params.conversationId) {
         onFollowLatestChange(true)
         if (params.renderItems.isNotEmpty()) {
-            listState.scrollToItem(chatBottomIndex)
+            listState.scrollToChatBottom(chatBottomIndex)
         }
     }
 
@@ -262,7 +289,7 @@ private fun MessageListFollowEffects(params: MessageListFollowParams) {
         params.isSending,
     ) {
         if (ChatViewportFollowPolicy.shouldAutoFollow(params.followLatest(), params.renderItems.size)) {
-            listState.scrollToItem(chatBottomIndex)
+            listState.scrollToChatBottom(chatBottomIndex)
         }
     }
 
@@ -272,7 +299,7 @@ private fun MessageListFollowEffects(params: MessageListFollowParams) {
     LaunchedEffect(params.isSending) {
         if (params.isSending) {
             onFollowLatestChange(true)
-            listState.animateScrollToItem(chatBottomIndex)
+            listState.animateScrollToChatBottom(chatBottomIndex)
         }
     }
 }
