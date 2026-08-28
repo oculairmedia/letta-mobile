@@ -6,7 +6,6 @@ import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
 import com.letta.mobile.data.controller.fanout.InboundControlRequestRegistry
-import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerInputMessage
@@ -15,7 +14,6 @@ import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeStartClientInfo
-import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.runtime.RuntimeEventDraft
 import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeEventSource
@@ -31,8 +29,6 @@ import com.letta.mobile.runtime.TurnInput
 import com.letta.mobile.runtime.RunId
 import com.letta.mobile.util.Telemetry
 import kotlinx.atomicfu.atomic
-import kotlinx.atomicfu.getAndUpdate
-import kotlinx.atomicfu.update
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
@@ -48,13 +44,11 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Job
-import kotlin.coroutines.coroutineContext
 import kotlin.time.Duration.Companion.milliseconds
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
