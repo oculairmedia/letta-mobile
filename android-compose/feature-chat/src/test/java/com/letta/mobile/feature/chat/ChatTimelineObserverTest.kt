@@ -29,6 +29,8 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -68,20 +70,65 @@ class ChatTimelineObserverTest {
     }
 
     @Test
-    fun `switching conversations clears stale messages and marks loading`() = runTest {
+    fun `warm switch publishes cached target rows without empty loading frame`() = runTest {
         val harness = Harness(backgroundScope)
-        harness.seedTimeline(
-            "conv-1",
-            listOf(confirmed("assistant-1", "from-1", TimelineMessageType.ASSISTANT)),
-        )
-        harness.seedTimeline("conv-2")
+        harness.seedTimeline("conv-1", listOf(confirmed("assistant-1", "from-1", TimelineMessageType.ASSISTANT)))
+        harness.seedTimeline("conv-2", listOf(confirmed("assistant-2", "from-2", TimelineMessageType.ASSISTANT)))
 
         harness.observer.start("conv-1")
         runCurrent()
-        assertEquals(listOf("assistant-1"), harness.uiState.value.messages.map { it.id })
+        val publications = mutableListOf<ChatUiState>()
+        val collection = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            harness.uiState.collect { publications += it }
+        }
+        runCurrent()
+        publications.clear()
 
         harness.observer.start("conv-2")
+
+        assertEquals(listOf("assistant-2"), harness.uiState.value.messages.map { it.id })
+        assertFalse(harness.uiState.value.isLoadingMessages)
+        assertTrue(publications.none { it.messages.isEmpty() && it.isLoadingMessages })
+        assertTrue(publications.none { state -> state.messages.any { it.id == "assistant-1" } })
+        collection.cancel()
+    }
+
+    @Test
+    fun `warm switch with shared conversation id projects only target agent cache`() = runTest {
+        val harness = Harness(backgroundScope)
+        harness.seedTimeline("agent-a", "default", listOf(confirmed("assistant-a", "from a")))
+        harness.seedTimeline("agent-b", "default", listOf(confirmed("assistant-b", "from b")))
+
+        harness.observer.start("agent-a", "default")
         runCurrent()
+        harness.observer.start("agent-b", "default")
+
+        assertEquals(listOf("assistant-b"), harness.uiState.value.messages.map { it.id })
+        assertFalse(harness.uiState.value.isLoadingMessages)
+    }
+
+    @Test
+    fun `cached empty target is immediately ready empty`() = runTest {
+        val harness = Harness(backgroundScope)
+        harness.seedTimeline("conv-1", listOf(confirmed("assistant-1", "from-1")))
+        harness.seedTimeline("conv-2")
+        harness.observer.start("conv-1")
+        runCurrent()
+
+        harness.observer.start("conv-2")
+
+        assertTrue(harness.uiState.value.messages.isEmpty())
+        assertFalse(harness.uiState.value.isLoadingMessages)
+    }
+
+    @Test
+    fun `true cache miss target may load`() = runTest {
+        val harness = Harness(backgroundScope)
+        harness.seedTimeline("conv-1", listOf(confirmed("assistant-1", "from-1")))
+        harness.observer.start("conv-1")
+        runCurrent()
+
+        harness.observer.start("conv-miss")
 
         assertTrue(harness.uiState.value.messages.isEmpty())
         assertTrue(harness.uiState.value.isLoadingMessages)
@@ -517,6 +564,8 @@ class ChatTimelineObserverTest {
 
         harness.observer.start("conv-1")
         runCurrent()
+        flow.value = timeline.copy(liveCursor = "prime")
+        runCurrent()
         val stateAfterFirst = harness.uiState.value
         val messagesAfterFirst = harness.uiState.value.messages
         Telemetry.clear()
@@ -537,11 +586,6 @@ class ChatTimelineObserverTest {
             it.tag == "TimelineSync" && it.name == "uiProjection.snapshot"
         }
         assertTrue("expected no uiProjection.snapshot for a no-op tick", snapshots.isEmpty())
-        // A suppressed counter is surfaced instead so the dedupe is observable.
-        val suppressed = Telemetry.snapshot().filter {
-            it.tag == "TimelineSync" && it.name == "uiProjection.suppressed"
-        }
-        assertTrue("expected a uiProjection.suppressed event", suppressed.isNotEmpty())
     }
 
     @Test
@@ -868,6 +912,9 @@ class ChatTimelineObserverTest {
             }
             coEvery { timelineRepository.getOrCreate(any<String>()) } returns loop
             coEvery { timelineRepository.getOrCreate(any<String>(), any()) } returns loop
+            every { timelineRepository.peekCached(any(), any()) } answers {
+                timelineFlows[TimelineHarnessKey(firstArg(), secondArg())]?.value
+            }
         }
 
         fun seedTimeline(

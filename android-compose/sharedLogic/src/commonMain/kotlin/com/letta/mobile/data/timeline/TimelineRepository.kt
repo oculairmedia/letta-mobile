@@ -72,6 +72,15 @@ open class TimelineRepository(
     // [loopsMutex], which makes the remove+reinsert touch safe.
     private val loops = LinkedHashMap<TimelineCacheKey, TimelineSyncLoop>()
     private val loopsMutex = Mutex()
+
+    // Immutable publication for synchronous UI cache probes. Replaced only
+    // while loopsMutex is held, so readers never touch the mutable LRU map.
+    @Volatile
+    private var loopSnapshot: Map<TimelineCacheKey, TimelineSyncLoop> = emptyMap()
+
+    private fun publishLoopSnapshotLocked() {
+        loopSnapshot = loops.toMap()
+    }
     private val externalSeenMutex = Mutex()
     private val externalSeenByConversation = LinkedHashMap<String, LinkedHashSet<String>>()
 
@@ -102,6 +111,7 @@ open class TimelineRepository(
         val loop = loops.remove(existingKey) ?: return null
         val promotedKey = if (existingKey.agentId == null && key.agentId != null) key else existingKey
         loops[promotedKey] = loop
+        publishLoopSnapshotLocked()
         Telemetry.event(
             "TimelineRepo", "loop.aliasResolved",
             "requestedAgentId" to key.agentId.orEmpty(),
@@ -114,7 +124,7 @@ open class TimelineRepository(
     private fun removeAliasedLoopLocked(key: TimelineCacheKey): TimelineSyncLoop? {
         val candidates = loops.entries.filter { it.key.conversationId == key.conversationId }
         val match = candidates.singleOrNull { canAlias(it.key, key) } ?: return null
-        return loops.remove(match.key)
+        return loops.remove(match.key)?.also { publishLoopSnapshotLocked() }
     }
 
     private fun canAlias(existing: TimelineCacheKey, requested: TimelineCacheKey): Boolean =
@@ -361,6 +371,7 @@ open class TimelineRepository(
         )
         loops[key] = created
         evictEldestLoopsIfNeededLocked()
+        publishLoopSnapshotLocked()
         return created
     }
 
@@ -398,6 +409,7 @@ open class TimelineRepository(
             loop.closeAndJoin()
         }
         loops.clear()
+        publishLoopSnapshotLocked()
         Telemetry.event("TimelineRepo", "clearAll", "clearedLoopCount" to count)
     }
 
@@ -406,6 +418,13 @@ open class TimelineRepository(
         clearAll()
         confirmedTimelineStore.clearForBackend(backendId)
     }
+
+    /**
+     * Returns the exact agent-scoped cached timeline without creating, aliasing,
+     * touching LRU order, or triggering hydration.
+     */
+    fun peekCached(agentId: String?, conversationId: String): Timeline? =
+        loopSnapshot[TimelineCacheKey(agentId = agentId, conversationId = conversationId)]?.state?.value
 
     /** Observe a conversation's timeline state. */
     suspend fun observe(conversationId: String): StateFlow<Timeline> =
@@ -737,7 +756,7 @@ open class TimelineRepository(
     /** Force a reload — clears the cached loop for the conversation. */
     suspend fun clear(conversationId: String) = loopsMutex.withLock {
         val key = TimelineCacheKey(null, conversationId)
-        (loops.remove(key) ?: removeAliasedLoopLocked(key))?.let { loop ->
+        (loops.remove(key)?.also { publishLoopSnapshotLocked() } ?: removeAliasedLoopLocked(key))?.let { loop ->
             removeHydrateFlight(loop)
             loop.closeAndJoin()
             Telemetry.event(
@@ -749,7 +768,7 @@ open class TimelineRepository(
 
     suspend fun clear(agentId: String?, conversationId: String) = loopsMutex.withLock {
         val key = TimelineCacheKey(agentId, conversationId)
-        (loops.remove(key) ?: removeAliasedLoopLocked(key))?.let { loop ->
+        (loops.remove(key)?.also { publishLoopSnapshotLocked() } ?: removeAliasedLoopLocked(key))?.let { loop ->
             removeHydrateFlight(loop)
             loop.closeAndJoin()
             Telemetry.event(
