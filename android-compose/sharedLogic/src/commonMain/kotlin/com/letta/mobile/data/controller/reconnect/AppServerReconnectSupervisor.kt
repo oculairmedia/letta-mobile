@@ -5,6 +5,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlin.random.Random
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Drives automatic reconnect/replay of the App Server controller on connection
@@ -53,7 +54,7 @@ class AppServerReconnectSupervisor(
     private val stableConnectedResetMs: Long = DEFAULT_STABLE_RESET_MS,
     private val maxAttempts: Int? = null,
     private val random: Random = Random.Default,
-    private val delayProvider: suspend (Long) -> Unit = { delay(it) },
+    private val delayProvider: suspend (Long) -> Unit = { delay(it.milliseconds) },
     private val isTerminal: (AppServerControllerState) -> Boolean = { false },
     private val onEvent: (SupervisorEvent) -> Unit = {},
 ) {

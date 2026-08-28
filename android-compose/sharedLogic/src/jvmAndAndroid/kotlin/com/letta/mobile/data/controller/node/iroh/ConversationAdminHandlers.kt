@@ -10,6 +10,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
+import kotlin.time.Duration.Companion.milliseconds
 
 object ConversationAdminHandlers {
     /**
@@ -279,7 +280,7 @@ object ConversationAdminHandlers {
         op: NativeAdminOp,
     ): JsonElement {
         val message = try {
-            kotlinx.coroutines.withTimeout(messageGetBudgetMs()) {
+            kotlinx.coroutines.withTimeout(messageGetBudgetMs().milliseconds) {
                 walkMessagePages(nativeClient, conversationId, messageId, op)
             }
         } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
