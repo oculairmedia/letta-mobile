@@ -12,6 +12,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * One generation-local request registry + inbound router for the App Server
@@ -87,7 +88,7 @@ internal class AppServerRequestRegistry(
 
         try {
             send()
-            withTimeout(timeoutMs) {
+            withTimeout(timeoutMs.milliseconds) {
                 deferred.await()
             }
         } catch (e: kotlinx.coroutines.TimeoutCancellationException) {

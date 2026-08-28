@@ -36,6 +36,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonArray
+import kotlin.time.Duration.Companion.milliseconds
 
 @Suppress("NoDetachedCoroutineLifecycle") // Compatibility factory; the wrapper closes this owned scope.
 internal fun defaultSessionScopedChannelTransportScope(): CoroutineScope =
@@ -234,7 +235,7 @@ class SessionScopedChannelTransport internal constructor(
                     FrameCollectorOverflowRecoveryOutcome.Reconciled(result.appended),
                 )
             }
-            if (attempt < MAX_RECONCILE_ATTEMPTS) delay(RECONCILE_RETRY_DELAY_MS)
+            if (attempt < MAX_RECONCILE_ATTEMPTS) delay(RECONCILE_RETRY_DELAY_MS.milliseconds)
         }
         return CompletedReconciliation(
             MAX_RECONCILE_ATTEMPTS,
