@@ -1,0 +1,11 @@
+# Smoke: launch a configured install and assert the Conversations home.
+# Pixel 2 XL (USB) or any device with com.letta.mobile.dev already configured.
+# For a fresh-install Settings path, use smoke-first-run.yaml instead.
+appId: com.letta.mobile.dev
+---
+- launchApp
+- extendedWaitUntil:
+    visible: "Conversations"
+    timeout: 20000
+- assertVisible: "Search conversations"
+- takeScreenshot: smoke-launch-ok

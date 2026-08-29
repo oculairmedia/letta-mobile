@@ -1,0 +1,15 @@
+# Smoke: launch a configured Iroh-backed install against a fresh local backend.
+# Asserts the empty-state "Welcome to Letta" card, which only renders after the
+# Pixel successfully dials Iroh, authenticates via admin_rpc, and reads the
+# empty agent/conversation list from the local backend. If Iroh is down or the
+# transport regresses to ws://, the screen shows the error card instead.
+appId: com.letta.mobile.dev
+---
+- launchApp
+- extendedWaitUntil:
+    visible: "Conversations"
+    timeout: 20000
+- extendedWaitUntil:
+    visible: "Welcome to Letta"
+    timeout: 20000
+- takeScreenshot: smoke-iroh-empty-ok
