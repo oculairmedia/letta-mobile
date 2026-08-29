@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Handles server-side turn abort requests (stop button) and timeouts with fallback local clearing.
@@ -62,7 +63,7 @@ internal class DesktopChatInterruptCoordinator(
             onForcedLocalStop(conversationId, "abortNotDispatched")
             return
         }
-        val settled = withTimeoutOrNull(CANCEL_TERMINAL_TIMEOUT_MS) {
+        val settled = withTimeoutOrNull(CANCEL_TERMINAL_TIMEOUT_MS.milliseconds) {
             _cancellingConversationId.first { it != conversationId }
             true
         } ?: false

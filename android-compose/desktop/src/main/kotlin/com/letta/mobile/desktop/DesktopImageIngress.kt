@@ -19,6 +19,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.milliseconds
 
 internal data class DesktopImageIngressConfig(
     val enabled: Boolean,
@@ -103,7 +104,7 @@ private fun DesktopImageFileDropEffect(config: DesktopImageIngressConfig): State
                 if (!dragActive.value) dragActive.value = true
             } else {
                 clearJob = currentScope.launch {
-                    delay(DRAG_EXIT_CLEAR_DELAY_MS)
+                    delay(DRAG_EXIT_CLEAR_DELAY_MS.milliseconds)
                     dragActive.value = false
                 }
             }
