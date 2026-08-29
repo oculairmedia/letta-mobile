@@ -119,6 +119,32 @@ class DesktopChatDayDividersTest {
     }
 
     @Test
+    fun aRepeatedTimestampIsParsedOnlyOnce() {
+        // Parsing an ISO timestamp costs ~2µs and the chat asks for the same
+        // strings on every recomposition — once per visible message for the clock
+        // labels, once per row for every day-divider rebuild, which runs on each
+        // streamed token. A wall-clock assertion would flake in CI; counting the
+        // parses does not. Uses the production zone so a zone switch elsewhere
+        // cannot invalidate the cache mid-test.
+        val zone = ZoneId.systemDefault()
+        val stamp = IsoTimestamp("2031-04-17T09:41:00Z")
+        parseMessageTimestamp(stamp, zone)
+        val afterFirst = timestampParseCount
+        repeat(50) { parseMessageTimestamp(stamp, zone) }
+        assertEquals(afterFirst, timestampParseCount, "a cached timestamp must never be re-parsed")
+    }
+
+    @Test
+    fun anUnparseableTimestampIsNotRetriedEveryFrame() {
+        val zone = ZoneId.systemDefault()
+        val junk = IsoTimestamp("not-a-timestamp-9f3a1c")
+        parseMessageTimestamp(junk, zone)
+        val afterFirst = timestampParseCount
+        repeat(50) { parseMessageTimestamp(junk, zone) }
+        assertEquals(afterFirst, timestampParseCount, "a failed parse must be remembered too")
+    }
+
+    @Test
     fun labelsReadRelativeToToday() {
         val today = LocalDate.of(2026, 3, 4)
         assertEquals("Today", desktopDayLabel(today, today))

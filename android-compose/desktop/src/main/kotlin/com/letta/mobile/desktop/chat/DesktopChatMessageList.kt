@@ -195,13 +195,16 @@ private suspend fun LazyListState.animateScrollToChatBottom(index: Int) {
  */
 @Composable
 private fun rememberPromptPinned(listState: LazyListState, rows: List<DesktopChatRow>): Boolean {
-    val userPromptKeys = remember(rows) {
-        rows.mapNotNull { row -> (row as? DesktopChatRow.Item)?.takeIf { it.item.isUserPrompt() }?.key }.toSet()
-    }
-    val pinned by remember(userPromptKeys) {
+    // The column emits exactly one LazyColumn item per row (the same alignment
+    // chatBottomIndex relies on), so the top item's index addresses `rows`
+    // directly. Building a set of every prompt key just to answer this cost a
+    // list and a set on every streamed token.
+    val pinned by remember(rows) {
         derivedStateOf {
             val topItem = listState.layoutInfo.visibleItemsInfo.firstOrNull()
-            topItem != null && topItem.offset <= 0 && userPromptKeys.contains(topItem.key)
+            topItem != null &&
+                topItem.offset <= 0 &&
+                (rows.getOrNull(topItem.index) as? DesktopChatRow.Item)?.item?.isUserPrompt() == true
         }
     }
     return pinned

@@ -28,6 +28,9 @@ import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.runComposeUiTest
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.width
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
@@ -312,6 +315,35 @@ class DesktopChatInteractionUiTest {
         mentionables = emptyList(),
         placeholder = "Message",
     )
+
+    @Test
+    fun composerStopsGrowingOnAWideWindow() {
+        // The bar is capped so it stays aligned with the message column instead
+        // of running the full width of a maximised window.
+        val wide = 1600.dp
+        var measured: Dp = Dp.Unspecified
+        runComposeUiTest {
+            setContent {
+                MaterialTheme {
+                    Box(Modifier.width(wide)) {
+                        ComposerInputSurface(
+                            ComposerInputSurfaceParams(
+                                state = composerState("ready"),
+                                actions = composerActions(),
+                                canSend = true,
+                                matchedCommands = emptyList(),
+                            ),
+                        )
+                    }
+                }
+            }
+            measured = onNodeWithTag("composer-controls").getUnclippedBoundsInRoot().width
+        }
+        assertTrue(
+            measured <= ChatColumnMaxWidth,
+            "composer spanned $measured of a ${wide} window; expected a cap at $ChatColumnMaxWidth",
+        )
+    }
 
     @Test
     fun composerHintShowsOnlyWhileThereIsNothingToSend() {
