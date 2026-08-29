@@ -40,8 +40,28 @@ class ObserverStreamPromotionPolicyTest {
         var timeline = Timeline(
             conversationId = "conv-test",
             events = persistentListOf(
-                assistantEvent("older-observer", "S", "iroh-observer-run-older", 0, 0.0),
-                assistantEvent("nearest-observer", "Sur", "iroh-observer-run-nearest", 1, 1.0),
+                TimelineEvent.Confirmed(
+                    position = 0.0,
+                    otid = "older-observer-otid",
+                    content = "S",
+                    serverId = "older-observer",
+                    messageType = TimelineMessageType.ASSISTANT,
+                    date = timelineNow(),
+                    runId = "iroh-observer-run-older",
+                    stepId = null,
+                    seqId = 0,
+                ),
+                TimelineEvent.Confirmed(
+                    position = 1.0,
+                    otid = "nearest-observer-otid",
+                    content = "Sur",
+                    serverId = "nearest-observer",
+                    messageType = TimelineMessageType.ASSISTANT,
+                    date = timelineNow(),
+                    runId = "iroh-observer-run-nearest",
+                    stepId = null,
+                    seqId = 1,
+                ),
             ),
         )
         timeline = reduce(ReasoningMessage("run-bridge", "Checking", runId = "run-real-nearest", seqId = 2), timeline)
@@ -82,24 +102,6 @@ class ObserverStreamPromotionPolicyTest {
 
     private fun reduce(frame: LettaMessage, previous: Timeline = Timeline("conv-test")): Timeline =
         reduceStreamFrame(TimelineReducerInput(previous, frame, persistentMapOf())).next
-
-    private fun assistantEvent(
-        serverId: String,
-        content: String,
-        runId: String,
-        seqId: Int,
-        position: Double,
-    ): TimelineEvent.Confirmed = TimelineEvent.Confirmed(
-        position = position,
-        otid = "$serverId-otid",
-        content = content,
-        serverId = serverId,
-        messageType = TimelineMessageType.ASSISTANT,
-        date = timelineNow(),
-        runId = runId,
-        stepId = null,
-        seqId = seqId,
-    )
 
     private fun Timeline.assistants(): List<TimelineEvent.Confirmed> = events
         .filterIsInstance<TimelineEvent.Confirmed>()
