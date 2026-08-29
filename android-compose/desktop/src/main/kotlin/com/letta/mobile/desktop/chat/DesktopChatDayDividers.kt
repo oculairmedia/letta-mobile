@@ -56,14 +56,18 @@ private fun DesktopChatRow.timestampOrNull(): String? = when (this) {
     is DesktopChatRow.DayDivider -> null
 }
 
+// Built once rather than per label: ofPattern recompiles the pattern each call.
+private val SameYearDayFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("MMMM d")
+private val OtherYearDayFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("MMMM d, yyyy")
+
 /** "Today" / "Yesterday" / "March 4" / "March 4, 2024" — mirrors the Android separator copy. */
 internal fun desktopDayLabel(date: LocalDate, today: LocalDate): String {
     val days = ChronoUnit.DAYS.between(date, today)
     return when {
         days == 0L -> "Today"
         days == 1L -> "Yesterday"
-        date.year == today.year -> date.format(DateTimeFormatter.ofPattern("MMMM d"))
-        else -> date.format(DateTimeFormatter.ofPattern("MMMM d, yyyy"))
+        date.year == today.year -> date.format(SameYearDayFormatter)
+        else -> date.format(OtherYearDayFormatter)
     }
 }
 
