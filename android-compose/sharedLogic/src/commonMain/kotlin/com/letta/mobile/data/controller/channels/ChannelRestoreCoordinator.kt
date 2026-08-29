@@ -5,9 +5,11 @@ import com.letta.mobile.data.transport.appserver.AppServerChannelAccountPatch
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.util.Telemetry
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Boot/reconnect restore of the App Server's channel accounts (lgns8.23).
@@ -109,7 +111,7 @@ class ChannelRestoreCoordinator(
     private val maxAttemptsPerAccount: Int = DEFAULT_MAX_ATTEMPTS,
     private val baseBackoffMs: Long = DEFAULT_BASE_BACKOFF_MS,
     private val maxBackoffMs: Long = DEFAULT_MAX_BACKOFF_MS,
-    private val sleep: suspend (Long) -> Unit = { delay(it) },
+    private val sleep: suspend (Long) -> Unit = { delay(it.milliseconds) },
     /**
      * Diagnostic sink. Receives ids and outcomes only — never config bodies.
      * Defaults to a no-op so library use is silent; the CLI passes a printer.
@@ -240,6 +242,8 @@ class ChannelRestoreCoordinator(
     ): List<String>? {
         val response = try {
             client.channelsList(AppServerCommand.ChannelsList(requestId = requestIdFactory()))
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             failures += ChannelRestoreFailure(null, ChannelRestorePhase.LIST_CHANNELS, e.messageOrClass())
             warn("list_channels_failed", "reason" to e.messageOrClass())
@@ -276,6 +280,8 @@ class ChannelRestoreCoordinator(
                     channelId = channelId,
                 ),
             )
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             failures += ChannelRestoreFailure(
                 ChannelAccountRef(channelId, accountId = null),
@@ -359,6 +365,8 @@ class ChannelRestoreCoordinator(
             ),
         )
         if (response.success) null else (response.error ?: "channel_start reported failure")
+    } catch (e: CancellationException) {
+        throw e
     } catch (e: Exception) {
         e.messageOrClass()
     }
@@ -381,6 +389,8 @@ class ChannelRestoreCoordinator(
                 ),
             )
             if (response.success) return else (response.error ?: "unknown")
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             e.messageOrClass()
         }
@@ -400,6 +410,9 @@ class ChannelRestoreCoordinator(
         return if (scaled >= maxBackoffMs.toDouble()) maxBackoffMs else scaled.toLong()
     }
 
+    // Telemetry.event defines this heterogeneous vararg boundary; values are limited to ids,
+    // counts, booleans, and bounded server error strings by this coordinator's call sites.
+    @Suppress("NoAnyType")
     private fun warn(name: String, vararg attrs: Pair<String, Any?>) {
         Telemetry.event(TELEMETRY_TAG, name, *attrs, level = Telemetry.Level.WARN)
     }
