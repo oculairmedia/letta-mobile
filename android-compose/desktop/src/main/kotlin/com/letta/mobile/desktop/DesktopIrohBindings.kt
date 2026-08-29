@@ -16,7 +16,6 @@ import com.letta.mobile.data.transport.iroh.IrohConnectConfig
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.createDefaultDesktopChatGateway
 import com.letta.mobile.desktop.data.DesktopDataBindings
-import com.letta.mobile.desktop.data.DesktopFileSecureSettingsStore
 import com.letta.mobile.desktop.data.DesktopWsChannelTransport
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope

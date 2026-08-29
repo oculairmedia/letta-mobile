@@ -11,7 +11,6 @@ import com.letta.mobile.data.skills.SkillsApi
 import com.letta.mobile.data.skills.SkillApi
 import com.letta.mobile.desktop.chat.createDesktopLettaHttpClient
 import com.letta.mobile.desktop.commands.DesktopIrohSlashCommandApi
-import com.letta.mobile.desktop.data.DesktopFileSecureSettingsStore
 import com.letta.mobile.desktop.memory.DesktopBlockApi
 import com.letta.mobile.desktop.memory.DesktopHttpBlockApi
 import com.letta.mobile.desktop.memory.DesktopIrohBlockApi

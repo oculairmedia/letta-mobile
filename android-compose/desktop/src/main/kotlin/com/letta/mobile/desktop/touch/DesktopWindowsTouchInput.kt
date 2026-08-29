@@ -16,7 +16,6 @@ import java.util.WeakHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.swing.SwingUtilities
 import javax.swing.Timer
-import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
