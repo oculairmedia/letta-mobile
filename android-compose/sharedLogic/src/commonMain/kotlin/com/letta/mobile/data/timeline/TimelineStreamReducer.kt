@@ -562,11 +562,13 @@ private fun applyObserverStreamPromotion(
     val promotion = ObserverStreamPromotionPolicy.decide(timeline, incoming)
         as? ObserverStreamPromotionDecision.Promote ?: return null
     ObserverStreamPromotionTelemetry.emit(
-        stableServerId = promotion.stableServerId,
-        incomingServerId = incoming.serverId,
-        runId = incoming.runId,
-        mergedLen = promotion.merged.content.length,
-        conversationId = conversationId,
+        ObserverStreamPromotionTelemetry.Event(
+            stableServerId = promotion.stableServerId,
+            incomingServerId = incoming.serverId,
+            runId = incoming.runId,
+            mergedLen = promotion.merged.content.length,
+            conversationId = conversationId,
+        ),
     )
     return ObserverStreamPromotionResult(
         timeline = timeline.replaceByServerId(promotion.merged).copy(liveCursor = promotion.stableServerId),
