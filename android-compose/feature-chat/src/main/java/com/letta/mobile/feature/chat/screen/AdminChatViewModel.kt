@@ -43,6 +43,8 @@ import com.letta.mobile.runtime.RuntimeEventOutbox
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -118,6 +120,13 @@ internal fun resolveLocalRuntimeRouting(
         LocalRuntimeRouting.Remote
     }
 }
+
+internal fun chatFontScaleState(
+    scales: Flow<Float>,
+    scope: CoroutineScope,
+): StateFlow<Float?> = scales
+    .map<Float, Float?> { it }
+    .stateIn(scope, SharingStarted.WhileSubscribed(5000), null)
 
 @HiltViewModel
 internal class AdminChatViewModel @Inject constructor(
@@ -434,8 +443,10 @@ internal class AdminChatViewModel @Inject constructor(
         .map { ChatBackground.fromKey(it) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ChatBackground.Default)
 
-    val chatFontScale: StateFlow<Float> = settingsRepository.getChatFontScale()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 1f)
+    val chatFontScale: StateFlow<Float?> = chatFontScaleState(
+        settingsRepository.getChatFontScale(),
+        viewModelScope,
+    )
 
     // Master switch for the expressive Jindong activity haptics (streaming +
     // tool-call pattern cues). Default-on; gates the new ChatScreen effects.
