@@ -29,6 +29,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonPrimitive
+import kotlin.time.Duration.Companion.milliseconds
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.ConversationState
 
@@ -171,7 +172,7 @@ internal class LocalRuntimeChatSendCoordinator(
         // interrupt()'s own return; the timeout keeps a hung interrupt from
         // wedging "stopping…" forever, telemetered as an assumed terminal.
         scope.launch {
-            val delivered = kotlinx.coroutines.withTimeoutOrNull(LOCAL_INTERRUPT_ACK_TIMEOUT_MS) {
+            val delivered = kotlinx.coroutines.withTimeoutOrNull(LOCAL_INTERRUPT_ACK_TIMEOUT_MS.milliseconds) {
                 runCatching { localBackend()?.interrupt() }.isSuccess
             } ?: false
             if (!delivered) {

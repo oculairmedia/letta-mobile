@@ -53,6 +53,7 @@ import com.letta.mobile.ui.motion.rememberChatMotionPolicy
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.LettaChatTheme
+import kotlin.time.Duration.Companion.milliseconds
 
 const val DEFAULT_AUTO_EXPAND_DELAY_MS = 1500L
 const val DEFAULT_STAGED_COLLAPSE_DELAY_MS = 300L
@@ -321,7 +322,7 @@ private fun ProjectedToolTimelineCallRow(
                     val elapsedMs = (System.nanoTime() / 1_000_000L) - startMonotonicMs
                     val remainingDelayMs = maxOf(0L, autoExpandDelayMs - elapsedMs)
                     if (remainingDelayMs > 0L) {
-                        delay(remainingDelayMs)
+                        delay(remainingDelayMs.milliseconds)
                     }
                     if (!currentCall.isTerminal && provenance == ExpansionProvenance.None && !expanded) {
                         provenance = ExpansionProvenance.Auto
@@ -339,7 +340,7 @@ private fun ProjectedToolTimelineCallRow(
                 if (call.isTerminal && provenance == ExpansionProvenance.Auto && expanded) {
                     val collapseDelay = if (motionPolicy.isReducedMotionEnabled) 0L else stagedCollapseDelayMs
                     if (collapseDelay > 0L) {
-                        delay(collapseDelay)
+                        delay(collapseDelay.milliseconds)
                     }
                     if (provenance == ExpansionProvenance.Auto) {
                         expanded = false

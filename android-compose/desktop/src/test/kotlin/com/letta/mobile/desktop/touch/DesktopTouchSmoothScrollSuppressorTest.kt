@@ -3,6 +3,7 @@ package com.letta.mobile.desktop.touch
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 /**
  * Covers the save/restore state machine independently of AWT and of the real
@@ -93,11 +94,23 @@ class DesktopTouchSmoothScrollSuppressorTest {
 
     @Test
     fun `binding against the real Compose Foundation classpath finds the setter`() {
-        // Exercises the real reflective lookup against
-        // androidx.compose.foundation.gestures.WindowsWinUIConfig, which is on
-        // the desktop module's compile classpath. Flip the flag and flip it
-        // straight back so this test does not leak global state into others
-        // sharing the test JVM.
+        val configClass = Class.forName(
+            "androidx.compose.foundation.gestures.WindowsWinUIConfig",
+            false,
+            javaClass.classLoader,
+        )
+        assertTrue(
+            configClass.methods.any { method ->
+                method.name.startsWith("setSmoothScrollingEnabled") &&
+                    method.parameterTypes.contentEquals(arrayOf(Boolean::class.javaPrimitiveType))
+            },
+        )
+
+        // Initializing the Windows singleton on a non-Windows host starts an
+        // AWT thread that outlives the test and prevents Gradle's worker from
+        // exiting. The classpath contract above is platform-neutral; exercise
+        // the live singleton and restore its global flag only on Windows.
+        if (!System.getProperty("os.name").startsWith("Windows", ignoreCase = true)) return
         val switch = assertNotNull(DesktopSmoothScrollSwitch.bindOrNull())
         switch.setEnabled(false)
         switch.setEnabled(true)
