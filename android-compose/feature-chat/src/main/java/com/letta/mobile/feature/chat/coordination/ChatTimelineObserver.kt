@@ -106,23 +106,39 @@ internal class ChatTimelineObserver(
 
         observerJob?.cancel()
         hydrateSignalJob?.cancel()
+        observerBinding = binding
         if (!bindingSame) {
-            // Binding change (conversation and/or agent): drop projection cache
-            // and clear stale rows so we never flash the previous agent's
-            // messages when both share conversation id "default", then hold the
-            // skeleton until hydrate/projection completes.
             presenter.reset()
-            uiState.value = uiState.value.copy(
-                messages = kotlinx.collections.immutable.persistentListOf(),
-                messageListChange = com.letta.mobile.data.chat.projection.ChatMessageListChange.Full,
-                isLoadingMessages = true,
-            )
+            val cachedTimeline = timelineRepository.peekCached(agentId, conversationId)
+            if (cachedTimeline != null) {
+                // Project the target loop synchronously so its identity and rows
+                // become visible in one publication. Empty is a ready cache hit.
+                val previous = uiState.value
+                val projection = presenter.project(
+                    timeline = cachedTimeline,
+                    prefix = presenter.olderPrefixFor(conversationId),
+                    previousState = previous,
+                    isActiveRunStreaming = hasActiveChatTurn(),
+                    ownAgentId = agentId,
+                )
+                publishProjection(binding, projection, generation = null).let {
+                    uiState.value = reconcileCollapsedRunsOnProjection(
+                        it.previous,
+                        it.next.copy(isLoadingMessages = false),
+                    )
+                }
+            } else {
+                uiState.value = uiState.value.copy(
+                    messages = kotlinx.collections.immutable.persistentListOf(),
+                    messageListChange = com.letta.mobile.data.chat.projection.ChatMessageListChange.Full,
+                    isLoadingMessages = true,
+                )
+            }
         } else {
             // Same binding rebind (job died / restart): keep projection
             // cache + visible messages so Compose retains item identity.
             uiState.value = uiState.value.copy(isLoadingMessages = true)
         }
-        observerBinding = binding
         hydrationGeneration = ChatHydrationTrace.begin(hydrationIdentity(agentId, conversationId), reuseIfActive = true)
         observerJob = launchObserver(binding, hydrationGeneration)
     }
@@ -139,14 +155,18 @@ internal class ChatTimelineObserver(
                 throw cancelled
             } catch (failure: Exception) {
                 android.util.Log.e("AdminChatViewModel", "Timeline observe failed", failure)
-                uiState.value = uiState.value.copy(
-                    error = "Couldn't sync conversation — pull to refresh",
-                    isLoadingMessages = false,
-                )
+                if (observerBinding == binding) {
+                    uiState.value = uiState.value.copy(
+                        error = "Couldn't sync conversation — pull to refresh",
+                        isLoadingMessages = false,
+                    )
+                }
                 return@launch
             }
 
+            if (observerBinding != binding) return@launch
             val loop = timelineRepository.getOrCreate(agentId, conversationId)
+            if (observerBinding != binding) return@launch
             currentConversationTracker.setCurrent(conversationId)
             hydrateSignalJob = launchHydrationCollector(loop, binding, generation)
 
@@ -162,6 +182,7 @@ internal class ChatTimelineObserver(
                 // delta, so Compose hit-testing / gesture handling get a clean
                 // pass and tool-card taps land mid-stream.
                 flow.collect { timeline ->
+                    if (observerBinding != binding) return@collect
                     if (Telemetry.isTimelineSyncGateDebugEnabled()) {
                         Telemetry.event(
                             "TimelineSyncIngest", "gate6.timelineCollected",
@@ -186,9 +207,11 @@ internal class ChatTimelineObserver(
                             // between tools (regression introduced by PR
                             // #1119 — see bead letta-mobile-dir4k.1).
                             isActiveRunStreaming = hasActiveChatTurn(),
-                            ownAgentId = observerBinding?.agentId,
+                            ownAgentId = binding.agentId,
                         )
                     }
+
+                    if (observerBinding != binding) return@collect
 
                     // letta-mobile-yflpp DEDUPE: a no-op streaming tick (the
                     // tail event was re-emitted unchanged) projects to a UI
@@ -230,6 +253,7 @@ internal class ChatTimelineObserver(
         generation: ChatHydrationTrace.Generation?,
     ): Job = scope.launch {
         loop.events.collect { ev ->
+            if (observerBinding != binding) return@collect
             when (ev) {
                 is TimelineSyncEvent.ReconcileError -> {
                     val previous = uiState.value

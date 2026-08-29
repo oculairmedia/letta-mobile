@@ -67,6 +67,45 @@ class TimelineRepositoryIrohRegressionTest {
     }
 
     @Test
+    fun `peek cache is exact scoped and tracks removal without aliasing`() = runTest {
+        val repository = TimelineRepository(
+            NoopTimelineTransport(),
+            NoOpPendingLocalStore,
+            NoOpConversationCursorStore,
+            repositoryScope = backgroundScope,
+        )
+        val agentALoop = repository.getOrCreate("agent-a", "shared")
+        val agentBLoop = repository.getOrCreate("agent-b", "shared")
+
+        assertSame(agentALoop.state.value, repository.peekCached("agent-a", "shared"))
+        assertSame(agentBLoop.state.value, repository.peekCached("agent-b", "shared"))
+        assertEquals(null, repository.peekCached(null, "shared"))
+
+        repository.clear("agent-a", "shared")
+
+        assertEquals(null, repository.peekCached("agent-a", "shared"))
+        assertSame(agentBLoop.state.value, repository.peekCached("agent-b", "shared"))
+    }
+
+    @Test
+    fun `peek cache follows unscoped alias promotion exactly`() = runTest {
+        val repository = TimelineRepository(
+            NoopTimelineTransport(),
+            NoOpPendingLocalStore,
+            NoOpConversationCursorStore,
+            repositoryScope = backgroundScope,
+        )
+        val unscoped = repository.getOrCreate(null, "promoted")
+        assertSame(unscoped.state.value, repository.peekCached(null, "promoted"))
+
+        repository.getOrCreate("agent-a", "promoted")
+
+        assertEquals(null, repository.peekCached(null, "promoted"))
+        assertSame(unscoped.state.value, repository.peekCached("agent-a", "promoted"))
+        assertEquals(null, repository.peekCached("agent-b", "promoted"))
+    }
+
+    @Test
     fun `cancelling repository scope stops loop stream collection`() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         val repositoryScope = CoroutineScope(Job() + dispatcher)
