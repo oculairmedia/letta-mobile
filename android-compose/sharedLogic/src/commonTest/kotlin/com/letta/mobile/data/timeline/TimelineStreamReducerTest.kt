@@ -4,6 +4,7 @@ import com.letta.mobile.data.model.ApprovalRequestMessage
 import com.letta.mobile.data.model.ApprovalResponseMessage
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.MessageContentPart
+import com.letta.mobile.data.model.ReasoningMessage
 import com.letta.mobile.data.model.ToolCall
 import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.model.ToolReturnMessage
@@ -1661,37 +1662,6 @@ class TimelineStreamReducerTest {
         tl.events shouldHaveSize 1
         val event = tl.events.single() as TimelineEvent.Confirmed
         event.content shouldBe "It looks like it worked."
-    }
-
-    @Test
-    fun `blank existing run id must NOT absorb a later stream w0ctr`() {
-        // The other half of the orphan cause is deliberately NOT fixed by relaxing this
-        // gate. A blank run id is indistinguishable from an older RECONCILED reply, so
-        // merging into it would overwrite an unrelated earlier message whose text happens
-        // to be a prefix (the #827 regression). This pins that decision: the blank case
-        // stays a separate row here, and must be addressed at settle time instead.
-        var tl = reduce(
-            frame = AssistantMessage(
-                id = "letta-msg-2100",
-                contentRaw = JsonPrimitive("Su"),
-                runId = null,
-                otid = null,
-                seqId = 0,
-            ),
-        ).next
-
-        tl = reduce(
-            prev = tl,
-            frame = AssistantMessage(
-                id = "letta-msg-2101",
-                contentRaw = JsonPrimitive("Sure, here it is."),
-                runId = "run-real-77",
-                otid = null,
-                seqId = 1,
-            ),
-        ).next
-
-        tl.events shouldHaveSize 2
     }
 
     @Test

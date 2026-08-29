@@ -464,7 +464,10 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
     //
     // Merge ONLY on STRICT forward growth: the immediately-preceding (last) event
     // is a same-run assistant row AND the incoming content EXTENDS it
-    // (incoming.startsWith(existing) && incoming strictly longer). This excludes:
+    // (incoming.startsWith(existing) && incoming strictly longer). A second,
+    // observer-only fallback below may cross bounded intervening run events, but
+    // only when promoting a recognized synthetic observer run to a real run.
+    // This excludes:
     //   • post-tool continuations — those START a new message ("Y" after a longer
     //     prior assistant), where incoming is SHORTER, so existing.startsWith(incoming)
     //     not incoming.startsWith(existing) → not a forward growth → not merged.
@@ -517,6 +520,12 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
         return output()
     }
 
+    applyObserverStreamPromotion(timeline, confirmed, conversationId)?.let { promotion ->
+        timeline = promotion.timeline
+        pendingEvents += TimelineSyncEvent.StreamEventIngested(promotion.stableServerId, message.messageType)
+        return output()
+    }
+
     timeline = timeline.append(applyPendingToolReturns(confirmed, pendingToolReturnsByCallId))
     timeline = timeline.copy(liveCursor = confirmed.serverId)
     pendingEvents += TimelineSyncEvent.StreamEventIngested(confirmed.serverId, message.messageType)
@@ -554,7 +563,7 @@ private fun StreamTextMergeResult.defensiveTelemetryName(): String? = when (bran
 
 private fun hotPathTelemetry(
     name: String,
-    vararg attrs: Pair<String, Any?>,
+    vararg attrs: TelemetryAttribute,
 ) {
     if (!Telemetry.isChatHotPathDebugEnabled()) return
     Telemetry.event(
@@ -595,7 +604,7 @@ private fun TimelineEvent.Confirmed.hasIrohSyntheticRunId(): Boolean =
  * intentionally kept separate: it only ever evaluates an `ActiveTurn` run id
  * (always born `iroh-run-*` in `send()`), and observer ids can never reach it.
  */
-internal val IROH_SYNTHETIC_RUN_ID_PREFIXES = listOf("iroh-run-", "iroh-observer-run-")
+internal val IROH_SYNTHETIC_RUN_ID_PREFIXES = listOf("iroh-run-", ObserverStreamPromotionPolicy.OBSERVER_RUN_ID_PREFIX)
 
 internal fun String.isIrohSyntheticRunId(): Boolean =
     IROH_SYNTHETIC_RUN_ID_PREFIXES.any { startsWith(it) }
