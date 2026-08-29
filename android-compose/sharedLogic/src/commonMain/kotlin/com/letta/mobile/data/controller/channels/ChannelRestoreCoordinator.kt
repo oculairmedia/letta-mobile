@@ -5,9 +5,11 @@ import com.letta.mobile.data.transport.appserver.AppServerChannelAccountPatch
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.util.Telemetry
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Boot/reconnect restore of the App Server's channel accounts (lgns8.23).
@@ -109,7 +111,7 @@ class ChannelRestoreCoordinator(
     private val maxAttemptsPerAccount: Int = DEFAULT_MAX_ATTEMPTS,
     private val baseBackoffMs: Long = DEFAULT_BASE_BACKOFF_MS,
     private val maxBackoffMs: Long = DEFAULT_MAX_BACKOFF_MS,
-    private val sleep: suspend (Long) -> Unit = { delay(it) },
+    private val sleep: suspend (Long) -> Unit = { delay(it.milliseconds) },
     /**
      * Diagnostic sink. Receives ids and outcomes only — never config bodies.
      * Defaults to a no-op so library use is silent; the CLI passes a printer.
@@ -238,13 +240,14 @@ class ChannelRestoreCoordinator(
     private suspend fun listConfiguredChannels(
         failures: MutableList<ChannelRestoreFailure>,
     ): List<String>? {
-        val response = try {
-            client.channelsList(AppServerCommand.ChannelsList(requestId = requestIdFactory()))
-        } catch (e: Exception) {
-            failures += ChannelRestoreFailure(null, ChannelRestorePhase.LIST_CHANNELS, e.messageOrClass())
-            warn("list_channels_failed", "reason" to e.messageOrClass())
-            return null
-        }
+        val response = transportCall(
+            block = { client.channelsList(AppServerCommand.ChannelsList(requestId = requestIdFactory())) },
+            onFailure = { e ->
+                failures += ChannelRestoreFailure(null, ChannelRestorePhase.LIST_CHANNELS, e.messageOrClass())
+                warn("list_channels_failed", "reason" to e.messageOrClass())
+                return null
+            },
+        )
         if (!response.success) {
             failures += ChannelRestoreFailure(
                 null,
@@ -269,22 +272,25 @@ class ChannelRestoreCoordinator(
         channelId: String,
         failures: MutableList<ChannelRestoreFailure>,
     ): List<AppServerChannelAccount> {
-        val response = try {
-            client.channelAccountsList(
-                AppServerCommand.ChannelAccountsList(
-                    requestId = requestIdFactory(),
-                    channelId = channelId,
-                ),
-            )
-        } catch (e: Exception) {
-            failures += ChannelRestoreFailure(
-                ChannelAccountRef(channelId, accountId = null),
-                ChannelRestorePhase.LIST_ACCOUNTS,
-                e.messageOrClass(),
-            )
-            warn("list_accounts_failed", "channelId" to channelId, "reason" to e.messageOrClass())
-            return emptyList()
-        }
+        val response = transportCall(
+            block = {
+                client.channelAccountsList(
+                    AppServerCommand.ChannelAccountsList(
+                        requestId = requestIdFactory(),
+                        channelId = channelId,
+                    ),
+                )
+            },
+            onFailure = { e ->
+                failures += ChannelRestoreFailure(
+                    ChannelAccountRef(channelId, accountId = null),
+                    ChannelRestorePhase.LIST_ACCOUNTS,
+                    e.messageOrClass(),
+                )
+                warn("list_accounts_failed", "channelId" to channelId, "reason" to e.messageOrClass())
+                return emptyList()
+            },
+        )
         if (!response.success) {
             failures += ChannelRestoreFailure(
                 ChannelAccountRef(channelId, accountId = null),
@@ -350,18 +356,19 @@ class ChannelRestoreCoordinator(
     }
 
     /** @return null on success, else a bounded error string (never a config echo). */
-    private suspend fun attemptStart(ref: ChannelAccountRef): String? = try {
-        val response = client.channelStart(
-            AppServerCommand.ChannelStart(
-                requestId = requestIdFactory(),
-                channelId = ref.channelId,
-                accountId = ref.accountId,
-            ),
-        )
-        if (response.success) null else (response.error ?: "channel_start reported failure")
-    } catch (e: Exception) {
-        e.messageOrClass()
-    }
+    private suspend fun attemptStart(ref: ChannelAccountRef): String? = transportCall(
+        block = {
+            val response = client.channelStart(
+                AppServerCommand.ChannelStart(
+                    requestId = requestIdFactory(),
+                    channelId = ref.channelId,
+                    accountId = ref.accountId,
+                ),
+            )
+            if (response.success) null else (response.error ?: "channel_start reported failure")
+        },
+        onFailure = { it.messageOrClass() },
+    )
 
     /**
      * Re-asserts `enabled=true` on an account whose start just failed. Sends only
@@ -371,19 +378,20 @@ class ChannelRestoreCoordinator(
      * re-runs the whole restore.
      */
     private suspend fun reassertEnabled(ref: ChannelAccountRef) {
-        val reason = try {
-            val response = client.channelAccountUpdate(
-                AppServerCommand.ChannelAccountUpdate(
-                    requestId = requestIdFactory(),
-                    channelId = ref.channelId,
-                    accountId = requireNotNull(ref.accountId),
-                    patch = AppServerChannelAccountPatch(enabled = true),
-                ),
-            )
-            if (response.success) return else (response.error ?: "unknown")
-        } catch (e: Exception) {
-            e.messageOrClass()
-        }
+        val reason = transportCall(
+            block = {
+                val response = client.channelAccountUpdate(
+                    AppServerCommand.ChannelAccountUpdate(
+                        requestId = requestIdFactory(),
+                        channelId = ref.channelId,
+                        accountId = requireNotNull(ref.accountId),
+                        patch = AppServerChannelAccountPatch(enabled = true),
+                    ),
+                )
+                if (response.success) return else (response.error ?: "unknown")
+            },
+            onFailure = { it.messageOrClass() },
+        )
         warn(
             "reassert_enabled_failed",
             "channelId" to ref.channelId,
@@ -400,6 +408,20 @@ class ChannelRestoreCoordinator(
         return if (scaled >= maxBackoffMs.toDouble()) maxBackoffMs else scaled.toLong()
     }
 
+    private suspend inline fun <T> transportCall(
+        block: () -> T,
+        onFailure: (Exception) -> T,
+    ): T = try {
+        block()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        onFailure(e)
+    }
+
+    // Telemetry.event defines this heterogeneous vararg boundary; values are limited to ids,
+    // counts, booleans, and bounded server error strings by this coordinator's call sites.
+    @Suppress("NoAnyType")
     private fun warn(name: String, vararg attrs: Pair<String, Any?>) {
         Telemetry.event(TELEMETRY_TAG, name, *attrs, level = Telemetry.Level.WARN)
     }
