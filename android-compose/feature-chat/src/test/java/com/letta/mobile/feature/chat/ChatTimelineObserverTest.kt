@@ -95,6 +95,93 @@ class ChatTimelineObserverTest {
     }
 
     @Test
+    fun `warm bootstrap does not republish identical target geometry`() = runTest {
+        val harness = Harness(backgroundScope, activeReplyConversationIds = setOf("conv-2"))
+        harness.seedTimeline("conv-1", listOf(confirmed("source-1", "source")))
+        harness.seedTimeline(
+            "conv-2",
+            listOf(
+                confirmed("target-10", "question"),
+                confirmed("target-15", "reasoning", TimelineMessageType.REASONING, runId = "run-target"),
+                confirmed("target-20", "answer", TimelineMessageType.ASSISTANT, runId = "run-target"),
+            ),
+        )
+        harness.observer.start("conv-1")
+        runCurrent()
+        val publications = mutableListOf<ChatUiState>()
+        val collection = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            harness.uiState.collect { publications += it }
+        }
+        runCurrent()
+        publications.clear()
+
+        harness.observer.start("conv-2")
+        val warmState = harness.uiState.value
+        assertFalse(warmState.collapsedRunIds.contains("run-target"))
+        runCurrent()
+
+        assertEquals(1, publications.size)
+        assertSame(warmState, publications.single())
+        assertEquals(
+            listOf("target-10", "target-15:REASONING", "target-20"),
+            harness.uiState.value.messages.map { it.id },
+        )
+        assertFalse(harness.uiState.value.collapsedRunIds.contains("run-target"))
+        assertTrue(Telemetry.snapshot().any {
+            it.tag == "TimelineSync" && it.name == "warmBootstrap.suppressed"
+        })
+        collection.cancel()
+    }
+
+    @Test
+    fun `first collector update after warm projection still publishes new timeline`() = runTest {
+        Telemetry.clear()
+        val harness = Harness(backgroundScope)
+        val flow = harness.seedTimeline(
+            "conv-1",
+            listOf(confirmed("assistant-10", "cached", TimelineMessageType.ASSISTANT)),
+        )
+
+        harness.observer.start("conv-1")
+        flow.value = flow.value.append(confirmed("assistant-20", "new", TimelineMessageType.ASSISTANT))
+        runCurrent()
+
+        assertEquals(
+            listOf("assistant-10", "assistant-20"),
+            harness.uiState.value.messages.map { it.id },
+        )
+        assertFalse(Telemetry.snapshot().any {
+            it.tag == "TimelineSync" && it.name == "warmBootstrap.suppressed"
+        })
+    }
+
+    @Test
+    fun `identical warm bootstrap still publishes genuine presence change`() = runTest {
+        var turnActive = false
+        val observeStarted = CompletableDeferred<Unit>()
+        val releaseObserve = CompletableDeferred<Unit>()
+        val harness = Harness(backgroundScope, hasActiveChatTurn = { turnActive })
+        harness.seedTimeline(
+            "conv-1",
+            listOf(confirmed("assistant-10", "cached", TimelineMessageType.ASSISTANT)),
+        )
+        coEvery { harness.timelineRepository.observe(null, "conv-1") } coAnswers {
+            observeStarted.complete(Unit)
+            releaseObserve.await()
+            harness.timelineFlows.getValue(TimelineHarnessKey(null, "conv-1"))
+        }
+
+        harness.observer.start("conv-1")
+        assertFalse(harness.uiState.value.isStreaming)
+        observeStarted.await()
+        turnActive = true
+        releaseObserve.complete(Unit)
+        runCurrent()
+
+        assertTrue(harness.uiState.value.isStreaming)
+    }
+
+    @Test
     fun `warm switch with shared conversation id projects only target agent cache`() = runTest {
         val harness = Harness(backgroundScope)
         harness.seedTimeline("agent-a", "default", listOf(confirmed("assistant-a", "from a")))
@@ -890,6 +977,7 @@ class ChatTimelineObserverTest {
     private class Harness(
         scope: CoroutineScope,
         activeReplyConversationIds: Set<String> = emptySet(),
+        hasActiveChatTurn: () -> Boolean = { false },
         a2uiThinkingStartMessageCount: () -> Int? = { null },
         clearA2uiThinkingOnResponse: () -> Unit = {},
         isFollowingDuplicateInitialMessageInFlight: () -> Boolean = { false },
@@ -919,6 +1007,7 @@ class ChatTimelineObserverTest {
             activeReplyStreams = activeReplyStreams,
             uiState = uiState,
             isClientModeStreamInFlight = { false },
+            hasActiveChatTurn = hasActiveChatTurn,
             a2uiThinkingStartMessageCount = a2uiThinkingStartMessageCount,
             clearA2uiThinkingOnResponse = clearA2uiThinkingOnResponse,
             isFollowingDuplicateInitialMessageInFlight = isFollowingDuplicateInitialMessageInFlight,
