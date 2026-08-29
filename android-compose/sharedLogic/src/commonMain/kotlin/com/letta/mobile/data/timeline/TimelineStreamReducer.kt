@@ -520,23 +520,10 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
         return output()
     }
 
-    when (val promotion = ObserverStreamPromotionPolicy.decide(timeline, confirmed)) {
-        is ObserverStreamPromotionDecision.Promote -> {
-            timeline = timeline.replaceByServerId(promotion.merged)
-            timeline = timeline.copy(liveCursor = promotion.stableServerId)
-            pendingEvents += TimelineSyncEvent.StreamEventIngested(promotion.stableServerId, message.messageType)
-            hotPathTelemetry(
-                "streamSubscriber.forwardGrowthMerged",
-                "reason" to "observerPromotionOffTail",
-                "serverId" to promotion.stableServerId,
-                "incomingServerId" to confirmed.serverId,
-                "runId" to (confirmed.runId ?: "<null>"),
-                "mergedLen" to promotion.merged.content.length,
-                "conversationId" to conversationId,
-            )
-            return output()
-        }
-        ObserverStreamPromotionDecision.NoPromotion -> Unit
+    applyObserverStreamPromotion(timeline, confirmed, conversationId)?.let { promotion ->
+        timeline = promotion.timeline
+        pendingEvents += TimelineSyncEvent.StreamEventIngested(promotion.stableServerId, message.messageType)
+        return output()
     }
 
     timeline = timeline.append(applyPendingToolReturns(confirmed, pendingToolReturnsByCallId))
@@ -562,6 +549,31 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
     )
 }
 
+private data class ObserverStreamPromotionResult(
+    val timeline: Timeline,
+    val stableServerId: String,
+)
+
+private fun applyObserverStreamPromotion(
+    timeline: Timeline,
+    incoming: TimelineEvent.Confirmed,
+    conversationId: String,
+): ObserverStreamPromotionResult? {
+    val promotion = ObserverStreamPromotionPolicy.decide(timeline, incoming)
+        as? ObserverStreamPromotionDecision.Promote ?: return null
+    ObserverStreamPromotionTelemetry.emit(
+        stableServerId = promotion.stableServerId,
+        incomingServerId = incoming.serverId,
+        runId = incoming.runId,
+        mergedLen = promotion.merged.content.length,
+        conversationId = conversationId,
+    )
+    return ObserverStreamPromotionResult(
+        timeline = timeline.replaceByServerId(promotion.merged).copy(liveCursor = promotion.stableServerId),
+        stableServerId = promotion.stableServerId,
+    )
+}
+
 private fun StreamTextMergeResult.defensiveTelemetryName(): String? = when (branch) {
     StreamTextMergeBranch.CUMULATIVE -> "streamSubscriber.cumulativeSnapshotReplaced"
     StreamTextMergeBranch.STALE -> "streamSubscriber.staleFrameDropped"
@@ -576,7 +588,7 @@ private fun StreamTextMergeResult.defensiveTelemetryName(): String? = when (bran
 
 private fun hotPathTelemetry(
     name: String,
-    vararg attrs: Pair<String, Any?>,
+    vararg attrs: TelemetryAttribute,
 ) {
     if (!Telemetry.isChatHotPathDebugEnabled()) return
     Telemetry.event(

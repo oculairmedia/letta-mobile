@@ -33,25 +33,43 @@ internal object ObserverStreamPromotionPolicy {
         timeline: Timeline,
         incoming: TimelineEvent.Confirmed,
     ): TimelineEvent.Confirmed? {
-        val incomingRunId = incoming.realAssistantRunId() ?: return null
-        val incomingText = incoming.content.trim().takeIf { it.isNotEmpty() } ?: return null
+        val context = incoming.promotionContext() ?: return null
+        return timeline.activeReverseTail().findPromotionTarget(context)
+    }
+
+    private data class PromotionContext(
+        val incoming: TimelineEvent.Confirmed,
+        val runId: String,
+        val text: String,
+    )
+
+    private fun TimelineEvent.Confirmed.promotionContext(): PromotionContext? {
+        val realRunId = realAssistantRunId() ?: return null
+        val incomingText = content.trim().takeIf(String::isNotEmpty) ?: return null
+        return PromotionContext(this, realRunId, incomingText)
+    }
+
+    private fun List<TimelineEvent>.findPromotionTarget(context: PromotionContext): TimelineEvent.Confirmed? {
         var sawIncomingRunBridge = false
-
-        for (event in timeline.activeReverseTail()) {
+        for (event in this) {
             val existing = event as? TimelineEvent.Confirmed ?: continue
-            if (existing.runId?.takeIf { it.isNotBlank() } == incomingRunId) sawIncomingRunBridge = true
-            if (!existing.isEligibleObserverAssistant(incoming, sawIncomingRunBridge)) continue
-
-            val existingText = existing.content.trim()
-            if (existingText.isNotEmpty() &&
-                incomingText.length > existingText.length &&
-                incomingText.startsWith(existingText)
-            ) {
-                return existing
-            }
+            sawIncomingRunBridge = sawIncomingRunBridge || existing.hasRunId(context.runId)
+            if (existing.isPromotionTarget(context, sawIncomingRunBridge)) return existing
         }
         return null
     }
+
+    private fun TimelineEvent.Confirmed.hasRunId(expected: String): Boolean =
+        runId?.takeIf(String::isNotBlank) == expected
+
+    private fun TimelineEvent.Confirmed.isPromotionTarget(
+        context: PromotionContext,
+        sawIncomingRunBridge: Boolean,
+    ): Boolean = isEligibleObserverAssistant(context.incoming, sawIncomingRunBridge) &&
+        content.trim().isStrictPrefixOf(context.text)
+
+    private fun String.isStrictPrefixOf(incomingText: String): Boolean =
+        isNotEmpty() && incomingText.length > length && incomingText.startsWith(this)
 
     private fun TimelineEvent.Confirmed.realAssistantRunId(): String? {
         if (messageType != TimelineMessageType.ASSISTANT) return null
