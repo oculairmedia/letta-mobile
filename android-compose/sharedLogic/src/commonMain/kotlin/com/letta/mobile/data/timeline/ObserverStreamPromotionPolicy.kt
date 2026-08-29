@@ -1,5 +1,32 @@
 package com.letta.mobile.data.timeline
 
+internal data class ObserverStreamPromotionResult(
+    val timeline: Timeline,
+    val stableServerId: String,
+)
+
+internal fun applyObserverStreamPromotion(
+    timeline: Timeline,
+    incoming: TimelineEvent.Confirmed,
+    conversationId: String,
+): ObserverStreamPromotionResult? {
+    val promotion = ObserverStreamPromotionPolicy.decide(timeline, incoming)
+        as? ObserverStreamPromotionDecision.Promote ?: return null
+    ObserverStreamPromotionTelemetry.emit(
+        ObserverStreamPromotionTelemetry.Event(
+            stableServerId = promotion.stableServerId,
+            incomingServerId = incoming.serverId,
+            runId = incoming.runId,
+            mergedLen = promotion.merged.content.length,
+            conversationId = conversationId,
+        ),
+    )
+    return ObserverStreamPromotionResult(
+        timeline = timeline.replaceByServerId(promotion.merged).copy(liveCursor = promotion.stableServerId),
+        stableServerId = promotion.stableServerId,
+    )
+}
+
 internal sealed interface ObserverStreamPromotionDecision {
     data object NoPromotion : ObserverStreamPromotionDecision
 

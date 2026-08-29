@@ -549,33 +549,6 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
     )
 }
 
-private data class ObserverStreamPromotionResult(
-    val timeline: Timeline,
-    val stableServerId: String,
-)
-
-private fun applyObserverStreamPromotion(
-    timeline: Timeline,
-    incoming: TimelineEvent.Confirmed,
-    conversationId: String,
-): ObserverStreamPromotionResult? {
-    val promotion = ObserverStreamPromotionPolicy.decide(timeline, incoming)
-        as? ObserverStreamPromotionDecision.Promote ?: return null
-    ObserverStreamPromotionTelemetry.emit(
-        ObserverStreamPromotionTelemetry.Event(
-            stableServerId = promotion.stableServerId,
-            incomingServerId = incoming.serverId,
-            runId = incoming.runId,
-            mergedLen = promotion.merged.content.length,
-            conversationId = conversationId,
-        ),
-    )
-    return ObserverStreamPromotionResult(
-        timeline = timeline.replaceByServerId(promotion.merged).copy(liveCursor = promotion.stableServerId),
-        stableServerId = promotion.stableServerId,
-    )
-}
-
 private fun StreamTextMergeResult.defensiveTelemetryName(): String? = when (branch) {
     StreamTextMergeBranch.CUMULATIVE -> "streamSubscriber.cumulativeSnapshotReplaced"
     StreamTextMergeBranch.STALE -> "streamSubscriber.staleFrameDropped"
