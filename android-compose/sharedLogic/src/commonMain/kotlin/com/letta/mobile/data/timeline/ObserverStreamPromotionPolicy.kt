@@ -49,7 +49,7 @@ internal object ObserverStreamPromotionPolicy {
         return ObserverStreamPromotionDecision.Promote(
             stableServerId = target.serverId,
             merged = target.copy(
-                content = if (incoming.content.length >= target.content.length) incoming.content else target.content,
+                content = incoming.content,
                 runId = incoming.runId,
                 seqId = latestSeqId(target.seqId, incoming.seqId),
             ),

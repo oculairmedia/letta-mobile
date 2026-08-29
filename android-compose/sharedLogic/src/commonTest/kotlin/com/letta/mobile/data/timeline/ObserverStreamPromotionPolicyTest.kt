@@ -4,6 +4,7 @@ import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.ReasoningMessage
 import com.letta.mobile.data.model.UserMessage
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.persistentMapOf
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
@@ -36,8 +37,13 @@ class ObserverStreamPromotionPolicyTest {
 
     @Test
     fun `observer promotion chooses nearest eligible candidate le5m6`() {
-        var timeline = reduce(AssistantMessage("older-observer", JsonPrimitive("Alternate"), runId = "iroh-observer-run-older", seqId = 0))
-        timeline = reduce(AssistantMessage("nearest-observer", JsonPrimitive("Sur"), runId = "iroh-observer-run-nearest", seqId = 1), timeline)
+        var timeline = Timeline(
+            conversationId = "conv-test",
+            events = persistentListOf(
+                assistantEvent("older-observer", "S", "iroh-observer-run-older", 0, 0.0),
+                assistantEvent("nearest-observer", "Sur", "iroh-observer-run-nearest", 1, 1.0),
+            ),
+        )
         timeline = reduce(ReasoningMessage("run-bridge", "Checking", runId = "run-real-nearest", seqId = 2), timeline)
         timeline = reduce(AssistantMessage("canonical-nearest", JsonPrimitive("Sure, done."), runId = "run-real-nearest", seqId = 3), timeline)
 
@@ -49,6 +55,15 @@ class ObserverStreamPromotionPolicyTest {
     }
 
     @Test
+    fun `canonical content replaces whitespace-padded observer prefix le5m6`() {
+        var timeline = reduce(AssistantMessage("observer-assistant", JsonPrimitive("Hello     "), runId = "iroh-observer-run-spaces", seqId = 0))
+        timeline = reduce(ReasoningMessage("run-bridge", "Checking", runId = "run-real-spaces", seqId = 1), timeline)
+        timeline = reduce(AssistantMessage("canonical-assistant", JsonPrimitive("Hello!"), runId = "run-real-spaces", seqId = 2), timeline)
+
+        assertEquals(listOf("Hello!"), timeline.assistants().map { it.content })
+    }
+
+    @Test
     fun `prefix text in distinct turns remains separate without provenance match le5m6`() {
         var timeline = reduce(AssistantMessage("earlier-assistant", JsonPrimitive("Su"), runId = null, otid = "earlier-turn-otid", seqId = 0))
         timeline = reduce(AssistantMessage("later-assistant", JsonPrimitive("Sure, here it is."), runId = "run-later-turn", otid = "later-turn-otid", seqId = 0), timeline)
@@ -56,8 +71,35 @@ class ObserverStreamPromotionPolicyTest {
         assertEquals(listOf("Su", "Sure, here it is."), timeline.assistants().map { it.content })
     }
 
+    @Test
+    fun `blank run prefix remains separate from later canonical stream le5m6`() {
+        var timeline = reduce(AssistantMessage("blank-run-assistant", JsonPrimitive("Su"), runId = null, seqId = 0))
+        timeline = reduce(ReasoningMessage("run-bridge", "Checking", runId = "run-real-blank", seqId = 1), timeline)
+        timeline = reduce(AssistantMessage("canonical-assistant", JsonPrimitive("Sure, here it is."), runId = "run-real-blank", seqId = 2), timeline)
+
+        assertEquals(listOf("blank-run-assistant", "canonical-assistant"), timeline.assistants().map { it.serverId })
+    }
+
     private fun reduce(frame: LettaMessage, previous: Timeline = Timeline("conv-test")): Timeline =
         reduceStreamFrame(TimelineReducerInput(previous, frame, persistentMapOf())).next
+
+    private fun assistantEvent(
+        serverId: String,
+        content: String,
+        runId: String,
+        seqId: Int,
+        position: Double,
+    ): TimelineEvent.Confirmed = TimelineEvent.Confirmed(
+        position = position,
+        otid = "$serverId-otid",
+        content = content,
+        serverId = serverId,
+        messageType = TimelineMessageType.ASSISTANT,
+        date = timelineNow(),
+        runId = runId,
+        stepId = null,
+        seqId = seqId,
+    )
 
     private fun Timeline.assistants(): List<TimelineEvent.Confirmed> = events
         .filterIsInstance<TimelineEvent.Confirmed>()
