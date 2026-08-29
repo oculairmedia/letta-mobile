@@ -9,7 +9,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -26,10 +25,8 @@ import kotlin.time.Duration.Companion.milliseconds
 
 internal class IrohWasmAppServerTransport private constructor(
     private val bridge: IrohWasmBridge,
-    parentScope: CoroutineScope,
+    private val parentScope: CoroutineScope,
 ) : AppServerTransport {
-    private val transportJob = SupervisorJob(parentScope.coroutineContext[Job])
-    private val scope = CoroutineScope(parentScope.coroutineContext + transportJob)
     private val control = MutableSharedFlow<AppServerReceivedFrame>(extraBufferCapacity = FRAME_BUFFER)
     private val stream = MutableSharedFlow<AppServerReceivedFrame>(extraBufferCapacity = FRAME_BUFFER)
     private val connected = MutableStateFlow(true)
@@ -45,13 +42,17 @@ internal class IrohWasmAppServerTransport private constructor(
 
     private fun startControlPump() {
         if (controlPump == null) {
-            controlPump = scope.launch { pump(AppServerChannel.Control, bridge::pollControl, control) }
+            controlPump = parentScope.launch {
+                pump(AppServerChannel.Control, bridge::pollControl, control)
+            }
         }
     }
 
     private fun startStreamPump() {
         if (streamPump == null) {
-            streamPump = scope.launch { pump(AppServerChannel.Stream, bridge::pollStream, stream) }
+            streamPump = parentScope.launch {
+                pump(AppServerChannel.Stream, bridge::pollStream, stream)
+            }
         }
     }
 
@@ -65,7 +66,8 @@ internal class IrohWasmAppServerTransport private constructor(
         closed = true
         connected.value = false
         withContext(NonCancellable) {
-            transportJob.cancelAndJoin()
+            controlPump?.cancelAndJoin()
+            streamPump?.cancelAndJoin()
             bridge.close()
         }
     }
