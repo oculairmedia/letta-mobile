@@ -17,16 +17,12 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.letta.mobile.MainActivity
 import com.letta.mobile.R
-import com.letta.mobile.data.api.ConversationApi
-import com.letta.mobile.data.channel.CurrentConversationTracker
 import com.letta.mobile.data.channel.NotificationCandidatePhase
 import com.letta.mobile.data.channel.NotificationCandidateSource
 import com.letta.mobile.data.channel.NotificationDeliveryCandidate
 import com.letta.mobile.data.model.ConversationId
-import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.timeline.IngestedMessageListener
 import com.letta.mobile.data.timeline.TimelineRepository
-import com.letta.mobile.data.transport.appserver.BackgroundStreamBudget
 import com.letta.mobile.util.Telemetry
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
