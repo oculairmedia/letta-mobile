@@ -97,7 +97,7 @@ internal fun ComposerCommandSuggestions(
 ) {
     if (matchedCommands.isEmpty()) return
     Surface(
-        modifier = Modifier.fillMaxWidth().widthIn(max = 760.dp),
+        modifier = Modifier.widthIn(max = ChatColumnMaxWidth).fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
@@ -163,8 +163,8 @@ internal fun ComposerHintRow(visible: Boolean) {
     )
     Row(
         modifier = Modifier
+            .widthIn(max = ChatColumnMaxWidth)
             .fillMaxWidth()
-            .widthIn(max = 760.dp)
             .padding(start = 8.dp, top = 2.dp, bottom = 2.dp)
             .graphicsLayer { this.alpha = alpha }
             // Hidden copy must not be announced or hit-tested.
@@ -188,9 +188,13 @@ internal data class ComposerInputSurfaceParams(
 @Composable
 internal fun ComposerInputSurface(params: ComposerInputSurfaceParams) {
     Surface(
+// Order matters: widthIn BEFORE fillMaxWidth. fillMaxWidth pins the incoming
+// constraints to min == max == available, and widthIn then coerces its own
+// maximum into that fixed range, discarding the cap — so the bar grew to the
+// full width of the window while the messages above it stayed in their column.
         modifier = Modifier
-            .fillMaxWidth()
-            .widthIn(max = 760.dp),
+            .widthIn(max = ChatColumnMaxWidth)
+            .fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
         color = MaterialTheme.colorScheme.surfaceContainer,
         contentColor = MaterialTheme.colorScheme.onSurface,

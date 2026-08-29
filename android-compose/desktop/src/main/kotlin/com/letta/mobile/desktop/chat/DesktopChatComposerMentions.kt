@@ -42,7 +42,7 @@ internal fun MentionPopup(
     onSelect: (Mentionable) -> Unit,
 ) {
     Surface(
-        modifier = Modifier.fillMaxWidth().widthIn(max = 760.dp).heightIn(max = 320.dp),
+        modifier = Modifier.widthIn(max = ChatColumnMaxWidth).fillMaxWidth().heightIn(max = 320.dp),
         shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),

@@ -199,9 +199,12 @@ private fun ToolCardHeader(
         ToolCardProvenanceHeader(provenance = provenance, expanded = expanded, onToggle = onToggle)
         return
     }
-    val collapsedSummary = toolCall.stepLabel()
-        .takeUnless { it == toolCall.name }
-        ?: toolCall.stepSummary()
+    // stepLabel parses the arguments JSON (~2µs). Unremembered, that ran for
+    // every visible tool card on every recomposition — i.e. on each streamed
+    // token. UiToolCall is a data class, so an equal call reuses the result.
+    val collapsedSummary = remember(toolCall) {
+        toolCall.stepLabel().takeUnless { it == toolCall.name } ?: toolCall.stepSummary()
+    }
     // Hover-only source (separate from the row's click interaction, which
     // `clickable` owns internally) purely so the copy affordance below can
     // reveal on hover of this activity-log row.
@@ -278,9 +281,10 @@ private fun ToolCardBody(toolCall: UiToolCall, isError: Boolean) {
     ) {
         provenance?.let { AgentMessageProvenanceMetadata(it, provenanceTint) }
         toolCall.arguments.takeIf { it.isNotBlank() }?.let { args ->
+            val argumentLine = remember(args) { "$ ${primaryToolArgument(ToolArgumentPayload(args))}" }
             SelectionContainer {
                 Text(
-                    text = "$ ${primaryToolArgument(ToolArgumentPayload(args))}",
+                    text = argumentLine,
                     style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                     color = MaterialTheme.colorScheme.onSurface,
                 )
