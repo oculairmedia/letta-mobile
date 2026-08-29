@@ -12,6 +12,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flatMapLatest
 
+// The singleton repository owns this scope and cancels it explicitly in close().
+@Suppress("NoDetachedCoroutineLifecycle")
 internal fun defaultSessionScopedScheduleRepositoryScope(): CoroutineScope =
     CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -32,7 +34,7 @@ class SessionScopedScheduleRepository internal constructor(
     override fun getSchedules(agentId: String): Flow<List<ScheduledMessage>> =
         sessionManager.currentGraph.flatMapLatest { it.scheduleRepository.getSchedules(agentId) }
 
-    override suspend fun refreshSchedules(agentId: String, limit: Int?, after: String?) =
+    override suspend fun refreshSchedules(agentId: String, limit: Int?, after: String?): Unit =
         sessionManager.withCurrentSession { it.scheduleRepository.refreshSchedules(agentId, limit, after) }
 
     override suspend fun getSchedule(agentId: String, scheduledMessageId: String): ScheduledMessage =
@@ -41,7 +43,7 @@ class SessionScopedScheduleRepository internal constructor(
     override suspend fun createSchedule(agentId: String, params: ScheduleCreateParams): ScheduledMessage =
         sessionManager.withCurrentSession { it.scheduleRepository.createSchedule(agentId, params) }
 
-    override suspend fun deleteSchedule(agentId: String, scheduledMessageId: String) =
+    override suspend fun deleteSchedule(agentId: String, scheduledMessageId: String): Unit =
         sessionManager.withCurrentSession { it.scheduleRepository.deleteSchedule(agentId, scheduledMessageId) }
 
     fun close() { proxyScope.cancel() }

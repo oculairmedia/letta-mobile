@@ -23,6 +23,8 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.serialization.json.JsonElement
 
+// The singleton repository owns this scope and cancels it explicitly in close().
+@Suppress("NoDetachedCoroutineLifecycle")
 internal fun defaultSessionScopedGroupRepositoryScope(): CoroutineScope =
     CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -50,7 +52,7 @@ class SessionScopedGroupRepository internal constructor(
             .launchIn(proxyScope)
     }
 
-    override suspend fun refreshGroups(managerType: String?, projectId: ProjectId?, showHiddenGroups: Boolean?) =
+    override suspend fun refreshGroups(managerType: String?, projectId: ProjectId?, showHiddenGroups: Boolean?): Unit =
         sessionManager.withCurrentSession { it.groupRepository.refreshGroups(managerType, projectId, showHiddenGroups) }
 
     override suspend fun countGroups(): Int = sessionManager.withCurrentSession { it.groupRepository.countGroups() }
@@ -62,7 +64,7 @@ class SessionScopedGroupRepository internal constructor(
     override suspend fun updateGroup(groupId: GroupId, params: GroupUpdateParams): Group =
         sessionManager.withCurrentSession { it.groupRepository.updateGroup(groupId, params) }
 
-    override suspend fun deleteGroup(groupId: GroupId) = sessionManager.withCurrentSession { it.groupRepository.deleteGroup(groupId) }
+    override suspend fun deleteGroup(groupId: GroupId): Unit = sessionManager.withCurrentSession { it.groupRepository.deleteGroup(groupId) }
 
     override suspend fun sendGroupMessage(groupId: GroupId, request: MessageCreateRequest): LettaResponse =
         sessionManager.withCurrentSession { it.groupRepository.sendGroupMessage(groupId, request) }
@@ -75,7 +77,7 @@ class SessionScopedGroupRepository internal constructor(
 
     override suspend fun listGroupMessages(groupId: GroupId): List<LettaMessage> = sessionManager.withCurrentSession { it.groupRepository.listGroupMessages(groupId) }
 
-    override suspend fun resetGroupMessages(groupId: GroupId) = sessionManager.withCurrentSession { it.groupRepository.resetGroupMessages(groupId) }
+    override suspend fun resetGroupMessages(groupId: GroupId): Unit = sessionManager.withCurrentSession { it.groupRepository.resetGroupMessages(groupId) }
 
     fun close() { proxyScope.cancel() }
 }

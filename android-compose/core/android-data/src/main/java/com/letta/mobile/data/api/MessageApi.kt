@@ -351,7 +351,7 @@ class MessageApi @Inject constructor(
         }
     }
 
-    suspend fun resetMessages(agentId: String) = resetMessages(AgentId(agentId))
+    suspend fun resetMessages(agentId: String): Unit = resetMessages(AgentId(agentId))
 
     override suspend fun cancelMessage(agentId: AgentId, runIds: List<String>?): Map<String, String> {
         val (client, baseUrl) = apiClient.session()

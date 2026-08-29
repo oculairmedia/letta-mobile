@@ -50,7 +50,7 @@ class SessionScopedFolderRepository internal constructor(
             .launchIn(proxyScope)
     }
 
-    override suspend fun refreshFolders(name: String?) = sessionManager.withCurrentSession { it.folderRepository.refreshFolders(name) }
+    override suspend fun refreshFolders(name: String?): Unit = sessionManager.withCurrentSession { it.folderRepository.refreshFolders(name) }
 
     override suspend fun countFolders(): Int = sessionManager.withCurrentSession { it.folderRepository.countFolders() }
 
@@ -64,7 +64,7 @@ class SessionScopedFolderRepository internal constructor(
     override suspend fun updateFolder(folderId: FolderId, params: FolderUpdateParams): Folder =
         sessionManager.withCurrentSession { it.folderRepository.updateFolder(folderId, params) }
 
-    override suspend fun deleteFolder(folderId: FolderId) = sessionManager.withCurrentSession { it.folderRepository.deleteFolder(folderId) }
+    override suspend fun deleteFolder(folderId: FolderId): Unit = sessionManager.withCurrentSession { it.folderRepository.deleteFolder(folderId) }
 
     override suspend fun uploadFileToFolder(params: FolderFileUploadParams): FileMetadata =
         sessionManager.withCurrentSession { it.folderRepository.uploadFileToFolder(params) }
@@ -78,7 +78,7 @@ class SessionScopedFolderRepository internal constructor(
     override suspend fun listFolderFiles(folderId: FolderId, includeContent: Boolean): List<FileMetadata> =
         sessionManager.withCurrentSession { it.folderRepository.listFolderFiles(folderId, includeContent) }
 
-    override suspend fun deleteFileFromFolder(folderId: FolderId, fileId: String) =
+    override suspend fun deleteFileFromFolder(folderId: FolderId, fileId: String): Unit =
         sessionManager.withCurrentSession { it.folderRepository.deleteFileFromFolder(folderId, fileId) }
 
     fun close() { proxyScope.cancel() }

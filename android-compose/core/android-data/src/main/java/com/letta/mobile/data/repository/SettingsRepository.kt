@@ -46,7 +46,7 @@ class SettingsRepository @Inject constructor(
     )
 
     companion object {
-        val DEFAULT_PINNED_SHORTCUTS = CachedSettingsRepository.DEFAULT_PINNED_SHORTCUTS
+        val DEFAULT_PINNED_SHORTCUTS: List<String> = CachedSettingsRepository.DEFAULT_PINNED_SHORTCUTS
 
         internal fun forTests(
             dataStore: DataStore<Preferences>,

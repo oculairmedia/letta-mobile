@@ -135,7 +135,7 @@ class AgentApi @Inject constructor(
         response.requireSuccess()
     }
 
-    suspend fun deleteAgent(agentId: String) = deleteAgent(AgentId(agentId))
+    suspend fun deleteAgent(agentId: String): Unit = deleteAgent(AgentId(agentId))
 
     override suspend fun exportAgent(agentId: AgentId): String {
         val (client, baseUrl) = apiClient.session()
@@ -172,7 +172,7 @@ class AgentApi @Inject constructor(
         response.requireSuccess()
     }
 
-    suspend fun attachArchive(agentId: String, archiveId: String) = attachArchive(AgentId(agentId), archiveId)
+    suspend fun attachArchive(agentId: String, archiveId: String): Unit = attachArchive(AgentId(agentId), archiveId)
 
     override suspend fun detachArchive(agentId: AgentId, archiveId: String) {
         val (client, baseUrl) = apiClient.session()
@@ -181,7 +181,7 @@ class AgentApi @Inject constructor(
         response.requireSuccess()
     }
 
-    suspend fun detachArchive(agentId: String, archiveId: String) = detachArchive(AgentId(agentId), archiveId)
+    suspend fun detachArchive(agentId: String, archiveId: String): Unit = detachArchive(AgentId(agentId), archiveId)
 
     private suspend fun HttpResponse.requireSuccess(): HttpResponse {
         if (status.value !in 200..299) {

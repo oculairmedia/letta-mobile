@@ -23,6 +23,8 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.withTimeoutOrNull
 
+// The singleton repository owns this scope and cancels it explicitly in close().
+@Suppress("NoDetachedCoroutineLifecycle")
 internal fun defaultSessionScopedAllConversationsRepositoryScope(): CoroutineScope =
     CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -68,7 +70,7 @@ class SessionScopedAllConversationsRepository internal constructor(
     ): Flow<PagingData<Conversation>> = sessionManager.currentGraph
         .flatMapLatest { it.allConversationsRepository.getConversationsPaged(agentId, archiveStatus, summarySearch) }
 
-    override suspend fun loadNextPage() = sessionManager.withCurrentSession { it.allConversationsRepository.loadNextPage() }
+    override suspend fun loadNextPage(): Unit = sessionManager.withCurrentSession { it.allConversationsRepository.loadNextPage() }
 
     override suspend fun refresh() = withCurrentSessionAndRetryOnSwitch { graph ->
         graph.allConversationsRepository.refresh()
@@ -129,8 +131,8 @@ class SessionScopedAllConversationsRepository internal constructor(
         )
     }
 
-    override fun handleOptimisticUpdate(conversation: Conversation) = current.handleOptimisticUpdate(conversation)
-    override fun handleOptimisticDelete(conversationId: ConversationId) = current.handleOptimisticDelete(conversationId)
+    override fun handleOptimisticUpdate(conversation: Conversation): Unit = current.handleOptimisticUpdate(conversation)
+    override fun handleOptimisticDelete(conversationId: ConversationId): Unit = current.handleOptimisticDelete(conversationId)
     override fun loadedCountEstimate(): ConversationCountEstimate? = current.loadedCountEstimate()
 
     @Deprecated("Use loadedCountEstimate() and render approximate/unknown states explicitly.")
