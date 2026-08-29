@@ -927,7 +927,17 @@ class DesktopChatController(
         val nextGateway = gateway ?: return
         val conversations = nextGateway.listConversations(archiveStatus = ConversationArchiveFilter.All.apiValue)
         val agentIds = conversations.map { it.agentId.value }.filter { it.isNotBlank() }.toSet()
-        val agentNamesById = runCatching { agentNamesByIdProvider(agentIds) }.getOrDefault(emptyMap())
+        // An empty map here silently degrades every conversation label to its
+        // raw `agent-<uuid>`, so the failure must not be invisible.
+        val agentNamesById = runCatching { agentNamesByIdProvider(agentIds) }
+            .onFailure { t ->
+                if (t is CancellationException) throw t
+                Telemetry.error(
+                    "DesktopChat", "agentNames.resolveFailed", t,
+                    "agentIds" to agentIds.size,
+                )
+            }
+            .getOrDefault(emptyMap())
         val summaries = conversations.toChatConversationSummaries(agentNamesById)
             .distinctBy { it.id }
             .map { if (it.id in locallyArchivedIds) it.copy(archived = true) else it }
