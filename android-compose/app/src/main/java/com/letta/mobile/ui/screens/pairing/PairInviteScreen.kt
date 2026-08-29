@@ -37,6 +37,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
 import com.letta.mobile.ui.icons.LettaIcons
 import kotlinx.coroutines.delay
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Server-mode invite-generation screen (letta-mobile-g2d2i): mints a QR via
@@ -166,7 +167,7 @@ private fun ExpiryCountdown(expiresAtMs: Long) {
         while (true) {
             remainingMs = expiresAtMs - System.currentTimeMillis()
             if (remainingMs <= 0L) break
-            delay(1_000L)
+            delay(1.seconds)
         }
     }
     val text = if (remainingMs <= 0L) {
