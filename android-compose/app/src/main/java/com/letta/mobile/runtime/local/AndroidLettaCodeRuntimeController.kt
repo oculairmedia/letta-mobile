@@ -423,6 +423,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
         ).toStreamJsonNodeStartRequest(session)
     }
 
+    @Suppress("UnusedReceiverParameter")
     private fun TurnCommand.toWireLine(): String = when (val input = input) {
         is TurnInput.UserMessage -> encodeUserTurnWireLine(input)
         is TurnInput.ToolApprovalResponse -> error("Tool approvals are not supported by embedded LettaCode.")

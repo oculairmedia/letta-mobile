@@ -39,6 +39,7 @@ fun logChunked(priority: Int, tag: String, message: String) {
     }
 }
 
+@Suppress("UnusedReceiverParameter")
 private fun Throwable.stackTraceToStringCompat(): String {
     val writer = StringWriter()
     printStackTrace(PrintWriter(writer))

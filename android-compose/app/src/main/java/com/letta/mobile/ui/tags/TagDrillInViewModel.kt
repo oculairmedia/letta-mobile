@@ -128,6 +128,7 @@ class TagDrillInViewModel @Inject constructor(
     }
 }
 
+@Suppress("UnusedReceiverParameter")
 private fun Agent.toTagDrillInItem(activeTag: String): TagDrillInItem {
     return TagDrillInItem(
         id = id.value,
@@ -139,6 +140,7 @@ private fun Agent.toTagDrillInItem(activeTag: String): TagDrillInItem {
     )
 }
 
+@Suppress("UnusedReceiverParameter")
 private fun Tool.toTagDrillInItem(activeTag: String): TagDrillInItem {
     return TagDrillInItem(
         id = id.value,
@@ -161,6 +163,7 @@ private fun StarterAgentTemplate.toTagDrillInItem(activeTag: String): TagDrillIn
     )
 }
 
+@Suppress("UnusedReceiverParameter")
 private fun Step.toTagDrillInItem(activeTag: String): TagDrillInItem {
     return TagDrillInItem(
         id = id,

@@ -538,6 +538,7 @@ private fun embeddingModelListKey(index: Int, model: EmbeddingModel): String {
     return model.stableModelListKey(index, prefix = "embedding")
 }
 
+@Suppress("UnusedReceiverParameter")
 private fun LlmModel.stableModelListKey(index: Int, prefix: String): String {
     return buildModelListKey(
         prefix = prefix,
@@ -549,6 +550,7 @@ private fun LlmModel.stableModelListKey(index: Int, prefix: String): String {
     )
 }
 
+@Suppress("UnusedReceiverParameter")
 private fun EmbeddingModel.stableModelListKey(index: Int, prefix: String): String {
     return buildModelListKey(
         prefix = prefix,

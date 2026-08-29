@@ -164,6 +164,7 @@ class AndroidDeviceSensorSnapshotProvider(
         else -> "unknown:$this"
     }
 
+    @Suppress("UnusedReceiverParameter")
     private fun Sensor.reportingModeName(): String = when (reportingMode) {
         Sensor.REPORTING_MODE_CONTINUOUS -> "continuous"
         Sensor.REPORTING_MODE_ON_CHANGE -> "on_change"

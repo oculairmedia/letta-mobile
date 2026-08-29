@@ -472,6 +472,7 @@ private fun MemoryParitySectionKind.icon(): ImageVector = when (this) {
 }
 
 @Composable
+@Suppress("UnusedReceiverParameter")
 private fun MemoryParitySectionKind.tint(): Color = accentRole.color()
 
 private fun MemoryParityItem.icon(): ImageVector = when (this) {
@@ -482,6 +483,7 @@ private fun MemoryParityItem.icon(): ImageVector = when (this) {
 }
 
 @Composable
+@Suppress("UnusedReceiverParameter")
 private fun MemoryParityItem.tint(): Color = accentRole.color()
 
 @Composable
