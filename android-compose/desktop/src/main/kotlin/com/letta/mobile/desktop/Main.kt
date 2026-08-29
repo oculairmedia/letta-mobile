@@ -127,16 +127,22 @@ private fun runDesktopApplication(
                             DesktopWindowsTouchInput.attach(window)
                         }
 
-                        LettaDesktopApp(
-                            shell = DesktopAppShellBindings(
-                                nucleusApplicationScope = nucleusScope,
-                                window = window,
-                                deepLinks = deepLinks,
-                                quickQuery = quickQuery,
-                            ),
-                            onActiveTitleChange = { windowTitle = it },
-                            onHeaderChromeChange = { headerChrome = it },
-                        )
+                        // Ctrl+scroll scales app type. Wraps the shell only, so
+                        // the custom title bar (a composition sibling) keeps its
+                        // fixed chrome metrics the way browser zoom leaves the
+                        // browser's own chrome alone.
+                        DesktopTextZoomHost {
+                            LettaDesktopApp(
+                                shell = DesktopAppShellBindings(
+                                    nucleusApplicationScope = nucleusScope,
+                                    window = window,
+                                    deepLinks = deepLinks,
+                                    quickQuery = quickQuery,
+                                ),
+                                onActiveTitleChange = { windowTitle = it },
+                                onHeaderChromeChange = { headerChrome = it },
+                            )
+                        }
                     }
                     // Spotlight-style floating query bar, summoned by the global
                     // hotkey without raising the main window.
