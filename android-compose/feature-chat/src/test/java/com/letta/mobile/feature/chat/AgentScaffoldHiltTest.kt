@@ -69,7 +69,7 @@ class AgentScaffoldHiltTest {
         com.letta.mobile.ui.theme.ChatBackground.Default
     )
     private val composerFlow = MutableStateFlow(ChatComposerState())
-    private val fontScaleFlow = MutableStateFlow(1.0f)
+    private val fontScaleFlow = MutableStateFlow<Float?>(1.0f)
     private val availableAgentsFlow = MutableStateFlow(emptyList<com.letta.mobile.data.model.Agent>())
 
     private lateinit var viewModel: AdminChatViewModel
