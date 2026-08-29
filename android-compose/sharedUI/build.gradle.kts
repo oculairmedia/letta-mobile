@@ -76,7 +76,7 @@ kotlin {
 
         jvmTest {
             dependencies {
-                implementation("junit:junit:4.13.2")
+                implementation(libs.junit4)
                 implementation(compose.desktop.currentOs)
                 implementation(kotlin("test"))
             }

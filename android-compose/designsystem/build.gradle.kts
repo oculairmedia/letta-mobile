@@ -101,14 +101,14 @@ dependencies {
     // RECORD_AUDIO permission flow (rememberLauncherForActivityResult,
     // ActivityResultContracts) and ContextCompat.checkSelfPermission.
     // Designsystem stays Hilt-free — VoiceInputViewModel lives in :app.
-    implementation("androidx.activity:activity-compose:1.13.0")
+    implementation(libs.androidx.activity.compose)
     implementation("androidx.core:core-ktx:1.16.0")
     implementation("com.google.android.material:material:1.14.0")
 
-    testImplementation("junit:junit:4.13.2")
-    testImplementation("io.mockk:mockk:1.14.9")
+    testImplementation(libs.junit4)
+    testImplementation(libs.mockk)
     testImplementation(libs.junit.jupiter.api)
-    testImplementation("org.robolectric:robolectric:4.16.1")
+    testImplementation(libs.robolectric)
     testImplementation("androidx.compose.ui:ui-test-junit4")
     testRuntimeOnly(libs.junit.platform.launcher)
     testRuntimeOnly(libs.junit.vintage.engine)

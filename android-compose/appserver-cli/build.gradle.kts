@@ -34,7 +34,7 @@ application {
 dependencies {
     implementation(project(":sharedLogic"))
 
-    implementation("com.github.ajalt.clikt:clikt:5.1.0")
+    implementation(libs.clikt)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.ktor.client.core)
     implementation(libs.ktor.client.cio)
