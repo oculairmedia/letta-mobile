@@ -4,6 +4,7 @@ import com.letta.mobile.data.model.ApprovalRequestMessage
 import com.letta.mobile.data.model.ApprovalResponseMessage
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.MessageContentPart
+import com.letta.mobile.data.model.ReasoningMessage
 import com.letta.mobile.data.model.ToolCall
 import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.model.ToolReturnMessage
@@ -1664,34 +1665,73 @@ class TimelineStreamReducerTest {
     }
 
     @Test
-    fun `blank existing run id must NOT absorb a later stream w0ctr`() {
-        // The other half of the orphan cause is deliberately NOT fixed by relaxing this
-        // gate. A blank run id is indistinguishable from an older RECONCILED reply, so
-        // merging into it would overwrite an unrelated earlier message whose text happens
-        // to be a prefix (the #827 regression). This pins that decision: the blank case
-        // stays a separate row here, and must be addressed at settle time instead.
+    fun `provisional observer assistant promotes to canonical identity off tail le5m6`() {
         var tl = reduce(
             frame = AssistantMessage(
-                id = "letta-msg-2100",
+                id = "observer-assistant",
+                contentRaw = JsonPrimitive("Su"),
+                runId = "iroh-observer-run-77",
+                otid = "observer-otid",
+                seqId = 0,
+            ),
+        ).next
+        val provisional = tl.events.single() as TimelineEvent.Confirmed
+        val stableServerId = provisional.serverId
+
+        tl = reduce(
+            prev = tl,
+            frame = ReasoningMessage(
+                id = "reasoning-between-copies",
+                reasoning = "Checking the request",
+                runId = "run-real-77",
+                otid = "reasoning-otid",
+                seqId = 1,
+            ),
+        ).next
+        tl = reduce(
+            prev = tl,
+            frame = AssistantMessage(
+                id = "canonical-assistant",
+                contentRaw = JsonPrimitive("Sure, here it is."),
+                runId = "run-real-77",
+                otid = "canonical-otid",
+                seqId = 2,
+            ),
+        ).next
+
+        val assistants = tl.events.filterIsInstance<TimelineEvent.Confirmed>()
+            .filter { it.messageType == TimelineMessageType.ASSISTANT }
+        assertEquals(1, assistants.size, "observer and initiator copies must project as one assistant row")
+        assistants.single().content shouldBe "Sure, here it is."
+        assistants.single().serverId shouldBe stableServerId
+    }
+
+    @Test
+    fun `prefix text in distinct turns remains separate without provenance match le5m6`() {
+        var tl = reduce(
+            frame = AssistantMessage(
+                id = "earlier-assistant",
                 contentRaw = JsonPrimitive("Su"),
                 runId = null,
-                otid = null,
+                otid = "earlier-turn-otid",
+                seqId = 0,
+            ),
+        ).next
+        tl = reduce(
+            prev = tl,
+            frame = AssistantMessage(
+                id = "later-assistant",
+                contentRaw = JsonPrimitive("Sure, here it is."),
+                runId = "run-later-turn",
+                otid = "later-turn-otid",
                 seqId = 0,
             ),
         ).next
 
-        tl = reduce(
-            prev = tl,
-            frame = AssistantMessage(
-                id = "letta-msg-2101",
-                contentRaw = JsonPrimitive("Sure, here it is."),
-                runId = "run-real-77",
-                otid = null,
-                seqId = 1,
-            ),
-        ).next
-
-        tl.events shouldHaveSize 2
+        val assistants = tl.events.filterIsInstance<TimelineEvent.Confirmed>()
+            .filter { it.messageType == TimelineMessageType.ASSISTANT }
+        assistants shouldHaveSize 2
+        assistants.map { it.content } shouldBe listOf("Su", "Sure, here it is.")
     }
 
     @Test
