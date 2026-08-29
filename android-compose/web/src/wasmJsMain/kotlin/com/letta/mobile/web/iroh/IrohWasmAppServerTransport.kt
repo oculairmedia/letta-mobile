@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.onSubscription
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.time.Duration.Companion.milliseconds
 
 internal class IrohWasmAppServerTransport private constructor(
     private val bridge: IrohWasmBridge,
@@ -85,7 +86,7 @@ internal class IrohWasmAppServerTransport private constructor(
                 }
                 when (bridge.state()) {
                     "connected" -> {
-                        delay(pollIntervalMs)
+                        delay(pollIntervalMs.milliseconds)
                         pollIntervalMs = (pollIntervalMs * 2).coerceAtMost(MAX_POLL_INTERVAL_MS)
                     }
                     "error" -> error(bridge.error() ?: "Iroh App Server stream failed")
