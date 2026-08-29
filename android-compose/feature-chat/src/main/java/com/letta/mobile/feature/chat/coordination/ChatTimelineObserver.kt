@@ -7,6 +7,7 @@ import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.timeline.TimelineRepository
 import com.letta.mobile.data.timeline.TimelineSyncLoop
 import com.letta.mobile.data.timeline.TimelineSyncEvent
+import com.letta.mobile.data.timeline.Timeline
 import kotlinx.collections.immutable.toPersistentMap
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -84,6 +85,7 @@ internal class ChatTimelineObserver(
     /** Agent/conversation id pair the current observer job is bound to. */
     private var observerBinding: TimelineObserverBinding? = null
     private var hydrationGeneration: ChatHydrationTrace.Generation? = null
+    private var warmBootstrap: WarmBootstrap? = null
 
     fun stop() {
         observerJob?.cancel()
@@ -92,6 +94,7 @@ internal class ChatTimelineObserver(
         hydrateSignalJob = null
         observerBinding = null
         hydrationGeneration = null
+        warmBootstrap = null
         awaitingProjectionAfterHydrate = false
         presenter.reset()
     }
@@ -107,6 +110,7 @@ internal class ChatTimelineObserver(
         observerJob?.cancel()
         hydrateSignalJob?.cancel()
         observerBinding = binding
+        warmBootstrap = null
         if (!bindingSame) {
             presenter.reset()
             val cachedTimeline = timelineRepository.peekCached(agentId, conversationId)
@@ -127,6 +131,7 @@ internal class ChatTimelineObserver(
                         it.next.copy(isLoadingMessages = false),
                     )
                 }
+                warmBootstrap = WarmBootstrap(binding, cachedTimeline)
             } else {
                 uiState.value = uiState.value.copy(
                     messages = kotlinx.collections.immutable.persistentListOf(),
@@ -212,6 +217,10 @@ internal class ChatTimelineObserver(
                     }
 
                     if (observerBinding != binding) return@collect
+
+                    if (suppressWarmBootstrapReplay(binding, timeline, projection, generation)) {
+                        return@collect
+                    }
 
                     // letta-mobile-yflpp DEDUPE: a no-op streaming tick (the
                     // tail event was re-emitted unchanged) projects to a UI
@@ -473,6 +482,33 @@ internal class ChatTimelineObserver(
         val agentId: String?,
         val conversationId: String,
     )
+
+    private data class WarmBootstrap(
+        val binding: TimelineObserverBinding,
+        val timeline: Timeline,
+    )
+
+    private fun suppressWarmBootstrapReplay(
+        binding: TimelineObserverBinding,
+        timeline: Timeline,
+        projection: TimelineProjection,
+        generation: ChatHydrationTrace.Generation?,
+    ): Boolean {
+        val bootstrap = warmBootstrap?.takeIf { it.binding == binding } ?: return false
+        warmBootstrap = null
+        if (timeline !== bootstrap.timeline || !projection.noChange) return false
+
+        publishPresenceOnly(binding, projection, generation)?.let { publication ->
+            val reconciled = reconcileCollapsedRunsOnProjection(publication.previous, publication.next)
+            if (reconciled != publication.previous) uiState.value = reconciled
+        }
+        Telemetry.event(
+            "TimelineSync", "warmBootstrap.suppressed",
+            "conversationId" to binding.conversationId,
+            "eventCount" to timeline.events.size,
+        )
+        return true
+    }
 
     private companion object {
         // letta-mobile-yflpp COALESCE: minimum gap between projection writes.
