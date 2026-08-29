@@ -127,11 +127,12 @@ private fun runDesktopApplication(
                             DesktopWindowsTouchInput.attach(window)
                         }
 
-                        // Ctrl+scroll scales app type. Wraps the shell only, so
-                        // the custom title bar (a composition sibling) keeps its
-                        // fixed chrome metrics the way browser zoom leaves the
-                        // browser's own chrome alone.
-                        DesktopTextZoomHost {
+                        // Ctrl+scroll scales app type, persisted across
+                        // launches. Wraps the shell only, so the custom title
+                        // bar (a composition sibling) keeps its fixed chrome
+                        // metrics the way browser zoom leaves the browser's own
+                        // chrome alone.
+                        DesktopChatFontScaleHost {
                             LettaDesktopApp(
                                 shell = DesktopAppShellBindings(
                                     nucleusApplicationScope = nucleusScope,
