@@ -464,7 +464,10 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
     //
     // Merge ONLY on STRICT forward growth: the immediately-preceding (last) event
     // is a same-run assistant row AND the incoming content EXTENDS it
-    // (incoming.startsWith(existing) && incoming strictly longer). This excludes:
+    // (incoming.startsWith(existing) && incoming strictly longer). A second,
+    // observer-only fallback below may cross bounded intervening run events, but
+    // only when promoting a recognized synthetic observer run to a real run.
+    // This excludes:
     //   • post-tool continuations — those START a new message ("Y" after a longer
     //     prior assistant), where incoming is SHORTER, so existing.startsWith(incoming)
     //     not incoming.startsWith(existing) → not a forward growth → not merged.
@@ -512,6 +515,36 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
             "incomingServerId" to confirmed.serverId,
             "runId" to (confirmed.runId ?: "<null>"),
             "mergedLen" to confirmed.content.length,
+            "conversationId" to conversationId,
+        )
+        return output()
+    }
+
+    // letta-mobile-le5m6.12.2: the passive Iroh observer can publish the opening
+    // cumulative assistant fragment before the canonical stream has its real run
+    // id. Reasoning/tool/status frames from that real run may then land before the
+    // canonical assistant snapshot, so the provisional assistant is no longer the
+    // last event. Search only the bounded active tail, stop at a user/system turn
+    // boundary, and require a synthetic-observer -> real-run promotion plus strict
+    // non-empty prefix growth. The intervening real-run event is the provenance
+    // bridge; content alone can never select an older or unrelated row.
+    val observerPromotion = timeline.findObserverPromotionTarget(confirmed)
+    if (observerPromotion != null) {
+        val merged = observerPromotion.copy(
+            content = longerContent(observerPromotion.content, confirmed.content),
+            runId = promoteRunId(observerPromotion.runId, confirmed.runId),
+            seqId = latestSeqId(observerPromotion.seqId, confirmed.seqId),
+        )
+        timeline = timeline.replaceByServerId(merged)
+        timeline = timeline.copy(liveCursor = observerPromotion.serverId)
+        pendingEvents += TimelineSyncEvent.StreamEventIngested(observerPromotion.serverId, message.messageType)
+        hotPathTelemetry(
+            "streamSubscriber.forwardGrowthMerged",
+            "reason" to "observerPromotionOffTail",
+            "serverId" to observerPromotion.serverId,
+            "incomingServerId" to confirmed.serverId,
+            "runId" to (confirmed.runId ?: "<null>"),
+            "mergedLen" to merged.content.length,
             "conversationId" to conversationId,
         )
         return output()
@@ -579,6 +612,52 @@ private fun TimelineEvent.Confirmed.canMergeStreamFrame(
 private fun TimelineEvent.Confirmed.hasIrohSyntheticRunId(): Boolean =
     runId?.takeIf { it.isNotBlank() }?.isIrohSyntheticRunId() == true
 
+private fun Timeline.findObserverPromotionTarget(
+    incoming: TimelineEvent.Confirmed,
+): TimelineEvent.Confirmed? {
+    if (incoming.messageType != TimelineMessageType.ASSISTANT) return null
+    val incomingRunId = incoming.runId?.takeIf { it.isNotBlank() } ?: return null
+    if (incomingRunId.isIrohSyntheticRunId()) return null
+    val incomingText = incoming.content.trim()
+    if (incomingText.isEmpty()) return null
+
+    val activeTail = events.takeLast(OBSERVER_PROMOTION_TAIL_LIMIT)
+    val reverseTail = activeTail.asReversed()
+    val boundaryOffset = reverseTail.indexOfFirst { event ->
+        event is TimelineEvent.Confirmed &&
+            (event.messageType == TimelineMessageType.USER || event.messageType == TimelineMessageType.SYSTEM)
+    }
+    val activeReverseTail = if (boundaryOffset >= 0) reverseTail.take(boundaryOffset) else reverseTail
+
+    // A real-run event between the provisional and incoming assistants ties the
+    // otherwise opaque observer placeholder to this canonical run. This rejects
+    // unrelated synthetic prefixes and settled history without using content as
+    // provenance.
+    var sawIncomingRunBridge = false
+    for (event in activeReverseTail) {
+        val existing = event as? TimelineEvent.Confirmed ?: continue
+        if (existing.runId?.takeIf { it.isNotBlank() } == incomingRunId) {
+            sawIncomingRunBridge = true
+        }
+        if (existing.messageType != TimelineMessageType.ASSISTANT) continue
+        if (existing.serverId == incoming.serverId) continue
+        if (existing.runId?.startsWith(IROH_OBSERVER_RUN_ID_PREFIX) != true) continue
+        if (!sawIncomingRunBridge) continue
+
+        val existingText = existing.content.trim()
+        if (existingText.isNotEmpty() &&
+            incomingText.length > existingText.length &&
+            incomingText.startsWith(existingText)
+        ) {
+            return existing
+        }
+    }
+    return null
+}
+
+private fun longerContent(existing: String, incoming: String): String =
+    if (incoming.length >= existing.length) incoming else existing
+
 /**
  * letta-mobile-j98r5.1: the single canonical predicate for "is this a
  * client-synthesized Iroh run-id placeholder" shared by BOTH the stream reducer
@@ -595,7 +674,9 @@ private fun TimelineEvent.Confirmed.hasIrohSyntheticRunId(): Boolean =
  * intentionally kept separate: it only ever evaluates an `ActiveTurn` run id
  * (always born `iroh-run-*` in `send()`), and observer ids can never reach it.
  */
-internal val IROH_SYNTHETIC_RUN_ID_PREFIXES = listOf("iroh-run-", "iroh-observer-run-")
+private const val IROH_OBSERVER_RUN_ID_PREFIX = "iroh-observer-run-"
+private const val OBSERVER_PROMOTION_TAIL_LIMIT = 30
+internal val IROH_SYNTHETIC_RUN_ID_PREFIXES = listOf("iroh-run-", IROH_OBSERVER_RUN_ID_PREFIX)
 
 internal fun String.isIrohSyntheticRunId(): Boolean =
     IROH_SYNTHETIC_RUN_ID_PREFIXES.any { startsWith(it) }

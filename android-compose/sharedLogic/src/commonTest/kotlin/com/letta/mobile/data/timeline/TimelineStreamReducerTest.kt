@@ -1707,6 +1707,100 @@ class TimelineStreamReducerTest {
     }
 
     @Test
+    fun `observer promotion ignores unrelated synthetic and settled candidates le5m6`() {
+        var tl = reduce(
+            frame = AssistantMessage(
+                id = "settled-observer",
+                contentRaw = JsonPrimitive("Su"),
+                runId = "iroh-observer-run-settled",
+                seqId = 0,
+            ),
+        ).next
+        tl = reduce(
+            prev = tl,
+            frame = UserMessage(id = "new-turn", contentRaw = JsonPrimitive("Start another turn")),
+        ).next
+        tl = reduce(
+            prev = tl,
+            frame = AssistantMessage(
+                id = "unrelated-observer",
+                contentRaw = JsonPrimitive("Su"),
+                runId = "iroh-observer-run-unrelated",
+                seqId = 0,
+            ),
+        ).next
+        tl = reduce(
+            prev = tl,
+            frame = ReasoningMessage(
+                id = "other-run-reasoning",
+                reasoning = "Different run",
+                runId = "run-other",
+                seqId = 1,
+            ),
+        ).next
+        tl = reduce(
+            prev = tl,
+            frame = AssistantMessage(
+                id = "canonical",
+                contentRaw = JsonPrimitive("Sure, here it is."),
+                runId = "run-canonical",
+                seqId = 2,
+            ),
+        ).next
+
+        val assistants = tl.events.filterIsInstance<TimelineEvent.Confirmed>()
+            .filter { it.messageType == TimelineMessageType.ASSISTANT }
+        assistants.map { it.serverId } shouldBe listOf("settled-observer", "unrelated-observer", "canonical")
+    }
+
+    @Test
+    fun `observer promotion chooses nearest eligible candidate le5m6`() {
+        var tl = reduce(
+            frame = AssistantMessage(
+                id = "older-observer",
+                contentRaw = JsonPrimitive("Alternate"),
+                runId = "iroh-observer-run-older",
+                seqId = 0,
+            ),
+        ).next
+        tl = reduce(
+            prev = tl,
+            frame = AssistantMessage(
+                id = "nearest-observer",
+                contentRaw = JsonPrimitive("Sur"),
+                runId = "iroh-observer-run-nearest",
+                seqId = 1,
+            ),
+        ).next
+        tl = reduce(
+            prev = tl,
+            frame = ReasoningMessage(
+                id = "run-bridge",
+                reasoning = "Checking",
+                runId = "run-real-nearest",
+                seqId = 2,
+            ),
+        ).next
+        tl = reduce(
+            prev = tl,
+            frame = AssistantMessage(
+                id = "canonical-nearest",
+                contentRaw = JsonPrimitive("Sure, done."),
+                runId = "run-real-nearest",
+                seqId = 3,
+            ),
+        ).next
+
+        val assistants = tl.events.filterIsInstance<TimelineEvent.Confirmed>()
+            .filter { it.messageType == TimelineMessageType.ASSISTANT }
+        assistants shouldHaveSize 2
+        assistants.map { it.serverId } shouldBe listOf("older-observer", "nearest-observer")
+        assistants.last().content shouldBe "Sure, done."
+        assistants.last().runId shouldBe "run-real-nearest"
+        assistants.last().seqId shouldBe 3
+    }
+
+    @Test
     fun `prefix text in distinct turns remains separate without provenance match le5m6`() {
         var tl = reduce(
             frame = AssistantMessage(
