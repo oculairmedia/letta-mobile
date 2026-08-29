@@ -27,7 +27,7 @@ object TestData {
         tags: List<String> = listOf("test"),
         system: String? = null,
         blocks: List<Block> = emptyList(),
-    ) = Agent(
+    ): Agent = Agent(
         id = AgentId(id),
         name = name,
         model = model,
@@ -43,7 +43,7 @@ object TestData {
         summary: String? = "Test conversation",
         createdAt: String? = null,
         lastMessageAt: String? = null,
-    ) = Conversation(
+    ): Conversation = Conversation(
         id = ConversationId(id),
         agentId = AgentId(agentId),
         summary = summary,
@@ -60,7 +60,7 @@ object TestData {
         toolName: String? = null,
         toolCallId: String? = null,
         date: Instant = Instant.parse("2024-03-15T10:00:00Z"),
-    ) = AppMessage(
+    ): AppMessage = AppMessage(
         id = id,
         date = date,
         messageType = messageType,
@@ -75,7 +75,7 @@ object TestData {
         id: String = "tool-1",
         name: String = "test_tool",
         description: String? = "A test tool",
-    ) = Tool(
+    ): Tool = Tool(
         id = ToolId(id),
         name = name,
         description = description,
@@ -85,7 +85,7 @@ object TestData {
         id: String = "block-1",
         label: String = "persona",
         value: String = "I am a helpful assistant.",
-    ) = Block(
+    ): Block = Block(
         id = BlockId(id),
         label = label,
         value = value,
@@ -95,7 +95,7 @@ object TestData {
         id: String = "mcp-1",
         serverName: String = "Test MCP",
         serverUrl: String? = "http://localhost:8080",
-    ) = McpServer(
+    ): McpServer = McpServer(
         id = McpServerId(id),
         serverName = serverName,
         serverUrl = serverUrl,
@@ -107,7 +107,7 @@ object TestData {
         funcReturn: String = "ok",
         stdout: List<String>? = null,
         stderr: List<String>? = null,
-    ) = McpToolExecutionResult(
+    ): McpToolExecutionResult = McpToolExecutionResult(
         status = status,
         funcReturn = JsonPrimitive(funcReturn),
         stdout = stdout,
@@ -119,7 +119,7 @@ object TestData {
         mode: LettaConfig.Mode = LettaConfig.Mode.CLOUD,
         serverUrl: String = "https://api.letta.com",
         accessToken: String? = "test-token",
-    ) = LettaConfig(
+    ): LettaConfig = LettaConfig(
         id = id,
         mode = mode,
         serverUrl = serverUrl,
