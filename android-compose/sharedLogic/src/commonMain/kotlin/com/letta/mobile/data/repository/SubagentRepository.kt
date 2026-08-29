@@ -181,7 +181,7 @@ open class SubagentRepository(
 
     enum class SnapshotKind { AUTHORITATIVE, INCREMENTAL }
 
-    private suspend fun mergeSnapshot(
+    private fun mergeSnapshot(
         incoming: List<SubagentEntry>,
         terminal: SubagentEntry? = null,
         kind: SnapshotKind,

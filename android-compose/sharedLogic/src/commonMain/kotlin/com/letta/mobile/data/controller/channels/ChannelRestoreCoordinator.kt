@@ -408,7 +408,7 @@ class ChannelRestoreCoordinator(
         return if (scaled >= maxBackoffMs.toDouble()) maxBackoffMs else scaled.toLong()
     }
 
-    private suspend inline fun <T> transportCall(
+    private inline fun <T> transportCall(
         block: () -> T,
         onFailure: (Exception) -> T,
     ): T = try {
