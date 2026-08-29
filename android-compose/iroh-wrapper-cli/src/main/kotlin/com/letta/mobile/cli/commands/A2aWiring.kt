@@ -17,7 +17,6 @@ import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.transport.iroh.HostEndpointAddressStore
 import com.letta.mobile.data.transport.iroh.IdentityMigrationAction
 import com.letta.mobile.data.transport.iroh.IrohAgentAddress
-import com.letta.mobile.data.transport.iroh.IrohAgentAddressResolver
 import com.letta.mobile.data.transport.iroh.IrohAgentIdentity
 import com.letta.mobile.data.transport.iroh.IrohAgentMessage
 import com.letta.mobile.data.transport.iroh.DeliveryOutcome
@@ -64,9 +63,8 @@ class A2aWiring internal constructor(
     /**
      * M2 (PR #1125): the a2a node id (hex, 64 chars). Equal to the app-server
      * node id when both endpoints share the same secret-key file. Computed
-     * once at bind time (suspending; the underlying `Endpoint.addr().id()`
-     * is async) and stored as a plain `val`, so callers can read it
-     * synchronously without a `runBlocking` per access. */
+     * once at bind time from `Endpoint.addr().id()` and stored as a plain
+     * `val`, so callers can read it without a `runBlocking` per access. */
     val nodeIdHex: String,
 ) {
     /** Start the receiver's accept loop on [scope]; returns the accept-loop Job. */
@@ -186,7 +184,7 @@ suspend fun buildA2aWiring(
     // gracefully. The native-gated test `endpoint is released when post-bind
     // setup fails` (in A2aWiringTest) pins this contract.
     try {
-        // M2: compute hex node id once at bind time (suspend id() call) and store it
+        // M2: compute hex node id once at bind time and store it
         // on A2aWiring as a plain `val`.
         val nodeIdHex = endpointIdHex(endpoint)
 
@@ -671,14 +669,13 @@ private suspend fun loadSecretKey(path: String?): ByteArray {
 
 /**
  * M2 (PR #1125): file-scope helper that returns the bound endpoint's node id
- * as a hex string. `Endpoint.id()` itself is `suspend` (UniFFI bridges the
- * async FFI call); the subsequent `EndpointId.toBytes()` is not. Wrapping
+ * as a hex string. `Endpoint.addr().id()` is a sync UniFFI call; wrapping
  * here lets `buildA2aWiring` compute the hex once at bind time and store it
  * on [A2aWiring] as a plain `val`, so the many property reads elsewhere do
  * not pay for a `runBlocking` apiece. Also used by [publishHost] when
  * it writes the address book — one helper, two callers, zero divergence.
  */
-private suspend fun endpointIdHex(endpoint: Endpoint): String {
+private fun endpointIdHex(endpoint: Endpoint): String {
     val id = endpoint.addr().id()
     return id.use { it.toBytes().joinToString("") { b -> "%02x".format(b) } }
 }
