@@ -16,6 +16,7 @@ import com.letta.mobile.data.transport.appserver.KtorAppServerWebSocketTransport
 import com.letta.mobile.data.transport.iroh.IrohAppServerTransport
 import com.letta.mobile.data.transport.iroh.IrohAppServerTransportAdapter
 import com.letta.mobile.desktop.security.DesktopIrohIdentity
+import com.letta.mobile.desktop.runtime.DesktopLocalRuntimeHost
 import com.letta.mobile.desktop.runtime.DesktopLocalAppServerClientRegistry
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.data.transport.iroh.IrohFrameCodec
