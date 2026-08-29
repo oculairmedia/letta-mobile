@@ -157,7 +157,7 @@ private class JvmDesktopRuntimeProcess(
         get() = process.descendants().map(::JvmDesktopRuntimeProcessHandle).toList()
     override val exitCodeOrNull: Int? get() = runCatching { process.exitValue() }.getOrNull()
     override fun destroy() = process.destroy()
-    override fun destroyForcibly() = process.destroyForcibly().let { Unit }
+    override fun destroyForcibly() { process.destroyForcibly() }
     override fun waitFor(timeoutMs: Long): Boolean =
         process.waitFor(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)
 }
