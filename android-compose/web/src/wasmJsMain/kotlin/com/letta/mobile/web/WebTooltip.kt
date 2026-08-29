@@ -26,6 +26,7 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import kotlinx.coroutines.delay
+import kotlin.time.Duration.Companion.milliseconds
 
 private const val WebTooltipDelayMs = 150L
 private const val WebTooltipGapPx = 6
@@ -41,7 +42,7 @@ internal fun WebTooltip(
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(hovered) {
         if (hovered) {
-            delay(WebTooltipDelayMs)
+            delay(WebTooltipDelayMs.milliseconds)
             visible = true
         } else {
             visible = false

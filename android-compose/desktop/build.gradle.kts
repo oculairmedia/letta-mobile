@@ -261,6 +261,16 @@ dependencies {
 
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
+
+    // Compose Desktop tests share process-global AWT and Skiko state. Running
+    // multiple test workers against that state intermittently leaves a worker
+    // blocked after the test suite, wedging the required shared-multiplatform
+    // check until GitHub's six-hour timeout. Keep this module single-forked;
+    // other modules retain the repository-wide parallel test configuration.
+    maxParallelForks = 1
+    testLogging {
+        events("started", "failed")
+    }
 }
 
 // P4 spike entry point (see avatar/DESIGN-BRIEF.md + docs/design/avatar-system-prd.md):
