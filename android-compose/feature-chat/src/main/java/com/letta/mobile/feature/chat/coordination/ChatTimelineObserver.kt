@@ -218,24 +218,8 @@ internal class ChatTimelineObserver(
 
                     if (observerBinding != binding) return@collect
 
-                    val bootstrap = warmBootstrap
-                    if (bootstrap?.binding == binding) {
-                        warmBootstrap = null
-                        if (timeline === bootstrap.timeline && projection.noChange) {
-                            publishPresenceOnly(binding, projection, generation)?.let { publication ->
-                                val reconciled = reconcileCollapsedRunsOnProjection(
-                                    publication.previous,
-                                    publication.next,
-                                )
-                                if (reconciled != publication.previous) uiState.value = reconciled
-                            }
-                            Telemetry.event(
-                                "TimelineSync", "warmBootstrap.suppressed",
-                                "conversationId" to binding.conversationId,
-                                "eventCount" to timeline.events.size,
-                            )
-                            return@collect
-                        }
+                    if (suppressWarmBootstrapReplay(binding, timeline, projection, generation)) {
+                        return@collect
                     }
 
                     // letta-mobile-yflpp DEDUPE: a no-op streaming tick (the
@@ -503,6 +487,28 @@ internal class ChatTimelineObserver(
         val binding: TimelineObserverBinding,
         val timeline: Timeline,
     )
+
+    private fun suppressWarmBootstrapReplay(
+        binding: TimelineObserverBinding,
+        timeline: Timeline,
+        projection: TimelineProjection,
+        generation: ChatHydrationTrace.Generation?,
+    ): Boolean {
+        val bootstrap = warmBootstrap?.takeIf { it.binding == binding } ?: return false
+        warmBootstrap = null
+        if (timeline !== bootstrap.timeline || !projection.noChange) return false
+
+        publishPresenceOnly(binding, projection, generation)?.let { publication ->
+            val reconciled = reconcileCollapsedRunsOnProjection(publication.previous, publication.next)
+            if (reconciled != publication.previous) uiState.value = reconciled
+        }
+        Telemetry.event(
+            "TimelineSync", "warmBootstrap.suppressed",
+            "conversationId" to binding.conversationId,
+            "eventCount" to timeline.events.size,
+        )
+        return true
+    }
 
     private companion object {
         // letta-mobile-yflpp COALESCE: minimum gap between projection writes.

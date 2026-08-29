@@ -84,6 +84,7 @@ class ChatTimelineObserverTest {
         }
         runCurrent()
         publications.clear()
+        Telemetry.clear()
 
         harness.observer.start("conv-2")
 
