@@ -38,7 +38,7 @@ internal object ChatHydrationTrace {
 
     private class Registry {
         var nextGeneration = 0L
-        val active = linkedMapOf<Identity, State>()
+        val active: MutableMap<Identity, State> = linkedMapOf()
     }
 
     private data class TraceDetails(
