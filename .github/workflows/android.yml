@@ -239,14 +239,13 @@ jobs:
             ${{ runner.os }}-konan-
 
       - name: Run shared multiplatform verification task graph
-        # :sharedLogic:allTests runs the jvm + android-unit suites. Native
-        # commonMain/commonTest is compiled explicitly so JVM-only API leaks
-        # still fail the job (the original allTests purpose; see b97bcf48).
-        # :sharedLogic:hostNativeTest is excluded: the Kotlin/Native test
-        # process hangs after the suite starts on GitHub ubuntu-latest and
-        # locally on Windows, which cancelled this required check for ~25
-        # minutes on every retry (letta-mobile-oi3od).
-        run: ./gradlew :sharedLogic:compileKotlinHostNative :sharedLogic:compileTestKotlinHostNative :sharedLogic:allTests :desktop:test :appserver-cli:test :appserver-cli:distZip :iroh-wrapper-cli:test :iroh-wrapper-cli:installDist -x :sharedLogic:hostNativeTest && node sharedLogic/karma.config.test.cjs
+        # Do not request :sharedLogic:allTests. That aggregator always runs
+        # :sharedLogic:hostNativeTest, and Gradle -x does not skip it (the
+        # process hangs after start on GitHub ubuntu-latest and locally on
+        # Windows; letta-mobile-oi3od). Compile hostNative main+test so
+        # JVM-only API leaks still fail the job (b97bcf48). Run jvm +
+        # android host tests explicitly.
+        run: ./gradlew :sharedLogic:compileKotlinHostNative :sharedLogic:compileTestKotlinHostNative :sharedLogic:jvmTest :sharedLogic:testDebugHostTest :desktop:test :appserver-cli:test :appserver-cli:distZip :iroh-wrapper-cli:test :iroh-wrapper-cli:installDist && node sharedLogic/karma.config.test.cjs
 
   web-wasm:
     name: web-wasm
