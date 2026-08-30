@@ -88,7 +88,7 @@ kotlin {
                 api(project(":core:runtime"))
                 api(libs.kotlinx.coroutines.core)
                 api("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")
-                api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+                api(libs.kotlinx.serialization.json)
                 api("org.jetbrains.kotlinx:atomicfu:0.32.1")
                 api("org.jetbrains.kotlinx:kotlinx-collections-immutable:0.5.0-beta01")
                 // Multiplatform date/time for the shared cron evaluator +
@@ -139,7 +139,7 @@ kotlin {
             dependencies {
                 // Iroh AAR: brings the JVM iroh classes transitively + the
                 // Android-only IrohAndroid class (JNI entry point).
-                implementation("computer.iroh:iroh-android:1.1.0")
+                implementation(libs.iroh.android)
             }
         }
 
@@ -150,7 +150,7 @@ kotlin {
         getByName("jvmMain") {
             dependsOn(jvmAndAndroid)
             dependencies {
-                implementation("computer.iroh:iroh:1.1.0")
+                implementation(libs.iroh)
                 // PNG rendering (QrRenderer.kt) needs ZXing javase — jvmMain only.
                 implementation("com.google.zxing:javase:3.5.3")
                 api(libs.ktor.websockets)
@@ -179,9 +179,9 @@ kotlin {
         commonTest {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("app.cash.turbine:turbine:1.2.1")
+                implementation(libs.turbine)
                 implementation(libs.kotlinx.coroutines.test)
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+                implementation(libs.kotlinx.serialization.json)
                 implementation(libs.ktor.client.mock)
                 implementation(libs.ktor.client.content.negotiation)
                 implementation(libs.ktor.serialization.kotlinx.json)

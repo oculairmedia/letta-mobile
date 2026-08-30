@@ -71,9 +71,9 @@ application {
 dependencies {
     api(project(":sharedLogic"))
 
-    api("com.github.ajalt.clikt:clikt:5.1.0")
+    api(libs.clikt)
     implementation(libs.kotlinx.coroutines.core)
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+    implementation(libs.kotlinx.serialization.json)
     implementation(libs.ktor.client.core)
     implementation(libs.ktor.client.cio)
     implementation(libs.ktor.client.websockets)
@@ -94,7 +94,7 @@ dependencies {
     // irohNativeBindingIsOnTheDistributionRuntimeClasspath test still passes
     // after the removal (it resolves `computer.iroh.Endpoint` through the
     // production `implementation` declaration).
-    implementation("computer.iroh:iroh:1.1.0")
+    implementation(libs.iroh)
 
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.kotlinx.coroutines.test)

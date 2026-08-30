@@ -1713,12 +1713,12 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material:material-icons-extended")
-    implementation("androidx.activity:activity-compose:1.13.0")
+    implementation(libs.androidx.activity.compose)
     implementation("androidx.exifinterface:exifinterface:1.4.2")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.4")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.4")
     implementation("androidx.lifecycle:lifecycle-process:2.9.4")
-    implementation("app.cash.molecule:molecule-runtime:2.2.0")
+    implementation(libs.molecule.runtime)
     debugImplementation("androidx.compose.ui:ui-tooling")
     implementation("androidx.metrics:metrics-performance:1.0.0")
     debugImplementation("com.squareup.leakcanary:leakcanary-android:3.0-alpha-8")
@@ -1753,7 +1753,7 @@ dependencies {
     implementation(libs.ktor.client.auth)
 
     // Kotlinx Serialization
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+    implementation(libs.kotlinx.serialization.json)
 
     // DataStore + Encrypted SharedPreferences
     implementation("androidx.datastore:datastore-preferences:1.3.0-alpha09")
@@ -1791,8 +1791,8 @@ dependencies {
     implementation("com.mikepenz:aboutlibraries-compose-m3:14.2.1")
 
     // Paging 3
-    implementation("androidx.paging:paging-runtime-ktx:3.5.0")
-    implementation("androidx.paging:paging-compose:3.5.0")
+    implementation(libs.androidx.paging.runtime.ktx)
+    implementation(libs.androidx.paging.compose)
 
     // Background sync
     implementation("androidx.work:work-runtime-ktx:2.11.2")
@@ -1809,27 +1809,27 @@ dependencies {
     "baselineProfile"(project(":baselineprofile"))
 
     // Testing
-    testImplementation("junit:junit:4.13.2")
+    testImplementation(libs.junit4)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.ktor.client.mock)
-    testImplementation("app.cash.turbine:turbine:1.2.1")
-    testImplementation("io.mockk:mockk:1.14.9")
-    testImplementation("io.kotest:kotest-runner-junit5:6.1.11")
-    testImplementation("io.kotest:kotest-assertions-core:6.1.11")
-    testImplementation("org.robolectric:robolectric:4.16.1")
+    testImplementation(libs.turbine)
+    testImplementation(libs.mockk)
+    testImplementation(libs.kotest.runner.junit5)
+    testImplementation(libs.kotest.assertions.core)
+    testImplementation(libs.robolectric)
     testImplementation("androidx.compose.ui:ui-test-junit4")
     testImplementation("io.github.takahirom.roborazzi:roborazzi:1.63.0")
     testImplementation("io.github.takahirom.roborazzi:roborazzi-compose:1.63.0")
-    testImplementation("androidx.test:core-ktx:1.7.0")
-    testImplementation("androidx.test.ext:junit-ktx:1.3.0")
+    testImplementation(libs.androidx.test.core.ktx)
+    testImplementation(libs.androidx.test.ext.junit.ktx)
 
     // Hilt testing
     testImplementation(libs.hilt.android.testing)
     kspTest(libs.hilt.compiler)
     testRuntimeOnly(libs.junit.vintage.engine)
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
-    androidTestImplementation("androidx.test.ext:junit:1.3.0")
-    androidTestImplementation("androidx.test:core-ktx:1.7.0")
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.core.ktx)
     androidTestImplementation(libs.kotlinx.coroutines.android)
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }

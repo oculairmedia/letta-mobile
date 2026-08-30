@@ -24,7 +24,7 @@ dependencies {
     api(project(":avatar:core"))
     api(project(":avatar:catalog"))
     implementation(libs.kotlinx.coroutines.core)
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+    implementation(libs.kotlinx.serialization.json)
 
     testImplementation(kotlin("test-junit5"))
     testImplementation(libs.kotlinx.coroutines.test)
