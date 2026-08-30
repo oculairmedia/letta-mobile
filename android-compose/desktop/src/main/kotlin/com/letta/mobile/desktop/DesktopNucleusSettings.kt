@@ -16,6 +16,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import kotlinx.coroutines.delay
+import kotlin.time.Duration.Companion.milliseconds
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -167,7 +168,7 @@ private fun SystemInfoSettingsSection(system: DesktopSystemSnapshot, onRefresh: 
     val currentRefresh by rememberUpdatedState(onRefresh)
     LaunchedEffect(Unit) {
         while (true) {
-            delay(SYSTEM_INFO_REFRESH_INTERVAL_MS)
+            delay(SYSTEM_INFO_REFRESH_INTERVAL_MS.milliseconds)
             currentRefresh()
         }
     }

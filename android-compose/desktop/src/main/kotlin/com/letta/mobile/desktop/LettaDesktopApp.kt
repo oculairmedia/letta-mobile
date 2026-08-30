@@ -71,6 +71,7 @@ import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.StateFlow
+import kotlin.time.Duration.Companion.seconds
 import java.awt.Window
 import java.time.Instant
 import dev.nucleusframework.application.NucleusApplicationScope
@@ -492,7 +493,7 @@ internal fun LettaDesktopApp(
     var fleetClock by remember { mutableStateOf(Instant.now()) }
     LaunchedEffect(Unit) {
         while (true) {
-            delay(60_000)
+            delay(60.seconds)
             fleetClock = Instant.now()
         }
     }

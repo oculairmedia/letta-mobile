@@ -13,6 +13,7 @@ import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Splits a conversation's rows into day sections.
@@ -84,7 +85,7 @@ internal fun rememberCurrentDate(zone: ZoneId = ZoneId.systemDefault()): LocalDa
     var today by remember(zone) { mutableStateOf(LocalDate.now(zone)) }
     LaunchedEffect(zone) {
         while (true) {
-            delay(millisUntilNextMidnight(ZonedDateTime.now(zone)))
+            delay(millisUntilNextMidnight(ZonedDateTime.now(zone)).milliseconds)
             today = LocalDate.now(zone)
         }
     }

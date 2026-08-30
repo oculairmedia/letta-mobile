@@ -22,6 +22,7 @@ import androidx.compose.foundation.verticalScroll
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import kotlin.time.Duration.Companion.seconds
 import java.io.File
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
@@ -248,7 +249,7 @@ private fun LookdevRoot() {
                     state.source = updated.source
                 }
             }
-            delay(1_000)
+            delay(1.seconds)
         }
     }
 
