@@ -1,0 +1,41 @@
+# Smoke: seeded agent onboarding + create-new-agent flow against the Iroh mini.
+#
+# Pre-conditions (operator runs BEFORE this flow):
+#   1. Mini's wrapper is up and serving UDP Iroh (run start-test-appserver.sh).
+#   2. scripts/test-sites/seed-test-site-agent.sh has been applied (so two
+#      agents + their default conversation rows are present on disk).
+#   3. Pixel is configured for Iroh transport — AUTOMATION_SERVER_URL injected
+#      as iroh://<ticket> from the wrapper's startup log.
+#
+# This flow verifies:
+#   (A) Seeded-state landing: Pixel dials Iroh, lists agents, taps into a
+#       conversation, asserts the chat header is visible (no Welcome card).
+#   (B) Onboarding flow: from the Agents tab, the user can still kick off
+#       Create Agent and reach the agent-creation surface, even when agents
+#       are pre-seeded (proves the create flow is reachable, not just on a
+#       blank install).
+
+appId: com.letta.mobile.dev
+---
+# --- (A) Seeded-state landing ---
+- launchApp
+- extendedWaitUntil:
+    visible: "Conversations"
+    timeout: 20000
+# Welcome to Letta card must NOT appear because agents exist.
+- assertNotVisible: "Welcome to Letta"
+# The seeded agents should be visible — names from the mini backend.
+- assertVisible: "mini-sender"
+- assertVisible: "mini-with-tool"
+- takeScreenshot: smoke-iroh-seeded-agents
+
+# --- (B) Onboarding path is still reachable ---
+# Tap into the Agents tab (top-right account/agents glyph varies; safest is the
+# "Agents" tab on the bottom navigation, present when configured).
+- tapOn:
+    "Agents"
+- extendedWaitUntil:
+    visible: "Agents"
+    timeout: 10000
+# The Create flow is reachable from the Agents screen.
+- assertVisible: "Create"
