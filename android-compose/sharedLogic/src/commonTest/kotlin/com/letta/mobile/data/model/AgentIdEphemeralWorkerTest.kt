@@ -12,7 +12,8 @@ class AgentIdEphemeralWorkerTest {
     }
 
     @Test
-    fun localAgentIdsAreNotEphemeralLettaCodeWorkers() {
+    fun persistedLocalAgentIdsAreNotEphemeralLettaCodeWorkers() {
+        assertFalse(AgentId("agent-local-07f5b235-633f-44be-a08f-32373247f541").isLettaCodeEphemeralWorker())
         assertFalse(AgentId("local-agent-device-123").isLettaCodeEphemeralWorker())
     }
 
