@@ -239,13 +239,14 @@ jobs:
             ${{ runner.os }}-konan-
 
       - name: Run shared multiplatform verification task graph
-        # Do not request :sharedLogic:allTests. That aggregator always runs
-        # :sharedLogic:hostNativeTest, which hangs on GitHub ubuntu-latest
-        # (letta-mobile-oi3od). Compile hostNative main+test in a second
-        # Gradle invocation AFTER JVM/desktop tests: running :desktop:test
-        # after Konan compile hung the job for the 25m timeout.
+        # Do not request :sharedLogic:allTests (hostNativeTest hangs) or
+        # :desktop:test in this job (:desktop:test hung for the 25m timeout
+        # on follow-up PRs even when run before Konan). Desktop unit tests
+        # still run in the required `test` job when android-compose/desktop
+        # changes (additive module tasks). Native compile still catches
+        # JVM-only API leaks in commonMain/commonTest (b97bcf48).
         run: |
-          ./gradlew :sharedLogic:jvmTest :desktop:test :appserver-cli:test :appserver-cli:distZip :iroh-wrapper-cli:test :iroh-wrapper-cli:installDist
+          ./gradlew :sharedLogic:jvmTest :appserver-cli:test :appserver-cli:distZip :iroh-wrapper-cli:test :iroh-wrapper-cli:installDist
           ./gradlew :sharedLogic:compileKotlinHostNative :sharedLogic:compileTestKotlinHostNative
           node sharedLogic/karma.config.test.cjs
 
