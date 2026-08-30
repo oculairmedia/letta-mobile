@@ -73,10 +73,9 @@ shared_job="$(
   ' "$android_workflow"
 )"
 assert_contains "$shared_job" 'Run shared multiplatform verification task graph'
-# allTests always pulls in hostNativeTest, which hangs on GitHub ubuntu-latest
-# (letta-mobile-oi3od). JVM/desktop tests first; native compile second so
-# :desktop:test is not started after Konan.
-assert_contains "$shared_job" ':sharedLogic:jvmTest :desktop:test :appserver-cli:test :appserver-cli:distZip :iroh-wrapper-cli:test :iroh-wrapper-cli:installDist'
+# allTests / hostNativeTest hang; :desktop:test also hung on follow-up PRs
+# even before Konan. JVM + CLI tests first; native compile second.
+assert_contains "$shared_job" ':sharedLogic:jvmTest :appserver-cli:test :appserver-cli:distZip :iroh-wrapper-cli:test :iroh-wrapper-cli:installDist'
 assert_contains "$shared_job" ':sharedLogic:compileKotlinHostNative :sharedLogic:compileTestKotlinHostNative'
 shared_gradle_invocations="$(grep -Ec '^[[:space:]]*\./gradlew ' <<<"$shared_job")"
 assert_eq "$shared_gradle_invocations" '2'
