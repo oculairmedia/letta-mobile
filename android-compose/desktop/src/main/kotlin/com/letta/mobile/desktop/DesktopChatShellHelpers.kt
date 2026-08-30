@@ -31,7 +31,6 @@ import com.letta.mobile.data.search.PaletteItemKind
 import com.letta.mobile.desktop.chat.ComposerCommand
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
-import com.letta.mobile.desktop.data.DesktopFileSecureSettingsStore
 import com.letta.mobile.desktop.memory.DesktopMemorySurfaceState
 import com.letta.mobile.data.commands.AgentSlashCommand
 
