@@ -75,40 +75,22 @@ open class CachedBlockRepository(
 
     override suspend fun deleteBlock(blockId: String) {
         withIrohOrRemote(
-            iroh = {
-                it.deleteBlock(blockId)
-                Unit
-            },
-            http = {
-                remote.deleteBlock(blockId)
-                Unit
-            },
+            iroh = { it.deleteBlock(blockId) },
+            http = { remote.deleteBlock(blockId) },
         )
     }
 
     override suspend fun attachBlock(agentId: String, blockId: String) {
         withIrohOrRemote(
-            iroh = {
-                it.attachBlock(agentId, blockId)
-                Unit
-            },
-            http = {
-                remote.attachBlock(agentId, blockId)
-                Unit
-            },
+            iroh = { it.attachBlock(agentId, blockId) },
+            http = { remote.attachBlock(agentId, blockId) },
         )
     }
 
     override suspend fun detachBlock(agentId: String, blockId: String) {
         withIrohOrRemote(
-            iroh = {
-                it.detachBlock(agentId, blockId)
-                Unit
-            },
-            http = {
-                remote.detachBlock(agentId, blockId)
-                Unit
-            },
+            iroh = { it.detachBlock(agentId, blockId) },
+            http = { remote.detachBlock(agentId, blockId) },
         )
     }
 
