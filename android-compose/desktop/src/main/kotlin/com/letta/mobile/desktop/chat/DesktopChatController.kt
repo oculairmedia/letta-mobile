@@ -686,7 +686,7 @@ class DesktopChatController(
         if (trimmed.isEmpty()) return
         scope.launch {
             val selection = selectConversation(conversationId)
-            withTimeoutOrNull(NOTIFICATION_REPLY_SETTLE_TIMEOUT_MS) { selection?.join() }
+            withTimeoutOrNull(NOTIFICATION_REPLY_SETTLE_TIMEOUT_MS.milliseconds) { selection?.join() }
             updateComposerText(trimmed)
             send()
         }
