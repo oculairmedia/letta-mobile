@@ -2,6 +2,7 @@ package com.letta.mobile.feature.chat.subagent
 
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentStatus
+import com.letta.mobile.data.model.SubagentTodo
 import com.letta.mobile.data.repository.api.ISubagentRepository
 import com.letta.mobile.data.repository.api.SubagentParentScope
 import kotlinx.collections.immutable.ImmutableList
@@ -57,7 +58,7 @@ class WsActiveSubagentSource(
     private val parentConversationId: StateFlow<String?>,
 ) : ActiveSubagentSource {
 
-    override suspend fun todos(toolCallId: String) = repository.todos(toolCallId)
+    override suspend fun todos(toolCallId: String): Result<List<SubagentTodo>> = repository.todos(toolCallId)
 
     override suspend fun resolveConversationId(subagent: ActiveSubagent): Result<String?> {
         subagent.subagentNavigationConversationId?.let { return Result.success(it) }

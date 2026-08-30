@@ -63,7 +63,7 @@ internal enum class ChatRestorationState {
 }
 
 private class ChatViewportRestorationTracker(params: ChatMessageListEffectsParams) {
-    val conversationId = (params.state.conversationState as? ConversationState.Ready)?.conversationId
+    val conversationId: String? = (params.state.conversationState as? ConversationState.Ready)?.conversationId
     var restorationState by mutableStateOf(initialRestorationState(params.renderItems.isNotEmpty()))
         private set
     var followLatest by mutableStateOf(true)
