@@ -49,6 +49,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.time.Duration.Companion.milliseconds
 import org.jetbrains.skia.Image
 
 /**
@@ -94,7 +95,7 @@ internal fun DesktopPairInstallScreen(
                 return@LaunchedEffect
             }
             lastSeen = controller.peers.size
-            delay(500L)
+            delay(500.milliseconds)
         }
     }
     DesktopMaterialTheme {
