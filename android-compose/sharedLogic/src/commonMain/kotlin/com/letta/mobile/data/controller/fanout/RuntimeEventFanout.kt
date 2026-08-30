@@ -119,7 +119,7 @@ class RuntimeEventFanout(
      * for the given runtime. Multiple subscribers can subscribe to the same runtime;
      * each receives events on its own buffered channel with full channel/raw fidelity.
      */
-    suspend fun subscribe(
+    fun subscribe(
         agentId: AgentId,
         conversationId: ConversationId,
         subscriberId: String = generateSubscriberId(),
@@ -143,7 +143,7 @@ class RuntimeEventFanout(
      * (lgns8.22.3). Idle locks are retired from [releaseTurnLock] once no waiters
      * remain and no viewers are subscribed.
      */
-    suspend fun unsubscribe(subscriberId: String): Boolean = synchronized(stateLock) {
+    fun unsubscribe(subscriberId: String): Boolean = synchronized(stateLock) {
         val slot = subscribers.remove(subscriberId) ?: return false
         slot.channel.close()
         true
@@ -332,7 +332,7 @@ class RuntimeEventFanout(
     }
 
     /** Test/telemetry: control frames retained for a future subscriber. */
-    suspend fun pendingControlFrameCount(): Int = synchronized(stateLock) {
+    fun pendingControlFrameCount(): Int = synchronized(stateLock) {
         pendingControlFrames.size
     }
 
@@ -426,7 +426,7 @@ class RuntimeEventFanout(
         }
     }
 
-    suspend fun releaseTurnLock(agentId: AgentId, conversationId: ConversationId) {
+    fun releaseTurnLock(agentId: AgentId, conversationId: ConversationId) {
         val key = RuntimeKey(agentId.value, conversationId.value)
         val entry = synchronized(stateLock) { runtimeTurnLocks[key] } ?: return
         entry.mutex.unlock()
@@ -446,20 +446,20 @@ class RuntimeEventFanout(
         }
     }
 
-    suspend fun subscriberCount(): Int = synchronized(stateLock) {
+    fun subscriberCount(): Int = synchronized(stateLock) {
         subscribers.size
     }
 
-    suspend fun runtimeFlowCount(): Int = synchronized(stateLock) {
+    fun runtimeFlowCount(): Int = synchronized(stateLock) {
         subscribers.values.map { it.key }.toSet().size
     }
 
     /** Test/telemetry: number of retained per-runtime turn locks. */
-    suspend fun turnLockCount(): Int = synchronized(stateLock) {
+    fun turnLockCount(): Int = synchronized(stateLock) {
         runtimeTurnLocks.size
     }
 
-    suspend fun subscriberCountForRuntime(agentId: AgentId, conversationId: ConversationId): Int =
+    fun subscriberCountForRuntime(agentId: AgentId, conversationId: ConversationId): Int =
         synchronized(stateLock) {
             val key = RuntimeKey(agentId.value, conversationId.value)
             subscribers.values.count { it.key == key }

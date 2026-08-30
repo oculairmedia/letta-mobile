@@ -17,7 +17,7 @@ internal class TurnInboundSource(
     private val client: AppServerClient,
     private val eventRouter: AppServerRuntimeEventRouter?,
 ) {
-    suspend fun subscribe(
+    fun subscribe(
         scope: AppServerRuntimeScope,
     ): Pair<String?, Flow<AppServerReceivedFrame>> {
         val router = eventRouter ?: return null to client.events
@@ -28,7 +28,7 @@ internal class TurnInboundSource(
         return subId to flow
     }
 
-    suspend fun unsubscribe(subscriberId: String?) {
+    fun unsubscribe(subscriberId: String?) {
         val id = subscriberId ?: return
         eventRouter?.unsubscribe(id)
     }
