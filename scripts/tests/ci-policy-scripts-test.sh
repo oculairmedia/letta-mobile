@@ -73,7 +73,10 @@ shared_job="$(
   ' "$android_workflow"
 )"
 assert_contains "$shared_job" 'Run shared multiplatform verification task graph'
-assert_contains "$shared_job" ':sharedLogic:allTests :desktop:test :appserver-cli:test :appserver-cli:distZip :iroh-wrapper-cli:test :iroh-wrapper-cli:installDist'
+# allTests always pulls in hostNativeTest, which hangs on GitHub ubuntu-latest
+# (letta-mobile-oi3od). Compile native + run jvmTest instead.
+assert_contains "$shared_job" ':sharedLogic:compileKotlinHostNative :sharedLogic:compileTestKotlinHostNative :sharedLogic:jvmTest :desktop:test :appserver-cli:test :appserver-cli:distZip :iroh-wrapper-cli:test :iroh-wrapper-cli:installDist'
+assert_not_contains "$shared_job" ':sharedLogic:allTests'
 shared_gradle_invocations="$(grep -Ec '^[[:space:]]*run: ./gradlew ' <<<"$shared_job")"
 assert_eq "$shared_gradle_invocations" '1'
 
