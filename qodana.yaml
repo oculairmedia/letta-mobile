@@ -47,6 +47,7 @@ exclude:
       - cli/src/main/java/com/letta/mobile/cli/commands/AppServerServeCommand.kt
       - cli/src/main/java/com/letta/mobile/cli/commands/AppServerServeIrohStubCommand.kt
       - cli/src/main/java/com/letta/mobile/cli/runtime/CliImageAttachments.kt
+      - core/android-data/src/main/java/com/letta/mobile/data/session/SessionScopedChannelTransport.kt
       - core/android-data/src/main/java/com/letta/mobile/data/transport/ChannelTransport.kt
       - core/android-data/src/main/java/com/letta/mobile/util/RelativeTimeFormatter.kt
       - core/testutil/src/main/java/com/letta/mobile/testutil/FakeMcpServerApi.kt

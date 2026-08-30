@@ -23,6 +23,8 @@ on:
       # that would otherwise never report test/build-apk-pass/
       # shared-multiplatform. perf-gate needs no entry — android-perf.yml has no
       # pull_request paths filter and always runs.
+      # qodana.yaml lives at the repo root, not under android-compose/. A
+      # Qodana-exclude-only PR would otherwise skip these required jobs forever.
       - ".github/workflows/**"
       - "android-compose/**"
       - "third_party/overmorrow/**"
@@ -32,6 +34,7 @@ on:
       - "scripts/mcp/**"
       - "scripts/scip/**"
       - "tools/**"
+      - "qodana.yaml"
   workflow_dispatch:
 
 concurrency:
@@ -201,7 +204,11 @@ jobs:
     # and desktop targets. This job compiles and tests :sharedLogic across every
     # configured KMP target and builds/tests the :desktop module. See
     # letta-mobile-kx1r3.
+    # Healthy runs finish in ~8-10 minutes. Without a cap, a stuck
+    # :sharedLogic:hostNativeTest holds the required check for the 6-hour
+    # GitHub default and wedges the rest of the PR queue.
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     defaults:
       run:
         working-directory: android-compose
