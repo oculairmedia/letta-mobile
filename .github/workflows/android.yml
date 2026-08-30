@@ -245,7 +245,9 @@ jobs:
         # Windows; letta-mobile-oi3od). Compile hostNative main+test so
         # JVM-only API leaks still fail the job (b97bcf48). Run jvmTest
         # explicitly. commonTest still compiles via compileTestKotlinHostNative.
-        run: ./gradlew :sharedLogic:compileKotlinHostNative :sharedLogic:compileTestKotlinHostNative :sharedLogic:jvmTest :desktop:test :appserver-cli:test :appserver-cli:distZip :iroh-wrapper-cli:test :iroh-wrapper-cli:installDist && node sharedLogic/karma.config.test.cjs
+        # --no-parallel keeps jvmTest and desktop:test from starting together;
+        # that pairing hung this job after both tasks logged a start.
+        run: ./gradlew --no-parallel :sharedLogic:compileKotlinHostNative :sharedLogic:compileTestKotlinHostNative :sharedLogic:jvmTest :desktop:test :appserver-cli:test :appserver-cli:distZip :iroh-wrapper-cli:test :iroh-wrapper-cli:installDist && node sharedLogic/karma.config.test.cjs
 
   web-wasm:
     name: web-wasm
