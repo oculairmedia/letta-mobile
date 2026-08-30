@@ -536,6 +536,7 @@ class LocalAndroidNetworkBridge @Inject constructor(
             else -> "OK"
         }
 
+        @Suppress("UnusedReceiverParameter")
         private fun OutputStream.streamLimited(input: InputStream, limit: Int) {
             val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
             var total = 0
@@ -642,6 +643,7 @@ private fun readBody(input: InputStream, length: Int): String? {
     return String(buffer, Charsets.UTF_8)
 }
 
+@Suppress("UnusedReceiverParameter")
 private fun InputStream.readHttpLine(): String? {
     val line = StringBuilder()
     while (true) {
@@ -653,6 +655,7 @@ private fun InputStream.readHttpLine(): String? {
     return line.toString()
 }
 
+@Suppress("UnusedReceiverParameter")
 private fun HttpURLConnection.useResponse(block: (InputStream) -> Unit) {
     try {
         val input = if (responseCode >= 400) errorStream ?: inputStream else inputStream

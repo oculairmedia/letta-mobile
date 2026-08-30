@@ -157,6 +157,7 @@ class LettaCodeStreamJsonMapper @Inject constructor() {
         return command.runStatus(status, reason, runId())
     }
 
+    @Suppress("UnusedReceiverParameter")
     private fun TurnCommand.runStatus(
         status: RuntimeRunStatus,
         reason: String? = null,

@@ -211,8 +211,10 @@ class AssetEmbeddedModelRepository @Inject constructor(
     private fun huggingFaceTokenFor(url: String): String? =
         settingsRepository.huggingFaceToken.value?.takeIf { it.isNotBlank() && url.isHuggingFaceUrl() }
 
+    @Suppress("UnusedReceiverParameter")
     private fun Context.availableStorageBytes(): Long = filesDir.usableSpace
 
+    @Suppress("UnusedReceiverParameter")
     private fun File.sha256(): String {
         val digest = MessageDigest.getInstance("SHA-256")
         inputStream().use { input ->

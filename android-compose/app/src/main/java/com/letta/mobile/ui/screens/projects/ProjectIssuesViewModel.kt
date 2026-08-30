@@ -237,6 +237,7 @@ class ProjectIssuesViewModel @Inject constructor(
         return current.readyWork.applyIssueFilter(current.searchQuery, current.selectedStatus)
     }
 
+    @Suppress("UnusedReceiverParameter")
     private fun List<ProjectIssueSummary>.applyIssueFilter(
         searchQuery: String,
         selectedStatus: String?,
@@ -625,6 +626,7 @@ fun buildIssueCreationBuckets(
         }
 }
 
+@Suppress("UnusedReceiverParameter")
 private fun ProjectIssueSummary.isCompletedIssue(): Boolean {
     val normalizedStatus = status.lowercase(Locale.ROOT)
     val normalizedLabel = statusLabel?.lowercase(Locale.ROOT).orEmpty()
@@ -638,6 +640,7 @@ private fun String.toIssueLocalDateOrNull(zoneId: ZoneId): LocalDate? =
     toIssueInstantOrNull(zoneId)?.atZone(zoneId)?.toLocalDate()
         ?: runCatching { LocalDate.parse(this) }.getOrNull()
 
+@Suppress("UnusedReceiverParameter")
 private fun String.toIssueInstantOrNull(zoneId: ZoneId): Instant? =
     runCatching { Instant.parse(this) }.getOrNull()
         ?: runCatching { OffsetDateTime.parse(this).toInstant() }.getOrNull()

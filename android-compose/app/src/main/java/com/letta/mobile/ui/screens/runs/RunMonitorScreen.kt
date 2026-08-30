@@ -1356,6 +1356,7 @@ private fun messageSummary(message: LettaMessage): String {
     }
 }
 
+@Suppress("UnusedReceiverParameter")
 private fun Run.isTerminalStatus(): Boolean {
     return status in setOf("completed", "failed", "cancelled", "expired")
 }

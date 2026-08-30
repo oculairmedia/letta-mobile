@@ -206,6 +206,7 @@ private fun parseEventStartMillis(datetime: String): Long? {
         .getOrNull()
 }
 
+@Suppress("UnusedReceiverParameter")
 private fun Intent.withNewTaskFlag(): Intent = apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
 
 private fun openedUiMessage(toolName: String): String = when (toolName) {
@@ -217,6 +218,7 @@ private fun openedUiMessage(toolName: String): String = when (toolName) {
     else -> "Opened Android UI for this user-mediated action. The user must confirm before anything is completed."
 }
 
+@Suppress("UnusedReceiverParameter")
 private fun Intent.toMapping(): IntentMapping = IntentMapping(
     action = action,
     data = data?.toString(),
