@@ -261,7 +261,7 @@ internal class DumpTimelineCommand : AdminShimCommand(
     private val conversation by option("--conversation", envvar = "LETTA_CONVERSATION_ID")
     private val limit by option("--limit").long().default(200)
 
-    override fun run() = runBlocking {
+    override fun run(): Unit = runBlocking {
         val rest = CliRestClient(baseUrl, token)
         try {
             val conversationId = requireConversationId(conversation)

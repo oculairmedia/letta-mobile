@@ -30,7 +30,7 @@ class ProbeStubStore {
 
     private val nextMessageSeq = AtomicLong(0)
     private val messagesByConversation = ConcurrentHashMap<String, MutableList<StoredMessage>>()
-    val runStatuses = ConcurrentHashMap<String, String>()
+    val runStatuses: ConcurrentHashMap<String, String> = ConcurrentHashMap()
 
     fun nextMessageId(): String = "stub-msg-%08d".format(nextMessageSeq.incrementAndGet())
 
