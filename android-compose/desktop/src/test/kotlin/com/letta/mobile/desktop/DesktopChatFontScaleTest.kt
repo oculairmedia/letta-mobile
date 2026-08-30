@@ -85,4 +85,20 @@ class DesktopChatFontScaleTest {
             Files.deleteIfExists(dir)
         }
     }
+
+    @Test
+    fun `persisted NaN is treated as absent rather than crashing snap`() {
+        val dir = Files.createTempDirectory("chat-font-scale-nan")
+        val path = dir.resolve("chat-font-scale.properties")
+        try {
+            Files.writeString(path, "chat.fontScale=NaN\n")
+            val loaded = DesktopChatFontScaleStore(path).load()
+            assertNull(loaded)
+            assertEquals(DEFAULT_CHAT_FONT_SCALE, snapChatFontScale(Float.NaN))
+            assertEquals(DEFAULT_CHAT_FONT_SCALE, snapChatFontScale(Float.POSITIVE_INFINITY))
+        } finally {
+            Files.deleteIfExists(path)
+            Files.deleteIfExists(dir)
+        }
+    }
 }

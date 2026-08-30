@@ -65,6 +65,7 @@ internal fun nextChatFontScale(current: Float, scrollDeltaY: Float): Float {
 
 /** Clamps and snaps any candidate scale, including one restored from disk. */
 internal fun snapChatFontScale(value: Float): Float {
+    if (value.isNaN() || value.isInfinite()) return DEFAULT_CHAT_FONT_SCALE
     val clamped = value.coerceIn(MIN_CHAT_FONT_SCALE, MAX_CHAT_FONT_SCALE)
     return (clamped * 100f).roundToInt() / 100f
 }

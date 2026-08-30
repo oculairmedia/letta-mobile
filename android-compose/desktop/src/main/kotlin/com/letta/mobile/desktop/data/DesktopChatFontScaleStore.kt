@@ -33,6 +33,7 @@ class DesktopChatFontScaleStore(
     fun load(): Float? = readProperties()
         ?.getProperty(CHAT_FONT_SCALE_KEY)
         ?.toFloatOrNull()
+        ?.takeUnless { it.isNaN() || it.isInfinite() }
 
     @Synchronized
     fun save(scale: Float) {
