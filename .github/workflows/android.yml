@@ -240,14 +240,14 @@ jobs:
 
       - name: Run shared multiplatform verification task graph
         # Do not request :sharedLogic:allTests. That aggregator always runs
-        # :sharedLogic:hostNativeTest, and Gradle -x does not skip it (the
-        # process hangs after start on GitHub ubuntu-latest and locally on
-        # Windows; letta-mobile-oi3od). Compile hostNative main+test so
-        # JVM-only API leaks still fail the job (b97bcf48). Run jvmTest
-        # explicitly. commonTest still compiles via compileTestKotlinHostNative.
-        # --no-parallel keeps jvmTest and desktop:test from starting together;
-        # that pairing hung this job after both tasks logged a start.
-        run: ./gradlew --no-parallel :sharedLogic:compileKotlinHostNative :sharedLogic:compileTestKotlinHostNative :sharedLogic:jvmTest :desktop:test :appserver-cli:test :appserver-cli:distZip :iroh-wrapper-cli:test :iroh-wrapper-cli:installDist && node sharedLogic/karma.config.test.cjs
+        # :sharedLogic:hostNativeTest, which hangs on GitHub ubuntu-latest
+        # (letta-mobile-oi3od). Compile hostNative main+test in a second
+        # Gradle invocation AFTER JVM/desktop tests: running :desktop:test
+        # after Konan compile hung the job for the 25m timeout.
+        run: |
+          ./gradlew :sharedLogic:jvmTest :desktop:test :appserver-cli:test :appserver-cli:distZip :iroh-wrapper-cli:test :iroh-wrapper-cli:installDist
+          ./gradlew :sharedLogic:compileKotlinHostNative :sharedLogic:compileTestKotlinHostNative
+          node sharedLogic/karma.config.test.cjs
 
   web-wasm:
     name: web-wasm
