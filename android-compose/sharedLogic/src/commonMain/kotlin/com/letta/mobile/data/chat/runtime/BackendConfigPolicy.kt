@@ -38,7 +38,15 @@ object BackendConfigPolicy {
      * scheme, so any of these prefixes on a LOCAL config is leftover state
      * from a prior remote session, not a legitimate value.
      */
-    private val REMOTE_URL_PREFIXES = listOf("iroh://", "http://", "https://", "ws://", "wss://")
+    /**
+     * Canonical set of URL schemes the app knows how to route to. Published
+     * (rather than `private`) so app-layer code that has to make the same
+     * "is this URL on a scheme the app can route to?" decision (notably
+     * `AutomationAuthBootstrap` when normalizing an injected payload's
+     * `serverUrl` before persistence) does not duplicate the list and risk
+     * drifting from this one.
+     */
+    val REMOTE_URL_PREFIXES = listOf("iroh://", "http://", "https://", "ws://", "wss://")
 
     fun normalize(
         config: LettaConfig,

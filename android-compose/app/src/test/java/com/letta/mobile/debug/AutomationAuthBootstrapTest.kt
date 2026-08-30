@@ -86,6 +86,55 @@ class AutomationAuthBootstrapTest {
     }
 
     @Test
+    fun importPendingConfig_preservesIrohServerUrlInSelfHostedMode() = runBlocking {
+        // Regression: AutomationAuthBootstrap.normalized() used to mangle iroh:// URLs
+        // into https://iroh:// by force-prepending https:// on anything that did not
+        // start with http:// or https://. SELF_HOSTED mode with an iroh:// serverUrl
+        // must round-trip through normalization unchanged so that the automation
+        // injection script (scripts/release/inject-automation-creds.sh) can hand
+        // the Pixel an iroh ticket for the seeded Iroh mini.
+        stagePayload(
+            """
+            {"serverUrl":"iroh://deadbeefcafebabe1234567890abcdef1234567890abcdef1234567890abcdef","accessToken":"iroh-anon","configId":"automation-auth","mode":"SELF_HOSTED"}
+            """.trimIndent(),
+        )
+
+        AutomationAuthBootstrap.importPendingConfig(context, ::recordConfig)
+
+        assertEquals(LettaConfig.Mode.SELF_HOSTED, activeConfig?.mode)
+        assertEquals(
+            "iroh://deadbeefcafebabe1234567890abcdef1234567890abcdef1234567890abcdef",
+            activeConfig?.serverUrl,
+        )
+        assertEquals("iroh-anon", activeConfig?.accessToken)
+        assertTrue(savedConfigs.any { it.id == "automation-auth" })
+    }
+
+    @Test
+    fun importPendingConfig_preservesWsAndWssServerUrlsInSelfHostedMode() = runBlocking {
+        // Same fix surface, other non-http transports: ws:// and wss:// must also
+        // pass through unchanged in SELF_HOSTED mode. Covers the canonical
+        // BackendConfigPolicy.REMOTE_URL_PREFIXES set
+        // (iroh://, http://, https://, ws://, wss://) — only http(s) survive the
+        // current branch, leaving ws/wss/iroh all mangled.
+        stagePayload(
+            """
+            {"serverUrl":"ws://127.0.0.1:4502/","accessToken":"ws-token","configId":"automation-auth","mode":"SELF_HOSTED"}
+            """.trimIndent(),
+        )
+        AutomationAuthBootstrap.importPendingConfig(context, ::recordConfig)
+        assertEquals("ws://127.0.0.1:4502", activeConfig?.serverUrl)
+
+        stagePayload(
+            """
+            {"serverUrl":"wss://demo.letta.internal/","accessToken":"wss-token","configId":"automation-auth","mode":"SELF_HOSTED"}
+            """.trimIndent(),
+        )
+        AutomationAuthBootstrap.importPendingConfig(context, ::recordConfig)
+        assertEquals("wss://demo.letta.internal", activeConfig?.serverUrl)
+    }
+
+    @Test
     fun importPendingConfig_promotesClientModeSettingsWhenPresent() = runBlocking {
         stagePayload(
             """
