@@ -326,7 +326,7 @@ internal class IrohObserverIngestor(
         return buildSubagentsUpdatedIfChanged(toolCallId, SUBAGENT_REASON_DISPATCHED)
     }
 
-    private suspend fun observeChildActivity(streamDelta: AppServerInboundFrame.StreamDelta) {
+    private fun observeChildActivity(streamDelta: AppServerInboundFrame.StreamDelta) {
         val line = SubagentParentProjection.activityLine(streamDelta.delta) ?: return
         Telemetry.event(
             "IrohObserver",
