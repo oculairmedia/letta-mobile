@@ -72,7 +72,7 @@ class FakeStepApi : StepApi(mockk(relaxed = true)) {
         return step
     }
 
-    fun sampleStep(id: String) = Step(
+    fun sampleStep(id: String): Step = Step(
         id = id,
         origin = "sdk",
         organizationId = "org-1",
