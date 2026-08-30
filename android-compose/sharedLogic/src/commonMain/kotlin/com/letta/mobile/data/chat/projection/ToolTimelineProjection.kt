@@ -9,6 +9,7 @@ import com.letta.mobile.data.model.UiSubagentDispatch
 import com.letta.mobile.data.model.UiToolApprovalDecision
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.data.model.UiToolResultTruncation
+import com.letta.mobile.runtime.RuntimeUserInputTools
 
 /**
  * State of a tool call lifecycle in the timeline.
@@ -99,15 +100,19 @@ fun classifyToolCallState(
 /**
  * A call is awaiting approval only while it has no decision, no status and no result, and the
  * owning request actually references it (by id, or by name when the call carries no id).
+ *
+ * Ordinary calls may retain an `approval_request_message` after the runtime has auto-allowed
+ * them. Only canonical runtime user-input tools can remain parked without a decision.
  */
 private fun UiToolCall.isAwaitingApproval(request: UiApprovalRequest?): Boolean {
     if (request == null) return false
+    if (!RuntimeUserInputTools.requiresUserInput(name)) return false
     if (approvalDecision != null || result != null || status != null) return false
     // Match on ID whenever IDs are available on BOTH sides. Falling back to the name
     // marked sibling calls pending too: parallel same-name calls where the request lists
     // only one id had every sibling reported as AwaitingApproval. Name matching is only
     // safe when the request carries no usable ids at all.
-    if (toolCallId != null && request.toolCalls.any { it.toolCallId != null }) {
+    if (request.toolCalls.any { it.toolCallId != null }) {
         return request.toolCalls.any { it.toolCallId == toolCallId }
     }
     return request.toolCalls.any { it.name == name }

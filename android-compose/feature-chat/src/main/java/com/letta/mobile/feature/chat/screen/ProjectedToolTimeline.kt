@@ -222,8 +222,9 @@ internal fun ProjectedToolTimelineGroupCard(
             }
         }
 
-        // Approvals survive hydration; render ApprovalRequestControls if approval requests exist
-        approvalRequests.forEach { approval ->
+        // Ordinary calls can retain an auto-allowed request row while running. Surface
+        // controls only for canonical runtime tools that are actually awaiting user input.
+        approvalRequests.filter(UiApprovalRequest::requiresUserInput).forEach { approval ->
             ApprovalRequestControls(
                 approval = approval,
                 isSubmitting = activeApprovalRequestId == approval.requestId,

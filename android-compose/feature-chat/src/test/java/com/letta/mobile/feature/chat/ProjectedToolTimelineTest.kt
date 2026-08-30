@@ -173,9 +173,8 @@ class ProjectedToolTimelineTest {
                 LettaChatTheme {
                     RunBlock(
                         messages = listOf(
-                            toolMessage(
+                            userInputToolMessage(
                                 id = "tc-a",
-                                command = "pwd",
                                 approvalRequest = approvalRequest(),
                             ),
                             toolMessage(id = "tc-b", command = "ls"),
@@ -196,18 +195,43 @@ class ProjectedToolTimelineTest {
             }
         }
 
-        composeRule.onNodeWithText("Review the requested tool actions before continuing.").assertIsDisplayed()
-        composeRule.onNodeWithText("Reject").assertIsDisplayed()
-        composeRule.onNodeWithText("Approve").assertIsDisplayed()
+        composeRule.onNodeWithText("The agent has a question").assertIsDisplayed()
+        composeRule.onNodeWithText("Continue?").assertIsDisplayed()
+        composeRule.onNodeWithText("Yes").assertIsDisplayed()
 
-        composeRule.onNodeWithText("Approve").performClick()
+        composeRule.onNodeWithText("Yes").performClick()
+        composeRule.onNodeWithText("Send answer").performClick()
 
         composeRule.runOnIdle {
             assertEquals("approval-1", submittedRequestId)
-            assertEquals(listOf("call-a", "call-b"), submittedToolCallIds)
+            assertEquals(listOf("call-a"), submittedToolCallIds)
             assertTrue(submittedApprove == true)
-            assertNull(submittedReason)
+            assertTrue(submittedReason?.contains("askuserquestion-answer") == true)
         }
+    }
+
+    @Test
+    fun projectedToolTimeline_hidesControlsForAutoAllowedOrdinaryRequest() {
+        composeRule.setContent {
+            LettaTheme(AppTheme.LIGHT, ThemePreset.DEFAULT, false) {
+                LettaChatTheme {
+                    RunBlock(
+                        messages = listOf(
+                            toolMessage(id = "tc-a", command = "pwd", approvalRequest = ordinaryApprovalRequest()),
+                            toolMessage(id = "tc-b", command = "ls"),
+                        ),
+                        collapsed = false,
+                        onToggleCollapsed = {},
+                    ) { message, _, rowModifier -> Text(text = message.id, modifier = rowModifier) }
+                }
+            }
+        }
+
+        composeRule.onNodeWithText("Bash(pwd)").assertIsDisplayed()
+        composeRule.onNodeWithText("Awaiting approval").assertDoesNotExist()
+        composeRule.onNodeWithText("Review the requested tool actions before continuing.").assertDoesNotExist()
+        composeRule.onNodeWithText("Reject").assertDoesNotExist()
+        composeRule.onNodeWithText("Approve").assertDoesNotExist()
     }
 
     @Test
@@ -613,6 +637,26 @@ class ProjectedToolTimelineTest {
         runId = "run-state",
     )
 
+    private fun userInputToolMessage(
+        id: String,
+        approvalRequest: UiApprovalRequest,
+    ) = UiMessage(
+        id = id,
+        role = "assistant",
+        content = "",
+        timestamp = "2026-05-09T00:00:00Z",
+        runId = "run-1",
+        approvalRequest = approvalRequest,
+        toolCalls = listOf(
+            UiToolCall(
+                name = "AskUserQuestion",
+                arguments = """{"questions":[{"question":"Continue?","options":[{"label":"Yes"}]}]}""",
+                result = null,
+                toolCallId = "call-a",
+            ),
+        ),
+    )
+
     private fun toolMessage(
         id: String,
         command: String,
@@ -636,13 +680,24 @@ class ProjectedToolTimelineTest {
         ),
     )
 
-    private fun approvalRequest() = UiApprovalRequest(
-        requestId = "approval-1",
+    private fun ordinaryApprovalRequest() = UiApprovalRequest(
+        requestId = "ordinary-approval-1",
         toolCalls = listOf(
             UiApprovalToolCall(
                 toolCallId = "call-a",
                 name = "Bash",
                 arguments = """{"command":"pwd"}""",
+            ),
+        ),
+    )
+
+    private fun approvalRequest() = UiApprovalRequest(
+        requestId = "approval-1",
+        toolCalls = listOf(
+            UiApprovalToolCall(
+                toolCallId = "call-a",
+                name = "AskUserQuestion",
+                arguments = """{"questions":[{"question":"Continue?","options":[{"label":"Yes"}]}]}""",
             ),
             UiApprovalToolCall(
                 toolCallId = "call-b",

@@ -287,7 +287,7 @@ class ToolTimelineProjectionTest {
     }
 
     @Test
-    fun approvalPendingApprovedRunningSuccessLifecycle() {
+    fun userInputApprovalPendingApprovedRunningSuccessLifecycle() {
         val reqMsg = UiMessage(
             id = "msg-appr-1",
             role = "assistant",
@@ -296,11 +296,11 @@ class ToolTimelineProjectionTest {
             approvalRequest = UiApprovalRequest(
                 requestId = "appr-req-1",
                 toolCalls = listOf(
-                    UiApprovalToolCall(toolCallId = "call-appr-1", name = "delete_file", arguments = """{"path":"old.txt"}""")
+                    UiApprovalToolCall(toolCallId = "call-appr-1", name = "AskUserQuestion", arguments = """{"questions":[{"question":"Continue?","options":[{"label":"Yes"}]}]}""")
                 )
             ),
             toolCalls = listOf(
-                UiToolCall(name = "delete_file", arguments = """{"path":"old.txt"}""", result = null, status = null, toolCallId = "call-appr-1")
+                UiToolCall(name = "AskUserQuestion", arguments = """{"questions":[{"question":"Continue?","options":[{"label":"Yes"}]}]}""", result = null, status = null, toolCallId = "call-appr-1")
             )
         )
 
@@ -312,7 +312,7 @@ class ToolTimelineProjectionTest {
         val approvedMsg = reqMsg.copy(
             approvalRequest = null,
             toolCalls = listOf(
-                UiToolCall(name = "delete_file", arguments = """{"path":"old.txt"}""", result = null, status = null, toolCallId = "call-appr-1", approvalDecision = UiToolApprovalDecision.Approved)
+                UiToolCall(name = "AskUserQuestion", arguments = """{"questions":[{"question":"Continue?","options":[{"label":"Yes"}]}]}""", result = null, status = null, toolCallId = "call-appr-1", approvalDecision = UiToolApprovalDecision.Approved)
             )
         )
 
@@ -323,7 +323,7 @@ class ToolTimelineProjectionTest {
 
         val successMsg = approvedMsg.copy(
             toolCalls = listOf(
-                UiToolCall(name = "delete_file", arguments = """{"path":"old.txt"}""", result = "deleted", status = "success", toolCallId = "call-appr-1", approvalDecision = UiToolApprovalDecision.Approved)
+                UiToolCall(name = "AskUserQuestion", arguments = """{"questions":[{"question":"Continue?","options":[{"label":"Yes"}]}]}""", result = "answered", status = "success", toolCallId = "call-appr-1", approvalDecision = UiToolApprovalDecision.Approved)
             )
         )
 
@@ -331,6 +331,33 @@ class ToolTimelineProjectionTest {
         assertNotNull(g3)
         assertEquals(ToolTimelineState.Succeeded, g3.state)
         assertEquals(ToolTimelineState.Succeeded, g3.calls.single().state)
+    }
+
+    @Test
+    fun autoAllowedOrdinaryRequestRunsAndSettlesWithoutAwaitingApproval() {
+        val request = UiApprovalRequest(
+            requestId = "auto-allowed-request",
+            toolCalls = listOf(
+                UiApprovalToolCall(toolCallId = "ordinary-call", name = "Bash", arguments = """{"command":"pwd"}"""),
+            ),
+        )
+        val inFlight = UiToolCall(
+            name = "Bash",
+            arguments = """{"command":"pwd"}""",
+            result = null,
+            status = null,
+            toolCallId = "ordinary-call",
+        )
+
+        assertEquals(ToolTimelineState.Running, classifyToolCallState(inFlight, request))
+        assertEquals(
+            ToolTimelineState.Succeeded,
+            classifyToolCallState(inFlight.copy(result = "/workspace", status = "success"), request),
+        )
+        assertEquals(
+            ToolTimelineState.Failed,
+            classifyToolCallState(inFlight.copy(result = "denied", status = "error"), request),
+        )
     }
 
     @Test
