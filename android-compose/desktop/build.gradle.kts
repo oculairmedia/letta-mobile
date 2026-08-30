@@ -261,7 +261,6 @@ dependencies {
 
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
-    timeout.set(java.time.Duration.ofMinutes(12))
 }
 
 // P4 spike entry point (see avatar/DESIGN-BRIEF.md + docs/design/avatar-system-prd.md):

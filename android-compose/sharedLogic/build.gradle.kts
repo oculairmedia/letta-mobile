@@ -39,7 +39,6 @@ detekt {
 // Those tests dial a real loopback QUIC connection via iroh-ffi, which is flaky
 // in CI runners; they are skipped (via JUnit Assume) unless this is "true".
 tasks.withType<Test>().configureEach {
-    timeout.set(java.time.Duration.ofMinutes(12))
     System.getProperty("runIrohLiveE2E")?.let { systemProperty("runIrohLiveE2E", it) }
 }
 
