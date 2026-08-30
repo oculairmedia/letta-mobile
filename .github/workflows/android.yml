@@ -23,6 +23,8 @@ on:
       # that would otherwise never report test/build-apk-pass/
       # shared-multiplatform. perf-gate needs no entry — android-perf.yml has no
       # pull_request paths filter and always runs.
+      # qodana.yaml lives at the repo root, not under android-compose/. A
+      # Qodana-exclude-only PR would otherwise skip these required jobs forever.
       - ".github/workflows/**"
       - "android-compose/**"
       - "third_party/overmorrow/**"
@@ -32,6 +34,7 @@ on:
       - "scripts/mcp/**"
       - "scripts/scip/**"
       - "tools/**"
+      - "qodana.yaml"
   workflow_dispatch:
 
 concurrency:
