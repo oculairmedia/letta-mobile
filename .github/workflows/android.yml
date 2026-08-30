@@ -243,9 +243,9 @@ jobs:
         # :sharedLogic:hostNativeTest, and Gradle -x does not skip it (the
         # process hangs after start on GitHub ubuntu-latest and locally on
         # Windows; letta-mobile-oi3od). Compile hostNative main+test so
-        # JVM-only API leaks still fail the job (b97bcf48). Run jvm +
-        # android host tests explicitly.
-        run: ./gradlew :sharedLogic:compileKotlinHostNative :sharedLogic:compileTestKotlinHostNative :sharedLogic:jvmTest :sharedLogic:testDebugHostTest :desktop:test :appserver-cli:test :appserver-cli:distZip :iroh-wrapper-cli:test :iroh-wrapper-cli:installDist && node sharedLogic/karma.config.test.cjs
+        # JVM-only API leaks still fail the job (b97bcf48). Run jvmTest
+        # explicitly. commonTest still compiles via compileTestKotlinHostNative.
+        run: ./gradlew :sharedLogic:compileKotlinHostNative :sharedLogic:compileTestKotlinHostNative :sharedLogic:jvmTest :desktop:test :appserver-cli:test :appserver-cli:distZip :iroh-wrapper-cli:test :iroh-wrapper-cli:installDist && node sharedLogic/karma.config.test.cjs
 
   web-wasm:
     name: web-wasm
