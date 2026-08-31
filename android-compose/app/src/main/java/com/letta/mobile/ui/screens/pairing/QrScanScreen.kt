@@ -184,7 +184,8 @@ private fun CameraPreview(onDecoded: (String) -> Unit) {
 
 @Composable
 private fun ScanStatusOverlay(uiState: ScanUiState, onScanAgain: () -> Unit) {
-    if (uiState.status == ScanStatus.SCANNING) return
+    val status = uiState.status
+    if (status == ScanStatus.SCANNING) return
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -201,7 +202,7 @@ private fun ScanStatusOverlay(uiState: ScanUiState, onScanAgain: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            when (uiState.status) {
+            when (status) {
                 ScanStatus.VALID -> Text(
                     text = "Pairing code recognized. Connecting…",
                     color = MaterialTheme.colorScheme.onSurface,
@@ -217,7 +218,6 @@ private fun ScanStatusOverlay(uiState: ScanUiState, onScanAgain: () -> Unit) {
                         Text(stringResource(R.string.pairing_scan_again))
                     }
                 }
-                ScanStatus.SCANNING -> Unit
             }
         }
     }
