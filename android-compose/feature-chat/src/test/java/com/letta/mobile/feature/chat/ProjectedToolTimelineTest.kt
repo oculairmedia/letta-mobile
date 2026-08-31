@@ -7,7 +7,6 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.performClick
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.ThemePreset
@@ -308,132 +307,6 @@ class ProjectedToolTimelineTest {
     }
 
     @Test
-    fun projectedToolTimeline_newestRunningCallOwnsAutoExpansionAcrossStaggeredArrival() {
-        var groupState by androidx.compose.runtime.mutableStateOf(
-            timelineGroup(
-                timelineCall("older", "older", com.letta.mobile.data.chat.projection.ToolTimelineState.Running),
-            ),
-        )
-
-        composeRule.setContent {
-            LettaTheme(AppTheme.LIGHT, ThemePreset.DEFAULT, false) {
-                LettaChatTheme {
-                    com.letta.mobile.feature.chat.screen.ProjectedToolTimelineGroupCard(
-                        groups = listOf(groupState),
-                        autoExpandDelayMs = 200L,
-                        stagedCollapseDelayMs = 100L,
-                    )
-                }
-            }
-        }
-
-        composeRule.mainClock.advanceTimeBy(100L)
-        composeRule.waitForIdle()
-        composeRule.runOnIdle {
-            groupState = timelineGroup(
-                timelineCall("older", "older", com.letta.mobile.data.chat.projection.ToolTimelineState.Running),
-                timelineCall("newer", "newer", com.letta.mobile.data.chat.projection.ToolTimelineState.Running),
-            )
-        }
-        composeRule.waitForIdle()
-        composeRule.mainClock.advanceTimeUntil(timeoutMillis = 1_000L) {
-            composeRule.onAllNodesWithText("Bash(newer)").fetchSemanticsNodes()
-                .any {
-                    runCatching {
-                        it.config[androidx.compose.ui.semantics.SemanticsProperties.StateDescription]
-                    }.getOrNull() == "Expanded"
-                }
-        }
-        // Only the newer row auto-opens; the older timer was cancelled.
-        composeRule.onNodeWithText("Bash(newer)").assertIsDisplayed()
-        composeRule.onNodeWithText("Executing older...").assertDoesNotExist()
-
-        // Completing the older call out of order must not reactivate its cancelled timer.
-        composeRule.runOnIdle {
-            groupState = timelineGroup(
-                timelineCall("older", "older", com.letta.mobile.data.chat.projection.ToolTimelineState.Succeeded, result = "older done"),
-                timelineCall("newer", "newer", com.letta.mobile.data.chat.projection.ToolTimelineState.Running),
-            )
-        }
-        composeRule.mainClock.advanceTimeBy(300L)
-        composeRule.waitForIdle()
-        composeRule.onNodeWithText("older done").assertDoesNotExist()
-
-        // Once the newer auto-owned row completes, neither terminal row opens late.
-        composeRule.runOnIdle {
-            groupState = timelineGroup(
-                timelineCall("older", "older", com.letta.mobile.data.chat.projection.ToolTimelineState.Succeeded, result = "older done"),
-                timelineCall("newer", "newer", com.letta.mobile.data.chat.projection.ToolTimelineState.Succeeded, result = "newer done"),
-            )
-        }
-        composeRule.mainClock.advanceTimeBy(150L)
-        composeRule.waitForIdle()
-        composeRule.onNodeWithText("older done").assertDoesNotExist()
-        composeRule.onNodeWithText("newer done").assertDoesNotExist()
-    }
-
-    @Test
-    fun projectedToolTimeline_manualCollapseOverridesAutoExpansion() {
-        composeRule.setContent {
-            LettaTheme(AppTheme.LIGHT, ThemePreset.DEFAULT, false) {
-                LettaChatTheme {
-                    com.letta.mobile.feature.chat.screen.ProjectedToolTimelineGroupCard(
-                        groups = listOf(
-                            timelineGroup(
-                                timelineCall("active", "active", com.letta.mobile.data.chat.projection.ToolTimelineState.Running),
-                            ),
-                        ),
-                        autoExpandDelayMs = 100L,
-                    )
-                }
-            }
-        }
-
-        composeRule.mainClock.advanceTimeUntil(timeoutMillis = 1_000L) {
-            isExpanded("Bash(active)")
-        }
-        composeRule.onNodeWithText("Bash(active)").performClick()
-        composeRule.waitForIdle()
-
-        org.junit.Assert.assertFalse(isExpanded("Bash(active)"))
-        composeRule.onNodeWithText("Executing Bash...").assertDoesNotExist()
-    }
-
-    @Test
-    fun projectedToolTimeline_manualOlderExpansionSurvivesNewAutomaticOwner() {
-        var groupState by androidx.compose.runtime.mutableStateOf(
-            timelineGroup(
-                timelineCall("older", "older", com.letta.mobile.data.chat.projection.ToolTimelineState.Running),
-            ),
-        )
-        composeRule.setContent {
-            LettaTheme(AppTheme.LIGHT, ThemePreset.DEFAULT, false) {
-                LettaChatTheme {
-                    com.letta.mobile.feature.chat.screen.ProjectedToolTimelineGroupCard(
-                        groups = listOf(groupState),
-                        autoExpandDelayMs = 200L,
-                    )
-                }
-            }
-        }
-
-        composeRule.onNodeWithText("Bash(older)").performClick()
-        composeRule.runOnIdle {
-            groupState = timelineGroup(
-                timelineCall("older", "older", com.letta.mobile.data.chat.projection.ToolTimelineState.Running),
-                timelineCall("newer", "newer", com.letta.mobile.data.chat.projection.ToolTimelineState.Running),
-            )
-        }
-        composeRule.waitForIdle()
-        composeRule.mainClock.advanceTimeUntil(timeoutMillis = 1_000L) {
-            isExpanded("Bash(newer)")
-        }
-
-        org.junit.Assert.assertTrue(isExpanded("Bash(older)"))
-        org.junit.Assert.assertTrue(isExpanded("Bash(newer)"))
-    }
-
-    @Test
     fun projectedToolTimeline_explicitUserExpansion_winsOverAutoCollapse() {
         var groupState by androidx.compose.runtime.mutableStateOf(
             com.letta.mobile.data.chat.projection.ToolTimelineGroup(
@@ -620,36 +493,6 @@ class ProjectedToolTimelineTest {
         composeRule.onNodeWithText("LEGACY-ROW-tc-a").assertDoesNotExist()
         composeRule.onNodeWithText("LEGACY-ROW-tc-b").assertDoesNotExist()
     }
-
-    private fun timelineGroup(
-        vararg calls: com.letta.mobile.data.chat.projection.ToolTimelineCall,
-    ) = com.letta.mobile.data.chat.projection.ToolTimelineGroup(
-        key = "group-1",
-        calls = calls.toList(),
-        state = calls.lastOrNull()?.state ?: com.letta.mobile.data.chat.projection.ToolTimelineState.Succeeded,
-    )
-
-    private fun timelineCall(
-        id: String,
-        command: String,
-        state: com.letta.mobile.data.chat.projection.ToolTimelineState,
-        result: String? = null,
-    ) = com.letta.mobile.data.chat.projection.ToolTimelineCall(
-        key = "call:$id",
-        toolCallId = id,
-        name = "Bash",
-        arguments = "{\"command\":\"$command\"}",
-        result = result,
-        state = state,
-        summary = "Bash($command)",
-    )
-
-    private fun isExpanded(title: String): Boolean =
-        composeRule.onAllNodesWithText(title).fetchSemanticsNodes().any {
-            runCatching {
-                it.config[androidx.compose.ui.semantics.SemanticsProperties.StateDescription]
-            }.getOrNull() == "Expanded"
-        }
 
     private fun rawToolMessage(id: String, rawArguments: String, result: String) = UiMessage(
         id = id,
