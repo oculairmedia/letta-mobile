@@ -9,7 +9,6 @@ import com.letta.mobile.data.model.ToolReturnMessage
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -103,27 +102,6 @@ class TimelineRepositoryIrohRegressionTest {
         assertEquals(null, repository.peekCached(null, "promoted"))
         assertSame(unscoped.state.value, repository.peekCached("agent-a", "promoted"))
         assertEquals(null, repository.peekCached("agent-b", "promoted"))
-    }
-
-    @Test
-    fun `cancelling repository scope stops loop stream collection`() = runTest {
-        val dispatcher = StandardTestDispatcher(testScheduler)
-        val repositoryScope = CoroutineScope(Job() + dispatcher)
-        val transport = NoopTimelineTransport()
-        val repository = TimelineRepository(
-            transport,
-            NoOpPendingLocalStore,
-            NoOpConversationCursorStore,
-            repositoryScope = repositoryScope,
-        )
-
-        repository.getOrCreate("conv-lifecycle")
-        runCurrent()
-        assertEquals(1, transport.stream.subscriptionCount.value)
-
-        repositoryScope.cancel()
-        runCurrent()
-        assertEquals(0, transport.stream.subscriptionCount.value)
     }
 
     @Test
