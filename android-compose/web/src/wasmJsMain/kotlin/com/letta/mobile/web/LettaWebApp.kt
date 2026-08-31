@@ -30,7 +30,6 @@ import com.letta.mobile.web.data.replaceOptimisticTurn
 import com.letta.mobile.web.data.upsertWebChatEntry
 import com.letta.mobile.web.fs.WebWorkspaceController
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 internal enum class WebNavDestination { CHAT, SETTINGS }
 @Composable
