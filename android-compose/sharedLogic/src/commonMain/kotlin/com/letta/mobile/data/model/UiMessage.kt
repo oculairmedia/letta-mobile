@@ -41,6 +41,18 @@ data class UiMessage(
      */
     val isError: Boolean = false,
     /**
+     * letta-mobile-jt4wq: this LOCAL message could not be handed to the
+     * transport (delivery state FAILED). It is NOT [isError].
+     *
+     * These were previously folded together, which meant a user's own prompt
+     * was re-rendered as a left-aligned destructive "Error" bubble containing
+     * their own words — the message looked like a server failure report rather
+     * than something they said. The two states need different treatment: a
+     * send failure is local, retryable, and belongs to the user's own bubble;
+     * an error frame is the server telling us the run went wrong.
+     */
+    val isSendFailed: Boolean = false,
+    /**
      * Best-effort elapsed time from the triggering user prompt to this
      * assistant-side message. Populated at render time when server timestamps
      * are available; null means latency should be hidden.

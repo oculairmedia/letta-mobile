@@ -202,8 +202,14 @@ fun timelineEventToUiMessage(ev: TimelineEvent, ownAgentId: String? = null): UiM
                 clientMessageId = ev.otid,
                 isPending = ev.deliveryState == DeliveryState.SENDING,
                 isReasoning = ev.messageType == TimelineMessageType.REASONING,
-                isError = ev.messageType == TimelineMessageType.ERROR ||
-                    ev.deliveryState == DeliveryState.FAILED,
+                // letta-mobile-jt4wq: a FAILED delivery is not a server error
+                // frame. Folding it into isError made the user's own prompt
+                // render as a destructive "Error" bubble quoting their own
+                // words back at them — see UiMessage.isSendFailed. The
+                // confirmed-event branch below has always drawn this line
+                // correctly; only the optimistic/local branch conflated them.
+                isError = ev.messageType == TimelineMessageType.ERROR,
+                isSendFailed = ev.deliveryState == DeliveryState.FAILED,
                 toolCalls = uiToolCalls,
                 approvalRequest = uiApproval,
                 approvalResponse = null,
