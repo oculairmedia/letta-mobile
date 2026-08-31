@@ -10,7 +10,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 /**
@@ -293,8 +292,16 @@ internal object DanglingToolCallSynthesizer {
         obj["delta"]?.jsonObject ?: obj
     }.getOrNull()
 
-    fun messageType(delta: JsonObject): String? =
-        delta["message_type"]?.jsonPrimitive?.contentOrNull
+    /**
+     * letta-mobile-fkpd4: FAIL-SOFT wire read. `.jsonPrimitive` THROWS on a
+     * JsonArray/JsonObject, and these helpers run over RAW frames on the
+     * fanout path where `id`, `status` and `content` can legitimately arrive
+     * non-scalar. A throw here does not degrade one field — it escapes the turn
+     * collect loop and settles the whole parent turn as a stream error.
+     */
+    private fun JsonObject.str(key: String): String? = (this[key] as? JsonPrimitive)?.contentOrNull
+
+    fun messageType(delta: JsonObject): String? = delta.str("message_type")
 
     /** tool_call ids opened by a tool_call/approval_request delta. */
     fun toolCallIds(delta: JsonObject): List<String> {
@@ -303,24 +310,20 @@ internal object DanglingToolCallSynthesizer {
         }.orEmpty()
         if (explicit.isNotEmpty()) return explicit
         (delta["tool_call"] as? JsonObject)?.toolCallId()?.let { return listOf(it) }
-        return listOfNotNull(
-            delta["tool_call_id"]?.jsonPrimitive?.contentOrNull
-                ?: delta["id"]?.jsonPrimitive?.contentOrNull,
-        )
+        return listOfNotNull(delta.str("tool_call_id") ?: delta.str("id"))
     }
 
     /** tool_call ids closed by a tool_return delta. */
     fun toolReturnCallIds(delta: JsonObject): List<String> {
-        val direct = delta["tool_call_id"]?.jsonPrimitive?.contentOrNull
-        val nested = (delta["tool_return"] as? JsonObject)
-            ?.get("tool_call_id")?.jsonPrimitive?.contentOrNull
+        val direct = delta.str("tool_call_id")
+        val nested = (delta["tool_return"] as? JsonObject)?.str("tool_call_id")
         return listOfNotNull(direct ?: nested)
     }
 
     private fun JsonObject.toolCallId(): String? =
-        this["tool_call_id"]?.jsonPrimitive?.contentOrNull
-            ?: this["id"]?.jsonPrimitive?.contentOrNull
-            ?: (this["function"] as? JsonObject)?.get("tool_call_id")?.jsonPrimitive?.contentOrNull
+        str("tool_call_id")
+            ?: str("id")
+            ?: (this["function"] as? JsonObject)?.str("tool_call_id")
 
     /**
      * Delta for a synthetic terminal tool_return closing an open tool_call after

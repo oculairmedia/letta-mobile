@@ -203,7 +203,14 @@ class WsActiveSubagentSource(
             java.time.Instant.parse(iso).toEpochMilli()
         }.getOrNull()
 
-        internal fun String.toActiveSubagentStatus(): ActiveSubagent.Status = when (this) {
+        /**
+         * letta-mobile-al6q5: canonicalize through the SHARED vocabulary before
+         * mapping. This used to match the four [SubagentStatus] constants
+         * literally, so the App Server's real terminal value `success` matched
+         * nothing and fell through to the forward-compat `else` below — a
+         * subagent that had SUCCEEDED rendered as perpetually RUNNING.
+         */
+        internal fun String.toActiveSubagentStatus(): ActiveSubagent.Status = when (SubagentStatus.normalize(this) ?: this) {
             SubagentStatus.RUNNING -> ActiveSubagent.Status.RUNNING
             SubagentStatus.COMPLETED -> ActiveSubagent.Status.COMPLETED
             SubagentStatus.FAILED -> ActiveSubagent.Status.FAILED

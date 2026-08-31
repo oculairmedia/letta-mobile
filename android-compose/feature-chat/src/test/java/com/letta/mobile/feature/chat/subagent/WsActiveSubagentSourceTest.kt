@@ -91,6 +91,31 @@ class WsActiveSubagentSourceTest {
         assertEquals(ActiveSubagent.Status.RUNNING, "some_future_state".toActiveSubagentStatus())
     }
 
+    /**
+     * letta-mobile-al6q5: the App Server's real terminal value for a SUCCESSFUL
+     * subagent is `success`, not `completed`. It used to match none of the four
+     * canonical constants above and fell through the forward-compat branch, so
+     * a finished subagent rendered as perpetually RUNNING — the stuck-chip bug.
+     */
+    @Test
+    fun `wire success aliases map to a terminal COMPLETED chip`() {
+        listOf("success", "succeeded", "complete", "done", "SUCCESS", " success ").forEach { wire ->
+            assertEquals(ActiveSubagent.Status.COMPLETED, wire.toActiveSubagentStatus(), wire)
+            assertTrue(wire.toActiveSubagentStatus().isTerminal, wire)
+        }
+    }
+
+    @Test
+    fun `wire failure and cancellation aliases stay terminal`() {
+        listOf("error", "errored", "failed").forEach { wire ->
+            assertEquals(ActiveSubagent.Status.FAILED, wire.toActiveSubagentStatus(), wire)
+        }
+        listOf("canceled", "killed", "stopped", "evicted").forEach { wire ->
+            assertEquals(ActiveSubagent.Status.FAILED, wire.toActiveSubagentStatus(), wire)
+            assertTrue(wire.toActiveSubagentStatus().isTerminal, wire)
+        }
+    }
+
     @Test
     fun `id prefers toolCallId then falls back to taskId`() {
         assertEquals("toolu_1", entry(ToolCallRef("toolu_1")).toActiveSubagent().id)

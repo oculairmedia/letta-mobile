@@ -14,9 +14,9 @@ import com.letta.mobile.runtime.ToolExecutionStatus
 import com.letta.mobile.runtime.ToolName
 import com.letta.mobile.runtime.TurnCommand
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 class AppServerRuntimeEventMapper {
     fun map(command: TurnCommand, received: AppServerReceivedFrame): List<RuntimeEventDraft> =
@@ -251,7 +251,20 @@ class AppServerRuntimeEventMapper {
             payload = payload,
         )
 
-    private fun JsonObject.string(key: String): String? = this[key]?.jsonPrimitive?.contentOrNull
+    /**
+     * letta-mobile-fkpd4: FAIL-SOFT wire read — see the sibling accessor in
+     * [com.letta.mobile.data.subagents.SubagentParentProjection]. `.jsonPrimitive`
+     * THROWS on a JsonArray/JsonObject, and this mapper runs inside
+     * [AppServerTurnEngine]'s turn collect loop over RAW App Server deltas,
+     * where `content`, `status`, `output` and `message` can all legitimately
+     * arrive non-scalar. A throw here does not degrade one field — it kills the
+     * whole turn and settles it as "Tool execution interrupted by stream
+     * error". Never throw on a wire read.
+     */
+    private fun JsonObject.string(key: String): String? =
+        (this[key] as? JsonPrimitive)?.contentOrNull
+
+    private fun JsonObject.objectOrNull(key: String): JsonObject? = this[key] as? JsonObject
 
     private fun JsonObject.isTerminalStopReason(): Boolean {
         val reason = string("stop_reason") ?: string("reason") ?: return true
@@ -265,7 +278,7 @@ class AppServerRuntimeEventMapper {
 
     private fun JsonObject.errorMessage(fallback: String = "App Server turn failed"): String =
         string("message")
-            ?: this["api_error"]?.jsonObject?.string("message")
-            ?: this["api_error"]?.jsonObject?.string("detail")
+            ?: objectOrNull("api_error")?.string("message")
+            ?: objectOrNull("api_error")?.string("detail")
             ?: fallback
 }
