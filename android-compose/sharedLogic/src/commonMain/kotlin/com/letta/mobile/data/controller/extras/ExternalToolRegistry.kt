@@ -5,6 +5,7 @@ import com.letta.mobile.data.controller.reconnect.ExternalToolRegistrar
 import com.letta.mobile.data.transport.appserver.AppServerExternalToolDefinition
 import com.letta.mobile.data.transport.appserver.AppServerExternalToolsGroup
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -118,6 +119,8 @@ class ExternalToolRegistry(
 
         return try {
             tool.invoke(input, agentId)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             ExternalToolResult.Error("Tool invocation failed: ${e.message}")
         }
