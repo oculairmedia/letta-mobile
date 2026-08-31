@@ -1,6 +1,7 @@
 package com.letta.mobile.data.session
 
 import android.content.Context
+import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.timeline.ConversationCursorStore
@@ -28,6 +29,7 @@ class SessionChannelTransportFactory @Inject constructor(
     @ApplicationContext private val appContext: Context,
     private val runCursorStore: RunCursorStore,
     private val conversationCursorStore: ConversationCursorStore,
+    private val externalToolRegistry: ExternalToolRegistry? = null,
 ) {
     fun create(
         scope: CoroutineScope,
@@ -54,6 +56,7 @@ class SessionChannelTransportFactory @Inject constructor(
                     secretKeyStore = com.letta.mobile.data.controller.node.iroh.FileIrohSecretKeyStore(
                         java.io.File(appContext.filesDir, "iroh-client-identity.key").path,
                     ),
+                    externalToolRegistry = externalToolRegistry,
                     activeConfigProvider = {
                         settingsRepository?.activeConfig?.value?.let { config ->
                             IrohConnectConfig(

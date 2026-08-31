@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
 import com.letta.mobile.data.controller.node.iroh.EphemeralIrohSecretKeyStore
 import com.letta.mobile.data.controller.node.iroh.IrohSecretKeyStore
@@ -26,6 +27,7 @@ internal class IrohDialer(
     private val secretKeyStore: IrohSecretKeyStore = EphemeralIrohSecretKeyStore(),
     private val onConnectionLost: (reason: String, handle: IrohConnectionHandle?) -> Unit,
     private val onCloseResources: (reason: String) -> Unit = {},
+    private val externalToolRegistry: ExternalToolRegistry? = null,
     private val bindEndpoint: suspend (ByteArray) -> Endpoint = { secretKey ->
         Endpoint.bind(EndpointOptions(relayMode = RelayMode.defaultMode(), secretKey = secretKey))
     },
@@ -152,6 +154,7 @@ internal class IrohDialer(
             permissionMode = AppServerPermissionMode.Unrestricted,
             turnContextPreflight = TurnContextPreflight.None,
             eventRouter = eventRouter,
+            externalToolRegistry = externalToolRegistry,
         )
         return engine to eventRouter
     }

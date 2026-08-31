@@ -64,6 +64,12 @@ interface ExternalTool {
 }
 
 /**
+ * Host-owned external tool that is available because of the client device, not
+ * because the remote App Server advertised an extension capability.
+ */
+interface HostExternalTool : ExternalTool
+
+/**
  * Result of an external tool invocation.
  */
 sealed interface ExternalToolResult {

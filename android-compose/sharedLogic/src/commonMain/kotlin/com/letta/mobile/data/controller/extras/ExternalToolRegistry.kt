@@ -47,7 +47,7 @@ class ExternalToolRegistry(
      * Tools that are advertised (i.e., their capability is enabled).
      */
     private val advertisedTools: List<ExternalTool> by lazy {
-        tools.filter { capabilities.has(it.capability) }
+        tools.filter { it is HostExternalTool || capabilities.has(it.capability) }
     }
 
     /**
@@ -164,6 +164,7 @@ class ExternalToolRegistry(
             capabilities: RemoteCapabilities,
             customIrohMessagingTool: CustomIrohMessagingTool? = null,
             agentDiscoveryTool: AgentDiscoveryTool? = null,
+            hostTools: List<HostExternalTool> = emptyList(),
         ): ExternalToolRegistry {
             val baseTools = listOf(
                 ImageHydrationTool(),
@@ -182,6 +183,7 @@ class ExternalToolRegistry(
                 addAll(baseTools)
                 if (customIrohMessagingTool != null) add(customIrohMessagingTool)
                 if (agentDiscoveryTool != null) add(agentDiscoveryTool)
+                addAll(hostTools)
             }
             return ExternalToolRegistry(
                 tools = toolsWithIroh,
@@ -228,6 +230,10 @@ class ExternalToolRegistry(
         fun factoryDefault(): ExternalToolRegistry {
             return standard(RemoteCapabilities.FACTORY_DEFAULT)
         }
+
+        /** Creates a baseline-safe registry containing only tools supplied by this host. */
+        fun hostTools(tools: List<HostExternalTool>): ExternalToolRegistry =
+            standard(RemoteCapabilities.FACTORY_DEFAULT, hostTools = tools)
 
         /**
          * JSON-Schema for a tool that takes no arguments. `parameters` is a

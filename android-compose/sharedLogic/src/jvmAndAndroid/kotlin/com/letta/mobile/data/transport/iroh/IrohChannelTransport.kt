@@ -1,6 +1,7 @@
 package com.letta.mobile.data.transport.iroh
 
 import com.letta.mobile.data.a2ui.A2uiAction
+import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.repository.subagent.ParentContext
 import com.letta.mobile.data.repository.subagent.SubagentCorrelator
 import com.letta.mobile.data.subagents.SubagentParentProjection
@@ -77,6 +78,7 @@ class IrohChannelTransport(
     // — a prerequisite for server-side pairing (a churning NodeId can never
     // bind to a paired peer).
     private val secretKeyStore: IrohSecretKeyStore = EphemeralIrohSecretKeyStore(),
+    private val externalToolRegistry: ExternalToolRegistry? = null,
     private val testDialer: (suspend (IrohConnectConfig) -> IrohConnectionHandle)? = null,
     // Bounded window (ms) to await the server's own terminal after an abort
     // before synthesizing a cancelled terminal. Overridable so tests need not
@@ -197,6 +199,7 @@ class IrohChannelTransport(
         secretKeyStore = secretKeyStore,
         onConnectionLost = { reason, handle -> supervisor.onConnectionLostAsync(reason, handle) },
         onCloseResources = ::handleCloseResources,
+        externalToolRegistry = externalToolRegistry,
     )
 
     // Explicit type: this field and `livenessProbe` reference each other through
