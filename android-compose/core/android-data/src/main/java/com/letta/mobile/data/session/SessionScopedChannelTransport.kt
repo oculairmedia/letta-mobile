@@ -300,7 +300,7 @@ class SessionScopedChannelTransport internal constructor(
     override val hasAnyActiveChatTurn: Boolean
         get() = current.hasAnyActiveChatTurn
 
-    override suspend fun connect(baseShimUrl: String, token: String, deviceId: String, clientVersion: String) =
+    override suspend fun connect(baseShimUrl: String, token: String, deviceId: String, clientVersion: String): Unit =
         sessionManager.withCurrentSession { it.channelTransport.connect(baseShimUrl, token, deviceId, clientVersion) }
 
     override fun send(
@@ -317,7 +317,7 @@ class SessionScopedChannelTransport internal constructor(
     override fun subscribe(runId: String, cursor: Long): Boolean = current.subscribe(runId, cursor)
     override suspend fun adminRpc(method: String, path: String, body: String?): com.letta.mobile.data.transport.appserver.AppServerInboundFrame.AdminRpcResponse =
         sessionManager.withCurrentSession { it.channelTransport.adminRpc(method, path, body) }
-    override suspend fun disconnect() = sessionManager.withCurrentSession { it.channelTransport.disconnect() }
+    override suspend fun disconnect(): Unit = sessionManager.withCurrentSession { it.channelTransport.disconnect() }
     override fun sendA2uiAction(action: A2uiAction): A2uiActionDispatchResult = current.sendA2uiAction(action)
 
     override suspend fun sendCronList(

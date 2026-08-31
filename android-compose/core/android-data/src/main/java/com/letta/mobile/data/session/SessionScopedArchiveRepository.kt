@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 
+// The singleton repository owns this scope and cancels it explicitly in close().
+@Suppress("NoDetachedCoroutineLifecycle")
 internal fun defaultSessionScopedArchiveRepositoryScope(): CoroutineScope =
     CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -44,7 +46,7 @@ class SessionScopedArchiveRepository internal constructor(
             .launchIn(proxyScope)
     }
 
-    override suspend fun refreshArchives(name: String?, agentId: String?) =
+    override suspend fun refreshArchives(name: String?, agentId: String?): Unit =
         sessionManager.withCurrentSession { it.archiveRepository.refreshArchives(name, agentId) }
 
     override suspend fun getArchive(archiveId: String): Archive =
@@ -62,7 +64,7 @@ class SessionScopedArchiveRepository internal constructor(
     override suspend fun listAgentsForArchive(archiveId: String): List<Agent> =
         sessionManager.withCurrentSession { it.archiveRepository.listAgentsForArchive(archiveId) }
 
-    override suspend fun deletePassageFromArchive(archiveId: String, passageId: String) =
+    override suspend fun deletePassageFromArchive(archiveId: String, passageId: String): Unit =
         sessionManager.withCurrentSession { it.archiveRepository.deletePassageFromArchive(archiveId, passageId) }
 
     fun close() { proxyScope.cancel() }

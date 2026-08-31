@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 
+// The singleton repository owns this scope and cancels it explicitly in close().
+@Suppress("NoDetachedCoroutineLifecycle")
 internal fun defaultSessionScopedPassageRepositoryScope(): CoroutineScope =
     CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -60,7 +62,7 @@ class SessionScopedPassageRepository internal constructor(
         flow.asStateFlow()
     }
 
-    override suspend fun refreshPassages(agentId: String) = sessionManager.withCurrentSession { it.passageRepository.refreshPassages(agentId) }
+    override suspend fun refreshPassages(agentId: String): Unit = sessionManager.withCurrentSession { it.passageRepository.refreshPassages(agentId) }
 
     override suspend fun clearForBackendSwitch() {
         clearTrackedFlows()
@@ -69,7 +71,7 @@ class SessionScopedPassageRepository internal constructor(
 
     override suspend fun createPassage(agentId: String, text: String): Passage = sessionManager.withCurrentSession { it.passageRepository.createPassage(agentId, text) }
 
-    override suspend fun deletePassage(agentId: String, passageId: String) =
+    override suspend fun deletePassage(agentId: String, passageId: String): Unit =
         sessionManager.withCurrentSession { it.passageRepository.deletePassage(agentId, passageId) }
 
     override suspend fun searchArchival(agentId: String, query: String): List<Passage> =

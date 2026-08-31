@@ -196,7 +196,7 @@ open class IrohAdminRpcProjectSource(
         )
     }
 
-    override suspend fun deleteProject(identifier: String) = deleteProject(ProjectId(identifier))
+    override suspend fun deleteProject(identifier: String): Unit = deleteProject(ProjectId(identifier))
 
     suspend fun deleteProject(projectId: ProjectId) {
         val project = ProjectRpcRef(projectId)
@@ -296,20 +296,20 @@ private data class ProjectMutationRpcParams(
 )
 
 private object ProjectRpcMethods {
-    val List = AdminRpcMethod("project.list")
-    val Get = AdminRpcMethod("project.get")
-    val BeadsRemoteStatus = AdminRpcMethod("project.beadsRemoteStatus")
-    val ProvisionBeadsRemote = AdminRpcMethod("project.provisionBeadsRemote")
-    val TriggerSync = AdminRpcMethod("project.triggerSync")
-    val Create = AdminRpcMethod("project.create")
-    val Update = AdminRpcMethod("project.update")
-    val Archive = AdminRpcMethod("project.archive")
-    val Delete = AdminRpcMethod("project.delete")
+    val List: AdminRpcMethod = AdminRpcMethod("project.list")
+    val Get: AdminRpcMethod = AdminRpcMethod("project.get")
+    val BeadsRemoteStatus: AdminRpcMethod = AdminRpcMethod("project.beadsRemoteStatus")
+    val ProvisionBeadsRemote: AdminRpcMethod = AdminRpcMethod("project.provisionBeadsRemote")
+    val TriggerSync: AdminRpcMethod = AdminRpcMethod("project.triggerSync")
+    val Create: AdminRpcMethod = AdminRpcMethod("project.create")
+    val Update: AdminRpcMethod = AdminRpcMethod("project.update")
+    val Archive: AdminRpcMethod = AdminRpcMethod("project.archive")
+    val Delete: AdminRpcMethod = AdminRpcMethod("project.delete")
 }
 
 private object ProjectRpcPaths {
-    val SyncTrigger = AdminRpcPath("/api/sync/trigger")
-    val RegistryProjects = AdminRpcPath("/api/registry/projects")
+    val SyncTrigger: AdminRpcPath = AdminRpcPath("/api/sync/trigger")
+    val RegistryProjects: AdminRpcPath = AdminRpcPath("/api/registry/projects")
     val BeadsRemoteSuffix = ProjectPathSuffix("/beads-remote")
     val BeadsRemoteProvisionSuffix = ProjectPathSuffix("/beads-remote/provision")
 

@@ -22,6 +22,8 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 
+// The singleton repository owns this scope and cancels it explicitly in close().
+@Suppress("NoDetachedCoroutineLifecycle")
 internal fun defaultSessionScopedToolRepositoryScope(): CoroutineScope =
     CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -79,14 +81,14 @@ class SessionScopedToolRepository internal constructor(
 
     override suspend fun countTools(): Int = sessionManager.withCurrentSession { it.toolRepository.countTools() }
 
-    override suspend fun refreshTools() = sessionManager.withCurrentSession { it.toolRepository.refreshTools() }
+    override suspend fun refreshTools(): Unit = sessionManager.withCurrentSession { it.toolRepository.refreshTools() }
     override suspend fun refreshToolsIfStale(maxAgeMs: Long): Boolean = sessionManager.withCurrentSession { it.toolRepository.refreshToolsIfStale(maxAgeMs) }
     override suspend fun fetchToolsPage(limit: Int, offset: Int): List<Tool> = sessionManager.withCurrentSession { it.toolRepository.fetchToolsPage(limit, offset) }
-    override suspend fun attachTool(agentId: AgentId, toolId: ToolId) = sessionManager.withCurrentSession { it.toolRepository.attachTool(agentId, toolId) }
-    override suspend fun detachTool(agentId: AgentId, toolId: ToolId) = sessionManager.withCurrentSession { it.toolRepository.detachTool(agentId, toolId) }
+    override suspend fun attachTool(agentId: AgentId, toolId: ToolId): Unit = sessionManager.withCurrentSession { it.toolRepository.attachTool(agentId, toolId) }
+    override suspend fun detachTool(agentId: AgentId, toolId: ToolId): Unit = sessionManager.withCurrentSession { it.toolRepository.detachTool(agentId, toolId) }
     override suspend fun upsertTool(params: ToolCreateParams): Tool = sessionManager.withCurrentSession { it.toolRepository.upsertTool(params) }
     override suspend fun updateTool(toolId: ToolId, params: ToolUpdateParams): Tool = sessionManager.withCurrentSession { it.toolRepository.updateTool(toolId, params) }
-    override suspend fun deleteTool(toolId: ToolId) = sessionManager.withCurrentSession { it.toolRepository.deleteTool(toolId) }
+    override suspend fun deleteTool(toolId: ToolId): Unit = sessionManager.withCurrentSession { it.toolRepository.deleteTool(toolId) }
 
     fun close() { proxyScope.cancel() }
 }

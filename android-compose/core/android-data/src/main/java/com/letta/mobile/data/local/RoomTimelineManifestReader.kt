@@ -1,5 +1,6 @@
 package com.letta.mobile.data.local
 
+import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineReadResult
 import com.letta.mobile.data.timeline.snapshot.SnapshotReadFailure
 import com.letta.mobile.data.timeline.snapshot.StoredTimelineEnvelope
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
@@ -68,8 +69,8 @@ internal data class RoomSnapshotReadRequest(
     fun activeManifest(manifestId: String) = manifest(manifestId, RoomRevisionPolicy.EXACT)
     fun fallbackManifest(manifestId: String) = manifest(manifestId, RoomRevisionPolicy.AT_OR_BELOW)
 
-    fun reconciliation(failure: SnapshotReadFailure) =
-        com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineReadResult.ReconciliationRequired(
+    fun reconciliation(failure: SnapshotReadFailure): ConfirmedTimelineReadResult.ReconciliationRequired =
+        ConfirmedTimelineReadResult.ReconciliationRequired(
             failure = failure,
             highWaterRevision = head.highWaterRevision,
         )

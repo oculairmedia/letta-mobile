@@ -26,7 +26,7 @@ class SessionScopedConversationRepository @Inject constructor(
     override fun hasFreshConversations(agentId: AgentId, maxAgeMs: Long): Boolean =
         current.hasFreshConversations(agentId, maxAgeMs)
 
-    override suspend fun refreshConversations(agentId: AgentId) =
+    override suspend fun refreshConversations(agentId: AgentId): Unit =
         sessionManager.withCurrentSession { it.conversationRepository.refreshConversations(agentId) }
 
     override suspend fun clearForBackendSwitch() {
@@ -42,16 +42,16 @@ class SessionScopedConversationRepository @Inject constructor(
     override suspend fun createConversation(agentId: AgentId, summary: String?): Conversation =
         sessionManager.withCurrentSession { it.conversationRepository.createConversation(agentId, summary) }
 
-    override suspend fun deleteConversation(id: ConversationId, agentId: AgentId) =
+    override suspend fun deleteConversation(id: ConversationId, agentId: AgentId): Unit =
         sessionManager.withCurrentSession { it.conversationRepository.deleteConversation(id, agentId) }
 
-    override suspend fun updateConversation(id: ConversationId, agentId: AgentId, summary: String) =
+    override suspend fun updateConversation(id: ConversationId, agentId: AgentId, summary: String): Unit =
         sessionManager.withCurrentSession { it.conversationRepository.updateConversation(id, agentId, summary) }
 
-    override suspend fun setConversationArchived(id: ConversationId, agentId: AgentId, archived: Boolean) =
+    override suspend fun setConversationArchived(id: ConversationId, agentId: AgentId, archived: Boolean): Unit =
         sessionManager.withCurrentSession { it.conversationRepository.setConversationArchived(id, agentId, archived) }
 
-    override suspend fun cancelConversation(id: ConversationId, agentId: AgentId?) =
+    override suspend fun cancelConversation(id: ConversationId, agentId: AgentId?): Unit =
         sessionManager.withCurrentSession { it.conversationRepository.cancelConversation(id, agentId) }
 
     override suspend fun recompileConversation(id: ConversationId, dryRun: Boolean, agentId: AgentId?): String =

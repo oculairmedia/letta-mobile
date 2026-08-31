@@ -15,6 +15,8 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 
+// The singleton repository owns this scope and cancels it explicitly in close().
+@Suppress("NoDetachedCoroutineLifecycle")
 internal fun defaultSessionScopedJobRepositoryScope(): CoroutineScope =
     CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -45,7 +47,7 @@ class SessionScopedJobRepository internal constructor(
     private val current: IJobRepository
         get() = sessionManager.current.jobRepository
 
-    override suspend fun refreshJobs(params: JobListParams) = sessionManager.withCurrentSession { it.jobRepository.refreshJobs(params) }
+    override suspend fun refreshJobs(params: JobListParams): Unit = sessionManager.withCurrentSession { it.jobRepository.refreshJobs(params) }
 
     override suspend fun getJob(jobId: String): Job = sessionManager.withCurrentSession { it.jobRepository.getJob(jobId) }
 
@@ -53,7 +55,7 @@ class SessionScopedJobRepository internal constructor(
 
     override suspend fun deleteJob(jobId: String): Job = sessionManager.withCurrentSession { it.jobRepository.deleteJob(jobId) }
 
-    override fun upsertJob(job: Job) = current.upsertJob(job)
+    override fun upsertJob(job: Job): Unit = current.upsertJob(job)
 
     fun close() { proxyScope.cancel() }
 }

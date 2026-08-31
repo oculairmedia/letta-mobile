@@ -32,7 +32,7 @@ data class ConversationEntity(
     val isolatedBlockIdsJson: String = "[]",
     val cachedAtEpochMs: Long = System.currentTimeMillis(),
 ) {
-    fun toConversation() = Conversation(
+    fun toConversation(): Conversation = Conversation(
         id = ConversationId(id),
         agentId = AgentId(agentId),
         summary = summary,

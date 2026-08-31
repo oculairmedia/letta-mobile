@@ -30,11 +30,11 @@ class MessageRepository @Inject constructor(
     irohApprovalSource = irohApprovalSource,
 ) {
     companion object {
-        const val INITIAL_FETCH_LIMIT = CachedMessageRepository.INITIAL_FETCH_LIMIT
-        const val OLDER_MESSAGES_PAGE_SIZE = CachedMessageRepository.OLDER_MESSAGES_PAGE_SIZE
-        const val DEFAULT_FETCH_LIMIT = CachedMessageRepository.DEFAULT_FETCH_LIMIT
-        const val TARGETED_FETCH_LIMIT = CachedMessageRepository.TARGETED_FETCH_LIMIT
-        const val MAX_TARGETED_FETCH_PAGES = CachedMessageRepository.MAX_TARGETED_FETCH_PAGES
+        const val INITIAL_FETCH_LIMIT: Int = CachedMessageRepository.INITIAL_FETCH_LIMIT
+        const val OLDER_MESSAGES_PAGE_SIZE: Int = CachedMessageRepository.OLDER_MESSAGES_PAGE_SIZE
+        const val DEFAULT_FETCH_LIMIT: Int = CachedMessageRepository.DEFAULT_FETCH_LIMIT
+        const val TARGETED_FETCH_LIMIT: Int = CachedMessageRepository.TARGETED_FETCH_LIMIT
+        const val MAX_TARGETED_FETCH_PAGES: Int = CachedMessageRepository.MAX_TARGETED_FETCH_PAGES
     }
 
     override fun getMessagesPaged(agentId: AgentId?, conversationId: ConversationId?): Flow<PagingData<AppMessage>> {
