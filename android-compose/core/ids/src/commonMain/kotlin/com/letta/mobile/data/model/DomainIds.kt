@@ -23,7 +23,7 @@ value class AgentId(val value: String) {
 fun AgentId.isLettaCodeEphemeralWorker(): Boolean =
     value.startsWith(LETTA_CODE_EPHEMERAL_WORKER_ID_PREFIX)
 
-private const val LETTA_CODE_EPHEMERAL_WORKER_ID_PREFIX = "agent-local-"
+private const val LETTA_CODE_EPHEMERAL_WORKER_ID_PREFIX = "agent-local-worker-"
 
 @JvmInline
 @Serializable

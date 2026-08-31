@@ -19,8 +19,26 @@ appId: com.letta.mobile.dev
 ---
 # --- (A) Seeded-state landing ---
 - launchApp
+# State restore may drop the user into the most-recently-opened chat thread,
+# not the Conversations tab. Navigate explicitly before asserting seeded rows.
+# The composer placeholder uses U+2026, not three ASCII periods.
 - extendedWaitUntil:
-    visible: "Conversations"
+    visible: "Type a message…"
+    timeout: 20000
+    optional: true
+- runFlow:
+    when:
+      visible: "Type a message…"
+    commands:
+      - tapOn:
+          point: "1340,200"
+      - extendedWaitUntil:
+          visible: "Conversations"
+          timeout: 10000
+      - tapOn:
+          text: "Conversations"
+- extendedWaitUntil:
+    visible: "mini-sender"
     timeout: 20000
 # Welcome to Letta card must NOT appear because agents exist.
 - assertNotVisible: "Welcome to Letta"
