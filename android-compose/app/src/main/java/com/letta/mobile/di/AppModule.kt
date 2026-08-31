@@ -9,6 +9,7 @@ import com.letta.mobile.channel.IChannelNotificationPublisher
 import com.letta.mobile.channel.IChannelSyncStateStore
 import com.letta.mobile.chat.BuildConfigChatClientVersionProvider
 import com.letta.mobile.data.channel.NotificationDelivery
+import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.health.IServerHealthRepository
 import com.letta.mobile.data.health.ServerHealthRepository
 import com.letta.mobile.data.session.BackendScopedCache
@@ -93,6 +94,8 @@ import com.letta.mobile.platform.systemaccess.AndroidSystemAccessEnvironment
 import com.letta.mobile.platform.systemaccess.DefaultSystemAccessCapabilityRegistry
 import com.letta.mobile.platform.systemaccess.SystemAccessCapabilityRegistry
 import com.letta.mobile.platform.systemaccess.SystemAccessEnvironment
+import com.letta.mobile.runtime.actions.DeviceActionCommandRunner
+import com.letta.mobile.runtime.actions.DeviceActionExternalTool
 import com.letta.mobile.startup.AppStartupActions
 import com.letta.mobile.startup.DefaultAppStartupActions
 import dagger.Binds
@@ -110,6 +113,14 @@ abstract class AppModule {
         @Provides
         @Singleton
         fun provideWsChatBridge(transport: IChannelTransport): WsChatBridge = WsChatBridge(transport)
+
+        @Provides
+        @Singleton
+        fun provideAndroidExternalToolRegistry(
+            runner: DeviceActionCommandRunner,
+        ): ExternalToolRegistry = ExternalToolRegistry.hostTools(
+            listOf(DeviceActionExternalTool(runner)),
+        )
 
         // letta-mobile-qfa81 (P4 row 13): approval submission routed over
         // admin_rpc when the active backend is iroh://. Injected into
