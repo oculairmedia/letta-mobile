@@ -23,6 +23,7 @@ import com.letta.mobile.runtime.ToolApprovalDecisionValue
 import com.letta.mobile.runtime.ToolCallId
 import com.letta.mobile.runtime.ToolExecutionStatus
 import com.letta.mobile.runtime.ToolName
+import com.letta.mobile.runtime.ToolPolicy
 import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.runtime.TurnEngine
 import com.letta.mobile.runtime.TurnInput
@@ -1540,7 +1541,7 @@ class AppServerTurnEngine(
                             clientMessageId = turnInput.localMessageId,
                         ),
                     ),
-                    clientToolAllowlist = toolPolicy.allowedTools.toWireAllowlist(),
+                    clientToolAllowlist = toolPolicy.toWireAllowlist(externalToolRegistry),
                 ),
             )
             is TurnInput.ToolApprovalResponse -> AppServerCommand.Input(
@@ -1563,8 +1564,19 @@ class AppServerTurnEngine(
             )
         }
 
-    private fun Set<ToolName>.toWireAllowlist(): List<String>? =
-        takeIf { it.isNotEmpty() }?.map { it.value }?.sorted()
+    /**
+     * App Server applies `client_tool_allowlist` to built-ins and registered
+     * external tools alike. Keep an explicit caller allowlist for built-ins, but
+     * add only the tools this engine advertises for the current runtime.
+     */
+    private fun ToolPolicy.toWireAllowlist(registry: ExternalToolRegistry?): List<String>? {
+        if (allowedTools.isEmpty()) return null
+        return allowedTools
+            .map { it.value }
+            .plus(registry?.listAdvertisedTools().orEmpty().map { it.name })
+            .distinct()
+            .sorted()
+    }
 
     private fun TurnCommand.startedDraft(): RuntimeEventDraft =
         RuntimeEventDraft(

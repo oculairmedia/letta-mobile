@@ -2,6 +2,9 @@ package com.letta.mobile.data.runtime
 
 import app.cash.turbine.test
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.controller.extras.ExternalToolRegistry
+import com.letta.mobile.data.controller.capability.Capability
+import com.letta.mobile.data.controller.extras.HostExternalTool
 import com.letta.mobile.data.transport.appserver.AppServerApprovalResponseDecision
 import com.letta.mobile.data.transport.appserver.AppServerChannel
 import com.letta.mobile.data.transport.appserver.AppServerClient
@@ -22,6 +25,8 @@ import com.letta.mobile.runtime.ToolApprovalDecisionValue
 import com.letta.mobile.runtime.ToolApprovalId
 import com.letta.mobile.runtime.ToolApprovalScope
 import com.letta.mobile.runtime.ToolCallId
+import com.letta.mobile.runtime.ToolName
+import com.letta.mobile.runtime.ToolPolicy
 import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.runtime.TurnInput
 import kotlin.test.Test
@@ -152,6 +157,67 @@ class AppServerTurnEngineTest {
             client.runtimeStartCommands.size,
             "failed preflight must drop the cached runtime so the retry reseeds",
         )
+    }
+
+    @Test
+    fun explicitAllowlistPreservesBuiltInsAndIncludesOnlyThisRuntimesHostTools() = runTest {
+        val client = FakeAppServerClient()
+        val registry = ExternalToolRegistry.hostTools(listOf(DeviceActionTool))
+        val engine = AppServerTurnEngine(client = client, externalToolRegistry = registry)
+        val restricted = command.copy(
+            toolPolicy = ToolPolicy(allowedTools = setOf(ToolName("read_file"))),
+        )
+
+        engine.runTurn(restricted).test {
+            assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+            val runtimeStart = client.runtimeStartCommands.single()
+            assertEquals(
+                listOf("device_action"),
+                runtimeStart.externalTools!!.flatMap { it.tools }.map { it.name },
+                "advertising alone is insufficient; create_message must carry the same host tool",
+            )
+            val input = assertIs<AppServerCommand.Input>(client.sentCommands.single())
+            val payload = assertIs<AppServerInputPayload.CreateMessage>(input.payload)
+            assertEquals(listOf("device_action", "read_file"), payload.clientToolAllowlist)
+            client.emit(streamDelta(messageType = "stop_reason", runId = "run-1"))
+            awaitItem()
+            awaitItem()
+            awaitComplete()
+        }
+    }
+
+    @Test
+    fun defaultAllowlistStaysNullAndRegistryLessTurnsDoNotAddHostTools() = runTest {
+        val defaultClient = FakeAppServerClient()
+        val defaultEngine = AppServerTurnEngine(
+            client = defaultClient,
+            externalToolRegistry = ExternalToolRegistry.hostTools(listOf(DeviceActionTool)),
+        )
+        defaultEngine.runTurn(command).test {
+            assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+            val payload = assertIs<AppServerInputPayload.CreateMessage>(
+                assertIs<AppServerCommand.Input>(defaultClient.sentCommands.single()).payload,
+            )
+            assertEquals(null, payload.clientToolAllowlist)
+            defaultClient.emit(streamDelta(messageType = "stop_reason", runId = "run-default"))
+            awaitItem()
+            awaitItem()
+            awaitComplete()
+        }
+
+        val noRegistryClient = FakeAppServerClient()
+        val noRegistryEngine = AppServerTurnEngine(client = noRegistryClient)
+        noRegistryEngine.runTurn(command.copy(toolPolicy = ToolPolicy(allowedTools = setOf(ToolName("read_file"))))).test {
+            awaitItem()
+            val payload = assertIs<AppServerInputPayload.CreateMessage>(
+                assertIs<AppServerCommand.Input>(noRegistryClient.sentCommands.single()).payload,
+            )
+            assertEquals(listOf("read_file"), payload.clientToolAllowlist)
+            noRegistryClient.emit(streamDelta(messageType = "stop_reason", runId = "run-no-registry"))
+            awaitItem()
+            awaitItem()
+            awaitComplete()
+        }
     }
 
     @Test
@@ -1134,6 +1200,17 @@ class AppServerTurnEngineTest {
             listOf("runtime-start-1", "runtime-start-2"),
             client.runtimeStartCommands.map { it.requestId },
         )
+    }
+
+    private object DeviceActionTool : HostExternalTool {
+        override val name = "device_action"
+        override val description = "Perform an Android device action."
+        override val capability = Capability.SlimAgents
+        override val inputSchema = buildJsonObject { put("type", "object") }
+        override suspend fun invoke(
+            input: kotlinx.serialization.json.JsonObject,
+            agentId: String?,
+        ) = com.letta.mobile.data.controller.extras.ExternalToolResult.Success("ok")
     }
 
     companion object {
