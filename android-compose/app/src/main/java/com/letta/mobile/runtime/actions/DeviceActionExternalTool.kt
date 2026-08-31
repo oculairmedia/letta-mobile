@@ -4,6 +4,8 @@ import com.letta.mobile.data.controller.capability.Capability
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.controller.extras.HostExternalTool
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
@@ -34,7 +36,19 @@ class DeviceActionExternalTool(
     override val capability: Capability = Capability.ImageHydration
 
     override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult =
-        ExternalToolResult.Success(executor.runJson(input.toString()))
+        runCatching { executor.runJson(input.toString()) }.fold(
+            onSuccess = { content ->
+                val result = runCatching {
+                    kotlinx.serialization.json.Json.parseToJsonElement(content).jsonObject
+                }.getOrElse { return ExternalToolResult.Error("Device action returned invalid JSON: ${it.message}") }
+                if (result["success"]?.jsonPrimitive?.content?.toBooleanStrictOrNull() == true) {
+                    ExternalToolResult.Success(content)
+                } else {
+                    ExternalToolResult.Error(result["error"]?.toString() ?: "Device action failed.")
+                }
+            },
+            onFailure = { ExternalToolResult.Error("Device action failed: ${it.message}") },
+        )
 
     companion object {
         const val NAME = "device_action"

@@ -58,4 +58,16 @@ class DeviceActionExternalToolTest {
         assertTrue(schema.toString().contains("input"))
         assertFalse(schema.toString().contains("hardware.flashlight_on"))
     }
+
+    @Test
+    fun `runner failures become external tool errors`() = runTest {
+        val tool = DeviceActionExternalTool(DeviceActionCommandExecutor {
+            """{"command":"hardware.flashlight","success":false,"error":{"code":"unavailable","message":"No torch"}}"""
+        })
+
+        val result = tool.invoke(buildJsonObject { put("command", "hardware.flashlight") })
+
+        assertTrue(result is ExternalToolResult.Error)
+        assertTrue((result as ExternalToolResult.Error).error.contains("No torch"))
+    }
 }
