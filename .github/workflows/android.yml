@@ -238,7 +238,34 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-konan-
 
-      - name: Run shared multiplatform verification task graph
+      - name: Run bounded sharedLogic JVM tests
+        id: sharedlogic_jvm_tests
+        # A Gradle test-process hang used to consume the whole job timeout and
+        # discard the only evidence of which test was active. Bound this phase
+        # so the always-run artifact step can preserve reports and daemon logs.
+        continue-on-error: true
+        run: timeout --preserve-status 12m ./gradlew :sharedLogic:jvmTest --info
+
+      - name: Upload sharedLogic JVM test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sharedlogic-jvmtest-diagnostics-${{ github.run_id }}
+          path: |
+            android-compose/sharedLogic/build/test-results/jvmTest/**
+            android-compose/sharedLogic/build/reports/tests/jvmTest/**
+            android-compose/build/reports/problems/**
+            ~/.gradle/daemon/**
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Fail when bounded sharedLogic JVM tests fail or hang
+        if: steps.sharedlogic_jvm_tests.outcome != 'success'
+        run: |
+          echo "sharedLogic:jvmTest failed or exceeded its 12-minute diagnostic bound"
+          exit 1
+
+      - name: Run remaining shared multiplatform verification task graph
         # Do not request :sharedLogic:allTests (hostNativeTest hangs) or
         # :desktop:test in this job (:desktop:test hung for the 25m timeout
         # on follow-up PRs even when run before Konan). Desktop unit tests
@@ -246,7 +273,7 @@ jobs:
         # changes (additive module tasks). Native compile still catches
         # JVM-only API leaks in commonMain/commonTest (b97bcf48).
         run: |
-          ./gradlew :sharedLogic:jvmTest :appserver-cli:test :appserver-cli:distZip :iroh-wrapper-cli:test :iroh-wrapper-cli:installDist
+          ./gradlew :appserver-cli:test :appserver-cli:distZip :iroh-wrapper-cli:test :iroh-wrapper-cli:installDist
           ./gradlew :sharedLogic:compileKotlinHostNative :sharedLogic:compileTestKotlinHostNative
           node sharedLogic/karma.config.test.cjs
 

@@ -72,10 +72,15 @@ shared_job="$(
     in_job { print }
   ' "$android_workflow"
 )"
-assert_contains "$shared_job" 'Run shared multiplatform verification task graph'
+assert_contains "$shared_job" 'Run bounded sharedLogic JVM tests'
+assert_contains "$shared_job" 'timeout --preserve-status 12m ./gradlew :sharedLogic:jvmTest --info'
+assert_contains "$shared_job" 'Upload sharedLogic JVM test diagnostics'
+assert_contains "$shared_job" 'sharedlogic-jvmtest-diagnostics-${{ github.run_id }}'
+assert_contains "$shared_job" 'Fail when bounded sharedLogic JVM tests fail or hang'
+assert_contains "$shared_job" 'Run remaining shared multiplatform verification task graph'
 # allTests / hostNativeTest hang; :desktop:test also hung on follow-up PRs
 # even before Konan. JVM + CLI tests first; native compile second.
-assert_contains "$shared_job" ':sharedLogic:jvmTest :appserver-cli:test :appserver-cli:distZip :iroh-wrapper-cli:test :iroh-wrapper-cli:installDist'
+assert_contains "$shared_job" ':appserver-cli:test :appserver-cli:distZip :iroh-wrapper-cli:test :iroh-wrapper-cli:installDist'
 assert_contains "$shared_job" ':sharedLogic:compileKotlinHostNative :sharedLogic:compileTestKotlinHostNative'
 shared_gradle_invocations="$(grep -Ec '^[[:space:]]*\./gradlew ' <<<"$shared_job")"
 assert_eq "$shared_gradle_invocations" '2'
