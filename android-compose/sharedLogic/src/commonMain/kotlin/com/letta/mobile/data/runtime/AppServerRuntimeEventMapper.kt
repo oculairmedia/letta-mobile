@@ -1,5 +1,6 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.data.transport.appserver.AppServerChannel
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.runtime.RunId
@@ -16,10 +17,15 @@ import com.letta.mobile.runtime.TurnCommand
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonObject
 
-class AppServerRuntimeEventMapper {
-    fun map(command: TurnCommand, received: AppServerReceivedFrame): List<RuntimeEventDraft> =
+/**
+ * letta-mobile-gdvbf: `open` so the injected-mapper seam that
+ * [AppServerTurnEngine] already exposes is actually usable — the engine takes
+ * a mapper as a constructor parameter for testing, but the type being final
+ * made that impossible to exercise.
+ */
+open class AppServerRuntimeEventMapper {
+    open fun map(command: TurnCommand, received: AppServerReceivedFrame): List<RuntimeEventDraft> =
         when (val frame = received.frame) {
             is AppServerInboundFrame.AuthResponse -> emptyList()
             is AppServerInboundFrame.RuntimeStartResponse -> emptyList()
@@ -93,7 +99,20 @@ class AppServerRuntimeEventMapper {
         command: TurnCommand,
         raw: JsonObject,
     ): List<RuntimeEventDraft> {
-        val deltaObject = delta.jsonObject
+        // letta-mobile-gdvbf: `.jsonObject` THROWS on a non-object delta, and
+        // that throw used to escape into the turn collect loop and settle the
+        // whole turn as a stream error. A delta we cannot read is one frame we
+        // cannot project — surface it as an external-transport draft (the same
+        // treatment Unknown and DecodeFailure frames get) so it stays
+        // observable without deciding the terminal.
+        val deltaObject = delta as? JsonObject
+            ?: return listOf(
+                AppServerReceivedFrame(
+                    channel = AppServerChannel.Stream,
+                    frame = this,
+                    raw = raw,
+                ).toExternalTransportDraft(command),
+            )
         val messageType = deltaObject.string("message_type")
         val runId = deltaObject.string("run_id")?.let(::RunId)
         return when (messageType) {
