@@ -45,18 +45,6 @@ data class SubagentParentIdentity(
 )
 
 object AppServerSubagentSnapshotAdapter {
-    private val normalizedStatuses = mapOf(
-        "pending" to SubagentStatus.RUNNING,
-        "in_progress" to SubagentStatus.RUNNING,
-        "running" to SubagentStatus.RUNNING,
-        "error" to SubagentStatus.FAILED,
-        "failed" to SubagentStatus.FAILED,
-        "cancelled" to SubagentStatus.CANCELLED,
-        "canceled" to SubagentStatus.CANCELLED,
-        "completed" to SubagentStatus.COMPLETED,
-        "complete" to SubagentStatus.COMPLETED,
-        "done" to SubagentStatus.COMPLETED,
-    )
 
     fun toEntry(
         snapshot: AppServerSubagentSnapshot,
@@ -129,10 +117,16 @@ object AppServerSubagentSnapshotAdapter {
         return !snapshot.toolCallId.isNullOrBlank() || !snapshot.subagentId.isNullOrBlank()
     }
 
+    /**
+     * letta-mobile-al6q5: canonicalize through the shared vocabulary
+     * ([SubagentStatus.normalize]) rather than a private map that silently
+     * lacked `success`. An unrecognized value still passes through unchanged so
+     * a forward-compat status stays observable downstream.
+     */
     private fun normalizeStatus(rawStatus: String?, error: String?): String {
         if (!error.isNullOrBlank()) return SubagentStatus.FAILED
         val status = rawStatus?.lowercase() ?: "pending"
-        return normalizedStatuses[status] ?: status
+        return SubagentStatus.normalize(status) ?: status
     }
 
     private fun startedAt(snapshot: AppServerSubagentSnapshot): String? {

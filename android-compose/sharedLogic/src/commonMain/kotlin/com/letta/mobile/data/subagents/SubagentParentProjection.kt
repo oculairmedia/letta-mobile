@@ -1,12 +1,12 @@
 package com.letta.mobile.data.subagents
 
 import com.letta.mobile.data.model.SUBAGENT_ACTIVITY_MAX_LINE_BYTES
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 /** Shared fail-closed projection policy for child-attributed parent stream frames. */
@@ -29,6 +29,7 @@ object SubagentParentProjection {
         STATUS_TEXT("status_text"),
         ACTIVE_FORM("active_form"),
         CONTENT("content"),
+        TEXT("text"),
         STATUS("status"),
         TASK_ID("task_id"),
         TASK_ID_CAMEL("taskId"),
@@ -61,7 +62,7 @@ object SubagentParentProjection {
         val raw = obj.string(WireField.SUMMARY)
             ?: obj.string(WireField.STATUS_TEXT)
             ?: obj.string(WireField.ACTIVE_FORM)
-            ?: obj.string(WireField.CONTENT)
+            ?: obj.stringOrBlocks(WireField.CONTENT)
             ?: return null
         return raw.sanitizedActivityLine()
     }
@@ -218,8 +219,40 @@ object SubagentParentProjection {
     private fun JsonElement.bodyString(): String =
         if (this is JsonPrimitive && isString) content else toString()
 
+    /**
+     * letta-mobile-fkpd4: FAIL-SOFT wire read.
+     *
+     * `.jsonPrimitive` THROWS on a JsonArray/JsonObject, and this accessor runs
+     * over RAW App Server frames where several of these keys are legitimately
+     * non-scalar — `content` carries Letta content blocks (an array), and a
+     * non-scalar `status` was observed in the m6oa1.6 capture. The throw
+     * escaped into [com.letta.mobile.data.runtime.AppServerTurnEngine]'s turn
+     * collect loop, which settles the whole parent turn as "Tool execution
+     * interrupted by stream error" — so a child that SUCCEEDED surfaced as a
+     * failed parent turn.
+     *
+     * Reading a wire field must never throw: a non-primitive simply is not a
+     * string here. [stringOrBlocks] recovers the common content-block case
+     * rather than silently dropping the text.
+     */
     private fun JsonObject.string(field: WireField): String? =
-        this[field.key]?.jsonPrimitive?.contentOrNull
+        (this[field.key] as? JsonPrimitive)?.contentOrNull
+
+    /**
+     * As [string], but additionally flattens Letta content blocks
+     * (`[{"type":"text","text":"..."}]`) into a single line. Used for activity
+     * text, where an array-valued `content` is the normal assistant shape and
+     * returning null would drop the subagent's visible progress.
+     */
+    private fun JsonObject.stringOrBlocks(field: WireField): String? {
+        string(field)?.let { return it }
+        val blocks = this[field.key] as? JsonArray ?: return null
+        return blocks
+            .mapNotNull { block -> (block as? JsonObject)?.string(WireField.TEXT) }
+            .filter(String::isNotBlank)
+            .joinToString(" ")
+            .takeIf(String::isNotBlank)
+    }
 
     private fun String.takeUtf8Bytes(limit: Utf8ByteLimit): String {
         var used = 0

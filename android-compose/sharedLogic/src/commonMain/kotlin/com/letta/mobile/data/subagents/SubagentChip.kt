@@ -88,15 +88,20 @@ enum class SubagentChipState {
          * vocabulary is conservatively treated as [OBSERVED] (pending) rather
          * than as a terminal — never invent a completion (5hihw).
          */
-        fun fromWireStatus(status: String?): SubagentChipState = when (status?.lowercase()) {
+        fun fromWireStatus(status: String?): SubagentChipState = when (val raw = status?.trim()?.lowercase()) {
             null, "" -> OBSERVED
-            "pending", "queued", "dispatched", "observed", "starting" -> OBSERVED
-            SubagentStatus.RUNNING, "in_progress", "active" -> RUNNING
-            SubagentStatus.COMPLETED, "complete", "success", "succeeded", "done" -> COMPLETED
-            SubagentStatus.FAILED, "error", "errored" -> FAILED
-            SubagentStatus.CANCELLED, "canceled", "killed", "stopped", "evicted" -> CANCELLED
+            // Kept ahead of the shared vocabulary: this state machine draws a
+            // distinction the wire vocabulary does not, between "dispatched but
+            // not yet started" (OBSERVED) and RUNNING.
+            in SubagentStatus.PENDING_ALIASES -> OBSERVED
             "orphaned", "unknown" -> ORPHANED
-            else -> OBSERVED
+            else -> when (SubagentStatus.normalize(raw)) {
+                SubagentStatus.RUNNING -> RUNNING
+                SubagentStatus.COMPLETED -> COMPLETED
+                SubagentStatus.FAILED -> FAILED
+                SubagentStatus.CANCELLED -> CANCELLED
+                else -> OBSERVED
+            }
         }
     }
 }
