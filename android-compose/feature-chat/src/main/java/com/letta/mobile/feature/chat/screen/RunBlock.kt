@@ -88,7 +88,6 @@ internal fun RunBlock(
     val effectiveCollapsed = when {
         !collapsible -> false
         activity.isActive -> false
-        !showCompletedDisclosure -> false
         else -> collapsed
     }
     val latestCompletedDisclosure = !activity.isActive && showCompletedDisclosure

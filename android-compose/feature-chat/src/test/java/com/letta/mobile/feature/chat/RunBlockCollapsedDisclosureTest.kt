@@ -119,6 +119,40 @@ class RunBlockCollapsedDisclosureTest {
         composeRule.runOnIdle { org.junit.Assert.assertEquals(0, toggles) }
     }
 
+    @Test
+    fun completedRunCollapseDoesNotDependOnDisclosureVisibility() {
+        val showDisclosure = mutableStateOf(true)
+        composeRule.setContent {
+            LettaTheme(AppTheme.LIGHT, ThemePreset.DEFAULT, false) {
+                LettaChatTheme {
+                    RunBlock(
+                        messages = listOf(
+                            message(id = "reasoning-1", content = "Inspecting", isReasoning = true),
+                            toolMessage(id = "tool-1", command = "visibility-check"),
+                            message(id = "final-1", content = "All done."),
+                        ),
+                        collapsed = true,
+                        onToggleCollapsed = {},
+                        showCompletedDisclosure = showDisclosure.value,
+                    ) { message, _, rowModifier ->
+                        Box(modifier = rowModifier.testTag("run-row-${message.id}")) {
+                            Text(text = message.content.ifBlank { message.id })
+                        }
+                    }
+                }
+            }
+        }
+
+        composeRule.onNodeWithText("Bash(visibility-check)").assertDoesNotExist()
+        composeRule.runOnIdle { showDisclosure.value = false }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag(RunActivityDisclosureTestTags.Header).assertDoesNotExist()
+        composeRule.onNodeWithText("Bash(visibility-check)").assertDoesNotExist()
+        composeRule.onNodeWithTag("run-row-reasoning-1").assertDoesNotExist()
+        composeRule.onNodeWithTag("run-row-final-1").assertIsDisplayed()
+    }
+
     private fun message(
         id: String,
         content: String,
