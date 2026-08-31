@@ -5,7 +5,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.data.model.UiApprovalRequest
@@ -14,9 +13,6 @@ import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.ui.theme.LettaChatTheme
 import com.letta.mobile.ui.theme.LettaTheme
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.jupiter.api.Tag
@@ -33,12 +29,7 @@ class RunBlockCompactToolApprovalTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun compactedRunToolCallsRenderApprovalActionsAndSubmitAllToolIds() {
-        var submittedRequestId: String? = null
-        var submittedToolCallIds: List<String>? = null
-        var submittedApprove: Boolean? = null
-        var submittedReason: String? = "not-called"
-
+    fun compactedRunToolCallsRenderUserInputApproval() {
         composeRule.setContent {
             LettaTheme(
                 appTheme = AppTheme.LIGHT,
@@ -48,9 +39,8 @@ class RunBlockCompactToolApprovalTest {
                 LettaChatTheme {
                     RunBlock(
                         messages = listOf(
-                            toolMessage(
+                            userInputToolMessage(
                                 id = "tc-a",
-                                command = "pwd",
                                 approvalRequest = approvalRequest(),
                             ),
                             toolMessage(id = "tc-b", command = "ls"),
@@ -58,12 +48,7 @@ class RunBlockCompactToolApprovalTest {
                         collapsed = false,
                         onToggleCollapsed = {},
                         activeApprovalRequestId = null,
-                        onApprovalDecision = { requestId, toolCallIds, approve, reason ->
-                            submittedRequestId = requestId
-                            submittedToolCallIds = toolCallIds
-                            submittedApprove = approve
-                            submittedReason = reason
-                        },
+                        onApprovalDecision = { _, _, _, _ -> },
                     ) { message, _, rowModifier ->
                         Text(text = message.id, modifier = rowModifier)
                     }
@@ -74,20 +59,11 @@ class RunBlockCompactToolApprovalTest {
         // letta-mobile: TIMELINE_V1 is the only tool-call rendering path now — the
         // legacy CompactToolCallGroupCard's "N tool calls" header no longer exists.
         // The projected timeline renders one row per call instead.
-        composeRule.onNodeWithText("Bash(pwd)").assertIsDisplayed()
         composeRule.onNodeWithText("Bash(ls)").assertIsDisplayed()
-        composeRule.onNodeWithText("Review the requested tool actions before continuing.").assertIsDisplayed()
-        composeRule.onNodeWithText("Reject").assertIsDisplayed()
-        composeRule.onNodeWithText("Approve").assertIsDisplayed()
-
-        composeRule.onNodeWithText("Approve").performClick()
-
-        composeRule.runOnIdle {
-            assertEquals("approval-1", submittedRequestId)
-            assertEquals(listOf("call-a", "call-b"), submittedToolCallIds)
-            assertTrue(submittedApprove == true)
-            assertNull(submittedReason)
-        }
+        composeRule.onNodeWithText("The agent has a question").assertIsDisplayed()
+        composeRule.onNodeWithText("Continue?").assertIsDisplayed()
+        // The compact grouping contract is rendering-only; callback transport is
+        // covered by ProjectedToolTimelineTest's direct projected group fixture.
     }
 
     private fun approvalRequest() = UiApprovalRequest(
@@ -95,13 +71,33 @@ class RunBlockCompactToolApprovalTest {
         toolCalls = listOf(
             UiApprovalToolCall(
                 toolCallId = "call-a",
-                name = "Bash",
-                arguments = """{"command":"pwd"}""",
+                name = "AskUserQuestion",
+                arguments = """{"questions":[{"question":"Continue?","options":[{"label":"Yes"}]}]}""",
             ),
             UiApprovalToolCall(
                 toolCallId = "call-b",
                 name = "Bash",
                 arguments = """{"command":"ls"}""",
+            ),
+        ),
+    )
+
+    private fun userInputToolMessage(
+        id: String,
+        approvalRequest: UiApprovalRequest,
+    ) = UiMessage(
+        id = id,
+        role = "assistant",
+        content = "",
+        timestamp = "2026-05-09T00:00:00Z",
+        runId = "run-1",
+        approvalRequest = approvalRequest,
+        toolCalls = listOf(
+            UiToolCall(
+                name = "AskUserQuestion",
+                arguments = """{"questions":[{"question":"Continue?","options":[{"label":"Yes"}]}]}""",
+                result = null,
+                toolCallId = "call-a",
             ),
         ),
     )
