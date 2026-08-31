@@ -103,6 +103,7 @@ class NavViewModel @Inject constructor(
 
 }
 
+@Suppress("NoAnyType") // NavHost.startDestination is Any; each branch is a typed route object.
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun AppNavGraph(
@@ -129,7 +130,6 @@ fun AppNavGraph(
     val initialNotificationTarget = remember { notificationTarget }
     val restoredChatSelection = lastChatSelection
     val fallbackAgentId = favoriteAgentId ?: adminAgentId
-    @Suppress("NoAnyType") // NavHost.startDestination is Any; each branch is a typed route object.
     val startDestination: Any = when {
         hasConfig && initialNotificationTarget != null -> initialNotificationTarget.toRoute()
         hasConfig && restoredChatSelection != null -> restoredChatSelection.let { selection ->
