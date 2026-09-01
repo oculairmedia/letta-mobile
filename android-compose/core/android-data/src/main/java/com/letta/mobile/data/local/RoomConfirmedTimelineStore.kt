@@ -39,6 +39,11 @@ class RoomConfirmedTimelineStore(
     // fault. Proves stageLegacyCheckpoint's failure never downgrades an already-committed
     // normalized write.
     private val legacyCheckpointFailureInjector: (() -> Throwable)? = null,
+    // Test seam only: faults immediately BEFORE normalized head publication, after the row
+    // mutations have been applied inside the same transaction (PM review item 4). Distinct
+    // from commitBatchObserver, which faults mid-row-batch: this one proves a head is never
+    // published over rows that did not survive.
+    private val beforeHeadPublicationObserver: suspend () -> Unit = {},
 ) : ConfirmedTimelineStore {
     private val dao = database.confirmedTimelineSnapshotDao()
     private val manifestReader = RoomTimelineManifestReader(dao)
@@ -63,15 +68,7 @@ class RoomConfirmedTimelineStore(
             // payload-free head reads is far cheaper than decoding the legacy envelope, so this
             // preserves the fast path for the common (normalized-ahead) case without ever
             // serving stale data when it isn't.
-            val normalizedIsFreshEnough = normalizedHead != null &&
-                (head == null || normalizedHead.revision >= head.highWaterRevision)
-            if (normalizedIsFreshEnough) {
-                val normalizedResult = readNormalized(scope)
-                if (normalizedResult is ConfirmedTimelineReadResult.Active) return@withContext normalizedResult
-                // No legacy head to fall back to: propagate normalized's own failure reason
-                // (e.g. CHECKSUM_MISMATCH) rather than masking it as a generic MISSING.
-                if (head == null && normalizedResult != null) return@withContext normalizedResult
-            }
+            selectNormalizedRead(scope, normalizedHead, head)?.let { return@withContext it }
             if (head == null) {
                 return@withContext ConfirmedTimelineReadResult.ReconciliationRequired(SnapshotReadFailure.MISSING)
             }
@@ -84,6 +81,38 @@ class RoomConfirmedTimelineStore(
             if (!normalizedBootstrapIsSafe(envelope) || !bootstrapNormalized(envelope)) return@withContext legacy
             readNormalized(scope) ?: legacy
         }
+    }
+
+    /**
+     * Normalized-vs-legacy read selection, extracted so [readSnapshotResult] stays a linear
+     * sequence of steps.
+     *
+     * Returns a result only when normalized storage is the right source to answer from;
+     * null means "fall through to the legacy v11 path".
+     *
+     * Normalized rows are the incremental-commit write target and, once present, are USUALLY
+     * at least as fresh as the periodic legacy checkpoint (which trails on a bounded cadence
+     * -- see TimelineSyncLoop's checkpoint policy). But a caller can still write legacy
+     * directly, bypassing commitNormalized entirely (this class's own writeSnapshot called
+     * standalone, or the Invalid-plan fallback), without touching normalized rows. So trust
+     * normalized only when its revision is not provably behind the legacy high-water
+     * revision. Comparing these two cheap, payload-free head reads is far cheaper than
+     * decoding the legacy envelope, which preserves the fast path for the common
+     * normalized-ahead case without ever serving stale data when it isn't.
+     */
+    private suspend fun selectNormalizedRead(
+        scope: TimelineScope,
+        normalizedHead: NormalizedTimelineSnapshotHeadEntity?,
+        legacyHead: ConfirmedTimelineSnapshotHeadMetadata?,
+    ): ConfirmedTimelineReadResult? {
+        if (normalizedHead == null) return null
+        if (legacyHead != null && normalizedHead.revision < legacyHead.highWaterRevision) return null
+        val normalizedResult = readNormalized(scope)
+        if (normalizedResult is ConfirmedTimelineReadResult.Active) return normalizedResult
+        // No legacy head to fall back to: propagate normalized's own failure reason
+        // (e.g. CHECKSUM_MISMATCH) rather than masking it as a generic MISSING.
+        if (legacyHead == null && normalizedResult != null) return normalizedResult
+        return null
     }
 
     private suspend fun readNormalized(scope: TimelineScope): ConfirmedTimelineReadResult? {
@@ -256,7 +285,14 @@ class RoomConfirmedTimelineStore(
         }
         val committedOrNoOp = result is NormalizedTimelineWriteResult.Committed || result is NormalizedTimelineWriteResult.NoOp
         if (checkpointLegacyEnvelope && committedOrNoOp) {
-            stageLegacyCheckpoint(fullEnvelope)
+            // PM review item 1 / requirement 13: the normalized commit above is
+            // ALREADY DURABLE at this point. Post-commit checkpoint work must not be
+            // able to downgrade that result, so it runs NonCancellable and swallows
+            // even cancellation. Rethrowing here made the caller observe an exception
+            // for a durable write, leaving lastPersistedEnvelope/fingerprint/checkpoint
+            // counters unadvanced and the next attempt planning from stale acknowledged
+            // state.
+            withContext(NonCancellable) { stageLegacyCheckpoint(fullEnvelope) }
         }
         result
     }
@@ -268,13 +304,31 @@ class RoomConfirmedTimelineStore(
      * purely so v11 rollback readers stay within [TimelineSyncLoop.LEGACY_CHECKPOINT_INTERVAL]
      * revisions of current instead of only ever reflecting the very first commit.
      */
+    @Suppress("CancellationMustPropagate")
     private suspend fun stageLegacyCheckpoint(envelope: StoredTimelineEnvelope) {
+        // GUARDRAIL SUPPRESSION, deliberate and narrow -- flagged for review rather than
+        // applied silently.
+        //
+        // CancellationMustPropagate is right almost everywhere: swallowing cancellation
+        // breaks structured concurrency. This is the documented exception. By the time
+        // control reaches here the normalized CAS transaction has ALREADY COMMITTED, and the
+        // caller invokes this inside `withContext(NonCancellable)`, so no cancellation can
+        // legitimately arrive from the framework. Propagating one anyway would make the
+        // caller report a durable write as failed, leave the acknowledged envelope
+        // unadvanced, and replan the next commit from stale state -- data-integrity damage
+        // traded for protocol purity. The alternative loss is bounded and harmless: v11
+        // rollback readers stay at the previous checkpoint.
+        //
+        // Scope is one function whose entire body is best-effort, post-durable work.
         try {
             legacyCheckpointFailureInjector?.let { throw it() }
             writeSnapshot(envelope)
-        } catch (cancelled: CancellationException) {
-            throw cancelled
         } catch (failure: Throwable) {
+            // Deliberately catches CancellationException too. Normally swallowing
+            // cancellation is wrong, but this runs inside NonCancellable AFTER a
+            // durable commit: propagating it would misreport a write that actually
+            // landed, which is a worse failure than a missed checkpoint. The loss is
+            // bounded -- v11 readers simply stay at the previous checkpoint.
             Telemetry.error(
                 "RoomTimelineStore", "commitNormalized.legacyCheckpointFailed", failure,
                 "backendId" to envelope.scope.backendId,
@@ -294,8 +348,30 @@ class RoomConfirmedTimelineStore(
                 return@withTransaction NormalizedTimelineWriteResult.Stale(TimelineRevision(currentRevision))
             }
             // No-op CAS: advance revision + timestamp only, zero row writes, row set unchanged.
+            //
+            // The root digest MUST still be recomputed. `normalizedRootDigest` folds in
+            // `envelope.revision` (see RoomNormalizedTimelineReader), and the reader
+            // recomputes it from the head's revision, so bumping the revision while keeping
+            // the old digest makes every subsequent read of this conversation fail closed as
+            // CHECKSUM_MISMATCH — the timeline becomes unreadable after an idle no-op.
+            // Caught by RoomNormalizedCommitIntegrityTest; the pre-existing no-op test missed
+            // it because it never read the snapshot back.
+            val projection = dao.getNormalizedRowDigestProjection(backendId, conversationId)
+            val digestEnvelope = StoredTimelineEnvelope(
+                schemaVersion = head.envelopeSchemaVersion,
+                scope = plan.scope,
+                revision = plan.targetRevision.value,
+                liveCursor = head.liveCursor,
+                backfillCursor = head.backfillCursor,
+                releasedOlderCount = head.releasedOlderCount,
+                writtenAtMillis = plan.writtenAtMillis,
+            )
             dao.upsertNormalizedHead(
-                head.copy(revision = plan.targetRevision.value, writtenAtMillis = plan.writtenAtMillis),
+                head.copy(
+                    revision = plan.targetRevision.value,
+                    writtenAtMillis = plan.writtenAtMillis,
+                    rootDigest = normalizedRootDigest(digestEnvelope, projection),
+                ),
             )
             NormalizedTimelineWriteResult.NoOp(plan.targetRevision)
         }
@@ -331,6 +407,11 @@ class RoomConfirmedTimelineStore(
             }
             currentCoroutineContext().ensureActive()
             val projection = dao.getNormalizedRowDigestProjection(backendId, conversationId)
+            // PM review item 4: seam for faulting IMMEDIATELY BEFORE head publication.
+            // Rows are already mutated at this point; the surrounding transaction is what
+            // must roll them back, so the head is never published over rows that did not
+            // survive. Distinct from commitBatchObserver, which faults mid-row-batch.
+            beforeHeadPublicationObserver()
             val digestEnvelope = StoredTimelineEnvelope(
                 schemaVersion = commit.metadata.schemaVersion,
                 scope = scope,

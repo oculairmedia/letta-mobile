@@ -195,7 +195,15 @@ class TimelineSyncLoop(
             return
         }
 
-        val revision = ++snapshotRevision
+        // PM review item 2: allocate the candidate revision WITHOUT mutating
+        // snapshotRevision. It is committed only on a successful Committed/NoOp result
+        // below. Incrementing here meant a Stale/Invalid/failed attempt burned a
+        // revision while lastPersistedEnvelope stayed put: the retry still converged
+        // (the CAS base comes from the acknowledged envelope, not from this counter)
+        // but the emitted revision sequence developed permanent gaps, which makes
+        // "did we skip a write?" unanswerable from telemetry. Success-safe ownership
+        // instead: no durable write, no revision consumed.
+        val revision = snapshotRevision + 1
         val envelope = provisionalEnvelope.copy(revision = revision)
         val startedAtMs = timelineCurrentTimeMillis()
         val plan = NormalizedTimelineCommitPlanner.plan(lastPersistedEnvelope, envelope)
@@ -206,20 +214,8 @@ class TimelineSyncLoop(
                 val result = confirmedTimelineStore.commitNormalized(plan, envelope, checkpointDue)
                 val durationMs = timelineCurrentTimeMillis() - startedAtMs
                 when (result) {
-                    is NormalizedTimelineWriteResult.Committed, is NormalizedTimelineWriteResult.NoOp -> {
-                        lastPersistedFingerprint = fingerprint
-                        lastPersistedEnvelope = envelope
-                        recordSuccessfulSnapshotMutation(envelope, revision)
-                        commitsSinceLegacyCheckpoint = if (checkpointDue) 0 else commitsSinceLegacyCheckpoint + 1
-                        Telemetry.event(
-                            "TimelineSync", "snapshotPersist.written",
-                            "conversationId" to conversationId,
-                            "revision" to revision,
-                            "eventCount" to envelope.events.size,
-                            "durationMs" to durationMs,
-                            "committed" to (result is NormalizedTimelineWriteResult.Committed),
-                        )
-                    }
+                    is NormalizedTimelineWriteResult.Committed, is NormalizedTimelineWriteResult.NoOp ->
+                        onDurableCommit(result, envelope, revision, fingerprint, checkpointDue, durationMs)
                     is NormalizedTimelineWriteResult.Stale -> Telemetry.event(
                         "TimelineSync", "snapshotPersist.staleRejected",
                         "conversationId" to conversationId,
@@ -227,13 +223,8 @@ class TimelineSyncLoop(
                         "actualHighWaterRevision" to result.highWaterRevision.value,
                         level = Telemetry.Level.WARN,
                     )
-                    is NormalizedTimelineWriteResult.Invalid -> Telemetry.event(
-                        "TimelineSync", "snapshotPersist.invalidRejected",
-                        "conversationId" to conversationId,
-                        "revision" to revision,
-                        "reason" to result.reason.name,
-                        level = Telemetry.Level.WARN,
-                    )
+                    is NormalizedTimelineWriteResult.Invalid ->
+                        onInvalidPlan(result, envelope, revision, fingerprint)
                 }
                 if (prune) {
                     confirmedTimelineStore.prune(snapshotScope.backendId, MAX_RETAINED_SNAPSHOTS)
@@ -264,6 +255,71 @@ class TimelineSyncLoop(
     private fun isLegacyCheckpointDue(plan: NormalizedTimelineCommitPlan): Boolean {
         val isInitialCommit = plan is NormalizedTimelineCommitPlan.Apply && plan.commit.baseRevision.value == 0L
         return isInitialCommit || commitsSinceLegacyCheckpoint + 1 >= LEGACY_CHECKPOINT_INTERVAL
+    }
+
+    /**
+     * The durable write landed. Only here is the candidate revision consumed and the
+     * acknowledged baseline advanced -- see the allocation comment in
+     * [persistCurrentSnapshot] for why nothing above this point may mutate them.
+     */
+    private fun onDurableCommit(
+        result: NormalizedTimelineWriteResult,
+        envelope: StoredTimelineEnvelope,
+        revision: Long,
+        fingerprint: Long,
+        checkpointDue: Boolean,
+        durationMs: Long,
+    ) {
+        snapshotRevision = revision
+        lastPersistedFingerprint = fingerprint
+        lastPersistedEnvelope = envelope
+        recordSuccessfulSnapshotMutation(envelope, revision)
+        commitsSinceLegacyCheckpoint = if (checkpointDue) 0 else commitsSinceLegacyCheckpoint + 1
+        Telemetry.event(
+            "TimelineSync", "snapshotPersist.written",
+            "conversationId" to conversationId,
+            "revision" to revision,
+            "eventCount" to envelope.events.size,
+            "durationMs" to durationMs,
+            "committed" to (result is NormalizedTimelineWriteResult.Committed),
+        )
+    }
+
+    /**
+     * An `Invalid` plan is NOT transient: an oversized event row makes every subsequent plan
+     * for this conversation Invalid too, so logging alone meant the conversation silently
+     * stopped being durable forever -- the worst shape a persistence bug can take, because
+     * nothing ever surfaces.
+     *
+     * Explicit bounded fallback: write the full legacy v11 envelope so durable progress is
+     * preserved. Its high-water revision then exceeds the normalized head, and
+     * `readSnapshotResult`'s freshness comparison serves legacy until normalized catches up,
+     * so the two stores stay coherent. This is the ONLY path that still performs
+     * full-envelope encoding on an ordinary mutation, and it is reached only when incremental
+     * commit is structurally impossible.
+     */
+    private suspend fun onInvalidPlan(
+        result: NormalizedTimelineWriteResult.Invalid,
+        envelope: StoredTimelineEnvelope,
+        revision: Long,
+        fingerprint: Long,
+    ) {
+        val recovered = confirmedTimelineStore.writeSnapshot(envelope)
+        if (recovered) {
+            snapshotRevision = revision
+            lastPersistedFingerprint = fingerprint
+            lastPersistedEnvelope = envelope
+            recordSuccessfulSnapshotMutation(envelope, revision)
+            commitsSinceLegacyCheckpoint = 0
+        }
+        Telemetry.event(
+            "TimelineSync", "snapshotPersist.invalidRejected",
+            "conversationId" to conversationId,
+            "revision" to revision,
+            "reason" to result.reason.name,
+            "legacyFallbackWritten" to recovered,
+            level = Telemetry.Level.WARN,
+        )
     }
 
     private fun recordSuccessfulSnapshotMutation(envelope: StoredTimelineEnvelope, revision: Long) {
