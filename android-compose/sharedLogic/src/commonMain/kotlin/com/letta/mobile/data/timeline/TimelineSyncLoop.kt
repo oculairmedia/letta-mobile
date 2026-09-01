@@ -16,6 +16,7 @@ import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotMutationCharacter
 import com.letta.mobile.data.timeline.snapshot.SnapshotStructuralSummary
 import kotlin.concurrent.Volatile
 import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CompletableDeferred
@@ -100,6 +101,18 @@ class TimelineSyncLoop(
     // Consecutive Stale results. Reset by any durable commit; a duplicate holder never
     // resets and so detaches quickly, while a transient loser recovers.
     private var consecutiveStaleRejections: Int = 0
+    // Generation guard for the one-shot safety deadline: only the owning generation may clear
+    // ownership or enqueue, so an old timer cannot clear a replacement or write post-terminal.
+    private var turnSafetyFlushGeneration: Long = 0L
+    // Stable for one loop lifetime, distinct across concurrent holders. conversationId +
+    // agentId cannot tell two duplicate holders apart, which is exactly what the device
+    // capture needed to attribute writes.
+    private val holderId: String = "holder-" + holderSequence.incrementAndGet()
+    // Best-effort run/turn identity for telemetry. Emitted as explicit empty when unknown.
+    @Volatile
+    private var currentRunId: String? = null
+    @Volatile
+    private var currentTurnId: String? = null
     // Set once this loop is proven not to own its conversation's durable state (see
     // onStaleRejection). A detached loop still serves reads; it just stops writing.
     @Volatile
@@ -174,8 +187,7 @@ class TimelineSyncLoop(
         if (turnActive && !reason.isTurnBoundary) {
             Telemetry.event(
                 "TimelineSync", "snapshotPersist.streamingDeferred",
-                "conversationId" to conversationId,
-                "agentId" to agentId.orEmpty(),
+                *identityAttrs(),
                 "reason" to reason.name,
             )
             deferredDuringTurn = true
@@ -184,10 +196,9 @@ class TimelineSyncLoop(
         }
         Telemetry.event(
             "TimelineSync", "snapshotPersist.scheduled",
-            "conversationId" to conversationId,
-            "agentId" to agentId.orEmpty(),
+            *identityAttrs(),
             "reason" to reason.name,
-            "turnActive" to turnActive,
+            "turnActive" to turnActive.toString(),
         )
         persistRequests.trySend(
             if (reason.isDebounced) SnapshotPersistRequest.Debounced else SnapshotPersistRequest.Immediate,
@@ -268,7 +279,9 @@ class TimelineSyncLoop(
                 val durationMs = timelineCurrentTimeMillis() - startedAtMs
                 when (result) {
                     is NormalizedTimelineWriteResult.Committed, is NormalizedTimelineWriteResult.NoOp ->
-                        onDurableCommit(result, envelope, revision, fingerprint, checkpointDue, durationMs)
+                        onDurableCommit(
+                            DurableCommitOutcome(result, envelope, revision, fingerprint, checkpointDue, durationMs),
+                        )
                     is NormalizedTimelineWriteResult.Stale -> onStaleRejection(result, revision)
                     is NormalizedTimelineWriteResult.Invalid ->
                         onInvalidPlan(result, envelope, revision, fingerprint)
@@ -322,6 +335,24 @@ class TimelineSyncLoop(
      * conversation under the child agent id. This stops the wasted work; grrhq stops the
      * second holder existing.
      */
+    /**
+     * Round 5 item 2: the identity block every persistence-lifecycle event carries.
+     *
+     * `conversationId + agentId` could not distinguish the duplicate holders observed on
+     * device, which is precisely what a capture needs to attribute a write. [holderId] is
+     * stable for one loop lifetime and distinct across concurrent holders.
+     *
+     * Run and turn are emitted as explicit empty values when unknown rather than omitted, so
+     * captures stay mechanically comparable across events.
+     */
+    private fun identityAttrs(): Array<Pair<String, String>> = arrayOf(
+        "holderId" to holderId,
+        "conversationId" to conversationId,
+        "agentId" to agentId.orEmpty(),
+        "runId" to currentRunId.orEmpty(),
+        "turnId" to currentTurnId.orEmpty(),
+    )
+
     private fun onStaleRejection(result: NormalizedTimelineWriteResult.Stale, revision: Long) {
         // Round 4: detach after a BOUNDED run of consecutive stales, not the first one.
         //
@@ -341,8 +372,7 @@ class TimelineSyncLoop(
         }
         Telemetry.event(
             "TimelineSync", "snapshotPersist.staleRejected",
-            "conversationId" to conversationId,
-            "agentId" to agentId.orEmpty(),
+            *identityAttrs(),
             "revision" to revision,
             "actualHighWaterRevision" to result.highWaterRevision.value,
             "consecutiveStale" to consecutiveStaleRejections,
@@ -356,14 +386,8 @@ class TimelineSyncLoop(
      * acknowledged baseline advanced -- see the allocation comment in
      * [persistCurrentSnapshot] for why nothing above this point may mutate them.
      */
-    private fun onDurableCommit(
-        result: NormalizedTimelineWriteResult,
-        envelope: StoredTimelineEnvelope,
-        revision: Long,
-        fingerprint: Long,
-        checkpointDue: Boolean,
-        durationMs: Long,
-    ) {
+    private fun onDurableCommit(outcome: DurableCommitOutcome) {
+        val (result, envelope, revision, fingerprint, checkpointDue, durationMs) = outcome
         consecutiveStaleRejections = 0
         snapshotRevision = revision
         lastPersistedFingerprint = fingerprint
@@ -372,7 +396,7 @@ class TimelineSyncLoop(
         commitsSinceLegacyCheckpoint = if (checkpointDue) 0 else commitsSinceLegacyCheckpoint + 1
         Telemetry.event(
             "TimelineSync", "snapshotPersist.written",
-            "conversationId" to conversationId,
+            *identityAttrs(),
             "revision" to revision,
             "eventCount" to envelope.events.size,
             "durationMs" to durationMs,
@@ -401,6 +425,11 @@ class TimelineSyncLoop(
     ) {
         val recovered = confirmedTimelineStore.writeSnapshot(envelope)
         if (recovered) {
+            // Round 5 item 3: a durable fallback IS durable progress, so it must break the
+            // consecutive-stale sequence exactly as a normalized commit does. Without this,
+            // Stale -> Stale -> fallback success -> Stale detached a writer that had in fact
+            // just made progress.
+            consecutiveStaleRejections = 0
             snapshotRevision = revision
             lastPersistedFingerprint = fingerprint
             lastPersistedEnvelope = envelope
@@ -409,7 +438,7 @@ class TimelineSyncLoop(
         }
         Telemetry.event(
             "TimelineSync", "snapshotPersist.invalidRejected",
-            "conversationId" to conversationId,
+            *identityAttrs(),
             "revision" to revision,
             "reason" to result.reason.name,
             "legacyFallbackWritten" to recovered,
@@ -620,12 +649,22 @@ class TimelineSyncLoop(
      */
     private fun armSafetyFlushDeadline() {
         if (turnSafetyFlushJob?.isActive == true) return
+        val generation = ++turnSafetyFlushGeneration
         turnSafetyFlushJob = loopScope.launch {
             delay(STREAMING_SAFETY_FLUSH)
-            if (turnActive && deferredDuringTurn) {
-                deferredDuringTurn = false
-                scheduleSnapshotPersist(SnapshotPersistReason.SAFETY_FLUSH)
-            }
+            // Round 5: RELEASE OWNERSHIP FIRST. Previously this scheduled the safety write
+            // while turnSafetyFlushJob still pointed at this very coroutine, so a delta
+            // arriving before it completed saw isActive == true and skipped arming the next
+            // window -- leaving the rest of a long turn with no further bounded write.
+            //
+            // Identity-guarded by generation so an OLD timer can never clear a REPLACEMENT
+            // timer's ownership, and so a timer that fires after turnEnded (which bumps the
+            // generation) cannot enqueue a post-terminal write.
+            if (turnSafetyFlushGeneration != generation) return@launch
+            turnSafetyFlushJob = null
+            if (!turnActive || !deferredDuringTurn) return@launch
+            deferredDuringTurn = false
+            scheduleSnapshotPersist(SnapshotPersistReason.SAFETY_FLUSH)
         }
     }
 
@@ -647,6 +686,9 @@ class TimelineSyncLoop(
      */
     suspend fun turnEnded(clean: Boolean) {
         turnActive = false
+        // Bump the generation so a timer already past its delay cannot enqueue a
+        // post-terminal write, then cancel the current one.
+        turnSafetyFlushGeneration++
         turnSafetyFlushJob?.cancel()
         turnSafetyFlushJob = null
         // letta-mobile-827s9.4: this is the settled boundary the streaming defer in
@@ -1014,6 +1056,19 @@ class TimelineSyncLoop(
         wsSubscription.clear()
     }
 
+    /**
+     * Round 5 item 5: the six arguments onDurableCommit needed were flagged as excess. They
+     * are one cohesive thing -- the outcome of a durable write -- so they travel together.
+     */
+    private data class DurableCommitOutcome(
+        val result: NormalizedTimelineWriteResult,
+        val envelope: StoredTimelineEnvelope,
+        val revision: Long,
+        val fingerprint: Long,
+        val checkpointDue: Boolean,
+        val durationMs: Long,
+    )
+
     private enum class SnapshotPersistRequest {
         Immediate,
         Debounced,
@@ -1031,6 +1086,9 @@ class TimelineSyncLoop(
 
         /** Bound on wasted planning by a writer that cannot commit. */
         internal const val MAX_CONSECUTIVE_STALE_REJECTIONS = 3
+
+        /** Process-wide sequence giving each loop a holder id distinct from its peers. */
+        private val holderSequence = atomic(0L)
         private const val STREAM_HEARTBEAT_EXPECTED_MS = 30_000L
         // letta-mobile-5pi: 6x multiplier = 3 minute silence timeout.
         // Previously 12x (6 minutes) — a dead stream could go undetected

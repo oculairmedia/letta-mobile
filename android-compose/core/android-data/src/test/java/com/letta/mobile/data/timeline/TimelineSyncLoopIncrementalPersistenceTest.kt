@@ -380,6 +380,206 @@ class TimelineSyncLoopIncrementalPersistenceTest {
         )
     }
 
+    /**
+     * Round 5 item 1: the safety deadline must RE-ARM across successive windows.
+     *
+     * The one-shot timer used to schedule its safety write while `turnSafetyFlushJob` still
+     * pointed at the executing coroutine, so a delta arriving before it completed saw
+     * `isActive == true` and skipped arming the next window -- leaving the rest of a long turn
+     * with no further bounded write. A first-window-only test cannot see that; this walks
+     * several windows.
+     */
+    @Test
+    fun theSafetyDeadlineReArmsAcrossSuccessiveWindows() = runTest {
+        val db = inMemoryDatabase()
+        val store = CountingStore(RoomConfirmedTimelineStore(db))
+        val scope = TimelineScope(backendId = "backend", conversationId = "conv-rearm", agentId = "agent")
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val loop = newLoop(scope, store, dispatcher)
+
+        com.letta.mobile.util.Telemetry.clear()
+        loop.turnStarted()
+
+        // Window 1: continuous deltas, nothing may be written before the deadline.
+        repeat(40) { index ->
+            loop.ingestStreamEvent(
+                UserMessage(id = "w1-$index", date = FIXTURE_DATE, contentRaw = JsonPrimitive("w1 $index")),
+            )
+            advanceTimeBy(100)
+        }
+        assertEquals("no write may occur before the first deadline", 0, safetyFlushes(scope.conversationId))
+
+        advanceTimeBy(1_500)
+        // The commit hops to real Dispatchers.IO and holds persistMutex while it runs, which
+        // virtual time cannot drive -- without settling here the NEXT window blocks on the
+        // mutex and looks like a re-arm failure.
+        assertEquals("exactly one safety flush in the first dirty window", 1, safetyFlushes(scope.conversationId))
+
+        // Window 2: more deltas must re-arm and produce exactly one more.
+        repeat(40) { index ->
+            loop.ingestStreamEvent(
+                UserMessage(id = "w2-$index", date = FIXTURE_DATE, contentRaw = JsonPrimitive("w2 $index")),
+            )
+            advanceTimeBy(100)
+        }
+        assertEquals("still one until the second deadline elapses", 1, safetyFlushes(scope.conversationId))
+        advanceTimeBy(1_500)
+        assertEquals("the deadline must RE-ARM: a second dirty window flushes exactly once", 2, safetyFlushes(scope.conversationId))
+
+        // A CLEAN window -- no new deferred work -- must not write at all.
+        advanceTimeBy(6_000)
+        advanceUntilIdle()
+        assertEquals("a clean window must not produce a flush", 2, safetyFlushes(scope.conversationId))
+
+        // One more delta proves a fresh deadline still arms after an idle window.
+        loop.ingestStreamEvent(UserMessage(id = "w3", date = FIXTURE_DATE, contentRaw = JsonPrimitive("w3")))
+        advanceTimeBy(100)
+
+        loop.turnEnded(clean = true)
+        var persisted: Int? = null
+        for (attempt in 0 until 200) {
+            advanceUntilIdle()
+            persisted = store.readSnapshot(scope)?.events?.size
+            if (persisted == 81) break
+            @Suppress("BlockingMethodInNonBlockingContext")
+            Thread.sleep(10)
+        }
+        assertEquals("turn end must durably persist the whole turn", 81, persisted)
+        val afterTerminal = safetyFlushes(scope.conversationId)
+
+        // A timer from the last armed window must not fire a post-terminal write.
+        advanceTimeBy(10_000)
+        advanceUntilIdle()
+        assertEquals("no late safety write may occur after the turn ended", afterTerminal, safetyFlushes(scope.conversationId))
+        loop.closeAndJoin()
+    }
+
+    /**
+     * Round 5 item 3: a durable legacy fallback breaks the consecutive-stale sequence.
+     *
+     * `Stale -> Stale -> durable fallback success -> Stale` used to reach the detach threshold
+     * even though the writer had just made durable progress, because only `onDurableCommit`
+     * reset the counter.
+     */
+    @Test
+    fun aDurableFallbackResetsStaleHistoryAndKeepsTheWriterAttached() = runTest {
+        val db = inMemoryDatabase()
+        val store = OutcomeOverridingStore(RoomConfirmedTimelineStore(db))
+        val scope = TimelineScope(backendId = "backend", conversationId = "conv-reset", agentId = "agent")
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val loop = newLoop(scope, store, dispatcher)
+
+        loop.ingestStreamEvent(UserMessage(id = "m0", date = FIXTURE_DATE, contentRaw = JsonPrimitive("first")))
+        loop.flushSnapshotNow()
+        advanceUntilIdle()
+
+        repeat(2) { index ->
+            store.forceStaleOnce()
+            loop.ingestStreamEvent(
+                UserMessage(id = "s-$index", date = FIXTURE_DATE, contentRaw = JsonPrimitive("stale $index")),
+            )
+            loop.flushSnapshotNow()
+            advanceUntilIdle()
+        }
+
+        // Durable progress via the legacy fallback.
+        store.forceInvalidOnce()
+        loop.ingestStreamEvent(UserMessage(id = "fb", date = FIXTURE_DATE, contentRaw = JsonPrimitive("fallback")))
+        loop.flushSnapshotNow()
+        advanceUntilIdle()
+
+        // One more stale must NOT reach the threshold, because the fallback reset the run.
+        store.forceStaleOnce()
+        loop.ingestStreamEvent(UserMessage(id = "s-last", date = FIXTURE_DATE, contentRaw = JsonPrimitive("stale last")))
+        loop.flushSnapshotNow()
+        advanceUntilIdle()
+
+        // A detached writer would persist nothing further, so durable content growing is the
+        // property that actually proves it is still attached.
+        val eventsBefore = store.readSnapshot(scope)?.events?.size ?: 0
+        loop.ingestStreamEvent(UserMessage(id = "after", date = FIXTURE_DATE, contentRaw = JsonPrimitive("after")))
+        loop.flushSnapshotNow()
+        advanceUntilIdle()
+        assertTrue(
+            "the writer must remain attached and still persist normally",
+            (store.readSnapshot(scope)?.events?.size ?: 0) > eventsBefore,
+        )
+        assertNotNull(store.readSnapshot(scope))
+        loop.closeAndJoin()
+    }
+
+    /**
+     * Counts SAFETY_FLUSH writes the loop actually scheduled.
+     *
+     * Deliberately measured from the loop's own telemetry rather than from store commit
+     * counts: the commit hops to Room's real IO dispatcher, so under virtual time the test
+     * clock races ahead of the write and a later flush can find the timeline already
+     * persisted. The scheduling event is the deterministic signal for the property under test
+     * -- whether the deadline re-armed -- and it cannot be faked by coalescing downstream.
+     */
+    private fun safetyFlushes(conversationId: String): Int =
+        com.letta.mobile.util.Telemetry.snapshot().count {
+            it.name == "snapshotPersist.scheduled" &&
+                it.attrs["reason"] == SnapshotPersistReason.SAFETY_FLUSH.name &&
+                it.attrs["conversationId"] == conversationId
+        }
+
+    /**
+     * Drives the test scheduler AND yields the JVM thread so a commit already dispatched to
+     * Room's real IO dispatcher can finish and release persistMutex. Returns the observed
+     * count so a failing assertion reports the real value rather than a timeout.
+     */
+    private fun kotlinx.coroutines.test.TestScope.settleCommits(store: CountingStore, expected: Int, attempts: Int = 200): Int {
+        repeat(attempts) {
+            advanceUntilIdle()
+            if (store.commits >= expected) return store.commits
+            @Suppress("BlockingMethodInNonBlockingContext")
+            Thread.sleep(10)
+        }
+        return store.commits
+    }
+
+    /**
+     * Round 5 item 2: telemetry must distinguish two concurrent holders of the SAME
+     * agent + conversation.
+     *
+     * That pair is exactly what the device capture could not tell apart, so a write could not
+     * be attributed to a holder. A stable per-loop id makes duplicate-holder behaviour
+     * mechanically visible in a log.
+     */
+    @Test
+    fun telemetryDistinguishesTwoHoldersOfTheSameAgentAndConversation() = runTest {
+        val db = inMemoryDatabase()
+        val scope = TimelineScope(backendId = "backend", conversationId = "conv-holders", agentId = "agent")
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val first = newLoop(scope, RoomConfirmedTimelineStore(db), dispatcher)
+        val second = newLoop(scope, RoomConfirmedTimelineStore(db), dispatcher)
+
+        com.letta.mobile.util.Telemetry.clear()
+        first.ingestStreamEvent(UserMessage(id = "a", date = FIXTURE_DATE, contentRaw = JsonPrimitive("a")))
+        first.flushSnapshotNow()
+        advanceUntilIdle()
+        second.ingestStreamEvent(UserMessage(id = "b", date = FIXTURE_DATE, contentRaw = JsonPrimitive("b")))
+        second.flushSnapshotNow()
+        advanceUntilIdle()
+
+        val holders = com.letta.mobile.util.Telemetry.snapshot()
+            .filter { it.name.startsWith("snapshotPersist.") && it.attrs["conversationId"] == scope.conversationId }
+            .mapNotNull { it.attrs["holderId"]?.toString() }
+            .toSet()
+
+        assertEquals(
+            "two concurrent holders of one agent+conversation must be distinguishable in telemetry",
+            2,
+            holders.size,
+        )
+        // conversationId + agentId alone cannot do this -- that is the whole point.
+        assertTrue(holders.all { it.isNotBlank() })
+
+        first.closeAndJoin()
+        second.closeAndJoin()
+    }
+
     /** Counts commit attempts that actually reach the store, and can force permanent Stale. */
     private class CountingStore(
         private val delegate: RoomConfirmedTimelineStore,
