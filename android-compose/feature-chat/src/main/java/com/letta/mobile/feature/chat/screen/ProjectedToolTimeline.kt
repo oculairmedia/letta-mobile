@@ -269,8 +269,7 @@ private fun ProjectedToolTimelineCallRow(
             val fallbackReason = when {
                 isSpecialImageCard -> "image_card"
                 isSpecialSubagentDispatchCard -> "subagent_dispatch"
-                isSpecialSubagentNotificationCard -> "subagent_notification"
-                else -> "special_card"
+                else -> "subagent_notification"
             }
             RenderDiagnostics.onLegacyFallback(
                 conversationId = "",
@@ -313,7 +312,7 @@ private fun ProjectedToolTimelineCallRow(
                     executionTimeMs = call.executionTimeMs,
                     modifier = Modifier.fillMaxWidth(),
                 )
-            } else if (isSpecialSubagentNotificationCard) {
+            } else {
                 SubagentNotificationCard(
                     notification = specialSubagentNotification!!,
                     toolCallId = call.toolCallId,
