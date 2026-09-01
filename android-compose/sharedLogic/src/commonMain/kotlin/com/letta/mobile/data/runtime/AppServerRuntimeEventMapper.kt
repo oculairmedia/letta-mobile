@@ -14,6 +14,7 @@ import com.letta.mobile.runtime.ToolCallId
 import com.letta.mobile.runtime.ToolExecutionStatus
 import com.letta.mobile.runtime.ToolName
 import com.letta.mobile.runtime.TurnCommand
+import com.letta.mobile.util.Telemetry
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -95,6 +96,39 @@ open class AppServerRuntimeEventMapper {
             emptyList()
         }
 
+    /**
+     * letta-mobile-gdvbf: a `stream_delta` whose `delta` is not a JSON object.
+     *
+     * Because this shape is now HANDLED rather than thrown, it would otherwise
+     * be invisible — no exception means no `frame.projection_failed` event, so
+     * the exact malformed shape that motivated this work would stop
+     * self-identifying. It gets its own classification event instead, and the
+     * frame is still surfaced as an external-transport draft (the treatment
+     * Unknown and DecodeFailure frames get) so it stays observable in the
+     * timeline without deciding the terminal.
+     */
+    private fun AppServerInboundFrame.StreamDelta.unprojectableDelta(
+        command: TurnCommand,
+        raw: JsonObject,
+    ): List<RuntimeEventDraft> {
+        Telemetry.event(
+            "AppServerRuntimeEventMapper", "frame.unprojectable_delta",
+            "reason" to "delta_not_an_object",
+            "deltaKind" to (delta::class.simpleName ?: "JsonElement"),
+            "conversationId" to runtime.conversationId,
+            "agentId" to runtime.agentId,
+            "eventSeq" to eventSeq,
+            "idempotencyKey" to idempotencyKey,
+        )
+        return listOf(
+            AppServerReceivedFrame(
+                channel = AppServerChannel.Stream,
+                frame = this,
+                raw = raw,
+            ).toExternalTransportDraft(command),
+        )
+    }
+
     private fun AppServerInboundFrame.StreamDelta.toStreamDeltaDraft(
         command: TurnCommand,
         raw: JsonObject,
@@ -106,13 +140,7 @@ open class AppServerRuntimeEventMapper {
         // treatment Unknown and DecodeFailure frames get) so it stays
         // observable without deciding the terminal.
         val deltaObject = delta as? JsonObject
-            ?: return listOf(
-                AppServerReceivedFrame(
-                    channel = AppServerChannel.Stream,
-                    frame = this,
-                    raw = raw,
-                ).toExternalTransportDraft(command),
-            )
+            ?: return unprojectableDelta(command, raw)
         val messageType = deltaObject.string("message_type")
         val runId = deltaObject.string("run_id")?.let(::RunId)
         return when (messageType) {

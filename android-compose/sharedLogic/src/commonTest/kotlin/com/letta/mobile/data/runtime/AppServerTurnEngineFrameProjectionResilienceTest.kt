@@ -22,6 +22,7 @@ import kotlin.test.assertIs
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -53,12 +54,18 @@ import kotlinx.serialization.json.put
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppServerTurnEngineFrameProjectionResilienceTest {
 
+    private val client = ProjectionFailureClient()
+
+    private fun engine(mapper: AppServerRuntimeEventMapper = AppServerRuntimeEventMapper()) =
+        AppServerTurnEngine(
+            client = client,
+            mapper = mapper,
+            requestIdFactory = { "runtime-start-1" },
+        )
+
     @Test
     fun anUnprojectableFrameDoesNotFailTheTurn() = runTest {
-        val client = ProjectionFailureClient()
-        val engine = AppServerTurnEngine(client = client, requestIdFactory = { "runtime-start-1" })
-
-        engine.runTurn(command).test {
+        engine().runTurn(command).test {
             assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
 
             // The frame that used to kill the turn.
@@ -86,10 +93,7 @@ class AppServerTurnEngineFrameProjectionResilienceTest {
 
     @Test
     fun successfulFramesAroundAnUnprojectableOneStillProject() = runTest {
-        val client = ProjectionFailureClient()
-        val engine = AppServerTurnEngine(client = client, requestIdFactory = { "runtime-start-1" })
-
-        engine.runTurn(command).test {
+        engine().runTurn(command).test {
             assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
 
             client.emitAssistantText("Dispatched a mundane read-only inventory task.")
@@ -127,15 +131,7 @@ class AppServerTurnEngineFrameProjectionResilienceTest {
      */
     @Test
     fun aThrowingMapperOnOneFrameDoesNotFailTheTurn() = runTest {
-        val client = ProjectionFailureClient()
-        val mapper = ThrowOnNthFrameMapper(throwOnFrame = 1)
-        val engine = AppServerTurnEngine(
-            client = client,
-            mapper = mapper,
-            requestIdFactory = { "runtime-start-1" },
-        )
-
-        engine.runTurn(command).test {
+        engine(ThrowOnNthFrameMapper(throwOnFrame = 1)).runTurn(command).test {
             assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
 
             client.emitAssistantText("this one blows up in the mapper")
@@ -153,15 +149,7 @@ class AppServerTurnEngineFrameProjectionResilienceTest {
 
     @Test
     fun aSustainedRunOfProjectionFailuresStillFailsTheTurn() = runTest {
-        val client = ProjectionFailureClient()
-        val mapper = ThrowOnNthFrameMapper(throwOnFrame = null) // throw on every frame
-        val engine = AppServerTurnEngine(
-            client = client,
-            mapper = mapper,
-            requestIdFactory = { "runtime-start-1" },
-        )
-
-        engine.runTurn(command).test {
+        engine(ThrowOnNthFrameMapper(throwOnFrame = null)).runTurn(command).test {
             assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
 
             // Tolerating one bad frame is resilience; tolerating an endlessly
@@ -172,6 +160,44 @@ class AppServerTurnEngineFrameProjectionResilienceTest {
 
             assertIs<IllegalStateException>(awaitError())
         }
+    }
+
+    /**
+     * NEGATIVE regression for the boundary: the resilience is scoped to
+     * `mapper.map(...)` and MUST NOT extend to anything after it.
+     *
+     * A failure during draft processing / emission happens AFTER turn state has
+     * been mutated and may require terminal settlement, so it is not equivalent
+     * to an unreadable frame. Here the downstream collector throws, which
+     * surfaces inside the engine at `callbacks.emit(draft)` — squarely
+     * post-map. It must propagate rather than being swallowed or consuming the
+     * projection error budget.
+     */
+    @Test
+    fun aPostMapEmissionFailurePropagatesInsteadOfBeingAbsorbed() = runTest {
+        val boom = IllegalStateException("emission blew up downstream of the mapper")
+        engine().runTurn(command)
+            .onEach { draft ->
+                val payload = draft.payload
+                if (payload is RuntimeEventPayload.RemoteStreamFrame &&
+                    payload.messageType == "assistant_message"
+                ) {
+                    throw boom
+                }
+            }
+            .test {
+                assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+                client.emitAssistantText("this emission fails")
+                // Identity, not instance: kotlinx.coroutines recovers stack
+                // traces by copying the exception across the suspension.
+                val propagated = awaitError()
+                assertIs<IllegalStateException>(propagated)
+                assertEquals(
+                    boom.message,
+                    propagated.message,
+                    "a post-map failure must not be absorbed by the projection error budget",
+                )
+            }
     }
 
     /**
