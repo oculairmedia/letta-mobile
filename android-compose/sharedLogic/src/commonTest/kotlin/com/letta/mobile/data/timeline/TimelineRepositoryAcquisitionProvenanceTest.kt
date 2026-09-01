@@ -40,12 +40,12 @@ class TimelineRepositoryAcquisitionProvenanceTest {
     @BeforeTest
     fun setUp() {
         Telemetry.clear()
-        Telemetry.timelineAcquisitionProvenanceEnabled.set(true)
+        timelineAcquisitionProvenanceEnabled.set(true)
     }
 
     @AfterTest
     fun tearDown() {
-        Telemetry.timelineAcquisitionProvenanceEnabled.set(true)
+        timelineAcquisitionProvenanceEnabled.set(true)
         Telemetry.clear()
     }
 
@@ -412,7 +412,7 @@ class TimelineRepositoryAcquisitionProvenanceTest {
             val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
             val repo = newRepo(scope)
             try {
-                Telemetry.timelineAcquisitionProvenanceEnabled.set(false)
+                timelineAcquisitionProvenanceEnabled.set(false)
                 repo.getOrCreate(parentAgent, conversation, provenance("x", TimelineAcquisitionSource.UI_NAVIGATION))
                 repo.getOrCreate(childAgent, conversation, provenance("y", TimelineAcquisitionSource.UI_NAVIGATION))
                 assertTrue(events("acquisition.entry").isEmpty(), "new diagnostic must be silenced")
@@ -422,7 +422,7 @@ class TimelineRepositoryAcquisitionProvenanceTest {
                 )
                 assertEquals(2, repo.cachedLoopCount(), "the flag must not change holder behavior")
             } finally {
-                Telemetry.timelineAcquisitionProvenanceEnabled.set(true)
+                timelineAcquisitionProvenanceEnabled.set(true)
                 scope.cancel()
             }
         }

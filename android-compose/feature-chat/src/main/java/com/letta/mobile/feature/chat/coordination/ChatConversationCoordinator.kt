@@ -411,7 +411,7 @@ internal class ChatConversationCoordinator(
     ) {
         // Fully inert when the diagnostic is off: no capture is built and no
         // cached-conversation read is performed.
-        if (!Telemetry.timelineAcquisitionProvenanceEnabled.get()) return
+        if (!timelineAcquisitionProvenanceEnabled.get()) return
         lastConversationSelection = TimelineConversationSelectionRecord(
             acquisitionId = acquisitionIds.next(),
             selectionMode = selectionMode,
@@ -429,7 +429,7 @@ internal class ChatConversationCoordinator(
         pinnedExplicit: String?,
         fromRouteState: Boolean,
     ) {
-        if (!Telemetry.timelineAcquisitionProvenanceEnabled.get()) return
+        if (!timelineAcquisitionProvenanceEnabled.get()) return
         val mode = when {
             pinnedExplicit != null -> TimelineConversationSelectionMode.EXPLICIT_CONVERSATION_ID
             conversationId == null -> TimelineConversationSelectionMode.DEFAULT_FALLBACK

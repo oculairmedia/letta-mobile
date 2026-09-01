@@ -1,6 +1,7 @@
 package com.letta.mobile.data.timeline
 
 import com.letta.mobile.util.Telemetry
+import com.letta.mobile.util.TelemetryFlag
 
 /**
  * letta-mobile-grrhq: DIAGNOSTIC-ONLY acquisition provenance for timeline holders.
@@ -337,6 +338,23 @@ object TimelineProvenanceRedaction {
  *
  * All events share [TimelineAcquisitionProvenance.acquisitionId].
  */
+/**
+ * letta-mobile-grrhq: gate for the acquisition-provenance diagnostic.
+ *
+ * ON by default while the subagent double-holder investigation is open, because
+ * the defect only reproduces on a real background `Agent` dispatch and a missed
+ * capture costs a whole device rerun. Silence with
+ * `timelineAcquisitionProvenanceEnabled.set(false)`.
+ *
+ * Deliberately declared HERE rather than alongside the other flags in
+ * `Telemetry`. `guardrailDetekt` analyses whole files changed from `origin/main`
+ * (`setSource(changedKotlinFiles)`), so adding one line to `Telemetry.kt` pulls
+ * that file's pre-existing `NoAnyType` / `NoProcessGlobalMutableState` debt into
+ * this PR's gate. Paying that debt down is worth doing, but not as a silent
+ * side-effect of a diagnostic — the flag lives with the feature that owns it.
+ */
+val timelineAcquisitionProvenanceEnabled: TelemetryFlag = TelemetryFlag(true)
+
 object TimelineAcquisitionTelemetry {
     const val TAG: String = "TimelineRepo"
 
@@ -347,7 +365,7 @@ object TimelineAcquisitionTelemetry {
         provenance: TimelineAcquisitionProvenance,
         creator: String,
     ) {
-        if (!Telemetry.timelineAcquisitionProvenanceEnabled.get()) return
+        if (!timelineAcquisitionProvenanceEnabled.get()) return
         Telemetry.event(
             TAG, "acquisition.entry",
             *baseAttrs(agentId, conversationId, provenance),
@@ -361,7 +379,7 @@ object TimelineAcquisitionTelemetry {
         capture: TimelineConversationAttributionCapture,
         provenance: TimelineAcquisitionProvenance,
     ) {
-        if (!Telemetry.timelineAcquisitionProvenanceEnabled.get()) return
+        if (!timelineAcquisitionProvenanceEnabled.get()) return
         Telemetry.event(
             TAG, "acquisition.conversationAttribution",
             "acquisitionId" to TimelineProvenanceRedaction.boundedIdentifier(provenance.acquisitionId),
@@ -385,7 +403,7 @@ object TimelineAcquisitionTelemetry {
         agentId: String?,
         conversationId: String,
         provenance: TimelineAcquisitionProvenance,
-    ): Array<Pair<String, Any?>> = arrayOf(
+    ): Array<Pair<String, String>> = arrayOf(
         "acquisitionId" to TimelineProvenanceRedaction.boundedIdentifier(provenance.acquisitionId),
         "source" to provenance.source.name,
         "operation" to TimelineProvenanceRedaction.boundedIdentifier(provenance.operation),
@@ -400,7 +418,7 @@ object TimelineAcquisitionTelemetry {
         "toolCallId" to TimelineProvenanceRedaction.boundedIdentifier(provenance.toolCallId),
         "subagentId" to TimelineProvenanceRedaction.boundedIdentifier(provenance.subagentId),
         "otid" to TimelineProvenanceRedaction.boundedIdentifier(provenance.otid),
-        "isReplay" to provenance.isReplay,
+        "isReplay" to provenance.isReplay.toString(),
         "attribution" to (provenance.attribution?.attribution?.name ?: TimelineConversationAttribution.UNKNOWN.name),
     )
 }
