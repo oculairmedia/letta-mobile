@@ -30,6 +30,15 @@ import kotlinx.coroutines.withContext
 class RoomConfirmedTimelineStore(
     private val database: LettaDatabase,
     private val bootstrapBatchObserver: suspend (Int) -> Unit = {},
+    // Test seam only (mirrors bootstrapBatchObserver): lets tests inject a cancellation mid
+    // incremental-commit row-batch loop to prove the surrounding Room transaction rolls back
+    // atomically instead of leaving partially-mutated rows.
+    private val commitBatchObserver: suspend (Int) -> Unit = {},
+    // Test seam only: lets tests deterministically fault the best-effort legacy checkpoint
+    // staged after a normalized commit already durably succeeded, without needing a real I/O
+    // fault. Proves stageLegacyCheckpoint's failure never downgrades an already-committed
+    // normalized write.
+    private val legacyCheckpointFailureInjector: (() -> Throwable)? = null,
 ) : ConfirmedTimelineStore {
     private val dao = database.confirmedTimelineSnapshotDao()
     private val manifestReader = RoomTimelineManifestReader(dao)
@@ -41,18 +50,31 @@ class RoomConfirmedTimelineStore(
 
     override suspend fun readSnapshotResult(scope: TimelineScope): ConfirmedTimelineReadResult {
         return withContext(Dispatchers.IO) {
-            // Normalized rows are the incremental-commit write target and are therefore, once
-            // present, always at least as fresh as the periodic legacy v11 checkpoint (which
-            // only trails behind on a bounded cadence — see TimelineSyncLoop's checkpoint
-            // policy). Prefer a valid normalized read; only fall back to decoding the legacy
-            // envelope (and re-bootstrapping normalized data from it) when normalized data is
-            // missing or fails closed as corrupt.
-            readNormalized(scope)?.let { normalized ->
-                if (normalized is ConfirmedTimelineReadResult.Active) return@withContext normalized
-            }
             val startedAtMillis = timelineCurrentTimeMillis()
+            val normalizedHead = dao.getNormalizedHead(scope.backendId, scope.conversationId)
             val head = dao.getHeadMetadata(scope.backendId, scope.conversationId)
-                ?: return@withContext ConfirmedTimelineReadResult.ReconciliationRequired(SnapshotReadFailure.MISSING)
+            // Normalized rows are the incremental-commit write target and, once present, are
+            // USUALLY at least as fresh as the periodic legacy v11 checkpoint (which only
+            // trails behind on a bounded cadence — see TimelineSyncLoop's checkpoint policy).
+            // But a caller can still write legacy directly (bypassing commitNormalized
+            // entirely, e.g. this class's own writeSnapshot called standalone) without
+            // touching normalized rows, so trust normalized only when its revision is not
+            // provably behind the legacy high-water revision -- comparing these two cheap,
+            // payload-free head reads is far cheaper than decoding the legacy envelope, so this
+            // preserves the fast path for the common (normalized-ahead) case without ever
+            // serving stale data when it isn't.
+            val normalizedIsFreshEnough = normalizedHead != null &&
+                (head == null || normalizedHead.revision >= head.highWaterRevision)
+            if (normalizedIsFreshEnough) {
+                val normalizedResult = readNormalized(scope)
+                if (normalizedResult is ConfirmedTimelineReadResult.Active) return@withContext normalizedResult
+                // No legacy head to fall back to: propagate normalized's own failure reason
+                // (e.g. CHECKSUM_MISMATCH) rather than masking it as a generic MISSING.
+                if (head == null && normalizedResult != null) return@withContext normalizedResult
+            }
+            if (head == null) {
+                return@withContext ConfirmedTimelineReadResult.ReconciliationRequired(SnapshotReadFailure.MISSING)
+            }
             if (!head.matches(scope)) {
                 return@withContext ConfirmedTimelineReadResult.ReconciliationRequired(SnapshotReadFailure.METADATA_INVALID)
             }
@@ -248,6 +270,7 @@ class RoomConfirmedTimelineStore(
      */
     private suspend fun stageLegacyCheckpoint(envelope: StoredTimelineEnvelope) {
         try {
+            legacyCheckpointFailureInjector?.let { throw it() }
             writeSnapshot(envelope)
         } catch (cancelled: CancellationException) {
             throw cancelled
@@ -300,9 +323,10 @@ class RoomConfirmedTimelineStore(
             }
             if (commit.upserts.isNotEmpty()) {
                 val entities = commit.upserts.map { row -> row.toRowEntity(backendId, conversationId) }
-                entities.chunked(NORMALIZED_ROW_INSERT_BATCH).forEach { batch ->
+                entities.chunked(NORMALIZED_ROW_INSERT_BATCH).forEachIndexed { index, batch ->
                     currentCoroutineContext().ensureActive()
                     dao.upsertNormalizedRows(batch)
+                    commitBatchObserver(index)
                 }
             }
             currentCoroutineContext().ensureActive()
