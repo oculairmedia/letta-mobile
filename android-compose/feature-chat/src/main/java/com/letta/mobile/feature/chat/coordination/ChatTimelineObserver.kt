@@ -27,6 +27,7 @@ import com.letta.mobile.feature.chat.screen.AdminChatViewModel
 import com.letta.mobile.util.Telemetry
 
 import kotlin.time.Duration.Companion.milliseconds
+import com.letta.mobile.data.timeline.TimelineAcquisitionProvenance
 /**
  * Owns the long-lived timeline subscriptions and projection of timeline events
  * into [ChatUiState]. [AdminChatViewModel] still decides when to bind a
@@ -101,7 +102,20 @@ internal class ChatTimelineObserver(
 
     fun start(conversationId: String) = start(agentId = null, conversationId = conversationId)
 
-    fun start(agentId: String?, conversationId: String) {
+    /**
+     * letta-mobile-grrhq: provenance for the acquisition this bind performs.
+     * Deliberately a SEPARATE field rather than a [TimelineObserverBinding]
+     * member — binding equality drives rebind/keep-projection decisions, so
+     * putting diagnostic data in it would change behavior.
+     */
+    private var pendingProvenance: TimelineAcquisitionProvenance = TimelineAcquisitionProvenance.UNSPECIFIED
+
+    fun start(
+        agentId: String?,
+        conversationId: String,
+        provenance: TimelineAcquisitionProvenance = TimelineAcquisitionProvenance.UNSPECIFIED,
+    ) {
+        pendingProvenance = provenance
         val binding = TimelineObserverBinding(agentId = agentId, conversationId = conversationId)
         val bindingSame = observerBinding == binding
         val jobActive = observerJob?.isActive == true
@@ -154,8 +168,9 @@ internal class ChatTimelineObserver(
     ): Job = scope.launch {
             val agentId = binding.agentId
             val conversationId = binding.conversationId
+            val provenance = pendingProvenance
             val flow = try {
-                timelineRepository.observe(agentId, conversationId)
+                timelineRepository.observe(agentId, conversationId, provenance)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: Exception) {
@@ -170,7 +185,7 @@ internal class ChatTimelineObserver(
             }
 
             if (observerBinding != binding) return@launch
-            val loop = timelineRepository.getOrCreate(agentId, conversationId)
+            val loop = timelineRepository.getOrCreate(agentId, conversationId, provenance)
             if (observerBinding != binding) return@launch
             currentConversationTracker.setCurrent(conversationId)
             hydrateSignalJob = launchHydrationCollector(loop, binding, generation)

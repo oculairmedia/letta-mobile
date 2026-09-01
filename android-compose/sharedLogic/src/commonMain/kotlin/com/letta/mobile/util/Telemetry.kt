@@ -76,6 +76,15 @@ object Telemetry {
     // Per-gate Iroh frame-flow content-length diagnostic (see IrohFrameFlowDiagnostics).
     val frameFlowDiagEnabled = TelemetryFlag(false)
 
+    // letta-mobile-grrhq: timeline-holder acquisition provenance. Bounded,
+    // redacted, identifier-only; correlates acquisition entry -> alias refusal
+    // -> second-holder creation by a shared acquisitionId. ON by default while
+    // the subagent double-holder investigation is open, because the defect only
+    // reproduces on a real background Agent dispatch and a missed capture costs
+    // a whole device rerun. Turn OFF to silence: timelineAcquisitionProvenanceEnabled.set(false).
+    @Suppress("MemberVisibilityCanBePrivate")
+    val timelineAcquisitionProvenanceEnabled = TelemetryFlag(true)
+
     // letta-mobile-z5lqt: roster-completeness probe. When on, a finished agent
     // roster sweep additionally reads the authoritative `agent.count` purely so
     // the swept size can be compared against it (RosterNameTelemetry). The

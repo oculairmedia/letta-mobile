@@ -16,6 +16,9 @@ import com.letta.mobile.data.chat.projection.ChatMessageListChange
 import com.letta.mobile.data.chat.runtime.ChatSessionReducer
 import com.letta.mobile.data.chat.runtime.ChatConversationSummary
 import com.letta.mobile.data.chat.runtime.ChatSessionState
+import com.letta.mobile.data.timeline.SequentialAcquisitionIdGenerator
+import com.letta.mobile.data.timeline.TimelineConversationAttributionCapture
+import com.letta.mobile.data.timeline.TimelineConversationSelectionMode
 
 internal const val LOCAL_RUNTIME_REMOTE_AGENT_ERROR = "This agent is remote; create/select a local-runtime agent to use Local LettaCode."
 
@@ -301,21 +304,33 @@ internal class ChatConversationCoordinator(
         }
 
         val suppressFreshRouteFallback = isFreshRoute && isFirstResolve
-        if (
-            pinnedExplicit == null &&
+        val usedMostRecentFallback = pinnedExplicit == null &&
             !suppressFreshRouteFallback &&
             activeConversationId == null &&
             explicitConversationId() == null
-        ) {
+        if (usedMostRecentFallback) {
             resolveMostRecentConversation(CONVERSATION_CACHE_TTL_MS.milliseconds)
         }
 
+        val routeStateId = activeConversationId
         val conversationId = pinnedExplicit
             ?: if (suppressFreshRouteFallback) {
                 explicitConversationId()
             } else {
                 activeConversationId ?: explicitConversationId()
             }
+
+        // letta-mobile-grrhq: the fallback already recorded its own (richer)
+        // selection inside resolveMostRecentConversation; only record here when
+        // it did NOT run, so an explicit route stays distinguishable from a
+        // resolver fallback in the emitted chain.
+        if (!usedMostRecentFallback) {
+            recordNonFallbackSelection(
+                conversationId = conversationId,
+                pinnedExplicit = pinnedExplicit,
+                fromRouteState = routeStateId != null && conversationId == routeStateId,
+            )
+        }
 
         val resolved = if (conversationId == null) {
             updateSessionState { ChatSessionReducer.conversationsLoaded(it, emptyList()) }
@@ -369,8 +384,91 @@ internal class ChatConversationCoordinator(
 
     internal val rosterNameResolverForTest get() = rosterNameResolver
 
+    /**
+     * letta-mobile-grrhq: the resolver/route DECISION half of the acquisition
+     * chain. Recorded here and read by the ViewModel when it starts the timeline
+     * observer, so the selection that produced a conversation id and the
+     * acquisition that opens a holder for it share one acquisitionId.
+     *
+     * Diagnostic only: nothing reads this to make a routing decision.
+     */
+    @Volatile
+    var lastConversationSelection: TimelineConversationSelectionRecord? = null
+        private set
+
+    /** Bounded record of how this coordinator last chose a conversation id. */
+    internal data class TimelineConversationSelectionRecord(
+        val acquisitionId: String,
+        val selectionMode: TimelineConversationSelectionMode,
+        val capture: TimelineConversationAttributionCapture?,
+    )
+
+    private val acquisitionIds = SequentialAcquisitionIdGenerator()
+
+    private fun recordSelection(
+        selectionMode: TimelineConversationSelectionMode,
+        capture: TimelineConversationAttributionCapture?,
+    ) {
+        // Fully inert when the diagnostic is off: no capture is built and no
+        // cached-conversation read is performed.
+        if (!Telemetry.timelineAcquisitionProvenanceEnabled.get()) return
+        lastConversationSelection = TimelineConversationSelectionRecord(
+            acquisitionId = acquisitionIds.next(),
+            selectionMode = selectionMode,
+            capture = capture,
+        )
+    }
+
+    /**
+     * Record a selection made WITHOUT the most-recent fallback (explicit route
+     * id, restored route state, or no conversation at all), so an explicit route
+     * and a resolver fallback are distinguishable in the log.
+     */
+    private fun recordNonFallbackSelection(
+        conversationId: String?,
+        pinnedExplicit: String?,
+        fromRouteState: Boolean,
+    ) {
+        if (!Telemetry.timelineAcquisitionProvenanceEnabled.get()) return
+        val mode = when {
+            pinnedExplicit != null -> TimelineConversationSelectionMode.EXPLICIT_CONVERSATION_ID
+            conversationId == null -> TimelineConversationSelectionMode.DEFAULT_FALLBACK
+            fromRouteState -> TimelineConversationSelectionMode.ROUTE_STATE
+            else -> TimelineConversationSelectionMode.EXPLICIT_CONVERSATION_ID
+        }
+        recordSelection(
+            mode,
+            chatSessionResolver.captureAttribution(
+                requestedAgentId = agentId,
+                selectedConversationId = conversationId,
+                parentAgentId = parentAgentIdForAttribution(),
+                selectionMode = mode,
+            ),
+        )
+    }
+
+    /**
+     * The canonical parent agent for attribution classification, when this route
+     * is known to be a subagent view.
+     *
+     * Returns null today: the chat route does not carry its dispatching parent,
+     * so attribution is honestly reported as UNKNOWN rather than guessed. The
+     * seam exists so a parent can be supplied once the subagent registry is
+     * threaded here, WITHOUT changing any emitted shape.
+     */
+    private fun parentAgentIdForAttribution(): String? = null
+
     private suspend fun resolveMostRecentConversation(maxAge: Duration): String? {
-        return chatSessionResolver.resolveMostRecentConversation(agentId, maxAge.inWholeMilliseconds)
+        // letta-mobile-grrhq: H1 under test. If a CHILD-agent route reaches this
+        // fallback and the newest cached conversation for that child is the
+        // PARENT's, this is where the second holder's identity gets decided.
+        val selection = chatSessionResolver.resolveMostRecentConversationWithProvenance(
+            agentId = agentId,
+            maxAgeMs = maxAge.inWholeMilliseconds,
+            parentAgentId = parentAgentIdForAttribution(),
+        )
+        recordSelection(TimelineConversationSelectionMode.MOST_RECENT_FALLBACK, selection.capture)
+        return selection.conversationId
             ?.also { setRouteConversationId(it) }
     }
 

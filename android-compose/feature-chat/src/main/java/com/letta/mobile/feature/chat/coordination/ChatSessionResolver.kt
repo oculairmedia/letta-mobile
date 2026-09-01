@@ -3,6 +3,8 @@ package com.letta.mobile.feature.chat.coordination
 import com.letta.mobile.data.chat.runtime.SharedChatSessionResolver
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
+import com.letta.mobile.data.timeline.TimelineConversationAttributionCapture
+import com.letta.mobile.data.timeline.TimelineConversationSelectionMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 
@@ -36,4 +38,25 @@ internal class ChatSessionResolver(
         agentId: String,
         maxAgeMs: Long,
     ): String? = delegate.resolveMostRecentConversation(agentId, maxAgeMs)
+
+    /** letta-mobile-grrhq: same selection, plus a bounded attribution capture. */
+    suspend fun resolveMostRecentConversationWithProvenance(
+        agentId: String,
+        maxAgeMs: Long,
+        parentAgentId: String? = null,
+    ): SharedChatSessionResolver.ConversationSelection =
+        delegate.resolveMostRecentConversationWithProvenance(agentId, maxAgeMs, parentAgentId)
+
+    /** letta-mobile-grrhq: capture for a selection made outside the resolver. */
+    fun captureAttribution(
+        requestedAgentId: String,
+        selectedConversationId: String?,
+        parentAgentId: String?,
+        selectionMode: TimelineConversationSelectionMode,
+    ): TimelineConversationAttributionCapture = delegate.captureAttribution(
+        requestedAgentId = requestedAgentId,
+        selectedConversationId = selectedConversationId,
+        parentAgentId = parentAgentId,
+        selectionMode = selectionMode,
+    )
 }

@@ -102,6 +102,10 @@ import com.letta.mobile.ui.chat.render.toConversationState
 import com.letta.mobile.ui.chat.render.ProjectChatContext
 import com.letta.mobile.data.chat.runtime.ChatSessionState
 import com.letta.mobile.data.chat.runtime.ChatSessionReducer
+import com.letta.mobile.data.timeline.TimelineAcquisitionFrameFamily
+import com.letta.mobile.data.timeline.TimelineAcquisitionProvenance
+import com.letta.mobile.data.timeline.TimelineAcquisitionSource
+import com.letta.mobile.data.timeline.TimelineConversationSelectionMode
 
 internal fun resolveLocalRuntimeRouting(
     agent: Agent?,
@@ -738,9 +742,41 @@ internal class AdminChatViewModel @Inject constructor(
 
     fun removeAttachment(index: Int) = composerCoordinator.removeAttachment(index)
 
+    /**
+     * letta-mobile-grrhq: build the provenance for this bind from the
+     * coordinator's recorded resolver/route decision, so the resolver decision,
+     * any alias refusal, and the resulting second-holder creation all carry one
+     * acquisitionId. Diagnostic only — nothing here affects what is observed.
+     */
+    private fun timelineObserverProvenance(): TimelineAcquisitionProvenance {
+        val selection = chatConversationCoordinator.lastConversationSelection
+            ?: return TimelineAcquisitionProvenance(
+                acquisitionId = "",
+                source = TimelineAcquisitionSource.UI_NAVIGATION,
+                operation = "observer.start",
+                callSite = "AdminChatViewModel.kt:startTimelineObserver",
+                frameFamily = TimelineAcquisitionFrameFamily.DIRECT_NAVIGATION,
+            )
+        val resolved = selection.selectionMode == TimelineConversationSelectionMode.MOST_RECENT_FALLBACK ||
+            selection.selectionMode == TimelineConversationSelectionMode.DEFAULT_FALLBACK
+        return TimelineAcquisitionProvenance(
+            acquisitionId = selection.acquisitionId,
+            source = if (resolved) {
+                TimelineAcquisitionSource.UI_RESOLVED_ROUTE
+            } else {
+                TimelineAcquisitionSource.UI_NAVIGATION
+            },
+            operation = "observer.start",
+            callSite = "AdminChatViewModel.kt:startTimelineObserver",
+            frameFamily = TimelineAcquisitionFrameFamily.DIRECT_NAVIGATION,
+            selectionMode = selection.selectionMode,
+            attribution = selection.capture,
+        )
+    }
+
     private fun startTimelineObserver(conversationId: String) {
         adminChatA2uiCoordinator.ensureA2uiConversation(conversationId)
-        chatTimelineObserver.start(agentId.value, conversationId)
+        chatTimelineObserver.start(agentId.value, conversationId, timelineObserverProvenance())
         // letta-mobile-qfa81 (P4): the iroh active-reconcile poll loop
         // (startIrohRecentReconcileLoop) and its stall-recovery crutch were
         // removed here. P3 (canonical run ids + durable dedupe + parked
