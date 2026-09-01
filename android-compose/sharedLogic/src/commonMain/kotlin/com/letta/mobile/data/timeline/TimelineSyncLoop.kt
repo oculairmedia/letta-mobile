@@ -92,8 +92,11 @@ class TimelineSyncLoop(
     // every LEGACY_CHECKPOINT_INTERVAL successful normalized commits, plus always on the very
     // first commit for a scope. Bounds legacy staleness to at most that many revisions.
     private var commitsSinceLegacyCheckpoint: Int = 0
-    // Wall-clock of the last persist attempt, for the streaming safety-flush bound below.
-    private var lastPersistAtMs: Long = 0L
+    // Set when a persist was suppressed during an active turn, so the per-turn safety timer
+    // only writes when there is actually something deferred to write.
+    @Volatile
+    private var deferredDuringTurn: Boolean = false
+    private var turnSafetyFlushJob: Job? = null
     // Set once this loop is proven not to own its conversation's durable state (see
     // onStaleRejection). A detached loop still serves reads; it just stops writing.
     @Volatile
@@ -121,7 +124,7 @@ class TimelineSyncLoop(
             conversationId = conversationId,
             agentId = agentId,
             processor = timelineProcessor,
-            onStreamFrameIngested = { scheduleSnapshotPersist(immediate = false) },
+            onStreamFrameIngested = { scheduleSnapshotPersist(SnapshotPersistReason.STREAM_FRAME) },
         )
     }
 
@@ -134,7 +137,7 @@ class TimelineSyncLoop(
         state = state,
         streamSubscriberActive = _streamSubscriberActive.asStateFlow(),
         processor = timelineProcessor,
-            onSnapshotApplied = { scheduleSnapshotPersist(immediate = true) },
+            onSnapshotApplied = { scheduleSnapshotPersist(SnapshotPersistReason.RECONCILE) },
         )
     }
 
@@ -145,16 +148,46 @@ class TimelineSyncLoop(
             pendingLocalStore = pendingLocalStore,
             events = _events,
             timelineProcessor = timelineProcessor,
-            onHydrationCommitted = { scheduleSnapshotPersist(immediate = true) },
+            onHydrationCommitted = { scheduleSnapshotPersist(SnapshotPersistReason.HYDRATION) },
         )
     }
 
-    internal fun scheduleSnapshotPersist(immediate: Boolean = false) {
+    /**
+     * letta-mobile-827s9.4, dogfood round 3 item 1: every scheduling source is now TYPED.
+     *
+     * The previous boolean gated only `Debounced` requests, and 12 of the 13 call sites passed
+     * `immediate = true` -- so hydration, reconcile, cursor repair and local-mutation callbacks
+     * all bypassed the streaming deferral entirely. That is why the capture still showed 12
+     * commits in 106 s, including a background conversation committing 11 times at 182-207 ms
+     * each while a different conversation was under test.
+     *
+     * During an active turn only [SnapshotPersistReason.isTurnBoundary] reasons may write.
+     * Everything else coalesces behind that boundary instead of jumping it.
+     */
+    internal fun scheduleSnapshotPersist(reason: SnapshotPersistReason) {
         timelineScope ?: return
         if (confirmedTimelineStore === NoOpConfirmedTimelineStore) return
         if (detachedAsStaleWriter) return
+        if (turnActive && !reason.isTurnBoundary) {
+            Telemetry.event(
+                "TimelineSync", "snapshotPersist.streamingDeferred",
+                "conversationId" to conversationId,
+                "agentId" to agentId.orEmpty(),
+                "reason" to reason.name,
+            )
+            deferredDuringTurn = true
+            armSafetyFlushDeadline()
+            return
+        }
+        Telemetry.event(
+            "TimelineSync", "snapshotPersist.scheduled",
+            "conversationId" to conversationId,
+            "agentId" to agentId.orEmpty(),
+            "reason" to reason.name,
+            "turnActive" to turnActive,
+        )
         persistRequests.trySend(
-            if (immediate) SnapshotPersistRequest.Immediate else SnapshotPersistRequest.Debounced,
+            if (reason.isDebounced) SnapshotPersistRequest.Debounced else SnapshotPersistRequest.Immediate,
         )
     }
 
@@ -162,45 +195,17 @@ class TimelineSyncLoop(
         for (request in persistRequests) {
             if (request == SnapshotPersistRequest.Debounced) {
                 delay(SNAPSHOT_PERSIST_DEBOUNCE)
-                if (shouldDeferStreamingPersist()) continue
             }
             while (persistRequests.tryReceive().isSuccess) {
                 // Coalesce all timeline changes received during the debounce window into the latest state.
             }
-            lastPersistAtMs = timelineCurrentTimeMillis()
+            // Deferral is decided at SCHEDULING time by reason now, not here on arrival --
+            // arrival-based gating let unrelated later requests decide when a write happened,
+            // which is what produced the irregular 2.5-17 s commit spacing in the capture.
             flushSnapshotNow(prune = true)
         }
     }
 
-    /**
-     * letta-mobile-827s9.4, dogfood round 2: do NOT persist every streaming delta.
-     *
-     * Every applied stream frame schedules a Debounced persist, and the debounce is only
-     * [SNAPSHOT_PERSIST_DEBOUNCE]. On the Pixel capture a visible 2,161-event conversation
-     * took 589-721 ms per commit, so a streaming turn queued commits far faster than they
-     * could drain: 0.2-0.7 s persistence windows back to back, heap to the 256 MiB ceiling,
-     * GC freeing 159-181 MiB, and Choreographer skipping 34-79 frames. Removing full-envelope
-     * JSON encoding was necessary but did not touch this, because the remaining per-commit
-     * cost is O(N) planner comparison plus an O(N) digest projection.
-     *
-     * While a turn is streaming, a frame-driven persist is therefore SKIPPED unless
-     * [STREAMING_SAFETY_FLUSH] has elapsed since the last one. Durability is not weakened:
-     * settlement, hydration, reconcile and turn-end all schedule IMMEDIATE persists, which are
-     * never deferred, so a completed turn is still written promptly. The safety flush bounds
-     * exposure for a single very long streamed response, which would otherwise persist only at
-     * its end.
-     */
-    private fun shouldDeferStreamingPersist(): Boolean {
-        if (!turnActive) return false
-        val sinceLastPersist = timelineCurrentTimeMillis() - lastPersistAtMs
-        if (sinceLastPersist >= STREAMING_SAFETY_FLUSH.inWholeMilliseconds) return false
-        Telemetry.event(
-            "TimelineSync", "snapshotPersist.streamingDeferred",
-            "conversationId" to conversationId,
-            "sinceLastPersistMs" to sinceLastPersist,
-        )
-        return true
-    }
 
     suspend fun flushSnapshotNow(prune: Boolean = false) {
         val snapshotScope = timelineScope ?: return
@@ -424,7 +429,7 @@ class TimelineSyncLoop(
                 is RecentMessagesReconcileOutcome.Failed -> throw outcome.cause
             }
         },
-        onSettlementCommitted = { scheduleSnapshotPersist(immediate = true) },
+        onSettlementCommitted = { scheduleSnapshotPersist(SnapshotPersistReason.SETTLEMENT) },
     ) }
 
     /** True while a turn is believed active for this conversation. Toggled by [turnStarted]/[turnEnded]. */
@@ -560,7 +565,43 @@ class TimelineSyncLoop(
      */
     suspend fun turnStarted() {
         turnActive = true
+        deferredDuringTurn = false
+        startTurnSafetyFlushTimer()
         danglingToolCallResolver.cancelPendingSweep()
+    }
+
+    /**
+     * letta-mobile-827s9.4, dogfood round 3 item 2: a real per-turn DEADLINE, not
+     * request-arrival behaviour.
+     *
+     * The previous safety flush only took effect when some later request happened to arrive
+     * after the window had elapsed, so unrelated callbacks decided when the write happened.
+     * That is why the capture showed irregular 2.5-17 s spacing instead of a bound. A deferred
+     * request now enqueues nothing; this timer owns the boundary, firing at most once per
+     * [STREAMING_SAFETY_FLUSH] and only when something was actually deferred.
+     */
+    private fun startTurnSafetyFlushTimer() {
+        turnSafetyFlushJob?.cancel()
+        turnSafetyFlushJob = null
+    }
+
+    /**
+     * Arms a ONE-SHOT deadline the first time a persist is deferred in this turn.
+     *
+     * Deliberately not a `while (turnActive) { delay(...) }` poll. A never-completing delay
+     * loop makes `advanceUntilIdle()` spin forever in tests, and in production it wakes every
+     * 5 s for the whole turn even when nothing was deferred. One-shot, re-armed only by the
+     * next deferral, costs nothing on an idle conversation and terminates.
+     */
+    private fun armSafetyFlushDeadline() {
+        if (turnSafetyFlushJob?.isActive == true) return
+        turnSafetyFlushJob = loopScope.launch {
+            delay(STREAMING_SAFETY_FLUSH)
+            if (turnActive && deferredDuringTurn) {
+                deferredDuringTurn = false
+                scheduleSnapshotPersist(SnapshotPersistReason.SAFETY_FLUSH)
+            }
+        }
     }
 
     /**
@@ -581,12 +622,14 @@ class TimelineSyncLoop(
      */
     suspend fun turnEnded(clean: Boolean) {
         turnActive = false
+        turnSafetyFlushJob?.cancel()
+        turnSafetyFlushJob = null
         // letta-mobile-827s9.4: this is the settled boundary the streaming defer in
         // shouldDeferStreamingPersist relies on. Without it, a turn whose final delta was
         // deferred stays memory-only until some unrelated trigger happens along -- the
         // deferral would be trading a real durability guarantee for frame rate, which is not
         // the bargain. Scheduled AFTER clearing turnActive so it is never itself deferred.
-        scheduleSnapshotPersist(immediate = true)
+        scheduleSnapshotPersist(SnapshotPersistReason.TURN_END)
         danglingToolCallResolver.scheduleSweepIfUnresolved(clean)
     }
 
@@ -676,7 +719,7 @@ class TimelineSyncLoop(
                         try {
                             stateTransitionHandler.applyLocalSendAppend(event)
                         } finally {
-                            scheduleSnapshotPersist(immediate = true)
+                            scheduleSnapshotPersist(SnapshotPersistReason.LOCAL_MUTATION)
                         }
                     }
                     is TimelineGatewayEvent.ExternalTransportLocalAppend -> {
@@ -684,7 +727,7 @@ class TimelineSyncLoop(
                         try {
                             externalTransportAppender.applyExternalTransportLocalAppend(event)
                         } finally {
-                            scheduleSnapshotPersist(immediate = true)
+                            scheduleSnapshotPersist(SnapshotPersistReason.LOCAL_MUTATION)
                         }
                     }
                     is TimelineGatewayEvent.ReconcileAfterSendSnapshot -> applyReconcileAfterSendSnapshot(event)
@@ -695,21 +738,21 @@ class TimelineSyncLoop(
                         try {
                             stateTransitionHandler.applyRetrySend(event)
                         } finally {
-                            scheduleSnapshotPersist(immediate = true)
+                            scheduleSnapshotPersist(SnapshotPersistReason.LOCAL_MUTATION)
                         }
                     }
                     is TimelineGatewayEvent.MarkSent -> {
                         try {
                             stateTransitionHandler.applyMarkSent(event)
                         } finally {
-                            scheduleSnapshotPersist(immediate = true)
+                            scheduleSnapshotPersist(SnapshotPersistReason.LOCAL_MUTATION)
                         }
                     }
                     is TimelineGatewayEvent.MarkFailed -> {
                         try {
                             stateTransitionHandler.applyMarkFailed(event)
                         } finally {
-                            scheduleSnapshotPersist(immediate = true)
+                            scheduleSnapshotPersist(SnapshotPersistReason.LOCAL_MUTATION)
                         }
                     }
                     is TimelineGatewayEvent.CleanupAbandonedAssistantFragments -> applyCleanupAbandonedAssistantFragments(event)
@@ -747,7 +790,7 @@ class TimelineSyncLoop(
             is TimelineProcessorAck.Applied -> {
                 val result = applied.result as? TimelineReductionResult.ReconcileAfterSendApplied
                     ?: error("post-send acknowledgement did not carry reconcile result")
-                if (result.changed) scheduleSnapshotPersist(immediate = true)
+                if (result.changed) scheduleSnapshotPersist(SnapshotPersistReason.LOCAL_MUTATION)
                 event.ack.complete(result.result)
             }
             is TimelineProcessorAck.Rejected,
@@ -787,7 +830,7 @@ class TimelineSyncLoop(
                 val result = ack.result as? TimelineReductionResult.CleanupApplied
                 val removed = result?.removed ?: 0
                 if (result?.changed == true) {
-                    scheduleSnapshotPersist(immediate = true)
+                    scheduleSnapshotPersist(SnapshotPersistReason.LOCAL_MUTATION)
                     if (!event.runId.isNullOrBlank()) {
                         _events.emit(TimelineSyncEvent.OrphanAssistantFragmentsCleaned(event.runId, event.turnId, removed, event.reason))
                     }
@@ -824,7 +867,7 @@ class TimelineSyncLoop(
         val result = (applied as? TimelineProcessorAck.Applied)?.result as? TimelineReductionResult.FullToolReturnRepaired
             ?: return false
         if (!result.changed) return false
-        scheduleSnapshotPersist(immediate = true)
+        scheduleSnapshotPersist(SnapshotPersistReason.LOCAL_MUTATION)
         Telemetry.event(
             "TimelineSync", "toolReturn.resolved",
             "conversationId" to conversationId,

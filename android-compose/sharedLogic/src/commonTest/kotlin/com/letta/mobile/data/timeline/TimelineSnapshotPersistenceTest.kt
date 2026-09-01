@@ -111,11 +111,11 @@ class TimelineSnapshotPersistenceTest {
             ioDispatcher = kotlinx.coroutines.test.StandardTestDispatcher(testScheduler),
         )
 
-        fixture.loop.scheduleSnapshotPersist(immediate = true)
+        fixture.loop.scheduleSnapshotPersist(SnapshotPersistReason.LOCAL_MUTATION)
         runCurrent()
         store.firstWriteStarted.await()
         fixture.loop.ingestStreamEvent(ConfirmedMessageFixture("msg-1", "confirmed hello").message())
-        fixture.loop.scheduleSnapshotPersist(immediate = false)
+        fixture.loop.scheduleSnapshotPersist(SnapshotPersistReason.STREAM_FRAME)
         store.releaseFirstWrite.complete(Unit)
         advanceUntilIdle()
 
@@ -139,7 +139,7 @@ class TimelineSnapshotPersistenceTest {
             ioDispatcher = kotlinx.coroutines.test.StandardTestDispatcher(testScheduler),
         )
 
-        fixture.loop.scheduleSnapshotPersist(immediate = true)
+        fixture.loop.scheduleSnapshotPersist(SnapshotPersistReason.LOCAL_MUTATION)
         runCurrent()
         store.firstWriteStarted.await()
         store.releaseFirstWrite.complete(Unit)
@@ -148,7 +148,7 @@ class TimelineSnapshotPersistenceTest {
 
         // Trigger 100 un-mutated persist schedules
         repeat(100) {
-            fixture.loop.scheduleSnapshotPersist(immediate = true)
+            fixture.loop.scheduleSnapshotPersist(SnapshotPersistReason.LOCAL_MUTATION)
             advanceUntilIdle()
         }
 
@@ -168,7 +168,7 @@ class TimelineSnapshotPersistenceTest {
         )
         Telemetry.clear()
 
-        fixture.loop.scheduleSnapshotPersist(immediate = true)
+        fixture.loop.scheduleSnapshotPersist(SnapshotPersistReason.LOCAL_MUTATION)
         advanceUntilIdle()
         val first = mutationShapeEvents()
         assertEquals(1, first.size)
@@ -181,7 +181,7 @@ class TimelineSnapshotPersistenceTest {
         fixture.loop.flushSnapshotNow()
         assertEquals(1, mutationShapeEvents().size)
 
-        fixture.loop.scheduleSnapshotPersist(immediate = true)
+        fixture.loop.scheduleSnapshotPersist(SnapshotPersistReason.LOCAL_MUTATION)
         advanceUntilIdle()
         val shapes = mutationShapeEvents()
         assertEquals(2, shapes.size)
@@ -286,7 +286,7 @@ class TimelineSnapshotPersistenceTest {
             ioDispatcher = kotlinx.coroutines.test.StandardTestDispatcher(testScheduler),
         )
 
-        loop.scheduleSnapshotPersist(immediate = true)
+        loop.scheduleSnapshotPersist(SnapshotPersistReason.LOCAL_MUTATION)
         runCurrent()
         store.firstWriteStarted.await()
         val closing = async { loop.closeAndJoin() }

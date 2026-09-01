@@ -11,6 +11,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonPrimitive
@@ -251,14 +252,32 @@ class TimelineSyncLoopIncrementalPersistenceTest {
         val loop = newLoop(scope, store, dispatcher)
 
         loop.turnStarted()
+        // advanceUntilIdle() would ALSO run the armed 5 s deadline on every iteration, which
+        // makes the bound unobservable. Advance by the frame interval instead so virtual time
+        // is controlled: 40 deltas x 100 ms = 4 s, which is inside one safety window.
         repeat(40) { index ->
             loop.ingestStreamEvent(
                 UserMessage(id = "msg-$index", date = FIXTURE_DATE, contentRaw = JsonPrimitive("delta $index")),
             )
-            // Let the debounce elapse, as real frame arrival does.
-            advanceUntilIdle()
+            advanceTimeBy(100)
         }
-        val commitsDuringStreaming = store.commits
+        val commitsInsideFirstWindow = store.commits
+        assertEquals(
+            "40 deltas inside one 5 s window must produce no streaming commits at all",
+            0,
+            commitsInsideFirstWindow,
+        )
+
+        // Cross the deadline: exactly one safety flush, regardless of how many deltas arrived.
+        advanceTimeBy(1_500)
+        advanceUntilIdle()
+        val commitsAfterOneWindow = store.commits
+        assertEquals(
+            "crossing the safety deadline must produce exactly one commit",
+            1,
+            commitsAfterOneWindow,
+        )
+        val commitsDuringStreaming = commitsAfterOneWindow
 
         // Review round 2 item 1: deliberately NO manual flushSnapshotNow() here. Calling the
         // internal flush seam is what masked the real defect -- turnEnded cleared turnActive
@@ -285,10 +304,6 @@ class TimelineSyncLoopIncrementalPersistenceTest {
             Thread.sleep(10)
         }
 
-        assertTrue(
-            "40 streamed deltas must not produce ~40 commits; observed $commitsDuringStreaming",
-            commitsDuringStreaming <= 3,
-        )
         assertEquals(
             "turnEnded alone must durably persist the completed turn",
             40,
