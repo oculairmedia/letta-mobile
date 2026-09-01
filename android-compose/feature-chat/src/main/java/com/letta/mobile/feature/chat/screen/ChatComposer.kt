@@ -342,7 +342,6 @@ private fun ChatComposerInput(
     // reclaims the padding. Driven off ime visibility rather than focus so it
     // tracks the keyboard even when the field loses focus while the IME is
     // still up (e.g. user taps the attach menu).
-    val keyboardOpen = WindowInsets.ime.getBottom(LocalDensity.current) > 0
     // Drive the height transition from the same continuously changing IME
     // inset that moves the parent. A fixed tween starts after the keyboard
     // transition and produces a visible pop on close.

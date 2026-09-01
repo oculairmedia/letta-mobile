@@ -12,7 +12,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.feature.chat.subagent.ActiveSubagentSource
@@ -57,7 +56,6 @@ internal fun ChatScreen(
     val committedFontScale = activeFontScale
     LettaChatTheme(fontScale = committedFontScale ?: 1f) {
         var floatingBannerMessage by remember { mutableStateOf("") }
-        val density = LocalDensity.current
         val currentConversationId = viewModel.conversationId?.value
         val subagentBarState = rememberChatScreenSubagentBarState(
             resolvedSubagentSource = resolvedSubagentSource,
