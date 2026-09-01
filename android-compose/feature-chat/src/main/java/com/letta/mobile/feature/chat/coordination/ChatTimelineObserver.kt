@@ -170,7 +170,11 @@ internal class ChatTimelineObserver(
             val conversationId = binding.conversationId
             val provenance = pendingProvenance
             val flow = try {
-                timelineRepository.observe(agentId, conversationId, provenance)
+                if (provenance == TimelineAcquisitionProvenance.UNSPECIFIED) {
+                    timelineRepository.observe(agentId, conversationId)
+                } else {
+                    timelineRepository.observe(agentId, conversationId, provenance)
+                }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: Exception) {
@@ -185,7 +189,11 @@ internal class ChatTimelineObserver(
             }
 
             if (observerBinding != binding) return@launch
-            val loop = timelineRepository.getOrCreate(agentId, conversationId, provenance)
+            val loop = if (provenance == TimelineAcquisitionProvenance.UNSPECIFIED) {
+                timelineRepository.getOrCreate(agentId, conversationId)
+            } else {
+                timelineRepository.getOrCreate(agentId, conversationId, provenance)
+            }
             if (observerBinding != binding) return@launch
             currentConversationTracker.setCurrent(conversationId)
             hydrateSignalJob = launchHydrationCollector(loop, binding, generation)

@@ -64,11 +64,9 @@ class ChatTimelineObserverTest {
 
         // ChatTimelineObserver.start(conversationId) delegates to the
         // agentId-scoped start(agentId = null, conversationId), which calls
-        // the PROVENANCE-carrying three-arg observe/getOrCreate overloads
-        // (letta-mobile-grrhq). Verifying the two-arg form here would pass
-        // vacuously while production called the three-arg one.
-        coVerify(exactly = 1) { harness.timelineRepository.observe(null, "conv-1", any()) }
-        coVerify(exactly = 1) { harness.timelineRepository.getOrCreate(null, "conv-1", any()) }
+        // the two-arg observe/getOrCreate overloads.
+        coVerify(exactly = 1) { harness.timelineRepository.observe(null, "conv-1") }
+        coVerify(exactly = 1) { harness.timelineRepository.getOrCreate(null, "conv-1") }
         assertEquals("conv-1", harness.currentConversationTracker.current)
     }
 
@@ -168,7 +166,7 @@ class ChatTimelineObserverTest {
             "conv-1",
             listOf(confirmed("assistant-10", "cached", TimelineMessageType.ASSISTANT)),
         )
-        coEvery { harness.timelineRepository.observe(null, "conv-1", any()) } coAnswers {
+        coEvery { harness.timelineRepository.observe(null, "conv-1") } coAnswers {
             observeStarted.complete(Unit)
             releaseObserve.await()
             harness.timelineFlows.getValue(TimelineHarnessKey(null, "conv-1"))
@@ -232,7 +230,7 @@ class ChatTimelineObserverTest {
         val harness = Harness(backgroundScope)
         harness.seedTimeline("conv-old", listOf(confirmed("assistant-old", "old")))
         harness.seedTimeline("conv-new", listOf(confirmed("assistant-new", "new")))
-        coEvery { harness.timelineRepository.observe(null, "conv-old", any()) } coAnswers {
+        coEvery { harness.timelineRepository.observe(null, "conv-old") } coAnswers {
             oldObserveStarted.complete(Unit)
             releaseOldObserve.await()
             harness.timelineFlows.getValue(TimelineHarnessKey(null, "conv-old"))
@@ -300,8 +298,8 @@ class ChatTimelineObserverTest {
         harness.observer.start("conv-2")
         runCurrent()
 
-        coVerify(exactly = 1) { harness.timelineRepository.observe(null, "conv-1", any()) }
-        coVerify(exactly = 1) { harness.timelineRepository.observe(null, "conv-2", any()) }
+        coVerify(exactly = 1) { harness.timelineRepository.observe(null, "conv-1") }
+        coVerify(exactly = 1) { harness.timelineRepository.observe(null, "conv-2") }
         assertEquals("conv-2", harness.currentConversationTracker.current)
     }
 
@@ -322,8 +320,8 @@ class ChatTimelineObserverTest {
 
         assertEquals(listOf("assistant-1"), harness.uiState.value.messages.map { it.id })
         assertEquals("done", harness.uiState.value.messages.single().content)
-        coVerify(exactly = 1) { harness.timelineRepository.observe("agent-a", "default", any()) }
-        coVerify(exactly = 1) { harness.timelineRepository.getOrCreate("agent-a", "default", any()) }
+        coVerify(exactly = 1) { harness.timelineRepository.observe("agent-a", "default") }
+        coVerify(exactly = 1) { harness.timelineRepository.getOrCreate("agent-a", "default") }
     }
 
     @Test
@@ -1032,16 +1030,8 @@ class ChatTimelineObserverTest {
             coEvery { timelineRepository.observe(any<String>(), any()) } answers {
                 timelineFlows.getValue(TimelineHarnessKey(firstArg(), secondArg()))
             }
-            // letta-mobile-grrhq: production now calls the PROVENANCE-carrying
-            // overloads. MockK dispatches on arity, so without these the 2-arg
-            // stubs above stop matching, the mock returns a default, and every
-            // projection assertion in this file fails with an empty timeline.
-            coEvery { timelineRepository.observe(any<String>(), any(), any()) } answers {
-                timelineFlows.getValue(TimelineHarnessKey(firstArg(), secondArg()))
-            }
             coEvery { timelineRepository.getOrCreate(any<String>()) } returns loop
             coEvery { timelineRepository.getOrCreate(any<String>(), any()) } returns loop
-            coEvery { timelineRepository.getOrCreate(any<String>(), any(), any()) } returns loop
             every { timelineRepository.peekCached(any(), any()) } answers {
                 timelineFlows[TimelineHarnessKey(firstArg(), secondArg())]?.value
             }
