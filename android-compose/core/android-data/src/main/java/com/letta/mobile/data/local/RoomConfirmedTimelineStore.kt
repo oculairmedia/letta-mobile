@@ -4,6 +4,8 @@ import androidx.room.withTransaction
 import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineReadResult
 import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore
 import com.letta.mobile.data.timeline.snapshot.SnapshotReadFailure
+import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineCommitPlanner
+import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineCommitPlan
 import com.letta.mobile.data.timeline.snapshot.StoredTimelineEnvelope
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
@@ -21,9 +23,11 @@ import kotlinx.coroutines.withContext
 /** CursorWindow-safe Room persistence using metadata heads and bounded BLOB chunks. */
 class RoomConfirmedTimelineStore(
     private val database: LettaDatabase,
+    private val bootstrapBatchObserver: suspend (Int) -> Unit = {},
 ) : ConfirmedTimelineStore {
     private val dao = database.confirmedTimelineSnapshotDao()
     private val manifestReader = RoomTimelineManifestReader(dao)
+    private val normalizedReader = RoomNormalizedTimelineReader()
 
     override suspend fun readSnapshot(scope: TimelineScope): StoredTimelineEnvelope? {
         return readSnapshotResult(scope).snapshot
@@ -31,15 +35,87 @@ class RoomConfirmedTimelineStore(
 
     override suspend fun readSnapshotResult(scope: TimelineScope): ConfirmedTimelineReadResult {
         return withContext(Dispatchers.IO) {
-        val startedAtMillis = timelineCurrentTimeMillis()
-        val head = dao.getHeadMetadata(scope.backendId, scope.conversationId)
-            ?: return@withContext ConfirmedTimelineReadResult.ReconciliationRequired(SnapshotReadFailure.MISSING)
-        if (!head.matches(scope)) {
-            return@withContext ConfirmedTimelineReadResult.ReconciliationRequired(SnapshotReadFailure.METADATA_INVALID)
-        }
-            readFromHead(RoomSnapshotReadRequest(scope, head, startedAtMillis))
+            val startedAtMillis = timelineCurrentTimeMillis()
+            val head = dao.getHeadMetadata(scope.backendId, scope.conversationId)
+                ?: return@withContext readNormalized(scope)
+                    ?: ConfirmedTimelineReadResult.ReconciliationRequired(SnapshotReadFailure.MISSING)
+            if (!head.matches(scope)) {
+                return@withContext ConfirmedTimelineReadResult.ReconciliationRequired(SnapshotReadFailure.METADATA_INVALID)
+            }
+            val legacy = readFromHead(RoomSnapshotReadRequest(scope, head, startedAtMillis))
+            if (legacy !is ConfirmedTimelineReadResult.Active) return@withContext legacy
+            val envelope = legacy.snapshot
+            if (!normalizedBootstrapIsSafe(envelope) || !bootstrapNormalized(envelope)) return@withContext legacy
+            readNormalized(scope) ?: legacy
         }
     }
+
+    private suspend fun readNormalized(scope: TimelineScope): ConfirmedTimelineReadResult? {
+        val normalizedHead = dao.getNormalizedHead(scope.backendId, scope.conversationId)
+            ?: return null
+        return when (val read = normalizedReader.read(scope, normalizedHead, dao.getNormalizedRows(scope.backendId, scope.conversationId))) {
+            is NormalizedTimelineRead.Valid -> ConfirmedTimelineReadResult.Active(read.envelope)
+            is NormalizedTimelineRead.Invalid -> ConfirmedTimelineReadResult.ReconciliationRequired(read.failure, normalizedHead.revision)
+        }
+    }
+
+    private suspend fun bootstrapNormalized(envelope: StoredTimelineEnvelope): Boolean {
+        val plan = NormalizedTimelineCommitPlanner.plan(null, envelope) as? NormalizedTimelineCommitPlan.Apply ?: return false
+        val rows = plan.commit.upserts.map { row ->
+            val payload = TimelineSnapshotCodec.json.encodeToString(com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent.serializer(), row.event).toByteArray(StandardCharsets.UTF_8)
+            NormalizedTimelineSnapshotRowEntity(
+                backendId = envelope.scope.backendId,
+                conversationId = envelope.scope.conversationId,
+                identityPrimary = row.key.identityPrimary,
+                identitySecondary = row.key.identitySecondary,
+                eventOrder = row.order,
+                payload = payload,
+                checksum = sha256(payload),
+            )
+        }
+        val root = normalizedRootDigest(envelope, rows)
+        return try {
+            database.withTransaction {
+                dao.deleteNormalizedHead(envelope.scope.backendId, envelope.scope.conversationId)
+                dao.deleteNormalizedRows(envelope.scope.backendId, envelope.scope.conversationId)
+                rows.chunked(NORMALIZED_ROW_INSERT_BATCH).forEachIndexed { index, batch ->
+                    currentCoroutineContext().ensureActive()
+                    dao.insertNormalizedRows(batch)
+                    bootstrapBatchObserver(index)
+                }
+                dao.insertNormalizedHead(
+                    NormalizedTimelineSnapshotHeadEntity(
+                        backendId = envelope.scope.backendId,
+                        conversationId = envelope.scope.conversationId,
+                        agentId = envelope.scope.agentId,
+                        storageLayoutVersion = NORMALIZED_LAYOUT_VERSION,
+                        revision = envelope.revision,
+                        envelopeSchemaVersion = envelope.schemaVersion,
+                        liveCursor = envelope.liveCursor,
+                        backfillCursor = envelope.backfillCursor,
+                        releasedOlderCount = envelope.releasedOlderCount,
+                        rowCount = rows.size,
+                        rootDigest = root,
+                        generation = envelope.revision,
+                        writtenAtMillis = envelope.writtenAtMillis,
+                    )
+                )
+            }
+            true
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
+    private fun normalizedBootstrapIsSafe(envelope: StoredTimelineEnvelope): Boolean =
+        envelope.events.all { event ->
+            TimelineSnapshotCodec.json.encodeToString(
+                com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent.serializer(),
+                event,
+            ).toByteArray(StandardCharsets.UTF_8).size <= NORMALIZED_MAX_ROW_PAYLOAD_BYTES
+        }
 
     private suspend fun readFromHead(request: RoomSnapshotReadRequest): ConfirmedTimelineReadResult {
         val activeId = request.head.activeManifestId
@@ -244,8 +320,10 @@ class RoomConfirmedTimelineStore(
     override suspend fun deleteSnapshot(scope: TimelineScope) {
         withContext(Dispatchers.IO) {
         database.withTransaction {
+            dao.deleteNormalizedHead(scope.backendId, scope.conversationId)
+            dao.deleteNormalizedRows(scope.backendId, scope.conversationId)
             dao.deleteHead(scope.backendId, scope.conversationId)
-                dao.deleteManifestsForScope(scope.backendId, scope.conversationId)
+            dao.deleteManifestsForScope(scope.backendId, scope.conversationId)
             }
         }
     }
@@ -253,8 +331,10 @@ class RoomConfirmedTimelineStore(
     override suspend fun clearForBackend(backendId: String) {
         withContext(Dispatchers.IO) {
         database.withTransaction {
+            dao.clearNormalizedHeadsForBackend(backendId)
+            dao.clearNormalizedRowsForBackend(backendId)
             dao.clearHeadsForBackend(backendId)
-                dao.clearManifestsForBackend(backendId)
+            dao.clearManifestsForBackend(backendId)
             }
         }
     }
@@ -263,11 +343,15 @@ class RoomConfirmedTimelineStore(
         withContext(Dispatchers.IO) {
         database.withTransaction {
             if (maxRetainedConversations <= 0) {
+                dao.clearNormalizedHeadsForBackend(backendId)
+                dao.clearNormalizedRowsForBackend(backendId)
                 dao.clearHeadsForBackend(backendId)
                 dao.clearManifestsForBackend(backendId)
             } else {
                 dao.pruneHeads(backendId, maxRetainedConversations)
-                    dao.deleteOrphanManifestsForBackend(backendId)
+                dao.deleteNormalizedRowsWithoutLegacyHead(backendId)
+                dao.deleteNormalizedHeadsWithoutLegacyHead(backendId)
+                dao.deleteOrphanManifestsForBackend(backendId)
                 }
             }
         }
@@ -333,6 +417,8 @@ class RoomConfirmedTimelineStore(
     companion object {
         const val CHUNK_SIZE_BYTES = 128 * 1024
         private const val CHUNK_INSERT_BATCH = 32
+        private const val NORMALIZED_ROW_INSERT_BATCH = 256
+        private const val NORMALIZED_MAX_ROW_PAYLOAD_BYTES = 512 * 1024
         private const val MAX_CHUNK_COUNT = 2048
         private const val MAX_PAYLOAD_BYTES = CHUNK_SIZE_BYTES.toLong() * MAX_CHUNK_COUNT
     }

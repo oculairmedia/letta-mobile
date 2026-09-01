@@ -28,8 +28,10 @@ import com.letta.mobile.data.model.DomainIdConverters
         ConfirmedTimelineSnapshotHeadEntity::class,
         ConfirmedTimelineSnapshotManifestEntity::class,
         ConfirmedTimelineSnapshotChunkEntity::class,
+        NormalizedTimelineSnapshotHeadEntity::class,
+        NormalizedTimelineSnapshotRowEntity::class,
     ],
-    version = 11,
+    version = 12,
     exportSchema = true,
 )
 @androidx.room.TypeConverters(DomainIdConverters::class)
