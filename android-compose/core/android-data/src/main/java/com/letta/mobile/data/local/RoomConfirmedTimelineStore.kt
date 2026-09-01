@@ -34,34 +34,27 @@ class RoomConfirmedTimelineStore(
 
     override suspend fun readSnapshotResult(scope: TimelineScope): ConfirmedTimelineReadResult {
         return withContext(Dispatchers.IO) {
-        readNormalizedOrBootstrap(scope) ?: run {
             val startedAtMillis = timelineCurrentTimeMillis()
             val head = dao.getHeadMetadata(scope.backendId, scope.conversationId)
-                ?: return@withContext ConfirmedTimelineReadResult.ReconciliationRequired(SnapshotReadFailure.MISSING)
+                ?: return@withContext readNormalized(scope)
+                    ?: ConfirmedTimelineReadResult.ReconciliationRequired(SnapshotReadFailure.MISSING)
             if (!head.matches(scope)) {
                 return@withContext ConfirmedTimelineReadResult.ReconciliationRequired(SnapshotReadFailure.METADATA_INVALID)
             }
-            readFromHead(RoomSnapshotReadRequest(scope, head, startedAtMillis))
-        }
+            val legacy = readFromHead(RoomSnapshotReadRequest(scope, head, startedAtMillis))
+            if (legacy !is ConfirmedTimelineReadResult.Active) return@withContext legacy
+            val envelope = legacy.snapshot
+            if (!bootstrapNormalized(envelope)) return@withContext legacy
+            readNormalized(scope) ?: legacy
         }
     }
 
-    private suspend fun readNormalizedOrBootstrap(scope: TimelineScope): ConfirmedTimelineReadResult? {
+    private suspend fun readNormalized(scope: TimelineScope): ConfirmedTimelineReadResult? {
         val normalizedHead = dao.getNormalizedHead(scope.backendId, scope.conversationId)
-        if (normalizedHead != null) {
-            return when (val read = normalizedReader.read(scope, normalizedHead, dao.getNormalizedRows(scope.backendId, scope.conversationId))) {
-                is NormalizedTimelineRead.Valid -> ConfirmedTimelineReadResult.Active(read.envelope)
-                is NormalizedTimelineRead.Invalid -> ConfirmedTimelineReadResult.ReconciliationRequired(read.failure, normalizedHead.revision)
-            }
-        }
-        val legacyHead = dao.getHeadMetadata(scope.backendId, scope.conversationId) ?: return null
-        if (!legacyHead.matches(scope)) return ConfirmedTimelineReadResult.ReconciliationRequired(SnapshotReadFailure.METADATA_INVALID)
-        val legacy = readFromHead(RoomSnapshotReadRequest(scope, legacyHead, timelineCurrentTimeMillis()))
-        val envelope = legacy.snapshot ?: return legacy
-        if (!bootstrapNormalized(envelope)) return legacy
-        return when (val reread = normalizedReader.read(scope, requireNotNull(dao.getNormalizedHead(scope.backendId, scope.conversationId)), dao.getNormalizedRows(scope.backendId, scope.conversationId))) {
-            is NormalizedTimelineRead.Valid -> ConfirmedTimelineReadResult.Active(reread.envelope)
-            is NormalizedTimelineRead.Invalid -> legacy
+            ?: return null
+        return when (val read = normalizedReader.read(scope, normalizedHead, dao.getNormalizedRows(scope.backendId, scope.conversationId))) {
+            is NormalizedTimelineRead.Valid -> ConfirmedTimelineReadResult.Active(read.envelope)
+            is NormalizedTimelineRead.Invalid -> ConfirmedTimelineReadResult.ReconciliationRequired(read.failure, normalizedHead.revision)
         }
     }
 
@@ -106,8 +99,8 @@ class RoomConfirmedTimelineStore(
                 )
             }
             true
-        } catch (_: CancellationException) {
-            throw
+        } catch (error: CancellationException) {
+            throw error
         } catch (_: Throwable) {
             false
         }
@@ -316,8 +309,10 @@ class RoomConfirmedTimelineStore(
     override suspend fun deleteSnapshot(scope: TimelineScope) {
         withContext(Dispatchers.IO) {
         database.withTransaction {
+            dao.deleteNormalizedHead(scope.backendId, scope.conversationId)
+            dao.deleteNormalizedRows(scope.backendId, scope.conversationId)
             dao.deleteHead(scope.backendId, scope.conversationId)
-                dao.deleteManifestsForScope(scope.backendId, scope.conversationId)
+            dao.deleteManifestsForScope(scope.backendId, scope.conversationId)
             }
         }
     }
@@ -325,8 +320,10 @@ class RoomConfirmedTimelineStore(
     override suspend fun clearForBackend(backendId: String) {
         withContext(Dispatchers.IO) {
         database.withTransaction {
+            dao.clearNormalizedHeadsForBackend(backendId)
+            dao.clearNormalizedRowsForBackend(backendId)
             dao.clearHeadsForBackend(backendId)
-                dao.clearManifestsForBackend(backendId)
+            dao.clearManifestsForBackend(backendId)
             }
         }
     }
@@ -335,6 +332,8 @@ class RoomConfirmedTimelineStore(
         withContext(Dispatchers.IO) {
         database.withTransaction {
             if (maxRetainedConversations <= 0) {
+                dao.clearNormalizedHeadsForBackend(backendId)
+                dao.clearNormalizedRowsForBackend(backendId)
                 dao.clearHeadsForBackend(backendId)
                 dao.clearManifestsForBackend(backendId)
             } else {

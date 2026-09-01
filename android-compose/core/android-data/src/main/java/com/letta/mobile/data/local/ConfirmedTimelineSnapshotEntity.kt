@@ -143,6 +143,12 @@ interface ConfirmedTimelineSnapshotDao {
     @Query("DELETE FROM normalized_timeline_snapshot_heads WHERE backend_id = :backendId AND conversation_id = :conversationId")
     suspend fun deleteNormalizedHead(backendId: String, conversationId: String)
 
+    @Query("DELETE FROM normalized_timeline_snapshot_rows WHERE backend_id = :backendId")
+    suspend fun clearNormalizedRowsForBackend(backendId: String)
+
+    @Query("DELETE FROM normalized_timeline_snapshot_heads WHERE backend_id = :backendId")
+    suspend fun clearNormalizedHeadsForBackend(backendId: String)
+
     @Query(
         """
         SELECT manifest_id, backend_id, conversation_id, agent_id, revision, schema_version,
