@@ -68,12 +68,22 @@ class NormalizedTimelineCommitTest {
 
         val noOp = cursorOnly.copy(revision = 5L)
         val noOpPlan = assertIs<NormalizedTimelineCommitPlan.NoOp>(NormalizedTimelineCommitPlanner.plan(cursorOnly, noOp))
-        assertEquals(NormalizedTimelineWriteResult.NoOp(TimelineRevision(4L)), store.apply(noOpPlan))
+        assertEquals(NormalizedTimelineWriteResult.NoOp(TimelineRevision(5L)), store.apply(noOpPlan))
 
-        val stale = envelope(4L, reordered.events + event(3_000))
+        val changedAfterNoOp = noOp.copy(revision = 6L, events = noOp.events + event(2_500), writtenAtMillis = 6L)
+        val changedAfterNoOpPlan = assertIs<NormalizedTimelineCommitPlan.Apply>(
+            NormalizedTimelineCommitPlanner.plan(noOp, changedAfterNoOp),
+        )
+        assertEquals(
+            NormalizedTimelineWriteResult.Committed(TimelineRevision(6L)),
+            store.apply(changedAfterNoOpPlan),
+        )
+        assertEquals(changedAfterNoOp, store.read(scope))
+
+        val stale = envelope(5L, reordered.events + event(3_000))
         val stalePlan = assertIs<NormalizedTimelineCommitPlan.Apply>(NormalizedTimelineCommitPlanner.plan(reordered, stale))
-        assertEquals(NormalizedTimelineWriteResult.Stale(TimelineRevision(4L)), store.apply(stalePlan))
-        assertEquals(cursorOnly, store.read(scope))
+        assertEquals(NormalizedTimelineWriteResult.Stale(TimelineRevision(6L)), store.apply(stalePlan))
+        assertEquals(changedAfterNoOp, store.read(scope))
     }
 
     @Test

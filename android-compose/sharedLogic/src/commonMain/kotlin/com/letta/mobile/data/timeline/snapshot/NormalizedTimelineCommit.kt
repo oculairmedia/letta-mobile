@@ -46,7 +46,12 @@ data class NormalizedTimelineCommit(
 
 sealed interface NormalizedTimelineCommitPlan {
     data class Apply(val commit: NormalizedTimelineCommit) : NormalizedTimelineCommitPlan
-    data class NoOp(val scope: TimelineScope, val revision: TimelineRevision) : NormalizedTimelineCommitPlan
+    data class NoOp(
+        val scope: TimelineScope,
+        val baseRevision: TimelineRevision,
+        val targetRevision: TimelineRevision,
+        val writtenAtMillis: Long,
+    ) : NormalizedTimelineCommitPlan
     data class Invalid(val reason: NormalizedTimelineCommitFailure) : NormalizedTimelineCommitPlan
 }
 
@@ -82,7 +87,8 @@ object NormalizedTimelineCommitPlanner {
         previous: StoredTimelineEnvelope?,
         current: StoredTimelineEnvelope,
     ): NormalizedTimelineCommitPlan {
-        if (current.revision <= 0L || current.revision <= (previous?.revision ?: 0L)) {
+        val baseRevision = previous?.revision ?: 0L
+        if (current.revision <= baseRevision) {
             return NormalizedTimelineCommitPlan.Invalid(NormalizedTimelineCommitFailure.INVALID_REVISION)
         }
         if (previous != null && previous.scope != current.scope) {
@@ -92,11 +98,16 @@ object NormalizedTimelineCommitPlanner {
             ?: return NormalizedTimelineCommitPlan.Invalid(NormalizedTimelineCommitFailure.AMBIGUOUS_EVENT_IDENTITY)
         val currentRows = index(current.events)
             ?: return NormalizedTimelineCommitPlan.Invalid(NormalizedTimelineCommitFailure.AMBIGUOUS_EVENT_IDENTITY)
-        val metadataChanged = previous == null || metadata(previous) != metadata(current)
+        val metadataChanged = previous == null || persistedMetadata(previous) != persistedMetadata(current)
         val upserts = currentRows.values.filter { row -> previousRows[row.key] != row }
         val deletes = previousRows.keys - currentRows.keys
         if (!metadataChanged && upserts.isEmpty() && deletes.isEmpty()) {
-            return NormalizedTimelineCommitPlan.NoOp(previous.scope, TimelineRevision(previous.revision))
+            return NormalizedTimelineCommitPlan.NoOp(
+                scope = previous.scope,
+                baseRevision = TimelineRevision(previous.revision),
+                targetRevision = TimelineRevision(current.revision),
+                writtenAtMillis = current.writtenAtMillis,
+            )
         }
         return NormalizedTimelineCommitPlan.Apply(
             NormalizedTimelineCommit(
@@ -133,6 +144,8 @@ object NormalizedTimelineCommitPlanner {
         writtenAtMillis = envelope.writtenAtMillis,
     )
 
+    private fun persistedMetadata(envelope: StoredTimelineEnvelope) = metadata(envelope).copy(writtenAtMillis = 0L)
+
     private val INTERNAL_SCOPE = TimelineScope("normalized-planner", "normalized-planner")
 }
 
@@ -149,11 +162,17 @@ class InMemoryNormalizedTimelineStore {
     fun apply(plan: NormalizedTimelineCommitPlan): NormalizedTimelineWriteResult = when (plan) {
         is NormalizedTimelineCommitPlan.Invalid -> NormalizedTimelineWriteResult.Invalid(plan.reason)
         is NormalizedTimelineCommitPlan.NoOp -> synchronized(lock) {
-            val highWater = states[plan.scope.storageKey]?.revision
-            if (highWater != null && highWater != plan.revision) {
+            val key = plan.scope.storageKey
+            val existing = states[key]
+            val highWater = existing?.revision ?: TimelineRevision(0L)
+            if (existing == null || highWater != plan.baseRevision) {
                 NormalizedTimelineWriteResult.Stale(highWater)
             } else {
-                NormalizedTimelineWriteResult.NoOp(plan.revision)
+                states[key] = existing.copy(
+                    revision = plan.targetRevision,
+                    metadata = existing.metadata.copy(writtenAtMillis = plan.writtenAtMillis),
+                )
+                NormalizedTimelineWriteResult.NoOp(plan.targetRevision)
             }
         }
         is NormalizedTimelineCommitPlan.Apply -> synchronized(lock) {
