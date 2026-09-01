@@ -1347,21 +1347,16 @@ class ChatSendCoordinator(
     ) {
         val conversationId = state.conversationId.takeIf { it.isNotBlank() }
             ?: defaultShimConversationId(agentId)
-        // A completed stop is the strongest main-reply evidence. Some Agent turns
-        // omit it after a persisted, run-scoped reply; that delivery is still
-        // authoritative unless the terminal carries a known provider failure kind.
-        // Known failures (especially content_filter) retain their notice because
-        // nonblank content can be only a partial provider response.
-        val knownTerminalFailure = TurnFailureNotices.isKnownKind(state.bufferedErrorKind) ||
-            terminalReasonKind(state.bufferedErrorMessage) != null
-        val mainReplyCompleted = state.deliveredAssistantContent && (
-            TurnFailureNotices.isCompletedMainReplyStopReason(state.stopReason) || !knownTerminalFailure
+        val completion = MainReplyCompletionPolicy.classify(
+            deliveredAssistantContent = state.deliveredAssistantContent,
+            stopReason = state.stopReason,
+            bufferedErrorMessage = state.bufferedErrorMessage,
         )
         val terminalNotice = when (status) {
             BridgeTurnStatus.Failed -> TurnFailureNotices.forFailedTerminal(
                 reason = state.bufferedErrorMessage,
                 deliveredAssistantContent = state.deliveredAssistantContent,
-                mainReplyCompleted = mainReplyCompleted,
+                mainReplyCompleted = completion.isAuthoritativelyComplete,
                 kindHint = state.bufferedErrorKind,
             )
             BridgeTurnStatus.Cancelled -> TurnFailureNotices.forCancelledTerminal()
@@ -1708,6 +1703,30 @@ class ChatSendCoordinator(
             "Agent run failed after your message was sent. No error details were provided by the shim."
         private const val CURSOR_EXPIRED_ERROR_CODE = "cursor_expired"
         private fun defaultShimConversationId(agentId: String): String = "conv-default-$agentId"
+    }
+
+    /**
+     * Keeps terminal classification out of the coordinator lifecycle hotspot.
+     * Delivery without a buffered error is authoritative for Agent turns that
+     * omit a main-reply stop reason; any buffered error remains terminal evidence.
+     */
+    private data class MainReplyCompletion(
+        val isAuthoritativelyComplete: Boolean,
+    )
+
+    private object MainReplyCompletionPolicy {
+        fun classify(
+            deliveredAssistantContent: Boolean,
+            stopReason: String?,
+            bufferedErrorMessage: String?,
+        ): MainReplyCompletion {
+            val hasBufferedTerminalError = !bufferedErrorMessage.isNullOrBlank()
+            val completedStop = TurnFailureNotices.isCompletedMainReplyStopReason(stopReason)
+            return MainReplyCompletion(
+                isAuthoritativelyComplete = deliveredAssistantContent &&
+                    (completedStop || !hasBufferedTerminalError),
+            )
+        }
     }
 
     private data class PendingWsSend(

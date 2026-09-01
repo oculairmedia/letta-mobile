@@ -576,7 +576,8 @@ data class Timeline(
             "turnId" to (turnId ?: ""),
             "reason" to reason,
             "count" to removeServerIds.size,
-            "removedServerIds" to removeServerIds.joinToString(","),
+            "removedServerIds" to removeServerIds.take(MAX_REMOVED_SERVER_IDS_TELEMETRY).joinToString(","),
+            "removedServerIdsTruncated" to (removeServerIds.size > MAX_REMOVED_SERVER_IDS_TELEMETRY),
         )
         return AbandonedAssistantFragmentCleanupResult(
             timeline = copy(
@@ -656,6 +657,7 @@ internal const val DEFAULT_EVICT_BUFFER = 200
 
 private const val ORPHAN_ASSISTANT_FRAGMENT_MIN_CHARS = 3
 private const val MAX_ABANDONED_ASSISTANT_FRAGMENT_SUPPRESSIONS = 32
+private const val MAX_REMOVED_SERVER_IDS_TELEMETRY = 16
 private const val ABANDONED_FRAGMENT_CONTENT_FINGERPRINT_CHARS = 256
 
 private fun String?.matchesCleanupRun(targetRunIds: Set<String>): Boolean {

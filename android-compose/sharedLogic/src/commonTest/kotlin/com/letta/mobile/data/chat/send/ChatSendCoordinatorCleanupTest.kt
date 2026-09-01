@@ -10,6 +10,9 @@ import com.letta.mobile.data.model.ErrorMessage
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
+import com.letta.mobile.data.model.ReasoningMessage
+import com.letta.mobile.data.model.ToolCall
+import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.runtime.TurnFailureNotices
 import com.letta.mobile.data.timeline.RecentMessagesReconcileOutcome
@@ -576,21 +579,73 @@ class ChatSendCoordinatorCleanupTest {
         coordinator.send("hey").join()
         val otid = timeline.externalLocals.last().otid
         coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
-        // Reasoning/tool rows use other message types; the coordinator must retain
-        // the run-scoped assistant prose independently of a clean stop reason.
+        // Exercise the live coordinator path through reasoning and Agent tool
+        // evidence before the short main reply, as emitted by a real Agent turn.
+        coordinator.handleEvent(
+            WsTimelineEvent.MessageDelta(
+                ReasoningMessage(id = "reasoning-1", reasoning = "Checking the request", runId = "run-1"),
+                conversationId = "conv-1",
+            ),
+        )
+        coordinator.handleEvent(
+            WsTimelineEvent.MessageDelta(
+                ToolCallMessage(
+                    id = "agent-tool-1",
+                    toolCall = ToolCall(id = "agent-call-1", name = "Agent", arguments = "{}"),
+                    runId = "run-1",
+                ),
+                conversationId = "conv-1",
+            ),
+        )
         coordinator.handleEvent(
             WsTimelineEvent.MessageDelta(
                 AssistantMessage(id = "reply-1", contentRaw = JsonPrimitive("Hey. I'm here."), runId = "run-1"),
+                conversationId = "conv-1",
             ),
         )
         coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", BridgeTurnStatus.Failed))
         advanceUntilIdle()
 
-        assertTrue(timeline.ingestedMessages.filterIsInstance<AssistantMessage>().any { it.id == "reply-1" })
+        assertTrue(timeline.ingestedMessages.filterIsInstance<ReasoningMessage>().any { it.id == "reasoning-1" })
+        assertTrue(timeline.ingestedMessages.filterIsInstance<ToolCallMessage>().any { it.id == "agent-tool-1" })
+        assertTrue(timeline.ingestedMessages.filterIsInstance<AssistantMessage>().any { it.content == "Hey. I'm here." })
         assertTrue(timeline.ingestedMessages.filterIsInstance<ErrorMessage>().isEmpty())
         assertTrue(timeline.sentLocals.contains(RecordingTimelineWriter.LocalMarker("conv-1", otid)))
         assertNull(ui.currentError())
         assertTrue(timeline.cleanupTails.isEmpty())
+    }
+
+    @Test
+    fun failedTurnWithUnknownBufferedErrorAfterPartialContentRemainsDead() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val ui = RecordingUiSink()
+        val coordinator = coordinator(timeline, ui, FakeChannelTransport(mutableListOf(true)))
+
+        coordinator.send("hello").join()
+        val otid = timeline.externalLocals.last().otid
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
+        coordinator.handleEvent(
+            WsTimelineEvent.MessageDelta(
+                AssistantMessage(id = "partial-1", contentRaw = JsonPrimitive("partial"), runId = "run-1"),
+                conversationId = "conv-1",
+            ),
+        )
+        coordinator.handleEvent(
+            WsTimelineEvent.Error(
+                code = "unrecognized_provider_failure",
+                message = "unrecognized provider failure",
+                conversationId = "conv-1",
+                turnId = "turn-1",
+                runId = "run-1",
+            ),
+        )
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", BridgeTurnStatus.Failed))
+        advanceUntilIdle()
+
+        assertEquals(1, timeline.ingestedMessages.filterIsInstance<ErrorMessage>().size)
+        assertEquals(listOf(RecordingTimelineWriter.LocalMarker("conv-1", otid)), timeline.failedLocals)
+        assertEquals("unrecognized provider failure", ui.currentError())
+        assertEquals(1, timeline.cleanupTails.size)
     }
 
     // letta-mobile-br5g0 (codex review): the mapper ships the sanitized family
