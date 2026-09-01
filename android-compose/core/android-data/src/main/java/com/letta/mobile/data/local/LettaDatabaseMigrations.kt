@@ -282,6 +282,49 @@ object LettaDatabaseMigrations {
         LegacySnapshotMigration(db).copyAll()
     }
 
+    val MIGRATION_11_12 = object : Migration(11, 12) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `normalized_timeline_snapshot_heads` (
+                    `backend_id` TEXT NOT NULL,
+                    `conversation_id` TEXT NOT NULL,
+                    `agent_id` TEXT,
+                    `storage_layout_version` INTEGER NOT NULL,
+                    `revision` INTEGER NOT NULL,
+                    `envelope_schema_version` INTEGER NOT NULL,
+                    `live_cursor` TEXT,
+                    `backfill_cursor` TEXT,
+                    `released_older_count` INTEGER NOT NULL,
+                    `row_count` INTEGER NOT NULL,
+                    `root_digest` TEXT NOT NULL,
+                    `generation` INTEGER NOT NULL,
+                    `written_at_millis` INTEGER NOT NULL,
+                    PRIMARY KEY(`backend_id`, `conversation_id`)
+                )
+                """.trimIndent(),
+            )
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `normalized_timeline_snapshot_rows` (
+                    `backend_id` TEXT NOT NULL,
+                    `conversation_id` TEXT NOT NULL,
+                    `identity_primary` INTEGER NOT NULL,
+                    `identity_secondary` INTEGER NOT NULL,
+                    `event_order` INTEGER NOT NULL,
+                    `payload` BLOB NOT NULL,
+                    `checksum` TEXT NOT NULL,
+                    PRIMARY KEY(`backend_id`, `conversation_id`, `identity_primary`, `identity_secondary`)
+                )
+                """.trimIndent(),
+            )
+            db.execSQL(
+                "CREATE UNIQUE INDEX IF NOT EXISTS `index_normalized_timeline_snapshot_rows_backend_id_conversation_id_event_order` " +
+                    "ON `normalized_timeline_snapshot_rows` (`backend_id`, `conversation_id`, `event_order`)",
+            )
+        }
+    }
+
     val ALL: Array<Migration> = arrayOf(
         MIGRATION_1_2,
         MIGRATION_2_3,
@@ -293,5 +336,6 @@ object LettaDatabaseMigrations {
         MIGRATION_8_9,
         MIGRATION_9_10,
         MIGRATION_10_11,
+        MIGRATION_11_12,
     )
 }

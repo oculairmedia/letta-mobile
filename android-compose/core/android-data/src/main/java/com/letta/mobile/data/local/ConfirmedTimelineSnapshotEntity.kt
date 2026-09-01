@@ -75,6 +75,42 @@ data class ConfirmedTimelineSnapshotHeadMetadata(
 )
 
 @Dao
+@Entity(
+    tableName = "normalized_timeline_snapshot_heads",
+    primaryKeys = ["backend_id", "conversation_id"],
+)
+data class NormalizedTimelineSnapshotHeadEntity(
+    @ColumnInfo(name = "backend_id") val backendId: String,
+    @ColumnInfo(name = "conversation_id") val conversationId: String,
+    @ColumnInfo(name = "agent_id") val agentId: String?,
+    @ColumnInfo(name = "storage_layout_version") val storageLayoutVersion: Int,
+    @ColumnInfo(name = "revision") val revision: Long,
+    @ColumnInfo(name = "envelope_schema_version") val envelopeSchemaVersion: Int,
+    @ColumnInfo(name = "live_cursor") val liveCursor: String?,
+    @ColumnInfo(name = "backfill_cursor") val backfillCursor: String?,
+    @ColumnInfo(name = "released_older_count") val releasedOlderCount: Int,
+    @ColumnInfo(name = "row_count") val rowCount: Int,
+    @ColumnInfo(name = "root_digest") val rootDigest: String,
+    @ColumnInfo(name = "generation") val generation: Long,
+    @ColumnInfo(name = "written_at_millis") val writtenAtMillis: Long,
+)
+
+@Entity(
+    tableName = "normalized_timeline_snapshot_rows",
+    primaryKeys = ["backend_id", "conversation_id", "identity_primary", "identity_secondary"],
+    indices = [Index(value = ["backend_id", "conversation_id", "event_order"], unique = true)],
+)
+data class NormalizedTimelineSnapshotRowEntity(
+    @ColumnInfo(name = "backend_id") val backendId: String,
+    @ColumnInfo(name = "conversation_id") val conversationId: String,
+    @ColumnInfo(name = "identity_primary") val identityPrimary: Long,
+    @ColumnInfo(name = "identity_secondary") val identitySecondary: Long,
+    @ColumnInfo(name = "event_order") val eventOrder: Int,
+    @ColumnInfo(name = "payload") val payload: ByteArray,
+    @ColumnInfo(name = "checksum") val checksum: String,
+)
+
+@Dao
 interface ConfirmedTimelineSnapshotDao {
     @Query(
         """
@@ -85,6 +121,28 @@ interface ConfirmedTimelineSnapshotDao {
         """
     )
     suspend fun getHeadMetadata(backendId: String, conversationId: String): ConfirmedTimelineSnapshotHeadMetadata?
+
+    @Query(
+        "SELECT * FROM normalized_timeline_snapshot_heads WHERE backend_id = :backendId AND conversation_id = :conversationId"
+    )
+    suspend fun getNormalizedHead(backendId: String, conversationId: String): NormalizedTimelineSnapshotHeadEntity?
+
+    @Query(
+        "SELECT * FROM normalized_timeline_snapshot_rows WHERE backend_id = :backendId AND conversation_id = :conversationId ORDER BY event_order"
+    )
+    suspend fun getNormalizedRows(backendId: String, conversationId: String): List<NormalizedTimelineSnapshotRowEntity>
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertNormalizedRows(rows: List<NormalizedTimelineSnapshotRowEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertNormalizedHead(head: NormalizedTimelineSnapshotHeadEntity)
+
+    @Query("DELETE FROM normalized_timeline_snapshot_rows WHERE backend_id = :backendId AND conversation_id = :conversationId")
+    suspend fun deleteNormalizedRows(backendId: String, conversationId: String)
+
+    @Query("DELETE FROM normalized_timeline_snapshot_heads WHERE backend_id = :backendId AND conversation_id = :conversationId")
+    suspend fun deleteNormalizedHead(backendId: String, conversationId: String)
 
     @Query(
         """
