@@ -19,6 +19,7 @@ import com.letta.mobile.data.chat.runtime.ChatSessionState
 import com.letta.mobile.data.timeline.SequentialAcquisitionIdGenerator
 import com.letta.mobile.data.timeline.TimelineConversationAttributionCapture
 import com.letta.mobile.data.timeline.TimelineConversationSelectionMode
+import com.letta.mobile.data.timeline.timelineAcquisitionProvenanceEnabled
 
 internal const val LOCAL_RUNTIME_REMOTE_AGENT_ERROR = "This agent is remote; create/select a local-runtime agent to use Local LettaCode."
 

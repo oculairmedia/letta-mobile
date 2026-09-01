@@ -219,9 +219,9 @@ class TimelineRepositoryAcquisitionProvenanceTest {
                     byId["a2"]?.attrs?.get("selectionMode"),
                 )
                 assertEquals(TimelineAcquisitionSource.REPLAY_RECONCILE.name, byId["a3"]?.attrs?.get("source"))
-                assertEquals(true, byId["a3"]?.attrs?.get("isReplay"))
+                assertEquals("true", byId["a3"]?.attrs?.get("isReplay"))
                 assertEquals(TimelineAcquisitionSource.RUNTIME_FANOUT.name, byId["a4"]?.attrs?.get("source"))
-                assertEquals(false, byId["a4"]?.attrs?.get("isReplay"))
+                assertEquals("false", byId["a4"]?.attrs?.get("isReplay"))
 
                 // UNSPECIFIED is OBSERVABLE, not dropped.
                 val unspecified = events("acquisition.entry")
@@ -266,7 +266,7 @@ class TimelineRepositoryAcquisitionProvenanceTest {
                 val entry = events("acquisition.entry").single { it.attrs["conversationId"] == "c-repair" }
                 assertEquals(TimelineAcquisitionSource.REPLAY_RECONCILE.name, entry.attrs["source"])
                 assertEquals("acq-repair", entry.attrs["acquisitionId"])
-                assertEquals(true, entry.attrs["isReplay"])
+                assertEquals("true", entry.attrs["isReplay"])
             } finally {
                 scope.cancel()
             }
