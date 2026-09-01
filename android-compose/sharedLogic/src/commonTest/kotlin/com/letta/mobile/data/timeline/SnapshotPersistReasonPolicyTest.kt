@@ -50,13 +50,22 @@ class SnapshotPersistReasonPolicyTest {
             .forEach { assertFalse(it.isDebounced, "$it must not be debounced") }
     }
 
+    /**
+     * Round 4: the previous version of this asserted
+     * `reason.isTurnBoundary || !reason.isTurnBoundary`, which is a tautology -- it could never
+     * fail and proved nothing. Replaced with the property actually worth pinning: the two
+     * classifications must not overlap, so a high-volume source can never also be treated as a
+     * boundary. Adding STREAM_FRAME to isTurnBoundary fails this.
+     */
     @Test
-    fun everyReasonIsClassifiedExactlyOnce() {
-        // Guards against a new reason being added without deciding its policy.
-        SnapshotPersistReason.entries.forEach { reason ->
-            val classified = reason.isTurnBoundary || !reason.isTurnBoundary
-            assertTrue(classified, "$reason must have an explicit policy")
-        }
-        assertEquals(7, SnapshotPersistReason.entries.size)
+    fun debouncedSourcesAreNeverAlsoTurnBoundaries() {
+        SnapshotPersistReason.entries
+            .filter { it.isDebounced }
+            .forEach {
+                assertFalse(
+                    it.isTurnBoundary,
+                    "$it is a high-volume debounced source and must never be a write boundary",
+                )
+            }
     }
 }

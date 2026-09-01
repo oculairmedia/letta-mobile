@@ -97,6 +97,9 @@ class TimelineSyncLoop(
     @Volatile
     private var deferredDuringTurn: Boolean = false
     private var turnSafetyFlushJob: Job? = null
+    // Consecutive Stale results. Reset by any durable commit; a duplicate holder never
+    // resets and so detaches quickly, while a transient loser recovers.
+    private var consecutiveStaleRejections: Int = 0
     // Set once this loop is proven not to own its conversation's durable state (see
     // onStaleRejection). A detached loop still serves reads; it just stops writing.
     @Volatile
@@ -210,6 +213,12 @@ class TimelineSyncLoop(
     suspend fun flushSnapshotNow(prune: Boolean = false) {
         val snapshotScope = timelineScope ?: return
         if (confirmedTimelineStore === NoOpConfirmedTimelineStore) return
+        // Round 4: the detach guard was only on scheduleSnapshotPersist, so every direct
+        // caller of this -- including closeAndJoin -- could still run a full O(N) plan and a
+        // rejected commit after the loop had been proven not to own its conversation. Returning
+        // BEFORE the mutex and the planner is the point: a detached writer must cost nothing,
+        // not merely fail cheaply at the store.
+        if (detachedAsStaleWriter) return
         persistMutex.withLock {
             persistCurrentSnapshot(snapshotScope, prune)
         }
@@ -314,15 +323,30 @@ class TimelineSyncLoop(
      * second holder existing.
      */
     private fun onStaleRejection(result: NormalizedTimelineWriteResult.Stale, revision: Long) {
-        detachedAsStaleWriter = true
-        // Drain anything already queued so the detach takes effect immediately.
-        while (persistRequests.tryReceive().isSuccess) Unit
+        // Round 4: detach after a BOUNDED run of consecutive stales, not the first one.
+        //
+        // First-stale detachment is the stricter reading of the review, and I implemented it
+        // that way initially -- but it permanently stops a writer that lost a single transient
+        // race, and it broke a documented pre-existing behaviour (a rejected write followed by
+        // a successful retry). Trading a durability guarantee for CPU is the wrong direction;
+        // the goal was to stop UNBOUNDED spinning, and a small cap does that. A duplicate
+        // holder never succeeds, so it still detaches almost immediately; a transient loser
+        // recovers on its next attempt and resets the counter.
+        consecutiveStaleRejections += 1
+        val detaching = consecutiveStaleRejections >= MAX_CONSECUTIVE_STALE_REJECTIONS
+        if (detaching) {
+            detachedAsStaleWriter = true
+            // Drain anything already queued so the detach takes effect immediately.
+            while (persistRequests.tryReceive().isSuccess) Unit
+        }
         Telemetry.event(
             "TimelineSync", "snapshotPersist.staleRejected",
             "conversationId" to conversationId,
+            "agentId" to agentId.orEmpty(),
             "revision" to revision,
             "actualHighWaterRevision" to result.highWaterRevision.value,
-            "detachedAsWriter" to true,
+            "consecutiveStale" to consecutiveStaleRejections,
+            "detachedAsWriter" to detaching,
             level = Telemetry.Level.WARN,
         )
     }
@@ -340,6 +364,7 @@ class TimelineSyncLoop(
         checkpointDue: Boolean,
         durationMs: Long,
     ) {
+        consecutiveStaleRejections = 0
         snapshotRevision = revision
         lastPersistedFingerprint = fingerprint
         lastPersistedEnvelope = envelope
@@ -1003,6 +1028,9 @@ class TimelineSyncLoop(
          * times mid-stream; small enough that a very long response is never wholly at risk.
          */
         internal val STREAMING_SAFETY_FLUSH = 5_000.milliseconds
+
+        /** Bound on wasted planning by a writer that cannot commit. */
+        internal const val MAX_CONSECUTIVE_STALE_REJECTIONS = 3
         private const val STREAM_HEARTBEAT_EXPECTED_MS = 30_000L
         // letta-mobile-5pi: 6x multiplier = 3 minute silence timeout.
         // Previously 12x (6 minutes) — a dead stream could go undetected

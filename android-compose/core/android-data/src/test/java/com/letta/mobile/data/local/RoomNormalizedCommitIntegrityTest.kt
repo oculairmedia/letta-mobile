@@ -177,6 +177,82 @@ class RoomNormalizedCommitIntegrityTest {
 
     private fun store(db: LettaDatabase) = RoomConfirmedTimelineStore(db)
 
+    /**
+     * Round 4 gap 1: an UNSCOPED writer must not alter an OWNED head, on either branch.
+     *
+     * The ownership predicate previously accepted `scope.agentId == null` even when the head
+     * had an owner. Apply then wrote `agentId = scope.agentId`, clearing ownership outright,
+     * and NoOp recomputed the root under a null scope against an owned head so the owner's
+     * later reads failed checksum. Both are same-revision cases, so revision CAS cannot catch
+     * them -- only the ownership check can.
+     *
+     * Asserts head, rows and digest are byte-identical afterwards, and the owner still reads.
+     */
+    @Test
+    fun anUnscopedApplyCannotClearOwnershipOfAnOwnedHead() = runTest {
+        val db = database()
+        val store = RoomConfirmedTimelineStore(db)
+        val owner = TimelineScope(backendId = "b1", conversationId = "conv-unscoped", agentId = "agent-owner")
+        val unscoped = TimelineScope(backendId = "b1", conversationId = "conv-unscoped")
+
+        val first = envelope(owner, revision = 1L, events = 3)
+        assertTrue(commit(store, null, first) is NormalizedTimelineWriteResult.Committed)
+
+        val dao = db.confirmedTimelineSnapshotDao()
+        val headBefore = dao.getNormalizedHead("b1", "conv-unscoped")
+        val rowsBefore = dao.getNormalizedRowDigestProjection("b1", "conv-unscoped")
+
+        // Same base revision, so only ownership can reject this.
+        val target = envelope(unscoped, revision = 2L, events = 5)
+        val result = commit(store, first.copy(scope = unscoped), target)
+        assertTrue(
+            "an unscoped Apply must not take an owned head",
+            result is NormalizedTimelineWriteResult.Stale,
+        )
+
+        val headAfter = dao.getNormalizedHead("b1", "conv-unscoped")
+        assertEquals("ownership must survive", headBefore?.agentId, headAfter?.agentId)
+        assertEquals("revision must not move", headBefore?.revision, headAfter?.revision)
+        assertEquals("root digest must be byte-identical", headBefore?.rootDigest, headAfter?.rootDigest)
+        assertEquals("row set must be untouched", rowsBefore.size, dao.getNormalizedRowDigestProjection("b1", "conv-unscoped").size)
+        assertNotNull("the owner must still read its own timeline", store.readSnapshot(owner))
+        assertEquals(3, store.readSnapshot(owner)?.events?.size)
+    }
+
+    /**
+     * Round 4 gap 1, NoOp branch. A null-scope no-op previously advanced the revision and
+     * recomputed the root under the wrong identity, which is the shape that made reads fail
+     * checksum rather than merely losing ownership.
+     */
+    @Test
+    fun anUnscopedNoOpCannotRewriteAnOwnedHead() = runTest {
+        val db = database()
+        val store = RoomConfirmedTimelineStore(db)
+        val owner = TimelineScope(backendId = "b1", conversationId = "conv-unscoped-noop", agentId = "agent-owner")
+        val unscoped = TimelineScope(backendId = "b1", conversationId = "conv-unscoped-noop")
+
+        val first = envelope(owner, revision = 1L, events = 3)
+        assertTrue(commit(store, null, first) is NormalizedTimelineWriteResult.Committed)
+
+        val dao = db.confirmedTimelineSnapshotDao()
+        val headBefore = dao.getNormalizedHead("b1", "conv-unscoped-noop")
+
+        // Content-identical under an unscoped identity => a NoOp plan at the same base revision.
+        val unchanged = first.copy(scope = unscoped, revision = 2L, writtenAtMillis = 9_000L)
+        val plan = NormalizedTimelineCommitPlanner.plan(first.copy(scope = unscoped), unchanged)
+        assertTrue(plan is NormalizedTimelineCommitPlan.NoOp)
+        assertTrue(
+            "an unscoped NoOp must not rewrite an owned head",
+            store.commitNormalized(plan, unchanged, false) is NormalizedTimelineWriteResult.Stale,
+        )
+
+        val headAfter = dao.getNormalizedHead("b1", "conv-unscoped-noop")
+        assertEquals(headBefore?.agentId, headAfter?.agentId)
+        assertEquals(headBefore?.revision, headAfter?.revision)
+        assertEquals("root digest must be byte-identical", headBefore?.rootDigest, headAfter?.rootDigest)
+        assertNotNull("the owner read must still validate", store.readSnapshot(owner))
+    }
+
     /** Guards the planner contract these gates rely on: no plan, no commit. */
     @Test
     fun anUnchangedEnvelopePlansNoOpRatherThanRewritingRows() = runTest {

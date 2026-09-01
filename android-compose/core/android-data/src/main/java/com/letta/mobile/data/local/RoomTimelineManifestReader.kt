@@ -200,7 +200,16 @@ private object RoomManifestValidator {
  */
 internal fun NormalizedTimelineSnapshotHeadEntity?.ownedBy(scope: TimelineScope): Boolean {
     val owner = this?.agentId ?: return true
-    return scope.agentId == null || owner == scope.agentId
+    // Round 4: the `scope.agentId == null` leg was a hole, and I put it there deliberately
+    // "so unscoped callers keep working". It let an UNSCOPED writer mutate an OWNED head:
+    // Apply writes agentId = scope.agentId, clearing ownership outright, and NoOp recomputes
+    // the root under a null scope against an owned head, so the owner's later reads fail
+    // checksum. Adoption is legitimate only from an UNOWNED head (handled above); once a head
+    // has an owner, only that exact owner may write it.
+    //
+    // This now matches ownershipCompatibleWith for the legacy head, which already refused the
+    // scoped -> unscoped downgrade for the same reason. The two guards were inconsistent.
+    return owner == scope.agentId
 }
 
 internal fun ConfirmedTimelineSnapshotHeadMetadata.matches(scope: TimelineScope): Boolean =

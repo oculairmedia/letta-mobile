@@ -330,13 +330,21 @@ class TimelineSyncLoopIncrementalPersistenceTest {
         loop.ingestStreamEvent(UserMessage(id = "msg-0", date = FIXTURE_DATE, contentRaw = JsonPrimitive("first")))
         loop.flushSnapshotNow()
         advanceUntilIdle()
-        // An attempt already queued when the first Stale lands may still reach the store, so
-        // the exact count here is 1 or 2 depending on interleaving. What must hold is that it
-        // is BOUNDED and then stops growing.
+        // Round 4: detachment is bounded at MAX_CONSECUTIVE_STALE_REJECTIONS rather than firing
+        // on the first Stale, because first-stale detachment permanently stops a writer that
+        // lost one transient race. Drive more attempts than the threshold and assert the spin
+        // is capped -- the point is boundedness, not a specific count.
+        repeat(6) { index ->
+            loop.ingestStreamEvent(
+                UserMessage(id = "spin-$index", date = FIXTURE_DATE, contentRaw = JsonPrimitive("spin $index")),
+            )
+            loop.flushSnapshotNow()
+            advanceUntilIdle()
+        }
         val commitsAfterFirstStale = store.commits
         assertTrue(
-            "the initial attempts must be bounded; observed $commitsAfterFirstStale",
-            commitsAfterFirstStale in 1..2,
+            "a holder that can never commit must stop within the threshold; observed $commitsAfterFirstStale",
+            commitsAfterFirstStale <= STALE_DETACH_THRESHOLD + 1,
         )
 
         repeat(10) { index ->
@@ -351,7 +359,25 @@ class TimelineSyncLoopIncrementalPersistenceTest {
             commitsAfterFirstStale,
             store.commits,
         )
+
+        // Round 4 gap 2: the detach guard was only on scheduleSnapshotPersist, so a DIRECT
+        // flush -- and closeAndJoin, which flushes -- still ran a full plan and a rejected
+        // commit. Both must now cost nothing.
+        loop.flushSnapshotNow()
+        advanceUntilIdle()
+        assertEquals(
+            "an explicit flush must not bypass stale detachment",
+            commitsAfterFirstStale,
+            store.commits,
+        )
+
         loop.closeAndJoin()
+        advanceUntilIdle()
+        assertEquals(
+            "closing a detached writer must not attempt another commit",
+            commitsAfterFirstStale,
+            store.commits,
+        )
     }
 
     /** Counts commit attempts that actually reach the store, and can force permanent Stale. */
@@ -449,5 +475,8 @@ class TimelineSyncLoopIncrementalPersistenceTest {
 
     private companion object {
         const val FIXTURE_DATE = "2026-08-24T12:00:00Z"
+
+        /** Mirrors TimelineSyncLoop.MAX_CONSECUTIVE_STALE_REJECTIONS, which is internal to sharedLogic. */
+        const val STALE_DETACH_THRESHOLD = 3
     }
 }
