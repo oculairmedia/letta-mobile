@@ -175,18 +175,21 @@ class TimelineSyncLoopIncrementalPersistenceTest {
 
         val persisted = store.readSnapshot(scope)
         assertNotNull(persisted)
-        // The loop retries the rejected content on the next persist, so all three events land.
         assertEquals(3, persisted?.events?.size)
-        // The real invariant, expressed rather than hard-coded: every event arrived in its own
-        // successful commit, so a gapless revision sequence means revision == committed events.
-        // A rejected attempt that burned a revision shows up here as revision 4 against 3
-        // events -- which is exactly what happens if `snapshotRevision` is incremented before
-        // the outcome is known.
+        // Review round 2 item 3. `revision == events.size` was the wrong invariant: it
+        // conflates "no revision was burned" with "no coalescing happened", and coalescing is
+        // a property this PR deliberately introduces. Whether the retried content lands in its
+        // own commit or coalesced with the next one is timing-dependent, so ANY hard-coded
+        // number here is incidental -- both 2 and 3 are legitimate outcomes.
+        //
+        // Assert the property itself instead: the durable revision equals the number of
+        // SUCCESSFUL commits, never successes + rejections. That holds under any coalescing.
         assertEquals(
             "a rejected write must not consume a revision",
-            persisted?.events?.size?.toLong(),
+            store.successfulCommits.toLong(),
             persisted?.revision,
         )
+        assertTrue("the forced rejection must actually have been exercised", store.rejections == 1)
         loop.closeAndJoin()
     }
 
@@ -257,16 +260,40 @@ class TimelineSyncLoopIncrementalPersistenceTest {
         }
         val commitsDuringStreaming = store.commits
 
+        // Review round 2 item 1: deliberately NO manual flushSnapshotNow() here. Calling the
+        // internal flush seam is what masked the real defect -- turnEnded cleared turnActive
+        // but scheduled nothing, so a turn whose last delta was deferred stayed memory-only
+        // and the test passed anyway. Durability must be proven through the production
+        // turn-end path alone.
         loop.turnEnded(clean = true)
-        loop.flushSnapshotNow()
-        advanceUntilIdle()
+
+        // Await the BACKGROUND persist that turnEnded scheduled. Two things must both be
+        // driven, which is why this loop does both on every iteration:
+        //  - advanceUntilIdle() runs the persist coroutine, which lives on the test scheduler;
+        //  - Thread.sleep yields the JVM thread so Room's internal Dispatchers.IO hop, which
+        //    the test scheduler does NOT drive, can actually complete.
+        // Driving only one of them makes this pass in isolation and fail under a loaded suite.
+        //
+        // Deliberately NOT flushSnapshotNow(): awaiting that suspend seam is what let the
+        // missing turnEnded scheduling go unnoticed in the first place.
+        var persistedEvents: Int? = null
+        for (attempt in 0 until 200) {
+            advanceUntilIdle()
+            persistedEvents = store.readSnapshot(scope)?.events?.size
+            if (persistedEvents == 40) break
+            @Suppress("BlockingMethodInNonBlockingContext")
+            Thread.sleep(10)
+        }
 
         assertTrue(
             "40 streamed deltas must not produce ~40 commits; observed $commitsDuringStreaming",
             commitsDuringStreaming <= 3,
         )
-        // Durability is not weakened: everything is persisted once the turn settles.
-        assertEquals(40, store.readSnapshot(scope)?.events?.size)
+        assertEquals(
+            "turnEnded alone must durably persist the completed turn",
+            40,
+            persistedEvents,
+        )
         loop.closeAndJoin()
     }
 
@@ -362,6 +389,14 @@ class TimelineSyncLoopIncrementalPersistenceTest {
         private var staleOnce = false
         private var invalidOnce = false
 
+        /** Commits the store actually accepted, for the revision-accounting invariant. */
+        var successfulCommits: Int = 0
+            private set
+
+        /** Forced rejections, so a test can prove the rejection path was exercised at all. */
+        var rejections: Int = 0
+            private set
+
         fun forceStaleOnce() {
             staleOnce = true
         }
@@ -377,17 +412,23 @@ class TimelineSyncLoopIncrementalPersistenceTest {
         ): com.letta.mobile.data.timeline.snapshot.NormalizedTimelineWriteResult {
             if (staleOnce) {
                 staleOnce = false
+                rejections += 1
                 return com.letta.mobile.data.timeline.snapshot.NormalizedTimelineWriteResult.Stale(
                     com.letta.mobile.data.timeline.snapshot.TimelineRevision(0L),
                 )
             }
             if (invalidOnce) {
                 invalidOnce = false
+                rejections += 1
                 return com.letta.mobile.data.timeline.snapshot.NormalizedTimelineWriteResult.Invalid(
                     com.letta.mobile.data.timeline.snapshot.NormalizedTimelineCommitFailure.OVERSIZED_ROW,
                 )
             }
-            return delegate.commitNormalized(plan, fullEnvelope, checkpointLegacyEnvelope)
+            return delegate.commitNormalized(plan, fullEnvelope, checkpointLegacyEnvelope).also { result ->
+                val landed = result is com.letta.mobile.data.timeline.snapshot.NormalizedTimelineWriteResult.Committed ||
+                    result is com.letta.mobile.data.timeline.snapshot.NormalizedTimelineWriteResult.NoOp
+                if (landed) successfulCommits += 1
+            }
         }
     }
 

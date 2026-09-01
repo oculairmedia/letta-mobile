@@ -185,6 +185,24 @@ private object RoomManifestValidator {
         SnapshotReadFailure.METADATA_INVALID.takeUnless { manifest.hasBoundedShape() }
 }
 
+/**
+ * letta-mobile-827s9.4, review round 2 item 2: NORMALIZED head ownership.
+ *
+ * The normalized CAS previously compared revision only, so a different agent sharing a
+ * backend and conversation id could commit whenever its base revision happened to match --
+ * transferring ownership (the head's agent_id is written from the committing scope) or
+ * leaving a digest computed under one identity validated under another.
+ *
+ * Same rule as the legacy head guard and as `TimelineRepository.canAlias`'s intent: an
+ * unowned head may be adopted once, and thereafter only that agent may write it. A null
+ * requesting scope is treated as compatible so unscoped callers and bootstrap paths keep
+ * working, exactly as they do for reads.
+ */
+internal fun NormalizedTimelineSnapshotHeadEntity?.ownedBy(scope: TimelineScope): Boolean {
+    val owner = this?.agentId ?: return true
+    return scope.agentId == null || owner == scope.agentId
+}
+
 internal fun ConfirmedTimelineSnapshotHeadMetadata.matches(scope: TimelineScope): Boolean =
     backendId == scope.backendId && conversationId == scope.conversationId && agentId == scope.agentId &&
         highWaterRevision >= 0L

@@ -581,6 +581,12 @@ class TimelineSyncLoop(
      */
     suspend fun turnEnded(clean: Boolean) {
         turnActive = false
+        // letta-mobile-827s9.4: this is the settled boundary the streaming defer in
+        // shouldDeferStreamingPersist relies on. Without it, a turn whose final delta was
+        // deferred stays memory-only until some unrelated trigger happens along -- the
+        // deferral would be trading a real durability guarantee for frame rate, which is not
+        // the bargain. Scheduled AFTER clearing turnActive so it is never itself deferred.
+        scheduleSnapshotPersist(immediate = true)
         danglingToolCallResolver.scheduleSweepIfUnresolved(clean)
     }
 

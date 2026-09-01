@@ -344,7 +344,7 @@ class RoomConfirmedTimelineStore(
         return database.withTransaction {
             val head = dao.getNormalizedHead(backendId, conversationId)
             val currentRevision = head?.revision ?: 0L
-            if (head == null || currentRevision != plan.baseRevision.value) {
+            if (head == null || currentRevision != plan.baseRevision.value || !head.ownedBy(plan.scope)) {
                 return@withTransaction NormalizedTimelineWriteResult.Stale(TimelineRevision(currentRevision))
             }
             // No-op CAS: advance revision + timestamp only, zero row writes, row set unchanged.
@@ -390,7 +390,7 @@ class RoomConfirmedTimelineStore(
         return database.withTransaction {
             val head = dao.getNormalizedHead(backendId, conversationId)
             val currentRevision = head?.revision ?: 0L
-            if (currentRevision != commit.baseRevision.value) {
+            if (currentRevision != commit.baseRevision.value || !head.ownedBy(scope)) {
                 return@withTransaction NormalizedTimelineWriteResult.Stale(TimelineRevision(currentRevision))
             }
             commit.deletes.forEach { key ->

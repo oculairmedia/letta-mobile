@@ -99,11 +99,18 @@ class RoomNormalizedCommitIntegrityTest {
         val ownerFirst = envelope(owner, revision = 1L, events = 2)
         assertTrue(commit(store, null, ownerFirst) is NormalizedTimelineWriteResult.Committed)
 
-        // The intruder plans from nothing, so its commit carries baseRevision 0 while the
-        // durable head is at 1. CAS must reject it rather than adopting the conversation.
-        val intruderResult = commit(store, null, envelope(intruder, revision = 1L, events = 5))
+        // Review round 2 item 2: this previously planned from null, so the intruder's commit
+        // carried baseRevision 0 against a durable head at 1 and was rejected on REVISION.
+        // That proved nothing about ownership -- it passed for the wrong reason.
+        //
+        // Now the intruder plans from the SAME baseline the owner just committed, so its base
+        // revision matches exactly and revision-CAS alone would let it through. Only the
+        // agentId ownership check can reject it.
+        val intruderTarget = envelope(intruder, revision = 2L, events = 5)
+        val intruderPlan = NormalizedTimelineCommitPlanner.plan(ownerFirst.copy(scope = intruder), intruderTarget)
+        val intruderResult = store.commitNormalized(intruderPlan, intruderTarget, false)
         assertTrue(
-            "a different agent must not be able to commit over this conversation",
+            "a different agent must not commit over this conversation even at a matching base revision",
             intruderResult is NormalizedTimelineWriteResult.Stale,
         )
 
