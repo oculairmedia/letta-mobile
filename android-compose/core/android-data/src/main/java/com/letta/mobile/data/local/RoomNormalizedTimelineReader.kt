@@ -20,50 +20,79 @@ internal class RoomNormalizedTimelineReader {
         head: NormalizedTimelineSnapshotHeadEntity,
         rows: List<NormalizedTimelineSnapshotRowEntity>,
     ): NormalizedTimelineRead {
-        if (head.backendId != scope.backendId || head.conversationId != scope.conversationId ||
-            head.agentId != scope.agentId
-        ) return NormalizedTimelineRead.Invalid(SnapshotReadFailure.SCOPE_MISMATCH)
-        if (head.storageLayoutVersion != NORMALIZED_LAYOUT_VERSION) {
-            return NormalizedTimelineRead.Invalid(SnapshotReadFailure.SCHEMA_MISMATCH)
+        validateHead(scope, head, rows.size)?.let { return NormalizedTimelineRead.Invalid(it) }
+        validateRows(scope, rows)?.let { return NormalizedTimelineRead.Invalid(it) }
+        val events = decodeRows(rows) ?: return NormalizedTimelineRead.Invalid(SnapshotReadFailure.CORRUPT_ENCODING)
+        val envelope = head.toEnvelope(scope, events)
+        return if (normalizedRootDigest(envelope, rows) == head.rootDigest.lowercase()) {
+            NormalizedTimelineRead.Valid(envelope)
+        } else {
+            NormalizedTimelineRead.Invalid(SnapshotReadFailure.CHECKSUM_MISMATCH)
         }
-        if (head.revision < 0L || head.envelopeSchemaVersion !in 1..StoredTimelineEnvelope.CURRENT_SCHEMA_VERSION ||
-            head.rowCount < 0 || head.generation < 0L
-        ) return NormalizedTimelineRead.Invalid(SnapshotReadFailure.METADATA_INVALID)
-        if (rows.size != head.rowCount) return NormalizedTimelineRead.Invalid(SnapshotReadFailure.LENGTH_MISMATCH)
+    }
+
+    private fun validateHead(
+        scope: TimelineScope,
+        head: NormalizedTimelineSnapshotHeadEntity,
+        actualRowCount: Int,
+    ): SnapshotReadFailure? {
+        if (!head.matches(scope)) return SnapshotReadFailure.SCOPE_MISMATCH
+        if (head.storageLayoutVersion != NORMALIZED_LAYOUT_VERSION) return SnapshotReadFailure.SCHEMA_MISMATCH
+        if (!head.hasValidMetadata()) return SnapshotReadFailure.METADATA_INVALID
+        return SnapshotReadFailure.LENGTH_MISMATCH.takeIf { actualRowCount != head.rowCount }
+    }
+
+    private fun validateRows(
+        scope: TimelineScope,
+        rows: List<NormalizedTimelineSnapshotRowEntity>,
+    ): SnapshotReadFailure? {
         val identities = HashSet<Pair<Long, Long>>()
         rows.forEachIndexed { index, row ->
             if (row.backendId != scope.backendId || row.conversationId != scope.conversationId) {
-                return NormalizedTimelineRead.Invalid(SnapshotReadFailure.SCOPE_MISMATCH)
+                return SnapshotReadFailure.SCOPE_MISMATCH
             }
             if (row.eventOrder != index || !identities.add(row.identityPrimary to row.identitySecondary)) {
-                return NormalizedTimelineRead.Invalid(SnapshotReadFailure.METADATA_INVALID)
+                return SnapshotReadFailure.METADATA_INVALID
             }
             if (sha256(row.payload) != row.checksum.lowercase()) {
-                return NormalizedTimelineRead.Invalid(SnapshotReadFailure.CHECKSUM_MISMATCH)
+                return SnapshotReadFailure.CHECKSUM_MISMATCH
             }
         }
-        val events = rows.map { row ->
-            val event = runCatching {
-                TimelineSnapshotCodec.json.decodeFromString(StoredTimelineEvent.serializer(), row.payload.toString(StandardCharsets.UTF_8))
-            }.getOrNull() ?: return NormalizedTimelineRead.Invalid(SnapshotReadFailure.CORRUPT_ENCODING)
-            event
-        }
-        val envelope = StoredTimelineEnvelope(
-            schemaVersion = head.envelopeSchemaVersion,
-            scope = scope,
-            revision = head.revision,
-            liveCursor = head.liveCursor,
-            backfillCursor = head.backfillCursor,
-            releasedOlderCount = head.releasedOlderCount,
-            events = events,
-            writtenAtMillis = head.writtenAtMillis,
-        )
-        if (normalizedRootDigest(envelope, rows) != head.rootDigest.lowercase()) {
-            return NormalizedTimelineRead.Invalid(SnapshotReadFailure.CHECKSUM_MISMATCH)
-        }
-        return NormalizedTimelineRead.Valid(envelope)
+        return null
     }
+
+    private fun decodeRows(rows: List<NormalizedTimelineSnapshotRowEntity>): List<StoredTimelineEvent>? =
+        rows.map { row ->
+            runCatching {
+                TimelineSnapshotCodec.json.decodeFromString(
+                    StoredTimelineEvent.serializer(),
+                    row.payload.toString(StandardCharsets.UTF_8),
+                )
+            }.getOrNull() ?: return null
+        }
 }
+
+private fun NormalizedTimelineSnapshotHeadEntity.matches(scope: TimelineScope): Boolean =
+    backendId == scope.backendId && conversationId == scope.conversationId && agentId == scope.agentId
+
+private fun NormalizedTimelineSnapshotHeadEntity.hasValidMetadata(): Boolean =
+    revision >= 0L && envelopeSchemaVersion in 1..StoredTimelineEnvelope.CURRENT_SCHEMA_VERSION &&
+        rowCount >= 0 && generation >= 0L
+
+private fun NormalizedTimelineSnapshotHeadEntity.toEnvelope(
+    scope: TimelineScope,
+    events: List<StoredTimelineEvent>,
+): StoredTimelineEnvelope =
+    StoredTimelineEnvelope(
+        schemaVersion = envelopeSchemaVersion,
+        scope = scope,
+        revision = revision,
+        liveCursor = liveCursor,
+        backfillCursor = backfillCursor,
+        releasedOlderCount = releasedOlderCount,
+        events = events,
+        writtenAtMillis = writtenAtMillis,
+    )
 
 internal fun normalizedRootDigest(
     envelope: StoredTimelineEnvelope,

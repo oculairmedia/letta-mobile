@@ -122,12 +122,24 @@ interface ConfirmedTimelineSnapshotDao {
     suspend fun getHeadMetadata(backendId: String, conversationId: String): ConfirmedTimelineSnapshotHeadMetadata?
 
     @Query(
-        "SELECT * FROM normalized_timeline_snapshot_heads WHERE backend_id = :backendId AND conversation_id = :conversationId"
+        """
+        SELECT backend_id, conversation_id, agent_id, storage_layout_version, revision,
+               envelope_schema_version, live_cursor, backfill_cursor, released_older_count,
+               row_count, root_digest, generation, written_at_millis
+        FROM normalized_timeline_snapshot_heads
+        WHERE backend_id = :backendId AND conversation_id = :conversationId
+        """
     )
     suspend fun getNormalizedHead(backendId: String, conversationId: String): NormalizedTimelineSnapshotHeadEntity?
 
     @Query(
-        "SELECT * FROM normalized_timeline_snapshot_rows WHERE backend_id = :backendId AND conversation_id = :conversationId ORDER BY event_order"
+        """
+        SELECT backend_id, conversation_id, identity_primary, identity_secondary,
+               event_order, payload, checksum
+        FROM normalized_timeline_snapshot_rows
+        WHERE backend_id = :backendId AND conversation_id = :conversationId
+        ORDER BY event_order
+        """
     )
     suspend fun getNormalizedRows(backendId: String, conversationId: String): List<NormalizedTimelineSnapshotRowEntity>
 
