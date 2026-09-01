@@ -1091,7 +1091,35 @@ class AppServerTurnEngine(
         val emit: suspend (RuntimeEventDraft) -> Unit,
     )
 
-    private suspend fun processReceivedFrame(received: AppServerReceivedFrame, context: TurnFrameContext) {
+
+    /**
+     * Consecutive-failure counter for [projectOrSkip]. Reset
+     * by any successfully projected frame, so an isolated bad frame never
+     * accumulates toward the cap across an otherwise healthy turn.
+     */
+    private class FrameProjectionErrorBudget {
+        private var consecutive = 0
+
+        fun recordSuccess() {
+            consecutive = 0
+        }
+
+        /** Returns the new consecutive-failure count. */
+        fun recordFailure(): Int {
+            consecutive += 1
+            return consecutive
+        }
+
+        companion object {
+            const val MAX_CONSECUTIVE = 8
+        }
+    }
+
+    private suspend fun processReceivedFrame(
+        received: AppServerReceivedFrame,
+        context: TurnFrameContext,
+        budget: FrameProjectionErrorBudget,
+    ) {
         if (isConnectionGenerationSuperseded(context.lease)) {
             completeSupersededTurn(context)
         }
@@ -1106,11 +1134,70 @@ class AppServerTurnEngine(
         answerExternalToolCallIfPresent(received, context.lease, context.externalToolDispatchScope)
         if (suppressChildFrame(received)) return
         val frameSeq = received.eventSeqOrNull()
-        val drafts = mapper.map(context.command, received)
+        // letta-mobile-gdvbf: the resilience boundary is EXACTLY this seam, and
+        // deliberately no wider. Everything above has already touched turn
+        // state (generation/scope gating, watchdog, external-tool dispatch,
+        // child suppression) and everything below mutates or emits
+        // (run-id promotion, draft processing). A failure there is not
+        // equivalent to an unreadable frame — it may need terminal settlement —
+        // so it must still propagate.
+        val drafts = projectOrSkip(received, context, budget) ?: return
         drafts.firstOrNull { it.runId != null }?.runId?.value?.let { runId ->
             slot.runIdGate.promote(runId, context.lease.token)
         }
         drafts.forEach { draft -> context.draftProcessor.process(draft, frameSeq) }
+    }
+
+    /**
+     * letta-mobile-gdvbf: TERMINAL PRECEDENCE — failing to PROJECT one frame is
+     * not evidence that the model's turn failed.
+     *
+     * An exception out of [AppServerRuntimeEventMapper.map] used to escape the
+     * collect loop and hit the blanket `catch (e: Throwable)`, which settles the
+     * whole turn with `turnEndReason = "Tool execution interrupted by stream
+     * error"`. A single unreadable field therefore outranked every piece of
+     * successful evidence in the turn.
+     *
+     * Returns null when the frame could not be projected and should be skipped.
+     *
+     * Deliberately NOT swallowed:
+     *  - [CancellationException] — never swallow cancellation.
+     *  - [TurnCompletedMarker] / [TurnIdleTimedOutMarker] and anything caused by
+     *    a clean completion — control-flow signals.
+     *  - a SUSTAINED run of failures ([FrameProjectionErrorBudget]). Tolerating
+     *    one bad frame is resilience; tolerating every frame would be silently
+     *    pretending a broken stream is fine.
+     */
+    private fun projectOrSkip(
+        received: AppServerReceivedFrame,
+        context: TurnFrameContext,
+        budget: FrameProjectionErrorBudget,
+    ): List<RuntimeEventDraft>? {
+        return try {
+            mapper.map(context.command, received).also { budget.recordSuccess() }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: TurnCompletedMarker) {
+            throw e
+        } catch (e: TurnIdleTimedOutMarker) {
+            throw e
+        } catch (e: Throwable) {
+            if (e.isCausedByCleanCompletion()) throw e
+            val consecutive = budget.recordFailure()
+            val rethrown = consecutive > FrameProjectionErrorBudget.MAX_CONSECUTIVE
+            Telemetry.event(
+                "AppServerTurnEngine", "frame.projection_failed",
+                "frameType" to (received.frame.type ?: "<unknown>"),
+                "conversationId" to context.runtimeScope.conversationId,
+                "error" to (e::class.simpleName ?: "Throwable"),
+                "message" to (e.message ?: ""),
+                "consecutive" to consecutive,
+                "budget" to FrameProjectionErrorBudget.MAX_CONSECUTIVE,
+                "rethrown" to rethrown,
+            )
+            if (rethrown) throw e
+            null
+        }
     }
 
     private suspend fun completeSupersededTurn(context: TurnFrameContext): Nothing {
@@ -1226,7 +1313,10 @@ class AppServerTurnEngine(
         )
         try {
             collectorReady.complete(Unit)
-            inboundEvents.collect { received -> processReceivedFrame(received, frameContext) }
+            val projectionErrors = FrameProjectionErrorBudget()
+            inboundEvents.collect { received ->
+                processReceivedFrame(received, frameContext, projectionErrors)
+            }
         } catch (idle: TurnIdleTimedOutMarker) {
             // letta-mobile-oqfbj: settle before emitting the failed draft
             settleDanglingToolCalls(command, emittedToolCallIds, returnedToolCallIds, emitDraft, "Tool execution interrupted by turn timeout")
