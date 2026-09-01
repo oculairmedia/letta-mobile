@@ -335,7 +335,6 @@ open class SubagentRepository(
         if (current.isEmpty()) return
         val timed = current.filter { it.status == SubagentStatus.RUNNING && (now - it.lastSeenAtMs) > STREAM_TIMEOUT_MS }
         if (timed.isEmpty()) return
-        val byKey = current.associateBy { it.cacheKey() }
         val updated = current.map { entry ->
             val expired = timed.firstOrNull { it.cacheKey() == entry.cacheKey() }
             if (expired != null && entry.status == SubagentStatus.RUNNING) {
