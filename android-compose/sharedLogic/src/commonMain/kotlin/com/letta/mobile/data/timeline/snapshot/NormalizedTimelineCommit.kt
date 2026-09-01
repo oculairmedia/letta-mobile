@@ -83,6 +83,13 @@ fun normalizedTimelineCommitFailureFromStorage(value: String): NormalizedTimelin
 }
 
 object NormalizedTimelineCommitPlanner {
+    private data class RowDiff(
+        val previousCount: Int,
+        val currentCount: Int,
+        val upserts: List<NormalizedTimelineRow>,
+        val deletes: Set<TimelineEventRowKey>,
+    )
+
     fun plan(
         previous: StoredTimelineEnvelope?,
         current: StoredTimelineEnvelope,
@@ -92,10 +99,14 @@ object NormalizedTimelineCommitPlanner {
             ?: return NormalizedTimelineCommitPlan.Invalid(NormalizedTimelineCommitFailure.AMBIGUOUS_EVENT_IDENTITY)
         val currentRows = index(current.events)
             ?: return NormalizedTimelineCommitPlan.Invalid(NormalizedTimelineCommitFailure.AMBIGUOUS_EVENT_IDENTITY)
-        val upserts = currentRows.values.filter { row -> previousRows[row.key] != row }
-        val deletes = previousRows.keys - currentRows.keys
-        return if (hasPersistedChanges(previous, current, upserts, deletes)) {
-            applyPlan(previous, current, previousRows, currentRows, upserts, deletes)
+        val diff = RowDiff(
+            previousCount = previousRows.size,
+            currentCount = currentRows.size,
+            upserts = currentRows.values.filter { row -> previousRows[row.key] != row },
+            deletes = previousRows.keys - currentRows.keys,
+        )
+        return if (hasPersistedChanges(previous, current, diff)) {
+            applyPlan(previous, current, diff)
         } else {
             noOpPlan(requireNotNull(previous), current)
         }
@@ -113,10 +124,9 @@ object NormalizedTimelineCommitPlanner {
     private fun hasPersistedChanges(
         previous: StoredTimelineEnvelope?,
         current: StoredTimelineEnvelope,
-        upserts: List<NormalizedTimelineRow>,
-        deletes: Set<TimelineEventRowKey>,
+        diff: RowDiff,
     ): Boolean = previous == null || persistedMetadata(previous) != persistedMetadata(current) ||
-        upserts.isNotEmpty() || deletes.isNotEmpty()
+        diff.upserts.isNotEmpty() || diff.deletes.isNotEmpty()
 
     private fun noOpPlan(
         previous: StoredTimelineEnvelope,
@@ -131,18 +141,15 @@ object NormalizedTimelineCommitPlanner {
     private fun applyPlan(
         previous: StoredTimelineEnvelope?,
         current: StoredTimelineEnvelope,
-        previousRows: Map<TimelineEventRowKey, NormalizedTimelineRow>,
-        currentRows: Map<TimelineEventRowKey, NormalizedTimelineRow>,
-        upserts: List<NormalizedTimelineRow>,
-        deletes: Set<TimelineEventRowKey>,
+        diff: RowDiff,
     ) = NormalizedTimelineCommitPlan.Apply(
         NormalizedTimelineCommit(
             baseRevision = TimelineRevision(previous?.revision ?: 0L),
             targetRevision = TimelineRevision(current.revision),
             metadata = metadata(current),
-            upserts = upserts,
-            deletes = deletes,
-            comparisonEvents = previousRows.size + currentRows.size,
+            upserts = diff.upserts,
+            deletes = diff.deletes,
+            comparisonEvents = diff.previousCount + diff.currentCount,
         ),
     )
 
