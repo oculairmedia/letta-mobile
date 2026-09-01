@@ -230,6 +230,111 @@ class TimelineSyncLoopIncrementalPersistenceTest {
         loop.closeAndJoin()
     }
 
+    /**
+     * Dogfood round 2, item 1: a long streamed response must not persist per delta.
+     *
+     * Before this, every applied stream frame scheduled a persist behind a 100 ms debounce.
+     * On the Pixel a 2,161-event conversation took 589-721 ms per commit, so commits queued
+     * faster than they drained: back-to-back persistence windows, heap to the 256 MiB ceiling
+     * and 34-79 skipped frames. Fail-on-revert: remove the streaming defer and the commit
+     * count here rises with the frame count instead of staying bounded.
+     */
+    @Test
+    fun aLongStreamedResponseYieldsABoundedCommitCount() = runTest {
+        val db = inMemoryDatabase()
+        val store = CountingStore(RoomConfirmedTimelineStore(db))
+        val scope = TimelineScope(backendId = "backend", conversationId = "conv-stream", agentId = "agent")
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val loop = newLoop(scope, store, dispatcher)
+
+        loop.turnStarted()
+        repeat(40) { index ->
+            loop.ingestStreamEvent(
+                UserMessage(id = "msg-$index", date = FIXTURE_DATE, contentRaw = JsonPrimitive("delta $index")),
+            )
+            // Let the debounce elapse, as real frame arrival does.
+            advanceUntilIdle()
+        }
+        val commitsDuringStreaming = store.commits
+
+        loop.turnEnded(clean = true)
+        loop.flushSnapshotNow()
+        advanceUntilIdle()
+
+        assertTrue(
+            "40 streamed deltas must not produce ~40 commits; observed $commitsDuringStreaming",
+            commitsDuringStreaming <= 3,
+        )
+        // Durability is not weakened: everything is persisted once the turn settles.
+        assertEquals(40, store.readSnapshot(scope)?.events?.size)
+        loop.closeAndJoin()
+    }
+
+    /**
+     * Dogfood round 2, item 2: a stale holder must stop, not spin.
+     *
+     * The capture showed duplicate holders repeatedly planning and being rejected, each
+     * rejection costing a full O(N) plan that could never commit. Fail-on-revert: without the
+     * detach, further ingests keep reaching the store.
+     */
+    @Test
+    fun aStaleHolderStopsSchedulingInsteadOfReplanningForever() = runTest {
+        val db = inMemoryDatabase()
+        val store = CountingStore(RoomConfirmedTimelineStore(db), alwaysStale = true)
+        val scope = TimelineScope(backendId = "backend", conversationId = "conv-detach", agentId = "agent")
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val loop = newLoop(scope, store, dispatcher)
+
+        loop.ingestStreamEvent(UserMessage(id = "msg-0", date = FIXTURE_DATE, contentRaw = JsonPrimitive("first")))
+        loop.flushSnapshotNow()
+        advanceUntilIdle()
+        // An attempt already queued when the first Stale lands may still reach the store, so
+        // the exact count here is 1 or 2 depending on interleaving. What must hold is that it
+        // is BOUNDED and then stops growing.
+        val commitsAfterFirstStale = store.commits
+        assertTrue(
+            "the initial attempts must be bounded; observed $commitsAfterFirstStale",
+            commitsAfterFirstStale in 1..2,
+        )
+
+        repeat(10) { index ->
+            loop.ingestStreamEvent(
+                UserMessage(id = "later-$index", date = FIXTURE_DATE, contentRaw = JsonPrimitive("later $index")),
+            )
+            advanceUntilIdle()
+        }
+
+        assertEquals(
+            "a detached stale writer must not keep planning and rejecting",
+            commitsAfterFirstStale,
+            store.commits,
+        )
+        loop.closeAndJoin()
+    }
+
+    /** Counts commit attempts that actually reach the store, and can force permanent Stale. */
+    private class CountingStore(
+        private val delegate: RoomConfirmedTimelineStore,
+        private val alwaysStale: Boolean = false,
+    ) : com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore by delegate {
+        var commits: Int = 0
+            private set
+
+        override suspend fun commitNormalized(
+            plan: com.letta.mobile.data.timeline.snapshot.NormalizedTimelineCommitPlan,
+            fullEnvelope: com.letta.mobile.data.timeline.snapshot.StoredTimelineEnvelope,
+            checkpointLegacyEnvelope: Boolean,
+        ): com.letta.mobile.data.timeline.snapshot.NormalizedTimelineWriteResult {
+            commits += 1
+            if (alwaysStale) {
+                return com.letta.mobile.data.timeline.snapshot.NormalizedTimelineWriteResult.Stale(
+                    com.letta.mobile.data.timeline.snapshot.TimelineRevision(999L),
+                )
+            }
+            return delegate.commitNormalized(plan, fullEnvelope, checkpointLegacyEnvelope)
+        }
+    }
+
     private fun newLoop(
         scope: TimelineScope,
         store: com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore,

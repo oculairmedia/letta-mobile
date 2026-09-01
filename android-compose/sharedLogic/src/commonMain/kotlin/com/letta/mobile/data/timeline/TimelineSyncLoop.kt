@@ -92,6 +92,12 @@ class TimelineSyncLoop(
     // every LEGACY_CHECKPOINT_INTERVAL successful normalized commits, plus always on the very
     // first commit for a scope. Bounds legacy staleness to at most that many revisions.
     private var commitsSinceLegacyCheckpoint: Int = 0
+    // Wall-clock of the last persist attempt, for the streaming safety-flush bound below.
+    private var lastPersistAtMs: Long = 0L
+    // Set once this loop is proven not to own its conversation's durable state (see
+    // onStaleRejection). A detached loop still serves reads; it just stops writing.
+    @Volatile
+    private var detachedAsStaleWriter: Boolean = false
     private val persistRequests = Channel<SnapshotPersistRequest>(Channel.CONFLATED)
     private val persistMutex = Mutex()
     private val persistJob: Job
@@ -146,6 +152,7 @@ class TimelineSyncLoop(
     internal fun scheduleSnapshotPersist(immediate: Boolean = false) {
         timelineScope ?: return
         if (confirmedTimelineStore === NoOpConfirmedTimelineStore) return
+        if (detachedAsStaleWriter) return
         persistRequests.trySend(
             if (immediate) SnapshotPersistRequest.Immediate else SnapshotPersistRequest.Debounced,
         )
@@ -155,12 +162,44 @@ class TimelineSyncLoop(
         for (request in persistRequests) {
             if (request == SnapshotPersistRequest.Debounced) {
                 delay(SNAPSHOT_PERSIST_DEBOUNCE)
+                if (shouldDeferStreamingPersist()) continue
             }
             while (persistRequests.tryReceive().isSuccess) {
                 // Coalesce all timeline changes received during the debounce window into the latest state.
             }
+            lastPersistAtMs = timelineCurrentTimeMillis()
             flushSnapshotNow(prune = true)
         }
+    }
+
+    /**
+     * letta-mobile-827s9.4, dogfood round 2: do NOT persist every streaming delta.
+     *
+     * Every applied stream frame schedules a Debounced persist, and the debounce is only
+     * [SNAPSHOT_PERSIST_DEBOUNCE]. On the Pixel capture a visible 2,161-event conversation
+     * took 589-721 ms per commit, so a streaming turn queued commits far faster than they
+     * could drain: 0.2-0.7 s persistence windows back to back, heap to the 256 MiB ceiling,
+     * GC freeing 159-181 MiB, and Choreographer skipping 34-79 frames. Removing full-envelope
+     * JSON encoding was necessary but did not touch this, because the remaining per-commit
+     * cost is O(N) planner comparison plus an O(N) digest projection.
+     *
+     * While a turn is streaming, a frame-driven persist is therefore SKIPPED unless
+     * [STREAMING_SAFETY_FLUSH] has elapsed since the last one. Durability is not weakened:
+     * settlement, hydration, reconcile and turn-end all schedule IMMEDIATE persists, which are
+     * never deferred, so a completed turn is still written promptly. The safety flush bounds
+     * exposure for a single very long streamed response, which would otherwise persist only at
+     * its end.
+     */
+    private fun shouldDeferStreamingPersist(): Boolean {
+        if (!turnActive) return false
+        val sinceLastPersist = timelineCurrentTimeMillis() - lastPersistAtMs
+        if (sinceLastPersist >= STREAMING_SAFETY_FLUSH.inWholeMilliseconds) return false
+        Telemetry.event(
+            "TimelineSync", "snapshotPersist.streamingDeferred",
+            "conversationId" to conversationId,
+            "sinceLastPersistMs" to sinceLastPersist,
+        )
+        return true
     }
 
     suspend fun flushSnapshotNow(prune: Boolean = false) {
@@ -216,13 +255,7 @@ class TimelineSyncLoop(
                 when (result) {
                     is NormalizedTimelineWriteResult.Committed, is NormalizedTimelineWriteResult.NoOp ->
                         onDurableCommit(result, envelope, revision, fingerprint, checkpointDue, durationMs)
-                    is NormalizedTimelineWriteResult.Stale -> Telemetry.event(
-                        "TimelineSync", "snapshotPersist.staleRejected",
-                        "conversationId" to conversationId,
-                        "revision" to revision,
-                        "actualHighWaterRevision" to result.highWaterRevision.value,
-                        level = Telemetry.Level.WARN,
-                    )
+                    is NormalizedTimelineWriteResult.Stale -> onStaleRejection(result, revision)
                     is NormalizedTimelineWriteResult.Invalid ->
                         onInvalidPlan(result, envelope, revision, fingerprint)
                 }
@@ -255,6 +288,38 @@ class TimelineSyncLoop(
     private fun isLegacyCheckpointDue(plan: NormalizedTimelineCommitPlan): Boolean {
         val isInitialCommit = plan is NormalizedTimelineCommitPlan.Apply && plan.commit.baseRevision.value == 0L
         return isInitialCommit || commitsSinceLegacyCheckpoint + 1 >= LEGACY_CHECKPOINT_INTERVAL
+    }
+
+    /**
+     * letta-mobile-827s9.4, dogfood round 2, item 2: a stale writer must STOP, not spin.
+     *
+     * The Pixel capture showed repeated `revision=1 actualHighWaterRevision=...` rejections
+     * from holders that could never commit. Each rejection still cost a full O(N) plan over a
+     * 2k-event timeline, so a duplicate holder burned real CPU and heap producing nothing,
+     * concurrently with the visible conversation's own commits.
+     *
+     * A `Stale` result means another holder owns this conversation's durable state. Retrying
+     * cannot help: this loop's acknowledged baseline is behind and nothing in this loop will
+     * advance it. So the loop detaches as a writer — it keeps serving reads and its in-memory
+     * timeline, but stops scheduling persists entirely.
+     *
+     * NOTE this is a bounded mitigation, not the cure. The duplicate holders themselves are
+     * letta-mobile-grrhq: a subagent dispatch acquires a SECOND holder for the parent's
+     * conversation under the child agent id. This stops the wasted work; grrhq stops the
+     * second holder existing.
+     */
+    private fun onStaleRejection(result: NormalizedTimelineWriteResult.Stale, revision: Long) {
+        detachedAsStaleWriter = true
+        // Drain anything already queued so the detach takes effect immediately.
+        while (persistRequests.tryReceive().isSuccess) Unit
+        Telemetry.event(
+            "TimelineSync", "snapshotPersist.staleRejected",
+            "conversationId" to conversationId,
+            "revision" to revision,
+            "actualHighWaterRevision" to result.highWaterRevision.value,
+            "detachedAsWriter" to true,
+            level = Telemetry.Level.WARN,
+        )
     }
 
     /**
@@ -882,6 +947,13 @@ class TimelineSyncLoop(
 
     companion object {
         private val SNAPSHOT_PERSIST_DEBOUNCE = 100.milliseconds
+
+        /**
+         * Upper bound on how long a streaming turn may go without a durable write. Large
+         * enough that an ordinary turn persists once at settlement rather than dozens of
+         * times mid-stream; small enough that a very long response is never wholly at risk.
+         */
+        internal val STREAMING_SAFETY_FLUSH = 5_000.milliseconds
         private const val STREAM_HEARTBEAT_EXPECTED_MS = 30_000L
         // letta-mobile-5pi: 6x multiplier = 3 minute silence timeout.
         // Previously 12x (6 minutes) — a dead stream could go undetected
