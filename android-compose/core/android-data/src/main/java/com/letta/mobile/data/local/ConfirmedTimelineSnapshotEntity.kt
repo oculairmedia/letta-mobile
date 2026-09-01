@@ -74,7 +74,6 @@ data class ConfirmedTimelineSnapshotHeadMetadata(
     @ColumnInfo(name = "written_at_millis") val writtenAtMillis: Long,
 )
 
-@Dao
 @Entity(
     tableName = "normalized_timeline_snapshot_heads",
     primaryKeys = ["backend_id", "conversation_id"],
