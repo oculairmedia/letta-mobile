@@ -100,7 +100,7 @@ object TimelineSnapshotCodec {
     }
 }
 
-private object StoredEnvelopeFingerprint {
+internal object StoredEnvelopeFingerprint {
     private const val OFFSET_BASIS = -3750763034362895579L
     private const val PRIME = 1099511628211L
     private const val NULL_STRING = -1L
@@ -117,8 +117,8 @@ private object StoredEnvelopeFingerprint {
         envelope.events.forEach(::mixEvent)
     }.value
 
-    private class Hasher {
-        var value: Long = OFFSET_BASIS
+    internal class Hasher(seed: Long = OFFSET_BASIS) {
+        var value: Long = seed
             private set
 
         fun mix(valueToAdd: Long) {
@@ -134,8 +134,8 @@ private object StoredEnvelopeFingerprint {
             valueToAdd.forEach { character -> mix(character.code.toLong()) }
         }
 
-        fun mixEvent(event: StoredTimelineEvent) {
-            mix(event.position.toBits())
+        fun mixEvent(event: StoredTimelineEvent, includePosition: Boolean = true) {
+            if (includePosition) mix(event.position.toBits())
             mixString(event.otid)
             mixString(event.content)
             mixString(event.serverId)
