@@ -361,6 +361,12 @@ open class TimelineRepository(
             )
         }
         val storedSnapshot = readResult.snapshot
+        // The incremental commit planner's `previous` must carry the store's actual durable
+        // high-water revision (not necessarily storedSnapshot.revision, which can trail it in
+        // the Fallback-recovery case) so the first commit's baseRevision matches the store's
+        // CAS precondition instead of being rejected Stale forever.
+        val persistedBaseline = storedSnapshot?.takeIf { it.revision == readResult.highWaterRevision }
+            ?: storedSnapshot?.copy(revision = readResult.highWaterRevision)
         val created = TimelineSyncLoop(
             messageApi = timelineTransport, conversationId = key.conversationId, agentId = key.agentId, scope = repositoryScope,
             ingestedListenerProvider = { ingestedListener }, pendingLocalStore = pendingLocalStore,
@@ -368,6 +374,7 @@ open class TimelineRepository(
             confirmedTimelineStore = confirmedTimelineStore, timelineScope = timelineScope,
             initialTimeline = storedSnapshot?.let(TimelineSnapshotCodec::storedEnvelopeToTimeline),
             initialRevision = readResult.highWaterRevision,
+            initialPersistedEnvelope = persistedBaseline,
         )
         loops[key] = created
         evictEldestLoopsIfNeededLocked()

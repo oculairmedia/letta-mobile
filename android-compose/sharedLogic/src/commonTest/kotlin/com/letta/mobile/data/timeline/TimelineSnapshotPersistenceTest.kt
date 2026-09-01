@@ -85,6 +85,20 @@ class TimelineSnapshotPersistenceTest {
                 if (writeIndex == 1) firstWriteCompleted.complete(Unit)
             }
         }
+
+        // Kotlin's `by delegate` forwards EVERY interface member not explicitly overridden
+        // here -- including default-bodied ones -- straight to `delegate`, bypassing the
+        // `writeSnapshot` override above entirely. Production now calls `commitNormalized`,
+        // not `writeSnapshot`, so without this explicit re-declaration the gating in this
+        // fixture (firstWriteStarted/releaseFirstWrite/writeCount) would silently stop being
+        // exercised. `super.commitNormalized` resolves the interface's default body, which
+        // dispatches back to `this.writeSnapshot`/`this.readSnapshot` -- i.e. the overrides
+        // above -- because default interface methods dispatch dynamically on the receiver.
+        override suspend fun commitNormalized(
+            plan: com.letta.mobile.data.timeline.snapshot.NormalizedTimelineCommitPlan,
+            fullEnvelope: StoredTimelineEnvelope,
+            checkpointLegacyEnvelope: Boolean,
+        ) = super.commitNormalized(plan, fullEnvelope, checkpointLegacyEnvelope)
     }
 
     @Test

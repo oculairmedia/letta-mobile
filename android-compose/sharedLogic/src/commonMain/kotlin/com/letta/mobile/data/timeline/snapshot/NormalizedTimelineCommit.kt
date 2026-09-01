@@ -59,6 +59,7 @@ enum class NormalizedTimelineCommitFailure {
     INVALID_REVISION,
     SCOPE_MISMATCH,
     AMBIGUOUS_EVENT_IDENTITY,
+    OVERSIZED_ROW,
 }
 
 sealed interface NormalizedTimelineWriteResult {
@@ -73,12 +74,14 @@ fun NormalizedTimelineCommitFailure.toStorageValue(): String = when (this) {
     NormalizedTimelineCommitFailure.INVALID_REVISION -> "invalid_revision"
     NormalizedTimelineCommitFailure.SCOPE_MISMATCH -> "scope_mismatch"
     NormalizedTimelineCommitFailure.AMBIGUOUS_EVENT_IDENTITY -> "ambiguous_event_identity"
+    NormalizedTimelineCommitFailure.OVERSIZED_ROW -> "oversized_row"
 }
 
 fun normalizedTimelineCommitFailureFromStorage(value: String): NormalizedTimelineCommitFailure? = when (value) {
     "invalid_revision" -> NormalizedTimelineCommitFailure.INVALID_REVISION
     "scope_mismatch" -> NormalizedTimelineCommitFailure.SCOPE_MISMATCH
     "ambiguous_event_identity" -> NormalizedTimelineCommitFailure.AMBIGUOUS_EVENT_IDENTITY
+    "oversized_row" -> NormalizedTimelineCommitFailure.OVERSIZED_ROW
     else -> null
 }
 

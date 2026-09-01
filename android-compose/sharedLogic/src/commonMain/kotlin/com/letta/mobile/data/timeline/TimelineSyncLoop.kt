@@ -6,6 +6,9 @@ import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.ToolReturnMessage
 import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore
 import com.letta.mobile.data.timeline.snapshot.NoOpConfirmedTimelineStore
+import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineCommitPlan
+import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineCommitPlanner
+import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineWriteResult
 import com.letta.mobile.data.timeline.snapshot.StoredTimelineEnvelope
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
@@ -57,6 +60,12 @@ class TimelineSyncLoop(
     private val timelineScope: TimelineScope? = null,
     initialTimeline: Timeline? = null,
     initialRevision: Long = 0L,
+    // The last durably-acknowledged full envelope (from repository hydration), used as the
+    // incremental commit planner's structural baseline. Without this, a loop created after a
+    // process restart would plan every mutation against `previous = null`, i.e. baseRevision
+    // 0, and the very first commit would be rejected Stale by the store's CAS check against
+    // the already-durable revision from the prior session.
+    initialPersistedEnvelope: StoredTimelineEnvelope? = null,
     private val ioDispatcher: kotlinx.coroutines.CoroutineDispatcher = timelineIoDispatcher,
 ) {
     private val loopJob = SupervisorJob(scope.coroutineContext[Job])
@@ -75,6 +84,14 @@ class TimelineSyncLoop(
     private var lastPersistedFingerprint: Long? = null
     // The first successful write establishes this compact baseline; failed/stale writes do not advance it.
     private var lastPersistedSnapshot: SnapshotStructuralSummary? = null
+    // Full envelope of the last durably-committed (normalized OR legacy) write. This is the
+    // incremental commit planner's `previous`. Only successful commits/no-ops advance it;
+    // stale/invalid/failed attempts never do (letta-mobile-827s9.4 requirement 5).
+    private var lastPersistedEnvelope: StoredTimelineEnvelope? = initialPersistedEnvelope
+    // Legacy v11 checkpoint cadence: write a full envelope (readable by rollback/older builds)
+    // every LEGACY_CHECKPOINT_INTERVAL successful normalized commits, plus always on the very
+    // first commit for a scope. Bounds legacy staleness to at most that many revisions.
+    private var commitsSinceLegacyCheckpoint: Int = 0
     private val persistRequests = Channel<SnapshotPersistRequest>(Channel.CONFLATED)
     private val persistMutex = Mutex()
     private val persistJob: Job
@@ -181,31 +198,45 @@ class TimelineSyncLoop(
         val revision = ++snapshotRevision
         val envelope = provisionalEnvelope.copy(revision = revision)
         val startedAtMs = timelineCurrentTimeMillis()
+        val plan = NormalizedTimelineCommitPlanner.plan(lastPersistedEnvelope, envelope)
+        val checkpointDue = isLegacyCheckpointDue(plan)
 
         try {
             withContext(ioDispatcher + NonCancellable) {
-                val written = confirmedTimelineStore.writeSnapshot(envelope)
-                if (prune) {
-                    confirmedTimelineStore.prune(snapshotScope.backendId, MAX_RETAINED_SNAPSHOTS)
-                }
+                val result = confirmedTimelineStore.commitNormalized(plan, envelope, checkpointDue)
                 val durationMs = timelineCurrentTimeMillis() - startedAtMs
-                if (!written) {
-                    Telemetry.event(
+                when (result) {
+                    is NormalizedTimelineWriteResult.Committed, is NormalizedTimelineWriteResult.NoOp -> {
+                        lastPersistedFingerprint = fingerprint
+                        lastPersistedEnvelope = envelope
+                        recordSuccessfulSnapshotMutation(envelope, revision)
+                        commitsSinceLegacyCheckpoint = if (checkpointDue) 0 else commitsSinceLegacyCheckpoint + 1
+                        Telemetry.event(
+                            "TimelineSync", "snapshotPersist.written",
+                            "conversationId" to conversationId,
+                            "revision" to revision,
+                            "eventCount" to envelope.events.size,
+                            "durationMs" to durationMs,
+                            "committed" to (result is NormalizedTimelineWriteResult.Committed),
+                        )
+                    }
+                    is NormalizedTimelineWriteResult.Stale -> Telemetry.event(
                         "TimelineSync", "snapshotPersist.staleRejected",
                         "conversationId" to conversationId,
                         "revision" to revision,
+                        "actualHighWaterRevision" to result.highWaterRevision.value,
                         level = Telemetry.Level.WARN,
                     )
-                } else {
-                    lastPersistedFingerprint = fingerprint
-                    recordSuccessfulSnapshotMutation(envelope, revision)
-                    Telemetry.event(
-                        "TimelineSync", "snapshotPersist.written",
+                    is NormalizedTimelineWriteResult.Invalid -> Telemetry.event(
+                        "TimelineSync", "snapshotPersist.invalidRejected",
                         "conversationId" to conversationId,
                         "revision" to revision,
-                        "eventCount" to envelope.events.size,
-                        "durationMs" to durationMs,
+                        "reason" to result.reason.name,
+                        level = Telemetry.Level.WARN,
                     )
+                }
+                if (prune) {
+                    confirmedTimelineStore.prune(snapshotScope.backendId, MAX_RETAINED_SNAPSHOTS)
                 }
             }
         } catch (cancelled: CancellationException) {
@@ -217,6 +248,22 @@ class TimelineSyncLoop(
                 "revision" to revision,
             )
         }
+    }
+
+    /**
+     * Legacy v11 checkpoint policy: always checkpoint the very first commit for a scope (so a
+     * brand-new conversation has an immediately rollback-readable legacy envelope), then every
+     * [LEGACY_CHECKPOINT_INTERVAL] successful commits after that. Bounds legacy staleness to at
+     * most that many revisions. This is only a *hint* passed to
+     * [ConfirmedTimelineStore.commitNormalized]; whether/how a checkpoint is actually staged
+     * (and that a checkpoint failure never fails an otherwise-successful normalized commit) is
+     * the store implementation's responsibility -- see the Android Room
+     * `RoomConfirmedTimelineStore.commitNormalized` implementation for the real
+     * incremental-commit + best-effort-checkpoint behavior.
+     */
+    private fun isLegacyCheckpointDue(plan: NormalizedTimelineCommitPlan): Boolean {
+        val isInitialCommit = plan is NormalizedTimelineCommitPlan.Apply && plan.commit.baseRevision.value == 0L
+        return isInitialCommit || commitsSinceLegacyCheckpoint + 1 >= LEGACY_CHECKPOINT_INTERVAL
     }
 
     private fun recordSuccessfulSnapshotMutation(envelope: StoredTimelineEnvelope, revision: Long) {
@@ -788,6 +835,9 @@ class TimelineSyncLoop(
         private const val GATEWAY_EVENT_CAPACITY = 64
         private const val MAX_SEEN_STREAM_MESSAGES = 512
         private const val MAX_RETAINED_SNAPSHOTS = 50
+        // letta-mobile-827s9.4: bounds legacy v11 checkpoint staleness to at most this many
+        // normalized commits (plus the always-checkpointed initial commit for a scope).
+        internal const val LEGACY_CHECKPOINT_INTERVAL = 25
         private val activeStreamCount = TimelineAtomicCounter(0)
         internal val DEFAULT_INCLUDE_TYPES = listOf("assistant_message", "reasoning_message", "tool_call_message", "tool_return_message")
     }

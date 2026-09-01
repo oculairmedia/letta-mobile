@@ -4,9 +4,15 @@ import androidx.room.withTransaction
 import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineReadResult
 import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore
 import com.letta.mobile.data.timeline.snapshot.SnapshotReadFailure
+import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineCommit
+import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineCommitFailure
 import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineCommitPlanner
 import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineCommitPlan
+import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineRow
+import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineWriteResult
 import com.letta.mobile.data.timeline.snapshot.StoredTimelineEnvelope
+import com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent
+import com.letta.mobile.data.timeline.snapshot.TimelineRevision
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
 import com.letta.mobile.data.timeline.timelineCurrentTimeMillis
@@ -35,10 +41,18 @@ class RoomConfirmedTimelineStore(
 
     override suspend fun readSnapshotResult(scope: TimelineScope): ConfirmedTimelineReadResult {
         return withContext(Dispatchers.IO) {
+            // Normalized rows are the incremental-commit write target and are therefore, once
+            // present, always at least as fresh as the periodic legacy v11 checkpoint (which
+            // only trails behind on a bounded cadence — see TimelineSyncLoop's checkpoint
+            // policy). Prefer a valid normalized read; only fall back to decoding the legacy
+            // envelope (and re-bootstrapping normalized data from it) when normalized data is
+            // missing or fails closed as corrupt.
+            readNormalized(scope)?.let { normalized ->
+                if (normalized is ConfirmedTimelineReadResult.Active) return@withContext normalized
+            }
             val startedAtMillis = timelineCurrentTimeMillis()
             val head = dao.getHeadMetadata(scope.backendId, scope.conversationId)
-                ?: return@withContext readNormalized(scope)
-                    ?: ConfirmedTimelineReadResult.ReconciliationRequired(SnapshotReadFailure.MISSING)
+                ?: return@withContext ConfirmedTimelineReadResult.ReconciliationRequired(SnapshotReadFailure.MISSING)
             if (!head.matches(scope)) {
                 return@withContext ConfirmedTimelineReadResult.ReconciliationRequired(SnapshotReadFailure.METADATA_INVALID)
             }
@@ -199,6 +213,145 @@ class RoomConfirmedTimelineStore(
             handleWriteFailure(plan, published, failure)
         }
         }
+    }
+
+    /**
+     * Incremental normalized-row commit. Touches only changed rows: deletes, upserts, and a
+     * lightweight (no-payload) row projection to recompute row count + canonical root digest.
+     * Never calls [TimelineSnapshotCodec.encode] and never reads/writes event JSON payloads
+     * for rows outside [NormalizedTimelineCommit.upserts]. All mutation (deletes, upserts,
+     * row-count, root digest, head metadata) happens in one [database] transaction.
+     */
+    override suspend fun commitNormalized(
+        plan: NormalizedTimelineCommitPlan,
+        fullEnvelope: StoredTimelineEnvelope,
+        checkpointLegacyEnvelope: Boolean,
+    ): NormalizedTimelineWriteResult = withContext(Dispatchers.IO) {
+        val result = when (plan) {
+            is NormalizedTimelineCommitPlan.Invalid -> NormalizedTimelineWriteResult.Invalid(plan.reason)
+            is NormalizedTimelineCommitPlan.NoOp -> commitNormalizedNoOp(plan)
+            is NormalizedTimelineCommitPlan.Apply -> commitNormalizedApply(plan.commit)
+        }
+        val committedOrNoOp = result is NormalizedTimelineWriteResult.Committed || result is NormalizedTimelineWriteResult.NoOp
+        if (checkpointLegacyEnvelope && committedOrNoOp) {
+            stageLegacyCheckpoint(fullEnvelope)
+        }
+        result
+    }
+
+    /**
+     * Best-effort legacy v11 checkpoint, staged AFTER the normalized commit above has already
+     * durably succeeded. A checkpoint failure (or cancellation) must never be reported as a
+     * persistence failure -- the normalized commit is the durable write of record; this is
+     * purely so v11 rollback readers stay within [TimelineSyncLoop.LEGACY_CHECKPOINT_INTERVAL]
+     * revisions of current instead of only ever reflecting the very first commit.
+     */
+    private suspend fun stageLegacyCheckpoint(envelope: StoredTimelineEnvelope) {
+        try {
+            writeSnapshot(envelope)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Throwable) {
+            Telemetry.error(
+                "RoomTimelineStore", "commitNormalized.legacyCheckpointFailed", failure,
+                "backendId" to envelope.scope.backendId,
+                "conversationId" to envelope.scope.conversationId,
+                "revision" to envelope.revision,
+            )
+        }
+    }
+
+    private suspend fun commitNormalizedNoOp(plan: NormalizedTimelineCommitPlan.NoOp): NormalizedTimelineWriteResult {
+        val backendId = plan.scope.backendId
+        val conversationId = plan.scope.conversationId
+        return database.withTransaction {
+            val head = dao.getNormalizedHead(backendId, conversationId)
+            val currentRevision = head?.revision ?: 0L
+            if (head == null || currentRevision != plan.baseRevision.value) {
+                return@withTransaction NormalizedTimelineWriteResult.Stale(TimelineRevision(currentRevision))
+            }
+            // No-op CAS: advance revision + timestamp only, zero row writes, row set unchanged.
+            dao.upsertNormalizedHead(
+                head.copy(revision = plan.targetRevision.value, writtenAtMillis = plan.writtenAtMillis),
+            )
+            NormalizedTimelineWriteResult.NoOp(plan.targetRevision)
+        }
+    }
+
+    private suspend fun commitNormalizedApply(commit: NormalizedTimelineCommit): NormalizedTimelineWriteResult {
+        val oversized = commit.upserts.any { row -> rowPayloadBytes(row.event).size > NORMALIZED_MAX_ROW_PAYLOAD_BYTES }
+        if (oversized) {
+            // Oversized rows must not enter normalized storage. Fail closed and let the caller
+            // fall back to a full legacy checkpoint write rather than silently dropping data.
+            return NormalizedTimelineWriteResult.Invalid(NormalizedTimelineCommitFailure.OVERSIZED_ROW)
+        }
+        val scope = commit.metadata.scope
+        val backendId = scope.backendId
+        val conversationId = scope.conversationId
+        return database.withTransaction {
+            val head = dao.getNormalizedHead(backendId, conversationId)
+            val currentRevision = head?.revision ?: 0L
+            if (currentRevision != commit.baseRevision.value) {
+                return@withTransaction NormalizedTimelineWriteResult.Stale(TimelineRevision(currentRevision))
+            }
+            commit.deletes.forEach { key ->
+                currentCoroutineContext().ensureActive()
+                dao.deleteNormalizedRow(backendId, conversationId, key.identityPrimary, key.identitySecondary)
+            }
+            if (commit.upserts.isNotEmpty()) {
+                val entities = commit.upserts.map { row -> row.toRowEntity(backendId, conversationId) }
+                entities.chunked(NORMALIZED_ROW_INSERT_BATCH).forEach { batch ->
+                    currentCoroutineContext().ensureActive()
+                    dao.upsertNormalizedRows(batch)
+                }
+            }
+            currentCoroutineContext().ensureActive()
+            val projection = dao.getNormalizedRowDigestProjection(backendId, conversationId)
+            val digestEnvelope = StoredTimelineEnvelope(
+                schemaVersion = commit.metadata.schemaVersion,
+                scope = scope,
+                revision = commit.targetRevision.value,
+                liveCursor = commit.metadata.liveCursor,
+                backfillCursor = commit.metadata.backfillCursor,
+                releasedOlderCount = commit.metadata.releasedOlderCount,
+                writtenAtMillis = commit.metadata.writtenAtMillis,
+            )
+            dao.upsertNormalizedHead(
+                NormalizedTimelineSnapshotHeadEntity(
+                    backendId = backendId,
+                    conversationId = conversationId,
+                    agentId = scope.agentId,
+                    storageLayoutVersion = NORMALIZED_LAYOUT_VERSION,
+                    revision = commit.targetRevision.value,
+                    envelopeSchemaVersion = commit.metadata.schemaVersion,
+                    liveCursor = commit.metadata.liveCursor,
+                    backfillCursor = commit.metadata.backfillCursor,
+                    releasedOlderCount = commit.metadata.releasedOlderCount,
+                    rowCount = projection.size,
+                    rootDigest = normalizedRootDigest(digestEnvelope, projection),
+                    generation = commit.targetRevision.value,
+                    writtenAtMillis = commit.metadata.writtenAtMillis,
+                ),
+            )
+            NormalizedTimelineWriteResult.Committed(commit.targetRevision)
+        }
+    }
+
+    private fun rowPayloadBytes(event: StoredTimelineEvent): ByteArray =
+        TimelineSnapshotCodec.json.encodeToString(StoredTimelineEvent.serializer(), event)
+            .toByteArray(StandardCharsets.UTF_8)
+
+    private fun NormalizedTimelineRow.toRowEntity(backendId: String, conversationId: String): NormalizedTimelineSnapshotRowEntity {
+        val payload = rowPayloadBytes(event)
+        return NormalizedTimelineSnapshotRowEntity(
+            backendId = backendId,
+            conversationId = conversationId,
+            identityPrimary = key.identityPrimary,
+            identitySecondary = key.identitySecondary,
+            eventOrder = order,
+            payload = payload,
+            checksum = sha256(payload),
+        )
     }
 
     private fun createWritePlan(envelope: StoredTimelineEnvelope): SnapshotWritePlan {
