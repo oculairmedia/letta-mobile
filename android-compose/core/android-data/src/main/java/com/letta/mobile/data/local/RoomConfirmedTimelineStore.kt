@@ -23,6 +23,7 @@ import kotlinx.coroutines.withContext
 /** CursorWindow-safe Room persistence using metadata heads and bounded BLOB chunks. */
 class RoomConfirmedTimelineStore(
     private val database: LettaDatabase,
+    private val bootstrapBatchObserver: suspend (Int) -> Unit = {},
 ) : ConfirmedTimelineStore {
     private val dao = database.confirmedTimelineSnapshotDao()
     private val manifestReader = RoomTimelineManifestReader(dao)
@@ -76,9 +77,10 @@ class RoomConfirmedTimelineStore(
         return try {
             database.withTransaction {
                 dao.deleteNormalizedRows(envelope.scope.backendId, envelope.scope.conversationId)
-                rows.chunked(NORMALIZED_ROW_INSERT_BATCH).forEach { batch ->
+                rows.chunked(NORMALIZED_ROW_INSERT_BATCH).forEachIndexed { index, batch ->
                     currentCoroutineContext().ensureActive()
                     dao.insertNormalizedRows(batch)
+                    bootstrapBatchObserver(index)
                 }
                 dao.insertNormalizedHead(
                     NormalizedTimelineSnapshotHeadEntity(

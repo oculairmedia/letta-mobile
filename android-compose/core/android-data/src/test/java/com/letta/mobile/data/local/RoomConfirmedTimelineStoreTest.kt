@@ -12,6 +12,7 @@ import com.letta.mobile.data.timeline.snapshot.StoredTimelineEnvelope
 import com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -232,6 +233,114 @@ class RoomConfirmedTimelineStoreTest {
             fixture.delete()
         }
     }
+
+    @Test
+    fun normalizedBootstrapReconstructsRichTwoThousandEventHistory() = runTest {
+        val db = inMemoryDatabase()
+        val store = RoomConfirmedTimelineStore(db)
+        val scope = TimelineScope("normalized", "large-history", "agent")
+        val envelope = StoredTimelineEnvelope(
+            scope = scope,
+            revision = 2_001L,
+            liveCursor = "live-2000",
+            backfillCursor = "backfill-1",
+            releasedOlderCount = 7,
+            events = (0 until 2_000).map { index -> event(index) },
+            writtenAtMillis = 9_999L,
+        )
+
+        assertTrue(store.writeSnapshot(envelope))
+        assertEquals(envelope, store.readSnapshot(scope))
+        assertEquals(2_000, db.confirmedTimelineSnapshotDao().getNormalizedRows(scope.backendId, scope.conversationId).size)
+
+        db.confirmedTimelineSnapshotDao().deleteHead(scope.backendId, scope.conversationId)
+        db.confirmedTimelineSnapshotDao().deleteManifestsForScope(scope.backendId, scope.conversationId)
+        assertEquals(envelope, store.readSnapshot(scope))
+    }
+
+    @Test
+    fun normalizedReaderRejectsInvalidHeadAndRowShapes() = runTest {
+        val db = inMemoryDatabase()
+        val store = RoomConfirmedTimelineStore(db)
+        val scope = TimelineScope("normalized", "corruption", "agent")
+        val envelope = StoredTimelineEnvelope(
+            scope = scope,
+            revision = 2L,
+            events = listOf(event(0), event(1)),
+            writtenAtMillis = 10L,
+        )
+        assertTrue(store.writeSnapshot(envelope))
+        assertEquals(envelope, store.readSnapshot(scope))
+        val dao = db.confirmedTimelineSnapshotDao()
+        val originalHead = requireNotNull(dao.getNormalizedHead(scope.backendId, scope.conversationId))
+        val originalRows = dao.getNormalizedRows(scope.backendId, scope.conversationId)
+        dao.deleteHead(scope.backendId, scope.conversationId)
+        dao.deleteManifestsForScope(scope.backendId, scope.conversationId)
+
+        suspend fun assertRejected(
+            expected: SnapshotReadFailure,
+            head: NormalizedTimelineSnapshotHeadEntity = originalHead,
+            rows: List<NormalizedTimelineSnapshotRowEntity> = originalRows,
+        ) {
+            dao.deleteNormalizedHead(scope.backendId, scope.conversationId)
+            dao.deleteNormalizedRows(scope.backendId, scope.conversationId)
+            dao.insertNormalizedRows(rows)
+            dao.insertNormalizedHead(head)
+            val result = store.readSnapshotResult(scope) as ConfirmedTimelineReadResult.ReconciliationRequired
+            assertEquals(expected, result.failure)
+        }
+
+        assertRejected(SnapshotReadFailure.SCHEMA_MISMATCH, head = originalHead.copy(storageLayoutVersion = 99))
+        assertRejected(SnapshotReadFailure.SCOPE_MISMATCH, head = originalHead.copy(agentId = "other-agent"))
+        assertRejected(SnapshotReadFailure.LENGTH_MISMATCH, rows = originalRows.dropLast(1))
+        assertRejected(SnapshotReadFailure.METADATA_INVALID, rows = originalRows.mapIndexed { index, row -> row.copy(eventOrder = index + 1) })
+        assertRejected(SnapshotReadFailure.CHECKSUM_MISMATCH, rows = originalRows.mapIndexed { index, row -> if (index == 0) row.copy(checksum = "0".repeat(64)) else row })
+        assertRejected(SnapshotReadFailure.CORRUPT_ENCODING, rows = originalRows.mapIndexed { index, row ->
+            if (index == 0) row.copy(payload = "not-json".encodeToByteArray(), checksum = sha256("not-json".encodeToByteArray())) else row
+        })
+        assertRejected(SnapshotReadFailure.CHECKSUM_MISMATCH, head = originalHead.copy(rootDigest = "f".repeat(64)))
+    }
+
+    @Test
+    fun cancellationDuringBootstrapRollsBackRowsAndHead() = runTest {
+        val db = inMemoryDatabase()
+        val scope = TimelineScope("normalized", "cancelled-bootstrap", "agent")
+        val writer = RoomConfirmedTimelineStore(db)
+        val envelope = StoredTimelineEnvelope(
+            scope = scope,
+            revision = 1L,
+            events = (0 until 600).map { index -> event(index) },
+            writtenAtMillis = 10L,
+        )
+        assertTrue(writer.writeSnapshot(envelope))
+        val cancellingStore = RoomConfirmedTimelineStore(db) { batch ->
+            if (batch == 1) throw CancellationException("cancel bootstrap")
+        }
+
+        try {
+            cancellingStore.readSnapshot(scope)
+            throw AssertionError("bootstrap cancellation must propagate")
+        } catch (_: CancellationException) {
+            // Expected: Room rolls the transaction back before head publication.
+        }
+
+        val dao = db.confirmedTimelineSnapshotDao()
+        assertNull(dao.getNormalizedHead(scope.backendId, scope.conversationId))
+        assertTrue(dao.getNormalizedRows(scope.backendId, scope.conversationId).isEmpty())
+        assertEquals(envelope, writer.readSnapshot(scope))
+    }
+
+    private fun event(index: Int) = StoredTimelineEvent(
+        position = index.toDouble(),
+        otid = "otid-$index",
+        content = "message-$index",
+        serverId = "server-$index",
+        messageType = if (index % 2 == 0) "USER" else "ASSISTANT",
+        dateIso = "2026-08-24T00:00:00Z",
+        runId = "run-${index / 10}",
+        stepId = "step-$index",
+        seqId = index,
+    )
 
     private data class LegacySnapshotFixture(
         val envelope: StoredTimelineEnvelope,
