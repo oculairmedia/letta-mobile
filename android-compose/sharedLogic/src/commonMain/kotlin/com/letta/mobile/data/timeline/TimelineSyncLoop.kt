@@ -8,6 +8,8 @@ import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore
 import com.letta.mobile.data.timeline.snapshot.NoOpConfirmedTimelineStore
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
+import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotMutationCharacterizer
+import com.letta.mobile.data.timeline.snapshot.SnapshotStructuralSummary
 import kotlin.concurrent.Volatile
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.atomicfu.locks.SynchronizedObject
@@ -70,6 +72,8 @@ class TimelineSyncLoop(
 
     private var snapshotRevision: Long = initialRevision
     private var lastPersistedFingerprint: Long? = null
+    // The first successful write establishes this compact baseline; failed/stale writes do not advance it.
+    private var lastPersistedSnapshot: SnapshotStructuralSummary? = null
     private val persistRequests = Channel<SnapshotPersistRequest>(Channel.CONFLATED)
     private val persistMutex = Mutex()
     private val persistJob: Job
@@ -193,6 +197,27 @@ class TimelineSyncLoop(
                     )
                 } else {
                     lastPersistedFingerprint = fingerprint
+                    val structuralSummary = TimelineSnapshotMutationCharacterizer.summarize(envelope)
+                    val mutationShape = TimelineSnapshotMutationCharacterizer.characterize(
+                        previous = lastPersistedSnapshot,
+                        current = structuralSummary,
+                    )
+                    lastPersistedSnapshot = structuralSummary
+                    Telemetry.event(
+                        "TimelineSync", "snapshotPersist.mutationShape",
+                        "revision" to revision,
+                        "previousCount" to mutationShape.previousCount,
+                        "eventCount" to mutationShape.currentCount,
+                        "inserted" to mutationShape.inserted,
+                        "updated" to mutationShape.updated,
+                        "deleted" to mutationShape.deleted,
+                        "moved" to mutationShape.moved,
+                        "cursorMetadataChanged" to mutationShape.cursorMetadataChanged,
+                        "noOp" to mutationShape.noOp,
+                        "unclassifiable" to mutationShape.unclassifiable,
+                        "comparisonEvents" to mutationShape.eventComparisons,
+                        "fullEnvelopeEncodes" to mutationShape.fullEnvelopeEncodes,
+                    )
                     Telemetry.event(
                         "TimelineSync", "snapshotPersist.written",
                         "conversationId" to conversationId,

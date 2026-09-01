@@ -9,6 +9,7 @@ import com.letta.mobile.data.timeline.snapshot.StoredTimelineEnvelope
 import com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
+import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -139,6 +140,44 @@ class TimelineSnapshotPersistenceTest {
 
         // writeCount must remain 1 because content was identical
         assertEquals(1, store.writeCount)
+        fixture.loop.closeAndJoin()
+    }
+
+    @Test
+    fun rejectedSnapshotWriteDoesNotAdvanceMutationBaselineOrExposeContent() = runTest {
+        val store = RejectingConfirmedTimelineStore()
+        val fixture = SnapshotLoopFixture(
+            coroutineScope = this,
+            identity = SnapshotIdentity("conv-mutation-baseline"),
+            store = store,
+            ioDispatcher = kotlinx.coroutines.test.StandardTestDispatcher(testScheduler),
+        )
+        Telemetry.clear()
+
+        fixture.loop.scheduleSnapshotPersist(immediate = true)
+        advanceUntilIdle()
+        val first = mutationShapeEvents()
+        assertEquals(1, first.size)
+        assertEquals(0, first.single().attrs["previousCount"])
+        assertEquals(0, first.single().attrs["eventCount"])
+        assertEquals(0, first.single().attrs["inserted"])
+
+        fixture.loop.ingestStreamEvent(ConfirmedMessageFixture("raw-server-id", "private message content").message())
+        store.rejectNextWrite = true
+        fixture.loop.flushSnapshotNow()
+        assertEquals(1, mutationShapeEvents().size)
+
+        fixture.loop.scheduleSnapshotPersist(immediate = true)
+        advanceUntilIdle()
+        val shapes = mutationShapeEvents()
+        assertEquals(2, shapes.size)
+        val afterRejectedWrite = shapes.last()
+        assertEquals(0, afterRejectedWrite.attrs["previousCount"])
+        // A successful follow-up is the evidence the rejected write did not
+        // advance the baseline; conflation may legitimately persist either
+        // the pending event or the latest empty state.
+        assertEquals(afterRejectedWrite.attrs["eventCount"], afterRejectedWrite.attrs["inserted"])
+        assertMutationTelemetryIsBounded(shapes)
         fixture.loop.closeAndJoin()
     }
 
@@ -384,6 +423,44 @@ class TimelineSnapshotPersistenceTest {
         loop.flushSnapshotNow()
         assertEquals(5L, store.lastWrite?.revision)
         repository.clearAll()
+    }
+
+    private class RejectingConfirmedTimelineStore : ConfirmedTimelineStore {
+        private val delegate = InMemoryConfirmedTimelineStore()
+        var rejectNextWrite = false
+
+        override suspend fun readSnapshot(scope: TimelineScope): StoredTimelineEnvelope? = delegate.readSnapshot(scope)
+
+        override suspend fun writeSnapshot(envelope: StoredTimelineEnvelope): Boolean {
+            if (rejectNextWrite) {
+                rejectNextWrite = false
+                return false
+            }
+            return delegate.writeSnapshot(envelope)
+        }
+
+        override suspend fun deleteSnapshot(scope: TimelineScope) = delegate.deleteSnapshot(scope)
+        override suspend fun clearForBackend(backendId: String) = delegate.clearForBackend(backendId)
+        override suspend fun prune(backendId: String, maxRetainedConversations: Int) =
+            delegate.prune(backendId, maxRetainedConversations)
+    }
+
+    private fun mutationShapeEvents() = Telemetry.snapshot().filter {
+        it.name == "snapshotPersist.mutationShape"
+    }
+
+    private fun assertMutationTelemetryIsBounded(events: List<Telemetry.Event>) {
+        val expectedAttrs = setOf(
+            "revision", "previousCount", "eventCount", "inserted", "updated", "deleted", "moved",
+            "cursorMetadataChanged", "noOp", "unclassifiable", "comparisonEvents", "fullEnvelopeEncodes",
+        )
+        events.forEach { event ->
+            assertEquals(expectedAttrs, event.attrs.keys)
+            assertTrue(event.attrs.values.all { it is Int || it is Long || it is Boolean })
+            assertFalse(event.attrs.values.any { value ->
+                value.toString().contains("private message content") || value.toString().contains("raw-server-id")
+            })
+        }
     }
 
     private class TypedRecoveryStore(

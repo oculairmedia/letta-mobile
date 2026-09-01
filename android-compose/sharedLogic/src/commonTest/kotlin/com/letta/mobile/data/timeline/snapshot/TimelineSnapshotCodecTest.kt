@@ -105,6 +105,48 @@ class TimelineSnapshotCodecTest {
     }
 
     @Test
+    fun storedEnvelopeFingerprintRemainsCompatibleAfterHasherExtraction() {
+        val event = StoredTimelineEvent(
+            position = 2.0,
+            otid = "otid-rich",
+            content = "rich persisted content",
+            serverId = "server-rich",
+            messageType = "TOOL_CALL",
+            dateIso = "2026-08-24T00:00:00Z",
+            runId = "run-rich",
+            stepId = "step-rich",
+            agentId = "agent-rich",
+            seqId = 7,
+            toolCalls = listOf(StoredToolCall("call-rich", "bash", "{\"cmd\":\"ls\"}")),
+            approvalRequestId = "approval-rich",
+            approvalDecided = true,
+            approvalDecision = "APPROVED",
+            toolReturnContent = "tool-return",
+            toolReturnIsError = true,
+            toolReturnContentByCallId = linkedMapOf("call-rich" to "tool-return"),
+            toolReturnIsErrorByCallId = linkedMapOf("call-rich" to true),
+            toolReturnTruncationByCallId = linkedMapOf(
+                "call-rich" to StoredToolReturnTruncation("return-rich", 123L),
+            ),
+            attachments = listOf(
+                StoredImageAttachmentPointer("image/png", 128L, "https://example.invalid/image", "thumb"),
+            ),
+        )
+        val envelope = StoredTimelineEnvelope(
+            schemaVersion = 1,
+            scope = TimelineScope("backend-rich", "conversation-rich", "agent-rich"),
+            revision = 99L,
+            liveCursor = "live-rich",
+            backfillCursor = "backfill-rich",
+            releasedOlderCount = 3,
+            events = listOf(event),
+            writtenAtMillis = 1234L,
+        )
+
+        assertEquals(7672553595301230214L, TimelineSnapshotCodec.computeStoredEnvelopeFingerprint(envelope))
+    }
+
+    @Test
     fun unknownMessageTypeAndDecisionsFallbackGracefully() {
         val jsonWithUnknowns = """
             {
