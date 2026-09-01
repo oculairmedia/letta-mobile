@@ -67,10 +67,17 @@ internal fun UiMessage.displayRoleLabel(defaultLabel: String): String {
                 "Tool activity"
             }
         } else {
-            defaultLabel
+            // letta-mobile-jt4wq: a message that could not be handed to the
+            // transport keeps its own identity ("You · Not sent") instead of
+            // being restyled as a server "Error" bubble quoting the user's own
+            // words back at them.
+            defaultLabel.withSendFailedSuffix(isSendFailed)
         }
     return toolCall.name
 }
+
+private fun String.withSendFailedSuffix(isSendFailed: Boolean): String =
+    if (isSendFailed) "$this · Not sent" else this
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
