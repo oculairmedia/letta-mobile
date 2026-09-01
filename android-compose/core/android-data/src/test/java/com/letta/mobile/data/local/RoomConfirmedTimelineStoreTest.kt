@@ -330,6 +330,52 @@ class RoomConfirmedTimelineStoreTest {
         assertEquals(envelope, writer.readSnapshot(scope))
     }
 
+    @Test
+    fun laterLegacyRevisionRefreshesExistingNormalizedSnapshot() = runTest {
+        val db = inMemoryDatabase()
+        val store = RoomConfirmedTimelineStore(db)
+        val scope = TimelineScope("normalized", "refresh", "agent")
+        val first = StoredTimelineEnvelope(scope = scope, revision = 1L, events = listOf(event(0)), writtenAtMillis = 10L)
+        val second = first.copy(revision = 2L, events = listOf(event(0), event(1)), writtenAtMillis = 20L)
+
+        assertTrue(store.writeSnapshot(first))
+        assertEquals(first, store.readSnapshot(scope))
+        assertTrue(store.writeSnapshot(second))
+        assertEquals(second, store.readSnapshot(scope))
+
+        db.confirmedTimelineSnapshotDao().deleteHead(scope.backendId, scope.conversationId)
+        db.confirmedTimelineSnapshotDao().deleteManifestsForScope(scope.backendId, scope.conversationId)
+        assertEquals(second, store.readSnapshot(scope))
+    }
+
+    @Test
+    fun positivePruneRemovesNormalizedFallbackForDroppedConversation() = runTest {
+        val db = inMemoryDatabase()
+        val store = RoomConfirmedTimelineStore(db)
+        val retained = TimelineScope("normalized", "retained", "agent")
+        val dropped = TimelineScope("normalized", "dropped", "agent")
+        assertTrue(store.writeSnapshot(StoredTimelineEnvelope(scope = dropped, revision = 1L, writtenAtMillis = 10L)))
+        assertTrue(store.writeSnapshot(StoredTimelineEnvelope(scope = retained, revision = 1L, writtenAtMillis = 20L)))
+        assertNotNull(store.readSnapshot(dropped))
+        assertNotNull(store.readSnapshot(retained))
+
+        store.prune(retained.backendId, maxRetainedConversations = 1)
+
+        assertNull(store.readSnapshot(dropped))
+        assertNotNull(store.readSnapshot(retained))
+    }
+
+    @Test
+    fun normalizedRootDigestDistinguishesNullLiteralAndDelimiters() {
+        val scope = TimelineScope("backend|id", "conversation", null)
+        val base = StoredTimelineEnvelope(scope = scope, revision = 1L, liveCursor = null, backfillCursor = "a|b")
+        val nullLiteral = base.copy(liveCursor = "null")
+        val delimiterShift = base.copy(liveCursor = "a", backfillCursor = "b|null")
+
+        assertFalse(normalizedRootDigest(base, emptyList()) == normalizedRootDigest(nullLiteral, emptyList()))
+        assertFalse(normalizedRootDigest(base, emptyList()) == normalizedRootDigest(delimiterShift, emptyList()))
+    }
+
     private fun event(index: Int) = StoredTimelineEvent(
         position = index.toDouble(),
         otid = "otid-$index",

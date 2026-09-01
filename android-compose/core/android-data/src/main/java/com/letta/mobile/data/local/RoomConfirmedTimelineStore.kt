@@ -45,7 +45,7 @@ class RoomConfirmedTimelineStore(
             val legacy = readFromHead(RoomSnapshotReadRequest(scope, head, startedAtMillis))
             if (legacy !is ConfirmedTimelineReadResult.Active) return@withContext legacy
             val envelope = legacy.snapshot
-            if (!bootstrapNormalized(envelope)) return@withContext legacy
+            if (!normalizedBootstrapIsSafe(envelope) || !bootstrapNormalized(envelope)) return@withContext legacy
             readNormalized(scope) ?: legacy
         }
     }
@@ -76,6 +76,7 @@ class RoomConfirmedTimelineStore(
         val root = normalizedRootDigest(envelope, rows)
         return try {
             database.withTransaction {
+                dao.deleteNormalizedHead(envelope.scope.backendId, envelope.scope.conversationId)
                 dao.deleteNormalizedRows(envelope.scope.backendId, envelope.scope.conversationId)
                 rows.chunked(NORMALIZED_ROW_INSERT_BATCH).forEachIndexed { index, batch ->
                     currentCoroutineContext().ensureActive()
@@ -107,6 +108,14 @@ class RoomConfirmedTimelineStore(
             false
         }
     }
+
+    private fun normalizedBootstrapIsSafe(envelope: StoredTimelineEnvelope): Boolean =
+        envelope.events.all { event ->
+            TimelineSnapshotCodec.json.encodeToString(
+                com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent.serializer(),
+                event,
+            ).toByteArray(StandardCharsets.UTF_8).size <= NORMALIZED_MAX_ROW_PAYLOAD_BYTES
+        }
 
     private suspend fun readFromHead(request: RoomSnapshotReadRequest): ConfirmedTimelineReadResult {
         val activeId = request.head.activeManifestId
@@ -340,7 +349,9 @@ class RoomConfirmedTimelineStore(
                 dao.clearManifestsForBackend(backendId)
             } else {
                 dao.pruneHeads(backendId, maxRetainedConversations)
-                    dao.deleteOrphanManifestsForBackend(backendId)
+                dao.deleteNormalizedRowsWithoutLegacyHead(backendId)
+                dao.deleteNormalizedHeadsWithoutLegacyHead(backendId)
+                dao.deleteOrphanManifestsForBackend(backendId)
                 }
             }
         }
@@ -407,6 +418,7 @@ class RoomConfirmedTimelineStore(
         const val CHUNK_SIZE_BYTES = 128 * 1024
         private const val CHUNK_INSERT_BATCH = 32
         private const val NORMALIZED_ROW_INSERT_BATCH = 256
+        private const val NORMALIZED_MAX_ROW_PAYLOAD_BYTES = 512 * 1024
         private const val MAX_CHUNK_COUNT = 2048
         private const val MAX_PAYLOAD_BYTES = CHUNK_SIZE_BYTES.toLong() * MAX_CHUNK_COUNT
     }

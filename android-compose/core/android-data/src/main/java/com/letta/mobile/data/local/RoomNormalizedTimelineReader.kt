@@ -98,9 +98,27 @@ internal fun normalizedRootDigest(
     envelope: StoredTimelineEnvelope,
     rows: List<NormalizedTimelineSnapshotRowEntity>,
 ): String = sha256(buildString {
-    append(envelope.schemaVersion).append('|')
-    append(envelope.scope.backendId).append('|').append(envelope.scope.agentId).append('|').append(envelope.scope.conversationId).append('|')
-    append(envelope.revision).append('|').append(envelope.liveCursor).append('|').append(envelope.backfillCursor).append('|')
-    append(envelope.releasedOlderCount).append('|').append(envelope.writtenAtMillis)
-    rows.forEach { row -> append('|').append(row.identityPrimary).append(':').append(row.identitySecondary).append(':').append(row.eventOrder).append(':').append(row.checksum) }
+    appendDigestField(envelope.schemaVersion.toString())
+    appendDigestField(envelope.scope.backendId)
+    appendNullableDigestField(envelope.scope.agentId)
+    appendDigestField(envelope.scope.conversationId)
+    appendDigestField(envelope.revision.toString())
+    appendNullableDigestField(envelope.liveCursor)
+    appendNullableDigestField(envelope.backfillCursor)
+    appendDigestField(envelope.releasedOlderCount.toString())
+    appendDigestField(envelope.writtenAtMillis.toString())
+    rows.forEach { row ->
+        appendDigestField(row.identityPrimary.toString())
+        appendDigestField(row.identitySecondary.toString())
+        appendDigestField(row.eventOrder.toString())
+        appendDigestField(row.checksum)
+    }
 }.toByteArray(StandardCharsets.UTF_8))
+
+private fun StringBuilder.appendNullableDigestField(value: String?) {
+    if (value == null) append("N;") else append("S;").appendDigestField(value)
+}
+
+private fun StringBuilder.appendDigestField(value: String) {
+    append(value.length).append(':').append(value).append(';')
+}

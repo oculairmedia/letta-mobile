@@ -163,6 +163,26 @@ interface ConfirmedTimelineSnapshotDao {
 
     @Query(
         """
+        DELETE FROM normalized_timeline_snapshot_rows
+        WHERE backend_id = :backendId AND conversation_id NOT IN (
+            SELECT conversation_id FROM confirmed_timeline_snapshots WHERE backend_id = :backendId
+        )
+        """
+    )
+    suspend fun deleteNormalizedRowsWithoutLegacyHead(backendId: String)
+
+    @Query(
+        """
+        DELETE FROM normalized_timeline_snapshot_heads
+        WHERE backend_id = :backendId AND conversation_id NOT IN (
+            SELECT conversation_id FROM confirmed_timeline_snapshots WHERE backend_id = :backendId
+        )
+        """
+    )
+    suspend fun deleteNormalizedHeadsWithoutLegacyHead(backendId: String)
+
+    @Query(
+        """
         SELECT manifest_id, backend_id, conversation_id, agent_id, revision, schema_version,
                byte_length, chunk_count, sha256, written_at_millis
         FROM confirmed_timeline_snapshot_manifests WHERE manifest_id = :manifestId
