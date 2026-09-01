@@ -154,8 +154,8 @@ class ChatSendCoordinator(
         // wire family (when it is a known one) alongside the message.
         @Volatile var bufferedErrorKind: String? = null
 
-        // letta-mobile-br5g0: set when this turn ingested assistant content. Drives
-        // the dead-turn vs delivered-then-failed split in [finishActiveTurn].
+        // Set when a non-replay assistant message is authoritatively scoped to this
+        // active conversation/run. This is delivery evidence, not completion evidence.
         @Volatile var deliveredAssistantContent: Boolean = false
 
         /** Set on the terminal path so a clear can tell "settled" from "evicted". */
@@ -1247,7 +1247,18 @@ class ChatSendCoordinator(
         candidateRunIds: Set<String> = emptySet(),
     ) {
         try {
-            timelineRepository.cleanupAbandonedAssistantFragments(agentId, conversationId, runId, turnId, reason, candidateRunIds)
+            val removed = timelineRepository.cleanupAbandonedAssistantFragments(
+                agentId, conversationId, runId, turnId, reason, candidateRunIds,
+            )
+            Telemetry.event(
+                "AdminChatVM", "cleanupAbandonedAssistantFragments.completed",
+                "conversationId" to conversationId,
+                "runId" to (runId ?: ""),
+                "turnId" to (turnId ?: ""),
+                "candidateRunIds" to candidateRunIds.joinToString(","),
+                "removedCount" to removed,
+                "reason" to reason,
+            )
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Throwable) {
@@ -1336,13 +1347,16 @@ class ChatSendCoordinator(
     ) {
         val conversationId = state.conversationId.takeIf { it.isNotBlank() }
             ?: defaultShimConversationId(agentId)
-        // letta-mobile-br5g0: a Failed terminal has two very different user
-        // meanings. Only a turn that delivered NO completed assistant reply is a
-        // dead turn worth a hard error state; a Failed terminal that lands after
-        // the reply completed (non-error stop_reason) is a trailing aux-step
-        // failure and must not be painted like a dead turn.
-        val mainReplyCompleted = state.deliveredAssistantContent &&
-            TurnFailureNotices.isCompletedMainReplyStopReason(state.stopReason)
+        // A completed stop is the strongest main-reply evidence. Some Agent turns
+        // omit it after a persisted, run-scoped reply; that delivery is still
+        // authoritative unless the terminal carries a known provider failure kind.
+        // Known failures (especially content_filter) retain their notice because
+        // nonblank content can be only a partial provider response.
+        val knownTerminalFailure = TurnFailureNotices.isKnownKind(state.bufferedErrorKind) ||
+            terminalReasonKind(state.bufferedErrorMessage) != null
+        val mainReplyCompleted = state.deliveredAssistantContent && (
+            TurnFailureNotices.isCompletedMainReplyStopReason(state.stopReason) || !knownTerminalFailure
+        )
         val terminalNotice = when (status) {
             BridgeTurnStatus.Failed -> TurnFailureNotices.forFailedTerminal(
                 reason = state.bufferedErrorMessage,

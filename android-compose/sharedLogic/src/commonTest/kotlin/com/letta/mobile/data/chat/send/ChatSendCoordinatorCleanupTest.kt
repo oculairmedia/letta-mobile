@@ -567,6 +567,32 @@ class ChatSendCoordinatorCleanupTest {
         assertNull(ui.currentError())
     }
 
+    @Test
+    fun failedAgentTurnWithDeliveredShortReplyAndNoStopReasonIsNotDead() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val ui = RecordingUiSink()
+        val coordinator = coordinator(timeline, ui, FakeChannelTransport(mutableListOf(true)))
+
+        coordinator.send("hey").join()
+        val otid = timeline.externalLocals.last().otid
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
+        // Reasoning/tool rows use other message types; the coordinator must retain
+        // the run-scoped assistant prose independently of a clean stop reason.
+        coordinator.handleEvent(
+            WsTimelineEvent.MessageDelta(
+                AssistantMessage(id = "reply-1", contentRaw = JsonPrimitive("Hey. I'm here."), runId = "run-1"),
+            ),
+        )
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", BridgeTurnStatus.Failed))
+        advanceUntilIdle()
+
+        assertTrue(timeline.ingestedMessages.filterIsInstance<AssistantMessage>().any { it.id == "reply-1" })
+        assertTrue(timeline.ingestedMessages.filterIsInstance<ErrorMessage>().isEmpty())
+        assertTrue(timeline.sentLocals.contains(RecordingTimelineWriter.LocalMarker("conv-1", otid)))
+        assertNull(ui.currentError())
+        assertTrue(timeline.cleanupTails.isEmpty())
+    }
+
     // letta-mobile-br5g0 (codex review): the mapper ships the sanitized family
     // in Error.code with fixed copy in Error.message. Reclassifying the copy
     // downgraded content_filter to provider_error — the wire code must win.

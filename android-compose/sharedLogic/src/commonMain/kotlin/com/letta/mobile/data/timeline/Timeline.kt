@@ -576,6 +576,7 @@ data class Timeline(
             "turnId" to (turnId ?: ""),
             "reason" to reason,
             "count" to removeServerIds.size,
+            "removedServerIds" to removeServerIds.joinToString(","),
         )
         return AbandonedAssistantFragmentCleanupResult(
             timeline = copy(
