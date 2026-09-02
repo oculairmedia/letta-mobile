@@ -29,6 +29,19 @@ RETRYABLE_STARTUP_METRIC_KEYS = frozenset({
     "startup.cold.p95_ms",
     "startup.warm.p95_ms",
 })
+ORDINARY_EXIT_CODES = frozenset({0, 1, 2})
+
+
+def _retryable_exit_code(value: str) -> int:
+    try:
+        exit_code = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("must be an integer exit status") from exc
+    if not 1 <= exit_code <= 255 or exit_code in ORDINARY_EXIT_CODES:
+        raise argparse.ArgumentTypeError(
+            "must be a distinct nonzero process exit status (3-255)"
+        )
+    return exit_code
 
 
 def _load_baselines(baselines_path: pathlib.Path) -> dict:
@@ -341,7 +354,11 @@ def main(argv: list[str]) -> int:
     parser.add_argument("outputs_dir", type=pathlib.Path)
     parser.add_argument("--baselines", type=pathlib.Path, default=BASELINES_PATH)
     parser.add_argument("--rebaseline", action="store_true")
-    parser.add_argument("--retryable-single-startup-exit-code", type=int, default=None)
+    parser.add_argument(
+        "--retryable-single-startup-exit-code",
+        type=_retryable_exit_code,
+        default=None,
+    )
     parser.add_argument("--summary-json", type=pathlib.Path, default=None)
     parser.add_argument("--summary-md", type=pathlib.Path, default=None)
     args = parser.parse_args(argv)
