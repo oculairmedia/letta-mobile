@@ -259,7 +259,11 @@ class TimelineSyncLoop(
                 if (lastPersistedEnvelope == null) "baseline_missing" else "delta_empty",
             )
         }
-        if (incremental is TimelineIncrementalSnapshotPlanner.Result.Planned && !isLegacyCheckpointDue(incremental.plan)) {
+        if (
+            confirmedTimelineStore.supportsIncrementalCommit &&
+            incremental is TimelineIncrementalSnapshotPlanner.Result.Planned &&
+            !isLegacyCheckpointDue(incremental.plan)
+        ) {
             persistIncrementalSnapshot(snapshotScope, committedState.timeline, capturedDelta, incremental, prune)
             return
         }

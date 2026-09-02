@@ -2,7 +2,12 @@ package com.letta.mobile.desktop.data
 
 import com.letta.mobile.data.timeline.snapshot.StoredTimelineEnvelope
 import com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent
+import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineCommitFailure
+import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineCommitPlan
+import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineCommitPlanner
+import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineWriteResult
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
+import com.letta.mobile.data.timeline.snapshot.TimelineRevision
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlinx.coroutines.test.runTest
@@ -67,6 +72,53 @@ class DesktopConfirmedTimelineStoreTest {
     }
 
     @Test
+    fun metadataOnlyIncrementalApplyFailsClosedWithoutTruncatingEvents() = runTest {
+        val scope = TimelineScope(backendId = "backend-local", conversationId = "conv-guard")
+        val original = envelope(scope, revision = 1L, cursor = "cursor-1", content = "durable content")
+        val updated = envelope(scope, revision = 2L, cursor = "cursor-2", content = "updated content")
+        assertTrue(store.writeSnapshot(original))
+
+        val result = store.commitNormalized(
+            plan = NormalizedTimelineCommitPlanner.plan(original, updated),
+            fullEnvelope = updated.copy(events = emptyList()),
+        )
+
+        assertEquals(
+            NormalizedTimelineWriteResult.Invalid(NormalizedTimelineCommitFailure.UNSUPPORTED_PLAN),
+            result,
+        )
+        assertEquals(original, store.readSnapshot(scope))
+    }
+
+    @Test
+    fun unsupportedStoreDoesNotAdvertiseIncrementalCommits() {
+        assertFalse(store.supportsIncrementalCommit)
+    }
+
+    @Test
+    fun metadataOnlyNoOpCannotEraseAnEventBearingSnapshot() = runTest {
+        val scope = TimelineScope(backendId = "backend-local", conversationId = "conv-no-op")
+        val original = envelope(scope, revision = 1L, cursor = "cursor-1", content = "durable content")
+        assertTrue(store.writeSnapshot(original))
+
+        val result = store.commitNormalized(
+            plan = NormalizedTimelineCommitPlan.NoOp(
+                scope = scope,
+                baseRevision = TimelineRevision(1L),
+                targetRevision = TimelineRevision(2L),
+                writtenAtMillis = 2L,
+            ),
+            fullEnvelope = original.copy(revision = 2L, events = emptyList()),
+        )
+
+        assertEquals(
+            NormalizedTimelineWriteResult.Invalid(NormalizedTimelineCommitFailure.UNSUPPORTED_PLAN),
+            result,
+        )
+        assertEquals(original, store.readSnapshot(scope))
+    }
+
+    @Test
     fun staleRevisionWritesAreRejected() = runTest {
         val scope = TimelineScope(backendId = "b1", conversationId = "c1")
 
@@ -126,4 +178,26 @@ class DesktopConfirmedTimelineStoreTest {
         val read = store.readSnapshot(scope)
         assertNull(read)
     }
+
+    private fun envelope(
+        scope: TimelineScope,
+        revision: Long,
+        cursor: String,
+        content: String,
+    ) = StoredTimelineEnvelope(
+        scope = scope,
+        revision = revision,
+        liveCursor = cursor,
+        events = listOf(
+            StoredTimelineEvent(
+                position = 1.0,
+                otid = "otid-guard",
+                content = content,
+                serverId = "server-guard",
+                messageType = "ASSISTANT",
+                dateIso = "2026-09-02T00:00:00Z",
+            ),
+        ),
+        writtenAtMillis = revision,
+    )
 }

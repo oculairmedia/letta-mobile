@@ -45,6 +45,8 @@ class RoomConfirmedTimelineStore(
     // published over rows that did not survive.
     private val beforeHeadPublicationObserver: suspend () -> Unit = {},
 ) : ConfirmedTimelineStore {
+    override val supportsIncrementalCommit: Boolean = true
+
     private val dao = database.confirmedTimelineSnapshotDao()
     private val manifestReader = RoomTimelineManifestReader(dao)
     private val normalizedReader = RoomNormalizedTimelineReader()

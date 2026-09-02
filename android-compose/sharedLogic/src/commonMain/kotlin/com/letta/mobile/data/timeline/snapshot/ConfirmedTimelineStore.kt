@@ -49,6 +49,9 @@ sealed interface ConfirmedTimelineReadResult {
  * stale writes whose revision <= existing stored revision).
  */
 interface ConfirmedTimelineStore {
+    /** True only when [commitNormalized] applies row plans without a full event envelope. */
+    val supportsIncrementalCommit: Boolean get() = false
+
     /**
      * Read the persisted snapshot for [scope], or null if none exists / if corrupt.
      *
@@ -122,6 +125,11 @@ interface ConfirmedTimelineStore {
     ): NormalizedTimelineWriteResult = when (plan) {
         is NormalizedTimelineCommitPlan.Invalid -> NormalizedTimelineWriteResult.Invalid(plan.reason)
         is NormalizedTimelineCommitPlan.NoOp -> {
+            if (!supportsIncrementalCommit && fullEnvelope.events.isEmpty()) {
+                return NormalizedTimelineWriteResult.Invalid(
+                    NormalizedTimelineCommitFailure.UNSUPPORTED_PLAN,
+                )
+            }
             val target = fullEnvelope.copy(revision = plan.targetRevision.value, writtenAtMillis = plan.writtenAtMillis)
             if (writeSnapshot(target)) {
                 NormalizedTimelineWriteResult.NoOp(plan.targetRevision)
@@ -131,6 +139,11 @@ interface ConfirmedTimelineStore {
         }
         is NormalizedTimelineCommitPlan.Apply -> {
             val commit = plan.commit
+            if (!supportsIncrementalCommit && fullEnvelope.events.isEmpty()) {
+                return NormalizedTimelineWriteResult.Invalid(
+                    NormalizedTimelineCommitFailure.UNSUPPORTED_PLAN,
+                )
+            }
             val target = fullEnvelope.copy(revision = commit.targetRevision.value)
             if (writeSnapshot(target)) {
                 NormalizedTimelineWriteResult.Committed(commit.targetRevision)
