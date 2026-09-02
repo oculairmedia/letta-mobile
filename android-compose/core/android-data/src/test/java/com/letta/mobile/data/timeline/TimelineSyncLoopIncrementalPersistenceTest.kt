@@ -193,7 +193,7 @@ class TimelineSyncLoopIncrementalPersistenceTest {
             it.name == "snapshotPersist.planningDecision" && it.attrs["conversationId"] == scope.conversationId
         }
         assertEquals("full_scan", decision.attrs["planningMode"])
-        assertEquals("delete_requires_ranked_order", decision.attrs["reason"])
+        assertEquals(SnapshotPlanningFallback.DELETE_REQUIRES_RANKED_ORDER.name, decision.attrs["reason"])
         loop.closeAndJoin()
     }
 

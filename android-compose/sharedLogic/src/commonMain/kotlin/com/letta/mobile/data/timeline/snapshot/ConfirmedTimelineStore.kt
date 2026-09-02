@@ -147,6 +147,14 @@ interface ConfirmedTimelineStore {
         }
         is NormalizedTimelineCommitPlan.Apply -> {
             val commit = plan.commit
+            // Fail loud rather than silently truncating. Reaching here with row upserts and an
+            // empty envelope means a caller took the incremental path against a store that
+            // cannot apply plans -- writing `target` would erase the conversation.
+            if (commit.upserts.isNotEmpty() && fullEnvelope.events.isEmpty()) {
+                return NormalizedTimelineWriteResult.Invalid(
+                    NormalizedTimelineCommitFailure.UNSUPPORTED_PLAN,
+                )
+            }
             val target = fullEnvelope.copy(revision = commit.targetRevision.value)
             if (writeSnapshot(target)) {
                 NormalizedTimelineWriteResult.Committed(commit.targetRevision)

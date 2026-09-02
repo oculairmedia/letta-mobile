@@ -8,7 +8,7 @@ class PendingTimelinePersistenceDelta : SynchronizedObject() {
     private val changed = linkedSetOf<String>()
     private val deleted = linkedSetOf<String>()
     private var metadataChanged = false
-    private var fallbackReason: String? = null
+    private var fallbackReason: SnapshotPlanningFallback? = null
     private var latestSequence = 0L
 
     fun merge(sequence: Long, delta: TimelineMutationDelta) = synchronized(this) {
@@ -30,7 +30,7 @@ class PendingTimelinePersistenceDelta : SynchronizedObject() {
                 if (changed.size + deleted.size > MAX_PENDING_IDENTITIES) {
                     changed.clear()
                     deleted.clear()
-                    fallbackReason = "pending_delta_too_wide"
+                    fallbackReason = SnapshotPlanningFallback.PENDING_DELTA_TOO_WIDE
                 }
             }
         }
@@ -59,7 +59,7 @@ class PendingTimelinePersistenceDelta : SynchronizedObject() {
         val changedConfirmedServerIds: Set<String>,
         val deletedConfirmedServerIds: Set<String>,
         val metadataChanged: Boolean,
-        val fallbackReason: String?,
+        val fallbackReason: SnapshotPlanningFallback?,
     ) {
         val requiresFullRescan: Boolean get() = fallbackReason != null
         val dirtyIdentityCount: Int get() = changedConfirmedServerIds.size + deletedConfirmedServerIds.size

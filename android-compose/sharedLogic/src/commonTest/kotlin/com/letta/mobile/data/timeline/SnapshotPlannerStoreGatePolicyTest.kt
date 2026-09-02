@@ -52,7 +52,7 @@ class SnapshotPlannerStoreGatePolicyTest {
         val decision = TimelineSyncLoop.IncrementalPlanningDecision(
             result = plannedResult(),
             checkpointDue = false,
-            reason = "store_unsupported",
+            reason = SnapshotPlanningFallback.STORE_UNSUPPORTED,
             baseRevision = 0L,
             targetRevision = 1L,
             storeSupportsIncremental = false,
@@ -76,7 +76,7 @@ class SnapshotPlannerStoreGatePolicyTest {
         val decision = TimelineSyncLoop.IncrementalPlanningDecision(
             result = plannedResult(),
             checkpointDue = false,
-            reason = "delta",
+            reason = null,
             baseRevision = 0L,
             targetRevision = 1L,
             storeSupportsIncremental = true,
@@ -94,7 +94,7 @@ class SnapshotPlannerStoreGatePolicyTest {
         val decision = TimelineSyncLoop.IncrementalPlanningDecision(
             result = plannedResult(),
             checkpointDue = true,
-            reason = "checkpoint_due",
+            reason = SnapshotPlanningFallback.CHECKPOINT_DUE,
             baseRevision = 0L,
             targetRevision = 1L,
             storeSupportsIncremental = true,
@@ -116,11 +116,11 @@ class SnapshotPlannerStoreGatePolicyTest {
     @Test
     fun reasonPrecedenceIsStoreUnsupportedOverDelta() {
         assertEquals(
-            "store_unsupported",
+            SnapshotPlanningFallback.STORE_UNSUPPORTED,
             TimelineSyncLoop.IncrementalPlanningDecision(
                 result = plannedResult(),
                 checkpointDue = false,
-                reason = "store_unsupported",
+                reason = SnapshotPlanningFallback.STORE_UNSUPPORTED,
                 baseRevision = 0L,
                 targetRevision = 1L,
                 storeSupportsIncremental = false,
@@ -155,9 +155,9 @@ class SnapshotPlannerStoreGatePolicyTest {
     @Test
     fun fullScanDecisionIsNotPersistableRegardlessOfStore() {
         val decision = TimelineSyncLoop.IncrementalPlanningDecision(
-            result = TimelineIncrementalSnapshotPlanner.Result.FullScan("baseline_missing"),
+            result = TimelineIncrementalSnapshotPlanner.Result.FullScan(SnapshotPlanningFallback.BASELINE_MISSING),
             checkpointDue = false,
-            reason = "baseline_missing",
+            reason = SnapshotPlanningFallback.BASELINE_MISSING,
             baseRevision = null,
             targetRevision = 1L,
             storeSupportsIncremental = true,

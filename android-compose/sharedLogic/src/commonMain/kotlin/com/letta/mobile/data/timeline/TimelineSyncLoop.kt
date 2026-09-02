@@ -259,6 +259,22 @@ class TimelineSyncLoop(
             )
             return
         }
+        // letta-mobile-94bt8.1 AC1: EVERY full scan reports why. The clean-main capture had nine
+        // full-scan writes and not one said what forced it, so a reducer that simply never
+        // declared a delta was indistinguishable from a genuine ambiguity or a due checkpoint.
+        // A due checkpoint is reported as such rather than as the planner's own reason, since
+        // that path is required by design and is not a planning failure.
+        val fallbackReason = when {
+            incremental is TimelineIncrementalSnapshotPlanner.Result.Planned -> SnapshotPlanningFallback.CHECKPOINT_DUE
+            else -> (incremental as TimelineIncrementalSnapshotPlanner.Result.FullScan).reason
+        }
+        Telemetry.event(
+            "TimelineSync", "snapshotPersist.fullScanPlanned",
+            *identityAttrs(),
+            "reason" to fallbackReason.name,
+            "dirtyIdentities" to capturedDelta.dirtyIdentityCount,
+            "metadataChanged" to capturedDelta.metadataChanged,
+        )
         val (provisionalEnvelope, fingerprint) = withContext(ioDispatcher) {
             val envelope = TimelineSnapshotCodec.timelineToStoredEnvelope(
                 timeline = committedState.timeline,
@@ -328,7 +344,7 @@ class TimelineSyncLoop(
     internal data class IncrementalPlanningDecision(
         val result: TimelineIncrementalSnapshotPlanner.Result,
         val checkpointDue: Boolean,
-        val reason: String,
+        val reason: SnapshotPlanningFallback?,
         val baseRevision: Long?,
         val targetRevision: Long,
         // Whether the underlying store can serve a real incremental commit. When false, a
@@ -356,16 +372,17 @@ class TimelineSyncLoop(
             )
         } else {
             TimelineIncrementalSnapshotPlanner.Result.FullScan(
-                if (baseline == null) "baseline_missing" else "delta_empty",
+                if (baseline == null) SnapshotPlanningFallback.BASELINE_MISSING
+                else SnapshotPlanningFallback.DELTA_EMPTY,
             )
         }
         val checkpointDue = result is TimelineIncrementalSnapshotPlanner.Result.Planned && isLegacyCheckpointDue(result.plan)
         // Reason precedence for telemetry: explicit gates first, planner verdict last.
-        val reason = when {
-            checkpointDue -> "checkpoint_due"
-            result is TimelineIncrementalSnapshotPlanner.Result.Planned && !storeSupportsIncremental -> "store_unsupported"
+        val reason: SnapshotPlanningFallback? = when {
+            checkpointDue -> SnapshotPlanningFallback.CHECKPOINT_DUE
+            result is TimelineIncrementalSnapshotPlanner.Result.Planned && !storeSupportsIncremental -> SnapshotPlanningFallback.STORE_UNSUPPORTED
             result is TimelineIncrementalSnapshotPlanner.Result.FullScan -> result.reason
-            else -> "delta"
+            else -> null
         }
         return IncrementalPlanningDecision(
             result = result,
@@ -388,7 +405,7 @@ class TimelineSyncLoop(
             "TimelineSync", "snapshotPersist.planningDecision",
             *identityAttrs(),
             "planningMode" to if (canPersistIncremental(decision)) "delta" else "full_scan",
-            "reason" to decision.reason,
+            "reason" to (decision.reason?.name ?: "delta"),
             "throughSequence" to delta.throughSequence,
             "dirtyChanged" to delta.changedConfirmedServerIds.size,
             "dirtyDeleted" to delta.deletedConfirmedServerIds.size,

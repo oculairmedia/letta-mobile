@@ -215,7 +215,29 @@ class TimelineProcessor(
             next = reduced.next.copy(lastAppliedMutationSequence = sequence.value),
         )
         _state.value = committed.next
-        onStateCommitted(sequence.value, committed.persistenceDelta)
+        // letta-mobile-94bt8.1: TimelineMutationDelta.None is the DEFAULT on TimelineReduction,
+        // so a reducer that changed the timeline without declaring a delta produced an empty
+        // pending set. Persistence then read that as "nothing changed" and fell back to a full
+        // O(N) scan reported only as `delta_empty`. That is how every ordinary write on device
+        // bypassed proportional persistence while looking benign.
+        //
+        // An undeclared delta on a REAL timeline change is now a typed, loud fallback. It still
+        // persists correctly -- full scan is always safe -- but it is attributable, and it
+        // cannot be mistaken for the genuinely-empty case.
+        val declaredDelta = if (
+            committed.persistenceDelta == TimelineMutationDelta.None &&
+            current.timeline != committed.next.timeline
+        ) {
+            // Derive it centrally rather than making each of the seven reducers remember to.
+            // exactConfirmedDelta compares the confirmed sets directly, so an EMPTY result here
+            // is a derived fact -- "no persisted row changed" -- not an assertion a reducer
+            // could get wrong. Local-only mutations (append, retry, delivery-state) legitimately
+            // land here: locals are not persisted rows at all.
+            exactConfirmedDelta(current.timeline, committed.next.timeline)
+        } else {
+            committed.persistenceDelta
+        }
+        onStateCommitted(sequence.value, declaredDelta)
         return PreparedMutation.Committed(committed)
     }
 
