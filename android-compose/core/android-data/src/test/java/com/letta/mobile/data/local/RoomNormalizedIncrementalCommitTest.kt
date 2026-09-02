@@ -228,7 +228,12 @@ class RoomNormalizedIncrementalCommitTest {
         val rowsBefore = db.confirmedTimelineSnapshotDao().getNormalizedRows(scope.backendId, scope.conversationId)
             .map { row -> Triple(row.identityPrimary, row.identitySecondary, row.checksum) }
 
-        val v2 = v1.copy(revision = 2L, liveCursor = "c2")
+        val v2 = v1.copy(
+            revision = 2L,
+            liveCursor = "c2",
+            backfillCursor = "backfill-2",
+            releasedOlderCount = 17,
+        )
         val commitPlan = plan(v1, v2)
         assertTrue("cursor-only change must still be an Apply plan (empty upserts/deletes)", commitPlan is NormalizedTimelineCommitPlan.Apply)
         commitPlan as NormalizedTimelineCommitPlan.Apply
@@ -238,7 +243,11 @@ class RoomNormalizedIncrementalCommitTest {
         val result = store.commitNormalized(commitPlan, v2)
 
         assertTrue(result is NormalizedTimelineWriteResult.Committed)
-        assertEquals("c2", store.readSnapshot(scope)?.liveCursor)
+        val persisted = store.readSnapshot(scope)
+        assertEquals("c2", persisted?.liveCursor)
+        assertEquals("backfill-2", persisted?.backfillCursor)
+        assertEquals(17, persisted?.releasedOlderCount)
+        assertEquals(v1.events, persisted?.events)
         val rowsAfter = db.confirmedTimelineSnapshotDao().getNormalizedRows(scope.backendId, scope.conversationId)
             .map { row -> Triple(row.identityPrimary, row.identitySecondary, row.checksum) }
         assertEquals(rowsBefore, rowsAfter)
