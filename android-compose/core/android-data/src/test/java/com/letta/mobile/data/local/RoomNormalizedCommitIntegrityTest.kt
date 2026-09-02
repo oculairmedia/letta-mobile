@@ -146,10 +146,18 @@ class RoomNormalizedCommitIntegrityTest {
         assertTrue(commit(baseline, null, first) is NormalizedTimelineWriteResult.Committed)
 
         val dao = db.confirmedTimelineSnapshotDao()
-        val rowsBefore = dao.getNormalizedRowDigestProjection(scope.backendId, scope.conversationId).size
-        val headBefore = dao.getNormalizedHead(scope.backendId, scope.conversationId)
-        assertEquals(2, rowsBefore)
-        assertEquals(1L, headBefore?.revision)
+        // Round 6 item 1: capture the COMPLETE pre-fault state, not just cardinalities.
+        // Counting rows and reading the head revision cannot see a transaction that mutated
+        // the two existing rows while rolling back the new ones -- the count and the revision
+        // would both still match and the test would pass on corrupt data.
+        val rowsBefore = dao.getNormalizedRowDigestProjection(scope.backendId, scope.conversationId)
+        val headBefore = requireNotNull(dao.getNormalizedHead(scope.backendId, scope.conversationId))
+        val readBefore = requireNotNull(store(db).readSnapshot(scope)) {
+            "the owner must be able to read its own snapshot before the fault is injected"
+        }
+        assertEquals(2, rowsBefore.size)
+        assertEquals(1L, headBefore.revision)
+        assertEquals(2, readBefore.events.size)
 
         val faulting = RoomConfirmedTimelineStore(
             db,
@@ -159,14 +167,20 @@ class RoomNormalizedCommitIntegrityTest {
         runCatching { commit(faulting, first, second) }
 
         assertEquals(
-            "row mutations staged before the fault must roll back",
+            "every row's identity, order, kind and digest must be byte-identical after rollback",
             rowsBefore,
-            dao.getNormalizedRowDigestProjection(scope.backendId, scope.conversationId).size,
+            dao.getNormalizedRowDigestProjection(scope.backendId, scope.conversationId),
+        )
+        val headAfter = requireNotNull(dao.getNormalizedHead(scope.backendId, scope.conversationId))
+        assertEquals(
+            "the complete head -- owner, revision, rootDigest, cursors, released count, schema -- must be unchanged",
+            headBefore,
+            headAfter,
         )
         assertEquals(
-            "the head must not advance past rows that never became durable",
-            1L,
-            dao.getNormalizedHead(scope.backendId, scope.conversationId)?.revision,
+            "the owner must still read the identical pre-fault timeline",
+            readBefore.events,
+            store(db).readSnapshot(scope)?.events,
         )
 
         // The store is not wedged: a clean commit still succeeds afterwards.

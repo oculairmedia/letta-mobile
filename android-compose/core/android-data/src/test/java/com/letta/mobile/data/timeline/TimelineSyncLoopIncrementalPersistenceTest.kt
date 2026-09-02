@@ -509,7 +509,13 @@ class TimelineSyncLoopIncrementalPersistenceTest {
     }
 
     /**
-     * Counts SAFETY_FLUSH writes the loop actually scheduled.
+     * Counts SAFETY_FLUSH persist requests the loop ENQUEUED -- scheduling events, not
+     * completed durable writes. The distinction matters: a scheduled request may still be
+     * coalesced downstream, so this number bounds writes from above rather than equalling
+     * them, and the assertions here are written against that meaning.
+     *
+     * Scoped by conversation because `Telemetry` is process-global: an unscoped version of
+     * this helper passed in isolation and failed in the full suite.
      *
      * Deliberately measured from the loop's own telemetry rather than from store commit
      * counts: the commit hops to Room's real IO dispatcher, so under virtual time the test
@@ -523,21 +529,6 @@ class TimelineSyncLoopIncrementalPersistenceTest {
                 it.attrs["reason"] == SnapshotPersistReason.SAFETY_FLUSH.name &&
                 it.attrs["conversationId"] == conversationId
         }
-
-    /**
-     * Drives the test scheduler AND yields the JVM thread so a commit already dispatched to
-     * Room's real IO dispatcher can finish and release persistMutex. Returns the observed
-     * count so a failing assertion reports the real value rather than a timeout.
-     */
-    private fun kotlinx.coroutines.test.TestScope.settleCommits(store: CountingStore, expected: Int, attempts: Int = 200): Int {
-        repeat(attempts) {
-            advanceUntilIdle()
-            if (store.commits >= expected) return store.commits
-            @Suppress("BlockingMethodInNonBlockingContext")
-            Thread.sleep(10)
-        }
-        return store.commits
-    }
 
     /**
      * Round 5 item 2: telemetry must distinguish two concurrent holders of the SAME
@@ -624,6 +615,105 @@ class TimelineSyncLoopIncrementalPersistenceTest {
      * implementation rather than a hand-rolled fake, so these tests still exercise the real
      * commit path either side of the injected rejection.
      */
+    /**
+     * Round 6 item 5: the legacy fallback must not STRAND normalized state behind it.
+     *
+     * The fallback writes LEGACY only, but it advances the loop's acknowledged envelope to the
+     * fallback revision. Normalized state stays at the previous revision, so every later commit
+     * plans baseRevision = N against a normalized head still at N-1, is rejected Stale forever,
+     * and eventually detaches the writer -- one durable fallback permanently disabling
+     * durability. onInvalidPlan now reconciles through the store's read path, which bootstraps
+     * normalized rows from the validated legacy snapshot.
+     *
+     * Proven on the PRODUCTION path (no direct store calls): after the fallback, ordinary
+     * appends must keep reaching durable normalized state.
+     */
+    @Test
+    fun aLegacyFallbackDoesNotStrandNormalizedStateBehindIt() = runTest {
+        val db = inMemoryDatabase()
+        val scope = TimelineScope(backendId = "backend", conversationId = "conv-strand", agentId = "agent")
+        val store = OutcomeOverridingStore(RoomConfirmedTimelineStore(db))
+        val loop = newLoop(scope, store, StandardTestDispatcher(testScheduler))
+        val dao = db.confirmedTimelineSnapshotDao()
+
+        loop.ingestStreamEvent(UserMessage(id = "m0", date = FIXTURE_DATE, contentRaw = JsonPrimitive("first")))
+        loop.flushSnapshotNow()
+        advanceUntilIdle()
+
+        store.forceInvalidOnce()
+        loop.ingestStreamEvent(UserMessage(id = "m1", date = FIXTURE_DATE, contentRaw = JsonPrimitive("fallback")))
+        loop.flushSnapshotNow()
+        advanceUntilIdle()
+
+        val commitsAfterFallback = store.successfulCommits
+        repeat(3) { index ->
+            loop.ingestStreamEvent(
+                UserMessage(id = "after-$index", date = FIXTURE_DATE, contentRaw = JsonPrimitive("after")),
+            )
+            loop.flushSnapshotNow()
+            advanceUntilIdle()
+        }
+
+        assertTrue(
+            "normalized commits must keep succeeding after a legacy fallback -- " +
+                "permanent Stale here is the stranding regression",
+            store.successfulCommits > commitsAfterFallback,
+        )
+        assertEquals(
+            "the normalized head must carry the post-fallback events, not be frozen behind them",
+            5,
+            store.readSnapshot(scope)?.events?.size,
+        )
+        assertEquals(
+            "the head must still be owned by this agent",
+            scope.agentId,
+            dao.getNormalizedHead(scope.backendId, scope.conversationId)?.agentId,
+        )
+        loop.closeAndJoin()
+    }
+
+    /**
+     * Round 6 item 5, ownership half: a fallback from agent B must not overwrite agent A's
+     * legacy state. publishHead's ownership guard (PR #1439) is the production guard; this
+     * pins it from the loop's own fallback path rather than by calling the store directly.
+     */
+    @Test
+    fun aLegacyFallbackCannotOverwriteAnotherAgentsState() = runTest {
+        val db = inMemoryDatabase()
+        val owner = TimelineScope(backendId = "backend", conversationId = "conv-shared", agentId = "agent-a")
+        val intruder = TimelineScope(backendId = "backend", conversationId = "conv-shared", agentId = "agent-b")
+
+        val ownerLoop = newLoop(owner, RoomConfirmedTimelineStore(db), StandardTestDispatcher(testScheduler))
+        ownerLoop.ingestStreamEvent(UserMessage(id = "a1", date = FIXTURE_DATE, contentRaw = JsonPrimitive("owned")))
+        ownerLoop.flushSnapshotNow()
+        advanceUntilIdle()
+        val ownerEvents = RoomConfirmedTimelineStore(db).readSnapshot(owner)?.events?.size
+        assertEquals(1, ownerEvents)
+
+        val intruderStore = OutcomeOverridingStore(RoomConfirmedTimelineStore(db))
+        val intruderLoop = newLoop(intruder, intruderStore, StandardTestDispatcher(testScheduler))
+        intruderStore.forceInvalidOnce()
+        intruderLoop.ingestStreamEvent(
+            UserMessage(id = "b1", date = FIXTURE_DATE, contentRaw = JsonPrimitive("intruding")),
+        )
+        intruderLoop.flushSnapshotNow()
+        advanceUntilIdle()
+
+        assertEquals(
+            "agent A's timeline must survive agent B's legacy fallback untouched",
+            ownerEvents,
+            RoomConfirmedTimelineStore(db).readSnapshot(owner)?.events?.size,
+        )
+        assertEquals(
+            "ownership must remain with agent A",
+            owner.agentId,
+            db.confirmedTimelineSnapshotDao()
+                .getNormalizedHead(owner.backendId, owner.conversationId)?.agentId,
+        )
+        ownerLoop.closeAndJoin()
+        intruderLoop.closeAndJoin()
+    }
+
     private class OutcomeOverridingStore(
         private val delegate: RoomConfirmedTimelineStore,
     ) : com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore by delegate {

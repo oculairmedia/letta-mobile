@@ -3,6 +3,7 @@ package com.letta.mobile.data.local
 import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineReadResult
 import com.letta.mobile.data.timeline.snapshot.SnapshotReadFailure
 import com.letta.mobile.data.timeline.snapshot.StoredTimelineEnvelope
+import com.letta.mobile.data.timeline.snapshot.TimelineRevision
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
 import java.io.ByteArrayOutputStream
@@ -198,6 +199,23 @@ private object RoomManifestValidator {
  * requesting scope is treated as compatible so unscoped callers and bootstrap paths keep
  * working, exactly as they do for reads.
  */
+/**
+ * The complete normalized CAS precondition, as one named predicate.
+ *
+ * Both commit branches previously inlined the same conditional (revision matches, owner
+ * matches), which CodeScene flagged as complex and which made it easy for the branches to
+ * drift -- they had in fact already drifted once on the ownership half.
+ *
+ * A NULL head satisfies this at baseRevision 0: that is the bootstrap commit, which has no
+ * predecessor to compare against. NoOp additionally requires a head to be present -- there is
+ * nothing to no-op otherwise -- so it keeps that check at its call site rather than folding it
+ * in here and silently breaking bootstrap.
+ */
+internal fun NormalizedTimelineSnapshotHeadEntity?.acceptsCommitAt(
+    baseRevision: TimelineRevision,
+    scope: TimelineScope,
+): Boolean = (this?.revision ?: 0L) == baseRevision.value && ownedBy(scope)
+
 internal fun NormalizedTimelineSnapshotHeadEntity?.ownedBy(scope: TimelineScope): Boolean {
     val owner = this?.agentId ?: return true
     // Round 4: the `scope.agentId == null` leg was a hole, and I put it there deliberately

@@ -318,24 +318,6 @@ class TimelineSyncLoop(
     }
 
     /**
-     * letta-mobile-827s9.4, dogfood round 2, item 2: a stale writer must STOP, not spin.
-     *
-     * The Pixel capture showed repeated `revision=1 actualHighWaterRevision=...` rejections
-     * from holders that could never commit. Each rejection still cost a full O(N) plan over a
-     * 2k-event timeline, so a duplicate holder burned real CPU and heap producing nothing,
-     * concurrently with the visible conversation's own commits.
-     *
-     * A `Stale` result means another holder owns this conversation's durable state. Retrying
-     * cannot help: this loop's acknowledged baseline is behind and nothing in this loop will
-     * advance it. So the loop detaches as a writer — it keeps serving reads and its in-memory
-     * timeline, but stops scheduling persists entirely.
-     *
-     * NOTE this is a bounded mitigation, not the cure. The duplicate holders themselves are
-     * letta-mobile-grrhq: a subagent dispatch acquires a SECOND holder for the parent's
-     * conversation under the child agent id. This stops the wasted work; grrhq stops the
-     * second holder existing.
-     */
-    /**
      * Round 5 item 2: the identity block every persistence-lifecycle event carries.
      *
      * `conversationId + agentId` could not distinguish the duplicate holders observed on
@@ -353,6 +335,24 @@ class TimelineSyncLoop(
         "turnId" to currentTurnId.orEmpty(),
     )
 
+    /**
+     * letta-mobile-827s9.4, dogfood round 2, item 2: a stale writer must STOP, not spin.
+     *
+     * The Pixel capture showed repeated `revision=1 actualHighWaterRevision=...` rejections
+     * from holders that could never commit. Each rejection still cost a full O(N) plan over a
+     * 2k-event timeline, so a duplicate holder burned real CPU and heap producing nothing,
+     * concurrently with the visible conversation's own commits.
+     *
+     * A `Stale` result means another holder owns this conversation's durable state. Retrying
+     * cannot help: this loop's acknowledged baseline is behind and nothing in this loop will
+     * advance it. So the loop detaches as a writer — it keeps serving reads and its in-memory
+     * timeline, but stops scheduling persists entirely.
+     *
+     * NOTE this is a bounded mitigation, not the cure. The duplicate holders themselves are
+     * letta-mobile-grrhq: a subagent dispatch acquires a SECOND holder for the parent's
+     * conversation under the child agent id. This stops the wasted work; grrhq stops the
+     * second holder existing.
+     */
     private fun onStaleRejection(result: NormalizedTimelineWriteResult.Stale, revision: Long) {
         // Round 4: detach after a BOUNDED run of consecutive stales, not the first one.
         //
@@ -435,6 +435,27 @@ class TimelineSyncLoop(
             lastPersistedEnvelope = envelope
             recordSuccessfulSnapshotMutation(envelope, revision)
             commitsSinceLegacyCheckpoint = 0
+            // Round 6 item 5: the fallback writes LEGACY only, so normalized state is left
+            // behind at the previous revision while the acknowledged envelope advances to this
+            // one. Every later commit would then plan baseRevision = N against a normalized
+            // head still at N-1, be rejected Stale forever, and eventually detach the writer --
+            // durable progress that permanently disables durability.
+            //
+            // Reconcile by reading through the store: readSnapshotResult already bootstraps
+            // normalized rows from a validated legacy snapshot when normalized is behind, so
+            // this brings the normalized head up to N and the next commit's CAS matches.
+            // Best-effort -- a failure here leaves us no worse off than before the fallback.
+            timelineScope?.let { scope ->
+                runCatching { confirmedTimelineStore.readSnapshotResult(scope) }
+                    .onFailure { failure ->
+                        if (failure is CancellationException) throw failure
+                        Telemetry.error(
+                            "TimelineSync", "snapshotPersist.fallbackReconcileFailed", failure,
+                            "conversationId" to conversationId,
+                            "revision" to revision,
+                        )
+                    }
+            }
         }
         Telemetry.event(
             "TimelineSync", "snapshotPersist.invalidRejected",

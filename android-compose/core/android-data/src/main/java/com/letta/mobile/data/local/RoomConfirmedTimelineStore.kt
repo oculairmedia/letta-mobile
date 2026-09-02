@@ -342,11 +342,15 @@ class RoomConfirmedTimelineStore(
         val backendId = plan.scope.backendId
         val conversationId = plan.scope.conversationId
         return database.withTransaction {
-            val head = dao.getNormalizedHead(backendId, conversationId)
-            val currentRevision = head?.revision ?: 0L
-            if (head == null || currentRevision != plan.baseRevision.value || !head.ownedBy(plan.scope)) {
+            val current = dao.getNormalizedHead(backendId, conversationId)
+            val currentRevision = current?.revision ?: 0L
+            // A NoOp needs an EXISTING head to advance; there is nothing to no-op otherwise.
+            // Apply deliberately does not require this, because its baseRevision-0 case is the
+            // bootstrap commit.
+            if (current == null || !current.acceptsCommitAt(plan.baseRevision, plan.scope)) {
                 return@withTransaction NormalizedTimelineWriteResult.Stale(TimelineRevision(currentRevision))
             }
+            val head = current
             // No-op CAS: advance revision + timestamp only, zero row writes, row set unchanged.
             //
             // The root digest MUST still be recomputed. `normalizedRootDigest` folds in
@@ -390,7 +394,7 @@ class RoomConfirmedTimelineStore(
         return database.withTransaction {
             val head = dao.getNormalizedHead(backendId, conversationId)
             val currentRevision = head?.revision ?: 0L
-            if (currentRevision != commit.baseRevision.value || !head.ownedBy(scope)) {
+            if (!head.acceptsCommitAt(commit.baseRevision, scope)) {
                 return@withTransaction NormalizedTimelineWriteResult.Stale(TimelineRevision(currentRevision))
             }
             commit.deletes.forEach { key ->
