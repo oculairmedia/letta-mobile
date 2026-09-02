@@ -1365,17 +1365,7 @@ class ChatSendCoordinator(
             else -> null
         }
         val deadTurn = status is BridgeTurnStatus.Failed && terminalNotice != null
-        // Skip abandoned-fragment cleanup for delivered-then-failed turns: a
-        // legitimate short reply (e.g. "OK") must not be purged before we
-        // classify the failure as aux-only. An Iroh synthetic terminal is the
-        // exception: it may name a placeholder while already-observed assistant
-        // fragments use the promoted App Server run id, so both identities must
-        // be cleaned before the terminal is allowed to finish.
-        val syntheticTerminalRun = IROH_SYNTHETIC_RUN_ID_PREFIXES.any(runId::startsWith)
-        if (
-            status is BridgeTurnStatus.Cancelled ||
-            (status is BridgeTurnStatus.Failed && (deadTurn || syntheticTerminalRun))
-        ) {
+        if (shouldCleanupAbandonedAssistantFragments(status, deadTurn, runId)) {
             cleanupAbandonedAssistantFragmentsSafely(
                 conversationId = conversationId,
                 runId = runId,
@@ -1616,6 +1606,21 @@ class ChatSendCoordinator(
             candidateRunIds = activeCleanupCandidateRunIds(state, cleanupRunId),
         )
     }
+
+    /**
+     * Skip abandoned-fragment cleanup for delivered-then-failed turns: a legitimate
+     * short reply (for example, "OK") must survive an aux-only failure. An Iroh
+     * synthetic terminal is the exception because it can name a placeholder while
+     * observed fragments use the promoted App Server run id.
+     */
+    private fun shouldCleanupAbandonedAssistantFragments(
+        status: BridgeTurnStatus,
+        deadTurn: Boolean,
+        runId: String,
+    ): Boolean = status is BridgeTurnStatus.Cancelled ||
+        (status is BridgeTurnStatus.Failed && (
+            deadTurn || IROH_SYNTHETIC_RUN_ID_PREFIXES.any(runId::startsWith)
+        ))
 
     /**
      * letta-mobile-dangling-tool: an abnormal end (not a clean completion) — this
