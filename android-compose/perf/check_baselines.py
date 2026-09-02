@@ -272,13 +272,16 @@ def _evaluate_metric(key: str, spec: dict, measurements: list[dict], rebaseline:
     return row, outcome
 
 
+def _is_single_retry_eligible_startup_regression(failures: list[dict]) -> bool:
+    if len(failures) != 1:
+        return False
+    return failures[0]["key"] in RETRYABLE_STARTUP_METRIC_KEYS
+
+
 def _regression_exit_code(failures: list[dict], retryable_exit_code: int | None) -> int:
-    failing_keys = {row["key"] for row in failures}
-    if (
-        len(failures) == 1
-        and failing_keys <= RETRYABLE_STARTUP_METRIC_KEYS
-        and retryable_exit_code is not None
-    ):
+    if retryable_exit_code is None:
+        return 1
+    if _is_single_retry_eligible_startup_regression(failures):
         return retryable_exit_code
     return 1
 

@@ -57,6 +57,36 @@ class CheckBaselinesTest(unittest.TestCase):
     def write_measurement(self, payload: dict, name: str = "sample-benchmarkData.json") -> None:
         (self.outputs_dir / name).write_text(json.dumps(payload, indent=2) + "\n")
 
+    def startup_spec(self, key: str, baseline: float = 100.0, *, gate: bool = True) -> dict:
+        source = self.startup_names(key)[0]
+        spec = {
+            "baseline": baseline,
+            "tolerance_pct": 10,
+            "source": source,
+            "metric": "timeToInitialDisplayMs",
+        }
+        if not gate:
+            spec["gate"] = False
+        return spec
+
+    @staticmethod
+    def startup_names(key: str) -> tuple[str, str]:
+        return {
+            "startup.cold.p95_ms": ("StartupBenchmark.coldStartupCompilationPartial", "coldStartupCompilationPartial"),
+            "startup.warm.p95_ms": ("StartupBenchmark.warmStartup", "warmStartup"),
+        }[key]
+
+    def write_startup_measurement(self, key: str, observed: float) -> None:
+        _, name = self.startup_names(key)
+        self.write_measurement(
+            make_benchmark(
+                "com.letta.mobile.macrobenchmark.StartupBenchmark",
+                name,
+                {"timeToInitialDisplayMs": {"P95": observed}},
+            ),
+            name=f"{key}-benchmarkData.json",
+        )
+
     def assert_fails_closed(self, key: str, spec: dict, measurement: dict) -> None:
         self.write_baselines({key: spec})
         self.write_measurement(measurement)
@@ -382,37 +412,12 @@ class CheckBaselinesTest(unittest.TestCase):
     def test_single_startup_regression_can_request_retry_exit_code(self) -> None:
         self.write_baselines(
             {
-                "startup.cold.p95_ms": {
-                    "baseline": 100.0,
-                    "tolerance_pct": 10,
-                    "source": "StartupBenchmark.coldStartupCompilationPartial",
-                    "metric": "timeToInitialDisplayMs",
-                },
-                "startup.warm.p95_ms": {
-                    "baseline": 50.0,
-                    "tolerance_pct": 10,
-                    "source": "StartupBenchmark.warmStartup",
-                    "metric": "timeToInitialDisplayMs",
-                    "gate": False,
-                },
+                "startup.cold.p95_ms": self.startup_spec("startup.cold.p95_ms"),
+                "startup.warm.p95_ms": self.startup_spec("startup.warm.p95_ms", 50.0, gate=False),
             }
         )
-        self.write_measurement(
-            make_benchmark(
-                "com.letta.mobile.macrobenchmark.StartupBenchmark",
-                "coldStartupCompilationPartial",
-                {"timeToInitialDisplayMs": {"P95": 120.0}},
-            ),
-            name="cold-benchmarkData.json",
-        )
-        self.write_measurement(
-            make_benchmark(
-                "com.letta.mobile.macrobenchmark.StartupBenchmark",
-                "warmStartup",
-                {"timeToInitialDisplayMs": {"P95": 100.0}},
-            ),
-            name="warm-benchmarkData.json",
-        )
+        self.write_startup_measurement("startup.cold.p95_ms", 120.0)
+        self.write_startup_measurement("startup.warm.p95_ms", 100.0)
 
         result = check_baselines.check(
             self.outputs_dir,
@@ -426,36 +431,12 @@ class CheckBaselinesTest(unittest.TestCase):
     def test_single_warm_start_regression_can_request_retry_exit_code(self) -> None:
         self.write_baselines(
             {
-                "startup.cold.p95_ms": {
-                    "baseline": 100.0,
-                    "tolerance_pct": 10,
-                    "source": "StartupBenchmark.coldStartupCompilationPartial",
-                    "metric": "timeToInitialDisplayMs",
-                },
-                "startup.warm.p95_ms": {
-                    "baseline": 100.0,
-                    "tolerance_pct": 10,
-                    "source": "StartupBenchmark.warmStartup",
-                    "metric": "timeToInitialDisplayMs",
-                },
+                "startup.cold.p95_ms": self.startup_spec("startup.cold.p95_ms"),
+                "startup.warm.p95_ms": self.startup_spec("startup.warm.p95_ms"),
             }
         )
-        self.write_measurement(
-            make_benchmark(
-                "com.letta.mobile.macrobenchmark.StartupBenchmark",
-                "coldStartupCompilationPartial",
-                {"timeToInitialDisplayMs": {"P95": 90.0}},
-            ),
-            name="cold-benchmarkData.json",
-        )
-        self.write_measurement(
-            make_benchmark(
-                "com.letta.mobile.macrobenchmark.StartupBenchmark",
-                "warmStartup",
-                {"timeToInitialDisplayMs": {"P95": 120.0}},
-            ),
-            name="warm-benchmarkData.json",
-        )
+        self.write_startup_measurement("startup.cold.p95_ms", 90.0)
+        self.write_startup_measurement("startup.warm.p95_ms", 120.0)
 
         result = check_baselines.check(
             self.outputs_dir,
@@ -469,36 +450,12 @@ class CheckBaselinesTest(unittest.TestCase):
     def test_multiple_regressions_do_not_request_retry(self) -> None:
         self.write_baselines(
             {
-                "startup.cold.p95_ms": {
-                    "baseline": 100.0,
-                    "tolerance_pct": 10,
-                    "source": "StartupBenchmark.coldStartupCompilationPartial",
-                    "metric": "timeToInitialDisplayMs",
-                },
-                "startup.warm.p95_ms": {
-                    "baseline": 100.0,
-                    "tolerance_pct": 10,
-                    "source": "StartupBenchmark.warmStartup",
-                    "metric": "timeToInitialDisplayMs",
-                },
+                "startup.cold.p95_ms": self.startup_spec("startup.cold.p95_ms"),
+                "startup.warm.p95_ms": self.startup_spec("startup.warm.p95_ms"),
             }
         )
-        self.write_measurement(
-            make_benchmark(
-                "com.letta.mobile.macrobenchmark.StartupBenchmark",
-                "coldStartupCompilationPartial",
-                {"timeToInitialDisplayMs": {"P95": 120.0}},
-            ),
-            name="cold-benchmarkData.json",
-        )
-        self.write_measurement(
-            make_benchmark(
-                "com.letta.mobile.macrobenchmark.StartupBenchmark",
-                "warmStartup",
-                {"timeToInitialDisplayMs": {"P95": 120.0}},
-            ),
-            name="warm-benchmarkData.json",
-        )
+        self.write_startup_measurement("startup.cold.p95_ms", 120.0)
+        self.write_startup_measurement("startup.warm.p95_ms", 120.0)
 
         result = check_baselines.check(
             self.outputs_dir,
@@ -512,27 +469,11 @@ class CheckBaselinesTest(unittest.TestCase):
     def test_retryable_exit_does_not_override_missing_measurements(self) -> None:
         self.write_baselines(
             {
-                "startup.cold.p95_ms": {
-                    "baseline": 100.0,
-                    "tolerance_pct": 10,
-                    "source": "StartupBenchmark.coldStartupCompilationPartial",
-                    "metric": "timeToInitialDisplayMs",
-                },
-                "startup.warm.p95_ms": {
-                    "baseline": 100.0,
-                    "tolerance_pct": 10,
-                    "source": "StartupBenchmark.warmStartup",
-                    "metric": "timeToInitialDisplayMs",
-                },
+                "startup.cold.p95_ms": self.startup_spec("startup.cold.p95_ms"),
+                "startup.warm.p95_ms": self.startup_spec("startup.warm.p95_ms"),
             }
         )
-        self.write_measurement(
-            make_benchmark(
-                "com.letta.mobile.macrobenchmark.StartupBenchmark",
-                "coldStartupCompilationPartial",
-                {"timeToInitialDisplayMs": {"P95": 120.0}},
-            )
-        )
+        self.write_startup_measurement("startup.cold.p95_ms", 120.0)
 
         result = check_baselines.check(
             self.outputs_dir,
