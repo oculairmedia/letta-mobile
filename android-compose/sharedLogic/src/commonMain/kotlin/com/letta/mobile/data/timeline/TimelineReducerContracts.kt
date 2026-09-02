@@ -264,6 +264,7 @@ fun reduceCleanup(
             removed = cleanup.suppressions.size,
             changed = cleanup.timeline != state.timeline,
         ),
+        persistenceDelta = exactConfirmedDelta(state.timeline, cleanup.timeline),
     )
 }
 

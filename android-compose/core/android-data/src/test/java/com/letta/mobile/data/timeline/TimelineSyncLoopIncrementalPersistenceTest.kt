@@ -162,7 +162,9 @@ class TimelineSyncLoopIncrementalPersistenceTest {
         assertEquals("delta", decision.attrs["reason"])
         assertEquals("1", decision.attrs["comparisonEvents"].toString())
         assertEquals("1", decision.attrs["encodedRows"].toString())
-        assertEquals(2_000, RoomConfirmedTimelineStore(db).readSnapshot(scope)?.events?.size)
+        val afterUpdate = RoomConfirmedTimelineStore(db).readSnapshot(scope)
+        assertEquals(2_000, afterUpdate?.events?.size)
+        assertEquals("seed-1999", afterUpdate?.liveCursor)
 
         reopened.closeAndJoin()
     }
@@ -173,7 +175,8 @@ class TimelineSyncLoopIncrementalPersistenceTest {
         val db = inMemoryDatabase()
         val scope = TimelineScope(backendId = "backend", conversationId = "conv-delete-fallback", agentId = "agent")
         val loop = newLoop(scope, RoomConfirmedTimelineStore(db), StandardTestDispatcher(testScheduler))
-        loop.ingestStreamEvent(AssistantMessage(id = "assistant", date = FIXTURE_DATE, contentRaw = JsonPrimitive("partial"), runId = "run-delete", seqId = 1))
+        loop.ingestStreamEvent(AssistantMessage(id = "assistant-canonical", date = FIXTURE_DATE, contentRaw = JsonPrimitive("partial response with enough content"), runId = "run-delete", seqId = 1, otid = "canonical-otid"))
+        loop.ingestStreamEvent(AssistantMessage(id = "assistant-orphan", date = FIXTURE_DATE, contentRaw = JsonPrimitive("p"), runId = "run-delete", seqId = 1, otid = "orphan-otid"))
         loop.flushSnapshotNow()
         advanceUntilIdle()
 
@@ -181,10 +184,15 @@ class TimelineSyncLoopIncrementalPersistenceTest {
         val removed = loop.cleanupAbandonedAssistantFragments("run-delete", null, "test")
         loop.flushSnapshotNow()
         advanceUntilIdle()
+
         assertEquals(1, removed)
+        val persisted = RoomConfirmedTimelineStore(db).readSnapshot(scope)
+        assertEquals(1, persisted?.events?.size)
+        assertEquals("assistant-canonical", persisted?.events?.singleOrNull()?.serverId)
         val decision = com.letta.mobile.util.Telemetry.snapshot().last {
             it.name == "snapshotPersist.planningDecision" && it.attrs["conversationId"] == scope.conversationId
         }
+        assertEquals("full_scan", decision.attrs["planningMode"])
         assertEquals("delete_requires_ranked_order", decision.attrs["reason"])
         loop.closeAndJoin()
     }
