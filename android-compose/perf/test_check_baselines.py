@@ -77,16 +77,39 @@ class CheckBaselinesTest(unittest.TestCase):
             "startup.warm.p95_ms": ("StartupBenchmark.warmStartup", "warmStartup"),
         }[key]
 
-    def write_startup_measurement(self, key: str, observed: float) -> None:
-        _, name = self.startup_names(key)
-        self.write_measurement(
-            make_benchmark(
-                "com.letta.mobile.macrobenchmark.StartupBenchmark",
-                name,
-                {"timeToInitialDisplayMs": {"P95": observed}},
+    def write_startup_retry_case(
+        self,
+        cold_observed: float | None,
+        warm_observed: float | None,
+        *,
+        cold_gate: bool = True,
+        warm_gate: bool = True,
+        cold_baseline: float = 100.0,
+        warm_baseline: float = 100.0,
+    ) -> None:
+        startup_specs = {
+            "startup.cold.p95_ms": self.startup_spec(
+                "startup.cold.p95_ms", cold_baseline, gate=cold_gate
             ),
-            name=f"{key}-benchmarkData.json",
-        )
+            "startup.warm.p95_ms": self.startup_spec(
+                "startup.warm.p95_ms", warm_baseline, gate=warm_gate
+            ),
+        }
+        self.write_baselines(startup_specs)
+        for key, observed in (
+            ("startup.cold.p95_ms", cold_observed),
+            ("startup.warm.p95_ms", warm_observed),
+        ):
+            if observed is not None:
+                _, name = self.startup_names(key)
+                self.write_measurement(
+                    make_benchmark(
+                        "com.letta.mobile.macrobenchmark.StartupBenchmark",
+                        name,
+                        {"timeToInitialDisplayMs": {"P95": observed}},
+                    ),
+                    name=f"{key}-benchmarkData.json",
+                )
 
     def assert_fails_closed(self, key: str, spec: dict, measurement: dict) -> None:
         self.write_baselines({key: spec})
@@ -426,14 +449,12 @@ class CheckBaselinesTest(unittest.TestCase):
         self.assertEqual(check_baselines._retryable_exit_code("3"), 3)
 
     def test_single_startup_regression_can_request_retry_exit_code(self) -> None:
-        self.write_baselines(
-            {
-                "startup.cold.p95_ms": self.startup_spec("startup.cold.p95_ms"),
-                "startup.warm.p95_ms": self.startup_spec("startup.warm.p95_ms", 50.0, gate=False),
-            }
+        self.write_startup_retry_case(
+            cold_observed=120.0,
+            warm_observed=100.0,
+            warm_baseline=50.0,
+            warm_gate=False,
         )
-        self.write_startup_measurement("startup.cold.p95_ms", 120.0)
-        self.write_startup_measurement("startup.warm.p95_ms", 100.0)
 
         result = check_baselines.check(
             self.outputs_dir,
@@ -445,14 +466,7 @@ class CheckBaselinesTest(unittest.TestCase):
         self.assertEqual(result, 3)
 
     def test_single_warm_start_regression_can_request_retry_exit_code(self) -> None:
-        self.write_baselines(
-            {
-                "startup.cold.p95_ms": self.startup_spec("startup.cold.p95_ms"),
-                "startup.warm.p95_ms": self.startup_spec("startup.warm.p95_ms"),
-            }
-        )
-        self.write_startup_measurement("startup.cold.p95_ms", 90.0)
-        self.write_startup_measurement("startup.warm.p95_ms", 120.0)
+        self.write_startup_retry_case(cold_observed=90.0, warm_observed=120.0)
 
         result = check_baselines.check(
             self.outputs_dir,
@@ -464,14 +478,7 @@ class CheckBaselinesTest(unittest.TestCase):
         self.assertEqual(result, 3)
 
     def test_multiple_regressions_do_not_request_retry(self) -> None:
-        self.write_baselines(
-            {
-                "startup.cold.p95_ms": self.startup_spec("startup.cold.p95_ms"),
-                "startup.warm.p95_ms": self.startup_spec("startup.warm.p95_ms"),
-            }
-        )
-        self.write_startup_measurement("startup.cold.p95_ms", 120.0)
-        self.write_startup_measurement("startup.warm.p95_ms", 120.0)
+        self.write_startup_retry_case(cold_observed=120.0, warm_observed=120.0)
 
         result = check_baselines.check(
             self.outputs_dir,
@@ -483,13 +490,7 @@ class CheckBaselinesTest(unittest.TestCase):
         self.assertEqual(result, 1)
 
     def test_retryable_exit_does_not_override_missing_measurements(self) -> None:
-        self.write_baselines(
-            {
-                "startup.cold.p95_ms": self.startup_spec("startup.cold.p95_ms"),
-                "startup.warm.p95_ms": self.startup_spec("startup.warm.p95_ms"),
-            }
-        )
-        self.write_startup_measurement("startup.cold.p95_ms", 120.0)
+        self.write_startup_retry_case(cold_observed=120.0, warm_observed=None)
 
         result = check_baselines.check(
             self.outputs_dir,
