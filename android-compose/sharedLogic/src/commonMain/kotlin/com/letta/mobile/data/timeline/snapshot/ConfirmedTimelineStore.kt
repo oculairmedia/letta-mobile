@@ -75,6 +75,21 @@ interface ConfirmedTimelineStore {
      */
     suspend fun normalizedHeadRevision(scope: TimelineScope): Long? = null
 
+    /**
+     * Whether this store can APPLY a [NormalizedTimelineCommitPlan] to durable rows.
+     *
+     * The incremental path deliberately hands `commitNormalized` a METADATA-ONLY envelope --
+     * not encoding the whole timeline is the entire point. A store whose commitNormalized is
+     * the default shim below writes that envelope wholesale, which for an Apply plan means
+     * replacing the stored timeline with ZERO events.
+     *
+     * letta-mobile-94bt8.1: DesktopConfirmedTimelineStore does not override commitNormalized,
+     * so it takes that shim. Defaulting to false keeps every such store on the full-envelope
+     * path, which is slower but correct; Room, which really does apply plans row-wise,
+     * overrides this to true and keeps the proportional win.
+     */
+    val supportsIncrementalCommit: Boolean get() = false
+
     suspend fun writeSnapshot(envelope: StoredTimelineEnvelope): Boolean
 
     /**
@@ -131,6 +146,14 @@ interface ConfirmedTimelineStore {
         }
         is NormalizedTimelineCommitPlan.Apply -> {
             val commit = plan.commit
+            // Fail loud rather than silently truncating. Reaching here with row upserts and an
+            // empty envelope means a caller took the incremental path against a store that
+            // cannot apply plans -- writing `target` would erase the conversation.
+            if (commit.upserts.isNotEmpty() && fullEnvelope.events.isEmpty()) {
+                return NormalizedTimelineWriteResult.Invalid(
+                    NormalizedTimelineCommitFailure.UNSUPPORTED_PLAN,
+                )
+            }
             val target = fullEnvelope.copy(revision = commit.targetRevision.value)
             if (writeSnapshot(target)) {
                 NormalizedTimelineWriteResult.Committed(commit.targetRevision)

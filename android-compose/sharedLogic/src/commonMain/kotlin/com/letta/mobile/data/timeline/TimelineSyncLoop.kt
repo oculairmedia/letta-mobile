@@ -256,13 +256,34 @@ class TimelineSyncLoop(
             )
         } else {
             TimelineIncrementalSnapshotPlanner.Result.FullScan(
-                if (lastPersistedEnvelope == null) "baseline_missing" else "delta_empty",
+                if (lastPersistedEnvelope == null) SnapshotPlanningFallback.BASELINE_MISSING
+                else if (capturedDelta.fallbackReason != null) requireNotNull(capturedDelta.fallbackReason)
+                else SnapshotPlanningFallback.DELTA_EMPTY,
             )
         }
-        if (incremental is TimelineIncrementalSnapshotPlanner.Result.Planned && !isLegacyCheckpointDue(incremental.plan)) {
+        if (incremental is TimelineIncrementalSnapshotPlanner.Result.Planned &&
+            confirmedTimelineStore.supportsIncrementalCommit &&
+            !isLegacyCheckpointDue(incremental.plan)
+        ) {
             persistIncrementalSnapshot(snapshotScope, committedState.timeline, capturedDelta, incremental, prune)
             return
         }
+        // letta-mobile-94bt8.1 AC1: EVERY full scan reports why. The clean-main capture had nine
+        // full-scan writes and not one said what forced it, so a reducer that simply never
+        // declared a delta was indistinguishable from a genuine ambiguity or a due checkpoint.
+        // A due checkpoint is reported as such rather than as the planner's own reason, since
+        // that path is required by design and is not a planning failure.
+        val fallbackReason = when {
+            incremental is TimelineIncrementalSnapshotPlanner.Result.Planned -> SnapshotPlanningFallback.CHECKPOINT_DUE
+            else -> (incremental as TimelineIncrementalSnapshotPlanner.Result.FullScan).reason
+        }
+        Telemetry.event(
+            "TimelineSync", "snapshotPersist.fullScanPlanned",
+            *identityAttrs(),
+            "reason" to fallbackReason.name,
+            "dirtyIdentities" to capturedDelta.dirtyIdentityCount,
+            "metadataChanged" to capturedDelta.metadataChanged,
+        )
         val (provisionalEnvelope, fingerprint) = withContext(ioDispatcher) {
             val envelope = TimelineSnapshotCodec.timelineToStoredEnvelope(
                 timeline = committedState.timeline,

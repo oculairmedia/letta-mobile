@@ -284,6 +284,9 @@ class RoomConfirmedTimelineStore(
      * for rows outside [NormalizedTimelineCommit.upserts]. All mutation (deletes, upserts,
      * row-count, root digest, head metadata) happens in one [database] transaction.
      */
+    /** Room applies plans row-wise, so the metadata-only incremental envelope is safe here. */
+    override val supportsIncrementalCommit: Boolean = true
+
     override suspend fun commitNormalized(
         plan: NormalizedTimelineCommitPlan,
         fullEnvelope: StoredTimelineEnvelope,
