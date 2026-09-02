@@ -94,7 +94,12 @@ class TimelineSyncLoop(
     // Legacy v11 checkpoint cadence: write a full envelope (readable by rollback/older builds)
     // every LEGACY_CHECKPOINT_INTERVAL successful normalized commits, plus always on the very
     // first commit for a scope. Bounds legacy staleness to at most that many revisions.
-    private var commitsSinceLegacyCheckpoint: Int = 0
+    // A reopened normalized baseline has already passed the first-commit checkpoint. Start its
+    // cadence after that checkpoint so the first ordinary post-restart mutation stays incremental.
+    private var commitsSinceLegacyCheckpoint: Int = initialPersistedEnvelope
+        ?.takeIf { it.revision > 0L }
+        ?.let { LEGACY_CHECKPOINT_INTERVAL - 1 }
+        ?: 0
     // Set when a persist was suppressed during an active turn, so the per-turn safety timer
     // only writes when there is actually something deferred to write.
     @Volatile
@@ -245,21 +250,10 @@ class TimelineSyncLoop(
         // Capture one immutable processor commit so content and sequence cannot race.
         val committedState = timelineProcessor.state.value
         val capturedDelta = pendingPersistenceDelta.snapshot()
-        val incremental = if (lastPersistedEnvelope != null && !capturedDelta.isEmpty) {
-            TimelineIncrementalSnapshotPlanner.plan(
-                timeline = committedState.timeline,
-                scope = snapshotScope,
-                baseRevision = requireNotNull(lastPersistedEnvelope).revision,
-                targetRevision = snapshotRevision + 1,
-                writtenAtMillis = timelineCurrentTimeMillis(),
-                delta = capturedDelta,
-            )
-        } else {
-            TimelineIncrementalSnapshotPlanner.Result.FullScan(
-                if (lastPersistedEnvelope == null) "baseline_missing" else "delta_empty",
-            )
-        }
-        if (incremental is TimelineIncrementalSnapshotPlanner.Result.Planned && !isLegacyCheckpointDue(incremental.plan)) {
+        val planningDecision = decideIncrementalPlan(snapshotScope, committedState.timeline, capturedDelta)
+        emitPlanningDecision(planningDecision, capturedDelta)
+        val incremental = planningDecision.result
+        if (incremental is TimelineIncrementalSnapshotPlanner.Result.Planned && !planningDecision.checkpointDue) {
             persistIncrementalSnapshot(snapshotScope, committedState.timeline, capturedDelta, incremental, prune)
             return
         }
@@ -327,6 +321,67 @@ class TimelineSyncLoop(
                 "revision" to revision,
             )
         }
+    }
+
+    private data class IncrementalPlanningDecision(
+        val result: TimelineIncrementalSnapshotPlanner.Result,
+        val checkpointDue: Boolean,
+        val reason: String,
+        val baseRevision: Long?,
+        val targetRevision: Long,
+    )
+
+    private fun decideIncrementalPlan(
+        snapshotScope: TimelineScope,
+        timeline: Timeline,
+        delta: PendingTimelinePersistenceDelta.Snapshot,
+    ): IncrementalPlanningDecision {
+        val targetRevision = snapshotRevision + 1
+        val baseline = lastPersistedEnvelope
+        val result = if (baseline != null && !delta.isEmpty) {
+            TimelineIncrementalSnapshotPlanner.plan(
+                timeline = timeline,
+                scope = snapshotScope,
+                baseRevision = baseline.revision,
+                targetRevision = targetRevision,
+                writtenAtMillis = timelineCurrentTimeMillis(),
+                delta = delta,
+            )
+        } else {
+            TimelineIncrementalSnapshotPlanner.Result.FullScan(
+                if (baseline == null) "baseline_missing" else "delta_empty",
+            )
+        }
+        val checkpointDue = result is TimelineIncrementalSnapshotPlanner.Result.Planned && isLegacyCheckpointDue(result.plan)
+        val reason = when {
+            checkpointDue -> "checkpoint_due"
+            result is TimelineIncrementalSnapshotPlanner.Result.FullScan -> result.reason
+            else -> "delta"
+        }
+        return IncrementalPlanningDecision(result, checkpointDue, reason, baseline?.revision, targetRevision)
+    }
+
+    private fun emitPlanningDecision(
+        decision: IncrementalPlanningDecision,
+        delta: PendingTimelinePersistenceDelta.Snapshot,
+    ) {
+        val plan = (decision.result as? TimelineIncrementalSnapshotPlanner.Result.Planned)?.plan
+        val comparisonEvents = (plan as? NormalizedTimelineCommitPlan.Apply)?.commit?.comparisonEvents ?: 0
+        val encodedRows = (plan as? NormalizedTimelineCommitPlan.Apply)?.commit?.encodedRows ?: 0
+        Telemetry.event(
+            "TimelineSync", "snapshotPersist.planningDecision",
+            *identityAttrs(),
+            "planningMode" to if (decision.result is TimelineIncrementalSnapshotPlanner.Result.Planned && !decision.checkpointDue) "delta" else "full_scan",
+            "reason" to decision.reason,
+            "throughSequence" to delta.throughSequence,
+            "dirtyChanged" to delta.changedConfirmedServerIds.size,
+            "dirtyDeleted" to delta.deletedConfirmedServerIds.size,
+            "metadataChanged" to delta.metadataChanged,
+            "baselineRevision" to (decision.baseRevision ?: 0L),
+            "targetRevision" to decision.targetRevision,
+            "comparisonEvents" to comparisonEvents,
+            "encodedRows" to encodedRows,
+        )
     }
 
     private suspend fun persistIncrementalSnapshot(
