@@ -4,9 +4,15 @@ import androidx.room.withTransaction
 import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineReadResult
 import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore
 import com.letta.mobile.data.timeline.snapshot.SnapshotReadFailure
+import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineCommit
+import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineCommitFailure
 import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineCommitPlanner
 import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineCommitPlan
+import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineRow
+import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineWriteResult
 import com.letta.mobile.data.timeline.snapshot.StoredTimelineEnvelope
+import com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent
+import com.letta.mobile.data.timeline.snapshot.TimelineRevision
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
 import com.letta.mobile.data.timeline.timelineCurrentTimeMillis
@@ -24,6 +30,20 @@ import kotlinx.coroutines.withContext
 class RoomConfirmedTimelineStore(
     private val database: LettaDatabase,
     private val bootstrapBatchObserver: suspend (Int) -> Unit = {},
+    // Test seam only (mirrors bootstrapBatchObserver): lets tests inject a cancellation mid
+    // incremental-commit row-batch loop to prove the surrounding Room transaction rolls back
+    // atomically instead of leaving partially-mutated rows.
+    private val commitBatchObserver: suspend (Int) -> Unit = {},
+    // Test seam only: lets tests deterministically fault the best-effort legacy checkpoint
+    // staged after a normalized commit already durably succeeded, without needing a real I/O
+    // fault. Proves stageLegacyCheckpoint's failure never downgrades an already-committed
+    // normalized write.
+    private val legacyCheckpointFailureInjector: (() -> Throwable)? = null,
+    // Test seam only: faults immediately BEFORE normalized head publication, after the row
+    // mutations have been applied inside the same transaction (PM review item 4). Distinct
+    // from commitBatchObserver, which faults mid-row-batch: this one proves a head is never
+    // published over rows that did not survive.
+    private val beforeHeadPublicationObserver: suspend () -> Unit = {},
 ) : ConfirmedTimelineStore {
     private val dao = database.confirmedTimelineSnapshotDao()
     private val manifestReader = RoomTimelineManifestReader(dao)
@@ -36,9 +56,22 @@ class RoomConfirmedTimelineStore(
     override suspend fun readSnapshotResult(scope: TimelineScope): ConfirmedTimelineReadResult {
         return withContext(Dispatchers.IO) {
             val startedAtMillis = timelineCurrentTimeMillis()
+            val normalizedHead = dao.getNormalizedHead(scope.backendId, scope.conversationId)
             val head = dao.getHeadMetadata(scope.backendId, scope.conversationId)
-                ?: return@withContext readNormalized(scope)
-                    ?: ConfirmedTimelineReadResult.ReconciliationRequired(SnapshotReadFailure.MISSING)
+            // Normalized rows are the incremental-commit write target and, once present, are
+            // USUALLY at least as fresh as the periodic legacy v11 checkpoint (which only
+            // trails behind on a bounded cadence — see TimelineSyncLoop's checkpoint policy).
+            // But a caller can still write legacy directly (bypassing commitNormalized
+            // entirely, e.g. this class's own writeSnapshot called standalone) without
+            // touching normalized rows, so trust normalized only when its revision is not
+            // provably behind the legacy high-water revision -- comparing these two cheap,
+            // payload-free head reads is far cheaper than decoding the legacy envelope, so this
+            // preserves the fast path for the common (normalized-ahead) case without ever
+            // serving stale data when it isn't.
+            selectNormalizedRead(scope, normalizedHead, head)?.let { return@withContext it }
+            if (head == null) {
+                return@withContext ConfirmedTimelineReadResult.ReconciliationRequired(SnapshotReadFailure.MISSING)
+            }
             if (!head.matches(scope)) {
                 return@withContext ConfirmedTimelineReadResult.ReconciliationRequired(SnapshotReadFailure.METADATA_INVALID)
             }
@@ -48,6 +81,38 @@ class RoomConfirmedTimelineStore(
             if (!normalizedBootstrapIsSafe(envelope) || !bootstrapNormalized(envelope)) return@withContext legacy
             readNormalized(scope) ?: legacy
         }
+    }
+
+    /**
+     * Normalized-vs-legacy read selection, extracted so [readSnapshotResult] stays a linear
+     * sequence of steps.
+     *
+     * Returns a result only when normalized storage is the right source to answer from;
+     * null means "fall through to the legacy v11 path".
+     *
+     * Normalized rows are the incremental-commit write target and, once present, are USUALLY
+     * at least as fresh as the periodic legacy checkpoint (which trails on a bounded cadence
+     * -- see TimelineSyncLoop's checkpoint policy). But a caller can still write legacy
+     * directly, bypassing commitNormalized entirely (this class's own writeSnapshot called
+     * standalone, or the Invalid-plan fallback), without touching normalized rows. So trust
+     * normalized only when its revision is not provably behind the legacy high-water
+     * revision. Comparing these two cheap, payload-free head reads is far cheaper than
+     * decoding the legacy envelope, which preserves the fast path for the common
+     * normalized-ahead case without ever serving stale data when it isn't.
+     */
+    private suspend fun selectNormalizedRead(
+        scope: TimelineScope,
+        normalizedHead: NormalizedTimelineSnapshotHeadEntity?,
+        legacyHead: ConfirmedTimelineSnapshotHeadMetadata?,
+    ): ConfirmedTimelineReadResult? {
+        if (normalizedHead == null) return null
+        if (legacyHead != null && normalizedHead.revision < legacyHead.highWaterRevision) return null
+        val normalizedResult = readNormalized(scope)
+        if (normalizedResult is ConfirmedTimelineReadResult.Active) return normalizedResult
+        // No legacy head to fall back to: propagate normalized's own failure reason
+        // (e.g. CHECKSUM_MISMATCH) rather than masking it as a generic MISSING.
+        if (legacyHead == null && normalizedResult != null) return normalizedResult
+        return null
     }
 
     private suspend fun readNormalized(scope: TimelineScope): ConfirmedTimelineReadResult? {
@@ -174,6 +239,13 @@ class RoomConfirmedTimelineStore(
         )
     }
 
+    override suspend fun normalizedHeadRevision(scope: TimelineScope): Long? =
+        withContext(Dispatchers.IO) {
+            dao.getNormalizedHead(scope.backendId, scope.conversationId)
+                ?.takeIf { it.ownedBy(scope) }
+                ?.revision
+        }
+
     override suspend fun writeSnapshot(envelope: StoredTimelineEnvelope): Boolean {
         return withContext(Dispatchers.IO) {
         val plan = createWritePlan(envelope)
@@ -199,6 +271,203 @@ class RoomConfirmedTimelineStore(
             handleWriteFailure(plan, published, failure)
         }
         }
+    }
+
+    /**
+     * Incremental normalized-row commit. Touches only changed rows: deletes, upserts, and a
+     * lightweight (no-payload) row projection to recompute row count + canonical root digest.
+     * Never calls [TimelineSnapshotCodec.encode] and never reads/writes event JSON payloads
+     * for rows outside [NormalizedTimelineCommit.upserts]. All mutation (deletes, upserts,
+     * row-count, root digest, head metadata) happens in one [database] transaction.
+     */
+    override suspend fun commitNormalized(
+        plan: NormalizedTimelineCommitPlan,
+        fullEnvelope: StoredTimelineEnvelope,
+        checkpointLegacyEnvelope: Boolean,
+    ): NormalizedTimelineWriteResult = withContext(Dispatchers.IO) {
+        val result = when (plan) {
+            is NormalizedTimelineCommitPlan.Invalid -> NormalizedTimelineWriteResult.Invalid(plan.reason)
+            is NormalizedTimelineCommitPlan.NoOp -> commitNormalizedNoOp(plan)
+            is NormalizedTimelineCommitPlan.Apply -> commitNormalizedApply(plan.commit)
+        }
+        val committedOrNoOp = result is NormalizedTimelineWriteResult.Committed || result is NormalizedTimelineWriteResult.NoOp
+        if (checkpointLegacyEnvelope && committedOrNoOp) {
+            // PM review item 1 / requirement 13: the normalized commit above is
+            // ALREADY DURABLE at this point. Post-commit checkpoint work must not be
+            // able to downgrade that result, so it runs NonCancellable and swallows
+            // even cancellation. Rethrowing here made the caller observe an exception
+            // for a durable write, leaving lastPersistedEnvelope/fingerprint/checkpoint
+            // counters unadvanced and the next attempt planning from stale acknowledged
+            // state.
+            withContext(NonCancellable) { stageLegacyCheckpoint(fullEnvelope) }
+        }
+        result
+    }
+
+    /**
+     * Best-effort legacy v11 checkpoint, staged AFTER the normalized commit above has already
+     * durably succeeded. A checkpoint failure (or cancellation) must never be reported as a
+     * persistence failure -- the normalized commit is the durable write of record; this is
+     * purely so v11 rollback readers stay within [TimelineSyncLoop.LEGACY_CHECKPOINT_INTERVAL]
+     * revisions of current instead of only ever reflecting the very first commit.
+     */
+    @Suppress("CancellationMustPropagate")
+    private suspend fun stageLegacyCheckpoint(envelope: StoredTimelineEnvelope) {
+        // GUARDRAIL SUPPRESSION, deliberate and narrow -- flagged for review rather than
+        // applied silently.
+        //
+        // CancellationMustPropagate is right almost everywhere: swallowing cancellation
+        // breaks structured concurrency. This is the documented exception. By the time
+        // control reaches here the normalized CAS transaction has ALREADY COMMITTED, and the
+        // caller invokes this inside `withContext(NonCancellable)`, so no cancellation can
+        // legitimately arrive from the framework. Propagating one anyway would make the
+        // caller report a durable write as failed, leave the acknowledged envelope
+        // unadvanced, and replan the next commit from stale state -- data-integrity damage
+        // traded for protocol purity. The alternative loss is bounded and harmless: v11
+        // rollback readers stay at the previous checkpoint.
+        //
+        // Scope is one function whose entire body is best-effort, post-durable work.
+        try {
+            legacyCheckpointFailureInjector?.let { throw it() }
+            writeSnapshot(envelope)
+        } catch (failure: Throwable) {
+            // Deliberately catches CancellationException too. Normally swallowing
+            // cancellation is wrong, but this runs inside NonCancellable AFTER a
+            // durable commit: propagating it would misreport a write that actually
+            // landed, which is a worse failure than a missed checkpoint. The loss is
+            // bounded -- v11 readers simply stay at the previous checkpoint.
+            Telemetry.error(
+                "RoomTimelineStore", "commitNormalized.legacyCheckpointFailed", failure,
+                "backendId" to envelope.scope.backendId,
+                "conversationId" to envelope.scope.conversationId,
+                "revision" to envelope.revision,
+            )
+        }
+    }
+
+    private suspend fun commitNormalizedNoOp(plan: NormalizedTimelineCommitPlan.NoOp): NormalizedTimelineWriteResult {
+        val backendId = plan.scope.backendId
+        val conversationId = plan.scope.conversationId
+        return database.withTransaction {
+            val current = dao.getNormalizedHead(backendId, conversationId)
+            val currentRevision = current?.revision ?: 0L
+            // A NoOp needs an EXISTING head to advance; there is nothing to no-op otherwise.
+            // Apply deliberately does not require this, because its baseRevision-0 case is the
+            // bootstrap commit.
+            if (current == null || !current.acceptsCommitAt(plan.baseRevision, plan.scope)) {
+                return@withTransaction NormalizedTimelineWriteResult.Stale(TimelineRevision(currentRevision))
+            }
+            val head = current
+            // No-op CAS: advance revision + timestamp only, zero row writes, row set unchanged.
+            //
+            // The root digest MUST still be recomputed. `normalizedRootDigest` folds in
+            // `envelope.revision` (see RoomNormalizedTimelineReader), and the reader
+            // recomputes it from the head's revision, so bumping the revision while keeping
+            // the old digest makes every subsequent read of this conversation fail closed as
+            // CHECKSUM_MISMATCH — the timeline becomes unreadable after an idle no-op.
+            // Caught by RoomNormalizedCommitIntegrityTest; the pre-existing no-op test missed
+            // it because it never read the snapshot back.
+            val projection = dao.getNormalizedRowDigestProjection(backendId, conversationId)
+            val digestEnvelope = StoredTimelineEnvelope(
+                schemaVersion = head.envelopeSchemaVersion,
+                scope = plan.scope,
+                revision = plan.targetRevision.value,
+                liveCursor = head.liveCursor,
+                backfillCursor = head.backfillCursor,
+                releasedOlderCount = head.releasedOlderCount,
+                writtenAtMillis = plan.writtenAtMillis,
+            )
+            dao.upsertNormalizedHead(
+                head.copy(
+                    revision = plan.targetRevision.value,
+                    writtenAtMillis = plan.writtenAtMillis,
+                    rootDigest = normalizedRootDigest(digestEnvelope, projection),
+                ),
+            )
+            NormalizedTimelineWriteResult.NoOp(plan.targetRevision)
+        }
+    }
+
+    private suspend fun commitNormalizedApply(commit: NormalizedTimelineCommit): NormalizedTimelineWriteResult {
+        val oversized = commit.upserts.any { row -> rowPayloadBytes(row.event).size > NORMALIZED_MAX_ROW_PAYLOAD_BYTES }
+        if (oversized) {
+            // Oversized rows must not enter normalized storage. Fail closed and let the caller
+            // fall back to a full legacy checkpoint write rather than silently dropping data.
+            return NormalizedTimelineWriteResult.Invalid(NormalizedTimelineCommitFailure.OVERSIZED_ROW)
+        }
+        val scope = commit.metadata.scope
+        val backendId = scope.backendId
+        val conversationId = scope.conversationId
+        return database.withTransaction {
+            val head = dao.getNormalizedHead(backendId, conversationId)
+            val currentRevision = head?.revision ?: 0L
+            if (!head.acceptsCommitAt(commit.baseRevision, scope)) {
+                return@withTransaction NormalizedTimelineWriteResult.Stale(TimelineRevision(currentRevision))
+            }
+            commit.deletes.forEach { key ->
+                currentCoroutineContext().ensureActive()
+                dao.deleteNormalizedRow(backendId, conversationId, key.identityPrimary, key.identitySecondary)
+            }
+            if (commit.upserts.isNotEmpty()) {
+                val entities = commit.upserts.map { row -> row.toRowEntity(backendId, conversationId) }
+                entities.chunked(NORMALIZED_ROW_INSERT_BATCH).forEachIndexed { index, batch ->
+                    currentCoroutineContext().ensureActive()
+                    dao.upsertNormalizedRows(batch)
+                    commitBatchObserver(index)
+                }
+            }
+            currentCoroutineContext().ensureActive()
+            val projection = dao.getNormalizedRowDigestProjection(backendId, conversationId)
+            // PM review item 4: seam for faulting IMMEDIATELY BEFORE head publication.
+            // Rows are already mutated at this point; the surrounding transaction is what
+            // must roll them back, so the head is never published over rows that did not
+            // survive. Distinct from commitBatchObserver, which faults mid-row-batch.
+            beforeHeadPublicationObserver()
+            val digestEnvelope = StoredTimelineEnvelope(
+                schemaVersion = commit.metadata.schemaVersion,
+                scope = scope,
+                revision = commit.targetRevision.value,
+                liveCursor = commit.metadata.liveCursor,
+                backfillCursor = commit.metadata.backfillCursor,
+                releasedOlderCount = commit.metadata.releasedOlderCount,
+                writtenAtMillis = commit.metadata.writtenAtMillis,
+            )
+            dao.upsertNormalizedHead(
+                NormalizedTimelineSnapshotHeadEntity(
+                    backendId = backendId,
+                    conversationId = conversationId,
+                    agentId = scope.agentId,
+                    storageLayoutVersion = NORMALIZED_LAYOUT_VERSION,
+                    revision = commit.targetRevision.value,
+                    envelopeSchemaVersion = commit.metadata.schemaVersion,
+                    liveCursor = commit.metadata.liveCursor,
+                    backfillCursor = commit.metadata.backfillCursor,
+                    releasedOlderCount = commit.metadata.releasedOlderCount,
+                    rowCount = projection.size,
+                    rootDigest = normalizedRootDigest(digestEnvelope, projection),
+                    generation = commit.targetRevision.value,
+                    writtenAtMillis = commit.metadata.writtenAtMillis,
+                ),
+            )
+            NormalizedTimelineWriteResult.Committed(commit.targetRevision)
+        }
+    }
+
+    private fun rowPayloadBytes(event: StoredTimelineEvent): ByteArray =
+        TimelineSnapshotCodec.json.encodeToString(StoredTimelineEvent.serializer(), event)
+            .toByteArray(StandardCharsets.UTF_8)
+
+    private fun NormalizedTimelineRow.toRowEntity(backendId: String, conversationId: String): NormalizedTimelineSnapshotRowEntity {
+        val payload = rowPayloadBytes(event)
+        return NormalizedTimelineSnapshotRowEntity(
+            backendId = backendId,
+            conversationId = conversationId,
+            identityPrimary = key.identityPrimary,
+            identitySecondary = key.identitySecondary,
+            eventOrder = order,
+            payload = payload,
+            checksum = sha256(payload),
+        )
     }
 
     private fun createWritePlan(envelope: StoredTimelineEnvelope): SnapshotWritePlan {
@@ -258,7 +527,15 @@ class RoomConfirmedTimelineStore(
         }
         return database.withTransaction {
             val existing = dao.getHeadMetadata(plan.scope.backendId, plan.scope.conversationId)
-            if (existing != null && existing.highWaterRevision >= plan.normalized.revision) {
+            if (existing != null && !existing.ownershipCompatibleWith(plan.scope)) {
+                // Round 7: a LEGACY head owned by another agent must never be replaced, at ANY
+                // revision. The revision guard below is not a substitute: a cross-agent write at
+                // a STRICTLY HIGHER revision sails past it and replaceHead then restamps
+                // agent_id to the intruder, destroying the owner's head. The earlier
+                // same-revision test passed only because the revision guard fired first, which
+                // is why this went unnoticed.
+                false
+            } else if (existing != null && existing.highWaterRevision >= plan.normalized.revision) {
                 false
             } else {
                 dao.replaceHead(

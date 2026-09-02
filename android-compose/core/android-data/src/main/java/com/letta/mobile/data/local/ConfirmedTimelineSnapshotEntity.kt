@@ -102,12 +102,26 @@ data class NormalizedTimelineSnapshotHeadEntity(
 data class NormalizedTimelineSnapshotRowEntity(
     @ColumnInfo(name = "backend_id") val backendId: String,
     @ColumnInfo(name = "conversation_id") val conversationId: String,
-    @ColumnInfo(name = "identity_primary") val identityPrimary: Long,
-    @ColumnInfo(name = "identity_secondary") val identitySecondary: Long,
-    @ColumnInfo(name = "event_order") val eventOrder: Int,
+    @ColumnInfo(name = "identity_primary") override val identityPrimary: Long,
+    @ColumnInfo(name = "identity_secondary") override val identitySecondary: Long,
+    @ColumnInfo(name = "event_order") override val eventOrder: Int,
     @ColumnInfo(name = "payload") val payload: ByteArray,
-    @ColumnInfo(name = "checksum") val checksum: String,
-)
+    @ColumnInfo(name = "checksum") override val checksum: String,
+) : NormalizedTimelineRowDigestFields
+
+/**
+ * Lightweight row projection carrying only the fields needed to CAS-check row identity,
+ * maintain the canonical root digest, and recompute row count — never the (potentially
+ * large) event JSON [NormalizedTimelineSnapshotRowEntity.payload]. Used by the incremental
+ * commit path so that ordinary append/update/delete/cursor-only mutations never pull whole
+ * event payloads back out of Room.
+ */
+data class NormalizedTimelineSnapshotRowDigestProjection(
+    @ColumnInfo(name = "identity_primary") override val identityPrimary: Long,
+    @ColumnInfo(name = "identity_secondary") override val identitySecondary: Long,
+    @ColumnInfo(name = "event_order") override val eventOrder: Int,
+    @ColumnInfo(name = "checksum") override val checksum: String,
+) : NormalizedTimelineRowDigestFields
 
 @Dao
 interface ConfirmedTimelineSnapshotDao {
@@ -149,8 +163,47 @@ interface ConfirmedTimelineSnapshotDao {
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertNormalizedHead(head: NormalizedTimelineSnapshotHeadEntity)
 
+    /** Incremental-commit upsert: replaces changed rows only. Never touches unrelated rows. */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertNormalizedRows(rows: List<NormalizedTimelineSnapshotRowEntity>)
+
+    /** Incremental-commit head publish: same CAS-checked transaction inserts or replaces. */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertNormalizedHead(head: NormalizedTimelineSnapshotHeadEntity)
+
     @Query("DELETE FROM normalized_timeline_snapshot_rows WHERE backend_id = :backendId AND conversation_id = :conversationId")
     suspend fun deleteNormalizedRows(backendId: String, conversationId: String)
+
+    @Query(
+        """
+        DELETE FROM normalized_timeline_snapshot_rows
+        WHERE backend_id = :backendId AND conversation_id = :conversationId
+          AND identity_primary = :identityPrimary AND identity_secondary = :identitySecondary
+        """
+    )
+    suspend fun deleteNormalizedRow(
+        backendId: String,
+        conversationId: String,
+        identityPrimary: Long,
+        identitySecondary: Long,
+    )
+
+    /**
+     * Row projection (no payload) used to recompute row count and the canonical root digest
+     * after an incremental commit, without pulling event JSON back out of Room.
+     */
+    @Query(
+        """
+        SELECT identity_primary, identity_secondary, event_order, checksum
+        FROM normalized_timeline_snapshot_rows
+        WHERE backend_id = :backendId AND conversation_id = :conversationId
+        ORDER BY event_order
+        """
+    )
+    suspend fun getNormalizedRowDigestProjection(
+        backendId: String,
+        conversationId: String,
+    ): List<NormalizedTimelineSnapshotRowDigestProjection>
 
     @Query("DELETE FROM normalized_timeline_snapshot_heads WHERE backend_id = :backendId AND conversation_id = :conversationId")
     suspend fun deleteNormalizedHead(backendId: String, conversationId: String)
@@ -249,4 +302,15 @@ interface ConfirmedTimelineSnapshotDao {
 
     @Query("DELETE FROM confirmed_timeline_snapshot_manifests WHERE manifest_id = :manifestId")
     suspend fun deleteManifest(manifestId: String)
+
+    /**
+     * Every legacy v11 [writeSnapshot][ConfirmedTimelineStore.writeSnapshot] call inserts
+     * exactly one manifest row (see [RoomConfirmedTimelineStore.createWritePlan]), and that
+     * insert is the only place [TimelineSnapshotCodec.encode] runs on the write path. This
+     * count is therefore a faithful, production-code-observing proxy for full-envelope
+     * encode calls; tests assert it stops growing once ordinary mutations are routed through
+     * [ConfirmedTimelineStore.commitNormalized] instead.
+     */
+    @Query("SELECT COUNT(*) FROM confirmed_timeline_snapshot_manifests WHERE backend_id = :backendId AND conversation_id = :conversationId")
+    suspend fun countManifests(backendId: String, conversationId: String): Int
 }

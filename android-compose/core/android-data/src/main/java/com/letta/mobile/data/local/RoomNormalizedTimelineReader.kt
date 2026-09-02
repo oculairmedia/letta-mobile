@@ -94,9 +94,17 @@ private fun NormalizedTimelineSnapshotHeadEntity.toEnvelope(
         writtenAtMillis = writtenAtMillis,
     )
 
+/** Minimal fields needed to fold a row into the canonical root digest, without its payload. */
+internal interface NormalizedTimelineRowDigestFields {
+    val identityPrimary: Long
+    val identitySecondary: Long
+    val eventOrder: Int
+    val checksum: String
+}
+
 internal fun normalizedRootDigest(
     envelope: StoredTimelineEnvelope,
-    rows: List<NormalizedTimelineSnapshotRowEntity>,
+    rows: List<NormalizedTimelineRowDigestFields>,
 ): String = sha256(buildString {
     appendDigestField(envelope.schemaVersion.toString())
     appendDigestField(envelope.scope.backendId)

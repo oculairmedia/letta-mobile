@@ -7,6 +7,10 @@ import androidx.sqlite.db.SupportSQLiteOpenHelper
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.core.app.ApplicationProvider
 import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineReadResult
+import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineCommitFailure
+import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineCommitPlan
+import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineCommitPlanner
+import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineWriteResult
 import com.letta.mobile.data.timeline.snapshot.SnapshotReadFailure
 import com.letta.mobile.data.timeline.snapshot.StoredTimelineEnvelope
 import com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent
@@ -313,9 +317,9 @@ class RoomConfirmedTimelineStoreTest {
             writtenAtMillis = 10L,
         )
         assertTrue(writer.writeSnapshot(envelope))
-        val cancellingStore = RoomConfirmedTimelineStore(db) { batch ->
+        val cancellingStore = RoomConfirmedTimelineStore(db, bootstrapBatchObserver = { batch ->
             if (batch == 1) throw CancellationException("cancel bootstrap")
-        }
+        })
 
         try {
             cancellingStore.readSnapshot(scope)
@@ -375,6 +379,24 @@ class RoomConfirmedTimelineStoreTest {
         assertFalse(normalizedRootDigest(base, emptyList()) == normalizedRootDigest(nullLiteral, emptyList()))
         assertFalse(normalizedRootDigest(base, emptyList()) == normalizedRootDigest(delimiterShift, emptyList()))
     }
+
+    // -- letta-mobile-827s9.4: incremental normalized-commit (commitNormalized) coverage --
+
+    private fun plan(previous: StoredTimelineEnvelope?, current: StoredTimelineEnvelope) =
+        NormalizedTimelineCommitPlanner.plan(previous, current)
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     private fun event(index: Int) = StoredTimelineEvent(
         position = index.toDouble(),

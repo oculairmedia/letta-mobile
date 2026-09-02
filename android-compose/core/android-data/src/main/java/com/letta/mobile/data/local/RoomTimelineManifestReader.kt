@@ -3,6 +3,7 @@ package com.letta.mobile.data.local
 import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineReadResult
 import com.letta.mobile.data.timeline.snapshot.SnapshotReadFailure
 import com.letta.mobile.data.timeline.snapshot.StoredTimelineEnvelope
+import com.letta.mobile.data.timeline.snapshot.TimelineRevision
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
 import java.io.ByteArrayOutputStream
@@ -185,6 +186,50 @@ private object RoomManifestValidator {
         SnapshotReadFailure.METADATA_INVALID.takeUnless { manifest.hasBoundedShape() }
 }
 
+/**
+ * letta-mobile-827s9.4, review round 2 item 2: NORMALIZED head ownership.
+ *
+ * The normalized CAS previously compared revision only, so a different agent sharing a
+ * backend and conversation id could commit whenever its base revision happened to match --
+ * transferring ownership (the head's agent_id is written from the committing scope) or
+ * leaving a digest computed under one identity validated under another.
+ *
+ * Same rule as the legacy head guard and as `TimelineRepository.canAlias`'s intent: an
+ * unowned head may be adopted once, and thereafter only that agent may write it. A null
+ * requesting scope is treated as compatible so unscoped callers and bootstrap paths keep
+ * working, exactly as they do for reads.
+ */
+/**
+ * The complete normalized CAS precondition, as one named predicate.
+ *
+ * Both commit branches previously inlined the same conditional (revision matches, owner
+ * matches), which CodeScene flagged as complex and which made it easy for the branches to
+ * drift -- they had in fact already drifted once on the ownership half.
+ *
+ * A NULL head satisfies this at baseRevision 0: that is the bootstrap commit, which has no
+ * predecessor to compare against. NoOp additionally requires a head to be present -- there is
+ * nothing to no-op otherwise -- so it keeps that check at its call site rather than folding it
+ * in here and silently breaking bootstrap.
+ */
+internal fun NormalizedTimelineSnapshotHeadEntity?.acceptsCommitAt(
+    baseRevision: TimelineRevision,
+    scope: TimelineScope,
+): Boolean = (this?.revision ?: 0L) == baseRevision.value && ownedBy(scope)
+
+internal fun NormalizedTimelineSnapshotHeadEntity?.ownedBy(scope: TimelineScope): Boolean {
+    val owner = this?.agentId ?: return true
+    // Round 4: the `scope.agentId == null` leg was a hole, and I put it there deliberately
+    // "so unscoped callers keep working". It let an UNSCOPED writer mutate an OWNED head:
+    // Apply writes agentId = scope.agentId, clearing ownership outright, and NoOp recomputes
+    // the root under a null scope against an owned head, so the owner's later reads fail
+    // checksum. Adoption is legitimate only from an UNOWNED head (handled above); once a head
+    // has an owner, only that exact owner may write it.
+    //
+    // This now matches ownershipCompatibleWith for the legacy head, which already refused the
+    // scoped -> unscoped downgrade for the same reason. The two guards were inconsistent.
+    return owner == scope.agentId
+}
+
 internal fun ConfirmedTimelineSnapshotHeadMetadata.matches(scope: TimelineScope): Boolean =
     backendId == scope.backendId && conversationId == scope.conversationId && agentId == scope.agentId &&
         highWaterRevision >= 0L
@@ -237,3 +282,12 @@ internal fun ByteArray.toHex(): String = joinToString(separator = "") { byte -> 
 private const val MAX_SNAPSHOT_CHUNKS = 2048
 private const val SHA_256_HEX_LENGTH = 64
 private const val SHA_256 = "SHA-256"
+
+/**
+ * Legacy-head ownership: an UNOWNED head may be adopted, an owned one only by its owner.
+ *
+ * A null requesting agent is deliberately NOT allowed to take over an owned head -- that is the
+ * same asymmetry [ownedBy] enforces for the normalized head.
+ */
+internal fun ConfirmedTimelineSnapshotHeadMetadata.ownershipCompatibleWith(scope: TimelineScope): Boolean =
+    agentId == null || agentId == scope.agentId

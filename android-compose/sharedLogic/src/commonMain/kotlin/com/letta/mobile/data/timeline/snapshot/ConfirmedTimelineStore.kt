@@ -66,6 +66,15 @@ interface ConfirmedTimelineStore {
      * Write [envelope] atomically.
      * Returns `true` if written, `false` if rejected due to a stale revision.
      */
+    /**
+     * The revision NORMALIZED storage durably holds, or null when it is unknown/absent.
+     *
+     * Needed because a legacy fallback can succeed at revision N while normalized stays at
+     * N-1 -- reading the snapshot back cannot tell the two apart, since legacy serves N either
+     * way. Only this distinguishes "normalized caught up" from "normalized is stranded".
+     */
+    suspend fun normalizedHeadRevision(scope: TimelineScope): Long? = null
+
     suspend fun writeSnapshot(envelope: StoredTimelineEnvelope): Boolean
 
     /**
@@ -82,6 +91,56 @@ interface ConfirmedTimelineStore {
      * Prune older snapshots for [backendId] keeping at most [maxRetainedConversations].
      */
     suspend fun prune(backendId: String, maxRetainedConversations: Int)
+
+    /**
+     * Commit an incremental normalized-row [plan] describing the changed rows between the
+     * last durably acknowledged envelope and [fullEnvelope] (the fully-materialized target
+     * state, already built in memory by the caller at zero extra encode cost).
+     *
+     * Implementations that persist a normalized row store (Android Room) MUST override this
+     * with a real incremental transaction that touches only changed rows and performs no
+     * full-envelope [TimelineSnapshotCodec.encode] call for ordinary append/update/delete/
+     * cursor-only/no-op mutations — that is the whole point of this slice.
+     *
+     * The default below is a **compatibility shim only**. It reconstructs the target
+     * envelope (already fully available as [fullEnvelope], no extra encode) and delegates to
+     * [writeSnapshot]/[readSnapshot], so no-op/in-memory/Desktop/test stores keep working
+     * unmodified. It is intentionally NOT the fast path and must never be assumed to satisfy
+     * the production zero-full-encode requirement — only [RoomConfirmedTimelineStore]'s
+     * override does that.
+     */
+    suspend fun commitNormalized(
+        plan: NormalizedTimelineCommitPlan,
+        fullEnvelope: StoredTimelineEnvelope,
+        // Advisory checkpoint hint from the caller's legacy-v11 cadence policy (see
+        // TimelineSyncLoop.maybeCheckpointLegacyEnvelope). The default shim below already
+        // performs a full envelope write for every commit, so it ignores this; only an
+        // implementation whose ordinary commit path is otherwise incremental (Room) needs to
+        // act on it, by also staging a full v11 write when true, best-effort, without turning
+        // a checkpoint failure into a reported persistence failure.
+        checkpointLegacyEnvelope: Boolean = false,
+    ): NormalizedTimelineWriteResult = when (plan) {
+        is NormalizedTimelineCommitPlan.Invalid -> NormalizedTimelineWriteResult.Invalid(plan.reason)
+        is NormalizedTimelineCommitPlan.NoOp -> {
+            val target = fullEnvelope.copy(revision = plan.targetRevision.value, writtenAtMillis = plan.writtenAtMillis)
+            if (writeSnapshot(target)) {
+                NormalizedTimelineWriteResult.NoOp(plan.targetRevision)
+            } else {
+                NormalizedTimelineWriteResult.Stale(TimelineRevision(readSnapshot(plan.scope)?.revision ?: 0L))
+            }
+        }
+        is NormalizedTimelineCommitPlan.Apply -> {
+            val commit = plan.commit
+            val target = fullEnvelope.copy(revision = commit.targetRevision.value)
+            if (writeSnapshot(target)) {
+                NormalizedTimelineWriteResult.Committed(commit.targetRevision)
+            } else {
+                NormalizedTimelineWriteResult.Stale(
+                    TimelineRevision(readSnapshot(commit.metadata.scope)?.revision ?: 0L),
+                )
+            }
+        }
+    }
 }
 
 /**
