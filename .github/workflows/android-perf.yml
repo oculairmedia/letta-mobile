@@ -122,19 +122,19 @@ jobs:
             echo "retry=false" >> "$GITHUB_OUTPUT"
           else
             set +e
-            python3 perf/check_baselines.py "$PERF_OUTPUT_DIR" --retryable-single-cold-start-exit-code 3 --summary-json "$PERF_SUMMARY_DIR/attempt-1/perf-summary.json" --summary-md "$PERF_SUMMARY_DIR/attempt-1/perf-summary.md"
+            python3 perf/check_baselines.py "$PERF_OUTPUT_DIR" --retryable-single-startup-exit-code 3 --summary-json "$PERF_SUMMARY_DIR/attempt-1/perf-summary.json" --summary-md "$PERF_SUMMARY_DIR/attempt-1/perf-summary.md"
             status=$?
             set -e
             if [[ "$status" -eq 3 ]]; then
               echo "retry=true" >> "$GITHUB_OUTPUT"
-              echo "::warning::Cold startup exceeded the perf ceiling on attempt 1; rerunning once to distinguish emulator noise from a repeatable regression."
+              echo "::warning::Exactly one startup metric exceeded the perf ceiling on attempt 1; rerunning the complete suite once to distinguish emulator noise from a repeatable regression."
               exit 0
             fi
             echo "retry=false" >> "$GITHUB_OUTPUT"
             exit "$status"
           fi
 
-      - name: Rerun macrobenchmarks after retryable cold-start failure (attempt 2)
+      - name: Rerun macrobenchmarks after one retryable startup failure (attempt 2)
         if: steps.classify.outputs.run_benchmark == 'true' && steps.check_perf_attempt_1.outputs.retry == 'true'
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -150,7 +150,10 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
           working-directory: android-compose
           script: |
-            rm -rf "$PERF_OUTPUT_DIR" "$PERF_REPORT_DIR"; mkdir -p "$PERF_SUMMARY_DIR/attempt-2"
+            mkdir -p "$PERF_SUMMARY_DIR/attempt-1/results" "$PERF_SUMMARY_DIR/attempt-1/reports" "$PERF_SUMMARY_DIR/attempt-2"
+            cp -R "$PERF_OUTPUT_DIR"/. "$PERF_SUMMARY_DIR/attempt-1/results/"
+            if [[ -d "$PERF_REPORT_DIR" ]]; then cp -R "$PERF_REPORT_DIR"/. "$PERF_SUMMARY_DIR/attempt-1/reports/"; fi
+            rm -rf "$PERF_OUTPUT_DIR" "$PERF_REPORT_DIR"
             FILTER=$(printf '%s\n' "$PERF_BENCHMARK_FILTER" | awk 'NF { printf "%s,", $0 } END { print "" }' | sed 's/,$//'); ./gradlew :macrobenchmark:connectedBenchmarkAndroidTest -Pandroid.testInstrumentationRunnerArguments.class="$FILTER"
 
       - name: Check perf baselines after retry (attempt 2)

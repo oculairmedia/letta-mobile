@@ -12,7 +12,7 @@ class CheckBaselinesModule(Protocol):
         outputs_dir: pathlib.Path,
         rebaseline: bool,
         baselines_path: pathlib.Path = ...,
-        retryable_single_cold_start_exit_code: int | None = ...,
+        retryable_single_startup_exit_code: int | None = ...,
         summary_json_path: pathlib.Path | None = ...,
         summary_md_path: pathlib.Path | None = ...,
     ) -> int: ...
@@ -379,7 +379,7 @@ class CheckBaselinesTest(unittest.TestCase):
 
         self.assertEqual(result, 0)
 
-    def test_single_cold_start_regression_can_request_retry_exit_code(self) -> None:
+    def test_single_startup_regression_can_request_retry_exit_code(self) -> None:
         self.write_baselines(
             {
                 "startup.cold.p95_ms": {
@@ -418,10 +418,130 @@ class CheckBaselinesTest(unittest.TestCase):
             self.outputs_dir,
             rebaseline=False,
             baselines_path=self.baselines_path,
-            retryable_single_cold_start_exit_code=3,
+            retryable_single_startup_exit_code=3,
         )
 
         self.assertEqual(result, 3)
+
+    def test_single_warm_start_regression_can_request_retry_exit_code(self) -> None:
+        self.write_baselines(
+            {
+                "startup.cold.p95_ms": {
+                    "baseline": 100.0,
+                    "tolerance_pct": 10,
+                    "source": "StartupBenchmark.coldStartupCompilationPartial",
+                    "metric": "timeToInitialDisplayMs",
+                },
+                "startup.warm.p95_ms": {
+                    "baseline": 100.0,
+                    "tolerance_pct": 10,
+                    "source": "StartupBenchmark.warmStartup",
+                    "metric": "timeToInitialDisplayMs",
+                },
+            }
+        )
+        self.write_measurement(
+            make_benchmark(
+                "com.letta.mobile.macrobenchmark.StartupBenchmark",
+                "coldStartupCompilationPartial",
+                {"timeToInitialDisplayMs": {"P95": 90.0}},
+            ),
+            name="cold-benchmarkData.json",
+        )
+        self.write_measurement(
+            make_benchmark(
+                "com.letta.mobile.macrobenchmark.StartupBenchmark",
+                "warmStartup",
+                {"timeToInitialDisplayMs": {"P95": 120.0}},
+            ),
+            name="warm-benchmarkData.json",
+        )
+
+        result = check_baselines.check(
+            self.outputs_dir,
+            rebaseline=False,
+            baselines_path=self.baselines_path,
+            retryable_single_startup_exit_code=3,
+        )
+
+        self.assertEqual(result, 3)
+
+    def test_multiple_regressions_do_not_request_retry(self) -> None:
+        self.write_baselines(
+            {
+                "startup.cold.p95_ms": {
+                    "baseline": 100.0,
+                    "tolerance_pct": 10,
+                    "source": "StartupBenchmark.coldStartupCompilationPartial",
+                    "metric": "timeToInitialDisplayMs",
+                },
+                "startup.warm.p95_ms": {
+                    "baseline": 100.0,
+                    "tolerance_pct": 10,
+                    "source": "StartupBenchmark.warmStartup",
+                    "metric": "timeToInitialDisplayMs",
+                },
+            }
+        )
+        self.write_measurement(
+            make_benchmark(
+                "com.letta.mobile.macrobenchmark.StartupBenchmark",
+                "coldStartupCompilationPartial",
+                {"timeToInitialDisplayMs": {"P95": 120.0}},
+            ),
+            name="cold-benchmarkData.json",
+        )
+        self.write_measurement(
+            make_benchmark(
+                "com.letta.mobile.macrobenchmark.StartupBenchmark",
+                "warmStartup",
+                {"timeToInitialDisplayMs": {"P95": 120.0}},
+            ),
+            name="warm-benchmarkData.json",
+        )
+
+        result = check_baselines.check(
+            self.outputs_dir,
+            rebaseline=False,
+            baselines_path=self.baselines_path,
+            retryable_single_startup_exit_code=3,
+        )
+
+        self.assertEqual(result, 1)
+
+    def test_retryable_exit_does_not_override_missing_measurements(self) -> None:
+        self.write_baselines(
+            {
+                "startup.cold.p95_ms": {
+                    "baseline": 100.0,
+                    "tolerance_pct": 10,
+                    "source": "StartupBenchmark.coldStartupCompilationPartial",
+                    "metric": "timeToInitialDisplayMs",
+                },
+                "startup.warm.p95_ms": {
+                    "baseline": 100.0,
+                    "tolerance_pct": 10,
+                    "source": "StartupBenchmark.warmStartup",
+                    "metric": "timeToInitialDisplayMs",
+                },
+            }
+        )
+        self.write_measurement(
+            make_benchmark(
+                "com.letta.mobile.macrobenchmark.StartupBenchmark",
+                "coldStartupCompilationPartial",
+                {"timeToInitialDisplayMs": {"P95": 120.0}},
+            )
+        )
+
+        result = check_baselines.check(
+            self.outputs_dir,
+            rebaseline=False,
+            baselines_path=self.baselines_path,
+            retryable_single_startup_exit_code=3,
+        )
+
+        self.assertEqual(result, 2)
 
     def test_summary_files_include_diagnostics(self) -> None:
         self.write_baselines(
