@@ -30,6 +30,7 @@ import com.letta.mobile.data.timeline.snapshot.TimelineRevision
 import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineWriteResult
 import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineCommitPlan
 import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineCommitFailure
+import com.letta.mobile.data.timeline.snapshot.InMemoryConfirmedTimelineStore
 
 /**
  * letta-mobile-827s9.4: proves the *production* [TimelineSyncLoop] persistence path -- not a
@@ -252,8 +253,11 @@ class TimelineSyncLoopIncrementalPersistenceTest {
      */
     @Test
     fun aLongStreamedResponseYieldsABoundedCommitCount() = runTest {
-        val db = inMemoryDatabase()
-        val store = CountingStore(RoomConfirmedTimelineStore(db))
+        // In-memory for the same reason as the re-arm test: this asserts a LOOP property
+        // (commits stay bounded, and turnEnded alone persists the turn). Routing it through Room
+        // put a real Dispatchers.IO hop between the loop and the assertion, which is what made
+        // the sibling test flaky.
+        val store = CountingStore(InMemoryConfirmedTimelineStore())
         val scope = TimelineScope(backendId = "backend", conversationId = "conv-stream", agentId = "agent")
         val dispatcher = StandardTestDispatcher(testScheduler)
         val loop = newLoop(scope, store, dispatcher)
@@ -303,18 +307,8 @@ class TimelineSyncLoopIncrementalPersistenceTest {
         // Deliberately NOT flushSnapshotNow(): awaiting that suspend seam is what let the
         // missing turnEnded scheduling go unnoticed in the first place.
         var persistedEvents: Int? = null
-        // Budget deliberately generous: this settles a real Dispatchers.IO write, and a
-        // sibling test in this class stages 600 KiB payloads, so the shared dispatcher can be
-        // busy. The loop exits as soon as the expected state is observed, so a larger bound
-        // costs nothing when the write is quick -- it only stops a loaded run from failing on
-        // a deadline rather than on the property under test.
-        for (attempt in 0 until 1_000) {
-            advanceUntilIdle()
-            persistedEvents = store.readSnapshot(scope)?.events?.size
-            if (persistedEvents == 40) break
-            @Suppress("BlockingMethodInNonBlockingContext")
-            Thread.sleep(10)
-        }
+        advanceUntilIdle()
+        persistedEvents = store.readSnapshot(scope)?.events?.size
 
         assertEquals(
             "turnEnded alone must durably persist the completed turn",
@@ -403,8 +397,18 @@ class TimelineSyncLoopIncrementalPersistenceTest {
      */
     @Test
     fun theSafetyDeadlineReArmsAcrossSuccessiveWindows() = runTest {
-        val db = inMemoryDatabase()
-        val store = CountingStore(RoomConfirmedTimelineStore(db))
+        // Deterministic by construction. This test previously wrapped a real
+        // RoomConfirmedTimelineStore, whose commits hop to Room's own Dispatchers.IO -- work the
+        // test scheduler cannot drive. The assertions then raced that thread and the test failed
+        // INTERMITTENTLY under full-module load (observed at 40 of 81 events). Widening the poll
+        // budget only lowered the failure rate; it did not remove the race, so the budget is not
+        // the fix and is not relied on here.
+        //
+        // The property under test -- that the deadline re-arms across windows and the turn end
+        // persists everything -- is about the LOOP's scheduling, not about Room. With an
+        // in-memory store every hop stays on the test scheduler and the outcome is exact.
+        // Room's own durability is covered by RoomNormalizedIncrementalCommitTest.
+        val store = CountingStore(InMemoryConfirmedTimelineStore())
         val scope = TimelineScope(backendId = "backend", conversationId = "conv-rearm", agentId = "agent")
         val dispatcher = StandardTestDispatcher(testScheduler)
         val loop = newLoop(scope, store, dispatcher)
@@ -448,15 +452,14 @@ class TimelineSyncLoopIncrementalPersistenceTest {
         advanceTimeBy(100)
 
         loop.turnEnded(clean = true)
-        var persisted: Int? = null
-        for (attempt in 0 until 200) {
-            advanceUntilIdle()
-            persisted = store.readSnapshot(scope)?.events?.size
-            if (persisted == 81) break
-            @Suppress("BlockingMethodInNonBlockingContext")
-            Thread.sleep(10)
-        }
-        assertEquals("turn end must durably persist the whole turn", 81, persisted)
+        // No polling and no Thread.sleep: with an in-memory store every hop runs on the test
+        // scheduler, so draining it is sufficient and the result is exact rather than probable.
+        advanceUntilIdle()
+        assertEquals(
+            "turn end must durably persist the whole turn",
+            81,
+            store.readSnapshot(scope)?.events?.size,
+        )
         val afterTerminal = safetyFlushes(scope.conversationId)
 
         // A timer from the last armed window must not fire a post-terminal write.
@@ -585,7 +588,7 @@ class TimelineSyncLoopIncrementalPersistenceTest {
 
     /** Counts commit attempts that actually reach the store, and can force permanent Stale. */
     private class CountingStore(
-        private val delegate: RoomConfirmedTimelineStore,
+        private val delegate: com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore,
         private val alwaysStale: Boolean = false,
     ) : com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore by delegate {
         var commits: Int = 0
@@ -962,6 +965,85 @@ class TimelineSyncLoopIncrementalPersistenceTest {
         override suspend fun deleteSnapshot(scope: TimelineScope) { latest = null }
         override suspend fun clearForBackend(backendId: String) { latest = null }
         override suspend fun prune(backendId: String, maxRetainedConversations: Int) = Unit
+    }
+
+    /**
+     * Round 8 item 5: run and turn must actually correlate a write to its run.
+     *
+     * The device capture showed `runId=` and `turnId=` empty on EVERY persistence event,
+     * including while `turnActive=true`. The fields were declared and emitted but never
+     * assigned, so they were structurally guaranteed to be blank -- present in the schema and
+     * useless for attribution. The ids exist upstream on WsTimelineEvent.TurnStarted; they are
+     * now carried into the loop.
+     */
+    @Test
+    fun persistenceEventsCarryTheActiveRunAndTurn() = runTest {
+        val db = inMemoryDatabase()
+        val scope = TimelineScope(backendId = "backend", conversationId = "conv-identity", agentId = "agent")
+        val loop = newLoop(scope, RoomConfirmedTimelineStore(db), StandardTestDispatcher(testScheduler))
+
+        com.letta.mobile.util.Telemetry.clear()
+        loop.turnStarted(runId = "run-77", turnId = "turn-9")
+        loop.ingestStreamEvent(UserMessage(id = "m", date = FIXTURE_DATE, contentRaw = JsonPrimitive("hi")))
+        loop.turnEnded(clean = true)
+        advanceUntilIdle()
+
+        val events = com.letta.mobile.util.Telemetry.snapshot().filter {
+            it.name.startsWith("snapshotPersist.") && it.attrs["conversationId"] == scope.conversationId
+        }
+        assertTrue("the turn must have produced persistence events", events.isNotEmpty())
+        assertTrue(
+            "every persistence event in an active turn must name its run and turn -- " +
+                "blank fields here are the attribution gap seen on device",
+            events.all { it.attrs["runId"] == "run-77" && it.attrs["turnId"] == "turn-9" },
+        )
+        loop.closeAndJoin()
+    }
+
+    /**
+     * Round 8 item 3: one turn schedules one terminal write.
+     *
+     * ChatSendCoordinator ends a turn from two paths, so a single turn reached turnEnded twice
+     * ~41 ms apart on device and scheduled TURN_END twice. The second converged to an identical
+     * skip, so nothing was corrupted -- but it still cost a full O(N) plan over the timeline.
+     */
+    @Test
+    fun aTurnEndedTwiceSchedulesOnlyOneTerminalWrite() = runTest {
+        val db = inMemoryDatabase()
+        val scope = TimelineScope(backendId = "backend", conversationId = "conv-turnend", agentId = "agent")
+        val loop = newLoop(scope, RoomConfirmedTimelineStore(db), StandardTestDispatcher(testScheduler))
+
+        com.letta.mobile.util.Telemetry.clear()
+        loop.turnStarted(runId = "run-1", turnId = "turn-1")
+        loop.ingestStreamEvent(UserMessage(id = "m", date = FIXTURE_DATE, contentRaw = JsonPrimitive("hi")))
+        loop.turnEnded(clean = true)
+        loop.turnEnded(clean = false)
+        advanceUntilIdle()
+
+        assertEquals(
+            "a turn ended twice must still schedule exactly one terminal write",
+            1,
+            com.letta.mobile.util.Telemetry.snapshot().count {
+                it.name == "snapshotPersist.scheduled" &&
+                    it.attrs["reason"] == SnapshotPersistReason.TURN_END.name &&
+                    it.attrs["conversationId"] == scope.conversationId
+            },
+        )
+        // A NEW turn must still get its own terminal write.
+        loop.turnStarted(runId = "run-2", turnId = "turn-2")
+        loop.ingestStreamEvent(UserMessage(id = "m2", date = FIXTURE_DATE, contentRaw = JsonPrimitive("again")))
+        loop.turnEnded(clean = true)
+        advanceUntilIdle()
+        assertEquals(
+            "the guard must reset per turn, not silence every later turn",
+            2,
+            com.letta.mobile.util.Telemetry.snapshot().count {
+                it.name == "snapshotPersist.scheduled" &&
+                    it.attrs["reason"] == SnapshotPersistReason.TURN_END.name &&
+                    it.attrs["conversationId"] == scope.conversationId
+            },
+        )
+        loop.closeAndJoin()
     }
 
     private class OutcomeOverridingStore(

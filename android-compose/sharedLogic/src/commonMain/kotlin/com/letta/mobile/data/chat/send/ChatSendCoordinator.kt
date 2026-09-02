@@ -1095,7 +1095,9 @@ class ChatSendCoordinator(
         // letta-mobile-dangling-tool: a fresh turn on this conversation
         // supersedes whatever the previous turn's post-turn dangling-
         // tool-call sweep left pending.
-        runCatching { timelineRepository.turnStarted(agentId, event.conversationId) }
+        runCatching {
+            timelineRepository.turnStarted(agentId, event.conversationId, event.runId, event.turnId)
+        }
         runtimeEventBatcher.enqueue(event, event.conversationId)
         setActiveConversationId(event.conversationId)
         startTimelineObserver(event.conversationId)

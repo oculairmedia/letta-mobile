@@ -631,8 +631,8 @@ open class TimelineRepository(
     // supersede a pending sweep (turnStarted) and when to (re)schedule one
     // (turnEnded — unconditionally, regardless of clean; see Codex #902
     // review finding 3 / DanglingToolCallResolver.scheduleSweepIfUnresolved).
-    override suspend fun turnStarted(agentId: String?, conversationId: String) {
-        getOrCreate(agentId, conversationId).turnStarted()
+    override suspend fun turnStarted(agentId: String?, conversationId: String, runId: String?, turnId: String?) {
+        getOrCreate(agentId, conversationId).turnStarted(runId = runId, turnId = turnId)
     }
 
     override suspend fun turnEnded(agentId: String?, conversationId: String, clean: Boolean) {

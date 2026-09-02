@@ -117,6 +117,9 @@ class TimelineSyncLoop(
     // onStaleRejection). A detached loop still serves reads; it just stops writing.
     @Volatile
     private var detachedAsStaleWriter: Boolean = false
+
+    /** One turn schedules one terminal write, however many times turnEnded is called. */
+    private var turnEndScheduled: Boolean = false
     private val persistRequests = Channel<SnapshotPersistRequest>(Channel.CONFLATED)
     private val persistMutex = Mutex()
     private val persistJob: Job
@@ -655,8 +658,15 @@ class TimelineSyncLoop(
      * supersedes whatever the previous turn's sweep left pending — see
      * [DanglingToolCallResolver.cancelPendingSweep].
      */
-    suspend fun turnStarted() {
+    suspend fun turnStarted(runId: String? = null, turnId: String? = null) {
         turnActive = true
+        // Round 8 item 5: these were declared and emitted but never assigned, so runId/turnId
+        // were structurally guaranteed to be empty on every persistence event -- the fields
+        // existed and could never correlate a write to its run. The ids come from
+        // WsTimelineEvent.TurnStarted via TurnIdentityLifecycle; they are simply carried here.
+        currentRunId = runId
+        currentTurnId = turnId
+        turnEndScheduled = false
         deferredDuringTurn = false
         startTurnSafetyFlushTimer()
         danglingToolCallResolver.cancelPendingSweep()
@@ -734,7 +744,19 @@ class TimelineSyncLoop(
         // deferred stays memory-only until some unrelated trigger happens along -- the
         // deferral would be trading a real durability guarantee for frame rate, which is not
         // the bargain. Scheduled AFTER clearing turnActive so it is never itself deferred.
-        scheduleSnapshotPersist(SnapshotPersistReason.TURN_END)
+        // Round 8 item 3: ChatSendCoordinator ends a turn from two paths (bridge status and
+        // the failure/cleanup route), so a single turn reached here twice and scheduled TURN_END
+        // twice ~41 ms apart on device. The second converged to an identical skip, but it still
+        // cost a full O(N) plan. One turn schedules one terminal write.
+        val alreadyEnded = turnEndScheduled
+        turnEndScheduled = true
+        if (alreadyEnded) {
+            Telemetry.event("TimelineSync", "snapshotPersist.duplicateTurnEndSkipped", *identityAttrs())
+        } else {
+            scheduleSnapshotPersist(SnapshotPersistReason.TURN_END)
+        }
+        // The sweep stays unconditional: it is idempotent and the second call may carry a
+        // different `clean`.
         danglingToolCallResolver.scheduleSweepIfUnresolved(clean)
     }
 

@@ -76,7 +76,7 @@ interface TimelineExternalTransportWriter {
      * turn's sweep left pending. Default no-op so existing fakes compile
      * unchanged.
      */
-    suspend fun turnStarted(agentId: String?, conversationId: String) {}
+    suspend fun turnStarted(agentId: String?, conversationId: String, runId: String? = null, turnId: String? = null) {}
 
     /**
      * letta-mobile-dangling-tool: signals that a turn ended on
