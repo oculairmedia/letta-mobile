@@ -94,12 +94,9 @@ class TimelineSyncLoop(
     // Legacy v11 checkpoint cadence: write a full envelope (readable by rollback/older builds)
     // every LEGACY_CHECKPOINT_INTERVAL successful normalized commits, plus always on the very
     // first commit for a scope. Bounds legacy staleness to at most that many revisions.
-    // A reopened normalized baseline has already passed the first-commit checkpoint. Start its
-    // cadence after that checkpoint so the first ordinary post-restart mutation stays incremental.
-    private var commitsSinceLegacyCheckpoint: Int = initialPersistedEnvelope
-        ?.takeIf { it.revision > 0L }
-        ?.let { LEGACY_CHECKPOINT_INTERVAL - 1 }
-        ?: 0
+    // A reopened normalized baseline has already passed the first-commit checkpoint. Start a
+    // fresh interval so the first ordinary post-restart mutation stays incremental.
+    private var commitsSinceLegacyCheckpoint: Int = 0
     // Set when a persist was suppressed during an active turn, so the per-turn safety timer
     // only writes when there is actually something deferred to write.
     @Volatile

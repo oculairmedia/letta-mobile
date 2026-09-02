@@ -5,8 +5,10 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.letta.mobile.data.local.LettaDatabase
 import com.letta.mobile.data.local.RoomConfirmedTimelineStore
+import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
+import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -110,6 +112,80 @@ class TimelineSyncLoopIncrementalPersistenceTest {
         assertEquals(11, persisted?.events?.size)
         assertTrue(dao.getNormalizedRowDigestProjection(scope.backendId, scope.conversationId).size == 11)
 
+        loop.closeAndJoin()
+    }
+
+    /**
+     * Exercises the full processor -> loop -> Room path at production history size. The
+     * reopened loop receives one ordinary stream update and must use its persisted baseline,
+     * producing a bounded delta plan rather than re-encoding the 2k-row timeline.
+     */
+    @Test
+    fun reopenedTwoThousandRowTimelineWritesADeltaWithBoundedWorkAndCursorMetadata() = runTest {
+        val db = inMemoryDatabase()
+        val scope = TimelineScope(backendId = "backend", conversationId = "conv-2k-reopen", agentId = "agent")
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val initial = newLoop(scope, RoomConfirmedTimelineStore(db), dispatcher)
+
+        repeat(2_000) { index ->
+            initial.ingestStreamEvent(UserMessage(id = "seed-$index", date = FIXTURE_DATE, contentRaw = JsonPrimitive("seed $index")))
+        }
+        initial.flushSnapshotNow()
+        advanceUntilIdle()
+        initial.closeAndJoin()
+
+        val persisted = RoomConfirmedTimelineStore(db).readSnapshot(scope)
+        assertNotNull(persisted)
+        val reopened = TimelineSyncLoop(
+            messageApi = FakeSyncApi().let(::MessageApiTimelineTransport),
+            conversationId = scope.conversationId,
+            agentId = scope.agentId,
+            scope = CoroutineScope(dispatcher),
+            startStreamSubscriber = false,
+            confirmedTimelineStore = RoomConfirmedTimelineStore(db),
+            timelineScope = scope,
+            initialTimeline = TimelineSnapshotCodec.storedEnvelopeToTimeline(requireNotNull(persisted)),
+            initialRevision = requireNotNull(persisted).revision,
+            initialPersistedEnvelope = persisted,
+            ioDispatcher = dispatcher,
+        )
+
+        com.letta.mobile.util.Telemetry.clear()
+        reopened.ingestStreamEvent(UserMessage(id = "seed-1999", date = FIXTURE_DATE, contentRaw = JsonPrimitive("updated"), seqId = 2_001))
+        reopened.flushSnapshotNow()
+        advanceUntilIdle()
+
+        val decision = com.letta.mobile.util.Telemetry.snapshot().last {
+            it.name == "snapshotPersist.planningDecision" && it.attrs["conversationId"] == scope.conversationId
+        }
+        assertEquals("delta", decision.attrs["planningMode"])
+        assertEquals("delta", decision.attrs["reason"])
+        assertEquals("1", decision.attrs["comparisonEvents"].toString())
+        assertEquals("1", decision.attrs["encodedRows"].toString())
+        assertEquals(2_000, RoomConfirmedTimelineStore(db).readSnapshot(scope)?.events?.size)
+
+        reopened.closeAndJoin()
+    }
+
+    /** Delete deltas are deliberately rejected until persisted ranks make ordering exact. */
+    @Test
+    fun deleteFallsBackWithExplicitRankedOrderReason() = runTest {
+        val db = inMemoryDatabase()
+        val scope = TimelineScope(backendId = "backend", conversationId = "conv-delete-fallback", agentId = "agent")
+        val loop = newLoop(scope, RoomConfirmedTimelineStore(db), StandardTestDispatcher(testScheduler))
+        loop.ingestStreamEvent(AssistantMessage(id = "assistant", date = FIXTURE_DATE, contentRaw = JsonPrimitive("partial"), runId = "run-delete", seqId = 1))
+        loop.flushSnapshotNow()
+        advanceUntilIdle()
+
+        com.letta.mobile.util.Telemetry.clear()
+        val removed = loop.cleanupAbandonedAssistantFragments("run-delete", null, "test")
+        loop.flushSnapshotNow()
+        advanceUntilIdle()
+        assertEquals(1, removed)
+        val decision = com.letta.mobile.util.Telemetry.snapshot().last {
+            it.name == "snapshotPersist.planningDecision" && it.attrs["conversationId"] == scope.conversationId
+        }
+        assertEquals("delete_requires_ranked_order", decision.attrs["reason"])
         loop.closeAndJoin()
     }
 
