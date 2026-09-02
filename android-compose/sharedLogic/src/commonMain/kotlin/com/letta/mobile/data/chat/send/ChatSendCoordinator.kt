@@ -1367,8 +1367,15 @@ class ChatSendCoordinator(
         val deadTurn = status is BridgeTurnStatus.Failed && terminalNotice != null
         // Skip abandoned-fragment cleanup for delivered-then-failed turns: a
         // legitimate short reply (e.g. "OK") must not be purged before we
-        // classify the failure as aux-only.
-        if (status is BridgeTurnStatus.Cancelled || (status is BridgeTurnStatus.Failed && deadTurn)) {
+        // classify the failure as aux-only. An Iroh synthetic terminal is the
+        // exception: it may name a placeholder while already-observed assistant
+        // fragments use the promoted App Server run id, so both identities must
+        // be cleaned before the terminal is allowed to finish.
+        val syntheticTerminalRun = IROH_SYNTHETIC_RUN_ID_PREFIXES.any(runId::startsWith)
+        if (
+            status is BridgeTurnStatus.Cancelled ||
+            (status is BridgeTurnStatus.Failed && (deadTurn || syntheticTerminalRun))
+        ) {
             cleanupAbandonedAssistantFragmentsSafely(
                 conversationId = conversationId,
                 runId = runId,
