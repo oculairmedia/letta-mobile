@@ -23,6 +23,7 @@ sealed interface TimelineProcessorAck {
     data class Applied(
         override val sequence: Long,
         val result: TimelineReductionResult,
+        val persistenceDelta: TimelineMutationDelta = TimelineMutationDelta.None,
     ) : TimelineProcessorAck
 
     data class Rejected(
@@ -92,6 +93,7 @@ class TimelineProcessor(
     scope: CoroutineScope,
     private val reducer: (TimelineReducerState, TimelineMutation) -> TimelineReduction = ::reduceProductionMutation,
     private val effectHandler: suspend (TimelineReductionEffect) -> Unit = {},
+    private val onStateCommitted: (Long, TimelineMutationDelta) -> Unit = { _, _ -> },
     mailboxCapacity: Int = DEFAULT_MAILBOX_CAPACITY,
 ) {
     private val capacity = mailboxCapacity.also { require(it > 0) { "mailboxCapacity must be positive" } }
@@ -213,6 +215,7 @@ class TimelineProcessor(
             next = reduced.next.copy(lastAppliedMutationSequence = sequence.value),
         )
         _state.value = committed.next
+        onStateCommitted(sequence.value, committed.persistenceDelta)
         return PreparedMutation.Committed(committed)
     }
 
@@ -226,7 +229,13 @@ class TimelineProcessor(
             request.ack.complete(failure)
             return
         }
-        request.ack.complete(TimelineProcessorAck.Applied(sequence.value, committed.result))
+        request.ack.complete(
+            TimelineProcessorAck.Applied(
+                sequence = sequence.value,
+                result = committed.result,
+                persistenceDelta = committed.persistenceDelta,
+            ),
+        )
     }
 
     private suspend fun runEffect(

@@ -1,33 +1,60 @@
 package com.letta.mobile.data.local
 
-import android.content.Context
-import androidx.room.Room
-import androidx.sqlite.db.SupportSQLiteDatabase
-import androidx.sqlite.db.SupportSQLiteOpenHelper
-import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
-import androidx.test.core.app.ApplicationProvider
-import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineReadResult
-import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineCommitFailure
-import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineCommitPlan
-import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineCommitPlanner
-import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineWriteResult
-import com.letta.mobile.data.timeline.snapshot.SnapshotReadFailure
-import com.letta.mobile.data.timeline.snapshot.StoredTimelineEnvelope
-import com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent
-import com.letta.mobile.data.timeline.snapshot.TimelineScope
-import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.runTest
-import org.junit.After
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
-import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
+import android.content.Context
+
+import androidx.room.Room
+
+import androidx.sqlite.db.SupportSQLiteDatabase
+
+import androidx.sqlite.db.SupportSQLiteOpenHelper
+
+import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
+
+import androidx.test.core.app.ApplicationProvider
+
+import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineReadResult
+
+import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineCommitFailure
+
+import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineCommitPlan
+
+import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineCommitPlanner
+
+import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineWriteResult
+
+import com.letta.mobile.data.timeline.snapshot.SnapshotReadFailure
+
+import com.letta.mobile.data.timeline.snapshot.StoredTimelineEnvelope
+
+import com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent
+
+import com.letta.mobile.data.timeline.snapshot.TimelineScope
+
+import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
+
+import kotlinx.coroutines.CancellationException
+
+
+import kotlinx.coroutines.runBlocking
+
+import org.junit.After
+
+import org.junit.Assert.assertEquals
+
+import org.junit.Assert.assertFalse
+
+import org.junit.Assert.assertNotNull
+
+import org.junit.Assert.assertNull
+
+import org.junit.Assert.assertTrue
+
+import org.junit.Test
+
+import org.junit.runner.RunWith
+
+import org.robolectric.RobolectricTestRunner
+
 import org.robolectric.annotation.Config
 
 /**
@@ -40,7 +67,6 @@ import org.robolectric.annotation.Config
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], manifest = Config.NONE)
-@OptIn(ExperimentalCoroutinesApi::class)
 class RoomNormalizedIncrementalCommitTest {
     private var database: LettaDatabase? = null
 
@@ -59,7 +85,7 @@ class RoomNormalizedIncrementalCommitTest {
     }
 
     @Test
-    fun initialNormalizedCommitAppliesWithoutAnyLegacyWrite() = runTest {
+    fun initialNormalizedCommitAppliesWithoutAnyLegacyWrite() = runBlocking {
         val db = inMemoryDatabase()
         val store = RoomConfirmedTimelineStore(db)
         val scope = TimelineScope("normalized", "initial-commit", "agent")
@@ -73,7 +99,7 @@ class RoomNormalizedIncrementalCommitTest {
     }
 
     @Test
-    fun oneEventAppendCommitsWithoutGrowingLegacyManifestCount() = runTest {
+    fun oneEventAppendCommitsWithoutGrowingLegacyManifestCount() = runBlocking {
         val db = inMemoryDatabase()
         val store = RoomConfirmedTimelineStore(db)
         val scope = TimelineScope("normalized", "append", "agent")
@@ -96,7 +122,53 @@ class RoomNormalizedIncrementalCommitTest {
     }
 
     @Test
-    fun oneEventContentUpdateTouchesOnlyThatRow() = runTest {
+    fun twoThousandRowAppendUsesCompactDigestChainAndReadsWithFullIntegrityVerification() = runBlocking {
+        val db = inMemoryDatabase()
+        val store = RoomConfirmedTimelineStore(db)
+        val scope = TimelineScope("normalized", "two-thousand-append", "agent")
+        val initialEvents = List(2_000, ::event)
+        val v1 = StoredTimelineEnvelope(scope = scope, revision = 1L, events = initialEvents)
+        assertTrue(store.commitNormalized(plan(null, v1), v1) is NormalizedTimelineWriteResult.Committed)
+        val headBefore = requireNotNull(db.confirmedTimelineSnapshotDao().getNormalizedHead(scope.backendId, scope.conversationId))
+        assertTrue(headBefore.rowDigest.startsWith(CHAIN_ROW_DIGEST_PREFIX))
+
+        val appended = event(2_000)
+        val v2 = v1.copy(revision = 2L, events = initialEvents + appended)
+        val appendPlan = plan(v1, v2) as NormalizedTimelineCommitPlan.Apply
+        assertEquals(1, appendPlan.commit.upserts.size)
+        assertEquals(1, appendPlan.commit.encodedRows)
+        assertTrue(store.commitNormalized(appendPlan, v2) is NormalizedTimelineWriteResult.Committed)
+
+        val headAfter = requireNotNull(db.confirmedTimelineSnapshotDao().getNormalizedHead(scope.backendId, scope.conversationId))
+        assertEquals(2_001, headAfter.rowCount)
+        assertTrue(headAfter.rowDigest.startsWith(CHAIN_ROW_DIGEST_PREFIX))
+        assertFalse(headBefore.rowDigest == headAfter.rowDigest)
+        assertEquals(v2, store.readSnapshot(scope))
+
+        // Fail-on-revert integrity guard: even though the write used only the appended row,
+        // read verification must still reject corruption in an untouched historical row.
+        val historical = db.confirmedTimelineSnapshotDao()
+            .getNormalizedRows(scope.backendId, scope.conversationId)
+            .first()
+        db.confirmedTimelineSnapshotDao().deleteNormalizedRow(
+            scope.backendId,
+            scope.conversationId,
+            historical.identityPrimary,
+            historical.identitySecondary,
+        )
+        db.confirmedTimelineSnapshotDao().upsertNormalizedRows(
+            listOf(historical.copy(checksum = "0".repeat(64))),
+        )
+        val corruptRead = store.readSnapshotResult(scope)
+        assertTrue(corruptRead is ConfirmedTimelineReadResult.ReconciliationRequired)
+        assertEquals(
+            SnapshotReadFailure.CHECKSUM_MISMATCH,
+            (corruptRead as ConfirmedTimelineReadResult.ReconciliationRequired).failure,
+        )
+    }
+
+    @Test
+    fun oneEventContentUpdateTouchesOnlyThatRow() = runBlocking {
         val db = inMemoryDatabase()
         val store = RoomConfirmedTimelineStore(db)
         val scope = TimelineScope("normalized", "update", "agent")
@@ -113,7 +185,7 @@ class RoomNormalizedIncrementalCommitTest {
     }
 
     @Test
-    fun deleteRemovesRowSymmetricallyFromNormalizedStorage() = runTest {
+    fun deleteRemovesRowSymmetricallyFromNormalizedStorage() = runBlocking {
         val db = inMemoryDatabase()
         val store = RoomConfirmedTimelineStore(db)
         val scope = TimelineScope("normalized", "delete", "agent")
@@ -129,7 +201,7 @@ class RoomNormalizedIncrementalCommitTest {
     }
 
     @Test
-    fun reorderUpdatesAffectedRowOrdersAndRootDigest() = runTest {
+    fun reorderUpdatesAffectedRowOrdersAndRootDigest() = runBlocking {
         val db = inMemoryDatabase()
         val store = RoomConfirmedTimelineStore(db)
         val scope = TimelineScope("normalized", "reorder", "agent")
@@ -147,7 +219,7 @@ class RoomNormalizedIncrementalCommitTest {
     }
 
     @Test
-    fun cursorOnlyMetadataUpdateWritesNoRows() = runTest {
+    fun cursorOnlyMetadataUpdateWritesNoRows() = runBlocking {
         val db = inMemoryDatabase()
         val store = RoomConfirmedTimelineStore(db)
         val scope = TimelineScope("normalized", "cursor-only", "agent")
@@ -173,7 +245,7 @@ class RoomNormalizedIncrementalCommitTest {
     }
 
     @Test
-    fun noOpRevisionAdvanceWritesZeroRowsThenAcceptsAChangedCommitAfterward() = runTest {
+    fun noOpRevisionAdvanceWritesZeroRowsThenAcceptsAChangedCommitAfterward() = runBlocking {
         val db = inMemoryDatabase()
         val store = RoomConfirmedTimelineStore(db)
         val scope = TimelineScope("normalized", "no-op-then-change", "agent")
@@ -202,7 +274,7 @@ class RoomNormalizedIncrementalCommitTest {
     }
 
     @Test
-    fun staleConcurrentWriterIsRejectedWithoutMutatingRowsOrHead() = runTest {
+    fun staleConcurrentWriterIsRejectedWithoutMutatingRowsOrHead() = runBlocking {
         val db = inMemoryDatabase()
         val store = RoomConfirmedTimelineStore(db)
         val scope = TimelineScope("normalized", "stale-writer", "agent")
@@ -225,7 +297,7 @@ class RoomNormalizedIncrementalCommitTest {
     }
 
     @Test
-    fun oversizedRowFailsClosedAndNeverEntersNormalizedStorage() = runTest {
+    fun oversizedRowFailsClosedAndNeverEntersNormalizedStorage() = runBlocking {
         val db = inMemoryDatabase()
         val store = RoomConfirmedTimelineStore(db)
         val scope = TimelineScope("normalized", "oversized", "agent")
@@ -245,7 +317,7 @@ class RoomNormalizedIncrementalCommitTest {
     }
 
     @Test
-    fun corruptedRowAfterIncrementalCommitFailsClosedOnRead() = runTest {
+    fun corruptedRowAfterIncrementalCommitFailsClosedOnRead() = runBlocking {
         val db = inMemoryDatabase()
         val store = RoomConfirmedTimelineStore(db)
         val scope = TimelineScope("normalized", "corrupt-after-commit", "agent")
@@ -265,7 +337,7 @@ class RoomNormalizedIncrementalCommitTest {
     }
 
     @Test
-    fun cancellationDuringIncrementalCommitRowMutationRollsBackRowsAndHead() = runTest {
+    fun cancellationDuringIncrementalCommitRowMutationRollsBackRowsAndHead() = runBlocking {
         val db = inMemoryDatabase()
         val scope = TimelineScope("normalized", "cancelled-commit", "agent")
         val writer = RoomConfirmedTimelineStore(db)
@@ -291,7 +363,7 @@ class RoomNormalizedIncrementalCommitTest {
     }
 
     @Test
-    fun pruneRemovesNormalizedRowsWrittenIncrementallyForDroppedConversation() = runTest {
+    fun pruneRemovesNormalizedRowsWrittenIncrementallyForDroppedConversation() = runBlocking {
         val db = inMemoryDatabase()
         val store = RoomConfirmedTimelineStore(db)
         val retained = TimelineScope("normalized", "retained-incremental", "agent")
@@ -309,7 +381,7 @@ class RoomNormalizedIncrementalCommitTest {
     }
 
     @Test
-    fun legacyCheckpointFailureDoesNotDowngradeAnAlreadyDurableCommit() = runTest {
+    fun legacyCheckpointFailureDoesNotDowngradeAnAlreadyDurableCommit() = runBlocking {
         val db = inMemoryDatabase()
         val scope = TimelineScope("normalized", "checkpoint-failure", "agent")
         val v1 = StoredTimelineEnvelope(scope = scope, revision = 1L, events = listOf(event(0)))

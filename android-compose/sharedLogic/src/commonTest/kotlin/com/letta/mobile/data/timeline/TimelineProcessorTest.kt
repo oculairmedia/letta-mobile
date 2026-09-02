@@ -457,6 +457,7 @@ class TimelineProcessorTest {
         assertEquals(processor.state.value.timeline, timeline.value)
         assertEquals(listOf("projected"), timeline.value.events.map { it.otid })
         assertEquals(listOf(timeline.value), timeline.replayCache)
+        processor.closeAndJoin()
     }
 
     @Test

@@ -170,6 +170,14 @@ object NormalizedTimelineCommitPlanner {
         return rows
     }
 
+    internal fun rowKey(event: StoredTimelineEvent): TimelineEventRowKey? {
+        val summary = TimelineSnapshotMutationCharacterizer.summarize(
+            StoredTimelineEnvelope(scope = INTERNAL_SCOPE, revision = 1L, events = listOf(event)),
+        ).events.single()
+        return TimelineEventRowKey(summary.identityPrimary, summary.identitySecondary)
+            .takeUnless { it.identityPrimary == 0L && it.identitySecondary == 0L }
+    }
+
     private fun metadata(envelope: StoredTimelineEnvelope) = TimelineCommitMetadata(
         schemaVersion = envelope.schemaVersion,
         scope = envelope.scope,

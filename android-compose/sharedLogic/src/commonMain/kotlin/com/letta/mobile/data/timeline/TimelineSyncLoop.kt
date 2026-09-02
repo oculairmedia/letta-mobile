@@ -9,10 +9,12 @@ import com.letta.mobile.data.timeline.snapshot.NoOpConfirmedTimelineStore
 import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineCommitPlan
 import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineCommitPlanner
 import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineWriteResult
+import com.letta.mobile.data.timeline.snapshot.toStorageValue
 import com.letta.mobile.data.timeline.snapshot.StoredTimelineEnvelope
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
 import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotMutationCharacterizer
+import com.letta.mobile.data.timeline.snapshot.TimelineIncrementalSnapshotPlanner
 import com.letta.mobile.data.timeline.snapshot.SnapshotStructuralSummary
 import kotlin.concurrent.Volatile
 import kotlin.time.Duration.Companion.milliseconds
@@ -129,6 +131,7 @@ class TimelineSyncLoop(
     private val seenStreamMessageLock = SynchronizedObject()
     private val seenStreamMessageKeys = ArrayDeque<String>()
     private val seenStreamMessageKeySet = mutableSetOf<String>()
+    private val pendingPersistenceDelta = PendingTimelinePersistenceDelta()
 
     private val ingestNotificationDispatcher = TimelineIngestNotificationDispatcher(
         conversationId = conversationId,
@@ -241,6 +244,25 @@ class TimelineSyncLoop(
     private suspend fun persistCurrentSnapshot(snapshotScope: TimelineScope, prune: Boolean) {
         // Capture one immutable processor commit so content and sequence cannot race.
         val committedState = timelineProcessor.state.value
+        val capturedDelta = pendingPersistenceDelta.snapshot()
+        val incremental = if (lastPersistedEnvelope != null && !capturedDelta.isEmpty) {
+            TimelineIncrementalSnapshotPlanner.plan(
+                timeline = committedState.timeline,
+                scope = snapshotScope,
+                baseRevision = requireNotNull(lastPersistedEnvelope).revision,
+                targetRevision = snapshotRevision + 1,
+                writtenAtMillis = timelineCurrentTimeMillis(),
+                delta = capturedDelta,
+            )
+        } else {
+            TimelineIncrementalSnapshotPlanner.Result.FullScan(
+                if (lastPersistedEnvelope == null) "baseline_missing" else "delta_empty",
+            )
+        }
+        if (incremental is TimelineIncrementalSnapshotPlanner.Result.Planned && !isLegacyCheckpointDue(incremental.plan)) {
+            persistIncrementalSnapshot(snapshotScope, committedState.timeline, capturedDelta, incremental, prune)
+            return
+        }
         val (provisionalEnvelope, fingerprint) = withContext(ioDispatcher) {
             val envelope = TimelineSnapshotCodec.timelineToStoredEnvelope(
                 timeline = committedState.timeline,
@@ -283,7 +305,10 @@ class TimelineSyncLoop(
                 when (result) {
                     is NormalizedTimelineWriteResult.Committed, is NormalizedTimelineWriteResult.NoOp ->
                         onDurableCommit(
-                            DurableCommitOutcome(result, envelope, revision, fingerprint, checkpointDue, durationMs),
+                            DurableCommitOutcome(
+                                result, envelope, revision, fingerprint, checkpointDue, durationMs,
+                                capturedDelta.throughSequence,
+                            ),
                         )
                     is NormalizedTimelineWriteResult.Stale -> onStaleRejection(result, revision)
                     is NormalizedTimelineWriteResult.Invalid ->
@@ -301,6 +326,64 @@ class TimelineSyncLoop(
                 "conversationId" to conversationId,
                 "revision" to revision,
             )
+        }
+    }
+
+    private suspend fun persistIncrementalSnapshot(
+        snapshotScope: TimelineScope,
+        timeline: Timeline,
+        capturedDelta: PendingTimelinePersistenceDelta.Snapshot,
+        incremental: TimelineIncrementalSnapshotPlanner.Result.Planned,
+        prune: Boolean,
+    ) {
+        val revision = snapshotRevision + 1
+        val startedAtMs = timelineCurrentTimeMillis()
+        val metadataEnvelope = StoredTimelineEnvelope(
+            scope = snapshotScope,
+            revision = revision,
+            liveCursor = timeline.liveCursor,
+            backfillCursor = timeline.backfillCursor,
+            releasedOlderCount = timeline.releasedOlderCount,
+            writtenAtMillis = startedAtMs,
+        )
+        try {
+            withContext(ioDispatcher + NonCancellable) {
+                when (val result = confirmedTimelineStore.commitNormalized(incremental.plan, metadataEnvelope, false)) {
+                    is NormalizedTimelineWriteResult.Committed, is NormalizedTimelineWriteResult.NoOp -> {
+                        val durationMs = timelineCurrentTimeMillis() - startedAtMs
+                        consecutiveStaleRejections = 0
+                        snapshotRevision = revision
+                        pendingPersistenceDelta.acknowledge(capturedDelta.throughSequence)
+                        commitsSinceLegacyCheckpoint += 1
+                        Telemetry.event(
+                            "TimelineSync", "snapshotPersist.written",
+                            *identityAttrs(),
+                            "revision" to revision,
+                            "eventCount" to timeline.events.count { it is TimelineEvent.Confirmed },
+                            "durationMs" to durationMs,
+                            "committed" to (result is NormalizedTimelineWriteResult.Committed),
+                            "planningMode" to "delta",
+                            "dirtyIdentities" to capturedDelta.dirtyIdentityCount,
+                            "rowPayloadsEncoded" to incremental.changedEvents.size,
+                            "fullEnvelopeEncodes" to 0,
+                        )
+                    }
+                    is NormalizedTimelineWriteResult.Stale -> onStaleRejection(result, revision)
+                    is NormalizedTimelineWriteResult.Invalid -> {
+                        Telemetry.event(
+                            "TimelineSync", "snapshotPersist.deltaInvalid",
+                            *identityAttrs(),
+                            "reason" to result.reason.toStorageValue(),
+                            level = Telemetry.Level.WARN,
+                        )
+                    }
+                }
+                if (prune) confirmedTimelineStore.prune(snapshotScope.backendId, MAX_RETAINED_SNAPSHOTS)
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Throwable) {
+            Telemetry.error("TimelineSync", "snapshotPersist.failed", error, "conversationId" to conversationId, "revision" to revision)
         }
     }
 
@@ -390,11 +473,12 @@ class TimelineSyncLoop(
      * [persistCurrentSnapshot] for why nothing above this point may mutate them.
      */
     private fun onDurableCommit(outcome: DurableCommitOutcome) {
-        val (result, envelope, revision, fingerprint, checkpointDue, durationMs) = outcome
+        val (result, envelope, revision, fingerprint, checkpointDue, durationMs, acknowledgedSequence) = outcome
         consecutiveStaleRejections = 0
         snapshotRevision = revision
         lastPersistedFingerprint = fingerprint
         lastPersistedEnvelope = envelope
+        pendingPersistenceDelta.acknowledge(acknowledgedSequence)
         recordSuccessfulSnapshotMutation(envelope, revision)
         commitsSinceLegacyCheckpoint = if (checkpointDue) 0 else commitsSinceLegacyCheckpoint + 1
         Telemetry.event(
@@ -563,6 +647,7 @@ class TimelineSyncLoop(
                 is TimelineReductionEffect.AdvanceCursor -> Unit
             }
         },
+        onStateCommitted = pendingPersistenceDelta::merge,
     )
 
     val state: StateFlow<Timeline> = timelineProcessor.timeline
@@ -1127,6 +1212,7 @@ class TimelineSyncLoop(
         val fingerprint: Long,
         val checkpointDue: Boolean,
         val durationMs: Long,
+        val acknowledgedSequence: Long,
     )
 
     private enum class SnapshotPersistRequest {
