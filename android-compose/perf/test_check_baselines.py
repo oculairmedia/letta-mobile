@@ -448,46 +448,32 @@ class CheckBaselinesTest(unittest.TestCase):
     def test_retryable_exit_code_accepts_valid_status(self) -> None:
         self.assertEqual(check_baselines._retryable_exit_code("3"), 3)
 
-    def test_single_startup_regression_can_request_retry_exit_code(self) -> None:
-        self.write_startup_retry_case(
-            cold_observed=120.0,
-            warm_observed=100.0,
-            warm_baseline=50.0,
-            warm_gate=False,
+    def test_startup_regression_retry_exit_code_scenarios(self) -> None:
+        scenarios = (
+            (
+                "isolated-cold",
+                {
+                    "cold_observed": 120.0,
+                    "warm_observed": 100.0,
+                    "warm_baseline": 50.0,
+                    "warm_gate": False,
+                },
+                3,
+            ),
+            ("isolated-warm", {"cold_observed": 90.0, "warm_observed": 120.0}, 3),
+            ("both-regress", {"cold_observed": 120.0, "warm_observed": 120.0}, 1),
         )
 
-        result = check_baselines.check(
-            self.outputs_dir,
-            rebaseline=False,
-            baselines_path=self.baselines_path,
-            retryable_single_startup_exit_code=3,
-        )
-
-        self.assertEqual(result, 3)
-
-    def test_single_warm_start_regression_can_request_retry_exit_code(self) -> None:
-        self.write_startup_retry_case(cold_observed=90.0, warm_observed=120.0)
-
-        result = check_baselines.check(
-            self.outputs_dir,
-            rebaseline=False,
-            baselines_path=self.baselines_path,
-            retryable_single_startup_exit_code=3,
-        )
-
-        self.assertEqual(result, 3)
-
-    def test_multiple_regressions_do_not_request_retry(self) -> None:
-        self.write_startup_retry_case(cold_observed=120.0, warm_observed=120.0)
-
-        result = check_baselines.check(
-            self.outputs_dir,
-            rebaseline=False,
-            baselines_path=self.baselines_path,
-            retryable_single_startup_exit_code=3,
-        )
-
-        self.assertEqual(result, 1)
+        for name, case, expected_exit_code in scenarios:
+            with self.subTest(scenario=name):
+                self.write_startup_retry_case(**case)
+                result = check_baselines.check(
+                    self.outputs_dir,
+                    rebaseline=False,
+                    baselines_path=self.baselines_path,
+                    retryable_single_startup_exit_code=3,
+                )
+                self.assertEqual(result, expected_exit_code)
 
     def test_retryable_exit_does_not_override_missing_measurements(self) -> None:
         self.write_startup_retry_case(cold_observed=120.0, warm_observed=None)
