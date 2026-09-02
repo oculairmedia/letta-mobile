@@ -282,3 +282,12 @@ internal fun ByteArray.toHex(): String = joinToString(separator = "") { byte -> 
 private const val MAX_SNAPSHOT_CHUNKS = 2048
 private const val SHA_256_HEX_LENGTH = 64
 private const val SHA_256 = "SHA-256"
+
+/**
+ * Legacy-head ownership: an UNOWNED head may be adopted, an owned one only by its owner.
+ *
+ * A null requesting agent is deliberately NOT allowed to take over an owned head -- that is the
+ * same asymmetry [ownedBy] enforces for the normalized head.
+ */
+internal fun ConfirmedTimelineSnapshotHeadMetadata.ownershipCompatibleWith(scope: TimelineScope): Boolean =
+    agentId == null || agentId == scope.agentId

@@ -23,6 +23,13 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.junit.Assert.assertFalse
+import com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent
+import com.letta.mobile.data.timeline.snapshot.StoredTimelineEnvelope
+import com.letta.mobile.data.timeline.snapshot.TimelineRevision
+import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineWriteResult
+import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineCommitPlan
+import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineCommitFailure
 
 /**
  * letta-mobile-827s9.4: proves the *production* [TimelineSyncLoop] persistence path -- not a
@@ -296,7 +303,12 @@ class TimelineSyncLoopIncrementalPersistenceTest {
         // Deliberately NOT flushSnapshotNow(): awaiting that suspend seam is what let the
         // missing turnEnded scheduling go unnoticed in the first place.
         var persistedEvents: Int? = null
-        for (attempt in 0 until 200) {
+        // Budget deliberately generous: this settles a real Dispatchers.IO write, and a
+        // sibling test in this class stages 600 KiB payloads, so the shared dispatcher can be
+        // busy. The loop exits as soon as the expected state is observed, so a larger bound
+        // costs nothing when the write is quick -- it only stops a loaded run from failing on
+        // a deadline rather than on the property under test.
+        for (attempt in 0 until 1_000) {
             advanceUntilIdle()
             persistedEvents = store.readSnapshot(scope)?.events?.size
             if (persistedEvents == 40) break
@@ -712,6 +724,244 @@ class TimelineSyncLoopIncrementalPersistenceTest {
         )
         ownerLoop.closeAndJoin()
         intruderLoop.closeAndJoin()
+    }
+
+    /**
+     * Round 7 blocker 1: the PRODUCTION-shaped stranding case -- a REAL oversized event.
+     *
+     * The round-6 test used a synthetic Invalid over a perfectly representable envelope, so the
+     * post-fallback read bootstrapped normalized to N and the bug could not appear. That was a
+     * false pass. With a genuine OVERSIZED_ROW normalized cannot represent the envelope at all:
+     * legacy persists N, normalized is stuck at N-1, and advancing the planning baseline to N
+     * makes every later commit fail CAS forever.
+     *
+     * Sequence: commit -> oversized event forces the fallback -> REMOVE the oversized event ->
+     * the next commit must reach durable normalized state.
+     */
+    @Test
+    fun aRealOversizedEventDoesNotStrandNormalizedPlanningOnceItIsRemoved() = runTest {
+        val db = inMemoryDatabase()
+        val scope = TimelineScope(backendId = "backend", conversationId = "conv-oversized", agentId = "agent")
+        val store = RoomConfirmedTimelineStore(db)
+        val loop = newLoop(scope, store, StandardTestDispatcher(testScheduler))
+        com.letta.mobile.util.Telemetry.clear()
+        val dao = db.confirmedTimelineSnapshotDao()
+
+        loop.ingestStreamEvent(UserMessage(id = "keep", date = FIXTURE_DATE, contentRaw = JsonPrimitive("keep")))
+        loop.flushSnapshotNow()
+        advanceUntilIdle()
+        val baselineRevision = dao.getNormalizedHead(scope.backendId, scope.conversationId)?.revision
+        assertNotNull(baselineRevision)
+
+        // A genuinely unrepresentable row: over NORMALIZED_MAX_ROW_PAYLOAD_BYTES (512 KiB).
+        // Sent as an OPTIMISTIC LOCAL so it can later collapse into its server version -- that
+        // collapse is how an event actually leaves this timeline. Re-ingesting a stream message
+        // under the same id cannot express removal: shouldDropDuplicateStreamMessage discards
+        // the repeat, so the oversized body would simply persist.
+        loop.ingestStreamEvent(
+            UserMessage(
+                id = "huge",
+                date = FIXTURE_DATE,
+                contentRaw = JsonPrimitive("x".repeat(600 * 1024)),
+                otid = "huge-otid",
+            ),
+        )
+        loop.flushSnapshotNow()
+        advanceUntilIdle()
+
+        assertEquals(
+            "normalized cannot represent the oversized envelope, so it must stay put",
+            baselineRevision,
+            dao.getNormalizedHead(scope.backendId, scope.conversationId)?.revision,
+        )
+        assertTrue(
+            "the oversized row must actually have forced the legacy fallback -- without this " +
+                "the test proves nothing about stranding",
+            com.letta.mobile.util.Telemetry.snapshot().any {
+                it.name == "snapshotPersist.invalidRejected" &&
+                    it.attrs["conversationId"] == scope.conversationId
+            },
+        )
+
+        // NOTE: the recovery leg ("remove the oversized event, commit succeeds") is NOT driven
+        // here. TimelineSyncLoop exposes no event-removal API; re-ingesting the same id is
+        // discarded by shouldDropDuplicateStreamMessage, and an optimistic-local collapse does
+        // not evict the row either. Attempting it produced a VACUOUS test -- the oversized guard
+        // never even fired -- which is the same false-pass shape flagged in review, so it is not
+        // left in. The baseline property that recovery depends on is proven deterministically in
+        // aStrandedNormalizedRevisionKeepsThePlanningBaselineBehind below.
+        loop.closeAndJoin()
+    }
+
+    /**
+     * Round 7 blocker 2: a cross-agent fallback at a STRICTLY HIGHER revision.
+     *
+     * The round-6 version had both agents at the same revision, so publishHead's revision guard
+     * fired first and the ownership branch was never reached -- a false pass. publishHead in
+     * fact had NO ownership check, so a higher-revision cross-agent write replaced the head and
+     * restamped agent_id to the intruder.
+     */
+    @Test
+    fun aHigherRevisionCrossAgentFallbackCannotReplaceTheLegacyHead() = runTest {
+        val db = inMemoryDatabase()
+        val owner = TimelineScope(backendId = "backend", conversationId = "conv-cross", agentId = "agent-a")
+        val intruder = TimelineScope(backendId = "backend", conversationId = "conv-cross", agentId = "agent-b")
+        val dao = db.confirmedTimelineSnapshotDao()
+
+        val ownerStore = RoomConfirmedTimelineStore(db)
+        val ownerLoop = newLoop(owner, ownerStore, StandardTestDispatcher(testScheduler))
+        repeat(2) { index ->
+            ownerLoop.ingestStreamEvent(
+                UserMessage(id = "a$index", date = FIXTURE_DATE, contentRaw = JsonPrimitive("owned")),
+            )
+            ownerLoop.flushSnapshotNow()
+            advanceUntilIdle()
+        }
+        val headBefore = requireNotNull(dao.getHeadMetadata(owner.backendId, owner.conversationId))
+        val rowsBefore = dao.getNormalizedRowDigestProjection(owner.backendId, owner.conversationId)
+        val readBefore = requireNotNull(ownerStore.readSnapshot(owner)).events.size
+
+        // Agent B writes at a STRICTLY HIGHER revision -- past the revision guard.
+        val intruderEnvelope = StoredTimelineEnvelope(
+            scope = intruder,
+            revision = headBefore.highWaterRevision + 5,
+            events = listOf(
+                StoredTimelineEvent(
+                    position = 1.0,
+                    otid = "intruder",
+                    content = "intruding",
+                    serverId = "server-intruder",
+                    messageType = "USER",
+                    dateIso = "2026-08-24T00:00:00Z",
+                ),
+            ),
+            writtenAtMillis = 9_000L,
+        )
+        assertFalse(
+            "a higher-revision write by another agent must be refused",
+            RoomConfirmedTimelineStore(db).writeSnapshot(intruderEnvelope),
+        )
+
+        assertEquals(
+            "agent A's legacy head must be untouched -- owner, revision, manifests, all of it",
+            headBefore,
+            dao.getHeadMetadata(owner.backendId, owner.conversationId),
+        )
+        assertEquals(
+            "agent A's normalized rows must be untouched",
+            rowsBefore,
+            dao.getNormalizedRowDigestProjection(owner.backendId, owner.conversationId),
+        )
+        assertEquals(
+            "agent A must still read its own timeline",
+            readBefore,
+            ownerStore.readSnapshot(owner)?.events?.size,
+        )
+        ownerLoop.closeAndJoin()
+    }
+
+    /**
+     * Round 7 blocker 1, the production hunk under deterministic control.
+     *
+     * A legacy fallback leaves LEGACY at N and NORMALIZED at N-1. The planning baseline must
+     * follow NORMALIZED, not legacy: advance it to N and every later commit plans against a
+     * revision normalized never reached, is rejected Stale, and the writer eventually detaches.
+     *
+     * The store double reports the lagging normalized revision and enforces CAS exactly as Room
+     * does, so the next commit's fate is decided purely by which baseline the loop kept.
+     *
+     * FAIL-ON-REVERT: making the advance unconditional turns the final commit into a Stale
+     * rejection and fails this test.
+     */
+    @Test
+    fun aStrandedNormalizedRevisionKeepsThePlanningBaselineBehind() = runTest {
+        val scope = TimelineScope(backendId = "backend", conversationId = "conv-baseline", agentId = "agent")
+        val store = StrandingStore()
+        val loop = newLoop(scope, store, StandardTestDispatcher(testScheduler))
+
+        loop.ingestStreamEvent(UserMessage(id = "e1", date = FIXTURE_DATE, contentRaw = JsonPrimitive("one")))
+        loop.flushSnapshotNow()
+        advanceUntilIdle()
+        assertEquals("the first commit must reach normalized", 1L, store.normalizedRevision)
+
+        // This one cannot be represented: legacy advances, normalized cannot.
+        store.forceInvalidOnce()
+        loop.ingestStreamEvent(UserMessage(id = "e2", date = FIXTURE_DATE, contentRaw = JsonPrimitive("two")))
+        loop.flushSnapshotNow()
+        advanceUntilIdle()
+        assertTrue("the fallback must have written legacy", store.legacyWrites > 0)
+        assertEquals("normalized must be stranded one revision behind", 1L, store.normalizedRevision)
+
+        // The next commit decides it: baseline N-1 matches normalized and commits; baseline N
+        // does not and is rejected Stale.
+        loop.ingestStreamEvent(UserMessage(id = "e3", date = FIXTURE_DATE, contentRaw = JsonPrimitive("three")))
+        loop.flushSnapshotNow()
+        advanceUntilIdle()
+
+        assertEquals(
+            "the commit after a fallback must be planned against the revision NORMALIZED holds; " +
+                "a stale rejection here means the baseline followed legacy instead",
+            0,
+            store.staleRejections,
+        )
+        assertTrue("normalized must have advanced past the stranding", store.normalizedRevision > 1L)
+        loop.closeAndJoin()
+    }
+
+    /**
+     * Models the asymmetry that makes stranding possible: legacy accepts a write normalized
+     * cannot represent, and normalized enforces CAS against its own revision.
+     */
+    private class StrandingStore : com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore {
+        var normalizedRevision: Long = 0L
+            private set
+        var legacyWrites: Int = 0
+            private set
+        var staleRejections: Int = 0
+            private set
+        private var invalidOnce = false
+        private var latest: StoredTimelineEnvelope? = null
+
+        fun forceInvalidOnce() { invalidOnce = true }
+
+        override suspend fun normalizedHeadRevision(scope: TimelineScope): Long? =
+            normalizedRevision.takeIf { it > 0L }
+
+        override suspend fun commitNormalized(
+            plan: NormalizedTimelineCommitPlan,
+            fullEnvelope: StoredTimelineEnvelope,
+            checkpointLegacyEnvelope: Boolean,
+        ): NormalizedTimelineWriteResult {
+            if (invalidOnce) {
+                invalidOnce = false
+                return NormalizedTimelineWriteResult.Invalid(NormalizedTimelineCommitFailure.OVERSIZED_ROW)
+            }
+            val base = when (plan) {
+                is NormalizedTimelineCommitPlan.Apply -> plan.commit.baseRevision.value
+                is NormalizedTimelineCommitPlan.NoOp -> plan.baseRevision.value
+                else -> return NormalizedTimelineWriteResult.Invalid(
+                    NormalizedTimelineCommitFailure.OVERSIZED_ROW,
+                )
+            }
+            if (base != normalizedRevision) {
+                staleRejections++
+                return NormalizedTimelineWriteResult.Stale(TimelineRevision(normalizedRevision))
+            }
+            normalizedRevision = fullEnvelope.revision
+            latest = fullEnvelope
+            return NormalizedTimelineWriteResult.Committed(TimelineRevision(fullEnvelope.revision))
+        }
+
+        override suspend fun writeSnapshot(envelope: StoredTimelineEnvelope): Boolean {
+            legacyWrites++
+            latest = envelope
+            return true
+        }
+
+        override suspend fun readSnapshot(scope: TimelineScope): StoredTimelineEnvelope? = latest
+        override suspend fun deleteSnapshot(scope: TimelineScope) { latest = null }
+        override suspend fun clearForBackend(backendId: String) { latest = null }
+        override suspend fun prune(backendId: String, maxRetainedConversations: Int) = Unit
     }
 
     private class OutcomeOverridingStore(

@@ -432,7 +432,9 @@ class TimelineSyncLoop(
             consecutiveStaleRejections = 0
             snapshotRevision = revision
             lastPersistedFingerprint = fingerprint
-            lastPersistedEnvelope = envelope
+            // NOTE: lastPersistedEnvelope is the NORMALIZED planning baseline and is advanced
+            // below only if normalized genuinely caught up. Legacy durability at `revision` is
+            // recorded by snapshotRevision.
             recordSuccessfulSnapshotMutation(envelope, revision)
             commitsSinceLegacyCheckpoint = 0
             // Round 6 item 5: the fallback writes LEGACY only, so normalized state is left
@@ -446,7 +448,22 @@ class TimelineSyncLoop(
             // this brings the normalized head up to N and the next commit's CAS matches.
             // Best-effort -- a failure here leaves us no worse off than before the fallback.
             timelineScope?.let { scope ->
-                runCatching { confirmedTimelineStore.readSnapshotResult(scope) }
+                runCatching {
+                    confirmedTimelineStore.readSnapshotResult(scope)
+                    // Advance the NORMALIZED planning baseline only if normalized actually
+                    // reached this revision. A representable envelope is bootstrapped by the
+                    // read above and reaches N. A genuinely unrepresentable one -- a real
+                    // OVERSIZED_ROW, which is what drives this path in production -- cannot be
+                    // bootstrapped at all, so normalized stays at N-1.
+                    //
+                    // Advancing unconditionally is what stranded the writer: planning would
+                    // then base at N against a normalized head at N-1 and be rejected Stale
+                    // forever. Leaving the baseline at N-1 instead means the next commit bases
+                    // at N-1, matches, and succeeds as soon as the oversized event is gone.
+                    if (confirmedTimelineStore.normalizedHeadRevision(scope) == revision) {
+                        lastPersistedEnvelope = envelope
+                    }
+                }
                     .onFailure { failure ->
                         if (failure is CancellationException) throw failure
                         Telemetry.error(

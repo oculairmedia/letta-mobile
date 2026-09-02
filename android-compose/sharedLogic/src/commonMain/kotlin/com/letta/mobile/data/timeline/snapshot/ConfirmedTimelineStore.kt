@@ -66,6 +66,15 @@ interface ConfirmedTimelineStore {
      * Write [envelope] atomically.
      * Returns `true` if written, `false` if rejected due to a stale revision.
      */
+    /**
+     * The revision NORMALIZED storage durably holds, or null when it is unknown/absent.
+     *
+     * Needed because a legacy fallback can succeed at revision N while normalized stays at
+     * N-1 -- reading the snapshot back cannot tell the two apart, since legacy serves N either
+     * way. Only this distinguishes "normalized caught up" from "normalized is stranded".
+     */
+    suspend fun normalizedHeadRevision(scope: TimelineScope): Long? = null
+
     suspend fun writeSnapshot(envelope: StoredTimelineEnvelope): Boolean
 
     /**

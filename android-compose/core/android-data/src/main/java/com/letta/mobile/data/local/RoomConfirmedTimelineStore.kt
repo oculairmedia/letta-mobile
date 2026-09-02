@@ -239,6 +239,13 @@ class RoomConfirmedTimelineStore(
         )
     }
 
+    override suspend fun normalizedHeadRevision(scope: TimelineScope): Long? =
+        withContext(Dispatchers.IO) {
+            dao.getNormalizedHead(scope.backendId, scope.conversationId)
+                ?.takeIf { it.ownedBy(scope) }
+                ?.revision
+        }
+
     override suspend fun writeSnapshot(envelope: StoredTimelineEnvelope): Boolean {
         return withContext(Dispatchers.IO) {
         val plan = createWritePlan(envelope)
@@ -520,7 +527,15 @@ class RoomConfirmedTimelineStore(
         }
         return database.withTransaction {
             val existing = dao.getHeadMetadata(plan.scope.backendId, plan.scope.conversationId)
-            if (existing != null && existing.highWaterRevision >= plan.normalized.revision) {
+            if (existing != null && !existing.ownershipCompatibleWith(plan.scope)) {
+                // Round 7: a LEGACY head owned by another agent must never be replaced, at ANY
+                // revision. The revision guard below is not a substitute: a cross-agent write at
+                // a STRICTLY HIGHER revision sails past it and replaceHead then restamps
+                // agent_id to the intruder, destroying the owner's head. The earlier
+                // same-revision test passed only because the revision guard fired first, which
+                // is why this went unnoticed.
+                false
+            } else if (existing != null && existing.highWaterRevision >= plan.normalized.revision) {
                 false
             } else {
                 dao.replaceHead(
