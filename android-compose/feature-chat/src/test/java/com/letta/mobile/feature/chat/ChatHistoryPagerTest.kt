@@ -61,6 +61,7 @@ class ChatHistoryPagerTest {
         harness.pager.loadOlderMessages(clientModeEnabled = false)
         advanceUntilIdle()
 
+        assertFalse(harness.uiState.value.isLoadingOlderMessages)
         coVerify(exactly = 0) { harness.messageRepository.fetchOlderMessagesPage(any<AgentId>(), any<ConversationId>(), any()) }
     }
 
