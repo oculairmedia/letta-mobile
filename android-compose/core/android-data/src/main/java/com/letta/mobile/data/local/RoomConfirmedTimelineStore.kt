@@ -420,7 +420,10 @@ class RoomConfirmedTimelineStore(
                 }
             }
             currentCoroutineContext().ensureActive()
-            val projection = if (commit.baseRevision.value == 0L || head?.rowDigest.isNullOrBlank()) {
+            val metadataOnly = commit.upserts.isEmpty() && commit.deletes.isEmpty()
+            val projection = if (metadataOnly) {
+                null
+            } else if (commit.baseRevision.value == 0L || head?.rowDigest.isNullOrBlank()) {
                 dao.getNormalizedRowDigestProjection(backendId, conversationId)
             } else {
                 // The canonical row digest is order-sensitive. Until segment digests land,
@@ -444,7 +447,9 @@ class RoomConfirmedTimelineStore(
                 releasedOlderCount = commit.metadata.releasedOlderCount,
                 writtenAtMillis = commit.metadata.writtenAtMillis,
             )
-            val rowDigest = projection?.let { rows ->
+            val rowDigest = if (metadataOnly) {
+                requireNotNull(head).rowDigest
+            } else projection?.let { rows ->
                 rows.fold(normalizedRowDigest(emptyList())) { digest, row ->
                     incrementalNormalizedRowDigest(digest, listOf(row))
                 }
@@ -475,7 +480,11 @@ class RoomConfirmedTimelineStore(
                     liveCursor = commit.metadata.liveCursor,
                     backfillCursor = commit.metadata.backfillCursor,
                     releasedOlderCount = commit.metadata.releasedOlderCount,
-                    rowCount = projection?.size ?: (requireNotNull(head).rowCount + commit.upserts.size),
+                    rowCount = when {
+                        metadataOnly -> requireNotNull(head).rowCount
+                        projection != null -> projection.size
+                        else -> requireNotNull(head).rowCount + commit.upserts.size
+                    },
                     rootDigest = normalizedRootDigest(digestEnvelope, rowDigest),
                     rowDigest = rowDigest,
                     generation = commit.targetRevision.value,
