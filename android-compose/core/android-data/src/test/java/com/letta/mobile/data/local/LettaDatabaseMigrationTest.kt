@@ -15,8 +15,7 @@ import com.letta.mobile.runtime.RuntimeEventId
 import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeEventSource
 import com.letta.mobile.runtime.RuntimeId
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -28,7 +27,6 @@ import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], manifest = Config.NONE)
-@OptIn(ExperimentalCoroutinesApi::class)
 @Tag("integration")
 class LettaDatabaseMigrationTest {
 
@@ -43,7 +41,98 @@ class LettaDatabaseMigrationTest {
     }
 
     @Test
-    fun `migrates reconstructed v1 database to latest and preserves agents`() = runTest {
+    fun `migrates v12 normalized heads with explicit empty row digest marker`() = runBlocking {
+        createLegacyDatabase(version = 12) { db ->
+            createAgentsTable(db)
+            createProjectBugReportsTable(db)
+            createPendingLocalMessagesTable(db)
+            createConversationTables(db)
+            createRuntimeEventsTable(db)
+            createMemFsTables(db)
+            db.execSQL(
+                "CREATE TABLE conversation_cursors (conv_id TEXT NOT NULL, highest_seen_seq INTEGER NOT NULL, " +
+                    "updated_at INTEGER NOT NULL, PRIMARY KEY(conv_id))",
+            )
+            db.execSQL("ALTER TABLE agents ADD COLUMN metadataJson TEXT")
+            db.execSQL(
+                "CREATE TABLE confirmed_timeline_snapshots (backend_id TEXT NOT NULL, conversation_id TEXT NOT NULL, " +
+                    "agent_id TEXT, active_manifest_id TEXT, fallback_manifest_id TEXT, " +
+                    "high_water_revision INTEGER NOT NULL, written_at_millis INTEGER NOT NULL, " +
+                    "PRIMARY KEY(backend_id, conversation_id))",
+            )
+            db.execSQL(
+                "CREATE INDEX index_confirmed_timeline_snapshots_backend_id_written_at_millis " +
+                    "ON confirmed_timeline_snapshots (backend_id, written_at_millis)",
+            )
+            db.execSQL(
+                "CREATE TABLE confirmed_timeline_snapshot_manifests (manifest_id TEXT NOT NULL, backend_id TEXT NOT NULL, " +
+                    "conversation_id TEXT NOT NULL, agent_id TEXT, revision INTEGER NOT NULL, schema_version INTEGER NOT NULL, " +
+                    "byte_length INTEGER NOT NULL, chunk_count INTEGER NOT NULL, sha256 TEXT NOT NULL, " +
+                    "written_at_millis INTEGER NOT NULL, PRIMARY KEY(manifest_id))",
+            )
+            db.execSQL(
+                "CREATE INDEX index_confirmed_timeline_snapshot_manifests_backend_id_conversation_id_revision " +
+                    "ON confirmed_timeline_snapshot_manifests (backend_id, conversation_id, revision)",
+            )
+            db.execSQL(
+                "CREATE INDEX index_confirmed_timeline_snapshot_manifests_backend_id " +
+                    "ON confirmed_timeline_snapshot_manifests (backend_id)",
+            )
+            db.execSQL(
+                "CREATE TABLE confirmed_timeline_snapshot_chunks (manifest_id TEXT NOT NULL, chunk_index INTEGER NOT NULL, " +
+                    "payload BLOB NOT NULL, PRIMARY KEY(manifest_id, chunk_index), " +
+                    "FOREIGN KEY(manifest_id) REFERENCES confirmed_timeline_snapshot_manifests(manifest_id) ON DELETE CASCADE)",
+            )
+            db.execSQL(
+                "CREATE INDEX index_confirmed_timeline_snapshot_chunks_manifest_id " +
+                    "ON confirmed_timeline_snapshot_chunks (manifest_id)",
+            )
+            db.execSQL(
+                """
+                CREATE TABLE normalized_timeline_snapshot_heads (
+                    backend_id TEXT NOT NULL,
+                    conversation_id TEXT NOT NULL,
+                    agent_id TEXT,
+                    storage_layout_version INTEGER NOT NULL,
+                    revision INTEGER NOT NULL,
+                    envelope_schema_version INTEGER NOT NULL,
+                    live_cursor TEXT,
+                    backfill_cursor TEXT,
+                    released_older_count INTEGER NOT NULL,
+                    row_count INTEGER NOT NULL,
+                    root_digest TEXT NOT NULL,
+                    generation INTEGER NOT NULL,
+                    written_at_millis INTEGER NOT NULL,
+                    PRIMARY KEY(backend_id, conversation_id)
+                )
+                """.trimIndent(),
+            )
+            db.execSQL(
+                "CREATE TABLE normalized_timeline_snapshot_rows (backend_id TEXT NOT NULL, conversation_id TEXT NOT NULL, " +
+                    "identity_primary INTEGER NOT NULL, identity_secondary INTEGER NOT NULL, event_order INTEGER NOT NULL, " +
+                    "payload BLOB NOT NULL, checksum TEXT NOT NULL, " +
+                    "PRIMARY KEY(backend_id, conversation_id, identity_primary, identity_secondary))",
+            )
+            db.execSQL(
+                "CREATE UNIQUE INDEX index_normalized_timeline_snapshot_rows_backend_id_conversation_id_event_order " +
+                    "ON normalized_timeline_snapshot_rows (backend_id, conversation_id, event_order)",
+            )
+            db.execSQL(
+                """
+                INSERT INTO normalized_timeline_snapshot_heads VALUES
+                ('backend', 'conversation', 'agent', 1, 12, 12, NULL, NULL, 0, 0, 'legacy-root', 12, 123)
+                """.trimIndent(),
+            )
+        }
+
+        val db = openMigratedDatabase()
+        val head = requireNotNull(db.confirmedTimelineSnapshotDao().getNormalizedHead("backend", "conversation"))
+        assertEquals("", head.rowDigest)
+        assertEquals(12L, head.revision)
+    }
+
+    @Test
+    fun `migrates reconstructed v1 database to latest and preserves agents`() = runBlocking {
         createLegacyDatabase(version = 1) { db ->
             createAgentsTable(db)
             db.execSQL(
@@ -84,7 +173,7 @@ class LettaDatabaseMigrationTest {
     }
 
     @Test
-    fun `migrates reconstructed v2 database to latest and preserves bug reports`() = runTest {
+    fun `migrates reconstructed v2 database to latest and preserves bug reports`() = runBlocking {
         createLegacyDatabase(version = 2) { db ->
             createAgentsTable(db)
             createProjectBugReportsTable(db)
@@ -120,7 +209,7 @@ class LettaDatabaseMigrationTest {
     }
 
     @Test
-    fun `opens current v3 database and preserves pending local messages`() = runTest {
+    fun `opens current v3 database and preserves pending local messages`() = runBlocking {
         val row = PendingLocalEntity(
             otid = "otid-1",
             conversationId = "conversation-1",
@@ -174,7 +263,7 @@ class LettaDatabaseMigrationTest {
     }
 
     @Test
-    fun `opens current v4 database and adds conversation cache tables`() = runTest {
+    fun `opens current v4 database and adds conversation cache tables`() = runBlocking {
         createLegacyDatabase(version = 4) { db ->
             createAgentsTable(db)
             createProjectBugReportsTable(db)
@@ -203,7 +292,7 @@ class LettaDatabaseMigrationTest {
     }
 
     @Test
-    fun `opens current v5 database and adds runtime event outbox`() = runTest {
+    fun `opens current v5 database and adds runtime event outbox`() = runBlocking {
         createLegacyDatabase(version = 5) { db ->
             createAgentsTable(db)
             createProjectBugReportsTable(db)
@@ -237,7 +326,7 @@ class LettaDatabaseMigrationTest {
     }
 
     @Test
-    fun `opens current v6 database and adds memfs tables`() = runTest {
+    fun `opens current v6 database and adds memfs tables`() = runBlocking {
         createLegacyDatabase(version = 6) { db ->
             createAgentsTable(db)
             createProjectBugReportsTable(db)
@@ -267,7 +356,7 @@ class LettaDatabaseMigrationTest {
     }
 
     @Test
-    fun `opens current v7 database and adds conversation cursor table`() = runTest {
+    fun `opens current v7 database and adds conversation cursor table`() = runBlocking {
         createLegacyDatabase(version = 7) { db ->
             createAgentsTable(db)
             createProjectBugReportsTable(db)

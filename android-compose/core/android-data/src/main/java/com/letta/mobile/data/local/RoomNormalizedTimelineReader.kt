@@ -24,7 +24,14 @@ internal class RoomNormalizedTimelineReader {
         validateRows(scope, rows)?.let { return NormalizedTimelineRead.Invalid(it) }
         val events = decodeRows(rows) ?: return NormalizedTimelineRead.Invalid(SnapshotReadFailure.CORRUPT_ENCODING)
         val envelope = head.toEnvelope(scope, events)
-        return if (normalizedRootDigest(envelope, rows) == head.rootDigest.lowercase()) {
+        val rowDigest = if (head.rowDigest.startsWith(CHAIN_ROW_DIGEST_PREFIX)) {
+            chainedRowDigest(rows)
+        } else {
+            normalizedRowDigest(rows)
+        }
+        return if (rowDigest == head.rowDigest.removePrefix(CHAIN_ROW_DIGEST_PREFIX).lowercase() &&
+            normalizedRootDigest(envelope, head.rowDigest) == head.rootDigest.lowercase()
+        ) {
             NormalizedTimelineRead.Valid(envelope)
         } else {
             NormalizedTimelineRead.Invalid(SnapshotReadFailure.CHECKSUM_MISMATCH)
@@ -105,6 +112,11 @@ internal interface NormalizedTimelineRowDigestFields {
 internal fun normalizedRootDigest(
     envelope: StoredTimelineEnvelope,
     rows: List<NormalizedTimelineRowDigestFields>,
+): String = normalizedRootDigest(envelope, normalizedRowDigest(rows))
+
+internal fun normalizedRootDigest(
+    envelope: StoredTimelineEnvelope,
+    rowDigest: String,
 ): String = sha256(buildString {
     appendDigestField(envelope.schemaVersion.toString())
     appendDigestField(envelope.scope.backendId)
@@ -115,6 +127,10 @@ internal fun normalizedRootDigest(
     appendNullableDigestField(envelope.backfillCursor)
     appendDigestField(envelope.releasedOlderCount.toString())
     appendDigestField(envelope.writtenAtMillis.toString())
+    appendDigestField(rowDigest)
+}.toByteArray(StandardCharsets.UTF_8))
+
+internal fun normalizedRowDigest(rows: List<NormalizedTimelineRowDigestFields>): String = sha256(buildString {
     rows.forEach { row ->
         appendDigestField(row.identityPrimary.toString())
         appendDigestField(row.identitySecondary.toString())
@@ -122,6 +138,29 @@ internal fun normalizedRootDigest(
         appendDigestField(row.checksum)
     }
 }.toByteArray(StandardCharsets.UTF_8))
+
+internal fun incrementalNormalizedRowDigest(
+    previousDigest: String,
+    appendedRows: List<NormalizedTimelineRowDigestFields>,
+): String = CHAIN_ROW_DIGEST_PREFIX + sha256(buildString {
+    appendDigestField(previousDigest.removePrefix(CHAIN_ROW_DIGEST_PREFIX))
+    appendedRows.forEach { row ->
+        appendDigestField(row.identityPrimary.toString())
+        appendDigestField(row.identitySecondary.toString())
+        appendDigestField(row.eventOrder.toString())
+        appendDigestField(row.checksum)
+    }
+}.toByteArray(StandardCharsets.UTF_8))
+
+private fun chainedRowDigest(rows: List<NormalizedTimelineRowDigestFields>): String {
+    var digest = normalizedRowDigest(emptyList())
+    rows.forEach { row ->
+        digest = incrementalNormalizedRowDigest(digest, listOf(row)).removePrefix(CHAIN_ROW_DIGEST_PREFIX)
+    }
+    return digest
+}
+
+internal const val CHAIN_ROW_DIGEST_PREFIX = "chain-v1:"
 
 private fun StringBuilder.appendNullableDigestField(value: String?) {
     if (value == null) append("N;") else append("S;").appendDigestField(value)

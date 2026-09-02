@@ -90,6 +90,11 @@ data class NormalizedTimelineSnapshotHeadEntity(
     @ColumnInfo(name = "released_older_count") val releasedOlderCount: Int,
     @ColumnInfo(name = "row_count") val rowCount: Int,
     @ColumnInfo(name = "root_digest") val rootDigest: String,
+    /**
+     * Canonical digest of the ordered row projection only. Kept separate from
+     * [rootDigest], whose envelope metadata changes every revision.
+     */
+    @ColumnInfo(name = "row_digest") val rowDigest: String,
     @ColumnInfo(name = "generation") val generation: Long,
     @ColumnInfo(name = "written_at_millis") val writtenAtMillis: Long,
 )
@@ -139,7 +144,7 @@ interface ConfirmedTimelineSnapshotDao {
         """
         SELECT backend_id, conversation_id, agent_id, storage_layout_version, revision,
                envelope_schema_version, live_cursor, backfill_cursor, released_older_count,
-               row_count, root_digest, generation, written_at_millis
+               row_count, root_digest, row_digest, generation, written_at_millis
         FROM normalized_timeline_snapshot_heads
         WHERE backend_id = :backendId AND conversation_id = :conversationId
         """
@@ -204,6 +209,22 @@ interface ConfirmedTimelineSnapshotDao {
         backendId: String,
         conversationId: String,
     ): List<NormalizedTimelineSnapshotRowDigestProjection>
+
+    /** Reads one changed row's digest fields; ordinary commits never scan unrelated rows. */
+    @Query(
+        """
+        SELECT identity_primary, identity_secondary, event_order, checksum
+        FROM normalized_timeline_snapshot_rows
+        WHERE backend_id = :backendId AND conversation_id = :conversationId
+          AND identity_primary = :identityPrimary AND identity_secondary = :identitySecondary
+        """
+    )
+    suspend fun getNormalizedRowDigest(
+        backendId: String,
+        conversationId: String,
+        identityPrimary: Long,
+        identitySecondary: Long,
+    ): NormalizedTimelineSnapshotRowDigestProjection?
 
     @Query("DELETE FROM normalized_timeline_snapshot_heads WHERE backend_id = :backendId AND conversation_id = :conversationId")
     suspend fun deleteNormalizedHead(backendId: String, conversationId: String)

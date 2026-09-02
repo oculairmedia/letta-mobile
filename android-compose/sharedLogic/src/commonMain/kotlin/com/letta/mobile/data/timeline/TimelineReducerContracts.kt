@@ -21,6 +21,24 @@ data class TimelineReducerState(
     val danglingSweepGeneration: Long = 0L,
 )
 
+/**
+ * Storage-neutral description of one committed timeline mutation.
+ *
+ * Persistence may use an exact delta to avoid rebuilding the whole confirmed timeline.
+ * Broad reconciliation and hydration deliberately request a full rescan instead of guessing.
+ */
+sealed interface TimelineMutationDelta {
+    data object None : TimelineMutationDelta
+
+    data class Exact(
+        val changedConfirmedServerIds: Set<String> = emptySet(),
+        val deletedConfirmedServerIds: Set<String> = emptySet(),
+        val metadataChanged: Boolean = false,
+    ) : TimelineMutationDelta
+
+    data class RequiresFullRescan(val reason: String) : TimelineMutationDelta
+}
+
 /** Payload-only mutation families. Ordering is assigned internally by [TimelineProcessor]. */
 sealed interface TimelineMutation {
     data class LocalAppend(
@@ -132,6 +150,7 @@ data class TimelineReduction(
     val next: TimelineReducerState,
     val effects: PersistentList<TimelineReductionEffect> = persistentListOf(),
     val result: TimelineReductionResult,
+    val persistenceDelta: TimelineMutationDelta = TimelineMutationDelta.None,
 )
 
 data class LocalAppendPayload(
@@ -452,6 +471,11 @@ private fun reduceStreamMutation(
     }.toTimelinePersistentList()
     val didChange = output.next != state.timeline ||
         output.updatedPendingToolReturnsByCallId != state.pendingToolReturnsByCallId
+    val persistenceDelta = if (output.next == state.timeline) {
+        TimelineMutationDelta.None
+    } else {
+        exactConfirmedDelta(state.timeline, output.next)
+    }
     return TimelineReduction(
         state.copy(
             timeline = output.next,
@@ -460,8 +484,52 @@ private fun reduceStreamMutation(
         effects,
         if (didChange) TimelineReductionResult.Changed(TimelineChangeKind.RECONCILED)
         else TimelineReductionResult.NoChange,
+        persistenceDelta,
     )
 }
+
+/**
+ * Stream frames normally append or replace a bounded number of confirmed rows. Derive that
+ * exact set from persistent-list reference reuse and stable server ids. If ordering or identity
+ * changes outside that bounded shape, fail closed to the full planner.
+ */
+private fun exactConfirmedDelta(previous: Timeline, current: Timeline): TimelineMutationDelta {
+    if (previous.liveCursor != current.liveCursor || previous.backfillCursor != current.backfillCursor ||
+        previous.releasedOlderCount != current.releasedOlderCount
+    ) {
+        return TimelineMutationDelta.RequiresFullRescan("stream_metadata_changed")
+    }
+
+    val changed = linkedSetOf<String>()
+    val deleted = linkedSetOf<String>()
+    val previousByServerId = previous.events.mapNotNull { event ->
+        (event as? TimelineEvent.Confirmed)?.let { it.serverId to it }
+    }.toMap()
+    val currentByServerId = current.events.mapNotNull { event ->
+        (event as? TimelineEvent.Confirmed)?.let { it.serverId to it }
+    }.toMap()
+    if (previousByServerId.size != previous.events.count { it is TimelineEvent.Confirmed } ||
+        currentByServerId.size != current.events.count { it is TimelineEvent.Confirmed }
+    ) {
+        return TimelineMutationDelta.RequiresFullRescan("ambiguous_server_identity")
+    }
+    currentByServerId.forEach { (serverId, event) ->
+        val old = previousByServerId[serverId]
+        if (old == null || old !== event) changed += serverId
+    }
+    previousByServerId.keys.forEach { serverId ->
+        if (serverId !in currentByServerId) deleted += serverId
+    }
+    if (changed.size + deleted.size > MAX_EXACT_STREAM_DELTA_ROWS) {
+        return TimelineMutationDelta.RequiresFullRescan("stream_delta_too_wide")
+    }
+    return TimelineMutationDelta.Exact(
+        changedConfirmedServerIds = changed,
+        deletedConfirmedServerIds = deleted,
+    )
+}
+
+private const val MAX_EXACT_STREAM_DELTA_ROWS = 64
 
 private fun reduceHydrateMutation(
     state: TimelineReducerState,
@@ -485,6 +553,8 @@ private fun reduceHydrateMutation(
             visibleEventCount = hydrated.visibleEventCount,
             changed = next != state,
         ),
+        persistenceDelta = if (next != state) TimelineMutationDelta.RequiresFullRescan("hydrate")
+        else TimelineMutationDelta.None,
     )
 }
 
@@ -505,6 +575,8 @@ private fun reduceRecentMessagesMutation(
             appended = merge.second,
             changed = next.timeline != state.timeline,
         ),
+        persistenceDelta = if (next.timeline != state.timeline) TimelineMutationDelta.RequiresFullRescan("recent_messages")
+        else TimelineMutationDelta.None,
     )
 }
 
@@ -532,4 +604,6 @@ private fun changedIfNeeded(
     next,
     result = if (next == state) TimelineReductionResult.NoChange
     else TimelineReductionResult.Changed(TimelineChangeKind.RECONCILED),
+    persistenceDelta = if (next.timeline != state.timeline) TimelineMutationDelta.RequiresFullRescan("reconcile")
+    else TimelineMutationDelta.None,
 )

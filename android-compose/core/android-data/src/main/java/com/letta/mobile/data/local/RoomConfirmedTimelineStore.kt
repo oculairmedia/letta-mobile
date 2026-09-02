@@ -138,7 +138,10 @@ class RoomConfirmedTimelineStore(
                 checksum = sha256(payload),
             )
         }
-        val root = normalizedRootDigest(envelope, rows)
+        val rowDigest = rows.fold(normalizedRowDigest(emptyList())) { digest, row ->
+            incrementalNormalizedRowDigest(digest, listOf(row))
+        }
+        val root = normalizedRootDigest(envelope, rowDigest)
         return try {
             database.withTransaction {
                 dao.deleteNormalizedHead(envelope.scope.backendId, envelope.scope.conversationId)
@@ -161,6 +164,7 @@ class RoomConfirmedTimelineStore(
                         releasedOlderCount = envelope.releasedOlderCount,
                         rowCount = rows.size,
                         rootDigest = root,
+                        rowDigest = rowDigest,
                         generation = envelope.revision,
                         writtenAtMillis = envelope.writtenAtMillis,
                     )
@@ -367,7 +371,6 @@ class RoomConfirmedTimelineStore(
             // CHECKSUM_MISMATCH — the timeline becomes unreadable after an idle no-op.
             // Caught by RoomNormalizedCommitIntegrityTest; the pre-existing no-op test missed
             // it because it never read the snapshot back.
-            val projection = dao.getNormalizedRowDigestProjection(backendId, conversationId)
             val digestEnvelope = StoredTimelineEnvelope(
                 schemaVersion = head.envelopeSchemaVersion,
                 scope = plan.scope,
@@ -381,7 +384,7 @@ class RoomConfirmedTimelineStore(
                 head.copy(
                     revision = plan.targetRevision.value,
                     writtenAtMillis = plan.writtenAtMillis,
-                    rootDigest = normalizedRootDigest(digestEnvelope, projection),
+                    rootDigest = normalizedRootDigest(digestEnvelope, head.rowDigest),
                 ),
             )
             NormalizedTimelineWriteResult.NoOp(plan.targetRevision)
@@ -417,7 +420,16 @@ class RoomConfirmedTimelineStore(
                 }
             }
             currentCoroutineContext().ensureActive()
-            val projection = dao.getNormalizedRowDigestProjection(backendId, conversationId)
+            val projection = if (commit.baseRevision.value == 0L || head?.rowDigest.isNullOrBlank()) {
+                dao.getNormalizedRowDigestProjection(backendId, conversationId)
+            } else {
+                // The canonical row digest is order-sensitive. Until segment digests land,
+                // exact replacements can preserve it only when their digest fields are
+                // unchanged. Payload updates alter checksum, so recompute deliberately and
+                // expose the cost; append-only commits are handled below without payload reads.
+                val appendOnly = commit.deletes.isEmpty() && commit.upserts.all { it.order >= (head?.rowCount ?: 0) }
+                if (appendOnly) null else dao.getNormalizedRowDigestProjection(backendId, conversationId)
+            }
             // PM review item 4: seam for faulting IMMEDIATELY BEFORE head publication.
             // Rows are already mutated at this point; the surrounding transaction is what
             // must roll them back, so the head is never published over rows that did not
@@ -432,6 +444,26 @@ class RoomConfirmedTimelineStore(
                 releasedOlderCount = commit.metadata.releasedOlderCount,
                 writtenAtMillis = commit.metadata.writtenAtMillis,
             )
+            val rowDigest = projection?.let { rows ->
+                rows.fold(normalizedRowDigest(emptyList())) { digest, row ->
+                    incrementalNormalizedRowDigest(digest, listOf(row))
+                }
+            } ?: run {
+                // Append folds changed rows onto a compact digest chain. The reader verifies
+                // this chain against all rows, so corruption detection remains fail closed.
+                incrementalNormalizedRowDigest(
+                    requireNotNull(head).rowDigest,
+                    commit.upserts.sortedBy(NormalizedTimelineRow::order).map { row ->
+                        val payload = rowPayloadBytes(row.event)
+                        NormalizedTimelineSnapshotRowDigestProjection(
+                            row.key.identityPrimary,
+                            row.key.identitySecondary,
+                            row.order,
+                            sha256(payload),
+                        )
+                    },
+                )
+            }
             dao.upsertNormalizedHead(
                 NormalizedTimelineSnapshotHeadEntity(
                     backendId = backendId,
@@ -443,8 +475,9 @@ class RoomConfirmedTimelineStore(
                     liveCursor = commit.metadata.liveCursor,
                     backfillCursor = commit.metadata.backfillCursor,
                     releasedOlderCount = commit.metadata.releasedOlderCount,
-                    rowCount = projection.size,
-                    rootDigest = normalizedRootDigest(digestEnvelope, projection),
+                    rowCount = projection?.size ?: (requireNotNull(head).rowCount + commit.upserts.size),
+                    rootDigest = normalizedRootDigest(digestEnvelope, rowDigest),
+                    rowDigest = rowDigest,
                     generation = commit.targetRevision.value,
                     writtenAtMillis = commit.metadata.writtenAtMillis,
                 ),
