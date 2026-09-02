@@ -7,6 +7,7 @@ import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.util.Telemetry
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
@@ -21,7 +22,18 @@ internal class ChatHistoryPager(
     private val chatTimelineObserver: ChatTimelineObserver,
     private val uiState: MutableStateFlow<ChatUiState>,
     private val activeConversationId: () -> String?,
+    private val selectionGeneration: () -> Long,
 ) {
+    private data class RequestOwner(
+        val conversationId: String,
+        val selectionGeneration: Long,
+        val requestId: Long,
+    )
+
+    private val ownershipLock = Any()
+    private var activeOwner: RequestOwner? = null
+    private var nextRequestId = 0L
+
     fun loadOlderMessages(clientModeEnabled: Boolean) {
         // letta-mobile-doq50: every short-circuit path is now telemetered so
         // 'no loading indicator at all' diagnostics are answerable without
@@ -53,13 +65,20 @@ internal class ChatHistoryPager(
             )
             return
         }
-        if (currentState.isLoadingOlderMessages) {
-            Telemetry.event(
-                "ChatHistoryPager", "loadSkipped",
-                "reason" to "alreadyLoadingOlder",
-                "conversationId" to conversationId,
-            )
-            return
+        val generation = selectionGeneration()
+        synchronized(ownershipLock) {
+            if (activeOwner?.conversationId == conversationId &&
+                activeOwner?.selectionGeneration == generation
+            ) {
+                Telemetry.event(
+                    "ChatHistoryPager", "loadSkipped",
+                    "reason" to "alreadyLoadingOlder",
+                    "conversationId" to conversationId,
+                    "selectionGeneration" to generation,
+                    "requestId" to activeOwner?.requestId,
+                )
+                return
+            }
         }
         if (!currentState.hasMoreOlderMessages) {
             Telemetry.event(
@@ -104,16 +123,21 @@ internal class ChatHistoryPager(
         }
 
         val cursorIsSynthetic = oldestLoadedMessageId.startsWith("toolreturn-")
+        val owner = synchronized(ownershipLock) {
+            RequestOwner(conversationId, generation, ++nextRequestId).also { activeOwner = it }
+        }
         Telemetry.event(
             "ChatHistoryPager", "loadAttempting",
             "conversationId" to conversationId,
             "beforeMessageId" to oldestLoadedMessageId,
             "currentMessageCount" to currentState.messages.size,
             "cursorIsSynthetic" to cursorIsSynthetic,
+            "selectionGeneration" to owner.selectionGeneration,
+            "requestId" to owner.requestId,
         )
 
         scope.launch {
-            uiState.value = uiState.value.copy(isLoadingOlderMessages = true)
+            updateIfOwner(owner) { it.copy(isLoadingOlderMessages = true) }
             try {
                 val olderPage = messageRepository.fetchOlderMessagesPage(
                     agentId = AgentId(agentId),
@@ -121,62 +145,81 @@ internal class ChatHistoryPager(
                     beforeMessageId = oldestLoadedMessageId,
                 )
                 val olderMessages = olderPage.messages
-                if (conversationId != activeConversationId()) {
-                    Telemetry.event(
-                        "ChatHistoryPager", "loadAbandoned",
-                        "reason" to "conversationChanged",
-                        "conversationId" to conversationId,
-                    )
-                    return@launch
-                }
+                synchronized(ownershipLock) {
+                    if (!isCurrentOwner(owner)) {
+                        Telemetry.event(
+                            "ChatHistoryPager", "loadAbandoned",
+                            "reason" to "selectionChanged",
+                            "conversationId" to conversationId,
+                            "selectionGeneration" to owner.selectionGeneration,
+                            "requestId" to owner.requestId,
+                        )
+                        return@launch
+                    }
 
-                val previousCount = uiState.value.messages.size
-                val olderUi = olderMessages.toUiMessages()
-                val mergedMessages = chatTimelineObserver.mergeOlderPage(
-                    conversationId = conversationId,
-                    olderMessages = olderUi,
-                    existingMessages = uiState.value.messages,
-                )
-                // letta-mobile-doq50: if a fetch returns messages but the
-                // merge filters all of them as duplicates of what's already
-                // loaded, the cursor is broken (server returned the same
-                // page). Mark pagination terminal to prevent an infinite
-                // spinner-then-clear loop. The user can still pull-to-
-                // refresh to retry.
-                val mergeAddedMessages = mergedMessages.size > previousCount
-                // letta-mobile-f0ixs: prefer the transport's explicit answer. Page SIZE is not a
-                // reliable end-of-history signal — MessageListPageGuard trims an oversized window
-                // to fit its byte budget, so a page with older history still behind it can arrive
-                // SHORT. Reading that as "reached the beginning" truncated scroll-back silently.
-                // hasMore is null when the transport said nothing (HTTP path, untrimmed pages),
-                // and only then do we fall back to the size heuristic.
-                val newHasMore = mergeAddedMessages &&
-                    (olderPage.hasMore ?: (olderMessages.size >= MessageRepository.OLDER_MESSAGES_PAGE_SIZE))
-                uiState.value = uiState.value.copy(
-                    messages = mergedMessages.toImmutableList(),
-                    messageListChange = ChatMessageListChange.Full,
-                    isLoadingOlderMessages = false,
-                    hasMoreOlderMessages = newHasMore,
-                )
-                Telemetry.event(
-                    "ChatHistoryPager", "loadSucceeded",
-                    "conversationId" to conversationId,
-                    "fetchedCount" to olderMessages.size,
-                    "mergedAddedCount" to (mergedMessages.size - previousCount),
-                    "mergedTotalCount" to mergedMessages.size,
-                    "hasMoreAfter" to newHasMore,
-                    "filteredAllDuplicates" to (olderMessages.isNotEmpty() && !mergeAddedMessages),
-                )
+                    val state = uiState.value
+                    val previousCount = state.messages.size
+                    val olderUi = olderMessages.toUiMessages()
+                    val mergedMessages = chatTimelineObserver.mergeOlderPage(
+                        conversationId = conversationId,
+                        olderMessages = olderUi,
+                        existingMessages = state.messages,
+                    )
+                    val mergeAddedMessages = mergedMessages.size > previousCount
+                    val newHasMore = mergeAddedMessages &&
+                        (olderPage.hasMore ?: (olderMessages.size >= MessageRepository.OLDER_MESSAGES_PAGE_SIZE))
+                    uiState.value = state.copy(
+                        messages = mergedMessages.toImmutableList(),
+                        messageListChange = ChatMessageListChange.Full,
+                        isLoadingOlderMessages = false,
+                        hasMoreOlderMessages = newHasMore,
+                    )
+                    activeOwner = null
+                    Telemetry.event(
+                        "ChatHistoryPager", "loadSucceeded",
+                        "conversationId" to conversationId,
+                        "fetchedCount" to olderMessages.size,
+                        "mergedAddedCount" to (mergedMessages.size - previousCount),
+                        "mergedTotalCount" to mergedMessages.size,
+                        "hasMoreAfter" to newHasMore,
+                        "filteredAllDuplicates" to (olderMessages.isNotEmpty() && !mergeAddedMessages),
+                        "selectionGeneration" to owner.selectionGeneration,
+                        "requestId" to owner.requestId,
+                    )
+                }
+            } catch (e: CancellationException) {
+                clearIfOwner(owner)
+                throw e
             } catch (e: Exception) {
                 Telemetry.error(
                     "ChatHistoryPager", "loadFailed", e,
                     "conversationId" to conversationId,
                     "beforeMessageId" to oldestLoadedMessageId,
+                    "selectionGeneration" to owner.selectionGeneration,
+                    "requestId" to owner.requestId,
                 )
                 android.util.Log.w("AdminChatViewModel", "Failed to load older messages", e)
-                if (conversationId == activeConversationId()) {
-                    uiState.value = uiState.value.copy(isLoadingOlderMessages = false)
-                }
+                clearIfOwner(owner)
+            }
+        }
+    }
+
+    private fun isCurrentOwner(owner: RequestOwner): Boolean =
+        activeOwner == owner &&
+            activeConversationId() == owner.conversationId &&
+            selectionGeneration() == owner.selectionGeneration
+
+    private fun updateIfOwner(owner: RequestOwner, update: (ChatUiState) -> ChatUiState) {
+        synchronized(ownershipLock) {
+            if (isCurrentOwner(owner)) uiState.value = update(uiState.value)
+        }
+    }
+
+    private fun clearIfOwner(owner: RequestOwner) {
+        synchronized(ownershipLock) {
+            if (isCurrentOwner(owner)) {
+                uiState.value = uiState.value.copy(isLoadingOlderMessages = false)
+                activeOwner = null
             }
         }
     }
