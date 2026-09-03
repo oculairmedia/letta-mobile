@@ -561,7 +561,7 @@ internal suspend fun handleCreateAndDeliver(
         )
         return inputOnConversation(client, message, createdId)
     } else {
-        val dropAttrs = mutableListOf<Pair<String, Any?>>(
+        val dropAttrs = mutableListOf<Pair<String, String>>(
             "fromAgentId" to message.fromAgentId,
             "toAgentId" to message.toAgentId,
             "msgId" to message.msgId,
