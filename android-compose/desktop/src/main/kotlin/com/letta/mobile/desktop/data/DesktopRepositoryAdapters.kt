@@ -50,7 +50,6 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 
 class DesktopRepositoryUnavailableException(
     contractName: String,
@@ -192,6 +191,7 @@ fun defaultDesktopChatSessionGraphFactory(
         gatewayFactory = { createDefaultDesktopChatGateway(configProvider() ?: defaultDesktopLettaConfig()) },
     )
 
+@Suppress("NoDetachedCoroutineLifecycle")
 class DesktopRepositoryAdapters(
     config: LettaConfig? = null,
     irohAgentDirectoryProvider: () -> IrohAdminRpcAgentDirectory? = { null },
