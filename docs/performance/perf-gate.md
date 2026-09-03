@@ -52,7 +52,9 @@ The parser reads AndroidX benchmark JSON output from:
 Each CI run also writes compact summaries under `android-compose/build/perf-summary/`:
 
 - `attempt-1/perf-summary.json` and `.md` for the first benchmark sample
-- `attempt-2/perf-summary.json` and `.md` only when the cold-start retry path runs
+- `attempt-2/perf-summary.json` and `.md` only when the bounded startup retry path runs
+- `attempt-1/results/` and `attempt-1/reports/` when a retry runs, preserving the
+  first attempt rather than replacing its evidence with the terminal attempt
 
 The summaries include observed value, baseline, ceiling, percent delta, benchmark source, AndroidX metric name, source JSON path, and whether the metric is gating or informational.
 
@@ -79,25 +81,30 @@ sample counts prevent absent or undersampled output from silently passing.
 ## Retry behavior
 
 The workflow automatically performs **one bounded retry** when, and only when,
-the first baseline check finds a regression limited to
-`startup.cold.p95_ms`. The first check exits through a dedicated retryable
-status, the job reruns the macrobenchmark suite on a fresh emulator action
-invocation, clears the first attempt's AndroidX output, and then runs the
+the first baseline check finds one regression limited to either
+`startup.cold.p95_ms` or `startup.warm.p95_ms`. The first check exits through a
+dedicated retryable status, the job copies the first attempt's AndroidX results
+and reports into the attempt-specific artifact directory, reruns the complete
+macrobenchmark suite on a fresh emulator action invocation, and then runs the
 baseline check again without the retryable exit code.
 
 Outcomes:
 
 - attempt 1 passes: job passes, no retry
-- attempt 1 has only `startup.cold.p95_ms` above ceiling and attempt 2 passes:
-  job passes and both attempt summaries are uploaded
-- attempt 2 also has `startup.cold.p95_ms` above ceiling: job fails and should
-  be treated as a repeatable startup regression
-- any non-retryable failure, malformed input, unseeded gating baseline, or
-  benchmark task failure: job fails immediately
+- attempt 1 has exactly one startup metric above ceiling and attempt 2 passes:
+  job passes; artifacts retain both complete attempts and their summaries
+- attempt 2 has any regression, missing measurement, malformed input, or
+  unseeded gating baseline: job fails and remains red
+- attempt 1 has multiple failures or a non-startup failure: job fails immediately
 
-This retry does **not** raise the `+20%` ceiling or retry warm-start failures.
-It exists only to separate a single shared-emulator cold-start spike from a
-repeatable regression.
+The retry is prospective: it applies to every qualifying PR and does not bypass
+or rebaseline a particular change. It does **not** raise the `+20%` ceiling.
+It is supported by noisy healthy warm-start p95 observations on the unlocked
+shared emulator (428.617, 432.252, 503.493, 521.637, and 538.351 ms), while a
+second fully evaluated attempt continues to detect repeatable regressions.
+Preserving the first attempt prevents the former semantic false-pass mode where
+a cold-only retry's terminal success could hide an earlier warm breach in an
+artifact.
 
 ## Re-baselining
 
@@ -185,8 +192,8 @@ If the job fails unexpectedly:
 3. inspect the underlying `*-benchmarkData.json` files and HTML reports for the
    failing attempt
 4. verify the failing metric is from the expected benchmark method
-5. if the workflow already used attempt 2 and cold startup failed again, treat
-   it as repeatable rather than manually rerunning to hide the failure
+5. if the workflow already used attempt 2 and any metric failed or was missing,
+   treat it as terminal rather than manually rerunning to hide the failure
 6. if the change is legitimate and repeatable, rebaseline deliberately
 
 ## Regression simulation
