@@ -72,8 +72,7 @@ object SkillArgumentNormalizer {
     private fun unwrapJsonObject(raw: String, depth: Int): JsonObject? {
         if (depth > 2) return null
         return runCatching {
-            val element = json.parseToJsonElement(raw)
-            when (element) {
+            when (val element = json.parseToJsonElement(raw)) {
                 is JsonObject -> element
                 is JsonPrimitive -> {
                     val content = element.contentOrNull ?: return null

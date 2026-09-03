@@ -56,9 +56,7 @@ fun LiveStatusText(
 ) {
     val shouldAnimate = active && motionPolicy.runningCue.allowInfiniteAnimation
 
-    val progress: Float = if (shimmerProgress != null) {
-        shimmerProgress
-    } else if (shouldAnimate) {
+    val progress: Float = shimmerProgress ?: if (shouldAnimate) {
         val transition = rememberInfiniteTransition(label = "LiveStatusTextShimmer")
         val spec = (motionPolicy.runningCue.spec as? InfiniteRepeatableSpec<Float>)
             ?: infiniteRepeatable(tween(ChatMotionTokens.RUNNING_CUE_DURATION_MILLIS))

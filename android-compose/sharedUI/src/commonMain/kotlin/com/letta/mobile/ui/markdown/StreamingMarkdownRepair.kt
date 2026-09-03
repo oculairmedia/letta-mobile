@@ -172,7 +172,7 @@ private fun repairOpenInlineMath(text: String): String? {
 
     val body = line.substring(opener + 1)
     if (!isLikelyInlineMathBody(body)) return null
-    return "$text${'$'}"
+    return "$text\$"
 }
 
 private fun findUnclosedInlineMathOpener(line: String): Int {

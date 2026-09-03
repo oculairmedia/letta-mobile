@@ -94,7 +94,7 @@ class IrohChannelTransport(
     // letta-mobile-parg0: congestion grace is overridable so compressed tests can
     // expire young-in-flight protection without waiting the production 45s window.
     private val livenessCongestionGraceMs: Long = IrohLivenessProbe.CONGESTION_GRACE_MS,
-    private val livenessMaxDetectionMs: Long = IrohLivenessProbe.MAX_DETECTION_MS,
+    livenessMaxDetectionMs: Long = IrohLivenessProbe.MAX_DETECTION_MS,
 ) : IChannelTransport, RedialAwareChannelTransport, LivenessProbingChannelTransport,
     FrameCollectorOverflowAwareChannelTransport {
     private val _state = MutableStateFlow<ChannelTransportState>(ChannelTransportState.Idle)
@@ -876,7 +876,7 @@ class IrohChannelTransport(
      */
     override fun cancel(conversationId: String): Boolean {
         val turn = turnRegistry.getActiveTurn(IrohConversationId(conversationId))
-        if (turn == null) return cancelWithoutActiveTurn(conversationId)
+            ?: return cancelWithoutActiveTurn(conversationId)
         Telemetry.event(
             "IrohTransport", "cancel.begin",
             "conversationId" to conversationId,

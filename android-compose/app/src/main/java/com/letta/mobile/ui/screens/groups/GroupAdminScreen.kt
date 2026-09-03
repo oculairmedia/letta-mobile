@@ -178,15 +178,15 @@ private fun GroupAdminContent(
     onEdit: (Group) -> Unit,
     onDelete: (Group) -> Unit,
 ) {
-    when (val state = uiState) {
+    when (uiState) {
         is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(16.dp))
         is UiState.Error -> ErrorContent(
-            message = state.message,
+            message = uiState.message,
             onRetry = viewModel::loadGroups,
             modifier = Modifier.padding(paddingValues),
         )
         is UiState.Success -> {
-            val filtered = remember(state.data.groups, state.data.searchQuery) { viewModel.getFilteredGroups() }
+            val filtered = remember(uiState.data.groups, uiState.data.searchQuery) { viewModel.getFilteredGroups() }
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -195,10 +195,10 @@ private fun GroupAdminContent(
                 if (filtered.isEmpty()) {
                     EmptyState(
                         icon = LettaIcons.ForkRight,
-                        message = if (state.data.searchQuery.isBlank()) {
+                        message = if (uiState.data.searchQuery.isBlank()) {
                             stringResource(R.string.screen_groups_empty)
                         } else {
-                            stringResource(R.string.screen_groups_empty_search, state.data.searchQuery)
+                            stringResource(R.string.screen_groups_empty_search, uiState.data.searchQuery)
                         },
                         modifier = Modifier.fillMaxSize(),
                     )

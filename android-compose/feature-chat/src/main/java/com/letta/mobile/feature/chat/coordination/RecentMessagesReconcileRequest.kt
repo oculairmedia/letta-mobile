@@ -37,10 +37,9 @@ internal class RecentMessagesReconcileLauncher(
         val result = runCatching {
             reconcile(reconcileRequest(openRequest, generation))
         }
-        val error = result.exceptionOrNull()
-        when {
-            error == null -> traceCompleted(generation)
-            error is CancellationException -> throw error
+        when (val error = result.exceptionOrNull()) {
+            null -> traceCompleted(generation)
+            is CancellationException -> throw error
             else -> reportFailure(openRequest, error)
         }
     }

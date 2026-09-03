@@ -183,8 +183,7 @@ class PairCommand : CliktCommand(name = "pair") {
         }
         // Step 3: render. The renderer is the ONLY difference between CLI,
         // Desktop, and Mobile per protocol §10.
-        val mode = parseQrFormat(qrFormat)
-        when (mode) {
+        when (val mode = parseQrFormat(qrFormat)) {
             is QrFormatSpec.Text -> {
                 val matrix = QrCode.encode(qrInvite)
                 val text = QrRenderer.renderText(matrix)

@@ -37,11 +37,10 @@ class IrohBearerAuthVerifier(
 
         if (isRateLimited(remoteEndpointId)) return Outcome.RateLimited
 
-        val provided = providedToken
-        val matches = provided != null &&
+        val matches = providedToken != null &&
             MessageDigest.isEqual(
                 expected.encodeToByteArray(),
-                provided.encodeToByteArray(),
+                providedToken.encodeToByteArray(),
             )
         return if (matches) {
             Outcome.Authenticated
@@ -50,7 +49,7 @@ class IrohBearerAuthVerifier(
             if (isRateLimited(remoteEndpointId)) {
                 Outcome.RateLimited
             } else {
-                Outcome.Denied(if (provided.isNullOrBlank()) "missing_token" else "invalid_token")
+                Outcome.Denied(if (providedToken.isNullOrBlank()) "missing_token" else "invalid_token")
             }
         }
     }

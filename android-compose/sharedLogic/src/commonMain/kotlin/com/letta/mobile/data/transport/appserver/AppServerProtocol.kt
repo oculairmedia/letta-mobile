@@ -107,10 +107,7 @@ object AppServerProtocol {
      */
     fun decodeFrame(rawJson: String, channel: AppServerChannel? = null): AppServerReceivedFrame {
         val element = runCatching { json.parseToJsonElement(rawJson) }.getOrNull()
-        val raw = element as? JsonObject
-        if (raw == null) {
-            return malformedFrame(element, channel)
-        }
+        val raw = element as? JsonObject ?: return malformedFrame(element, channel)
         val parsed = ParsedInboundFrame(type = raw["type"] as? JsonPrimitive, raw = raw)
         val resolvedChannel = channel ?: if (parsed.typeName in STREAM_CHANNEL_MESSAGE_TYPES) {
             AppServerChannel.Stream

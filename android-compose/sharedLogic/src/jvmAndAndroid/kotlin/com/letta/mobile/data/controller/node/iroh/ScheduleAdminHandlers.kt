@@ -58,7 +58,7 @@ object ScheduleAdminHandlers {
                 AppServerCommand.CronList(requestId = NativeAdmin.requestId(), agentId = agentId),
             )
             if (!response.success) adminError(response.error ?: "cron_list failed")
-            val all = (response.tasks ?: JsonArray(emptyList())).mapNotNull { it as? JsonObject }
+            val all = response.tasks?.filterIsInstance<JsonObject>() ?: emptyList()
             page(all, after = param(params, AdminParamKey("after")), limit = param(params, AdminParamKey("limit"))?.toIntOrNull())
         }
 
@@ -170,7 +170,7 @@ object ScheduleAdminHandlers {
         val schedule = params?.get("schedule") as? JsonObject ?: adminError("schedule is required")
         val content = (params["messages"] as? JsonArray)
             ?.jsonArray
-            ?.mapNotNull { it as? JsonObject }
+            ?.filterIsInstance<JsonObject>()
             ?.firstNotNullOfOrNull { it["content"]?.stringOrNull() }
             ?.takeIf { it.isNotEmpty() }
             ?: adminError("messages[0].content is required")

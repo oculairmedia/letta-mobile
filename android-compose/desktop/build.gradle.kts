@@ -2,6 +2,9 @@ import dev.nucleusframework.desktop.application.dsl.TargetFormat
 import dev.nucleusframework.desktop.application.dsl.ReleaseChannel
 import dev.nucleusframework.desktop.application.dsl.ReleaseType
 import dev.nucleusframework.desktop.application.dsl.SigningAlgorithm
+import org.gradle.jvm.toolchain.JavaInstallationMetadata
+import org.gradle.jvm.toolchain.JavaLanguageVersion
+import org.gradle.jvm.toolchain.JavaLauncher
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 // WiX 4 still resolves installer sources through Win32 paths. Keep CI's
@@ -712,10 +715,10 @@ afterEvaluate {
             val jbrJava = desktopJbrHome.map { it.file("bin/java.exe") }
             javaLauncher.set(provider {
                 val executable = jbrJava.get()
-                object : org.gradle.jvm.toolchain.JavaLauncher {
+                object : JavaLauncher {
                     override fun getExecutablePath() = executable
-                    override fun getMetadata() = object : org.gradle.jvm.toolchain.JavaInstallationMetadata {
-                        override fun getLanguageVersion() = org.gradle.jvm.toolchain.JavaLanguageVersion.of(minimumRuntimeJdk)
+                    override fun getMetadata() = object : JavaInstallationMetadata {
+                        override fun getLanguageVersion() = JavaLanguageVersion.of(minimumRuntimeJdk)
                         override fun getJavaRuntimeVersion() = jbrVersion
                         override fun getJvmVersion() = jbrVersion
                         override fun getVendor() = "JetBrains"

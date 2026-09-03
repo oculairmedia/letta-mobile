@@ -398,7 +398,7 @@ fun deduplicateRenderKeys(items: List<ChatRenderItem>): List<ChatRenderItem> {
 
 private const val MinRunPanelEchoLength = 24
 
-private data class EchoCompactionIndex(
+private class EchoCompactionIndex(
     val keys: Array<String?>,
     val lastIndexByKey: Map<String, Int>,
 )

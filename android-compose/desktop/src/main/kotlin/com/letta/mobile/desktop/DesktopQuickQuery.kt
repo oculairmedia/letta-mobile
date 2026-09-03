@@ -377,17 +377,19 @@ private fun handleQuickQueryKey(
     keys: QuickQueryKeyActions,
 ): Boolean {
     if (event.type != KeyEventType.KeyDown) return false
-    return when {
-        event.key == Key.Escape -> {
+    return when (event.key) {
+        Key.Escape -> {
             keys.onClose()
             true
         }
-        event.key == Key.Enter && event.isCtrlPressed -> {
-            keys.onSubmit()
-            true
-        }
-        event.key == Key.Enter -> {
-            if (hasResults) keys.onOpenTop() else keys.onSubmit()
+        Key.Enter -> {
+            if (event.isCtrlPressed) {
+                keys.onSubmit()
+            } else if (hasResults) {
+                keys.onOpenTop()
+            } else {
+                keys.onSubmit()
+            }
             true
         }
         else -> false

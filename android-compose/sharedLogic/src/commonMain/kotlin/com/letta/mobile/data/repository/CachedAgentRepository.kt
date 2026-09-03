@@ -53,7 +53,7 @@ open class CachedAgentRepository(
     private val repositoryScope: CoroutineScope = defaultCachedAgentRepositoryScope(),
     private val localAgentSource: LocalRuntimeAgentSource? = null,
     private val settingsRepository: ISettingsRepository? = null,
-    private val transport: IChannelTransport? = null,
+    transport: IChannelTransport? = null,
     // letta-mobile-71orq: Iroh admin_rpc agent reads. Platform wires
     // [AgentIrohSource] (Android: IrohAdminRpcAgentSource).
     private val irohAgentSource: AgentIrohSource? = null,

@@ -60,7 +60,7 @@ private fun DesktopMermaidDiagram(source: String, modifier: Modifier = Modifier)
     // A synchronous cache probe lets us seed produceState with the finished SVG so a revisit never
     // flashes "Rendering diagram..." nor pays for another mutex-serialized JNI render.
     val cached = remember(source, style) { DesktopMermaidRenderCache.get(source, style) }
-    val result by produceState<DesktopMermaidRenderResult>(
+    val result by produceState(
         initialValue = cached ?: DesktopMermaidRenderResult.Loading,
         source,
         style,

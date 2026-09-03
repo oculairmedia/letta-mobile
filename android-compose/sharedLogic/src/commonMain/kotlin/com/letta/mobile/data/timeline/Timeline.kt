@@ -423,11 +423,10 @@ data class Timeline(
         if (events.size <= evictTriggerSize) return this
         val protectedFloorIndex = protectedFloorIndex()
         val desiredCutoff = events.size - maxResident
-        val cutoff = minOf(desiredCutoff, protectedFloorIndex)
-        if (cutoff <= 0) return this
+        val evictedCount = minOf(desiredCutoff, protectedFloorIndex)
+        if (evictedCount <= 0) return this
 
-        val evictedCount = cutoff
-        val remaining = events.subList(cutoff, events.size).toPersistentList()
+        val remaining = events.subList(evictedCount, events.size).toPersistentList()
         val newOldestServerId = remaining.firstNotNullOfOrNull { (it as? TimelineEvent.Confirmed)?.serverId }
         Telemetry.event(
             "Timeline", "slideResidentWindow.evicted",
