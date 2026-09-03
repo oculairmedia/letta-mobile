@@ -638,6 +638,7 @@ internal class AdminChatViewModel @Inject constructor(
             chatTimelineObserver = chatTimelineObserver,
             uiState = _uiState,
             activeConversationId = { chatConversationCoordinator.activeConversationId },
+            selectionGeneration = { _sessionState.value.selectionGeneration },
         )
     }
     private val projectChatCoordinator: ProjectChatCoordinator = ProjectChatCoordinator(
