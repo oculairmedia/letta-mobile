@@ -571,6 +571,10 @@ class TimelineSyncLoop(
         )
     }
 
+    private object TimelineMetricAvailability {
+        const val UNAVAILABLE = "unavailable"
+    }
+
     private fun recordSuccessfulSnapshotMutation(envelope: StoredTimelineEnvelope, revision: Long) {
         val structuralSummary = TimelineSnapshotMutationCharacterizer.summarize(envelope)
         val mutationShape = TimelineSnapshotMutationCharacterizer.characterize(lastPersistedSnapshot, structuralSummary)
@@ -589,6 +593,14 @@ class TimelineSyncLoop(
             "unclassifiable" to mutationShape.unclassifiable,
             "comparisonEvents" to mutationShape.eventComparisons,
             "fullEnvelopeEncodes" to mutationShape.fullEnvelopeEncodes,
+            // This operation already owns the envelope and summary counts. Expose
+            // residency/copy amplification without another history traversal.
+            "durableRows" to mutationShape.currentCount,
+            "residentRows" to envelope.events.size,
+            "settledEventsVisited" to mutationShape.eventComparisons,
+            "pagesCopied" to TimelineMetricAvailability.UNAVAILABLE,
+            "liveProjected" to TimelineMetricAvailability.UNAVAILABLE,
+            "boundaryRebuilt" to TimelineMetricAvailability.UNAVAILABLE,
         )
     }
 

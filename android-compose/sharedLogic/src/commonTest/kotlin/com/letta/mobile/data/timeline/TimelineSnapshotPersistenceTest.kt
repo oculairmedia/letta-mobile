@@ -175,6 +175,9 @@ class TimelineSnapshotPersistenceTest {
         assertEquals(0, first.single().attrs["previousCount"])
         assertEquals(0, first.single().attrs["eventCount"])
         assertEquals(0, first.single().attrs["inserted"])
+        assertEquals(0, first.single().attrs["durableRows"])
+        assertEquals(0, first.single().attrs["residentRows"])
+        assertEquals(0, first.single().attrs["settledEventsVisited"])
 
         fixture.loop.ingestStreamEvent(ConfirmedMessageFixture("raw-server-id", "private message content").message())
         store.rejectNextWrite = true
@@ -191,6 +194,12 @@ class TimelineSnapshotPersistenceTest {
         // advance the baseline; conflation may legitimately persist either
         // the pending event or the latest empty state.
         assertEquals(afterRejectedWrite.attrs["eventCount"], afterRejectedWrite.attrs["inserted"])
+        assertEquals(afterRejectedWrite.attrs["eventCount"], afterRejectedWrite.attrs["durableRows"])
+        assertEquals(afterRejectedWrite.attrs["eventCount"], afterRejectedWrite.attrs["residentRows"])
+        assertEquals(
+            afterRejectedWrite.attrs["comparisonEvents"],
+            afterRejectedWrite.attrs["settledEventsVisited"],
+        )
         assertMutationTelemetryIsBounded(shapes)
         fixture.loop.closeAndJoin()
     }
@@ -467,10 +476,16 @@ class TimelineSnapshotPersistenceTest {
         val expectedAttrs = setOf(
             "revision", "previousCount", "eventCount", "inserted", "updated", "deleted", "moved",
             "cursorMetadataChanged", "noOp", "unclassifiable", "comparisonEvents", "fullEnvelopeEncodes",
+            "durableRows", "residentRows", "settledEventsVisited", "pagesCopied", "liveProjected", "boundaryRebuilt",
         )
         events.forEach { event ->
             assertEquals(expectedAttrs, event.attrs.keys)
-            assertTrue(event.attrs.values.all { it is Int || it is Long || it is Boolean })
+            assertTrue(event.attrs.values.all {
+                it is Int || it is Long || it is Boolean || it == "unavailable"
+            })
+            assertEquals("unavailable", event.attrs["pagesCopied"])
+            assertEquals("unavailable", event.attrs["liveProjected"])
+            assertEquals("unavailable", event.attrs["boundaryRebuilt"])
             assertFalse(event.attrs.values.any { value ->
                 value.toString().contains("private message content") || value.toString().contains("raw-server-id")
             })
