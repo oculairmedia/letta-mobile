@@ -333,7 +333,7 @@ internal class CoroutineTestGuardrails(config: Config = Config.empty) : MobileRu
     }
 
     private fun org.jetbrains.kotlin.psi.KtExpression?.isZeroLiteral(): Boolean =
-        this?.text?.matches(Regex("0(?:[LlFfDd])?")) == true
+        this?.text?.matches(Regex("0[LlFfDd]?")) == true
 
     private fun org.jetbrains.kotlin.psi.KtExpression?.isTimingValue(): Boolean {
         val normalized = this?.text?.lowercase().orEmpty()

@@ -610,7 +610,7 @@ internal class StreamingAppendedDeltaFadeState {
     /** First sighting of a block: the whole body is the appended range. */
     private fun beginBlock(blockId: Long, source: String): Boolean {
         // No empty-source branch here: update()'s guard already returned for that case.
-        fadingDeltaRange = 0 until source.length
+        fadingDeltaRange = source.indices
         fadingBlockId = blockId
         lastActiveBlockId = blockId
         lastActiveSource = source

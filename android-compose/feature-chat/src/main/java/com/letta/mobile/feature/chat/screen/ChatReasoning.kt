@@ -44,11 +44,11 @@ import com.letta.mobile.ui.theme.sectionTitle
 private const val REASONING_PREVIEW_MAX_LENGTH = 96
 
 internal object ChatReasoningTestTags {
-    const val Header = "chat-reasoning-header"
-    const val LiveStatus = "chat-reasoning-live-status"
-    const val Title = "chat-reasoning-title"
-    const val Preview = "chat-reasoning-preview"
-    const val Content = "chat-reasoning-content"
+    val Header = "chat-reasoning-header"
+    val LiveStatus = "chat-reasoning-live-status"
+    val Title = "chat-reasoning-title"
+    val Preview = "chat-reasoning-preview"
+    val Content = "chat-reasoning-content"
 }
 
 @Composable
