@@ -67,9 +67,9 @@ internal class LocalBackendMessageProjection(private val support: LocalBackendSt
             projectedRunId = (id?.let { sidecars.runIds[it] })?.let { JsonPrimitive(it) } ?: JsonNull,
             attachmentRefs = id?.let { sidecars.attachments[it] },
         )
-        return when {
-            role == "user" || role == "system" -> projectUserOrSystem(ctx, role, parts)
-            role == "toolResult" -> projectToolResultRow(ctx, localMsg, parts)
+        return when (role) {
+            "user", "system" -> projectUserOrSystem(ctx, role, parts)
+            "toolResult" -> projectToolResultRow(ctx, localMsg, parts)
             else -> projectAssistantParts(ctx, parts)
         }
     }
@@ -241,7 +241,7 @@ internal class LocalBackendMessageProjection(private val support: LocalBackendSt
             put("run_id", ctx.projectedRunId)
             put("content", content)
             // attachRefsToWireMessage: only user_message, only when refs present.
-            if (wireType == "user_message" && ctx.attachmentRefs != null && ctx.attachmentRefs.isNotEmpty()) {
+            if (wireType == "user_message" && !ctx.attachmentRefs.isNullOrEmpty()) {
                 put("attachments", ctx.attachmentRefs)
             }
         }
@@ -476,9 +476,9 @@ internal class LocalBackendMessageProjection(private val support: LocalBackendSt
     }
 
     /** Resolve the `tool_return` raw value to its wire text: verbatim string, `"\"\""` for null, else JSON. */
-    private fun resolveToolReturnText(returnRaw: JsonElement?): String = when {
-        returnRaw is JsonPrimitive && returnRaw.isString -> returnRaw.content
-        returnRaw == null || returnRaw is JsonNull -> "\"\""
+    private fun resolveToolReturnText(returnRaw: JsonElement?): String = when (returnRaw) {
+        null, is JsonNull -> "\"\""
+        is JsonPrimitive -> if (returnRaw.isString) returnRaw.content else returnRaw.toString()
         else -> returnRaw.toString()
     }
 
