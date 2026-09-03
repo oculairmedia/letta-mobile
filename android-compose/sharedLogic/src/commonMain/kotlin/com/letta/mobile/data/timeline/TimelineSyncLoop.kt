@@ -454,7 +454,9 @@ class TimelineSyncLoop(
         if (detaching) {
             detachedAsStaleWriter = true
             // Drain anything already queued so the detach takes effect immediately.
-            while (persistRequests.tryReceive().isSuccess) Unit
+            while (persistRequests.tryReceive().isSuccess) {
+                // Drain queue
+            }
         }
         Telemetry.event(
             "TimelineSync", "snapshotPersist.staleRejected",

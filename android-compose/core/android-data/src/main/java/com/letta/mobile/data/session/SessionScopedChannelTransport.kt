@@ -18,6 +18,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -123,7 +124,7 @@ class SessionScopedChannelTransport internal constructor(
         try {
             source().collect { emit(it) }
         } catch (cancelled: CancellationException) {
-            kotlin.coroutines.coroutineContext.ensureActive()
+            currentCoroutineContext().ensureActive()
             if (!isCurrentOverflowDetach(graph.id, overflowAware, subscriptionIdentity, cancelled)) {
                 throw cancelled
             }
