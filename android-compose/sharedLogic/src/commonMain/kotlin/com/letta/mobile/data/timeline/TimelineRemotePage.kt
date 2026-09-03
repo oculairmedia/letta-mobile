@@ -5,6 +5,7 @@ import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
+import kotlin.jvm.JvmInline
 
 @JvmInline
 value class TimelineRequestId(val value: String) {
