@@ -46,7 +46,7 @@ import kotlinx.serialization.json.JsonBuilder
  * depend on.
  */
 class ImmutableListSerializer<T>(
-    private val elementSerializer: KSerializer<T>,
+    elementSerializer: KSerializer<T>,
 ) : KSerializer<ImmutableList<T>> {
     private val delegate = ListSerializer(elementSerializer)
     override val descriptor: SerialDescriptor = listSerialDescriptor(elementSerializer.descriptor)

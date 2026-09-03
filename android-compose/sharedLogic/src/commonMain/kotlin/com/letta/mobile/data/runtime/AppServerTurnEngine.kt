@@ -1717,22 +1717,17 @@ class AppServerTurnEngine(
         // Reject delayed frames stamped for a prior reconnect generation even when
         // the live provider has already advanced (or a new lease shares the runtime).
         val frameGeneration = connectionGeneration
-        if (frameGeneration != null && frameGeneration != lease.connectionGeneration) {
-            return false
-        }
+        if (frameGeneration != null && frameGeneration != lease.connectionGeneration) return false
         // Generation mismatch is handled by the collect loop (terminate turn).
         if (lease.connectionGeneration != connectionGenerationProvider()) return false
-        val eventRuntime = frame.runtime
-        if (eventRuntime == null) {
+        val eventRuntime = frame.runtime ?: return when (val f = frame) {
             // lgns8.22.4: runtime-less auth/admin/unknown frames are not turn
             // wildcards. External-tool / control requests correlate through the
             // inbound registry (registered by fanout or here on the direct path).
-            return when (val f = frame) {
-                is AppServerInboundFrame.ExternalToolCallRequest,
-                is AppServerInboundFrame.ControlRequest,
-                -> claimInboundControlDelivery(f, leaseRef.token, lease.connectionGeneration)
-                else -> false
-            }
+            is AppServerInboundFrame.ExternalToolCallRequest,
+            is AppServerInboundFrame.ControlRequest,
+            -> claimInboundControlDelivery(f, leaseRef.token, lease.connectionGeneration)
+            else -> false
         }
         if (eventRuntime.agentId != scope.agentId ||
             eventRuntime.conversationId != scope.conversationId

@@ -876,7 +876,7 @@ class IrohChannelTransport(
      */
     override fun cancel(conversationId: String): Boolean {
         val turn = turnRegistry.getActiveTurn(IrohConversationId(conversationId))
-        if (turn == null) return cancelWithoutActiveTurn(conversationId)
+            ?: return cancelWithoutActiveTurn(conversationId)
         Telemetry.event(
             "IrohTransport", "cancel.begin",
             "conversationId" to conversationId,
