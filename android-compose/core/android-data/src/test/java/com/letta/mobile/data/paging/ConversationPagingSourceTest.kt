@@ -218,8 +218,8 @@ class ConversationPagingSourceTest {
         assert(result is PagingSource.LoadResult.Error)
     }
 
-    @Test(expected = kotlinx.coroutines.CancellationException::class)
-    fun `load propagates CancellationException when cancelled`() = runTest {
+    @Test
+    fun `load propagates CancellationException when cancelled`() {
         val throwingLoader: ConversationPageLoader = { _, _, _, _, _, _, _ ->
             throw kotlinx.coroutines.CancellationException("paging cancelled")
         }
@@ -227,7 +227,12 @@ class ConversationPagingSourceTest {
             conversationApi = armedConversationApi(),
             pageLoader = throwingLoader,
         )
-        source.load(refresh(loadSize = 50))
+        val ex = org.junit.Assert.assertThrows(kotlinx.coroutines.CancellationException::class.java) {
+            runTest {
+                source.load(refresh(loadSize = 50))
+            }
+        }
+        assertEquals("paging cancelled", ex.message)
     }
 
     @Test
