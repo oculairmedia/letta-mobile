@@ -105,7 +105,7 @@ class NativeSkillsCatalog {
                 val advertised = extractSkills(frame.deviceStatus["current_available_skills"])
                 // A hard-coded empty array is not an enumeration. Only a populated
                 // array is evidence that the server knows about any skills at all.
-                if (advertised != null && advertised.isNotEmpty()) {
+                if (!advertised.isNullOrEmpty()) {
                     hydrate(advertised, SkillCatalogOrigin.DeviceStatus)
                 }
             }

@@ -36,8 +36,7 @@ internal fun TimelineEvent.Confirmed.hasExplicitApprovalResponse(evidence: Appro
     val requestId = approvalRequestId?.takeIf(String::isNotBlank) ?: return false
     val response = evidence.responsesByRequestId[requestId]
         .orEmpty()
-        .filter(ApprovalResponseMessage::hasExplicitDecision)
-        .singleOrNull()
+        .singleOrNull(ApprovalResponseMessage::hasExplicitDecision)
         ?: return false
     return response.runId.isCompatibleRun(runId)
 }
@@ -155,7 +154,7 @@ internal fun TimelineEvent.Confirmed.matchesApprovalResponse(response: ApprovalR
         (runId.isNullOrBlank() || response.runId.isNullOrBlank() || runId == response.runId)
 
 internal fun Timeline.matchingApprovalEvent(response: ApprovalResponseMessage): TimelineEvent.Confirmed? =
-    events.filterIsInstance<TimelineEvent.Confirmed>().filter { it.matchesApprovalResponse(response) }.singleOrNull()
+    events.filterIsInstance<TimelineEvent.Confirmed>().singleOrNull { it.matchesApprovalResponse(response) }
 
 internal fun TimelineEvent.Confirmed.takeMatchingPendingReturns(
     pendingReturns: MutableMap<String, ToolReturnMessage>,

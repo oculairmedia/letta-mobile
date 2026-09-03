@@ -83,9 +83,9 @@ internal class CumulativeStreamText {
      */
     private fun textKey(delta: JsonObject, messageType: String): String {
         val otid = delta["otid"]?.jsonPrimitive?.contentOrNull
-        if (otid != null && otid.isNotBlank()) return "$otid:$messageType"
+        if (!otid.isNullOrBlank()) return "$otid:$messageType"
         val runId = delta["run_id"]?.jsonPrimitive?.contentOrNull
-        if (runId != null && runId.isNotBlank()) return "$runId:$messageType"
+        if (!runId.isNullOrBlank()) return "$runId:$messageType"
         // Last resort only — prefer message_id over rotating frame id.
         return delta["message_id"]?.jsonPrimitive?.contentOrNull
             ?: delta["id"]?.jsonPrimitive?.contentOrNull

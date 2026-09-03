@@ -52,7 +52,7 @@ object PairingAdminHandlers {
     ) {
         if (pairing == null) return
         val qrEnabled = qrSigner !is NoOpPairQrSigner &&
-            qrNodeIdHex != null && qrNodeIdHex.isNotBlank()
+            !qrNodeIdHex.isNullOrBlank()
         val effectiveSigner = if (qrEnabled) qrSigner else NoOpPairQrSigner
         val effectiveNodeId = qrNodeIdHex?.takeIf { it.isNotBlank() } ?: ""
 
