@@ -434,7 +434,7 @@ internal fun StreamingMarkdownDocumentBlock.supportsAppendedDeltaFade(): Boolean
     }
 
 internal fun String.isUnicodeSafeBoundary(index: Int): Boolean {
-    if (index <= 0 || index >= length) return true
+    if (index !in 1 until length) return true
     if (Character.isLowSurrogate(this[index]) && Character.isHighSurrogate(this[index - 1])) {
         return false
     }

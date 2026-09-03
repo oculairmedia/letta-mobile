@@ -199,7 +199,7 @@ class TimelineRecentMessagesReconciler(
             (allowWhileStreamActive || !request.allowWhileStreamActive)
 
     private fun ReconcileRequest.isOlderThan(generation: Long): Boolean =
-        connectionGeneration > DEFAULT_CONNECTION_GENERATION && connectionGeneration < generation
+        connectionGeneration in (DEFAULT_CONNECTION_GENERATION + 1) until generation
 
     private suspend fun isSupersededGeneration(connectionGeneration: Long): Boolean =
         connectionGeneration > DEFAULT_CONNECTION_GENERATION &&

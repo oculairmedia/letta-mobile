@@ -89,14 +89,13 @@ internal class ExternalToolDispatcher(
         leaseToken: Long,
         validatedGeneration: Long,
     ) {
-        val generation = validatedGeneration
         val ref = InboundControlRequestRegistry.RequestRef(request.requestId, request.toolCallId)
         // Direct client.events path may not have gone through the fanout register.
         inboundControlRegistry.register(
             InboundControlRequestRegistry.RegisterRequest(
                 requestId = request.requestId,
                 kind = InboundControlRequestRegistry.Kind.ExternalTool,
-                connectionGeneration = generation,
+                connectionGeneration = validatedGeneration,
                 agentId = request.runtime?.agentId,
                 conversationId = request.runtime?.conversationId,
                 toolCallId = request.toolCallId,
@@ -104,15 +103,15 @@ internal class ExternalToolDispatcher(
         )
         // matches() already claimed delivery for this lease; only answer if we own it
         // (or claim here on paths that skipped the registry match branch).
-        if (!inboundControlRegistry.ownsClaim(ref, leaseToken, generation) &&
-            !inboundControlRegistry.tryClaim(ref, leaseToken, generation)
+        if (!inboundControlRegistry.ownsClaim(ref, leaseToken, validatedGeneration) &&
+            !inboundControlRegistry.tryClaim(ref, leaseToken, validatedGeneration)
         ) {
             Telemetry.event(
                 TELEMETRY_SOURCE, "externalTool.claimSkipped",
                 "requestId" to request.requestId,
                 "toolCallId" to request.toolCallId,
                 "leaseToken" to leaseToken,
-                "generation" to generation,
+                "generation" to validatedGeneration,
             )
             return
         }
@@ -122,17 +121,17 @@ internal class ExternalToolDispatcher(
         // flip this request back to Pending WHILE the tool is still running, letting
         // a replay or successor lease execute a non-idempotent tool a second time.
         // Detaching keeps ownership with the invocation until it answers or releases.
-        inboundControlRegistry.markDetached(ref, leaseToken, generation)
+        inboundControlRegistry.markDetached(ref, leaseToken, validatedGeneration)
         // Fence BEFORE invoking a possibly non-idempotent handler: if the
         // connection died between the claim and here, the tool must not run and
         // this claim is returned so the successor generation's replay can own it.
-        if (abortStale(request, leaseToken, generation, phase = "beforeInvoke")) return
+        if (abortStale(request, leaseToken, validatedGeneration, phase = "beforeInvoke")) return
         val cached = resultCache.get(request.resultCacheKey())
         val result: AppServerExternalToolResult = cached ?: computeAndCacheResult(request)
         // Tool invocation is a suspension point: re-fence before sending so an
         // old-generation response is not written onto the successor connection.
         // The result is cached, so the replay answers without re-invoking.
-        if (abortStale(request, leaseToken, generation, phase = "beforeSend")) return
+        if (abortStale(request, leaseToken, validatedGeneration, phase = "beforeSend")) return
         Telemetry.event(
             TELEMETRY_SOURCE, "externalTool.responded",
             "requestId" to request.requestId,
@@ -151,7 +150,7 @@ internal class ExternalToolDispatcher(
             // an earlier send failure, then re-claimed by a successor), retiring the
             // identity here would delete the successor's LIVE claim and strand its
             // response. markAnsweredBy no-ops unless we still own it.
-            inboundControlRegistry.markAnsweredBy(ref, leaseToken, generation)
+            inboundControlRegistry.markAnsweredBy(ref, leaseToken, validatedGeneration)
             // lgns8.22.4.1.6: the cached result is deliberately RETAINED. A one-way
             // send is an AmbiguousMutation — if the server never received it, it
             // replays the request and the replay must reuse this result rather than
@@ -161,7 +160,7 @@ internal class ExternalToolDispatcher(
             Telemetry.error(TELEMETRY_SOURCE, "externalTool.responseSendFailed", it)
             // Keep retriable: server never saw the response and will re-emit.
             // Cached result above prevents re-invoking the tool on replay.
-            inboundControlRegistry.releaseClaim(ref, leaseToken, generation)
+            inboundControlRegistry.releaseClaim(ref, leaseToken, validatedGeneration)
         }
     }
 
