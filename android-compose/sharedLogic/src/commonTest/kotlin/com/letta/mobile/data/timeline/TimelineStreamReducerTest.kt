@@ -1897,6 +1897,76 @@ class TimelineStreamReducerTest {
         confirmed.agentId shouldBe "agent-A"
     }
 
+    @Test
+    fun `run-id-less cumulative fragments grow one row instead of stranding the opening bubble lf4hh`() {
+        // On-device symptom (desktop, 2026-09-03): one reply rendered as TWO bubbles,
+        // "Hey" above "Hey there! Still connected." The frames carried no otid and NO
+        // run id, so the otid merge, the same-run prefix skip and the forward-growth
+        // merge all missed and the second cumulative fragment appended a new row.
+        var tl = reduce(frame = AssistantMessage(id = "letta-msg-1", contentRaw = JsonPrimitive("Hey"))).next
+        tl = reduce(
+            prev = tl,
+            frame = AssistantMessage(id = "letta-msg-2", contentRaw = JsonPrimitive("Hey there! Still connected.")),
+        ).next
+
+        val rows = tl.events.filterIsInstance<TimelineEvent.Confirmed>()
+            .filter { it.messageType == TimelineMessageType.ASSISTANT }
+        assertEquals(1, rows.size, "rows: " + rows.joinToString("|") { it.content })
+        rows.single().content shouldBe "Hey there! Still connected."
+    }
+
+    @Test
+    fun `blank-run growth does not fire when the incoming fragment carries a real run id lf4hh`() {
+        // #827 shape: a settled reconciled row (runId = null) must not be grown by a
+        // streamed fragment that carries its own real run id, however similar the text.
+        var tl = timeline().mergeServerMessages(
+            listOf(
+                AssistantMessage(id = "ui-msg-old", contentRaw = JsonPrimitive("Hey"), runId = null, otid = "ui-msg-old")
+            )
+        ).first
+        tl = reduce(
+            prev = tl,
+            frame = AssistantMessage(
+                id = "letta-msg-9",
+                contentRaw = JsonPrimitive("Hey there, how are"),
+                runId = "local-run-9",
+                otid = "provider-assistant-1-z",
+                seqId = 9,
+            ),
+        ).next
+
+        val rows = tl.events.filterIsInstance<TimelineEvent.Confirmed>()
+            .filter { it.messageType == TimelineMessageType.ASSISTANT }
+        assertEquals(2, rows.size, "rows: " + rows.joinToString("|") { it.content })
+    }
+
+    @Test
+    fun `blank-run growth never absorbs a settled older reply with the same prefix lf4hh`() {
+        // The date window, not the run id, is what keeps an older run-id-less reply
+        // safe when a NEW turn opens with text that happens to extend it.
+        var tl = timeline().mergeServerMessages(
+            listOf(
+                AssistantMessage(
+                    id = "ui-msg-old",
+                    contentRaw = JsonPrimitive("Hey"),
+                    date = "2020-01-01T00:00:00Z",
+                    runId = null,
+                    otid = "ui-msg-old",
+                )
+            )
+        ).first
+        tl = reduce(
+            prev = tl,
+            frame = AssistantMessage(id = "letta-msg-9", contentRaw = JsonPrimitive("Hey there, a brand new turn.")),
+        ).next
+
+        val rows = tl.events.filterIsInstance<TimelineEvent.Confirmed>()
+            .filter { it.messageType == TimelineMessageType.ASSISTANT }
+        assertEquals(2, rows.size, "rows: " + rows.joinToString("|") { it.content })
+        rows[0].content shouldBe "Hey"
+        rows[1].content shouldBe "Hey there, a brand new turn."
+    }
+
     private fun reduce(
         prev: Timeline = timeline(),
         frame: com.letta.mobile.data.model.LettaMessage,
