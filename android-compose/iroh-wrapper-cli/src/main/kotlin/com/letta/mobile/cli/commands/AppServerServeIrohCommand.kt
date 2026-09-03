@@ -27,11 +27,14 @@ import com.letta.mobile.data.controller.node.iroh.IrohAuthPolicyResolution
 import com.letta.mobile.data.controller.node.iroh.IrohPairingService
 import com.letta.mobile.data.controller.node.iroh.SubagentRegistrySource
 import com.letta.mobile.data.controller.node.iroh.IrohNodeEndpoint
+import com.letta.mobile.data.controller.node.iroh.NativeSkillsCatalog
 import com.letta.mobile.data.runtime.AppServerContextWindowPreflight
+import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
 import com.letta.mobile.data.transport.appserver.DualLaneAppServerClient
 import com.letta.mobile.data.transport.appserver.KtorAppServerWebSocketTransport
 import com.letta.mobile.data.transport.appserver.applyAppServerDefaults
+import com.letta.mobile.util.Telemetry
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.HttpTimeout
@@ -79,8 +82,8 @@ fun buildProductionAdminRouter(
      * previous in-memory-only behaviour.
      */
     subagentRegistryFile: String? = null,
-    pairingService: com.letta.mobile.data.controller.node.iroh.IrohPairingService? = null,
-    nativeClient: com.letta.mobile.data.transport.appserver.AppServerClient? = null,
+    pairingService: IrohPairingService? = null,
+    nativeClient: AppServerClient? = null,
     vibesyncBaseUrl: String? = null,
     /**
      * lgns8.9: the letta-code on-disk backend root. Admin READS the App Server
@@ -99,24 +102,24 @@ fun buildProductionAdminRouter(
     skillsDir: String? = null,
     eventScope: CoroutineScope? = null,
 ): AdminRpcRouter {
-    val skillsCatalog = com.letta.mobile.data.controller.node.iroh.NativeSkillsCatalog()
+    val skillsCatalog = NativeSkillsCatalog()
     // Cold-start discovery: hydrate BEFORE the router is built, so the very first
     // skill.list after a restart is already authoritative (lgns8.21.2 AC:
     // "discovery at cold start" + "preserved across restart" — the skills root is
     // on disk, so re-enumerating on every boot preserves it by construction).
-    val resolvedSkillsDir = com.letta.mobile.data.controller.node.iroh.HostSkillsEnumerator
+    val resolvedSkillsDir = HostSkillsEnumerator
         .resolveSkillsDir(skillsDir)
-    com.letta.mobile.data.controller.node.iroh.HostSkillsEnumerator.enumerate(resolvedSkillsDir)
+    HostSkillsEnumerator.enumerate(resolvedSkillsDir)
         ?.let { enumerated ->
             skillsCatalog.hydrateFromHost(enumerated)
-            com.letta.mobile.util.Telemetry.event(
+            Telemetry.event(
                 "SkillsCatalog",
                 "host.hydrated",
                 "skillsDir" to resolvedSkillsDir,
                 "skills" to enumerated.size.toString(),
             )
         }
-        ?: com.letta.mobile.util.Telemetry.event(
+        ?: Telemetry.event(
             "SkillsCatalog",
             "host.root_missing",
             "skillsDir" to resolvedSkillsDir,
@@ -356,6 +359,7 @@ class AppServerServeIrohCommand : CliktCommand(
             "Only used with --own-app-server.",
     ).default("letta")
 
+    @Suppress("NoDetachedCoroutineLifecycle")
     override fun run() = runBlocking {
         val scope = CoroutineScope(Dispatchers.IO)
         
@@ -511,6 +515,8 @@ class AppServerServeIrohCommand : CliktCommand(
             while (true) {
                 delay(1.seconds)
             }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             System.err.println("[iroh-app-server] Error: ${e.message}")
             e.printStackTrace()
@@ -662,6 +668,7 @@ class AppServerServeIrohCommand : CliktCommand(
      * Mint one connection generation: a fresh WS transport + client on a job
      * child of [scope], closable independently of its successors.
      */
+    @Suppress("NoDetachedCoroutineLifecycle")
     private fun mintGeneration(
         httpClient: HttpClient,
         appServerUrl: String,
