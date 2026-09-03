@@ -22,6 +22,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class TimelineStreamReducerTest {
     @AfterTest
@@ -876,7 +877,7 @@ class TimelineStreamReducerTest {
     }
 
     @Test
-    fun `reconcile copy with backend-minted id does not duplicate identical live row`() {
+    fun `ui-msg final without exact alias preserves identical live row`() {
         val live = reduce(
             frame = AssistantMessage(
                 id = "letta-msg-166",
@@ -897,9 +898,9 @@ class TimelineStreamReducerTest {
             )
         )
 
-        changed shouldBe 0
-        mergedTimeline.events shouldHaveSize 1
-        (mergedTimeline.events.single() as TimelineEvent.Confirmed).serverId shouldBe "letta-msg-166"
+        changed shouldBe 1
+        mergedTimeline.events shouldHaveSize 2
+        (mergedTimeline.events.first() as TimelineEvent.Confirmed).serverId shouldBe "letta-msg-166"
     }
 
     @Test
@@ -1720,6 +1721,19 @@ class TimelineStreamReducerTest {
         tl.events shouldHaveSize 1
         val event = tl.events.single() as TimelineEvent.Confirmed
         event.content shouldBe "Hey back. Still here."
+    }
+
+    @Test
+    fun `ui-msg final without exact alias preserves identical content rows and emits telemetry`() {
+        Telemetry.clear()
+        var tl = reduce(frame = AssistantMessage(
+            id = "cm-stream-logical-live", contentRaw = JsonPrimitive("same"), runId = "run-1", otid = "logical-live", seqId = 1,
+        )).next
+        tl = tl.mergeServerMessages(listOf(
+            AssistantMessage(id = "ui-msg-final", contentRaw = JsonPrimitive("same"), runId = null, otid = "ui-msg-final", seqId = null),
+        )).first
+        assertEquals(2, tl.events.filterIsInstance<TimelineEvent.Confirmed>().count { it.messageType == TimelineMessageType.ASSISTANT })
+        assertTrue(Telemetry.snapshot().any { it.name == "recentReconcile.unresolvedCrossBoundaryIdentity" })
     }
 
     @Test

@@ -45,6 +45,27 @@ class IrohStreamDeltaServerFrameMapperTest {
     }
 
     @Test
+    fun mapsRotatingAssistantFragmentsByStableMessageId() {
+        fun assistant(id: String, content: String) = assertIs<ServerFrame.AssistantMessage>(map(
+            """{"type":"stream_delta","idempotency_key":"$id","delta":{"id":"$id","message_id":"logical-1","message_type":"assistant_message","content":"$content"}}""",
+        ).single())
+
+        val first = assistant("delivery-1", "not a prefix")
+        val second = assistant("delivery-2", "completely different")
+
+        assertEquals("logical-1", first.id)
+        assertEquals(first.id, second.id)
+    }
+
+    @Test
+    fun stableCmStreamIdWinsOverMessageId() {
+        val frame = assertIs<ServerFrame.AssistantMessage>(map(
+            """{"type":"stream_delta","delta":{"id":"cm-stream-authoritative","message_id":"other","message_type":"assistant_message","content":"x"}}""",
+        ).single())
+        assertEquals("cm-stream-authoritative", frame.id)
+    }
+
+    @Test
     fun mapsReasoningToolCallAndToolReturnDeltasToTypedFrames() {
         val reasoning = assertIs<ServerFrame.ReasoningMessage>(
             map(

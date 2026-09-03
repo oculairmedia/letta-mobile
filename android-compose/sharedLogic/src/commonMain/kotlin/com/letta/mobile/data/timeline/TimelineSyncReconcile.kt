@@ -80,21 +80,6 @@ fun Timeline.mergeServerMessages(
         }
         if (timeline.containsIdentityFor(confirmed)) return@forEach
         val existingByServerId = timeline.findByServerId(confirmed.serverId, confirmed.messageType)
-        if (existingByServerId == null && timeline.recentTailContainsEquivalent(confirmed)) {
-            // The HTTP backend mints its OWN message ids (ui-msg-*) that never
-            // match the App Server ids (letta-msg-*) carried by the live Iroh
-            // frames, and it omits run_id/original otid. No id-based identity
-            // can catch that copy, so a live-delivered reply re-appends on the
-            // next reconcile poll. Dedupe by (messageType + identical trimmed
-            // content) within the recent tail window instead of inserting.
-            Telemetry.event(
-                "TimelineSync", "recentReconcile.contentDeduped",
-                "conversationId" to timeline.conversationId,
-                "serverId" to confirmed.serverId,
-                "messageType" to confirmed.messageType.name,
-            )
-            return@forEach
-        }
         if (existingByServerId?.canReplaceIrohSyntheticLiveRow(confirmed) == true) {
             // letta-mobile-9lgfu: terminal settlement fence. The synthetic live
             // row may already hold deltas the reconciled snapshot predates; a
@@ -105,6 +90,31 @@ fun Timeline.mergeServerMessages(
             timeline = timeline.replaceByServerId(settled)
             merged++
         } else if (existingByServerId == null) {
+            // Exact fixed-field aliases are the only valid cross-boundary link.
+            // Do not treat content, run, or turn as identity: each can describe
+            // distinct assistant messages.
+            val exactAliasIndex = timeline.findExactAssistantAliasIndex(confirmed)
+            // Legacy content fallbacks below remain intentionally untouched for
+            // non-ui-msg server records until their call sites gain exact aliases.
+            // ui-msg finals bypass them and emit telemetry instead of corrupting
+            // distinct rows that merely look related.
+            if (confirmed.serverId.startsWith("ui-msg-") && exactAliasIndex == null) {
+                Telemetry.event(
+                    "TimelineSync", "recentReconcile.unresolvedCrossBoundaryIdentity",
+                    "conversationId" to timeline.conversationId,
+                    "serverId" to confirmed.serverId,
+                    "messageType" to confirmed.messageType.name,
+                    level = Telemetry.Level.WARN,
+                )
+                timeline = timeline.insertOrdered(confirmed)
+                merged++
+                return@forEach
+            }
+            if (exactAliasIndex != null) {
+                timeline = timeline.replaceEventAt(exactAliasIndex, confirmed.copy(position = timeline.events[exactAliasIndex].position))
+                merged++
+                return@forEach
+            }
             val prefixIndex = timeline.findRecentAssistantPrefixIndex(confirmed)
             // letta-mobile-x1xnl (SECOND path). The live Iroh stream lands the
             // assistant reply as a draft row keyed on the turn-anchored SYNTHETIC
@@ -183,6 +193,18 @@ private fun Timeline.replaceEventAt(index: Int, event: TimelineEvent.Confirmed):
             residentOtids = updatedEvents.mapTo(mutableSetOf()) { it.otid }.toPersistentSet(),
             invariantsKnown = true,
         )
+}
+
+private fun Timeline.findExactAssistantAliasIndex(incoming: TimelineEvent.Confirmed): Int? {
+    if (incoming.messageType != TimelineMessageType.ASSISTANT) return null
+    for (index in events.indices.reversed()) {
+        val event = events[index] as? TimelineEvent.Confirmed ?: continue
+        if (event.messageType != TimelineMessageType.ASSISTANT) continue
+        if (event.serverId == incoming.serverId || event.otid == incoming.otid ||
+            event.serverId == incoming.otid || event.otid == incoming.serverId
+        ) return index
+    }
+    return null
 }
 
 private fun Timeline.findRecentAssistantPrefixIndex(incoming: TimelineEvent.Confirmed): Int? {
