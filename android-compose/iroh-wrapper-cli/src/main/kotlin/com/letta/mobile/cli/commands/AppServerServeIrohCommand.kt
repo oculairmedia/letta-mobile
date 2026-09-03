@@ -45,6 +45,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -362,8 +363,18 @@ class AppServerServeIrohCommand : CliktCommand(
     @Suppress("NoDetachedCoroutineLifecycle")
     override fun run() = runBlocking {
         val scope = CoroutineScope(Dispatchers.IO)
-        
-        try {
+        var irohEndpoint: IrohNodeEndpoint? = null
+        var ownedServer: com.letta.mobile.cli.appserver.OwnedAppServerProcess? = null
+
+        runWithLifecycleCleanup(
+            scope = scope,
+            cleanup = {
+                println("\n[iroh-app-server] Shutting down...")
+                runCatching { irohEndpoint?.shutdown() }
+                runCatching { ownedServer?.close() }
+                scope.cancel()
+            },
+        ) {
             val authPolicy = resolveAuthPolicy()
 
             val pairingService = pairingStoreFile?.let { storePath ->
@@ -374,20 +385,21 @@ class AppServerServeIrohCommand : CliktCommand(
             println("[iroh-app-server] Starting Iroh endpoint...")
             
             // Create the Iroh endpoint
-            val irohEndpoint = IrohNodeEndpoint(
+            val endpoint = IrohNodeEndpoint(
                 scope = scope,
                 bindAddr = "0.0.0.0:${irohPort}",
                 secretKeyPath = irohSecretKeyPath,
                 authPolicy = authPolicy,
                 pairingService = pairingService,
             )
-            irohEndpoint.create()
+            irohEndpoint = endpoint
+            endpoint.create()
             
-            printDialInfo(irohEndpoint)
+            printDialInfo(endpoint)
 
             // lgns8.18 (Path A, desktop): optionally spawn + OWN the App Server child
             // on an ephemeral loopback port, instead of connecting to an external URL.
-            val ownedServer = maybeSpawnOwnedAppServer(scope)
+            ownedServer = maybeSpawnOwnedAppServer(scope)
             val effectiveAppServerUrl = ownedServer?.wsBaseUrl ?: appServerUrl
 
             // Create the controller. With --own-app-server this connects the WS
@@ -409,15 +421,12 @@ class AppServerServeIrohCommand : CliktCommand(
                 localBackendDir = localBackendDir ?: System.getenv("LETTA_LOCAL_BACKEND_DIR"),
                 eventScope = scope,
             )
-            irohEndpoint.adminRpcRouter.copyHandlersFrom(adminRpcRouter)
+            endpoint.adminRpcRouter.copyHandlersFrom(adminRpcRouter)
             println(
                 "[iroh-app-server] admin_rpc handlers registered " +
                     "(methods: ${adminRpcRouter.methodCount}, " +
                     "subagent_registry_v1: ${AdminRpcRegistry.subagentMethods.all { it in adminRpcRouter.registeredMethods }})",
             )
-            // The two wirings whose ABSENCE silently blanked the memory and skills
-            // surfaces after the 2026-08-01 cutover. Print them so a deploy can be
-            // verified from the log instead of from a client round trip.
             println(
                 "[iroh-app-server] local_backend_store: " +
                     (localBackendDir ?: System.getenv("LETTA_LOCAL_BACKEND_DIR") ?: "UNSET (block.list/agent.context fail closed)"),
@@ -426,102 +435,113 @@ class AppServerServeIrohCommand : CliktCommand(
             printChannelsHostBanner()
 
             // Start accepting connections
-            irohEndpoint.start(controller)
+            endpoint.start(controller)
             println("[iroh-app-server] Listening on Iroh... (Ctrl+C to stop)")
 
-            // letta-mobile-bn008.6: bind the a2a (direct agent-to-agent) receiver.
-            // The receiver's accept loop runs on the wrapper's main scope so the
-            // shutdown hook below cancels it. Disable with --a2a-port=-1; the default
-            // is to enable with an OS-assigned port (the address-book entry carries
-            // the dialable addr, so pinning the port is not required for peers).
-            //
-            // N9 (PR #1125): `a2aPort` is now an Int (option declared via
-            // `.int().default(0)`), so the old `a2aPort.toIntOrNull()`-and-fallback
-            // dance is gone — the parser owns the type conversion.
-            if (a2aPort < 0) {
-                println("[iroh-app-server] a2a receiver: DISABLED (--a2a-port=$a2aPort)")
-            } else {
-                // N8 (PR #1125): hoist the LETTA_IROH_HOME fallback so the
-                // address-book and identity-dir defaults can't drift apart
-                // (the previous duplicated expression was a footgun the day a
-                // future operator sets the envvar on only one path).
-                val irohHome = java.io.File(
-                    System.getenv("LETTA_IROH_HOME") ?: "${System.getProperty("user.home")}/.letta/iroh",
-                )
-                val effectiveAddressBook: java.io.File = a2aAddressBook
-                    ?.let { java.io.File(it) }
-                    ?: java.io.File(irohHome, "agent-addresses.kv")
-                val effectiveIdentityDir: java.io.File = a2aIdentityDir
-                    ?.let { java.io.File(it) }
-                    ?: java.io.File(irohHome, "identities")
-                val localBackendFile = (localBackendDir ?: System.getenv("LETTA_LOCAL_BACKEND_DIR"))
-                    ?.takeIf { it.isNotBlank() }
-                    ?.let { java.io.File(it) }
-                val a2aCfg = A2aWiringConfig(
-                    // N8 (PR #1125): the `else` branch above already guarantees
-                    // `a2aPort >= 0`, so the previous `coerceAtLeast(0)` was
-                    // dead code.
-                    port = a2aPort,
-                    secretKeyPath = irohSecretKeyPath,
-                    identityDir = effectiveIdentityDir,
-                    addressBook = effectiveAddressBook,
-                )
-                // B1 (PR #1125): degrade gracefully when the a2a receiver can't
-                // be built. letta-mobile-xmpqm: the address-book seed is no
-                // longer required for the receiver to come up — the host record
-                // is written by [publishHost] during the build itself. The
-                // fallback here still exists for any setup-time failure (e.g.
-                // permission denied on the kv file, or a host record that can't
-                // be written for some other reason).
-                val wiring = runCatching {
-                    buildA2aWiring(
-                        config = a2aCfg,
-                        client = nativeAdminClient,
-                        localBackendDir = localBackendFile,
-                    )
-                }.getOrElse { t ->
-                    println(
-                        "[iroh-app-server] a2a receiver: DISABLED (${t.message}). " +
-                            "Check $effectiveAddressBook is writable.",
-                    )
-                    null
-                }
-                if (wiring != null) {
-                    val acceptJob = wiring.start(scope)
-                    scope.coroutineContext[Job]?.invokeOnCompletion { _ ->
-                        runCatching { acceptJob.cancel() }
-                        runCatching { wiring.close() }
-                    }
-                    println(
-                        "[iroh-app-server] a2a receiver: BOUND " +
-                            "(node=${wiring.nodeIdHex}, port=$a2aPort, " +
-                            "address_book=${effectiveAddressBook.absolutePath}, " +
-                            "local_backend=${localBackendFile?.absolutePath ?: "UNSET (membership gate disabled)"})",
-                    )
-                }
+            setupA2aReceiver(scope, nativeAdminClient)
+
+            awaitServerLoop()
+        }
+    }
+
+    private suspend fun setupA2aReceiver(
+        scope: CoroutineScope,
+        nativeAdminClient: AppServerClient?,
+    ) {
+        if (a2aPort < 0) {
+            println("[iroh-app-server] a2a receiver: DISABLED (--a2a-port=$a2aPort)")
+            return
+        }
+        val irohHome = java.io.File(
+            System.getenv("LETTA_IROH_HOME") ?: "${System.getProperty("user.home")}/.letta/iroh",
+        )
+        val effectiveAddressBook: java.io.File = a2aAddressBook
+            ?.let { java.io.File(it) }
+            ?: java.io.File(irohHome, "agent-addresses.kv")
+        val effectiveIdentityDir: java.io.File = a2aIdentityDir
+            ?.let { java.io.File(it) }
+            ?: java.io.File(irohHome, "identities")
+        val localBackendFile = (localBackendDir ?: System.getenv("LETTA_LOCAL_BACKEND_DIR"))
+            ?.takeIf { it.isNotBlank() }
+            ?.let { java.io.File(it) }
+        val a2aCfg = A2aWiringConfig(
+            port = a2aPort,
+            secretKeyPath = irohSecretKeyPath,
+            identityDir = effectiveIdentityDir,
+            addressBook = effectiveAddressBook,
+        )
+        val wiring = runCatching {
+            buildA2aWiring(
+                config = a2aCfg,
+                client = nativeAdminClient,
+                localBackendDir = localBackendFile,
+            )
+        }.getOrElse { t ->
+            println(
+                "[iroh-app-server] a2a receiver: DISABLED (${t.message}). " +
+                    "Check $effectiveAddressBook is writable.",
+            )
+            null
+        }
+        if (wiring != null) {
+            val acceptJob = wiring.start(scope)
+            scope.coroutineContext[Job]?.invokeOnCompletion { _ ->
+                runCatching { acceptJob.cancel() }
+                runCatching { wiring.close() }
             }
-            
-            // Keep the server running
-            // In production, this would handle graceful shutdown signals
-            Runtime.getRuntime().addShutdownHook(Thread {
-                runBlocking {
-                    println("\n[iroh-app-server] Shutting down...")
-                    irohEndpoint.shutdown()
-                    scope.cancel()
-                }
-            })
-            
-            // Wait indefinitely
-            while (true) {
-                delay(1.seconds)
+            println(
+                "[iroh-app-server] a2a receiver: BOUND " +
+                    "(node=${wiring.nodeIdHex}, port=$a2aPort, " +
+                    "address_book=${effectiveAddressBook.absolutePath}, " +
+                    "local_backend=${localBackendFile?.absolutePath ?: "UNSET (membership gate disabled)"})",
+            )
+        }
+    }
+
+    internal suspend fun awaitServerLoop() {
+        while (true) {
+            delay(1.seconds)
+        }
+    }
+
+    internal suspend fun <T> runWithLifecycleCleanup(
+        scope: CoroutineScope,
+        cleanup: suspend () -> Unit,
+        shutdownHookRegistry: (Thread) -> Unit = { Runtime.getRuntime().addShutdownHook(it) },
+        shutdownHookDeregistry: (Thread) -> Unit = { runCatching { Runtime.getRuntime().removeShutdownHook(it) } },
+        exitHandler: (Int) -> Nothing = { exitProcess(it) },
+        action: suspend () -> T,
+    ): T {
+        val cleanupRan = java.util.concurrent.atomic.AtomicBoolean(false)
+        suspend fun executeCleanup() {
+            if (!cleanupRan.compareAndSet(false, true)) return
+            cleanup()
+        }
+
+        val shutdownHook = Thread {
+            runBlocking {
+                executeCleanup()
             }
+        }
+        shutdownHookRegistry(shutdownHook)
+
+        try {
+            return action()
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
             System.err.println("[iroh-app-server] Error: ${e.message}")
             e.printStackTrace()
-            scope.cancel()
-            exitProcess(1)
+            withContext(NonCancellable) {
+                shutdownHookDeregistry(shutdownHook)
+                executeCleanup()
+            }
+            exitHandler(1)
+        } finally {
+            withContext(NonCancellable) {
+                shutdownHookDeregistry(shutdownHook)
+                executeCleanup()
+            }
         }
     }
 

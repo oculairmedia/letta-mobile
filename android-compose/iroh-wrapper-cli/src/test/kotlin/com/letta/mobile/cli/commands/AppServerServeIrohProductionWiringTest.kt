@@ -9,16 +9,87 @@ import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.async
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import kotlin.time.Duration.Companion.hours
 
 class AppServerServeIrohProductionWiringTest {
+    @Test
+    fun `lifecycle cleanup cancels scope and runs cleanup upon cancellation`() = runTest {
+        val command = AppServerServeIrohCommand()
+        val scope = CoroutineScope(Job() + Dispatchers.Default)
+        var cleanupRan = false
+
+        val job = launch {
+            command.runWithLifecycleCleanup(
+                scope = scope,
+                cleanup = {
+                    cleanupRan = true
+                    scope.cancel()
+                },
+                shutdownHookRegistry = {},
+                shutdownHookDeregistry = {},
+                exitHandler = { error("unexpected exit") },
+            ) {
+                delay(1.hours)
+            }
+        }
+
+        testScheduler.runCurrent()
+        assertFalse(cleanupRan)
+        assertTrue(scope.isActive)
+
+        job.cancel()
+        job.join()
+
+        assertTrue(cleanupRan)
+        assertFalse(scope.isActive)
+    }
+
+    @Test
+    fun `lifecycle cleanup runs exactly once across exception and shutdown hook`() = runTest {
+        val command = AppServerServeIrohCommand()
+        val scope = CoroutineScope(Job() + Dispatchers.Default)
+        val cleanupCount = java.util.concurrent.atomic.AtomicInteger(0)
+        var registeredHook: Thread? = null
+
+        val failure = runCatching {
+            command.runWithLifecycleCleanup(
+                scope = scope,
+                cleanup = {
+                    cleanupCount.incrementAndGet()
+                    scope.cancel()
+                },
+                shutdownHookRegistry = { registeredHook = it },
+                shutdownHookDeregistry = {},
+                exitHandler = { throw IllegalStateException("process exited: $it") },
+            ) {
+                throw RuntimeException("partial initialization failure")
+            }
+        }.exceptionOrNull()
+
+        assertTrue(failure is IllegalStateException)
+        assertEquals(1, cleanupCount.get())
+        assertFalse(scope.isActive)
+
+        // Simulate shutdown hook firing afterwards; cleanup must not run twice
+        registeredHook?.run()
+        assertEquals(1, cleanupCount.get())
+    }
     @Test
     fun `runtime readiness waits for management lane readiness`() = runTest {
         val state = MutableStateFlow<ReconnectingClientState>(ReconnectingClientState.Connecting(attempt = 0))
