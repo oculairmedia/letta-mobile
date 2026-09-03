@@ -470,7 +470,7 @@ class AppServerTurnEngine(
         agentId: String,
         conversationId: String,
         runId: String?,
-    ): AppServerInboundFrame.AbortMessageResponse? {
+    ): AppServerInboundFrame.AbortMessageResponse {
         val key = TurnRuntimeKey(agentId, conversationId)
         val scope = leases.peek(key)?.runtimeScope
             ?: AppServerRuntimeScope(agentId = agentId, conversationId = conversationId)
@@ -2130,7 +2130,7 @@ class AppServerTurnEngine(
          * rationale against the server's own `EXTERNAL_TOOL_CALL_TIMEOUT_MS` is
          * documented). Re-exported here so existing callers/tests keep one name.
          */
-        val EXTERNAL_TOOL_INVOCATION_TIMEOUT_MS: Long = ExternalToolDispatcher.INVOCATION_TIMEOUT_MS
+        const val EXTERNAL_TOOL_INVOCATION_TIMEOUT_MS: Long = ExternalToolDispatcher.INVOCATION_TIMEOUT_MS
 
         /**
          * lgns8.17(d): sentinel lease token for an answer taken with NO turn lease.

@@ -119,7 +119,7 @@ internal fun ShaderLookdevWindow() {
  * Reset to production via the button; port back to AmbientShaderSource.kt
  * once a look is approved.
  */
-private val PROPOSED_DESKTOP_SKSL = """
+private const val PROPOSED_DESKTOP_SKSL = """
 uniform float2 uSize;
 uniform float uTime;
 uniform float uAgitation;
