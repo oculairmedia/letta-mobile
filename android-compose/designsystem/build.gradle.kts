@@ -103,7 +103,7 @@ dependencies {
     // Designsystem stays Hilt-free — VoiceInputViewModel lives in :app.
     implementation(libs.androidx.activity.compose)
     implementation("androidx.core:core-ktx:1.16.0")
-    implementation("com.google.android.material:material:1.14.0")
+    implementation(libs.google.material)
 
     testImplementation(libs.junit4)
     testImplementation(libs.mockk)
