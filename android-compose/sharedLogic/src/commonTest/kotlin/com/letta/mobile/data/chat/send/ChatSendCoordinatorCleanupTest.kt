@@ -279,18 +279,18 @@ class ChatSendCoordinatorCleanupTest {
         val coordinator = coordinator(timeline = timeline, ui = RecordingUiSink(), transport = FakeChannelTransport(mutableListOf(true)), activeConversationId = { "conv-1" })
 
         coordinator.send("hello").join()
-        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "iroh-run-synthetic"))
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", SYNTHETIC_RUN_ID))
         coordinator.handleEvent(WsTimelineEvent.MessageDelta(AssistantMessage(id = "m1", contentRaw = JsonPrimitive("a"), runId = "run-real")))
-        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "iroh-run-synthetic", BridgeTurnStatus.Failed))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", SYNTHETIC_RUN_ID, BridgeTurnStatus.Failed))
         advanceUntilIdle()
 
         assertEquals(
             RecordingTimelineWriter.CleanupTail(
                 agentId = AGENT_ID,
                 conversationId = "conv-1",
-                activeRunId = "iroh-run-synthetic",
+                activeRunId = SYNTHETIC_RUN_ID,
                 activeTurnId = "turn-1",
-                candidateRunIds = setOf("iroh-run-synthetic", "run-real"),
+                candidateRunIds = setOf(SYNTHETIC_RUN_ID, "run-real"),
             ),
             timeline.cleanupTails.single(),
         )
@@ -907,6 +907,7 @@ class ChatSendCoordinatorCleanupTest {
 
     private companion object {
         const val AGENT_ID = "agent-1"
+        const val SYNTHETIC_RUN_ID = "iroh-run-synthetic"
         var otid = 0
     }
 }
