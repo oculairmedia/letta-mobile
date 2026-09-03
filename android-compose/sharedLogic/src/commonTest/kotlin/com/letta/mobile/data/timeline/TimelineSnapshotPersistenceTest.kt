@@ -175,6 +175,9 @@ class TimelineSnapshotPersistenceTest {
         assertEquals(0, first.single().attrs["previousCount"])
         assertEquals(0, first.single().attrs["eventCount"])
         assertEquals(0, first.single().attrs["inserted"])
+        assertEquals(0, first.single().attrs["durableRows"])
+        assertEquals(0, first.single().attrs["residentRows"])
+        assertEquals(0, first.single().attrs["settledEventsVisited"])
 
         fixture.loop.ingestStreamEvent(ConfirmedMessageFixture("raw-server-id", "private message content").message())
         store.rejectNextWrite = true
@@ -191,6 +194,12 @@ class TimelineSnapshotPersistenceTest {
         // advance the baseline; conflation may legitimately persist either
         // the pending event or the latest empty state.
         assertEquals(afterRejectedWrite.attrs["eventCount"], afterRejectedWrite.attrs["inserted"])
+        assertEquals(afterRejectedWrite.attrs["eventCount"], afterRejectedWrite.attrs["durableRows"])
+        assertEquals(afterRejectedWrite.attrs["eventCount"], afterRejectedWrite.attrs["residentRows"])
+        assertEquals(
+            afterRejectedWrite.attrs["comparisonEvents"],
+            afterRejectedWrite.attrs["settledEventsVisited"],
+        )
         assertMutationTelemetryIsBounded(shapes)
         fixture.loop.closeAndJoin()
     }
