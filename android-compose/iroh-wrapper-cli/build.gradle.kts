@@ -55,7 +55,7 @@ version = providers.exec {
     commandLine("git", "rev-parse", "--short=12", "HEAD")
     isIgnoreExitValue = true
 }.standardOutput.asText.map { it.trim() }.orElse("").map { sha ->
-    if (sha.isEmpty()) "dev" else sha
+    sha.ifEmpty { "dev" }
 }.get()
 
 application {
