@@ -19,6 +19,21 @@ interface TimelineTransport {
         order: String? = null,
     ): List<LettaMessage>
 
+    suspend fun listConversationMessagePage(
+        request: TimelineRemotePageRequest,
+        progress: TimelinePageProgress? = null,
+    ): TimelineRemotePageResult {
+        if (request.continuation is TimelineContinuation.Before) {
+            throw TimelineRemotePageException.InvalidRequest(
+                "this transport does not implement before-continuation pages",
+            )
+        }
+        val page = TimelineRemotePageAdapter.load(request) { limit, _, after, order ->
+            listConversationMessages(request.scope.conversationId, limit, after, order)
+        }
+        return progress?.let { TimelineRemotePageProgressClassifier.classify(request, page, it) } ?: page
+    }
+
     suspend fun listAgentMessages(
         agentId: String,
         limit: Int? = null,

@@ -11,8 +11,9 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.JsonObject
-import java.util.concurrent.ConcurrentHashMap
+import io.ktor.http.encodeURLParameter
 
 class IrohAdminRpcTimelineTransport(
     private val channelTransport: IChannelTransport,
@@ -22,6 +23,7 @@ class IrohAdminRpcTimelineTransport(
     // coerceInputValues=true coerce those to property defaults instead of
     // failing to decode with "Expected JsonObject, but had JsonNull" — matching
     // the leniency the agent.get fix (IrohAdminRpcAgentSource) already uses.
+    private val gatedTelemetryPaths: MutableSet<String> = mutableSetOf(),
     private val json: Json = Json {
         ignoreUnknownKeys = true
         isLenient = true
@@ -113,8 +115,65 @@ class IrohAdminRpcTimelineTransport(
         if (!response.success) {
             throw TimelineTransportHttpException(502, response.error ?: "Iroh admin_rpc message.list (before) failed")
         }
-        val result = response.result ?: return MessageListPage(emptyList(), hasMore = null)
+        val result = response.result ?: return MessageListPage(emptyList(), hasMore = null, nextBefore = null)
         return decodeMessageListPage(result)
+    }
+
+    override suspend fun listConversationMessagePage(
+        request: TimelineRemotePageRequest,
+        progress: TimelinePageProgress?,
+    ): TimelineRemotePageResult {
+        val params = buildList {
+            add("limit=${request.budget.maxMetadataRows}")
+            when (val continuation = request.continuation) {
+                TimelineContinuation.Initial -> Unit
+                is TimelineContinuation.Before -> add("before=${continuation.messageId.value.encodeURLParameter()}")
+                is TimelineContinuation.After -> add("after=${continuation.messageId.value.encodeURLParameter()}")
+            }
+            add("order=${request.order.toWireOrder()}")
+        }
+        val path = "/v1/conversations/${request.scope.conversationId}/messages?${params.joinToString("&")}"
+        val response = channelTransport.adminRpc(method = "message.list", path = path, body = null)
+        if (!response.success) {
+            throw TimelineRemotePageException.Transport("Iroh message.list page failed")
+        }
+        val result = response.result ?: return classifyPage(
+            request,
+            TimelineRemotePageAdapter.fromMessages(request, emptyList(), false),
+            progress,
+        )
+        val decoded = decodeMessageListPage(result)
+        val hasMore = decoded.hasMore ?: (decoded.messages.size >= request.budget.maxMetadataRows)
+        val explicitContinuation = when (request.continuation) {
+            is TimelineContinuation.Before -> decoded.nextBefore.asBeforeContinuation()
+            TimelineContinuation.Initial -> if (request.order == TimelineRemoteOrder.NewestFirst) {
+                decoded.nextBefore.asBeforeContinuation()
+            } else {
+                null
+            }
+            is TimelineContinuation.After -> null
+        }
+        val page = TimelineRemotePageAdapter.fromMessages(request, decoded.messages, hasMore, explicitContinuation)
+        return classifyPage(request, page, progress)
+    }
+
+    private fun classifyPage(
+        request: TimelineRemotePageRequest,
+        page: TimelineRemotePageResult.Page,
+        progress: TimelinePageProgress?,
+    ): TimelineRemotePageResult =
+        progress?.let { TimelineRemotePageProgressClassifier.classify(request, page, it) } ?: page
+
+    private fun String?.asBeforeContinuation(): TimelineContinuation.Before? = when {
+        this == null -> null
+        isBlank() -> throw TimelineRemotePageException.MalformedPage("next_before must not be blank")
+        else -> TimelineContinuation.Before(TimelineMessageId(this))
+    }
+
+    private fun TimelineRemoteOrder.toWireOrder(): String = when (this) {
+        TimelineRemoteOrder.OldestFirst -> "asc"
+        TimelineRemoteOrder.NewestFirst -> "desc"
+        TimelineRemoteOrder.Unknown -> throw TimelineRemotePageException.InvalidRequest("unknown order")
     }
 
     override suspend fun listAgentMessages(
@@ -192,6 +251,7 @@ class IrohAdminRpcTimelineTransport(
     data class MessageListPage(
         val messages: List<LettaMessage>,
         val hasMore: Boolean?,
+        val nextBefore: String?,
     )
 
     /**
@@ -207,9 +267,8 @@ class IrohAdminRpcTimelineTransport(
         messages = decodeMessageListBody(result),
         hasMore = ((result as? JsonObject)?.get("has_more") as? JsonPrimitive)
             ?.booleanOrNull,
+        nextBefore = ((result as? JsonObject)?.get("next_before") as? JsonPrimitive)
+            ?.contentOrNull,
     )
 
-    private companion object {
-        val gatedTelemetryPaths: MutableSet<String> = ConcurrentHashMap.newKeySet()
-    }
 }

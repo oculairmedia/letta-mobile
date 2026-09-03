@@ -29,6 +29,11 @@ class IrohRoutingTimelineTransport(
         order: String?,
     ): List<LettaMessage> = selected().listConversationMessages(conversationId, limit, after, order)
 
+    override suspend fun listConversationMessagePage(
+        request: TimelineRemotePageRequest,
+        progress: TimelinePageProgress?,
+    ): TimelineRemotePageResult = selected().listConversationMessagePage(request, progress)
+
     override suspend fun listAgentMessages(
         agentId: String,
         limit: Int?,
