@@ -87,7 +87,7 @@ dependencies {
     implementation("androidx.compose.runtime:runtime:1.8.3")
 
     // androidx.tracing — Perfetto tracing integration
-    implementation("androidx.tracing:tracing:1.2.0")
+    implementation(libs.androidx.tracing)
 
     implementation(libs.ktor.client.core)
     implementation(libs.ktor.client.okhttp)
@@ -100,21 +100,21 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
 
     implementation(libs.androidx.paging.runtime.ktx)
-    implementation("androidx.datastore:datastore-preferences:1.3.0-alpha09")
-    implementation("androidx.security:security-crypto:1.1.0")
-    implementation("androidx.lifecycle:lifecycle-process:2.9.4")
-    implementation("me.xdrop:fuzzywuzzy:1.4.0")
-    implementation("com.google.android.material:material:1.14.0")
+    implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.security.crypto)
+    implementation(libs.androidx.lifecycle.process)
+    implementation(libs.fuzzywuzzy)
+    implementation(libs.google.material)
 
-    api("androidx.room:room-runtime:2.8.4")
-    api("androidx.room:room-ktx:2.8.4")
-    ksp("androidx.room:room-compiler:2.8.4")
+    api(libs.androidx.room.runtime)
+    api(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
 
     testImplementation(libs.junit4)
     testImplementation(libs.junit.jupiter.api)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.ktor.client.mock)
-    testImplementation("com.squareup.okhttp3:mockwebserver:5.3.2")
+    testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.turbine)
     testImplementation(libs.mockk)
     testImplementation(libs.kotest.runner.junit5)
