@@ -274,23 +274,23 @@ class ChatSendCoordinatorCleanupTest {
     }
 
     @Test
-    fun failedTurnDoneWithSyntheticRunUsesObservedAssistantRunCandidates() = runTest(UnconfinedTestDispatcher()) {
+    fun failedSyntheticTerminalUsesObservedAssistantRunCandidatesExactlyOnce() = runTest(UnconfinedTestDispatcher()) {
         val timeline = RecordingTimelineWriter()
         val coordinator = coordinator(timeline = timeline, ui = RecordingUiSink(), transport = FakeChannelTransport(mutableListOf(true)), activeConversationId = { "conv-1" })
 
         coordinator.send("hello").join()
-        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "synthetic-turn-run"))
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", SYNTHETIC_RUN_ID))
         coordinator.handleEvent(WsTimelineEvent.MessageDelta(AssistantMessage(id = "m1", contentRaw = JsonPrimitive("a"), runId = "run-real")))
-        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "synthetic-turn-run", BridgeTurnStatus.Cancelled))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", SYNTHETIC_RUN_ID, BridgeTurnStatus.Failed))
         advanceUntilIdle()
 
         assertEquals(
             RecordingTimelineWriter.CleanupTail(
                 agentId = AGENT_ID,
                 conversationId = "conv-1",
-                activeRunId = "synthetic-turn-run",
+                activeRunId = SYNTHETIC_RUN_ID,
                 activeTurnId = "turn-1",
-                candidateRunIds = setOf("synthetic-turn-run", "run-real"),
+                candidateRunIds = setOf(SYNTHETIC_RUN_ID, "run-real"),
             ),
             timeline.cleanupTails.single(),
         )
@@ -907,6 +907,7 @@ class ChatSendCoordinatorCleanupTest {
 
     private companion object {
         const val AGENT_ID = "agent-1"
+        const val SYNTHETIC_RUN_ID = "iroh-run-synthetic"
         var otid = 0
     }
 }

@@ -545,9 +545,18 @@ class WsChatSendCoordinatorTest {
         coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "iroh-run-1", status = BridgeTurnStatus.Failed))
         advanceUntilIdle()
 
-        val cleanup = timelineRepository.abandonedFragmentCleanups.single()
-        assertEquals("iroh-run-1", cleanup.runId)
-        assertEquals(setOf("iroh-run-1", "run-app"), cleanup.candidateRunIds)
+        assertEquals(1, timelineRepository.abandonedFragmentCleanups.size)
+        assertEquals(
+            FakeTimelineExternalTransportWriter.AbandonedFragmentCleanup(
+                agentId = "agent-1",
+                conversationId = "conv-1",
+                runId = "iroh-run-1",
+                turnId = "turn-1",
+                reason = "turn_done_Failed",
+                candidateRunIds = setOf("iroh-run-1", "run-app"),
+            ),
+            timelineRepository.abandonedFragmentCleanups.first(),
+        )
     }
 
     @Test
