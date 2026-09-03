@@ -79,35 +79,43 @@ fun Timeline.mergeServerMessages(
             return@forEach
         }
         if (timeline.containsIdentityFor(confirmed)) return@forEach
-        val existingByServerId = timeline.findByServerId(confirmed.serverId, confirmed.messageType)
-        if (existingByServerId?.canReplaceIrohSyntheticLiveRow(confirmed) == true) {
-            // letta-mobile-9lgfu: terminal settlement fence. The synthetic live
-            // row may already hold deltas the reconciled snapshot predates; a
-            // stale, non-superset final must not shrink it. Keep the promotion
-            // (ids/run id come from `confirmed`) but fold the text so the
-            // accumulator can only keep-or-grow.
-            val settled = settleTerminalEvent(timeline.conversationId, existingByServerId, confirmed)
-            timeline = timeline.replaceByServerId(settled)
-            merged++
-        } else if (existingByServerId == null) {
-            when (val decision = timeline.resolveCrossBoundaryAssistantIdentity(confirmed)) {
-                is CrossBoundaryAssistantDecision.ExactAlias -> {
-                    timeline = timeline.replaceEventAt(
-                        decision.index,
-                        confirmed.copy(position = timeline.events[decision.index].position),
-                    )
-                    merged++
-                    return@forEach
-                }
-                CrossBoundaryAssistantDecision.UnresolvedUiFinal -> {
-                    timeline.reportUnresolvedCrossBoundaryIdentity(confirmed)
-                    timeline = timeline.insertOrdered(confirmed)
-                    merged++
-                    return@forEach
-                }
-                CrossBoundaryAssistantDecision.UseLegacyFallbacks -> Unit
-            }
-            val prefixIndex = timeline.findRecentAssistantPrefixIndex(confirmed)
+        val result = timeline.mergeConfirmedServerMessage(confirmed)
+        timeline = result.timeline
+        if (result.merged) merged++
+    }
+    return timeline to merged
+}
+
+private data class ConfirmedServerMergeResult(val timeline: Timeline, val merged: Boolean)
+
+private fun Timeline.mergeConfirmedServerMessage(
+    confirmed: TimelineEvent.Confirmed,
+): ConfirmedServerMergeResult {
+    val existingByServerId = findByServerId(confirmed.serverId, confirmed.messageType)
+    if (existingByServerId?.canReplaceIrohSyntheticLiveRow(confirmed) == true) {
+        val settled = settleTerminalEvent(conversationId, existingByServerId, confirmed)
+        return ConfirmedServerMergeResult(replaceByServerId(settled), true)
+    }
+    if (existingByServerId == null) return mergeMissingServerIdentity(confirmed)
+    if (existingByServerId.sharesRunIdentityWith(confirmed)) return ConfirmedServerMergeResult(this, false)
+    return ConfirmedServerMergeResult(insertOrdered(confirmed), true)
+}
+
+private fun Timeline.mergeMissingServerIdentity(
+    confirmed: TimelineEvent.Confirmed,
+): ConfirmedServerMergeResult {
+    when (val decision = resolveCrossBoundaryAssistantIdentity(confirmed)) {
+        is CrossBoundaryAssistantDecision.ExactAlias -> {
+            val replacement = confirmed.copy(position = events[decision.index].position)
+            return ConfirmedServerMergeResult(replaceEventAt(decision.index, replacement), true)
+        }
+        CrossBoundaryAssistantDecision.UnresolvedUiFinal -> {
+            reportUnresolvedCrossBoundaryIdentity(confirmed)
+            return ConfirmedServerMergeResult(insertOrdered(confirmed), true)
+        }
+        CrossBoundaryAssistantDecision.UseLegacyFallbacks -> Unit
+    }
+    val prefixIndex = findRecentAssistantPrefixIndex(confirmed)
             // letta-mobile-x1xnl (SECOND path). The live Iroh stream lands the
             // assistant reply as a draft row keyed on the turn-anchored SYNTHETIC
             // otid (iroh-assistant-<turnId>) with a rotating letta-msg-* serverId,
@@ -122,7 +130,7 @@ fun Timeline.mergeServerMessages(
             // the transport: collapse the snapshot INTO the draft row (snapshot
             // REPLACE, never append) instead of stranding a duplicate.
             val sameRunIndex = if (prefixIndex == null) {
-                timeline.findRecentSameRealRunAssistantIndex(confirmed)
+                findRecentSameRealRunAssistantIndex(confirmed)
             } else {
                 null
             }
@@ -136,41 +144,25 @@ fun Timeline.mergeServerMessages(
             // content is contained within the incoming full text is the same
             // in-flight reply — replace it with the fuller final (one row).
             val contentSupersetIndex = if (prefixIndex == null && sameRunIndex == null) {
-                timeline.findRecentAssistantContentSupersetIndex(confirmed)
+                findRecentAssistantContentSupersetIndex(confirmed)
             } else {
                 null
             }
             val replaceIndex = prefixIndex ?: sameRunIndex ?: contentSupersetIndex
-            if (replaceIndex != null) {
-                timeline = timeline.replaceEventAt(replaceIndex, confirmed.copy(position = timeline.events[replaceIndex].position))
+            return if (replaceIndex != null) {
+                val timeline = replaceEventAt(replaceIndex, confirmed.copy(position = events[replaceIndex].position))
                 Telemetry.event(
                     "TimelineSync",
                     if (prefixIndex != null) "recentReconcile.assistantPrefixReplaced"
                     else "recentReconcile.assistantSameRunReplaced",
-                    "conversationId" to timeline.conversationId,
+                    "conversationId" to conversationId,
                     "serverId" to confirmed.serverId,
                     "incomingLen" to confirmed.content.length,
                 )
-                merged++
+                ConfirmedServerMergeResult(timeline, true)
             } else {
-                timeline = timeline.insertOrdered(confirmed)
-                merged++
+                ConfirmedServerMergeResult(insertOrdered(confirmed), true)
             }
-        } else if (existingByServerId.sharesRunIdentityWith(confirmed)) {
-            // Same server id + message type, and at least one side lacks a
-            // run id (REST /messages replies often omit run_id while the live
-            // Iroh/WS row carries the real one). #780 run-scoped identity keys
-            // no longer overlap in that case, so without this guard the
-            // reconciled copy re-inserts and the reply renders twice. Only a
-            // REAL run-id mismatch on both sides (recycled server id across
-            // runs) may append.
-            return@forEach
-        } else {
-            timeline = timeline.insertOrdered(confirmed)
-            merged++
-        }
-    }
-    return timeline to merged
 }
 
 private const val CONTENT_FALLBACK_RECENCY_MS = 2 * 60 * 1000L
