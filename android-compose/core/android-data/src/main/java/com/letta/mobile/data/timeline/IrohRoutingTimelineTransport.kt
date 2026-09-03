@@ -31,7 +31,8 @@ class IrohRoutingTimelineTransport(
 
     override suspend fun listConversationMessagePage(
         request: TimelineRemotePageRequest,
-    ): TimelineRemotePageResult = selected().listConversationMessagePage(request)
+        progress: TimelinePageProgress?,
+    ): TimelineRemotePageResult = selected().listConversationMessagePage(request, progress)
 
     override suspend fun listAgentMessages(
         agentId: String,

@@ -9,6 +9,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertThrows
 import org.junit.Test
 
 /**
@@ -127,6 +128,64 @@ class IrohAdminRpcTimelineTransportOlderMessagesTest {
         assertEquals(true, page.hasMore)
         assertTrue(fake.adminRpcCalls.single().path.contains("before=letta-msg-40"))
     }
+
+    @Test
+    fun `typed page URL encodes reserved continuation characters`() = runTest {
+        val fake = FakeChannelTransport().apply { adminRpcHandler = { _, _, _ -> ok("[]") } }
+        val request = typedRequest(TimelineContinuation.Before(TimelineMessageId("id/a?b&c=d")))
+
+        transport(fake).listConversationMessagePage(request)
+
+        assertTrue(fake.adminRpcCalls.single().path.contains("before=id%2Fa%3Fb%26c%3Dd"))
+    }
+
+    @Test
+    fun `trimmed oldest-first initial derives after continuation`() = runTest {
+        val fake = FakeChannelTransport().apply {
+            adminRpcHandler = { _, _, _ -> ok("""{"messages":[{"id":"first","message_type":"assistant_message","content":"a"},{"id":"last","message_type":"assistant_message","content":"b"}],"has_more":true,"next_before":"wrong-direction"}""") }
+        }
+        val request = typedRequest(TimelineContinuation.Initial, TimelineRemoteOrder.OldestFirst)
+
+        val page = transport(fake).listConversationMessagePage(request) as TimelineRemotePageResult.Page
+
+        assertEquals(TimelineContinuation.After(TimelineMessageId("last")), page.nextContinuation)
+    }
+
+    @Test
+    fun `trimmed after request derives after continuation and reaches no-progress classifier`() = runTest {
+        val previous = TimelineContinuation.After(TimelineMessageId("last"))
+        val fake = FakeChannelTransport().apply {
+            adminRpcHandler = { _, _, _ -> ok("""{"messages":[{"id":"last","message_type":"assistant_message","content":"duplicate"}],"has_more":true,"next_before":"wrong-direction"}""") }
+        }
+        val request = typedRequest(previous, TimelineRemoteOrder.OldestFirst)
+
+        val result = transport(fake).listConversationMessagePage(request, TimelinePageProgress(previous, 1, 0))
+
+        assertTrue(result is TimelineRemotePageResult.NoProgress)
+    }
+
+    @Test
+    fun `blank next-before is malformed for before request`() = runTest {
+        val fake = FakeChannelTransport().apply {
+            adminRpcHandler = { _, _, _ -> ok("""{"messages":[{"id":"old","message_type":"assistant_message","content":"a"}],"has_more":true,"next_before":" "}""") }
+        }
+
+        assertThrows(TimelineRemotePageException.MalformedPage::class.java) {
+            kotlinx.coroutines.runBlocking { transport(fake).listConversationMessagePage(typedRequest(TimelineContinuation.Before(TimelineMessageId("cursor")))) }
+        }
+    }
+
+    private fun typedRequest(
+        continuation: TimelineContinuation,
+        order: TimelineRemoteOrder = TimelineRemoteOrder.NewestFirst,
+    ) = TimelineRemotePageRequest(
+        scope = TimelineScope("backend", "conv-1"),
+        requestId = TimelineRequestId("request-extra"),
+        selectionGeneration = TimelineSelectionGeneration(5),
+        order = order,
+        continuation = continuation,
+        budget = TimelinePageBudget(20, 4096),
+    )
 
     @Test
     fun `listOlderConversationMessages decodes the trimmed wrapper shape`() = runTest {

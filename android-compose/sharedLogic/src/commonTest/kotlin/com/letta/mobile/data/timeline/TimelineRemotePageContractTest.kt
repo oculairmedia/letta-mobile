@@ -1,9 +1,13 @@
 package com.letta.mobile.data.timeline
 
 import com.letta.mobile.data.model.AssistantMessage
+import com.letta.mobile.data.model.LettaMessage
+import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
@@ -78,6 +82,23 @@ class TimelineRemotePageContractTest {
         assertFailsWith<TimelineRemotePageException.MalformedPage> {
             TimelineRemotePageAdapter.fromMessages(request, listOf(message("a")), false, request.continuation)
         }
+    }
+
+    @Test
+    fun `default before rejection performs no legacy request`() = runTest {
+        var calls = 0
+        val transport = object : TimelineTransport {
+            override suspend fun sendConversationMessage(conversationId: String, request: MessageCreateRequest): Flow<LettaMessage> = emptyFlow()
+            override suspend fun streamConversation(conversationId: String): Flow<TimelineStreamFrame> = emptyFlow()
+            override suspend fun listConversationMessages(conversationId: String, limit: Int?, after: String?, order: String?): List<LettaMessage> {
+                calls++
+                return emptyList()
+            }
+            override suspend fun listAgentMessages(agentId: String, limit: Int?, order: String?, conversationId: String?): List<LettaMessage> = emptyList()
+        }
+
+        assertFailsWith<TimelineRemotePageException.InvalidRequest> { transport.listConversationMessagePage(request) }
+        assertEquals(0, calls)
     }
 
     @Test
