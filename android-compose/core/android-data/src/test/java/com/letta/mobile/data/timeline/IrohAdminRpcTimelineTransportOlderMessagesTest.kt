@@ -4,6 +4,7 @@ import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.testutil.FakeChannelTransport
 import com.letta.mobile.testutil.FakeSettingsRepository
+import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
@@ -97,6 +98,34 @@ class IrohAdminRpcTimelineTransportOlderMessagesTest {
 
         assertEquals(1, messages.size)
         assertEquals("letta-msg-30", messages.single().id)
+    }
+
+    @Test
+    fun `typed page preserves trimmed next-before and ownership`() = runTest {
+        val fake = FakeChannelTransport().apply {
+            adminRpcHandler = { _, _, _ ->
+                ok(
+                    """{"messages":[{"id":"letta-msg-31","message_type":"assistant_message","content":"older"}],""" +
+                        """"has_more":true,"next_before":"letta-msg-31"}""",
+                )
+            }
+        }
+        val request = TimelineRemotePageRequest(
+            scope = TimelineScope("backend", "conv-1"),
+            requestId = TimelineRequestId("request-1"),
+            selectionGeneration = TimelineSelectionGeneration(4),
+            order = TimelineRemoteOrder.NewestFirst,
+            continuation = TimelineContinuation.Before(TimelineMessageId("letta-msg-40")),
+            budget = TimelinePageBudget(20, 1024),
+        )
+
+        val page = transport(fake).listConversationMessagePage(request) as TimelineRemotePageResult.Page
+
+        assertEquals(request.requestId, page.requestId)
+        assertEquals(request.selectionGeneration, page.selectionGeneration)
+        assertEquals(TimelineContinuation.Before(TimelineMessageId("letta-msg-31")), page.nextContinuation)
+        assertEquals(true, page.hasMore)
+        assertTrue(fake.adminRpcCalls.single().path.contains("before=letta-msg-40"))
     }
 
     @Test
