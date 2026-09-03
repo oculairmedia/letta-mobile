@@ -467,10 +467,16 @@ class TimelineSnapshotPersistenceTest {
         val expectedAttrs = setOf(
             "revision", "previousCount", "eventCount", "inserted", "updated", "deleted", "moved",
             "cursorMetadataChanged", "noOp", "unclassifiable", "comparisonEvents", "fullEnvelopeEncodes",
+            "durableRows", "residentRows", "settledEventsVisited", "pagesCopied", "liveProjected", "boundaryRebuilt",
         )
         events.forEach { event ->
             assertEquals(expectedAttrs, event.attrs.keys)
-            assertTrue(event.attrs.values.all { it is Int || it is Long || it is Boolean })
+            assertTrue(event.attrs.values.all {
+                it is Int || it is Long || it is Boolean || it == "unavailable"
+            })
+            assertEquals("unavailable", event.attrs["pagesCopied"])
+            assertEquals("unavailable", event.attrs["liveProjected"])
+            assertEquals("unavailable", event.attrs["boundaryRebuilt"])
             assertFalse(event.attrs.values.any { value ->
                 value.toString().contains("private message content") || value.toString().contains("raw-server-id")
             })
