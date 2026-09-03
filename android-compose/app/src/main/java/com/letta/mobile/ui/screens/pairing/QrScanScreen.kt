@@ -139,7 +139,6 @@ fun QrScanScreen(
 
 @Composable
 private fun CameraPreview(onDecoded: (String) -> Unit) {
-    val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val analysisExecutor = remember { Executors.newSingleThreadExecutor() }
     DisposableEffect(Unit) {

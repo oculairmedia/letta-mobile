@@ -39,7 +39,7 @@ import java.util.UUID
  * - [WebSocketConnection] (OkHttp socket lifecycle & reconnect redialing)
  */
 class ChannelTransport(
-    private val scope: CoroutineScope,
+    scope: CoroutineScope,
     cursorStore: RunCursorStore,
     conversationCursorStore: ConversationCursorStore = NoOpConversationCursorStore,
 ) : IChannelTransport {

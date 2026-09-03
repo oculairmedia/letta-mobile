@@ -75,7 +75,6 @@ internal fun DesktopPairInstallScreen(
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val scope = rememberCoroutineScope()
     // Initial mint — fire and forget. The controller's `loading` flag gates
     // re-entry; tapping "regenerate" while loading is a no-op.
     LaunchedEffect(controller) {

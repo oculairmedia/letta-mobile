@@ -729,7 +729,7 @@ class AppServerTurnEngine(
         val leaseToken = leaseTokenSeq.incrementAndGet()
         val slot = slotFor(command)
         val leaseRef = LeaseRef(slot, leaseToken)
-        var lease = TurnLease(
+        val lease = TurnLease(
             token = leaseToken,
             runtimeId = command.runtimeId.value,
             agentId = command.agentId.value,
@@ -773,7 +773,6 @@ class AppServerTurnEngine(
         slot.updateLease { cur ->
             if (cur?.token == leaseToken) cur.copy(ownerJob = coroutineContext[Job]) else cur
         }
-        lease = leaseRef.current ?: lease
 
         slot.owner = ActiveTurnOwner(
             runId = null,

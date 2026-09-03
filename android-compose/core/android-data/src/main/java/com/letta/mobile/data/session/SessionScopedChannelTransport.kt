@@ -228,13 +228,13 @@ class SessionScopedChannelTransport internal constructor(
             } catch (_: Throwable) {
                 return CompletedReconciliation(attempt, FrameCollectorOverflowRecoveryOutcome.Failed)
             }
-            last = result
             if (result is com.letta.mobile.data.timeline.RecentMessagesReconcileOutcome.Applied) {
                 return CompletedReconciliation(
                     attempt,
                     FrameCollectorOverflowRecoveryOutcome.Reconciled(result.appended),
                 )
             }
+            last = result
             if (attempt < MAX_RECONCILE_ATTEMPTS) delay(RECONCILE_RETRY_DELAY_MS.milliseconds)
         }
         return CompletedReconciliation(
