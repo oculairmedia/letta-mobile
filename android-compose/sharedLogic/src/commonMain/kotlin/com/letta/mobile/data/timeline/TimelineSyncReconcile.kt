@@ -90,30 +90,22 @@ fun Timeline.mergeServerMessages(
             timeline = timeline.replaceByServerId(settled)
             merged++
         } else if (existingByServerId == null) {
-            // Exact fixed-field aliases are the only valid cross-boundary link.
-            // Do not treat content, run, or turn as identity: each can describe
-            // distinct assistant messages.
-            val exactAliasIndex = timeline.findExactAssistantAliasIndex(confirmed)
-            // Legacy content fallbacks below remain intentionally untouched for
-            // non-ui-msg server records until their call sites gain exact aliases.
-            // ui-msg finals bypass them and emit telemetry instead of corrupting
-            // distinct rows that merely look related.
-            if (confirmed.serverId.startsWith("ui-msg-") && exactAliasIndex == null) {
-                Telemetry.event(
-                    "TimelineSync", "recentReconcile.unresolvedCrossBoundaryIdentity",
-                    "conversationId" to timeline.conversationId,
-                    "serverId" to confirmed.serverId,
-                    "messageType" to confirmed.messageType.name,
-                    level = Telemetry.Level.WARN,
-                )
-                timeline = timeline.insertOrdered(confirmed)
-                merged++
-                return@forEach
-            }
-            if (exactAliasIndex != null) {
-                timeline = timeline.replaceEventAt(exactAliasIndex, confirmed.copy(position = timeline.events[exactAliasIndex].position))
-                merged++
-                return@forEach
+            when (val decision = timeline.resolveCrossBoundaryAssistantIdentity(confirmed)) {
+                is CrossBoundaryAssistantDecision.ExactAlias -> {
+                    timeline = timeline.replaceEventAt(
+                        decision.index,
+                        confirmed.copy(position = timeline.events[decision.index].position),
+                    )
+                    merged++
+                    return@forEach
+                }
+                CrossBoundaryAssistantDecision.UnresolvedUiFinal -> {
+                    timeline.reportUnresolvedCrossBoundaryIdentity(confirmed)
+                    timeline = timeline.insertOrdered(confirmed)
+                    merged++
+                    return@forEach
+                }
+                CrossBoundaryAssistantDecision.UseLegacyFallbacks -> Unit
             }
             val prefixIndex = timeline.findRecentAssistantPrefixIndex(confirmed)
             // letta-mobile-x1xnl (SECOND path). The live Iroh stream lands the
@@ -193,6 +185,34 @@ private fun Timeline.replaceEventAt(index: Int, event: TimelineEvent.Confirmed):
             residentOtids = updatedEvents.mapTo(mutableSetOf()) { it.otid }.toPersistentSet(),
             invariantsKnown = true,
         )
+}
+
+private sealed interface CrossBoundaryAssistantDecision {
+    data class ExactAlias(val index: Int) : CrossBoundaryAssistantDecision
+    data object UnresolvedUiFinal : CrossBoundaryAssistantDecision
+    data object UseLegacyFallbacks : CrossBoundaryAssistantDecision
+}
+
+/** Keeps identity decisions explicit before any legacy content heuristics run. */
+private fun Timeline.resolveCrossBoundaryAssistantIdentity(
+    incoming: TimelineEvent.Confirmed,
+): CrossBoundaryAssistantDecision {
+    val exactAliasIndex = findExactAssistantAliasIndex(incoming)
+    if (exactAliasIndex != null) return CrossBoundaryAssistantDecision.ExactAlias(exactAliasIndex)
+    if (incoming.messageType == TimelineMessageType.ASSISTANT && incoming.serverId.startsWith("ui-msg-")) {
+        return CrossBoundaryAssistantDecision.UnresolvedUiFinal
+    }
+    return CrossBoundaryAssistantDecision.UseLegacyFallbacks
+}
+
+private fun Timeline.reportUnresolvedCrossBoundaryIdentity(incoming: TimelineEvent.Confirmed) {
+    Telemetry.event(
+        "TimelineSync", "recentReconcile.unresolvedCrossBoundaryIdentity",
+        "conversationId" to conversationId,
+        "serverId" to incoming.serverId,
+        "messageType" to incoming.messageType.name,
+        level = Telemetry.Level.WARN,
+    )
 }
 
 private fun Timeline.findExactAssistantAliasIndex(incoming: TimelineEvent.Confirmed): Int? {
