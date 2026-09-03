@@ -484,16 +484,29 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
         // sides synthetic) and the second fragment appended a new row instead of growing
         // the first — stranding the opening chunk as its own bubble.
         //
-        // Both ids must stay non-blank. A blank existing run id is indistinguishable from
-        // an older RECONCILED reply (those carry runId = null), and merging into one would
-        // overwrite an unrelated earlier message whose text happens to be a prefix — the
-        // #827 regression guarded by "reconcile final does not overwrite an unrelated older
-        // reply that is a substring". So the blank case is deliberately NOT relaxed here.
+        // letta-mobile-lf4hh: a blank existing run id is indistinguishable BY ID from
+        // an older RECONCILED reply (those carry runId = null), so merging into one on
+        // the strength of a prefix alone would overwrite an unrelated earlier message —
+        // the #827 regression guarded by "reconcile final does not overwrite an
+        // unrelated older reply that is a substring". It stays blocked whenever the
+        // INCOMING frame carries a real run id, which is exactly that shape.
+        //
+        // When NEITHER side carries a run id there is no identity signal at all, and the
+        // wire really does deliver run-id-less cumulative fragments: the reply then
+        // stranded its opening chunk as a separate bubble ("Hey" above "Hey there! Still
+        // connected."). Admit that case on a second, independent signal — the two frames
+        // must be within [SAME_FRAGMENT_WINDOW_MS] of each other. Fragments of one reply
+        // land milliseconds apart; a settled earlier reply at the tail is at least a
+        // round trip plus user typing older, so it stays outside the window.
         run {
             val existingRun = liveAssistant.runId?.takeIf { it.isNotBlank() }
             val incomingRun = confirmed.runId?.takeIf { it.isNotBlank() }
-            existingRun != null && incomingRun != null &&
-                (existingRun == incomingRun || existingRun.isIrohSyntheticRunId())
+            when {
+                existingRun == null -> incomingRun == null &&
+                    isWithinSameFragmentWindow(liveAssistant.date, confirmed.date)
+                incomingRun == null -> false
+                else -> existingRun == incomingRun || existingRun.isIrohSyntheticRunId()
+            }
         } &&
         run {
             val existing = liveAssistant.content.trim()
@@ -604,6 +617,24 @@ private fun TimelineEvent.Confirmed.hasIrohSyntheticRunId(): Boolean =
  * intentionally kept separate: it only ever evaluates an `ActiveTurn` run id
  * (always born `iroh-run-*` in `send()`), and observer ids can never reach it.
  */
+/**
+ * letta-mobile-lf4hh: widest gap between two streamed fragments of ONE assistant
+ * reply. Fragments of a single reply are emitted within the same generation loop
+ * (milliseconds apart); anything older at the timeline tail is a settled message.
+ */
+private const val SAME_FRAGMENT_WINDOW_MS = 2_000L
+
+/**
+ * True when [existing] and [incoming] are close enough in time to be fragments of
+ * the same in-flight reply. Order-insensitive: a row can carry a server date
+ * marginally AHEAD of the live fragment's client date.
+ */
+private fun isWithinSameFragmentWindow(existing: TimelineInstant, incoming: TimelineInstant): Boolean {
+    val delta = timelineInstantDurationMillis(existing, incoming)
+    val magnitude = if (delta < 0) -delta else delta
+    return magnitude <= SAME_FRAGMENT_WINDOW_MS
+}
+
 internal val IROH_SYNTHETIC_RUN_ID_PREFIXES = listOf("iroh-run-", ObserverStreamPromotionPolicy.OBSERVER_RUN_ID_PREFIX)
 
 internal fun String.isIrohSyntheticRunId(): Boolean =
