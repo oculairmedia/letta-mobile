@@ -336,7 +336,7 @@ internal object IrohStreamDeltaServerFrameMapper {
             // Only trust ids the serve-path accumulator stamped: raw backend
             // ids (`letta-msg-*`) ROTATE per fragment and would re-split one
             // message into per-fragment rows (the original x1xnl bug).
-            val stableMessageId = messageId?.takeIf { it.startsWith("cm-stream-") }
+            val stableMessageId = stableMessageId?.takeIf { it.isNotBlank() }
             return if (stableMessageId != null) {
                 "iroh-assistant-$stableMessageId"
             } else {
@@ -345,11 +345,11 @@ internal object IrohStreamDeltaServerFrameMapper {
         }
         companion object {
             private fun stableLogicalMessageId(delta: JsonObject): String? {
-                val id = delta.string("id")
+                val id = delta.string("id")?.takeIf { it.isNotBlank() }
                 if (id?.startsWith("cm-stream-") == true) return id
-                return delta.string("message_id")
-                    ?: delta.string("otid")?.let { "cm-stream-$it" }
-                    ?: delta.string("client_message_id")?.let { "cm-stream-$it" }
+                return delta.string("message_id")?.takeIf { it.isNotBlank() }
+                    ?: delta.string("otid")?.takeIf { it.isNotBlank() }?.let { "cm-stream-$it" }
+                    ?: delta.string("client_message_id")?.takeIf { it.isNotBlank() }?.let { "cm-stream-$it" }
             }
 
             fun from(

@@ -220,9 +220,8 @@ private fun Timeline.findExactAssistantAliasIndex(incoming: TimelineEvent.Confir
     for (index in events.indices.reversed()) {
         val event = events[index] as? TimelineEvent.Confirmed ?: continue
         if (event.messageType != TimelineMessageType.ASSISTANT) continue
-        if (event.serverId == incoming.serverId || event.otid == incoming.otid ||
-            event.serverId == incoming.otid || event.otid == incoming.serverId
-        ) return index
+        val incomingAliases = setOf(incoming.serverId, incoming.otid)
+        if (event.serverId in incomingAliases || event.otid in incomingAliases) return index
     }
     return null
 }

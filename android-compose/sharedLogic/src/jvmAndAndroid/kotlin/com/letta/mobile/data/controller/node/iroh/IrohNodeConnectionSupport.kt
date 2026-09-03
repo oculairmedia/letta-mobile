@@ -366,10 +366,10 @@ internal fun tagStreamDeltaForOptimisticDedup(
     if (currentId != null && (currentId.startsWith("cm-stream-") || currentId.startsWith("cm-reason-"))) {
         return delta
     }
-    val stableAlias = delta["message_id"]?.let { (it as? JsonPrimitive)?.contentOrNull }
-        ?: delta["otid"]?.let { (it as? JsonPrimitive)?.contentOrNull }
-        ?: delta["client_message_id"]?.let { (it as? JsonPrimitive)?.contentOrNull }
-    if (stableAlias.isNullOrEmpty()) return delta
+    val stableAlias = delta["message_id"]?.let { (it as? JsonPrimitive)?.contentOrNull }?.takeIf { it.isNotBlank() }
+        ?: delta["otid"]?.let { (it as? JsonPrimitive)?.contentOrNull }?.takeIf { it.isNotBlank() }
+        ?: delta["client_message_id"]?.let { (it as? JsonPrimitive)?.contentOrNull }?.takeIf { it.isNotBlank() }
+        ?: return delta
     return buildJsonObject {
         delta.forEach { (k, v) -> if (k != "id") put(k, v) }
         put("id", "$prefix$stableAlias")

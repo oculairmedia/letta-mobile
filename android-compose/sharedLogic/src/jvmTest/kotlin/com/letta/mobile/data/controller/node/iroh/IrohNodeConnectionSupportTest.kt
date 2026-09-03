@@ -149,6 +149,20 @@ class IrohNodeConnectionSupportTest {
     }
 
     @Test
+    fun tagStreamDelta_skipsBlankAliasesAndUsesNextStableValue() {
+        val delta = kotlinx.serialization.json.buildJsonObject {
+            put("id", kotlinx.serialization.json.JsonPrimitive("delivery"))
+            put("message_id", kotlinx.serialization.json.JsonPrimitive(" "))
+            put("otid", kotlinx.serialization.json.JsonPrimitive("stable-otid"))
+            put("message_type", kotlinx.serialization.json.JsonPrimitive("assistant_message"))
+        }
+        assertEquals(
+            "cm-stream-stable-otid",
+            tagStreamDeltaForOptimisticDedup(delta)["id"]?.jsonPrimitive?.contentOrNull,
+        )
+    }
+
+    @Test
     fun tagStreamDelta_reasoning_getsCmReasonId() {
         val delta = kotlinx.serialization.json.buildJsonObject {
             put("id", kotlinx.serialization.json.JsonPrimitive("letta-msg-9"))
