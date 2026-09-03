@@ -29,23 +29,27 @@ class ConversationPagingSource(
 
     override suspend fun load(params: LoadParams<String>): LoadResult<String, Conversation> {
         return try {
-            val conversations = pageLoader?.invoke(
-                agentId,
-                params.loadSize,
-                params.key,
-                archiveStatus,
-                summarySearch,
-                order,
-                orderBy,
-            ) ?: conversationApi.listConversations(
-                agentId = agentId,
-                limit = params.loadSize,
-                after = params.key,
-                archiveStatus = archiveStatus,
-                summarySearch = summarySearch,
-                order = order,
-                orderBy = orderBy,
-            )
+            val conversations = if (pageLoader != null) {
+                pageLoader.invoke(
+                    agentId,
+                    params.loadSize,
+                    params.key,
+                    archiveStatus,
+                    summarySearch,
+                    order,
+                    orderBy,
+                )
+            } else {
+                conversationApi.listConversations(
+                    agentId = agentId,
+                    limit = params.loadSize,
+                    after = params.key,
+                    archiveStatus = archiveStatus,
+                    summarySearch = summarySearch,
+                    order = order,
+                    orderBy = orderBy,
+                )
+            }
             LoadResult.Page(
                 data = conversations,
                 prevKey = null,
