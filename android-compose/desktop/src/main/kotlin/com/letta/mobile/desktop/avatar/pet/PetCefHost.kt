@@ -87,13 +87,11 @@ class PetCefHost private constructor(
                 defaultDesktopStateDirectory().resolve("jcef-bundle").toFile(),
             )
             builder.cefSettings.windowless_rendering_enabled = true
-            builder.setProgressHandler(
-                { state: EnumProgress, percent: Float ->
-                    if (state == EnumProgress.DOWNLOADING || state == EnumProgress.EXTRACTING) {
-                        onLog("jcef $state ${percent.toInt().coerceAtLeast(0)}%")
-                    }
-                },
-            )
+            builder.setProgressHandler { state: EnumProgress, percent: Float ->
+                if (state == EnumProgress.DOWNLOADING || state == EnumProgress.EXTRACTING) {
+                    onLog("jcef $state ${percent.toInt().coerceAtLeast(0)}%")
+                }
+            }
             val app = builder.build()
             return PetCefHost(app, app.createClient(), onLog)
         }

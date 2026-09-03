@@ -86,7 +86,7 @@ class AppServerReconnectSupervisor(
                 -> {
                     if (isTerminal(state)) {
                         onEvent(SupervisorEvent.TerminalStop(state))
-                        throw StopSupervision
+                        throw StopSupervision()
                     }
 
                     // A stable prior connection resets the sequence.
@@ -103,7 +103,7 @@ class AppServerReconnectSupervisor(
                     while (isRetryableDrop(connectionState.value)) {
                         if (maxAttempts != null && attempt >= maxAttempts) {
                             onEvent(SupervisorEvent.GaveUp(attempt))
-                            throw StopSupervision
+                            throw StopSupervision()
                         }
                         val waitMs = backoff.delayMs(attempt, random)
                         onEvent(SupervisorEvent.Scheduled(attempt, waitMs))
@@ -130,7 +130,7 @@ class AppServerReconnectSupervisor(
     }
 
     /** Private sentinel to break the infinite StateFlow collect on stop. */
-    private object StopSupervision : CancellationException("reconnect supervision stopped")
+    private class StopSupervision : CancellationException("reconnect supervision stopped")
 
     private fun isRetryableDrop(state: AppServerControllerState): Boolean =
         (state is AppServerControllerState.Disconnected ||

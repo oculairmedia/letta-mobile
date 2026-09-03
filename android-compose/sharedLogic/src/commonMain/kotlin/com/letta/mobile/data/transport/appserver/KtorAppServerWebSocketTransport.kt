@@ -144,7 +144,7 @@ class KtorAppServerWebSocketTransport(
             }
         }
         var reachedEndOfStream = false
-        var drainTimedOut = false
+        var drainTimedOut: Boolean
         try {
             receiveAndDemuxFrames(controlDeliveryQueue, streamDeliveryQueue)
             reachedEndOfStream = true
