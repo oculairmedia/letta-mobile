@@ -50,25 +50,51 @@ internal class ChatHistoryPager(
     )
 
     private fun classifyLoadRequest(clientModeEnabled: Boolean): LoadRequest? {
-        if (clientModeEnabled) return skipLoad("clientModeEnabled", "agentId" to agentId)
+        if (clientModeEnabled) return skipLoadForAgent("clientModeEnabled")
         val conversationId = activeConversationId()
-            ?: return skipLoad("noActiveConversation", "agentId" to agentId)
+            ?: return skipLoadForAgent("noActiveConversation")
         val state = uiState.value
-        if (state.isLoadingMessages) return skipLoad("isLoadingMessages", "conversationId" to conversationId)
+        if (state.isLoadingMessages) return skipLoadForConversation("isLoadingMessages", conversationId)
         if (!state.hasMoreOlderMessages) {
-            return skipLoad("noMoreOlder", "conversationId" to conversationId, "messageCount" to state.messages.size)
+            return skipLoadForConversation("noMoreOlder", conversationId, state.messages.size)
         }
-        if (state.isStreaming) return skipLoad("isStreaming", "conversationId" to conversationId)
+        if (state.isStreaming) return skipLoadForConversation("isStreaming", conversationId)
         val beforeMessageId = state.messages
             .firstOrNull { !it.isPending && it.isPaginationCursorEligible() }
             ?.id
             ?: state.messages.firstOrNull { !it.isPending }?.id
-            ?: return skipLoad("noNonPendingMessage", "conversationId" to conversationId, "messageCount" to state.messages.size)
+            ?: return skipLoadForConversation("noNonPendingMessage", conversationId, state.messages.size)
         return LoadRequest(conversationId, selectionGeneration(), state, beforeMessageId)
     }
 
-    private fun skipLoad(reason: String, vararg attributes: Pair<String, Any?>): Nothing? {
-        Telemetry.event("ChatHistoryPager", "loadSkipped", "reason" to reason, *attributes)
+    private fun skipLoadForAgent(reason: String): Nothing? {
+        Telemetry.event(
+            "ChatHistoryPager", "loadSkipped",
+            "reason" to reason,
+            "agentId" to agentId,
+        )
+        return null
+    }
+
+    private fun skipLoadForConversation(
+        reason: String,
+        conversationId: String,
+        messageCount: Int? = null,
+    ): Nothing? {
+        if (messageCount == null) {
+            Telemetry.event(
+                "ChatHistoryPager", "loadSkipped",
+                "reason" to reason,
+                "conversationId" to conversationId,
+            )
+        } else {
+            Telemetry.event(
+                "ChatHistoryPager", "loadSkipped",
+                "reason" to reason,
+                "conversationId" to conversationId,
+                "messageCount" to messageCount,
+            )
+        }
         return null
     }
 
