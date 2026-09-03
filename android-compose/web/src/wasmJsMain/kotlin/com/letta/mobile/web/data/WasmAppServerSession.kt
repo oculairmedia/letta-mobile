@@ -48,7 +48,7 @@ internal class WasmAppServerSession(
             pending.await().also { conversationByAgent[agentId] = it }
         } finally {
             if (pending.isCompleted && conversationInFlight[agentId] === pending) {
-                conversationInFlight.remove(agentId)
+                conversationInFlight -= agentId
             }
         }
     }
