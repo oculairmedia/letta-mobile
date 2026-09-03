@@ -24,7 +24,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlin.time.Duration.Companion.seconds
 import java.io.File
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
@@ -119,7 +118,7 @@ internal fun ShaderLookdevWindow() {
  * Reset to production via the button; port back to AmbientShaderSource.kt
  * once a look is approved.
  */
-private val PROPOSED_DESKTOP_SKSL = """
+private const val PROPOSED_DESKTOP_SKSL = """
 uniform float2 uSize;
 uniform float uTime;
 uniform float uAgitation;

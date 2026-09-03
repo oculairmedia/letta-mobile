@@ -136,9 +136,8 @@ internal class ConversationTurnFanout(
      * to this timeout (it must receive every frame). Injectable for tests.
      */
     private val observerWriteTimeoutMs: Long = OBSERVER_WRITE_TIMEOUT_MS,
-    observerWrites: ObserverWriteQueue? = null,
+    private val observerWrites: ObserverWriteQueue? = null,
 ) {
-    private val observerWrites = observerWrites
     private val openToolCalls = OpenToolCallTracker()
     private val cumulativeText = CumulativeStreamText()
     private val broadcastToolSignatures = mutableSetOf<String>()

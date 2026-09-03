@@ -55,7 +55,7 @@ class BackendOwnershipPreflight(
                 Decision.StaleReclaimable(reason = "recorded owner pid ${info.pid} is not alive", previous = info)
             actualStart != info.startTimeMs ->
                 Decision.StaleReclaimable(
-                    reason = "pid ${info.pid} reused (start time ${actualStart} != recorded ${info.startTimeMs})",
+                    reason = "pid ${info.pid} reused (start time $actualStart != recorded ${info.startTimeMs})",
                     previous = info,
                 )
             else -> Decision.HeldByLiveOwner(info)

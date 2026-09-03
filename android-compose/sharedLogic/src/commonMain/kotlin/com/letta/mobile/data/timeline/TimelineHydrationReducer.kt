@@ -78,7 +78,7 @@ object TimelineHydrationReducer {
         } else {
             val unmatched = timelineBeforeFetch.events.filterIsInstance<TimelineEvent.Confirmed>()
                 .filter { it.identityKeys().none(convertedKeys::contains) }
-            Pair(unmatched, emptyList<TimelineEvent.Confirmed>())
+            Pair(unmatched, emptyList())
         }
         val pendingLocals = currentTimeline.events.filterIsInstance<TimelineEvent.Local>()
             .filter { it.deliveryState.isPendingOrRestorable() }

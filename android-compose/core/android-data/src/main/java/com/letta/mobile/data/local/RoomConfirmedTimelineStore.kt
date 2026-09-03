@@ -361,7 +361,6 @@ class RoomConfirmedTimelineStore(
             if (current == null || !current.acceptsCommitAt(plan.baseRevision, plan.scope)) {
                 return@withTransaction NormalizedTimelineWriteResult.Stale(TimelineRevision(currentRevision))
             }
-            val head = current
             // No-op CAS: advance revision + timestamp only, zero row writes, row set unchanged.
             //
             // The root digest MUST still be recomputed. `normalizedRootDigest` folds in
@@ -372,19 +371,19 @@ class RoomConfirmedTimelineStore(
             // Caught by RoomNormalizedCommitIntegrityTest; the pre-existing no-op test missed
             // it because it never read the snapshot back.
             val digestEnvelope = StoredTimelineEnvelope(
-                schemaVersion = head.envelopeSchemaVersion,
+                schemaVersion = current.envelopeSchemaVersion,
                 scope = plan.scope,
                 revision = plan.targetRevision.value,
-                liveCursor = head.liveCursor,
-                backfillCursor = head.backfillCursor,
-                releasedOlderCount = head.releasedOlderCount,
+                liveCursor = current.liveCursor,
+                backfillCursor = current.backfillCursor,
+                releasedOlderCount = current.releasedOlderCount,
                 writtenAtMillis = plan.writtenAtMillis,
             )
             dao.upsertNormalizedHead(
-                head.copy(
+                current.copy(
                     revision = plan.targetRevision.value,
                     writtenAtMillis = plan.writtenAtMillis,
-                    rootDigest = normalizedRootDigest(digestEnvelope, head.rowDigest),
+                    rootDigest = normalizedRootDigest(digestEnvelope, current.rowDigest),
                 ),
             )
             NormalizedTimelineWriteResult.NoOp(plan.targetRevision)

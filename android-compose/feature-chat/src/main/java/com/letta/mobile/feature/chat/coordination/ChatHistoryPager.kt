@@ -67,7 +67,7 @@ internal class ChatHistoryPager(
         return LoadRequest(conversationId, selectionGeneration(), state, beforeMessageId)
     }
 
-    private fun skipLoadForAgent(reason: String): Nothing? {
+    private fun skipLoadForAgent(reason: String): LoadRequest? {
         Telemetry.event(
             "ChatHistoryPager", "loadSkipped",
             "reason" to reason,
@@ -80,7 +80,7 @@ internal class ChatHistoryPager(
         reason: String,
         conversationId: String,
         messageCount: Int? = null,
-    ): Nothing? {
+    ): LoadRequest? {
         if (messageCount == null) {
             Telemetry.event(
                 "ChatHistoryPager", "loadSkipped",

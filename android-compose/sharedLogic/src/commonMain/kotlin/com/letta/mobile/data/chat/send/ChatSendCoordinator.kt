@@ -76,7 +76,7 @@ class ChatSendCoordinator(
     private val startTimelineObserver: (String) -> Unit,
     private val clientVersion: () -> String,
     private val otidGenerator: () -> String,
-    private val recordRuntimeEvents: suspend (List<ScopedRuntimeEvent>) -> Unit = {},
+    recordRuntimeEvents: suspend (List<ScopedRuntimeEvent>) -> Unit = {},
 ) {
     // Send acceptance, transport events, and cleanup all mutate one ownership graph. Serializing
     // their suspend paths makes the lifecycle decision and the matching UI/OTID mutation atomic.

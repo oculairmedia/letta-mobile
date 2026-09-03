@@ -5,6 +5,7 @@ import androidx.paging.PagingState
 import com.letta.mobile.data.api.ConversationApi
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
+import kotlinx.coroutines.CancellationException
 
 internal typealias ConversationPageLoader = suspend (
     agentId: AgentId?,
@@ -54,6 +55,8 @@ class ConversationPagingSource(
                 prevKey = null,
                 nextKey = conversations.lastOrNull()?.id?.value?.takeIf { conversations.size >= params.loadSize },
             )
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             LoadResult.Error(e)
         }

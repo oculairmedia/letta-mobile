@@ -457,8 +457,9 @@ class AppServerTurnEngine(
 
     /**
      * Sends an `abort_message` for the given runtime so the server tears down
-     * the in-flight run and emits its own terminal frame. Returns null when no
-     * runtime has been started yet (nothing to abort). [runId] should be the
+     * the in-flight run and emits its own terminal frame. When no cached runtime
+     * scope exists, the engine uses a synthesized scope and still returns the
+     * server response. [runId] should be the
      * canonical (promoted) run id of the turn being cancelled; a null run id asks
      * the server to abort whatever run is currently active for the runtime.
      *
@@ -470,7 +471,7 @@ class AppServerTurnEngine(
         agentId: String,
         conversationId: String,
         runId: String?,
-    ): AppServerInboundFrame.AbortMessageResponse? {
+    ): AppServerInboundFrame.AbortMessageResponse {
         val key = TurnRuntimeKey(agentId, conversationId)
         val scope = leases.peek(key)?.runtimeScope
             ?: AppServerRuntimeScope(agentId = agentId, conversationId = conversationId)
@@ -729,7 +730,7 @@ class AppServerTurnEngine(
         val leaseToken = leaseTokenSeq.incrementAndGet()
         val slot = slotFor(command)
         val leaseRef = LeaseRef(slot, leaseToken)
-        var lease = TurnLease(
+        val lease = TurnLease(
             token = leaseToken,
             runtimeId = command.runtimeId.value,
             agentId = command.agentId.value,
@@ -773,7 +774,6 @@ class AppServerTurnEngine(
         slot.updateLease { cur ->
             if (cur?.token == leaseToken) cur.copy(ownerJob = coroutineContext[Job]) else cur
         }
-        lease = leaseRef.current ?: lease
 
         slot.owner = ActiveTurnOwner(
             runId = null,
@@ -1717,22 +1717,17 @@ class AppServerTurnEngine(
         // Reject delayed frames stamped for a prior reconnect generation even when
         // the live provider has already advanced (or a new lease shares the runtime).
         val frameGeneration = connectionGeneration
-        if (frameGeneration != null && frameGeneration != lease.connectionGeneration) {
-            return false
-        }
+        if (frameGeneration != null && frameGeneration != lease.connectionGeneration) return false
         // Generation mismatch is handled by the collect loop (terminate turn).
         if (lease.connectionGeneration != connectionGenerationProvider()) return false
-        val eventRuntime = frame.runtime
-        if (eventRuntime == null) {
+        val eventRuntime = frame.runtime ?: return when (val f = frame) {
             // lgns8.22.4: runtime-less auth/admin/unknown frames are not turn
             // wildcards. External-tool / control requests correlate through the
             // inbound registry (registered by fanout or here on the direct path).
-            return when (val f = frame) {
-                is AppServerInboundFrame.ExternalToolCallRequest,
-                is AppServerInboundFrame.ControlRequest,
-                -> claimInboundControlDelivery(f, leaseRef.token, lease.connectionGeneration)
-                else -> false
-            }
+            is AppServerInboundFrame.ExternalToolCallRequest,
+            is AppServerInboundFrame.ControlRequest,
+            -> claimInboundControlDelivery(f, leaseRef.token, lease.connectionGeneration)
+            else -> false
         }
         if (eventRuntime.agentId != scope.agentId ||
             eventRuntime.conversationId != scope.conversationId
@@ -2130,7 +2125,7 @@ class AppServerTurnEngine(
          * rationale against the server's own `EXTERNAL_TOOL_CALL_TIMEOUT_MS` is
          * documented). Re-exported here so existing callers/tests keep one name.
          */
-        val EXTERNAL_TOOL_INVOCATION_TIMEOUT_MS: Long = ExternalToolDispatcher.INVOCATION_TIMEOUT_MS
+        const val EXTERNAL_TOOL_INVOCATION_TIMEOUT_MS: Long = ExternalToolDispatcher.INVOCATION_TIMEOUT_MS
 
         /**
          * lgns8.17(d): sentinel lease token for an answer taken with NO turn lease.
