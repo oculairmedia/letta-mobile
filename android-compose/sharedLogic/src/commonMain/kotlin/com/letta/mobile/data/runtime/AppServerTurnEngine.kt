@@ -457,8 +457,9 @@ class AppServerTurnEngine(
 
     /**
      * Sends an `abort_message` for the given runtime so the server tears down
-     * the in-flight run and emits its own terminal frame. Returns null when no
-     * runtime has been started yet (nothing to abort). [runId] should be the
+     * the in-flight run and emits its own terminal frame. When no cached runtime
+     * scope exists, the engine uses a synthesized scope and still returns the
+     * server response. [runId] should be the
      * canonical (promoted) run id of the turn being cancelled; a null run id asks
      * the server to abort whatever run is currently active for the runtime.
      *
