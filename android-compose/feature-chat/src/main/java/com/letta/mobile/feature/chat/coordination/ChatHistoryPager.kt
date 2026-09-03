@@ -2,6 +2,7 @@ package com.letta.mobile.feature.chat.coordination
 
 import com.letta.mobile.data.mapper.toUiMessages
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.AppMessage
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.repository.MessageRepository
@@ -35,172 +36,142 @@ internal class ChatHistoryPager(
     private var nextRequestId = 0L
 
     fun loadOlderMessages(clientModeEnabled: Boolean) {
-        // letta-mobile-doq50: every short-circuit path is now telemetered so
-        // 'no loading indicator at all' diagnostics are answerable without
-        // device repro. Pair with the catch-block 'failed' event so the full
-        // skip/attempt/succeed/fail surface is visible.
-        if (clientModeEnabled) {
-            Telemetry.event(
-                "ChatHistoryPager", "loadSkipped",
-                "reason" to "clientModeEnabled",
-                "agentId" to agentId,
-            )
-            return
-        }
-        val conversationId = activeConversationId()
-        if (conversationId == null) {
-            Telemetry.event(
-                "ChatHistoryPager", "loadSkipped",
-                "reason" to "noActiveConversation",
-                "agentId" to agentId,
-            )
-            return
-        }
-        val currentState = uiState.value
-        if (currentState.isLoadingMessages) {
-            Telemetry.event(
-                "ChatHistoryPager", "loadSkipped",
-                "reason" to "isLoadingMessages",
-                "conversationId" to conversationId,
-            )
-            return
-        }
-        val generation = selectionGeneration()
-        synchronized(ownershipLock) {
-            if (activeOwner?.conversationId == conversationId &&
-                activeOwner?.selectionGeneration == generation
-            ) {
-                Telemetry.event(
-                    "ChatHistoryPager", "loadSkipped",
-                    "reason" to "alreadyLoadingOlder",
-                    "conversationId" to conversationId,
-                    "selectionGeneration" to generation,
-                    "requestId" to activeOwner?.requestId,
-                )
-                return
-            }
-        }
-        if (!currentState.hasMoreOlderMessages) {
-            Telemetry.event(
-                "ChatHistoryPager", "loadSkipped",
-                "reason" to "noMoreOlder",
-                "conversationId" to conversationId,
-                "messageCount" to currentState.messages.size,
-            )
-            return
-        }
-        if (currentState.isStreaming) {
-            Telemetry.event(
-                "ChatHistoryPager", "loadSkipped",
-                "reason" to "isStreaming",
-                "conversationId" to conversationId,
-            )
-            return
-        }
+        val request = classifyLoadRequest(clientModeEnabled) ?: return
+        val owner = claimOwner(request) ?: return
+        reportLoadAttempt(owner, request)
+        scope.launch { fetchAndApply(owner, request) }
+    }
 
-        // letta-mobile-doq50: prefer a real server message ID (user / assistant)
-        // over synthetic IDs like `toolreturn-...` that the WS frame mapper
-        // generates locally to dedup tool returns. The server doesn't
-        // recognize synthetic IDs as cursors, so older-message fetches with
-        // such an ID either silently no-op or return the same page that's
-        // already loaded â€” which the merge then filters out, leaving the
-        // visible message count unchanged.
-        //
-        // Fallback to the original "first non-pending" if no real ID is found
-        // so the bug surface is bounded by content shape rather than crashing.
-        val oldestLoadedMessageId = currentState.messages
+    private data class LoadRequest(
+        val conversationId: String,
+        val generation: Long,
+        val state: ChatUiState,
+        val beforeMessageId: String,
+    )
+
+    private fun classifyLoadRequest(clientModeEnabled: Boolean): LoadRequest? {
+        if (clientModeEnabled) return skipLoad("clientModeEnabled", "agentId" to agentId)
+        val conversationId = activeConversationId()
+            ?: return skipLoad("noActiveConversation", "agentId" to agentId)
+        val state = uiState.value
+        if (state.isLoadingMessages) return skipLoad("isLoadingMessages", "conversationId" to conversationId)
+        if (!state.hasMoreOlderMessages) {
+            return skipLoad("noMoreOlder", "conversationId" to conversationId, "messageCount" to state.messages.size)
+        }
+        if (state.isStreaming) return skipLoad("isStreaming", "conversationId" to conversationId)
+        val beforeMessageId = state.messages
             .firstOrNull { !it.isPending && it.isPaginationCursorEligible() }
             ?.id
-            ?: currentState.messages.firstOrNull { !it.isPending }?.id
-        if (oldestLoadedMessageId == null) {
+            ?: state.messages.firstOrNull { !it.isPending }?.id
+            ?: return skipLoad("noNonPendingMessage", "conversationId" to conversationId, "messageCount" to state.messages.size)
+        return LoadRequest(conversationId, selectionGeneration(), state, beforeMessageId)
+    }
+
+    private fun skipLoad(reason: String, vararg attributes: Pair<String, Any?>): Nothing? {
+        Telemetry.event("ChatHistoryPager", "loadSkipped", "reason" to reason, *attributes)
+        return null
+    }
+
+    private fun claimOwner(request: LoadRequest): RequestOwner? = synchronized(ownershipLock) {
+        val existingOwner = activeOwner
+        if (existingOwner?.conversationId == request.conversationId &&
+            existingOwner.selectionGeneration == request.generation
+        ) {
             Telemetry.event(
                 "ChatHistoryPager", "loadSkipped",
-                "reason" to "noNonPendingMessage",
-                "conversationId" to conversationId,
-                "messageCount" to currentState.messages.size,
+                "reason" to "alreadyLoadingOlder",
+                "conversationId" to request.conversationId,
+                "selectionGeneration" to request.generation,
+                "requestId" to existingOwner.requestId,
             )
-            return
+            null
+        } else {
+            RequestOwner(request.conversationId, request.generation, ++nextRequestId).also { activeOwner = it }
         }
+    }
 
-        val cursorIsSynthetic = oldestLoadedMessageId.startsWith("toolreturn-")
-        val owner = synchronized(ownershipLock) {
-            RequestOwner(conversationId, generation, ++nextRequestId).also { activeOwner = it }
-        }
+    private fun reportLoadAttempt(owner: RequestOwner, request: LoadRequest) {
         Telemetry.event(
             "ChatHistoryPager", "loadAttempting",
-            "conversationId" to conversationId,
-            "beforeMessageId" to oldestLoadedMessageId,
-            "currentMessageCount" to currentState.messages.size,
-            "cursorIsSynthetic" to cursorIsSynthetic,
+            "conversationId" to request.conversationId,
+            "beforeMessageId" to request.beforeMessageId,
+            "currentMessageCount" to request.state.messages.size,
+            "cursorIsSynthetic" to request.beforeMessageId.startsWith("toolreturn-"),
             "selectionGeneration" to owner.selectionGeneration,
             "requestId" to owner.requestId,
         )
+    }
 
-        scope.launch {
-            updateIfOwner(owner) { it.copy(isLoadingOlderMessages = true) }
-            try {
-                val olderPage = messageRepository.fetchOlderMessagesPage(
-                    agentId = AgentId(agentId),
-                    conversationId = ConversationId(conversationId),
-                    beforeMessageId = oldestLoadedMessageId,
-                )
-                val olderMessages = olderPage.messages
-                synchronized(ownershipLock) {
-                    if (!isCurrentOwner(owner)) {
-                        Telemetry.event(
-                            "ChatHistoryPager", "loadAbandoned",
-                            "reason" to "selectionChanged",
-                            "conversationId" to conversationId,
-                            "selectionGeneration" to owner.selectionGeneration,
-                            "requestId" to owner.requestId,
-                        )
-                        return@launch
-                    }
+    private suspend fun fetchAndApply(owner: RequestOwner, request: LoadRequest) {
+        updateIfOwner(owner) { it.copy(isLoadingOlderMessages = true) }
+        try {
+            val olderPage = messageRepository.fetchOlderMessagesPage(
+                agentId = AgentId(agentId),
+                conversationId = ConversationId(request.conversationId),
+                beforeMessageId = request.beforeMessageId,
+            )
+            applySuccessIfOwner(owner, request, olderPage.messages, olderPage.hasMore)
+        } catch (e: CancellationException) {
+            clearIfOwner(owner)
+            throw e
+        } catch (e: Exception) {
+            Telemetry.error(
+                "ChatHistoryPager", "loadFailed", e,
+                "conversationId" to request.conversationId,
+                "beforeMessageId" to request.beforeMessageId,
+                "selectionGeneration" to owner.selectionGeneration,
+                "requestId" to owner.requestId,
+            )
+            android.util.Log.w("AdminChatViewModel", "Failed to load older messages", e)
+            clearIfOwner(owner)
+        }
+    }
 
-                    val state = uiState.value
-                    val previousCount = state.messages.size
-                    val olderUi = olderMessages.toUiMessages()
-                    val mergedMessages = chatTimelineObserver.mergeOlderPage(
-                        conversationId = conversationId,
-                        olderMessages = olderUi,
-                        existingMessages = state.messages,
-                    )
-                    val mergeAddedMessages = mergedMessages.size > previousCount
-                    val newHasMore = mergeAddedMessages &&
-                        (olderPage.hasMore ?: (olderMessages.size >= MessageRepository.OLDER_MESSAGES_PAGE_SIZE))
-                    uiState.value = state.copy(
-                        messages = mergedMessages.toImmutableList(),
-                        messageListChange = ChatMessageListChange.Full,
-                        isLoadingOlderMessages = false,
-                        hasMoreOlderMessages = newHasMore,
-                    )
-                    activeOwner = null
-                    Telemetry.event(
-                        "ChatHistoryPager", "loadSucceeded",
-                        "conversationId" to conversationId,
-                        "fetchedCount" to olderMessages.size,
-                        "mergedAddedCount" to (mergedMessages.size - previousCount),
-                        "mergedTotalCount" to mergedMessages.size,
-                        "hasMoreAfter" to newHasMore,
-                        "filteredAllDuplicates" to (olderMessages.isNotEmpty() && !mergeAddedMessages),
-                        "selectionGeneration" to owner.selectionGeneration,
-                        "requestId" to owner.requestId,
-                    )
-                }
-            } catch (e: CancellationException) {
-                clearIfOwner(owner)
-                throw e
-            } catch (e: Exception) {
-                Telemetry.error(
-                    "ChatHistoryPager", "loadFailed", e,
-                    "conversationId" to conversationId,
-                    "beforeMessageId" to oldestLoadedMessageId,
+    private fun applySuccessIfOwner(
+        owner: RequestOwner,
+        request: LoadRequest,
+        olderMessages: List<AppMessage>,
+        hasMore: Boolean?,
+    ) {
+        synchronized(ownershipLock) {
+            if (!isCurrentOwner(owner)) {
+                Telemetry.event(
+                    "ChatHistoryPager", "loadAbandoned",
+                    "reason" to "selectionChanged",
+                    "conversationId" to request.conversationId,
                     "selectionGeneration" to owner.selectionGeneration,
                     "requestId" to owner.requestId,
                 )
-                android.util.Log.w("AdminChatViewModel", "Failed to load older messages", e)
-                clearIfOwner(owner)
+                return
             }
+            val state = uiState.value
+            val previousCount = state.messages.size
+            val mergedMessages = chatTimelineObserver.mergeOlderPage(
+                conversationId = request.conversationId,
+                olderMessages = olderMessages.toUiMessages(),
+                existingMessages = state.messages,
+            )
+            val mergeAddedMessages = mergedMessages.size > previousCount
+            val newHasMore = mergeAddedMessages &&
+                (hasMore ?: (olderMessages.size >= MessageRepository.OLDER_MESSAGES_PAGE_SIZE))
+            uiState.value = state.copy(
+                messages = mergedMessages.toImmutableList(),
+                messageListChange = ChatMessageListChange.Full,
+                isLoadingOlderMessages = false,
+                hasMoreOlderMessages = newHasMore,
+            )
+            activeOwner = null
+            Telemetry.event(
+                "ChatHistoryPager", "loadSucceeded",
+                "conversationId" to request.conversationId,
+                "fetchedCount" to olderMessages.size,
+                "mergedAddedCount" to (mergedMessages.size - previousCount),
+                "mergedTotalCount" to mergedMessages.size,
+                "hasMoreAfter" to newHasMore,
+                "filteredAllDuplicates" to (olderMessages.isNotEmpty() && !mergeAddedMessages),
+                "selectionGeneration" to owner.selectionGeneration,
+                "requestId" to owner.requestId,
+            )
         }
     }
 
