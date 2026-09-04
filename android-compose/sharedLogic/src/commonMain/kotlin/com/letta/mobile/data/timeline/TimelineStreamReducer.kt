@@ -472,64 +472,9 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
     //     prior assistant), where incoming is SHORTER, so existing.startsWith(incoming)
     //     not incoming.startsWith(existing) → not a forward growth → not merged.
     //   • distinct same-run assistant messages — no forward-prefix relationship.
-    val liveAssistant = (timeline.events.lastOrNull() as? TimelineEvent.Confirmed)
-        ?.takeIf { it.messageType == TimelineMessageType.ASSISTANT }
-    val isForwardGrowthFragment = liveAssistant != null &&
-        confirmed.messageType == TimelineMessageType.ASSISTANT &&
-        liveAssistant.serverId != confirmed.serverId &&
-        // letta-mobile-w0ctr: widen the run-id gate by EXACTLY the promotion case —
-        // a synthetic existing run id growing into a real incoming one. The first streamed
-        // fragment is committed before run-id promotion lands, so `iroh-run-*` vs `run-*`
-        // failed isCompatibleAssistantPrefixRunId (which only accepts equal ids, or BOTH
-        // sides synthetic) and the second fragment appended a new row instead of growing
-        // the first — stranding the opening chunk as its own bubble.
-        //
-        // letta-mobile-lf4hh: a blank existing run id is indistinguishable BY ID from
-        // an older RECONCILED reply (those carry runId = null), so merging into one on
-        // the strength of a prefix alone would overwrite an unrelated earlier message —
-        // the #827 regression guarded by "reconcile final does not overwrite an
-        // unrelated older reply that is a substring". It stays blocked whenever the
-        // INCOMING frame carries a real run id, which is exactly that shape.
-        //
-        // When NEITHER side carries a run id there is no identity signal at all, and the
-        // wire really does deliver run-id-less cumulative fragments: the reply then
-        // stranded its opening chunk as a separate bubble ("Hey" above "Hey there! Still
-        // connected."). Admit that case on a second, independent signal — the two frames
-        // must be within [SAME_FRAGMENT_WINDOW_MS] of each other. Fragments of one reply
-        // land milliseconds apart; a settled earlier reply at the tail is at least a
-        // round trip plus user typing older, so it stays outside the window.
-        run {
-            val existingRun = liveAssistant.runId?.takeIf { it.isNotBlank() }
-            val incomingRun = confirmed.runId?.takeIf { it.isNotBlank() }
-            when {
-                existingRun == null -> incomingRun == null &&
-                    isWithinSameFragmentWindow(liveAssistant.date, confirmed.date)
-                incomingRun == null -> false
-                else -> existingRun == incomingRun || existingRun.isIrohSyntheticRunId()
-            }
-        } &&
-        run {
-            val existing = liveAssistant.content.trim()
-            val incoming = confirmed.content.trim()
-            existing.isNotEmpty() && incoming.length > existing.length && incoming.startsWith(existing)
-        }
-    if (isForwardGrowthFragment && liveAssistant != null) {
-        val merged = liveAssistant.copy(
-            content = confirmed.content,
-            runId = promoteRunId(liveAssistant.runId, confirmed.runId),
-            seqId = latestSeqId(liveAssistant.seqId, confirmed.seqId),
-        )
-        timeline = timeline.replaceByServerId(merged)
-        timeline = timeline.copy(liveCursor = liveAssistant.serverId)
-        pendingEvents += TimelineSyncEvent.StreamEventIngested(liveAssistant.serverId, message.messageType)
-        hotPathTelemetry(
-            "streamSubscriber.forwardGrowthMerged",
-            "serverId" to liveAssistant.serverId,
-            "incomingServerId" to confirmed.serverId,
-            "runId" to (confirmed.runId ?: "<null>"),
-            "mergedLen" to confirmed.content.length,
-            "conversationId" to conversationId,
-        )
+    applyForwardGrowthMerge(timeline, confirmed, conversationId)?.let { growth ->
+        timeline = growth.timeline
+        pendingEvents += TimelineSyncEvent.StreamEventIngested(growth.stableServerId, message.messageType)
         return output()
     }
 
@@ -574,7 +519,7 @@ private fun StreamTextMergeResult.defensiveTelemetryName(): String? = when (bran
     StreamTextMergeBranch.APPEND -> null
 }
 
-private fun hotPathTelemetry(
+internal fun hotPathTelemetry(
     name: String,
     vararg attrs: TelemetryAttribute,
 ) {
@@ -617,24 +562,6 @@ private fun TimelineEvent.Confirmed.hasIrohSyntheticRunId(): Boolean =
  * intentionally kept separate: it only ever evaluates an `ActiveTurn` run id
  * (always born `iroh-run-*` in `send()`), and observer ids can never reach it.
  */
-/**
- * letta-mobile-lf4hh: widest gap between two streamed fragments of ONE assistant
- * reply. Fragments of a single reply are emitted within the same generation loop
- * (milliseconds apart); anything older at the timeline tail is a settled message.
- */
-private const val SAME_FRAGMENT_WINDOW_MS = 2_000L
-
-/**
- * True when [existing] and [incoming] are close enough in time to be fragments of
- * the same in-flight reply. Order-insensitive: a row can carry a server date
- * marginally AHEAD of the live fragment's client date.
- */
-private fun isWithinSameFragmentWindow(existing: TimelineInstant, incoming: TimelineInstant): Boolean {
-    val delta = timelineInstantDurationMillis(existing, incoming)
-    val magnitude = if (delta < 0) -delta else delta
-    return magnitude <= SAME_FRAGMENT_WINDOW_MS
-}
-
 internal val IROH_SYNTHETIC_RUN_ID_PREFIXES = listOf("iroh-run-", ObserverStreamPromotionPolicy.OBSERVER_RUN_ID_PREFIX)
 
 internal fun String.isIrohSyntheticRunId(): Boolean =
@@ -647,7 +574,7 @@ internal fun String.isIrohSyntheticRunId(): Boolean =
  * existing id (never regress a real id back to a synthetic one, and never
  * clobber with a blank incoming id).
  */
-private fun promoteRunId(existing: String?, incoming: String?): String? {
+internal fun promoteRunId(existing: String?, incoming: String?): String? {
     val existingRunId = existing?.takeIf { it.isNotBlank() }
     val incomingRunId = incoming?.takeIf { it.isNotBlank() } ?: return existingRunId
     if (existingRunId == null) return incomingRunId
