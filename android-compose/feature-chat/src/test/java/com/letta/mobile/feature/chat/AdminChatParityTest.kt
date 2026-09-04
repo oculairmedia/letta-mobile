@@ -68,6 +68,13 @@ class AdminChatParityTest {
     @Test
     fun `resolve conversation failure triggers offline state and sets error message`() = runTest {
         val harness = Harness(scope = this)
+        // letta-mobile-grrhq: production resolves through
+        // resolveMostRecentConversationWithProvenance now. Stubbing only the
+        // plain overload leaves this test vacuous — the throw never fires and
+        // the state stays Live.
+        coEvery {
+            harness.chatSessionResolver.resolveMostRecentConversationWithProvenance("agent-1", any(), any())
+        } throws RuntimeException("Network error")
         coEvery { harness.chatSessionResolver.resolveMostRecentConversation("agent-1", any()) } throws RuntimeException("Network error")
 
         harness.coordinator.resolveConversationAndLoad(ConversationAccessMode.Timeline)
