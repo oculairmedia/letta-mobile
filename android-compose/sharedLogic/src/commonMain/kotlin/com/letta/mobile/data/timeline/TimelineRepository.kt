@@ -169,7 +169,10 @@ open class TimelineRepository(
             "conversationId" to requested.conversationId,
             // Provenance of the REQUESTING acquisition, correlated to its
             // acquisition.entry and to the cacheMiss that follows this refusal.
-            *TimelineAcquisitionTelemetry.baseAttrs(requested.agentId, requested.conversationId, provenance),
+            *TimelineAcquisitionTelemetry.baseAttrs(
+                TimelineAcquisitionTarget(requested.agentId, requested.conversationId),
+                provenance,
+            ),
             level = Telemetry.Level.WARN,
         )
     }
@@ -199,7 +202,10 @@ open class TimelineRepository(
         provenance: TimelineAcquisitionProvenance = TimelineAcquisitionProvenance.UNSPECIFIED,
     ): TimelineSyncLoop {
         val key = TimelineCacheKey(agentId = agentId, conversationId = conversationId)
-        TimelineAcquisitionTelemetry.emitEntry(agentId, conversationId, provenance, creator = "getOrCreate")
+        TimelineAcquisitionTelemetry.emitEntry(
+            TimelineAcquisitionTarget(agentId, conversationId, creator = "getOrCreate"),
+            provenance,
+        )
         // Fast path for already-cached loops. The access-order map mutates on
         // reads, so even cache hits go through the mutex.
         loopsMutex.withLock { getLoopLocked(key) ?: getAliasedLoopLocked(key, provenance) }?.let { cached ->
@@ -359,7 +365,8 @@ open class TimelineRepository(
     ): TimelineSyncLoop {
         if (emitEntry) {
             TimelineAcquisitionTelemetry.emitEntry(
-                key.agentId, key.conversationId, provenance, creator = "getOrCreateLoopWithoutHydrate",
+                TimelineAcquisitionTarget(key.agentId, key.conversationId, creator = "getOrCreateLoopWithoutHydrate"),
+                provenance,
             )
         }
         loopsMutex.withLock { getLoopLocked(key) ?: getAliasedLoopLocked(key, provenance) }?.let { return it }

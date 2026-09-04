@@ -235,23 +235,28 @@ data class TimelineConversationAttributionCapture(
  * who the other claimant would be. This is deliberate: silently reporting
  * REQUESTED_AGENT_ONLY on missing parent data would mask outcome B.
  */
+/** Query parameters for attribution classification. */
+data class ConversationAttributionQuery(
+    val requestedAgentId: String,
+    val selectedConversationId: String? = null,
+    val selectedRecordAgentId: String? = null,
+    val requestedAgentCandidateIds: Set<String> = emptySet(),
+    val parentAgentId: String? = null,
+    val parentAgentCandidateIds: Set<String> = emptySet(),
+)
+
 fun classifyConversationAttribution(
-    selectedConversationId: String?,
-    requestedAgentId: String,
-    selectedRecordAgentId: String?,
-    requestedAgentCandidateIds: Set<String>,
-    parentAgentId: String?,
-    parentAgentCandidateIds: Set<String>,
+    query: ConversationAttributionQuery,
 ): TimelineConversationAttribution {
-    if (selectedConversationId.isNullOrBlank()) return TimelineConversationAttribution.UNKNOWN
-    val attributedToRequested = if (selectedRecordAgentId != null) {
-        selectedRecordAgentId == requestedAgentId
+    if (query.selectedConversationId.isNullOrBlank()) return TimelineConversationAttribution.UNKNOWN
+    val attributedToRequested = if (query.selectedRecordAgentId != null) {
+        query.selectedRecordAgentId == query.requestedAgentId
     } else {
-        selectedConversationId in requestedAgentCandidateIds
+        query.selectedConversationId in query.requestedAgentCandidateIds
     }
-    if (parentAgentId.isNullOrBlank()) return TimelineConversationAttribution.UNKNOWN
-    val attributedToParent = selectedConversationId in parentAgentCandidateIds ||
-        selectedRecordAgentId == parentAgentId
+    if (query.parentAgentId.isNullOrBlank()) return TimelineConversationAttribution.UNKNOWN
+    val attributedToParent = query.selectedConversationId in query.parentAgentCandidateIds ||
+        query.selectedRecordAgentId == query.parentAgentId
     return when {
         attributedToRequested && attributedToParent -> TimelineConversationAttribution.BOTH
         attributedToRequested -> TimelineConversationAttribution.REQUESTED_AGENT_ONLY
@@ -355,21 +360,25 @@ object TimelineProvenanceRedaction {
  */
 val timelineAcquisitionProvenanceEnabled: TelemetryFlag = TelemetryFlag(true)
 
+data class TimelineAcquisitionTarget(
+    val agentId: String?,
+    val conversationId: String,
+    val creator: String = "getOrCreate",
+)
+
 object TimelineAcquisitionTelemetry {
     const val TAG: String = "TimelineRepo"
 
     /** Acquisition entry. Fixed attribute allowlist; cardinality bounded by construction. */
     fun emitEntry(
-        agentId: String?,
-        conversationId: String,
+        target: TimelineAcquisitionTarget,
         provenance: TimelineAcquisitionProvenance,
-        creator: String,
     ) {
         if (!timelineAcquisitionProvenanceEnabled.get()) return
         Telemetry.event(
             TAG, "acquisition.entry",
-            *baseAttrs(agentId, conversationId, provenance),
-            "creator" to creator,
+            *baseAttrs(target, provenance),
+            "creator" to target.creator,
         )
         provenance.attribution?.let { emitAttribution(it, provenance) }
     }
@@ -400,8 +409,7 @@ object TimelineAcquisitionTelemetry {
 
     /** Shared attribute block for entry / refusal / cache-miss correlation. */
     fun baseAttrs(
-        agentId: String?,
-        conversationId: String,
+        target: TimelineAcquisitionTarget,
         provenance: TimelineAcquisitionProvenance,
     ): Array<Pair<String, String>> = arrayOf(
         "acquisitionId" to TimelineProvenanceRedaction.boundedIdentifier(provenance.acquisitionId),
@@ -410,8 +418,8 @@ object TimelineAcquisitionTelemetry {
         "callSite" to TimelineProvenanceRedaction.boundedIdentifier(provenance.callSite),
         "frameFamily" to provenance.frameFamily.name,
         "selectionMode" to provenance.selectionMode.name,
-        "agentId" to TimelineProvenanceRedaction.boundedIdentifier(agentId),
-        "conversationId" to TimelineProvenanceRedaction.boundedIdentifier(conversationId),
+        "agentId" to TimelineProvenanceRedaction.boundedIdentifier(target.agentId),
+        "conversationId" to TimelineProvenanceRedaction.boundedIdentifier(target.conversationId),
         "parentAgentId" to TimelineProvenanceRedaction.boundedIdentifier(provenance.parentAgentId),
         "parentConversationId" to TimelineProvenanceRedaction.boundedIdentifier(provenance.parentConversationId),
         "runId" to TimelineProvenanceRedaction.boundedIdentifier(provenance.runId),

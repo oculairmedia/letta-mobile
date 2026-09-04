@@ -93,19 +93,11 @@ class TimelineRepositoryAcquisitionProvenanceTest {
     private fun provenance(
         acquisitionId: String,
         source: TimelineAcquisitionSource,
-        selectionMode: TimelineConversationSelectionMode = TimelineConversationSelectionMode.UNKNOWN,
-        frameFamily: TimelineAcquisitionFrameFamily = TimelineAcquisitionFrameFamily.NONE,
-        isReplay: Boolean = false,
-        attribution: TimelineConversationAttributionCapture? = null,
     ) = TimelineAcquisitionProvenance(
         acquisitionId = acquisitionId,
         source = source,
         operation = "test.op",
         callSite = "TimelineRepositoryAcquisitionProvenanceTest.kt",
-        frameFamily = frameFamily,
-        selectionMode = selectionMode,
-        isReplay = isReplay,
-        attribution = attribution,
     )
 
     // ------------------------------------------------ the full correlated chain
@@ -141,6 +133,7 @@ class TimelineRepositoryAcquisitionProvenanceTest {
                     provenance(
                         acquisitionId = "acq-child",
                         source = TimelineAcquisitionSource.UI_RESOLVED_ROUTE,
+                    ).copy(
                         selectionMode = TimelineConversationSelectionMode.MOST_RECENT_FALLBACK,
                         attribution = capture,
                     ),
@@ -185,21 +178,17 @@ class TimelineRepositoryAcquisitionProvenanceTest {
             val repo = newRepo(scope)
             try {
                 val cases = listOf(
-                    "c-nav" to provenance(
-                        "a1", TimelineAcquisitionSource.UI_NAVIGATION,
+                    "c-nav" to provenance("a1", TimelineAcquisitionSource.UI_NAVIGATION).copy(
                         selectionMode = TimelineConversationSelectionMode.EXPLICIT_CONVERSATION_ID,
                         frameFamily = TimelineAcquisitionFrameFamily.DIRECT_NAVIGATION,
                     ),
-                    "c-resolved" to provenance(
-                        "a2", TimelineAcquisitionSource.UI_RESOLVED_ROUTE,
+                    "c-resolved" to provenance("a2", TimelineAcquisitionSource.UI_RESOLVED_ROUTE).copy(
                         selectionMode = TimelineConversationSelectionMode.MOST_RECENT_FALLBACK,
                     ),
-                    "c-replay" to provenance(
-                        "a3", TimelineAcquisitionSource.REPLAY_RECONCILE,
+                    "c-replay" to provenance("a3", TimelineAcquisitionSource.REPLAY_RECONCILE).copy(
                         frameFamily = TimelineAcquisitionFrameFamily.REPLAY, isReplay = true,
                     ),
-                    "c-fanout" to provenance(
-                        "a4", TimelineAcquisitionSource.RUNTIME_FANOUT,
+                    "c-fanout" to provenance("a4", TimelineAcquisitionSource.RUNTIME_FANOUT).copy(
                         frameFamily = TimelineAcquisitionFrameFamily.CHILD_STREAM_DELTA,
                     ),
                 )

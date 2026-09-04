@@ -9,6 +9,7 @@ import com.letta.mobile.data.timeline.TimelineConversationAttribution
 import com.letta.mobile.data.timeline.TimelineConversationAttributionCapture
 import com.letta.mobile.data.timeline.TimelineConversationSelectionMode
 import com.letta.mobile.data.timeline.TimelineProvenanceRedaction
+import com.letta.mobile.data.timeline.ConversationAttributionQuery
 import com.letta.mobile.data.timeline.classifyConversationAttribution
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -164,12 +165,14 @@ class SharedChatSessionResolver(
             .orEmpty()
         val selectedRecordAgentId = candidates.firstOrNull { it.id.value == request.selectedConversationId }?.agentId?.value
         val attribution = classifyConversationAttribution(
-            selectedConversationId = request.selectedConversationId,
-            requestedAgentId = request.requestedAgentId,
-            selectedRecordAgentId = selectedRecordAgentId,
-            requestedAgentCandidateIds = candidateIds.toSet(),
-            parentAgentId = request.parentAgentId,
-            parentAgentCandidateIds = parentCandidateIds.toSet(),
+            ConversationAttributionQuery(
+                requestedAgentId = request.requestedAgentId,
+                selectedConversationId = request.selectedConversationId,
+                selectedRecordAgentId = selectedRecordAgentId,
+                requestedAgentCandidateIds = candidateIds.toSet(),
+                parentAgentId = request.parentAgentId,
+                parentAgentCandidateIds = parentCandidateIds.toSet(),
+            ),
         )
         return TimelineConversationAttributionCapture(
             requestedAgentId = request.requestedAgentId,

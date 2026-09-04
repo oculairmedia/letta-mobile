@@ -23,13 +23,15 @@ class TimelineAcquisitionProvenanceTest {
     @Test
     fun selected_conversation_owned_only_by_parent_is_PARENT_AGENT_ONLY() {
         val attribution = classifyConversationAttribution(
-            selectedConversationId = conversation,
-            requestedAgentId = child,
-            // The record in the CHILD's cache bucket is attributed to the parent.
-            selectedRecordAgentId = parent,
-            requestedAgentCandidateIds = emptySet(),
-            parentAgentId = parent,
-            parentAgentCandidateIds = setOf(conversation),
+            ConversationAttributionQuery(
+                requestedAgentId = child,
+                selectedConversationId = conversation,
+                // The record in the CHILD's cache bucket is attributed to the parent.
+                selectedRecordAgentId = parent,
+                requestedAgentCandidateIds = emptySet(),
+                parentAgentId = parent,
+                parentAgentCandidateIds = setOf(conversation),
+            ),
         )
         assertEquals(TimelineConversationAttribution.PARENT_AGENT_ONLY, attribution)
     }
@@ -42,12 +44,14 @@ class TimelineAcquisitionProvenanceTest {
         // BOTH and silently reclassify outcome A (a resolver defect) as outcome
         // B (a legitimate dual attribution).
         val attribution = classifyConversationAttribution(
-            selectedConversationId = conversation,
-            requestedAgentId = child,
-            selectedRecordAgentId = parent,
-            requestedAgentCandidateIds = setOf(conversation),
-            parentAgentId = parent,
-            parentAgentCandidateIds = setOf(conversation),
+            ConversationAttributionQuery(
+                requestedAgentId = child,
+                selectedConversationId = conversation,
+                selectedRecordAgentId = parent,
+                requestedAgentCandidateIds = setOf(conversation),
+                parentAgentId = parent,
+                parentAgentCandidateIds = setOf(conversation),
+            ),
         )
         assertEquals(TimelineConversationAttribution.PARENT_AGENT_ONLY, attribution)
     }
@@ -55,12 +59,14 @@ class TimelineAcquisitionProvenanceTest {
     @Test
     fun bucket_membership_is_the_fallback_when_the_record_has_no_agent() {
         val attribution = classifyConversationAttribution(
-            selectedConversationId = conversation,
-            requestedAgentId = child,
-            selectedRecordAgentId = null,
-            requestedAgentCandidateIds = setOf(conversation),
-            parentAgentId = parent,
-            parentAgentCandidateIds = emptySet(),
+            ConversationAttributionQuery(
+                requestedAgentId = child,
+                selectedConversationId = conversation,
+                selectedRecordAgentId = null,
+                requestedAgentCandidateIds = setOf(conversation),
+                parentAgentId = parent,
+                parentAgentCandidateIds = emptySet(),
+            ),
         )
         assertEquals(TimelineConversationAttribution.REQUESTED_AGENT_ONLY, attribution)
     }
@@ -70,12 +76,14 @@ class TimelineAcquisitionProvenanceTest {
     @Test
     fun conversation_attributed_to_both_agents_is_BOTH() {
         val attribution = classifyConversationAttribution(
-            selectedConversationId = conversation,
-            requestedAgentId = child,
-            selectedRecordAgentId = child,
-            requestedAgentCandidateIds = setOf(conversation),
-            parentAgentId = parent,
-            parentAgentCandidateIds = setOf(conversation),
+            ConversationAttributionQuery(
+                requestedAgentId = child,
+                selectedConversationId = conversation,
+                selectedRecordAgentId = child,
+                requestedAgentCandidateIds = setOf(conversation),
+                parentAgentId = parent,
+                parentAgentCandidateIds = setOf(conversation),
+            ),
         )
         assertEquals(
             TimelineConversationAttribution.BOTH,
@@ -90,12 +98,14 @@ class TimelineAcquisitionProvenanceTest {
         // The child's cache bucket does not list it, but the record says child,
         // and the parent's bucket does list it. Still dual attribution.
         val attribution = classifyConversationAttribution(
-            selectedConversationId = conversation,
-            requestedAgentId = child,
-            selectedRecordAgentId = child,
-            requestedAgentCandidateIds = emptySet(),
-            parentAgentId = parent,
-            parentAgentCandidateIds = setOf(conversation),
+            ConversationAttributionQuery(
+                requestedAgentId = child,
+                selectedConversationId = conversation,
+                selectedRecordAgentId = child,
+                requestedAgentCandidateIds = emptySet(),
+                parentAgentId = parent,
+                parentAgentCandidateIds = setOf(conversation),
+            ),
         )
         assertEquals(TimelineConversationAttribution.BOTH, attribution)
     }
@@ -105,12 +115,14 @@ class TimelineAcquisitionProvenanceTest {
     @Test
     fun unknown_parent_reports_UNKNOWN_and_never_fabricates_requested_only() {
         val attribution = classifyConversationAttribution(
-            selectedConversationId = conversation,
-            requestedAgentId = child,
-            selectedRecordAgentId = child,
-            requestedAgentCandidateIds = setOf(conversation),
-            parentAgentId = null,
-            parentAgentCandidateIds = emptySet(),
+            ConversationAttributionQuery(
+                requestedAgentId = child,
+                selectedConversationId = conversation,
+                selectedRecordAgentId = child,
+                requestedAgentCandidateIds = setOf(conversation),
+                parentAgentId = null,
+                parentAgentCandidateIds = emptySet(),
+            ),
         )
         assertEquals(
             TimelineConversationAttribution.UNKNOWN,
@@ -125,23 +137,27 @@ class TimelineAcquisitionProvenanceTest {
         assertEquals(
             TimelineConversationAttribution.REQUESTED_AGENT_ONLY,
             classifyConversationAttribution(
-                selectedConversationId = conversation,
-                requestedAgentId = child,
-                selectedRecordAgentId = child,
-                requestedAgentCandidateIds = setOf(conversation),
-                parentAgentId = parent,
-                parentAgentCandidateIds = setOf("local-conv-7"),
+                ConversationAttributionQuery(
+                    requestedAgentId = child,
+                    selectedConversationId = conversation,
+                    selectedRecordAgentId = child,
+                    requestedAgentCandidateIds = setOf(conversation),
+                    parentAgentId = parent,
+                    parentAgentCandidateIds = setOf("local-conv-7"),
+                ),
             ),
         )
         assertEquals(
             TimelineConversationAttribution.NEITHER,
             classifyConversationAttribution(
-                selectedConversationId = conversation,
-                requestedAgentId = child,
-                selectedRecordAgentId = "agent-someone-else",
-                requestedAgentCandidateIds = setOf("local-conv-3"),
-                parentAgentId = parent,
-                parentAgentCandidateIds = setOf("local-conv-7"),
+                ConversationAttributionQuery(
+                    requestedAgentId = child,
+                    selectedConversationId = conversation,
+                    selectedRecordAgentId = "agent-someone-else",
+                    requestedAgentCandidateIds = setOf("local-conv-3"),
+                    parentAgentId = parent,
+                    parentAgentCandidateIds = setOf("local-conv-7"),
+                ),
             ),
         )
     }
@@ -150,11 +166,23 @@ class TimelineAcquisitionProvenanceTest {
     fun blank_selection_is_UNKNOWN() {
         assertEquals(
             TimelineConversationAttribution.UNKNOWN,
-            classifyConversationAttribution(null, child, null, emptySet(), parent, emptySet()),
+            classifyConversationAttribution(
+                ConversationAttributionQuery(
+                    requestedAgentId = child,
+                    selectedConversationId = null,
+                    parentAgentId = parent,
+                ),
+            ),
         )
         assertEquals(
             TimelineConversationAttribution.UNKNOWN,
-            classifyConversationAttribution("", child, null, emptySet(), parent, emptySet()),
+            classifyConversationAttribution(
+                ConversationAttributionQuery(
+                    requestedAgentId = child,
+                    selectedConversationId = "",
+                    parentAgentId = parent,
+                ),
+            ),
         )
     }
 
