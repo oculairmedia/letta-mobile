@@ -49,14 +49,18 @@ internal class ChatSessionResolver(
 
     /** letta-mobile-grrhq: capture for a selection made outside the resolver. */
     fun captureAttribution(
+        request: SharedChatSessionResolver.AttributionRequest,
+    ): TimelineConversationAttributionCapture = delegate.captureAttribution(request)
+
+    fun captureAttribution(
         requestedAgentId: String,
         selectedConversationId: String?,
-        parentAgentId: String?,
         selectionMode: TimelineConversationSelectionMode,
+        parentAgentId: String? = null,
     ): TimelineConversationAttributionCapture = delegate.captureAttribution(
         requestedAgentId = requestedAgentId,
         selectedConversationId = selectedConversationId,
-        parentAgentId = parentAgentId,
         selectionMode = selectionMode,
+        parentAgentId = parentAgentId,
     )
 }

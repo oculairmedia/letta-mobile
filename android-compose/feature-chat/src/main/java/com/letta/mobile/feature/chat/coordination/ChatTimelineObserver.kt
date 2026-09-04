@@ -162,122 +162,132 @@ internal class ChatTimelineObserver(
         observerJob = launchObserver(binding, hydrationGeneration)
     }
 
+    private suspend fun observeTimeline(
+        agentId: String?,
+        conversationId: String,
+        provenance: TimelineAcquisitionProvenance,
+    ): StateFlow<Timeline> = if (provenance == TimelineAcquisitionProvenance.UNSPECIFIED) {
+        timelineRepository.observe(agentId, conversationId)
+    } else {
+        timelineRepository.observe(agentId, conversationId, provenance)
+    }
+
+    private suspend fun getOrCreateTimelineLoop(
+        agentId: String?,
+        conversationId: String,
+        provenance: TimelineAcquisitionProvenance,
+    ): TimelineSyncLoop = if (provenance == TimelineAcquisitionProvenance.UNSPECIFIED) {
+        timelineRepository.getOrCreate(agentId, conversationId)
+    } else {
+        timelineRepository.getOrCreate(agentId, conversationId, provenance)
+    }
+
     private fun launchObserver(
         binding: TimelineObserverBinding,
         generation: ChatHydrationTrace.Generation?,
     ): Job = scope.launch {
-            val agentId = binding.agentId
-            val conversationId = binding.conversationId
-            val provenance = pendingProvenance
-            val flow = try {
-                if (provenance == TimelineAcquisitionProvenance.UNSPECIFIED) {
-                    timelineRepository.observe(agentId, conversationId)
-                } else {
-                    timelineRepository.observe(agentId, conversationId, provenance)
-                }
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (failure: Exception) {
-                android.util.Log.e("AdminChatViewModel", "Timeline observe failed", failure)
-                if (observerBinding == binding) {
-                    uiState.value = uiState.value.copy(
-                        error = "Couldn't sync conversation — pull to refresh",
-                        isLoadingMessages = false,
+        val flow = try {
+            observeTimeline(binding.agentId, binding.conversationId, pendingProvenance)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            android.util.Log.e("AdminChatViewModel", "Timeline observe failed", failure)
+            if (observerBinding == binding) {
+                uiState.value = uiState.value.copy(
+                    error = "Couldn't sync conversation — pull to refresh",
+                    isLoadingMessages = false,
+                )
+            }
+            return@launch
+        }
+
+        if (observerBinding != binding) return@launch
+        val loop = getOrCreateTimelineLoop(binding.agentId, binding.conversationId, pendingProvenance)
+        if (observerBinding != binding) return@launch
+        currentConversationTracker.setCurrent(binding.conversationId)
+        hydrateSignalJob = launchHydrationCollector(loop, binding, generation)
+
+        try {
+            // letta-mobile-yflpp COALESCE: during streaming the
+            // authoritative Timeline StateFlow can produce ~20 updates/sec
+            // (one per token delta + shadow-holder parity churn). `flow` is
+            // a StateFlow, which is already conflated — a collector that
+            // suspends (e.g. on the projection dispatcher or the frame-pace
+            // delay below) only ever sees the LATEST value when it resumes,
+            // never a backlog. Together with that pacing delay the
+            // projection runs at most ~once per frame instead of once per
+            // delta, so Compose hit-testing / gesture handling get a clean
+            // pass and tool-card taps land mid-stream.
+            flow.collect { timeline ->
+                if (observerBinding != binding) return@collect
+                val conversationId = binding.conversationId
+                if (Telemetry.isTimelineSyncGateDebugEnabled()) {
+                    Telemetry.event(
+                        "TimelineSyncIngest", "gate6.timelineCollected",
+                        "conversationId" to conversationId,
+                        "count" to timeline.events.size,
+                        level = Telemetry.Level.DEBUG,
                     )
                 }
-                return@launch
-            }
+                val prefix = presenter.olderPrefixFor(conversationId)
+                val previousState = uiState.value
+                val projection = withContext(projectionDispatcher) {
+                    presenter.project(
+                        timeline = timeline,
+                        prefix = prefix,
+                        previousState = previousState,
+                        // letta-mobile-dir4k.1: thread the transport's
+                        // "turn in flight" latch into the projector so
+                        // [TimelineProjection.anyRunActive] stays true
+                        // across inter-tool-call gaps where no
+                        // `isPending=true` message is currently in `live`.
+                        // Without this the Thinking chip drops mid-turn
+                        // between tools (regression introduced by PR
+                        // #1119 — see bead letta-mobile-dir4k.1).
+                        isActiveRunStreaming = hasActiveChatTurn(),
+                        ownAgentId = binding.agentId,
+                    )
+                }
 
-            if (observerBinding != binding) return@launch
-            val loop = if (provenance == TimelineAcquisitionProvenance.UNSPECIFIED) {
-                timelineRepository.getOrCreate(agentId, conversationId)
-            } else {
-                timelineRepository.getOrCreate(agentId, conversationId, provenance)
-            }
-            if (observerBinding != binding) return@launch
-            currentConversationTracker.setCurrent(conversationId)
-            hydrateSignalJob = launchHydrationCollector(loop, binding, generation)
+                if (observerBinding != binding) return@collect
 
-            try {
-                // letta-mobile-yflpp COALESCE: during streaming the
-                // authoritative Timeline StateFlow can produce ~20 updates/sec
-                // (one per token delta + shadow-holder parity churn). `flow` is
-                // a StateFlow, which is already conflated â€” a collector that
-                // suspends (e.g. on the projection dispatcher or the frame-pace
-                // delay below) only ever sees the LATEST value when it resumes,
-                // never a backlog. Together with that pacing delay the
-                // projection runs at most ~once per frame instead of once per
-                // delta, so Compose hit-testing / gesture handling get a clean
-                // pass and tool-card taps land mid-stream.
-                flow.collect { timeline ->
-                    if (observerBinding != binding) return@collect
-                    if (Telemetry.isTimelineSyncGateDebugEnabled()) {
-                        Telemetry.event(
-                            "TimelineSyncIngest", "gate6.timelineCollected",
-                            "conversationId" to conversationId,
-                            "count" to timeline.events.size,
-                            level = Telemetry.Level.DEBUG,
-                        )
-                    }
-                    val prefix = presenter.olderPrefixFor(conversationId)
-                    val previousState = uiState.value
-                    val projection = withContext(projectionDispatcher) {
-                        presenter.project(
-                            timeline = timeline,
-                            prefix = prefix,
-                            previousState = previousState,
-                            // letta-mobile-dir4k.1: thread the transport's
-                            // "turn in flight" latch into the projector so
-                            // [TimelineProjection.anyRunActive] stays true
-                            // across inter-tool-call gaps where no
-                            // `isPending=true` message is currently in `live`.
-                            // Without this the Thinking chip drops mid-turn
-                            // between tools (regression introduced by PR
-                            // #1119 — see bead letta-mobile-dir4k.1).
-                            isActiveRunStreaming = hasActiveChatTurn(),
-                            ownAgentId = binding.agentId,
-                        )
-                    }
+                if (suppressWarmBootstrapReplay(binding, timeline, projection, generation)) {
+                    return@collect
+                }
 
-                    if (observerBinding != binding) return@collect
-
-                    if (suppressWarmBootstrapReplay(binding, timeline, projection, generation)) {
-                        return@collect
-                    }
-
-                    // letta-mobile-yflpp DEDUPE: a no-op streaming tick (the
-                    // tail event was re-emitted unchanged) projects to a UI
-                    // byte-identical to the screen. Skip the uiState write so we
-                    // don't allocate a new ChatUiState and force a recomposition
-                    // storm over every tool card. Telemetry was already emitted
-                    // as uiProjection.suppressed by the presenter.
-                    if (projection.noChange) {
-                        publishPresenceOnly(binding, projection, generation)?.let {
-                            uiState.value = reconcileCollapsedRunsOnProjection(it.previous, it.next)
-                        }
-                        return@collect
-                    }
-                    publishProjection(binding, projection, generation).let {
+                // letta-mobile-yflpp DEDUPE: a no-op streaming tick (the
+                // tail event was re-emitted unchanged) projects to a UI
+                // byte-identical to the screen. Skip the uiState write so we
+                // don't allocate a new ChatUiState and force a recomposition
+                // storm over every tool card. Telemetry was already emitted
+                // as uiProjection.suppressed by the presenter.
+                if (projection.noChange) {
+                    publishPresenceOnly(binding, projection, generation)?.let {
                         uiState.value = reconcileCollapsedRunsOnProjection(it.previous, it.next)
                     }
-
-                    // letta-mobile-yflpp COALESCE: pace real updates to at most
-                    // ~one per frame. conflate() already drops backlog while we
-                    // were projecting; this delay guarantees a minimum gap
-                    // between writes so a burst of genuine token deltas can't
-                    // peg the UI thread with >60 recompositions/sec. The latest
-                    // value is always re-read after the delay, so no update is
-                    // lost â€” they just collapse to frame cadence. A zero
-                    // interval (tests) disables pacing so virtual-clock tests
-                    // that drive emissions with runCurrent() stay synchronous.
-                    if (projectionFrameIntervalMs > 0L) {
-                        delay(projectionFrameIntervalMs.milliseconds)
-                    }
+                    return@collect
                 }
-            } finally {
-                hydrateSignalJob?.cancel()
+                publishProjection(binding, projection, generation).let {
+                    uiState.value = reconcileCollapsedRunsOnProjection(it.previous, it.next)
+                }
+
+                // letta-mobile-yflpp COALESCE: pace real updates to at most
+                // ~one per frame. conflate() already drops backlog while we
+                // were projecting; this delay guarantees a minimum gap
+                // between writes so a burst of genuine token deltas can't
+                // peg the UI thread with >60 recompositions/sec. The latest
+                // value is always re-read after the delay, so no update is
+                // lost — they just collapse to frame cadence. A zero
+                // interval (tests) disables pacing so virtual-clock tests
+                // that drive emissions with runCurrent() stay synchronous.
+                if (projectionFrameIntervalMs > 0L) {
+                    delay(projectionFrameIntervalMs.milliseconds)
+                }
             }
+        } finally {
+            hydrateSignalJob?.cancel()
         }
+    }
 
     private fun launchHydrationCollector(
         loop: TimelineSyncLoop,

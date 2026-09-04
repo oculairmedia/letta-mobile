@@ -105,73 +105,84 @@ class SharedChatSessionResolver(
         return ConversationSelection(
             conversationId = selected,
             capture = buildCapture(
-                requestedAgentId = agentId,
-                selectedConversationId = selected,
+                request = AttributionRequest(
+                    requestedAgentId = agentId,
+                    selectedConversationId = selected,
+                    parentAgentId = parentAgentId,
+                    selectionMode = TimelineConversationSelectionMode.MOST_RECENT_FALLBACK,
+                    freshness = when {
+                        refreshed -> TimelineCandidateListFreshness.REFRESHED
+                        wasFresh -> TimelineCandidateListFreshness.FRESH
+                        else -> TimelineCandidateListFreshness.STALE
+                    },
+                ),
                 candidates = candidates,
-                parentAgentId = parentAgentId,
-                selectionMode = TimelineConversationSelectionMode.MOST_RECENT_FALLBACK,
-                freshness = when {
-                    refreshed -> TimelineCandidateListFreshness.REFRESHED
-                    wasFresh -> TimelineCandidateListFreshness.FRESH
-                    else -> TimelineCandidateListFreshness.STALE
-                },
             ),
         )
     }
+
+    /** Request parameters for capturing attribution outside the default resolver loop. */
+    data class AttributionRequest(
+        val requestedAgentId: String,
+        val selectedConversationId: String?,
+        val selectionMode: TimelineConversationSelectionMode,
+        val parentAgentId: String? = null,
+        val freshness: TimelineCandidateListFreshness = TimelineCandidateListFreshness.UNKNOWN,
+    )
 
     /**
      * Build the bounded attribution capture for a selection. Public so callers
      * that chose a conversation by a NON-resolver route (explicit id, route
      * state) can emit the same shape and stay comparable in the log.
      */
+    fun captureAttribution(request: AttributionRequest): TimelineConversationAttributionCapture = buildCapture(
+        request = request,
+        candidates = conversationRepository.getCachedConversations(AgentId(request.requestedAgentId)),
+    )
+
     fun captureAttribution(
         requestedAgentId: String,
         selectedConversationId: String?,
-        parentAgentId: String?,
         selectionMode: TimelineConversationSelectionMode,
-        freshness: TimelineCandidateListFreshness = TimelineCandidateListFreshness.UNKNOWN,
-    ): TimelineConversationAttributionCapture = buildCapture(
-        requestedAgentId = requestedAgentId,
-        selectedConversationId = selectedConversationId,
-        candidates = conversationRepository.getCachedConversations(AgentId(requestedAgentId)),
-        parentAgentId = parentAgentId,
-        selectionMode = selectionMode,
-        freshness = freshness,
+        parentAgentId: String? = null,
+    ): TimelineConversationAttributionCapture = captureAttribution(
+        AttributionRequest(
+            requestedAgentId = requestedAgentId,
+            selectedConversationId = selectedConversationId,
+            selectionMode = selectionMode,
+            parentAgentId = parentAgentId,
+        ),
     )
 
     private fun buildCapture(
-        requestedAgentId: String,
-        selectedConversationId: String?,
+        request: AttributionRequest,
         candidates: List<com.letta.mobile.data.model.Conversation>,
-        parentAgentId: String?,
-        selectionMode: TimelineConversationSelectionMode,
-        freshness: TimelineCandidateListFreshness,
     ): TimelineConversationAttributionCapture {
         val candidateIds = candidates.map { it.id.value }
-        val parentCandidateIds = parentAgentId
+        val parentCandidateIds = request.parentAgentId
             ?.let { parent -> conversationRepository.getCachedConversations(AgentId(parent)).map { it.id.value } }
             .orEmpty()
-        val selectedRecordAgentId = candidates.firstOrNull { it.id.value == selectedConversationId }?.agentId?.value
+        val selectedRecordAgentId = candidates.firstOrNull { it.id.value == request.selectedConversationId }?.agentId?.value
         val attribution = classifyConversationAttribution(
-            selectedConversationId = selectedConversationId,
-            requestedAgentId = requestedAgentId,
+            selectedConversationId = request.selectedConversationId,
+            requestedAgentId = request.requestedAgentId,
             selectedRecordAgentId = selectedRecordAgentId,
             requestedAgentCandidateIds = candidateIds.toSet(),
-            parentAgentId = parentAgentId,
+            parentAgentId = request.parentAgentId,
             parentAgentCandidateIds = parentCandidateIds.toSet(),
         )
         return TimelineConversationAttributionCapture(
-            requestedAgentId = requestedAgentId,
-            selectedConversationId = selectedConversationId,
+            requestedAgentId = request.requestedAgentId,
+            selectedConversationId = request.selectedConversationId,
             selectedRecordAgentId = selectedRecordAgentId,
             candidateCount = candidateIds.size,
-            parentAgentId = parentAgentId,
+            parentAgentId = request.parentAgentId,
             selectedAlsoAttributedToParent = attribution == TimelineConversationAttribution.BOTH ||
                 attribution == TimelineConversationAttribution.PARENT_AGENT_ONLY,
             attribution = attribution,
-            selectionMode = selectionMode,
+            selectionMode = request.selectionMode,
             candidateListSource = TimelineCandidateListSource.AGENT_SCOPED_CACHE,
-            candidateListFreshness = freshness,
+            candidateListFreshness = request.freshness,
             candidateIdSample = TimelineProvenanceRedaction.boundedSample(candidateIds),
             candidateIdDigest = TimelineProvenanceRedaction.setDigest(candidateIds),
         )
