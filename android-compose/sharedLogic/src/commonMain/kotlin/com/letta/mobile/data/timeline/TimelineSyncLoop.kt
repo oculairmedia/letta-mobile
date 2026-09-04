@@ -259,12 +259,14 @@ class TimelineSyncLoop(
                 if (lastPersistedEnvelope == null) "baseline_missing" else "delta_empty",
             )
         }
-        if (
-            confirmedTimelineStore.supportsIncrementalCommit &&
-            incremental is TimelineIncrementalSnapshotPlanner.Result.Planned &&
-            !isLegacyCheckpointDue(incremental.plan)
-        ) {
-            persistIncrementalSnapshot(snapshotScope, committedState.timeline, capturedDelta, incremental, prune)
+        if (canPersistIncrementalSnapshot(incremental)) {
+            persistIncrementalSnapshot(
+                snapshotScope,
+                committedState.timeline,
+                capturedDelta,
+                incremental as TimelineIncrementalSnapshotPlanner.Result.Planned,
+                prune,
+            )
             return
         }
         val (provisionalEnvelope, fingerprint) = withContext(ioDispatcher) {
@@ -402,6 +404,12 @@ class TimelineSyncLoop(
      * `RoomConfirmedTimelineStore.commitNormalized` implementation for the real
      * incremental-commit + best-effort-checkpoint behavior.
      */
+    private fun canPersistIncrementalSnapshot(
+        incremental: TimelineIncrementalSnapshotPlanner.Result,
+    ): Boolean = confirmedTimelineStore.supportsIncrementalCommit &&
+        incremental is TimelineIncrementalSnapshotPlanner.Result.Planned &&
+        !isLegacyCheckpointDue(incremental.plan)
+
     private fun isLegacyCheckpointDue(plan: NormalizedTimelineCommitPlan): Boolean {
         val isInitialCommit = plan is NormalizedTimelineCommitPlan.Apply && plan.commit.baseRevision.value == 0L
         return isInitialCommit || commitsSinceLegacyCheckpoint + 1 >= LEGACY_CHECKPOINT_INTERVAL
