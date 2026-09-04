@@ -49,6 +49,9 @@ sealed interface ConfirmedTimelineReadResult {
  * stale writes whose revision <= existing stored revision).
  */
 interface ConfirmedTimelineStore {
+    /** True only when [commitNormalized] applies row plans without a full event envelope. */
+    val supportsIncrementalCommit: Boolean get() = false
+
     /**
      * Read the persisted snapshot for [scope], or null if none exists / if corrupt.
      *
@@ -121,24 +124,34 @@ interface ConfirmedTimelineStore {
         checkpointLegacyEnvelope: Boolean = false,
     ): NormalizedTimelineWriteResult = when (plan) {
         is NormalizedTimelineCommitPlan.Invalid -> NormalizedTimelineWriteResult.Invalid(plan.reason)
-        is NormalizedTimelineCommitPlan.NoOp -> {
-            val target = fullEnvelope.copy(revision = plan.targetRevision.value, writtenAtMillis = plan.writtenAtMillis)
-            if (writeSnapshot(target)) {
-                NormalizedTimelineWriteResult.NoOp(plan.targetRevision)
-            } else {
-                NormalizedTimelineWriteResult.Stale(TimelineRevision(readSnapshot(plan.scope)?.revision ?: 0L))
-            }
+        is NormalizedTimelineCommitPlan.NoOp -> commitFullEnvelope(
+            scope = plan.scope,
+            target = fullEnvelope.copy(revision = plan.targetRevision.value, writtenAtMillis = plan.writtenAtMillis),
+            successResult = NormalizedTimelineWriteResult.NoOp(plan.targetRevision),
+        )
+        is NormalizedTimelineCommitPlan.Apply -> commitFullEnvelope(
+            scope = plan.commit.metadata.scope,
+            target = fullEnvelope.copy(revision = plan.commit.targetRevision.value),
+            successResult = NormalizedTimelineWriteResult.Committed(plan.commit.targetRevision),
+        )
+    }
+
+    private suspend fun commitFullEnvelope(
+        scope: TimelineScope,
+        target: StoredTimelineEnvelope,
+        successResult: NormalizedTimelineWriteResult,
+    ): NormalizedTimelineWriteResult {
+        if (!supportsIncrementalCommit && target.events.isEmpty()) {
+            return NormalizedTimelineWriteResult.Invalid(
+                NormalizedTimelineCommitFailure.UNSUPPORTED_PLAN,
+            )
         }
-        is NormalizedTimelineCommitPlan.Apply -> {
-            val commit = plan.commit
-            val target = fullEnvelope.copy(revision = commit.targetRevision.value)
-            if (writeSnapshot(target)) {
-                NormalizedTimelineWriteResult.Committed(commit.targetRevision)
-            } else {
-                NormalizedTimelineWriteResult.Stale(
-                    TimelineRevision(readSnapshot(commit.metadata.scope)?.revision ?: 0L),
-                )
-            }
+        return if (writeSnapshot(target)) {
+            successResult
+        } else {
+            NormalizedTimelineWriteResult.Stale(
+                TimelineRevision(readSnapshot(scope)?.revision ?: 0L),
+            )
         }
     }
 }

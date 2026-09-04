@@ -108,6 +108,11 @@ class NormalizedTimelineCommitTest {
             NormalizedTimelineCommitFailure.SCOPE_MISMATCH,
             normalizedTimelineCommitFailureFromStorage("scope_mismatch"),
         )
+        assertEquals("unsupported_plan", NormalizedTimelineCommitFailure.UNSUPPORTED_PLAN.toStorageValue())
+        assertEquals(
+            NormalizedTimelineCommitFailure.UNSUPPORTED_PLAN,
+            normalizedTimelineCommitFailureFromStorage("unsupported_plan"),
+        )
         assertNull(normalizedTimelineCommitFailureFromStorage("future_failure"))
     }
 

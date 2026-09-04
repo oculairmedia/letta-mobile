@@ -60,6 +60,7 @@ enum class NormalizedTimelineCommitFailure {
     SCOPE_MISMATCH,
     AMBIGUOUS_EVENT_IDENTITY,
     OVERSIZED_ROW,
+    UNSUPPORTED_PLAN,
 }
 
 sealed interface NormalizedTimelineWriteResult {
@@ -75,6 +76,7 @@ fun NormalizedTimelineCommitFailure.toStorageValue(): String = when (this) {
     NormalizedTimelineCommitFailure.SCOPE_MISMATCH -> "scope_mismatch"
     NormalizedTimelineCommitFailure.AMBIGUOUS_EVENT_IDENTITY -> "ambiguous_event_identity"
     NormalizedTimelineCommitFailure.OVERSIZED_ROW -> "oversized_row"
+    NormalizedTimelineCommitFailure.UNSUPPORTED_PLAN -> "unsupported_plan"
 }
 
 fun normalizedTimelineCommitFailureFromStorage(value: String): NormalizedTimelineCommitFailure? = when (value) {
@@ -82,6 +84,7 @@ fun normalizedTimelineCommitFailureFromStorage(value: String): NormalizedTimelin
     "scope_mismatch" -> NormalizedTimelineCommitFailure.SCOPE_MISMATCH
     "ambiguous_event_identity" -> NormalizedTimelineCommitFailure.AMBIGUOUS_EVENT_IDENTITY
     "oversized_row" -> NormalizedTimelineCommitFailure.OVERSIZED_ROW
+    "unsupported_plan" -> NormalizedTimelineCommitFailure.UNSUPPORTED_PLAN
     else -> null
 }
 
