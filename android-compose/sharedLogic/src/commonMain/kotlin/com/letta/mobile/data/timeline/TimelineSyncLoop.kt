@@ -303,7 +303,7 @@ class TimelineSyncLoop(
                         )
                     is NormalizedTimelineWriteResult.Stale -> onStaleRejection(result, revision)
                     is NormalizedTimelineWriteResult.Invalid ->
-                        onInvalidPlan(result, envelope, revision, fingerprint)
+                        onInvalidPlan(result, envelope, revision, fingerprint, capturedDelta.throughSequence)
                 }
                 if (prune) {
                     confirmedTimelineStore.prune(snapshotScope.backendId, MAX_RETAINED_SNAPSHOTS)
@@ -390,28 +390,30 @@ class TimelineSyncLoop(
     ) {
         val revision = snapshotRevision + 1
         val startedAtMs = timelineCurrentTimeMillis()
-        val metadataEnvelope = StoredTimelineEnvelope(
+        val envelope = TimelineSnapshotCodec.timelineToStoredEnvelope(
+            timeline = timeline,
             scope = snapshotScope,
             revision = revision,
-            liveCursor = timeline.liveCursor,
-            backfillCursor = timeline.backfillCursor,
-            releasedOlderCount = timeline.releasedOlderCount,
             writtenAtMillis = startedAtMs,
         )
+        val fingerprint = TimelineSnapshotCodec.computeStoredEnvelopeFingerprint(envelope)
         try {
             withContext(ioDispatcher + NonCancellable) {
-                when (val result = confirmedTimelineStore.commitNormalized(incremental.plan, metadataEnvelope, false)) {
+                when (val result = confirmedTimelineStore.commitNormalized(incremental.plan, envelope, false)) {
                     is NormalizedTimelineWriteResult.Committed, is NormalizedTimelineWriteResult.NoOp -> {
                         val durationMs = timelineCurrentTimeMillis() - startedAtMs
                         consecutiveStaleRejections = 0
                         snapshotRevision = revision
+                        lastPersistedFingerprint = fingerprint
+                        lastPersistedEnvelope = envelope
                         pendingPersistenceDelta.acknowledge(capturedDelta.throughSequence)
+                        recordSuccessfulSnapshotMutation(envelope, revision)
                         commitsSinceLegacyCheckpoint += 1
                         Telemetry.event(
                             "TimelineSync", "snapshotPersist.written",
                             *identityAttrs(),
                             "revision" to revision,
-                            "eventCount" to timeline.events.count { it is TimelineEvent.Confirmed },
+                            "eventCount" to envelope.events.size,
                             "durationMs" to durationMs,
                             "committed" to (result is NormalizedTimelineWriteResult.Committed),
                             "planningMode" to "delta",
@@ -421,14 +423,8 @@ class TimelineSyncLoop(
                         )
                     }
                     is NormalizedTimelineWriteResult.Stale -> onStaleRejection(result, revision)
-                    is NormalizedTimelineWriteResult.Invalid -> {
-                        Telemetry.event(
-                            "TimelineSync", "snapshotPersist.deltaInvalid",
-                            *identityAttrs(),
-                            "reason" to result.reason.toStorageValue(),
-                            level = Telemetry.Level.WARN,
-                        )
-                    }
+                    is NormalizedTimelineWriteResult.Invalid ->
+                        onInvalidPlan(result, envelope, revision, fingerprint, capturedDelta.throughSequence)
                 }
                 if (prune) confirmedTimelineStore.prune(snapshotScope.backendId, MAX_RETAINED_SNAPSHOTS)
             }
@@ -563,6 +559,7 @@ class TimelineSyncLoop(
         envelope: StoredTimelineEnvelope,
         revision: Long,
         fingerprint: Long,
+        acknowledgedSequence: Long,
     ) {
         val recovered = confirmedTimelineStore.writeSnapshot(envelope)
         if (recovered) {
@@ -573,6 +570,7 @@ class TimelineSyncLoop(
             consecutiveStaleRejections = 0
             snapshotRevision = revision
             lastPersistedFingerprint = fingerprint
+            pendingPersistenceDelta.acknowledge(acknowledgedSequence)
             // NOTE: lastPersistedEnvelope is the NORMALIZED planning baseline and is advanced
             // below only if normalized genuinely caught up. Legacy durability at `revision` is
             // recorded by snapshotRevision.
