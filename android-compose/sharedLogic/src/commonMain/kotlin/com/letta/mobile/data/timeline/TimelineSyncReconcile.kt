@@ -79,6 +79,16 @@ fun Timeline.mergeServerMessages(
             return@forEach
         }
         if (timeline.containsIdentityFor(confirmed)) return@forEach
+        val existingByServerId = timeline.findByServerId(confirmed.serverId, confirmed.messageType)
+        if (existingByServerId == null && timeline.recentTailContainsEquivalent(confirmed)) {
+            Telemetry.event(
+                "TimelineSync", "recentReconcile.contentDeduped",
+                "conversationId" to timeline.conversationId,
+                "serverId" to confirmed.serverId,
+                "messageType" to confirmed.messageType.name,
+            )
+            return@forEach
+        }
         val result = timeline.mergeConfirmedServerMessage(confirmed)
         timeline = result.timeline
         if (result.merged) merged++
@@ -164,6 +174,7 @@ private fun Timeline.mergeMissingServerIdentity(
                 ConfirmedServerMergeResult(insertOrdered(confirmed), true)
             }
 }
+
 
 private const val CONTENT_FALLBACK_RECENCY_MS = 2 * 60 * 1000L
 
@@ -435,6 +446,9 @@ private fun TimelineEvent.Confirmed.canReplaceIrohSyntheticLiveRow(
 private const val RECONCILE_CONTENT_DEDUPE_TAIL = 30
 
 private fun Timeline.recentTailContainsEquivalent(incoming: TimelineEvent.Confirmed): Boolean {
+    if (incoming.messageType == TimelineMessageType.ASSISTANT && incoming.serverId.startsWith("ui-msg-")) {
+        return false
+    }
     if (incoming.messageType != TimelineMessageType.ASSISTANT &&
         incoming.messageType != TimelineMessageType.USER &&
         incoming.messageType != TimelineMessageType.REASONING
