@@ -87,12 +87,9 @@ class TimelineRepositoryAcquisitionProvenanceTest {
 
     private fun events(name: String) = Telemetry.snapshot().filter { it.name == name }
 
-    private fun attr(name: String, key: String): Any? =
-        events(name).lastOrNull()?.attrs?.get(key)
-
     private fun provenance(
-        acquisitionId: String,
         source: TimelineAcquisitionSource,
+        acquisitionId: String = "acq",
     ) = TimelineAcquisitionProvenance(
         acquisitionId = acquisitionId,
         source = source,
@@ -109,7 +106,7 @@ class TimelineRepositoryAcquisitionProvenanceTest {
             val repo = newRepo(scope)
             try {
                 // Canonical parent holder for the conversation.
-                repo.getOrCreate(parentAgent, conversation, provenance("acq-parent", TimelineAcquisitionSource.UI_NAVIGATION))
+                repo.getOrCreate(parentAgent, conversation, provenance(TimelineAcquisitionSource.UI_NAVIGATION, "acq-parent"))
                 Telemetry.clear()
 
                 // The child-scoped acquisition under investigation.
@@ -131,8 +128,8 @@ class TimelineRepositoryAcquisitionProvenanceTest {
                     childAgent,
                     conversation,
                     provenance(
+                        TimelineAcquisitionSource.UI_RESOLVED_ROUTE,
                         acquisitionId = "acq-child",
-                        source = TimelineAcquisitionSource.UI_RESOLVED_ROUTE,
                     ).copy(
                         selectionMode = TimelineConversationSelectionMode.MOST_RECENT_FALLBACK,
                         attribution = capture,
@@ -140,14 +137,16 @@ class TimelineRepositoryAcquisitionProvenanceTest {
                 )
 
                 // 1. acquisition entry
-                assertEquals("acq-child", attr("acquisition.entry", "acquisitionId"))
-                assertEquals(TimelineAcquisitionSource.UI_RESOLVED_ROUTE.name, attr("acquisition.entry", "source"))
+                val entry = events("acquisition.entry").last()
+                assertEquals("acq-child", entry.attrs["acquisitionId"])
+                assertEquals(TimelineAcquisitionSource.UI_RESOLVED_ROUTE.name, entry.attrs["source"])
 
                 // 1b. the resolver/route decision, same id
-                assertEquals("acq-child", attr("acquisition.conversationAttribution", "acquisitionId"))
+                val attributionEvent = events("acquisition.conversationAttribution").last()
+                assertEquals("acq-child", attributionEvent.attrs["acquisitionId"])
                 assertEquals(
                     TimelineConversationAttribution.PARENT_AGENT_ONLY.name,
-                    attr("acquisition.conversationAttribution", "attribution"),
+                    attributionEvent.attrs["attribution"],
                 )
 
                 // 2. alias refusal, same id, with both competing agents named
@@ -178,17 +177,17 @@ class TimelineRepositoryAcquisitionProvenanceTest {
             val repo = newRepo(scope)
             try {
                 val cases = listOf(
-                    "c-nav" to provenance("a1", TimelineAcquisitionSource.UI_NAVIGATION).copy(
+                    "c-nav" to provenance(TimelineAcquisitionSource.UI_NAVIGATION, "a1").copy(
                         selectionMode = TimelineConversationSelectionMode.EXPLICIT_CONVERSATION_ID,
                         frameFamily = TimelineAcquisitionFrameFamily.DIRECT_NAVIGATION,
                     ),
-                    "c-resolved" to provenance("a2", TimelineAcquisitionSource.UI_RESOLVED_ROUTE).copy(
+                    "c-resolved" to provenance(TimelineAcquisitionSource.UI_RESOLVED_ROUTE, "a2").copy(
                         selectionMode = TimelineConversationSelectionMode.MOST_RECENT_FALLBACK,
                     ),
-                    "c-replay" to provenance("a3", TimelineAcquisitionSource.REPLAY_RECONCILE).copy(
+                    "c-replay" to provenance(TimelineAcquisitionSource.REPLAY_RECONCILE, "a3").copy(
                         frameFamily = TimelineAcquisitionFrameFamily.REPLAY, isReplay = true,
                     ),
-                    "c-fanout" to provenance("a4", TimelineAcquisitionSource.RUNTIME_FANOUT).copy(
+                    "c-fanout" to provenance(TimelineAcquisitionSource.RUNTIME_FANOUT, "a4").copy(
                         frameFamily = TimelineAcquisitionFrameFamily.CHILD_STREAM_DELTA,
                     ),
                 )
@@ -273,13 +272,13 @@ class TimelineRepositoryAcquisitionProvenanceTest {
                 return try {
                     val parent = repo.getOrCreate(
                         parentAgent, conversation,
-                        if (withProvenance) provenance("p", TimelineAcquisitionSource.UI_NAVIGATION)
+                        if (withProvenance) provenance(TimelineAcquisitionSource.UI_NAVIGATION, "p")
                         else TimelineAcquisitionProvenance.UNSPECIFIED,
                     )
                     val unscoped = repo.getOrCreate(null, conversation)
                     val child = repo.getOrCreate(
                         childAgent, conversation,
-                        if (withProvenance) provenance("c", TimelineAcquisitionSource.UI_RESOLVED_ROUTE)
+                        if (withProvenance) provenance(TimelineAcquisitionSource.UI_RESOLVED_ROUTE, "c")
                         else TimelineAcquisitionProvenance.UNSPECIFIED,
                     )
                     val parentAgain = repo.getOrCreate(parentAgent, conversation)
@@ -402,8 +401,8 @@ class TimelineRepositoryAcquisitionProvenanceTest {
             val repo = newRepo(scope)
             try {
                 timelineAcquisitionProvenanceEnabled.set(false)
-                repo.getOrCreate(parentAgent, conversation, provenance("x", TimelineAcquisitionSource.UI_NAVIGATION))
-                repo.getOrCreate(childAgent, conversation, provenance("y", TimelineAcquisitionSource.UI_NAVIGATION))
+                repo.getOrCreate(parentAgent, conversation, provenance(TimelineAcquisitionSource.UI_NAVIGATION, "x"))
+                repo.getOrCreate(childAgent, conversation, provenance(TimelineAcquisitionSource.UI_NAVIGATION, "y"))
                 assertTrue(events("acquisition.entry").isEmpty(), "new diagnostic must be silenced")
                 assertTrue(
                     events("loop.aliasRefused").isNotEmpty(),
