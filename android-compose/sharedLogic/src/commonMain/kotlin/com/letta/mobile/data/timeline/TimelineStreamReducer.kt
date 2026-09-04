@@ -472,51 +472,9 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
     //     prior assistant), where incoming is SHORTER, so existing.startsWith(incoming)
     //     not incoming.startsWith(existing) → not a forward growth → not merged.
     //   • distinct same-run assistant messages — no forward-prefix relationship.
-    val liveAssistant = (timeline.events.lastOrNull() as? TimelineEvent.Confirmed)
-        ?.takeIf { it.messageType == TimelineMessageType.ASSISTANT }
-    val isForwardGrowthFragment = liveAssistant != null &&
-        confirmed.messageType == TimelineMessageType.ASSISTANT &&
-        liveAssistant.serverId != confirmed.serverId &&
-        // letta-mobile-w0ctr: widen the run-id gate by EXACTLY the promotion case —
-        // a synthetic existing run id growing into a real incoming one. The first streamed
-        // fragment is committed before run-id promotion lands, so `iroh-run-*` vs `run-*`
-        // failed isCompatibleAssistantPrefixRunId (which only accepts equal ids, or BOTH
-        // sides synthetic) and the second fragment appended a new row instead of growing
-        // the first — stranding the opening chunk as its own bubble.
-        //
-        // Both ids must stay non-blank. A blank existing run id is indistinguishable from
-        // an older RECONCILED reply (those carry runId = null), and merging into one would
-        // overwrite an unrelated earlier message whose text happens to be a prefix — the
-        // #827 regression guarded by "reconcile final does not overwrite an unrelated older
-        // reply that is a substring". So the blank case is deliberately NOT relaxed here.
-        run {
-            val existingRun = liveAssistant.runId?.takeIf { it.isNotBlank() }
-            val incomingRun = confirmed.runId?.takeIf { it.isNotBlank() }
-            existingRun != null && incomingRun != null &&
-                (existingRun == incomingRun || existingRun.isIrohSyntheticRunId())
-        } &&
-        run {
-            val existing = liveAssistant.content.trim()
-            val incoming = confirmed.content.trim()
-            existing.isNotEmpty() && incoming.length > existing.length && incoming.startsWith(existing)
-        }
-    if (isForwardGrowthFragment && liveAssistant != null) {
-        val merged = liveAssistant.copy(
-            content = confirmed.content,
-            runId = promoteRunId(liveAssistant.runId, confirmed.runId),
-            seqId = latestSeqId(liveAssistant.seqId, confirmed.seqId),
-        )
-        timeline = timeline.replaceByServerId(merged)
-        timeline = timeline.copy(liveCursor = liveAssistant.serverId)
-        pendingEvents += TimelineSyncEvent.StreamEventIngested(liveAssistant.serverId, message.messageType)
-        hotPathTelemetry(
-            "streamSubscriber.forwardGrowthMerged",
-            "serverId" to liveAssistant.serverId,
-            "incomingServerId" to confirmed.serverId,
-            "runId" to (confirmed.runId ?: "<null>"),
-            "mergedLen" to confirmed.content.length,
-            "conversationId" to conversationId,
-        )
+    applyForwardGrowthMerge(timeline, confirmed, conversationId)?.let { growth ->
+        timeline = growth.timeline
+        pendingEvents += TimelineSyncEvent.StreamEventIngested(growth.stableServerId, message.messageType)
         return output()
     }
 
@@ -561,7 +519,7 @@ private fun StreamTextMergeResult.defensiveTelemetryName(): String? = when (bran
     StreamTextMergeBranch.APPEND -> null
 }
 
-private fun hotPathTelemetry(
+internal fun hotPathTelemetry(
     name: String,
     vararg attrs: TelemetryAttribute,
 ) {
@@ -616,7 +574,7 @@ internal fun String.isIrohSyntheticRunId(): Boolean =
  * existing id (never regress a real id back to a synthetic one, and never
  * clobber with a blank incoming id).
  */
-private fun promoteRunId(existing: String?, incoming: String?): String? {
+internal fun promoteRunId(existing: String?, incoming: String?): String? {
     val existingRunId = existing?.takeIf { it.isNotBlank() }
     val incomingRunId = incoming?.takeIf { it.isNotBlank() } ?: return existingRunId
     if (existingRunId == null) return incomingRunId
