@@ -81,7 +81,7 @@ internal object IrohStreamDeltaServerFrameMapper {
 
             "assistant_message" -> listOf(
                 ServerFrame.AssistantMessage(
-                    id = meta.messageId(),
+                    id = meta.logicalMessageId(),
                     ts = meta.timestamp,
                     agentId = meta.agentId,
                     conversationId = meta.conversationId,
@@ -299,8 +299,12 @@ internal object IrohStreamDeltaServerFrameMapper {
         val turnId: String,
         val runId: String,
         private val messageId: String?,
+        private val stableMessageId: String?,
     ) {
         fun messageId(): String = messageId ?: frameId
+
+        /** Logical identity is separate from the per-delivery envelope/frame id. */
+        fun logicalMessageId(): String = stableMessageId ?: messageId()
 
         fun messageIdFor(messageType: String): String = when (messageType) {
             "reasoning_message",
@@ -332,7 +336,7 @@ internal object IrohStreamDeltaServerFrameMapper {
             // Only trust ids the serve-path accumulator stamped: raw backend
             // ids (`letta-msg-*`) ROTATE per fragment and would re-split one
             // message into per-fragment rows (the original x1xnl bug).
-            val stableMessageId = messageId?.takeIf { it.startsWith("cm-stream-") }
+            val stableMessageId = stableMessageId?.takeIf { it.isNotBlank() }
             return if (stableMessageId != null) {
                 "iroh-assistant-$stableMessageId"
             } else {
@@ -340,6 +344,14 @@ internal object IrohStreamDeltaServerFrameMapper {
             }
         }
         companion object {
+            private fun stableLogicalMessageId(delta: JsonObject): String? {
+                val id = delta.string("id")?.takeIf { it.isNotBlank() }
+                if (id?.startsWith("cm-stream-") == true) return id
+                return delta.string("message_id")?.takeIf { it.isNotBlank() }
+                    ?: delta.string("otid")?.takeIf { it.isNotBlank() }?.let { "cm-stream-$it" }
+                    ?: delta.string("client_message_id")?.takeIf { it.isNotBlank() }?.let { "cm-stream-$it" }
+            }
+
             fun from(
                 payload: RuntimeEventPayload.RemoteStreamFrame,
                 envelope: JsonObject,
@@ -369,6 +381,7 @@ internal object IrohStreamDeltaServerFrameMapper {
                         ?: envelope.string("run_id")
                         ?: context.runId,
                     messageId = delta.string("id") ?: delta.string("message_id") ?: payload.messageId,
+                    stableMessageId = stableLogicalMessageId(delta),
                 )
             }
         }

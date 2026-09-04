@@ -22,6 +22,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class TimelineStreamReducerTest {
     @AfterTest
@@ -876,7 +877,7 @@ class TimelineStreamReducerTest {
     }
 
     @Test
-    fun `reconcile copy with backend-minted id does not duplicate identical live row`() {
+    fun `ui-msg final without exact alias preserves identical live row`() {
         val live = reduce(
             frame = AssistantMessage(
                 id = "letta-msg-166",
@@ -897,9 +898,9 @@ class TimelineStreamReducerTest {
             )
         )
 
-        changed shouldBe 0
-        mergedTimeline.events shouldHaveSize 1
-        (mergedTimeline.events.single() as TimelineEvent.Confirmed).serverId shouldBe "letta-msg-166"
+        changed shouldBe 1
+        mergedTimeline.events shouldHaveSize 2
+        (mergedTimeline.events.first() as TimelineEvent.Confirmed).serverId shouldBe "letta-msg-166"
     }
 
     @Test
@@ -1723,12 +1724,22 @@ class TimelineStreamReducerTest {
     }
 
     @Test
-    fun `REAL reconcile dup ui-msg final with null run collapses into streamed row h30cy`() {
-        // Ground truth (admin message.list): the reconciled FINAL has id==otid==ui-msg-*,
-        // run_id=NULL, and content that is a SUPERSET (or near-equal, first-word-lag
-        // means not byte-identical) of the streamed row. Different otid + null run +
-        // non-exact content defeated every match, so it inserted as a 2nd row.
-        // The streamed row is a live assistant row (synthetic otid, real run).
+    fun `ui-msg final without exact alias preserves identical content rows and emits telemetry`() {
+        Telemetry.clear()
+        var tl = reduce(frame = AssistantMessage(
+            id = "cm-stream-logical-live", contentRaw = JsonPrimitive("same"), runId = "run-1", otid = "logical-live", seqId = 1,
+        )).next
+        tl = tl.mergeServerMessages(listOf(
+            AssistantMessage(id = "ui-msg-final", contentRaw = JsonPrimitive("same"), runId = null, otid = "ui-msg-final", seqId = null),
+        )).first
+        assertEquals(2, tl.events.filterIsInstance<TimelineEvent.Confirmed>().count { it.messageType == TimelineMessageType.ASSISTANT })
+        assertTrue(Telemetry.snapshot().any { it.name == "recentReconcile.unresolvedCrossBoundaryIdentity" })
+    }
+
+    @Test
+    fun `REAL reconcile ui-msg final without exact identity remains distinct h30cy`() {
+        // A ui-msg final has no exact link to this streamed row. Similar content
+        // and a missing run id are insufficient identity evidence.
         val streamedRow = reduce(
             frame = AssistantMessage(
                 id = "letta-msg-1799",
@@ -1751,17 +1762,14 @@ class TimelineStreamReducerTest {
         val (afterReconcile, _) = streamedRow.mergeServerMessages(reconciled)
         val assistantRows = afterReconcile.events.filterIsInstance<TimelineEvent.Confirmed>()
             .filter { it.messageType == TimelineMessageType.ASSISTANT }
-        assertEquals(1, assistantRows.size)
-        assertEquals("I'm Lester, a dedicated test agent", assistantRows.single().content)
+        assertEquals(2, assistantRows.size)
+        assertEquals("m Lester, a dedicated test agent", assistantRows[0].content)
+        assertEquals("I'm Lester, a dedicated test agent", assistantRows[1].content)
     }
 
     @Test
-    fun `reconcile ui-msg final collapses even when liveCursor moved off the streamed row h30cy`() {
-        // h30cy RESURFACE: the earlier fix required the match to be the liveCursor
-        // row, but at reconcile time liveCursor has often moved off the streamed
-        // reply (e.g. a later turn started, or it was cleared), so the duplicate
-        // slipped through. The null-run signature is the correct discriminator;
-        // liveCursor must NOT be required.
+    fun `reconcile ui-msg final without exact identity stays distinct when cursor moved h30cy`() {
+        // Cursor position does not strengthen an otherwise unresolved identity.
         var tl = reduce(
             frame = AssistantMessage(
                 id = "letta-msg-1799", contentRaw = JsonPrimitive("I'm Lester, a dedicated test agent"),
@@ -1780,15 +1788,14 @@ class TimelineStreamReducerTest {
         val (after, _) = tl.mergeServerMessages(reconciled)
         val rows = after.events.filterIsInstance<TimelineEvent.Confirmed>()
             .filter { it.messageType == TimelineMessageType.ASSISTANT }
-        assertEquals(1, rows.size)
-        assertEquals("I'm Lester, a dedicated test agent for validating mobile", rows.single().content)
+        assertEquals(2, rows.size)
+        assertEquals("I'm Lester, a dedicated test agent", rows[0].content)
+        assertEquals("I'm Lester, a dedicated test agent for validating mobile", rows[1].content)
     }
 
     @Test
-    fun `server double-stores reply as two ui-msg finals both dedupe to one row h30cy`() {
-        // GROUND TRUTH (admin message.list): the App Server persists the reply
-        // TWICE — two ui-msg finals, DIFFERENT ids, SAME content "Hey.", null run.
-        // The streamed row already holds "Hey."; both reconcile copies must dedupe.
+    fun `distinct ui-msg finals without aliases are never content deduped h30cy`() {
+        // Distinct persisted IDs remain distinct even when their content matches.
         var tl = reduce(
             frame = AssistantMessage(
                 id = "letta-msg-3255", contentRaw = JsonPrimitive("Hey"),
@@ -1806,16 +1813,13 @@ class TimelineStreamReducerTest {
         )
         val (after, _) = tl.mergeServerMessages(reconciled)
         val rows = after.events.filterIsInstance<TimelineEvent.Confirmed>().filter { it.messageType == TimelineMessageType.ASSISTANT }
-        assertEquals(1, rows.size, "rows: " + rows.joinToString("|"){ it.content })
-        assertEquals("Hey.", rows.single().content)
+        assertEquals(3, rows.size, "rows: " + rows.joinToString("|"){ it.content })
+        assertEquals(listOf("Hey.", "Hey.", "Hey."), rows.map { it.content })
     }
 
     @Test
-    fun `second identical ui-msg final in a LATER reconcile poll still dedupes h30cy`() {
-        // GROUND TRUTH: the server persists the reply twice, 8s apart, so the two
-        // identical "Hey." finals arrive in SEPARATE reconcile polls (not one
-        // batch). streamed row -> poll1 "Hey." dedupes -> poll2 "Hey." (NEW ui-msg
-        // id) must ALSO dedupe, not insert a 2nd row.
+    fun `identical ui-msg finals in later polls remain distinct without aliases h30cy`() {
+        // Poll timing and identical content do not establish identity.
         var tl = reduce(frame = AssistantMessage(id = "letta-msg-1", contentRaw = JsonPrimitive("Hey"), runId = "local-run-1", otid = "provider-assistant-1-x", seqId = 1)).next
         tl = reduce(prev = tl, frame = AssistantMessage(id = "letta-msg-2", contentRaw = JsonPrimitive("."), runId = "local-run-1", otid = "provider-assistant-1-x", seqId = 2)).next
         // poll 1
@@ -1823,14 +1827,13 @@ class TimelineStreamReducerTest {
         // poll 2 (8s later): a NEW server-persisted identical copy
         tl = tl.mergeServerMessages(listOf(AssistantMessage(id = "ui-msg-598", contentRaw = JsonPrimitive("Hey."), runId = null, otid = "ui-msg-598", seqId = null))).first
         val rows = tl.events.filterIsInstance<TimelineEvent.Confirmed>().filter { it.messageType == TimelineMessageType.ASSISTANT }
-        assertEquals(1, rows.size, "rows: " + rows.joinToString("|"){ it.content })
+        assertEquals(3, rows.size, "rows: " + rows.joinToString("|"){ it.content })
     }
 
     @Test
     fun `reconcile final does not overwrite an unrelated older reply that is a substring h30cy`() {
-        // #827 review (Major): an OLDER distinct reply whose text is a substring of
-        // the null-run final must NOT be overwritten. Only the STREAMED row (real
-        // run id) being finalized is a valid target.
+        // Neither the older reply nor the streamed row has an exact alias for the
+        // final, so neither may be overwritten based on substring similarity.
         // older distinct reply — seed it as a reconciled null-run row via merge.
         var tl = Timeline(conversationId = "c").mergeServerMessages(listOf(
             AssistantMessage(id = "ui-msg-old", contentRaw = JsonPrimitive("Hey"), runId = null, otid = "ui-msg-old", seqId = null)
@@ -1846,10 +1849,11 @@ class TimelineStreamReducerTest {
             AssistantMessage(id = "ui-msg-final", contentRaw = JsonPrimitive("Hey there, how are you?"), runId = null, otid = "ui-msg-final", seqId = null)
         ))
         val rows = after.events.filterIsInstance<TimelineEvent.Confirmed>().filter { it.messageType == TimelineMessageType.ASSISTANT }
-        // old "Hey" preserved, streamed row replaced by the full final = 2 rows.
-        assertEquals(2, rows.size, "rows: " + rows.joinToString("|"){ it.content })
+        // Both prior rows are preserved and the unresolved final is appended.
+        assertEquals(3, rows.size, "rows: " + rows.joinToString("|"){ it.content })
         assertEquals("Hey", rows[0].content)
-        assertEquals("Hey there, how are you?", rows[1].content)
+        assertEquals("Hey there, how are", rows[1].content)
+        assertEquals("Hey there, how are you?", rows[2].content)
     }
 
     @Test
@@ -1881,9 +1885,10 @@ class TimelineStreamReducerTest {
 
         val rows = after.events.filterIsInstance<TimelineEvent.Confirmed>()
             .filter { it.messageType == TimelineMessageType.ASSISTANT }
-        assertEquals(2, rows.size, "rows: " + rows.joinToString("|") { it.content })
-        assertEquals("Ah, got it — so the original theory still holds. Clean on restart dupes only in streaming path. The persistence layer is fine.", rows[0].content)
+        assertEquals(3, rows.size, "rows: " + rows.joinToString("|") { it.content })
+        assertEquals(", got it — so the original theory still holds. Clean on restart dupes only in streaming path The persistence layer is fine", rows[0].content)
         assertEquals("Newer turn has already started", rows[1].content)
+        assertEquals("Ah, got it — so the original theory still holds. Clean on restart dupes only in streaming path. The persistence layer is fine.", rows[2].content)
     }
 
     @Test
