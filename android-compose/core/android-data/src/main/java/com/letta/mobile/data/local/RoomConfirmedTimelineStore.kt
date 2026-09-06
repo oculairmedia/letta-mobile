@@ -45,6 +45,14 @@ class RoomConfirmedTimelineStore(
     // published over rows that did not survive.
     private val beforeHeadPublicationObserver: suspend () -> Unit = {},
 ) : ConfirmedTimelineStore {
+    /**
+     * Room's [commitNormalized] override performs a real incremental transaction that touches
+     * only the changed normalized rows without re-running [TimelineSnapshotCodec.encode] on
+     * the full envelope, so the unified [com.letta.mobile.data.timeline.TimelineSyncLoop]
+     * planner is allowed to route to it.
+     */
+    override val supportsIncrementalCommit: Boolean = true
+
     private val dao = database.confirmedTimelineSnapshotDao()
     private val manifestReader = RoomTimelineManifestReader(dao)
     private val normalizedReader = RoomNormalizedTimelineReader()

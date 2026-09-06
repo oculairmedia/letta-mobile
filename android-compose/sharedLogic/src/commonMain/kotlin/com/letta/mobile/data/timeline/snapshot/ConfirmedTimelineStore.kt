@@ -58,6 +58,22 @@ interface ConfirmedTimelineStore {
      */
     suspend fun readSnapshot(scope: TimelineScope): StoredTimelineEnvelope?
 
+    /**
+     * Whether this store can serve [commitNormalized] as a real incremental write (touching
+     * only the changed normalized rows, with no full-envelope [TimelineSnapshotCodec.encode]
+     * on the hot path).
+     *
+     * `false` (the default) means callers must route the write through the legacy full-scan
+     * path even when [TimelineIncrementalSnapshotPlanner] would otherwise produce a
+     * [TimelineIncrementalSnapshotPlanner.Result.Planned]. Stores that override
+     * [commitNormalized] to do a real incremental transaction must override this to `true`
+     * so the planner's gate is informed.
+     *
+     * The flag exists so a unified planner can dedupe "store cannot increment" against
+     * "planner rejected the plan" without two callers checking the same condition.
+     */
+    val supportsIncrementalCommit: Boolean get() = false
+
     suspend fun readSnapshotResult(scope: TimelineScope): ConfirmedTimelineReadResult =
         readSnapshot(scope)?.let(ConfirmedTimelineReadResult::Active)
             ?: ConfirmedTimelineReadResult.ReconciliationRequired(SnapshotReadFailure.MISSING)
