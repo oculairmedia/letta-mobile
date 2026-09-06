@@ -250,8 +250,14 @@ class TimelineSyncLoop(
         val planningDecision = decideIncrementalPlan(snapshotScope, committedState.timeline, capturedDelta)
         emitPlanningDecision(planningDecision, capturedDelta)
         val incremental = planningDecision.result
-        if (incremental is TimelineIncrementalSnapshotPlanner.Result.Planned && !planningDecision.checkpointDue) {
-            persistIncrementalSnapshot(snapshotScope, committedState.timeline, capturedDelta, incremental, prune)
+        if (canPersistIncremental(planningDecision)) {
+            persistIncrementalSnapshot(
+                snapshotScope,
+                committedState.timeline,
+                capturedDelta,
+                incremental as TimelineIncrementalSnapshotPlanner.Result.Planned,
+                prune,
+            )
             return
         }
         val (provisionalEnvelope, fingerprint) = withContext(ioDispatcher) {
@@ -320,21 +326,26 @@ class TimelineSyncLoop(
         }
     }
 
-    private data class IncrementalPlanningDecision(
+    internal data class IncrementalPlanningDecision(
         val result: TimelineIncrementalSnapshotPlanner.Result,
         val checkpointDue: Boolean,
         val reason: String,
         val baseRevision: Long?,
         val targetRevision: Long,
+        // Whether the underlying store can serve a real incremental commit. When false, a
+        // `Planned` planner result still has to fall back to the legacy full-scan path because
+        // the default `commitNormalized` shim only writes the full envelope.
+        val storeSupportsIncremental: Boolean,
     )
 
-    private fun decideIncrementalPlan(
+    internal fun decideIncrementalPlan(
         snapshotScope: TimelineScope,
         timeline: Timeline,
         delta: PendingTimelinePersistenceDelta.Snapshot,
     ): IncrementalPlanningDecision {
         val targetRevision = snapshotRevision + 1
         val baseline = lastPersistedEnvelope
+        val storeSupportsIncremental = confirmedTimelineStore.supportsIncrementalCommit
         val result = if (baseline != null && !delta.isEmpty) {
             TimelineIncrementalSnapshotPlanner.plan(
                 timeline = timeline,
@@ -350,12 +361,21 @@ class TimelineSyncLoop(
             )
         }
         val checkpointDue = result is TimelineIncrementalSnapshotPlanner.Result.Planned && isLegacyCheckpointDue(result.plan)
+        // Reason precedence for telemetry: explicit gates first, planner verdict last.
         val reason = when {
             checkpointDue -> "checkpoint_due"
+            result is TimelineIncrementalSnapshotPlanner.Result.Planned && !storeSupportsIncremental -> "store_unsupported"
             result is TimelineIncrementalSnapshotPlanner.Result.FullScan -> result.reason
             else -> "delta"
         }
-        return IncrementalPlanningDecision(result, checkpointDue, reason, baseline?.revision, targetRevision)
+        return IncrementalPlanningDecision(
+            result = result,
+            checkpointDue = checkpointDue,
+            reason = reason,
+            baseRevision = baseline?.revision,
+            targetRevision = targetRevision,
+            storeSupportsIncremental = storeSupportsIncremental,
+        )
     }
 
     private fun emitPlanningDecision(
@@ -368,7 +388,7 @@ class TimelineSyncLoop(
         Telemetry.event(
             "TimelineSync", "snapshotPersist.planningDecision",
             *identityAttrs(),
-            "planningMode" to if (decision.result is TimelineIncrementalSnapshotPlanner.Result.Planned && !decision.checkpointDue) "delta" else "full_scan",
+            "planningMode" to if (canPersistIncremental(decision)) "delta" else "full_scan",
             "reason" to decision.reason,
             "throughSequence" to delta.throughSequence,
             "dirtyChanged" to delta.changedConfirmedServerIds.size,
@@ -378,6 +398,7 @@ class TimelineSyncLoop(
             "targetRevision" to decision.targetRevision,
             "comparisonEvents" to comparisonEvents,
             "encodedRows" to encodedRows,
+            "storeSupportsIncremental" to decision.storeSupportsIncremental,
         )
     }
 
@@ -1296,6 +1317,20 @@ class TimelineSyncLoop(
 
         /** Bound on wasted planning by a writer that cannot commit. */
         internal const val MAX_CONSECUTIVE_STALE_REJECTIONS = 3
+
+        /**
+         * Shared dedupe gate: the planner produced [TimelineIncrementalSnapshotPlanner.Result.Planned],
+         * no legacy checkpoint is due, AND the underlying [ConfirmedTimelineStore] reports
+         * [ConfirmedTimelineStore.supportsIncrementalCommit]. Exposed at internal visibility
+         * for the [SnapshotPlannerStoreGatePolicyTest] fail-on-revert contract; the function is
+         * a pure derivation of the decision fields, so it lives on the companion to avoid
+         * forcing test fixtures to construct a loop instance (which would spin up collector
+         * scopes and leak coroutines into [runTest]).
+         */
+        internal fun canPersistIncremental(decision: IncrementalPlanningDecision): Boolean =
+            decision.result is TimelineIncrementalSnapshotPlanner.Result.Planned &&
+                !decision.checkpointDue &&
+                decision.storeSupportsIncremental
 
         /** Process-wide sequence giving each loop a holder id distinct from its peers. */
         private val holderSequence = atomic(0L)
