@@ -91,7 +91,7 @@ class IrohObserverRunIdReconcileDedupTest {
      * candidate row as a live-streamed row and replace it — one row, not two.
      */
     @Test
-    fun `observer live row collapses into null-run superset reconcile final`() {
+    fun `observer live row stays distinct from unlinked null-run superset final`() {
         val conversationId = "conv-j98r5"
 
         val timeline = Timeline(
@@ -126,9 +126,9 @@ class IrohObserverRunIdReconcileDedupTest {
             .filter { it.messageType == TimelineMessageType.ASSISTANT }
 
         assertEquals(
-            1,
+            2,
             assistantRows.size,
-            "Null-run superset final must collapse into the observer draft, not append. " +
+            "Null-run superset final has no exact alias for the observer draft. " +
                 "Rows: " + assistantRows.joinToString(" || ") { "[${it.serverId}] ${it.content}" },
         )
     }
@@ -198,7 +198,7 @@ class IrohObserverRunIdReconcileDedupTest {
      * row → duplicate. PASSES once synthetic (streamed) candidates are eligible.
      */
     @Test
-    fun `observer row collapses into a null-run non-prefix superset reconcile final`() {
+    fun `observer row stays distinct from unlinked null-run non-prefix final`() {
         val conversationId = "conv-j98r5"
 
         val timeline = Timeline(
@@ -233,9 +233,9 @@ class IrohObserverRunIdReconcileDedupTest {
             .filter { it.messageType == TimelineMessageType.ASSISTANT }
 
         assertEquals(
-            1,
+            2,
             assistantRows.size,
-            "A null-run non-prefix superset final must collapse the synthetic observer row, not append. " +
+            "A null-run final without an exact alias must not collapse the observer row. " +
                 "Rows: " + assistantRows.joinToString(" || ") { "[${it.serverId}] ${it.content}" },
         )
     }

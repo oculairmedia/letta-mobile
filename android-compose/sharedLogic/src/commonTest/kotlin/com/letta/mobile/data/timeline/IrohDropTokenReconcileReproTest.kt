@@ -32,11 +32,9 @@ import kotlin.test.assertEquals
  * is misclassified as a stale prefix-snapshot and discarded, so the streamed row
  * loses one character.
  *
- * CONSEQUENCE (proven by [full_receive_pathway_yields_one_assistant_row]): that
- * one lost character made the streamed row's content neither a prefix, a
- * substring, nor an exact match of the reconciled final, and their ids/otid/run
- * all differ — so every matcher in mergeServerMessages missed and the final was
- * inserted as a SECOND assistant row. That is the duplicate.
+ * The persisted final has no exact alias for the stream row. Reconciliation must
+ * retain both rather than infer identity from content; the stable-ID transport
+ * contract is responsible for avoiding the discontinuity when an alias exists.
  *
  * These are the red repro the reconcile-stubbing HeadlessTimelineReplayer could
  * never produce. They are GREEN now that mergeStreamText's incremental-append
@@ -117,15 +115,15 @@ class IrohDropTokenReconcileReproTest {
         )
     }
 
-    /** The end-to-end symptom: streamed row + reconcile final must be ONE row. */
+    /** An unlinked persisted final must not be content-merged with the stream. */
     @Test
-    fun full_receive_pathway_yields_one_assistant_row() {
+    fun full_receive_pathway_preserves_unlinked_assistant_rows() {
         val full = fullAssistantText()
         val tl = reduceStream().mergeServerMessages(listOf(reconcileSnapshot(full))).first
         val rows = assistantRows(tl)
         assertEquals(
-            1, rows.size,
-            "reduce + reconcile produced ${rows.size} assistant rows (duplicate). Rows: " +
+            2, rows.size,
+            "reduce + reconcile must preserve unresolved identities. Rows: " +
                 rows.joinToString(" || ") { "[${it.serverId}] …${it.content.takeLast(28)}" },
         )
     }

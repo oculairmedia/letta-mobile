@@ -346,9 +346,11 @@ internal object DanglingToolCallSynthesizer {
  * the stream — so mobile cannot dedupe the streamed row against the disk-fetched
  * copy and renders it twice (Iroh dupes; HTTPS does not, because the WS/HTTP shim
  * paths already apply this tag). Rewrite an assistant/reasoning stream_delta's id
- * to a stable `cm-stream-<otid>` / `cm-reason-<otid>`, which mobile's
- * optimistic-twin dedup collapses against the disk copy. tool_call/tool_return
- * keep their stable ids; frames without an otid are left unchanged; idempotent.
+ * to a stable `cm-stream-<message_id-or-otid>` / `cm-reason-<message_id-or-otid>`.
+ * `message_id` is preferred because it identifies one logical assistant message;
+ * run/turn are deliberately never used because they can contain several messages.
+ * tool_call/tool_return keep their stable ids; frames without an exact stable alias
+ * are left unchanged; idempotent.
  */
 internal fun tagStreamDeltaForOptimisticDedup(
     delta: JsonObject,
@@ -360,15 +362,17 @@ internal fun tagStreamDeltaForOptimisticDedup(
         "reasoning_message", "hidden_reasoning_message" -> "cm-reason-"
         else -> return delta
     }
-    val otid = delta["otid"]?.let { (it as? JsonPrimitive)?.contentOrNull }
-    if (otid.isNullOrEmpty()) return delta
     val currentId = delta["id"]?.let { (it as? JsonPrimitive)?.contentOrNull }
     if (currentId != null && (currentId.startsWith("cm-stream-") || currentId.startsWith("cm-reason-"))) {
         return delta
     }
+    val stableAlias = delta["message_id"]?.let { (it as? JsonPrimitive)?.contentOrNull }?.takeIf { it.isNotBlank() }
+        ?: delta["otid"]?.let { (it as? JsonPrimitive)?.contentOrNull }?.takeIf { it.isNotBlank() }
+        ?: delta["client_message_id"]?.let { (it as? JsonPrimitive)?.contentOrNull }?.takeIf { it.isNotBlank() }
+        ?: return delta
     return buildJsonObject {
         delta.forEach { (k, v) -> if (k != "id") put(k, v) }
-        put("id", "$prefix$otid")
+        put("id", "$prefix$stableAlias")
     }
 }
 

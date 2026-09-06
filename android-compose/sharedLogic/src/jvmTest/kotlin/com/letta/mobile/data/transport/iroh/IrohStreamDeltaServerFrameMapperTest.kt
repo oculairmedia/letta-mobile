@@ -45,6 +45,48 @@ class IrohStreamDeltaServerFrameMapperTest {
     }
 
     @Test
+    fun mapsRotatingAssistantFragmentsByStableMessageId() {
+        fun assistant(id: String, content: String) = assertIs<ServerFrame.AssistantMessage>(map(
+            """{"type":"stream_delta","idempotency_key":"$id","delta":{"id":"$id","message_id":"logical-1","message_type":"assistant_message","content":"$content"}}""",
+        ).single())
+
+        val first = assistant("delivery-1", "not a prefix")
+        val second = assistant("delivery-2", "completely different")
+
+        assertEquals("logical-1", first.id)
+        assertEquals(first.id, second.id)
+    }
+
+    @Test
+    fun stableCmStreamIdWinsOverMessageId() {
+        val frame = assertIs<ServerFrame.AssistantMessage>(map(
+            """{"type":"stream_delta","delta":{"id":"cm-stream-authoritative","message_id":"other","message_type":"assistant_message","content":"x"}}""",
+        ).single())
+        assertEquals("cm-stream-authoritative", frame.id)
+    }
+
+    @Test
+    fun distinctMessageIdsProduceDistinctAssistantOtids() {
+        fun assistant(messageId: String) = assertIs<ServerFrame.AssistantMessage>(map(
+            """{"type":"stream_delta","delta":{"id":"delivery","message_id":"$messageId","message_type":"assistant_message","content":"same"}}""",
+        ).single())
+
+        val first = assistant("logical-a")
+        val second = assistant("logical-b")
+        assertEquals("iroh-assistant-logical-a", first.otid)
+        assertEquals("iroh-assistant-logical-b", second.otid)
+    }
+
+    @Test
+    fun blankStableAliasesFallBackWithoutProducingBlankIdentity() {
+        val frame = assertIs<ServerFrame.AssistantMessage>(map(
+            """{"type":"stream_delta","delta":{"id":"delivery","message_id":" ","otid":"stable-otid","message_type":"assistant_message","content":"x"}}""",
+        ).single())
+        assertEquals("cm-stream-stable-otid", frame.id)
+        assertEquals("stable-otid", frame.otid)
+    }
+
+    @Test
     fun mapsReasoningToolCallAndToolReturnDeltasToTypedFrames() {
         val reasoning = assertIs<ServerFrame.ReasoningMessage>(
             map(
