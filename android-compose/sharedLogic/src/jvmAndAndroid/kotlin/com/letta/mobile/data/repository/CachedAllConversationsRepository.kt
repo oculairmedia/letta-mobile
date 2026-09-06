@@ -27,6 +27,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
+@Suppress("NoDetachedCoroutineLifecycle")
 fun defaultCachedAllConversationsRepositoryScope(): CoroutineScope =
     CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -144,7 +145,7 @@ open class CachedAllConversationsRepository(
 
     /** Exposed for the Android paging binder when Iroh list routing is active. */
     fun irohPageLoaderOrNull(): (suspend (
-        agentId: com.letta.mobile.data.model.AgentId?,
+        agentId: AgentId?,
         limit: Int?,
         after: String?,
         archiveStatus: String?,

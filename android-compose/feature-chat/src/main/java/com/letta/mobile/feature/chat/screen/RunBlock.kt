@@ -18,8 +18,12 @@ import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.components.rememberReducedMotionEnabled
-import com.letta.mobile.ui.preview.LettaPreviewFrame
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.ui.tooling.preview.PreviewLightDark
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.LettaChatTheme
 
 /**
@@ -370,15 +374,15 @@ private fun previewRunBubble(message: UiMessage, position: GroupPosition, rowMod
     // timeline dot anchored on the first text baseline
     // (DefaultStepDotCenterY = 17.dp). Anything heavier than 7.dp vertical
     // padding pushes the text below the dot.
-    androidx.compose.material3.Surface(
+    Surface(
         modifier = rowModifier.padding(vertical = 7.dp),
-        color = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerLow,
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        shape = RoundedCornerShape(12.dp),
     ) {
-        androidx.compose.material3.Text(
+        Text(
             text = message.content,
-            modifier = androidx.compose.ui.Modifier.padding(horizontal = 12.dp),
-            style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(horizontal = 12.dp),
+            style = MaterialTheme.typography.bodyMedium,
         )
     }
 }
