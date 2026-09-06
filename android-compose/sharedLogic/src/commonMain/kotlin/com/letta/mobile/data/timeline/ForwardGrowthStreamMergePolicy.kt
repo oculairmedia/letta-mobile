@@ -1,4 +1,4 @@
-﻿package com.letta.mobile.data.timeline
+package com.letta.mobile.data.timeline
 
 internal data class ForwardGrowthMergeResult(
     val timeline: Timeline,
