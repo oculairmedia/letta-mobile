@@ -264,6 +264,7 @@ fun reduceCleanup(
             removed = cleanup.suppressions.size,
             changed = cleanup.timeline != state.timeline,
         ),
+        persistenceDelta = exactConfirmedDelta(state.timeline, cleanup.timeline),
     )
 }
 
@@ -494,12 +495,6 @@ private fun reduceStreamMutation(
  * changes outside that bounded shape, fail closed to the full planner.
  */
 private fun exactConfirmedDelta(previous: Timeline, current: Timeline): TimelineMutationDelta {
-    if (previous.liveCursor != current.liveCursor || previous.backfillCursor != current.backfillCursor ||
-        previous.releasedOlderCount != current.releasedOlderCount
-    ) {
-        return TimelineMutationDelta.RequiresFullRescan("stream_metadata_changed")
-    }
-
     val changed = linkedSetOf<String>()
     val deleted = linkedSetOf<String>()
     val previousByServerId = previous.events.mapNotNull { event ->
@@ -526,6 +521,11 @@ private fun exactConfirmedDelta(previous: Timeline, current: Timeline): Timeline
     return TimelineMutationDelta.Exact(
         changedConfirmedServerIds = changed,
         deletedConfirmedServerIds = deleted,
+        // Cursor and release metadata is persisted in TimelineCommitMetadata, so it does not
+        // require re-encoding the confirmed history.
+        metadataChanged = previous.liveCursor != current.liveCursor ||
+            previous.backfillCursor != current.backfillCursor ||
+            previous.releasedOlderCount != current.releasedOlderCount,
     )
 }
 
