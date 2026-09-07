@@ -1,11 +1,52 @@
 package com.letta.mobile.data.local
 
 import androidx.room.withTransaction
+import kotlinx.coroutines.ensureActive
 import androidx.sqlite.db.SimpleSQLiteQuery
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
+import com.letta.mobile.data.timeline.snapshot.StoredTimelineEnvelope
 
 /** Reads existing v13 tables without changing their schema or full-envelope validation path. */
 class RoomLegacyLedgerCopySource(private val legacy: LettaDatabase) : LegacyLedgerCopySource {
+    /** Independent metadata verification, not canonical conversion or permission to activate.
+     * Runs only post-open; bounded SQL pages avoid loading the legacy payload or row list.
+     */
+    suspend fun validateRoot(scope: TimelineScope, expectedToken: String): Boolean = snapshot(scope) {
+        val initial = head()
+        if (!initial.supported || initial.token != expectedToken) return@snapshot false
+        val stored = requireNotNull(legacy.confirmedTimelineSnapshotDao().getNormalizedHead(scope.backendId, scope.conversationId))
+        val flat = java.security.MessageDigest.getInstance("SHA-256")
+        var chain = normalizedRowDigest(emptyList())
+        var count = 0L
+        var after = Long.MIN_VALUE
+        while (true) {
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+            val page = metadata(after, 128)
+            if (page.isEmpty()) break
+            for (row in page) {
+                if (row.order != count || row.order > Int.MAX_VALUE) return@snapshot false
+                val fields = object : NormalizedTimelineRowDigestFields {
+                    override val identityPrimary = row.primary
+                    override val identitySecondary = row.secondary
+                    override val eventOrder = row.order.toInt()
+                    override val checksum = row.checksum
+                }
+                if (stored.rowDigest.startsWith(CHAIN_ROW_DIGEST_PREFIX)) {
+                    chain = incrementalNormalizedRowDigest(chain, listOf(fields)).removePrefix(CHAIN_ROW_DIGEST_PREFIX)
+                } else {
+                    val encoded = listOf(row.primary.toString(), row.secondary.toString(), row.order.toString(), row.checksum)
+                        .joinToString("") { "${it.length}:$it;" }
+                    flat.update(encoded.toByteArray(Charsets.UTF_8))
+                }
+                count++
+                after = row.order
+            }
+        }
+        val actual = if (stored.rowDigest.startsWith(CHAIN_ROW_DIGEST_PREFIX)) chain
+            else flat.digest().joinToString("") { "%02x".format(it) }
+        count == initial.rowCount && actual == stored.rowDigest.removePrefix(CHAIN_ROW_DIGEST_PREFIX).lowercase()
+    }
+
     override suspend fun <T> snapshot(scope: TimelineScope, block: suspend LegacyLedgerCopyReader.() -> T): T =
         legacy.withTransaction {
             var open = true
@@ -13,13 +54,26 @@ class RoomLegacyLedgerCopySource(private val legacy: LettaDatabase) : LegacyLedg
                 override suspend fun head(): LegacyLedgerCopyHead {
                     check(open)
                     return legacy.openHelper.readableDatabase.query(SimpleSQLiteQuery(
-                        "SELECT agent_id, storage_layout_version, revision, envelope_schema_version, live_cursor, backfill_cursor, released_older_count, row_count, root_digest, row_digest, generation FROM normalized_timeline_snapshot_heads WHERE backend_id = ? AND conversation_id = ?",
+                        "SELECT agent_id, storage_layout_version, revision, envelope_schema_version, live_cursor, backfill_cursor, released_older_count, row_count, root_digest, row_digest, generation, written_at_millis FROM normalized_timeline_snapshot_heads WHERE backend_id = ? AND conversation_id = ?",
                         arrayOf(scope.backendId, scope.conversationId),
                     )).use { cursor ->
                         check(cursor.moveToFirst()) { "No normalized source; retain legacy manifest fallback" }
                         val fields = (0 until cursor.columnCount).map { if (cursor.isNull(it)) null else cursor.getString(it) }
                         val token = fields.joinToString("") { if (it == null) "-1:" else "${it.length}:$it" }
-                        LegacyLedgerCopyHead(token, cursor.getLong(7), fields[0] == scope.agentId && cursor.getInt(1) == NORMALIZED_LAYOUT_VERSION && cursor.getInt(3) in 1..com.letta.mobile.data.timeline.snapshot.StoredTimelineEnvelope.CURRENT_SCHEMA_VERSION)
+                        val envelope = StoredTimelineEnvelope(
+                            schemaVersion = cursor.getInt(3), scope = scope, revision = cursor.getLong(2),
+                            liveCursor = fields[4], backfillCursor = fields[5],
+                            releasedOlderCount = cursor.getInt(6), writtenAtMillis = cursor.getLong(11),
+                        )
+                        val supported = fields[0] == scope.agentId && cursor.getInt(1) == NORMALIZED_LAYOUT_VERSION &&
+                            envelope.schemaVersion in 1..StoredTimelineEnvelope.CURRENT_SCHEMA_VERSION &&
+                            envelope.revision >= 0 && cursor.getLong(10) >= 0 && cursor.getLong(7) >= 0
+                        if (supported) {
+                            check(normalizedRootDigest(envelope, requireNotNull(fields[9])) == fields[8]?.lowercase()) {
+                                "Legacy root checksum mismatch"
+                            }
+                        }
+                        LegacyLedgerCopyHead(token, cursor.getLong(7), supported)
                     }
                 }
 
