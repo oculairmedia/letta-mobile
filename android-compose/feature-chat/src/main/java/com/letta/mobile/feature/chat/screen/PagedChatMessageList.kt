@@ -64,6 +64,11 @@ private fun PagedChatMessageListContent(
     val routeTarget = if (presentation.hasBoundRoute) presentation.routeTarget else appearance.scrollToMessageId
     val pages = presentation.settled.collectAsLazyPagingItems()
     val live by presentation.live.collectAsStateWithLifecycle()
+    LaunchedEffect(presentation, pages) {
+        snapshotFlow { pages.itemSnapshotList.items }.collect { resident ->
+            presentation.onResidentRows(resident)
+        }
+    }
     val listState = key(presentation) { rememberLazyListState() }
     val missingTarget by presentation.missingTarget.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()

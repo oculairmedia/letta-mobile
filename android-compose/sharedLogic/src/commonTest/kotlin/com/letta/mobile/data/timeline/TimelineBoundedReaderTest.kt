@@ -27,6 +27,14 @@ class TimelineBoundedReaderTest {
         assertEquals(2, store.bodyReads)
     }
 
+    @Test fun fullBodyUsesBoundedChunksWithinOneReadSnapshot() = runTest {
+        val store = Store(listOf(row(1, 150_000)))
+        val result = load(store, 150_000)
+        assertEquals(150_000, result.bodies.single().size)
+        assertEquals(listOf(0L, 65_536L, 131_072L), store.offsets)
+        assertEquals(3, store.bodyReads)
+    }
+
     @Test fun cancellationIsNotConvertedToEmptyPage() = runTest {
         val store = Store(listOf(row(1, 5)))
         store.cancel = true
@@ -55,6 +63,7 @@ class TimelineBoundedReaderTest {
 
     private class Store(private val rows: List<TimelineLedgerMetadata>) : TimelineBoundedStore, TimelineStoreReader {
         var bodyReads = 0
+        val offsets = mutableListOf<Long>()
         var cancel = false
         override suspend fun <T> read(scope: TimelineScope, block: suspend TimelineStoreReader.() -> T): T = block(this)
         override suspend fun <T> transaction(scope: TimelineScope, block: suspend TimelineStoreTransaction.() -> T): T =
@@ -66,7 +75,8 @@ class TimelineBoundedReaderTest {
         override suspend fun body(pointer: TimelineBodyPointer, offset: Long, maxBytes: Int): ByteArray {
             if (cancel) throw CancellationException("cancelled")
             bodyReads++
-            assertEquals(0L, offset)
+            require(maxBytes in 0..65_536)
+            offsets += offset
             return ByteArray(maxBytes)
         }
     }

@@ -180,6 +180,23 @@ abstract class AppModule {
 
         @Provides
         @Singleton
+        fun provideCanonicalTimelineTransport(
+            messageApi: MessageApi,
+            local: com.letta.mobile.runtime.local.LettaCodeLocalTimelineTransport,
+            remote: IrohAdminRpcTimelineTransport,
+            settingsRepository: ISettingsRepository,
+        ): com.letta.mobile.data.timeline.TimelineTransport =
+            com.letta.mobile.runtime.local.LocalRoutingTimelineTransport(
+                local = local,
+                remote = IrohRoutingTimelineTransport(
+                    settingsRepository = settingsRepository,
+                    http = MessageApiTimelineTransport(messageApi),
+                    iroh = remote,
+                ),
+            )
+
+        @Provides
+        @Singleton
         fun provideTimelineRepository(
             messageApi: MessageApi,
             pendingLocalStore: PendingLocalStore,

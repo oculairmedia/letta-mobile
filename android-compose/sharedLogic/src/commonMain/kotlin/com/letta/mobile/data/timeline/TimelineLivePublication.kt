@@ -1,5 +1,7 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.timeline.snapshot.toConfirmedTimelineEvent
+
 /** Immutable bounded projection supplied by the shared live reducer, separate from settled Paging. */
 data class TimelineLiveBlock(
     val records: List<TimelineRemoteRecord>,
@@ -15,6 +17,26 @@ data class TimelineSettledRecord(
     val pointer: TimelineBodyPointer? = null,
 ) {
     val isPreview: Boolean get() = pointer?.encodedBytes?.let { it > body.size } ?: false
+}
+
+/** Project only complete canonical bodies; partial JSON must never become a missing message. */
+fun TimelineSettledRecord.toRenderItem(ownAgentId: String? = null): com.letta.mobile.data.chat.projection.ChatRenderItem? {
+    require(!isPreview) { "Resolve bounded body before projection" }
+    require(contentType == "application/vnd.letta.timeline-event+json;version=1") {
+        "Unsupported canonical record type: $contentType"
+    }
+    val stored = com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec.json.decodeFromString(
+        com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent.serializer(),
+        body.decodeToString(throwOnInvalidSequence = true),
+    )
+    val event = stored.toConfirmedTimelineEvent()
+    val message = com.letta.mobile.data.chat.projection.timelineEventToUiMessage(event, ownAgentId) ?: return null
+    return if (message.runId != null) com.letta.mobile.data.chat.projection.ChatRenderItem.RunBlock(
+        message.runId, listOf(message to com.letta.mobile.ui.common.GroupPosition.None),
+        stableKey = "segment-${key.identity.value}",
+    ) else com.letta.mobile.data.chat.projection.ChatRenderItem.Single(
+        message, com.letta.mobile.ui.common.GroupPosition.None, keyOverride = "segment-${key.identity.value}",
+    )
 }
 
 data class TimelineLiveFence(val selection: TimelineEngineSelection, val requestId: TimelineRequestId)
