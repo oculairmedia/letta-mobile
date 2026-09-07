@@ -108,7 +108,7 @@ internal fun LazyListScope.chatMessageListItems(params: ChatMessageListItemsPara
 }
 
 @Composable
-private fun ChatMessageListRenderItem(params: ChatMessageListRenderItemParams) {
+internal fun ChatMessageListRenderItem(params: ChatMessageListRenderItemParams) {
     val renderItem = params.renderItem
     val context = params.context
     if (com.letta.mobile.ui.chat.render.RenderDiagnostics.enabled()) {
