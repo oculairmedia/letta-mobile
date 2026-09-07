@@ -44,7 +44,7 @@ internal fun interface DesktopTouchEventAccessor {
                 "AWTAccessor.getMouseEventAccessor() returned null"
             }
             val isCausedByTouchEvent: Method =
-                Class.forName("sun.awt.AWTAccessor\$MouseEventAccessor")
+                Class.forName($$"sun.awt.AWTAccessor$MouseEventAccessor")
                     .getMethod("isCausedByTouchEvent", MouseEvent::class.java)
                     .apply { isAccessible = true }
 
