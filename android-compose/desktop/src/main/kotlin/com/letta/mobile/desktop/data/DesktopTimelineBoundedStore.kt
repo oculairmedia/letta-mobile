@@ -25,6 +25,7 @@ internal interface DesktopTimelineCheckpointCodec {
 internal class DesktopTimelineBoundedStore(
     private val root: Path,
     private val checkpointCodec: DesktopTimelineCheckpointCodec,
+    private val persistentIndexForNewScopes: Boolean = true,
 ) : TimelineBoundedStore {
     override suspend fun <T> read(scope: TimelineScope, block: suspend TimelineStoreReader.() -> T): T =
         withContext(Dispatchers.IO) {
@@ -61,6 +62,12 @@ internal class DesktopTimelineBoundedStore(
         val directory: Path,
         val snapshot: DesktopIndexedTimelineFiles.Snapshot?,
     ) : TimelineStoreReader {
+        // Existing v1 scopes remain readable/writable without an implicit unbounded migration.
+        // Once v2 exists it is authoritative; corrupt v2 must never resurrect a stale v1 head.
+        val persistent = if (Files.exists(directory.resolve("v2/active-v2")) ||
+            (persistentIndexForNewScopes && snapshot == null)) {
+            DesktopPersistentTimelineAccess(directory.resolve("v2"), checkpointCodec)
+        } else null
         private val pointerSecret = ByteArray(32).also { java.security.SecureRandom().nextBytes(it) }
         private fun pointerTag(ordinal: Long): String {
             val mac = javax.crypto.Mac.getInstance("HmacSHA256")
@@ -84,12 +91,14 @@ internal class DesktopTimelineBoundedStore(
         }
         override suspend fun checkpoint(): TimelineDurableCheckpoint {
             checkActive()
+            persistent?.let { return it.checkpoint() }
             if (snapshot == null) return TimelineDurableCheckpoint(0, null, true)
             return checkpointCodec.decode(readBounded(generationAuxiliary().resolve("checkpoint"), MAX_CHECKPOINT))
         }
         override suspend fun metadata(position: TimelineReadPosition, maxRows: Int): TimelineMetadataPage {
             checkActive()
             require(maxRows > 0)
+            persistent?.let { return it.metadata(position, maxRows) }
             val revision = checkpoint().revision
             val snap = snapshot ?: return TimelineMetadataPage(emptyList(), null, null, revision)
             fun before(key: TimelinePageKey) = snap.seek(key.disk(), 1, DesktopIndexedTimelineFiles.Direction.BEFORE)
@@ -122,6 +131,7 @@ internal class DesktopTimelineBoundedStore(
         }
         override suspend fun locate(identity: TimelineMessageId): TimelinePageKey? {
             checkActive()
+            persistent?.let { return it.locate(identity) }
             if (snapshot == null) return null
             val path = auxiliary().resolve("id-" + digest(identity.value.exactBytes()))
             if (!Files.exists(path)) return null
@@ -133,6 +143,7 @@ internal class DesktopTimelineBoundedStore(
         override suspend fun body(pointer: TimelineBodyPointer, offset: Long, maxBytes: Int): ByteArray {
             checkActive()
             require(offset in 0..pointer.encodedBytes && maxBytes >= 0)
+            persistent?.let { return it.body(pointer, offset, maxBytes) }
             val snap = requireNotNull(snapshot)
             val parts = pointer.value.split(':')
             require(parts.size == 3 && parts[0] == snap.generation) { "Stale generation pointer" }
@@ -155,6 +166,7 @@ internal class DesktopTimelineBoundedStore(
         override suspend fun evidence(key: String, maxBytes: Int): ByteArray? {
             checkActive()
             require(maxBytes >= 0)
+            persistent?.let { return it.evidence(key, maxBytes) }
             if (snapshot == null) return null
             val path = auxiliary().resolve("e-" + digest(key.exactBytes()))
             if (!Files.exists(path)) return null
@@ -174,6 +186,13 @@ internal class DesktopTimelineBoundedStore(
         Reader(directory, snapshot), TimelineStoreTransaction {
         val records = mutableMapOf<TimelineMessageId, TimelineStoredRecord?>()
         val evidenceChanges = mutableMapOf<String, ByteArray?>()
+        private var stagedBytes = 0L
+        private fun reserve(bytes: Long) {
+            if (persistent == null) return
+            require(records.size + evidenceChanges.size < 256) { "Mutation count budget exceeded" }
+            require(bytes <= 8L * 1024 * 1024 - stagedBytes) { "Mutation batch byte budget exceeded" }
+            stagedBytes += bytes
+        }
         var changed = false
         var revision: Long? = null
         var cursorValue: Pair<TimelineContinuation?, Boolean>? = null
@@ -186,17 +205,21 @@ internal class DesktopTimelineBoundedStore(
             checkActive()
             record.key.disk()
             require(record.contentType.length <= 300)
+            reserve(record.body.size.toLong() + record.key.identity.value.length * 2L + record.contentType.length * 2L + 64)
             records[record.key.identity] = record.copy(body = record.body.copyOf())
             changed = true
         }
         override suspend fun delete(identity: TimelineMessageId, reason: TimelineDurableDeleteReason) {
-            checkActive(); records[identity] = null; changed = true
+            checkActive(); reserve(identity.value.length * 2L + 64); records[identity] = null; changed = true
         }
         override suspend fun putEvidence(key: String, value: ByteArray) {
-            checkActive(); evidenceChanges[key] = value.copyOf(); changed = true
+            checkActive()
+            if (persistent != null) DesktopPersistentTimelineAccess.exact(key)
+            reserve(value.size.toLong() + key.length * 2L + 64)
+            evidenceChanges[key] = value.copyOf(); changed = true
         }
         override suspend fun deleteEvidence(key: String) {
-            checkActive(); evidenceChanges[key] = null; changed = true
+            checkActive(); reserve(key.length * 2L + 64); evidenceChanges[key] = null; changed = true
         }
         override suspend fun cursor(continuation: TimelineContinuation?, hasMore: Boolean) {
             checkActive(); cursorValue = continuation to hasMore; changed = true
@@ -271,6 +294,7 @@ internal class DesktopTimelineBoundedStore(
         suspend fun commit(files: DesktopIndexedTimelineFiles) {
             if (!changed) { check(revision == null); return }
             val stamp = requireNotNull(revision) { "Changed transaction needs nextRevision" }
+            persistent?.let { it.commit(records, evidenceChanges, checkpoint()); return }
             val checkpointBytes = checkpointCodec.encode(checkpoint()).copyOf()
             require(checkpointBytes.size <= MAX_CHECKPOINT)
             val context = currentCoroutineContext()

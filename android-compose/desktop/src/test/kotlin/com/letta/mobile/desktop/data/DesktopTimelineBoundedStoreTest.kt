@@ -21,7 +21,8 @@ class DesktopTimelineBoundedStoreTest {
             return TimelineDurableCheckpoint(parts[0].toLong(), null, parts[1].toBooleanStrict())
         }
     }
-    private fun store() = DesktopTimelineBoundedStore(root, codec)
+    private var legacy = false
+    private fun store() = DesktopTimelineBoundedStore(root, codec, persistentIndexForNewScopes = !legacy)
     private fun record(order: Long, id: String = "id-$order", bytes: ByteArray = byteArrayOf(1)) =
         TimelineStoredRecord(TimelinePageKey(order, TimelineMessageId(id)), "opaque", bytes)
 
@@ -109,6 +110,7 @@ class DesktopTimelineBoundedStoreTest {
     }
 
     @Test fun exactUtf16KeysAndAuxiliaryCorruptionFailClosed() = runTest {
+        legacy = true // Explicit v1 compatibility/corruption regression.
         val ids = listOf("\uD800", "\uD801", "?")
         store().transaction(scope) {
             nextRevision()
@@ -186,7 +188,7 @@ class DesktopTimelineBoundedStoreTest {
     }
 
     @Test fun substitutedOrdinalAndOtherCallbackPointersFailClosed() = runTest {
-        store().transaction(scope) { nextRevision(); put(record(1)); put(record(2)) }
+        store().transaction(scope) { nextRevision(); put(record(1)); put(record(2, bytes = byteArrayOf(2))) }
         store().read(scope) {
             val rows = metadata(TimelineReadPosition.Tail, 2).rows
             val parts = rows.first().body.value.split(':').toMutableList()
@@ -203,6 +205,7 @@ class DesktopTimelineBoundedStoreTest {
     }
 
     @Test fun cursorOnlyRevisionsReuseHistoryWithoutOverlayChains() = runTest(timeout = kotlin.time.Duration.parse("5m")) {
+        legacy = true // Keep the published v1 corpus compatibility gate.
         val backend = store()
         backend.transaction(scope) {
             nextRevision()
@@ -238,6 +241,44 @@ class DesktopTimelineBoundedStoreTest {
             assertContentEquals(byteArrayOf(42), evidence("keep", 1))
             assertEquals(28000L, locate(TimelineMessageId("id-28000"))?.order)
         }
+    }
+
+    @Test fun persistentWritesKeepIndependentRootsAndRejectOversizedBatches() = runTest(timeout = kotlin.time.Duration.parse("5m")) {
+        val backend = store()
+        repeat(4) { batch ->
+            backend.transaction(scope) {
+                nextRevision()
+                repeat(64) { put(record((batch * 64 + it).toLong())) }
+                putEvidence("exact-\uD800", byteArrayOf(batch.toByte()))
+            }
+        }
+        val directory = Files.list(root).use { it.findFirst().orElseThrow() }.resolve("v2")
+        val index = DesktopPersistentTimelineIndex(directory)
+        val original = assertNotNull(index.open())
+        backend.transaction(scope) { nextRevision(); cursor(null, false) }
+        assertEquals(original.roots, index.open()?.roots)
+        val before = Files.list(directory).use { paths -> paths.mapToLong { Files.size(it) }.sum() }
+        backend.read(scope) {
+            val old = metadata(TimelineReadPosition.Tail, 1).rows.single()
+            backend.transaction(scope) { nextRevision(); put(record(-100, "id-255", byteArrayOf(9))) }
+            assertContentEquals(byteArrayOf(1), body(old.body, 0, 1))
+        }
+        val after = Files.list(directory).use { paths -> paths.mapToLong { Files.size(it) }.sum() }
+        assertTrue(after - before < 512 * 1024, "ordinary write bytes=${after - before}")
+        assertEquals(original.roots.evidence, index.open()?.roots?.evidence)
+        backend.read(scope) {
+            assertEquals(-100, locate(TimelineMessageId("id-255"))?.order?.toInt())
+            assertContentEquals(byteArrayOf(3), evidence("exact-\uD800", 1))
+            val page = metadata(TimelineReadPosition.After(record(Long.MIN_VALUE).key), 1)
+            assertContentEquals(byteArrayOf(9), body(page.rows.single().body, 0, 1))
+        }
+        assertFailsWith<IllegalArgumentException> {
+            backend.transaction(scope) { nextRevision(); put(record(999, bytes = ByteArray(8 * 1024 * 1024))) }
+        }
+        assertFailsWith<IllegalArgumentException> {
+            backend.transaction(scope) { nextRevision(); repeat(257) { put(record((1000 + it).toLong())) } }
+        }
+        backend.read(scope) { assertEquals(6L, checkpoint().revision); assertNull(locate(TimelineMessageId("id-999"))) }
     }
 
     @Test fun emptyBodyAndRevisionExhaustion() = runTest {
