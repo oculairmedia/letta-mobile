@@ -59,12 +59,10 @@ exclude:
       - sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/ConversationAdminHandlers.kt
       - sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/ConversationAgentListHelper.kt
   # Material HCT harmonization intentionally uses @RestrictTo APIs rather than
-  # reimplementing color math. Both files already carry source suppressions and
-  # focused tests; Qodana's Android model ignores those suppressions.
+  # reimplementing color math. Both files carry source suppressions and focused
+  # tests; Android Lint inside Qodana does not honor paths-scoped exclusions or
+  # inline suppressions for this check.
   - name: AndroidLintRestrictedApi
-    paths:
-      - core/android-data/src/main/java/com/letta/mobile/util/ColorHarmonizer.kt
-      - designsystem/src/main/java/com/letta/mobile/ui/theme/HctColorHarmonizer.kt
   - name: AndroidLintNewApi
     paths:
       - cli
@@ -74,10 +72,12 @@ exclude:
   - name: AndroidLintObsoleteSdkInt
     paths:
       - cli
-  # Dependency-version noise is tracked via Dependabot/Gradle, not Qodana gates.
+  # Dependency-version noise and targetSdk policy pinning (pinned to 36) are
+  # managed via libs.versions.toml, not Qodana gates.
   - name: AndroidLintNewerVersionAvailable
   - name: AndroidLintGradleDependency
   - name: AndroidLintAndroidGradlePluginVersion
+  - name: AndroidLintOldTargetApi
   # Fake* test doubles inherit these open API/repository classes (mockk ctor
   # injection). Qodana analyzes production sources and flags the required
   # `open` modality as redundant; keep inheritance working for fakes.
@@ -152,6 +152,10 @@ exclude:
       - app/src/playNonMinifiedRelease/AndroidManifest.xml
       - app/src/main/res/values/themes.xml
       - app/src/main/res/values-night/themes.xml
+  # Standard Android XML attributes (e.g. in manifests and vector drawables)
+  # produce false-positive UnknownAttribute warnings under Qodana's headless
+  # Android plugin model.
+  - name: AndroidUnknownAttribute
   # Gradle incubating APIs (dependencyResolutionManagement / externalNativeBuild)
   # are required by current AGP/Gradle DSL; tracked via Gradle upgrades, not this gate.
   - name: UnstableApiUsage
