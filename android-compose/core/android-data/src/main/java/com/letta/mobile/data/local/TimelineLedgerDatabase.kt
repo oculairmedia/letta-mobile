@@ -79,7 +79,7 @@ data class LedgerMigrationRow(
 
 @Dao
 interface TimelineLedgerDao {
-    @Query("SELECT * FROM ledger_migration WHERE scope = :scope")
+    @Query("SELECT scope, sourceToken, generation, afterOrder, copiedRows, complete, pendingPointer, pendingOffset, pendingDigest FROM ledger_migration WHERE scope = :scope")
     suspend fun migration(scope: ByteArray): LedgerMigrationState?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -88,22 +88,22 @@ interface TimelineLedgerDao {
     @Insert
     suspend fun migrationRow(row: LedgerMigrationRow)
 
-    @Query("SELECT * FROM ledger_migration_row WHERE scope = :scope AND generation = :generation AND position > :after ORDER BY position LIMIT min(128, max(0, :limit))")
+    @Query("SELECT scope, generation, position, primaryIdentity, secondaryIdentity, pointer, bytes, checksum FROM ledger_migration_row WHERE scope = :scope AND generation = :generation AND position > :after ORDER BY position LIMIT min(128, max(0, :limit))")
     suspend fun migrationRows(scope: ByteArray, generation: String, after: Long, limit: Int): List<LedgerMigrationRow>
 
-    @Query("SELECT * FROM ledger_head WHERE scope = :scope")
+    @Query("SELECT scope, revision, checkpoint FROM ledger_head WHERE scope = :scope")
     suspend fun head(scope: ByteArray): LedgerHead?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun head(head: LedgerHead)
 
-    @Query("SELECT * FROM ledger_row WHERE scope = :scope ORDER BY position DESC, identity DESC LIMIT min(128, max(0, :limit))")
+    @Query("SELECT scope, identity, position, pointer, bytes, contentType, revision FROM ledger_row WHERE scope = :scope ORDER BY position DESC, identity DESC LIMIT min(128, max(0, :limit))")
     suspend fun tail(scope: ByteArray, limit: Int): List<LedgerRow>
 
-    @Query("SELECT * FROM ledger_row WHERE scope = :scope AND (position < :position OR (position = :position AND identity < :identity)) ORDER BY position DESC, identity DESC LIMIT min(128, max(0, :limit))")
+    @Query("SELECT scope, identity, position, pointer, bytes, contentType, revision FROM ledger_row WHERE scope = :scope AND (position < :position OR (position = :position AND identity < :identity)) ORDER BY position DESC, identity DESC LIMIT min(128, max(0, :limit))")
     suspend fun before(scope: ByteArray, position: Long, identity: ByteArray, limit: Int): List<LedgerRow>
 
-    @Query("SELECT * FROM ledger_row WHERE scope = :scope AND (position > :position OR (position = :position AND identity > :identity)) ORDER BY position ASC, identity ASC LIMIT min(128, max(0, :limit))")
+    @Query("SELECT scope, identity, position, pointer, bytes, contentType, revision FROM ledger_row WHERE scope = :scope AND (position > :position OR (position = :position AND identity > :identity)) ORDER BY position ASC, identity ASC LIMIT min(128, max(0, :limit))")
     suspend fun after(scope: ByteArray, position: Long, identity: ByteArray, limit: Int): List<LedgerRow>
 
     @Query("SELECT EXISTS(SELECT 1 FROM ledger_row WHERE scope = :scope AND (position < :position OR (position = :position AND identity < :identity)))")
@@ -112,7 +112,7 @@ interface TimelineLedgerDao {
     @Query("SELECT EXISTS(SELECT 1 FROM ledger_row WHERE scope = :scope AND (position > :position OR (position = :position AND identity > :identity)))")
     suspend fun hasAfter(scope: ByteArray, position: Long, identity: ByteArray): Boolean
 
-    @Query("SELECT * FROM ledger_row WHERE scope = :scope AND identity = :identity")
+    @Query("SELECT scope, identity, position, pointer, bytes, contentType, revision FROM ledger_row WHERE scope = :scope AND identity = :identity")
     suspend fun locate(scope: ByteArray, identity: ByteArray): LedgerRow?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -130,16 +130,16 @@ interface TimelineLedgerDao {
     @Insert
     suspend fun chunk(chunk: LedgerChunk)
 
-    @Query("SELECT * FROM ledger_blob WHERE scope = :scope AND pointer = :pointer")
+    @Query("SELECT scope, pointer, bytes, checksum FROM ledger_blob WHERE scope = :scope AND pointer = :pointer")
     suspend fun blob(scope: ByteArray, pointer: String): LedgerBlob?
 
-    @Query("SELECT * FROM ledger_chunk WHERE scope = :scope AND pointer = :pointer AND ordinal = :ordinal")
+    @Query("SELECT scope, pointer, ordinal, payload, checksum FROM ledger_chunk WHERE scope = :scope AND pointer = :pointer AND ordinal = :ordinal")
     suspend fun chunk(scope: ByteArray, pointer: String, ordinal: Long): LedgerChunk?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun evidence(evidence: LedgerEvidence)
 
-    @Query("SELECT * FROM ledger_evidence WHERE scope = :scope AND identity = :identity")
+    @Query("SELECT scope, identity, pointer, bytes FROM ledger_evidence WHERE scope = :scope AND identity = :identity")
     suspend fun evidence(scope: ByteArray, identity: ByteArray): LedgerEvidence?
 
     @Query("DELETE FROM ledger_evidence WHERE scope = :scope AND identity = :identity")
