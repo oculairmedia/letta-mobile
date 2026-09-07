@@ -68,6 +68,18 @@ class TimelineRoomStrategyTest {
                 }
                 repeat(64) { assertEquals(before, dao.seekPage("scope", 128, "00000128", 64)) }
                 writer.await()
+                db.invalidationTracker.refreshVersionsSync()
+                assertTrue("Generated offset source must invalidate after insertion", generated.invalid)
+                db.openHelper.readableDatabase.query(
+                    "EXPLAIN QUERY PLAN SELECT scope,eventId,orderKey,bodyKey FROM strategy_metadata " +
+                        "WHERE scope='scope' AND (orderKey,eventId)<(128,'00000128') " +
+                        "ORDER BY orderKey DESC,eventId DESC LIMIT 64",
+                ).use { plan ->
+                    assertTrue(plan.moveToFirst())
+                    val detail = plan.getString(3)
+                    assertTrue(detail, detail.contains("USING INDEX index_strategy_metadata_scope_orderKey_eventId"))
+                    assertTrue(detail, detail.contains("orderKey"))
+                }
                 val reads = queries.filter { it.startsWith("SELECT") && it.contains("FROM strategy_metadata") }
                 assertEquals(64, reads.size)
                 assertTrue(reads.all { it.contains("LIMIT") && it.contains("(orderKey,eventId)<") && !it.contains("OFFSET") })
