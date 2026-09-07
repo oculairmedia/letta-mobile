@@ -206,7 +206,7 @@ internal class DesktopTimelineBoundedStore(
         override suspend fun metadata(position: TimelineReadPosition, maxRows: Int): TimelineMetadataPage {
             checkActive(); require(maxRows > 0)
             if (records.isEmpty()) return super.metadata(position, maxRows)
-            val stamp = requireNotNull(revision) { "Call nextRevision before reading staged metadata" }
+            val stamp = revision ?: Math.addExact(super.checkpoint().revision, 1)
             val pending = records.values.filterNotNull().map { record ->
                 val token = "pending:" + java.util.UUID.randomUUID()
                 pendingPointers[token] = record.body

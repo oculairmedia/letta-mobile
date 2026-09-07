@@ -147,6 +147,44 @@ class DesktopTimelineBoundedStoreTest {
         }
     }
 
+    @Test fun publishedEnginePagesRealFilesAndPersistsCursorOnlyRevision() = runTest {
+        val backend = store()
+        backend.transaction(scope) {
+            for (i in 0L..9) put(record(i))
+            assertEquals(3, metadata(TimelineReadPosition.Tail, 3).rows.size)
+            nextRevision()
+        }
+        val engine = CanonicalTimelineEngine(backend, TimelineCanonicalWriter { _, _ -> error("empty page") },
+            TimelinePageBudget(3, 100), enabled = true)
+        val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
+        val source = TimelineLedgerPagingSource(engine, selection)
+        val tail = assertIs<androidx.paging.PagingSource.LoadResult.Page<TimelinePageKey, TimelineSettledRecord>>(
+            source.load(androidx.paging.PagingSource.LoadParams.Refresh(null, 3, false)),
+        )
+        assertEquals(listOf(9L, 8L, 7L), tail.data.map { it.key.order })
+        val older = assertIs<androidx.paging.PagingSource.LoadResult.Page<TimelinePageKey, TimelineSettledRecord>>(
+            source.load(androidx.paging.PagingSource.LoadParams.Append(requireNotNull(tail.nextKey), 3, false)),
+        )
+        assertEquals(listOf(6L, 5L, 4L), older.data.map { it.key.order })
+        val request = engine.beginPage(selection)
+        assertEquals(TimelineEnginePageOutcome.Applied, engine.applyPage(request, TimelineRemotePageResult.Page(
+            request.remote.requestId, selection.generation, emptyList(), null, false, 0,
+        )))
+        assertIs<androidx.paging.PagingSource.LoadResult.Invalid<TimelinePageKey, TimelineSettledRecord>>(
+            source.load(androidx.paging.PagingSource.LoadParams.Refresh(null, 3, false)),
+        )
+        engine.release(selection)
+        store().read(scope) {
+            assertEquals(TimelineDurableCheckpoint(2, null, false), checkpoint())
+            assertEquals(10, metadata(TimelineReadPosition.Tail, 20).rows.size)
+        }
+        val target = assertIs<TimelineEngineOpen.Opened>(engine.open(scope, TimelineMessageId("id-5"))).selection
+        val centered = assertIs<androidx.paging.PagingSource.LoadResult.Page<TimelinePageKey, TimelineSettledRecord>>(
+            TimelineLedgerPagingSource(engine, target).load(androidx.paging.PagingSource.LoadParams.Refresh(target.anchor, 3, false)),
+        )
+        assertEquals(listOf(6L, 5L, 4L), centered.data.map { it.key.order })
+    }
+
     @Test fun emptyBodyAndRevisionExhaustion() = runTest {
         store().transaction(scope) { nextRevision(); put(record(1, bytes = ByteArray(0))) }
         store().read(scope) {
