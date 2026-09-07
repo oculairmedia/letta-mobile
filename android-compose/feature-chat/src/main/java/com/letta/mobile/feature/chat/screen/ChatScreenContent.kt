@@ -91,10 +91,11 @@ internal fun ChatContent(
     appearance: ChatContentAppearance,
     modifier: Modifier = Modifier,
 ) {
-    val renderItems = rememberChatRenderItems(state, appearance.chatMode)
+    val paging = LocalChatPagingPresentation.current
+    val renderItems = if (paging == null) rememberChatRenderItems(state, appearance.chatMode) else emptyList()
     var a2uiStackHeightDp by remember { mutableStateOf(0.dp) }
     val density = LocalDensity.current
-    val showStarterPrompts = state.messages.isEmpty() && !state.isStreaming && state.a2uiSurfaces.isEmpty()
+    val showStarterPrompts = paging == null && state.messages.isEmpty() && !state.isStreaming && state.a2uiSurfaces.isEmpty()
 
     Box(modifier = modifier.fillMaxSize()) {
         if (showStarterPrompts) {
@@ -175,6 +176,14 @@ private fun ChatContentMessageArea(
     appearance: ChatContentAppearance,
     a2uiStackHeightDp: Dp,
 ) {
+    LocalChatPagingPresentation.current?.let { paging ->
+        key(paging) {
+            PagedChatMessageList(paging, state, callbacks, appearance.copy(
+                bottomPadding = appearance.bottomPadding + a2uiStackHeightDp,
+            ))
+        }
+        return
+    }
     val hasMessagesOrStreaming = state.messages.isNotEmpty() || state.isStreaming
     if (!hasMessagesOrStreaming) return
 

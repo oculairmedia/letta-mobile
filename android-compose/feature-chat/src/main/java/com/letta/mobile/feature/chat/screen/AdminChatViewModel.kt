@@ -154,10 +154,15 @@ internal class AdminChatViewModel @Inject constructor(
     private val modelRepository: IModelRepository,
     val attachmentLimits: AttachmentLimits =
         AttachmentLimits.Default,
+    private val pagingHost: ChatPagingHost = ChatPagingHost(),
 ) : ViewModel() {
     companion object {
         private const val RESUME_CACHE_MAX_AGE_MS = 60_000L
     }
+
+    private val _pagingPresentation = MutableStateFlow<ChatPagingPresentation?>(null)
+    val pagingPresentation: StateFlow<ChatPagingPresentation?> = _pagingPresentation
+    private var pagingConversationId: String? = null
 
     val agentId: AgentId = AgentId(routeArgs.agentId)
     /**
@@ -719,13 +724,13 @@ internal class AdminChatViewModel @Inject constructor(
     }
 
     fun loadOlderMessages() {
-        if (localRuntimeRouting() == LocalRuntimeRouting.LocalBound) return
+        if (_pagingPresentation.value != null || localRuntimeRouting() == LocalRuntimeRouting.LocalBound) return
         chatHistoryPager.loadOlderMessages(false)
     }
 
     /** See [ChatHistoryPager.releaseOlderMessages]. */
     fun releaseOlderMessages() {
-        if (localRuntimeRouting() == LocalRuntimeRouting.LocalBound) return
+        if (_pagingPresentation.value != null || localRuntimeRouting() == LocalRuntimeRouting.LocalBound) return
         chatHistoryPager.releaseOlderMessages()
     }
 
@@ -776,6 +781,15 @@ internal class AdminChatViewModel @Inject constructor(
 
     private fun startTimelineObserver(conversationId: String) {
         adminChatA2uiCoordinator.ensureA2uiConversation(conversationId)
+        val select = pagingHost.select
+        if (select != null && localRuntimeRouting() != LocalRuntimeRouting.LocalBound) {
+            if (pagingConversationId != conversationId) {
+                stopTimelineObserver()
+                _pagingPresentation.value = select(agentId.value, conversationId, scrollToMessageId)
+                pagingConversationId = conversationId
+            }
+            return
+        }
         chatTimelineObserver.start(agentId.value, conversationId, timelineObserverProvenance())
         // letta-mobile-qfa81 (P4): the iroh active-reconcile poll loop
         // (startIrohRecentReconcileLoop) and its stall-recovery crutch were
@@ -788,6 +802,9 @@ internal class AdminChatViewModel @Inject constructor(
     }
 
     private fun stopTimelineObserver() {
+        _pagingPresentation.value?.close?.invoke()
+        _pagingPresentation.value = null
+        pagingConversationId = null
         chatTimelineObserver.stop()
     }
 
@@ -822,6 +839,7 @@ internal class AdminChatViewModel @Inject constructor(
     fun onScreenResumed() = screenLifecycleCoordinator.onScreenResumed()
 
     override fun onCleared() {
+        stopTimelineObserver()
         adminChatA2uiCoordinator.release()
         screenLifecycleCoordinator.onCleared()
     }
