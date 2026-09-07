@@ -102,7 +102,7 @@ dependencies {
     // ZXing's reader + BufferedImageLuminanceSource to prove the CLI's
     // PNG renderer produces a scannable image. The `core` jar comes
     // transitively from :sharedLogic's `api` declaration.
-    testImplementation("com.google.zxing:javase:3.5.3")
+    testImplementation(libs.zxing.javase)
     testRuntimeOnly(libs.junit.platform.launcher)
 }
 

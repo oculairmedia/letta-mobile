@@ -84,7 +84,7 @@ dependencies {
     ksp(libs.hilt.compiler)
 
     // Compose runtime for @Stable and @Immutable annotations
-    implementation("androidx.compose.runtime:runtime:1.8.3")
+    implementation(libs.androidx.compose.runtime)
 
     // androidx.tracing — Perfetto tracing integration
     implementation(libs.androidx.tracing)

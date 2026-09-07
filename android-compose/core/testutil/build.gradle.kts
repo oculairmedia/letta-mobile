@@ -19,5 +19,5 @@ dependencies {
     
     // Add mockk since fakes use it (relaxed relaxed = true mockk in FakeToolApi)
     implementation(libs.mockk)
-    api("androidx.datastore:datastore-preferences-core:1.3.0-alpha09")
+    api(libs.androidx.datastore.preferences.core)
 }

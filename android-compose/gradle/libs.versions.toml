@@ -50,6 +50,66 @@ androidx-navigation = "2.9.7"
 androidx-hilt-navigation = "1.4.0-beta01"
 kotlinx-collections-immutable = "0.5.0-beta01"
 coil3 = "3.5.0-beta01"
+compose-bom = "2026.03.01"
+compose-material3 = "1.5.0-alpha17"
+compose-material3-chat = "1.5.0-alpha25"
+camerax = "1.4.2"
+exifinterface = "1.4.2"
+work = "2.11.2"
+sentry = "8.42.0"
+startup = "1.2.0"
+profileinstaller = "1.4.1"
+leakcanary = "3.0-alpha-8"
+metrics = "1.0.0"
+splashscreen = "1.2.0"
+reorderable = "3.1.0"
+filekit = "0.14.1"
+filekit-chat = "0.15.0"
+aboutlibraries = "14.2.1"
+vico = "3.2.0-next.5"
+jetlime = "4.3.0"
+litertlm = "0.13.1"
+roborazzi = "1.63.0"
+roborazzi-chat = "1.71.0"
+icons-lucide = "1.1.0"
+jindong = "1.1.0"
+markdown = "0.41.0"
+core-ktx = "1.16.0"
+core-ktx-chat = "1.19.0"
+zxing-javase = "3.5.3"
+automerge = "0.0.9"
+jackson-yaml = "2.20.2"
+okhttp = "5.3.2"
+compose-runtime = "1.8.3"
+hilt-chat = "2.60.1"
+mockk-chat = "1.14.11"
+kotest-chat = "6.2.3"
+junit-jupiter-chat = "6.1.3"
+ktor-chat = "3.5.2"
+okhttp-mockwebserver-chat = "5.4.0"
+datastore-chat = "1.3.0-alpha10"
+kotlinx-collections-immutable-chat = "0.5.1"
+coil3-chat = "3.5.0"
+lifecycle-chat = "2.11.0"
+androidx-navigation-chat = "2.9.8"
+androidx-hilt-navigation-chat = "1.4.0"
+nucleus = "2.1.5"
+nucleus-native-tray = "2.0.1"
+jewel = "0.37.0-262.4852.51"
+kuiver = "0.3.0"
+autolinktext = "2.0.2"
+texty = "1.0.0-alpha"
+calendar = "2.10.1"
+jcefmaven = "146.0.10"
+jna = "5.17.0"
+skiko = "0.9.37.3"
+kotzilla = "2.3.3"
+compose-desktop-ui-test = "1.11.1"
+compose-desktop-material3 = "1.9.0"
+compose-desktop-material-icons = "1.7.3"
+compose-web = "1.10.0"
+compose-web-material3 = "1.9.0"
+compose-web-material-icons = "1.7.3"
 
 [libraries]
 androidx-paging-common = { module = "androidx.paging:paging-common", version.ref = "paging" }
@@ -128,8 +188,126 @@ androidx-hilt-navigation-compose = { module = "androidx.hilt:hilt-navigation-com
 kotlinx-collections-immutable = { module = "org.jetbrains.kotlinx:kotlinx-collections-immutable", version.ref = "kotlinx-collections-immutable" }
 coil3-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil3" }
 coil3-svg = { module = "io.coil-kt.coil3:coil-svg", version.ref = "coil3" }
+androidx-compose-bom = { module = "androidx.compose:compose-bom", version.ref = "compose-bom" }
+androidx-compose-ui = { module = "androidx.compose.ui:ui" }
+androidx-compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling" }
+androidx-compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
+androidx-compose-ui-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4" }
+androidx-compose-ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest" }
+androidx-compose-foundation = { module = "androidx.compose.foundation:foundation" }
+androidx-compose-material-icons-extended = { module = "androidx.compose.material:material-icons-extended" }
+androidx-compose-material3 = { module = "androidx.compose.material3:material3", version.ref = "compose-material3" }
+androidx-compose-material3-windowsize = { module = "androidx.compose.material3:material3-window-size-class", version.ref = "compose-material3" }
+androidx-compose-material3-chat = { module = "androidx.compose.material3:material3", version.ref = "compose-material3-chat" }
+androidx-compose-material3-windowsize-chat = { module = "androidx.compose.material3:material3-window-size-class", version.ref = "compose-material3-chat" }
+androidx-compose-runtime = { module = "androidx.compose.runtime:runtime", version.ref = "compose-runtime" }
+androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
+androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }
+androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "core-ktx" }
+androidx-core-ktx-chat = { module = "androidx.core:core-ktx", version.ref = "core-ktx-chat" }
+androidx-core-splashscreen = { module = "androidx.core:core-splashscreen", version.ref = "splashscreen" }
+androidx-exifinterface = { module = "androidx.exifinterface:exifinterface", version.ref = "exifinterface" }
+androidx-metrics-performance = { module = "androidx.metrics:metrics-performance", version.ref = "metrics" }
+androidx-work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "work" }
+androidx-startup-runtime = { module = "androidx.startup:startup-runtime", version.ref = "startup" }
+androidx-profileinstaller = { module = "androidx.profileinstaller:profileinstaller", version.ref = "profileinstaller" }
+androidx-camera-core = { module = "androidx.camera:camera-core", version.ref = "camerax" }
+androidx-camera-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "camerax" }
+androidx-camera-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "camerax" }
+androidx-camera-view = { module = "androidx.camera:camera-view", version.ref = "camerax" }
+androidx-datastore-preferences-core = { module = "androidx.datastore:datastore-preferences-core", version.ref = "datastore" }
+androidx-datastore-preferences-chat = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore-chat" }
+coil3-network-ktor3 = { module = "io.coil-kt.coil3:coil-network-ktor3", version.ref = "coil3" }
+coil3-compose-chat = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil3-chat" }
+filekit-core = { module = "io.github.vinceglb:filekit-core", version.ref = "filekit" }
+filekit-dialogs-compose = { module = "io.github.vinceglb:filekit-dialogs-compose", version.ref = "filekit" }
+filekit-core-chat = { module = "io.github.vinceglb:filekit-core", version.ref = "filekit-chat" }
+filekit-dialogs-compose-chat = { module = "io.github.vinceglb:filekit-dialogs-compose", version.ref = "filekit-chat" }
+leakcanary-android = { module = "com.squareup.leakcanary:leakcanary-android", version.ref = "leakcanary" }
+litertlm-android = { module = "com.google.ai.edge.litertlm:litertlm-android", version.ref = "litertlm" }
+reorderable = { module = "sh.calvin.reorderable:reorderable", version.ref = "reorderable" }
+vico-compose-m3 = { module = "com.patrykandpatrick.vico:compose-m3", version.ref = "vico" }
+jetlime = { module = "io.github.pushpalroy:jetlime", version.ref = "jetlime" }
+aboutlibraries-compose-m3 = { module = "com.mikepenz:aboutlibraries-compose-m3", version.ref = "aboutlibraries" }
+sentry-android = { module = "io.sentry:sentry-android", version.ref = "sentry" }
+roborazzi = { module = "io.github.takahirom.roborazzi:roborazzi", version.ref = "roborazzi" }
+roborazzi-compose = { module = "io.github.takahirom.roborazzi:roborazzi-compose", version.ref = "roborazzi" }
+roborazzi-chat = { module = "io.github.takahirom.roborazzi:roborazzi", version.ref = "roborazzi-chat" }
+roborazzi-compose-chat = { module = "io.github.takahirom.roborazzi:roborazzi-compose", version.ref = "roborazzi-chat" }
+icons-lucide = { module = "com.composables:icons-lucide", version.ref = "icons-lucide" }
+jindong-core = { module = "io.github.compose-jindong:jindong-core", version.ref = "jindong" }
+markdown-renderer-m3 = { module = "com.mikepenz:multiplatform-markdown-renderer-m3", version.ref = "markdown" }
+markdown-renderer-coil3 = { module = "com.mikepenz:multiplatform-markdown-renderer-coil3", version.ref = "markdown" }
+markdown-renderer-code = { module = "com.mikepenz:multiplatform-markdown-renderer-code", version.ref = "markdown" }
+zxing-javase = { module = "com.google.zxing:javase", version.ref = "zxing-javase" }
+automerge = { module = "org.automerge:automerge", version.ref = "automerge" }
+okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
+jackson-dataformat-yaml = { module = "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml", version.ref = "jackson-yaml" }
+hilt-android-chat = { module = "com.google.dagger:hilt-android", version.ref = "hilt-chat" }
+hilt-compiler-chat = { module = "com.google.dagger:hilt-compiler", version.ref = "hilt-chat" }
+hilt-android-testing-chat = { module = "com.google.dagger:hilt-android-testing", version.ref = "hilt-chat" }
+mockk-chat = { module = "io.mockk:mockk", version.ref = "mockk-chat" }
+kotest-runner-junit5-chat = { module = "io.kotest:kotest-runner-junit5", version.ref = "kotest-chat" }
+kotest-assertions-core-chat = { module = "io.kotest:kotest-assertions-core", version.ref = "kotest-chat" }
+kotest-property-chat = { module = "io.kotest:kotest-property", version.ref = "kotest-chat" }
+junit-jupiter-api-chat = { module = "org.junit.jupiter:junit-jupiter-api", version.ref = "junit-jupiter-chat" }
+junit-jupiter-engine-chat = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junit-jupiter-chat" }
+junit-platform-launcher-chat = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junit-jupiter-chat" }
+junit-vintage-engine-chat = { module = "org.junit.vintage:junit-vintage-engine", version.ref = "junit-jupiter-chat" }
+ktor-client-core-chat = { module = "io.ktor:ktor-client-core", version.ref = "ktor-chat" }
+okhttp-mockwebserver-chat = { module = "com.squareup.okhttp3:mockwebserver", version.ref = "okhttp-mockwebserver-chat" }
+kotlinx-collections-immutable-chat = { module = "org.jetbrains.kotlinx:kotlinx-collections-immutable", version.ref = "kotlinx-collections-immutable-chat" }
+androidx-hilt-navigation-compose-chat = { module = "androidx.hilt:hilt-navigation-compose", version.ref = "androidx-hilt-navigation-chat" }
+androidx-lifecycle-viewmodel-compose-chat = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle-chat" }
+androidx-lifecycle-runtime-compose-chat = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle-chat" }
+androidx-navigation-compose-chat = { module = "androidx.navigation:navigation-compose", version.ref = "androidx-navigation-chat" }
+filekit-core-jvm = { module = "io.github.vinceglb:filekit-core-jvm", version.ref = "filekit" }
+filekit-dialogs-compose-jvm = { module = "io.github.vinceglb:filekit-dialogs-compose-jvm", version.ref = "filekit" }
+filekit-dialogs = { module = "io.github.vinceglb:filekit-dialogs", version.ref = "filekit-chat" }
+nucleus-application = { module = "dev.nucleusframework:nucleus.nucleus-application", version.ref = "nucleus" }
+nucleus-updater-runtime = { module = "dev.nucleusframework:nucleus.updater-runtime", version.ref = "nucleus" }
+nucleus-native-http = { module = "dev.nucleusframework:nucleus.native-http", version.ref = "nucleus" }
+nucleus-native-ssl = { module = "dev.nucleusframework:nucleus.native-ssl", version.ref = "nucleus" }
+nucleus-notification-common = { module = "dev.nucleusframework:nucleus.notification-common", version.ref = "nucleus" }
+nucleus-notification-windows = { module = "dev.nucleusframework:nucleus.notification-windows", version.ref = "nucleus" }
+nucleus-notification-macos = { module = "dev.nucleusframework:nucleus.notification-macos", version.ref = "nucleus" }
+nucleus-notification-linux = { module = "dev.nucleusframework:nucleus.notification-linux", version.ref = "nucleus" }
+nucleus-system-info = { module = "dev.nucleusframework:nucleus.system-info", version.ref = "nucleus" }
+nucleus-darkmode-detector = { module = "dev.nucleusframework:nucleus.darkmode-detector", version.ref = "nucleus" }
+nucleus-system-color = { module = "dev.nucleusframework:nucleus.system-color", version.ref = "nucleus" }
+nucleus-taskbar-progress = { module = "dev.nucleusframework:nucleus.taskbar-progress", version.ref = "nucleus" }
+nucleus-autolaunch = { module = "dev.nucleusframework:nucleus.autolaunch", version.ref = "nucleus" }
+nucleus-launcher-windows = { module = "dev.nucleusframework:nucleus.launcher-windows", version.ref = "nucleus" }
+nucleus-launcher-linux = { module = "dev.nucleusframework:nucleus.launcher-linux", version.ref = "nucleus" }
+nucleus-launcher-macos = { module = "dev.nucleusframework:nucleus.launcher-macos", version.ref = "nucleus" }
+nucleus-global-hotkey = { module = "dev.nucleusframework:nucleus.global-hotkey", version.ref = "nucleus" }
+nucleus-energy-manager = { module = "dev.nucleusframework:nucleus.energy-manager", version.ref = "nucleus" }
+nucleus-media-control = { module = "dev.nucleusframework:nucleus.media-control", version.ref = "nucleus" }
+nucleus-linux-hidpi = { module = "dev.nucleusframework:nucleus.linux-hidpi", version.ref = "nucleus" }
+nucleus-composenativetray-jvm = { module = "dev.nucleusframework:composenativetray-jvm", version.ref = "nucleus-native-tray" }
+nucleus-decorated-window-core = { module = "dev.nucleusframework:nucleus.decorated-window-core", version.ref = "nucleus" }
+nucleus-decorated-window-awt = { module = "dev.nucleusframework:nucleus.decorated-window-awt", version.ref = "nucleus" }
+nucleus-decorated-window-jni = { module = "dev.nucleusframework:nucleus.decorated-window-jni", version.ref = "nucleus" }
+jewel-decorated-window = { module = "org.jetbrains.jewel:jewel-decorated-window", version.ref = "jewel" }
+compose-desktop-material3 = { module = "org.jetbrains.compose.material3:material3", version.ref = "compose-desktop-material3" }
+compose-desktop-material-icons = { module = "org.jetbrains.compose.material:material-icons-extended", version.ref = "compose-desktop-material-icons" }
+skiko-awt = { module = "org.jetbrains.skiko:skiko-awt", version.ref = "skiko" }
+kuiver = { module = "io.github.justdeko:kuiver", version.ref = "kuiver" }
+autolinktext = { module = "sh.calvin.autolinktext:autolinktext", version.ref = "autolinktext" }
+texty = { module = "com.arjunjadeja:texty", version.ref = "texty" }
+calendar-compose-multiplatform = { module = "com.kizitonwose.calendar:compose-multiplatform", version.ref = "calendar" }
+jcefmaven = { module = "me.friwi:jcefmaven", version.ref = "jcefmaven" }
+jna-platform = { module = "net.java.dev.jna:jna-platform", version.ref = "jna" }
+kotzilla-sdk-compose-jvm = { module = "io.kotzilla:kotzilla-sdk-compose-jvm", version.ref = "kotzilla" }
+compose-desktop-ui-test = { module = "org.jetbrains.compose.ui:ui-test", version.ref = "compose-desktop-ui-test" }
+compose-web-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "compose-web" }
+compose-web-foundation = { module = "org.jetbrains.compose.foundation:foundation", version.ref = "compose-web" }
+compose-web-material3 = { module = "org.jetbrains.compose.material3:material3", version.ref = "compose-web-material3" }
+compose-web-ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "compose-web" }
+compose-web-material-icons = { module = "org.jetbrains.compose.material:material-icons-extended", version.ref = "compose-web-material-icons" }
 
 [plugins]
+
 android-application = { id = "com.android.application", version.ref = "agp" }
 android-library = { id = "com.android.library", version.ref = "agp" }
 android-kmp-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }

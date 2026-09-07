@@ -75,44 +75,44 @@ kotlin {
 }
 
 dependencies {
-    val composeBom = platform("androidx.compose:compose-bom:2026.03.01")
+    val composeBom = platform(libs.androidx.compose.bom)
     implementation(composeBom)
 
     implementation(project(":sharedLogic"))
     api(project(":sharedUI"))
     implementation(project(":core:android-data"))
 
-    implementation("io.coil-kt.coil3:coil-compose:3.5.0-beta01")
-    implementation("io.coil-kt.coil3:coil-svg:3.5.0-beta01")
-    implementation("androidx.compose.material3:material3:1.5.0-alpha25")
-    implementation("androidx.compose.material3:material3-window-size-class:1.5.0-alpha25")
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.compose.foundation:foundation")
-    implementation("androidx.compose.material:material-icons-extended")
-    api("com.composables:icons-lucide:1.1.0")
-    implementation("io.github.compose-jindong:jindong-core:1.1.0")
-    implementation("com.mikepenz:multiplatform-markdown-renderer-m3:0.41.0")
-    implementation("com.mikepenz:multiplatform-markdown-renderer-coil3:0.41.0")
-    implementation("com.mikepenz:multiplatform-markdown-renderer-code:0.41.0")
-    debugImplementation("androidx.compose.ui:ui-tooling")
+    implementation(libs.coil3.compose)
+    implementation(libs.coil3.svg)
+    implementation(libs.androidx.compose.material3.chat)
+    implementation(libs.androidx.compose.material3.windowsize.chat)
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.ui.tooling.preview)
+    implementation(libs.androidx.compose.foundation)
+    implementation(libs.androidx.compose.material.icons.extended)
+    api(libs.icons.lucide)
+    implementation(libs.jindong.core)
+    implementation(libs.markdown.renderer.m3)
+    implementation(libs.markdown.renderer.coil3)
+    implementation(libs.markdown.renderer.code)
+    debugImplementation(libs.androidx.compose.ui.tooling)
 
     // letta-mobile-rl0d (audio): required for HoldToDictateButton's
     // RECORD_AUDIO permission flow (rememberLauncherForActivityResult,
     // ActivityResultContracts) and ContextCompat.checkSelfPermission.
     // Designsystem stays Hilt-free — VoiceInputViewModel lives in :app.
     implementation(libs.androidx.activity.compose)
-    implementation("androidx.core:core-ktx:1.16.0")
+    implementation(libs.androidx.core.ktx)
     implementation(libs.google.material)
 
     testImplementation(libs.junit4)
     testImplementation(libs.mockk)
     testImplementation(libs.junit.jupiter.api)
     testImplementation(libs.robolectric)
-    testImplementation("androidx.compose.ui:ui-test-junit4")
+    testImplementation(libs.androidx.compose.ui.test.junit4)
     testRuntimeOnly(libs.junit.platform.launcher)
     testRuntimeOnly(libs.junit.vintage.engine)
-    debugImplementation("androidx.compose.ui:ui-test-manifest")
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
 
 // Test tier tasks
