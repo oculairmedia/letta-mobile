@@ -61,14 +61,15 @@ private fun PagedChatMessageListContent(
     appearance: ChatContentAppearance,
     modifier: Modifier,
 ) {
+    val routeTarget = if (presentation.hasBoundRoute) presentation.routeTarget else appearance.scrollToMessageId
     val pages = presentation.settled.collectAsLazyPagingItems()
     val live by presentation.live.collectAsStateWithLifecycle()
     val listState = key(presentation) { rememberLazyListState() }
     val missingTarget by presentation.missingTarget.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     val restoreAnchor = remember(presentation) { presentation.viewport?.takeUnless { it.following } }
-    var following by remember(presentation, appearance.scrollToMessageId) {
-        mutableStateOf(appearance.scrollToMessageId == null && restoreAnchor == null)
+    var following by remember(presentation, routeTarget) {
+        mutableStateOf(routeTarget == null && restoreAnchor == null)
     }
     LaunchedEffect(listState) {
         var wasScrolling = false
@@ -84,24 +85,27 @@ private fun PagedChatMessageListContent(
     LaunchedEffect(live) {
         val newest = (live.firstOrNull() as? ChatRenderItem.Single)?.message
         if (newest?.role == "user" && newest.id != previousLiveUser) {
-            listState.scrollToItem(0)
-            following = true
+            if (presentation.hasBoundRoute) presentation.requestTail()
+            else {
+                listState.scrollToItem(0)
+                following = true
+            }
         }
         previousLiveUser = newest?.id
     }
     LaunchedEffect(live, pages.itemSnapshotList, following) {
         if (following && !listState.isScrollInProgress) listState.scrollToItem(0)
     }
-    var targetPositioned by remember(presentation, appearance.scrollToMessageId) { mutableStateOf(false) }
-    var highlightedTarget by remember(presentation, appearance.scrollToMessageId) { mutableStateOf<String?>(null) }
+    var targetPositioned by remember(presentation, routeTarget) { mutableStateOf(false) }
+    var highlightedTarget by remember(presentation, routeTarget) { mutableStateOf<String?>(null) }
     LaunchedEffect(highlightedTarget) {
         if (highlightedTarget != null) {
             kotlinx.coroutines.delay(2_000)
             highlightedTarget = null
         }
     }
-    LaunchedEffect(presentation, appearance.scrollToMessageId, pages.itemSnapshotList, live) {
-        val target = appearance.scrollToMessageId ?: restoreAnchor?.messageId ?: return@LaunchedEffect
+    LaunchedEffect(presentation, routeTarget, pages.itemSnapshotList, live) {
+        val target = routeTarget ?: restoreAnchor?.messageId ?: return@LaunchedEffect
         if (!targetPositioned) {
             // The engine selects an around-target window. Inspect only resident rows;
             // never trigger sequential history loads to search for an absent target.
@@ -109,7 +113,7 @@ private fun PagedChatMessageListContent(
             val index = live.indexOfFirst { it.containsMessageId(target) }.takeIf { it >= 0 }
                 ?: residentTargetIndex(snapshot.items, target, live.size, snapshot.placeholdersBefore)
             if (index != null) {
-                if (appearance.scrollToMessageId == null) {
+                if (routeTarget == null) {
                     listState.scrollToItem(index, restoreAnchor?.offset ?: 0)
                 } else {
                     listState.scrollToItem(index)
@@ -127,15 +131,12 @@ private fun PagedChatMessageListContent(
         }
     }
     LaunchedEffect(presentation, missingTarget) {
-        if (appearance.scrollToMessageId == null && restoreAnchor != null && missingTarget == restoreAnchor.messageId) {
-            presentation.clearViewport()
-            targetPositioned = true
-            following = true
-            listState.scrollToItem(0)
+        if (routeTarget == null && restoreAnchor != null && missingTarget == restoreAnchor.messageId) {
+            presentation.requestTail()
         }
     }
     LaunchedEffect(presentation, targetPositioned, live, pages.itemSnapshotList, following) {
-        if (!targetPositioned && (restoreAnchor != null || appearance.scrollToMessageId != null)) return@LaunchedEffect
+        if (!targetPositioned && (restoreAnchor != null || routeTarget != null)) return@LaunchedEffect
         snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
             .collect { (index, offset) ->
                 val row = live.getOrNull(index) ?: (index - live.size).takeIf { it in 0 until pages.itemCount }
@@ -235,12 +236,13 @@ private fun PagedChatMessageListContent(
             }
         }
         Column(Modifier.align(Alignment.BottomCenter).padding(bottom = appearance.bottomPadding)) {
-            if (missingTarget != null && missingTarget == appearance.scrollToMessageId) {
+            if (missingTarget != null && missingTarget == routeTarget) {
                 Text("Message not found")
             }
             if (!following) {
                 TextButton(onClick = {
-                    scope.launch {
+                    if (presentation.hasBoundRoute) presentation.requestTail()
+                    else scope.launch {
                         listState.scrollToItem(0)
                         following = true
                     }

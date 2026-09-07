@@ -1,6 +1,8 @@
 package com.letta.mobile.feature.chat
 
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -176,6 +178,67 @@ class PagedChatContentTest {
         org.junit.Assert.assertTrue(binding.select("a", 2, ::create).viewport!!.following)
     }
 
+    @Test fun explicitRouteOverridesSavedFollowingOnceThenRoundTripKeepsTailIntent() {
+        val binding = ChatPagingBinding()
+        val targets = mutableListOf<String?>()
+        fun create(target: String?) = ChatPagingPresentation(
+            flowOf(PagingData.empty()), MutableStateFlow(emptyList()), {},
+        ).also { targets += target }
+        binding.selectRoute("a", 1, null, {}, ::create)
+            .saveViewport(ChatPagingViewport("old-tail", 0, following = true))
+        val search = binding.selectRoute("a", 2, "search", {}, ::create)
+        org.junit.Assert.assertEquals("search", targets.last())
+        org.junit.Assert.assertEquals("search", search.routeTarget)
+        org.junit.Assert.assertNull(search.viewport)
+        search.saveViewport(ChatPagingViewport("new-tail", 0, following = true))
+        binding.close()
+        val restored = binding.selectRoute("a", 3, "search", {}, ::create)
+        org.junit.Assert.assertNull(targets.last())
+        org.junit.Assert.assertNull(restored.routeTarget)
+        org.junit.Assert.assertTrue(restored.viewport!!.following)
+    }
+
+    @Test fun immutableRouteIsNotAppliedToAnotherConversationOnRoundTrip() {
+        val binding = ChatPagingBinding()
+        val targets = mutableListOf<String?>()
+        fun create(target: String?) = ChatPagingPresentation(
+            flowOf(PagingData.empty()), MutableStateFlow(emptyList()), {},
+        ).also { targets += target }
+        binding.selectRoute("a", 1, "search-a", {}, ::create)
+            .saveViewport(ChatPagingViewport("anchor-a", 12))
+        val other = binding.selectRoute("b", 2, "search-a", {}, ::create)
+        org.junit.Assert.assertNull(other.routeTarget)
+        other.saveViewport(ChatPagingViewport("anchor-b", 24))
+        val restored = binding.selectRoute("a", 3, "search-a", {}, ::create)
+        org.junit.Assert.assertNull(restored.routeTarget)
+        org.junit.Assert.assertEquals(listOf("search-a", null, "anchor-a"), targets)
+        org.junit.Assert.assertEquals(ChatPagingViewport("anchor-a", 12), restored.viewport)
+    }
+
+    @Test fun deletedAnchorReselectsEngineTailAndRejectsStaleRequests() {
+        val binding = ChatPagingBinding()
+        val targets = mutableListOf<String?>()
+        var closes = 0
+        var published: ChatPagingPresentation? = null
+        fun create(target: String?) = ChatPagingPresentation(
+            flowOf(PagingData.empty()), MutableStateFlow(emptyList()), { closes++ },
+        ).also { targets += target }
+        binding.selectRoute("a", 1, null, {}, ::create)
+            .saveViewport(ChatPagingViewport("deleted", 28))
+        val around = binding.selectRoute("a", 2, null, { published = it }, ::create)
+        org.junit.Assert.assertEquals("deleted", targets.last())
+        around.requestTail()
+        org.junit.Assert.assertEquals(listOf(null, "deleted", null), targets)
+        org.junit.Assert.assertSame(binding.presentation, published)
+        org.junit.Assert.assertNotSame(around, published)
+        org.junit.Assert.assertNull(published!!.viewport)
+        org.junit.Assert.assertEquals(2, closes)
+        around.requestTail()
+        around.saveViewport(ChatPagingViewport("stale", 0))
+        org.junit.Assert.assertEquals(3, targets.size)
+        org.junit.Assert.assertNull(binding.target("a"))
+    }
+
     @Test fun stableAnchorRestoresInAChangedBoundedWindow() {
         val presentation = ChatPagingPresentation(
             flowOf(PagingData.from((30..90).map { row("row-$it") })), MutableStateFlow(emptyList()), {},
@@ -194,6 +257,36 @@ class PagedChatContentTest {
         }
         compose.onNodeWithText("row-70").assertIsDisplayed()
         compose.onNodeWithText("Scroll to latest").assertIsDisplayed()
+    }
+
+    @Test fun missingRestoreAnchorRequestsFreshTailRatherThanAroundWindowIndexZero() {
+        val binding = ChatPagingBinding()
+        val missing = MutableStateFlow<String?>(null)
+        val targets = mutableListOf<String?>()
+        var current by androidx.compose.runtime.mutableStateOf<ChatPagingPresentation?>(null)
+        fun create(target: String?) = ChatPagingPresentation(
+            flowOf(PagingData.from(listOf(row(if (target == null) "actual tail" else "around window")))),
+            MutableStateFlow(emptyList()), {}, missing,
+        ).also { targets += target }
+        binding.selectRoute("a", 1, null, {}, ::create).saveViewport(ChatPagingViewport("deleted", 0))
+        current = binding.selectRoute("a", 2, null, { current = it }, ::create)
+        compose.setContent {
+            LettaChatTheme {
+                PagedChatMessageList(
+                    current!!, ChatUiState(),
+                    ChatContentCallbacks(
+                        onSendMessage = {}, onRerunMessage = {}, onLoadOlderMessages = { error("No history walk") },
+                        onSubmitApproval = { _, _, _, _ -> }, onToggleRunCollapsed = {},
+                        onToggleReasoningExpanded = {}, onAttachmentImageTap = null,
+                    ), ChatContentAppearance(),
+                )
+            }
+        }
+        compose.onNodeWithText("around window").assertIsDisplayed()
+        compose.runOnIdle { missing.value = "deleted" }
+        compose.onNodeWithText("actual tail").assertIsDisplayed()
+        compose.onNodeWithText("around window").assertDoesNotExist()
+        compose.runOnIdle { org.junit.Assert.assertEquals(listOf(null, "deleted", null), targets) }
     }
 
     @Test fun hostIsDisabledWithoutEngineBinding() {
