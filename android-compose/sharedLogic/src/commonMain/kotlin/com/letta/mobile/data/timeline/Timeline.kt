@@ -620,6 +620,12 @@ data class AbandonedAssistantFragmentCleanupResult(
     val suppressions: Set<AbandonedAssistantFragmentSuppression>,
 )
 
+/**
+ * Exact legacy decision fields, NOT whole-content equality: the fingerprint is
+ * content.trim().take(256), together with normalized server and run identity.
+ * Assistant-only gating, cleanup tail/run conditions and the 32-entry cap remain unchanged.
+ */
+@kotlinx.serialization.Serializable
 data class AbandonedAssistantFragmentSuppression(
     val serverId: String?,
     val runId: String?,
@@ -668,7 +674,7 @@ private fun String?.matchesCleanupRun(targetRunIds: Set<String>): Boolean {
 
 private fun String.isSyntheticIrohRunFamily(): Boolean = startsWith("iroh-run-") || startsWith("local-run-")
 
-private fun TimelineEvent.Confirmed.toAbandonedAssistantFragmentSuppression(): AbandonedAssistantFragmentSuppression =
+internal fun TimelineEvent.Confirmed.toAbandonedAssistantFragmentSuppression(): AbandonedAssistantFragmentSuppression =
     AbandonedAssistantFragmentSuppression(
         serverId = serverId.takeIf { it.isNotBlank() },
         runId = runId?.takeIf { it.isNotBlank() },
