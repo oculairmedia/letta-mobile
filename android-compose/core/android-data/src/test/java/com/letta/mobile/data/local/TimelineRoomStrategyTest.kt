@@ -33,6 +33,14 @@ class TimelineRoomStrategyTest {
                 (0 until count).chunked(128).forEach { batch ->
                     dao.insert(batch.map { StrategyMetadata("scope", it.toString().padStart(8, '0'), it.toLong(), "body") })
                 }
+                assertEquals(
+                    listOf("00000128"),
+                    dao.seekPage("scope", 128, "00000129", 1).map { it.eventId },
+                )
+                assertEquals(
+                    listOf("00000127"),
+                    dao.seekPage("scope", 128, "00000128", 1).map { it.eventId },
+                )
                 val before = dao.seekPage("scope", 128, "00000128", 64)
                 assertEquals(64, before.size)
                 assertEquals(before, dao.offsetPage("scope", 64, count - 128))
