@@ -597,7 +597,7 @@ class AppServerServeIrohCommand : CliktCommand(
         appServerUrl: String?,
         requestTimeoutMs: Long,
         scope: CoroutineScope,
-    ): Pair<DefaultAppServerController, com.letta.mobile.data.transport.appserver.AppServerClient?> {
+    ): Pair<DefaultAppServerController, AppServerClient?> {
         return if (appServerUrl != null) {
             createLiveController(appServerUrl, requestTimeoutMs, scope)
         } else {
@@ -609,7 +609,7 @@ class AppServerServeIrohCommand : CliktCommand(
         appServerUrl: String,
         requestTimeoutMs: Long,
         scope: CoroutineScope,
-    ): Pair<DefaultAppServerController, com.letta.mobile.data.transport.appserver.AppServerClient> {
+    ): Pair<DefaultAppServerController, AppServerClient> {
         val httpClient = HttpClient(CIO) {
             install(WebSockets) { applyAppServerDefaults() }
             install(HttpTimeout) {
@@ -804,7 +804,7 @@ class AppServerServeIrohCommand : CliktCommand(
      * set, so the default deployment keeps lettashim as the sole channels host.
      * Never fails recovery — a channel outage must not block runtime reattach.
      */
-    private suspend fun restoreChannels(client: com.letta.mobile.data.transport.appserver.AppServerClient) {
+    private suspend fun restoreChannels(client: AppServerClient) {
         if (!channelsHost) return
         val result = com.letta.mobile.data.controller.channels.ChannelRestoreCoordinator(
             client = client,
@@ -832,7 +832,7 @@ class AppServerServeIrohCommand : CliktCommand(
     private fun createStubController(
         requestTimeoutMs: Long,
         scope: CoroutineScope,
-    ): Pair<DefaultAppServerController, com.letta.mobile.data.transport.appserver.AppServerClient?> {
+    ): Pair<DefaultAppServerController, AppServerClient?> {
         val httpClient = HttpClient(CIO) {
             install(WebSockets) { applyAppServerDefaults() }
         }
