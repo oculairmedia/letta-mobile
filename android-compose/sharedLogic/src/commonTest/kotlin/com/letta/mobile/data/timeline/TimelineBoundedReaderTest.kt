@@ -39,6 +39,16 @@ class TimelineBoundedReaderTest {
         assertEquals(0, store.bodyReads)
     }
 
+    @Test fun oversizedPreviewRetainsExactPointerAndBoundsAllocation() = runTest {
+        val metadata = listOf(row(1, 28_000_000), row(2, 20_000_000))
+        val result = TimelineBoundedReader(Store(metadata)).preview(
+            TimelineScope("backend", "conversation"), TimelineReadPosition.Tail, TimelinePageBudget(4, 20_000),
+        )
+        assertEquals(metadata, result.metadata.rows)
+        assertEquals(listOf(16_384, 3_616), result.bodies.map { it.size })
+        assertEquals(28_000_000L, result.metadata.rows.first().body.encodedBytes)
+    }
+
     private suspend fun load(store: Store, bytes: Long) = TimelineBoundedReader(store).load(
         TimelineScope("backend", "conversation"), TimelineReadPosition.Tail, TimelinePageBudget(4, bytes),
     )

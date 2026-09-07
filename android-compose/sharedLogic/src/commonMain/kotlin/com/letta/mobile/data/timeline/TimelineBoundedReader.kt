@@ -6,6 +6,25 @@ import com.letta.mobile.data.timeline.snapshot.TimelineScope
 data class TimelineBodyPage(val metadata: TimelineMetadataPage, val bodies: List<ByteArray>)
 
 class TimelineBoundedReader(private val store: TimelineBoundedStore) {
+    suspend fun preview(
+        scope: TimelineScope,
+        position: TimelineReadPosition,
+        budget: TimelinePageBudget,
+    ): TimelineBodyPage = store.read(scope) {
+        val page = metadata(position, budget.maxMetadataRows)
+        require(page.rows.size <= budget.maxMetadataRows)
+        require(page.rows.zipWithNext().all { (a, b) -> a.key < b.key })
+        var remaining = budget.maxDecodedBodyBytes
+        val bodies = page.rows.map { row ->
+            val size = minOf(row.body.encodedBytes, remaining, 16L * 1024).toInt()
+            val bytes = if (size == 0) byteArrayOf() else body(row.body, 0, size)
+            require(bytes.size == size) { "Incomplete preview" }
+            remaining -= size
+            bytes
+        }
+        TimelineBodyPage(page, bodies)
+    }
+
     suspend fun load(
         scope: TimelineScope,
         position: TimelineReadPosition,

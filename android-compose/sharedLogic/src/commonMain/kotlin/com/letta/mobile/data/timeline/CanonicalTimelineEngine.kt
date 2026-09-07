@@ -1,6 +1,9 @@
 package com.letta.mobile.data.timeline
 
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
+import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
+import com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent
+import com.letta.mobile.data.timeline.snapshot.toStoredTimelineEvent
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -52,6 +55,7 @@ class CanonicalTimelineEngine(
     private val mutablePublication = MutableStateFlow(TimelineEnginePublication())
     val publication = mutablePublication.asStateFlow()
     private var liveFence: TimelineLiveFence? = null
+    private var liveReduction: TimelineReducerState? = null
     private val mutableLive = MutableStateFlow<TimelineLivePublication?>(null)
     val live = mutableLive.asStateFlow()
 
@@ -61,8 +65,50 @@ class CanonicalTimelineEngine(
         check(sequence < Long.MAX_VALUE)
         TimelineLiveFence(selection, TimelineRequestId((++sequence).toString())).also {
             liveFence = it
+            liveReduction = TimelineReducerState(Timeline(conversationId = selection.scope.conversationId))
             mutableLive.value = null
         }
+    }
+
+    suspend fun ingest(fence: TimelineLiveFence, frame: TimelineStreamFrame): Boolean = mutex.withLock {
+        if (liveFence !== fence || fence.selection !== mutablePublication.value.selection ||
+            mutableLive.value?.settlementRevision != null
+        ) return@withLock false
+        val previous = checkNotNull(liveReduction)
+        val next = when (frame) {
+            is TimelineStreamFrame.Message -> {
+                val output = reduceStreamFrame(TimelineReducerInput(previous.timeline, frame.message,
+                    previous.pendingToolReturnsByCallId, agentId = fence.selection.scope.agentId))
+                previous.copy(timeline = output.next, pendingToolReturnsByCallId = output.updatedPendingToolReturnsByCallId)
+            }
+            TimelineStreamFrame.Heartbeat -> return@withLock true
+            TimelineStreamFrame.Done -> previous
+            is TimelineStreamFrame.RawEvent -> error("Raw events must be decoded by the transport before ingest")
+        }
+        val events = next.timeline.events.filterIsInstance<TimelineEvent.Confirmed>()
+        require(events.size <= budget.maxMetadataRows) { "Live block row budget exceeded" }
+        var liveBytes = 0L
+        for (event in events) {
+            liveBytes += TimelineSnapshotCodec.json.encodeToString(
+                StoredTimelineEvent.serializer(), event.toStoredTimelineEvent(),
+            ).encodeToByteArray().size
+            require(liveBytes <= budget.maxDecodedBodyBytes) { "Live block byte budget exceeded" }
+        }
+        val terminal = frame == TimelineStreamFrame.Done
+        val identities = mutableMapOf<TimelineMessageId, TimelineMessageId>()
+        val revision = if (terminal) store.transaction(fence.selection.scope) {
+            val exact = writer as? TimelineExactCanonicalWriter ?: error("Live reduction requires exact shared writer")
+            var changed = false
+            for (event in events) {
+                changed = exact.mergeEvent(this, event) || changed
+                identities[TimelineMessageId(event.serverId)] = exact.canonicalIdentity(this, event.serverId, event.otid)
+            }
+            if (changed) nextRevision() else checkpoint().revision
+        } else null
+        liveReduction = next
+        mutableLive.value = TimelineLivePublication(fence, TimelineLiveBlock(emptyList(), terminal, events), revision, identities)
+        if (revision != null) mutablePublication.value = TimelineEnginePublication(fence.selection, revision)
+        true
     }
 
     suspend fun publishLive(fence: TimelineLiveFence, block: TimelineLiveBlock): Boolean = mutex.withLock {
@@ -72,17 +118,22 @@ class CanonicalTimelineEngine(
             fence.requestId, fence.selection.generation, block.records, null, false,
             block.records.sumOf { it.encodedBodyBytes },
         ))
+        val identities = mutableMapOf<TimelineMessageId, TimelineMessageId>()
         val revision = if (block.terminal) store.transaction(fence.selection.scope) {
             val before = checkpoint()
             var changed = false
             for (record in block.records) {
                 currentCoroutineContext().ensureActive()
                 changed = writer.merge(this, record) || changed
+                val event = record.message.toTimelineEvent(0.0)
+                if (writer is TimelineExactCanonicalWriter && event != null) {
+                    identities[record.identity] = writer.canonicalIdentity(this, event.serverId, event.otid)
+                }
             }
             currentCoroutineContext().ensureActive()
             if (changed) nextRevision() else before.revision
         } else null
-        mutableLive.value = TimelineLivePublication(fence, block, revision)
+        mutableLive.value = TimelineLivePublication(fence, block, revision, identities)
         if (revision != null) mutablePublication.value = TimelineEnginePublication(fence.selection, revision)
         true
     }
@@ -94,11 +145,15 @@ class CanonicalTimelineEngine(
     ): Boolean = mutex.withLock {
         val current = mutableLive.value ?: return@withLock false
         val revision = current.settlementRevision ?: return@withLock false
-        if (current.fence !== fence || current.block.records.any { (presented[it.identity] ?: -1) < revision }) {
+        if (current.fence !== fence || current.block.records.any {
+                (presented[current.settlementIdentities[it.identity] ?: it.identity] ?: -1) < revision
+            } || current.unpresentedEvents(presented).isNotEmpty()
+        ) {
             return@withLock false
         }
         mutableLive.value = null
         liveFence = null
+        liveReduction = null
         true
     }
 
@@ -159,11 +214,30 @@ class CanonicalTimelineEngine(
             TimelineEnginePageOutcome.Applied
         }
 
+    suspend fun rejectNoProgress(
+        request: TimelineEngineRequest,
+        response: TimelineRemotePageResult.NoProgress,
+    ): TimelineEnginePageOutcome = mutex.withLock {
+        if (pending !== request || mutablePublication.value.selection !== request.selection ||
+            response.requestId != request.remote.requestId || response.selectionGeneration != request.selection.generation
+        ) return@withLock TimelineEnginePageOutcome.Stale
+        require(response.continuation == request.remote.continuation)
+        pending = null
+        TimelineEnginePageOutcome.NoProgress
+    }
+
     suspend fun load(selection: TimelineEngineSelection, position: TimelineReadPosition, maxRows: Int): TimelineBodyPage =
         mutex.withLock {
             check(selection === mutablePublication.value.selection) { "Stale selection" }
             require(maxRows > 0)
-            TimelineBoundedReader(store).load(selection.scope, position, budget.copy(maxMetadataRows = minOf(maxRows, budget.maxMetadataRows)))
+            TimelineBoundedReader(store).preview(selection.scope, position, budget.copy(maxMetadataRows = minOf(maxRows, budget.maxMetadataRows)))
+        }
+
+    suspend fun readBody(selection: TimelineEngineSelection, pointer: TimelineBodyPointer, offset: Long, maxBytes: Int): ByteArray =
+        mutex.withLock {
+            check(selection === mutablePublication.value.selection)
+            require(offset >= 0 && maxBytes > 0 && maxBytes.toLong() <= budget.maxDecodedBodyBytes)
+            store.read(selection.scope) { body(pointer, offset, maxBytes) }.also { require(it.size <= maxBytes) }
         }
 
     /** Releases resident ownership only. Durable ledger and evidence survive reopen and page dropping. */
