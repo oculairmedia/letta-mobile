@@ -170,6 +170,11 @@ class CanonicalTimelineEngine(
         TimelineEngineOpen.Opened(selection)
     }
 
+    suspend fun hasOlderHistory(selection: TimelineEngineSelection): Boolean = mutex.withLock {
+        check(selection === mutablePublication.value.selection) { "Stale selection" }
+        store.read(selection.scope) { checkpoint().hasMore }
+    }
+
     suspend fun beginPage(selection: TimelineEngineSelection): TimelineEngineRequest = mutex.withLock {
         check(selection === mutablePublication.value.selection) { "Stale selection" }
         val checkpoint = store.read(selection.scope) { checkpoint() }
@@ -231,6 +236,33 @@ class CanonicalTimelineEngine(
             check(selection === mutablePublication.value.selection) { "Stale selection" }
             require(maxRows > 0)
             TimelineBoundedReader(store).preview(selection.scope, position, budget.copy(maxMetadataRows = minOf(maxRows, budget.maxMetadataRows)))
+        }
+
+    /** Resolve only the selected row, in one storage snapshot, without following a stale pointer. */
+    suspend fun resolveBody(selection: TimelineEngineSelection, record: TimelineSettledRecord): TimelineSettledRecord =
+        mutex.withLock {
+            check(selection === mutablePublication.value.selection) { "Stale selection" }
+            val pointer = record.pointer ?: return@withLock record
+            if (!record.isPreview) return@withLock record
+            require(pointer.encodedBytes <= budget.maxDecodedBodyBytes && pointer.encodedBytes <= Int.MAX_VALUE) {
+                "Body requires chunked presentation"
+            }
+            store.read(selection.scope) {
+                val page = metadata(TimelineReadPosition.Around(record.key), 1)
+                check(page.revision == record.revision) { "Stale body revision" }
+                val row = page.rows.singleOrNull { it.key == record.key }
+                check(row?.body == pointer) { "Stale body pointer" }
+                val bytes = ByteArray(pointer.encodedBytes.toInt())
+                var offset = 0
+                while (offset < bytes.size) {
+                    val requested = minOf(64 * 1024, bytes.size - offset)
+                    val chunk = body(pointer, offset.toLong(), requested)
+                    check(chunk.isNotEmpty() && chunk.size <= requested) { "Incomplete body" }
+                    chunk.copyInto(bytes, offset)
+                    offset += chunk.size
+                }
+                record.copy(body = bytes)
+            }
         }
 
     suspend fun readBody(selection: TimelineEngineSelection, pointer: TimelineBodyPointer, offset: Long, maxBytes: Int): ByteArray =

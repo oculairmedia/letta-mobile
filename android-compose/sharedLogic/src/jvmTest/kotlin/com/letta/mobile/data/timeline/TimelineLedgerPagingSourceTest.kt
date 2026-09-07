@@ -28,6 +28,27 @@ class TimelineLedgerPagingSourceTest {
         )
     }
 
+    @Test fun mediatorOnlyAppendsAndUsesDurableHasMore() = runTest {
+        val store = Store()
+        store.hasMore = true
+        var calls = 0
+        val transport = object : TimelineTransport {
+            override suspend fun streamConversation(conversationId: String) = kotlinx.coroutines.flow.emptyFlow<TimelineStreamFrame>()
+            override suspend fun listConversationMessagePage(request: TimelineRemotePageRequest): TimelineRemotePageResult =
+                TimelineRemotePageResult.Page(request.requestId, request.selectionGeneration, emptyList(), null, false, 0).also { calls++ }
+        }
+        val session = CanonicalTimelineSession(store, transport, TimelineScope("b", "c"), enabled = true)
+        val selection = assertIs<TimelineEngineOpen.Opened>(session.open()).selection
+        val mediator = TimelineHistoryMediator(session, selection)
+        assertEquals(androidx.paging.RemoteMediator.MediatorResult.Success::class,
+            (mediator.load(androidx.paging.LoadType.PREPEND, androidx.paging.PagingState(emptyList(), null, androidx.paging.PagingSource.LoadResult.Invalid(), null)) as androidx.paging.RemoteMediator.MediatorResult.Success).let { 1 })
+        store.hasMore = false
+        val result = mediator.load(androidx.paging.LoadType.APPEND, androidx.paging.PagingState(emptyList(), null, androidx.paging.PagingSource.LoadResult.Invalid(), null))
+        assertEquals(1, calls)
+        kotlin.test.assertIs<androidx.paging.RemoteMediator.MediatorResult.Success>(result)
+        kotlin.test.assertTrue((result as androidx.paging.RemoteMediator.MediatorResult.Success).endOfPaginationReached)
+    }
+
     @Test fun cancellationEscapesPagingLoad() = runTest {
         val store = Store()
         val engine = CanonicalTimelineEngine(store, TimelineCanonicalWriter { _, _ -> false }, enabled = true)
@@ -40,10 +61,11 @@ class TimelineLedgerPagingSourceTest {
 
     private class Store : TimelineBoundedStore, TimelineStoreReader {
         var position: TimelineReadPosition? = null
+        var hasMore = false
         var cancel = false
         override suspend fun <T> read(scope: TimelineScope, block: suspend TimelineStoreReader.() -> T): T = block(this)
         override suspend fun <T> transaction(scope: TimelineScope, block: suspend TimelineStoreTransaction.() -> T): T = error("read only")
-        override suspend fun checkpoint() = TimelineDurableCheckpoint(1, null, false)
+        override suspend fun checkpoint() = TimelineDurableCheckpoint(1, null, hasMore)
         override suspend fun locate(identity: TimelineMessageId): TimelinePageKey? = null
         override suspend fun metadata(position: TimelineReadPosition, maxRows: Int): TimelineMetadataPage {
             if (cancel) throw CancellationException("cancelled")

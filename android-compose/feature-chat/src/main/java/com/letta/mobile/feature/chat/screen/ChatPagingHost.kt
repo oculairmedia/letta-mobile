@@ -22,6 +22,8 @@ class ChatPagingPresentation(
     val close: () -> Unit,
     // Only the engine can declare absence after exact-target lookup completes.
     val missingTarget: StateFlow<String?> = kotlinx.coroutines.flow.MutableStateFlow(null),
+    // The host maps only actually resident rows to their durable revisions before settlement.
+    val onResidentRows: (List<ChatRenderItem>) -> Unit = {},
 ) {
     internal var viewport: ChatPagingViewport? = null
     internal var saveViewport: (ChatPagingViewport) -> Unit = {}

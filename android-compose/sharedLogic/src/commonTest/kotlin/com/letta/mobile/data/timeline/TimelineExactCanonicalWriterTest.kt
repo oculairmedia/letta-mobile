@@ -40,6 +40,38 @@ class TimelineExactCanonicalWriterTest {
         assertEquals(2, store.evidence.size)
     }
 
+    @Test fun previewResolutionChecksRevisionAndReadsOnlySelectedBody() = runTest {
+        val store = Store()
+        val writer = TimelineExactCanonicalWriter(scope, 200_000)
+        store.transaction(scope) {
+            writer.merge(this, TimelineRemoteRecord(TimelineMessageId("id"), message("x".repeat(100_000)), 0))
+            nextRevision()
+        }
+        val engine = CanonicalTimelineEngine(store, writer, enabled = true)
+        val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
+        val page = engine.load(selection, TimelineReadPosition.Tail, 1)
+        val row = page.metadata.rows.single()
+        val preview = TimelineSettledRecord(row.key, row.contentType, page.bodies.single(), page.metadata.revision, row.body)
+        assertTrue(preview.isPreview)
+        kotlin.test.assertFailsWith<IllegalArgumentException> { preview.toRenderItem() }
+        val resolved = engine.resolveBody(selection, preview)
+        assertFalse(resolved.isPreview)
+        val item = assertIs<com.letta.mobile.data.chat.projection.ChatRenderItem.Single>(resolved.toRenderItem())
+        assertEquals("x".repeat(100_000), item.message.content)
+        assertEquals(row.body.encodedBytes, resolved.body.size.toLong())
+        store.transaction(scope) { nextRevision() }
+        kotlin.test.assertFailsWith<IllegalStateException> { engine.resolveBody(selection, preview) }
+    }
+
+    @Test fun historicalBodyReadsRespectPlatformChunkLimit() = runTest {
+        val store = Store()
+        val writer = TimelineExactCanonicalWriter(scope, 200_000)
+        val record = TimelineRemoteRecord(TimelineMessageId("id"), message("x".repeat(100_000)), 0)
+        store.transaction(scope) { writer.merge(this, record); nextRevision() }
+        store.transaction(scope) { assertFalse(writer.merge(this, record)) }
+        assertEquals(2, store.bodyReads)
+    }
+
     @Test fun concurrentCursorCompletionsOnlyCommitCurrentRequest() = runTest {
         val store = Store()
         val engine = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
@@ -128,6 +160,7 @@ class TimelineExactCanonicalWriterTest {
                 return TimelineMetadataPage(selected.map { TimelineLedgerMetadata(it.key, TimelineBodyPointer(it.key.identity.value, it.body.size.toLong()), it.contentType, current.revision) }, null, null, current.revision)
             }
             override suspend fun body(pointer: TimelineBodyPointer, offset: Long, maxBytes: Int): ByteArray {
+                require(maxBytes in 0..65_536)
                 bodyReads++
                 val bytes = rows.values.single { it.key.identity.value == pointer.value }.body
                 return bytes.copyOfRange(offset.toInt(), minOf(bytes.size, offset.toInt() + maxBytes))

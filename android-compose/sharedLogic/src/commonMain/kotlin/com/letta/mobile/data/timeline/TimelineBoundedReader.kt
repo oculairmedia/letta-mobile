@@ -42,8 +42,15 @@ class TimelineBoundedReader(private val store: TimelineBoundedStore) {
             remaining -= row.body.encodedBytes
         }
         val bodies = page.rows.map { row ->
-            val bytes = body(row.body, 0, row.body.encodedBytes.toInt())
-            require(bytes.size.toLong() == row.body.encodedBytes) { "Incomplete or oversized body" }
+            val bytes = ByteArray(row.body.encodedBytes.toInt())
+            var offset = 0
+            while (offset < bytes.size) {
+                val requested = minOf(64 * 1024, bytes.size - offset)
+                val chunk = body(row.body, offset.toLong(), requested)
+                require(chunk.isNotEmpty() && chunk.size <= requested) { "Incomplete or oversized body" }
+                chunk.copyInto(bytes, offset)
+                offset += chunk.size
+            }
             bytes
         }
         TimelineBodyPage(page, bodies)

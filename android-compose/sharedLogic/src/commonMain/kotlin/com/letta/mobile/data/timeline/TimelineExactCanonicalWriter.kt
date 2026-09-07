@@ -48,7 +48,7 @@ class TimelineExactCanonicalWriter(
             val bytes = ByteArray(old.body.encodedBytes.toInt())
             var offset = 0
             while (offset < bytes.size) {
-                val chunk = transaction.body(old.body, offset.toLong(), minOf(1024 * 1024, bytes.size - offset))
+                val chunk = transaction.body(old.body, offset.toLong(), minOf(64 * 1024, bytes.size - offset))
                 if (chunk.isEmpty() || chunk.size > bytes.size - offset) throw TimelineMergeUnavailable(identity, "incomplete_historical_body")
                 chunk.copyInto(bytes, offset)
                 offset += chunk.size
