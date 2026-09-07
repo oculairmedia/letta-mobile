@@ -26,11 +26,45 @@ class ChatPagingPresentation(
     internal var viewport: ChatPagingViewport? = null
     internal var saveViewport: (ChatPagingViewport) -> Unit = {}
     internal var clearViewport: () -> Unit = {}
+    internal var requestTail: () -> Unit = {}
+    internal var routeTarget: String? = null
+    internal var hasBoundRoute = false
 }
 
 /** ViewModel-scoped resource binding; engine still owns all paging and generation policy. */
 internal class ChatPagingBinding {
     private val viewports = mutableMapOf<String, ChatPagingViewport>()
+    private val consumedRoutes = mutableSetOf<String>()
+
+    fun selectRoute(
+        conversationId: String,
+        generation: Long,
+        routeTarget: String?,
+        publish: (ChatPagingPresentation) -> Unit,
+        create: (String?) -> ChatPagingPresentation,
+    ): ChatPagingPresentation {
+        val route = routeTarget?.takeUnless { it in consumedRoutes }
+        return select(conversationId, generation) {
+            create(route ?: target(conversationId))
+        }.also { current ->
+            if (!current.hasBoundRoute) {
+                current.hasBoundRoute = true
+                current.routeTarget = route
+                if (route != null) {
+                    consumedRoutes += route
+                    current.viewport = null
+                }
+            }
+            current.requestTail = {
+                if (presentation === current) {
+                    current.clearViewport()
+                    close()
+                    val tail = selectRoute(conversationId, generation, null, publish, create)
+                    publish(tail)
+                }
+            }
+        }
+    }
     fun target(conversationId: String): String? = viewports[conversationId]?.takeUnless { it.following }?.messageId
     private var selection: Pair<String, Long>? = null
     var presentation: ChatPagingPresentation? = null
