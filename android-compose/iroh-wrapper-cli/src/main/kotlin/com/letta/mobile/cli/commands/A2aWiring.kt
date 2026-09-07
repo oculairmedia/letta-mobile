@@ -30,6 +30,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonElement
@@ -235,7 +236,7 @@ suspend fun buildA2aWiring(
         // The endpoint is bound to a UDP socket on the OS, so leaking it
         // here would keep the port occupied until process exit — bad for
         // a wrapper that may restart on configuration changes.
-        runCatching { runBlocking { endpoint.shutdown() } }
+        runCatching { withContext(NonCancellable) { endpoint.shutdown() } }
         throw t
     }
 }
@@ -561,7 +562,7 @@ internal suspend fun handleCreateAndDeliver(
         )
         return inputOnConversation(client, message, createdId)
     } else {
-        val dropAttrs = mutableListOf<Pair<String, String>>(
+        val dropAttrs = mutableListOf(
             "fromAgentId" to message.fromAgentId,
             "toAgentId" to message.toAgentId,
             "msgId" to message.msgId,
@@ -677,7 +678,7 @@ private suspend fun loadSecretKey(path: String?): ByteArray {
  * not pay for a `runBlocking` apiece. Also used by [publishHost] when
  * it writes the address book — one helper, two callers, zero divergence.
  */
-private suspend fun endpointIdHex(endpoint: Endpoint): String {
+private fun endpointIdHex(endpoint: Endpoint): String {
     val id = endpoint.addr().id()
     return id.use { it.toBytes().joinToString("") { b -> "%02x".format(b) } }
 }

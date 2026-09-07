@@ -40,8 +40,8 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.preview.LettaPreviewFrame
 
 internal object RunActivityDisclosureTestTags {
-    val Header = "run-activity-disclosure"
-    val WorkingIndicator = "run-activity-working-indicator"
+    const val Header = "run-activity-disclosure"
+    const val WorkingIndicator = "run-activity-working-indicator"
 }
 
 @Composable
