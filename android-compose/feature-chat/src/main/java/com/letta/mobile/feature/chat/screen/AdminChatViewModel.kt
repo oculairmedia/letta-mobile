@@ -162,7 +162,7 @@ internal class AdminChatViewModel @Inject constructor(
 
     private val _pagingPresentation = MutableStateFlow<ChatPagingPresentation?>(null)
     val pagingPresentation: StateFlow<ChatPagingPresentation?> = _pagingPresentation
-    private var pagingConversationId: String? = null
+    private val pagingBinding = ChatPagingBinding()
 
     val agentId: AgentId = AgentId(routeArgs.agentId)
     /**
@@ -783,10 +783,10 @@ internal class AdminChatViewModel @Inject constructor(
         adminChatA2uiCoordinator.ensureA2uiConversation(conversationId)
         val select = pagingHost.select
         if (select != null && localRuntimeRouting() != LocalRuntimeRouting.LocalBound) {
-            if (pagingConversationId != conversationId) {
-                stopTimelineObserver()
-                _pagingPresentation.value = select(agentId.value, conversationId, scrollToMessageId)
-                pagingConversationId = conversationId
+            val generation = _sessionState.value.selectionGeneration
+            chatTimelineObserver.stop()
+            _pagingPresentation.value = pagingBinding.select(conversationId, generation) {
+                select(agentId.value, conversationId, scrollToMessageId, generation)
             }
             return
         }
@@ -802,9 +802,8 @@ internal class AdminChatViewModel @Inject constructor(
     }
 
     private fun stopTimelineObserver() {
-        _pagingPresentation.value?.close?.invoke()
         _pagingPresentation.value = null
-        pagingConversationId = null
+        pagingBinding.close()
         chatTimelineObserver.stop()
     }
 
