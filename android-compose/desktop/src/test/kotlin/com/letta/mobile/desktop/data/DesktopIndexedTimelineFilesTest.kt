@@ -96,6 +96,27 @@ class DesktopIndexedTimelineFilesTest {
         assertEquals(fallback.generation, store.open()!!.generation)
     }
 
+    @Test fun reusedGenerationNeverReadsEntriesAndCancellationPreservesActive() = temporary { root ->
+        val store = DesktopIndexedTimelineFiles(root)
+        val active = store.publish(sequenceOf(entry(1)))
+        val forbidden = sequence<DesktopIndexedTimelineFiles.Entry> { error("History enumeration") }
+        var checkpoints = 0
+        val reused = store.publish(forbidden, reuse = active) { checkpoints++ }
+        assertTrue(Files.isSameFile(root.resolve("${active.generation}.index"), root.resolve("${reused.generation}.index")))
+        repeat(checkpoints) { failAt ->
+            var visited = 0
+            assertFailsWith<CancellationException> {
+                store.publish(forbidden, reuse = reused) {
+                    if (visited++ == failAt) throw CancellationException("interrupted")
+                }
+            }
+            assertEquals(reused.generation, DesktopIndexedTimelineFiles(root).open()!!.generation)
+        }
+        // Missing newly-published directory entry leaves the prior linked generation usable.
+        Files.delete(root.resolve("${reused.generation}.index"))
+        assertEquals(active.generation, store.open()!!.generation)
+    }
+
     @Test fun auxiliaryPreparationFailureNeverPublishesGeneration() = temporary { root ->
         val store = DesktopIndexedTimelineFiles(root)
         val active = store.publish(sequenceOf(entry(1)))

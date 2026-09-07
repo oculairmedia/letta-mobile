@@ -202,6 +202,44 @@ class DesktopTimelineBoundedStoreTest {
         }
     }
 
+    @Test fun cursorOnlyRevisionsReuseHistoryWithoutOverlayChains() = runTest(timeout = kotlin.time.Duration.parse("5m")) {
+        val backend = store()
+        backend.transaction(scope) {
+            nextRevision()
+            for (i in 0L until 28000) put(record(i))
+            putEvidence("keep", byteArrayOf(42))
+        }
+        val directory = Files.list(root).use { it.findFirst().orElseThrow() }
+        fun generation() = java.io.RandomAccessFile(directory.resolve("active").toFile(), "r").use { it.readUTF() }
+        val original = generation()
+        repeat(8) { iteration ->
+            backend.transaction(scope) { nextRevision(); cursor(null, iteration % 2 == 0) }
+            val current = generation()
+            assertTrue(Files.isSameFile(directory.resolve("$original.index"), directory.resolve("$current.index")))
+            assertTrue(Files.isSameFile(directory.resolve("$original.body"), directory.resolve("$current.body")))
+            val aux = directory.resolve("$current.aux")
+            assertEquals(2L, Files.list(aux).use { it.count() })
+            assertTrue(Files.size(aux.resolve("data-generation")) < 128)
+            store().read(scope) {
+                assertEquals(iteration + 2L, checkpoint().revision)
+                assertEquals(27999L, locate(TimelineMessageId("id-27999"))?.order)
+                assertEquals(40, metadata(TimelineReadPosition.Tail, 40).rows.size)
+                assertContentEquals(byteArrayOf(42), evidence("keep", 1))
+            }
+        }
+        assertFailsWith<CancellationException> {
+            backend.transaction(scope) { nextRevision(); cursor(null, false); throw CancellationException() }
+        }
+        store().read(scope) { assertEquals(9L, checkpoint().revision) }
+        // A later row mutation must resolve the data owner, not the cursor-only auxiliary directory.
+        backend.transaction(scope) { nextRevision(); put(record(28000)) }
+        store().read(scope) {
+            assertEquals(10L, checkpoint().revision)
+            assertContentEquals(byteArrayOf(42), evidence("keep", 1))
+            assertEquals(28000L, locate(TimelineMessageId("id-28000"))?.order)
+        }
+    }
+
     @Test fun emptyBodyAndRevisionExhaustion() = runTest {
         store().transaction(scope) { nextRevision(); put(record(1, bytes = ByteArray(0))) }
         store().read(scope) {

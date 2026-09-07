@@ -48,6 +48,7 @@ internal class DesktopIndexedTimelineFiles(private val directory: Path) {
     fun publish(
         entries: Sequence<Entry>,
         prepareGeneration: (String) -> Unit = {},
+        reuse: Snapshot? = null,
         checkpoint: () -> Unit = {},
     ): Snapshot {
         Files.createDirectories(directory)
@@ -60,7 +61,11 @@ internal class DesktopIndexedTimelineFiles(private val directory: Path) {
                 val generation = UUID.randomUUID().toString()
                 val indexPath = directory.resolve("$generation.index")
                 val bodyPath = directory.resolve("$generation.body")
-                RandomAccessFile(indexPath.toFile(), "rw").use { index ->
+                if (reuse != null) {
+                    require(reuse.generation == previous) { "Can only reuse the active generation" }
+                    Files.createLink(indexPath, directory.resolve("${reuse.generation}.index"))
+                    Files.createLink(bodyPath, directory.resolve("${reuse.generation}.body"))
+                } else RandomAccessFile(indexPath.toFile(), "rw").use { index ->
                     RandomAccessFile(bodyPath.toFile(), "rw").use { bodies ->
                         index.writeLong(MAGIC)
                         index.writeLong(0)

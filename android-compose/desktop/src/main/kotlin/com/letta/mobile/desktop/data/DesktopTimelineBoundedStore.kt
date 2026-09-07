@@ -73,11 +73,19 @@ internal class DesktopTimelineBoundedStore(
         )
         var active = true
         fun checkActive() { check(active) { "Storage callback has escaped" } }
-        fun auxiliary(): Path = directory.resolve(requireNotNull(snapshot).generation + ".aux")
+        fun generationAuxiliary(): Path = directory.resolve(requireNotNull(snapshot).generation + ".aux")
+        fun auxiliary(): Path {
+            val own = generationAuxiliary()
+            val reference = own.resolve("data-generation")
+            if (!Files.exists(reference)) return own
+            val generation = readBounded(reference, 72).toString(Charsets.US_ASCII)
+            require(java.util.UUID.fromString(generation).toString() == generation)
+            return directory.resolve("$generation.aux")
+        }
         override suspend fun checkpoint(): TimelineDurableCheckpoint {
             checkActive()
             if (snapshot == null) return TimelineDurableCheckpoint(0, null, true)
-            return checkpointCodec.decode(readBounded(auxiliary().resolve("checkpoint"), MAX_CHECKPOINT))
+            return checkpointCodec.decode(readBounded(generationAuxiliary().resolve("checkpoint"), MAX_CHECKPOINT))
         }
         override suspend fun metadata(position: TimelineReadPosition, maxRows: Int): TimelineMetadataPage {
             checkActive()
@@ -224,24 +232,15 @@ internal class DesktopTimelineBoundedStore(
                 val token = "pending:" + java.util.UUID.randomUUID()
                 pendingPointers[token] = record.body
                 TimelineLedgerMetadata(record.key, TimelineBodyPointer(token, record.body.size.toLong()), record.contentType, stamp)
-            }.sortedBy { it.key }.iterator()
-            val rows = sequence {
-                var next = if (pending.hasNext()) pending.next() else null
-                for (ordinal in 0 until (snapshot?.count ?: 0)) {
-                    val row = requireNotNull(snapshot).row(ordinal)
-                    if (records.containsKey(TimelineMessageId(row.key.identity))) continue
-                    while (next != null && next.key < row.key.shared()) {
-                        yield(next); next = if (pending.hasNext()) pending.next() else null
-                    }
-                    val data = java.io.DataInputStream(ByteArrayInputStream(row.bytes))
-                    val oldStamp = data.readLong()
-                    yield(TimelineLedgerMetadata(row.key.shared(), pointer(row), data.readUTF(), oldStamp))
-                }
-                while (next != null) { yield(next); next = if (pending.hasNext()) pending.next() else null }
             }
+            // Each staged identity can hide at most one persisted row. Fetch enough neighbors
+            // on both sides for around windows without walking the persisted history.
+            val candidateBudget = Math.multiplyExact(Math.addExact(maxRows, records.size), 2)
+            val persisted = super.metadata(position, candidateBudget)
+            val rows = (persisted.rows.filterNot { records.containsKey(it.key.identity) } + pending).sortedBy { it.key }
             val selected = java.util.ArrayDeque<TimelineLedgerMetadata>()
-            var older = false
-            var newer = false
+            var older = persisted.older != null
+            var newer = persisted.newer != null
             val context = currentCoroutineContext()
             for (row in rows) {
                 context.ensureActive()
@@ -275,6 +274,19 @@ internal class DesktopTimelineBoundedStore(
             val checkpointBytes = checkpointCodec.encode(checkpoint()).copyOf()
             require(checkpointBytes.size <= MAX_CHECKPOINT)
             val context = currentCoroutineContext()
+            // Cursor-only revisions share immutable data directly, never a chain of revision overlays.
+            if (snapshot != null && records.isEmpty() && evidenceChanges.isEmpty()) {
+                val dataGeneration = auxiliary().fileName.toString().removeSuffix(".aux")
+                files.publish(emptySequence(), reuse = snapshot, checkpoint = { context.ensureActive() },
+                    prepareGeneration = { generation ->
+                        val aux = directory.resolve("$generation.aux")
+                        Files.createDirectory(aux)
+                        writeSynced(aux.resolve("data-generation")) { write(dataGeneration.toByteArray(Charsets.US_ASCII)) }
+                        writeSynced(aux.resolve("checkpoint")) { write(checkpointBytes) }
+                        FileChannel.open(aux, StandardOpenOption.READ).use { it.force(true) }
+                    })
+                return
+            }
             val entries = sequence {
                 val incoming = records.values.filterNotNull().sortedBy { it.key }.iterator()
                 var next = if (incoming.hasNext()) incoming.next() else null
