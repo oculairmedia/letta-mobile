@@ -5,7 +5,7 @@ import java.io.RandomAccessFile
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.CancellationException
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -37,6 +37,22 @@ class DesktopIndexedTimelineFilesTest {
             DesktopIndexedTimelineFiles.Direction.BEFORE)
         assertTrue(before.isEmpty())
         assertEquals(snapshot.generation, DesktopIndexedTimelineFiles(root).open()!!.generation)
+    }
+
+    @Test fun boundedTailIncludesMaximumKeyAndHandlesEmptyGeneration() = temporary { root ->
+        val store = DesktopIndexedTimelineFiles(root)
+        assertTrue(store.publish(emptySequence()).tail(40).isEmpty())
+        val snapshot = store.publish(sequence {
+            repeat(28_000) { yield(entry(it.toLong())) }
+            yield(entry(Long.MAX_VALUE, "\uffff".repeat(256)))
+        })
+        val rows = snapshot.tail(40)
+        assertEquals(40, rows.size)
+        assertEquals(Long.MAX_VALUE, rows.last().key.order)
+        assertEquals("\uffff".repeat(256), rows.last().key.identity)
+        assertTrue(snapshot.indexBytesRead < 70_000, "Tail must read only the requested rows")
+        assertFailsWith<IllegalArgumentException> { snapshot.tail(0) }
+        assertFailsWith<IllegalArgumentException> { snapshot.tail(257) }
     }
 
     @Test fun exactChunkedBytesAndCorruptionDetection() = temporary { root ->
@@ -80,6 +96,16 @@ class DesktopIndexedTimelineFilesTest {
         assertEquals(fallback.generation, store.open()!!.generation)
     }
 
+    @Test fun truncatedBodyFallsBackBeforeReturningStartupSnapshot() = temporary { root ->
+        val store = DesktopIndexedTimelineFiles(root)
+        val fallback = store.publish(sequenceOf(entry(0)))
+        val active = store.publish(sequenceOf(entry(1, bytes = ByteArray(150_000))))
+        RandomAccessFile(root.resolve("${active.generation}.body").toFile(), "rw").use {
+            it.setLength(it.length() - 1)
+        }
+        assertEquals(fallback.generation, DesktopIndexedTimelineFiles(root).open()!!.generation)
+    }
+
     @Test fun invalidInputNeverPublishesAndReadersKeepOldGeneration() = temporary { root ->
         val store = DesktopIndexedTimelineFiles(root)
         val old = store.publish(sequenceOf(entry(1)))
@@ -99,6 +125,28 @@ class DesktopIndexedTimelineFilesTest {
         assertFailsWith<IllegalArgumentException> {
             old.seek(row.key, 257, DesktopIndexedTimelineFiles.Direction.AFTER)
         }
+    }
+
+    @Test fun sameGenerationPointerSubstitutionFailsClosed() = temporary { root ->
+        val snapshot = DesktopIndexedTimelineFiles(root).publish(sequenceOf(
+            entry(1, bytes = byteArrayOf(1)), entry(2, bytes = byteArrayOf(2)),
+        ))
+        val (first, second) = snapshot.tail(2)
+        assertFailsWith<IllegalArgumentException> {
+            snapshot.readBody(first.copy(bodyOffset = second.bodyOffset), 0, 1)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            snapshot.readBody(first.copy(ordinal = second.ordinal, bodyOffset = second.bodyOffset), 0, 1)
+        }
+        assertContentEquals(byteArrayOf(1), snapshot.readBody(first, 0, 1))
+    }
+
+    @Test fun utf16TieBreakSurvivesDiskRoundTrip() = temporary { root ->
+        val identities = listOf("a", "\ud7ff", "\ud800", "\ud800\udc00", "\udfff", "\ue000", "\uffff")
+        val snapshot = DesktopIndexedTimelineFiles(root).publish(identities.asSequence().map { entry(1, it) })
+        assertEquals(identities, snapshot.tail(20).map { it.key.identity })
+        assertEquals(identities.drop(3), snapshot.seek(DesktopIndexedTimelineFiles.Key(1, "\ud800"),
+            20, DesktopIndexedTimelineFiles.Direction.AFTER).map { it.key.identity })
     }
 
     @Test fun indexCorruptionAndReadCancellationFailClosed() = temporary { root ->

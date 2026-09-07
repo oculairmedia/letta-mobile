@@ -36,6 +36,7 @@ internal class DesktopIndexedTimelineFiles(private val directory: Path) {
         val bodyOffset: Long,
         val bodyBytes: Long,
         val generation: String,
+        val ordinal: Long,
     )
 
     internal enum class Direction { BEFORE, AFTER }
@@ -126,14 +127,32 @@ internal class DesktopIndexedTimelineFiles(private val directory: Path) {
             require(it.length() == HEADER_BYTES + rows * RECORD_BYTES) { "Incomplete index" }
             rows
         }
-        require(Files.isRegularFile(directory.resolve("$generation.body")))
-        return Snapshot(generation, count)
+        val bodyPath = directory.resolve("$generation.body")
+        require(Files.isRegularFile(bodyPath))
+        val snapshot = Snapshot(generation, count)
+        // Validate the terminal extent without scanning history or decoding bodies at startup.
+        val last = snapshot.tail(1).singleOrNull()
+        val expectedBytes = if (last == null) 0L else {
+            val chunks = last.bodyBytes / CHUNK_BYTES + if (last.bodyBytes % CHUNK_BYTES == 0L) 0 else 1
+            val overhead = Math.multiplyExact(chunks, (HASH_BYTES + 4).toLong())
+            Math.addExact(last.bodyOffset, Math.addExact(last.bodyBytes, overhead))
+        }
+        require(Files.size(bodyPath) == expectedBytes) { "Incomplete body generation" }
+        return snapshot
     }
 
     internal inner class Snapshot internal constructor(val generation: String, val count: Long) {
         /** Actual index record bytes read, including binary-search probes. No body reads. */
         var indexBytesRead: Long = 0
             private set
+
+        /** Tail has no sentinel key: Long.MAX_VALUE and every valid identity remain addressable. */
+        fun tail(limit: Int): List<Metadata> {
+            require(limit in 1..MAX_PAGE_ROWS)
+            RandomAccessFile(directory.resolve("$generation.index").toFile(), "r").use { index ->
+                return ((count - limit).coerceAtLeast(0) until count).map { readMetadata(index, it) }
+            }
+        }
 
         fun seek(key: Key, limit: Int, direction: Direction): List<Metadata> {
             require(limit in 1..MAX_PAGE_ROWS)
@@ -157,6 +176,14 @@ internal class DesktopIndexedTimelineFiles(private val directory: Path) {
          */
         fun readBody(row: Metadata, offset: Long, maxBytes: Int, checkpoint: () -> Unit = {}): ByteArray {
             require(row.generation == generation) { "Body pointer belongs to another generation" }
+            require(row.ordinal in 0 until count) { "Invalid body pointer ordinal" }
+            RandomAccessFile(directory.resolve("$generation.index").toFile(), "r").use { index ->
+                val stored = readMetadata(index, row.ordinal)
+                require(stored.key == row.key && stored.bodyOffset == row.bodyOffset &&
+                    stored.bodyBytes == row.bodyBytes && stored.bytes.contentEquals(row.bytes)) {
+                    "Body pointer does not match indexed row"
+                }
+            }
             require(offset in 0..row.bodyBytes && maxBytes in 1..MAX_BODY_READ)
             val size = minOf(maxBytes.toLong(), row.bodyBytes - offset).toInt()
             val result = ByteArray(size)
@@ -200,7 +227,7 @@ internal class DesktopIndexedTimelineFiles(private val directory: Path) {
             val offset = record.long
             val size = record.long
             require(offset >= 0 && size >= 0)
-            return Metadata(Key(order, identity), metadata, offset, size, generation)
+            return Metadata(Key(order, identity), metadata, offset, size, generation, ordinal)
         }
     }
 
