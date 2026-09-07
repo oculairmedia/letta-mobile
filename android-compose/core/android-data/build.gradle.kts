@@ -109,6 +109,8 @@ dependencies {
     api(libs.androidx.room.runtime)
     api(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
+    add("kspTest", libs.androidx.room.compiler)
+    testImplementation("androidx.room:room-paging:2.8.4")
 
     testImplementation(libs.junit4)
     testImplementation(libs.junit.jupiter.api)
