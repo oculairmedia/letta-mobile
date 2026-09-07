@@ -9,6 +9,7 @@ import androidx.compose.ui.Alignment
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.ui.components.DateSeparator
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 import java.time.LocalDate
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -47,12 +48,28 @@ internal fun PagedChatMessageList(
     appearance: ChatContentAppearance,
     modifier: Modifier = Modifier,
 ) {
+    key(presentation) {
+        PagedChatMessageListContent(presentation, state, callbacks, appearance, modifier)
+    }
+}
+
+@Composable
+private fun PagedChatMessageListContent(
+    presentation: ChatPagingPresentation,
+    state: ChatUiState,
+    callbacks: ChatContentCallbacks,
+    appearance: ChatContentAppearance,
+    modifier: Modifier,
+) {
     val pages = presentation.settled.collectAsLazyPagingItems()
     val live by presentation.live.collectAsStateWithLifecycle()
     val listState = key(presentation) { rememberLazyListState() }
     val missingTarget by presentation.missingTarget.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
-    var following by remember(presentation) { mutableStateOf(appearance.scrollToMessageId == null) }
+    val restoreAnchor = remember(presentation) { presentation.viewport?.takeUnless { it.following } }
+    var following by remember(presentation, appearance.scrollToMessageId) {
+        mutableStateOf(appearance.scrollToMessageId == null && restoreAnchor == null)
+    }
     LaunchedEffect(listState) {
         var wasScrolling = false
         snapshotFlow { listState.isScrollInProgress }.collect { scrolling ->
@@ -84,7 +101,7 @@ internal fun PagedChatMessageList(
         }
     }
     LaunchedEffect(presentation, appearance.scrollToMessageId, pages.itemSnapshotList, live) {
-        val target = appearance.scrollToMessageId ?: return@LaunchedEffect
+        val target = appearance.scrollToMessageId ?: restoreAnchor?.messageId ?: return@LaunchedEffect
         if (!targetPositioned) {
             // The engine selects an around-target window. Inspect only resident rows;
             // never trigger sequential history loads to search for an absent target.
@@ -92,11 +109,44 @@ internal fun PagedChatMessageList(
             val index = live.indexOfFirst { it.containsMessageId(target) }.takeIf { it >= 0 }
                 ?: residentTargetIndex(snapshot.items, target, live.size, snapshot.placeholdersBefore)
             if (index != null) {
-                listState.scrollToItem(index)
+                if (appearance.scrollToMessageId == null) {
+                    listState.scrollToItem(index, restoreAnchor?.offset ?: 0)
+                } else {
+                    listState.scrollToItem(index)
+                    val item = snapshotFlow {
+                        listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
+                    }.first { it != null }!!
+                    val layout = listState.layoutInfo
+                    val centerOffset = ((layout.viewportEndOffset - layout.viewportStartOffset - item.size) / 2)
+                        .coerceAtLeast(0)
+                    listState.scrollToItem(index, -centerOffset)
+                    highlightedTarget = target
+                }
                 targetPositioned = true
-                highlightedTarget = target
             }
         }
+    }
+    LaunchedEffect(presentation, missingTarget) {
+        if (appearance.scrollToMessageId == null && restoreAnchor != null && missingTarget == restoreAnchor.messageId) {
+            presentation.clearViewport()
+            targetPositioned = true
+            following = true
+            listState.scrollToItem(0)
+        }
+    }
+    LaunchedEffect(presentation, targetPositioned, live, pages.itemSnapshotList, following) {
+        if (!targetPositioned && (restoreAnchor != null || appearance.scrollToMessageId != null)) return@LaunchedEffect
+        snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
+            .collect { (index, offset) ->
+                val row = live.getOrNull(index) ?: (index - live.size).takeIf { it in 0 until pages.itemCount }
+                    ?.let { pages.peek(it) }
+                val messageId = when (row) {
+                    is ChatRenderItem.Single -> row.message.id
+                    is ChatRenderItem.RunBlock -> row.messages.lastOrNull()?.first?.id
+                    else -> null
+                }
+                if (messageId != null) presentation.saveViewport(ChatPagingViewport(messageId, offset, following))
+            }
     }
     val density = LocalDensity.current
     val direction = LocalLayoutDirection.current
