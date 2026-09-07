@@ -790,6 +790,7 @@ internal class AdminChatViewModel @Inject constructor(
             }
             return
         }
+        if (_pagingPresentation.value != null) stopTimelineObserver()
         chatTimelineObserver.start(agentId.value, conversationId, timelineObserverProvenance())
         // letta-mobile-qfa81 (P4): the iroh active-reconcile poll loop
         // (startIrohRecentReconcileLoop) and its stall-recovery crutch were
