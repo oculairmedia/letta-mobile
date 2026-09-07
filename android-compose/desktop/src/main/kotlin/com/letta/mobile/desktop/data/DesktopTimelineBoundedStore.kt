@@ -61,6 +61,16 @@ internal class DesktopTimelineBoundedStore(
         val directory: Path,
         val snapshot: DesktopIndexedTimelineFiles.Snapshot?,
     ) : TimelineStoreReader {
+        private val pointerSecret = ByteArray(32).also { java.security.SecureRandom().nextBytes(it) }
+        private fun pointerTag(ordinal: Long): String {
+            val mac = javax.crypto.Mac.getInstance("HmacSHA256")
+            mac.init(javax.crypto.spec.SecretKeySpec(pointerSecret, "HmacSHA256"))
+            return mac.doFinal(java.nio.ByteBuffer.allocate(8).putLong(ordinal).array())
+                .joinToString("") { "%02x".format(it) }
+        }
+        fun pointer(row: DesktopIndexedTimelineFiles.Metadata) = TimelineBodyPointer(
+            "${requireNotNull(snapshot).generation}:${row.ordinal}:${pointerTag(row.ordinal)}", row.bodyBytes,
+        )
         var active = true
         fun checkActive() { check(active) { "Storage callback has escaped" } }
         fun auxiliary(): Path = directory.resolve(requireNotNull(snapshot).generation + ".aux")
@@ -96,7 +106,7 @@ internal class DesktopTimelineBoundedStore(
                 val metadata = java.io.DataInputStream(ByteArrayInputStream(row.bytes))
                 val stamp = metadata.readLong()
                 val type = metadata.readUTF()
-                TimelineLedgerMetadata(row.key.shared(), TimelineBodyPointer("${snap.generation}:${row.ordinal}", row.bodyBytes), type, stamp)
+                TimelineLedgerMetadata(row.key.shared(), pointer(row), type, stamp)
             }
             return TimelineMetadataPage(mapped,
                 rows.firstOrNull()?.takeIf { it.ordinal > 0 }?.key?.shared(),
@@ -117,8 +127,11 @@ internal class DesktopTimelineBoundedStore(
             require(offset in 0..pointer.encodedBytes && maxBytes >= 0)
             val snap = requireNotNull(snapshot)
             val parts = pointer.value.split(':')
-            require(parts.size == 2 && parts[0] == snap.generation) { "Stale generation pointer" }
-            val row = snap.row(parts[1].toLong())
+            require(parts.size == 3 && parts[0] == snap.generation) { "Stale generation pointer" }
+            val ordinal = parts[1].toLong()
+            require(java.security.MessageDigest.isEqual(parts[2].toByteArray(Charsets.US_ASCII),
+                pointerTag(ordinal).toByteArray(Charsets.US_ASCII))) { "Unissued body pointer" }
+            val row = snap.row(ordinal)
             require(row.bodyBytes == pointer.encodedBytes)
             if (maxBytes == 0) return ByteArray(0)
             val context = currentCoroutineContext()
@@ -222,7 +235,7 @@ internal class DesktopTimelineBoundedStore(
                     }
                     val data = java.io.DataInputStream(ByteArrayInputStream(row.bytes))
                     val oldStamp = data.readLong()
-                    yield(TimelineLedgerMetadata(row.key.shared(), TimelineBodyPointer("${snapshot.generation}:$ordinal", row.bodyBytes), data.readUTF(), oldStamp))
+                    yield(TimelineLedgerMetadata(row.key.shared(), pointer(row), data.readUTF(), oldStamp))
                 }
                 while (next != null) { yield(next); next = if (pending.hasNext()) pending.next() else null }
             }

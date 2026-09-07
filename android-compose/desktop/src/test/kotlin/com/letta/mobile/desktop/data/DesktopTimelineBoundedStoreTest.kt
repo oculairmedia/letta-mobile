@@ -185,6 +185,23 @@ class DesktopTimelineBoundedStoreTest {
         assertEquals(listOf(6L, 5L, 4L), centered.data.map { it.key.order })
     }
 
+    @Test fun substitutedOrdinalAndOtherCallbackPointersFailClosed() = runTest {
+        store().transaction(scope) { nextRevision(); put(record(1)); put(record(2)) }
+        store().read(scope) {
+            val rows = metadata(TimelineReadPosition.Tail, 2).rows
+            val parts = rows.first().body.value.split(':').toMutableList()
+            parts[1] = rows.last().body.value.split(':')[1]
+            assertFailsWith<IllegalArgumentException> {
+                body(TimelineBodyPointer(parts.joinToString(":"), rows.first().body.encodedBytes), 0, 1)
+            }
+            val issued = rows.first().body
+            assertEquals(1, body(issued, 0, 1).size)
+            store().read(scope) {
+                assertFailsWith<IllegalArgumentException> { body(issued, 0, 1) }
+            }
+        }
+    }
+
     @Test fun emptyBodyAndRevisionExhaustion() = runTest {
         store().transaction(scope) { nextRevision(); put(record(1, bytes = ByteArray(0))) }
         store().read(scope) {
