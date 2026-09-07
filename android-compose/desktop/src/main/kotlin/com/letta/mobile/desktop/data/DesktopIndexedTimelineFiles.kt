@@ -45,7 +45,11 @@ internal class DesktopIndexedTimelineFiles(private val directory: Path) {
      * Once publication linearizes there are no cancellation callbacks. A thrown IO error at directory
      * fsync may mean publication succeeded; callers must reopen rather than assume rollback.
      */
-    fun publish(entries: Sequence<Entry>, checkpoint: () -> Unit = {}): Snapshot {
+    fun publish(
+        entries: Sequence<Entry>,
+        prepareGeneration: (String) -> Unit = {},
+        checkpoint: () -> Unit = {},
+    ): Snapshot {
         Files.createDirectories(directory)
         FileChannel.open(directory.resolve("writer.lock"), java.nio.file.StandardOpenOption.CREATE,
             java.nio.file.StandardOpenOption.WRITE).use { lockChannel ->
@@ -87,6 +91,7 @@ internal class DesktopIndexedTimelineFiles(private val directory: Path) {
                         index.fd.sync()
                     }
                 }
+                prepareGeneration(generation)
                 syncDirectory()
                 checkpoint()
                 val manifest = directory.resolve("$generation.pending")
@@ -168,6 +173,13 @@ internal class DesktopIndexedTimelineFiles(private val directory: Path) {
                 val start = if (direction == Direction.AFTER) low else (low - limit).coerceAtLeast(0)
                 val end = if (direction == Direction.AFTER) (low + limit).coerceAtMost(count) else low
                 return (start until end).map { readMetadata(index, it) }
+            }
+        }
+
+        fun row(ordinal: Long): Metadata {
+            require(ordinal in 0 until count)
+            return RandomAccessFile(directory.resolve("$generation.index").toFile(), "r").use {
+                readMetadata(it, ordinal)
             }
         }
 

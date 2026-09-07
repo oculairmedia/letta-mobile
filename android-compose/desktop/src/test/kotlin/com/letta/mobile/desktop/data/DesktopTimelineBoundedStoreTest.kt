@@ -1,0 +1,164 @@
+package com.letta.mobile.desktop.data
+
+import com.letta.mobile.data.timeline.*
+import com.letta.mobile.data.timeline.snapshot.TimelineScope
+import java.nio.file.Files
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.test.runTest
+import kotlin.test.Test
+import kotlin.test.*
+
+class DesktopTimelineBoundedStoreTest {
+    private val scope = TimelineScope("backend", "conversation")
+    private val root = Files.createTempDirectory("bounded-store-test")
+    private val codec = object : DesktopTimelineCheckpointCodec {
+        override fun encode(value: TimelineDurableCheckpoint): ByteArray {
+            require(value.continuation == null)
+            return "${value.revision}:${value.hasMore}".toByteArray()
+        }
+        override fun decode(bytes: ByteArray): TimelineDurableCheckpoint {
+            val parts = bytes.toString(Charsets.UTF_8).split(':')
+            return TimelineDurableCheckpoint(parts[0].toLong(), null, parts[1].toBooleanStrict())
+        }
+    }
+    private fun store() = DesktopTimelineBoundedStore(root, codec)
+    private fun record(order: Long, id: String = "id-$order", bytes: ByteArray = byteArrayOf(1)) =
+        TimelineStoredRecord(TimelinePageKey(order, TimelineMessageId(id)), "opaque", bytes)
+
+    @Test fun transactionRestartExactEvidenceAndScopedPointers() = runTest {
+        val bytes = ByteArray(180000) { (it % 251).toByte() }
+        store().transaction(scope) {
+            assertEquals(1L, nextRevision())
+            put(record(Long.MIN_VALUE)); put(record(Long.MAX_VALUE, bytes = bytes))
+            putEvidence("exact/tool/run/one", bytes)
+            cursor(null, false)
+            assertEquals(record(Long.MAX_VALUE).key, locate(TimelineMessageId("id-${Long.MAX_VALUE}")))
+            val page = metadata(TimelineReadPosition.Tail, 2)
+            assertContentEquals(bytes.copyOfRange(65530, 65600), body(page.rows.last().body, 65530, 70))
+        }
+        bytes.fill(0)
+        lateinit var pointer: TimelineBodyPointer
+        store().read(scope) {
+            assertEquals(TimelineDurableCheckpoint(1, null, false), checkpoint())
+            val page = metadata(TimelineReadPosition.Tail, 2)
+            assertEquals(listOf(Long.MIN_VALUE, Long.MAX_VALUE), page.rows.map { it.key.order })
+            pointer = page.rows.last().body
+            assertEquals(1L, page.rows.last().revision)
+            assertContentEquals(ByteArray(70) { ((65530 + it) % 251).toByte() }, body(pointer, 65530, 70))
+            assertFailsWith<IllegalArgumentException> { evidence("exact/tool/run/one", 10) }
+            assertEquals(180000, evidence("exact/tool/run/one", 180000)?.size)
+            assertNull(evidence("exact/tool/run/two", 180000))
+        }
+        store().read(TimelineScope("backend", "other")) {
+            assertEquals(0L, checkpoint().revision)
+            assertFailsWith<IllegalArgumentException> { body(pointer, 0, 1) }
+        }
+    }
+
+    @Test fun rollbackRevisionAndEscapedCallbacks() = runTest {
+        var escaped: TimelineStoreTransaction? = null
+        assertFailsWith<CancellationException> {
+            store().transaction(scope) {
+                escaped = this
+                nextRevision(); put(record(1)); putEvidence("e", byteArrayOf(3))
+                throw CancellationException("before commit")
+            }
+        }
+        assertFailsWith<IllegalStateException> { escaped!!.checkpoint() }
+        store().read(scope) {
+            assertEquals(0L, checkpoint().revision)
+            assertNull(locate(TimelineMessageId("id-1"))); assertNull(evidence("e", 1))
+        }
+        assertFailsWith<IllegalArgumentException> { store().transaction(scope) { put(record(1)) } }
+        assertFailsWith<IllegalStateException> { store().transaction(scope) { nextRevision(); nextRevision() } }
+        store().transaction(scope) { nextRevision(); put(record(2)) }
+        store().read(scope) { assertEquals(1L, checkpoint().revision) }
+    }
+
+    @Test fun retainedSnapshotReplacementDeletionAndBoundaryMapping() = runTest {
+        val store = store()
+        store.transaction(scope) {
+            nextRevision()
+            for (i in 0L..9) put(record(i))
+            putEvidence("keep", byteArrayOf(8)); putEvidence("delete", byteArrayOf(9))
+        }
+        store.read(scope) {
+            val old = metadata(TimelineReadPosition.Tail, 3)
+            assertEquals(listOf(7L, 8L, 9L), old.rows.map { it.key.order })
+            assertEquals(old.rows.first().key, old.older); assertNull(old.newer)
+            store.transaction(scope) {
+                nextRevision(); put(record(20, "id-9", byteArrayOf(7)))
+                delete(TimelineMessageId("id-8"), TimelineDurableDeleteReason.UserDeletion)
+                deleteEvidence("delete")
+            }
+            assertContentEquals(byteArrayOf(1), body(old.rows.last().body, 0, 1))
+            store.read(scope) {
+                assertFailsWith<IllegalArgumentException> { body(old.rows.last().body, 0, 1) }
+                assertEquals(20L, locate(TimelineMessageId("id-9"))?.order)
+                assertNull(locate(TimelineMessageId("id-8")))
+                assertContentEquals(byteArrayOf(8), evidence("keep", 1)); assertNull(evidence("delete", 1))
+                val around = metadata(TimelineReadPosition.Around(record(5).key), 3)
+                assertEquals(listOf(4L, 5L, 6L), around.rows.map { it.key.order })
+                val before = metadata(TimelineReadPosition.Before(record(4).key), 2)
+                assertEquals(listOf(2L, 3L), before.rows.map { it.key.order })
+                assertEquals(before.rows.last().key, before.newer)
+                val after = metadata(TimelineReadPosition.After(record(6).key), 2)
+                assertEquals(listOf(7L, 20L), after.rows.map { it.key.order })
+            }
+        }
+    }
+
+    @Test fun exactUtf16KeysAndAuxiliaryCorruptionFailClosed() = runTest {
+        val ids = listOf("\uD800", "\uD801", "?")
+        store().transaction(scope) {
+            nextRevision()
+            ids.forEachIndexed { index, id -> put(record(index.toLong(), id)); putEvidence(id, byteArrayOf(index.toByte())) }
+        }
+        store().read(scope) {
+            ids.forEachIndexed { index, id ->
+                assertEquals(index.toLong(), locate(TimelineMessageId(id))?.order)
+                assertContentEquals(byteArrayOf(index.toByte()), evidence(id, 1))
+            }
+        }
+        val evidencePath = Files.walk(root).use { paths ->
+            paths.filter { it.fileName.toString().startsWith("e-") }.findFirst().orElseThrow()
+        }
+        java.io.RandomAccessFile(evidencePath.toFile(), "rw").use { it.seek(it.length() - 1); it.write(123) }
+        store().read(scope) {
+            var failures = 0
+            for (id in ids) try { evidence(id, 1) } catch (_: IllegalArgumentException) { failures++ }
+            assertEquals(1, failures)
+        }
+    }
+
+    @Test fun concurrentWriterIsFencedAndStagedReadsAreBounded() = runTest {
+        store().transaction(scope) {
+            nextRevision(); for (i in 0L..10) put(record(i))
+            assertFailsWith<java.nio.channels.OverlappingFileLockException> {
+                store().transaction(scope) { nextRevision(); put(record(12)) }
+            }
+            val around = metadata(TimelineReadPosition.Around(record(5).key), 3)
+            assertEquals(listOf(4L, 5L, 6L), around.rows.map { it.key.order })
+            val before = metadata(TimelineReadPosition.Before(record(4).key), 2)
+            assertEquals(listOf(2L, 3L), before.rows.map { it.key.order })
+            assertEquals(before.rows.last().key, before.newer)
+            val after = metadata(TimelineReadPosition.After(record(6).key), 2)
+            assertEquals(listOf(7L, 8L), after.rows.map { it.key.order })
+        }
+    }
+
+    @Test fun emptyBodyAndRevisionExhaustion() = runTest {
+        store().transaction(scope) { nextRevision(); put(record(1, bytes = ByteArray(0))) }
+        store().read(scope) {
+            val page = TimelineBoundedReader(store()).load(scope, TimelineReadPosition.Tail, TimelinePageBudget(1, 1))
+            assertEquals(0, page.bodies.single().size)
+        }
+        val overflowCodec = object : DesktopTimelineCheckpointCodec {
+            override fun encode(value: TimelineDurableCheckpoint) = codec.encode(value)
+            override fun decode(bytes: ByteArray) = TimelineDurableCheckpoint(Long.MAX_VALUE, null, false)
+        }
+        assertFailsWith<ArithmeticException> {
+            DesktopTimelineBoundedStore(root, overflowCodec).transaction(scope) { nextRevision() }
+        }
+    }
+}

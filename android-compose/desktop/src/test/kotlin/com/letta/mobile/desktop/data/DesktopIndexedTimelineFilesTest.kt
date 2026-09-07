@@ -96,6 +96,22 @@ class DesktopIndexedTimelineFilesTest {
         assertEquals(fallback.generation, store.open()!!.generation)
     }
 
+    @Test fun auxiliaryPreparationFailureNeverPublishesGeneration() = temporary { root ->
+        val store = DesktopIndexedTimelineFiles(root)
+        val active = store.publish(sequenceOf(entry(1)))
+        assertFailsWith<java.io.IOException> {
+            store.publish(sequenceOf(entry(2)), prepareGeneration = { throw java.io.IOException("aux fsync") })
+        }
+        assertEquals(active.generation, store.open()!!.generation)
+        assertFailsWith<CancellationException> {
+            var prepared = false
+            store.publish(sequenceOf(entry(2)), prepareGeneration = { prepared = true }, checkpoint = {
+                if (prepared) throw CancellationException("after aux preparation")
+            })
+        }
+        assertEquals(active.generation, store.open()!!.generation)
+    }
+
     @Test fun truncatedBodyFallsBackBeforeReturningStartupSnapshot() = temporary { root ->
         val store = DesktopIndexedTimelineFiles(root)
         val fallback = store.publish(sequenceOf(entry(0)))

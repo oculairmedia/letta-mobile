@@ -1,0 +1,372 @@
+package com.letta.mobile.desktop.data
+
+import com.letta.mobile.data.timeline.*
+import com.letta.mobile.data.timeline.snapshot.TimelineScope
+import java.io.ByteArrayInputStream
+import java.io.InputStream
+import java.io.RandomAccessFile
+import java.nio.channels.FileChannel
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.StandardOpenOption
+import java.security.MessageDigest
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withContext
+
+/** Shared owner supplies continuation serialization; Desktop never interprets evidence or messages. */
+internal interface DesktopTimelineCheckpointCodec {
+    fun encode(value: TimelineDurableCheckpoint): ByteArray
+    fun decode(bytes: ByteArray): TimelineDurableCheckpoint
+}
+
+/** Immutable generations plus scoped OS transaction locks. No legacy snapshot directory is modified. */
+internal class DesktopTimelineBoundedStore(
+    private val root: Path,
+    private val checkpointCodec: DesktopTimelineCheckpointCodec,
+) : TimelineBoundedStore {
+    override suspend fun <T> read(scope: TimelineScope, block: suspend TimelineStoreReader.() -> T): T =
+        withContext(Dispatchers.IO) {
+            val directory = directory(scope)
+            val reader = Reader(directory, DesktopIndexedTimelineFiles(directory).open())
+            try { block(reader) } finally { reader.active = false }
+        }
+
+    override suspend fun <T> transaction(scope: TimelineScope, block: suspend TimelineStoreTransaction.() -> T): T =
+        withContext(Dispatchers.IO) {
+            val directory = directory(scope)
+            Files.createDirectories(directory)
+            FileChannel.open(directory.resolve("transaction.lock"), StandardOpenOption.CREATE,
+                StandardOpenOption.WRITE).use { channel ->
+                channel.tryLock().use { lock ->
+                    check(lock != null) { "Another scoped transaction is active" }
+                    val files = DesktopIndexedTimelineFiles(directory)
+                    val tx = Transaction(directory, files.open())
+                    try {
+                        val result = block(tx)
+                        currentCoroutineContext().ensureActive()
+                        tx.commit(files)
+                        result
+                    } finally { tx.active = false }
+                }
+            }
+        }
+
+    private fun directory(scope: TimelineScope): Path = root.resolve(digest(
+        kotlinx.serialization.json.Json.encodeToString(TimelineScope.serializer(), scope).exactBytes(),
+    ))
+
+    private open inner class Reader(
+        val directory: Path,
+        val snapshot: DesktopIndexedTimelineFiles.Snapshot?,
+    ) : TimelineStoreReader {
+        var active = true
+        fun checkActive() { check(active) { "Storage callback has escaped" } }
+        fun auxiliary(): Path = directory.resolve(requireNotNull(snapshot).generation + ".aux")
+        override suspend fun checkpoint(): TimelineDurableCheckpoint {
+            checkActive()
+            if (snapshot == null) return TimelineDurableCheckpoint(0, null, true)
+            return checkpointCodec.decode(readBounded(auxiliary().resolve("checkpoint"), MAX_CHECKPOINT))
+        }
+        override suspend fun metadata(position: TimelineReadPosition, maxRows: Int): TimelineMetadataPage {
+            checkActive()
+            require(maxRows > 0)
+            val revision = checkpoint().revision
+            val snap = snapshot ?: return TimelineMetadataPage(emptyList(), null, null, revision)
+            fun before(key: TimelinePageKey) = snap.seek(key.disk(), 1, DesktopIndexedTimelineFiles.Direction.BEFORE)
+                .lastOrNull()?.ordinal?.plus(1) ?: 0L
+            val bounds = when (position) {
+                TimelineReadPosition.Tail -> (snap.count - maxRows).coerceAtLeast(0) to snap.count
+                is TimelineReadPosition.Before -> before(position.key).let { (it - maxRows).coerceAtLeast(0) to it }
+                is TimelineReadPosition.After -> {
+                    val start = snap.seek(position.key.disk(), 1, DesktopIndexedTimelineFiles.Direction.AFTER)
+                        .firstOrNull()?.ordinal ?: snap.count
+                    start to minOf(start + maxRows, snap.count)
+                }
+                is TimelineReadPosition.Around -> {
+                    val start = (before(position.key) - maxRows / 2).coerceAtLeast(0)
+                        .coerceAtMost((snap.count - maxRows).coerceAtLeast(0))
+                    start to minOf(start + maxRows, snap.count)
+                }
+            }
+            val context = currentCoroutineContext()
+            val rows = (bounds.first until bounds.second).map { context.ensureActive(); snap.row(it) }
+            val mapped = rows.map { row ->
+                val metadata = java.io.DataInputStream(ByteArrayInputStream(row.bytes))
+                val stamp = metadata.readLong()
+                val type = metadata.readUTF()
+                TimelineLedgerMetadata(row.key.shared(), TimelineBodyPointer("${snap.generation}:${row.ordinal}", row.bodyBytes), type, stamp)
+            }
+            return TimelineMetadataPage(mapped,
+                rows.firstOrNull()?.takeIf { it.ordinal > 0 }?.key?.shared(),
+                rows.lastOrNull()?.takeIf { it.ordinal + 1 < snap.count }?.key?.shared(), revision)
+        }
+        override suspend fun locate(identity: TimelineMessageId): TimelinePageKey? {
+            checkActive()
+            if (snapshot == null) return null
+            val path = auxiliary().resolve("id-" + digest(identity.value.exactBytes()))
+            if (!Files.exists(path)) return null
+            val ordinal = java.io.DataInputStream(ByteArrayInputStream(readBounded(path, 8))).readLong()
+            val row = snapshot.row(ordinal)
+            require(row.key.identity == identity.value) { "Identity index mismatch" }
+            return row.key.shared()
+        }
+        override suspend fun body(pointer: TimelineBodyPointer, offset: Long, maxBytes: Int): ByteArray {
+            checkActive()
+            require(offset in 0..pointer.encodedBytes && maxBytes >= 0)
+            val snap = requireNotNull(snapshot)
+            val parts = pointer.value.split(':')
+            require(parts.size == 2 && parts[0] == snap.generation) { "Stale generation pointer" }
+            val row = snap.row(parts[1].toLong())
+            require(row.bodyBytes == pointer.encodedBytes)
+            if (maxBytes == 0) return ByteArray(0)
+            val context = currentCoroutineContext()
+            val size = minOf(maxBytes.toLong(), row.bodyBytes - offset).toInt()
+            val bytes = ByteArray(size)
+            var copied = 0
+            while (copied < size) {
+                val chunk = snap.readBody(row, offset + copied, minOf(MAX_BODY, size - copied)) { context.ensureActive() }
+                chunk.copyInto(bytes, copied); copied += chunk.size
+            }
+            return bytes
+        }
+        override suspend fun evidence(key: String, maxBytes: Int): ByteArray? {
+            checkActive()
+            require(maxBytes >= 0)
+            if (snapshot == null) return null
+            val path = auxiliary().resolve("e-" + digest(key.exactBytes()))
+            if (!Files.exists(path)) return null
+            val keyBytes = key.exactBytes()
+            val budget = Math.addExact(maxBytes, Math.addExact(keyBytes.size, 4))
+            val bytes = readBounded(path, budget)
+            java.io.DataInputStream(ByteArrayInputStream(bytes)).use { file ->
+                require(file.readInt() == keyBytes.size)
+                val stored = ByteArray(keyBytes.size).also(file::readFully)
+                require(stored.contentEquals(keyBytes)) { "Evidence index mismatch" }
+                return ByteArray(file.available()).also(file::readFully)
+            }
+        }
+    }
+
+    private inner class Transaction(directory: Path, snapshot: DesktopIndexedTimelineFiles.Snapshot?) :
+        Reader(directory, snapshot), TimelineStoreTransaction {
+        val records = mutableMapOf<TimelineMessageId, TimelineStoredRecord?>()
+        val evidenceChanges = mutableMapOf<String, ByteArray?>()
+        var changed = false
+        var revision: Long? = null
+        var cursorValue: Pair<TimelineContinuation?, Boolean>? = null
+        override suspend fun nextRevision(): Long {
+            checkActive()
+            check(revision == null) { "Revision requested twice" }
+            return Math.addExact(super.checkpoint().revision, 1).also { revision = it }
+        }
+        override suspend fun put(record: TimelineStoredRecord) {
+            checkActive()
+            record.key.disk()
+            require(record.contentType.length <= 300)
+            records[record.key.identity] = record.copy(body = record.body.copyOf())
+            changed = true
+        }
+        override suspend fun delete(identity: TimelineMessageId, reason: TimelineDurableDeleteReason) {
+            checkActive(); records[identity] = null; changed = true
+        }
+        override suspend fun putEvidence(key: String, value: ByteArray) {
+            checkActive(); evidenceChanges[key] = value.copyOf(); changed = true
+        }
+        override suspend fun deleteEvidence(key: String) {
+            checkActive(); evidenceChanges[key] = null; changed = true
+        }
+        override suspend fun cursor(continuation: TimelineContinuation?, hasMore: Boolean) {
+            checkActive(); cursorValue = continuation to hasMore; changed = true
+        }
+        override suspend fun checkpoint(): TimelineDurableCheckpoint {
+            val old = super.checkpoint()
+            return TimelineDurableCheckpoint(revision ?: old.revision,
+                cursorValue?.first ?: if (cursorValue == null) old.continuation else null,
+                cursorValue?.second ?: old.hasMore)
+        }
+        override suspend fun locate(identity: TimelineMessageId): TimelinePageKey? {
+            checkActive()
+            return if (records.containsKey(identity)) records[identity]?.key else super.locate(identity)
+        }
+        override suspend fun evidence(key: String, maxBytes: Int): ByteArray? {
+            checkActive(); require(maxBytes >= 0)
+            if (!evidenceChanges.containsKey(key)) return super.evidence(key, maxBytes)
+            return evidenceChanges[key]?.also { require(it.size <= maxBytes) }?.copyOf()
+        }
+        private val pendingPointers = mutableMapOf<String, ByteArray>()
+        override suspend fun body(pointer: TimelineBodyPointer, offset: Long, maxBytes: Int): ByteArray {
+            checkActive()
+            val bytes = pendingPointers[pointer.value] ?: return super.body(pointer, offset, maxBytes)
+            require(pointer.encodedBytes == bytes.size.toLong())
+            require(offset in 0..bytes.size.toLong() && maxBytes >= 0)
+            return bytes.copyOfRange(offset.toInt(), minOf(bytes.size.toLong(), offset + maxBytes).toInt())
+        }
+        override suspend fun metadata(position: TimelineReadPosition, maxRows: Int): TimelineMetadataPage {
+            checkActive(); require(maxRows > 0)
+            if (records.isEmpty()) return super.metadata(position, maxRows)
+            val stamp = requireNotNull(revision) { "Call nextRevision before reading staged metadata" }
+            val pending = records.values.filterNotNull().map { record ->
+                val token = "pending:" + java.util.UUID.randomUUID()
+                pendingPointers[token] = record.body
+                TimelineLedgerMetadata(record.key, TimelineBodyPointer(token, record.body.size.toLong()), record.contentType, stamp)
+            }.sortedBy { it.key }.iterator()
+            val rows = sequence {
+                var next = if (pending.hasNext()) pending.next() else null
+                for (ordinal in 0 until (snapshot?.count ?: 0)) {
+                    val row = requireNotNull(snapshot).row(ordinal)
+                    if (records.containsKey(TimelineMessageId(row.key.identity))) continue
+                    while (next != null && next.key < row.key.shared()) {
+                        yield(next); next = if (pending.hasNext()) pending.next() else null
+                    }
+                    val data = java.io.DataInputStream(ByteArrayInputStream(row.bytes))
+                    val oldStamp = data.readLong()
+                    yield(TimelineLedgerMetadata(row.key.shared(), TimelineBodyPointer("${snapshot.generation}:$ordinal", row.bodyBytes), data.readUTF(), oldStamp))
+                }
+                while (next != null) { yield(next); next = if (pending.hasNext()) pending.next() else null }
+            }
+            val selected = java.util.ArrayDeque<TimelineLedgerMetadata>()
+            var older = false
+            var newer = false
+            val context = currentCoroutineContext()
+            for (row in rows) {
+                context.ensureActive()
+                val accept = when (position) {
+                    TimelineReadPosition.Tail -> true
+                    is TimelineReadPosition.Before -> row.key < position.key
+                    is TimelineReadPosition.After -> row.key > position.key
+                    is TimelineReadPosition.Around -> row.key >= position.key
+                }
+                if (!accept) {
+                    if (position is TimelineReadPosition.Around) {
+                        selected.addLast(row)
+                        if (selected.size > maxRows / 2) { selected.removeFirst(); older = true }
+                    } else if (position is TimelineReadPosition.Before) newer = true else older = true
+                    continue
+                }
+                if (selected.size == maxRows) {
+                    if (position is TimelineReadPosition.After || position is TimelineReadPosition.Around) {
+                        newer = true; break
+                    }
+                    selected.removeFirst(); older = true
+                }
+                selected.addLast(row)
+            }
+            return TimelineMetadataPage(selected.toList(), selected.peekFirst()?.key?.takeIf { older },
+                selected.peekLast()?.key?.takeIf { newer }, stamp)
+        }
+        suspend fun commit(files: DesktopIndexedTimelineFiles) {
+            if (!changed) { check(revision == null); return }
+            val stamp = requireNotNull(revision) { "Changed transaction needs nextRevision" }
+            val checkpointBytes = checkpointCodec.encode(checkpoint()).copyOf()
+            require(checkpointBytes.size <= MAX_CHECKPOINT)
+            val context = currentCoroutineContext()
+            val entries = sequence {
+                val incoming = records.values.filterNotNull().sortedBy { it.key }.iterator()
+                var next = if (incoming.hasNext()) incoming.next() else null
+                for (ordinal in 0 until (snapshot?.count ?: 0)) {
+                    context.ensureActive()
+                    val row = requireNotNull(snapshot).row(ordinal)
+                    if (records.containsKey(TimelineMessageId(row.key.identity))) continue
+                    while (next != null && next.key.disk() < row.key) {
+                        yield(entry(next, stamp)); next = if (incoming.hasNext()) incoming.next() else null
+                    }
+                    yield(DesktopIndexedTimelineFiles.Entry(row.key, row.bytes, row.bodyBytes) {
+                        chunkStream(requireNotNull(snapshot), row)
+                    })
+                }
+                while (next != null) {
+                    yield(entry(next, stamp)); next = if (incoming.hasNext()) incoming.next() else null
+                }
+            }
+            files.publish(entries, checkpoint = { context.ensureActive() }, prepareGeneration = { generation ->
+                val aux = directory.resolve("$generation.aux")
+                Files.createDirectory(aux)
+                if (snapshot != null) Files.newDirectoryStream(auxiliary(), "e-*").use { paths ->
+                    for (path in paths) { context.ensureActive(); Files.createLink(aux.resolve(path.fileName), path) }
+                }
+                for ((key, value) in evidenceChanges) {
+                    context.ensureActive()
+                    val path = aux.resolve("e-" + digest(key.exactBytes()))
+                    Files.deleteIfExists(path)
+                    if (value != null) writeSynced(path) {
+                        val bytes = key.exactBytes()
+                        writeInt(bytes.size); write(bytes); write(value)
+                    }
+                }
+                // Index identities without allocating or decoding the historical bodies.
+                var ordinal = 0L
+                for (entry in entries) {
+                    context.ensureActive()
+                    val path = aux.resolve("id-" + digest(entry.key.identity.exactBytes()))
+                    require(!Files.exists(path)) { "Duplicate identity" }
+                    writeSynced(path) { writeLong(ordinal) }; ordinal++
+                }
+                writeSynced(aux.resolve("checkpoint")) { write(checkpointBytes) }
+                FileChannel.open(aux, StandardOpenOption.READ).use { it.force(true) }
+            })
+        }
+    }
+
+    private fun entry(record: TimelineStoredRecord, revision: Long): DesktopIndexedTimelineFiles.Entry {
+        val bytes = java.io.ByteArrayOutputStream()
+        java.io.DataOutputStream(bytes).use { it.writeLong(revision); it.writeUTF(record.contentType) }
+        return DesktopIndexedTimelineFiles.Entry(record.key.disk(), bytes.toByteArray(), record.body.size.toLong()) {
+            ByteArrayInputStream(record.body)
+        }
+    }
+    private fun chunkStream(snapshot: DesktopIndexedTimelineFiles.Snapshot, row: DesktopIndexedTimelineFiles.Metadata) =
+        object : InputStream() {
+            var offset = 0L
+            override fun read(): Int {
+                if (offset == row.bodyBytes) return -1
+                return snapshot.readBody(row, offset++, 1).single().toInt() and 255
+            }
+            override fun read(bytes: ByteArray, start: Int, length: Int): Int {
+                if (length == 0) return 0
+                if (offset == row.bodyBytes) return -1
+                val part = snapshot.readBody(row, offset, minOf(length, MAX_BODY))
+                part.copyInto(bytes, start); offset += part.size
+                return part.size
+            }
+        }
+
+    companion object {
+        private const val MAX_BODY = 1024 * 1024
+        private const val MAX_CHECKPOINT = 1024 * 1024
+        private fun TimelinePageKey.disk() = DesktopIndexedTimelineFiles.Key(order, identity.value)
+        private fun DesktopIndexedTimelineFiles.Key.shared() = TimelinePageKey(order, TimelineMessageId(identity))
+        // Preserve Kotlin String identity, including unpaired UTF-16 code units.
+        private fun String.exactBytes(): ByteArray = java.nio.ByteBuffer.allocate(Math.multiplyExact(length, 2)).also {
+            for (char in this) it.putChar(char)
+        }.array()
+        private fun digest(bytes: ByteArray) = MessageDigest.getInstance("SHA-256").digest(bytes)
+            .joinToString("") { "%02x".format(it) }
+        private fun readBounded(path: Path, maxBytes: Int): ByteArray = RandomAccessFile(path.toFile(), "r").use {
+            val size = it.length() - 32
+            require(size in 0..maxBytes.toLong()) { "Stored value exceeds budget" }
+            val bytes = ByteArray(size.toInt()).also(it::readFully)
+            val hash = ByteArray(32).also(it::readFully)
+            require(MessageDigest.isEqual(hash, MessageDigest.getInstance("SHA-256").digest(bytes))) {
+                "Auxiliary index checksum mismatch"
+            }
+            bytes
+        }
+        private fun writeSynced(path: Path, block: RandomAccessFile.() -> Unit) {
+            RandomAccessFile(path.toFile(), "rw").use { file ->
+                file.block()
+                val size = file.filePointer
+                file.seek(0)
+                val hash = MessageDigest.getInstance("SHA-256")
+                val buffer = ByteArray(64 * 1024)
+                var remaining = size
+                while (remaining > 0) {
+                    val count = minOf(buffer.size.toLong(), remaining).toInt()
+                    file.readFully(buffer, 0, count); hash.update(buffer, 0, count); remaining -= count
+                }
+                file.write(hash.digest()); file.fd.sync()
+            }
+        }
+    }
+}
