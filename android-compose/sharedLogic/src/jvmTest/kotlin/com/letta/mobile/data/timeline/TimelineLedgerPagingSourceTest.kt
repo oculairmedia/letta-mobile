@@ -1,0 +1,62 @@
+package com.letta.mobile.data.timeline
+
+import androidx.paging.PagingSource
+import com.letta.mobile.data.timeline.snapshot.TimelineScope
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.test.runTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
+
+class TimelineLedgerPagingSourceTest {
+    @Test fun newestFirstAndExclusiveAppendUseTypedKeys() = runTest {
+        val store = Store()
+        val engine = CanonicalTimelineEngine(store, TimelineCanonicalWriter { _, _ -> false }, enabled = true)
+        val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(TimelineScope("b", "c"))).selection
+        val source = TimelineLedgerPagingSource(engine, selection)
+        val result = assertIs<PagingSource.LoadResult.Page<TimelinePageKey, TimelineSettledRecord>>(
+            source.load(PagingSource.LoadParams.Refresh(null, 64, false)),
+        )
+        assertEquals(listOf(2L, 1L), result.data.map { it.key.order })
+        assertEquals(key(1), result.nextKey)
+        source.load(PagingSource.LoadParams.Append(key(1), 64, false))
+        assertEquals(TimelineReadPosition.Before(key(1)), store.position)
+        engine.release(selection)
+        assertIs<PagingSource.LoadResult.Invalid<TimelinePageKey, TimelineSettledRecord>>(
+            source.load(PagingSource.LoadParams.Refresh(null, 64, false)),
+        )
+    }
+
+    @Test fun cancellationEscapesPagingLoad() = runTest {
+        val store = Store()
+        val engine = CanonicalTimelineEngine(store, TimelineCanonicalWriter { _, _ -> false }, enabled = true)
+        val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(TimelineScope("b", "c"))).selection
+        store.cancel = true
+        assertFailsWith<CancellationException> {
+            TimelineLedgerPagingSource(engine, selection).load(PagingSource.LoadParams.Refresh(null, 64, false))
+        }
+    }
+
+    private class Store : TimelineBoundedStore, TimelineStoreReader {
+        var position: TimelineReadPosition? = null
+        var cancel = false
+        override suspend fun <T> read(scope: TimelineScope, block: suspend TimelineStoreReader.() -> T): T = block(this)
+        override suspend fun <T> transaction(scope: TimelineScope, block: suspend TimelineStoreTransaction.() -> T): T = error("read only")
+        override suspend fun checkpoint() = TimelineDurableCheckpoint(1, null, false)
+        override suspend fun locate(identity: TimelineMessageId): TimelinePageKey? = null
+        override suspend fun metadata(position: TimelineReadPosition, maxRows: Int): TimelineMetadataPage {
+            if (cancel) throw CancellationException("cancelled")
+            this.position = position
+            return TimelineMetadataPage(listOf(1L, 2L).map {
+                TimelineLedgerMetadata(key(it), TimelineBodyPointer("body-$it", 1), "test", 1)
+            }, key(1), null, 1)
+        }
+        override suspend fun body(pointer: TimelineBodyPointer, offset: Long, maxBytes: Int) = byteArrayOf(1)
+        override suspend fun evidence(key: String, maxBytes: Int): ByteArray? = null
+    }
+
+    companion object {
+        private fun key(order: Long) = TimelinePageKey(order, TimelineMessageId("id-$order"))
+    }
+}
