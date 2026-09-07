@@ -28,6 +28,7 @@ class TimelineLedgerPagingSourceTest {
         )
     }
 
+    @OptIn(androidx.paging.ExperimentalPagingApi::class)
     @Test fun mediatorOnlyAppendsAndUsesDurableHasMore() = runTest {
         val store = Store()
         store.hasMore = true
@@ -40,13 +41,19 @@ class TimelineLedgerPagingSourceTest {
         val session = CanonicalTimelineSession(store, transport, TimelineScope("b", "c"), enabled = true)
         val selection = assertIs<TimelineEngineOpen.Opened>(session.open()).selection
         val mediator = TimelineHistoryMediator(session, selection)
-        assertEquals(androidx.paging.RemoteMediator.MediatorResult.Success::class,
-            (mediator.load(androidx.paging.LoadType.PREPEND, androidx.paging.PagingState(emptyList(), null, androidx.paging.PagingSource.LoadResult.Invalid(), null)) as androidx.paging.RemoteMediator.MediatorResult.Success).let { 1 })
+        val emptyState = androidx.paging.PagingState<Int, TimelineSettledRecord>(
+            pages = emptyList(),
+            anchorPosition = 0,
+            config = androidx.paging.PagingConfig(64),
+            leadingPlaceholderCount = 0,
+        )
+        val prepend = mediator.load(androidx.paging.LoadType.PREPEND, emptyState)
+        kotlin.test.assertIs<androidx.paging.RemoteMediator.MediatorResult.Success>(prepend)
         store.hasMore = false
-        val result = mediator.load(androidx.paging.LoadType.APPEND, androidx.paging.PagingState(emptyList(), null, androidx.paging.PagingSource.LoadResult.Invalid(), null))
+        val append = mediator.load(androidx.paging.LoadType.APPEND, emptyState)
         assertEquals(1, calls)
-        kotlin.test.assertIs<androidx.paging.RemoteMediator.MediatorResult.Success>(result)
-        kotlin.test.assertTrue((result as androidx.paging.RemoteMediator.MediatorResult.Success).endOfPaginationReached)
+        kotlin.test.assertIs<androidx.paging.RemoteMediator.MediatorResult.Success>(append)
+        kotlin.test.assertTrue((append as androidx.paging.RemoteMediator.MediatorResult.Success).endOfPaginationReached)
     }
 
     @Test fun cancellationEscapesPagingLoad() = runTest {
