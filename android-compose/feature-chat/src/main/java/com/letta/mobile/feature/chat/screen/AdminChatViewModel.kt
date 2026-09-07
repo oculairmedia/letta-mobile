@@ -785,8 +785,11 @@ internal class AdminChatViewModel @Inject constructor(
         if (select != null && localRuntimeRouting() != LocalRuntimeRouting.LocalBound) {
             val generation = _sessionState.value.selectionGeneration
             chatTimelineObserver.stop()
-            _pagingPresentation.value = pagingBinding.select(conversationId, generation) {
-                select(agentId.value, conversationId, scrollToMessageId ?: pagingBinding.target(conversationId), generation)
+            _pagingPresentation.value = pagingBinding.selectRoute(
+                conversationId, generation, scrollToMessageId,
+                publish = { _pagingPresentation.value = it },
+            ) { target ->
+                select(agentId.value, conversationId, target, generation)
             }
             return
         }
