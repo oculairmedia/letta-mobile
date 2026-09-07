@@ -14,7 +14,7 @@ class RoomLegacyLedgerCopySource(private val legacy: LettaDatabase) : LegacyLedg
                     check(open)
                     return legacy.openHelper.readableDatabase.query(SimpleSQLiteQuery(
                         "SELECT agent_id, storage_layout_version, revision, envelope_schema_version, live_cursor, backfill_cursor, released_older_count, row_count, root_digest, row_digest, generation FROM normalized_timeline_snapshot_heads WHERE backend_id = ? AND conversation_id = ?",
-                        arrayOf<Any?>(scope.backendId, scope.conversationId),
+                        arrayOf(scope.backendId, scope.conversationId),
                     )).use { cursor ->
                         check(cursor.moveToFirst()) { "No normalized source; retain legacy manifest fallback" }
                         val fields = (0 until cursor.columnCount).map { if (cursor.isNull(it)) null else cursor.getString(it) }
@@ -27,8 +27,8 @@ class RoomLegacyLedgerCopySource(private val legacy: LettaDatabase) : LegacyLedg
                     check(open)
                     require(maxRows in 1..128)
                     return legacy.openHelper.readableDatabase.query(SimpleSQLiteQuery(
-                        "SELECT event_order, identity_primary, identity_secondary, length(payload), checksum FROM normalized_timeline_snapshot_rows WHERE backend_id = ? AND conversation_id = ? AND event_order > ? ORDER BY event_order LIMIT min(128, max(0, ?))",
-                        arrayOf<Any?>(scope.backendId, scope.conversationId, afterOrder, maxRows),
+                        "SELECT event_order, identity_primary, identity_secondary, length(payload), checksum FROM normalized_timeline_snapshot_rows WHERE backend_id = ? AND conversation_id = ? AND event_order > ? ORDER BY event_order LIMIT min(128, max(0, CAST(? AS INTEGER)))",
+                        arrayOf(scope.backendId, scope.conversationId, afterOrder.toString(), maxRows.toString()),
                     )).use { cursor ->
                         buildList {
                             while (cursor.moveToNext()) add(LegacyLedgerCopyRow(cursor.getLong(0), cursor.getLong(1), cursor.getLong(2), cursor.getLong(3), cursor.getString(4)))
@@ -40,8 +40,8 @@ class RoomLegacyLedgerCopySource(private val legacy: LettaDatabase) : LegacyLedg
                     check(open)
                     require(offset >= 0 && offset < Long.MAX_VALUE && maxBytes in 0..65536)
                     return legacy.openHelper.readableDatabase.query(SimpleSQLiteQuery(
-                        "SELECT substr(payload, ? + 1, min(65536, max(0, ?))) FROM normalized_timeline_snapshot_rows WHERE backend_id = ? AND conversation_id = ? AND identity_primary = ? AND identity_secondary = ?",
-                        arrayOf<Any?>(offset, maxBytes, scope.backendId, scope.conversationId, row.primary, row.secondary),
+                        "SELECT substr(payload, ? + 1, min(65536, max(0, CAST(? AS INTEGER)))) FROM normalized_timeline_snapshot_rows WHERE backend_id = ? AND conversation_id = ? AND identity_primary = ? AND identity_secondary = ?",
+                        arrayOf(offset.toString(), maxBytes.toString(), scope.backendId, scope.conversationId, row.primary.toString(), row.secondary.toString()),
                     )).use { cursor ->
                         check(cursor.moveToFirst()) { "Missing legacy row" }
                         cursor.getBlob(0)
