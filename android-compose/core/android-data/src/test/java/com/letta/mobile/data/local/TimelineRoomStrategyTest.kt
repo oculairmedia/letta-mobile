@@ -20,6 +20,35 @@ import org.robolectric.annotation.SQLiteMode
 @Config(sdk = [34], manifest = Config.NONE)
 @SQLiteMode(SQLiteMode.Mode.NATIVE)
 class TimelineRoomStrategyTest {
+    private suspend fun measureStrategies(dao: StrategyMetadataDao, count: Int, expected: List<StrategyMetadata>) {
+        val offsetNanos = ArrayList<Long>()
+        val seekNanos = ArrayList<Long>()
+        repeat(30) {
+            val source = dao.generatedOffsetPages("scope")
+            val offsetStart = System.nanoTime()
+            source.load(androidx.paging.PagingSource.LoadParams.Refresh(count - 128, 64, false))
+            offsetNanos.add(System.nanoTime() - offsetStart)
+            source.invalidate()
+            val seekStart = System.nanoTime()
+            assertEquals(expected, dao.seekPage("scope", 128, "00000128", 64))
+            seekNanos.add(System.nanoTime() - seekStart)
+        }
+        println("Room strategy rows=$count refresh-offset-p95-ns=${offsetNanos.sorted()[28]} seek-p95-ns=${seekNanos.sorted()[28]}")
+    }
+
+    private fun assertSeekPlan(db: TimelineStrategyDatabase) {
+        db.openHelper.readableDatabase.query(
+            "EXPLAIN QUERY PLAN SELECT scope,eventId,orderKey,bodyKey FROM strategy_metadata " +
+                "WHERE scope='scope' AND (orderKey,eventId)<(128,'00000128') " +
+                "ORDER BY orderKey DESC,eventId DESC LIMIT 64",
+        ).use { plan ->
+            assertTrue(plan.moveToFirst())
+            val detail = plan.getString(3)
+            assertTrue(detail, detail.contains("USING INDEX index_strategy_metadata_scope_orderKey_eventId"))
+            assertTrue(detail, detail.contains("orderKey"))
+        }
+    }
+
     @Test
     fun `generated suspend keyset query preserves cursor across insert`() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
@@ -51,19 +80,7 @@ class TimelineRoomStrategyTest {
                 ) as androidx.paging.PagingSource.LoadResult.Page
                 assertEquals(before, generatedPage.data)
                 assertTrue(queries.any { it.contains("LIMIT") && it.contains("OFFSET") })
-                val offsetNanos = ArrayList<Long>()
-                val seekNanos = ArrayList<Long>()
-                repeat(30) {
-                    val source = dao.generatedOffsetPages("scope")
-                    val offsetStart = System.nanoTime()
-                    source.load(androidx.paging.PagingSource.LoadParams.Refresh(count - 128, 64, false))
-                    offsetNanos.add(System.nanoTime() - offsetStart)
-                    source.invalidate()
-                    val seekStart = System.nanoTime()
-                    assertEquals(before, dao.seekPage("scope", 128, "00000128", 64))
-                    seekNanos.add(System.nanoTime() - seekStart)
-                }
-                println("Room strategy rows=$count refresh-offset-p95-ns=${offsetNanos.sorted()[28]} seek-p95-ns=${seekNanos.sorted()[28]}")
+                measureStrategies(dao, count, before)
                 dao.insert(listOf(StrategyMetadata("scope", "live", count.toLong(), "new-body")))
                 assertEquals(before, dao.seekPage("scope", 128, "00000128", 64))
                 assertNotEquals(before, dao.offsetPage("scope", 64, count - 128))
@@ -78,16 +95,7 @@ class TimelineRoomStrategyTest {
                 writer.await()
                 db.invalidationTracker.refreshVersionsSync()
                 assertTrue("Generated offset source must invalidate after insertion", generated.invalid)
-                db.openHelper.readableDatabase.query(
-                    "EXPLAIN QUERY PLAN SELECT scope,eventId,orderKey,bodyKey FROM strategy_metadata " +
-                        "WHERE scope='scope' AND (orderKey,eventId)<(128,'00000128') " +
-                        "ORDER BY orderKey DESC,eventId DESC LIMIT 64",
-                ).use { plan ->
-                    assertTrue(plan.moveToFirst())
-                    val detail = plan.getString(3)
-                    assertTrue(detail, detail.contains("USING INDEX index_strategy_metadata_scope_orderKey_eventId"))
-                    assertTrue(detail, detail.contains("orderKey"))
-                }
+                assertSeekPlan(db)
                 val reads = queries.filter { it.startsWith("SELECT") && it.contains("FROM strategy_metadata") }
                 assertEquals(64, reads.size)
                 assertTrue(reads.all { it.contains("LIMIT") && it.contains("(orderKey,eventId)<") && !it.contains("OFFSET") })
