@@ -134,6 +134,26 @@ class PagedChatContentTest {
         }
     }
 
+    @Test fun sameConversationNewGenerationClosesAndReplacesPresentation() {
+        val binding = ChatPagingBinding()
+        var closes = 0
+        fun create() = ChatPagingPresentation(
+            flowOf(PagingData.empty()), MutableStateFlow(emptyList()), { closes++ },
+        )
+        val first = binding.select("conversation", 1, ::create)
+        org.junit.Assert.assertSame(first, binding.select("conversation", 1) { error("Must reuse current generation") })
+        val second = binding.select("conversation", 2, ::create)
+        org.junit.Assert.assertNotSame(first, second)
+        org.junit.Assert.assertEquals(1, closes)
+        val third = binding.select("other", 2, ::create)
+        org.junit.Assert.assertNotSame(second, third)
+        org.junit.Assert.assertEquals(2, closes)
+        binding.close()
+        binding.close()
+        org.junit.Assert.assertEquals(3, closes)
+        org.junit.Assert.assertNull(binding.presentation)
+    }
+
     @Test fun hostIsDisabledWithoutEngineBinding() {
         org.junit.Assert.assertNull(ChatPagingHost().select)
     }

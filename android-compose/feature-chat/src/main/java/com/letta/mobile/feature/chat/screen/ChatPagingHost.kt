@@ -11,7 +11,7 @@ import javax.inject.Inject
 @javax.inject.Singleton
 class ChatPagingHost @Inject constructor() {
     // Disabled until the host supplies an engine-backed selection and ingest binding.
-    var select: ((String, String, String?) -> ChatPagingPresentation)? = null
+    var select: ((String, String, String?, Long) -> ChatPagingPresentation)? = null
 }
 
 class ChatPagingPresentation(
@@ -21,5 +21,29 @@ class ChatPagingPresentation(
     // Only the engine can declare absence after exact-target lookup completes.
     val missingTarget: StateFlow<String?> = kotlinx.coroutines.flow.MutableStateFlow(null),
 )
+
+/** ViewModel-scoped resource binding; engine still owns all paging and generation policy. */
+internal class ChatPagingBinding {
+    private var selection: Pair<String, Long>? = null
+    var presentation: ChatPagingPresentation? = null
+        private set
+
+    fun select(conversationId: String, generation: Long, create: () -> ChatPagingPresentation): ChatPagingPresentation {
+        val next = conversationId to generation
+        if (selection != next) {
+            close()
+            presentation = create()
+            selection = next
+        }
+        return checkNotNull(presentation)
+    }
+
+    fun close() {
+        val previous = presentation
+        presentation = null
+        selection = null
+        previous?.close?.invoke()
+    }
+}
 
 internal val LocalChatPagingPresentation = staticCompositionLocalOf<ChatPagingPresentation?> { null }
