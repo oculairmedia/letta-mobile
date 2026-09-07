@@ -18,6 +18,8 @@ class ChatPagingPresentation(
     val settled: Flow<PagingData<ChatRenderItem>>,
     val live: StateFlow<List<ChatRenderItem>>,
     val close: () -> Unit,
+    // Only the engine can declare absence after exact-target lookup completes.
+    val missingTarget: StateFlow<String?> = kotlinx.coroutines.flow.MutableStateFlow(null),
 )
 
 internal val LocalChatPagingPresentation = staticCompositionLocalOf<ChatPagingPresentation?> { null }
