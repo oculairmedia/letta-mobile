@@ -66,13 +66,28 @@ class ChatHistoryPagerTest {
     }
 
     @Test
-    fun `switch accepts B while A is suspended and stale A cannot overwrite B`() = runTest {
+    fun `switch accepts B while A is suspended and stale A cannot overwrite B`() = assertStaleCompletionPreservesB {
+        complete(OlderMessagesPage(listOf(appMessage("older-1", "old")), hasMore = false))
+    }
+
+    @Test
+    fun `stale cancellation cannot clear pending B ownership`() = assertStaleCompletionPreservesB {
+        completeExceptionally(kotlinx.coroutines.CancellationException("stale A"))
+    }
+
+    @Test
+    fun `stale failure cannot clear pending B ownership`() = assertStaleCompletionPreservesB {
+        completeExceptionally(IllegalStateException("stale A"))
+    }
+
+    private fun assertStaleCompletionPreservesB(
+        completeA: CompletableDeferred<OlderMessagesPage>.() -> Unit,
+    ) = runTest {
         val harness = Harness(scope = this)
         val a = CompletableDeferred<OlderMessagesPage>()
         val b = CompletableDeferred<OlderMessagesPage>()
         coEvery { harness.messageRepository.fetchOlderMessagesPage(AgentId("agent-1"), ConversationId("conv-1"), any()) } coAnswers { a.await() }
         coEvery { harness.messageRepository.fetchOlderMessagesPage(AgentId("agent-1"), ConversationId("conv-2"), any()) } coAnswers { b.await() }
-
         harness.pager.loadOlderMessages(clientModeEnabled = false)
         runCurrent()
         harness.activeConversationId = "conv-2"
@@ -84,16 +99,19 @@ class ChatHistoryPagerTest {
         )
         harness.pager.loadOlderMessages(clientModeEnabled = false)
         runCurrent()
+        val pendingB = harness.uiState.value
+        assertTrue(pendingB.isLoadingOlderMessages)
+        a.completeA()
+        runCurrent()
+        assertEquals(pendingB, harness.uiState.value)
+        harness.pager.loadOlderMessages(clientModeEnabled = false)
+        runCurrent()
         coVerify(exactly = 1) { harness.messageRepository.fetchOlderMessagesPage(AgentId("agent-1"), ConversationId("conv-2"), "live-2") }
-
         b.complete(OlderMessagesPage(listOf(appMessage("older-2", "old")), hasMore = false))
         advanceUntilIdle()
-        a.complete(OlderMessagesPage(listOf(appMessage("older-1", "old")), hasMore = false))
-        advanceUntilIdle()
-
         assertEquals(listOf("older-2", "live-2"), harness.uiState.value.messages.map { it.id })
-        assertFalse(harness.uiState.value.hasMoreOlderMessages)
         assertFalse(harness.uiState.value.isLoadingOlderMessages)
+        assertFalse(harness.uiState.value.hasMoreOlderMessages)
     }
 
     @Test
