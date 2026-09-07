@@ -61,10 +61,28 @@ internal fun PagedChatMessageList(
             wasScrolling = scrolling
         }
     }
+    var previousLiveUser by remember(presentation) {
+        mutableStateOf((live.firstOrNull() as? ChatRenderItem.Single)?.message?.id)
+    }
+    LaunchedEffect(live) {
+        val newest = (live.firstOrNull() as? ChatRenderItem.Single)?.message
+        if (newest?.role == "user" && newest.id != previousLiveUser) {
+            listState.scrollToItem(0)
+            following = true
+        }
+        previousLiveUser = newest?.id
+    }
     LaunchedEffect(live, pages.itemSnapshotList, following) {
         if (following && !listState.isScrollInProgress) listState.scrollToItem(0)
     }
     var targetPositioned by remember(presentation, appearance.scrollToMessageId) { mutableStateOf(false) }
+    var highlightedTarget by remember(presentation, appearance.scrollToMessageId) { mutableStateOf<String?>(null) }
+    LaunchedEffect(highlightedTarget) {
+        if (highlightedTarget != null) {
+            kotlinx.coroutines.delay(2_000)
+            highlightedTarget = null
+        }
+    }
     LaunchedEffect(presentation, appearance.scrollToMessageId, pages.itemSnapshotList, live) {
         val target = appearance.scrollToMessageId ?: return@LaunchedEffect
         if (!targetPositioned) {
@@ -76,6 +94,7 @@ internal fun PagedChatMessageList(
             if (index != null) {
                 listState.scrollToItem(index)
                 targetPositioned = true
+                highlightedTarget = target
             }
         }
     }
@@ -93,7 +112,7 @@ internal fun PagedChatMessageList(
             awaitEachGesture {
                 awaitFirstDown(requireUnconsumed = false)
                 do {
-                    val event = awaitPointerEvent()
+                    val event = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
                     if (event.changes.count { it.pressed } >= 2) {
                         if (!pinch.isPinching) pinch.begin(appearance.activeFontScale)
                         pinch.applyZoom(event.calculateZoom())
@@ -124,7 +143,7 @@ internal fun PagedChatMessageList(
                 is ChatRenderItem.RunBlock -> newest.messages.lastOrNull()?.first?.id
                 else -> null
             },
-            highlightedMessageId = appearance.scrollToMessageId,
+            highlightedMessageId = highlightedTarget,
             itemGeometryState = geometry,
             pinchFontScaleController = pinch,
             scaleWindowIndexRange = IntRange.EMPTY,

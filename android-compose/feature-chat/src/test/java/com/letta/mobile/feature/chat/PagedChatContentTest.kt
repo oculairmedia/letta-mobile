@@ -96,7 +96,7 @@ class PagedChatContentTest {
             }
         }
         compose.onNodeWithText("row-50").assertIsDisplayed()
-        compose.runOnIdle { live.value = listOf(row("live-new")) }
+        compose.runOnIdle { live.value = listOf(row("live-new").copy(message = row("live-new").message.copy(role = "assistant"))) }
         compose.onNodeWithText("row-50").assertIsDisplayed()
         compose.onNodeWithText("Scroll to latest").performClick()
         compose.onNodeWithText("live-new").assertIsDisplayed()
