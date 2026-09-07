@@ -154,6 +154,48 @@ class PagedChatContentTest {
         org.junit.Assert.assertNull(binding.presentation)
     }
 
+    @Test fun conversationRoundTripRestoresStableMessageAndIgnoresClosedGenerationWrites() {
+        val binding = ChatPagingBinding()
+        fun create() = ChatPagingPresentation(flowOf(PagingData.empty()), MutableStateFlow(emptyList()), {})
+        val first = binding.select("a", 1, ::create)
+        first.saveViewport(ChatPagingViewport("stable-message", 37))
+        binding.select("b", 2, ::create).saveViewport(ChatPagingViewport("other-message", 11))
+        first.saveViewport(ChatPagingViewport("stale-message", 0))
+        org.junit.Assert.assertEquals("stable-message", binding.target("a"))
+        val restored = binding.select("a", 3, ::create)
+        org.junit.Assert.assertEquals(ChatPagingViewport("stable-message", 37), restored.viewport)
+        org.junit.Assert.assertEquals("other-message", binding.target("b"))
+    }
+
+    @Test fun followingViewportOpensTailInsteadOfOldAnchor() {
+        val binding = ChatPagingBinding()
+        fun create() = ChatPagingPresentation(flowOf(PagingData.empty()), MutableStateFlow(emptyList()), {})
+        binding.select("a", 1, ::create).saveViewport(ChatPagingViewport("old-tail", 0, following = true))
+        binding.close()
+        org.junit.Assert.assertNull(binding.target("a"))
+        org.junit.Assert.assertTrue(binding.select("a", 2, ::create).viewport!!.following)
+    }
+
+    @Test fun stableAnchorRestoresInAChangedBoundedWindow() {
+        val presentation = ChatPagingPresentation(
+            flowOf(PagingData.from((30..90).map { row("row-$it") })), MutableStateFlow(emptyList()), {},
+        ).also { it.viewport = ChatPagingViewport("row-70", 0) }
+        compose.setContent {
+            LettaChatTheme {
+                PagedChatMessageList(
+                    presentation, ChatUiState(),
+                    ChatContentCallbacks(
+                        onSendMessage = {}, onRerunMessage = {}, onLoadOlderMessages = { error("No sequential search") },
+                        onSubmitApproval = { _, _, _, _ -> }, onToggleRunCollapsed = {},
+                        onToggleReasoningExpanded = {}, onAttachmentImageTap = null,
+                    ), ChatContentAppearance(),
+                )
+            }
+        }
+        compose.onNodeWithText("row-70").assertIsDisplayed()
+        compose.onNodeWithText("Scroll to latest").assertIsDisplayed()
+    }
+
     @Test fun hostIsDisabledWithoutEngineBinding() {
         org.junit.Assert.assertNull(ChatPagingHost().select)
     }

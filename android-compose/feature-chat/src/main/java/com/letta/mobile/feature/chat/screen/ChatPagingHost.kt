@@ -14,16 +14,24 @@ class ChatPagingHost @Inject constructor() {
     var select: ((String, String, String?, Long) -> ChatPagingPresentation)? = null
 }
 
+internal data class ChatPagingViewport(val messageId: String, val offset: Int, val following: Boolean = false)
+
 class ChatPagingPresentation(
     val settled: Flow<PagingData<ChatRenderItem>>,
     val live: StateFlow<List<ChatRenderItem>>,
     val close: () -> Unit,
     // Only the engine can declare absence after exact-target lookup completes.
     val missingTarget: StateFlow<String?> = kotlinx.coroutines.flow.MutableStateFlow(null),
-)
+) {
+    internal var viewport: ChatPagingViewport? = null
+    internal var saveViewport: (ChatPagingViewport) -> Unit = {}
+    internal var clearViewport: () -> Unit = {}
+}
 
 /** ViewModel-scoped resource binding; engine still owns all paging and generation policy. */
 internal class ChatPagingBinding {
+    private val viewports = mutableMapOf<String, ChatPagingViewport>()
+    fun target(conversationId: String): String? = viewports[conversationId]?.takeUnless { it.following }?.messageId
     private var selection: Pair<String, Long>? = null
     var presentation: ChatPagingPresentation? = null
         private set
@@ -32,7 +40,21 @@ internal class ChatPagingBinding {
         val next = conversationId to generation
         if (selection != next) {
             close()
-            presentation = create()
+            presentation = create().also { current ->
+                current.viewport = viewports[conversationId]
+                current.clearViewport = {
+                    if (presentation === current) {
+                        current.viewport = null
+                        viewports.remove(conversationId)
+                    }
+                }
+                current.saveViewport = { anchor ->
+                    if (presentation === current) {
+                        current.viewport = anchor
+                        viewports[conversationId] = anchor
+                    }
+                }
+            }
             selection = next
         }
         return checkNotNull(presentation)
