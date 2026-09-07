@@ -28,7 +28,7 @@ class TimelineLedgerPagingSource(
             ) return LoadResult.Invalid()
             LoadResult.Page(
                 data = page.metadata.rows.zip(page.bodies) { metadata, body ->
-                    TimelineSettledRecord(metadata.key, metadata.contentType, body, page.metadata.revision)
+                    TimelineSettledRecord(metadata.key, metadata.contentType, body, page.metadata.revision, metadata.body)
                 }.reversed(),
                 prevKey = page.metadata.newer,
                 nextKey = page.metadata.older,
