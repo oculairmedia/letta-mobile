@@ -786,7 +786,7 @@ internal class AdminChatViewModel @Inject constructor(
             val generation = _sessionState.value.selectionGeneration
             chatTimelineObserver.stop()
             _pagingPresentation.value = pagingBinding.select(conversationId, generation) {
-                select(agentId.value, conversationId, scrollToMessageId, generation)
+                select(agentId.value, conversationId, scrollToMessageId ?: pagingBinding.target(conversationId), generation)
             }
             return
         }
