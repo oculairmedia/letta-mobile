@@ -30,6 +30,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonElement
@@ -235,7 +236,7 @@ suspend fun buildA2aWiring(
         // The endpoint is bound to a UDP socket on the OS, so leaking it
         // here would keep the port occupied until process exit — bad for
         // a wrapper that may restart on configuration changes.
-        runCatching { runBlocking { endpoint.shutdown() } }
+        runCatching { withContext(NonCancellable) { endpoint.shutdown() } }
         throw t
     }
 }
