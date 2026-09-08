@@ -16,6 +16,7 @@ class CanonicalTimelineCoordinator(
         val selection: TimelineEngineSelection,
     ) {
         internal var liveFence: TimelineLiveFence? = null
+        internal var activeRepairs: Int = 0
         internal val presentations = mutableSetOf<Presentation>()
     }
 
@@ -45,6 +46,34 @@ class CanonicalTimelineCoordinator(
 
     suspend fun current(scope: TimelineScope): Owner? = mutex.withLock { owners[scope] }
 
+    suspend fun appendPending(owner: Owner, record: CanonicalPendingLocalStore.Record) = mutex.withLock {
+        check(owners[owner.selection.scope] === owner) { "Stale canonical owner" }
+        owner.session.appendPending(record)
+    }
+
+    suspend fun markPending(owner: Owner, otid: String, delivery: CanonicalPendingLocalStore.Delivery) = mutex.withLock {
+        check(owners[owner.selection.scope] === owner) { "Stale canonical owner" }
+        owner.session.markPending(otid, delivery)
+    }
+
+    suspend fun reconcileRecent(owner: Owner): TimelineEnginePageOutcome = reconcileRecentDetailed(owner).outcome
+
+    suspend fun reconcileRecentDetailed(owner: Owner): TimelineEngineReconcileResult {
+        mutex.withLock {
+            check(owners[owner.selection.scope] === owner) { "Stale canonical owner" }
+            check(owner.activeRepairs < Int.MAX_VALUE)
+            owner.activeRepairs++
+        }
+        // Retain ownership during network I/O without blocking other conversations.
+        try {
+            return owner.session.reconcileRecentDetailed(owner.selection)
+        } finally {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                mutex.withLock { owner.activeRepairs-- }
+            }
+        }
+    }
+
     /** Search resolves a viewport anchor without replacing the conversation's ingestion generation. */
     suspend fun locate(owner: Owner, target: TimelineMessageId): TimelinePageKey? = mutex.withLock {
         check(owners[owner.selection.scope] === owner) { "Stale canonical owner" }
@@ -61,6 +90,19 @@ class CanonicalTimelineCoordinator(
         owner.session.ingest(fence, frame).also { accepted ->
             if (accepted) releaseUnobservedSettlement(owner)
         }
+    }
+
+    suspend fun ingestExternal(owner: Owner, message: com.letta.mobile.data.model.LettaMessage): Boolean = mutex.withLock {
+        if (owners[owner.selection.scope] !== owner) return@withLock false
+        val fence = owner.liveFence ?: owner.session.beginLive(owner.selection).also { owner.liveFence = it }
+        owner.session.ingest(fence, TimelineStreamFrame.Message(message))
+    }
+
+    suspend fun completeExternal(owner: Owner) = mutex.withLock {
+        if (owners[owner.selection.scope] !== owner) return@withLock
+        val fence = owner.liveFence ?: return@withLock
+        owner.session.ingest(fence, TimelineStreamFrame.Done)
+        releaseUnobservedSettlement(owner)
     }
 
     private suspend fun releaseUnobservedSettlement(owner: Owner) {
@@ -85,6 +127,7 @@ class CanonicalTimelineCoordinator(
     suspend fun retire(owner: Owner): Boolean = mutex.withLock {
         if (owners[owner.selection.scope] !== owner) return@withLock false
         if (owner.liveFence != null) return@withLock false
+        if (owner.activeRepairs != 0) return@withLock false
         if (owner.presentations.isNotEmpty()) return@withLock false
         owner.session.close(owner.selection)
         owners.remove(owner.selection.scope)
@@ -106,20 +149,73 @@ class CanonicalTimelineSession(
     )
     val publication = engine.publication
     val live = engine.live
+    private val pendingStore = CanonicalPendingLocalStore(store)
+    private val pendingMutex = kotlinx.coroutines.sync.Mutex()
+    private val mutablePending = kotlinx.coroutines.flow.MutableStateFlow<List<CanonicalPendingLocalStore.Record>>(emptyList())
+    val pending: kotlinx.coroutines.flow.StateFlow<List<CanonicalPendingLocalStore.Record>> = mutablePending
 
-    suspend fun open(target: TimelineMessageId? = null): TimelineEngineOpen = engine.open(scope, target)
+    suspend fun open(target: TimelineMessageId? = null): TimelineEngineOpen {
+        val opened = engine.open(scope, target)
+        if (opened is TimelineEngineOpen.Opened) refreshPending()
+        return opened
+    }
+
+    suspend fun appendPending(record: CanonicalPendingLocalStore.Record) = pendingMutex.withLock {
+        pendingStore.save(scope, record)
+        mutablePending.value = pendingStore.load(scope)
+    }
+
+    suspend fun markPending(otid: String, delivery: CanonicalPendingLocalStore.Delivery) = pendingMutex.withLock {
+        pendingStore.mark(scope, otid, delivery)
+        mutablePending.value = pendingStore.load(scope)
+    }
+
+    private suspend fun refreshPending() = pendingMutex.withLock {
+        mutablePending.value = pendingStore.load(scope)
+    }
 
     suspend fun loadOlder(selection: TimelineEngineSelection): TimelineEnginePageOutcome {
         val request = engine.beginPage(selection)
-        return when (val response = transport.listConversationMessagePage(request.remote)) {
-            is TimelineRemotePageResult.Page -> engine.applyPage(request, response)
-            is TimelineRemotePageResult.NoProgress -> engine.rejectNoProgress(request, response)
+        try {
+            return when (val response = transport.listConversationMessagePage(request.remote)) {
+                is TimelineRemotePageResult.Page -> engine.applyPage(request, response).also {
+                    if (it == TimelineEnginePageOutcome.Applied) refreshPending()
+                }
+                is TimelineRemotePageResult.NoProgress -> engine.rejectNoProgress(request, response)
+            }
+        } finally {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                engine.cancelPage(request)
+            }
+        }
+    }
+
+    /** Fetch one bounded recent page without consuming the older-history continuation. */
+    suspend fun reconcileRecent(selection: TimelineEngineSelection): TimelineEnginePageOutcome = reconcileRecentDetailed(selection).outcome
+
+    suspend fun reconcileRecentDetailed(selection: TimelineEngineSelection): TimelineEngineReconcileResult {
+        val request = engine.beginReconcile(selection)
+        try {
+            return when (val response = transport.listConversationMessagePage(request.remote)) {
+                is TimelineRemotePageResult.Page -> engine.reconcilePageDetailed(request, response).also {
+                    if (it.outcome == TimelineEnginePageOutcome.Applied) refreshPending()
+                }
+                is TimelineRemotePageResult.NoProgress -> TimelineEngineReconcileResult(engine.rejectReconcileNoProgress(request, response))
+            }
+        } finally {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                engine.cancelReconcile(request)
+            }
         }
     }
 
     suspend fun beginLive(selection: TimelineEngineSelection): TimelineLiveFence = engine.beginLive(selection)
 
-    suspend fun ingest(fence: TimelineLiveFence, frame: TimelineStreamFrame): Boolean = engine.ingest(fence, frame)
+    suspend fun ingest(fence: TimelineLiveFence, frame: TimelineStreamFrame): Boolean =
+        engine.ingest(fence, frame).also { accepted ->
+            // Token updates never read pending storage; only a durable completion can confirm echoes.
+            if (accepted && frame == TimelineStreamFrame.Done) refreshPending()
+        }
 
     suspend fun acknowledgeSettlement(fence: TimelineLiveFence, presented: Map<TimelineMessageId, Long>): Boolean =
         engine.acknowledgeSettlement(fence, presented)

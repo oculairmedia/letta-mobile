@@ -48,6 +48,15 @@ internal fun PagedChatMessageList(
     appearance: ChatContentAppearance,
     modifier: Modifier = Modifier,
 ) {
+    if (presentation.opening || presentation.openError != null) {
+        androidx.compose.foundation.layout.Column(modifier) {
+            androidx.compose.material3.Text(presentation.openError ?: "Opening conversation...")
+            if (presentation.openError != null) androidx.compose.material3.TextButton(onClick = presentation.retryOpen) {
+                androidx.compose.material3.Text("Retry")
+            }
+        }
+        return
+    }
     key(presentation) {
         PagedChatMessageListContent(presentation, state, callbacks, appearance, modifier)
     }
@@ -224,6 +233,7 @@ private fun PagedChatMessageListContent(
             items(pages.itemCount, key = pages.itemKey { it.key }) { index ->
                 val row = pages[index]
                 if (row != null) {
+                    presentation.deferredReader(row)?.let { reader -> DeferredWindowControls(row, reader) }
                     Column {
                         PagedDateBoundary(row, if (index + 1 < pages.itemCount) pages.peek(index + 1) else null)
                         ChatMessageListRenderItem(ChatMessageListRenderItemParams(row, live.size + index, context, dimens, shapes))

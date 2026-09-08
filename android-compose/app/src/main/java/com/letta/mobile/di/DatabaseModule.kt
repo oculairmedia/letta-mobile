@@ -63,8 +63,8 @@ object DatabaseModule {
 
     @Provides
     @Singleton
-    fun provideRoomConfirmedTimelineStore(database: LettaDatabase): RoomConfirmedTimelineStore {
-        return RoomConfirmedTimelineStore(database)
+    fun provideRoomConfirmedTimelineStore(database: LettaDatabase, authority: com.letta.mobile.data.local.TimelineOwnershipAuthority): RoomConfirmedTimelineStore {
+        return RoomConfirmedTimelineStore(database, ownership = authority)
     }
 
     @Provides
@@ -74,23 +74,26 @@ object DatabaseModule {
             context,
             com.letta.mobile.data.local.TimelineLedgerDatabase::class.java,
             "timeline-ledger.db",
-        ).build()
+        ).addMigrations(com.letta.mobile.data.local.TimelineLedgerDatabase.MIGRATION_1_2).build()
 
     @Provides
     @Singleton
-    fun provideTimelineBoundedStore(
-        database: com.letta.mobile.data.local.TimelineLedgerDatabase,
-    ): com.letta.mobile.data.timeline.TimelineBoundedStore =
-        com.letta.mobile.data.local.RoomTimelineBoundedStore(
-            database,
-            object : com.letta.mobile.data.local.RoomTimelineCheckpointCodec {
-                override fun encode(checkpoint: com.letta.mobile.data.timeline.TimelineDurableCheckpoint): ByteArray =
-                    com.letta.mobile.data.timeline.TimelineDurableCheckpointCodec.encode(checkpoint)
+    fun provideTimelineBoundedStore(): com.letta.mobile.data.timeline.TimelineBoundedStore =
+        com.letta.mobile.data.local.DormantCanonicalTimelineStore
 
-                override fun decode(bytes: ByteArray): com.letta.mobile.data.timeline.TimelineDurableCheckpoint =
-                    com.letta.mobile.data.timeline.TimelineDurableCheckpointCodec.decode(bytes)
-            },
-        )
+    @Provides
+    @Singleton
+    fun provideTimelineOwnership(@ApplicationContext context: Context): com.letta.mobile.data.local.TimelineOwnershipAuthority =
+        com.letta.mobile.data.local.TimelineOwnershipAuthority(context.noBackupFilesDir.toPath().resolve("timeline-ownership"))
+
+    @Provides
+    @Singleton
+    fun provideOwnedTimelineStorage(
+        legacy: LettaDatabase,
+        ledger: com.letta.mobile.data.local.TimelineLedgerDatabase,
+        authority: com.letta.mobile.data.local.TimelineOwnershipAuthority,
+    ): com.letta.mobile.data.local.TimelineOwnedStorageFactory =
+        com.letta.mobile.data.local.TimelineOwnedStorageFactory(legacy, ledger, authority)
 
     // letta-mobile-g2ff0: DAOs returned directly here, but the LettaDatabase
     // singleton is the only thing that triggers Room.databaseBuilder.build().

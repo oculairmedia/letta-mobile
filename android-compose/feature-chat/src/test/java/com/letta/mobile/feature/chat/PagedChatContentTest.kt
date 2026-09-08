@@ -21,6 +21,8 @@ import com.letta.mobile.ui.theme.LettaChatTheme
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -287,6 +289,27 @@ class PagedChatContentTest {
         compose.onNodeWithText("actual tail").assertIsDisplayed()
         compose.onNodeWithText("around window").assertDoesNotExist()
         compose.runOnIdle { org.junit.Assert.assertEquals(listOf(null, "deleted", null), targets) }
+    }
+
+    @Test fun canonicalPresentationCancellationDetachesWithoutRetiringWriter() = kotlinx.coroutines.test.runTest {
+        val coordinator = io.mockk.mockk<com.letta.mobile.data.timeline.CanonicalTimelineCoordinator>()
+        val owner = io.mockk.mockk<com.letta.mobile.data.timeline.CanonicalTimelineCoordinator.Owner>()
+        val lease = io.mockk.mockk<com.letta.mobile.data.timeline.CanonicalTimelineCoordinator.Presentation>()
+        io.mockk.coEvery { coordinator.attach(owner, null) } returns lease
+        io.mockk.coEvery { coordinator.detach(lease) } returns Unit
+        var closed = 0
+        val presentation = ChatPagingPresentation(flowOf(PagingData.empty()), MutableStateFlow(emptyList()), { closed++ })
+        val job = launch {
+            ChatPagingHost().attachCanonicalPresentation(coordinator, owner, null, { presentation }) {
+                kotlinx.coroutines.awaitCancellation()
+            }
+        }
+        runCurrent()
+        job.cancel()
+        job.join()
+        org.junit.Assert.assertEquals(1, closed)
+        io.mockk.coVerify(exactly = 1) { coordinator.detach(lease) }
+        io.mockk.coVerify(exactly = 0) { coordinator.retire(any()) }
     }
 
     @Test fun hostIsDisabledWithoutEngineBinding() {

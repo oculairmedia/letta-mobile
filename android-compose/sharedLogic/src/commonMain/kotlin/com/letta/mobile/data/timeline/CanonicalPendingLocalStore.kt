@@ -4,6 +4,9 @@ import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 
 /** Bounded durable optimistic state, independent of screen residency and settled history. */
 class CanonicalPendingLocalStore(private val store: TimelineBoundedStore) {
@@ -11,10 +14,26 @@ class CanonicalPendingLocalStore(private val store: TimelineBoundedStore) {
     data class Record(
         val otid: String,
         val content: String,
-        val attachments: List<MessageContentPart.Image>,
+        val attachments: List<@Serializable(with = PendingImageSerializer::class) MessageContentPart.Image>,
         val sentAt: String,
         val delivery: Delivery = Delivery.Sending,
     )
+
+    // Local persistence shape only; outbound images retain their existing wire encoding.
+    internal object PendingImageSerializer : KSerializer<MessageContentPart.Image> {
+        @Serializable
+        private data class StoredImage(val base64: String, val mediaType: String)
+
+        override val descriptor = StoredImage.serializer().descriptor
+
+        override fun serialize(encoder: Encoder, value: MessageContentPart.Image) =
+            encoder.encodeSerializableValue(StoredImage.serializer(), StoredImage(value.base64, value.mediaType))
+
+        override fun deserialize(decoder: Decoder): MessageContentPart.Image {
+            val stored = decoder.decodeSerializableValue(StoredImage.serializer())
+            return MessageContentPart.Image(stored.base64, stored.mediaType)
+        }
+    }
 
     @Serializable
     enum class Delivery { Sending, Sent, Failed }
@@ -50,12 +69,18 @@ class CanonicalPendingLocalStore(private val store: TimelineBoundedStore) {
 
     /** Called inside the same transaction that durably confirms the server echo. */
     internal suspend fun confirm(transaction: TimelineStoreTransaction, otid: String) {
-        with(transaction) {
-            val previous = readPending()
-            val next = previous.filterNot { it.otid == otid }
-            if (next != previous) writePending(next)
-        }
+        confirmEcho(transaction, otid)
     }
+
+    companion object {
+        internal suspend fun confirmEcho(transaction: TimelineStoreTransaction, otid: String) {
+            if (otid.isBlank()) return
+            with(transaction) {
+                val previous = readPending()
+                val next = previous.filterNot { it.otid == otid }
+                if (next != previous) writePending(next)
+            }
+        }
 
     private suspend fun TimelineStoreReader.readPending(): List<Record> {
         val bytes = evidence(KEY, MAX_BYTES) ?: return emptyList()
@@ -86,7 +111,6 @@ class CanonicalPendingLocalStore(private val store: TimelineBoundedStore) {
         if (records.isEmpty()) deleteEvidence(KEY) else putEvidence(KEY, bytes)
     }
 
-    companion object {
         private const val KEY = "pending/local/v1"
         const val MAX_RECORDS = 64
         const val MAX_BYTES = 2 * 1024 * 1024

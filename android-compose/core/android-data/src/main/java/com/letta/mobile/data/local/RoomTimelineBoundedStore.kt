@@ -15,10 +15,20 @@ interface RoomTimelineCheckpointCodec {
     fun decode(bytes: ByteArray): TimelineDurableCheckpoint
 }
 
-/** Not bound into startup: legacy rollback remains the default until schema/rollout reconciliation. */
+object SharedRoomTimelineCheckpointCodec : RoomTimelineCheckpointCodec {
+    override fun encode(checkpoint: TimelineDurableCheckpoint): ByteArray = TimelineDurableCheckpointCodec.encode(checkpoint)
+    override fun decode(bytes: ByteArray): TimelineDurableCheckpoint = TimelineDurableCheckpointCodec.decode(bytes)
+}
+
+/**
+ * Separately named canonical backend; legacy rollback remains the default until rollout reconciliation.
+ * Blobs remain durable after replacement/deletion: pointers can outlive a metadata callback in the
+ * shared body-resolution path. Reclamation requires an explicit pointer lease/retention protocol;
+ * page release and speculative reference scans must not delete bodies.
+ */
 class RoomTimelineBoundedStore(
     private val database: TimelineLedgerDatabase,
-    private val codec: RoomTimelineCheckpointCodec,
+    private val codec: RoomTimelineCheckpointCodec = SharedRoomTimelineCheckpointCodec,
     private val io: CoroutineDispatcher = Dispatchers.IO,
 ) : TimelineBoundedStore {
     override suspend fun <T> read(scope: TimelineScope, block: suspend TimelineStoreReader.() -> T): T =
@@ -50,6 +60,40 @@ class RoomTimelineBoundedStore(
         var changed = false
         var revision: Long? = null
         var pending: TimelineDurableCheckpoint? = null
+
+        override suspend fun toolCall(callId: String): TimelineToolIndexEntry? {
+            checkOpen()
+            return dao.toolCall(scope, ledgerKey(callId))?.shared()
+        }
+
+        override suspend fun unresolvedTools(afterCallId: String?, maxRows: Int): List<TimelineToolIndexEntry> {
+            checkOpen()
+            require(maxRows in 1..128)
+            return (if (afterCallId == null) dao.unresolvedTools(scope, maxRows)
+                else dao.unresolvedToolsAfter(scope, ledgerKey(afterCallId), maxRows)).map { it.shared() }
+        }
+
+        override suspend fun toolSweepGeneration(): Long {
+            checkOpen()
+            return dao.toolSweepGeneration(scope) ?: 0L
+        }
+
+        override suspend fun putToolCall(entry: TimelineToolIndexEntry) {
+            write()
+            require(entry.callId.length <= 4096 && (entry.owner?.value?.length ?: 0) <= 4096)
+            dao.toolCall(LedgerToolCall(scope, ledgerKey(entry.callId), entry.owner?.let { ledgerKey(it.value) },
+                entry.returned, entry.owner != null && !entry.returned))
+        }
+
+        override suspend fun setToolSweepGeneration(next: Long) {
+            write()
+            check(next > toolSweepGeneration()) { "Tool sweep generation must increase without overflow" }
+            dao.toolSweep(LedgerToolSweep(scope, next))
+        }
+
+        private fun LedgerToolCall.shared() = TimelineToolIndexEntry(
+            ledgerString(callId), owner?.let { TimelineMessageId(ledgerString(it)) }, returned,
+        )
 
         fun checkOpen() { check(open) { "Snapshot callback escaped" } }
         fun write() { checkOpen(); check(writable) { "Read-only snapshot" }; changed = true }

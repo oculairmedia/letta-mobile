@@ -172,6 +172,7 @@ tasks.named("processResources") {
 
 dependencies {
     implementation(project(":sharedLogic"))
+    implementation(libs.androidx.paging.compose)
     implementation(project(":sharedUI"))
     // letta-mobile-cq2ju: Iroh QUIC transport for desktop. sharedLogic declares
     // computer.iroh:iroh as `implementation` (not `api`), so it is NOT exposed

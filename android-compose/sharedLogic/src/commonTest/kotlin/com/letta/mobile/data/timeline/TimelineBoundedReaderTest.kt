@@ -156,6 +156,15 @@ class TimelineBoundedReaderTest {
         kotlin.test.assertIs<TimelineSettledProjection.Deferred>(record.copy(body = bytes.copyOf(7)).projectBounded(scope))
     }
 
+    @Test fun opaqueProtocolRecordDoesNotBreakSettledProjection() {
+        val metadata = row(1, 3)
+        val bytes = byteArrayOf(0, 1, 2)
+        val record = TimelineSettledRecord(metadata.key,
+            "application/vnd.letta.message+json;version=1", bytes, 1, metadata.body)
+        assertEquals(TimelineSettledProjection.NotRenderable, record.projectBounded(scope))
+        kotlin.test.assertContentEquals(byteArrayOf(0, 1, 2), record.body)
+    }
+
     private suspend fun load(store: Store, bytes: Long) = TimelineBoundedReader(store).load(
         TimelineScope("backend", "conversation"), TimelineReadPosition.Tail, TimelinePageBudget(4, bytes),
     )
@@ -167,7 +176,18 @@ class TimelineBoundedReaderTest {
         var payload: ByteArray? = null
         var responseSize: Int? = null
         val metadataLimits = mutableListOf<Int>()
-        override suspend fun <T> read(scope: TimelineScope, block: suspend TimelineStoreReader.() -> T): T = block(this)
+        private val tools = mutableMapOf<TimelineScope, TestToolIndexState>()
+        override suspend fun toolCall(callId: String): TimelineToolIndexEntry? = error("Use scoped read")
+        override suspend fun unresolvedTools(afterCallId: String?, maxRows: Int): List<TimelineToolIndexEntry> = error("Use scoped read")
+        override suspend fun toolSweepGeneration(): Long = error("Use scoped read")
+        override suspend fun <T> read(scope: TimelineScope, block: suspend TimelineStoreReader.() -> T): T {
+            val snapshot = tools[scope]?.snapshot() ?: TestToolIndexState()
+            return block(object : TimelineStoreReader by this {
+                override suspend fun toolCall(callId: String) = snapshot.entries[callId]
+                override suspend fun unresolvedTools(afterCallId: String?, maxRows: Int) = snapshot.unresolved(afterCallId, maxRows)
+                override suspend fun toolSweepGeneration() = snapshot.generation
+            })
+        }
         override suspend fun <T> transaction(scope: TimelineScope, block: suspend TimelineStoreTransaction.() -> T): T =
             error("Read must never mutate durable history")
         override suspend fun checkpoint() = TimelineDurableCheckpoint(1, null, false)

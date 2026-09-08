@@ -3,6 +3,22 @@ package com.letta.mobile.data.timeline
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import com.letta.mobile.data.timeline.snapshot.toConfirmedTimelineEvent
+import kotlinx.collections.immutable.toPersistentList
+
+/** Use the existing semantic mapper for optimistic attachments and delivery flags on every host. */
+fun CanonicalPendingLocalStore.Record.toRenderItem(ownAgentId: String? = null): ChatRenderItem.Single {
+    val event = TimelineEvent.Local(
+        position = 0.0, otid = otid, content = content, sentAt = parseTimelineInstant(sentAt),
+        deliveryState = when (delivery) {
+            CanonicalPendingLocalStore.Delivery.Sending -> DeliveryState.SENDING
+            CanonicalPendingLocalStore.Delivery.Sent -> DeliveryState.SENT
+            CanonicalPendingLocalStore.Delivery.Failed -> DeliveryState.FAILED
+        },
+        attachments = attachments.toPersistentList(),
+    )
+    val message = requireNotNull(com.letta.mobile.data.chat.projection.timelineEventToUiMessage(event, ownAgentId))
+    return ChatRenderItem.Single(message, com.letta.mobile.ui.common.GroupPosition.None)
+}
 
 /** Immutable bounded projection supplied by the shared live reducer, separate from settled Paging. */
 data class TimelineLiveBlock(
@@ -45,9 +61,8 @@ fun TimelineSettledRecord.projectBounded(
 /** Project only complete canonical bodies; partial JSON must never become a missing message. */
 fun TimelineSettledRecord.toRenderItem(ownAgentId: String? = null): com.letta.mobile.data.chat.projection.ChatRenderItem? {
     require(!isPreview) { "Resolve bounded body before projection" }
-    require(contentType == "application/vnd.letta.timeline-event+json;version=1") {
-        "Unsupported canonical record type: $contentType"
-    }
+    // Opaque protocol records remain durable but have no renderer in this client version.
+    if (contentType != "application/vnd.letta.timeline-event+json;version=1") return null
     val stored = com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec.json.decodeFromString(
         com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent.serializer(),
         body.decodeToString(throwOnInvalidSequence = true),

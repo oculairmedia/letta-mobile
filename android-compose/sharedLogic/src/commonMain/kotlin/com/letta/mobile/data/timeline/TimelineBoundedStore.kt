@@ -61,7 +61,23 @@ interface TimelineBoundedStore {
     suspend fun <T> transaction(scope: TimelineScope, block: suspend TimelineStoreTransaction.() -> T): T
 }
 
+/** Scoped exact tool identity; a return can precede discovery of its canonical owner. */
+data class TimelineToolIndexEntry(
+    val callId: String,
+    val owner: TimelineMessageId?,
+    val returned: Boolean,
+)
+
 interface TimelineStoreReader {
+    /** Exact indexed lookup. No ledger scan or body materialization. */
+    suspend fun toolCall(callId: String): TimelineToolIndexEntry?
+    /**
+     * Ascending Kotlin-string call IDs, strictly after afterCallId. Return at most maxRows
+     * entries with owner != null and returned == false. Apply filtering and limit in the index.
+     */
+    suspend fun unresolvedTools(afterCallId: String?, maxRows: Int): List<TimelineToolIndexEntry>
+    /** Durable fence, scoped exactly like toolCall; zero before the first turn. */
+    suspend fun toolSweepGeneration(): Long
     suspend fun checkpoint(): TimelineDurableCheckpoint
     suspend fun metadata(position: TimelineReadPosition, maxRows: Int): TimelineMetadataPage
     suspend fun locate(identity: TimelineMessageId): TimelinePageKey?
@@ -72,6 +88,10 @@ interface TimelineStoreReader {
 }
 
 interface TimelineStoreTransaction : TimelineStoreReader {
+    /** Atomic with canonical body/evidence writes; caller preserves monotonic returned evidence. */
+    suspend fun putToolCall(entry: TimelineToolIndexEntry)
+    /** Persist next generation; require next > current and fail on exhaustion. */
+    suspend fun setToolSweepGeneration(next: Long)
     /** Shared engine assigns canonical key and serialized body; backend stamps transaction revision. */
     suspend fun put(record: TimelineStoredRecord)
     suspend fun putEvidence(key: String, value: ByteArray)

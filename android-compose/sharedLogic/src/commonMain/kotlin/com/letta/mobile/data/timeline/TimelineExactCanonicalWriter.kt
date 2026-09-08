@@ -19,7 +19,14 @@ class TimelineExactCanonicalWriter(
 
     override suspend fun merge(transaction: TimelineStoreTransaction, record: TimelineRemoteRecord): Boolean {
         val incoming = record.message.toTimelineEvent(0.0)
-        if (incoming != null) return mergeEvent(transaction, incoming)
+        if (incoming != null) {
+            // toTimelineEvent intentionally omits the return's call ID; capture the wire identity
+            // before projection so returns on a different history page resolve old owners.
+            val returned = record.message as? com.letta.mobile.data.model.ToolReturnMessage
+            val callId = returned?.toolReturn?.toolCallId?.takeIf { it.isNotBlank() }
+            val indexed = if (callId != null) CanonicalToolIndex.observe(transaction, callId, null, true) else false
+            return mergeEvent(transaction, incoming) || indexed
+        }
         // Opaque protocol records must survive even when the current renderer cannot project them.
         val key = transaction.locate(record.identity) ?: TimelinePageKey(
             record.message.date?.let(::parseTimelineInstantOrNull)?.let {
@@ -33,6 +40,13 @@ class TimelineExactCanonicalWriter(
 
     suspend fun mergeEvent(transaction: TimelineStoreTransaction, incoming: TimelineEvent.Confirmed): Boolean {
         val identity = canonicalIdentity(transaction, incoming.serverId, incoming.otid)
+        val suppression = transaction.evidence("suppression/server/${identity.value}", 64 * 1024)
+        if (suppression != null && incoming.messageType == TimelineMessageType.ASSISTANT) {
+            val decision = TimelineSnapshotCodec.json.decodeFromString(
+                AbandonedAssistantFragmentSuppression.serializer(), suppression.decodeToString(),
+            )
+            if (decision == incoming.toAbandonedAssistantFragmentSuppression()) return false
+        }
         val ownerKey = "terminal/server/${identity.value}"
         val ownerBytes = transaction.evidence(ownerKey, 64 * 1024)
         val owner = ownerBytes?.let {
@@ -63,7 +77,21 @@ class TimelineExactCanonicalWriter(
                 is TerminalEvidenceDecision.Unavailable -> throw TimelineMergeUnavailable(identity, decision.reason)
             }
         } else historical?.let { TimelineHydrationReducer.mergeRicherEventFacts(incoming, it).copy(position = it.position, otid = it.otid) } ?: incoming
-        if (merged == historical) return false
+        // The echo and optimistic removal share the caller's transaction, even on replay.
+        // Assistant frames can carry an otid too; only a user echo confirms a local send.
+        if (incoming.messageType == TimelineMessageType.USER) {
+            CanonicalPendingLocalStore.confirmEcho(transaction, incoming.otid)
+        }
+        var indexed = false
+        for (call in merged.toolCalls) {
+            if (call.effectiveId.isBlank()) continue
+            indexed = CanonicalToolIndex.observe(transaction, call.effectiveId, identity,
+                call.effectiveId in merged.toolReturnContentByCallId) || indexed
+        }
+        for (callId in merged.toolReturnContentByCallId.keys) {
+            if (callId.isNotBlank()) indexed = CanonicalToolIndex.observe(transaction, callId, null, true) || indexed
+        }
+        if (merged == historical) return indexed
         val canonical = merged.copy(serverId = identity.value)
         val bytes = TimelineSnapshotCodec.json.encodeToString(StoredTimelineEvent.serializer(), canonical.toStoredTimelineEvent()).encodeToByteArray()
         if (canonical.otid.isNotBlank()) transaction.putEvidence("identity/otid/${canonical.otid}", identity.value.encodeToByteArray())

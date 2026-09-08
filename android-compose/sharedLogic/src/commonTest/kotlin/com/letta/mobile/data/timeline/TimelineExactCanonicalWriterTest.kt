@@ -12,6 +12,16 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class TimelineExactCanonicalWriterTest {
+    @Test fun capturedTransportScopeRejectsRetiredBackend() = runTest {
+        var current = "first"
+        val resolver = CanonicalTransportScopeResolver(current) { it == current }
+        assertEquals(TimelineScope("first", "conversation", "agent"), resolver.resolve("agent", "conversation"))
+        current = "second"
+        kotlin.test.assertFailsWith<IllegalStateException> { resolver.resolve("agent", "conversation") }
+        val replacement = CanonicalTransportScopeResolver(current) { it == current }
+        assertEquals(TimelineScope("second", "conversation", "agent"), replacement.resolve("agent", "conversation"))
+    }
+
     @Test fun liveReductionCommitsOnceAndRejectsStaleFence() = runTest {
         val store = Store()
         val engine = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
@@ -27,6 +37,240 @@ class TimelineExactCanonicalWriterTest {
         assertFalse(engine.acknowledgeSettlement(fence, emptyMap()))
         assertTrue(engine.acknowledgeSettlement(fence, mapOf(TimelineMessageId("id") to 1L)))
         assertEquals(null, engine.live.value)
+    }
+
+    @Test fun toolIndexRollsBackWithBodyAndResolvesCanonicalAlias() = runTest {
+        val store = Store()
+        val writer = TimelineExactCanonicalWriter(scope, 100_000)
+        val event = kotlin.test.assertNotNull(message("tool").toTimelineEvent(0.0)).copy(
+            messageType = TimelineMessageType.TOOL_CALL,
+            toolCalls = listOf(com.letta.mobile.data.model.ToolCall(id = "call", name = "test")).toTimelinePersistentList(),
+            otid = "local-tool",
+        )
+        kotlin.test.assertFailsWith<IllegalStateException> {
+            store.transaction(scope) {
+                writer.mergeEvent(this, event)
+                setToolSweepGeneration(1)
+                error("rollback")
+            }
+        }
+        assertEquals(0, store.rows.size)
+        store.read(scope) {
+            assertEquals(null, toolCall("call"))
+            assertEquals(0L, toolSweepGeneration())
+        }
+        store.transaction(scope) { writer.mergeEvent(this, event); nextRevision() }
+        store.transaction(scope) { writer.mergeEvent(this, event.copy(serverId = "alias")) }
+        store.read(scope) {
+            assertEquals(TimelineMessageId("id"), toolCall("call")?.owner)
+            assertEquals(listOf("call"), unresolvedTools(null, 1).map { it.callId })
+            assertEquals(emptyList(), unresolvedTools("call", 1))
+        }
+        store.read(scope.copy(backendId = "other")) {
+            assertEquals(null, toolCall("call"))
+            assertEquals(emptyList(), unresolvedTools(null, 1))
+        }
+    }
+
+    @Test fun undecodedRawEventFailsWithoutCommittingOrConsumingTypedTurn() = runTest {
+        val store = Store()
+        val engine = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
+        val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
+        val fence = engine.beginLive(selection)
+        kotlin.test.assertFailsWith<IllegalStateException> {
+            engine.ingest(fence, TimelineStreamFrame.RawEvent("message", "{}", "cursor"))
+        }
+        assertEquals(0, store.rows.size)
+        assertEquals(0L, engine.publication.value.durableRevision)
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(message("typed"))))
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
+        assertEquals(1, store.rows.size)
+    }
+
+    @Test fun semanticSuppressionRetainsRawBodyAndRejectsExactReplay() = runTest {
+        val store = Store()
+        val writer = TimelineExactCanonicalWriter(scope, 100_000)
+        val engine = CanonicalTimelineEngine(store, writer, enabled = true)
+        val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
+        val fence = engine.beginLive(selection)
+        val fragment = message("tiny").copy(runId = "run")
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(fragment)))
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
+        val raw = store.rows.values.single().body.copyOf()
+        assertEquals(1, engine.suppressAbandonedTail(selection, "run", null, "cancelled", emptySet()))
+        assertEquals(1, store.rows.size)
+        kotlin.test.assertContentEquals(raw, store.rows.values.single().body)
+        val event = kotlin.test.assertNotNull(fragment.toTimelineEvent(0.0))
+        assertTrue(engine.isSuppressed(selection, TimelineMessageId(fragment.id), 2L, event))
+        kotlin.test.assertFailsWith<IllegalStateException> {
+            engine.isSuppressed(selection, TimelineMessageId(fragment.id), 1L, event)
+        }
+        store.transaction(scope) {
+            assertFalse(writer.merge(this, TimelineRemoteRecord(TimelineMessageId(fragment.id), fragment, 0)))
+        }
+    }
+
+    @Test fun nextTurnHandsOffCommittedOffTailBodyAndRejectsOldAcknowledgment() = runTest {
+        val store = Store()
+        val engine = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
+        val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
+        val first = engine.beginLive(selection)
+        assertTrue(engine.ingest(first, TimelineStreamFrame.Message(message("first"))))
+        assertTrue(engine.ingest(first, TimelineStreamFrame.Done))
+        val firstBody = store.rows.values.single().body.copyOf()
+        val second = engine.beginLive(selection)
+        assertFalse(engine.acknowledgeSettlement(first, mapOf(TimelineMessageId("id") to 1L)))
+        assertTrue(engine.ingest(second, TimelineStreamFrame.Message(message("second").copy(id = "second", otid = "second"))))
+        kotlin.test.assertContentEquals(firstBody, store.rows.values.single().body)
+        assertTrue(engine.ingest(second, TimelineStreamFrame.Done))
+        assertEquals(2, store.rows.size)
+        assertFalse(engine.acknowledgeSettlement(first, mapOf(TimelineMessageId("id") to 2L)))
+        assertEquals(second, engine.live.value?.fence)
+        assertTrue(engine.acknowledgeSettlement(second, mapOf(TimelineMessageId("second") to 2L)))
+    }
+
+    @Test fun backgroundCoordinatorCompletionRetainsNonEmptyHistoryAcrossRetirement() = runTest {
+        val store = Store()
+        var repairStarted = kotlinx.coroutines.CompletableDeferred<Unit>()
+        var releaseRepair = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val transport = object : TimelineTransport {
+            override suspend fun listConversationMessagePage(request: TimelineRemotePageRequest, progress: TimelinePageProgress?): TimelineRemotePageResult {
+                repairStarted.complete(Unit)
+                releaseRepair.await()
+                assertEquals(TimelineContinuation.Initial, request.continuation)
+                return TimelineRemotePageResult.Page(request.requestId, request.selectionGeneration,
+                    listOf(TimelineRemoteRecord(TimelineMessageId("echo"), com.letta.mobile.data.model.UserMessage(
+                        id = "echo", contentRaw = kotlinx.serialization.json.JsonPrimitive("question"),
+                        date = "2026-01-01T00:00:00Z", otid = "pending-user",
+                    ), 0)), null, false, 0)
+            }
+            override suspend fun sendConversationMessage(
+                conversationId: String, request: com.letta.mobile.data.model.MessageCreateRequest,
+            ): kotlinx.coroutines.flow.Flow<com.letta.mobile.data.model.LettaMessage> = error("unexpected send")
+            override suspend fun streamConversation(conversationId: String): kotlinx.coroutines.flow.Flow<TimelineStreamFrame> =
+                error("ownership must not open transport")
+            override suspend fun listConversationMessages(
+                conversationId: String, limit: Int?, after: String?, order: String?,
+            ): List<com.letta.mobile.data.model.LettaMessage> = error("unexpected legacy hydration")
+            override suspend fun listAgentMessages(
+                agentId: String, limit: Int?, order: String?, conversationId: String?,
+            ): List<com.letta.mobile.data.model.LettaMessage> = error("unexpected legacy hydration")
+        }
+        val coordinator = CanonicalTimelineCoordinator(store, transport)
+        val calls = mutableListOf<String>()
+        val maintenance = object : CanonicalTimelineMaintenance {
+            override suspend fun turnStarted(owner: CanonicalTimelineCoordinator.Owner, runId: String?, turnId: String?) { calls += "start:$runId:$turnId" }
+            override suspend fun turnEnded(owner: CanonicalTimelineCoordinator.Owner, clean: Boolean) { calls += "end:$clean" }
+            override suspend fun cleanup(owner: CanonicalTimelineCoordinator.Owner, runId: String?, turnId: String?, reason: String, candidateRunIds: Set<String>): Int { calls += "cleanup:$reason"; return 2 }
+            override suspend fun repairCursor(owner: CanonicalTimelineCoordinator.Owner, fallbackSeq: Long?) { calls += "repair:$fallbackSeq" }
+        }
+        val external = CanonicalExternalTransportWriter(coordinator, { agentId, conversationId ->
+            assertEquals(scope.agentId, agentId)
+            assertEquals(scope.conversationId, conversationId)
+            scope
+        }, maintenance, now = { "2026-01-01T00:00:00Z" })
+        val local = CanonicalPendingLocalStore.Record("pending-user", "question", emptyList(), "2026-01-01T00:00:00Z")
+        external.appendExternalTransportLocal(scope.agentId, scope.conversationId, local.content, local.otid, local.attachments)
+        external.turnStarted(scope.agentId, scope.conversationId, "run", "turn")
+        assertEquals(2, external.cleanupAbandonedAssistantFragments(scope.agentId, scope.conversationId, "run", "turn", "cancelled"))
+        external.repairExpiredConversationCursorScoped(scope.agentId, scope.conversationId, 10L)
+        val owner = coordinator.acquire(scope)
+        assertEquals(listOf(local), owner.session.pending.value)
+        owner.session.markPending(local.otid, CanonicalPendingLocalStore.Delivery.Sent)
+        assertEquals(CanonicalPendingLocalStore.Delivery.Sent, owner.session.pending.value.single().delivery)
+        val screen = kotlin.test.assertNotNull(coordinator.attach(owner))
+        val fence = coordinator.beginLive(owner)
+        external.ingestExternalTransportMessage(scope.agentId, scope.conversationId, message("hello"))
+        coordinator.detach(screen)
+        assertFalse(coordinator.retire(owner))
+        external.turnEnded(scope.agentId, scope.conversationId, clean = false)
+        assertEquals(listOf("start:run:turn", "cleanup:cancelled", "repair:10", "end:false"), calls)
+        assertEquals(null, owner.session.live.value)
+        assertEquals(1, store.rows.size)
+        val durableBody = store.rows.values.single().body.copyOf()
+        assertEquals(1L, store.current.revision)
+        assertFalse(coordinator.ingest(owner, fence, TimelineStreamFrame.Done))
+        assertTrue(coordinator.retire(owner))
+        val reopened = coordinator.acquire(scope)
+        val page = reopened.session.engine.load(reopened.selection, TimelineReadPosition.Tail, 1)
+        kotlin.test.assertContentEquals(durableBody, page.bodies.single())
+        assertEquals(1L, reopened.session.publication.value.durableRevision)
+        assertEquals(1, store.rows.size)
+        val repair = async { coordinator.reconcileRecentDetailed(reopened) }
+        repairStarted.await()
+        assertFalse(coordinator.retire(reopened))
+        releaseRepair.complete(Unit)
+        assertEquals(TimelineEngineReconcileResult(TimelineEnginePageOutcome.Applied, appended = 1), repair.await())
+        assertEquals(TimelineEngineReconcileResult(TimelineEnginePageOutcome.Applied, appended = 0), coordinator.reconcileRecentDetailed(reopened))
+        assertEquals(emptyList(), reopened.session.pending.value)
+        assertEquals(2, store.rows.size)
+        assertTrue(store.current.hasMore)
+        assertEquals(TimelineContinuation.Initial, store.current.continuation)
+        repairStarted = kotlinx.coroutines.CompletableDeferred()
+        releaseRepair = kotlinx.coroutines.CompletableDeferred()
+        val cancelledRepair = async { coordinator.reconcileRecent(reopened) }
+        repairStarted.await()
+        assertFalse(coordinator.retire(reopened))
+        cancelledRepair.cancel()
+        cancelledRepair.join()
+        assertTrue(coordinator.retire(reopened))
+    }
+
+    @Test fun userEchoConfirmsPendingAtomicallyIncludingReplay() = runTest {
+        val store = Store()
+        val pending = CanonicalPendingLocalStore(store)
+        val writer = TimelineExactCanonicalWriter(scope, 100_000)
+        val local = CanonicalPendingLocalStore.Record("local", "hello", emptyList(), "2026-01-01T00:00:00Z")
+        pending.save(scope, local)
+        store.transaction(scope) {
+            writer.merge(this, TimelineRemoteRecord(TimelineMessageId("id"), message("reply").copy(otid = "assistant-local"), 0))
+        }
+        assertEquals(listOf(local), pending.load(scope))
+        val echo = com.letta.mobile.data.model.UserMessage(
+            id = "user", contentRaw = kotlinx.serialization.json.JsonPrimitive("hello"),
+            date = local.sentAt, otid = local.otid,
+        )
+        val record = TimelineRemoteRecord(TimelineMessageId("user"), echo, 0)
+        kotlin.test.assertFailsWith<IllegalStateException> {
+            store.transaction(scope) {
+                writer.merge(this, record)
+                error("simulated commit failure")
+            }
+        }
+        assertEquals(listOf(local), pending.load(scope))
+        assertEquals(1, store.rows.size)
+        store.transaction(scope) { assertTrue(writer.merge(this, record)) }
+        assertEquals(emptyList(), pending.load(scope))
+        pending.save(scope, local)
+        store.transaction(scope) { assertFalse(writer.merge(this, record)) }
+        assertEquals(emptyList(), pending.load(scope))
+        assertEquals(2, store.rows.size)
+    }
+
+    @Test fun recentRepairPreservesOlderCursorAndRejectsSupersededRequests() = runTest {
+        val store = Store()
+        val engine = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
+        val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
+        val older = engine.beginPage(selection)
+        val stale = engine.beginReconcile(selection)
+        val current = engine.beginReconcile(selection)
+        fun page(request: TimelineEngineRequest) = TimelineRemotePageResult.Page(
+            request.remote.requestId, selection.generation,
+            listOf(TimelineRemoteRecord(TimelineMessageId("id"), message("hello"), 0)), null, false, 0,
+        )
+        assertEquals(TimelineEnginePageOutcome.Stale, engine.reconcilePage(stale, page(stale)))
+        assertEquals(0, store.rows.size)
+        engine.cancelReconcile(stale)
+        assertEquals(TimelineEnginePageOutcome.Applied, engine.reconcilePage(current, page(current)))
+        assertEquals(TimelineContinuation.Initial, store.current.continuation)
+        assertTrue(store.current.hasMore)
+        assertEquals(TimelineEnginePageOutcome.Stale, engine.reconcilePage(current, page(current)))
+        assertEquals(TimelineEnginePageOutcome.Applied, engine.applyPage(older, page(older)))
+        assertEquals(1, store.rows.size)
+        assertFalse(store.current.hasMore)
+        val beforeRun = engine.beginReconcile(selection)
+        engine.beginLive(selection)
+        assertEquals(TimelineEnginePageOutcome.Stale, engine.reconcilePage(beforeRun, page(beforeRun)))
     }
 
     @Test fun exactWriterPreservesKeyOnDuplicateAndReopen() = runTest {
@@ -140,19 +384,27 @@ class TimelineExactCanonicalWriterTest {
         var current = TimelineDurableCheckpoint(0, TimelineContinuation.Initial, true)
         val rows = mutableMapOf<TimelinePageKey, TimelineStoredRecord>()
         val evidence = mutableMapOf<String, ByteArray>()
-        override suspend fun <T> read(scope: TimelineScope, block: suspend TimelineStoreReader.() -> T): T = block(Tx())
+        private val tools = mutableMapOf<TimelineScope, TestToolIndexState>()
+        override suspend fun <T> read(scope: TimelineScope, block: suspend TimelineStoreReader.() -> T): T =
+            block(Tx(tools[scope]?.snapshot() ?: TestToolIndexState()))
         override suspend fun <T> transaction(scope: TimelineScope, block: suspend TimelineStoreTransaction.() -> T): T {
             val before = current
             val oldRows = rows.toMap()
             val oldEvidence = evidence.toMap()
-            return try { block(Tx()) } catch (failure: Throwable) {
+            val toolCopy = tools[scope]?.snapshot() ?: TestToolIndexState()
+            return try { block(Tx(toolCopy)).also { tools[scope] = toolCopy } } catch (failure: Throwable) {
                 current = before
                 rows.clear(); rows.putAll(oldRows)
                 evidence.clear(); evidence.putAll(oldEvidence)
                 throw failure
             }
         }
-        private inner class Tx : TimelineStoreTransaction {
+        private inner class Tx(private val tools: TestToolIndexState) : TimelineStoreTransaction {
+            override suspend fun toolCall(callId: String) = tools.entries[callId]
+            override suspend fun unresolvedTools(afterCallId: String?, maxRows: Int) = tools.unresolved(afterCallId, maxRows)
+            override suspend fun toolSweepGeneration() = tools.generation
+            override suspend fun putToolCall(entry: TimelineToolIndexEntry) = tools.put(entry)
+            override suspend fun setToolSweepGeneration(next: Long) = tools.advance(next)
             override suspend fun checkpoint() = current
             override suspend fun locate(identity: TimelineMessageId) = rows.keys.singleOrNull { it.identity == identity }
             override suspend fun metadata(position: TimelineReadPosition, maxRows: Int): TimelineMetadataPage {

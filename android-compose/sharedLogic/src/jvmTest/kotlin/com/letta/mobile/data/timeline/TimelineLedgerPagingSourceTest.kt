@@ -78,7 +78,18 @@ class TimelineLedgerPagingSourceTest {
         var position: TimelineReadPosition? = null
         var hasMore = false
         var cancel = false
-        override suspend fun <T> read(scope: TimelineScope, block: suspend TimelineStoreReader.() -> T): T = block(this)
+        private val tools = mutableMapOf<TimelineScope, TestToolIndexState>()
+        override suspend fun toolCall(callId: String): TimelineToolIndexEntry? = error("Use scoped read")
+        override suspend fun unresolvedTools(afterCallId: String?, maxRows: Int): List<TimelineToolIndexEntry> = error("Use scoped read")
+        override suspend fun toolSweepGeneration(): Long = error("Use scoped read")
+        override suspend fun <T> read(scope: TimelineScope, block: suspend TimelineStoreReader.() -> T): T {
+            val snapshot = tools[scope]?.snapshot() ?: TestToolIndexState()
+            return block(object : TimelineStoreReader by this {
+                override suspend fun toolCall(callId: String) = snapshot.entries[callId]
+                override suspend fun unresolvedTools(afterCallId: String?, maxRows: Int) = snapshot.unresolved(afterCallId, maxRows)
+                override suspend fun toolSweepGeneration() = snapshot.generation
+            })
+        }
         override suspend fun <T> transaction(scope: TimelineScope, block: suspend TimelineStoreTransaction.() -> T): T = error("read only")
         override suspend fun checkpoint() = TimelineDurableCheckpoint(1, null, hasMore)
         override suspend fun locate(identity: TimelineMessageId): TimelinePageKey? = null

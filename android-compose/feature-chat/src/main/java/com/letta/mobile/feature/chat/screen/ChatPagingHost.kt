@@ -10,8 +10,44 @@ import javax.inject.Inject
 /** Android injection boundary only; selection, ingestion and fencing belong to the engine. */
 @javax.inject.Singleton
 class ChatPagingHost @Inject constructor() {
-    // Disabled until the host supplies an engine-backed selection and ingest binding.
+    // Installed only alongside the canonical writer, after the host's dev-only gate passes.
+    var openCanonical: (suspend (String, String, String?, kotlinx.coroutines.CoroutineScope) -> ChatPagingPresentation)? = null
+
+    fun bindCanonical(
+        coordinator: com.letta.mobile.data.timeline.CanonicalTimelineCoordinator,
+        resolveOwner: suspend (String, String) -> com.letta.mobile.data.timeline.CanonicalTimelineCoordinator.Owner,
+    ) {
+        openCanonical = { agent, conversation, target, uiScope ->
+            createCanonicalChatPagingPresentation(coordinator, resolveOwner(agent, conversation), uiScope, target)
+        }
+    }
+
+    // Legacy test seam; never used to activate a canonical route.
     var select: ((String, String, String?, Long) -> ChatPagingPresentation)? = null
+
+    /** Presentation disposal releases only its viewport lease, never the conversation writer. */
+    suspend fun attachCanonicalPresentation(
+        coordinator: com.letta.mobile.data.timeline.CanonicalTimelineCoordinator,
+        owner: com.letta.mobile.data.timeline.CanonicalTimelineCoordinator.Owner,
+        target: com.letta.mobile.data.timeline.TimelineMessageId?,
+        create: (com.letta.mobile.data.timeline.CanonicalTimelineCoordinator.Presentation) -> ChatPagingPresentation,
+        consume: suspend (ChatPagingPresentation) -> Unit,
+    ): Boolean {
+        val lease = coordinator.attach(owner, target) ?: return false
+        try {
+            val presentation = create(lease)
+            try {
+                consume(presentation)
+            } finally {
+                presentation.close()
+            }
+        } finally {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                coordinator.detach(lease)
+            }
+        }
+        return true
+    }
 }
 
 internal data class ChatPagingViewport(val messageId: String, val offset: Int, val following: Boolean = false)
@@ -24,6 +60,10 @@ class ChatPagingPresentation(
     val missingTarget: StateFlow<String?> = kotlinx.coroutines.flow.MutableStateFlow(null),
     // The host maps only actually resident rows to their durable revisions before settlement.
     val onResidentRows: (List<ChatRenderItem>) -> Unit = {},
+    val opening: Boolean = false,
+    val openError: String? = null,
+    val retryOpen: () -> Unit = {},
+    val deferredReader: (ChatRenderItem) -> (suspend (Long) -> com.letta.mobile.data.timeline.TimelineSemanticWindowResult)? = { null },
 ) {
     internal var viewport: ChatPagingViewport? = null
     internal var saveViewport: (ChatPagingViewport) -> Unit = {}

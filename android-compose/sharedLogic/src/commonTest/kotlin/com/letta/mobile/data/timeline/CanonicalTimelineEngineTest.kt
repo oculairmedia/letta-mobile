@@ -58,6 +58,19 @@ class CanonicalTimelineEngineTest {
         assertEquals(0, store.commits)
     }
 
+    @Test fun cancelledPageRejectsLateResponseWithoutClearingReplacement() = runTest {
+        val store = Store()
+        val engine = engine(store)
+        val selection = open(engine)
+        val cancelled = engine.beginPage(selection)
+        engine.cancelPage(cancelled)
+        assertEquals(TimelineEnginePageOutcome.Stale, engine.applyPage(cancelled, page(cancelled, null)))
+        val replacement = engine.beginPage(selection)
+        engine.cancelPage(cancelled)
+        assertEquals(TimelineEnginePageOutcome.Applied, engine.applyPage(replacement, page(replacement, null)))
+        assertEquals(1, store.commits)
+    }
+
     @Test fun emptyUnadvancedCursorIsNoProgressNotExhaustion() = runTest {
         val store = Store()
         val engine = engine(store)
@@ -151,6 +164,12 @@ class CanonicalTimelineEngineTest {
         assertEquals(false, coordinator.ingest(first, fence, TimelineStreamFrame.Heartbeat))
         assertEquals(false, coordinator.acknowledgeSettlement(first, fence, emptyMap()))
         assertFailsWith<IllegalStateException> { coordinator.beginLive(first) }
+        assertFailsWith<IllegalStateException> {
+            coordinator.appendPending(first, CanonicalPendingLocalStore.Record("stale", "text", emptyList(), "2026-01-01T00:00:00Z"))
+        }
+        assertFailsWith<IllegalStateException> {
+            coordinator.markPending(first, "stale", CanonicalPendingLocalStore.Delivery.Sent)
+        }
         assertEquals(TimelineEnginePageOutcome.Stale, first.session.engine.applyPage(request, page(request, null)))
         assertEquals(replacement, coordinator.current(scope))
         val attached = kotlin.test.assertNotNull(coordinator.attach(replacement))
@@ -161,11 +180,13 @@ class CanonicalTimelineEngineTest {
         assertEquals(null, replacement.session.engine.live.value)
         val nextFence = coordinator.beginLive(replacement)
         assertEquals(false, coordinator.retire(replacement))
-        assertEquals(true, replacement.session.engine.publishLive(nextFence, TimelineLiveBlock(emptyList(), true)))
-        coordinator.detach(attached)
+        // A background transport completion must release settlement without another UI detach.
+        assertEquals(true, coordinator.ingest(replacement, nextFence, TimelineStreamFrame.Done))
+        assertEquals(null, replacement.session.engine.live.value)
+        assertEquals(false, coordinator.ingest(replacement, nextFence, TimelineStreamFrame.Heartbeat))
         assertEquals(true, coordinator.retire(replacement))
         assertEquals(3, store.commits)
-        assertEquals(5, store.reads)
+        assertEquals(9, store.reads) // Three pending restores and one durable-completion refresh.
     }
 
     private fun engine(store: Store) = CanonicalTimelineEngine(store, writer, enabled = true)
@@ -177,22 +198,29 @@ class CanonicalTimelineEngineTest {
 
     private class Store : TimelineBoundedStore {
         val checkpoints = mutableMapOf<TimelineScope, TimelineDurableCheckpoint>()
+        private val tools = mutableMapOf<TimelineScope, TestToolIndexState>()
         var reads = 0
         var commits = 0
         var cancel = false
         override suspend fun <T> read(scope: TimelineScope, block: suspend TimelineStoreReader.() -> T): T {
             reads++
-            return block(Transaction(checkpoints[scope] ?: initial))
+            return block(Transaction(checkpoints[scope] ?: initial, tools[scope]?.snapshot() ?: TestToolIndexState()))
         }
         override suspend fun <T> transaction(scope: TimelineScope, block: suspend TimelineStoreTransaction.() -> T): T {
-            val tx = Transaction(checkpoints[scope] ?: initial)
+            val tx = Transaction(checkpoints[scope] ?: initial, tools[scope]?.snapshot() ?: TestToolIndexState())
             val result = block(tx)
             if (cancel) throw CancellationException("before commit")
             checkpoints[scope] = tx.current
+            tools[scope] = tx.tools
             commits++
             return result
         }
-        private class Transaction(var current: TimelineDurableCheckpoint) : TimelineStoreTransaction {
+        private class Transaction(var current: TimelineDurableCheckpoint, val tools: TestToolIndexState) : TimelineStoreTransaction {
+            override suspend fun toolCall(callId: String) = tools.entries[callId]
+            override suspend fun unresolvedTools(afterCallId: String?, maxRows: Int) = tools.unresolved(afterCallId, maxRows)
+            override suspend fun toolSweepGeneration() = tools.generation
+            override suspend fun putToolCall(entry: TimelineToolIndexEntry) = tools.put(entry)
+            override suspend fun setToolSweepGeneration(next: Long) = tools.advance(next)
             override suspend fun checkpoint() = current
             override suspend fun cursor(continuation: TimelineContinuation?, hasMore: Boolean) {
                 current = current.copy(continuation = continuation, hasMore = hasMore)
@@ -204,7 +232,11 @@ class CanonicalTimelineEngineTest {
             override suspend fun locate(identity: TimelineMessageId): TimelinePageKey? = null
             override suspend fun metadata(position: TimelineReadPosition, maxRows: Int): TimelineMetadataPage = error("unused")
             override suspend fun body(pointer: TimelineBodyPointer, offset: Long, maxBytes: Int): ByteArray = error("unused")
-            override suspend fun evidence(key: String, maxBytes: Int): ByteArray? = error("unused")
+            override suspend fun evidence(key: String, maxBytes: Int): ByteArray? {
+                assertEquals("pending/local/v1", key)
+                assertEquals(CanonicalPendingLocalStore.MAX_BYTES, maxBytes)
+                return null
+            }
             override suspend fun put(record: TimelineStoredRecord): Unit = error("unused")
             override suspend fun putEvidence(key: String, value: ByteArray): Unit = error("unused")
             override suspend fun deleteEvidence(key: String): Unit = error("unused")

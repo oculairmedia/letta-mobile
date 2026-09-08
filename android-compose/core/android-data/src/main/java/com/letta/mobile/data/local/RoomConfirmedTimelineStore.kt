@@ -44,6 +44,8 @@ class RoomConfirmedTimelineStore(
     // from commitBatchObserver, which faults mid-row-batch: this one proves a head is never
     // published over rows that did not survive.
     private val beforeHeadPublicationObserver: suspend () -> Unit = {},
+    private val ownership: TimelineOwnershipAuthority? = null,
+    private val ownerLease: TimelineOwnershipAuthority.Lease? = null,
 ) : ConfirmedTimelineStore {
     /**
      * Room's [commitNormalized] override performs a real incremental transaction that touches
@@ -61,7 +63,21 @@ class RoomConfirmedTimelineStore(
         return readSnapshotResult(scope).snapshot
     }
 
-    override suspend fun readSnapshotResult(scope: TimelineScope): ConfirmedTimelineReadResult {
+    private suspend fun <T> legacyOperation(scope: TimelineScope, block: suspend () -> T): T {
+        val authority = ownership ?: return block()
+        // The default singleton is permanently epoch zero, never silently upgraded after handoff.
+        val lease = ownerLease ?: TimelineOwnershipAuthority.Lease(scope, 0, TimelineOwnershipAuthority.Route.Legacy)
+        check(lease.scope == scope && lease.route == TimelineOwnershipAuthority.Route.Legacy)
+        return authority.withLease(lease, block)
+    }
+
+    private suspend fun <T> maintenance(backendId: String, block: suspend () -> T): T =
+        ownership?.legacyMaintenance(backendId, block) ?: block()
+
+    override suspend fun readSnapshotResult(scope: TimelineScope): ConfirmedTimelineReadResult =
+        legacyOperation(scope) { readSnapshotResultGuarded(scope) }
+
+    private suspend fun readSnapshotResultGuarded(scope: TimelineScope): ConfirmedTimelineReadResult {
         return withContext(Dispatchers.IO) {
             val startedAtMillis = timelineCurrentTimeMillis()
             val normalizedHead = dao.getNormalizedHead(scope.backendId, scope.conversationId)
@@ -258,7 +274,10 @@ class RoomConfirmedTimelineStore(
                 ?.revision
         }
 
-    override suspend fun writeSnapshot(envelope: StoredTimelineEnvelope): Boolean {
+    override suspend fun writeSnapshot(envelope: StoredTimelineEnvelope): Boolean =
+        legacyOperation(envelope.scope) { writeSnapshotGuarded(envelope) }
+
+    private suspend fun writeSnapshotGuarded(envelope: StoredTimelineEnvelope): Boolean {
         return withContext(Dispatchers.IO) {
         val plan = createWritePlan(envelope)
         var published = false
@@ -293,6 +312,19 @@ class RoomConfirmedTimelineStore(
      * row-count, root digest, head metadata) happens in one [database] transaction.
      */
     override suspend fun commitNormalized(
+        plan: NormalizedTimelineCommitPlan,
+        fullEnvelope: StoredTimelineEnvelope,
+        checkpointLegacyEnvelope: Boolean,
+    ): NormalizedTimelineWriteResult = legacyOperation(fullEnvelope.scope) {
+        when (plan) {
+            is NormalizedTimelineCommitPlan.Apply -> check(plan.commit.scope == fullEnvelope.scope)
+            is NormalizedTimelineCommitPlan.NoOp -> check(plan.scope == fullEnvelope.scope)
+            is NormalizedTimelineCommitPlan.Invalid -> Unit
+        }
+        commitNormalizedGuarded(plan, fullEnvelope, checkpointLegacyEnvelope)
+    }
+
+    private suspend fun commitNormalizedGuarded(
         plan: NormalizedTimelineCommitPlan,
         fullEnvelope: StoredTimelineEnvelope,
         checkpointLegacyEnvelope: Boolean,
@@ -341,7 +373,7 @@ class RoomConfirmedTimelineStore(
         // Scope is one function whose entire body is best-effort, post-durable work.
         try {
             legacyCheckpointFailureInjector?.let { throw it() }
-            writeSnapshot(envelope)
+            writeSnapshotGuarded(envelope)
         } catch (failure: Throwable) {
             // Deliberately catches CancellationException too. Normally swallowing
             // cancellation is wrong, but this runs inside NonCancellable AFTER a
@@ -643,7 +675,9 @@ class RoomConfirmedTimelineStore(
         )
     }
 
-    override suspend fun deleteSnapshot(scope: TimelineScope) {
+    override suspend fun deleteSnapshot(scope: TimelineScope): Unit = legacyOperation(scope) { deleteSnapshotGuarded(scope) }
+
+    private suspend fun deleteSnapshotGuarded(scope: TimelineScope) {
         withContext(Dispatchers.IO) {
         database.withTransaction {
             dao.deleteNormalizedHead(scope.backendId, scope.conversationId)
@@ -654,7 +688,9 @@ class RoomConfirmedTimelineStore(
         }
     }
 
-    override suspend fun clearForBackend(backendId: String) {
+    override suspend fun clearForBackend(backendId: String): Unit = maintenance(backendId) { clearForBackendGuarded(backendId) }
+
+    private suspend fun clearForBackendGuarded(backendId: String) {
         withContext(Dispatchers.IO) {
         database.withTransaction {
             dao.clearNormalizedHeadsForBackend(backendId)
@@ -665,7 +701,10 @@ class RoomConfirmedTimelineStore(
         }
     }
 
-    override suspend fun prune(backendId: String, maxRetainedConversations: Int) {
+    override suspend fun prune(backendId: String, maxRetainedConversations: Int): Unit =
+        maintenance(backendId) { pruneGuarded(backendId, maxRetainedConversations) }
+
+    private suspend fun pruneGuarded(backendId: String, maxRetainedConversations: Int) {
         withContext(Dispatchers.IO) {
         database.withTransaction {
             if (maxRetainedConversations <= 0) {

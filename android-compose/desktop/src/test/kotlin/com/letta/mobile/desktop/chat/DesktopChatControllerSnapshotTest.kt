@@ -68,6 +68,45 @@ class DesktopChatControllerSnapshotTest {
         controller.close()
     }
 
+    @Test
+    fun gatedCanonicalOpeningNeverStartsLegacyHydrationAndCloseCancelsIt() = runTest {
+        val gateway = GatedHydrationGateway(CompletableDeferred())
+        val opened = CompletableDeferred<Unit>()
+        val cancelled = CompletableDeferred<Unit>()
+        val controller = DesktopChatController(
+            bootstrapState = defaultDesktopBootstrapState(), scope = this,
+            gatewayFactory = { gateway },
+        )
+        controller.canonicalEligible = { true }
+        controller.canonicalOpen = { _, _, _ ->
+            opened.complete(Unit)
+            try { kotlinx.coroutines.awaitCancellation() }
+            finally { cancelled.complete(Unit) }
+        }
+        controller.start()
+        runCurrent()
+        assertTrue(opened.isCompleted)
+        kotlin.test.assertFalse(gateway.hydrationStarted.isCompleted)
+        controller.close()
+        runCurrent()
+        assertTrue(cancelled.isCompleted)
+    }
+
+    @Test
+    fun canonicalOpenFailureDoesNotFallBackToLegacyHydration() = runTest {
+        val gateway = GatedHydrationGateway(CompletableDeferred())
+        val controller = DesktopChatController(
+            bootstrapState = defaultDesktopBootstrapState(), scope = this,
+            gatewayFactory = { gateway },
+        )
+        controller.canonicalEligible = { true }
+        controller.canonicalOpen = { _, _, _ -> error("Canonical unavailable") }
+        controller.start()
+        runCurrent()
+        kotlin.test.assertFalse(gateway.hydrationStarted.isCompleted)
+        controller.close()
+    }
+
     private class GatedHydrationGateway(
         private val remoteGate: CompletableDeferred<Unit>,
     ) : FakeDesktopChatGateway() {
