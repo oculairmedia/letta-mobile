@@ -91,6 +91,55 @@ class CanonicalTimelineEngineTest {
         assertEquals(false, engine.publishLive(current, TimelineLiveBlock(emptyList(), true)))
     }
 
+    @Test fun conversationOwnersSurviveOtherSelectionsAndRejectRetiredOwners() = runTest {
+        val store = Store()
+        val transport = object : TimelineTransport {
+            override suspend fun sendConversationMessage(
+                conversationId: String,
+                request: com.letta.mobile.data.model.MessageCreateRequest,
+            ): kotlinx.coroutines.flow.Flow<com.letta.mobile.data.model.LettaMessage> = error("unexpected send")
+            override suspend fun streamConversation(conversationId: String): kotlinx.coroutines.flow.Flow<TimelineStreamFrame> =
+                error("selection must not start transport")
+            override suspend fun listConversationMessages(
+                conversationId: String, limit: Int?, after: String?, order: String?,
+            ): List<com.letta.mobile.data.model.LettaMessage> = error("unexpected legacy hydration")
+            override suspend fun listAgentMessages(
+                agentId: String, limit: Int?, order: String?, conversationId: String?,
+            ): List<com.letta.mobile.data.model.LettaMessage> = error("unexpected agent hydration")
+        }
+        val coordinator = CanonicalTimelineCoordinator(store, transport)
+        val first = coordinator.acquire(scope)
+        val screen = kotlin.test.assertNotNull(coordinator.attach(first))
+        assertEquals(false, coordinator.retire(first))
+        val request = first.session.engine.beginPage(first.selection)
+        val fence = coordinator.beginLive(first)
+        coordinator.detach(screen)
+        coordinator.detach(screen) // Disposal is idempotent and does not terminate the run.
+        assertEquals(first, coordinator.acquire(scope))
+        val otherScope = TimelineScope("another-backend", scope.conversationId)
+        val other = coordinator.acquire(otherScope)
+        assertEquals(null, coordinator.locate(first, TimelineMessageId("missing")))
+        assertEquals(first, coordinator.current(scope))
+        assertEquals(other, coordinator.current(otherScope))
+        assertEquals(false, coordinator.retire(first))
+        assertEquals(true, coordinator.ingest(first, fence, TimelineStreamFrame.Heartbeat))
+        assertEquals(false, coordinator.ingest(other, fence, TimelineStreamFrame.Heartbeat))
+        assertEquals(true, coordinator.retire(other))
+        assertEquals(true, first.session.engine.publishLive(fence, TimelineLiveBlock(emptyList(), true)))
+        assertEquals(false, coordinator.retire(first))
+        assertEquals(true, coordinator.acknowledgeSettlement(first, fence, emptyMap()))
+        assertEquals(true, coordinator.retire(first))
+        val replacement = coordinator.acquire(scope)
+        assertEquals(false, coordinator.ingest(first, fence, TimelineStreamFrame.Heartbeat))
+        assertEquals(false, coordinator.acknowledgeSettlement(first, fence, emptyMap()))
+        assertFailsWith<IllegalStateException> { coordinator.beginLive(first) }
+        assertEquals(TimelineEnginePageOutcome.Stale, first.session.engine.applyPage(request, page(request, null)))
+        assertEquals(replacement, coordinator.current(scope))
+        assertEquals(true, coordinator.retire(replacement))
+        assertEquals(1, store.commits)
+        assertEquals(5, store.reads)
+    }
+
     private fun engine(store: Store) = CanonicalTimelineEngine(store, writer, enabled = true)
     private suspend fun open(engine: CanonicalTimelineEngine, selectedScope: TimelineScope = scope) =
         assertIs<TimelineEngineOpen.Opened>(engine.open(selectedScope)).selection

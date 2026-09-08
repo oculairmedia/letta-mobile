@@ -42,6 +42,18 @@ abstract class PendingLocalStoreModule {
 
 @Module
 @InstallIn(SingletonComponent::class)
+object CanonicalTimelineModule {
+    @Provides
+    @Singleton
+    fun provideCoordinator(
+        store: com.letta.mobile.data.timeline.TimelineBoundedStore,
+        transport: com.letta.mobile.data.timeline.TimelineTransport,
+    ): com.letta.mobile.data.timeline.CanonicalTimelineCoordinator =
+        com.letta.mobile.data.timeline.CanonicalTimelineCoordinator(store, transport)
+}
+
+@Module
+@InstallIn(SingletonComponent::class)
 object DatabaseModule {
     @Provides
     @Singleton
@@ -54,6 +66,31 @@ object DatabaseModule {
     fun provideRoomConfirmedTimelineStore(database: LettaDatabase): RoomConfirmedTimelineStore {
         return RoomConfirmedTimelineStore(database)
     }
+
+    @Provides
+    @Singleton
+    fun provideTimelineLedgerDatabase(@ApplicationContext context: Context): com.letta.mobile.data.local.TimelineLedgerDatabase =
+        androidx.room.Room.databaseBuilder(
+            context,
+            com.letta.mobile.data.local.TimelineLedgerDatabase::class.java,
+            "timeline-ledger.db",
+        ).build()
+
+    @Provides
+    @Singleton
+    fun provideTimelineBoundedStore(
+        database: com.letta.mobile.data.local.TimelineLedgerDatabase,
+    ): com.letta.mobile.data.timeline.TimelineBoundedStore =
+        com.letta.mobile.data.local.RoomTimelineBoundedStore(
+            database,
+            object : com.letta.mobile.data.local.RoomTimelineCheckpointCodec {
+                override fun encode(checkpoint: com.letta.mobile.data.timeline.TimelineDurableCheckpoint): ByteArray =
+                    com.letta.mobile.data.timeline.TimelineDurableCheckpointCodec.encode(checkpoint)
+
+                override fun decode(bytes: ByteArray): com.letta.mobile.data.timeline.TimelineDurableCheckpoint =
+                    com.letta.mobile.data.timeline.TimelineDurableCheckpointCodec.decode(bytes)
+            },
+        )
 
     // letta-mobile-g2ff0: DAOs returned directly here, but the LettaDatabase
     // singleton is the only thing that triggers Room.databaseBuilder.build().

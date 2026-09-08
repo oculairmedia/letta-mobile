@@ -165,6 +165,7 @@ class CanonicalTimelineEngine(
         val selection = TimelineEngineSelection(scope, TimelineSelectionGeneration(++generation), anchor)
         pending = null
         liveFence = null
+        liveReduction = null
         mutableLive.value = null
         mutablePublication.value = TimelineEnginePublication(selection, checkpoint.revision)
         TimelineEngineOpen.Opened(selection)
@@ -277,6 +278,7 @@ class CanonicalTimelineEngine(
         if (selection === mutablePublication.value.selection) {
             pending = null
             liveFence = null
+            liveReduction = null
             mutableLive.value = null
             mutablePublication.value = TimelineEnginePublication()
         }

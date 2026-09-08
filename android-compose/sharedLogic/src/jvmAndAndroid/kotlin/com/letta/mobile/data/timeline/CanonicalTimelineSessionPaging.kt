@@ -16,14 +16,17 @@ import kotlinx.coroutines.flow.flatMapLatest
 
 /** Each durable publication cancels obsolete loaders and starts a selection-anchored generation. */
 @OptIn(ExperimentalCoroutinesApi::class, ExperimentalPagingApi::class)
-fun CanonicalTimelineSession.paging(selection: TimelineEngineSelection): Flow<PagingData<TimelineSettledRecord>> =
+fun CanonicalTimelineSession.paging(
+    selection: TimelineEngineSelection,
+    anchor: TimelinePageKey? = selection.anchor,
+): Flow<PagingData<TimelineSettledRecord>> =
     publication.distinctUntilChanged { old, new ->
         old.selection === new.selection && old.durableRevision == new.durableRevision
     }.flatMapLatest { current ->
         if (current.selection !== selection) emptyFlow() else Pager(
             config = PagingConfig(pageSize = engine.budget.maxMetadataRows, enablePlaceholders = false,
                 initialLoadSize = engine.budget.maxMetadataRows, maxSize = engine.budget.maxMetadataRows * 3),
-            initialKey = selection.anchor,
+            initialKey = anchor,
             remoteMediator = TimelineHistoryMediator(this, selection),
             pagingSourceFactory = { TimelineLedgerPagingSource(engine, selection) },
         ).flow

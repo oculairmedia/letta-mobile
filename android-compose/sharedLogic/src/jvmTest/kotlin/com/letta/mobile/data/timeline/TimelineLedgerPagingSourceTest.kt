@@ -35,13 +35,16 @@ class TimelineLedgerPagingSourceTest {
         var calls = 0
         val transport = object : TimelineTransport {
             override suspend fun streamConversation(conversationId: String) = kotlinx.coroutines.flow.emptyFlow<TimelineStreamFrame>()
-            override suspend fun listConversationMessagePage(request: TimelineRemotePageRequest): TimelineRemotePageResult =
-                TimelineRemotePageResult.Page(request.requestId, request.selectionGeneration, emptyList(), null, false, 0).also { calls++ }
+            override suspend fun sendConversationMessage(conversationId: String, request: com.letta.mobile.data.model.MessageCreateRequest): kotlinx.coroutines.flow.Flow<com.letta.mobile.data.model.LettaMessage> = error("unexpected send")
+            override suspend fun listConversationMessages(conversationId: String, limit: Int?, after: String?, order: String?): List<com.letta.mobile.data.model.LettaMessage> = error("unexpected legacy read")
+            override suspend fun listAgentMessages(agentId: String, limit: Int?, order: String?, conversationId: String?): List<com.letta.mobile.data.model.LettaMessage> = error("unexpected agent read")
+            override suspend fun listConversationMessagePage(request: TimelineRemotePageRequest, progress: TimelinePageProgress?): TimelineRemotePageResult =
+                TimelineRemotePageResult.NoProgress(request.requestId, request.selectionGeneration, request.continuation).also { calls++ }
         }
         val session = CanonicalTimelineSession(store, transport, TimelineScope("b", "c"), enabled = true)
         val selection = assertIs<TimelineEngineOpen.Opened>(session.open()).selection
         val mediator = TimelineHistoryMediator(session, selection)
-        val emptyState = androidx.paging.PagingState<Int, TimelineSettledRecord>(
+        val emptyState = androidx.paging.PagingState<TimelinePageKey, TimelineSettledRecord>(
             pages = emptyList(),
             anchorPosition = 0,
             config = androidx.paging.PagingConfig(64),
@@ -49,6 +52,11 @@ class TimelineLedgerPagingSourceTest {
         )
         val prepend = mediator.load(androidx.paging.LoadType.PREPEND, emptyState)
         kotlin.test.assertIs<androidx.paging.RemoteMediator.MediatorResult.Success>(prepend)
+        assertEquals(0, calls)
+        kotlin.test.assertIs<androidx.paging.RemoteMediator.MediatorResult.Error>(
+            mediator.load(androidx.paging.LoadType.APPEND, emptyState),
+        )
+        assertEquals(1, calls)
         store.hasMore = false
         val append = mediator.load(androidx.paging.LoadType.APPEND, emptyState)
         assertEquals(1, calls)

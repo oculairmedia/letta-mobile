@@ -36,7 +36,9 @@ class TimelineLedgerPagingSource(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (failure: Exception) {
-            if (engine.publication.value.selection !== selection) LoadResult.Invalid() else LoadResult.Error(failure)
+            if (invalid || engine.publication.value.selection !== selection ||
+                engine.publication.value.durableRevision != revision
+            ) LoadResult.Invalid() else LoadResult.Error(failure)
         }
     }
 }
