@@ -95,6 +95,7 @@ import com.letta.mobile.feature.chat.coordination.ChatSessionResolver
 import com.letta.mobile.feature.chat.coordination.ChatTimelineObserver
 import com.letta.mobile.feature.chat.coordination.LocalRuntimeRouting
 import com.letta.mobile.feature.chat.coordination.ProjectChatCoordinator
+import com.letta.mobile.feature.chat.coordination.retireSelectedGeneration
 import com.letta.mobile.data.chat.projection.ChatMessageListChange
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.ConversationState
@@ -307,10 +308,12 @@ internal class AdminChatViewModel @Inject constructor(
                         runtimes.collect { next ->
                             if (next !== selectedRuntime) {
                                 replacingSendRuntime = true
-                                stopTimelineObserver()
-                                pipelineLifetime.retire()
-                                selectedSendOwner?.retire()
-                                selectedRuntime?.retire()
+                                retireSelectedGeneration(
+                                    stopPresentation = ::stopTimelineObserver,
+                                    pipeline = pipelineLifetime,
+                                    owner = selectedSendOwner,
+                                    runtime = selectedRuntime,
+                                )
                                 pipelineLifetime = com.letta.mobile.feature.chat.coordination.ChatPipelineLifetime(viewModelScope)
                                 selectedRuntime = next
                                 selectedSendOwner = next?.let(::newSendOwner)

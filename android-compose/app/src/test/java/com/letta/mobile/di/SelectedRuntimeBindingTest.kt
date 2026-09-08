@@ -3,6 +3,7 @@ package com.letta.mobile.di
 import com.letta.mobile.feature.chat.coordination.SelectedChatRuntime
 import com.letta.mobile.feature.chat.screen.ChatPagingHost
 import com.letta.mobile.feature.chat.screen.ChatPagingPresentation
+import com.letta.mobile.testutil.FakeTimelineExternalTransportWriter
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -109,7 +110,7 @@ class SelectedRuntimeBindingTest {
         val scope = com.letta.mobile.data.timeline.snapshot.TimelineScope("backend", "conversation", "agent")
         val storage = mockk<com.letta.mobile.data.local.TimelineOwnedStorageFactory>()
         val authority = mockk<com.letta.mobile.data.local.TimelineOwnershipAuthority>()
-        val repository = mockk<com.letta.mobile.data.timeline.TimelineRepository>(relaxed = true)
+        val drained = mutableListOf<String>()
         val transport = mockk<com.letta.mobile.data.timeline.GenerationTimelineTransport>(relaxed = true)
         coEvery { authority.state(any()) } returns com.letta.mobile.data.local.TimelineOwnershipAuthority.State(
             scope, 0, com.letta.mobile.data.local.TimelineOwnershipAuthority.Phase.Legacy,
@@ -118,7 +119,7 @@ class SelectedRuntimeBindingTest {
             "legacy-manifest", 0, false, com.letta.mobile.data.local.LegacyLedgerCopyKind.ManifestOnly,
         )
         val runtime = AndroidCanonicalTimelineRuntime(
-            "backend", transport, repository, authority, storage, backgroundScope, "legacy",
+            "backend", transport, { drained += it }, authority, storage, backgroundScope, "legacy",
         )
         val result = runtime.bind(scope, repairCommittedCursor = { _, _, _ -> }, reportFailure = {})
         assertEquals(AndroidCanonicalTimelineRuntime.BindResult.LegacyDeferred, result)
@@ -127,8 +128,8 @@ class SelectedRuntimeBindingTest {
         assertEquals(0L, runtime.lastMeasurement.convertBytes)
         assertEquals(0, runtime.lastMeasurement.copyRows)
         assertEquals(0, runtime.lastMeasurement.copySteps)
+        assertTrue(drained.isEmpty())
         coVerify(exactly = 1) { storage.classifyCopySource(any()) }
-        coVerify(exactly = 0) { repository.drainForCanonicalHandoff(any()) }
         coVerify(exactly = 0) { storage.beginMappedMigrationAfterDrain(any(), any()) }
         runtime.retire()
     }
@@ -137,7 +138,7 @@ class SelectedRuntimeBindingTest {
         val scope = com.letta.mobile.data.timeline.snapshot.TimelineScope("backend", "conversation", "agent")
         val storage = mockk<com.letta.mobile.data.local.TimelineOwnedStorageFactory>()
         val authority = mockk<com.letta.mobile.data.local.TimelineOwnershipAuthority>()
-        val repository = mockk<com.letta.mobile.data.timeline.TimelineRepository>(relaxed = true)
+        val drained = mutableListOf<String>()
         val transport = mockk<com.letta.mobile.data.timeline.GenerationTimelineTransport>(relaxed = true)
         coEvery { authority.state(any()) } returns com.letta.mobile.data.local.TimelineOwnershipAuthority.State(
             scope, 0, com.letta.mobile.data.local.TimelineOwnershipAuthority.Phase.Legacy,
@@ -152,17 +153,18 @@ class SelectedRuntimeBindingTest {
             )
         }
         val runtime = AndroidCanonicalTimelineRuntime(
-            "backend", transport, repository, authority, storage, backgroundScope, "legacy",
+            "backend", transport, { drained += it }, authority, storage, backgroundScope, "legacy",
         )
         val result = runtime.bind(scope, repairCommittedCursor = { _, _, _ -> }, reportFailure = {})
         assertEquals(AndroidCanonicalTimelineRuntime.BindResult.LegacyDeferred, result)
         assertEquals(1L, runtime.lastMeasurement.envelopeDecodes)
+        assertTrue(drained.isEmpty())
         runtime.retire()
     }
 
     @Test fun capturedDeferredOpenAndSendUseLegacyWriterWithoutCanonicalWrites() = runTest {
-        val canonicalWriter = mockk<com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter>(relaxed = true)
-        val legacyWriter = mockk<com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter>(relaxed = true)
+        val canonicalWriter = FakeTimelineExternalTransportWriter()
+        val legacyWriter = FakeTimelineExternalTransportWriter()
         val presentation = ChatPagingPresentation(
             settled = flowOf(androidx.paging.PagingData.empty()),
             live = MutableStateFlow(emptyList()),
@@ -198,9 +200,19 @@ class SelectedRuntimeBindingTest {
         } catch (failure: IllegalStateException) {
             assertTrue(failure.message.orEmpty().contains("legacy observer"))
         }
-        captured.writer.markExternalTransportLocalSent("deferred", "otid")
-        coVerify(exactly = 1) { legacyWriter.markExternalTransportLocalSent("agent", "deferred", "otid") }
-        coVerify(exactly = 0) { canonicalWriter.markExternalTransportLocalSent(any(), any(), any()) }
+        captured.writer.appendExternalTransportLocal("agent", "deferred", "hello", "otid")
+        captured.writer.markExternalTransportLocalSent("agent", "deferred", "otid")
+        captured.writer.reconcileExternalTransportSend("deferred", "agent", "deferred", "otid")
+        captured.writer.reconcileRecentMessages("agent", "deferred", "post-send", forceRefresh = true)
+        assertEquals("otid", legacyWriter.externalLocals.single().otid)
+        assertEquals("hello", legacyWriter.externalLocals.single().content)
+        assertEquals("otid", legacyWriter.sentLocals.single().otid)
+        assertEquals("otid", legacyWriter.reconciledSends.single().otid)
+        assertEquals("deferred", legacyWriter.recentReconciles.single().conversationId)
+        assertTrue(canonicalWriter.externalLocals.isEmpty())
+        assertTrue(canonicalWriter.sentLocals.isEmpty())
+        assertTrue(canonicalWriter.reconciledSends.isEmpty())
+        assertTrue(canonicalWriter.recentReconciles.isEmpty())
         captured.retire()
         try {
             captured.writer.markExternalTransportLocalSent("deferred", "stale")
@@ -211,8 +223,8 @@ class SelectedRuntimeBindingTest {
     }
 
     @Test fun capturedNormalizedOpenAndSendStayOnCanonicalTogether() = runTest {
-        val canonicalWriter = mockk<com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter>(relaxed = true)
-        val legacyWriter = mockk<com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter>(relaxed = true)
+        val canonicalWriter = FakeTimelineExternalTransportWriter()
+        val legacyWriter = FakeTimelineExternalTransportWriter()
         val presentation = ChatPagingPresentation(
             settled = flowOf(androidx.paging.PagingData.empty()),
             live = MutableStateFlow(emptyList()),
@@ -240,9 +252,18 @@ class SelectedRuntimeBindingTest {
             captured.ready("normalized"),
         )
         assertSame(presentation, captured.open("normalized", "target", this))
-        captured.writer.markExternalTransportLocalSent("normalized", "otid")
-        coVerify(exactly = 1) { canonicalWriter.markExternalTransportLocalSent("agent", "normalized", "otid") }
-        coVerify(exactly = 0) { legacyWriter.markExternalTransportLocalSent(any(), any(), any()) }
+        captured.writer.appendExternalTransportLocal("agent", "normalized", "hello", "otid")
+        captured.writer.markExternalTransportLocalSent("agent", "normalized", "otid")
+        captured.writer.reconcileExternalTransportSend("normalized", "agent", "normalized", "otid")
+        captured.writer.reconcileRecentMessages("agent", "normalized", "post-send", forceRefresh = true)
+        assertEquals("otid", canonicalWriter.externalLocals.single().otid)
+        assertEquals("otid", canonicalWriter.sentLocals.single().otid)
+        assertEquals("otid", canonicalWriter.reconciledSends.single().otid)
+        assertEquals("normalized", canonicalWriter.recentReconciles.single().conversationId)
+        assertTrue(legacyWriter.externalLocals.isEmpty())
+        assertTrue(legacyWriter.sentLocals.isEmpty())
+        assertTrue(legacyWriter.reconciledSends.isEmpty())
+        assertTrue(legacyWriter.recentReconciles.isEmpty())
         captured.retire()
     }
 }

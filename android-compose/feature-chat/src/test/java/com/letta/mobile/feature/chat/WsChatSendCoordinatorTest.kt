@@ -54,6 +54,9 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import com.letta.mobile.feature.chat.coordination.ChatClientVersionProvider
+import com.letta.mobile.feature.chat.coordination.RoutingSelectedChatRuntime
+import com.letta.mobile.feature.chat.coordination.SelectedChatSendOwner
+import com.letta.mobile.feature.chat.coordination.SelectedTimelineRoute
 import com.letta.mobile.feature.chat.coordination.WsChatSendCoordinator
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -264,6 +267,132 @@ class WsChatSendCoordinatorTest {
         assertEquals("conv-default-agent-1", local.conversationId)
         assertEquals("look", local.content)
         assertEquals(listOf(image), local.attachments)
+    }
+
+    @Test
+    fun `deferred route send appends marks and reconciles on the legacy writer`() = runTest {
+        val legacyWriter = FakeTimelineExternalTransportWriter()
+        val canonicalWriter = FakeTimelineExternalTransportWriter()
+        val runtime = RoutingSelectedChatRuntime(
+            generation = 1L,
+            routes = mapOf("deferred" to SelectedTimelineRoute.LegacyDeferred),
+            presentations = emptyMap(),
+            canonicalWriter = canonicalWriter,
+            legacyWriter = legacyWriter,
+            parent = this,
+        )
+        val owner = SelectedChatSendOwner(runtime.config, runtime.descriptor, runtime.writer, this) {
+            runtime.ready(it)
+        }
+        val wsChatBridge = mockBridge(sendAccepted = true)
+        var activeConversation = "deferred"
+        val coordinator = WsChatSendCoordinator(
+            scope = backgroundScope,
+            agentId = "agent-1",
+            activeConfig = settingsRepository(),
+            wsChatBridge = wsChatBridge,
+            timelineRepository = runtime.writer,
+            conversationRepository = stubConversationRepository(conversationId = "deferred"),
+            uiState = MutableStateFlow(ChatUiState(agentName = "Agent")),
+            clearComposerAfterSend = {},
+            activeConversationId = { activeConversation },
+            setActiveConversationId = { activeConversation = it },
+            startTimelineObserver = {},
+            clientVersionProvider = clientVersionProvider,
+            prepareConversation = { owner.ready(it) },
+        )
+
+        coordinator.send("hello").join()
+        coordinator.handleEvent(
+            WsTimelineEvent.TurnStarted(
+                turnId = "turn-1",
+                agentId = "agent-1",
+                conversationId = "deferred",
+                runId = "run-1",
+            ),
+        )
+        coordinator.handleEvent(
+            WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = BridgeTurnStatus.Completed, lossy = true),
+        )
+        advanceUntilIdle()
+
+        val local = legacyWriter.externalLocals.single()
+        assertEquals("hello", local.content)
+        assertEquals("deferred", local.conversationId)
+        verify {
+            wsChatBridge.send(
+                agentId = "agent-1",
+                conversationId = "deferred",
+                text = "hello",
+                otid = local.otid,
+                attachments = emptyList(),
+            )
+        }
+        assertEquals(local.otid, legacyWriter.sentLocals.single().otid)
+        assertEquals(local.otid, legacyWriter.reconciledSends.single().otid)
+        assertTrue(canonicalWriter.externalLocals.isEmpty())
+        assertTrue(canonicalWriter.sentLocals.isEmpty())
+        assertTrue(canonicalWriter.reconciledSends.isEmpty())
+        owner.retire()
+        runtime.retire()
+    }
+
+    @Test
+    fun `canonical route send appends marks and reconciles on the canonical writer`() = runTest {
+        val legacyWriter = FakeTimelineExternalTransportWriter()
+        val canonicalWriter = FakeTimelineExternalTransportWriter()
+        val runtime = RoutingSelectedChatRuntime(
+            generation = 2L,
+            routes = mapOf("normalized" to SelectedTimelineRoute.Canonical),
+            presentations = emptyMap(),
+            canonicalWriter = canonicalWriter,
+            legacyWriter = legacyWriter,
+            parent = this,
+        )
+        val owner = SelectedChatSendOwner(runtime.config, runtime.descriptor, runtime.writer, this) {
+            runtime.ready(it)
+        }
+        val wsChatBridge = mockBridge(sendAccepted = true)
+        var activeConversation = "normalized"
+        val coordinator = WsChatSendCoordinator(
+            scope = backgroundScope,
+            agentId = "agent-1",
+            activeConfig = settingsRepository(),
+            wsChatBridge = wsChatBridge,
+            timelineRepository = runtime.writer,
+            conversationRepository = stubConversationRepository(conversationId = "normalized"),
+            uiState = MutableStateFlow(ChatUiState(agentName = "Agent")),
+            clearComposerAfterSend = {},
+            activeConversationId = { activeConversation },
+            setActiveConversationId = { activeConversation = it },
+            startTimelineObserver = {},
+            clientVersionProvider = clientVersionProvider,
+            prepareConversation = { owner.ready(it) },
+        )
+
+        coordinator.send("hello").join()
+        coordinator.handleEvent(
+            WsTimelineEvent.TurnStarted(
+                turnId = "turn-1",
+                agentId = "agent-1",
+                conversationId = "normalized",
+                runId = "run-1",
+            ),
+        )
+        coordinator.handleEvent(
+            WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = BridgeTurnStatus.Completed, lossy = true),
+        )
+        advanceUntilIdle()
+
+        val local = canonicalWriter.externalLocals.single()
+        assertEquals("normalized", local.conversationId)
+        assertEquals(local.otid, canonicalWriter.sentLocals.single().otid)
+        assertEquals(local.otid, canonicalWriter.reconciledSends.single().otid)
+        assertTrue(legacyWriter.externalLocals.isEmpty())
+        assertTrue(legacyWriter.sentLocals.isEmpty())
+        assertTrue(legacyWriter.reconciledSends.isEmpty())
+        owner.retire()
+        runtime.retire()
     }
 
     @Test

@@ -4,7 +4,6 @@ import com.letta.mobile.data.local.TimelineOwnedStorageFactory
 import com.letta.mobile.data.local.TimelineOwnershipAuthority
 import com.letta.mobile.data.timeline.CanonicalTimelineCoordinator
 import com.letta.mobile.data.timeline.TimelineRepository
-import com.letta.mobile.data.timeline.TimelineTransport
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -24,8 +23,15 @@ class AndroidCanonicalTimelineRuntimeFactory(
         val transport = com.letta.mobile.data.timeline.IrohAdminRpcTimelineTransport(graph.channelTransport, settings)
         require(transport.shouldUseIroh()) { "Captured canonical runtime currently requires Iroh" }
         val owned = com.letta.mobile.data.timeline.GenerationTimelineTransport(transport, ownerScope)
-        return AndroidCanonicalTimelineRuntime(graph.backendDescriptor.backendId.value, owned, legacy, authority, storage, ownerScope,
-            checkNotNull(graph.capturedConfig).id)
+        return AndroidCanonicalTimelineRuntime(
+            graph.backendDescriptor.backendId.value,
+            owned,
+            { legacy.drainForCanonicalHandoff(it) },
+            authority,
+            storage,
+            ownerScope,
+            checkNotNull(graph.capturedConfig).id,
+        )
     }
 }
 
@@ -33,7 +39,7 @@ class AndroidCanonicalTimelineRuntimeFactory(
 class AndroidCanonicalTimelineRuntime(
     private val backendId: String,
     private val transport: com.letta.mobile.data.timeline.GenerationTimelineTransport,
-    private val legacy: TimelineRepository,
+    private val drainLegacy: suspend (String) -> Unit,
     private val authority: TimelineOwnershipAuthority,
     private val storage: TimelineOwnedStorageFactory,
     private val graphScope: kotlinx.coroutines.CoroutineScope,
@@ -87,7 +93,7 @@ class AndroidCanonicalTimelineRuntime(
                 return null
             }
         }
-        legacy.drainForCanonicalHandoff(target.conversationId)
+        drainLegacy(target.conversationId)
         val lease = when (state.phase) {
             TimelineOwnershipAuthority.Phase.Migrating, TimelineOwnershipAuthority.Phase.Prepared ->
                 storage.resumeMappedMigration(source, target)
