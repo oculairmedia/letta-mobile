@@ -46,6 +46,8 @@ internal class ChatPagingBinding {
         create: (String?) -> ChatPagingPresentation,
     ): ChatPagingPresentation {
         val route = routeTarget?.takeUnless { it in consumedRoutes }
+        // A new search route needs a fresh Paging collection even in the same generation.
+        if (route != null && presentation?.routeTarget != route) close()
         return select(conversationId, generation) {
             create(route ?: target(conversationId))
         }.also { current ->
