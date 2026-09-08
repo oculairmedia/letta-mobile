@@ -62,7 +62,7 @@ class AndroidCanonicalTimelineRuntime(
         }
     }
 
-    /** Only a durably switched scope can resume. Manifest-only history stays on the legacy route. */
+    /** Only a durably switched scope can resume. Readable manifest-only history converts in bounded steps. */
     suspend fun resume(scope: TimelineScope): CanonicalTimelineCoordinator? = mutex.withLock {
         check(!retired && graphScope.coroutineContext[kotlinx.coroutines.Job]?.isActive == true && scope.backendId == backendId) { "Stale canonical backend generation" }
         bindings[scope]?.let { return@withLock it }
@@ -86,13 +86,6 @@ class AndroidCanonicalTimelineRuntime(
         val state = authority.state(target)
         if (state.phase == TimelineOwnershipAuthority.Phase.Canonical) return storage.reopenCanonical(target)
         val source = target.copy(backendId = legacyBackendId)
-        if (state.phase == TimelineOwnershipAuthority.Phase.Legacy &&
-            authority.state(source).phase != TimelineOwnershipAuthority.Phase.Migrating) {
-            val head = storage.classifyCopySource(source)
-            if (head.kind == com.letta.mobile.data.local.LegacyLedgerCopyKind.ManifestOnly) {
-                return null
-            }
-        }
         drainLegacy(target.conversationId)
         val lease = when (state.phase) {
             TimelineOwnershipAuthority.Phase.Migrating, TimelineOwnershipAuthority.Phase.Prepared ->

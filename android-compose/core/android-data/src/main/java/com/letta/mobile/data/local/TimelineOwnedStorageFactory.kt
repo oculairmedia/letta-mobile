@@ -9,21 +9,29 @@ class TimelineOwnedStorageFactory(
     private val ledger: TimelineLedgerDatabase,
     private val authority: TimelineOwnershipAuthority,
 ) {
+    private val manifestCache = mutableMapOf<String, ManifestCopyCache>()
+
+    private fun expandingCopySource(mapping: TimelineOwnershipAuthority.Mapping?) =
+        RoomLegacyLedgerCopySource(legacy, mapping, expandManifest = true, manifestCache)
+
+    private fun validator(mapping: TimelineOwnershipAuthority.Mapping?) =
+        RoomTimelineValidation(legacy, ledger, mapping, expandingCopySource(mapping))
+
     /** After closing admission and draining the captured raw-config source owner, call this with
      * the exact canonical graph scope. Retry the same pair after interruption (forward recovery).
      * A missing normalized head is empty only when no v13 snapshot head or manifest exists.
-     * Manifest-only history is not copied here: cutover is deferred so the usable legacy route
-     * remains. Unsupported schema is an error, never an empty certification.
+     * Readable manifest-only history copies through bounded expanded rows; unreadable manifests
+     * fail copy rather than certifying empty. Unsupported schema is an error, never an empty
+     * certification.
      */
     suspend fun beginMappedMigrationAfterDrain(
         source: TimelineOwnershipAuthority.Lease,
         target: TimelineScope,
     ): TimelineOwnershipAuthority.Lease = authority.beginMappedMigration(source, target) {
         val head = classifyCopySource(source.scope)
-        check(head.kind != LegacyLedgerCopyKind.ManifestOnly) {
-            "Manifest-only history defers canonical cutover"
+        if (head.kind != LegacyLedgerCopyKind.ManifestOnly) {
+            check(head.supported) { "Canonical copy source is unsupported" }
         }
-        check(head.supported) { "Canonical copy source is unsupported" }
         check(ledger.ledger().head(ledgerScopeKey(target)) == null) { "Canonical target occupied" }
         check(ledger.ledger().migration(ledgerScopeKey(target)) == null) { "Unmapped copy occupies target" }
     }
@@ -76,7 +84,7 @@ class TimelineOwnedStorageFactory(
         require(lease.route == TimelineOwnershipAuthority.Route.Migration)
         val mapping = authority.capturedMapping(lease)
         return authority.withLease(lease) {
-            RoomLegacyLedgerCopy(RoomLegacyLedgerCopySource(legacy, mapping), ledger).step(lease.scope)
+            RoomLegacyLedgerCopy(expandingCopySource(mapping), ledger).step(lease.scope)
         }
     }
 
@@ -84,7 +92,7 @@ class TimelineOwnedStorageFactory(
         require(lease.route == TimelineOwnershipAuthority.Route.Migration)
         val mapping = authority.capturedMapping(lease)
         return authority.withLease(lease) {
-            RoomLegacyCanonicalMigration(RoomLegacyLedgerCopySource(legacy, mapping), ledger).step(lease.scope)
+            RoomLegacyCanonicalMigration(expandingCopySource(mapping), ledger).step(lease.scope)
         }
     }
 
@@ -97,7 +105,7 @@ class TimelineOwnedStorageFactory(
     suspend fun prepareAfterDrain(lease: TimelineOwnershipAuthority.Lease, expectedRevision: Long): TimelineOwnershipAuthority.State {
         val mapping = authority.capturedMapping(lease)
         return authority.prepare(lease) {
-            RoomTimelineValidation(legacy, ledger, mapping).receipt(lease, expectedRevision)
+            validator(mapping).receipt(lease, expectedRevision)
         }
     }
 
@@ -115,7 +123,7 @@ class TimelineOwnedStorageFactory(
         require(lease.route == TimelineOwnershipAuthority.Route.Migration)
         val mapping = authority.capturedMapping(lease)
         return authority.withLease(lease) {
-            val progress = RoomTimelineValidation(legacy, ledger, mapping).step(lease)
+            val progress = validator(mapping).step(lease)
             ValidationProgress(progress.complete, progress.metadataRows, progress.bodyBytes, progress.certifiedRevision)
         }
     }
@@ -124,7 +132,7 @@ class TimelineOwnedStorageFactory(
     suspend fun switchPreparedAfterDrain(lease: TimelineOwnershipAuthority.Lease): TimelineOwnershipAuthority.Lease {
         val mapping = authority.capturedMapping(lease)
         return authority.commitSwitch(lease) { prepared ->
-            val actual = RoomTimelineValidation(legacy, ledger, mapping).receipt(lease, prepared.targetRevision)
+            val actual = validator(mapping).receipt(lease, prepared.targetRevision)
             check(actual == prepared) { "Prepared source/generation/revision changed" }
         }
     }
@@ -133,7 +141,7 @@ class TimelineOwnedStorageFactory(
         require(lease.route == TimelineOwnershipAuthority.Route.Migration)
         val mapping = authority.capturedMapping(lease)
         return authority.withLease(lease) {
-            RoomLegacyCanonicalMigration(RoomLegacyLedgerCopySource(legacy, mapping), ledger).validateForActivation(lease.scope, revision)
+            RoomLegacyCanonicalMigration(expandingCopySource(mapping), ledger).validateForActivation(lease.scope, revision)
         }
     }
 }

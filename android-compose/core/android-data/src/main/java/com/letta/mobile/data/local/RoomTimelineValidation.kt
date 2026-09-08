@@ -14,6 +14,7 @@ internal class RoomTimelineValidation(
     private val legacy: LettaDatabase,
     private val target: TimelineLedgerDatabase,
     private val mapping: TimelineOwnershipAuthority.Mapping? = null,
+    copySource: RoomLegacyLedgerCopySource? = null,
 ) {
     data class Progress(val complete: Boolean, val metadataRows: Int, val bodyBytes: Int, val certifiedRevision: Long?)
     @Serializable private data class State(
@@ -22,7 +23,7 @@ internal class RoomTimelineValidation(
         val count: Long = 0, val digest: String = "", val chain: String = "",
         val pointer: String? = null, val size: Long = 0, val offset: Long = 0, val checksum: String = "",
     )
-    private val source = RoomLegacyLedgerCopySource(legacy, mapping)
+    private val source = copySource ?: RoomLegacyLedgerCopySource(legacy, mapping)
     private val store = RoomTimelineBoundedStore(target)
 
     suspend fun step(lease: TimelineOwnershipAuthority.Lease): Progress = source.snapshot(lease.scope) {
@@ -30,7 +31,11 @@ internal class RoomTimelineValidation(
         check(head.supported)
         val sourceScope = mapping?.source ?: lease.scope
         val normalized = legacy.confirmedTimelineSnapshotDao().getNormalizedHead(sourceScope.backendId, sourceScope.conversationId)
-        if (normalized == null) check(head.rowCount == 0L) { "Empty source claimed rows" }
+        if (normalized == null) {
+            check(head.kind == LegacyLedgerCopyKind.ManifestOnly || head.rowCount == 0L) {
+                "Empty source claimed rows"
+            }
+        }
         target.withTransaction {
             val scope = ledgerScopeKey(lease.scope)
             val dao = target.ledger()
@@ -67,7 +72,9 @@ internal class RoomTimelineValidation(
                     if (row == null) {
                         check(state.count == head.rowCount)
                         if (normalized == null) {
-                            check(head.rowCount == 0L) { "Empty source claimed rows" }
+                            check(head.kind == LegacyLedgerCopyKind.ManifestOnly || head.rowCount == 0L) {
+                                "Empty source claimed rows"
+                            }
                         } else {
                             val actual = if (normalized.rowDigest.startsWith(CHAIN_ROW_DIGEST_PREFIX))
                                 state.chain.ifEmpty { normalizedRowDigest(emptyList()) }
@@ -75,8 +82,12 @@ internal class RoomTimelineValidation(
                             check(actual == normalized.rowDigest.removePrefix(CHAIN_ROW_DIGEST_PREFIX).lowercase()) { "Source root mismatch" }
                         }
                         state = state.copy(phase = 1, order = Long.MIN_VALUE, count = 0, digest = "", chain = "")
+                    } else if (normalized == null) {
+                        check(head.kind == LegacyLedgerCopyKind.ManifestOnly) { "Empty source produced rows" }
+                        rows++
+                        check(row.order == state.count && row.order <= Int.MAX_VALUE)
+                        state = state.copy(order = row.order, count = state.count + 1)
                     } else {
-                        checkNotNull(normalized) { "Empty source produced rows" }
                         rows++
                         check(row.order == state.count && row.order <= Int.MAX_VALUE)
                         val fields = object : NormalizedTimelineRowDigestFields {

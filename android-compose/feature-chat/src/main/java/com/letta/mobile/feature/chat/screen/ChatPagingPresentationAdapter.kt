@@ -50,7 +50,11 @@ internal suspend fun createCanonicalChatPagingPresentation(
         },
         live = canonical.live,
         missingTarget = MutableStateFlow(canonical.missingTarget),
-        onResidentRows = { resident -> canonical.onResidentRows(synchronized(rows) { resident.mapNotNull { rows[it] } }) },
+        onResidentRows = { resident ->
+            if (job.isActive) {
+                canonical.onResidentRows(synchronized(rows) { resident.mapNotNull { rows[it] } })
+            }
+        },
         close = {
             job.cancel()
             synchronized(rows) { rows.clear(); order.clear() }

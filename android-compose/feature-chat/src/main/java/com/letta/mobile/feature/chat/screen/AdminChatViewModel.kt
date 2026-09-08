@@ -43,6 +43,7 @@ import com.letta.mobile.runtime.RuntimeEventOutbox
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -54,7 +55,9 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 import com.letta.mobile.feature.chat.coordination.AdminChatAgentSelectionCoordinator
 import com.letta.mobile.feature.chat.coordination.AdminChatA2uiCoordinator
@@ -644,7 +647,7 @@ internal class AdminChatViewModel @Inject constructor(
         startLegacyObserver = { conversationId ->
             chatTimelineObserver.start(agentId.value, conversationId, timelineObserverProvenance())
         },
-        stopLegacyObserver = { chatTimelineObserver.stop() },
+        stopLegacyObserver = { chatTimelineObserver.stopAndJoin() },
     )
     private val chatConversationCoordinator: ChatConversationCoordinator = ChatConversationCoordinator(
         config = ChatConversationCoordinatorConfig(
@@ -849,105 +852,117 @@ internal class AdminChatViewModel @Inject constructor(
     private val canonicalViewports = mutableMapOf<String, ChatPagingViewport>()
     private val consumedCanonicalTargets = mutableSetOf<String>()
 
+    private val presentationSwitch = kotlinx.coroutines.sync.Mutex()
+
     private fun startTimelineObserver(conversationId: String) {
         adminChatA2uiCoordinator.ensureA2uiConversation(conversationId)
-        if (localRuntimeRouting() == LocalRuntimeRouting.LocalBound) {
-            startLegacyTimelineObserver(conversationId)
-            return
-        }
-        val capturedRuntime = selectedRuntime
-        val hostOpen = pagingHost.openCanonical
-        if (capturedRuntime == null && hostOpen == null) {
-            startLegacyTimelineObserver(conversationId)
-            return
-        }
-        val route = Triple(conversationId, _sessionState.value.selectionGeneration, scrollToMessageId)
-        if (canonicalRoute == route && canonicalPresentationJob?.isActive == true) return
-        stopTimelineObserver()
-        canonicalRoute = route
-        fun status(error: String? = null) = ChatPagingPresentation(
-            settled = kotlinx.coroutines.flow.flowOf(androidx.paging.PagingData.empty()),
-            live = MutableStateFlow(emptyList()), close = {}, opening = error == null, openError = error,
-            retryOpen = { stopTimelineObserver(); startTimelineObserver(conversationId) },
-        )
-        _pagingPresentation.value = status()
-        canonicalPresentationJob = viewModelScope.launch {
-            try {
-                val target = route.third?.takeUnless { it in consumedCanonicalTargets }
-                val viewport = canonicalViewports[conversationId]
-                val seek = target ?: viewport?.takeUnless { it.following }?.messageId
-                when (
-                    val decided = timelineRouteSession.decide(
-                        runtime = capturedRuntime,
-                        conversationId = conversationId,
-                        target = seek,
-                        scope = this,
-                        agentId = agentId.value,
-                        hostOpen = hostOpen,
-                    )
-                ) {
-                    com.letta.mobile.feature.chat.coordination.SelectedTimelineRouteSession.Presentation.LegacyDeferred -> {
-                        if (canonicalRoute != route) return@launch
-                        _pagingPresentation.value = null
-                        timelineRouteSession.activateDeferred(conversationId)
-                        try {
-                            kotlinx.coroutines.awaitCancellation()
-                        } finally {
-                            timelineRouteSession.retirePresentation()
-                        }
-                    }
-                    is com.letta.mobile.feature.chat.coordination.SelectedTimelineRouteSession.Presentation.Canonical -> {
-                        val presentation = decided.value
-                        try {
-                            if (canonicalRoute != route) return@launch
-                            presentation.hasBoundRoute = true
-                            presentation.routeTarget = target
-                            presentation.viewport = if (target == null) viewport else null
-                            target?.let { consumedCanonicalTargets += it }
-                            presentation.saveViewport = { if (_pagingPresentation.value === presentation) canonicalViewports[conversationId] = it }
-                            presentation.clearViewport = { canonicalViewports.remove(conversationId) }
-                            presentation.requestTail = {
-                                if (_pagingPresentation.value === presentation) {
-                                    canonicalViewports.remove(conversationId)
-                                    stopTimelineObserver()
-                                    startTimelineObserver(conversationId)
-                                }
-                            }
-                            _pagingPresentation.value = presentation
-                            kotlinx.coroutines.awaitCancellation()
-                        } finally {
-                            presentation.close()
-                        }
-                    }
-                }
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (failure: Exception) {
-                if (canonicalRoute == route) _pagingPresentation.value = status(failure.message ?: "Could not open conversation")
+        viewModelScope.launch { beginTimelineObserver(conversationId) }
+    }
+
+    private suspend fun beginTimelineObserver(conversationId: String) {
+        presentationSwitch.withLock {
+            stopTimelineObserverLocked()
+            if (localRuntimeRouting() == LocalRuntimeRouting.LocalBound) {
+                startLegacyTimelineObserverLocked(conversationId)
+                return
             }
+            val capturedRuntime = selectedRuntime
+            val hostOpen = pagingHost.openCanonical
+            if (capturedRuntime == null && hostOpen == null) {
+                startLegacyTimelineObserverLocked(conversationId)
+                return
+            }
+            val route = Triple(conversationId, _sessionState.value.selectionGeneration, scrollToMessageId)
+            if (canonicalRoute == route && canonicalPresentationJob?.isActive == true) return
+            canonicalRoute = route
+            fun status(error: String? = null) = ChatPagingPresentation(
+                settled = kotlinx.coroutines.flow.flowOf(androidx.paging.PagingData.empty()),
+                live = MutableStateFlow(emptyList()), close = {}, opening = error == null, openError = error,
+                retryOpen = { startTimelineObserver(conversationId) },
+            )
+            _pagingPresentation.value = status()
+            val presentationJob = viewModelScope.launch(start = CoroutineStart.LAZY) {
+                try {
+                    val target = route.third?.takeUnless { it in consumedCanonicalTargets }
+                    val viewport = canonicalViewports[conversationId]
+                    val seek = target ?: viewport?.takeUnless { it.following }?.messageId
+                    when (
+                        val decided = timelineRouteSession.decide(
+                            runtime = capturedRuntime,
+                            conversationId = conversationId,
+                            target = seek,
+                            scope = this,
+                            agentId = agentId.value,
+                            hostOpen = hostOpen,
+                        )
+                    ) {
+                        com.letta.mobile.feature.chat.coordination.SelectedTimelineRouteSession.Presentation.LegacyDeferred -> {
+                            if (canonicalRoute != route) return@launch
+                            _pagingPresentation.value = null
+                            timelineRouteSession.activateDeferred(conversationId)
+                            try {
+                                kotlinx.coroutines.awaitCancellation()
+                            } finally {
+                                timelineRouteSession.retirePresentation()
+                            }
+                        }
+                        is com.letta.mobile.feature.chat.coordination.SelectedTimelineRouteSession.Presentation.Canonical -> {
+                            val presentation = decided.value
+                            try {
+                                if (canonicalRoute != route) return@launch
+                                presentation.hasBoundRoute = true
+                                presentation.routeTarget = target
+                                presentation.viewport = if (target == null) viewport else null
+                                target?.let { consumedCanonicalTargets += it }
+                                presentation.saveViewport = { if (_pagingPresentation.value === presentation) canonicalViewports[conversationId] = it }
+                                presentation.clearViewport = { canonicalViewports.remove(conversationId) }
+                                presentation.requestTail = {
+                                    if (_pagingPresentation.value === presentation) {
+                                        canonicalViewports.remove(conversationId)
+                                        startTimelineObserver(conversationId)
+                                    }
+                                }
+                                _pagingPresentation.value = presentation
+                                kotlinx.coroutines.awaitCancellation()
+                            } finally {
+                                presentation.close()
+                            }
+                        }
+                    }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (failure: Exception) {
+                    if (canonicalRoute == route) _pagingPresentation.value = status(failure.message ?: "Could not open conversation")
+                }
+            }
+            canonicalPresentationJob = presentationJob
         }
+        canonicalPresentationJob?.start()
     }
 
-    private fun startLegacyTimelineObserver(conversationId: String) {
-        if (canonicalPresentationJob != null || _pagingPresentation.value != null) stopTimelineObserver()
+    private fun startLegacyTimelineObserverLocked(conversationId: String) {
         chatTimelineObserver.start(agentId.value, conversationId, timelineObserverProvenance())
-        // letta-mobile-qfa81 (P4): the iroh active-reconcile poll loop
-        // (startIrohRecentReconcileLoop) and its stall-recovery crutch were
-        // removed here. P3 (canonical run ids + durable dedupe + parked
-        // terminals replayed across redial) guarantees the terminal TurnDone
-        // reaches the client, so the client no longer needs to poll
-        // reconcileRecentMessages on a timer to un-wedge a dropped terminal.
-        // The single post-send reconcile (wired via reconcileRecentMessages in
-        // the send coordinator above) still runs.
     }
 
-    private fun stopTimelineObserver() {
+    private suspend fun stopTimelineObserver() = presentationSwitch.withLock { stopTimelineObserverLocked() }
+
+    private suspend fun stopTimelineObserverLocked() {
+        canonicalRoute = null
+        val job = canonicalPresentationJob
+        canonicalPresentationJob = null
+        _pagingPresentation.value = null
+        pagingBinding.close()
+        job?.cancelAndJoin()
+        timelineRouteSession.retirePresentation()
+    }
+
+    private fun abandonTimelineObserver() {
         canonicalRoute = null
         canonicalPresentationJob?.cancel()
         canonicalPresentationJob = null
         _pagingPresentation.value = null
         pagingBinding.close()
-        timelineRouteSession.retirePresentation()
+        chatTimelineObserver.stop()
     }
 
     fun submitApproval(
@@ -981,7 +996,7 @@ internal class AdminChatViewModel @Inject constructor(
     fun onScreenResumed() = screenLifecycleCoordinator.onScreenResumed()
 
     override fun onCleared() {
-        stopTimelineObserver()
+        abandonTimelineObserver()
         adminChatA2uiCoordinator.release()
         screenLifecycleCoordinator.onCleared()
     }

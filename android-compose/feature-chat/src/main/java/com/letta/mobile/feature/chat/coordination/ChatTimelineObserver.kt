@@ -14,6 +14,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -93,6 +94,20 @@ internal class ChatTimelineObserver(
         observerJob = null
         hydrateSignalJob?.cancel()
         hydrateSignalJob = null
+        clearObserverBinding()
+    }
+
+    suspend fun stopAndJoin() {
+        val observer = observerJob
+        val hydrate = hydrateSignalJob
+        observerJob = null
+        hydrateSignalJob = null
+        observer?.cancelAndJoin()
+        hydrate?.cancelAndJoin()
+        clearObserverBinding()
+    }
+
+    private fun clearObserverBinding() {
         observerBinding = null
         hydrationGeneration = null
         warmBootstrap = null

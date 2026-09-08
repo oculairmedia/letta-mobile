@@ -10,7 +10,7 @@ import kotlinx.coroutines.CoroutineScope
  */
 internal class SelectedTimelineRouteSession(
     private val startLegacyObserver: (String) -> Unit,
-    private val stopLegacyObserver: () -> Unit,
+    private val stopLegacyObserver: suspend () -> Unit,
 ) {
     sealed class Presentation {
         data class Canonical(val value: ChatPagingPresentation) : Presentation()
@@ -39,7 +39,7 @@ internal class SelectedTimelineRouteSession(
         startLegacyObserver(conversationId)
     }
 
-    fun retirePresentation() {
+    suspend fun retirePresentation() {
         stopLegacyObserver()
     }
 }

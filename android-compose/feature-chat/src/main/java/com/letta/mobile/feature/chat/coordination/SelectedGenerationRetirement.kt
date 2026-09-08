@@ -6,7 +6,7 @@ package com.letta.mobile.feature.chat.coordination
  * in-flight deferred observer cannot write into the replacement generation.
  */
 internal suspend fun retireSelectedGeneration(
-    stopPresentation: () -> Unit,
+    stopPresentation: suspend () -> Unit,
     pipeline: ChatPipelineLifetime,
     owner: SelectedChatSendOwner?,
     runtime: SelectedChatRuntime?,
