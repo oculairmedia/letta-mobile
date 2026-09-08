@@ -84,6 +84,9 @@ class TimelineExactCanonicalWriterTest {
         }
         store.transaction(scope) { writer.mergeEvent(this, event); nextRevision() }
         store.transaction(scope) { writer.mergeEvent(this, event.copy(serverId = "alias")) }
+        val afterAlias = store.puts
+        store.transaction(scope) { writer.mergeEvent(this, event.copy(serverId = "alias")) }
+        assertEquals(afterAlias, store.puts, "identical alias replay must not rewrite the canonical body")
         store.read(scope) {
             assertEquals(TimelineMessageId("id"), toolCall("call")?.owner)
             assertEquals(listOf("call"), unresolvedTools(null, 1).map { it.callId })
@@ -537,6 +540,7 @@ class TimelineExactCanonicalWriterTest {
 
     private class Store : TimelineBoundedStore {
         var bodyReads = 0
+        var puts = 0
         var current = TimelineDurableCheckpoint(0, TimelineContinuation.Initial, true)
         val rows = mutableMapOf<TimelinePageKey, TimelineStoredRecord>()
         val evidence = mutableMapOf<String, ByteArray>()
@@ -574,7 +578,10 @@ class TimelineExactCanonicalWriterTest {
                 return bytes.copyOfRange(offset.toInt(), minOf(bytes.size, offset.toInt() + maxBytes))
             }
             override suspend fun evidence(key: String, maxBytes: Int): ByteArray? = evidence[key]?.also { check(it.size <= maxBytes) }?.copyOf()
-            override suspend fun put(record: TimelineStoredRecord) { rows[record.key] = record.copy(body = record.body.copyOf()) }
+            override suspend fun put(record: TimelineStoredRecord) {
+                puts++
+                rows[record.key] = record.copy(body = record.body.copyOf())
+            }
             override suspend fun putEvidence(key: String, value: ByteArray) { evidence[key] = value.copyOf() }
             override suspend fun deleteEvidence(key: String) { evidence.remove(key) }
             override suspend fun cursor(continuation: TimelineContinuation?, hasMore: Boolean) { current = current.copy(continuation = continuation, hasMore = hasMore) }

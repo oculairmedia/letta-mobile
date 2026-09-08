@@ -31,6 +31,12 @@ import com.letta.mobile.ui.theme.chatDimens
 import com.letta.mobile.ui.theme.chatShapes
 import com.letta.mobile.ui.zoom.PinchScalePreviewController
 
+internal fun followNewestEdge(wasScrolling: Boolean, atNewestEdge: Boolean, prependExhausted: Boolean): Boolean =
+    wasScrolling && atNewestEdge && prependExhausted
+
+internal fun shouldRepositionAfterPagerRefresh(refresh: LoadState): Boolean =
+    refresh is LoadState.Loading
+
 internal fun residentTargetIndex(
     rows: List<com.letta.mobile.data.chat.projection.ChatRenderItem>,
     target: String,
@@ -85,11 +91,13 @@ private fun PagedChatMessageListContent(
     var following by remember(presentation, routeTarget) {
         mutableStateOf(routeTarget == null && restoreAnchor == null)
     }
-    LaunchedEffect(listState) {
+    LaunchedEffect(listState, pages.loadState.prepend.endOfPaginationReached) {
         var wasScrolling = false
         snapshotFlow { listState.isScrollInProgress }.collect { scrolling ->
             if (scrolling) following = false
-            else if (wasScrolling && !listState.canScrollBackward) following = true
+            else if (followNewestEdge(wasScrolling, !listState.canScrollBackward, pages.loadState.prepend.endOfPaginationReached)) {
+                following = true
+            }
             wasScrolling = scrolling
         }
     }
@@ -111,6 +119,9 @@ private fun PagedChatMessageListContent(
         if (following && !listState.isScrollInProgress) listState.scrollToItem(0)
     }
     var targetPositioned by remember(presentation, routeTarget) { mutableStateOf(false) }
+    LaunchedEffect(pages.loadState.refresh) {
+        if (shouldRepositionAfterPagerRefresh(pages.loadState.refresh)) targetPositioned = false
+    }
     var highlightedTarget by remember(presentation, routeTarget) { mutableStateOf<String?>(null) }
     LaunchedEffect(highlightedTarget) {
         if (highlightedTarget != null) {

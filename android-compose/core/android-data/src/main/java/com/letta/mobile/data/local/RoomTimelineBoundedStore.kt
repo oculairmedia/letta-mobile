@@ -60,6 +60,7 @@ class RoomTimelineBoundedStore(
         var changed = false
         var revision: Long? = null
         var pending: TimelineDurableCheckpoint? = null
+        val stagedIdentities = mutableListOf<ByteArray>()
 
         override suspend fun toolCall(callId: String): TimelineToolIndexEntry? {
             checkOpen()
@@ -116,7 +117,7 @@ class RoomTimelineBoundedStore(
         suspend fun finish() {
             if (!changed) return
             val next = checkNotNull(revision) { "Changed transaction requires nextRevision" }
-            dao.stamp(scope, -1, next)
+            for (identity in stagedIdentities) dao.stampIdentity(scope, identity, -1, next)
             dao.head(LedgerHead(scope, next, codec.encode(checkpoint()).copyOf()))
         }
 
@@ -153,7 +154,9 @@ class RoomTimelineBoundedStore(
             write()
             require(record.key.identity.value.length <= 4096 && record.contentType.length <= 256)
             val blob = persist(record.body)
-            dao.row(LedgerRow(scope, ledgerKey(record.key.identity.value), record.key.order, blob.pointer, blob.bytes, record.contentType, -1))
+            val identity = ledgerKey(record.key.identity.value)
+            dao.row(LedgerRow(scope, identity, record.key.order, blob.pointer, blob.bytes, record.contentType, -1))
+            stagedIdentities += identity
         }
 
         suspend fun persist(value: ByteArray): LedgerBlob {

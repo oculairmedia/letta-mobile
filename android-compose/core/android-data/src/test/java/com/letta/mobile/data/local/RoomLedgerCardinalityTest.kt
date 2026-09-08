@@ -57,11 +57,27 @@ class RoomLedgerCardinalityTest {
             }
             db.withTransaction {
                 db.openHelper.readableDatabase.query(androidx.sqlite.db.SimpleSQLiteQuery(
-                    "EXPLAIN QUERY PLAN SELECT * FROM ledger_row WHERE scope = ? AND (position < ? OR (position = ? AND identity < ?)) ORDER BY position DESC, identity DESC LIMIT 128",
-                    arrayOf<Any?>(key, 27000L, 27000L, ledgerKey("id-27000")),
+                    "EXPLAIN QUERY PLAN SELECT * FROM ledger_row WHERE scope = ? AND position = ? AND identity < ? ORDER BY identity DESC LIMIT 128",
+                    arrayOf<Any?>(key, 27000L, ledgerKey("id-27000")),
                 )).use { cursor ->
                     val details = buildList { while (cursor.moveToNext()) add(cursor.getString(3)) }.joinToString()
                     assertTrue(details, details.contains("USING INDEX index_ledger_row_scope_position_identity"))
+                    assertFalse(details, details.contains("TEMP B-TREE"))
+                }
+                db.openHelper.readableDatabase.query(androidx.sqlite.db.SimpleSQLiteQuery(
+                    "EXPLAIN QUERY PLAN SELECT * FROM ledger_row WHERE scope = ? AND position < ? ORDER BY position DESC, identity DESC LIMIT 128",
+                    arrayOf<Any?>(key, 27000L),
+                )).use { cursor ->
+                    val details = buildList { while (cursor.moveToNext()) add(cursor.getString(3)) }.joinToString()
+                    assertTrue(details, details.contains("USING INDEX index_ledger_row_scope_position_identity"))
+                    assertFalse(details, details.contains("TEMP B-TREE"))
+                }
+                db.openHelper.readableDatabase.query(androidx.sqlite.db.SimpleSQLiteQuery(
+                    "EXPLAIN QUERY PLAN UPDATE ledger_row SET revision = 2 WHERE scope = ? AND identity = ? AND revision = -1",
+                    arrayOf<Any?>(key, ledgerKey("id-14000")),
+                )).use { cursor ->
+                    val details = buildList { while (cursor.moveToNext()) add(cursor.getString(3)) }.joinToString()
+                    assertTrue(details, details.contains("USING INDEX") || details.contains("PRIMARY KEY"))
                     assertFalse(details, details.contains("TEMP B-TREE"))
                 }
             }

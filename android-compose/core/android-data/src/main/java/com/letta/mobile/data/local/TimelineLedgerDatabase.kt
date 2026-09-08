@@ -165,17 +165,29 @@ interface TimelineLedgerDao {
     @Query("SELECT scope, identity, position, pointer, bytes, contentType, revision FROM ledger_row WHERE scope = :scope ORDER BY position DESC, identity DESC LIMIT min(128, max(0, :limit))")
     suspend fun tail(scope: ByteArray, limit: Int): List<LedgerRow>
 
-    @Query("SELECT scope, identity, position, pointer, bytes, contentType, revision FROM ledger_row WHERE scope = :scope AND (position < :position OR (position = :position AND identity < :identity)) ORDER BY position DESC, identity DESC LIMIT min(128, max(0, :limit))")
-    suspend fun before(scope: ByteArray, position: Long, identity: ByteArray, limit: Int): List<LedgerRow>
+    @Query("SELECT scope, identity, position, pointer, bytes, contentType, revision FROM ledger_row WHERE scope = :scope AND position < :position ORDER BY position DESC, identity DESC LIMIT min(128, max(0, :limit))")
+    suspend fun beforeLowerPosition(scope: ByteArray, position: Long, limit: Int): List<LedgerRow>
 
-    @Query("SELECT scope, identity, position, pointer, bytes, contentType, revision FROM ledger_row WHERE scope = :scope AND (position > :position OR (position = :position AND identity > :identity)) ORDER BY position ASC, identity ASC LIMIT min(128, max(0, :limit))")
-    suspend fun after(scope: ByteArray, position: Long, identity: ByteArray, limit: Int): List<LedgerRow>
+    @Query("SELECT scope, identity, position, pointer, bytes, contentType, revision FROM ledger_row WHERE scope = :scope AND position = :position AND identity < :identity ORDER BY identity DESC LIMIT min(128, max(0, :limit))")
+    suspend fun beforeSamePosition(scope: ByteArray, position: Long, identity: ByteArray, limit: Int): List<LedgerRow>
 
-    @Query("SELECT EXISTS(SELECT 1 FROM ledger_row WHERE scope = :scope AND (position < :position OR (position = :position AND identity < :identity)))")
-    suspend fun hasBefore(scope: ByteArray, position: Long, identity: ByteArray): Boolean
+    @Query("SELECT scope, identity, position, pointer, bytes, contentType, revision FROM ledger_row WHERE scope = :scope AND position > :position ORDER BY position ASC, identity ASC LIMIT min(128, max(0, :limit))")
+    suspend fun afterHigherPosition(scope: ByteArray, position: Long, limit: Int): List<LedgerRow>
 
-    @Query("SELECT EXISTS(SELECT 1 FROM ledger_row WHERE scope = :scope AND (position > :position OR (position = :position AND identity > :identity)))")
-    suspend fun hasAfter(scope: ByteArray, position: Long, identity: ByteArray): Boolean
+    @Query("SELECT scope, identity, position, pointer, bytes, contentType, revision FROM ledger_row WHERE scope = :scope AND position = :position AND identity > :identity ORDER BY identity ASC LIMIT min(128, max(0, :limit))")
+    suspend fun afterSamePosition(scope: ByteArray, position: Long, identity: ByteArray, limit: Int): List<LedgerRow>
+
+    @Query("SELECT EXISTS(SELECT 1 FROM ledger_row WHERE scope = :scope AND position < :position LIMIT 1)")
+    suspend fun hasLowerPosition(scope: ByteArray, position: Long): Boolean
+
+    @Query("SELECT EXISTS(SELECT 1 FROM ledger_row WHERE scope = :scope AND position = :position AND identity < :identity LIMIT 1)")
+    suspend fun hasSamePositionBefore(scope: ByteArray, position: Long, identity: ByteArray): Boolean
+
+    @Query("SELECT EXISTS(SELECT 1 FROM ledger_row WHERE scope = :scope AND position > :position LIMIT 1)")
+    suspend fun hasHigherPosition(scope: ByteArray, position: Long): Boolean
+
+    @Query("SELECT EXISTS(SELECT 1 FROM ledger_row WHERE scope = :scope AND position = :position AND identity > :identity LIMIT 1)")
+    suspend fun hasSamePositionAfter(scope: ByteArray, position: Long, identity: ByteArray): Boolean
 
     @Query("SELECT scope, identity, position, pointer, bytes, contentType, revision FROM ledger_row WHERE scope = :scope AND identity = :identity")
     suspend fun locate(scope: ByteArray, identity: ByteArray): LedgerRow?
@@ -183,8 +195,8 @@ interface TimelineLedgerDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun row(row: LedgerRow)
 
-    @Query("UPDATE ledger_row SET revision = :revision WHERE scope = :scope AND revision = :staged")
-    suspend fun stamp(scope: ByteArray, staged: Long, revision: Long)
+    @Query("UPDATE ledger_row SET revision = :revision WHERE scope = :scope AND identity = :identity AND revision = :staged")
+    suspend fun stampIdentity(scope: ByteArray, identity: ByteArray, staged: Long, revision: Long)
 
     @Query("DELETE FROM ledger_row WHERE scope = :scope AND identity = :identity")
     suspend fun deleteRow(scope: ByteArray, identity: ByteArray)
@@ -213,6 +225,26 @@ interface TimelineLedgerDao {
     @Query("DELETE FROM ledger_evidence WHERE scope = :scope AND identity = :identity")
     suspend fun deleteEvidence(scope: ByteArray, identity: ByteArray)
 }
+
+internal suspend fun TimelineLedgerDao.before(scope: ByteArray, position: Long, identity: ByteArray, limit: Int): List<LedgerRow> {
+    if (limit <= 0) return emptyList()
+    val same = beforeSamePosition(scope, position, identity, limit)
+    if (same.size >= limit) return same
+    return same + beforeLowerPosition(scope, position, limit - same.size)
+}
+
+internal suspend fun TimelineLedgerDao.after(scope: ByteArray, position: Long, identity: ByteArray, limit: Int): List<LedgerRow> {
+    if (limit <= 0) return emptyList()
+    val same = afterSamePosition(scope, position, identity, limit)
+    if (same.size >= limit) return same
+    return same + afterHigherPosition(scope, position, limit - same.size)
+}
+
+internal suspend fun TimelineLedgerDao.hasBefore(scope: ByteArray, position: Long, identity: ByteArray): Boolean =
+    hasLowerPosition(scope, position) || hasSamePositionBefore(scope, position, identity)
+
+internal suspend fun TimelineLedgerDao.hasAfter(scope: ByteArray, position: Long, identity: ByteArray): Boolean =
+    hasHigherPosition(scope, position) || hasSamePositionAfter(scope, position, identity)
 
 internal fun ledgerScopeKey(scope: com.letta.mobile.data.timeline.snapshot.TimelineScope): ByteArray =
     ledgerKey(scope.storageKey + if (scope.agentId == null) "N" else "S")

@@ -114,72 +114,59 @@ class SelectedRuntimeBindingTest {
         assertFalse(allowsCapturedCanonicalRuntime(false, null))
     }
 
-    @Test fun manifestOnlyReadinessDrainsAndCopiesInsteadOfDeferring() = runTest {
+    @Test fun manifestOnlyReadinessDefersWithoutDrainOrEnvelopeDecode() = runTest {
         val scope = com.letta.mobile.data.timeline.snapshot.TimelineScope("backend", "conversation", "agent")
         val storage = mockk<com.letta.mobile.data.local.TimelineOwnedStorageFactory>()
         val authority = mockk<com.letta.mobile.data.local.TimelineOwnershipAuthority>()
         val drained = mutableListOf<String>()
         val transport = mockk<com.letta.mobile.data.timeline.GenerationTimelineTransport>(relaxed = true)
-        val lease = com.letta.mobile.data.local.TimelineOwnershipAuthority.Lease(
-            scope, 1, com.letta.mobile.data.local.TimelineOwnershipAuthority.Route.Migration,
-        )
         coEvery { authority.state(any()) } returns com.letta.mobile.data.local.TimelineOwnershipAuthority.State(
             scope, 0, com.letta.mobile.data.local.TimelineOwnershipAuthority.Phase.Legacy,
         )
-        coEvery { authority.acquire(any(), any()) } returns com.letta.mobile.data.local.TimelineOwnershipAuthority.Lease(
-            scope.copy(backendId = "legacy"), 0, com.letta.mobile.data.local.TimelineOwnershipAuthority.Route.Legacy,
+        coEvery { storage.classifyCopySource(any()) } returns com.letta.mobile.data.local.LegacyLedgerCopyHead(
+            "legacy-manifest", 0, false, com.letta.mobile.data.local.LegacyLedgerCopyKind.ManifestOnly,
         )
-        coEvery { storage.beginMappedMigrationAfterDrain(any(), any()) } returns lease
-        coEvery { storage.copyStep(any()) } throws IllegalStateException("manifest copy started")
         val runtime = AndroidCanonicalTimelineRuntime(
             "backend", transport, { drained += it }, authority, storage, backgroundScope, "legacy",
         )
-        try {
-            runtime.bind(scope, repairCommittedCursor = { _, _, _ -> }, reportFailure = {})
-            fail("Manifest-only history deferred without copy")
-        } catch (failure: IllegalStateException) {
-            assertEquals("manifest copy started", failure.message)
-        }
-        assertEquals(listOf("conversation"), drained)
-        coVerify(exactly = 1) { storage.beginMappedMigrationAfterDrain(any(), any()) }
-        coVerify(exactly = 1) { storage.copyStep(any()) }
+        val result = runtime.bind(scope, repairCommittedCursor = { _, _, _ -> }, reportFailure = {})
+        assertEquals(AndroidCanonicalTimelineRuntime.BindResult.LegacyDeferred, result)
+        assertEquals(0L, runtime.lastMeasurement.envelopeDecodes)
+        assertEquals(0L, runtime.lastMeasurement.copyBytes)
+        assertEquals(0L, runtime.lastMeasurement.convertBytes)
+        assertEquals(0, runtime.lastMeasurement.copyRows)
+        assertEquals(0, runtime.lastMeasurement.copySteps)
+        assertTrue(drained.isEmpty())
+        coVerify(exactly = 1) { storage.classifyCopySource(any()) }
+        coVerify(exactly = 0) { storage.beginMappedMigrationAfterDrain(any(), any()) }
         runtime.retire()
     }
 
-    @Test fun readinessMeasurementCountsEnvelopeDecodeDuringCopy() = runTest {
+    @Test fun readinessMeasurementCountsEnvelopeDecodeDuringClassify() = runTest {
         val scope = com.letta.mobile.data.timeline.snapshot.TimelineScope("backend", "conversation", "agent")
         val storage = mockk<com.letta.mobile.data.local.TimelineOwnedStorageFactory>()
         val authority = mockk<com.letta.mobile.data.local.TimelineOwnershipAuthority>()
         val drained = mutableListOf<String>()
         val transport = mockk<com.letta.mobile.data.timeline.GenerationTimelineTransport>(relaxed = true)
-        val lease = com.letta.mobile.data.local.TimelineOwnershipAuthority.Lease(
-            scope, 1, com.letta.mobile.data.local.TimelineOwnershipAuthority.Route.Migration,
-        )
         coEvery { authority.state(any()) } returns com.letta.mobile.data.local.TimelineOwnershipAuthority.State(
             scope, 0, com.letta.mobile.data.local.TimelineOwnershipAuthority.Phase.Legacy,
         )
-        coEvery { authority.acquire(any(), any()) } returns com.letta.mobile.data.local.TimelineOwnershipAuthority.Lease(
-            scope.copy(backendId = "legacy"), 0, com.letta.mobile.data.local.TimelineOwnershipAuthority.Route.Legacy,
-        )
-        coEvery { storage.beginMappedMigrationAfterDrain(any(), any()) } returns lease
         val encoded = com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec.encode(
             com.letta.mobile.data.timeline.snapshot.StoredTimelineEnvelope(scope = scope, revision = 1),
         )
-        coEvery { storage.copyStep(any()) } answers {
+        coEvery { storage.classifyCopySource(any()) } answers {
             checkNotNull(com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec.decode(encoded))
-            error("counted copy decode")
+            com.letta.mobile.data.local.LegacyLedgerCopyHead(
+                "legacy-manifest", 0, false, com.letta.mobile.data.local.LegacyLedgerCopyKind.ManifestOnly,
+            )
         }
         val runtime = AndroidCanonicalTimelineRuntime(
             "backend", transport, { drained += it }, authority, storage, backgroundScope, "legacy",
         )
-        try {
-            runtime.bind(scope, repairCommittedCursor = { _, _, _ -> }, reportFailure = {})
-            fail("Copy decode was not observed")
-        } catch (failure: IllegalStateException) {
-            assertEquals("counted copy decode", failure.message)
-        }
+        val result = runtime.bind(scope, repairCommittedCursor = { _, _, _ -> }, reportFailure = {})
+        assertEquals(AndroidCanonicalTimelineRuntime.BindResult.LegacyDeferred, result)
         assertEquals(1L, runtime.lastMeasurement.envelopeDecodes)
-        assertEquals(listOf("conversation"), drained)
+        assertTrue(drained.isEmpty())
         runtime.retire()
     }
 

@@ -115,6 +115,25 @@ class RoomTimelineBoundedStoreTest {
         store.read(scope) { assertNull(evidence("uncommitted", 1)) }
     }
 
+    @Test fun revisionStampTouchesOnlyWrittenIdentities() = runBlocking {
+        store.transaction(scope) {
+            put(TimelineStoredRecord(TimelinePageKey(1, TimelineMessageId("kept")), "test", byteArrayOf(1)))
+            put(TimelineStoredRecord(TimelinePageKey(2, TimelineMessageId("other")), "test", byteArrayOf(2)))
+            nextRevision()
+        }
+        store.transaction(scope) {
+            put(TimelineStoredRecord(TimelinePageKey(3, TimelineMessageId("new")), "test", byteArrayOf(3)))
+            nextRevision()
+        }
+        store.read(scope) {
+            val page = metadata(TimelineReadPosition.Tail, 3)
+            val revisions = page.rows.associate { it.key.identity.value to it.revision }
+            assertEquals(1L, revisions.getValue("kept"))
+            assertEquals(1L, revisions.getValue("other"))
+            assertEquals(2L, revisions.getValue("new"))
+        }
+    }
+
     @Test fun corruptChunksAndForeignPointersFailWithoutDestroyingGoodRows() = runBlocking {
         store.transaction(scope) {
             put(TimelineStoredRecord(TimelinePageKey(0, TimelineMessageId("good")), "test", byteArrayOf(1, 2, 3)))

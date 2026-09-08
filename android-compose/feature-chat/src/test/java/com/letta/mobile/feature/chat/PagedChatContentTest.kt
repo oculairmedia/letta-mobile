@@ -241,6 +241,48 @@ class PagedChatContentTest {
         org.junit.Assert.assertNull(binding.target("a"))
     }
 
+    @Test fun freshSearchAndTailUseNewFactoriesWithinOneSelectionGeneration() {
+        val binding = ChatPagingBinding()
+        val created = mutableListOf<ChatPagingPresentation>()
+        var published: ChatPagingPresentation? = null
+        fun create(target: String?) = ChatPagingPresentation(
+            flowOf(PagingData.empty()), MutableStateFlow(emptyList()), {},
+        ).also { created += it }
+        val tail = binding.selectRoute("a", 1, null, { published = it }, ::create)
+        val search = binding.selectRoute("a", 1, "hit", { published = it }, ::create)
+        org.junit.Assert.assertNotSame(tail, search)
+        org.junit.Assert.assertEquals("hit", search.routeTarget)
+        org.junit.Assert.assertEquals(2, created.size)
+        search.requestTail()
+        org.junit.Assert.assertNotSame(search, published)
+        org.junit.Assert.assertNull(published!!.routeTarget)
+        org.junit.Assert.assertEquals(3, created.size)
+        tail.requestTail()
+        search.requestTail()
+        org.junit.Assert.assertEquals(3, created.size)
+    }
+
+    @Test fun leftoverSearchKeepsCurrentPagingFlowInsideOneSelectionGeneration() {
+        val binding = ChatPagingBinding()
+        val created = mutableListOf<ChatPagingPresentation>()
+        fun create(target: String?) = ChatPagingPresentation(
+            flowOf(PagingData.empty()), MutableStateFlow(emptyList()), {},
+        ).also { created += it }
+        val search = binding.selectRoute("a", 1, "hit", {}, ::create)
+        val leftover = binding.selectRoute("a", 1, "hit", {}, ::create)
+        org.junit.Assert.assertSame(search, leftover)
+        org.junit.Assert.assertEquals(1, created.size)
+        org.junit.Assert.assertEquals("hit", leftover.routeTarget)
+    }
+
+    @Test fun historicalWindowEdgeIsNotGlobalTailFollow() {
+        org.junit.Assert.assertFalse(followNewestEdge(wasScrolling = true, atNewestEdge = true, prependExhausted = false))
+        org.junit.Assert.assertTrue(followNewestEdge(wasScrolling = true, atNewestEdge = true, prependExhausted = true))
+        org.junit.Assert.assertFalse(followNewestEdge(wasScrolling = true, atNewestEdge = false, prependExhausted = true))
+        org.junit.Assert.assertTrue(shouldRepositionAfterPagerRefresh(androidx.paging.LoadState.Loading))
+        org.junit.Assert.assertFalse(shouldRepositionAfterPagerRefresh(androidx.paging.LoadState.NotLoading(endOfPaginationReached = true)))
+    }
+
     @Test fun stableAnchorRestoresInAChangedBoundedWindow() {
         val presentation = ChatPagingPresentation(
             flowOf(PagingData.from((30..90).map { row("row-$it") })), MutableStateFlow(emptyList()), {},

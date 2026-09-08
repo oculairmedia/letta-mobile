@@ -57,17 +57,19 @@ class TimelineExactCanonicalWriter(
         )
         val old = transaction.metadata(TimelineReadPosition.Around(key), 1).rows.singleOrNull { it.key == key }
         var historical: TimelineEvent.Confirmed? = null
+        var historicalBytes: ByteArray? = null
         if (old != null) {
             if (old.body.encodedBytes > maxHistoricalBytes) throw TimelineMergeUnavailable(identity, "historical_body_budget")
-            val bytes = ByteArray(old.body.encodedBytes.toInt())
+            val stored = ByteArray(old.body.encodedBytes.toInt())
             var offset = 0
-            while (offset < bytes.size) {
-                val chunk = transaction.body(old.body, offset.toLong(), minOf(64 * 1024, bytes.size - offset))
-                if (chunk.isEmpty() || chunk.size > bytes.size - offset) throw TimelineMergeUnavailable(identity, "incomplete_historical_body")
-                chunk.copyInto(bytes, offset)
+            while (offset < stored.size) {
+                val chunk = transaction.body(old.body, offset.toLong(), minOf(64 * 1024, stored.size - offset))
+                if (chunk.isEmpty() || chunk.size > stored.size - offset) throw TimelineMergeUnavailable(identity, "incomplete_historical_body")
+                chunk.copyInto(stored, offset)
                 offset += chunk.size
             }
-            historical = TimelineSnapshotCodec.json.decodeFromString(StoredTimelineEvent.serializer(), bytes.decodeToString()).toConfirmedTimelineEvent()
+            historicalBytes = stored
+            historical = TimelineSnapshotCodec.json.decodeFromString(StoredTimelineEvent.serializer(), stored.decodeToString()).toConfirmedTimelineEvent()
         }
         val merged = if (owner != null) {
             when (val decision = mergeOwnedTerminal(scope, owner, incoming, maxHistoricalBytes.toLong(),
@@ -91,9 +93,9 @@ class TimelineExactCanonicalWriter(
         for (callId in merged.toolReturnContentByCallId.keys) {
             if (callId.isNotBlank()) indexed = CanonicalToolIndex.observe(transaction, callId, null, true) || indexed
         }
-        if (merged == historical) return indexed
         val canonical = merged.copy(serverId = identity.value)
         val bytes = TimelineSnapshotCodec.json.encodeToString(StoredTimelineEvent.serializer(), canonical.toStoredTimelineEvent()).encodeToByteArray()
+        if (historicalBytes != null && bytes.contentEquals(historicalBytes)) return indexed
         if (canonical.otid.isNotBlank()) transaction.putEvidence("identity/otid/${canonical.otid}", identity.value.encodeToByteArray())
         transaction.put(TimelineStoredRecord(key, "application/vnd.letta.timeline-event+json;version=1", bytes))
         if (merged.messageType == TimelineMessageType.ASSISTANT) {

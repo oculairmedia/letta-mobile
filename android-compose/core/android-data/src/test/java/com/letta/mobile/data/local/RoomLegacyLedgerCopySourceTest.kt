@@ -121,46 +121,4 @@ class RoomLegacyLedgerCopySourceTest {
             assertFalse(source.validateRoot(scope, manifest.token))
         } finally { legacy.close() }
     }
-
-    @Test fun expandedManifestCopyServesOneRowAtATimeWithoutRecodingTheEnvelope() = runBlocking {
-        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        val legacy = Room.inMemoryDatabaseBuilder(context, LettaDatabase::class.java).build()
-        try {
-            val scope = TimelineScope("b", "c", "a")
-            val envelope = com.letta.mobile.data.timeline.snapshot.StoredTimelineEnvelope(
-                scope = scope, revision = 3, events = listOf(
-                    com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent(
-                        position = 0.0, otid = "one", serverId = "s1", messageType = "USER",
-                        dateIso = "2026-01-01T00:00:00Z", content = "first",
-                    ),
-                    com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent(
-                        position = 1.0, otid = "two", serverId = "s2", messageType = "ASSISTANT",
-                        dateIso = "2026-01-01T00:00:01Z", content = "second",
-                    ),
-                ),
-            )
-            assertTrue(RoomConfirmedTimelineStore(legacy).writeSnapshot(envelope))
-            val cache = mutableMapOf<String, ManifestCopyCache>()
-            val source = RoomLegacyLedgerCopySource(legacy, expandManifest = true, manifestCache = cache)
-            val decodeBefore = com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec.envelopeDecodeCount
-            val first = source.snapshot(scope) {
-                val head = head()
-                assertTrue(head.supported)
-                assertEquals(LegacyLedgerCopyKind.ManifestOnly, head.kind)
-                assertEquals(2L, head.rowCount)
-                val row = metadata(-1, 1).single()
-                assertEquals(0L, row.order)
-                val bytes = chunk(row, 0, 65536)
-                assertEquals(row.bytes, bytes.size.toLong())
-                head.token
-            }
-            val afterFirst = com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec.envelopeDecodeCount
-            assertEquals(1, afterFirst - decodeBefore)
-            source.snapshot(scope) {
-                assertEquals(first, head().token)
-                assertEquals(1L, metadata(0, 1).single().order)
-            }
-            assertEquals(afterFirst, com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec.envelopeDecodeCount)
-        } finally { legacy.close() }
-    }
 }

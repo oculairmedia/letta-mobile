@@ -85,7 +85,9 @@ internal class ChatPagingBinding {
         publish: (ChatPagingPresentation) -> Unit,
         create: (String?) -> ChatPagingPresentation,
     ): ChatPagingPresentation {
-        val route = routeTarget?.takeUnless { it in consumedRoutes }
+        val route = effectiveRoute(routeTarget)
+        // A new search route needs a fresh Paging collection even in the same generation.
+        if (needsFreshCollection(routeTarget)) close()
         return select(conversationId, generation) {
             create(route ?: target(conversationId))
         }.also { current ->
@@ -108,6 +110,18 @@ internal class ChatPagingBinding {
         }
     }
     fun target(conversationId: String): String? = viewports[conversationId]?.takeUnless { it.following }?.messageId
+
+    fun effectiveRoute(routeTarget: String?): String? = routeTarget?.takeUnless { it in consumedRoutes }
+
+    fun needsFreshCollection(routeTarget: String?, currentRouteTarget: String? = presentation?.routeTarget): Boolean {
+        val route = effectiveRoute(routeTarget)
+        return route != null && currentRouteTarget != route
+    }
+
+    fun rememberRoute(route: String?) {
+        if (route != null) consumedRoutes += route
+    }
+
     private var selection: Pair<String, Long>? = null
     var presentation: ChatPagingPresentation? = null
         private set

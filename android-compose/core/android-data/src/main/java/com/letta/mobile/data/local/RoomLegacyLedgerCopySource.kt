@@ -3,17 +3,13 @@ package com.letta.mobile.data.local
 import androidx.room.withTransaction
 import kotlinx.coroutines.ensureActive
 import androidx.sqlite.db.SimpleSQLiteQuery
-import com.letta.mobile.data.timeline.snapshot.StoredTimelineEnvelope
-import com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
-import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
+import com.letta.mobile.data.timeline.snapshot.StoredTimelineEnvelope
 
 /** Reads existing v13 tables without changing their schema or full-envelope validation path. */
 class RoomLegacyLedgerCopySource(
     private val legacy: LettaDatabase,
     private val mapping: TimelineOwnershipAuthority.Mapping? = null,
-    private val expandManifest: Boolean = false,
-    private val manifestCache: MutableMap<String, ManifestCopyCache> = mutableMapOf(),
 ) : LegacyLedgerCopySource {
     private fun sourceScope(target: TimelineScope): TimelineScope {
         val captured = mapping ?: return target
@@ -27,7 +23,6 @@ class RoomLegacyLedgerCopySource(
             it.target.agentId, it.targetEpoch.toString(), token)
         checksum(fields.joinToString("") { value -> if (value == null) "-1:" else "${value.length}:$value" }.encodeToByteArray())
     } ?: token
-
     /** Independent metadata verification, not canonical conversion or permission to activate.
      * Runs only post-open; bounded SQL pages avoid loading the legacy payload or row list.
      */
@@ -37,9 +32,6 @@ class RoomLegacyLedgerCopySource(
         val captured = sourceScope(scope)
         val stored = legacy.confirmedTimelineSnapshotDao().getNormalizedHead(captured.backendId, captured.conversationId)
         if (stored == null) {
-            if (expandManifest && initial.kind == LegacyLedgerCopyKind.ManifestOnly && initial.supported) {
-                return@snapshot initial.token == expectedToken
-            }
             // A missing normalized head is empty only when no v13 snapshot exists.
             return@snapshot initial.rowCount == 0L && initial.supported && !hasLegacyManifestHistory(captured)
         }
@@ -75,16 +67,8 @@ class RoomLegacyLedgerCopySource(
         count == initial.rowCount && actual == stored.rowDigest.removePrefix(CHAIN_ROW_DIGEST_PREFIX).lowercase()
     }
 
-    override suspend fun <T> snapshot(scope: TimelineScope, block: suspend LegacyLedgerCopyReader.() -> T): T {
-        val captured = sourceScope(scope)
-        if (expandManifest &&
-            legacy.confirmedTimelineSnapshotDao().getNormalizedHead(captured.backendId, captured.conversationId) == null &&
-            hasLegacyManifestHistory(captured)
-        ) {
-            loadManifestCache(captured)
-        }
-        return snapshotSource(captured, block)
-    }
+    override suspend fun <T> snapshot(scope: TimelineScope, block: suspend LegacyLedgerCopyReader.() -> T): T =
+        snapshotSource(sourceScope(scope), block)
 
     private suspend fun <T> snapshotSource(scope: TimelineScope, block: suspend LegacyLedgerCopyReader.() -> T): T =
         legacy.withTransaction {
@@ -116,8 +100,9 @@ class RoomLegacyLedgerCopySource(
                     }
                     if (normalized != null) return normalized
                     return if (hasLegacyManifestHistory(scope)) {
-                        if (expandManifest) expandedManifestHead(scope)
-                        else LegacyLedgerCopyHead(bindToken("legacy-manifest"), 0, false, LegacyLedgerCopyKind.ManifestOnly)
+                        // History still lives in v13 manifests. Never certify that as empty,
+                        // and never decode the envelope on this path.
+                        LegacyLedgerCopyHead(bindToken("legacy-manifest"), 0, false, LegacyLedgerCopyKind.ManifestOnly)
                     } else {
                         LegacyLedgerCopyHead(bindToken("empty-normalized"), 0, true, LegacyLedgerCopyKind.Empty)
                     }
@@ -126,9 +111,6 @@ class RoomLegacyLedgerCopySource(
                 override suspend fun metadata(afterOrder: Long, maxRows: Int): List<LegacyLedgerCopyRow> {
                     check(open)
                     require(maxRows in 1..128)
-                    expandedManifest(scope)?.let { cached ->
-                        return cached.rows.filter { it.order > afterOrder }.take(maxRows)
-                    }
                     return legacy.openHelper.readableDatabase.query(SimpleSQLiteQuery(
                         "SELECT event_order, identity_primary, identity_secondary, length(payload), checksum FROM normalized_timeline_snapshot_rows WHERE backend_id = ? AND conversation_id = ? AND event_order > ? ORDER BY event_order LIMIT min(128, max(0, CAST(? AS INTEGER)))",
                         arrayOf(scope.backendId, scope.conversationId, afterOrder.toString(), maxRows.toString()),
@@ -142,12 +124,6 @@ class RoomLegacyLedgerCopySource(
                 override suspend fun chunk(row: LegacyLedgerCopyRow, offset: Long, maxBytes: Int): ByteArray {
                     check(open)
                     require(offset >= 0 && offset < Long.MAX_VALUE && maxBytes in 0..65536)
-                    expandedManifest(scope)?.let { cached ->
-                        val payload = cached.payloads[row.order.toInt()]
-                        val start = offset.toInt()
-                        val end = minOf(payload.size, start + maxBytes)
-                        return payload.copyOfRange(start, end)
-                    }
                     return legacy.openHelper.readableDatabase.query(SimpleSQLiteQuery(
                         "SELECT substr(payload, ? + 1, min(65536, max(0, CAST(? AS INTEGER)))) FROM normalized_timeline_snapshot_rows WHERE backend_id = ? AND conversation_id = ? AND identity_primary = ? AND identity_secondary = ?",
                         arrayOf(offset.toString(), maxBytes.toString(), scope.backendId, scope.conversationId, row.primary.toString(), row.secondary.toString()),
@@ -165,47 +141,4 @@ class RoomLegacyLedgerCopySource(
         return dao.getHeadMetadata(scope.backendId, scope.conversationId) != null ||
             dao.countManifests(scope.backendId, scope.conversationId) > 0
     }
-
-    private fun cacheKey(scope: TimelineScope) =
-        "${scope.backendId}\u0000${scope.conversationId}\u0000${scope.agentId}"
-
-    private suspend fun loadManifestCache(scope: TimelineScope): ManifestCopyCache? {
-        manifestCache[cacheKey(scope)]?.let { return it }
-        val dao = legacy.confirmedTimelineSnapshotDao()
-        val head = dao.getHeadMetadata(scope.backendId, scope.conversationId) ?: return null
-        val manifestId = head.activeManifestId ?: head.fallbackManifestId ?: return null
-        val policy = if (head.activeManifestId != null) RoomRevisionPolicy.EXACT else RoomRevisionPolicy.AT_OR_BELOW
-        val read = RoomTimelineManifestReader(dao).read(
-            RoomManifestRequest(scope, manifestId, head.highWaterRevision, policy),
-        )
-        val envelope = (read as? RoomManifestRead.Valid)?.envelope ?: return null
-        val payloads = envelope.events.map { event ->
-            TimelineSnapshotCodec.json.encodeToString(StoredTimelineEvent.serializer(), event).encodeToByteArray()
-        }
-        val rows = payloads.mapIndexed { index, bytes ->
-            LegacyLedgerCopyRow(index.toLong(), index.toLong(), 0L, bytes.size.toLong(), checksum(bytes))
-        }
-        val cached = ManifestCopyCache(
-            token = bindToken("legacy-manifest:${envelope.revision}:${rows.size}"),
-            rows = rows,
-            payloads = payloads,
-        )
-        manifestCache[cacheKey(scope)] = cached
-        return cached
-    }
-
-    private fun expandedManifest(scope: TimelineScope): ManifestCopyCache? =
-        if (expandManifest) manifestCache[cacheKey(scope)] else null
-
-    private fun expandedManifestHead(scope: TimelineScope): LegacyLedgerCopyHead {
-        val cached = manifestCache[cacheKey(scope)]
-            ?: return LegacyLedgerCopyHead(bindToken("legacy-manifest"), 0, false, LegacyLedgerCopyKind.ManifestOnly)
-        return LegacyLedgerCopyHead(cached.token, cached.rows.size.toLong(), true, LegacyLedgerCopyKind.ManifestOnly)
-    }
 }
-
-data class ManifestCopyCache(
-    val token: String,
-    val rows: List<LegacyLedgerCopyRow>,
-    val payloads: List<ByteArray>,
-)

@@ -90,6 +90,30 @@ class ChatPagingPresentationAdapterTest {
         assertTrue(coordinator.retire(owner))
     }
 
+    @Test fun lateResidentRowsAfterCloseDoNotAffectReplacement() = runTest(UnconfinedTestDispatcher()) {
+        val coordinator = CanonicalTimelineCoordinator(EmptyStore(), NoTransport)
+        val owner = coordinator.acquire(TimelineScope("backend", "conversation", "agent"))
+        val first = createCanonicalChatPagingPresentation(coordinator, owner, backgroundScope, null)
+        val second = createCanonicalChatPagingPresentation(coordinator, owner, backgroundScope, "missing")
+        assertEquals("missing", second.missingTarget.value)
+        first.close()
+        first.onResidentRows(
+            listOf(
+                com.letta.mobile.data.chat.projection.ChatRenderItem.Single(
+                    com.letta.mobile.data.model.UiMessage(
+                        id = "stale", role = "user", content = "stale", timestamp = "2026-09-07T00:00:00Z",
+                    ),
+                    com.letta.mobile.ui.common.GroupPosition.None,
+                ),
+            ),
+        )
+        assertEquals("missing", second.missingTarget.value)
+        assertFalse(second.opening)
+        second.close()
+        advanceUntilIdle()
+        assertTrue(coordinator.retire(owner))
+    }
+
     private class EmptyStore : TimelineBoundedStore {
         private val evidence = mutableMapOf<String, ByteArray>()
         private val tools = mutableMapOf<String, TimelineToolIndexEntry>()
