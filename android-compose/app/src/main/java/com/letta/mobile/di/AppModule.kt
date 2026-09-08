@@ -180,6 +180,19 @@ abstract class AppModule {
 
         @Provides
         @Singleton
+        fun provideTimelineExternalTransportWriter(impl: TimelineRepository): TimelineExternalTransportWriter =
+            impl.admittedExternalWriter
+
+        @Provides
+        @Singleton
+        fun provideAndroidCanonicalRuntimeFactory(
+            legacy: TimelineRepository,
+            authority: com.letta.mobile.data.local.TimelineOwnershipAuthority,
+            storage: com.letta.mobile.data.local.TimelineOwnedStorageFactory,
+        ) = AndroidCanonicalTimelineRuntimeFactory(legacy, authority, storage)
+
+        @Provides
+        @Singleton
         fun provideCanonicalTimelineTransport(
             messageApi: MessageApi,
             local: com.letta.mobile.runtime.local.LettaCodeLocalTimelineTransport,
@@ -230,6 +243,12 @@ abstract class AppModule {
             )
         }
     }
+
+    @Binds
+    @Singleton
+    abstract fun bindSelectedChatRuntimeProvider(
+        impl: ProductionSelectedChatRuntimeProvider,
+    ): com.letta.mobile.feature.chat.coordination.SelectedChatRuntimeProvider
 
     @Binds
     @Singleton
@@ -394,10 +413,6 @@ abstract class AppModule {
     abstract fun bindChannelNotificationPublisher(
         impl: ChannelNotificationPublisher,
     ): IChannelNotificationPublisher
-
-    @Binds
-    @Singleton
-    abstract fun bindTimelineExternalTransportWriter(impl: TimelineRepository): TimelineExternalTransportWriter
 
     @Binds
     @IntoSet

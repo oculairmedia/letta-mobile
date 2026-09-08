@@ -5,6 +5,8 @@ import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -93,7 +95,7 @@ class TimelineExactCanonicalWriterTest {
         val engine = CanonicalTimelineEngine(store, writer, enabled = true)
         val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
         val fence = engine.beginLive(selection)
-        val fragment = message("tiny").copy(runId = "run")
+        val fragment = message("Hi").copy(runId = "run")
         assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(fragment)))
         assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
         val raw = store.rows.values.single().body.copyOf()
@@ -133,6 +135,7 @@ class TimelineExactCanonicalWriterTest {
         val store = Store()
         var repairStarted = kotlinx.coroutines.CompletableDeferred<Unit>()
         var releaseRepair = kotlinx.coroutines.CompletableDeferred<Unit>()
+        var repairSequence: Int? = null
         val transport = object : TimelineTransport {
             override suspend fun listConversationMessagePage(request: TimelineRemotePageRequest, progress: TimelinePageProgress?): TimelineRemotePageResult {
                 repairStarted.complete(Unit)
@@ -141,7 +144,7 @@ class TimelineExactCanonicalWriterTest {
                 return TimelineRemotePageResult.Page(request.requestId, request.selectionGeneration,
                     listOf(TimelineRemoteRecord(TimelineMessageId("echo"), com.letta.mobile.data.model.UserMessage(
                         id = "echo", contentRaw = kotlinx.serialization.json.JsonPrimitive("question"),
-                        date = "2026-01-01T00:00:00Z", otid = "pending-user",
+                        date = "2026-01-01T00:00:00Z", otid = "pending-user", seqId = repairSequence,
                     ), 0)), null, false, 0)
             }
             override suspend fun sendConversationMessage(
@@ -162,7 +165,11 @@ class TimelineExactCanonicalWriterTest {
             override suspend fun turnStarted(owner: CanonicalTimelineCoordinator.Owner, runId: String?, turnId: String?) { calls += "start:$runId:$turnId" }
             override suspend fun turnEnded(owner: CanonicalTimelineCoordinator.Owner, clean: Boolean) { calls += "end:$clean" }
             override suspend fun cleanup(owner: CanonicalTimelineCoordinator.Owner, runId: String?, turnId: String?, reason: String, candidateRunIds: Set<String>): Int { calls += "cleanup:$reason"; return 2 }
-            override suspend fun repairCursor(owner: CanonicalTimelineCoordinator.Owner, fallbackSeq: Long?) { calls += "repair:$fallbackSeq" }
+            override suspend fun repairCursor(
+                owner: CanonicalTimelineCoordinator.Owner,
+                fallbackSeq: Long?,
+                expectedWatermark: Long?,
+            ) { calls += "repair:$fallbackSeq:$expectedWatermark" }
         }
         val external = CanonicalExternalTransportWriter(coordinator, { agentId, conversationId ->
             assertEquals(scope.agentId, agentId)
@@ -184,7 +191,7 @@ class TimelineExactCanonicalWriterTest {
         coordinator.detach(screen)
         assertFalse(coordinator.retire(owner))
         external.turnEnded(scope.agentId, scope.conversationId, clean = false)
-        assertEquals(listOf("start:run:turn", "cleanup:cancelled", "repair:10", "end:false"), calls)
+        assertEquals(listOf("start:run:turn", "cleanup:cancelled", "repair:10:null", "end:false"), calls)
         assertEquals(null, owner.session.live.value)
         assertEquals(1, store.rows.size)
         val durableBody = store.rows.values.single().body.copyOf()
@@ -213,6 +220,37 @@ class TimelineExactCanonicalWriterTest {
         assertFalse(coordinator.retire(reopened))
         cancelledRepair.cancel()
         cancelledRepair.join()
+        releaseRepair.complete(Unit)
+        val failures = mutableListOf<Throwable>()
+        val watermarks = mutableListOf<Pair<Long?, Long?>>()
+        var backendCurrent = true
+        val indexed = IndexedCanonicalTimelineMaintenance(coordinator, this, { _, expected, watermark ->
+            check(backendCurrent) { "retired backend" }
+            watermarks += expected to watermark
+        }, { failures += it })
+        kotlin.test.assertFailsWith<IllegalStateException> { indexed.repairCursor(reopened, 12L, expectedWatermark = 4L) }
+        assertEquals(emptyList<Pair<Long?, Long?>>(), watermarks)
+        repairSequence = 7
+        indexed.repairCursor(reopened, 999L, expectedWatermark = 4L)
+        assertEquals(listOf<Pair<Long?, Long?>>(4L to 7L), watermarks)
+        backendCurrent = false
+        val retiredFailure = kotlin.test.assertFailsWith<IllegalStateException> {
+            indexed.repairCursor(reopened, 13L, expectedWatermark = 4L)
+        }
+        assertEquals("retired backend", retiredFailure.message)
+        assertEquals(listOf<Pair<Long?, Long?>>(4L to 7L), watermarks)
+        assertEquals(0, indexed.cleanup(reopened, "missing", null, "test", emptySet()))
+        for (clean in listOf(true, false)) {
+            indexed.turnEnded(reopened, clean)
+            assertFalse(coordinator.retire(reopened))
+            indexed.turnStarted(reopened, "replacement", null)
+            runCurrent()
+            assertEquals(0, reopened.activeRepairs)
+            indexed.turnEnded(reopened, clean)
+            advanceUntilIdle()
+            assertEquals(0, reopened.activeRepairs)
+        }
+        assertEquals(emptyList(), failures)
         assertTrue(coordinator.retire(reopened))
     }
 
@@ -377,6 +415,103 @@ class TimelineExactCanonicalWriterTest {
             assertTrue(store.current.hasMore)
             assertEquals(1L, store.current.revision)
         }
+    }
+
+    @Test fun settlementBudgetFailureRollsBackEarlierOwnerBodyAndIndex() = runTest {
+        val store = Store()
+        val writer = TimelineExactCanonicalWriter(scope, 100_000)
+        fun tool(id: String, content: String) = kotlin.test.assertNotNull(message(content).toTimelineEvent(0.0)).copy(
+            serverId = id, otid = id, messageType = TimelineMessageType.TOOL_CALL,
+            toolCalls = listOf(com.letta.mobile.data.model.ToolCall(id = id, name = "test")).toTimelinePersistentList(),
+        )
+        store.transaction(scope) {
+            writer.mergeEvent(this, tool("a", "small"))
+            writer.mergeEvent(this, tool("z", "x".repeat(20_000)))
+            nextRevision()
+        }
+        val before = store.rows.mapValues { it.value.body.copyOf() }
+        val engine = CanonicalTimelineEngine(store, writer, TimelinePageBudget(64, 10_000), enabled = true)
+        val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
+        val generation = engine.advanceToolSweep(selection)
+        kotlin.test.assertFailsWith<IllegalArgumentException> { engine.settleToolSweep(selection, generation) }
+        assertTrue(store.bodyReads > 0)
+        before.forEach { (key, bytes) -> kotlin.test.assertContentEquals(bytes, store.rows.getValue(key).body) }
+        assertEquals(1L, store.current.revision)
+        assertEquals(1L, engine.publication.value.durableRevision)
+        store.read(scope) {
+            assertEquals(generation, toolSweepGeneration())
+            assertEquals(listOf("a", "z"), unresolvedTools(null, 64).map { it.callId })
+            assertFalse(kotlin.test.assertNotNull(toolCall("a")).returned)
+        }
+    }
+
+    @Test fun blockedSweepCancellationReleasesLeaseAndCannotFailNextTurn() = runTest {
+        val store = Store()
+        val entered = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val release = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val coordinator = CanonicalTimelineCoordinator(store, PageTransport {
+            entered.complete(Unit)
+            release.await()
+        })
+        val owner = coordinator.acquire(scope)
+        val failures = mutableListOf<Throwable>()
+        val maintenance = IndexedCanonicalTimelineMaintenance(coordinator, this, { _, _, _ -> error("unexpected cursor") }, { failures += it })
+        maintenance.turnEnded(owner, false)
+        entered.await()
+        assertFalse(coordinator.retire(owner))
+        maintenance.turnStarted(owner, "next", null)
+        val next = coordinator.beginLive(owner)
+        assertTrue(coordinator.ingest(owner, next, TimelineStreamFrame.Message(message("next"))))
+        release.complete(Unit)
+        runCurrent()
+        assertEquals(0, owner.activeRepairs)
+        assertEquals(next, owner.session.live.value?.fence)
+        assertEquals(emptyList(), failures)
+        assertTrue(coordinator.ingest(owner, next, TimelineStreamFrame.Done))
+        assertTrue(coordinator.retire(owner))
+        assertFalse(coordinator.retire(owner))
+    }
+
+    @Test fun attachedCommittedOverlayHandsOffBeforeRepairAndNextTurn() = runTest {
+        val store = Store()
+        val coordinator = CanonicalTimelineCoordinator(store, PageTransport {})
+        val owner = coordinator.acquire(scope)
+        val presentation = kotlin.test.assertNotNull(coordinator.attach(owner))
+        val first = coordinator.beginLive(owner)
+        coordinator.ingest(owner, first, TimelineStreamFrame.Message(message("durable off-tail")))
+        coordinator.ingest(owner, first, TimelineStreamFrame.Done)
+        val bytes = store.rows.values.single().body.copyOf()
+        assertEquals(first, owner.session.live.value?.fence)
+        assertEquals(TimelineEnginePageOutcome.Applied, coordinator.reconcileRecent(owner))
+        assertEquals(null, owner.session.live.value)
+        assertEquals(1L, owner.session.publication.value.durableRevision)
+        kotlin.test.assertContentEquals(bytes, store.rows.values.single().body)
+        val next = coordinator.beginLive(owner)
+        coordinator.ingest(owner, next, TimelineStreamFrame.Message(message("next").copy(id = "next", otid = "next")))
+        assertFalse(coordinator.acknowledgeSettlement(owner, first, mapOf(TimelineMessageId("id") to 1L)))
+        assertEquals(next, owner.session.live.value?.fence)
+        coordinator.ingest(owner, next, TimelineStreamFrame.Done)
+        coordinator.detach(presentation)
+        val maintenance = IndexedCanonicalTimelineMaintenance(coordinator, this, { _, _, _ -> error("unexpected cursor") }, { throw it })
+        repeat(2) {
+            maintenance.turnEnded(owner, true)
+            assertFalse(coordinator.retire(owner))
+            advanceUntilIdle()
+            assertEquals(0, owner.activeRepairs)
+        }
+        assertTrue(coordinator.retire(owner))
+        assertEquals(2, store.rows.size)
+    }
+
+    private class PageTransport(private val barrier: suspend () -> Unit) : TimelineTransport {
+        override suspend fun listConversationMessagePage(request: TimelineRemotePageRequest, progress: TimelinePageProgress?): TimelineRemotePageResult {
+            barrier()
+            return TimelineRemotePageResult.Page(request.requestId, request.selectionGeneration, emptyList(), null, false, 0)
+        }
+        override suspend fun sendConversationMessage(conversationId: String, request: com.letta.mobile.data.model.MessageCreateRequest): kotlinx.coroutines.flow.Flow<com.letta.mobile.data.model.LettaMessage> = error("unexpected send")
+        override suspend fun streamConversation(conversationId: String): kotlinx.coroutines.flow.Flow<TimelineStreamFrame> = error("unexpected stream")
+        override suspend fun listConversationMessages(conversationId: String, limit: Int?, after: String?, order: String?): List<com.letta.mobile.data.model.LettaMessage> = error("legacy hydration")
+        override suspend fun listAgentMessages(agentId: String, limit: Int?, order: String?, conversationId: String?): List<com.letta.mobile.data.model.LettaMessage> = error("legacy hydration")
     }
 
     private class Store : TimelineBoundedStore {

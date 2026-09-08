@@ -44,8 +44,7 @@ class RoomLegacyCanonicalMigration(
             if (!head.supported) return@snapshot fallback("source_schema")
             val observed = store.read(scope) { progress() }
             val sourceRow = metadata(observed?.after ?: Long.MIN_VALUE, 1).singleOrNull()
-            // Validate on the source transaction context, never by re-entering legacy from target.
-            val rootVerified = (observed?.count ?: 0) == head.rowCount && validateRoot(scope, head.token)
+            // Completion means conversion only; resumable validation is required before preparation.
             target.withTransaction {
                 val copy = target.ledger().migration(ledgerScopeKey(scope))
                     ?: return@withTransaction fallback("raw_copy_missing")
@@ -65,13 +64,11 @@ class RoomLegacyCanonicalMigration(
                     val previous = progress ?: ConversionProgress(copy.generation, Long.MIN_VALUE, 0, false, 0)
                     if (previous.revision != checkpoint().revision) return@transaction fallback("canonical_revision_changed")
                     if (previous.complete) {
-                        check(rootVerified) { "Source ordered root mismatch" }
                         return@transaction RoomCanonicalMigrationResult.Progress(previous.count, true)
                     }
                     val row = target.ledger().migrationRows(ledgerScopeKey(scope), copy.generation, previous.after, 1).singleOrNull()
                     if (row == null) {
                         check(previous.count == head.rowCount) { "Conversion count mismatch" }
-                        check(rootVerified) { "Source ordered root mismatch" }
                         val revision = nextRevision()
                         // A legacy backfill cursor is not a typed remote continuation. Reconcile remotely.
                         cursor(null, true)
@@ -104,7 +101,14 @@ class RoomLegacyCanonicalMigration(
     }
 
     /** Rechecks source and canonical CAS on every attempt; no cached success or activation marker. */
-    suspend fun validateForActivation(scope: TimelineScope, expectedRevision: Long): RoomCanonicalMigrationResult = guarded {
+    suspend fun validateForActivation(scope: TimelineScope, expectedRevision: Long): RoomCanonicalMigrationResult =
+        validate(scope, expectedRevision) { }
+
+    private suspend fun validate(
+        scope: TimelineScope,
+        expectedRevision: Long,
+        verified: (TimelineOwnershipAuthority.Receipt) -> Unit,
+    ): RoomCanonicalMigrationResult = guarded {
         source.snapshot(scope) {
             val head = head()
             if (!head.supported) return@snapshot fallback("source_schema")
@@ -126,7 +130,8 @@ class RoomLegacyCanonicalMigration(
                     check(rootVerified) { "Source ordered root mismatch" }
                     verifyCanonicalBodies(scope)
                     verifyEvidenceBodies(scope)
-                    // Deliberately no enabled parameter. Architecture must establish write ownership first.
+                    verified(TimelineOwnershipAuthority.Receipt(head.token, copy.generation, expectedRevision))
+                    // The standalone validator never grants activation, even on successful verification.
                     fallback("activation_dormant")
                 }
             }

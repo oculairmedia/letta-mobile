@@ -10,6 +10,14 @@ class CanonicalTimelineCoordinator(
 ) {
     private val mutex = kotlinx.coroutines.sync.Mutex()
     private val owners = mutableMapOf<TimelineScope, Owner>()
+    private var revoked = false
+
+    /** Runtime generation retirement, unlike viewport disposal, invalidates every owner. */
+    suspend fun revoke() = mutex.withLock {
+        revoked = true
+        owners.values.forEach { it.session.close(it.selection) }
+        owners.clear()
+    }
 
     class Owner internal constructor(
         val session: CanonicalTimelineSession,
@@ -38,6 +46,7 @@ class CanonicalTimelineCoordinator(
     }
 
     suspend fun acquire(scope: TimelineScope): Owner = mutex.withLock {
+        check(!revoked) { "Canonical runtime generation revoked" }
         owners[scope]?.let { return@withLock it }
         val session = CanonicalTimelineSession(store, transport, scope, enabled = true)
         val opened = session.open() as TimelineEngineOpen.Opened
@@ -58,19 +67,32 @@ class CanonicalTimelineCoordinator(
 
     suspend fun reconcileRecent(owner: Owner): TimelineEnginePageOutcome = reconcileRecentDetailed(owner).outcome
 
-    suspend fun reconcileRecentDetailed(owner: Owner): TimelineEngineReconcileResult {
+    suspend fun reconcileRecentDetailed(owner: Owner): TimelineEngineReconcileResult = withRepairLease(owner) {
         mutex.withLock {
-            check(owners[owner.selection.scope] === owner) { "Stale canonical owner" }
-            check(owner.activeRepairs < Int.MAX_VALUE)
-            owner.activeRepairs++
+            // Committed bodies remain in the ledger; only release the old live overlay.
+            val fence = owner.liveFence
+            if (fence != null && owner.session.engine.releaseUnobservedSettlement(fence)) owner.liveFence = null
         }
+        owner.session.reconcileRecentDetailed(owner.selection)
+    }
+
+    internal suspend fun retainRepair(owner: Owner) = mutex.withLock {
+        check(owners[owner.selection.scope] === owner) { "Stale canonical owner" }
+        check(owner.activeRepairs < Int.MAX_VALUE)
+        owner.activeRepairs++
+    }
+
+    internal suspend fun releaseRepair(owner: Owner) = kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+        mutex.withLock { check(owner.activeRepairs > 0); owner.activeRepairs-- }
+    }
+
+    suspend fun <T> withRepairLease(owner: Owner, block: suspend () -> T): T {
+        retainRepair(owner)
         // Retain ownership during network I/O without blocking other conversations.
         try {
-            return owner.session.reconcileRecentDetailed(owner.selection)
+            return block()
         } finally {
-            kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
-                mutex.withLock { owner.activeRepairs-- }
-            }
+            releaseRepair(owner)
         }
     }
 

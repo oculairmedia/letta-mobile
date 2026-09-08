@@ -74,7 +74,10 @@ object DatabaseModule {
             context,
             com.letta.mobile.data.local.TimelineLedgerDatabase::class.java,
             "timeline-ledger.db",
-        ).addMigrations(com.letta.mobile.data.local.TimelineLedgerDatabase.MIGRATION_1_2).build()
+        ).addMigrations(
+            com.letta.mobile.data.local.TimelineLedgerDatabase.MIGRATION_1_2,
+            com.letta.mobile.data.local.TimelineLedgerDatabase.MIGRATION_2_3,
+        ).build()
 
     @Provides
     @Singleton

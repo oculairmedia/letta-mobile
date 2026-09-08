@@ -1435,7 +1435,7 @@ class WsChatSendCoordinatorTest {
         // overload (see ChatSendCoordinator's CURSOR_EXPIRED_ERROR_CODE
         // branch).
         assertEquals(
-            listOf(FakeTimelineExternalTransportWriter.ScopedCursorRepair("agent-1", "conv-expired", 12L)),
+            listOf(FakeTimelineExternalTransportWriter.ScopedCursorRepair("agent-1", "conv-expired", 12L, 4L)),
             timelineRepository.scopedRepairedCursors,
         )
         assertNull(uiState.value.error)

@@ -11,14 +11,19 @@ import androidx.room.RoomDatabase
 
 /** Dormant, separately named database. Never register as a LettaDatabase 13 -> 14 migration. */
 @Database(
-    entities = [LedgerHead::class, LedgerRow::class, LedgerBlob::class, LedgerChunk::class, LedgerEvidence::class, LedgerMigrationState::class, LedgerMigrationRow::class, LedgerToolCall::class, LedgerToolSweep::class],
-    version = 2,
+    entities = [LedgerHead::class, LedgerRow::class, LedgerBlob::class, LedgerChunk::class, LedgerEvidence::class, LedgerMigrationState::class, LedgerMigrationRow::class, LedgerToolCall::class, LedgerToolSweep::class, LedgerValidationState::class],
+    version = 3,
     exportSchema = true,
 )
 abstract class TimelineLedgerDatabase : RoomDatabase() {
     abstract fun ledger(): TimelineLedgerDao
 
     companion object {
+        val MIGRATION_2_3 = object : androidx.room.migration.Migration(2, 3) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS ledger_validation (scope BLOB NOT NULL, payload BLOB NOT NULL, checksum TEXT NOT NULL, PRIMARY KEY(scope))")
+            }
+        }
         val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                 db.execSQL("CREATE TABLE IF NOT EXISTS ledger_tool_call (scope BLOB NOT NULL, callId BLOB NOT NULL, owner BLOB, returned INTEGER NOT NULL, unresolved INTEGER NOT NULL, PRIMARY KEY(scope, callId))")
@@ -95,8 +100,32 @@ data class LedgerMigrationRow(
     val checksum: String,
 )
 
+@Entity(tableName = "ledger_validation", primaryKeys = ["scope"])
+data class LedgerValidationState(val scope: ByteArray, val payload: ByteArray, val checksum: String)
+
 @Dao
 interface TimelineLedgerDao {
+    @Query("SELECT scope, substr(payload, 1, 16385) AS payload, checksum FROM ledger_validation WHERE scope = :scope")
+    suspend fun validation(scope: ByteArray): LedgerValidationState?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun validation(state: LedgerValidationState)
+
+    @Query("SELECT substr(payload, max(0, :start) + 1, min(32768, max(0, :limit))) FROM ledger_chunk WHERE scope = :scope AND pointer = :pointer AND ordinal = :ordinal")
+    suspend fun auditChunk(scope: ByteArray, pointer: String, ordinal: Long, start: Int, limit: Int): ByteArray?
+
+    @Query("SELECT * FROM ledger_evidence WHERE scope = :scope AND identity != :excluded AND identity > :after ORDER BY identity LIMIT 1")
+    suspend fun auditEvidence(scope: ByteArray, excluded: ByteArray, after: ByteArray): LedgerEvidence?
+
+    @Query("SELECT * FROM ledger_evidence WHERE scope = :scope AND identity != :excluded ORDER BY identity LIMIT 1")
+    suspend fun auditEvidenceFirst(scope: ByteArray, excluded: ByteArray): LedgerEvidence?
+
+    @Query("SELECT * FROM ledger_tool_call WHERE scope = :scope AND callId > :after ORDER BY callId LIMIT 1")
+    suspend fun auditTool(scope: ByteArray, after: ByteArray): LedgerToolCall?
+
+    @Query("SELECT * FROM ledger_tool_call WHERE scope = :scope ORDER BY callId LIMIT 1")
+    suspend fun auditToolFirst(scope: ByteArray): LedgerToolCall?
+
     @Query("SELECT * FROM ledger_tool_call WHERE scope = :scope AND callId = :callId")
     suspend fun toolCall(scope: ByteArray, callId: ByteArray): LedgerToolCall?
 

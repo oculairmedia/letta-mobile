@@ -26,6 +26,7 @@ class DefaultSessionRepositoryGraphFactory internal constructor(
     private val channelTransportFactory: SessionChannelTransportFactory,
     private val settingsRepository: ISettingsRepository? = null,
     private val localRuntimeOptions: LocalRuntimeOptions = LocalRuntimeOptions.Disabled,
+    private val cursorFactory: com.letta.mobile.data.local.BackendConversationCursorFactory? = null,
 ) : SessionRepositoryGraphFactory<SessionGraph> {
     @Inject
     constructor(
@@ -35,8 +36,10 @@ class DefaultSessionRepositoryGraphFactory internal constructor(
         memFsStore: MemFsStore,
         localRuntimeProviders: Set<@JvmSuppressWildcards LocalRuntimeProvider>,
         settingsRepository: ISettingsRepository,
+        cursorFactory: com.letta.mobile.data.local.BackendConversationCursorFactory,
     ) : this(
         assembler = assembler,
+        cursorFactory = cursorFactory,
         channelTransportFactory = channelTransportFactory,
         settingsRepository = settingsRepository,
         localRuntimeOptions = LocalRuntimeOptions.Enabled(
@@ -52,6 +55,8 @@ class DefaultSessionRepositoryGraphFactory internal constructor(
         val graphId = nextId.incrementAndGet()
         val activeConfig = settingsRepository?.activeConfig?.value
         val localRuntimeBackend = localRuntimeOptions.createBackend(activeConfig)
+        val descriptor = localRuntimeBackend?.descriptor ?: remoteLettaBackendDescriptor(activeConfig, ANDROID_REMOTE_LETTA_ID_PREFIX)
+        val cursors = cursorFactory?.capture(descriptor.backendId.value)
         runBlocking(Dispatchers.IO) {
             assembler.clearCachesForNewSession()
         }
@@ -61,10 +66,13 @@ class DefaultSessionRepositoryGraphFactory internal constructor(
             activeConfig = activeConfig,
             localRuntimeBackend = localRuntimeBackend,
             settingsRepository = settingsRepository,
+            capturedCursorStore = cursors,
         )
         return assembler.assemble(
             SessionGraphAssembleRequest(
                 graphId = graphId,
+                backendDescriptor = descriptor,
+                capturedCursorStore = cursors,
                 activeConfig = activeConfig,
                 localRuntimeBackend = localRuntimeBackend,
                 scope = scope,

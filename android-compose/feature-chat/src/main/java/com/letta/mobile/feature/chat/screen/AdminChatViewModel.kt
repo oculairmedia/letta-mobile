@@ -156,6 +156,7 @@ internal class AdminChatViewModel @Inject constructor(
     val attachmentLimits: AttachmentLimits =
         AttachmentLimits.Default,
     private val pagingHost: ChatPagingHost = ChatPagingHost(),
+    private val selectedRuntimeProvider: com.letta.mobile.feature.chat.coordination.SelectedChatRuntimeProvider? = null,
 ) : ViewModel() {
     companion object {
         private const val RESUME_CACHE_MAX_AGE_MS = 60_000L
@@ -286,9 +287,60 @@ internal class AdminChatViewModel @Inject constructor(
     private val composerController: ChatComposerController = ChatComposerController(limits = attachmentLimits)
     private val chatBannerController: ChatBannerController = ChatBannerController(_uiState, composerController)
 
-    private val sendPipeline: AdminChatSendPipeline by lazy {
+    private var selectedRuntime: com.letta.mobile.feature.chat.coordination.SelectedChatRuntime? = null
+    private var selectedSendOwner: com.letta.mobile.feature.chat.coordination.SelectedChatSendOwner? = null
+    private var currentSendPipeline: AdminChatSendPipeline? = null
+    private var replacingSendRuntime = false
+    private var runtimeCollectorStarted = false
+    private var pipelineLifetime = com.letta.mobile.feature.chat.coordination.ChatPipelineLifetime(viewModelScope)
+
+    private val sendPipeline: AdminChatSendPipeline
+        get() {
+            if (!runtimeCollectorStarted) {
+                runtimeCollectorStarted = true
+                val runtimes = selectedRuntimeProvider?.runtimes(agentId.value)
+                selectedRuntime = runtimes?.value
+                selectedSendOwner = selectedRuntime?.let(::newSendOwner)
+                currentSendPipeline = createSendPipeline()
+                if (runtimes != null) viewModelScope.launch {
+                    try {
+                        runtimes.collect { next ->
+                            if (next !== selectedRuntime) {
+                                replacingSendRuntime = true
+                                stopTimelineObserver()
+                                pipelineLifetime.retire()
+                                selectedSendOwner?.retire()
+                                selectedRuntime?.retire()
+                                pipelineLifetime = com.letta.mobile.feature.chat.coordination.ChatPipelineLifetime(viewModelScope)
+                                selectedRuntime = next
+                                selectedSendOwner = next?.let(::newSendOwner)
+                                currentSendPipeline = createSendPipeline()
+                                replacingSendRuntime = false
+                                chatConversationCoordinator.activeConversationId?.let(::startTimelineObserver)
+                            }
+                        }
+                    } finally {
+                        replacingSendRuntime = true
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                            pipelineLifetime.retire()
+                            selectedSendOwner?.retire()
+                            selectedRuntime?.retire()
+                        }
+                    }
+                }
+            }
+            return checkNotNull(currentSendPipeline)
+        }
+
+    private fun newSendOwner(runtime: com.letta.mobile.feature.chat.coordination.SelectedChatRuntime) =
+        com.letta.mobile.feature.chat.coordination.SelectedChatSendOwner(
+            runtime.config, runtime.descriptor, runtime.writer, pipelineLifetime.scope,
+            prepareConversation = runtime::ready,
+        )
+
+    private fun createSendPipeline(): AdminChatSendPipeline =
         AdminChatSendPipeline(
-            scope = viewModelScope,
+            scope = pipelineLifetime.scope,
             agentId = agentId,
             isFreshRoute = isFreshRoute,
             explicitConversationId = explicitConversationId,
@@ -312,8 +364,8 @@ internal class AdminChatViewModel @Inject constructor(
             activeConversationId = { chatConversationCoordinator.activeConversationId },
             setActiveConversationId = chatConversationCoordinator::setActiveConversationId,
             startTimelineObserver = ::startTimelineObserver,
+            selectedOwner = selectedSendOwner,
         )
-    }
 
     private val composerCoordinator: AdminChatComposerCoordinator
         get() = sendPipeline.composerCoordinator
@@ -448,7 +500,8 @@ internal class AdminChatViewModel @Inject constructor(
         )
     }
 
-    val composerState: StateFlow<ChatComposerState> by lazy { composerCoordinator.state }
+    // Every pipeline delegates to this same controller; no stale coordinator flow to flatten.
+    val composerState: StateFlow<ChatComposerState> = composerController.state
 
     val chatBackground: StateFlow<ChatBackground> = settingsRepository.getChatBackgroundKey()
         .map { ChatBackground.fromKey(it) }
@@ -629,6 +682,7 @@ internal class AdminChatViewModel @Inject constructor(
     )
 
     private fun sendCoordinatorMessage(message: String) {
+        if (replacingSendRuntime) return
         sendPipeline.timelineChatSendStrategy.send(
             text = message,
             attachments = emptyList(),
@@ -788,7 +842,14 @@ internal class AdminChatViewModel @Inject constructor(
 
     private fun startTimelineObserver(conversationId: String) {
         adminChatA2uiCoordinator.ensureA2uiConversation(conversationId)
-        val open = pagingHost.openCanonical
+        val capturedRuntime = selectedRuntime
+        val open: (suspend (String, String, String?, kotlinx.coroutines.CoroutineScope) -> ChatPagingPresentation)? =
+            if (capturedRuntime != null) {
+                { _, conversation, target, scope ->
+                    capturedRuntime.ready(conversation)
+                    capturedRuntime.open(conversation, target, scope)
+                }
+            } else pagingHost.openCanonical
         if (open != null && localRuntimeRouting() != LocalRuntimeRouting.LocalBound) {
             val route = Triple(conversationId, _sessionState.value.selectionGeneration, scrollToMessageId)
             if (canonicalRoute == route && canonicalPresentationJob?.isActive == true) return
@@ -902,9 +963,11 @@ internal class AdminChatViewModel @Inject constructor(
         slashCommandsCoordinator.uninstallSlashCommand(command)
 
     fun submitComposer(text: String = composerCoordinator.state.value.inputText): ChatComposerEffect? =
-        composerCoordinator.submitComposer(text)
+        if (replacingSendRuntime) null else composerCoordinator.submitComposer(text)
 
-    fun sendMessage(text: String) = composerCoordinator.sendMessage(text)
+    fun sendMessage(text: String) {
+        if (!replacingSendRuntime) composerCoordinator.sendMessage(text)
+    }
 
     fun refreshGoalStatus() = goalCoordinator.refreshGoalStatus()
 
@@ -912,9 +975,13 @@ internal class AdminChatViewModel @Inject constructor(
 
     fun continueGoal() = goalCoordinator.continueGoal(::sendMessage)
 
-    fun rerunMessage(message: UiMessage) = composerCoordinator.rerunMessage(message)
+    fun rerunMessage(message: UiMessage) {
+        if (!replacingSendRuntime) composerCoordinator.rerunMessage(message)
+    }
 
-    fun interruptRun() = composerCoordinator.interruptRun { adminChatA2uiCoordinator.clearA2uiThinkingOnResponse() }
+    fun interruptRun() {
+        if (!replacingSendRuntime) composerCoordinator.interruptRun { adminChatA2uiCoordinator.clearA2uiThinkingOnResponse() }
+    }
 
     // --- A2UI coordination delegates ---
     fun dismissA2uiSurface(surfaceId: String) = adminChatA2uiCoordinator.dismissA2uiSurface(surfaceId)

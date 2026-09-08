@@ -75,6 +75,44 @@ class TimelineOwnershipAuthorityTest {
         rejected { authority().acquire(scope, TimelineOwnershipAuthority.Route.Legacy) }
     }
 
+    @Test fun mappedIntentRecoversMissingTargetAndKeepsSourcePermanentlyFenced() = runBlocking {
+        val target = scope.copy(backendId = "remote-letta:backend")
+        val legacy = authority().acquire(scope, TimelineOwnershipAuthority.Route.Legacy)
+        val migration = authority().beginMappedMigration(legacy, target) { }
+        val mapping = authority().capturedMapping(migration)!!
+        assertEquals(scope, mapping.source)
+        assertEquals(target, mapping.target)
+        assertEquals(legacy.epoch + 1, mapping.sourceEpoch)
+        rejected { authority().withLease(legacy) { fail("source writer entered") } }
+        rejected { authority().abortBeforeSwitch(migration) }
+        // Model death after durable source intent, before target publication.
+        fun encodedBackend(value: String): String {
+            val bytes = java.io.ByteArrayOutputStream().also { output ->
+                java.io.DataOutputStream(output).use { it.writeUTF(value) }
+            }.toByteArray()
+            return java.security.MessageDigest.getInstance("SHA-256").digest(bytes)
+                .joinToString("") { "%02x".format(it.toInt() and 255) }
+        }
+        Files.list(temporary.root.toPath().resolve(encodedBackend(target.backendId))).use { paths ->
+            paths.filter { it.toString().endsWith(".state") }.forEach { Files.delete(it) }
+        }
+        assertEquals(migration, authority().beginMappedMigration(legacy, target) { fail("recapture") })
+        authority().withLease(migration) {
+            rejected { authority().legacyMaintenance(scope.backendId) { fail("source maintenance") } }
+        }
+        try { authority().prepare(migration) { throw CancellationException("mapped prepare") } }
+        catch (_: CancellationException) { }
+        assertEquals(TimelineOwnershipAuthority.Phase.Migrating, authority().state(target).phase)
+        authority().prepare(migration) { receipt }
+        try { authority().commitSwitch(migration) { throw CancellationException("mapped switch") } }
+        catch (_: CancellationException) { }
+        assertEquals(TimelineOwnershipAuthority.Phase.Prepared, authority().state(target).phase)
+        val canonical = authority().commitSwitch(migration) { }
+        authority().withLease(canonical) { }
+        rejected { authority().acquire(scope, TimelineOwnershipAuthority.Route.Legacy) }
+        rejected { authority().beginMappedMigration(legacy, target.copy(backendId = "wrong")) { } }
+    }
+
     @Test fun corruptOrOversizedStateNeverDefaultsToLegacy() = runBlocking {
         authority().beginMigration(authority().acquire(scope, TimelineOwnershipAuthority.Route.Legacy))
         val backend = Files.list(temporary.root.toPath()).use { it.findFirst().get() }

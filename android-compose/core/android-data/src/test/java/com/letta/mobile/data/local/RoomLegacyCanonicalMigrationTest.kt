@@ -59,18 +59,19 @@ class RoomLegacyCanonicalMigrationTest {
         }
     }
 
-    @Test fun rootFailureAndCancellationDoNotMarkConversionComplete() = runBlocking {
+    @Test fun conversionCompletionDoesNotRunWholeHistoryValidation() = runBlocking {
         fixture { db, source ->
             copy(source, db)
             val migration = RoomLegacyCanonicalMigration(source, db, { _, _ -> false })
             assertEquals(RoomCanonicalMigrationResult.Progress(1, false), migration.step(scope))
-            assertEquals(RoomCanonicalMigrationResult.LegacyFallback("integrity_or_storage_failure"), migration.step(scope))
-            assertEquals(1L, RoomTimelineBoundedStore(db).read(scope) { checkpoint().revision })
+            assertEquals(RoomCanonicalMigrationResult.Progress(1, true), migration.step(scope))
+            assertEquals(2L, RoomTimelineBoundedStore(db).read(scope) { checkpoint().revision })
+            assertEquals(RoomCanonicalMigrationResult.LegacyFallback("integrity_or_storage_failure"), migration.validateForActivation(scope, 2))
             try {
-                RoomLegacyCanonicalMigration(source, db, { _, _ -> throw CancellationException("cancel") }).step(scope)
+                RoomLegacyCanonicalMigration(source, db, { _, _ -> throw CancellationException("cancel") }).validateForActivation(scope, 2)
                 fail("Cancellation swallowed")
             } catch (_: CancellationException) { }
-            assertEquals(1L, RoomTimelineBoundedStore(db).read(scope) { checkpoint().revision })
+            assertEquals(2L, RoomTimelineBoundedStore(db).read(scope) { checkpoint().revision })
             assertEquals(RoomCanonicalMigrationResult.Progress(1, true), RoomLegacyCanonicalMigration(source, db, { _, _ -> true }).step(scope))
         }
     }

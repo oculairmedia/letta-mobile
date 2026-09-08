@@ -317,7 +317,7 @@ class RoomConfirmedTimelineStore(
         checkpointLegacyEnvelope: Boolean,
     ): NormalizedTimelineWriteResult = legacyOperation(fullEnvelope.scope) {
         when (plan) {
-            is NormalizedTimelineCommitPlan.Apply -> check(plan.commit.scope == fullEnvelope.scope)
+            is NormalizedTimelineCommitPlan.Apply -> check(plan.commit.metadata.scope == fullEnvelope.scope)
             is NormalizedTimelineCommitPlan.NoOp -> check(plan.scope == fullEnvelope.scope)
             is NormalizedTimelineCommitPlan.Invalid -> Unit
         }
@@ -459,7 +459,7 @@ class RoomConfirmedTimelineStore(
                 }
             }
             currentCoroutineContext().ensureActive()
-            val metadataOnly = commit.upserts.isEmpty() && commit.deletes.isEmpty()
+            val metadataOnly = head != null && commit.upserts.isEmpty() && commit.deletes.isEmpty()
             val projection = if (metadataOnly) {
                 null
             } else if (commit.baseRevision.value == 0L || head?.rowDigest.isNullOrBlank()) {

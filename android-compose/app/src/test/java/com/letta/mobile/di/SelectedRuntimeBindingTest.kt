@@ -1,0 +1,96 @@
+package com.letta.mobile.di
+
+import com.letta.mobile.feature.chat.coordination.SelectedChatRuntime
+import io.mockk.coVerify
+import io.mockk.mockk
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
+import org.junit.Assert.*
+import org.junit.Test
+
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+class SelectedRuntimeBindingTest {
+    @Test fun migrationStepBudgetFailsExplicitlyAndRetryCanResume() = runTest {
+        var steps = 0
+        try {
+            boundedSteps("copy", 3) { steps++; false }
+            fail("Unbounded migration accepted")
+        } catch (failure: IllegalStateException) {
+            assertTrue(failure.message.orEmpty().contains("budget exhausted"))
+        }
+        assertEquals(3, steps)
+        boundedSteps("copy", 3) { ++steps == 5 }
+        assertEquals(5, steps)
+    }
+
+    @Test fun migrationFailureDoesNotConsumeRemainingBudget() = runTest {
+        var calls = 0
+        try {
+            boundedSteps("validation") { calls++; error("certificate mismatch") }
+            fail("Validation failure swallowed")
+        } catch (failure: IllegalStateException) {
+            assertEquals("certificate mismatch", failure.message)
+        }
+        assertEquals(1, calls)
+    }
+
+    @Test fun subscriptionsCaptureSeparateHandlesAndConsumerOwnsRetirement() = runTest {
+        val firstGraph = Any()
+        val graphs = MutableStateFlow(firstGraph)
+        val created = mutableListOf<SelectedChatRuntime>()
+        fun flow() = SubscriberRuntimeFlow(graphs) {
+            mockk<SelectedChatRuntime>(relaxed = true).also { created += it }
+        }
+        val first = flow()
+        val second = flow()
+        assertNotSame(first.value, second.value)
+        val old = checkNotNull(first.value)
+        var observed: SelectedChatRuntime? = null
+        val collector = launch(start = CoroutineStart.UNDISPATCHED) { first.collect { observed = it } }
+        assertSame(old, observed)
+        graphs.value = Any()
+        runCurrent()
+        assertNotSame(old, observed)
+        coVerify(exactly = 0) { old.retire() }
+        collector.cancelAndJoin()
+        coVerify(exactly = 0) { old.retire() }
+    }
+
+    @Test fun capturedWriterRejectsForeignAgentBeforeResolution() = runTest {
+        var resolutions = 0
+        val writer = SelectedRuntimeWriter("agent-a") { resolutions++; error("not expected") }
+        try {
+            writer.markExternalTransportLocalSent("agent-b", "conversation", "otid")
+            fail("Foreign agent accepted")
+        } catch (_: IllegalArgumentException) { }
+        assertEquals(0, resolutions)
+    }
+
+    @Test fun expiryWithoutExpectedWatermarkIsRejectedBeforeDelegate() = runTest {
+        val delegate = mockk<com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter>()
+        val writer = SelectedRuntimeWriter("agent") { delegate }
+        try {
+            writer.repairExpiredConversationCursor("conversation", 10)
+            fail("Unfenced cursor repair accepted")
+        } catch (failure: IllegalArgumentException) {
+            assertTrue(failure.message.orEmpty().contains("expected watermark"))
+        }
+        coVerify(exactly = 0) { delegate.repairExpiredConversationCursorScoped(any(), any(), any()) }
+        coVerify(exactly = 0) { delegate.repairExpiredConversationCursorScoped(any(), any(), any(), any()) }
+    }
+
+    @Test fun expiryWithExpectedWatermarkDelegatesThroughResolvedWriter() = runTest {
+        val delegate = mockk<com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter>(relaxed = true)
+        val writer = SelectedRuntimeWriter("agent") { delegate }
+        writer.repairExpiredConversationCursorScoped("agent", "conversation", fallbackSeq = 12L, expectedWatermark = 4L)
+        coVerify(exactly = 1) {
+            delegate.repairExpiredConversationCursorScoped("agent", "conversation", 12L, 4L)
+        }
+        coVerify(exactly = 0) { delegate.repairExpiredConversationCursorScoped(any(), any(), any()) }
+    }
+}

@@ -33,8 +33,9 @@ import kotlinx.coroutines.withContext
 class TimelineOwnershipAuthority(private val directory: Path) {
     enum class Phase { Legacy, Migrating, Prepared, Canonical }
     enum class Route { Legacy, Migration, Canonical }
-    data class Receipt(val sourceToken: String, val targetGeneration: String, val targetRevision: Long)
-    data class State(val scope: TimelineScope, val epoch: Long, val phase: Phase, val receipt: Receipt? = null)
+    data class Receipt(val sourceToken: String, val targetGeneration: String, val targetRevision: Long, val certificateId: String = "")
+    data class Mapping(val source: TimelineScope, val sourceEpoch: Long, val target: TimelineScope, val targetEpoch: Long)
+    data class State(val scope: TimelineScope, val epoch: Long, val phase: Phase, val receipt: Receipt? = null, val mapping: Mapping? = null)
     data class Lease(val scope: TimelineScope, val epoch: Long, val route: Route)
 
     suspend fun state(scope: TimelineScope): State = locked(scope.backendId) { read(scope) }
@@ -46,7 +47,7 @@ class TimelineOwnershipAuthority(private val directory: Path) {
         Lease(scope, state.epoch, route)
     }
 
-    suspend fun <T> withLease(lease: Lease, block: suspend () -> T): T = locked(lease.scope.backendId) {
+    suspend fun <T> withLease(lease: Lease, block: suspend () -> T): T = leaseLocked(lease) {
         val state = read(lease.scope)
         check(state.epoch == lease.epoch) { "Stale timeline ownership epoch" }
         requireRoute(state, lease.scope, lease.route)
@@ -63,18 +64,87 @@ class TimelineOwnershipAuthority(private val directory: Path) {
         Lease(next.scope, next.epoch, Route.Migration)
     }
 
+    /** Captured source lease must be drained. No namespace inference or missing-source fallback.
+     * Source intent is published first: a crash can only leave writers fenced, never unguarded.
+     * Retry this same captured pair after cancellation/IO failure; do not reacquire a legacy lease.
+     */
+    suspend fun beginMappedMigration(legacy: Lease, target: TimelineScope, verifySource: suspend () -> Unit): Lease =
+        pairLocked(legacy.scope.backendId, target.backendId) {
+            require(legacy.route == Route.Legacy && legacy.scope.backendId != target.backendId)
+            require(legacy.scope.conversationId == target.conversationId && legacy.scope.agentId == target.agentId)
+            val source = read(legacy.scope)
+            val mapping = source.mapping ?: run {
+                check(source.scope == legacy.scope && source.phase == Phase.Legacy && source.epoch == legacy.epoch)
+                val destination = read(target)
+                check(destination.scope == target && destination.phase == Phase.Legacy && destination.mapping == null)
+                verifySource()
+                Mapping(legacy.scope, Math.addExact(source.epoch, 1), target, Math.addExact(destination.epoch, 1)).also {
+                    publish(State(it.source, it.sourceEpoch, Phase.Migrating, mapping = it))
+                }
+            }
+            check(mapping.source == legacy.scope && mapping.sourceEpoch == Math.addExact(legacy.epoch, 1) && mapping.target == target)
+            check(source.phase == Phase.Legacy || source.phase == Phase.Migrating)
+            if (!Files.exists(statePath(target))) {
+                publish(State(target, mapping.targetEpoch, Phase.Migrating, mapping = mapping))
+            } else {
+                val destination = read(target)
+                if (destination.mapping == null) {
+                    check(destination.phase == Phase.Legacy && destination.epoch + 1 == mapping.targetEpoch)
+                    publish(State(target, mapping.targetEpoch, Phase.Migrating, mapping = mapping))
+                } else {
+                    check(destination.mapping == mapping && destination.scope == target && destination.epoch == mapping.targetEpoch)
+                    check(destination.phase == Phase.Migrating || destination.phase == Phase.Prepared)
+                }
+            }
+            Lease(target, mapping.targetEpoch, Route.Migration)
+        }
+
+    suspend fun capturedMapping(lease: Lease): Mapping? = leaseLocked(lease) {
+        val state = read(lease.scope)
+        check(state.scope == lease.scope && state.epoch == lease.epoch)
+        state.mapping
+    }
+
+    private suspend fun <T> pairLocked(first: String, second: String, block: suspend () -> T): T {
+        val ordered = listOf(first, second).distinct().sorted()
+        return locked(ordered[0]) { if (ordered.size == 1) block() else locked(ordered[1], block) }
+    }
+
+    private suspend fun <T> leaseLocked(lease: Lease, block: suspend () -> T): T {
+        val captured = state(lease.scope).mapping
+        return pairLocked(lease.scope.backendId, captured?.source?.backendId ?: lease.scope.backendId) {
+            val current = read(lease.scope)
+            check(current.mapping == captured) { "Mapping changed; retry outside locks" }
+            captured?.let {
+                check(it.target == lease.scope && it.targetEpoch == lease.epoch)
+                val source = read(it.source)
+                check(source.mapping == it && source.epoch == it.sourceEpoch &&
+                    (source.phase == Phase.Migrating || (source.phase == Phase.Prepared &&
+                        current.phase in listOf(Phase.Prepared, Phase.Canonical)))) {
+                    "Captured source fence changed"
+                }
+            }
+            block()
+        }
+    }
+
     /** Validation callback runs under the same authority as the publication, not before acquisition. */
-    suspend fun prepare(migration: Lease, validate: suspend () -> Receipt): State = locked(migration.scope.backendId) {
+    suspend fun prepare(migration: Lease, validate: suspend () -> Receipt): State = leaseLocked(migration) {
         checkMigration(migration, Phase.Migrating)
         val receipt = validate()
         require(receipt.targetRevision >= 0 && receipt.sourceToken.isNotEmpty() && receipt.targetGeneration.isNotEmpty())
-        State(migration.scope, migration.epoch, Phase.Prepared, receipt).also { publish(it) }
+        State(migration.scope, migration.epoch, Phase.Prepared, receipt, read(migration.scope).mapping).also { publish(it) }
     }
 
     /** Does not select any runtime route. Caller must still keep activation_dormant until integrated. */
-    suspend fun commitSwitch(migration: Lease, validate: suspend (Receipt) -> Unit): Lease = locked(migration.scope.backendId) {
+    suspend fun commitSwitch(migration: Lease, validate: suspend (Receipt) -> Unit): Lease = leaseLocked(migration) {
         val previous = checkMigration(migration, Phase.Prepared)
         validate(checkNotNull(previous.receipt))
+        previous.mapping?.let {
+            // Seal source intent first. If the target is subsequently lost, never recreate it as
+            // an unswitched migration. Interrupted switch resumes from the prepared target.
+            publish(State(it.source, it.sourceEpoch, Phase.Prepared, previous.receipt, it))
+        }
         publish(previous.copy(phase = Phase.Canonical))
         Lease(previous.scope, previous.epoch, Route.Canonical)
     }
@@ -85,6 +155,7 @@ class TimelineOwnershipAuthority(private val directory: Path) {
         val previous = read(migration.scope)
         check(previous.scope == migration.scope && previous.epoch == migration.epoch)
         check(previous.phase == Phase.Migrating || previous.phase == Phase.Prepared)
+        check(previous.mapping == null) { "Mapped migrations are forward-recovery only; source must remain fenced" }
         val next = State(previous.scope, Math.addExact(previous.epoch, 1), Phase.Legacy)
         publish(next)
         Lease(next.scope, next.epoch, Route.Legacy)
@@ -147,24 +218,41 @@ class TimelineOwnershipAuthority(private val directory: Path) {
         val payload = bytes.copyOfRange(32, bytes.size)
         check(MessageDigest.isEqual(bytes.copyOfRange(0, 32), digest(payload))) { "Corrupt ownership state" }
         return DataInputStream(ByteArrayInputStream(payload)).use { input ->
-            check(input.readInt() == 1) { "Unknown ownership format" }
+            val version = input.readInt()
+            check(version in 1..2) { "Unknown ownership format" }
             val stored = TimelineScope(input.readUTF(), input.readUTF(), if (input.readBoolean()) input.readUTF() else null)
             val epoch = input.readLong()
             val phase = Phase.valueOf(input.readUTF())
             val receipt = if (input.readBoolean()) Receipt(input.readUTF(), input.readUTF(), input.readLong()) else null
             check(stored.backendId == scope.backendId && stored.conversationId == scope.conversationId && epoch > 0)
+            val boundReceipt = if (receipt != null && input.available() > 0) receipt.copy(certificateId = input.readUTF()) else receipt
+            val mapping = if (version == 2 && input.readBoolean()) {
+                fun scope() = TimelineScope(input.readUTF(), input.readUTF(), if (input.readBoolean()) input.readUTF() else null)
+                Mapping(scope(), input.readLong(), scope(), input.readLong()).also {
+                    check(it.source.backendId != it.target.backendId && it.sourceEpoch > 0 && it.targetEpoch > 0)
+                    check((stored == it.source && epoch == it.sourceEpoch) || (stored == it.target && epoch == it.targetEpoch))
+                }
+            } else null
             check(input.available() == 0)
-            check((phase == Phase.Prepared || phase == Phase.Canonical) == (receipt != null))
-            State(stored, epoch, phase, receipt)
+            check((phase == Phase.Prepared || phase == Phase.Canonical) == (boundReceipt != null))
+            State(stored, epoch, phase, boundReceipt, mapping)
         }
     }
 
     private suspend fun publish(state: State) {
         val payload = encode {
-            writeInt(1); writeUTF(state.scope.backendId); writeUTF(state.scope.conversationId)
+            writeInt(2); writeUTF(state.scope.backendId); writeUTF(state.scope.conversationId)
             writeBoolean(state.scope.agentId != null); state.scope.agentId?.let { writeUTF(it) }
             writeLong(state.epoch); writeUTF(state.phase.name); writeBoolean(state.receipt != null)
-            state.receipt?.let { writeUTF(it.sourceToken); writeUTF(it.targetGeneration); writeLong(it.targetRevision) }
+            state.receipt?.let { writeUTF(it.sourceToken); writeUTF(it.targetGeneration); writeLong(it.targetRevision); writeUTF(it.certificateId) }
+            writeBoolean(state.mapping != null)
+            state.mapping?.let {
+                fun scope(value: TimelineScope) {
+                    writeUTF(value.backendId); writeUTF(value.conversationId)
+                    writeBoolean(value.agentId != null); value.agentId?.let { agent -> writeUTF(agent) }
+                }
+                scope(it.source); writeLong(it.sourceEpoch); scope(it.target); writeLong(it.targetEpoch)
+            }
         }
         val bytes = digest(payload) + payload
         require(bytes.size <= MAX_STATE)

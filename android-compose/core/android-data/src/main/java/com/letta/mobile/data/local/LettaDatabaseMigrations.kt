@@ -334,6 +334,13 @@ object LettaDatabaseMigrations {
         }
     }
 
+    val MIGRATION_13_14 = object : Migration(13, 14) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // Unscoped cursor rows are ambiguous and deliberately remain in their original table.
+            db.execSQL("CREATE TABLE IF NOT EXISTS backend_conversation_cursors (backendId TEXT NOT NULL, conversationId TEXT NOT NULL, highestSeenSeq INTEGER NOT NULL, PRIMARY KEY(backendId, conversationId))")
+        }
+    }
+
     val ALL: Array<Migration> = arrayOf(
         MIGRATION_1_2,
         MIGRATION_2_3,
@@ -347,5 +354,6 @@ object LettaDatabaseMigrations {
         MIGRATION_10_11,
         MIGRATION_11_12,
         MIGRATION_12_13,
+        MIGRATION_13_14,
     )
 }

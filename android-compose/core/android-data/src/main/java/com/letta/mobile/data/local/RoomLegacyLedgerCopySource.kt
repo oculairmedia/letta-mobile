@@ -7,14 +7,30 @@ import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import com.letta.mobile.data.timeline.snapshot.StoredTimelineEnvelope
 
 /** Reads existing v13 tables without changing their schema or full-envelope validation path. */
-class RoomLegacyLedgerCopySource(private val legacy: LettaDatabase) : LegacyLedgerCopySource {
+class RoomLegacyLedgerCopySource(
+    private val legacy: LettaDatabase,
+    private val mapping: TimelineOwnershipAuthority.Mapping? = null,
+) : LegacyLedgerCopySource {
+    private fun sourceScope(target: TimelineScope): TimelineScope {
+        val captured = mapping ?: return target
+        check(target == captured.target) { "Captured migration target mismatch" }
+        return captured.source
+    }
+
+    private fun bindToken(token: String): String = mapping?.let {
+        val fields = listOf(it.source.backendId, it.source.conversationId, it.source.agentId,
+            it.sourceEpoch.toString(), it.target.backendId, it.target.conversationId,
+            it.target.agentId, it.targetEpoch.toString(), token)
+        checksum(fields.joinToString("") { value -> if (value == null) "-1:" else "${value.length}:$value" }.encodeToByteArray())
+    } ?: token
     /** Independent metadata verification, not canonical conversion or permission to activate.
      * Runs only post-open; bounded SQL pages avoid loading the legacy payload or row list.
      */
     suspend fun validateRoot(scope: TimelineScope, expectedToken: String): Boolean = snapshot(scope) {
         val initial = head()
         if (!initial.supported || initial.token != expectedToken) return@snapshot false
-        val stored = requireNotNull(legacy.confirmedTimelineSnapshotDao().getNormalizedHead(scope.backendId, scope.conversationId))
+        val captured = sourceScope(scope)
+        val stored = requireNotNull(legacy.confirmedTimelineSnapshotDao().getNormalizedHead(captured.backendId, captured.conversationId))
         val flat = java.security.MessageDigest.getInstance("SHA-256")
         var chain = normalizedRowDigest(emptyList())
         var count = 0L
@@ -48,6 +64,9 @@ class RoomLegacyLedgerCopySource(private val legacy: LettaDatabase) : LegacyLedg
     }
 
     override suspend fun <T> snapshot(scope: TimelineScope, block: suspend LegacyLedgerCopyReader.() -> T): T =
+        snapshotSource(sourceScope(scope), block)
+
+    private suspend fun <T> snapshotSource(scope: TimelineScope, block: suspend LegacyLedgerCopyReader.() -> T): T =
         legacy.withTransaction {
             var open = true
             val reader = object : LegacyLedgerCopyReader {
@@ -73,7 +92,7 @@ class RoomLegacyLedgerCopySource(private val legacy: LettaDatabase) : LegacyLedg
                                 "Legacy root checksum mismatch"
                             }
                         }
-                        LegacyLedgerCopyHead(token, cursor.getLong(7), supported)
+                        LegacyLedgerCopyHead(bindToken(token), cursor.getLong(7), supported)
                     }
                 }
 

@@ -39,7 +39,7 @@ sealed interface TimelineEngineOpen {
 
 enum class TimelineEnginePageOutcome { Applied, Stale, NoProgress }
 
-data class TimelineEngineReconcileResult(val outcome: TimelineEnginePageOutcome, val appended: Int = 0)
+data class TimelineEngineReconcileResult(val outcome: TimelineEnginePageOutcome, val appended: Int = 0, val committedSequence: Long? = null)
 
 /**
  * Serialized shadow coordinator. The mutex covers suspending storage transactions, not just dispatch.
@@ -60,6 +60,7 @@ class CanonicalTimelineEngine(
     val publication = mutablePublication.asStateFlow()
     private var liveFence: TimelineLiveFence? = null
     private var liveReduction: TimelineReducerState? = null
+    private var liveReturns = emptySet<String>()
     private val mutableLive = MutableStateFlow<TimelineLivePublication?>(null)
     val live = mutableLive.asStateFlow()
 
@@ -74,6 +75,7 @@ class CanonicalTimelineEngine(
             pendingReconcile = null
             liveFence = it
             liveReduction = TimelineReducerState(Timeline(conversationId = selection.scope.conversationId))
+            liveReturns = emptySet()
             mutableLive.value = null
         }
     }
@@ -102,11 +104,16 @@ class CanonicalTimelineEngine(
             ).encodeToByteArray().size
             require(liveBytes <= budget.maxDecodedBodyBytes) { "Live block byte budget exceeded" }
         }
+        val returnedId = ((frame as? TimelineStreamFrame.Message)?.message as? com.letta.mobile.data.model.ToolReturnMessage)
+            ?.toolReturn?.toolCallId?.takeIf { it.isNotBlank() }
+        val nextReturns = if (returnedId == null) liveReturns else liveReturns + returnedId
+        require(nextReturns.size <= budget.maxMetadataRows) { "Live return index budget exceeded" }
         val terminal = frame == TimelineStreamFrame.Done
         val identities = mutableMapOf<TimelineMessageId, TimelineMessageId>()
         val revision = if (terminal) store.transaction(fence.selection.scope) {
             val exact = writer as? TimelineExactCanonicalWriter ?: error("Live reduction requires exact shared writer")
             var changed = false
+            for (callId in nextReturns) changed = CanonicalToolIndex.observe(this, callId, null, true) || changed
             for (event in events) {
                 changed = exact.mergeEvent(this, event) || changed
                 identities[TimelineMessageId(event.serverId)] = exact.canonicalIdentity(this, event.serverId, event.otid)
@@ -114,6 +121,7 @@ class CanonicalTimelineEngine(
             if (changed) nextRevision() else checkpoint().revision
         } else null
         liveReduction = next
+        liveReturns = nextReturns
         mutableLive.value = TimelineLivePublication(fence, TimelineLiveBlock(emptyList(), terminal, events), revision, identities)
         if (revision != null) mutablePublication.value = TimelineEnginePublication(fence.selection, revision)
         true
@@ -281,7 +289,8 @@ class CanonicalTimelineEngine(
         }
         mutablePublication.value = TimelineEnginePublication(request.selection, revision)
         pendingReconcile = null
-        TimelineEngineReconcileResult(TimelineEnginePageOutcome.Applied, appended)
+        TimelineEngineReconcileResult(TimelineEnginePageOutcome.Applied, appended,
+            page.records.mapNotNull { it.message.seqId?.toLong() }.maxOrNull())
     }
 
     /**
@@ -354,6 +363,51 @@ class CanonicalTimelineEngine(
                 }
             }
             (if (changed > 0) nextRevision() else checkpoint().revision) to changed
+        }
+        mutablePublication.value = TimelineEnginePublication(selection, revision)
+        count
+    }
+
+    suspend fun advanceToolSweep(selection: TimelineEngineSelection): Long = mutex.withLock {
+        check(selection === mutablePublication.value.selection)
+        store.transaction(selection.scope) { CanonicalToolIndex.advanceGeneration(this) }
+    }
+
+    suspend fun settleToolSweep(selection: TimelineEngineSelection, generation: Long): Int = mutex.withLock {
+        check(selection === mutablePublication.value.selection)
+        val (revision, count) = store.transaction(selection.scope) {
+            if (toolSweepGeneration() != generation) return@transaction checkpoint().revision to 0
+            val entries = unresolvedTools(null, budget.maxMetadataRows)
+            var remaining = budget.maxDecodedBodyBytes
+            var count = 0
+            for (entry in entries) {
+                val identity = checkNotNull(entry.owner)
+                if (!CanonicalToolIndex.stillUnresolved(this, generation, entry.callId, identity)) continue
+                val key = checkNotNull(locate(identity)) { "Missing unresolved tool owner" }
+                val row = metadata(TimelineReadPosition.Around(key), 1).rows.single { it.key == key }
+                require(row.body.encodedBytes <= remaining && row.body.encodedBytes <= Int.MAX_VALUE) { "Tool settlement budget exceeded" }
+                val bytes = ByteArray(row.body.encodedBytes.toInt())
+                var offset = 0
+                while (offset < bytes.size) {
+                    val limit = minOf(64 * 1024, bytes.size - offset)
+                    val chunk = body(row.body, offset.toLong(), limit)
+                    check(chunk.isNotEmpty() && chunk.size <= limit)
+                    chunk.copyInto(bytes, offset)
+                    offset += chunk.size
+                }
+                remaining -= bytes.size
+                val event = TimelineSnapshotCodec.json.decodeFromString(StoredTimelineEvent.serializer(), bytes.decodeToString()).toConfirmedTimelineEvent()
+                check(event.toolCalls.any { it.effectiveId == entry.callId }) { "Tool index owner mismatch" }
+                val repaired = event.copy(
+                    toolReturnContent = event.toolReturnContent ?: DanglingToolCallResolver.NO_RESULT_MESSAGE,
+                    toolReturnIsError = if (event.toolReturnContent == null) true else event.toolReturnIsError,
+                    toolReturnContentByCallId = (event.toolReturnContentByCallId + (entry.callId to DanglingToolCallResolver.NO_RESULT_MESSAGE)).toTimelinePersistentMap(),
+                    toolReturnIsErrorByCallId = (event.toolReturnIsErrorByCallId + (entry.callId to true)).toTimelinePersistentMap(),
+                )
+                (writer as TimelineExactCanonicalWriter).mergeEvent(this, repaired)
+                count++
+            }
+            (if (count > 0) nextRevision() else checkpoint().revision) to count
         }
         mutablePublication.value = TimelineEnginePublication(selection, revision)
         count

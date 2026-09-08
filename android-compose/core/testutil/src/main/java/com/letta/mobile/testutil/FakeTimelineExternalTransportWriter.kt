@@ -99,7 +99,16 @@ class FakeTimelineExternalTransportWriter : TimelineExternalTransportWriter {
         conversationId: String,
         fallbackSeq: Long?,
     ) {
-        scopedRepairedCursors += ScopedCursorRepair(agentId, conversationId, fallbackSeq)
+        repairExpiredConversationCursorScoped(agentId, conversationId, fallbackSeq, expectedWatermark = null)
+    }
+
+    override suspend fun repairExpiredConversationCursorScoped(
+        agentId: String?,
+        conversationId: String,
+        fallbackSeq: Long?,
+        expectedWatermark: Long?,
+    ) {
+        scopedRepairedCursors += ScopedCursorRepair(agentId, conversationId, fallbackSeq, expectedWatermark)
     }
 
     override suspend fun clearExternalTransportActive(conversationId: String) {
@@ -174,6 +183,7 @@ class FakeTimelineExternalTransportWriter : TimelineExternalTransportWriter {
         val agentId: String?,
         val conversationId: String,
         val fallbackSeq: Long?,
+        val expectedWatermark: Long? = null,
     )
 
     data class ScopedConversation(

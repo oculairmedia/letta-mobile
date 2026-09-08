@@ -34,6 +34,8 @@ class RoomTimelineToolIndexTest {
         try {
             val db = helper.writableDatabase
             TimelineLedgerDatabase.MIGRATION_1_2.migrate(db)
+            TimelineLedgerDatabase.MIGRATION_2_3.migrate(db)
+            db.query("SELECT count(*) FROM ledger_validation").use { assertTrue(it.moveToFirst()); assertEquals(0, it.getInt(0)) }
             db.query("SELECT revision, hex(checkpoint) FROM ledger_head").use {
                 assertTrue(it.moveToFirst()); assertEquals(42L, it.getLong(0)); assertEquals("0304", it.getString(1))
             }
@@ -49,7 +51,7 @@ class RoomTimelineToolIndexTest {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val name = "tool-index-${java.util.UUID.randomUUID()}.db"
         fun open() = Room.databaseBuilder(context, TimelineLedgerDatabase::class.java, name)
-            .addMigrations(TimelineLedgerDatabase.MIGRATION_1_2).build()
+            .addMigrations(TimelineLedgerDatabase.MIGRATION_1_2, TimelineLedgerDatabase.MIGRATION_2_3).build()
         var db = open()
         try {
             var store = RoomTimelineBoundedStore(db)

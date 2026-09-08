@@ -91,17 +91,15 @@ internal class ResumableLedgerSha256 private constructor(private val h: IntArray
     private var remainder = ByteArray(0)
 
     fun update(bytes: ByteArray) {
-        require(remainder.isEmpty())
         count = Math.addExact(count, bytes.size.toLong())
+        val input = remainder + bytes
         var offset = 0
-        while (offset + 64 <= bytes.size) { compress(bytes, offset); offset += 64 }
-        remainder = bytes.copyOfRange(offset, bytes.size)
+        while (offset + 64 <= input.size) { compress(input, offset); offset += 64 }
+        remainder = input.copyOfRange(offset, input.size)
     }
 
-    fun checkpoint(): String {
-        check(remainder.isEmpty()) { "Checkpoint requires complete SHA blocks" }
-        return (listOf(count.toString()) + h.map { it.toUInt().toString(16) }).joinToString(":")
-    }
+    fun checkpoint(): String = (listOf(count.toString()) + h.map { it.toUInt().toString(16) } +
+        listOf(remainder.joinToString("") { "%02x".format(it.toInt() and 255) })).joinToString(":")
 
     fun finish(): String {
         val padding = ByteArray(if (remainder.size < 56) 64 else 128)
@@ -140,10 +138,13 @@ internal class ResumableLedgerSha256 private constructor(private val h: IntArray
         fun restore(state: String): ResumableLedgerSha256 {
             if (state.isEmpty()) return ResumableLedgerSha256(intArrayOf(0x6a09e667, 0xbb67ae85.toInt(), 0x3c6ef372, 0xa54ff53a.toInt(), 0x510e527f, 0x9b05688c.toInt(), 0x1f83d9ab, 0x5be0cd19), 0)
             val parts = state.split(':')
-            require(parts.size == 9)
+            require(parts.size == 9 || parts.size == 10)
             val count = parts[0].toLong()
-            require(count >= 0 && count % 64 == 0L)
-            return ResumableLedgerSha256(IntArray(8) { parts[it + 1].toUInt(16).toInt() }, count)
+            val tail = if (parts.size == 10) parts[9] else ""
+            require(tail.length % 2 == 0 && tail.length < 128)
+            val bytes = tail.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+            require(count >= 0 && count % 64 == bytes.size.toLong())
+            return ResumableLedgerSha256(IntArray(8) { parts[it + 1].toUInt(16).toInt() }, count).also { it.remainder = bytes }
         }
         private val K = longArrayOf(
             0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,

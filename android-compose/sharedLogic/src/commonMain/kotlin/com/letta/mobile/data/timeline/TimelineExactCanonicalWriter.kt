@@ -73,7 +73,7 @@ class TimelineExactCanonicalWriter(
             when (val decision = mergeOwnedTerminal(scope, owner, incoming, maxHistoricalBytes.toLong(),
                 TerminalHistoricalBodyReader { _, _, _ -> historical })) {
                 is TerminalEvidenceDecision.Changed -> decision.event
-                TerminalEvidenceDecision.Unchanged -> return false
+                TerminalEvidenceDecision.Unchanged -> historical ?: throw TimelineMergeUnavailable(identity, "missing_terminal_body_for_index")
                 is TerminalEvidenceDecision.Unavailable -> throw TimelineMergeUnavailable(identity, decision.reason)
             }
         } else historical?.let { TimelineHydrationReducer.mergeRicherEventFacts(incoming, it).copy(position = it.position, otid = it.otid) } ?: incoming

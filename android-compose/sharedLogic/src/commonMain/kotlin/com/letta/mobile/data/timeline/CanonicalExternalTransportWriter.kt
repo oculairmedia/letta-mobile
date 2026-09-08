@@ -12,7 +12,7 @@ interface CanonicalTimelineMaintenance {
     suspend fun turnStarted(owner: CanonicalTimelineCoordinator.Owner, runId: String?, turnId: String?)
     suspend fun turnEnded(owner: CanonicalTimelineCoordinator.Owner, clean: Boolean)
     suspend fun cleanup(owner: CanonicalTimelineCoordinator.Owner, runId: String?, turnId: String?, reason: String, candidateRunIds: Set<String>): Int
-    suspend fun repairCursor(owner: CanonicalTimelineCoordinator.Owner, fallbackSeq: Long?)
+    suspend fun repairCursor(owner: CanonicalTimelineCoordinator.Owner, fallbackSeq: Long?, expectedWatermark: Long? = null)
 }
 
 /** Captured once when a transport is created, never resolved from the active screen on callbacks. */
@@ -91,10 +91,17 @@ class CanonicalExternalTransportWriter(
         maintenance.cleanup(owner(agentId, conversationId), runId, turnId, reason, candidateRunIds)
 
     override suspend fun repairExpiredConversationCursor(conversationId: String, fallbackSeq: Long?) =
-        repairExpiredConversationCursorScoped(null, conversationId, fallbackSeq)
+        repairExpiredConversationCursorScoped(null, conversationId, fallbackSeq, expectedWatermark = null)
 
     override suspend fun repairExpiredConversationCursorScoped(agentId: String?, conversationId: String, fallbackSeq: Long?) =
-        maintenance.repairCursor(owner(agentId, conversationId), fallbackSeq)
+        repairExpiredConversationCursorScoped(agentId, conversationId, fallbackSeq, expectedWatermark = null)
+
+    override suspend fun repairExpiredConversationCursorScoped(
+        agentId: String?,
+        conversationId: String,
+        fallbackSeq: Long?,
+        expectedWatermark: Long?,
+    ) = maintenance.repairCursor(owner(agentId, conversationId), fallbackSeq, expectedWatermark)
 
     override suspend fun reconcileExternalTransportSend(conversationId: String, agentId: String, externalConversationId: String, otid: String) =
         reconcileExternalTransportSendScoped(agentId, conversationId, externalConversationId, otid)

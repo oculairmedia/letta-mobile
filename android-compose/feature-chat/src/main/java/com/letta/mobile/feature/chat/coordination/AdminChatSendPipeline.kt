@@ -45,7 +45,9 @@ internal class AdminChatSendPipeline(
     private val activeConversationId: () -> String?,
     private val setActiveConversationId: (String?) -> Unit,
     private val startTimelineObserver: (conversationId: String) -> Unit,
+    private val selectedOwner: SelectedChatSendOwner? = null,
 ) {
+    suspend fun retireSelectedOwner() { selectedOwner?.retire() }
     val timelineSendCoordinator: TimelineSendCoordinator by lazy {
         TimelineSendCoordinator(
             scope = scope,
@@ -68,11 +70,13 @@ internal class AdminChatSendPipeline(
 
     val wsChatSendCoordinator: WsChatSendCoordinator by lazy {
         WsChatSendCoordinator(
-            scope = scope,
+            scope = selectedOwner?.scope ?: scope,
             agentId = agentId.value,
-            activeConfig = { settingsRepository.activeConfig.value },
+            activeConfig = {
+                selectedOwner?.let { it.requireCurrent(); it.config } ?: settingsRepository.activeConfig.value
+            },
             wsChatBridge = wsChatBridge,
-            timelineRepository = externalTimelineWriter,
+            timelineRepository = selectedOwner?.writer ?: externalTimelineWriter,
             conversationRepository = conversationRepository,
             uiState = uiState,
             clearComposerAfterSend = { composerController.clearAfterSend() },
@@ -81,7 +85,10 @@ internal class AdminChatSendPipeline(
             setActiveConversationId = setActiveConversationId,
             startTimelineObserver = startTimelineObserver,
             clientVersionProvider = clientVersionProvider,
-            backendDescriptor = { sessionManager.current.backendDescriptor },
+            prepareConversation = { conversation -> selectedOwner?.ready(conversation) },
+            backendDescriptor = {
+                selectedOwner?.let { it.requireCurrent(); it.descriptor } ?: sessionManager.current.backendDescriptor
+            },
             runtimeEventSink = { drafts ->
                 runtimeEventOutbox.appendAll(drafts)
             },

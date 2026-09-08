@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
@@ -48,6 +49,84 @@ import kotlin.test.assertEquals
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatSendCoordinatorConversationSwitchTest {
+    @Test
+    fun `fresh conversation waits for readiness before observer and dispatch`() = runTest {
+        val ready = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val transport = RecordingChannelTransport()
+        var observed = false
+        var prepared: String? = null
+        val coordinator = ChatSendCoordinator(
+            scope = backgroundScope,
+            agentId = AGENT_ID,
+            activeConfig = { LettaConfig("shim", LettaConfig.Mode.SELF_HOSTED, "http://localhost:8291", "token") },
+            wsChatBridge = WsChatBridge(transport),
+            timelineRepository = RecordingTimelineWriter(),
+            conversationRepository = FakeConversationRepository(),
+            ui = NoopUiSink(), clearComposerAfterSend = {}, activeConversationId = { null },
+            setActiveConversationId = {}, startTimelineObserver = { observed = true },
+            clientVersion = { "test" }, otidGenerator = { "readiness-otid" },
+            prepareConversation = { prepared = it; ready.await() },
+        )
+        val send = coordinator.send("hello")
+        runCurrent()
+        assertEquals("conv-created", prepared)
+        assertEquals(false, observed)
+        assertEquals(emptyList(), transport.sentConversationIds)
+        ready.complete(Unit)
+        runCurrent()
+        assertEquals(true, observed)
+        assertEquals(listOf("conv-created"), transport.sentConversationIds)
+        send.join()
+    }
+
+    @Test
+    fun `readiness failure reports error without publishing conversation or writing`() = runTest {
+        val transport = RecordingChannelTransport()
+        val timeline = RecordingTimelineWriter()
+        val failures = mutableListOf<String>()
+        var observed = false
+        var published = false
+        var cleared = false
+        val coordinator = ChatSendCoordinator(
+            scope = backgroundScope, agentId = AGENT_ID,
+            activeConfig = { LettaConfig("shim", LettaConfig.Mode.SELF_HOSTED, "http://localhost:8291", "token") },
+            wsChatBridge = WsChatBridge(transport), timelineRepository = timeline,
+            conversationRepository = FakeConversationRepository(), ui = CapturingUiSink(failures),
+            clearComposerAfterSend = { cleared = true }, activeConversationId = { null },
+            setActiveConversationId = { published = true }, startTimelineObserver = { observed = true },
+            clientVersion = { "test" }, otidGenerator = { "test" },
+            prepareConversation = { error("canonical storage unavailable") },
+        )
+        coordinator.send("hello")
+        runCurrent()
+        assertEquals(1, failures.size)
+        assertEquals(false, observed)
+        assertEquals(false, published)
+        assertEquals(false, cleared)
+        assertEquals(emptyList(), timeline.ingestedConversationIds)
+        assertEquals(emptyList(), transport.sentConversationIds)
+    }
+
+    @Test
+    fun `readiness cancellation does not observe or dispatch`() = runTest {
+        val transport = RecordingChannelTransport()
+        var observed = false
+        val coordinator = ChatSendCoordinator(
+            scope = backgroundScope, agentId = AGENT_ID,
+            activeConfig = { LettaConfig("shim", LettaConfig.Mode.SELF_HOSTED, "http://localhost:8291", "token") },
+            wsChatBridge = WsChatBridge(transport), timelineRepository = RecordingTimelineWriter(),
+            conversationRepository = FakeConversationRepository(), ui = NoopUiSink(),
+            clearComposerAfterSend = {}, activeConversationId = { null }, setActiveConversationId = {},
+            startTimelineObserver = { observed = true }, clientVersion = { "test" }, otidGenerator = { "test" },
+            prepareConversation = { throw kotlinx.coroutines.CancellationException("retired") },
+        )
+        val send = coordinator.send("hello")
+        runCurrent()
+        assertEquals(true, send.isCancelled)
+        assertEquals(false, observed)
+        assertEquals(emptyList(), transport.sentConversationIds)
+    }
+
     @Test
     fun `switch between send call and coroutine body binds to conversation active at synchronous call`() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
