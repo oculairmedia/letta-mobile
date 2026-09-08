@@ -11,7 +11,8 @@ class TimelineOwnedStorageFactory(
 ) {
     /** After closing admission and draining the captured raw-config source owner, call this with
      * the exact canonical graph scope. Retry the same pair after interruption (forward recovery).
-     * Missing/unsupported source is an error, not an empty canonical conversation.
+     * A missing normalized head is an empty canonical conversation (fresh or manifest-only).
+     * Unsupported schema remains an error.
      */
     suspend fun beginMappedMigrationAfterDrain(
         source: TimelineOwnershipAuthority.Lease,

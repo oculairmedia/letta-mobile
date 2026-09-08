@@ -144,7 +144,7 @@ class TimelineOwnedStorageHandoffTest {
         } finally { target.close(); legacy.close() }
     }
 
-    @Test fun missingMappedSourceCannotFenceOrCopyAnEmptyTarget() = runBlocking {
+    @Test fun missingNormalizedSourceMigratesAsEmptyCanonical() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val legacy = Room.inMemoryDatabaseBuilder(context, LettaDatabase::class.java).build()
         val target = Room.inMemoryDatabaseBuilder(context, TimelineLedgerDatabase::class.java).build()
@@ -152,10 +152,26 @@ class TimelineOwnedStorageHandoffTest {
             val authority = TimelineOwnershipAuthority(temporary.root.toPath())
             val factory = TimelineOwnedStorageFactory(legacy, target, authority)
             val source = authority.acquire(scope, TimelineOwnershipAuthority.Route.Legacy)
-            try { factory.beginMappedMigrationAfterDrain(source, scope.copy(backendId = "remote-letta:b"))
-                fail("missing source accepted") } catch (_: IllegalStateException) { }
-            authority.withLease(source) { }
-            assertEquals(TimelineOwnershipAuthority.Phase.Legacy, authority.state(scope).phase)
+            val targetScope = scope.copy(backendId = "remote-letta:b")
+            val lease = factory.beginMappedMigrationAfterDrain(source, targetScope)
+            do {
+                val progress = factory.copyStep(lease) as LegacyLedgerCopyResult.Progress
+            } while (!progress.complete)
+            do {
+                val progress = factory.convertStep(lease) as RoomCanonicalMigrationResult.Progress
+            } while (!progress.complete)
+            var audit: TimelineOwnedStorageFactory.ValidationProgress
+            do {
+                audit = factory.validationStep(lease)
+            } while (!audit.complete)
+            val revision = checkNotNull(audit.certifiedRevision)
+            factory.prepareAfterDrain(lease, revision)
+            val canonical = factory.switchPreparedAfterDrain(lease)
+            factory.canonical(canonical).read(targetScope) {
+                assertEquals(revision, checkpoint().revision)
+                assertTrue(metadata(com.letta.mobile.data.timeline.TimelineReadPosition.Tail, 1).rows.isEmpty())
+            }
+            assertEquals(TimelineOwnershipAuthority.Phase.Canonical, authority.state(targetScope).phase)
         } finally { target.close(); legacy.close() }
     }
 

@@ -29,7 +29,8 @@ internal class RoomTimelineValidation(
         val head = head()
         check(head.supported)
         val sourceScope = mapping?.source ?: lease.scope
-        val normalized = checkNotNull(legacy.confirmedTimelineSnapshotDao().getNormalizedHead(sourceScope.backendId, sourceScope.conversationId))
+        val normalized = legacy.confirmedTimelineSnapshotDao().getNormalizedHead(sourceScope.backendId, sourceScope.conversationId)
+        if (normalized == null) check(head.rowCount == 0L) { "Empty source claimed rows" }
         target.withTransaction {
             val scope = ledgerScopeKey(lease.scope)
             val dao = target.ledger()
@@ -65,12 +66,17 @@ internal class RoomTimelineValidation(
                     val row = metadata(state.order, 1).singleOrNull()
                     if (row == null) {
                         check(state.count == head.rowCount)
-                        val actual = if (normalized.rowDigest.startsWith(CHAIN_ROW_DIGEST_PREFIX))
-                            state.chain.ifEmpty { normalizedRowDigest(emptyList()) }
-                        else ResumableLedgerSha256.restore(state.digest).finish()
-                        check(actual == normalized.rowDigest.removePrefix(CHAIN_ROW_DIGEST_PREFIX).lowercase()) { "Source root mismatch" }
+                        if (normalized == null) {
+                            check(head.rowCount == 0L) { "Empty source claimed rows" }
+                        } else {
+                            val actual = if (normalized.rowDigest.startsWith(CHAIN_ROW_DIGEST_PREFIX))
+                                state.chain.ifEmpty { normalizedRowDigest(emptyList()) }
+                            else ResumableLedgerSha256.restore(state.digest).finish()
+                            check(actual == normalized.rowDigest.removePrefix(CHAIN_ROW_DIGEST_PREFIX).lowercase()) { "Source root mismatch" }
+                        }
                         state = state.copy(phase = 1, order = Long.MIN_VALUE, count = 0, digest = "", chain = "")
                     } else {
+                        checkNotNull(normalized) { "Empty source produced rows" }
                         rows++
                         check(row.order == state.count && row.order <= Int.MAX_VALUE)
                         val fields = object : NormalizedTimelineRowDigestFields {

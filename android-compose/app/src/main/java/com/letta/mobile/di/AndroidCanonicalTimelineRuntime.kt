@@ -58,7 +58,7 @@ class AndroidCanonicalTimelineRuntime(
     suspend fun resume(scope: TimelineScope): CanonicalTimelineCoordinator = mutex.withLock {
         check(!retired && graphScope.coroutineContext[kotlinx.coroutines.Job]?.isActive == true && scope.backendId == backendId) { "Stale canonical backend generation" }
         bindings[scope]?.let { return@withLock it }
-        val lease = kotlinx.coroutines.withTimeout(30_000L) { readyLease(scope) }
+        val lease = readyLease(scope)
         CanonicalTimelineCoordinator(storage.canonical(lease), transport).also { bindings[scope] = it }
     }
 
@@ -168,12 +168,27 @@ class AndroidCanonicalTimelineRuntime(
     }
 }
 
-internal suspend fun boundedSteps(stage: String, maxSteps: Int = 256, step: suspend () -> Boolean) {
-    repeat(maxSteps) {
+/**
+ * Runs bounded copy/convert/validate slices until the stage completes.
+ * [slice] is a cooperative yield interval, not a readiness failure. A 28k-row
+ * copy is ~110 slices at one metadata row per step; throwing at 256 made large
+ * histories unopenable. [maxSteps] is only a stuck detector. Keep [maxSteps]
+ * as the second parameter so `boundedSteps("copy", 3)` remains a stuck cap.
+ */
+internal suspend fun boundedSteps(
+    stage: String,
+    maxSteps: Int = 4_194_304,
+    slice: Int = 256,
+    step: suspend () -> Boolean,
+) {
+    require(slice > 0 && maxSteps > 0)
+    var steps = 0
+    while (true) {
         if (step()) return
-        kotlinx.coroutines.yield()
+        steps++
+        check(steps < maxSteps) { "Canonical $stage budget exhausted after $steps bounded steps" }
+        if (steps % slice == 0) kotlinx.coroutines.yield()
     }
-    error("Canonical $stage budget exhausted; retry resumes durable progress")
 }
 
 /** Serializes binding creation and retirement; failed creation is never cached. */

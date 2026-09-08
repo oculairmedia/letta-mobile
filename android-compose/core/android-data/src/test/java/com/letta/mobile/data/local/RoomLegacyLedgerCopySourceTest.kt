@@ -72,4 +72,43 @@ class RoomLegacyLedgerCopySourceTest {
             assertEquals(LegacyLedgerCopyResult.SourceChanged, RoomLegacyLedgerCopy(source, target).step(scope))
         } finally { legacy.close(); target.close() }
     }
+
+    @Test fun missingNormalizedHeadIsEmptySupportedSource() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val legacy = Room.inMemoryDatabaseBuilder(context, LettaDatabase::class.java).build()
+        val target = Room.inMemoryDatabaseBuilder(context, TimelineLedgerDatabase::class.java).build()
+        try {
+            val scope = TimelineScope("b", "c", "a")
+            val source = RoomLegacyLedgerCopySource(legacy)
+            val token = source.snapshot(scope) {
+                val head = head()
+                assertTrue(head.supported)
+                assertEquals(0L, head.rowCount)
+                assertTrue(metadata(-1, 1).isEmpty())
+                head.token
+            }
+            assertEquals("empty-normalized", token)
+            assertTrue(source.validateRoot(scope, token))
+            var result: LegacyLedgerCopyResult.Progress
+            do {
+                result = RoomLegacyLedgerCopy(source, target).step(scope) as LegacyLedgerCopyResult.Progress
+            } while (!result.complete)
+            assertEquals(0, result.rows)
+            val dao = legacy.confirmedTimelineSnapshotDao()
+            dao.replaceHead(ConfirmedTimelineSnapshotHeadEntity(
+                "b", "c", "a", "manifest-only", null, 5, 100,
+            ))
+            dao.insertManifest(ConfirmedTimelineSnapshotManifestEntity(
+                "manifest-only", "b", "c", "a", 5, 1, 0, 0, "0".repeat(64), 100,
+            ))
+            val manifestToken = source.snapshot(scope) {
+                val head = head()
+                assertTrue(head.supported)
+                assertEquals(0L, head.rowCount)
+                head.token
+            }
+            assertEquals(token, manifestToken)
+            assertTrue(source.validateRoot(scope, manifestToken))
+        } finally { legacy.close(); target.close() }
+    }
 }

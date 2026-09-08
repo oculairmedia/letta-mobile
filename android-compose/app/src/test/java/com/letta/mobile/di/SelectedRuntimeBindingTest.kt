@@ -28,6 +28,12 @@ class SelectedRuntimeBindingTest {
         assertEquals(5, steps)
     }
 
+    @Test fun migrationSliceYieldsWithoutFailingReadiness() = runTest {
+        var steps = 0
+        boundedSteps("copy", maxSteps = 10_000) { ++steps == 300 }
+        assertEquals(300, steps)
+    }
+
     @Test fun migrationFailureDoesNotConsumeRemainingBudget() = runTest {
         var calls = 0
         try {

@@ -30,7 +30,8 @@ class RoomLegacyLedgerCopySource(
         val initial = head()
         if (!initial.supported || initial.token != expectedToken) return@snapshot false
         val captured = sourceScope(scope)
-        val stored = requireNotNull(legacy.confirmedTimelineSnapshotDao().getNormalizedHead(captured.backendId, captured.conversationId))
+        val stored = legacy.confirmedTimelineSnapshotDao().getNormalizedHead(captured.backendId, captured.conversationId)
+        if (stored == null) return@snapshot initial.rowCount == 0L && initial.supported
         val flat = java.security.MessageDigest.getInstance("SHA-256")
         var chain = normalizedRowDigest(emptyList())
         var count = 0L
@@ -76,7 +77,11 @@ class RoomLegacyLedgerCopySource(
                         "SELECT agent_id, storage_layout_version, revision, envelope_schema_version, live_cursor, backfill_cursor, released_older_count, row_count, root_digest, row_digest, generation, written_at_millis FROM normalized_timeline_snapshot_heads WHERE backend_id = ? AND conversation_id = ?",
                         arrayOf(scope.backendId, scope.conversationId),
                     )).use { cursor ->
-                        check(cursor.moveToFirst()) { "No normalized source; retain legacy manifest fallback" }
+                        if (!cursor.moveToFirst()) {
+                            // Fresh conversations and v13-manifest-only histories have no
+                            // normalized head. That is an empty canonical source, not damage.
+                            return@use LegacyLedgerCopyHead(bindToken("empty-normalized"), 0, true)
+                        }
                         val fields = (0 until cursor.columnCount).map { if (cursor.isNull(it)) null else cursor.getString(it) }
                         val token = fields.joinToString("") { if (it == null) "-1:" else "${it.length}:$it" }
                         val envelope = StoredTimelineEnvelope(
