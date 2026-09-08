@@ -13,9 +13,15 @@ class TimelineLedgerPagingSource(
     override fun getRefreshKey(state: PagingState<TimelinePageKey, TimelineSettledRecord>): TimelinePageKey? =
         state.anchorPosition?.let { state.closestItemToPosition(it)?.key } ?: selection.anchor
 
+    private fun isObsolete(): Boolean {
+        if (invalid) return true
+        val publication = engine.publication.value
+        if (publication.selection !== selection) return true
+        return publication.durableRevision != revision
+    }
+
     override suspend fun load(params: LoadParams<TimelinePageKey>): LoadResult<TimelinePageKey, TimelineSettledRecord> {
-        if (invalid || engine.publication.value.selection !== selection) return LoadResult.Invalid()
-        if (engine.publication.value.durableRevision != revision) return LoadResult.Invalid()
+        if (isObsolete()) return LoadResult.Invalid()
         return try {
             val position = when (params) {
                 is LoadParams.Refresh -> params.key?.let(TimelineReadPosition::Around) ?: TimelineReadPosition.Tail
@@ -23,9 +29,7 @@ class TimelineLedgerPagingSource(
                 is LoadParams.Prepend -> TimelineReadPosition.After(params.key)
             }
             val page = engine.load(selection, position, params.loadSize)
-            if (invalid || engine.publication.value.selection !== selection ||
-                engine.publication.value.durableRevision != revision
-            ) return LoadResult.Invalid()
+            if (isObsolete()) return LoadResult.Invalid()
             LoadResult.Page(
                 data = page.metadata.rows.zip(page.bodies) { metadata, body ->
                     TimelineSettledRecord(metadata.key, metadata.contentType, body, page.metadata.revision, metadata.body)
@@ -36,9 +40,7 @@ class TimelineLedgerPagingSource(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (failure: Exception) {
-            if (invalid || engine.publication.value.selection !== selection ||
-                engine.publication.value.durableRevision != revision
-            ) LoadResult.Invalid() else LoadResult.Error(failure)
+            if (isObsolete()) LoadResult.Invalid() else LoadResult.Error(failure)
         }
     }
 }

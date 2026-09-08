@@ -72,9 +72,9 @@ class CanonicalTimelineCoordinator(
 
     /** Not a screen-disposal callback. The runtime must release only after its users detach. */
     suspend fun retire(owner: Owner): Boolean = mutex.withLock {
-        if (owners[owner.selection.scope] !== owner || owner.liveFence != null ||
-            owner.presentations.isNotEmpty()
-        ) return@withLock false
+        if (owners[owner.selection.scope] !== owner) return@withLock false
+        if (owner.liveFence != null) return@withLock false
+        if (owner.presentations.isNotEmpty()) return@withLock false
         owner.session.close(owner.selection)
         owners.remove(owner.selection.scope)
         true
