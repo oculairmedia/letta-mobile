@@ -198,30 +198,16 @@ abstract class AppModule {
         @Provides
         @Singleton
         fun provideTimelineRepository(
-            messageApi: MessageApi,
+            timelineTransport: com.letta.mobile.data.timeline.TimelineTransport,
             pendingLocalStore: PendingLocalStore,
             conversationCursorStore: ConversationCursorStore,
             confirmedTimelineStore: com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore,
-            localTimelineTransport: com.letta.mobile.runtime.local.LettaCodeLocalTimelineTransport,
-            channelTransport: IChannelTransport,
             settingsRepository: ISettingsRepository,
         ): TimelineRepository {
-            val httpTimelineTransport = MessageApiTimelineTransport(messageApi)
-            val remoteTimelineTransport = IrohRoutingTimelineTransport(
-                settingsRepository = settingsRepository,
-                http = httpTimelineTransport,
-                iroh = IrohAdminRpcTimelineTransport(
-                    channelTransport = channelTransport,
-                    settingsRepository = settingsRepository,
-                ),
-            )
             return TimelineRepository(
                 // local-conv-* hydrates from the on-device letta.js transcript
                 // (letta-mobile-czomn); everything else uses the active remote route.
-                timelineTransport = com.letta.mobile.runtime.local.LocalRoutingTimelineTransport(
-                    local = localTimelineTransport,
-                    remote = remoteTimelineTransport,
-                ),
+                timelineTransport = timelineTransport,
                 pendingLocalStore = pendingLocalStore,
                 conversationCursorStore = conversationCursorStore,
                 confirmedTimelineStore = confirmedTimelineStore,
