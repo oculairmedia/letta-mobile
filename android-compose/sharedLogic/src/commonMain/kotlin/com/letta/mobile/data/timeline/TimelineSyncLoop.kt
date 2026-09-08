@@ -9,7 +9,6 @@ import com.letta.mobile.data.timeline.snapshot.NoOpConfirmedTimelineStore
 import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineCommitPlan
 import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineCommitPlanner
 import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineWriteResult
-import com.letta.mobile.data.timeline.snapshot.toStorageValue
 import com.letta.mobile.data.timeline.snapshot.StoredTimelineEnvelope
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
