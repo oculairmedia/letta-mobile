@@ -20,7 +20,7 @@ import java.util.concurrent.TimeUnit
 class ProcessHandleController(
     private val command: List<String>,
     private val environment: Map<String, String> = emptyMap(),
-    private val diagnosticBufferBytes: Int = 64 * 1024,
+    diagnosticBufferBytes: Int = 64 * 1024,
 ) : AppServerSupervisor.ProcessController {
 
     private var process: Process? = null

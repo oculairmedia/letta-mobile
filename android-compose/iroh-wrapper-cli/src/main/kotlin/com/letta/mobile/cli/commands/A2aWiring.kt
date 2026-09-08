@@ -561,7 +561,7 @@ internal suspend fun handleCreateAndDeliver(
         )
         return inputOnConversation(client, message, createdId)
     } else {
-        val dropAttrs = mutableListOf<Pair<String, String>>(
+        val dropAttrs = mutableListOf(
             "fromAgentId" to message.fromAgentId,
             "toAgentId" to message.toAgentId,
             "msgId" to message.msgId,
@@ -677,7 +677,7 @@ private suspend fun loadSecretKey(path: String?): ByteArray {
  * not pay for a `runBlocking` apiece. Also used by [publishHost] when
  * it writes the address book — one helper, two callers, zero divergence.
  */
-private suspend fun endpointIdHex(endpoint: Endpoint): String {
+private fun endpointIdHex(endpoint: Endpoint): String {
     val id = endpoint.addr().id()
     return id.use { it.toBytes().joinToString("") { b -> "%02x".format(b) } }
 }
