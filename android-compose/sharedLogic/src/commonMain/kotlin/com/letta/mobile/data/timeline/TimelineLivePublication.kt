@@ -1,5 +1,7 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.chat.projection.ChatRenderItem
+import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import com.letta.mobile.data.timeline.snapshot.toConfirmedTimelineEvent
 
 /** Immutable bounded projection supplied by the shared live reducer, separate from settled Paging. */
@@ -17,6 +19,27 @@ data class TimelineSettledRecord(
     val pointer: TimelineBodyPointer? = null,
 ) {
     val isPreview: Boolean get() = pointer?.encodedBytes?.let { it > body.size } ?: false
+}
+
+/** Deferred content is explicit, not a null/missing message or a truncated serialized event. */
+sealed interface TimelineSettledProjection {
+    data class Rendered(val item: ChatRenderItem) : TimelineSettledProjection
+    data class Deferred(val reference: TimelineBodyReference) : TimelineSettledProjection
+    data object NotRenderable : TimelineSettledProjection
+}
+
+fun TimelineSettledRecord.projectBounded(
+    scope: TimelineScope,
+    ownAgentId: String? = null,
+): TimelineSettledProjection {
+    require(pointer == null || body.size.toLong() <= pointer.encodedBytes) { "Body exceeds pointer length" }
+    if (isPreview || body.size.toLong() > TimelineBoundedReader.MAX_PAGE_BODY_BYTES) {
+        return TimelineSettledProjection.Deferred(TimelineBodyReference(
+            scope, key, requireNotNull(pointer) { "Deferred body requires a pointer" }, contentType, revision,
+        ))
+    }
+    return toRenderItem(ownAgentId)?.let { TimelineSettledProjection.Rendered(it) }
+        ?: TimelineSettledProjection.NotRenderable
 }
 
 /** Project only complete canonical bodies; partial JSON must never become a missing message. */
