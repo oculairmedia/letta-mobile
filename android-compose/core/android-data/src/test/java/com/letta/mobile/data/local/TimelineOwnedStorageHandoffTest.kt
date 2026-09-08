@@ -175,6 +175,71 @@ class TimelineOwnedStorageHandoffTest {
         } finally { target.close(); legacy.close() }
     }
 
+    @Test fun manifestOnlyHistoryMigratesBodiesInsteadOfEmptyCanonical() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val legacy = Room.inMemoryDatabaseBuilder(context, LettaDatabase::class.java).build()
+        val target = Room.inMemoryDatabaseBuilder(context, TimelineLedgerDatabase::class.java).build()
+        try {
+            val envelope = StoredTimelineEnvelope(scope = scope, revision = 7, events = listOf(
+                StoredTimelineEvent(position = 0.0, otid = "manifest-otid", serverId = "manifest-server",
+                    messageType = "ASSISTANT", dateIso = "2026-01-01T00:00:00Z", content = "manifest body"),
+                StoredTimelineEvent(position = 1.0, otid = "manifest-otid-2", serverId = "manifest-server-2",
+                    messageType = "USER", dateIso = "2026-01-01T00:00:01Z", content = "second body"),
+            ), writtenAtMillis = 100)
+            assertTrue(RoomConfirmedTimelineStore(legacy).writeSnapshot(envelope))
+            assertNull(legacy.confirmedTimelineSnapshotDao().getNormalizedHead(scope.backendId, scope.conversationId))
+            val authority = TimelineOwnershipAuthority(temporary.root.toPath())
+            val factory = TimelineOwnedStorageFactory(legacy, target, authority)
+            val source = authority.acquire(scope, TimelineOwnershipAuthority.Route.Legacy)
+            val targetScope = scope.copy(backendId = "remote-letta:b")
+            val lease = factory.beginMappedMigrationAfterDrain(source, targetScope)
+            assertNotNull(legacy.confirmedTimelineSnapshotDao().getNormalizedHead(scope.backendId, scope.conversationId))
+            do {
+                val progress = factory.copyStep(lease) as LegacyLedgerCopyResult.Progress
+                assertTrue(progress.rows <= 1 && progress.bytes <= 65536)
+            } while (!progress.complete)
+            do {
+                val progress = factory.convertStep(lease) as RoomCanonicalMigrationResult.Progress
+            } while (!progress.complete)
+            var audit: TimelineOwnedStorageFactory.ValidationProgress
+            do { audit = factory.validationStep(lease) } while (!audit.complete)
+            factory.prepareAfterDrain(lease, checkNotNull(audit.certifiedRevision))
+            val canonical = factory.switchPreparedAfterDrain(lease)
+            factory.canonical(canonical).read(targetScope) {
+                val rows = metadata(com.letta.mobile.data.timeline.TimelineReadPosition.Tail, 2).rows
+                assertEquals(2, rows.size)
+                val bodies = rows.map { row ->
+                    val event = TimelineSnapshotCodec.json.decodeFromString(
+                        StoredTimelineEvent.serializer(),
+                        body(row.body, 0, 65536).decodeToString(),
+                    )
+                    event.content
+                }
+                assertEquals(listOf("manifest body", "second body"), bodies)
+            }
+        } finally { target.close(); legacy.close() }
+    }
+
+    @Test fun corruptManifestOnlyHistoryCannotBeCertifiedEmpty() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val legacy = Room.inMemoryDatabaseBuilder(context, LettaDatabase::class.java).build()
+        val target = Room.inMemoryDatabaseBuilder(context, TimelineLedgerDatabase::class.java).build()
+        try {
+            legacy.confirmedTimelineSnapshotDao().replaceHead(ConfirmedTimelineSnapshotHeadEntity(
+                "b", "c", "a", "missing-manifest", null, 5, 100,
+            ))
+            val authority = TimelineOwnershipAuthority(temporary.root.toPath())
+            val factory = TimelineOwnedStorageFactory(legacy, target, authority)
+            val source = authority.acquire(scope, TimelineOwnershipAuthority.Route.Legacy)
+            try {
+                factory.beginMappedMigrationAfterDrain(source, scope.copy(backendId = "remote-letta:b"))
+                fail("Corrupt manifest certified empty")
+            } catch (_: IllegalStateException) { }
+            authority.withLease(source) { }
+            assertEquals(TimelineOwnershipAuthority.Phase.Legacy, authority.state(scope).phase)
+        } finally { target.close(); legacy.close() }
+    }
+
     private suspend fun fixture(block: suspend (LettaDatabase, TimelineLedgerDatabase, TimelineOwnershipAuthority,
         TimelineOwnedStorageFactory, TimelineOwnershipAuthority.Lease, Long) -> Unit) {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()

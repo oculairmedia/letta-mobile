@@ -1,6 +1,7 @@
 package com.letta.mobile.data.local
 
 import com.letta.mobile.data.timeline.TimelineBoundedStore
+import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineReadResult
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 
 /** Explicit captured-lease entrypoints. Does not acquire, migrate or activate during construction. */
@@ -11,16 +12,35 @@ class TimelineOwnedStorageFactory(
 ) {
     /** After closing admission and draining the captured raw-config source owner, call this with
      * the exact canonical graph scope. Retry the same pair after interruption (forward recovery).
-     * A missing normalized head is an empty canonical conversation (fresh or manifest-only).
-     * Unsupported schema remains an error.
+     * A missing normalized head is empty only when no v13 snapshot head or manifest exists.
+     * Manifest-only history is bootstrapped onto normalized rows before copy. Bootstrap or
+     * schema failure is an error, never an empty certification.
      */
     suspend fun beginMappedMigrationAfterDrain(
         source: TimelineOwnershipAuthority.Lease,
         target: TimelineScope,
     ): TimelineOwnershipAuthority.Lease = authority.beginMappedMigration(source, target) {
-        RoomLegacyLedgerCopySource(legacy).snapshot(source.scope) { check(head().supported) }
+        prepareNormalizedCopySource(source.scope)
+        RoomLegacyLedgerCopySource(legacy).snapshot(source.scope) {
+            check(head().supported) { "Canonical copy source is unsupported" }
+        }
         check(ledger.ledger().head(ledgerScopeKey(target)) == null) { "Canonical target occupied" }
         check(ledger.ledger().migration(ledgerScopeKey(target)) == null) { "Unmapped copy occupies target" }
+    }
+
+    /** Publish normalized rows from a v13 envelope when that is the only durable history. */
+    private suspend fun prepareNormalizedCopySource(scope: TimelineScope) {
+        val dao = legacy.confirmedTimelineSnapshotDao()
+        if (dao.getNormalizedHead(scope.backendId, scope.conversationId) != null) return
+        if (dao.getHeadMetadata(scope.backendId, scope.conversationId) == null &&
+            dao.countManifests(scope.backendId, scope.conversationId) == 0) return
+        val result = RoomConfirmedTimelineStore(legacy).readSnapshotResult(scope)
+        check(result is ConfirmedTimelineReadResult.Active) {
+            "Manifest-only history cannot be certified empty; bootstrap failed ($result)"
+        }
+        checkNotNull(dao.getNormalizedHead(scope.backendId, scope.conversationId)) {
+            "Manifest-only history cannot be certified empty; bootstrap published no normalized head"
+        }
     }
 
     /** Recover a crash between source intent and target publication using only durable identity. */

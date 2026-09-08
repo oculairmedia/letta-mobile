@@ -31,7 +31,10 @@ class RoomLegacyLedgerCopySource(
         if (!initial.supported || initial.token != expectedToken) return@snapshot false
         val captured = sourceScope(scope)
         val stored = legacy.confirmedTimelineSnapshotDao().getNormalizedHead(captured.backendId, captured.conversationId)
-        if (stored == null) return@snapshot initial.rowCount == 0L && initial.supported
+        if (stored == null) {
+            // A missing normalized head is empty only when no v13 snapshot exists.
+            return@snapshot initial.rowCount == 0L && initial.supported && !hasLegacyManifestHistory(captured)
+        }
         val flat = java.security.MessageDigest.getInstance("SHA-256")
         var chain = normalizedRowDigest(emptyList())
         var count = 0L
@@ -73,15 +76,11 @@ class RoomLegacyLedgerCopySource(
             val reader = object : LegacyLedgerCopyReader {
                 override suspend fun head(): LegacyLedgerCopyHead {
                     check(open)
-                    return legacy.openHelper.readableDatabase.query(SimpleSQLiteQuery(
+                    val normalized = legacy.openHelper.readableDatabase.query(SimpleSQLiteQuery(
                         "SELECT agent_id, storage_layout_version, revision, envelope_schema_version, live_cursor, backfill_cursor, released_older_count, row_count, root_digest, row_digest, generation, written_at_millis FROM normalized_timeline_snapshot_heads WHERE backend_id = ? AND conversation_id = ?",
                         arrayOf(scope.backendId, scope.conversationId),
                     )).use { cursor ->
-                        if (!cursor.moveToFirst()) {
-                            // Fresh conversations and v13-manifest-only histories have no
-                            // normalized head. That is an empty canonical source, not damage.
-                            return@use LegacyLedgerCopyHead(bindToken("empty-normalized"), 0, true)
-                        }
+                        if (!cursor.moveToFirst()) return@use null
                         val fields = (0 until cursor.columnCount).map { if (cursor.isNull(it)) null else cursor.getString(it) }
                         val token = fields.joinToString("") { if (it == null) "-1:" else "${it.length}:$it" }
                         val envelope = StoredTimelineEnvelope(
@@ -98,6 +97,13 @@ class RoomLegacyLedgerCopySource(
                             }
                         }
                         LegacyLedgerCopyHead(bindToken(token), cursor.getLong(7), supported)
+                    }
+                    if (normalized != null) return normalized
+                    return if (hasLegacyManifestHistory(scope)) {
+                        // History still lives in v13 manifests. Never certify that as empty.
+                        LegacyLedgerCopyHead(bindToken("legacy-manifest"), 0, false)
+                    } else {
+                        LegacyLedgerCopyHead(bindToken("empty-normalized"), 0, true)
                     }
                 }
 
@@ -128,4 +134,10 @@ class RoomLegacyLedgerCopySource(
             }
             try { reader.block() } finally { open = false }
         }
+
+    private suspend fun hasLegacyManifestHistory(scope: TimelineScope): Boolean {
+        val dao = legacy.confirmedTimelineSnapshotDao()
+        return dao.getHeadMetadata(scope.backendId, scope.conversationId) != null ||
+            dao.countManifests(scope.backendId, scope.conversationId) > 0
+    }
 }
