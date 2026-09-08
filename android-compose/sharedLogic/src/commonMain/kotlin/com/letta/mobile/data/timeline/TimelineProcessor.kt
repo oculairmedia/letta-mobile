@@ -224,16 +224,17 @@ class TimelineProcessor(
         // An undeclared delta on a REAL timeline change is now a typed, loud fallback. It still
         // persists correctly -- full scan is always safe -- but it is attributable, and it
         // cannot be mistaken for the genuinely-empty case.
-        val declaredDelta = if (
-            committed.persistenceDelta == TimelineMutationDelta.None &&
-            current.timeline != committed.next.timeline
-        ) {
-            // Derive it centrally rather than making each of the seven reducers remember to.
-            // exactConfirmedDelta compares the confirmed sets directly, so an EMPTY result here
-            // is a derived fact -- "no persisted row changed" -- not an assertion a reducer
-            // could get wrong. Local-only mutations (append, retry, delivery-state) legitimately
-            // land here: locals are not persisted rows at all.
-            exactConfirmedDelta(current.timeline, committed.next.timeline)
+        val declaredDelta = if (committed.persistenceDelta == TimelineMutationDelta.None) {
+            if (current.timeline != committed.next.timeline) {
+                // Derive it centrally rather than making each of the seven reducers remember to.
+                // exactConfirmedDelta compares the confirmed sets directly, so an EMPTY result here
+                // is a derived fact -- "no persisted row changed" -- not an assertion a reducer
+                // could get wrong. Local-only mutations (append, retry, delivery-state) legitimately
+                // land here: locals are not persisted rows at all.
+                exactConfirmedDelta(current.timeline, committed.next.timeline)
+            } else {
+                TimelineMutationDelta.Exact(emptySet(), emptySet(), metadataChanged = false)
+            }
         } else {
             committed.persistenceDelta
         }

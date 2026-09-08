@@ -172,6 +172,41 @@ class SnapshotPlannerStoreGatePolicyTest {
      * shim. This pins the contract between the gate flag and the override.
      */
     @Test
+    fun noWorkDecisionForEmptyDeltaAgainstPersistedBaselineIsNotPersistable() {
+        val decision = TimelineSyncLoop.IncrementalPlanningDecision(
+            result = TimelineIncrementalSnapshotPlanner.Result.NoWork,
+            checkpointDue = false,
+            reason = null,
+            baseRevision = 1L,
+            targetRevision = 2L,
+            storeSupportsIncremental = true,
+        )
+        assertFalse(
+            TimelineSyncLoop.canPersistIncremental(decision),
+            "NoWork result represents a known-no-persisted-change state and must NOT pass the incremental gate.",
+        )
+    }
+
+    @Test
+    fun undeclaredDeltaForcesFullScanFallbackReason() {
+        val delta = PendingTimelinePersistenceDelta()
+        delta.merge(1L, TimelineMutationDelta.None)
+        val snapshot = delta.snapshot()
+        assertTrue(snapshot.requiresFullRescan)
+        assertEquals(SnapshotPlanningFallback.UNDECLARED_DELTA, snapshot.fallbackReason)
+    }
+
+    @Test
+    fun explicitlyEmptyDeltaRetainsCleanNoWorkState() {
+        val delta = PendingTimelinePersistenceDelta()
+        delta.merge(1L, TimelineMutationDelta.Exact(emptySet(), emptySet(), metadataChanged = false))
+        val snapshot = delta.snapshot()
+        assertFalse(snapshot.requiresFullRescan)
+        assertTrue(snapshot.isEmpty)
+        assertEquals(1L, snapshot.throughSequence)
+    }
+
+    @Test
     fun storeOverrideIsVisibleToTheGate() {
         val store = RecordingSupportsStore(supportsIncrementalCommit = true)
         assertTrue(store.supportsIncrementalCommit)

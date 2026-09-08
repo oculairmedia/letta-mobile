@@ -15,6 +15,9 @@ internal object TimelineIncrementalSnapshotPlanner {
         ) : Result
 
         data class FullScan(val reason: SnapshotPlanningFallback) : Result
+
+        /** The pending delta is known to have no confirmed or metadata changes against baseline. */
+        data object NoWork : Result
     }
 
     fun plan(
