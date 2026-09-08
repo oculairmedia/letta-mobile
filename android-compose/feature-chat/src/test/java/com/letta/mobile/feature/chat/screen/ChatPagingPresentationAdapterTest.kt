@@ -56,6 +56,22 @@ class ChatPagingPresentationAdapterTest {
         assertTrue(coordinator.retire(owner))
     }
 
+    @Test fun rapidConversationSwitchRetiresOnlyTheDetachedOwner() = runTest(UnconfinedTestDispatcher()) {
+        val coordinator = CanonicalTimelineCoordinator(EmptyStore(), NoTransport)
+        val firstOwner = coordinator.acquire(TimelineScope("backend", "first", "agent"))
+        val secondOwner = coordinator.acquire(TimelineScope("backend", "second", "agent"))
+        val first = createCanonicalChatPagingPresentation(coordinator, firstOwner, backgroundScope, null)
+        val second = createCanonicalChatPagingPresentation(coordinator, secondOwner, backgroundScope, "missing")
+        assertEquals("missing", second.missingTarget.value)
+        first.close()
+        advanceUntilIdle()
+        assertTrue(coordinator.retire(firstOwner))
+        assertFalse(coordinator.retire(secondOwner))
+        second.close()
+        advanceUntilIdle()
+        assertTrue(coordinator.retire(secondOwner))
+    }
+
     @Test fun privateHostBindingDoesNotMutateUnboundRouter() = runTest(UnconfinedTestDispatcher()) {
         val coordinator = CanonicalTimelineCoordinator(EmptyStore(), NoTransport)
         val owner = coordinator.acquire(TimelineScope("backend", "conversation", "agent"))

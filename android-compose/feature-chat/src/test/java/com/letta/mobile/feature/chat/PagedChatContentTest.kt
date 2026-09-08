@@ -316,6 +316,44 @@ class PagedChatContentTest {
         org.junit.Assert.assertNull(ChatPagingHost().select)
     }
 
+    @Test fun openingAndErrorStatesSkipLegacyPagerAndRetryOnlyTheCanonicalAction() {
+        var retried = 0
+        var mode by androidx.compose.runtime.mutableStateOf("opening")
+        compose.setContent {
+            LettaChatTheme {
+                val presentation = if (mode == "opening") {
+                    ChatPagingPresentation(
+                        flowOf(PagingData.from(listOf(row("hidden opening")))),
+                        MutableStateFlow(listOf(row("hidden live"))), {},
+                        opening = true,
+                    )
+                } else {
+                    ChatPagingPresentation(
+                        flowOf(PagingData.from(listOf(row("hidden error")))), MutableStateFlow(emptyList()), {},
+                        opening = false, openError = "Could not open conversation", retryOpen = { retried++ },
+                    )
+                }
+                PagedChatMessageList(
+                    presentation, ChatUiState(messages = persistentListOf(row("legacy").message)),
+                    ChatContentCallbacks(
+                        onSendMessage = {}, onRerunMessage = {},
+                        onLoadOlderMessages = { error("Legacy pager must not run") },
+                        onSubmitApproval = { _, _, _, _ -> }, onToggleRunCollapsed = {},
+                        onToggleReasoningExpanded = {}, onAttachmentImageTap = null,
+                    ), ChatContentAppearance(),
+                )
+            }
+        }
+        compose.onNodeWithText("Opening conversation...").assertIsDisplayed()
+        compose.onNodeWithText("hidden opening").assertDoesNotExist()
+        compose.onNodeWithText("legacy").assertDoesNotExist()
+        compose.runOnIdle { mode = "error" }
+        compose.onNodeWithText("Could not open conversation").assertIsDisplayed()
+        compose.onNodeWithText("Retry").performClick()
+        compose.runOnIdle { org.junit.Assert.assertEquals(1, retried) }
+        compose.onNodeWithText("hidden error").assertDoesNotExist()
+    }
+
     @Test fun flaggedContentRendersPagedAndLiveRowsInsteadOfLegacyMessages() {
         val live = MutableStateFlow<List<ChatRenderItem>>(listOf(row("live row")))
         val presentation = ChatPagingPresentation(flowOf(PagingData.from(listOf(row("settled row")))), live, {})
