@@ -41,6 +41,27 @@ class TimelineExactCanonicalWriterTest {
         assertEquals(null, engine.live.value)
     }
 
+    @Test fun incrementalSameIdLiveUpdatesDoNotAdvanceSettledPublication() = runTest {
+        val store = Store()
+        val engine = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
+        val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
+        val published = engine.publication.value
+        val fence = engine.beginLive(selection)
+        repeat(1_000) { n ->
+            assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(message("x".repeat(n + 1)))))
+            assertTrue(engine.publication.value === published)
+            assertEquals(0, store.rows.size)
+            assertEquals(1, engine.live.value?.block?.events?.size)
+            assertEquals(null, engine.live.value?.settlementRevision)
+        }
+        assertEquals(selection, engine.publication.value.selection)
+        assertEquals(0L, engine.publication.value.durableRevision)
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
+        assertEquals(1, store.rows.size)
+        assertEquals(1L, engine.publication.value.durableRevision)
+        assertFalse(engine.publication.value === published)
+    }
+
     @Test fun toolIndexRollsBackWithBodyAndResolvesCanonicalAlias() = runTest {
         val store = Store()
         val writer = TimelineExactCanonicalWriter(scope, 100_000)
