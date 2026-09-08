@@ -9,6 +9,24 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 
 class CanonicalTimelineEngineTest {
+    @Test fun chunkResolutionRejectsForeignScopeAndReleasedSelectionBeforeStorage() = runTest {
+        val store = Store()
+        val engine = engine(store)
+        val selection = open(engine)
+        val reference = TimelineBodyReference(
+            TimelineScope("foreign-backend", scope.conversationId),
+            TimelinePageKey(0, TimelineMessageId("message")),
+            TimelineBodyPointer("body", 8), "application/json", 0,
+        )
+        val reads = store.reads
+        assertFailsWith<IllegalArgumentException> { engine.resolveBodyChunk(selection, reference, 0, 8) }
+        engine.release(selection)
+        assertFailsWith<IllegalStateException> {
+            engine.resolveBodyChunk(selection, reference.copy(scope = scope), 0, 8)
+        }
+        assertEquals(reads, store.reads)
+    }
+
     @Test fun disabledDoesNotReadStorage() = runTest {
         val store = Store()
         assertIs<TimelineEngineOpen.Disabled>(CanonicalTimelineEngine(store, writer).open(scope))

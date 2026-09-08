@@ -239,6 +239,18 @@ class CanonicalTimelineEngine(
             TimelineBoundedReader(store).preview(selection.scope, position, budget.copy(maxMetadataRows = minOf(maxRows, budget.maxMetadataRows)))
         }
 
+    /** Chunk access shares the selection fence; a reference cannot cross conversation ownership. */
+    suspend fun resolveBodyChunk(
+        selection: TimelineEngineSelection,
+        reference: TimelineBodyReference,
+        offset: Long,
+        maxBytes: Int,
+    ): TimelineBodyChunk = mutex.withLock {
+        check(selection === mutablePublication.value.selection) { "Stale selection" }
+        require(reference.scope == selection.scope) { "Body scope mismatch" }
+        TimelineBoundedReader(store).readChunk(reference, offset, maxBytes)
+    }
+
     /** Resolve only the selected row, in one storage snapshot, without following a stale pointer. */
     suspend fun resolveBody(selection: TimelineEngineSelection, record: TimelineSettledRecord): TimelineSettledRecord =
         mutex.withLock {
