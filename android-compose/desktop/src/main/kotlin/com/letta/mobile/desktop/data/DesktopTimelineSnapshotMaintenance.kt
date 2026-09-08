@@ -11,7 +11,7 @@ internal object DesktopTimelineSnapshotMaintenance {
     suspend fun clear(backendDirectory: Path, backendId: String): Unit = withContext(Dispatchers.IO) {
         if (Files.exists(backendDirectory)) {
             Files.walk(backendDirectory).use { paths ->
-                paths.sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
+                paths.sorted(Comparator.reverseOrder()).toList().forEach { Files.deleteIfExists(it) }
             }
         }
         Telemetry.event("DesktopTimelineStore", "clearForBackend", "backendId" to backendId)
