@@ -106,15 +106,15 @@ exclude:
       - app/src/main/java/com/letta/mobile/runtime/local/LettaCodeNodeBridge.kt # JNI bridge entry points called from native code
       - app/src/main/java/com/letta/mobile/ui/screens/memory/MemoryOverviewScreen.kt # @Preview entry points outside Previews.kt
       - app/src/main/java/com/letta/mobile/ui/screens/runs/RunMonitorScreen.kt # @Preview entry points outside Previews.kt
-      - build-logic/src/main/kotlin/com/letta/mobile/architecture # Gradle plugin entry loaded by plugin id
-      - core/data/src/main/java/com/letta/mobile/data/api # Retrofit/Ktor endpoint interface methods
-      - core/data/src/main/java/com/letta/mobile/data/capability # Hilt @Inject capability constructors
-      - core/data/src/main/java/com/letta/mobile/data/health # Hilt @Inject health constructors
-      - core/data/src/main/java/com/letta/mobile/data/local # Room @Dao query methods
-      - core/data/src/main/java/com/letta/mobile/data/repository # Hilt @Inject repository constructors
-      - core/data/src/main/java/com/letta/mobile/data/session # SessionScoped Hilt factory bindings
-      - core/data/src/main/java/com/letta/mobile/data/model/DomainIdConverters.kt # Room @TypeConverter
-      - core/domain/src/main/java/com/letta/mobile/data/repository/api # domain API interface methods
+      - core/android-data/src/main/java/com/letta/mobile/data/api # Retrofit/Ktor endpoint interface methods
+      - core/android-data/src/main/java/com/letta/mobile/data/local # Room @Dao query methods
+      - core/android-data/src/main/java/com/letta/mobile/data/repository # Hilt @Inject repository constructors
+      - core/android-data/src/main/java/com/letta/mobile/data/session # SessionScoped Hilt factory bindings
+      - sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/api # domain API interface methods
+      - sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/model # domain/serialization models consumed across modules
+      - sharedLogic/src/commonMain/kotlin/com/letta/mobile/ui/theme/DesignTokens.kt # shared design tokens
+      - sharedLogic/src/commonMain/kotlin/com/letta/mobile/ui/theme/ThemeTokens.kt # shared theme tokens
+      - sharedLogic/src/commonMain/kotlin/com/letta/mobile/ui/chat/render/ChatUiModels.kt # shared chat render models
       - core/runtime/src/commonMain/kotlin/com/letta/mobile/runtime/TurnContracts.kt # sealed runtime contract variants
       - core/testutil/src/main # test doubles and helper entry points
       - designsystem/src/main/java/com/letta/mobile/ui/components/Previews.kt # @Preview composables
@@ -132,6 +132,20 @@ exclude:
       - app/src/main/java/com/letta/mobile/platform/root/RootShellBridge.kt # root/IPC bridge surface
       - sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/ui/markdown/StreamingMarkdownParser.kt # streaming markdown helpers kept for parser evolution
       - sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/channel/NotificationDelivery.kt # @Preview + delivery stream contracts
+  # Cross-module KMP extension functions and inline receiver scopes (e.g. runCatching)
+  # falsely report unused receivers under Qodana's headless Android plugin model.
+  - name: UnusedReceiverParameter
+  # Paths.get(path) in CLI commands flags ReplaceGetOrSet falsely because
+  # static Java methods on java.nio.file.Paths start with 'get'.
+  - name: ReplaceGetOrSet
+    paths:
+      - cli
+  # Vector drawables for splash and adaptive icons run on API 26+ (minSdk 26).
+  - name: AndroidLintVectorRaster
+    paths:
+      - app/src/main/res/drawable/splash_letta_icon.xml
+      - app/src/main/res/drawable/ic_launcher_monochrome.xml
+      - app/src/main/res/drawable/ic_launcher_foreground.xml
   # Adaptive icons must stay in mipmap-anydpi-v26 (API 26+). Renaming to
   # mipmap-anydpi to silence ObsoleteSdkInt breaks AAPT linking for play builds.
   - name: AndroidLintObsoleteSdkInt
