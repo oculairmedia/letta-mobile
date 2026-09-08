@@ -757,22 +757,6 @@ internal class AdminChatViewModel @Inject constructor(
         )
     }
 
-    init {
-        viewModelScope.launch {
-            shimBackendDetector.refreshActive()
-            settingsRepository.activeConfigChanges.collect { config ->
-                shimBackendDetector.refresh(config)
-            }
-        }
-        transportCoordinator.startObserving()
-        goalCoordinator.startObserving()
-        slashCommandsCoordinator.loadSlashCommands()
-        refreshGoalStatus()
-        adminChatA2uiCoordinator
-        sendPipeline.ensureEagerInit()
-        chatSessionInitializer.run()
-    }
-
     private fun resolveConversationAndLoad(
         useClientModeForResolve: Boolean = false,
     ) = chatConversationCoordinator.resolveConversationAndLoad(
@@ -1052,4 +1036,22 @@ internal class AdminChatViewModel @Inject constructor(
     fun submitA2uiAction(action: A2uiAction) = adminChatA2uiCoordinator.submitA2uiAction(action)
 
     fun markA2uiActionSnackbarShown(id: Long) = adminChatA2uiCoordinator.markA2uiActionSnackbarShown(id)
+
+    // Keep startup after all backing fields and lazy delegates: Main.immediate can
+    // resolve a cached route and start its observer before this constructor returns.
+    init {
+        viewModelScope.launch {
+            shimBackendDetector.refreshActive()
+            settingsRepository.activeConfigChanges.collect { config ->
+                shimBackendDetector.refresh(config)
+            }
+        }
+        transportCoordinator.startObserving()
+        goalCoordinator.startObserving()
+        slashCommandsCoordinator.loadSlashCommands()
+        refreshGoalStatus()
+        adminChatA2uiCoordinator
+        sendPipeline.ensureEagerInit()
+        chatSessionInitializer.run()
+    }
 }
