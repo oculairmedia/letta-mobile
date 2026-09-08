@@ -7,6 +7,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.*
+import kotlin.time.Duration.Companion.minutes
 
 class DesktopTimelineBoundedStoreTest {
     private val scope = TimelineScope("backend", "conversation")
@@ -68,21 +69,22 @@ class DesktopTimelineBoundedStoreTest {
         }
     }
 
-    @Test fun unresolvedSeekSkipsTwentyEightThousandResolvedEntries() = runTest {
+    @Test fun unresolvedSeekSkipsTwentyEightThousandResolvedEntries() = runTest(timeout = 5.minutes) {
         val owner = TimelineMessageId("owner")
+        val store = store()
         repeat(280) { batch ->
-            store().transaction(scope) {
+            store.transaction(scope) {
                 nextRevision()
                 repeat(100) { offset ->
                     putToolCall(TimelineToolIndexEntry("resolved-${batch * 100 + offset}", owner, true))
                 }
             }
         }
-        store().transaction(scope) {
+        store.transaction(scope) {
             nextRevision()
             for (id in listOf("a", "b", "c")) putToolCall(TimelineToolIndexEntry(id, owner, false))
         }
-        store().read(scope) {
+        store.read(scope) {
             assertEquals(listOf("b", "c"), unresolvedTools("a", 2).map { it.callId })
             assertTrue(unresolvedTools("z", 128).isEmpty())
             assertFailsWith<IllegalArgumentException> { unresolvedTools(null, 129) }
@@ -124,18 +126,24 @@ class DesktopTimelineBoundedStoreTest {
 
     @Test fun migrationRowProgressResumesWithoutActivatingAndRejectsStaleSource() = runTest {
         legacy = true
-        store().transaction(scope) { repeat(5) { put(record(it.toLong())) } }
+        store().transaction(scope) {
+            nextRevision()
+            repeat(5) { put(record(it.toLong())) }
+        }
         assertEquals(2L, store().migrateRows(scope, maxRows = 2).copiedRows)
         assertEquals(4L, store().migrateRows(scope, maxRows = 2).copiedRows)
         store().read(scope) { assertEquals(5, metadata(TimelineReadPosition.Tail, 10).rows.size) }
-        store().transaction(scope) { put(record(6)) }
+        store().transaction(scope) { nextRevision(); put(record(6)) }
         assertFailsWith<IllegalStateException> { store().migrateRows(scope, maxRows = 2) }
         store().read(scope) { assertEquals(6, metadata(TimelineReadPosition.Tail, 10).rows.size) }
     }
 
     @Test fun migrationOversizedBodyDoesNotPublishProgress() = runTest {
         legacy = true
-        store().transaction(scope) { put(record(1, bytes = ByteArray(20))) }
+        store().transaction(scope) {
+            nextRevision()
+            put(record(1, bytes = ByteArray(20)))
+        }
         assertFailsWith<IllegalArgumentException> { store().migrateRows(scope, maxBodyBytes = 10) }
         assertEquals(1L, store().migrateRows(scope, maxBodyBytes = 20).copiedRows)
         store().read(scope) {

@@ -2,6 +2,7 @@ package com.letta.mobile.di
 
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
+import com.letta.mobile.data.model.isIrohBackend
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.session.SessionGraph
 import com.letta.mobile.data.session.SessionManager
@@ -27,7 +28,7 @@ class ProductionSelectedChatRuntimeProvider @Inject constructor(
 
     private fun capture(graph: SessionGraph, agent: String): SelectedChatRuntime? {
         val config = checkNotNull(graph.capturedConfig) { "Production graph has no captured config" }
-        if (graph.localRuntimeBackend != null || !config.serverUrl.startsWith("iroh://")) return null
+        if (graph.localRuntimeBackend != null || !config.isIrohBackend()) return null
         val capturedSettings = object : ISettingsRepository by settings {
             override val activeConfig = MutableStateFlow<com.letta.mobile.data.model.LettaConfig?>(config)
             override val activeConfigChanges = flowOf(config)
