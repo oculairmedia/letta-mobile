@@ -14,10 +14,7 @@ providers.environmentVariable("LETTA_DESKTOP_BUILD_DIR").orNull
     ?.takeIf(String::isNotBlank)
     ?.let { layout.buildDirectory.set(file(it)) }
 
-// Desktop-only library versions stay named here until the project catalog
-// grows beyond the Android SDK constants in gradle/libs.versions.toml.
-//
-// WARNING — the Compose versions below are FLOORS, not the versions that ship.
+// WARNING — the Compose versions in libs.versions.toml are FLOORS, not the versions that ship.
 // The runtime classpath resolves the whole `org.jetbrains.compose` atomic group
 // to 1.11.1 by conflict resolution across eight requested versions (1.11.1,
 // 1.10.3, 1.10.0, 1.9.3, 1.9.1, 1.9.0, 1.7.0, 1.7.0-beta01). The 1.11.1 comes
@@ -30,23 +27,6 @@ providers.environmentVariable("LETTA_DESKTOP_BUILD_DIR").orNull
 // Pinning the group deliberately is worth doing, but it must be validated
 // against Jewel AND Nucleus together (both are compiled against different
 // Compose baselines) — do it as its own change, not as a drive-by bump.
-val composeDesktopMaterial3Version = "1.9.0"
-val composeDesktopMaterialIconsVersion = "1.7.3"
-val jewelVersion = "0.37.0-262.4852.51"
-val kuiverVersion = "0.3.0"
-val autoLinkTextVersion = "2.0.2"
-val textyVersion = "1.0.0-alpha"
-// Kizitonwose Calendar (Compose Multiplatform) — backs the Schedules surface's
-// Agenda date-strip (WeekCalendar) and History reliability grid
-// (HeatMapCalendar). Uses kotlinx-datetime types, matching our shared
-// schedule projection (Phase 7).
-val calendarVersion = "2.10.1"
-// Pet-window surface host (avatar PRD P4): embedded Chromium for the
-// off-screen renderer + Win32 window styles (no-activate / click-through).
-val jcefMavenVersion = "146.0.10"
-val jnaVersion = "5.17.0"
-val nucleusVersion = "2.1.5"
-val nativeTrayVersion = "2.0.1"
 val desktopNodeVersion = "24.13.1"
 val desktopLettaCodeVersion = "0.29.12"
 val desktopNodeArchiveName = "node-v$desktopNodeVersion-win-x64.zip"
@@ -184,32 +164,32 @@ dependencies {
     // Avatar library: import pipeline + local catalog (license capture/display).
     implementation(project(":avatar:asset-pipeline"))
 
-    implementation("io.github.vinceglb:filekit-core-jvm:0.14.1")
-    implementation("io.github.vinceglb:filekit-dialogs-compose-jvm:0.14.1")
+    implementation(libs.filekit.core.jvm)
+    implementation(libs.filekit.dialogs.compose.jvm)
     implementation(compose.desktop.currentOs)
-    implementation("dev.nucleusframework:nucleus.nucleus-application:$nucleusVersion")
-    implementation("dev.nucleusframework:nucleus.updater-runtime:$nucleusVersion")
-    implementation("dev.nucleusframework:nucleus.native-http:$nucleusVersion")
-    implementation("dev.nucleusframework:nucleus.native-ssl:$nucleusVersion")
-    implementation("dev.nucleusframework:nucleus.notification-common:$nucleusVersion")
+    implementation(libs.nucleus.application)
+    implementation(libs.nucleus.updater.runtime)
+    implementation(libs.nucleus.native.http)
+    implementation(libs.nucleus.native.ssl)
+    implementation(libs.nucleus.notification.common)
     // The common NotificationManager delegates to the matching per-OS bridge,
     // so every desktop OS backend must be on the runtime classpath.
-    implementation("dev.nucleusframework:nucleus.notification-windows:$nucleusVersion")
-    implementation("dev.nucleusframework:nucleus.notification-macos:$nucleusVersion")
-    implementation("dev.nucleusframework:nucleus.notification-linux:$nucleusVersion")
-    implementation("dev.nucleusframework:nucleus.system-info:$nucleusVersion")
-    implementation("dev.nucleusframework:nucleus.darkmode-detector:$nucleusVersion")
-    implementation("dev.nucleusframework:nucleus.system-color:$nucleusVersion")
-    implementation("dev.nucleusframework:nucleus.taskbar-progress:$nucleusVersion")
-    implementation("dev.nucleusframework:nucleus.autolaunch:$nucleusVersion")
-    implementation("dev.nucleusframework:nucleus.launcher-windows:$nucleusVersion")
-    implementation("dev.nucleusframework:nucleus.launcher-linux:$nucleusVersion")
-    implementation("dev.nucleusframework:nucleus.launcher-macos:$nucleusVersion")
-    implementation("dev.nucleusframework:nucleus.global-hotkey:$nucleusVersion")
-    implementation("dev.nucleusframework:nucleus.energy-manager:$nucleusVersion")
-    implementation("dev.nucleusframework:nucleus.media-control:$nucleusVersion")
-    implementation("dev.nucleusframework:nucleus.linux-hidpi:$nucleusVersion")
-    implementation("dev.nucleusframework:composenativetray-jvm:$nativeTrayVersion")
+    implementation(libs.nucleus.notification.windows)
+    implementation(libs.nucleus.notification.macos)
+    implementation(libs.nucleus.notification.linux)
+    implementation(libs.nucleus.system.info)
+    implementation(libs.nucleus.darkmode.detector)
+    implementation(libs.nucleus.system.color)
+    implementation(libs.nucleus.taskbar.progress)
+    implementation(libs.nucleus.autolaunch)
+    implementation(libs.nucleus.launcher.windows)
+    implementation(libs.nucleus.launcher.linux)
+    implementation(libs.nucleus.launcher.macos)
+    implementation(libs.nucleus.global.hotkey)
+    implementation(libs.nucleus.energy.manager)
+    implementation(libs.nucleus.media.control)
+    implementation(libs.nucleus.linux.hidpi)
+    implementation(libs.nucleus.composenativetray.jvm)
     // Letta Desktop embeds JCEF and uses Swing/AWT integration, so Nucleus must
     // use its portable JNI-backed AWT window backend rather than Tao.
     //
@@ -222,29 +202,29 @@ dependencies {
     // real WS_CAPTION/WS_THICKFRAME frame. Nucleus's JNI backend keeps a real
     // native frame under custom-drawn chrome instead — the maintained
     // alternative to subclassing GWLP_WNDPROC ourselves via JNA.
-    implementation("dev.nucleusframework:nucleus.decorated-window-core:$nucleusVersion")
-    implementation("dev.nucleusframework:nucleus.decorated-window-awt:$nucleusVersion")
+    implementation(libs.nucleus.decorated.window.core)
+    implementation(libs.nucleus.decorated.window.awt)
     // `DecoratedWindow`/`TitleBar` themselves (the public entry points we call
     // from DesktopJewelWindow.kt) are published from this module, not -core —
     // it must be a compile-time dependency, not runtimeOnly.
-    implementation("dev.nucleusframework:nucleus.decorated-window-jni:$nucleusVersion")
-    implementation("org.jetbrains.jewel:jewel-decorated-window:$jewelVersion")
-    implementation("org.jetbrains.compose.material3:material3:$composeDesktopMaterial3Version")
-    implementation("org.jetbrains.compose.material:material-icons-extended:$composeDesktopMaterialIconsVersion")
-    implementation("org.jetbrains.skiko:skiko-awt:0.9.37.3")
-    implementation("io.github.justdeko:kuiver:$kuiverVersion")
-    implementation("sh.calvin.autolinktext:autolinktext:$autoLinkTextVersion")
+    implementation(libs.nucleus.decorated.window.jni)
+    implementation(libs.jewel.decorated.window)
+    implementation(libs.compose.desktop.material3)
+    implementation(libs.compose.desktop.material.icons)
+    implementation(libs.skiko.awt)
+    implementation(libs.kuiver)
+    implementation(libs.autolinktext)
     // Conversation tab strip drag-to-reorder (letta-mobile#1258): same
     // library the mobile dashboard already uses for its pinned-items grid
     // (see app/build.gradle.kts and HomeScreenWidgets.kt's
     // ReorderablePinnedItemsGrid) -- Kotlin Multiplatform, resolves to the
     // JVM/desktop artifact here via Gradle module metadata.
-    implementation("sh.calvin.reorderable:reorderable:3.1.0")
-    implementation("com.arjunjadeja:texty:$textyVersion")
-    implementation("com.kizitonwose.calendar:compose-multiplatform:$calendarVersion")
+    implementation(libs.reorderable)
+    implementation(libs.texty)
+    implementation(libs.calendar.compose.multiplatform)
     implementation(libs.kotlinx.coroutines.swing)
-    implementation("me.friwi:jcefmaven:$jcefMavenVersion")
-    implementation("net.java.dev.jna:jna-platform:$jnaVersion")
+    implementation(libs.jcefmaven)
+    implementation(libs.jna.platform)
     implementation(libs.ktor.client.cio)
     implementation(libs.ktor.client.websockets)
     implementation(libs.ktor.client.content.negotiation)
@@ -254,10 +234,10 @@ dependencies {
     // the generated `io.kotzilla.generated` package (reflective lookup so
     // the wrapper still compiles when the plugin isn't applied, e.g.
     // CI without a developer's local kotzilla.json).
-    implementation("io.kotzilla:kotzilla-sdk-compose-jvm:2.3.3")
+    implementation(libs.kotzilla.sdk.compose.jvm)
 
     testImplementation(kotlin("test"))
-    testImplementation("org.jetbrains.compose.ui:ui-test:1.11.1")
+    testImplementation(libs.compose.desktop.ui.test)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.ktor.client.mock)
 }

@@ -152,7 +152,7 @@ kotlin {
             dependencies {
                 implementation(libs.iroh)
                 // PNG rendering (QrRenderer.kt) needs ZXing javase — jvmMain only.
-                implementation("com.google.zxing:javase:3.5.3")
+                implementation(libs.zxing.javase)
                 api(libs.ktor.websockets)
             }
         }
@@ -165,9 +165,9 @@ kotlin {
                 // runtime and a generic Transport bridge, letting it run over
                 // the Iroh endpoint we already own instead of adding a second
                 // native mesh endpoint.
-                implementation("org.automerge:automerge:0.0.9")
+                implementation(libs.automerge)
                 implementation(libs.ktor.client.cio)
-                implementation("com.google.zxing:javase:3.5.3")
+                implementation(libs.zxing.javase)
                 implementation(libs.ktor.server.core)
                 implementation(libs.ktor.server.cio)
                 implementation(libs.ktor.server.websockets)

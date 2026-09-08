@@ -7,9 +7,6 @@ plugins {
     id("org.jetbrains.compose")
 }
 
-val composeVersion = "1.10.0"
-val composeMaterial3Version = "1.9.0"
-val composeIconsVersion = "1.7.3"
 val irohWasmDir = rootProject.layout.projectDirectory.dir("native/iroh-wasm")
 val irohWasmArtifact = irohWasmDir.file("target/wasm32-unknown-unknown/release/letta_iroh_wasm.wasm")
 val generatedIrohResources = layout.buildDirectory.dir("generated/iroh-wasm")
@@ -63,17 +60,17 @@ kotlin {
             resources.srcDir(generatedIrohResources)
             dependencies {
                 implementation(project(":sharedLogic"))
-                implementation("org.jetbrains.compose.runtime:runtime:$composeVersion")
-                implementation("org.jetbrains.compose.foundation:foundation:$composeVersion")
-                implementation("org.jetbrains.compose.material3:material3:$composeMaterial3Version")
-                implementation("org.jetbrains.compose.ui:ui:$composeVersion")
-                implementation("org.jetbrains.compose.material:material-icons-extended:$composeIconsVersion")
+                implementation(libs.compose.web.runtime)
+                implementation(libs.compose.web.foundation)
+                implementation(libs.compose.web.material3)
+                implementation(libs.compose.web.ui)
+                implementation(libs.compose.web.material.icons)
                 implementation(libs.ktor.client.js)
                 implementation(libs.ktor.client.websockets)
                 implementation(libs.ktor.client.content.negotiation)
                 implementation(libs.ktor.serialization.kotlinx.json)
-                implementation("io.github.vinceglb:filekit-core:0.15.0")
-                implementation("io.github.vinceglb:filekit-dialogs:0.15.0")
+                implementation(libs.filekit.core.chat)
+                implementation(libs.filekit.dialogs)
             }
         }
         val wasmJsTest by getting {

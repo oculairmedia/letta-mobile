@@ -18,9 +18,15 @@ class DesktopJewelWindowTest {
         assertContains(source, "BasicTitleBar(")
         assertContains(source, "style = titleBarStyle")
         assertFalse(source.lineSequence().any { it.trim().startsWith("undecorated = true") })
-        assertContains(build, "implementation(\"dev.nucleusframework:nucleus.decorated-window-core:")
-        assertContains(build, "implementation(\"dev.nucleusframework:nucleus.decorated-window-awt:")
-        assertContains(build, "implementation(\"dev.nucleusframework:nucleus.decorated-window-jni:")
+        val hasCore = build.contains("implementation(\"dev.nucleusframework:nucleus.decorated-window-core:") ||
+            build.contains("libs.nucleus.decorated.window.core")
+        kotlin.test.assertTrue(hasCore, "build.gradle.kts must include nucleus.decorated-window-core")
+        val hasAwt = build.contains("implementation(\"dev.nucleusframework:nucleus.decorated-window-awt:") ||
+            build.contains("libs.nucleus.decorated.window.awt")
+        kotlin.test.assertTrue(hasAwt, "build.gradle.kts must include nucleus.decorated-window-awt")
+        val hasJni = build.contains("implementation(\"dev.nucleusframework:nucleus.decorated-window-jni:") ||
+            build.contains("libs.nucleus.decorated.window.jni")
+        kotlin.test.assertTrue(hasJni, "build.gradle.kts must include nucleus.decorated-window-jni")
     }
 }
 
