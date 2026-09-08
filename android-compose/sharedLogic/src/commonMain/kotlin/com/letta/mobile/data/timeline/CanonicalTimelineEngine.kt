@@ -138,6 +138,18 @@ class CanonicalTimelineEngine(
         true
     }
 
+    /** Runtime-only release when no viewport is attached; never discard an uncommitted live block. */
+    internal suspend fun releaseUnobservedSettlement(fence: TimelineLiveFence): Boolean = mutex.withLock {
+        if (liveFence !== fence) return@withLock false
+        if (fence.selection !== mutablePublication.value.selection) return@withLock false
+        val current = mutableLive.value ?: return@withLock false
+        if (current.settlementRevision == null) return@withLock false
+        mutableLive.value = null
+        liveFence = null
+        liveReduction = null
+        true
+    }
+
     /** Host acknowledges only after every terminal identity is resident at the committed revision. */
     suspend fun acknowledgeSettlement(
         fence: TimelineLiveFence,

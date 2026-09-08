@@ -30,7 +30,9 @@ class CanonicalTimelineCoordinator(
 
     /** Detaching a viewport never closes the conversation or its active transport. */
     suspend fun detach(presentation: Presentation) = mutex.withLock {
-        presentation.owner.presentations.remove(presentation)
+        val owner = presentation.owner
+        owner.presentations.remove(presentation)
+        releaseUnobservedSettlement(owner)
         Unit
     }
 
@@ -56,7 +58,16 @@ class CanonicalTimelineCoordinator(
 
     suspend fun ingest(owner: Owner, fence: TimelineLiveFence, frame: TimelineStreamFrame): Boolean = mutex.withLock {
         if (owners[owner.selection.scope] !== owner || fence.selection !== owner.selection) return@withLock false
-        owner.session.ingest(fence, frame)
+        owner.session.ingest(fence, frame).also { accepted ->
+            if (accepted) releaseUnobservedSettlement(owner)
+        }
+    }
+
+    private suspend fun releaseUnobservedSettlement(owner: Owner) {
+        if (owners[owner.selection.scope] !== owner) return
+        if (owner.presentations.isNotEmpty()) return
+        val fence = owner.liveFence ?: return
+        if (owner.session.engine.releaseUnobservedSettlement(fence)) owner.liveFence = null
     }
 
     suspend fun acknowledgeSettlement(

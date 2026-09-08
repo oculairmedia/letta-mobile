@@ -153,8 +153,18 @@ class CanonicalTimelineEngineTest {
         assertFailsWith<IllegalStateException> { coordinator.beginLive(first) }
         assertEquals(TimelineEnginePageOutcome.Stale, first.session.engine.applyPage(request, page(request, null)))
         assertEquals(replacement, coordinator.current(scope))
+        val attached = kotlin.test.assertNotNull(coordinator.attach(replacement))
+        val backgroundFence = coordinator.beginLive(replacement)
+        assertEquals(true, replacement.session.engine.publishLive(backgroundFence, TimelineLiveBlock(emptyList(), true)))
+        assertEquals(false, coordinator.retire(replacement))
+        coordinator.detach(attached)
+        assertEquals(null, replacement.session.engine.live.value)
+        val nextFence = coordinator.beginLive(replacement)
+        assertEquals(false, coordinator.retire(replacement))
+        assertEquals(true, replacement.session.engine.publishLive(nextFence, TimelineLiveBlock(emptyList(), true)))
+        coordinator.detach(attached)
         assertEquals(true, coordinator.retire(replacement))
-        assertEquals(1, store.commits)
+        assertEquals(3, store.commits)
         assertEquals(5, store.reads)
     }
 
