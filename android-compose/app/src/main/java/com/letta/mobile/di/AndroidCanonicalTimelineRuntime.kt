@@ -66,6 +66,17 @@ class AndroidCanonicalTimelineRuntime(
 
     private suspend fun readyLease(target: TimelineScope): TimelineOwnershipAuthority.Lease? {
         lastMeasurement = com.letta.mobile.data.local.CanonicalReadinessMeasurement()
+        val decodeBefore = com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec.envelopeDecodeCount
+        try {
+            return readyLeaseGuarded(target)
+        } finally {
+            lastMeasurement = lastMeasurement.copy(
+                envelopeDecodes = com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec.envelopeDecodeCount - decodeBefore,
+            )
+        }
+    }
+
+    private suspend fun readyLeaseGuarded(target: TimelineScope): TimelineOwnershipAuthority.Lease? {
         val state = authority.state(target)
         if (state.phase == TimelineOwnershipAuthority.Phase.Canonical) return storage.reopenCanonical(target)
         val source = target.copy(backendId = legacyBackendId)
@@ -99,7 +110,7 @@ class AndroidCanonicalTimelineRuntime(
                 check(result.rows <= 1 && result.bytes <= 65536) { "Copy step exceeded bound: $result" }
                 measurement = measurement.copy(
                     copyRows = measurement.copyRows + result.rows,
-                    copyBytes = measurement.copyBytes + result.bytes,
+                    copyBytes = Math.addExact(measurement.copyBytes, result.bytes.toLong()),
                     copySteps = measurement.copySteps + 1,
                 )
                 lastMeasurement = measurement
@@ -110,6 +121,7 @@ class AndroidCanonicalTimelineRuntime(
                 check(result is com.letta.mobile.data.local.RoomCanonicalMigrationResult.Progress) { "Conversion failed: $result" }
                 measurement = measurement.copy(
                     convertRows = result.convertedRows,
+                    convertBytes = Math.addExact(measurement.convertBytes, result.bytes.toLong()),
                     convertSteps = measurement.convertSteps + 1,
                 )
                 lastMeasurement = measurement
@@ -121,7 +133,7 @@ class AndroidCanonicalTimelineRuntime(
                 check(result.metadataRows <= 128 && result.bodyBytes <= 65536) { "Validate step exceeded bound: $result" }
                 measurement = measurement.copy(
                     validateRows = measurement.validateRows + result.metadataRows,
-                    validateBytes = measurement.validateBytes + result.bodyBytes,
+                    validateBytes = Math.addExact(measurement.validateBytes, result.bodyBytes.toLong()),
                     validateSteps = measurement.validateSteps + 1,
                 )
                 lastMeasurement = measurement

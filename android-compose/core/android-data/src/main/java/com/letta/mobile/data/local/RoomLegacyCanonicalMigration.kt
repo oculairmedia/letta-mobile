@@ -13,7 +13,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.ensureActive
 
 sealed interface RoomCanonicalMigrationResult {
-    data class Progress(val convertedRows: Long, val complete: Boolean) : RoomCanonicalMigrationResult
+    data class Progress(val convertedRows: Long, val complete: Boolean, val bytes: Int = 0) : RoomCanonicalMigrationResult
     data class LegacyFallback(val reason: String) : RoomCanonicalMigrationResult
     /** The source row is retained and the resume position has NOT advanced. Never display as complete. */
     data class Deferred(val order: Long, val encodedBytes: Long, val budgetBytes: Int) : RoomCanonicalMigrationResult
@@ -94,7 +94,7 @@ class RoomLegacyCanonicalMigration(
                     TimelineExactCanonicalWriter(scope, maxEventBytes).mergeEvent(this, event)
                     val next = previous.copy(after = row.position, count = previous.count + 1, revision = revision)
                     putEvidence(PROGRESS, next.encode())
-                    RoomCanonicalMigrationResult.Progress(next.count, false)
+                    RoomCanonicalMigrationResult.Progress(next.count, false, bytes.size)
                 }
             }
         }

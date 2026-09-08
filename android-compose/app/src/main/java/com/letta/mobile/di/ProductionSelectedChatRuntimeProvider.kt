@@ -62,45 +62,71 @@ internal class SubscriberRuntimeFlow<G>(
     }
 }
 
+internal class ConversationBindHooks(
+    var bind: suspend (String) -> AndroidCanonicalTimelineRuntime.BindResult = {
+        error("Conversation bind hooks not installed")
+    },
+    var retire: suspend () -> Unit = { error("Conversation retire hook not installed") },
+)
+
 internal class CapturedSelectedChatRuntime(
-    graph: SessionGraph,
+    override val generation: Long,
+    override val config: com.letta.mobile.data.model.LettaConfig,
+    override val descriptor: com.letta.mobile.runtime.BackendDescriptor,
+    parent: CoroutineScope,
     private val agent: String,
-    factory: AndroidCanonicalTimelineRuntimeFactory,
-    settings: ISettingsRepository,
     private val legacyWriter: TimelineExternalTransportWriter,
+    private val hooks: ConversationBindHooks,
 ) : SelectedChatRuntime {
-    override val generation = graph.id
-    override val config = checkNotNull(graph.capturedConfig)
-    override val descriptor = graph.backendDescriptor
-    private val job = SupervisorJob(graph.scope.coroutineContext[Job])
-    override val scope = CoroutineScope(graph.scope.coroutineContext + job)
-    private val runtime = factory.capturedIroh(graph, settings, scope)
-    private val cursors = checkNotNull(graph.conversationCursorStore)
+    constructor(
+        graph: SessionGraph,
+        agent: String,
+        factory: AndroidCanonicalTimelineRuntimeFactory,
+        settings: ISettingsRepository,
+        legacyWriter: TimelineExternalTransportWriter,
+    ) : this(
+        generation = graph.id,
+        config = checkNotNull(graph.capturedConfig),
+        descriptor = graph.backendDescriptor,
+        parent = graph.scope,
+        agent = agent,
+        legacyWriter = legacyWriter,
+        hooks = ConversationBindHooks(),
+    ) {
+        val runtime = factory.capturedIroh(graph, settings, scope)
+        val cursors = checkNotNull(graph.conversationCursorStore)
+        hooks.bind = { conversation ->
+            runtime.bind(
+                TimelineScope(descriptor.backendId.value, conversation, agent),
+                repairCommittedCursor = { owner, expected, committed ->
+                    check(job.isActive) { "Selected runtime retired during cursor repair" }
+                    val conversationId = owner.selection.scope.conversationId
+                    val expectedWatermark = expected
+                        ?: cursors.getCursor(conversationId)
+                        ?: error("Cursor repair requires retained expected watermark for ${cursors.backendId}")
+                    val replacement = checkNotNull(committed) {
+                        "Cursor repair requires committed sequence for ${cursors.backendId}"
+                    }
+                    if (!cursors.replaceExpiredWatermark(conversationId, expectedWatermark, replacement)) {
+                        val current = cursors.getCursor(conversationId)
+                        check(current != null && current != expectedWatermark) {
+                            "Cursor replacement lost without a newer watermark for ${cursors.backendId}"
+                        }
+                    }
+                },
+                reportFailure = { android.util.Log.e("CanonicalTimeline", "Canonical maintenance failed", it) },
+            )
+        }
+        hooks.retire = { runtime.retire() }
+    }
+
+    private val job = SupervisorJob(parent.coroutineContext[Job])
+    override val scope = CoroutineScope(parent.coroutineContext + job)
     private val bindings = RuntimeBindingCache<String, AndroidCanonicalTimelineRuntime.BindResult>()
 
     private suspend fun binding(conversation: String) = bindings.get(conversation) {
         check(job.isActive) { "Selected runtime retired" }
-        runtime.bind(TimelineScope(descriptor.backendId.value, conversation, agent),
-            repairCommittedCursor = { owner, expected, committed ->
-                // Still under the repair lease + graph job that spanned the canonical commit.
-                check(job.isActive) { "Selected runtime retired during cursor repair" }
-                val conversationId = owner.selection.scope.conversationId
-                val expectedWatermark = expected
-                    ?: cursors.getCursor(conversationId)
-                    ?: error("Cursor repair requires retained expected watermark for ${cursors.backendId}")
-                val replacement = checkNotNull(committed) {
-                    "Cursor repair requires committed sequence for ${cursors.backendId}"
-                }
-                if (!cursors.replaceExpiredWatermark(conversationId, expectedWatermark, replacement)) {
-                    val current = cursors.getCursor(conversationId)
-                    // A newer live frame advanced past the expired expectation — leave it alone.
-                    check(current != null && current != expectedWatermark) {
-                        "Cursor replacement lost without a newer watermark for ${cursors.backendId}"
-                    }
-                }
-            },
-            reportFailure = { android.util.Log.e("CanonicalTimeline", "Canonical maintenance failed", it) },
-        )
+        hooks.bind(conversation)
     }
 
     override suspend fun ready(conversationId: String) = when (binding(conversationId)) {
@@ -127,7 +153,7 @@ internal class CapturedSelectedChatRuntime(
     }
 
     override suspend fun retire() = withContext(NonCancellable) {
-        bindings.close { runtime.retire() }
+        bindings.close { hooks.retire() }
         job.cancelAndJoin()
     }
 }

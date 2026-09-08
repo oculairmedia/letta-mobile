@@ -12,6 +12,7 @@ import com.letta.mobile.data.timeline.parseTimelineInstantOrNull
 import com.letta.mobile.data.timeline.timelineCurrentTimeMillis
 import com.letta.mobile.data.timeline.timelineNow
 import com.letta.mobile.util.Telemetry
+import kotlinx.atomicfu.atomic
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.collections.immutable.toPersistentMap
 import kotlinx.serialization.json.Json
@@ -30,11 +31,17 @@ object TimelineSnapshotCodec {
         prettyPrint = false
     }
 
+    private val envelopeDecodes = atomic(0L)
+
+    /** Process-wide count of v13 envelope decode attempts, including corrupt payloads. */
+    val envelopeDecodeCount: Long get() = envelopeDecodes.value
+
     fun encode(envelope: StoredTimelineEnvelope): String =
         json.encodeToString(StoredTimelineEnvelope.serializer(), envelope)
 
     fun decode(payload: String): StoredTimelineEnvelope? {
         if (payload.isBlank()) return null
+        envelopeDecodes.incrementAndGet()
         return runCatching {
             val envelope = json.decodeFromString(StoredTimelineEnvelope.serializer(), payload)
             migrateIfNeeded(envelope) ?: return null

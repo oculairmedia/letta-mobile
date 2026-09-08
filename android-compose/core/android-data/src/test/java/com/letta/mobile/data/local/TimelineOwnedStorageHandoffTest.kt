@@ -164,6 +164,7 @@ class TimelineOwnedStorageHandoffTest {
             } while (!progress.complete)
             do {
                 val progress = factory.convertStep(lease) as RoomCanonicalMigrationResult.Progress
+                assertTrue(progress.bytes >= 0)
             } while (!progress.complete)
             var audit: TimelineOwnedStorageFactory.ValidationProgress
             var validateRows = 0
@@ -204,6 +205,7 @@ class TimelineOwnedStorageHandoffTest {
             val authority = TimelineOwnershipAuthority(temporary.root.toPath())
             val factory = TimelineOwnedStorageFactory(legacy, target, authority)
             val source = authority.acquire(scope, TimelineOwnershipAuthority.Route.Legacy)
+            val decodeBefore = TimelineSnapshotCodec.envelopeDecodeCount
             val classified = factory.classifyCopySource(scope)
             assertEquals(LegacyLedgerCopyKind.ManifestOnly, classified.kind)
             assertFalse(classified.supported)
@@ -213,11 +215,20 @@ class TimelineOwnedStorageHandoffTest {
             } catch (failure: IllegalStateException) {
                 assertTrue(failure.message.orEmpty().contains("defers canonical cutover"))
             }
+            assertEquals(
+                "classify/beginMapped must not reconstruct a v13 envelope",
+                0,
+                TimelineSnapshotCodec.envelopeDecodeCount - decodeBefore,
+            )
             assertNull(legacy.confirmedTimelineSnapshotDao().getNormalizedHead(scope.backendId, scope.conversationId))
             assertEquals(TimelineOwnershipAuthority.Phase.Legacy, authority.state(scope).phase)
             authority.withLease(source) { }
             val preserved = checkNotNull(RoomConfirmedTimelineStore(legacy).readSnapshot(scope))
             assertEquals(listOf("manifest body", "second body"), preserved.events.map { it.content })
+            assertTrue(
+                "envelopeDecodeCount must observe a later legacy readSnapshot decode",
+                TimelineSnapshotCodec.envelopeDecodeCount - decodeBefore > 0,
+            )
         } finally { target.close(); legacy.close() }
     }
 

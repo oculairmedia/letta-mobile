@@ -637,6 +637,12 @@ internal class AdminChatViewModel @Inject constructor(
         syncA2uiHistorySnapshot = { convId, msgs -> adminChatA2uiCoordinator.syncA2uiHistorySnapshot(convId, msgs) },
         hydrationIdentity = ::hydrationIdentity,
     )
+    private val timelineRouteSession = com.letta.mobile.feature.chat.coordination.SelectedTimelineRouteSession(
+        startLegacyObserver = { conversationId ->
+            chatTimelineObserver.start(agentId.value, conversationId, timelineObserverProvenance())
+        },
+        stopLegacyObserver = { chatTimelineObserver.stop() },
+    )
     private val chatConversationCoordinator: ChatConversationCoordinator = ChatConversationCoordinator(
         config = ChatConversationCoordinatorConfig(
             scope = viewModelScope,
@@ -864,46 +870,52 @@ internal class AdminChatViewModel @Inject constructor(
         _pagingPresentation.value = status()
         canonicalPresentationJob = viewModelScope.launch {
             try {
-                val selectedRoute = capturedRuntime?.ready(conversationId)
-                    ?: com.letta.mobile.feature.chat.coordination.SelectedTimelineRoute.Canonical
-                if (selectedRoute == com.letta.mobile.feature.chat.coordination.SelectedTimelineRoute.LegacyDeferred) {
-                    if (canonicalRoute != route) return@launch
-                    _pagingPresentation.value = null
-                    chatTimelineObserver.start(agentId.value, conversationId, timelineObserverProvenance())
-                    try {
-                        kotlinx.coroutines.awaitCancellation()
-                    } finally {
-                        chatTimelineObserver.stop()
-                    }
-                    return@launch
-                }
                 val target = route.third?.takeUnless { it in consumedCanonicalTargets }
                 val viewport = canonicalViewports[conversationId]
                 val seek = target ?: viewport?.takeUnless { it.following }?.messageId
-                val presentation = if (capturedRuntime != null) {
-                    capturedRuntime.open(conversationId, seek, this)
-                } else {
-                    checkNotNull(hostOpen).invoke(agentId.value, conversationId, seek, this)
-                }
-                try {
-                    if (canonicalRoute != route) return@launch
-                    presentation.hasBoundRoute = true
-                    presentation.routeTarget = target
-                    presentation.viewport = if (target == null) viewport else null
-                    target?.let { consumedCanonicalTargets += it }
-                    presentation.saveViewport = { if (_pagingPresentation.value === presentation) canonicalViewports[conversationId] = it }
-                    presentation.clearViewport = { canonicalViewports.remove(conversationId) }
-                    presentation.requestTail = {
-                        if (_pagingPresentation.value === presentation) {
-                            canonicalViewports.remove(conversationId)
-                            stopTimelineObserver()
-                            startTimelineObserver(conversationId)
+                when (
+                    val decided = timelineRouteSession.decide(
+                        runtime = capturedRuntime,
+                        conversationId = conversationId,
+                        target = seek,
+                        scope = this,
+                        agentId = agentId.value,
+                        hostOpen = hostOpen,
+                    )
+                ) {
+                    com.letta.mobile.feature.chat.coordination.SelectedTimelineRouteSession.Presentation.LegacyDeferred -> {
+                        if (canonicalRoute != route) return@launch
+                        _pagingPresentation.value = null
+                        timelineRouteSession.activateDeferred(conversationId)
+                        try {
+                            kotlinx.coroutines.awaitCancellation()
+                        } finally {
+                            timelineRouteSession.retirePresentation()
                         }
                     }
-                    _pagingPresentation.value = presentation
-                    kotlinx.coroutines.awaitCancellation()
-                } finally {
-                    presentation.close()
+                    is com.letta.mobile.feature.chat.coordination.SelectedTimelineRouteSession.Presentation.Canonical -> {
+                        val presentation = decided.value
+                        try {
+                            if (canonicalRoute != route) return@launch
+                            presentation.hasBoundRoute = true
+                            presentation.routeTarget = target
+                            presentation.viewport = if (target == null) viewport else null
+                            target?.let { consumedCanonicalTargets += it }
+                            presentation.saveViewport = { if (_pagingPresentation.value === presentation) canonicalViewports[conversationId] = it }
+                            presentation.clearViewport = { canonicalViewports.remove(conversationId) }
+                            presentation.requestTail = {
+                                if (_pagingPresentation.value === presentation) {
+                                    canonicalViewports.remove(conversationId)
+                                    stopTimelineObserver()
+                                    startTimelineObserver(conversationId)
+                                }
+                            }
+                            _pagingPresentation.value = presentation
+                            kotlinx.coroutines.awaitCancellation()
+                        } finally {
+                            presentation.close()
+                        }
+                    }
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -932,7 +944,7 @@ internal class AdminChatViewModel @Inject constructor(
         canonicalPresentationJob = null
         _pagingPresentation.value = null
         pagingBinding.close()
-        chatTimelineObserver.stop()
+        timelineRouteSession.retirePresentation()
     }
 
     fun submitApproval(

@@ -22,7 +22,7 @@ class RoomLegacyCanonicalMigrationTest {
             val original = source.payload.copyOf()
             copy(source, db)
             fun migration() = RoomLegacyCanonicalMigration(source, db, { _, token -> token == source.token })
-            assertEquals(RoomCanonicalMigrationResult.Progress(1, false), migration().step(scope))
+            assertEquals(RoomCanonicalMigrationResult.Progress(1, false, source.payload.size), migration().step(scope))
             val store = RoomTimelineBoundedStore(db)
             store.read(scope) {
                 assertNotNull(locate(TimelineMessageId("server")))
@@ -63,7 +63,7 @@ class RoomLegacyCanonicalMigrationTest {
         fixture { db, source ->
             copy(source, db)
             val migration = RoomLegacyCanonicalMigration(source, db, { _, _ -> false })
-            assertEquals(RoomCanonicalMigrationResult.Progress(1, false), migration.step(scope))
+            assertEquals(RoomCanonicalMigrationResult.Progress(1, false, source.payload.size), migration.step(scope))
             assertEquals(RoomCanonicalMigrationResult.Progress(1, true), migration.step(scope))
             assertEquals(2L, RoomTimelineBoundedStore(db).read(scope) { checkpoint().revision })
             assertEquals(RoomCanonicalMigrationResult.LegacyFallback("integrity_or_storage_failure"), migration.validateForActivation(scope, 2))
@@ -120,7 +120,7 @@ class RoomLegacyCanonicalMigrationTest {
                 assertNull(db.ledger().evidence(ledgerScopeKey(scope), ledgerKey("identity/otid/otid")))
                 assertNull(db.ledger().evidence(ledgerScopeKey(scope), ledgerKey("terminal/server/server")))
                 db.openHelper.writableDatabase.execSQL("DROP TRIGGER interrupt_write")
-                assertEquals(RoomCanonicalMigrationResult.Progress(1, false),
+                assertEquals(RoomCanonicalMigrationResult.Progress(1, false, source.payload.size),
                     RoomLegacyCanonicalMigration(source, db, { _, _ -> true }).step(scope))
             }
         }

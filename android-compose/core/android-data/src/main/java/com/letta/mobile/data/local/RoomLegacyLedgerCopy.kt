@@ -28,14 +28,19 @@ data class LegacyLedgerCopyHead(
 
 enum class LegacyLedgerCopyKind { Empty, Normalized, ManifestOnly }
 
-/** Totals for one readiness attempt. Envelope decode must stay 0: readiness never reconstructs a v13 snapshot. */
+/**
+ * Totals for one readiness attempt. Byte fields are [Long] so histories above ~2 GiB
+ * do not wrap. [envelopeDecodes] is the [com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec]
+ * decode-count delta for this attempt; a default of 0 is not proof that decode was skipped.
+ */
 data class CanonicalReadinessMeasurement(
     val copyRows: Int = 0,
-    val copyBytes: Int = 0,
+    val copyBytes: Long = 0,
     val convertRows: Long = 0,
+    val convertBytes: Long = 0,
     val validateRows: Int = 0,
-    val validateBytes: Int = 0,
-    val envelopeDecodes: Int = 0,
+    val validateBytes: Long = 0,
+    val envelopeDecodes: Long = 0,
     val copySteps: Int = 0,
     val convertSteps: Int = 0,
     val validateSteps: Int = 0,

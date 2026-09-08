@@ -220,4 +220,15 @@ class TimelineSnapshotCodecTest {
         assertNull(TimelineSnapshotCodec.decode("not valid json at all"))
         assertNull(TimelineSnapshotCodec.decode("{\"schemaVersion\": \"invalid\"}"))
     }
+
+    @Test
+    fun envelopeDecodeCountTracksActualDecodeAttempts() {
+        val before = TimelineSnapshotCodec.envelopeDecodeCount
+        assertNull(TimelineSnapshotCodec.decode(""))
+        assertEquals(before, TimelineSnapshotCodec.envelopeDecodeCount)
+        assertNotNull(TimelineSnapshotCodec.decode(TimelineSnapshotCodec.encode(roundTripEnvelope())))
+        assertEquals(before + 1, TimelineSnapshotCodec.envelopeDecodeCount)
+        assertNull(TimelineSnapshotCodec.decode("not valid json at all"))
+        assertEquals(before + 2, TimelineSnapshotCodec.envelopeDecodeCount)
+    }
 }
