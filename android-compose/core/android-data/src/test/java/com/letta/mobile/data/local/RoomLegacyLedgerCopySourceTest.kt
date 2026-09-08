@@ -83,6 +83,7 @@ class RoomLegacyLedgerCopySourceTest {
             val token = source.snapshot(scope) {
                 val head = head()
                 assertTrue(head.supported)
+                assertEquals(LegacyLedgerCopyKind.Empty, head.kind)
                 assertEquals(0L, head.rowCount)
                 assertTrue(metadata(-1, 1).isEmpty())
                 head.token
@@ -112,6 +113,7 @@ class RoomLegacyLedgerCopySourceTest {
                 "manifest-only", "b", "c", "a", 5, 1, 0, 0, "0".repeat(64), 100,
             ))
             val manifest = source.snapshot(scope) { head() }
+            assertEquals(LegacyLedgerCopyKind.ManifestOnly, manifest.kind)
             assertFalse(manifest.supported)
             assertEquals(0L, manifest.rowCount)
             assertNotEquals(emptyToken, manifest.token)

@@ -154,16 +154,29 @@ class TimelineOwnedStorageHandoffTest {
             val source = authority.acquire(scope, TimelineOwnershipAuthority.Route.Legacy)
             val targetScope = scope.copy(backendId = "remote-letta:b")
             val lease = factory.beginMappedMigrationAfterDrain(source, targetScope)
+            var copyRows = 0
+            var copyBytes = 0
             do {
                 val progress = factory.copyStep(lease) as LegacyLedgerCopyResult.Progress
+                assertTrue(progress.rows <= 1 && progress.bytes <= 65536)
+                copyRows += progress.rows
+                copyBytes += progress.bytes
             } while (!progress.complete)
             do {
                 val progress = factory.convertStep(lease) as RoomCanonicalMigrationResult.Progress
             } while (!progress.complete)
             var audit: TimelineOwnedStorageFactory.ValidationProgress
+            var validateRows = 0
+            var validateBytes = 0
             do {
                 audit = factory.validationStep(lease)
+                assertTrue(audit.metadataRows <= 128 && audit.bodyBytes <= 65536)
+                validateRows += audit.metadataRows
+                validateBytes += audit.bodyBytes
             } while (!audit.complete)
+            assertEquals(0, copyRows)
+            assertEquals(0, copyBytes)
+            assertTrue(validateRows >= 0 && validateBytes >= 0)
             val revision = checkNotNull(audit.certifiedRevision)
             factory.prepareAfterDrain(lease, revision)
             val canonical = factory.switchPreparedAfterDrain(lease)
@@ -175,7 +188,7 @@ class TimelineOwnedStorageHandoffTest {
         } finally { target.close(); legacy.close() }
     }
 
-    @Test fun manifestOnlyHistoryMigratesBodiesInsteadOfEmptyCanonical() = runBlocking {
+    @Test fun manifestOnlyHistoryDefersCutoverAndKeepsLegacyBodies() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val legacy = Room.inMemoryDatabaseBuilder(context, LettaDatabase::class.java).build()
         val target = Room.inMemoryDatabaseBuilder(context, TimelineLedgerDatabase::class.java).build()
@@ -191,32 +204,20 @@ class TimelineOwnedStorageHandoffTest {
             val authority = TimelineOwnershipAuthority(temporary.root.toPath())
             val factory = TimelineOwnedStorageFactory(legacy, target, authority)
             val source = authority.acquire(scope, TimelineOwnershipAuthority.Route.Legacy)
-            val targetScope = scope.copy(backendId = "remote-letta:b")
-            val lease = factory.beginMappedMigrationAfterDrain(source, targetScope)
-            assertNotNull(legacy.confirmedTimelineSnapshotDao().getNormalizedHead(scope.backendId, scope.conversationId))
-            do {
-                val progress = factory.copyStep(lease) as LegacyLedgerCopyResult.Progress
-                assertTrue(progress.rows <= 1 && progress.bytes <= 65536)
-            } while (!progress.complete)
-            do {
-                val progress = factory.convertStep(lease) as RoomCanonicalMigrationResult.Progress
-            } while (!progress.complete)
-            var audit: TimelineOwnedStorageFactory.ValidationProgress
-            do { audit = factory.validationStep(lease) } while (!audit.complete)
-            factory.prepareAfterDrain(lease, checkNotNull(audit.certifiedRevision))
-            val canonical = factory.switchPreparedAfterDrain(lease)
-            factory.canonical(canonical).read(targetScope) {
-                val rows = metadata(com.letta.mobile.data.timeline.TimelineReadPosition.Tail, 2).rows
-                assertEquals(2, rows.size)
-                val bodies = rows.map { row ->
-                    val event = TimelineSnapshotCodec.json.decodeFromString(
-                        StoredTimelineEvent.serializer(),
-                        body(row.body, 0, 65536).decodeToString(),
-                    )
-                    event.content
-                }
-                assertEquals(listOf("manifest body", "second body"), bodies)
+            val classified = factory.classifyCopySource(scope)
+            assertEquals(LegacyLedgerCopyKind.ManifestOnly, classified.kind)
+            assertFalse(classified.supported)
+            try {
+                factory.beginMappedMigrationAfterDrain(source, scope.copy(backendId = "remote-letta:b"))
+                fail("Manifest-only history started canonical copy")
+            } catch (failure: IllegalStateException) {
+                assertTrue(failure.message.orEmpty().contains("defers canonical cutover"))
             }
+            assertNull(legacy.confirmedTimelineSnapshotDao().getNormalizedHead(scope.backendId, scope.conversationId))
+            assertEquals(TimelineOwnershipAuthority.Phase.Legacy, authority.state(scope).phase)
+            authority.withLease(source) { }
+            val preserved = checkNotNull(RoomConfirmedTimelineStore(legacy).readSnapshot(scope))
+            assertEquals(listOf("manifest body", "second body"), preserved.events.map { it.content })
         } finally { target.close(); legacy.close() }
     }
 

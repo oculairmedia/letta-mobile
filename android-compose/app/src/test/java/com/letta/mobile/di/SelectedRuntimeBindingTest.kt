@@ -1,6 +1,7 @@
 package com.letta.mobile.di
 
 import com.letta.mobile.feature.chat.coordination.SelectedChatRuntime
+import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.CoroutineStart
@@ -98,5 +99,32 @@ class SelectedRuntimeBindingTest {
             delegate.repairExpiredConversationCursorScoped("agent", "conversation", 12L, 4L)
         }
         coVerify(exactly = 0) { delegate.repairExpiredConversationCursorScoped(any(), any(), any()) }
+    }
+
+    @Test fun manifestOnlyReadinessDefersWithoutDrainOrEnvelopeDecode() = runTest {
+        val scope = com.letta.mobile.data.timeline.snapshot.TimelineScope("backend", "conversation", "agent")
+        val storage = mockk<com.letta.mobile.data.local.TimelineOwnedStorageFactory>()
+        val authority = mockk<com.letta.mobile.data.local.TimelineOwnershipAuthority>()
+        val repository = mockk<com.letta.mobile.data.timeline.TimelineRepository>(relaxed = true)
+        val transport = mockk<com.letta.mobile.data.timeline.GenerationTimelineTransport>(relaxed = true)
+        coEvery { authority.state(any()) } returns com.letta.mobile.data.local.TimelineOwnershipAuthority.State(
+            scope, 0, com.letta.mobile.data.local.TimelineOwnershipAuthority.Phase.Legacy,
+        )
+        coEvery { storage.classifyCopySource(any()) } returns com.letta.mobile.data.local.LegacyLedgerCopyHead(
+            "legacy-manifest", 0, false, com.letta.mobile.data.local.LegacyLedgerCopyKind.ManifestOnly,
+        )
+        val runtime = AndroidCanonicalTimelineRuntime(
+            "backend", transport, repository, authority, storage, backgroundScope, "legacy",
+        )
+        val result = runtime.bind(scope, repairCommittedCursor = { _, _, _ -> }, reportFailure = {})
+        assertEquals(AndroidCanonicalTimelineRuntime.BindResult.LegacyDeferred, result)
+        assertEquals(0, runtime.lastMeasurement.envelopeDecodes)
+        assertEquals(0, runtime.lastMeasurement.copyBytes)
+        assertEquals(0, runtime.lastMeasurement.copyRows)
+        assertEquals(0, runtime.lastMeasurement.copySteps)
+        coVerify(exactly = 1) { storage.classifyCopySource(any()) }
+        coVerify(exactly = 0) { repository.drainForCanonicalHandoff(any()) }
+        coVerify(exactly = 0) { storage.beginMappedMigrationAfterDrain(any(), any()) }
+        runtime.retire()
     }
 }

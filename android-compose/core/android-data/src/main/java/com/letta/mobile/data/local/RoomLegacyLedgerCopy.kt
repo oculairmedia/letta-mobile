@@ -19,7 +19,27 @@ interface LegacyLedgerCopyReader {
     suspend fun chunk(row: LegacyLedgerCopyRow, offset: Long, maxBytes: Int): ByteArray
 }
 
-data class LegacyLedgerCopyHead(val token: String, val rowCount: Long, val supported: Boolean)
+data class LegacyLedgerCopyHead(
+    val token: String,
+    val rowCount: Long,
+    val supported: Boolean,
+    val kind: LegacyLedgerCopyKind = LegacyLedgerCopyKind.Normalized,
+)
+
+enum class LegacyLedgerCopyKind { Empty, Normalized, ManifestOnly }
+
+/** Totals for one readiness attempt. Envelope decode must stay 0: readiness never reconstructs a v13 snapshot. */
+data class CanonicalReadinessMeasurement(
+    val copyRows: Int = 0,
+    val copyBytes: Int = 0,
+    val convertRows: Long = 0,
+    val validateRows: Int = 0,
+    val validateBytes: Int = 0,
+    val envelopeDecodes: Int = 0,
+    val copySteps: Int = 0,
+    val convertSteps: Int = 0,
+    val validateSteps: Int = 0,
+)
 data class LegacyLedgerCopyRow(val order: Long, val primary: Long, val secondary: Long, val bytes: Long, val checksum: String)
 
 sealed interface LegacyLedgerCopyResult {

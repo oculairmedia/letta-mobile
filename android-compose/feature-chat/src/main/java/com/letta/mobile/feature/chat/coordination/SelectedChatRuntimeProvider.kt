@@ -15,8 +15,12 @@ interface SelectedChatRuntime {
     val descriptor: com.letta.mobile.runtime.BackendDescriptor
     val scope: CoroutineScope
     val writer: com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
-    /** Must complete durable handoff before returning; errors never fall back to legacy. */
-    suspend fun ready(conversationId: String)
+    /** Must complete durable handoff or explicitly defer to the usable legacy route.
+     * Errors never silently fall back.
+     */
+    suspend fun ready(conversationId: String): SelectedTimelineRoute
     suspend fun open(conversationId: String, target: String?, scope: CoroutineScope): ChatPagingPresentation
     suspend fun retire()
 }
+
+enum class SelectedTimelineRoute { Canonical, LegacyDeferred }

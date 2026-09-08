@@ -335,7 +335,7 @@ internal class AdminChatViewModel @Inject constructor(
     private fun newSendOwner(runtime: com.letta.mobile.feature.chat.coordination.SelectedChatRuntime) =
         com.letta.mobile.feature.chat.coordination.SelectedChatSendOwner(
             runtime.config, runtime.descriptor, runtime.writer, pipelineLifetime.scope,
-            prepareConversation = runtime::ready,
+            prepareConversation = { runtime.ready(it) },
         )
 
     private fun createSendPipeline(): AdminChatSendPipeline =
@@ -842,59 +842,78 @@ internal class AdminChatViewModel @Inject constructor(
 
     private fun startTimelineObserver(conversationId: String) {
         adminChatA2uiCoordinator.ensureA2uiConversation(conversationId)
-        val capturedRuntime = selectedRuntime
-        val open: (suspend (String, String, String?, kotlinx.coroutines.CoroutineScope) -> ChatPagingPresentation)? =
-            if (capturedRuntime != null) {
-                { _, conversation, target, scope ->
-                    capturedRuntime.ready(conversation)
-                    capturedRuntime.open(conversation, target, scope)
-                }
-            } else pagingHost.openCanonical
-        if (open != null && localRuntimeRouting() != LocalRuntimeRouting.LocalBound) {
-            val route = Triple(conversationId, _sessionState.value.selectionGeneration, scrollToMessageId)
-            if (canonicalRoute == route && canonicalPresentationJob?.isActive == true) return
-            stopTimelineObserver()
-            canonicalRoute = route
-            fun status(error: String? = null) = ChatPagingPresentation(
-                settled = kotlinx.coroutines.flow.flowOf(androidx.paging.PagingData.empty()),
-                live = MutableStateFlow(emptyList()), close = {}, opening = error == null, openError = error,
-                retryOpen = { stopTimelineObserver(); startTimelineObserver(conversationId) },
-            )
-            _pagingPresentation.value = status()
-            canonicalPresentationJob = viewModelScope.launch {
-                try {
-                    val target = route.third?.takeUnless { it in consumedCanonicalTargets }
-                    val viewport = canonicalViewports[conversationId]
-                    val presentation = open(agentId.value, conversationId,
-                        target ?: viewport?.takeUnless { it.following }?.messageId, this)
-                    try {
-                        if (canonicalRoute != route) return@launch
-                        presentation.hasBoundRoute = true
-                        presentation.routeTarget = target
-                        presentation.viewport = if (target == null) viewport else null
-                        target?.let { consumedCanonicalTargets += it }
-                        presentation.saveViewport = { if (_pagingPresentation.value === presentation) canonicalViewports[conversationId] = it }
-                        presentation.clearViewport = { canonicalViewports.remove(conversationId) }
-                        presentation.requestTail = {
-                            if (_pagingPresentation.value === presentation) {
-                                canonicalViewports.remove(conversationId)
-                                stopTimelineObserver()
-                                startTimelineObserver(conversationId)
-                            }
-                        }
-                        _pagingPresentation.value = presentation
-                        kotlinx.coroutines.awaitCancellation()
-                    } finally {
-                        presentation.close()
-                    }
-                } catch (cancelled: CancellationException) {
-                    throw cancelled
-                } catch (failure: Exception) {
-                    if (canonicalRoute == route) _pagingPresentation.value = status(failure.message ?: "Could not open conversation")
-                }
-            }
+        if (localRuntimeRouting() == LocalRuntimeRouting.LocalBound) {
+            startLegacyTimelineObserver(conversationId)
             return
         }
+        val capturedRuntime = selectedRuntime
+        val hostOpen = pagingHost.openCanonical
+        if (capturedRuntime == null && hostOpen == null) {
+            startLegacyTimelineObserver(conversationId)
+            return
+        }
+        val route = Triple(conversationId, _sessionState.value.selectionGeneration, scrollToMessageId)
+        if (canonicalRoute == route && canonicalPresentationJob?.isActive == true) return
+        stopTimelineObserver()
+        canonicalRoute = route
+        fun status(error: String? = null) = ChatPagingPresentation(
+            settled = kotlinx.coroutines.flow.flowOf(androidx.paging.PagingData.empty()),
+            live = MutableStateFlow(emptyList()), close = {}, opening = error == null, openError = error,
+            retryOpen = { stopTimelineObserver(); startTimelineObserver(conversationId) },
+        )
+        _pagingPresentation.value = status()
+        canonicalPresentationJob = viewModelScope.launch {
+            try {
+                val selectedRoute = capturedRuntime?.ready(conversationId)
+                    ?: com.letta.mobile.feature.chat.coordination.SelectedTimelineRoute.Canonical
+                if (selectedRoute == com.letta.mobile.feature.chat.coordination.SelectedTimelineRoute.LegacyDeferred) {
+                    if (canonicalRoute != route) return@launch
+                    _pagingPresentation.value = null
+                    chatTimelineObserver.start(agentId.value, conversationId, timelineObserverProvenance())
+                    try {
+                        kotlinx.coroutines.awaitCancellation()
+                    } finally {
+                        chatTimelineObserver.stop()
+                    }
+                    return@launch
+                }
+                val target = route.third?.takeUnless { it in consumedCanonicalTargets }
+                val viewport = canonicalViewports[conversationId]
+                val seek = target ?: viewport?.takeUnless { it.following }?.messageId
+                val presentation = if (capturedRuntime != null) {
+                    capturedRuntime.open(conversationId, seek, this)
+                } else {
+                    checkNotNull(hostOpen).invoke(agentId.value, conversationId, seek, this)
+                }
+                try {
+                    if (canonicalRoute != route) return@launch
+                    presentation.hasBoundRoute = true
+                    presentation.routeTarget = target
+                    presentation.viewport = if (target == null) viewport else null
+                    target?.let { consumedCanonicalTargets += it }
+                    presentation.saveViewport = { if (_pagingPresentation.value === presentation) canonicalViewports[conversationId] = it }
+                    presentation.clearViewport = { canonicalViewports.remove(conversationId) }
+                    presentation.requestTail = {
+                        if (_pagingPresentation.value === presentation) {
+                            canonicalViewports.remove(conversationId)
+                            stopTimelineObserver()
+                            startTimelineObserver(conversationId)
+                        }
+                    }
+                    _pagingPresentation.value = presentation
+                    kotlinx.coroutines.awaitCancellation()
+                } finally {
+                    presentation.close()
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                if (canonicalRoute == route) _pagingPresentation.value = status(failure.message ?: "Could not open conversation")
+            }
+        }
+    }
+
+    private fun startLegacyTimelineObserver(conversationId: String) {
         if (canonicalPresentationJob != null || _pagingPresentation.value != null) stopTimelineObserver()
         chatTimelineObserver.start(agentId.value, conversationId, timelineObserverProvenance())
         // letta-mobile-qfa81 (P4): the iroh active-reconcile poll loop

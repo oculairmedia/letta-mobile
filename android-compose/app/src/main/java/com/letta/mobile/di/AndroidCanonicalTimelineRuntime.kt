@@ -44,7 +44,9 @@ class AndroidCanonicalTimelineRuntime(
     private val mutex = Mutex()
     private var retired = false
     private val bindings = mutableMapOf<TimelineScope, CanonicalTimelineCoordinator>()
-    private val bindingCache = RuntimeBindingCache<TimelineScope, Binding>()
+    private val bindingCache = RuntimeBindingCache<TimelineScope, BindResult>()
+    var lastMeasurement = com.letta.mobile.data.local.CanonicalReadinessMeasurement()
+        private set
 
     init {
         graphScope.launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
@@ -54,18 +56,26 @@ class AndroidCanonicalTimelineRuntime(
         }
     }
 
-    /** Only a durably switched scope can resume. Migration validation cannot be fabricated here. */
-    suspend fun resume(scope: TimelineScope): CanonicalTimelineCoordinator = mutex.withLock {
+    /** Only a durably switched scope can resume. Manifest-only history stays on the legacy route. */
+    suspend fun resume(scope: TimelineScope): CanonicalTimelineCoordinator? = mutex.withLock {
         check(!retired && graphScope.coroutineContext[kotlinx.coroutines.Job]?.isActive == true && scope.backendId == backendId) { "Stale canonical backend generation" }
         bindings[scope]?.let { return@withLock it }
-        val lease = readyLease(scope)
+        val lease = readyLease(scope) ?: return@withLock null
         CanonicalTimelineCoordinator(storage.canonical(lease), transport).also { bindings[scope] = it }
     }
 
-    private suspend fun readyLease(target: TimelineScope): TimelineOwnershipAuthority.Lease {
+    private suspend fun readyLease(target: TimelineScope): TimelineOwnershipAuthority.Lease? {
+        lastMeasurement = com.letta.mobile.data.local.CanonicalReadinessMeasurement()
         val state = authority.state(target)
         if (state.phase == TimelineOwnershipAuthority.Phase.Canonical) return storage.reopenCanonical(target)
         val source = target.copy(backendId = legacyBackendId)
+        if (state.phase == TimelineOwnershipAuthority.Phase.Legacy &&
+            authority.state(source).phase != TimelineOwnershipAuthority.Phase.Migrating) {
+            val head = storage.classifyCopySource(source)
+            if (head.kind == com.letta.mobile.data.local.LegacyLedgerCopyKind.ManifestOnly) {
+                return null
+            }
+        }
         legacy.drainForCanonicalHandoff(target.conversationId)
         val lease = when (state.phase) {
             TimelineOwnershipAuthority.Phase.Migrating, TimelineOwnershipAuthority.Phase.Prepared ->
@@ -82,25 +92,50 @@ class AndroidCanonicalTimelineRuntime(
             TimelineOwnershipAuthority.Phase.Canonical -> error("Unexpected canonical transition")
         }
         if (authority.state(target).phase != TimelineOwnershipAuthority.Phase.Prepared) {
+            var measurement = lastMeasurement
             boundedSteps("copy") {
                 val result = storage.copyStep(lease)
                 check(result is com.letta.mobile.data.local.LegacyLedgerCopyResult.Progress) { "Copy failed: $result" }
+                check(result.rows <= 1 && result.bytes <= 65536) { "Copy step exceeded bound: $result" }
+                measurement = measurement.copy(
+                    copyRows = measurement.copyRows + result.rows,
+                    copyBytes = measurement.copyBytes + result.bytes,
+                    copySteps = measurement.copySteps + 1,
+                )
+                lastMeasurement = measurement
                 result.complete
             }
             boundedSteps("convert") {
                 val result = storage.convertStep(lease)
                 check(result is com.letta.mobile.data.local.RoomCanonicalMigrationResult.Progress) { "Conversion failed: $result" }
+                measurement = measurement.copy(
+                    convertRows = result.convertedRows,
+                    convertSteps = measurement.convertSteps + 1,
+                )
+                lastMeasurement = measurement
                 result.complete
             }
             var revision: Long? = null
             boundedSteps("validate") {
                 val result = storage.validationStep(lease)
+                check(result.metadataRows <= 128 && result.bodyBytes <= 65536) { "Validate step exceeded bound: $result" }
+                measurement = measurement.copy(
+                    validateRows = measurement.validateRows + result.metadataRows,
+                    validateBytes = measurement.validateBytes + result.bodyBytes,
+                    validateSteps = measurement.validateSteps + 1,
+                )
+                lastMeasurement = measurement
                 if (result.complete) revision = checkNotNull(result.certifiedRevision)
                 result.complete
             }
             storage.prepareAfterDrain(lease, checkNotNull(revision))
         }
         return storage.switchPreparedAfterDrain(lease)
+    }
+
+    sealed class BindResult {
+        data class Canonical(val binding: Binding) : BindResult()
+        data object LegacyDeferred : BindResult()
     }
 
     class Binding(
@@ -123,8 +158,10 @@ class AndroidCanonicalTimelineRuntime(
         scope: TimelineScope,
         repairCommittedCursor: suspend (CanonicalTimelineCoordinator.Owner, Long? /* expected */, Long? /* committed */) -> Unit,
         reportFailure: (Throwable) -> Unit,
-    ): Binding = bindingCache.get(scope) {
+    ): BindResult = bindingCache.get(scope) {
         val coordinator = resume(scope)
+        if (coordinator == null) BindResult.LegacyDeferred
+        else {
         val owner = coordinator.acquire(scope)
         val maintenance = com.letta.mobile.data.timeline.IndexedCanonicalTimelineMaintenance(
             coordinator, maintenanceScope,
@@ -141,16 +178,18 @@ class AndroidCanonicalTimelineRuntime(
             scope
         }, maintenance)
         val admission = com.letta.mobile.data.timeline.TimelineLegacyAdmission()
-        Binding(coordinator, owner, com.letta.mobile.data.timeline.AdmittedTimelineExternalWriter(writer, admission), admission)
+        BindResult.Canonical(Binding(coordinator, owner, com.letta.mobile.data.timeline.AdmittedTimelineExternalWriter(writer, admission), admission))
+        }
     }
 
     /** Cancels RPCs and invalidates cached canonical owner handles. */
     suspend fun retire() = kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
         bindingCache.close { cached ->
             mutex.withLock { retired = true }
+            val canonical = cached.mapNotNull { (it as? BindResult.Canonical)?.binding }
             kotlinx.coroutines.coroutineScope {
                 // UNDISTPATCHED closes each gate before cancellation releases blocked RPCs.
-                val drains = cached.map { binding ->
+                val drains = canonical.map { binding ->
                     launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
                         binding.admission.close(binding.owner.selection.scope.conversationId)
                     }

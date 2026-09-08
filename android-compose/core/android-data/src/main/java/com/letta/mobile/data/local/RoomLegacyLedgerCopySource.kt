@@ -96,14 +96,15 @@ class RoomLegacyLedgerCopySource(
                                 "Legacy root checksum mismatch"
                             }
                         }
-                        LegacyLedgerCopyHead(bindToken(token), cursor.getLong(7), supported)
+                        LegacyLedgerCopyHead(bindToken(token), cursor.getLong(7), supported, LegacyLedgerCopyKind.Normalized)
                     }
                     if (normalized != null) return normalized
                     return if (hasLegacyManifestHistory(scope)) {
-                        // History still lives in v13 manifests. Never certify that as empty.
-                        LegacyLedgerCopyHead(bindToken("legacy-manifest"), 0, false)
+                        // History still lives in v13 manifests. Never certify that as empty,
+                        // and never decode the envelope on this path.
+                        LegacyLedgerCopyHead(bindToken("legacy-manifest"), 0, false, LegacyLedgerCopyKind.ManifestOnly)
                     } else {
-                        LegacyLedgerCopyHead(bindToken("empty-normalized"), 0, true)
+                        LegacyLedgerCopyHead(bindToken("empty-normalized"), 0, true, LegacyLedgerCopyKind.Empty)
                     }
                 }
 

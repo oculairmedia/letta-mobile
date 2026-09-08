@@ -22,6 +22,7 @@ class ProductionSelectedChatRuntimeProvider @Inject constructor(
     private val sessions: SessionManager,
     private val factory: AndroidCanonicalTimelineRuntimeFactory,
     private val settings: ISettingsRepository,
+    private val legacyWriter: TimelineExternalTransportWriter,
 ) : SelectedChatRuntimeProvider {
     override fun runtimes(agentId: String): StateFlow<SelectedChatRuntime?> =
         SubscriberRuntimeFlow(sessions.currentGraph) { capture(it, agentId) }
@@ -33,7 +34,7 @@ class ProductionSelectedChatRuntimeProvider @Inject constructor(
             override val activeConfig = MutableStateFlow<com.letta.mobile.data.model.LettaConfig?>(config)
             override val activeConfigChanges = flowOf(config)
         }
-        return CapturedSelectedChatRuntime(graph, agent, factory, capturedSettings)
+        return CapturedSelectedChatRuntime(graph, agent, factory, capturedSettings, legacyWriter)
     }
 }
 
@@ -66,6 +67,7 @@ internal class CapturedSelectedChatRuntime(
     private val agent: String,
     factory: AndroidCanonicalTimelineRuntimeFactory,
     settings: ISettingsRepository,
+    private val legacyWriter: TimelineExternalTransportWriter,
 ) : SelectedChatRuntime {
     override val generation = graph.id
     override val config = checkNotNull(graph.capturedConfig)
@@ -74,7 +76,7 @@ internal class CapturedSelectedChatRuntime(
     override val scope = CoroutineScope(graph.scope.coroutineContext + job)
     private val runtime = factory.capturedIroh(graph, settings, scope)
     private val cursors = checkNotNull(graph.conversationCursorStore)
-    private val bindings = RuntimeBindingCache<String, AndroidCanonicalTimelineRuntime.Binding>()
+    private val bindings = RuntimeBindingCache<String, AndroidCanonicalTimelineRuntime.BindResult>()
 
     private suspend fun binding(conversation: String) = bindings.get(conversation) {
         check(job.isActive) { "Selected runtime retired" }
@@ -101,17 +103,28 @@ internal class CapturedSelectedChatRuntime(
         )
     }
 
-    override suspend fun ready(conversationId: String) { binding(conversationId) }
+    override suspend fun ready(conversationId: String) = when (binding(conversationId)) {
+        is AndroidCanonicalTimelineRuntime.BindResult.Canonical ->
+            com.letta.mobile.feature.chat.coordination.SelectedTimelineRoute.Canonical
+        AndroidCanonicalTimelineRuntime.BindResult.LegacyDeferred ->
+            com.letta.mobile.feature.chat.coordination.SelectedTimelineRoute.LegacyDeferred
+    }
 
     override suspend fun open(conversationId: String, target: String?, scope: CoroutineScope): ChatPagingPresentation {
-        val binding = binding(conversationId)
+        val bound = binding(conversationId) as? AndroidCanonicalTimelineRuntime.BindResult.Canonical
+            ?: error("Deferred conversations use the legacy observer, not canonical paging")
         // Private host: never mutate the singleton presentation router.
         val host = ChatPagingHost()
-        binding.bindPresentation(host)
+        bound.binding.bindPresentation(host)
         return checkNotNull(host.openCanonical).invoke(agent, conversationId, target, scope)
     }
 
-    override val writer: TimelineExternalTransportWriter = SelectedRuntimeWriter(agent) { binding(it).writer }
+    override val writer: TimelineExternalTransportWriter = SelectedRuntimeWriter(agent) { conversation ->
+        when (val bound = binding(conversation)) {
+            is AndroidCanonicalTimelineRuntime.BindResult.Canonical -> bound.binding.writer
+            AndroidCanonicalTimelineRuntime.BindResult.LegacyDeferred -> legacyWriter
+        }
+    }
 
     override suspend fun retire() = withContext(NonCancellable) {
         bindings.close { runtime.retire() }
