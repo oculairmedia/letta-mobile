@@ -82,14 +82,22 @@ data class TimelineLiveFence(val selection: TimelineEngineSelection, val request
 data class TimelineLivePublication(
     val fence: TimelineLiveFence,
     val block: TimelineLiveBlock,
+    /** First durable revision able to carry this turn; only the sync writer can reach it. */
     val settlementRevision: Long? = null,
-    val settlementIdentities: Map<TimelineMessageId, TimelineMessageId> = emptyMap(),
 ) {
-    /** Derive overlay from the same resident snapshot being rendered, before acknowledging settlement. */
-    fun unpresentedEvents(presented: Map<TimelineMessageId, Long>): List<TimelineEvent.Confirmed> =
-        block.events.filter { event ->
-            val revision = settlementRevision
-            val incoming = TimelineMessageId(event.serverId)
-            revision == null || (presented[settlementIdentities[incoming] ?: incoming] ?: -1) < revision
-        }
+    /**
+     * Live ingest writes no durable rows, so its identities never appear in the settled ledger.
+     * Drain on ledger progress instead: the turn is settled once the rendered snapshot is at or
+     * beyond the terminal revision.
+     */
+    fun isSettled(presented: Map<TimelineMessageId, Long>): Boolean {
+        val revision = settlementRevision ?: return false
+        // A turn that produced nothing has nothing to wait for; never strand the fence on it.
+        if (block.events.isEmpty() && block.records.isEmpty()) return true
+        return presented.values.any { it >= revision }
+    }
+
+    /** Overlay stays resident, unchanged, until the settled ledger carries the same turn. */
+    fun overlayEvents(presented: Map<TimelineMessageId, Long>): List<TimelineEvent.Confirmed> =
+        if (isSettled(presented)) emptyList() else block.events
 }

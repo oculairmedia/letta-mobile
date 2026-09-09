@@ -67,12 +67,9 @@ class CanonicalTimelineCoordinator(
 
     suspend fun reconcileRecent(owner: Owner): TimelineEnginePageOutcome = reconcileRecentDetailed(owner).outcome
 
+    // The overlay is the only copy of a settled turn until this path writes it, so keep it resident;
+    // the presentation drops it once the reconciled rows are on screen.
     suspend fun reconcileRecentDetailed(owner: Owner): TimelineEngineReconcileResult = withRepairLease(owner) {
-        mutex.withLock {
-            // Committed bodies remain in the ledger; only release the old live overlay.
-            val fence = owner.liveFence
-            if (fence != null && owner.session.engine.releaseUnobservedSettlement(fence)) owner.liveFence = null
-        }
         owner.session.reconcileRecentDetailed(owner.selection)
     }
 

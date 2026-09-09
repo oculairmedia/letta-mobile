@@ -107,21 +107,19 @@ class CanonicalTimelinePresentation private constructor(
      */
     val live: StateFlow<List<ChatRenderItem>> = mutableLive.asStateFlow()
 
-    // Durability alone is not presentation: retain live until the matching revision is resident.
+    // Durability alone is not presentation: retain live until the settled ledger is at the turn's revision.
     private val liveProjection: Flow<List<ChatRenderItem>> = combine(
         owner.session.live, owner.session.pending, resident,
     ) { publication, pending, presented ->
-        val events = publication?.unpresentedEvents(presented).orEmpty()
-        val confirmedOtids = events.mapTo(mutableSetOf()) { it.otid }
+        val events = publication?.overlayEvents(presented).orEmpty()
+        // Suppress the local bubble from the whole echoing turn, not just the still-drawn overlay,
+        // so it cannot reappear between the overlay draining and pending storage refreshing.
+        val confirmedOtids = publication?.block?.events.orEmpty().mapTo(mutableSetOf()) { it.otid }
         val optimistic = pending.filterNot { it.otid in confirmedOtids }
             .map { it.toRenderItem(owner.selection.scope.agentId) }
         val active = events.mapNotNull { event ->
             timelineEventToUiMessage(event, owner.selection.scope.agentId)?.let {
-                val identity = publication?.settlementIdentities?.get(TimelineMessageId(event.serverId))?.value
-                    ?: event.serverId
-                ChatRenderItem.Single(
-                    it, GroupPosition.None, keyOverride = "segment-$identity",
-                )
+                ChatRenderItem.Single(it, GroupPosition.None, keyOverride = "segment-${event.serverId}")
             }
         }
         active.asReversed() + optimistic.asReversed()

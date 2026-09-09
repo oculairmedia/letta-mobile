@@ -109,21 +109,13 @@ class CanonicalTimelineEngine(
         val nextReturns = if (returnedId == null) liveReturns else liveReturns + returnedId
         require(nextReturns.size <= budget.maxMetadataRows) { "Live return index budget exceeded" }
         val terminal = frame == TimelineStreamFrame.Done
-        val identities = mutableMapOf<TimelineMessageId, TimelineMessageId>()
-        val revision = if (terminal) store.transaction(fence.selection.scope) {
-            val exact = writer as? TimelineExactCanonicalWriter ?: error("Live reduction requires exact shared writer")
-            var changed = false
-            for (callId in nextReturns) changed = CanonicalToolIndex.observe(this, callId, null, true) || changed
-            for (event in events) {
-                changed = exact.mergeEvent(this, event) || changed
-                identities[TimelineMessageId(event.serverId)] = exact.canonicalIdentity(this, event.serverId, event.otid)
-            }
-            if (changed) nextRevision() else checkpoint().revision
-        } else null
+        // Sync/reconcile is the single durable writer; a stream-only identity would double the row.
+        // Terminal frames only name the first revision that can carry this turn, so the overlay
+        // knows when the settled ledger has caught up. Nothing here commits.
+        val revision = if (terminal) store.read(fence.selection.scope) { checkpoint().revision + 1 } else null
         liveReduction = next
         liveReturns = nextReturns
-        mutableLive.value = TimelineLivePublication(fence, TimelineLiveBlock(emptyList(), terminal, events), revision, identities)
-        if (revision != null) mutablePublication.value = TimelineEnginePublication(fence.selection, revision)
+        mutableLive.value = TimelineLivePublication(fence, TimelineLiveBlock(emptyList(), terminal, events), revision)
         true
     }
 
@@ -134,27 +126,22 @@ class CanonicalTimelineEngine(
             fence.requestId, fence.selection.generation, block.records, null, false,
             block.records.sumOf { it.encodedBodyBytes },
         ))
-        val identities = mutableMapOf<TimelineMessageId, TimelineMessageId>()
         val revision = if (block.terminal) store.transaction(fence.selection.scope) {
             val before = checkpoint()
             var changed = false
             for (record in block.records) {
                 currentCoroutineContext().ensureActive()
                 changed = writer.merge(this, record) || changed
-                val event = record.message.toTimelineEvent(0.0)
-                if (writer is TimelineExactCanonicalWriter && event != null) {
-                    identities[record.identity] = writer.canonicalIdentity(this, event.serverId, event.otid)
-                }
             }
             currentCoroutineContext().ensureActive()
             if (changed) nextRevision() else before.revision
         } else null
-        mutableLive.value = TimelineLivePublication(fence, block, revision, identities)
+        mutableLive.value = TimelineLivePublication(fence, block, revision)
         if (revision != null) mutablePublication.value = TimelineEnginePublication(fence.selection, revision)
         true
     }
 
-    /** Runtime-only release when no viewport is attached; never discard an uncommitted live block. */
+    /** Runtime-only release when no viewport is attached; never discard a still-streaming block. */
     internal suspend fun releaseUnobservedSettlement(fence: TimelineLiveFence): Boolean = mutex.withLock {
         if (liveFence !== fence) return@withLock false
         if (fence.selection !== mutablePublication.value.selection) return@withLock false
@@ -166,19 +153,13 @@ class CanonicalTimelineEngine(
         true
     }
 
-    /** Host acknowledges only after every terminal identity is resident at the committed revision. */
+    /** Host acknowledges only once the settled ledger it renders carries this turn's revision. */
     suspend fun acknowledgeSettlement(
         fence: TimelineLiveFence,
         presented: Map<TimelineMessageId, Long>,
     ): Boolean = mutex.withLock {
         val current = mutableLive.value ?: return@withLock false
-        val revision = current.settlementRevision ?: return@withLock false
-        if (current.fence !== fence || current.block.records.any {
-                (presented[current.settlementIdentities[it.identity] ?: it.identity] ?: -1) < revision
-            } || current.unpresentedEvents(presented).isNotEmpty()
-        ) {
-            return@withLock false
-        }
+        if (current.fence !== fence || !current.isSettled(presented)) return@withLock false
         mutableLive.value = null
         liveFence = null
         liveReduction = null
@@ -269,7 +250,10 @@ class CanonicalTimelineEngine(
         if (pendingReconcile !== request || request.selection !== mutablePublication.value.selection ||
             page.requestId != request.remote.requestId || page.selectionGeneration != request.selection.generation
         ) return@withLock TimelineEngineReconcileResult(TimelineEnginePageOutcome.Stale)
-        if (liveFence != null) return@withLock TimelineEngineReconcileResult(TimelineEnginePageOutcome.NoProgress)
+        // A settled turn now depends on this path for its durable rows, so only refuse mid-stream.
+        if (liveFence != null && mutableLive.value?.settlementRevision == null) {
+            return@withLock TimelineEngineReconcileResult(TimelineEnginePageOutcome.NoProgress)
+        }
         validate(page)
         val (revision, appended) = store.transaction(request.selection.scope) {
             var changed = false
