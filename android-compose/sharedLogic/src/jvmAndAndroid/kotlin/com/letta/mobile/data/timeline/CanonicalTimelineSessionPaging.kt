@@ -1,36 +1,52 @@
 package com.letta.mobile.data.timeline
 
+import androidx.paging.ExperimentalPagingApi
+import androidx.paging.LoadType
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
-import androidx.paging.ExperimentalPagingApi
-import androidx.paging.LoadType
 import androidx.paging.PagingState
 import androidx.paging.RemoteMediator
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.collectIndexed
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.emptyFlow
-import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.launch
 
-/** Each durable publication cancels obsolete loaders and starts a selection-anchored generation. */
-@OptIn(ExperimentalCoroutinesApi::class, ExperimentalPagingApi::class)
+/**
+ * One Paging generation per selection. A durable revision invalidates the active source in place, so
+ * Paging swaps loaders while keeping the presented list on screen. Rebuilding the [Pager] instead would
+ * hand the UI a fresh [PagingData], resetting the presenter to zero rows: that blanks the list and
+ * collapses the resident set the live overlay subtracts against, which double-renders every settled row.
+ */
+@OptIn(ExperimentalPagingApi::class)
 fun CanonicalTimelineSession.paging(
     selection: TimelineEngineSelection,
     anchor: TimelinePageKey? = selection.anchor,
-): Flow<PagingData<TimelineSettledRecord>> =
-    publication.distinctUntilChanged { old, new ->
-        old.selection === new.selection && old.durableRevision == new.durableRevision
-    }.flatMapLatest { current ->
-        if (current.selection !== selection) emptyFlow() else Pager(
-            config = PagingConfig(pageSize = engine.budget.maxMetadataRows, enablePlaceholders = false,
-                initialLoadSize = engine.budget.maxMetadataRows, maxSize = engine.budget.maxMetadataRows * 3),
-            initialKey = anchor,
-            remoteMediator = TimelineHistoryMediator(this, selection),
-            pagingSourceFactory = { TimelineLedgerPagingSource(engine, selection) },
-        ).flow
+): Flow<PagingData<TimelineSettledRecord>> {
+    val active = AtomicReference<TimelineLedgerPagingSource?>(null)
+    val pages = Pager(
+        config = PagingConfig(
+            pageSize = engine.budget.maxMetadataRows, enablePlaceholders = false,
+            initialLoadSize = engine.budget.maxMetadataRows, maxSize = engine.budget.maxMetadataRows * 3,
+        ),
+        initialKey = anchor,
+        remoteMediator = TimelineHistoryMediator(this, selection),
+        pagingSourceFactory = { TimelineLedgerPagingSource(engine, selection).also(active::set) },
+    ).flow
+    return channelFlow {
+        val pump = launch { pages.collect { send(it) } }
+        // A superseded selection retires this generation without emitting, matching the prior contract.
+        publication.distinctUntilChanged { old, new ->
+            old.selection === new.selection && old.durableRevision == new.durableRevision
+        }.collectIndexed { index, current ->
+            if (current.selection !== selection) pump.cancel()
+            else if (index > 0) active.get()?.invalidate()
+        }
     }
+}
 
 /** Network history is requested only when Paging reaches the end of the local ledger. */
 @OptIn(ExperimentalPagingApi::class)
