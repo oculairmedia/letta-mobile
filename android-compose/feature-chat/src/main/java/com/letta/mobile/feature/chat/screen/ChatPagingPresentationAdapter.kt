@@ -14,6 +14,24 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
+/** Isolated paging-cache lifetime; disposing it never retires ingestion. */
+internal fun createChatPagingPresentation(
+    uiScope: CoroutineScope,
+    settled: kotlinx.coroutines.flow.Flow<PagingData<ChatRenderItem>>,
+    live: kotlinx.coroutines.flow.StateFlow<List<ChatRenderItem>>,
+    missingTarget: kotlinx.coroutines.flow.StateFlow<String?>,
+    onResidentRows: (List<ChatRenderItem>) -> Unit,
+): ChatPagingPresentation {
+    val job = SupervisorJob(uiScope.coroutineContext[Job])
+    return ChatPagingPresentation(
+        settled = settled.cachedIn(CoroutineScope(uiScope.coroutineContext + job)),
+        live = live,
+        missingTarget = missingTarget,
+        close = { job.cancel() },
+        onResidentRows = { if (job.isActive) onResidentRows(it) },
+    )
+}
+
 /** Called on the UI dispatcher; the application installs this only after canonical writer gating. */
 internal suspend fun createCanonicalChatPagingPresentation(
     coordinator: CanonicalTimelineCoordinator,
