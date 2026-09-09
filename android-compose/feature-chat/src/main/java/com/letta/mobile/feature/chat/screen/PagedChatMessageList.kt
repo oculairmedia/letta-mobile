@@ -78,14 +78,7 @@ private fun PagedChatMessageListContent(
 ) {
     val routeTarget = if (presentation.hasBoundRoute) presentation.routeTarget else appearance.scrollToMessageId
     val pages = presentation.settled.collectAsLazyPagingItems()
-    val liveOverlay by presentation.live.collectAsStateWithLifecycle()
-    // A settled row owns its LazyColumn key the moment Paging presents it. The overlay has to
-    // yield in that same composition, not one resident-report later, or both item blocks emit
-    // the same key and LazyColumn throws ("Key ... was already used").
-    val live = remember(liveOverlay, pages.itemSnapshotList) {
-        val settled = pages.itemSnapshotList.items.mapTo(HashSet()) { it.key }
-        if (settled.isEmpty()) liveOverlay else liveOverlay.filterNot { it.key in settled }
-    }
+    val live by presentation.live.collectAsStateWithLifecycle()
     LaunchedEffect(presentation, pages) {
         snapshotFlow { pages.itemSnapshotList.items }.collect { resident ->
             presentation.onResidentRows(resident)
