@@ -245,7 +245,7 @@ private fun PagedChatMessageListContent(
             items(pages.itemCount, key = pages.itemKey { it.key }) { index ->
                 val row = pages[index]
                 if (row != null) {
-                    presentation.deferredReader(row)?.let { reader -> DeferredWindowControls(row, reader) }
+                    presentation.deferredReader(row)?.let { reader -> DeferredWindowControls(row.key, reader) }
                     Column {
                         PagedDateBoundary(row, if (index + 1 < pages.itemCount) pages.peek(index + 1) else null)
                         ChatMessageListRenderItem(ChatMessageListRenderItemParams(row, live.size + index, context, dimens, shapes))

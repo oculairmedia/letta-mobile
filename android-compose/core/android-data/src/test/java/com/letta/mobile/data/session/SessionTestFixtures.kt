@@ -164,6 +164,8 @@ internal class TestDefaultSessionRepositoryGraphFactoryBuilder(
         settingsRepository = settingsRepository,
         localRuntimeOptions = localRuntimeOptions,
         cursorFactory = cursorFactory,
+        // Tests own the graph's outer bound; production uses the process lifecycle.
+        graphParentScope = { kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob()) },
     )
 }
 

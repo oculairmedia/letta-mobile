@@ -19,11 +19,13 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.plus
 
 /** Presentation-only lifetime shared by Android and Desktop. Closing never retires the writer. */
 class CanonicalTimelinePresentation private constructor(
@@ -33,16 +35,24 @@ class CanonicalTimelinePresentation private constructor(
     val missingTarget: String?,
 ) {
     private val job = SupervisorJob(parentScope.coroutineContext[Job])
-    private val scope = CoroutineScope(parentScope.coroutineContext + job)
+    private val scope = parentScope + job
     private val owner = lease.owner
     private val resident = MutableStateFlow<Map<TimelineMessageId, Long>>(emptyMap())
 
     private val detached = kotlinx.coroutines.CompletableDeferred<Unit>()
     init {
         job.invokeOnCompletion {
-            CoroutineScope(parentScope.coroutineContext + NonCancellable).launch {
-                try { coordinator.detach(lease); detached.complete(Unit) }
-                catch (failure: Throwable) { detached.completeExceptionally(failure) }
+            (parentScope + NonCancellable).launch {
+                try {
+                    coordinator.detach(lease)
+                    detached.complete(Unit)
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    // Retiring the viewport is not a detach failure; close() awaits this.
+                    detached.completeExceptionally(cancelled)
+                    throw cancelled
+                } catch (failure: Throwable) {
+                    detached.completeExceptionally(failure)
+                }
             }
         }
     }
@@ -88,8 +98,17 @@ class CanonicalTimelinePresentation private constructor(
         }
     }.cachedIn(scope)
 
+    private val mutableLive = MutableStateFlow<List<ChatRenderItem>>(emptyList())
+
+    /**
+     * Published from this presentation's own scope and cancelled with it. Sharing eagerly through
+     * stateIn would tie the projection's lifetime to whatever scope was handed in, which is the
+     * caller's to cancel, not this presentation's.
+     */
+    val live: StateFlow<List<ChatRenderItem>> = mutableLive.asStateFlow()
+
     // Durability alone is not presentation: retain live until the matching revision is resident.
-    val live: StateFlow<List<ChatRenderItem>> = combine(
+    private val liveProjection: Flow<List<ChatRenderItem>> = combine(
         owner.session.live, owner.session.pending, resident,
     ) { publication, pending, presented ->
         val events = publication?.unpresentedEvents(presented).orEmpty()
@@ -106,7 +125,11 @@ class CanonicalTimelinePresentation private constructor(
             }
         }
         active.asReversed() + optimistic.asReversed()
-    }.stateIn(scope, SharingStarted.Eagerly, emptyList())
+    }
+
+    init {
+        scope.launch { liveProjection.collect { mutableLive.value = it } }
+    }
 
     /** Only actual resident rows count, never prefetched rows or a remembered revision watermark. */
     fun onResidentRows(rows: List<Row>) {

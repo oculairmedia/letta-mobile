@@ -8,6 +8,7 @@ import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.plus
 
 class AndroidCanonicalTimelineRuntimeFactory(
     private val legacy: TimelineRepository,
@@ -46,7 +47,7 @@ class AndroidCanonicalTimelineRuntime(
     private val legacyBackendId: String,
 ) {
     private val maintenanceJob = kotlinx.coroutines.SupervisorJob(graphScope.coroutineContext[kotlinx.coroutines.Job])
-    private val maintenanceScope = kotlinx.coroutines.CoroutineScope(graphScope.coroutineContext + maintenanceJob)
+    private val maintenanceScope = graphScope + maintenanceJob
     private val mutex = Mutex()
     private var retired = false
     private val bindings = mutableMapOf<TimelineScope, CanonicalTimelineCoordinator>()

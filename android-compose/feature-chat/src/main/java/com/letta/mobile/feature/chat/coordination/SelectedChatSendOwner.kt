@@ -9,6 +9,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.plus
 
 /** Writer resolves newly created conversations within this captured backend, never active settings. */
 internal class SelectedChatSendOwner(
@@ -19,7 +20,7 @@ internal class SelectedChatSendOwner(
     private val prepareConversation: suspend (String) -> Unit,
 ) {
     private val job = SupervisorJob(parent.coroutineContext[Job])
-    val scope = CoroutineScope(parent.coroutineContext + job)
+    val scope = parent + job
     private val readiness = Mutex()
     private val prepared = mutableSetOf<String>()
 

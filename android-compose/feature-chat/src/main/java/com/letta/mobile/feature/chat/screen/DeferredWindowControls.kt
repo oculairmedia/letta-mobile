@@ -8,15 +8,15 @@ import kotlinx.coroutines.launch
 
 /** One bounded window replaces the previous one. No read occurs before an explicit click. */
 @Composable
-internal fun DeferredWindowControls(identity: Any, read: suspend (Long) -> TimelineSemanticWindowResult) {
+internal fun DeferredWindowControls(rowKey: String, read: suspend (Long) -> TimelineSemanticWindowResult) {
     val scope = rememberCoroutineScope()
-    var text by remember(identity) { mutableStateOf<String?>(null) }
-    var offset by remember(identity) { mutableStateOf(0L) }
-    var next by remember(identity) { mutableStateOf<Long?>(null) }
-    val history = remember(identity) { java.util.ArrayDeque<Long>() }
-    var busy by remember(identity) { mutableStateOf(false) }
-    var job by remember(identity) { mutableStateOf<kotlinx.coroutines.Job?>(null) }
-    DisposableEffect(identity) { onDispose { job?.cancel() } }
+    var text by remember(rowKey) { mutableStateOf<String?>(null) }
+    var offset by remember(rowKey) { mutableStateOf(0L) }
+    var next by remember(rowKey) { mutableStateOf<Long?>(null) }
+    val history = remember(rowKey) { java.util.ArrayDeque<Long>() }
+    var busy by remember(rowKey) { mutableStateOf(false) }
+    var job by remember(rowKey) { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    DisposableEffect(rowKey) { onDispose { job?.cancel() } }
     fun load(at: Long) {
         job?.cancel()
         job = scope.launch {

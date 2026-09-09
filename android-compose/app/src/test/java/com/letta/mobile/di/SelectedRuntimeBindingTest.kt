@@ -98,8 +98,11 @@ class SelectedRuntimeBindingTest {
 
     @Test fun expiryWithExpectedWatermarkDelegatesThroughResolvedWriter() = runTest {
         val delegate = mockk<com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter>(relaxed = true)
-        val writer = SelectedRuntimeWriter("agent") { delegate }
+        var resolutions = 0
+        val writer = SelectedRuntimeWriter("agent") { resolutions++; delegate }
         writer.repairExpiredConversationCursorScoped("agent", "conversation", fallbackSeq = 12L, expectedWatermark = 4L)
+        // The name's claim is that the call goes through a freshly resolved writer, not a captured one.
+        assertEquals(1, resolutions)
         coVerify(exactly = 1) {
             delegate.repairExpiredConversationCursorScoped("agent", "conversation", 12L, 4L)
         }
