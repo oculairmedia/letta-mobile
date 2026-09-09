@@ -154,7 +154,7 @@ class JankMeasurementRecorder(
     private val frameBudgetMs: Long,
     private val maxDetailedFrameMeasurements: Int,
 ) {
-    private var activeSpanKey: io.sentry.protocol.SentryId? = null
+    private var activeSpanKey: Any? = null
     private var jankFrameCount: Long = 0
     private var maxFrameDurationMs: Long = 0
     private var totalFrameDurationMs: Long = 0
@@ -162,7 +162,7 @@ class JankMeasurementRecorder(
     private var detailedFramesRecorded: Int = 0
 
     fun record(
-        spanKey: io.sentry.protocol.SentryId,
+        spanKey: Any,
         durationMs: Long,
         measurementSink: (String, Double) -> Unit,
     ) {
@@ -187,7 +187,7 @@ class JankMeasurementRecorder(
         }
     }
 
-    private fun reset(spanKey: io.sentry.protocol.SentryId) {
+    private fun reset(spanKey: Any) {
         activeSpanKey = spanKey
         jankFrameCount = 0
         maxFrameDurationMs = 0
