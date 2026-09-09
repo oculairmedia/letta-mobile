@@ -33,15 +33,14 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
-import com.letta.mobile.data.chat.projection.RunActivityState
 import com.letta.mobile.feature.chat.R
 import com.letta.mobile.ui.components.rememberReducedMotionEnabled
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.preview.LettaPreviewFrame
 
 internal object RunActivityDisclosureTestTags {
-    val Header = "run-activity-disclosure"
-    val WorkingIndicator = "run-activity-working-indicator"
+    const val Header = "run-activity-disclosure"
+    const val WorkingIndicator = "run-activity-working-indicator"
 }
 
 @Composable

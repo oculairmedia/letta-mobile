@@ -47,10 +47,8 @@
     <string name="screen_nav_favorite_agent">Favorite Agent</string>
     <string name="screen_system_access_title">System Access</string>
     <string name="action_pair_scan">Scan a pairing code</string>
-    <string name="action_pair_invite">Show my pairing code</string>
     <string name="screen_pairing_scan_title">Scan pairing code</string>
     <string name="screen_pairing_invite_title">Pair a device</string>
-    <string name="pairing_camera_permission_rationale">Letta needs camera access to scan a pairing QR code.</string>
     <string name="pairing_camera_permission_denied">Camera access was denied. Grant it in Settings to scan a pairing code.</string>
     <string name="pairing_open_settings">Open Settings</string>
     <string name="pairing_scan_again">Scan again</string>
@@ -73,7 +71,6 @@
         <item quantity="one">%d item</item>
         <item quantity="other">%d items</item>
     </plurals>
-    <string name="screen_home_usage_empty">No token activity recorded in the last 24 hours.</string>
     <string name="screen_usage_empty_runs">No recent runs recorded for the selected time range.</string>
 
     <string name="screen_projects_title">Projects</string>

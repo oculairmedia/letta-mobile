@@ -1700,45 +1700,43 @@ dependencies {
     implementation(project(":designsystem"))
     implementation(project(":feature-chat"))
     implementation(project(":feature-editagent"))
-    implementation("io.github.vinceglb:filekit-core:0.14.1")
-    implementation("io.github.vinceglb:filekit-dialogs-compose:0.14.1")
+    implementation(libs.filekit.core)
+    implementation(libs.filekit.dialogs.compose)
 
-    val composeBom = platform("androidx.compose:compose-bom:2026.03.01")
+    val composeBom = platform(libs.androidx.compose.bom)
     implementation(composeBom)
     androidTestImplementation(composeBom)
 
     // Compose
-    implementation("androidx.compose.material3:material3:1.5.0-alpha17")
-    implementation("androidx.compose.material3:material3-window-size-class:1.5.0-alpha17")
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.compose.material:material-icons-extended")
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material3.windowsize)
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.ui.tooling.preview)
+    implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.activity.compose)
-    implementation("androidx.exifinterface:exifinterface:1.4.2")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.4")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.4")
-    implementation("androidx.lifecycle:lifecycle-process:2.9.4")
+    implementation(libs.androidx.exifinterface)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.lifecycle.process)
     implementation(libs.molecule.runtime)
-    debugImplementation("androidx.compose.ui:ui-tooling")
-    implementation("androidx.metrics:metrics-performance:1.0.0")
-    debugImplementation("com.squareup.leakcanary:leakcanary-android:3.0-alpha-8")
+    debugImplementation(libs.androidx.compose.ui.tooling)
+    implementation(libs.androidx.metrics.performance)
+    debugImplementation(libs.leakcanary.android)
 
     // Navigation
-    implementation("androidx.navigation:navigation-compose:2.9.7")
-    implementation("androidx.hilt:hilt-navigation-compose:1.4.0-beta01")
+    implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.hilt.navigation.compose)
 
     // CameraX (letta-mobile-g2d2i: QR pairing scanner). Versions that are
-    // already centralized live in gradle/libs.versions.toml; CameraX stays
-    // pinned here until that catalog grows. Deliberately ImageAnalysis +
+    // centralized live in gradle/libs.versions.toml. Deliberately ImageAnalysis +
     // zxing:core (already a transitive sharedLogic dependency via core:android-data
     // -> sharedLogic) instead of ML Kit barcode scanning: ML Kit either
     // bundles a large model (APK bloat) or requires Google Play Services
     // (unbundled), which the Root/Sideload flavors cannot assume.
-    val cameraxVersion = "1.4.2"
-    implementation("androidx.camera:camera-core:$cameraxVersion")
-    implementation("androidx.camera:camera-camera2:$cameraxVersion")
-    implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
-    implementation("androidx.camera:camera-view:$cameraxVersion")
+    implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
 
     // Hilt DI
     implementation(libs.hilt.android)
@@ -1756,56 +1754,56 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
 
     // DataStore + Encrypted SharedPreferences
-    implementation("androidx.datastore:datastore-preferences:1.3.0-alpha09")
-    implementation("androidx.security:security-crypto:1.1.0")
+    implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.security.crypto)
 
     // Splash Screen
-    implementation("androidx.core:core-splashscreen:1.2.0")
+    implementation(libs.androidx.core.splashscreen)
 
     // Coil (image loading)
-    implementation("io.coil-kt.coil3:coil-compose:3.5.0-beta01")
-    implementation("io.coil-kt.coil3:coil-network-ktor3:3.5.0-beta01")
+    implementation(libs.coil3.compose)
+    implementation(libs.coil3.network.ktor3)
 
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
 
     // On-device LLM inference for explicitly constructed .litertlm engines.
-    implementation("com.google.ai.edge.litertlm:litertlm-android:0.13.1")
+    implementation(libs.litertlm.android)
 
     // Drag-to-reorder for Compose
-    implementation("sh.calvin.reorderable:reorderable:3.1.0")
+    implementation(libs.reorderable)
 
     // Immutable collections for Compose stability
-    implementation("org.jetbrains.kotlinx:kotlinx-collections-immutable:0.5.0-beta01")
+    implementation(libs.kotlinx.collections.immutable)
 
     // Fuzzy search
-    implementation("me.xdrop:fuzzywuzzy:1.4.0")
+    implementation(libs.fuzzywuzzy)
 
     // Vico charts
-    implementation("com.patrykandpatrick.vico:compose-m3:3.2.0-next.5")
+    implementation(libs.vico.compose.m3)
 
     // Timeline visualization
-    implementation("io.github.pushpalroy:jetlime:4.3.0")
+    implementation(libs.jetlime)
 
     // Open source notices
-    implementation("com.mikepenz:aboutlibraries-compose-m3:14.2.1")
+    implementation(libs.aboutlibraries.compose.m3)
 
     // Paging 3
     implementation(libs.androidx.paging.runtime.ktx)
     implementation(libs.androidx.paging.compose)
 
     // Background sync
-    implementation("androidx.work:work-runtime-ktx:2.11.2")
+    implementation(libs.androidx.work.runtime.ktx)
 
     // Sentry error tracking — initialized programmatically via
     // androidx.startup in SentryInitializer. See letta-mobile-o7ob.7.
-    implementation("io.sentry:sentry-android:8.42.0")
-    implementation("androidx.startup:startup-runtime:1.2.0")
+    implementation(libs.sentry.android)
+    implementation(libs.androidx.startup.runtime)
 
     // Baseline Profile installer — reads the bundled profile and warms
     // AOT compilation on first launch. See letta-mobile-o7ob.2.1 and
     // letta-mobile-o7ob.2.4.
-    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
+    implementation(libs.androidx.profileinstaller)
     "baselineProfile"(project(":baselineprofile"))
 
     // Testing
@@ -1817,9 +1815,9 @@ dependencies {
     testImplementation(libs.kotest.runner.junit5)
     testImplementation(libs.kotest.assertions.core)
     testImplementation(libs.robolectric)
-    testImplementation("androidx.compose.ui:ui-test-junit4")
-    testImplementation("io.github.takahirom.roborazzi:roborazzi:1.63.0")
-    testImplementation("io.github.takahirom.roborazzi:roborazzi-compose:1.63.0")
+    testImplementation(libs.androidx.compose.ui.test.junit4)
+    testImplementation(libs.roborazzi)
+    testImplementation(libs.roborazzi.compose)
     testImplementation(libs.androidx.test.core.ktx)
     testImplementation(libs.androidx.test.ext.junit.ktx)
 
@@ -1827,11 +1825,11 @@ dependencies {
     testImplementation(libs.hilt.android.testing)
     kspTest(libs.hilt.compiler)
     testRuntimeOnly(libs.junit.vintage.engine)
-    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.core.ktx)
     androidTestImplementation(libs.kotlinx.coroutines.android)
-    debugImplementation("androidx.compose.ui:ui-test-manifest")
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
 
 // Test tier tasks use Root debug as the full-featured local default.

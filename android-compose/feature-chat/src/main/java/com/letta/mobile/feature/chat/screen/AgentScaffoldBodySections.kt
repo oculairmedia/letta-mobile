@@ -23,8 +23,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import com.letta.mobile.feature.chat.R
 import com.letta.mobile.data.chat.routing.pickOtherAgentConversation
-import com.letta.mobile.feature.chat.screen.AndroidAgentMessageContext
-import com.letta.mobile.feature.chat.screen.LocalAndroidAgentMessageContext
 import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIcons
 import kotlinx.coroutines.launch

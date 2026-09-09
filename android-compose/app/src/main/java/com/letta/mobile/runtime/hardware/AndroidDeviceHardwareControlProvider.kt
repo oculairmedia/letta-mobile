@@ -192,7 +192,7 @@ class AndroidDeviceHardwareControlProvider @Inject constructor(
         }
         val ids = runCatching {
             cameraManager().cameraIdList.filter { id ->
-                cameraManager().getCameraCharacteristics(id).get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
+                cameraManager().getCameraCharacteristics(id)[CameraCharacteristics.FLASH_INFO_AVAILABLE] == true
             }
         }.getOrElse {
             return FlashlightCapability(
