@@ -311,6 +311,7 @@ class RoomConfirmedTimelineStore(
      * for rows outside [NormalizedTimelineCommit.upserts]. All mutation (deletes, upserts,
      * row-count, root digest, head metadata) happens in one [database] transaction.
      */
+
     override suspend fun commitNormalized(
         plan: NormalizedTimelineCommitPlan,
         fullEnvelope: StoredTimelineEnvelope,

@@ -52,7 +52,7 @@ class SnapshotPlannerStoreGatePolicyTest {
         val decision = TimelineSyncLoop.IncrementalPlanningDecision(
             result = plannedResult(),
             checkpointDue = false,
-            reason = "store_unsupported",
+            reason = SnapshotPlanningFallback.STORE_UNSUPPORTED,
             baseRevision = 0L,
             targetRevision = 1L,
             storeSupportsIncremental = false,
@@ -76,7 +76,7 @@ class SnapshotPlannerStoreGatePolicyTest {
         val decision = TimelineSyncLoop.IncrementalPlanningDecision(
             result = plannedResult(),
             checkpointDue = false,
-            reason = "delta",
+            reason = null,
             baseRevision = 0L,
             targetRevision = 1L,
             storeSupportsIncremental = true,
@@ -94,7 +94,7 @@ class SnapshotPlannerStoreGatePolicyTest {
         val decision = TimelineSyncLoop.IncrementalPlanningDecision(
             result = plannedResult(),
             checkpointDue = true,
-            reason = "checkpoint_due",
+            reason = SnapshotPlanningFallback.CHECKPOINT_DUE,
             baseRevision = 0L,
             targetRevision = 1L,
             storeSupportsIncremental = true,
@@ -116,11 +116,11 @@ class SnapshotPlannerStoreGatePolicyTest {
     @Test
     fun reasonPrecedenceIsStoreUnsupportedOverDelta() {
         assertEquals(
-            "store_unsupported",
+            SnapshotPlanningFallback.STORE_UNSUPPORTED,
             TimelineSyncLoop.IncrementalPlanningDecision(
                 result = plannedResult(),
                 checkpointDue = false,
-                reason = "store_unsupported",
+                reason = SnapshotPlanningFallback.STORE_UNSUPPORTED,
                 baseRevision = 0L,
                 targetRevision = 1L,
                 storeSupportsIncremental = false,
@@ -155,9 +155,9 @@ class SnapshotPlannerStoreGatePolicyTest {
     @Test
     fun fullScanDecisionIsNotPersistableRegardlessOfStore() {
         val decision = TimelineSyncLoop.IncrementalPlanningDecision(
-            result = TimelineIncrementalSnapshotPlanner.Result.FullScan("baseline_missing"),
+            result = TimelineIncrementalSnapshotPlanner.Result.FullScan(SnapshotPlanningFallback.BASELINE_MISSING),
             checkpointDue = false,
-            reason = "baseline_missing",
+            reason = SnapshotPlanningFallback.BASELINE_MISSING,
             baseRevision = null,
             targetRevision = 1L,
             storeSupportsIncremental = true,
@@ -171,6 +171,41 @@ class SnapshotPlannerStoreGatePolicyTest {
      * `commitNormalized` as a real incremental transaction, not silently fall back to the
      * shim. This pins the contract between the gate flag and the override.
      */
+    @Test
+    fun noWorkDecisionForEmptyDeltaAgainstPersistedBaselineIsNotPersistable() {
+        val decision = TimelineSyncLoop.IncrementalPlanningDecision(
+            result = TimelineIncrementalSnapshotPlanner.Result.NoWork,
+            checkpointDue = false,
+            reason = null,
+            baseRevision = 1L,
+            targetRevision = 2L,
+            storeSupportsIncremental = true,
+        )
+        assertFalse(
+            TimelineSyncLoop.canPersistIncremental(decision),
+            "NoWork result represents a known-no-persisted-change state and must NOT pass the incremental gate.",
+        )
+    }
+
+    @Test
+    fun undeclaredDeltaForcesFullScanFallbackReason() {
+        val delta = PendingTimelinePersistenceDelta()
+        delta.merge(1L, TimelineMutationDelta.None)
+        val snapshot = delta.snapshot()
+        assertTrue(snapshot.requiresFullRescan)
+        assertEquals(SnapshotPlanningFallback.UNDECLARED_DELTA, snapshot.fallbackReason)
+    }
+
+    @Test
+    fun explicitlyEmptyDeltaRetainsCleanNoWorkState() {
+        val delta = PendingTimelinePersistenceDelta()
+        delta.merge(1L, TimelineMutationDelta.Exact(emptySet(), emptySet(), metadataChanged = false))
+        val snapshot = delta.snapshot()
+        assertFalse(snapshot.requiresFullRescan)
+        assertTrue(snapshot.isEmpty)
+        assertEquals(1L, snapshot.throughSequence)
+    }
+
     @Test
     fun storeOverrideIsVisibleToTheGate() {
         val store = RecordingSupportsStore(supportsIncrementalCommit = true)

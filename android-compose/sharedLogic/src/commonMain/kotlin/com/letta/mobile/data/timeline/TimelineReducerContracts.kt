@@ -36,7 +36,7 @@ sealed interface TimelineMutationDelta {
         val metadataChanged: Boolean = false,
     ) : TimelineMutationDelta
 
-    data class RequiresFullRescan(val reason: String) : TimelineMutationDelta
+    data class RequiresFullRescan(val reason: SnapshotPlanningFallback) : TimelineMutationDelta
 }
 
 /** Payload-only mutation families. Ordering is assigned internally by [TimelineProcessor]. */
@@ -494,7 +494,16 @@ private fun reduceStreamMutation(
  * exact set from persistent-list reference reuse and stable server ids. If ordering or identity
  * changes outside that bounded shape, fail closed to the full planner.
  */
-private fun exactConfirmedDelta(previous: Timeline, current: Timeline): TimelineMutationDelta {
+internal fun exactConfirmedDelta(previous: Timeline, current: Timeline): TimelineMutationDelta {
+    // letta-mobile-94bt8.1: a cursor advance used to force a FULL RESCAN, and five of the nine
+    // writes in the clean-main capture advanced the cursor. It never needed to: the incremental
+    // plan already carries liveCursor, backfillCursor and releasedOlderCount in its commit
+    // METADATA, so metadata moves without implying anything about row identity or order. Carry
+    // it as a metadata flag and keep the bounded row path.
+    val metadataChanged = previous.liveCursor != current.liveCursor ||
+        previous.backfillCursor != current.backfillCursor ||
+        previous.releasedOlderCount != current.releasedOlderCount
+
     val changed = linkedSetOf<String>()
     val deleted = linkedSetOf<String>()
     val previousByServerId = previous.events.mapNotNull { event ->
@@ -506,7 +515,7 @@ private fun exactConfirmedDelta(previous: Timeline, current: Timeline): Timeline
     if (previousByServerId.size != previous.events.count { it is TimelineEvent.Confirmed } ||
         currentByServerId.size != current.events.count { it is TimelineEvent.Confirmed }
     ) {
-        return TimelineMutationDelta.RequiresFullRescan("ambiguous_server_identity")
+        return TimelineMutationDelta.RequiresFullRescan(SnapshotPlanningFallback.AMBIGUOUS_SERVER_IDENTITY)
     }
     currentByServerId.forEach { (serverId, event) ->
         val old = previousByServerId[serverId]
@@ -516,16 +525,12 @@ private fun exactConfirmedDelta(previous: Timeline, current: Timeline): Timeline
         if (serverId !in currentByServerId) deleted += serverId
     }
     if (changed.size + deleted.size > MAX_EXACT_STREAM_DELTA_ROWS) {
-        return TimelineMutationDelta.RequiresFullRescan("stream_delta_too_wide")
+        return TimelineMutationDelta.RequiresFullRescan(SnapshotPlanningFallback.STREAM_DELTA_TOO_WIDE)
     }
     return TimelineMutationDelta.Exact(
         changedConfirmedServerIds = changed,
         deletedConfirmedServerIds = deleted,
-        // Cursor and release metadata is persisted in TimelineCommitMetadata, so it does not
-        // require re-encoding the confirmed history.
-        metadataChanged = previous.liveCursor != current.liveCursor ||
-            previous.backfillCursor != current.backfillCursor ||
-            previous.releasedOlderCount != current.releasedOlderCount,
+        metadataChanged = metadataChanged,
     )
 }
 
@@ -553,7 +558,7 @@ private fun reduceHydrateMutation(
             visibleEventCount = hydrated.visibleEventCount,
             changed = next != state,
         ),
-        persistenceDelta = if (next != state) TimelineMutationDelta.RequiresFullRescan("hydrate")
+        persistenceDelta = if (next != state) TimelineMutationDelta.RequiresFullRescan(SnapshotPlanningFallback.HYDRATE)
         else TimelineMutationDelta.None,
     )
 }
@@ -575,7 +580,7 @@ private fun reduceRecentMessagesMutation(
             appended = merge.second,
             changed = next.timeline != state.timeline,
         ),
-        persistenceDelta = if (next.timeline != state.timeline) TimelineMutationDelta.RequiresFullRescan("recent_messages")
+        persistenceDelta = if (next.timeline != state.timeline) TimelineMutationDelta.RequiresFullRescan(SnapshotPlanningFallback.RECENT_MESSAGES)
         else TimelineMutationDelta.None,
     )
 }
@@ -604,6 +609,6 @@ private fun changedIfNeeded(
     next,
     result = if (next == state) TimelineReductionResult.NoChange
     else TimelineReductionResult.Changed(TimelineChangeKind.RECONCILED),
-    persistenceDelta = if (next.timeline != state.timeline) TimelineMutationDelta.RequiresFullRescan("reconcile")
+    persistenceDelta = if (next.timeline != state.timeline) TimelineMutationDelta.RequiresFullRescan(SnapshotPlanningFallback.RECONCILE)
     else TimelineMutationDelta.None,
 )
