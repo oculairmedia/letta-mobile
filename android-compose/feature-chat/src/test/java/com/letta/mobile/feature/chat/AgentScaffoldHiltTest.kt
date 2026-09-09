@@ -100,6 +100,7 @@ class AgentScaffoldHiltTest {
         projectBindings = mockk(relaxed = true)
         conversationRepository = mockk(relaxed = true)
         every { viewModel.uiState } returns uiFlow
+        every { viewModel.pagingPresentation } returns MutableStateFlow(null)
         every { viewModel.chatBackground } returns bgFlow
         every { viewModel.composerState } returns composerFlow
         every { viewModel.chatFontScale } returns fontScaleFlow

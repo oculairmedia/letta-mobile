@@ -68,6 +68,8 @@ import kotlin.time.Duration.Companion.milliseconds
 internal data class ChatDetailPaneState(
     val surface: DesktopChatSurfaceState,
     val isThinking: Boolean,
+    val canonicalPresentation: com.letta.mobile.data.timeline.CanonicalTimelinePresentation? = null,
+    val canonicalStatus: String? = null,
     val isStreamingReply: Boolean = false,
     val modelOptions: List<Pair<String, String>>,
     val commands: List<ComposerCommand>,
@@ -195,7 +197,11 @@ private fun ChatDetailBody(
                 onChangeDirectory = actions.onChangeWorkingDirectory,
             )
         }
-        if (surface.shouldShowStatePanel) {
+        if (state.canonicalPresentation != null) {
+            DesktopCanonicalMessageList(state.canonicalPresentation, Modifier.weight(1f))
+        } else if (state.canonicalStatus != null) {
+            Text(state.canonicalStatus, modifier = Modifier.weight(1f))
+        } else if (surface.shouldShowStatePanel) {
             ChatStatePanel(
                 state = surface,
                 onRetryConnection = actions.onRetryConnection,

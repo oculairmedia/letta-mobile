@@ -168,6 +168,8 @@ internal fun LettaDesktopApp(
         onRestartRequested = chatController::retryConnection,
     )
     val chatState by chatController.state.collectAsState()
+    val canonicalPresentation by chatController.canonicalPresentation.collectAsState()
+    val canonicalStatus by chatController.canonicalStatus.collectAsState()
     var conversationTabsState by remember(chatState.sessionGraphId) { mutableStateOf(ConversationTabsState()) }
     val availableModels by chatController.availableModels.collectAsState()
     val deletingConversationIds by chatController.deletingConversationIds.collectAsState()
@@ -780,6 +782,8 @@ internal fun LettaDesktopApp(
                         chatScope = chatScope,
                         chatDetailState = ChatDetailPaneState(
                             surface = chatState,
+                            canonicalPresentation = canonicalPresentation,
+                            canonicalStatus = canonicalStatus,
                             contextUsage = contextUsage,
                             isThinking = isThinkingSelected,
                             isStreamingReply = isStreamingReplySelected,

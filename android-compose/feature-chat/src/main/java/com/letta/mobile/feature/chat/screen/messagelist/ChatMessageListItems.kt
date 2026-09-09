@@ -121,7 +121,7 @@ internal fun RenderChatMessage(
     // compact grouped rhythm and avoid adding a second bottom inset on top of
     // MessageReasoning's own padding.
     val rowPadding = chatMessageRowVerticalPadding(
-        isReasoning = message.isReasoning,
+        isReasoning = message.isReasoning || !message.toolCalls.isNullOrEmpty(),
         position = position,
         groupedMessageSpacingDp = MaterialTheme.chatDimens.groupedMessageSpacing.value,
         ungroupedMessageSpacingDp = MaterialTheme.chatDimens.ungroupedMessageSpacing.value,

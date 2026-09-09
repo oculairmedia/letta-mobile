@@ -131,6 +131,7 @@ internal class TestDefaultSessionRepositoryGraphFactoryBuilder(
     var settingsRepository: ISettingsRepository? = null,
     var localRuntimeOptions: LocalRuntimeOptions = LocalRuntimeOptions.Disabled,
     var appContext: android.content.Context = mockk(relaxed = true),
+    var cursorFactory: com.letta.mobile.data.local.BackendConversationCursorFactory? = null,
 ) {
     fun build(): DefaultSessionRepositoryGraphFactory = DefaultSessionRepositoryGraphFactory(
         assembler = SessionGraphAssembler(
@@ -162,6 +163,7 @@ internal class TestDefaultSessionRepositoryGraphFactoryBuilder(
         ),
         settingsRepository = settingsRepository,
         localRuntimeOptions = localRuntimeOptions,
+        cursorFactory = cursorFactory,
     )
 }
 

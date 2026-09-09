@@ -43,7 +43,7 @@ internal data class ClientModeBootstrapConfig(
 
 internal data class TimelineObserverConfig(
     val start: (String) -> Unit,
-    val stop: () -> Unit,
+    val stop: suspend () -> Unit,
 )
 
 internal data class ConversationSendConfig(

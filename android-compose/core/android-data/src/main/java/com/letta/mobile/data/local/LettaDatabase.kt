@@ -22,6 +22,7 @@ import com.letta.mobile.data.model.DomainIdConverters
         ConversationEntity::class,
         ConversationRefreshEntity::class,
         ConversationCursorEntity::class,
+        BackendConversationCursorEntity::class,
         RuntimeEventEntity::class,
         MemFsFileEntity::class,
         MemFsCommitEntity::class,
@@ -31,7 +32,7 @@ import com.letta.mobile.data.model.DomainIdConverters
         NormalizedTimelineSnapshotHeadEntity::class,
         NormalizedTimelineSnapshotRowEntity::class,
     ],
-    version = 13,
+    version = 14,
     exportSchema = true,
 )
 @androidx.room.TypeConverters(DomainIdConverters::class)
@@ -41,6 +42,7 @@ abstract class LettaDatabase : RoomDatabase() {
     abstract fun pendingLocalDao(): PendingLocalDao
     abstract fun conversationDao(): ConversationDao
     abstract fun conversationCursorDao(): ConversationCursorDao
+    abstract fun backendConversationCursorDao(): BackendConversationCursorDao
     abstract fun runtimeEventDao(): RuntimeEventDao
     abstract fun memFsDao(): MemFsDao
     abstract fun confirmedTimelineSnapshotDao(): ConfirmedTimelineSnapshotDao

@@ -50,6 +50,7 @@ internal class WsChatSendCoordinator(
     clientVersionProvider: ChatClientVersionProvider,
     private val backendDescriptor: () -> BackendDescriptor? = { null },
     private val runtimeEventSink: suspend (List<RuntimeEventDraft>) -> Unit = {},
+    prepareConversation: suspend (String) -> Unit = {},
 ) {
     private val uiSink = object : ChatSendUiSink {
         override fun currentError(): String? = uiState.value.error
@@ -178,6 +179,7 @@ internal class WsChatSendCoordinator(
         activeConversationId = activeConversationId,
         setActiveConversationId = setActiveConversationId,
         startTimelineObserver = startTimelineObserver,
+        prepareConversation = prepareConversation,
         clientVersion = { clientVersionProvider.clientVersion },
         otidGenerator = { "cm-android-${UUID.randomUUID()}" },
         recordRuntimeEvents = ::recordRuntimeEvents,

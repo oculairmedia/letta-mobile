@@ -131,7 +131,7 @@ object TimelineHydrationReducer {
         val runtimeAndDisk: List<TimelineEvent>,
     )
 
-    private fun mergeRicherEventFacts(
+    internal fun mergeRicherEventFacts(
         serverEvent: TimelineEvent.Confirmed,
         localEvent: TimelineEvent.Confirmed,
     ): TimelineEvent.Confirmed {

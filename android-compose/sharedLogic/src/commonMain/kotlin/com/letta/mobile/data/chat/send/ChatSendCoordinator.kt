@@ -77,6 +77,7 @@ class ChatSendCoordinator(
     private val clientVersion: () -> String,
     private val otidGenerator: () -> String,
     recordRuntimeEvents: suspend (List<ScopedRuntimeEvent>) -> Unit = {},
+    private val prepareConversation: suspend (String) -> Unit = {},
 ) {
     // Send acceptance, transport events, and cleanup all mutate one ownership graph. Serializing
     // their suspend paths makes the lifecycle decision and the matching UI/OTID mutation atomic.
@@ -445,11 +446,21 @@ class ChatSendCoordinator(
             else -> runCatching {
                 conversationRepository.createConversation(AgentId(agentId)).id.value
             }.getOrElse { err ->
+                if (err is CancellationException) throw err
                 Telemetry.error("AdminChatVM", "ws.send.createConversationFailed", err)
                 ui.onSendFailed("Failed to create a new conversation: ${err.message ?: "unknown"}")
                 timer.stop("accepted" to false, "reason" to "create_failed")
                 return
             }
+        }
+        try {
+            prepareConversation(conversationId)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            ui.onSendFailed("Conversation is not ready: ${failure.message ?: "unknown"}")
+            timer.stop("accepted" to false, "reason" to "conversation_not_ready")
+            return
         }
         stateFor(conversationId)
         reportCrossConversationSend(conversationId)
@@ -955,6 +966,7 @@ class ChatSendCoordinator(
                 agentId = agentId,
                 conversationId = conversationId,
                 fallbackSeq = event.lastSeq,
+                expectedWatermark = event.afterSeq,
             )
         }.onSuccess {
             Telemetry.event(
@@ -966,6 +978,7 @@ class ChatSendCoordinator(
             )
             ui.onError(null)
         }.onFailure { t ->
+            if (t is kotlinx.coroutines.CancellationException) throw t
             Telemetry.error(
                 "AdminChatVM", "ws.cursorExpired.repairFailed", t,
                 "conversationId" to conversationId,

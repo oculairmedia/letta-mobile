@@ -952,6 +952,14 @@ class DesktopChatController(
         selectedId?.let { selectRemoteConversation(it, loadedRuntime.selectionGeneration) }
     }
 
+    /** Installed by the dev-gated writer host only; null keeps the existing desktop route. */
+    var canonicalOpen: (suspend (String, String, CoroutineScope) -> com.letta.mobile.data.timeline.CanonicalTimelinePresentation)? = null
+    var canonicalEligible: (String) -> Boolean = { false }
+    private val _canonicalPresentation = MutableStateFlow<com.letta.mobile.data.timeline.CanonicalTimelinePresentation?>(null)
+    val canonicalPresentation = _canonicalPresentation.asStateFlow()
+    private val _canonicalStatus = MutableStateFlow<String?>(null)
+    val canonicalStatus = _canonicalStatus.asStateFlow()
+
     private suspend fun selectRemoteConversation(conversationId: String, generation: Long) {
         if (!isActiveSelection(generation)) return
         val nextGateway = gateway ?: return
@@ -966,6 +974,38 @@ class DesktopChatController(
 
         _state.update {
             it.withRuntimeState(ChatSessionReducer.beginSelectedConversationHydrate(it.runtimeState, generation))
+        }
+
+        _canonicalPresentation.value = null
+        val canonical = canonicalOpen
+        _canonicalStatus.value = null
+        if (canonical != null && canonicalEligible(conversationId)) {
+            _canonicalStatus.value = "Opening conversation..."
+            timelineJob = scope.launch {
+                try {
+                    val presentation = canonical(requireNotNull(conversation.agentId) { "Canonical route requires an agent" }, conversationId, this)
+                    try {
+                        if (!isActiveSelection(generation)) return@launch
+                        _canonicalPresentation.value = presentation
+                        _state.update { it.withRuntimeState(ChatSessionReducer.hydrateCompleted(it.runtimeState, generation)) }
+                        kotlinx.coroutines.awaitCancellation()
+                    } finally {
+                        if (_canonicalPresentation.value === presentation) _canonicalPresentation.value = null
+                        presentation.close()
+                    }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (failure: Exception) {
+                    if (isActiveSelection(generation)) {
+                        _canonicalStatus.value = failure.message ?: "Canonical timeline failed to open"
+                        _state.update {
+                            it.withRuntimeState(ChatSessionReducer.hydrateFailed(it.runtimeState, generation,
+                                failure.message ?: "Canonical timeline failed to open"))
+                        }
+                    }
+                }
+            }
+            return
         }
 
         val selectionStart = System.currentTimeMillis()
