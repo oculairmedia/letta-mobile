@@ -72,14 +72,18 @@ class RoomValidationMeasuredTest {
     }
 
     @Test fun twentyEightThousandRowsAreMeasuredAndCheckpointStorageDoesNotGrow() = runBlocking {
-        audit(28000, false)
+        // The handoff cost must not scale with history: 28k rows still settle inside the bound.
+        val measured = audit(28000, false)
+        assertTrue("handoff read ${measured.rows} rows", measured.rows <= 128)
+        assertTrue("handoff read ${measured.bytes} bytes", measured.bytes <= 65536)
     }
 
     @Test fun chainedRootMultiChunkRestartCancellationAndPointOnlyHandoff() = runBlocking {
-        audit(2, true)
+        val measured = audit(2, true)
+        assertTrue("handoff contains range queries: ${measured.sql}", measured.sql.none { it.contains("ORDER BY") })
     }
 
-    private suspend fun audit(count: Int, chained: Boolean) {
+    private suspend fun audit(count: Int, chained: Boolean): Meter.Snapshot {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val meter = Meter()
         // Separate FIFO query executors permit nested legacy -> target transactions. Barriers
@@ -178,6 +182,7 @@ class RoomValidationMeasuredTest {
             val measured = meter.snapshot()
             assertTrue("handoff contains range queries: ${measured.sql}", measured.sql.none { it.contains("ORDER BY") })
             assertTrue(measured.rows <= 128 && measured.bytes <= 65536)
+            return measured
         } finally {
             target.close(); legacy.close()
             legacyQueries.shutdown(); targetQueries.shutdown()

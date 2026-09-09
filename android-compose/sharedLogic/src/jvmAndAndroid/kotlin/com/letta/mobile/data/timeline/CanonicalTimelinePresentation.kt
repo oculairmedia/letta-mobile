@@ -41,8 +41,16 @@ class CanonicalTimelinePresentation private constructor(
     init {
         job.invokeOnCompletion {
             CoroutineScope(parentScope.coroutineContext + NonCancellable).launch {
-                try { coordinator.detach(lease); detached.complete(Unit) }
-                catch (failure: Throwable) { detached.completeExceptionally(failure) }
+                try {
+                    coordinator.detach(lease)
+                    detached.complete(Unit)
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    // Retiring the viewport is not a detach failure; close() awaits this.
+                    detached.completeExceptionally(cancelled)
+                    throw cancelled
+                } catch (failure: Throwable) {
+                    detached.completeExceptionally(failure)
+                }
             }
         }
     }

@@ -240,6 +240,8 @@ class ChatPushService : Service() {
                     // Best-effort: look up the conversation's agent for a nice title.
                     val conv = conversationApi.getConversation(ConversationId(conversationId))
                     conv.agentId.value to agentRepository.agents.value.firstOrNull { it.id == conv.agentId }?.name.orEmpty()
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
                 } catch (_: Exception) {
                     "" to ""
                 }
@@ -346,6 +348,8 @@ class ChatPushService : Service() {
                             try {
                                 timelineRepository.getOrCreate(conversationId)
                                 WarmupResult.Success
+                            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                                throw cancelled
                             } catch (t: Throwable) {
                                 Log.w(TAG, "warmup getOrCreate failed for $conversationId", t)
                                 WarmupResult.Failure
@@ -362,6 +366,8 @@ class ChatPushService : Service() {
                     "failureCount" to failureCount,
                     "activeLoopCountAfter" to timelineRepository.cachedLoopCount(),
                 )
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
             } catch (t: Throwable) {
                 warmupTimer.stopError(
                     t,

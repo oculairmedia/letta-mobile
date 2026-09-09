@@ -24,7 +24,7 @@ interface BackendConversationCursorDao {
     @Query("SELECT highestSeenSeq FROM backend_conversation_cursors WHERE backendId = :backend AND conversationId = :conversation")
     suspend fun get(backend: String, conversation: String): Long?
 
-    @Query("SELECT * FROM backend_conversation_cursors WHERE backendId = :backend ORDER BY conversationId")
+    @Query("SELECT backendId, conversationId, highestSeenSeq FROM backend_conversation_cursors WHERE backendId = :backend ORDER BY conversationId")
     suspend fun list(backend: String): List<BackendConversationCursorEntity>
 
     @Query("DELETE FROM backend_conversation_cursors WHERE backendId = :backend AND conversationId = :conversation")

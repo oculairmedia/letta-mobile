@@ -16,8 +16,13 @@ class TimelineOwnershipAuthorityTest {
     private fun authority() = TimelineOwnershipAuthority(temporary.root.toPath())
     private val receipt = TimelineOwnershipAuthority.Receipt("source", "generation", 7)
 
-    private suspend fun rejected(block: suspend () -> Unit) {
-        try { block(); fail("Expected ownership rejection") } catch (_: IllegalStateException) { }
+    private suspend fun rejected(block: suspend () -> Unit): IllegalStateException {
+        try {
+            block()
+        } catch (rejection: IllegalStateException) {
+            return rejection
+        }
+        fail("Expected ownership rejection")
     }
 
     @Test fun restartFencesOldLeasesAndCanonicalNeverRollsBack() = runBlocking {
@@ -168,7 +173,10 @@ class TimelineOwnershipAuthorityTest {
         val backend = Files.list(temporary.root.toPath()).use { it.findFirst().get() }
         val state = Files.list(backend).use { paths -> paths.filter { it.toString().endsWith(".state") }.findFirst().get() }
         Files.write(state, ByteArray(65537))
-        rejected { authority().acquire(scope, TimelineOwnershipAuthority.Route.Legacy) }
-        rejected { authority().acquire(scope, TimelineOwnershipAuthority.Route.Canonical) }
+        // Corruption must fence both routes rather than silently reopening as legacy.
+        val legacy = rejected { authority().acquire(scope, TimelineOwnershipAuthority.Route.Legacy) }
+        val canonical = rejected { authority().acquire(scope, TimelineOwnershipAuthority.Route.Canonical) }
+        assertNotNull(legacy.message)
+        assertNotNull(canonical.message)
     }
 }

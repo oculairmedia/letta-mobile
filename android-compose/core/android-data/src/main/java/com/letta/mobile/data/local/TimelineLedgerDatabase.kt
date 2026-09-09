@@ -126,25 +126,25 @@ interface TimelineLedgerDao {
     @Query("SELECT substr(payload, max(0, :start) + 1, min(32768, max(0, :limit))) FROM ledger_chunk WHERE scope = :scope AND pointer = :pointer AND ordinal = :ordinal")
     suspend fun auditChunk(scope: ByteArray, pointer: String, ordinal: Long, start: Int, limit: Int): ByteArray?
 
-    @Query("SELECT * FROM ledger_evidence WHERE scope = :scope AND identity != :excluded AND identity > :after ORDER BY identity LIMIT 1")
+    @Query("SELECT scope, identity, pointer, bytes FROM ledger_evidence WHERE scope = :scope AND identity != :excluded AND identity > :after ORDER BY identity LIMIT 1")
     suspend fun auditEvidence(scope: ByteArray, excluded: ByteArray, after: ByteArray): LedgerEvidence?
 
-    @Query("SELECT * FROM ledger_evidence WHERE scope = :scope AND identity != :excluded ORDER BY identity LIMIT 1")
+    @Query("SELECT scope, identity, pointer, bytes FROM ledger_evidence WHERE scope = :scope AND identity != :excluded ORDER BY identity LIMIT 1")
     suspend fun auditEvidenceFirst(scope: ByteArray, excluded: ByteArray): LedgerEvidence?
 
-    @Query("SELECT * FROM ledger_tool_call WHERE scope = :scope AND callId > :after ORDER BY callId LIMIT 1")
+    @Query("SELECT scope, callId, owner, returned, unresolved FROM ledger_tool_call WHERE scope = :scope AND callId > :after ORDER BY callId LIMIT 1")
     suspend fun auditTool(scope: ByteArray, after: ByteArray): LedgerToolCall?
 
-    @Query("SELECT * FROM ledger_tool_call WHERE scope = :scope ORDER BY callId LIMIT 1")
+    @Query("SELECT scope, callId, owner, returned, unresolved FROM ledger_tool_call WHERE scope = :scope ORDER BY callId LIMIT 1")
     suspend fun auditToolFirst(scope: ByteArray): LedgerToolCall?
 
-    @Query("SELECT * FROM ledger_tool_call WHERE scope = :scope AND callId = :callId")
+    @Query("SELECT scope, callId, owner, returned, unresolved FROM ledger_tool_call WHERE scope = :scope AND callId = :callId")
     suspend fun toolCall(scope: ByteArray, callId: ByteArray): LedgerToolCall?
 
-    @Query("SELECT * FROM ledger_tool_call WHERE scope = :scope AND unresolved = 1 AND owner IS NOT NULL AND returned = 0 ORDER BY callId LIMIT min(128, max(0, :limit))")
+    @Query("SELECT scope, callId, owner, returned, unresolved FROM ledger_tool_call WHERE scope = :scope AND unresolved = 1 AND owner IS NOT NULL AND returned = 0 ORDER BY callId LIMIT min(128, max(0, :limit))")
     suspend fun unresolvedTools(scope: ByteArray, limit: Int): List<LedgerToolCall>
 
-    @Query("SELECT * FROM ledger_tool_call WHERE scope = :scope AND unresolved = 1 AND callId > :after AND owner IS NOT NULL AND returned = 0 ORDER BY callId LIMIT min(128, max(0, :limit))")
+    @Query("SELECT scope, callId, owner, returned, unresolved FROM ledger_tool_call WHERE scope = :scope AND unresolved = 1 AND callId > :after AND owner IS NOT NULL AND returned = 0 ORDER BY callId LIMIT min(128, max(0, :limit))")
     suspend fun unresolvedToolsAfter(scope: ByteArray, after: ByteArray, limit: Int): List<LedgerToolCall>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
