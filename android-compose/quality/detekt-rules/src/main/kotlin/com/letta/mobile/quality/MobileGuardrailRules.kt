@@ -24,6 +24,7 @@ import org.jetbrains.kotlin.psi.KtProperty
 import org.jetbrains.kotlin.psi.KtStringTemplateExpression
 import org.jetbrains.kotlin.psi.KtThrowExpression
 import org.jetbrains.kotlin.psi.KtTypeAlias
+import org.jetbrains.kotlin.psi.KtTypeParameter
 import org.jetbrains.kotlin.psi.KtTypeReference
 import org.jetbrains.kotlin.psi.KtTryExpression
 import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
@@ -63,11 +64,19 @@ internal class NoAnyType(config: Config = Config.empty) : MobileRule(
 
     override fun visitTypeReference(typeReference: KtTypeReference) {
         super.visitTypeReference(typeReference)
+        if (typeReference.isTypeParameterBound()) return
         val bannedAlias = typeReference.collectTypeNames().firstOrNull(anyTypeAliases::contains)
         if (typeReference.containsAnyType() || bannedAlias != null) {
             report(typeReference, "Replace '${typeReference.text}' with a typed model or boundary adapter.")
         }
     }
+
+    /**
+     * `<T : Any>` is Kotlin's way of excluding null from a type parameter, not a value typed as
+     * Any. Narrowing it to satisfy this rule would restrict what the generic accepts, so the bound
+     * is exempt while every actual Any-typed value stays reported.
+     */
+    private fun KtTypeReference.isTypeParameterBound(): Boolean = parent is KtTypeParameter
 
     private fun KtTypeReference.containsAnyType(): Boolean =
         collectTypeNames().any { it == "Any" || it == "kotlin.Any" }

@@ -18,6 +18,15 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
+/** One captured config, pinned for the lifetime of a single selected-runtime capture. */
+private class CapturedSettings(
+    delegate: ISettingsRepository,
+    config: com.letta.mobile.data.model.LettaConfig,
+) : ISettingsRepository by delegate {
+    override val activeConfig = MutableStateFlow<com.letta.mobile.data.model.LettaConfig?>(config)
+    override val activeConfigChanges = flowOf(config)
+}
+
 class ProductionSelectedChatRuntimeProvider @Inject constructor(
     private val sessions: SessionManager,
     private val factory: AndroidCanonicalTimelineRuntimeFactory,
@@ -30,10 +39,7 @@ class ProductionSelectedChatRuntimeProvider @Inject constructor(
     private fun capture(graph: SessionGraph, agent: String): SelectedChatRuntime? {
         val config = checkNotNull(graph.capturedConfig) { "Production graph has no captured config" }
         if (!allowsCapturedCanonicalRuntime(graph.localRuntimeBackend != null, config.serverUrl)) return null
-        val capturedSettings = object : ISettingsRepository by settings {
-            override val activeConfig = MutableStateFlow<com.letta.mobile.data.model.LettaConfig?>(config)
-            override val activeConfigChanges = flowOf(config)
-        }
+        val capturedSettings = CapturedSettings(settings, config)
         return CapturedSelectedChatRuntime(graph, agent, factory, capturedSettings, legacyWriter)
     }
 }
