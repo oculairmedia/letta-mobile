@@ -8,7 +8,10 @@ import kotlinx.coroutines.launch
 
 /** One bounded window replaces the previous one. No read occurs before an explicit click. */
 @Composable
-internal fun DeferredWindowControls(identity: Any, read: suspend (Long) -> TimelineSemanticWindowResult) {
+internal fun DeferredWindowControls(
+    identity: com.letta.mobile.data.chat.projection.ChatRenderItem,
+    read: suspend (Long) -> TimelineSemanticWindowResult,
+) {
     val scope = rememberCoroutineScope()
     var text by remember(identity) { mutableStateOf<String?>(null) }
     var offset by remember(identity) { mutableStateOf(0L) }
