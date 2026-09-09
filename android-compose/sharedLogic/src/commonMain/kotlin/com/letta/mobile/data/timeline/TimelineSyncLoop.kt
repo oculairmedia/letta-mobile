@@ -248,6 +248,13 @@ class TimelineSyncLoop(
         val capturedDelta = pendingPersistenceDelta.snapshot()
         val planningDecision = decideIncrementalPlan(snapshotScope, committedState.timeline, capturedDelta)
         emitPlanningDecision(planningDecision, capturedDelta)
+        if (planningDecision.result is TimelineIncrementalSnapshotPlanner.Result.NoWork) {
+            // Sequence-safe known-no-persisted-change state: local-only updates (append, retry,
+            // delivery state) produce no confirmed delta against an already-persisted baseline.
+            // Acknowledge the sequence without full-envelope planning, store write, or revision consumption.
+            pendingPersistenceDelta.acknowledge(capturedDelta.throughSequence)
+            return
+        }
         val incremental = planningDecision.result
         if (canPersistIncremental(planningDecision)) {
             persistIncrementalSnapshot(
@@ -259,6 +266,19 @@ class TimelineSyncLoop(
             )
             return
         }
+        // letta-mobile-94bt8.1 AC1: EVERY full scan reports why.
+        // Reuse planningDecision.reason directly so that store_unsupported is preserved
+        // rather than being incorrectly reported as checkpoint_due.
+        val fallbackReason = requireNotNull(planningDecision.reason) {
+            "planningDecision.reason must not be null when full scan fallback is planned"
+        }
+        Telemetry.event(
+            "TimelineSync", "snapshotPersist.fullScanPlanned",
+            *identityAttrs(),
+            "reason" to fallbackReason.name,
+            "dirtyIdentities" to capturedDelta.dirtyIdentityCount,
+            "metadataChanged" to capturedDelta.metadataChanged,
+        )
         val (provisionalEnvelope, fingerprint) = withContext(ioDispatcher) {
             val envelope = TimelineSnapshotCodec.timelineToStoredEnvelope(
                 timeline = committedState.timeline,
@@ -328,7 +348,7 @@ class TimelineSyncLoop(
     internal data class IncrementalPlanningDecision(
         val result: TimelineIncrementalSnapshotPlanner.Result,
         val checkpointDue: Boolean,
-        val reason: String,
+        val reason: SnapshotPlanningFallback?,
         val baseRevision: Long?,
         val targetRevision: Long,
         // Whether the underlying store can serve a real incremental commit. When false, a
@@ -345,27 +365,39 @@ class TimelineSyncLoop(
         val targetRevision = snapshotRevision + 1
         val baseline = lastPersistedEnvelope
         val storeSupportsIncremental = confirmedTimelineStore.supportsIncrementalCommit
-        val result = if (baseline != null && !delta.isEmpty) {
-            TimelineIncrementalSnapshotPlanner.plan(
-                timeline = timeline,
-                scope = snapshotScope,
-                baseRevision = baseline.revision,
-                targetRevision = targetRevision,
-                writtenAtMillis = timelineCurrentTimeMillis(),
-                delta = delta,
-            )
-        } else {
-            TimelineIncrementalSnapshotPlanner.Result.FullScan(
-                if (baseline == null) "baseline_missing" else "delta_empty",
-            )
+        val result = when {
+            baseline == null -> {
+                TimelineIncrementalSnapshotPlanner.Result.FullScan(SnapshotPlanningFallback.BASELINE_MISSING)
+            }
+            delta.requiresFullRescan -> {
+                TimelineIncrementalSnapshotPlanner.Result.FullScan(
+                    requireNotNull(delta.fallbackReason),
+                )
+            }
+            delta.isNoWork -> {
+                TimelineIncrementalSnapshotPlanner.Result.NoWork
+            }
+            delta.isEmpty -> {
+                TimelineIncrementalSnapshotPlanner.Result.FullScan(SnapshotPlanningFallback.DELTA_EMPTY)
+            }
+            else -> {
+                TimelineIncrementalSnapshotPlanner.plan(
+                    timeline = timeline,
+                    scope = snapshotScope,
+                    baseRevision = baseline.revision,
+                    targetRevision = targetRevision,
+                    writtenAtMillis = timelineCurrentTimeMillis(),
+                    delta = delta,
+                )
+            }
         }
         val checkpointDue = result is TimelineIncrementalSnapshotPlanner.Result.Planned && isLegacyCheckpointDue(result.plan)
         // Reason precedence for telemetry: explicit gates first, planner verdict last.
-        val reason = when {
-            checkpointDue -> "checkpoint_due"
-            result is TimelineIncrementalSnapshotPlanner.Result.Planned && !storeSupportsIncremental -> "store_unsupported"
+        val reason: SnapshotPlanningFallback? = when {
+            checkpointDue -> SnapshotPlanningFallback.CHECKPOINT_DUE
+            result is TimelineIncrementalSnapshotPlanner.Result.Planned && !storeSupportsIncremental -> SnapshotPlanningFallback.STORE_UNSUPPORTED
             result is TimelineIncrementalSnapshotPlanner.Result.FullScan -> result.reason
-            else -> "delta"
+            else -> null
         }
         return IncrementalPlanningDecision(
             result = result,
@@ -384,11 +416,21 @@ class TimelineSyncLoop(
         val plan = (decision.result as? TimelineIncrementalSnapshotPlanner.Result.Planned)?.plan
         val comparisonEvents = (plan as? NormalizedTimelineCommitPlan.Apply)?.commit?.comparisonEvents ?: 0
         val encodedRows = (plan as? NormalizedTimelineCommitPlan.Apply)?.commit?.encodedRows ?: 0
+        val planningMode = when {
+            decision.result is TimelineIncrementalSnapshotPlanner.Result.NoWork -> "no_work"
+            canPersistIncremental(decision) -> "delta"
+            else -> "full_scan"
+        }
+        val reasonStr = when {
+            decision.reason != null -> decision.reason.name
+            decision.result is TimelineIncrementalSnapshotPlanner.Result.NoWork -> "no_work"
+            else -> "delta"
+        }
         Telemetry.event(
             "TimelineSync", "snapshotPersist.planningDecision",
             *identityAttrs(),
-            "planningMode" to if (canPersistIncremental(decision)) "delta" else "full_scan",
-            "reason" to decision.reason,
+            "planningMode" to planningMode,
+            "reason" to reasonStr,
             "throughSequence" to delta.throughSequence,
             "dirtyChanged" to delta.changedConfirmedServerIds.size,
             "dirtyDeleted" to delta.deletedConfirmedServerIds.size,

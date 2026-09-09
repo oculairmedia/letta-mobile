@@ -5,7 +5,8 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
-import android.app.Service
+import androidx.lifecycle.LifecycleService
+import androidx.lifecycle.lifecycleScope
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -16,7 +17,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.letta.mobile.MainActivity
-import com.letta.mobile.R
+import ca.oculair.meridian.R
 import com.letta.mobile.data.api.ConversationApi
 import com.letta.mobile.data.channel.CurrentConversationTracker
 import com.letta.mobile.data.channel.NotificationCandidatePhase
@@ -77,7 +78,7 @@ fun clearIngestedListenerIfActive(
  * See letta-mobile-mge5 for the architectural epic.
  */
 @AndroidEntryPoint
-class ChatPushService : Service() {
+class ChatPushService : LifecycleService() {
 
     /**
      * Single field inject required by `@AndroidEntryPoint`. Collaborators live
@@ -85,7 +86,9 @@ class ChatPushService : Service() {
      */
     @Inject lateinit var deps: ChatPushServiceDependencies
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    // LifecycleService owns this scope and cancels it at onDestroy, so the service no longer
+    // holds a root scope whose cancellation depends on remembering to do it by hand.
+    private val scope get() = lifecycleScope
     private var warmupJob: Job? = null
     private var installedIngestedListener: IngestedMessageListener? = null
 
@@ -96,7 +99,10 @@ class ChatPushService : Service() {
     private val channelNotificationPublisher get() = deps.channelNotificationPublisher
     private val currentConversationTracker get() = deps.currentConversationTracker
 
-    override fun onBind(intent: Intent?): IBinder? = null
+    override fun onBind(intent: Intent): IBinder? {
+        super.onBind(intent)
+        return null
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -119,6 +125,8 @@ class ChatPushService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // LifecycleService dispatches its lifecycle events from these super calls.
+        super.onStartCommand(intent, flags, startId)
         // letta-mobile-jmzq.5: track service restarts (Android may restart after
         // being killed, onStartCommand fires without onCreate in that case).
         Telemetry.event(
@@ -135,7 +143,6 @@ class ChatPushService : Service() {
     override fun onDestroy() {
         Telemetry.event("ChatPushService", "destroyed")
         clearInstalledListener()
-        scope.cancel()
         super.onDestroy()
     }
 
@@ -240,6 +247,8 @@ class ChatPushService : Service() {
                     // Best-effort: look up the conversation's agent for a nice title.
                     val conv = conversationApi.getConversation(ConversationId(conversationId))
                     conv.agentId.value to agentRepository.agents.value.firstOrNull { it.id == conv.agentId }?.name.orEmpty()
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
                 } catch (_: Exception) {
                     "" to ""
                 }
@@ -301,7 +310,7 @@ class ChatPushService : Service() {
         // tapped) and starts its own subscriber from there. Foreground UI
         // getOrCreate remains on-demand and is not evicted by this budget.
         warmupJob?.cancel()
-        warmupJob = scope.launch {
+        warmupJob = scope.launch(Dispatchers.IO) {
             val warmupTimer = Telemetry.startTimer("ChatPushService", "warmup")
             val currentConversationId = currentConversationTracker.current
             try {
@@ -346,6 +355,8 @@ class ChatPushService : Service() {
                             try {
                                 timelineRepository.getOrCreate(conversationId)
                                 WarmupResult.Success
+                            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                                throw cancelled
                             } catch (t: Throwable) {
                                 Log.w(TAG, "warmup getOrCreate failed for $conversationId", t)
                                 WarmupResult.Failure
@@ -362,6 +373,8 @@ class ChatPushService : Service() {
                     "failureCount" to failureCount,
                     "activeLoopCountAfter" to timelineRepository.cachedLoopCount(),
                 )
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
             } catch (t: Throwable) {
                 warmupTimer.stopError(
                     t,

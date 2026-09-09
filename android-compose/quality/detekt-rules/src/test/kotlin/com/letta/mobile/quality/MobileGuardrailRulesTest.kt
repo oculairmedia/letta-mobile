@@ -21,6 +21,21 @@ class MobileGuardrailRulesTest {
     }
 
     @Test
+    fun `a non-null type parameter bound passes while an Any valued generic still fails`() {
+        // <T : Any> excludes null from a type parameter; it is not a value typed as Any, and
+        // narrowing it would restrict what the generic accepts.
+        val bound = """
+            fun <T : Any> firstOf(values: List<T>): T = values.first()
+            inline fun <reified R : Any> decode(raw: String): R? = null
+        """.trimIndent()
+        val valued = """
+            fun <T : Any> store(value: T, fallback: Any): T = value
+        """.trimIndent()
+        assertEquals(0, NoAnyType().compileAndLint(bound).size)
+        assertEquals(1, NoAnyType().compileAndLint(valued).size)
+    }
+
+    @Test
     fun `Room star projection fails and named columns pass`() {
         val bad = """interface Dao { @Query("SELECT * FROM agents") fun agents(): List<String> }"""
         val good = """interface Dao { @Query("SELECT id, name FROM agents") fun agents(): List<String> }"""

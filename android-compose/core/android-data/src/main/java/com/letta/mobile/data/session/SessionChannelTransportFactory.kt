@@ -36,6 +36,7 @@ class SessionChannelTransportFactory @Inject constructor(
         activeConfig: LettaConfig?,
         localRuntimeBackend: LocalLettaBackend?,
         settingsRepository: ISettingsRepository?,
+        capturedCursorStore: com.letta.mobile.data.local.CapturedBackendConversationCursorStore? = null,
     ): IChannelTransport {
         val forceIroh = IrohChannelTransport.shouldUseIroh(activeConfig?.serverUrl)
         fun reportChoice(chosen: String) {
@@ -79,7 +80,8 @@ class SessionChannelTransportFactory @Inject constructor(
                     NoOpChannelTransport()
                 } else {
                     reportChoice("ws-default")
-                    ChannelTransport(scope, runCursorStore, conversationCursorStore)
+                    // Replay readers and frame writers share the graph's captured namespace.
+                    ChannelTransport(scope, runCursorStore, capturedCursorStore ?: conversationCursorStore)
                 }
             }
         }

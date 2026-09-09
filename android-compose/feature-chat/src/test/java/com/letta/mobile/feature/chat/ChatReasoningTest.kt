@@ -35,6 +35,16 @@ class ChatReasoningTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    /**
+     * The reasoning body enters behind an AnimatedVisibility, so the node exists before it is
+     * displayed. Settle that motion on the test clock rather than asserting on the frame that
+     * happens to follow setContent, which passes or fails with machine load.
+     */
+    private fun settleReasoningEnter() {
+        composeRule.mainClock.advanceTimeBy(1_000)
+        composeRule.waitForIdle()
+    }
+
     @Test
     fun activeReasoningWithBlankContentShowsLiveStatusIndicator() {
         val blankActiveMessage = UiMessage(
@@ -96,6 +106,7 @@ class ChatReasoningTest {
             }
         }
 
+        settleReasoningEnter()
         composeRule.onNodeWithText("Thought for 1.5s").assertIsDisplayed()
         composeRule.onNodeWithTag(ChatReasoningTestTags.Content).assertIsDisplayed()
     }
@@ -210,6 +221,7 @@ class ChatReasoningTest {
         }
 
         composeRule.waitForIdle()
+        settleReasoningEnter()
         composeRule.onNodeWithTag(ChatReasoningTestTags.Content).assertIsDisplayed()
 
         // Non-prefix replacement
@@ -220,6 +232,7 @@ class ChatReasoningTest {
         }
 
         composeRule.waitForIdle()
+        settleReasoningEnter()
         composeRule.onNodeWithTag(ChatReasoningTestTags.Content).assertIsDisplayed()
     }
 
@@ -252,6 +265,7 @@ class ChatReasoningTest {
             }
         }
 
+        settleReasoningEnter()
         composeRule.onNodeWithTag(ChatReasoningTestTags.Content).assertIsDisplayed()
     }
 

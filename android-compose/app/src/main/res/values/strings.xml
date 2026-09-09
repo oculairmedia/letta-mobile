@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Letta</string>
+    <string name="app_name">Meridian</string>
     
     <string name="common_conversations">Conversations</string>
     <string name="common_agents">Agents</string>

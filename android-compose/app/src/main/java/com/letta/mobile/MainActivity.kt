@@ -98,9 +98,8 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            // Surface any uncaught crash from the previous session exactly once.
-            // Snackbar with a "Copy id" action lets the user file a ticket tied
-            // to the Sentry event. Dismissing clears the on-disk record.
+            // Surface the previous crash briefly without blocking the composer.
+            // Copy/dismiss leaves the diagnostic record available on disk.
             val lastCrashState = crashReporter.lastCrash.collectAsStateWithLifecycle()
             LaunchedEffect(lastCrashState.value) {
                 val crash = lastCrashState.value ?: return@LaunchedEffect
@@ -110,6 +109,8 @@ class MainActivity : ComponentActivity() {
                 val result = snackbarHostState.showSnackbar(
                     message = summary,
                     actionLabel = label,
+                    withDismissAction = true,
+                    duration = androidx.compose.material3.SnackbarDuration.Long,
                 )
                 if (result == SnackbarResult.ActionPerformed) {
                     val payload = crash.sentryEventId

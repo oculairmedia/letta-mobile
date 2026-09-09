@@ -55,6 +55,18 @@ interface TimelineExternalTransportWriter {
 
     suspend fun repairExpiredConversationCursorScoped(agentId: String?, conversationId: String, fallbackSeq: Long?)
 
+    /**
+     * Cursor-expiry recovery with the server's retained hello [expectedWatermark] (`after_seq`).
+     * Default ignores the watermark and delegates to the legacy three-arg path.
+     * Production captured runtimes must override and CAS-replace after a generation-fenced commit.
+     */
+    suspend fun repairExpiredConversationCursorScoped(
+        agentId: String?,
+        conversationId: String,
+        fallbackSeq: Long?,
+        expectedWatermark: Long?,
+    ) = repairExpiredConversationCursorScoped(agentId, conversationId, fallbackSeq)
+
     suspend fun clearExternalTransportActive(conversationId: String)
 
     suspend fun clearExternalTransportActive(agentId: String?, conversationId: String)

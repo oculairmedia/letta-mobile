@@ -10,7 +10,12 @@ on:
       - "scripts/ci/**"
       - "scripts/tests/**"
   pull_request:
-    branches: [main]
+    # Required contexts (test / build-apk-pass / shared-multiplatform) must report
+    # on stacked letta/** PRs as well as PRs into main. Do not infer those results
+    # from the base branch.
+    branches:
+      - main
+      - "letta/**"
     paths:
       # Broadened to all workflow files so a PR that only edits CI config still
       # triggers the required checks (test/build-apk-pass/shared-multiplatform).

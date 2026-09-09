@@ -2,7 +2,7 @@ package com.letta.mobile.ui.screens.dashboard
 
 import androidx.annotation.StringRes
 import androidx.compose.ui.graphics.vector.ImageVector
-import com.letta.mobile.R
+import ca.oculair.meridian.R
 import com.letta.mobile.ui.icons.LettaIcons
 
 /**

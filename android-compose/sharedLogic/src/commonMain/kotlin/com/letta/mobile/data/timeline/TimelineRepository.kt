@@ -84,6 +84,31 @@ open class TimelineRepository(
     // [loopsMutex], which makes the remove+reinsert touch safe.
     private val loops = LinkedHashMap<TimelineCacheKey, TimelineSyncLoop>()
     private val loopsMutex = Mutex()
+    private val legacyAdmission = TimelineLegacyAdmission()
+    private val externalAdmission = TimelineLegacyAdmission()
+    val admittedExternalWriter: TimelineExternalTransportWriter by lazy {
+        AdmittedTimelineExternalWriter(this, externalAdmission)
+    }
+
+    /** Stop creators/hydration before draining persistence. Does not delete durable history. */
+    suspend fun drainForCanonicalHandoff(conversationId: String) {
+        // Drain whole external operations before closing the nested creator gate.
+        externalAdmission.close(conversationId)
+        legacyAdmission.close(conversationId)
+        val retiring = loopsMutex.withLock {
+            val keys = loops.keys.filter { it.conversationId == conversationId }
+            val owned = keys.mapNotNull { loops.remove(it) }
+            publishLoopSnapshotLocked()
+            owned
+        }
+        // Never join while holding the repository map mutex.
+        withContext(kotlinx.coroutines.NonCancellable) {
+            retiring.forEach { loop ->
+                removeHydrateFlight(loop)
+                loop.closeAndJoin()
+            }
+        }
+    }
 
     // Immutable publication for synchronous UI cache probes. Replaced only
     // while loopsMutex is held, so readers never touch the mutable LRU map.
@@ -200,6 +225,14 @@ open class TimelineRepository(
         // letta-mobile-grrhq: DIAGNOSTIC ONLY, defaulted so every existing call
         // site keeps compiling and reports UNSPECIFIED rather than vanishing.
         provenance: TimelineAcquisitionProvenance = TimelineAcquisitionProvenance.UNSPECIFIED,
+    ): TimelineSyncLoop = legacyAdmission.admitted(conversationId) {
+        getOrCreateAdmitted(agentId, conversationId, provenance)
+    }
+
+    private suspend fun getOrCreateAdmitted(
+        agentId: String?,
+        conversationId: String,
+        provenance: TimelineAcquisitionProvenance,
     ): TimelineSyncLoop {
         val key = TimelineCacheKey(agentId = agentId, conversationId = conversationId)
         TimelineAcquisitionTelemetry.emitEntry(
@@ -222,7 +255,7 @@ open class TimelineRepository(
             }
             return cached
         }
-        val loop = getOrCreateLoopWithoutHydrate(key, provenance, emitEntry = false)
+        val loop = createWithoutHydrateAdmitted(key, provenance, emitEntry = false)
         // Hydrate OUTSIDE the mutex so parallel callers don't block each other.
         // letta-mobile-oznnh: concurrent same-conversation callers now JOIN the
         // in-flight hydration instead of starting a duplicate one — the loop
@@ -362,6 +395,14 @@ open class TimelineRepository(
         // again here would double-log every acquisition and make the correlated
         // chain ambiguous. Direct callers of this creator emit their own.
         emitEntry: Boolean = true,
+    ): TimelineSyncLoop = legacyAdmission.admitted(key.conversationId) {
+        createWithoutHydrateAdmitted(key, provenance, emitEntry)
+    }
+
+    private suspend fun createWithoutHydrateAdmitted(
+        key: TimelineCacheKey,
+        provenance: TimelineAcquisitionProvenance,
+        emitEntry: Boolean,
     ): TimelineSyncLoop {
         if (emitEntry) {
             TimelineAcquisitionTelemetry.emitEntry(

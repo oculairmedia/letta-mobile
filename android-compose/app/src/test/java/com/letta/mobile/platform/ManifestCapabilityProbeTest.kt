@@ -28,7 +28,7 @@ class ManifestCapabilityProbeTest {
         context = mockk()
         packageManager = mockk()
         every { context.packageManager } returns packageManager
-        every { context.packageName } returns "com.letta.mobile"
+        every { context.packageName } returns "ca.oculair.meridian"
     }
 
     // --- hasDeclaredPermission Tests ---
@@ -41,7 +41,7 @@ class ManifestCapabilityProbeTest {
         }
 
         every {
-            packageManager.getPackageInfo("com.letta.mobile", PackageManager.GET_PERMISSIONS)
+            packageManager.getPackageInfo("ca.oculair.meridian", PackageManager.GET_PERMISSIONS)
         } returns packageInfo
 
         val result = ManifestCapabilityProbe.hasDeclaredPermission(context, "android.permission.INTERNET")
@@ -57,7 +57,7 @@ class ManifestCapabilityProbeTest {
 
         every {
             packageManager.getPackageInfo(
-                "com.letta.mobile",
+                "ca.oculair.meridian",
                 any<PackageManager.PackageInfoFlags>()
             )
         } returns packageInfo
@@ -75,7 +75,7 @@ class ManifestCapabilityProbeTest {
 
         every {
             packageManager.getPackageInfo(
-                "com.letta.mobile",
+                "ca.oculair.meridian",
                 any<PackageManager.PackageInfoFlags>()
             )
         } returns packageInfo
@@ -93,7 +93,7 @@ class ManifestCapabilityProbeTest {
 
         every {
             packageManager.getPackageInfo(
-                "com.letta.mobile",
+                "ca.oculair.meridian",
                 any<PackageManager.PackageInfoFlags>()
             )
         } returns packageInfo

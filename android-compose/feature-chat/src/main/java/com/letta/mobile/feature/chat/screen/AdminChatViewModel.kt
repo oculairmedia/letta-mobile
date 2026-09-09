@@ -43,6 +43,7 @@ import com.letta.mobile.runtime.RuntimeEventOutbox
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -54,7 +55,9 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 import com.letta.mobile.feature.chat.coordination.AdminChatAgentSelectionCoordinator
 import com.letta.mobile.feature.chat.coordination.AdminChatA2uiCoordinator
@@ -95,6 +98,7 @@ import com.letta.mobile.feature.chat.coordination.ChatSessionResolver
 import com.letta.mobile.feature.chat.coordination.ChatTimelineObserver
 import com.letta.mobile.feature.chat.coordination.LocalRuntimeRouting
 import com.letta.mobile.feature.chat.coordination.ProjectChatCoordinator
+import com.letta.mobile.feature.chat.coordination.retireSelectedGeneration
 import com.letta.mobile.data.chat.projection.ChatMessageListChange
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.ConversationState
@@ -137,6 +141,7 @@ internal class AdminChatViewModel @Inject constructor(
     private val routeArgs: ChatRouteArgs,
     private val messageRepository: MessageRepository,
     private val timelineRepository: TimelineRepository,
+    private val externalTimelineWriter: com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter,
     private val agentRepository: IAgentRepository,
     private val blockRepository: IBlockRepository,
     private val bugReportRepository: IBugReportRepository,
@@ -154,10 +159,16 @@ internal class AdminChatViewModel @Inject constructor(
     private val modelRepository: IModelRepository,
     val attachmentLimits: AttachmentLimits =
         AttachmentLimits.Default,
+    private val pagingHost: ChatPagingHost = ChatPagingHost(),
+    private val selectedRuntimeProvider: com.letta.mobile.feature.chat.coordination.SelectedChatRuntimeProvider? = null,
 ) : ViewModel() {
     companion object {
         private const val RESUME_CACHE_MAX_AGE_MS = 60_000L
     }
+
+    private val _pagingPresentation = MutableStateFlow<ChatPagingPresentation?>(null)
+    val pagingPresentation: StateFlow<ChatPagingPresentation?> = _pagingPresentation
+    private val pagingBinding = ChatPagingBinding()
 
     val agentId: AgentId = AgentId(routeArgs.agentId)
     /**
@@ -280,15 +291,69 @@ internal class AdminChatViewModel @Inject constructor(
     private val composerController: ChatComposerController = ChatComposerController(limits = attachmentLimits)
     private val chatBannerController: ChatBannerController = ChatBannerController(_uiState, composerController)
 
-    private val sendPipeline: AdminChatSendPipeline by lazy {
+    private var selectedRuntime: com.letta.mobile.feature.chat.coordination.SelectedChatRuntime? = null
+    private var selectedSendOwner: com.letta.mobile.feature.chat.coordination.SelectedChatSendOwner? = null
+    private var currentSendPipeline: AdminChatSendPipeline? = null
+    private var replacingSendRuntime = false
+    private var runtimeCollectorStarted = false
+    private var pipelineLifetime = com.letta.mobile.feature.chat.coordination.ChatPipelineLifetime(viewModelScope)
+
+    private val sendPipeline: AdminChatSendPipeline
+        get() {
+            if (!runtimeCollectorStarted) {
+                runtimeCollectorStarted = true
+                val runtimes = selectedRuntimeProvider?.runtimes(agentId.value)
+                selectedRuntime = runtimes?.value
+                selectedSendOwner = selectedRuntime?.let(::newSendOwner)
+                currentSendPipeline = createSendPipeline()
+                if (runtimes != null) viewModelScope.launch {
+                    try {
+                        runtimes.collect { next ->
+                            if (next !== selectedRuntime) {
+                                replacingSendRuntime = true
+                                retireSelectedGeneration(
+                                    stopPresentation = ::stopTimelineObserver,
+                                    pipeline = pipelineLifetime,
+                                    owner = selectedSendOwner,
+                                    runtime = selectedRuntime,
+                                )
+                                pipelineLifetime = com.letta.mobile.feature.chat.coordination.ChatPipelineLifetime(viewModelScope)
+                                selectedRuntime = next
+                                selectedSendOwner = next?.let(::newSendOwner)
+                                currentSendPipeline = createSendPipeline()
+                                replacingSendRuntime = false
+                                chatConversationCoordinator.activeConversationId?.let(::startTimelineObserver)
+                            }
+                        }
+                    } finally {
+                        replacingSendRuntime = true
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                            pipelineLifetime.retire()
+                            selectedSendOwner?.retire()
+                            selectedRuntime?.retire()
+                        }
+                    }
+                }
+            }
+            return checkNotNull(currentSendPipeline)
+        }
+
+    private fun newSendOwner(runtime: com.letta.mobile.feature.chat.coordination.SelectedChatRuntime) =
+        com.letta.mobile.feature.chat.coordination.SelectedChatSendOwner(
+            runtime.config, runtime.descriptor, runtime.writer, pipelineLifetime.scope,
+            prepareConversation = { runtime.ready(it) },
+        )
+
+    private fun createSendPipeline(): AdminChatSendPipeline =
         AdminChatSendPipeline(
-            scope = viewModelScope,
+            scope = pipelineLifetime.scope,
             agentId = agentId,
             isFreshRoute = isFreshRoute,
             explicitConversationId = explicitConversationId,
             projectContextAvailable = projectContext != null,
             conversationRepository = conversationRepository,
             timelineRepository = timelineRepository,
+            externalTimelineWriter = externalTimelineWriter,
             settingsRepository = settingsRepository,
             sessionManager = sessionManager,
             messageRepository = messageRepository,
@@ -305,8 +370,8 @@ internal class AdminChatViewModel @Inject constructor(
             activeConversationId = { chatConversationCoordinator.activeConversationId },
             setActiveConversationId = chatConversationCoordinator::setActiveConversationId,
             startTimelineObserver = ::startTimelineObserver,
+            selectedOwner = selectedSendOwner,
         )
-    }
 
     private val composerCoordinator: AdminChatComposerCoordinator
         get() = sendPipeline.composerCoordinator
@@ -402,7 +467,7 @@ internal class AdminChatViewModel @Inject constructor(
         val gen = chatConversationCoordinator.currentHydrationGeneration(convId)?.id ?: 0L
         viewModelScope.launch {
             try {
-                timelineRepository.reconcileRecentMessages(
+                (selectedRuntime?.writer ?: timelineRepository).reconcileRecentMessages(
                     agentId = agentId.value,
                     conversationId = convId,
                     reason = "screen_resumed",
@@ -441,7 +506,8 @@ internal class AdminChatViewModel @Inject constructor(
         )
     }
 
-    val composerState: StateFlow<ChatComposerState> by lazy { composerCoordinator.state }
+    // Every pipeline delegates to this same controller; no stale coordinator flow to flatten.
+    val composerState: StateFlow<ChatComposerState> = composerController.state
 
     val chatBackground: StateFlow<ChatBackground> = settingsRepository.getChatBackgroundKey()
         .map { ChatBackground.fromKey(it) }
@@ -577,6 +643,12 @@ internal class AdminChatViewModel @Inject constructor(
         syncA2uiHistorySnapshot = { convId, msgs -> adminChatA2uiCoordinator.syncA2uiHistorySnapshot(convId, msgs) },
         hydrationIdentity = ::hydrationIdentity,
     )
+    private val timelineRouteSession = com.letta.mobile.feature.chat.coordination.SelectedTimelineRouteSession(
+        startLegacyObserver = { conversationId ->
+            chatTimelineObserver.start(agentId.value, conversationId, timelineObserverProvenance())
+        },
+        stopLegacyObserver = { chatTimelineObserver.stopAndJoin() },
+    )
     private val chatConversationCoordinator: ChatConversationCoordinator = ChatConversationCoordinator(
         config = ChatConversationCoordinatorConfig(
             scope = viewModelScope,
@@ -602,7 +674,7 @@ internal class AdminChatViewModel @Inject constructor(
             reconcileLauncher = RecentMessagesReconcileLauncher(
                 scope = viewModelScope,
                 reconcile = { request ->
-                    timelineRepository.reconcileRecentMessages(
+                    (selectedRuntime?.writer ?: timelineRepository).reconcileRecentMessages(
                         agentId = agentId.value,
                         conversationId = request.conversationId,
                         reason = request.reason,
@@ -622,6 +694,7 @@ internal class AdminChatViewModel @Inject constructor(
     )
 
     private fun sendCoordinatorMessage(message: String) {
+        if (replacingSendRuntime) return
         sendPipeline.timelineChatSendStrategy.send(
             text = message,
             attachments = emptyList(),
@@ -684,22 +757,6 @@ internal class AdminChatViewModel @Inject constructor(
         )
     }
 
-    init {
-        viewModelScope.launch {
-            shimBackendDetector.refreshActive()
-            settingsRepository.activeConfigChanges.collect { config ->
-                shimBackendDetector.refresh(config)
-            }
-        }
-        transportCoordinator.startObserving()
-        goalCoordinator.startObserving()
-        slashCommandsCoordinator.loadSlashCommands()
-        refreshGoalStatus()
-        adminChatA2uiCoordinator
-        sendPipeline.ensureEagerInit()
-        chatSessionInitializer.run()
-    }
-
     private fun resolveConversationAndLoad(
         useClientModeForResolve: Boolean = false,
     ) = chatConversationCoordinator.resolveConversationAndLoad(
@@ -719,13 +776,13 @@ internal class AdminChatViewModel @Inject constructor(
     }
 
     fun loadOlderMessages() {
-        if (localRuntimeRouting() == LocalRuntimeRouting.LocalBound) return
+        if (_pagingPresentation.value != null || localRuntimeRouting() == LocalRuntimeRouting.LocalBound) return
         chatHistoryPager.loadOlderMessages(false)
     }
 
     /** See [ChatHistoryPager.releaseOlderMessages]. */
     fun releaseOlderMessages() {
-        if (localRuntimeRouting() == LocalRuntimeRouting.LocalBound) return
+        if (_pagingPresentation.value != null || localRuntimeRouting() == LocalRuntimeRouting.LocalBound) return
         chatHistoryPager.releaseOlderMessages()
     }
 
@@ -774,20 +831,135 @@ internal class AdminChatViewModel @Inject constructor(
         )
     }
 
+    private var canonicalPresentationJob: kotlinx.coroutines.Job? = null
+    private var canonicalRoute: Triple<String, Long, String?>? = null
+    private val canonicalViewports = mutableMapOf<String, ChatPagingViewport>()
+
+    private val presentationSwitch = kotlinx.coroutines.sync.Mutex()
+
+    private var replacePresentation = false
+
     private fun startTimelineObserver(conversationId: String) {
         adminChatA2uiCoordinator.ensureA2uiConversation(conversationId)
-        chatTimelineObserver.start(agentId.value, conversationId, timelineObserverProvenance())
-        // letta-mobile-qfa81 (P4): the iroh active-reconcile poll loop
-        // (startIrohRecentReconcileLoop) and its stall-recovery crutch were
-        // removed here. P3 (canonical run ids + durable dedupe + parked
-        // terminals replayed across redial) guarantees the terminal TurnDone
-        // reaches the client, so the client no longer needs to poll
-        // reconcileRecentMessages on a timer to un-wedge a dropped terminal.
-        // The single post-send reconcile (wired via reconcileRecentMessages in
-        // the send coordinator above) still runs.
+        viewModelScope.launch { beginTimelineObserver(conversationId) }
     }
 
-    private fun stopTimelineObserver() {
+    private suspend fun beginTimelineObserver(conversationId: String) {
+        presentationSwitch.withLock {
+            val generation = _sessionState.value.selectionGeneration
+            val force = replacePresentation.also { replacePresentation = false }
+            val sameSelection = canonicalRoute?.first == conversationId &&
+                canonicalRoute?.second == generation &&
+                canonicalPresentationJob?.isActive == true
+            if (!force && sameSelection &&
+                !pagingBinding.needsFreshCollection(scrollToMessageId, _pagingPresentation.value?.routeTarget)
+            ) {
+                return
+            }
+            stopTimelineObserverLocked()
+            if (localRuntimeRouting() == LocalRuntimeRouting.LocalBound) {
+                startLegacyTimelineObserverLocked(conversationId)
+                return
+            }
+            val capturedRuntime = selectedRuntime
+            val hostOpen = pagingHost.openCanonical
+            if (capturedRuntime == null && hostOpen == null) {
+                startLegacyTimelineObserverLocked(conversationId)
+                return
+            }
+            val route = Triple(conversationId, generation, scrollToMessageId)
+            canonicalRoute = route
+            val target = pagingBinding.effectiveRoute(route.third)
+            pagingBinding.rememberRoute(target)
+            fun status(error: String? = null) = ChatPagingPresentation(
+                settled = kotlinx.coroutines.flow.flowOf(androidx.paging.PagingData.empty()),
+                live = MutableStateFlow(emptyList()), close = {}, opening = error == null, openError = error,
+                retryOpen = {
+                    replacePresentation = true
+                    startTimelineObserver(conversationId)
+                },
+            )
+            _pagingPresentation.value = status()
+            val presentationJob = viewModelScope.launch(start = CoroutineStart.LAZY) {
+                try {
+                    val viewport = canonicalViewports[conversationId]
+                    val seek = target ?: viewport?.takeUnless { it.following }?.messageId
+                    when (
+                        val decided = timelineRouteSession.decide(
+                            runtime = capturedRuntime,
+                            conversationId = conversationId,
+                            target = seek,
+                            scope = this,
+                            agentId = agentId.value,
+                            hostOpen = hostOpen,
+                        )
+                    ) {
+                        com.letta.mobile.feature.chat.coordination.SelectedTimelineRouteSession.Presentation.LegacyDeferred -> {
+                            if (canonicalRoute != route) return@launch
+                            _pagingPresentation.value = null
+                            timelineRouteSession.activateDeferred(conversationId)
+                            try {
+                                kotlinx.coroutines.awaitCancellation()
+                            } finally {
+                                timelineRouteSession.retirePresentation()
+                            }
+                        }
+                        is com.letta.mobile.feature.chat.coordination.SelectedTimelineRouteSession.Presentation.Canonical -> {
+                            val presentation = decided.value
+                            try {
+                                if (canonicalRoute != route) return@launch
+                                presentation.hasBoundRoute = true
+                                presentation.routeTarget = target
+                                presentation.viewport = if (target == null) viewport else null
+                                presentation.saveViewport = { if (_pagingPresentation.value === presentation) canonicalViewports[conversationId] = it }
+                                presentation.clearViewport = { canonicalViewports.remove(conversationId) }
+                                presentation.requestTail = {
+                                    if (_pagingPresentation.value === presentation) {
+                                        canonicalViewports.remove(conversationId)
+                                        replacePresentation = true
+                                        startTimelineObserver(conversationId)
+                                    }
+                                }
+                                _pagingPresentation.value = presentation
+                                kotlinx.coroutines.awaitCancellation()
+                            } finally {
+                                presentation.close()
+                            }
+                        }
+                    }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (failure: Exception) {
+                    if (canonicalRoute == route) _pagingPresentation.value = status(failure.message ?: "Could not open conversation")
+                }
+            }
+            canonicalPresentationJob = presentationJob
+        }
+        canonicalPresentationJob?.start()
+    }
+
+    private fun startLegacyTimelineObserverLocked(conversationId: String) {
+        chatTimelineObserver.start(agentId.value, conversationId, timelineObserverProvenance())
+    }
+
+    private suspend fun stopTimelineObserver() = presentationSwitch.withLock { stopTimelineObserverLocked() }
+
+    private suspend fun stopTimelineObserverLocked() {
+        canonicalRoute = null
+        val job = canonicalPresentationJob
+        canonicalPresentationJob = null
+        _pagingPresentation.value = null
+        pagingBinding.close()
+        job?.cancelAndJoin()
+        timelineRouteSession.retirePresentation()
+    }
+
+    private fun abandonTimelineObserver() {
+        canonicalRoute = null
+        canonicalPresentationJob?.cancel()
+        canonicalPresentationJob = null
+        _pagingPresentation.value = null
+        pagingBinding.close()
         chatTimelineObserver.stop()
     }
 
@@ -822,6 +994,7 @@ internal class AdminChatViewModel @Inject constructor(
     fun onScreenResumed() = screenLifecycleCoordinator.onScreenResumed()
 
     override fun onCleared() {
+        abandonTimelineObserver()
         adminChatA2uiCoordinator.release()
         screenLifecycleCoordinator.onCleared()
     }
@@ -837,9 +1010,11 @@ internal class AdminChatViewModel @Inject constructor(
         slashCommandsCoordinator.uninstallSlashCommand(command)
 
     fun submitComposer(text: String = composerCoordinator.state.value.inputText): ChatComposerEffect? =
-        composerCoordinator.submitComposer(text)
+        if (replacingSendRuntime) null else composerCoordinator.submitComposer(text)
 
-    fun sendMessage(text: String) = composerCoordinator.sendMessage(text)
+    fun sendMessage(text: String) {
+        if (!replacingSendRuntime) composerCoordinator.sendMessage(text)
+    }
 
     fun refreshGoalStatus() = goalCoordinator.refreshGoalStatus()
 
@@ -847,9 +1022,13 @@ internal class AdminChatViewModel @Inject constructor(
 
     fun continueGoal() = goalCoordinator.continueGoal(::sendMessage)
 
-    fun rerunMessage(message: UiMessage) = composerCoordinator.rerunMessage(message)
+    fun rerunMessage(message: UiMessage) {
+        if (!replacingSendRuntime) composerCoordinator.rerunMessage(message)
+    }
 
-    fun interruptRun() = composerCoordinator.interruptRun { adminChatA2uiCoordinator.clearA2uiThinkingOnResponse() }
+    fun interruptRun() {
+        if (!replacingSendRuntime) composerCoordinator.interruptRun { adminChatA2uiCoordinator.clearA2uiThinkingOnResponse() }
+    }
 
     // --- A2UI coordination delegates ---
     fun dismissA2uiSurface(surfaceId: String) = adminChatA2uiCoordinator.dismissA2uiSurface(surfaceId)
@@ -857,4 +1036,22 @@ internal class AdminChatViewModel @Inject constructor(
     fun submitA2uiAction(action: A2uiAction) = adminChatA2uiCoordinator.submitA2uiAction(action)
 
     fun markA2uiActionSnackbarShown(id: Long) = adminChatA2uiCoordinator.markA2uiActionSnackbarShown(id)
+
+    // Keep startup after all backing fields and lazy delegates: Main.immediate can
+    // resolve a cached route and start its observer before this constructor returns.
+    init {
+        viewModelScope.launch {
+            shimBackendDetector.refreshActive()
+            settingsRepository.activeConfigChanges.collect { config ->
+                shimBackendDetector.refresh(config)
+            }
+        }
+        transportCoordinator.startObserving()
+        goalCoordinator.startObserving()
+        slashCommandsCoordinator.loadSlashCommands()
+        refreshGoalStatus()
+        adminChatA2uiCoordinator
+        sendPipeline.ensureEagerInit()
+        chatSessionInitializer.run()
+    }
 }

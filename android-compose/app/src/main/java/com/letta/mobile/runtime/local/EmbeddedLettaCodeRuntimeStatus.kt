@@ -1,6 +1,6 @@
 package com.letta.mobile.runtime.local
 
-import com.letta.mobile.BuildConfig
+import ca.oculair.meridian.BuildConfig
 import javax.inject.Inject
 import javax.inject.Singleton
 

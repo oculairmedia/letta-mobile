@@ -285,7 +285,8 @@ internal fun MessageBubbleSurface(
             modifier = (if (bubbleLess) {
                 // No surface chrome → no horizontal padding; the message
                 // list's own contentPadding is the only side gutter.
-                Modifier.padding(vertical = dimens.bubblePaddingVertical)
+                // Tool headers already provide a 48dp touch target and vertical padding.
+                Modifier.padding(vertical = if (!message.toolCalls.isNullOrEmpty()) 0.dp else dimens.bubblePaddingVertical)
             } else {
                 Modifier.padding(
                     horizontal = dimens.bubblePaddingHorizontal,

@@ -31,7 +31,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
-import com.letta.mobile.R
+import ca.oculair.meridian.R
 import com.letta.mobile.data.model.McpServer
 import com.letta.mobile.data.model.McpServerId
 import com.letta.mobile.data.model.Tool

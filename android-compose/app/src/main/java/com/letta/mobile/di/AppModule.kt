@@ -180,31 +180,47 @@ abstract class AppModule {
 
         @Provides
         @Singleton
-        fun provideTimelineRepository(
+        fun provideTimelineExternalTransportWriter(impl: TimelineRepository): TimelineExternalTransportWriter =
+            impl.admittedExternalWriter
+
+        @Provides
+        @Singleton
+        fun provideAndroidCanonicalRuntimeFactory(
+            legacy: TimelineRepository,
+            authority: com.letta.mobile.data.local.TimelineOwnershipAuthority,
+            storage: com.letta.mobile.data.local.TimelineOwnedStorageFactory,
+        ) = AndroidCanonicalTimelineRuntimeFactory(legacy, authority, storage)
+
+        @Provides
+        @Singleton
+        fun provideCanonicalTimelineTransport(
             messageApi: MessageApi,
+            local: com.letta.mobile.runtime.local.LettaCodeLocalTimelineTransport,
+            remote: IrohAdminRpcTimelineTransport,
+            settingsRepository: ISettingsRepository,
+        ): com.letta.mobile.data.timeline.TimelineTransport =
+            com.letta.mobile.runtime.local.LocalRoutingTimelineTransport(
+                local = local,
+                remote = IrohRoutingTimelineTransport(
+                    settingsRepository = settingsRepository,
+                    http = MessageApiTimelineTransport(messageApi),
+                    iroh = remote,
+                ),
+            )
+
+        @Provides
+        @Singleton
+        fun provideTimelineRepository(
+            timelineTransport: com.letta.mobile.data.timeline.TimelineTransport,
             pendingLocalStore: PendingLocalStore,
             conversationCursorStore: ConversationCursorStore,
             confirmedTimelineStore: com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore,
-            localTimelineTransport: com.letta.mobile.runtime.local.LettaCodeLocalTimelineTransport,
-            channelTransport: IChannelTransport,
             settingsRepository: ISettingsRepository,
         ): TimelineRepository {
-            val httpTimelineTransport = MessageApiTimelineTransport(messageApi)
-            val remoteTimelineTransport = IrohRoutingTimelineTransport(
-                settingsRepository = settingsRepository,
-                http = httpTimelineTransport,
-                iroh = IrohAdminRpcTimelineTransport(
-                    channelTransport = channelTransport,
-                    settingsRepository = settingsRepository,
-                ),
-            )
             return TimelineRepository(
                 // local-conv-* hydrates from the on-device letta.js transcript
                 // (letta-mobile-czomn); everything else uses the active remote route.
-                timelineTransport = com.letta.mobile.runtime.local.LocalRoutingTimelineTransport(
-                    local = localTimelineTransport,
-                    remote = remoteTimelineTransport,
-                ),
+                timelineTransport = timelineTransport,
                 pendingLocalStore = pendingLocalStore,
                 conversationCursorStore = conversationCursorStore,
                 confirmedTimelineStore = confirmedTimelineStore,
@@ -213,6 +229,12 @@ abstract class AppModule {
             )
         }
     }
+
+    @Binds
+    @Singleton
+    abstract fun bindSelectedChatRuntimeProvider(
+        impl: ProductionSelectedChatRuntimeProvider,
+    ): com.letta.mobile.feature.chat.coordination.SelectedChatRuntimeProvider
 
     @Binds
     @Singleton
@@ -377,10 +399,6 @@ abstract class AppModule {
     abstract fun bindChannelNotificationPublisher(
         impl: ChannelNotificationPublisher,
     ): IChannelNotificationPublisher
-
-    @Binds
-    @Singleton
-    abstract fun bindTimelineExternalTransportWriter(impl: TimelineRepository): TimelineExternalTransportWriter
 
     @Binds
     @IntoSet

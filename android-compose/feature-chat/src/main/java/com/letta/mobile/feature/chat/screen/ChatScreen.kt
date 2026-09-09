@@ -36,6 +36,7 @@ internal fun ChatScreen(
     val resolvedSubagentSource = activeSubagentSource ?: viewModel.activeSubagentSource
     val resolvedSelfTodoSource = selfTodoSource ?: viewModel.selfTodoSource
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val pagingPresentation by viewModel.pagingPresentation.collectAsStateWithLifecycle()
     val composerState by viewModel.composerState.collectAsStateWithLifecycle()
     val activeFontScale by viewModel.chatFontScale.collectAsStateWithLifecycle()
     val hapticsEnabled by viewModel.hapticsEnabled.collectAsStateWithLifecycle()
@@ -99,7 +100,10 @@ internal fun ChatScreen(
                 .then(backgroundModifier),
         ) {
             if (committedFontScale != null) {
-                ChatScreenLayout(
+                androidx.compose.runtime.CompositionLocalProvider(
+                    LocalChatPagingPresentation provides pagingPresentation,
+                ) {
+                    ChatScreenLayout(
                     params = ChatScreenLayoutParams(
                         state = state,
                         composerState = composerState,
@@ -118,6 +122,7 @@ internal fun ChatScreen(
                         streamingRevealPulse = streamingRevealPulse,
                     ),
                 )
+                }
             }
         }
     }

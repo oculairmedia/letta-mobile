@@ -1,5 +1,9 @@
 package com.letta.mobile.data.session
 
+import androidx.lifecycle.ProcessLifecycleOwner
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.plus
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.runtime.LocalLettaBackend
@@ -26,6 +30,13 @@ class DefaultSessionRepositoryGraphFactory internal constructor(
     private val channelTransportFactory: SessionChannelTransportFactory,
     private val settingsRepository: ISettingsRepository? = null,
     private val localRuntimeOptions: LocalRuntimeOptions = LocalRuntimeOptions.Disabled,
+    private val cursorFactory: com.letta.mobile.data.local.BackendConversationCursorFactory? = null,
+    /**
+     * Outer bound for every graph this factory creates. Production hands back the process
+     * lifecycle so a graph that is never closed still dies with the process; tests supply their
+     * own so the factory does not reach for a main-thread global to build a data-layer object.
+     */
+    private val graphParentScope: () -> CoroutineScope = { ProcessLifecycleOwner.get().lifecycleScope },
 ) : SessionRepositoryGraphFactory<SessionGraph> {
     @Inject
     constructor(
@@ -35,8 +46,10 @@ class DefaultSessionRepositoryGraphFactory internal constructor(
         memFsStore: MemFsStore,
         localRuntimeProviders: Set<@JvmSuppressWildcards LocalRuntimeProvider>,
         settingsRepository: ISettingsRepository,
+        cursorFactory: com.letta.mobile.data.local.BackendConversationCursorFactory,
     ) : this(
         assembler = assembler,
+        cursorFactory = cursorFactory,
         channelTransportFactory = channelTransportFactory,
         settingsRepository = settingsRepository,
         localRuntimeOptions = LocalRuntimeOptions.Enabled(
@@ -52,19 +65,27 @@ class DefaultSessionRepositoryGraphFactory internal constructor(
         val graphId = nextId.incrementAndGet()
         val activeConfig = settingsRepository?.activeConfig?.value
         val localRuntimeBackend = localRuntimeOptions.createBackend(activeConfig)
+        val descriptor = localRuntimeBackend?.descriptor ?: remoteLettaBackendDescriptor(activeConfig, ANDROID_REMOTE_LETTA_ID_PREFIX)
+        val cursors = cursorFactory?.capture(descriptor.backendId.value)
         runBlocking(Dispatchers.IO) {
             assembler.clearCachesForNewSession()
         }
-        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        // SessionGraph owns and cancels this scope; parenting it means a graph that is never
+        // closed dies with its owner rather than outliving everything.
+        val parent = graphParentScope()
+        val scope = parent + SupervisorJob(parent.coroutineContext[Job]) + Dispatchers.IO
         val channelTransport = channelTransportFactory.create(
             scope = scope,
             activeConfig = activeConfig,
             localRuntimeBackend = localRuntimeBackend,
             settingsRepository = settingsRepository,
+            capturedCursorStore = cursors,
         )
         return assembler.assemble(
             SessionGraphAssembleRequest(
                 graphId = graphId,
+                backendDescriptor = descriptor,
+                capturedCursorStore = cursors,
                 activeConfig = activeConfig,
                 localRuntimeBackend = localRuntimeBackend,
                 scope = scope,

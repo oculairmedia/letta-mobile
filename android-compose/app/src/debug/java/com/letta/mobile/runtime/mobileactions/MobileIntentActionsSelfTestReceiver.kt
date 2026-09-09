@@ -8,8 +8,8 @@ import java.io.File
 
 /**
  * ADB usage:
- *   adb shell am broadcast -a com.letta.mobile.MOBILE_INTENT_ACTIONS_SELF_TEST com.letta.mobile.dev
- *   adb shell run-as com.letta.mobile.dev cat files/mobile-intent-actions-self-test.json
+ *   adb shell am broadcast -a com.letta.mobile.MOBILE_INTENT_ACTIONS_SELF_TEST ca.oculair.meridian.dev
+ *   adb shell run-as ca.oculair.meridian.dev cat files/mobile-intent-actions-self-test.json
  */
 class MobileIntentActionsSelfTestReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {

@@ -75,7 +75,7 @@ class ScrollJankBenchmark {
     }
 
     private companion object {
-        const val TARGET_PACKAGE = "com.letta.mobile.benchmark"
+        const val TARGET_PACKAGE = "ca.oculair.meridian.benchmark"
         const val DEFAULT_ITERATIONS = 5
         const val STARTUP_WAIT_MS = 10_000L
         const val SCROLL_PASSES = 3

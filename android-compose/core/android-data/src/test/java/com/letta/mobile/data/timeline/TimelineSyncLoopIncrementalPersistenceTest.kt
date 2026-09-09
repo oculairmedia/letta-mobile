@@ -10,6 +10,7 @@ import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -193,7 +194,7 @@ class TimelineSyncLoopIncrementalPersistenceTest {
             it.name == "snapshotPersist.planningDecision" && it.attrs["conversationId"] == scope.conversationId
         }
         assertEquals("full_scan", decision.attrs["planningMode"])
-        assertEquals("delete_requires_ranked_order", decision.attrs["reason"])
+        assertEquals(SnapshotPlanningFallback.DELETE_REQUIRES_RANKED_ORDER.name, decision.attrs["reason"])
         loop.closeAndJoin()
     }
 
@@ -697,8 +698,9 @@ class TimelineSyncLoopIncrementalPersistenceTest {
         scope: TimelineScope,
         store: com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore,
         dispatcher: kotlinx.coroutines.CoroutineDispatcher,
+        messageApi: FakeSyncApi = FakeSyncApi(),
     ) = TimelineSyncLoop(
-        messageApi = FakeSyncApi().let(::MessageApiTimelineTransport),
+        messageApi = messageApi.let(::MessageApiTimelineTransport),
         conversationId = scope.conversationId,
         agentId = scope.agentId,
         scope = CoroutineScope(dispatcher),
@@ -1127,6 +1129,282 @@ class TimelineSyncLoopIncrementalPersistenceTest {
                     it.attrs["conversationId"] == scope.conversationId
             },
         )
+        loop.closeAndJoin()
+    }
+
+    /**
+     * letta-mobile-94bt8.1: local-only mutations (append, retry, delivery-state transitions)
+     * against an already-persisted baseline produce no confirmed delta. They must NOT:
+     * - fall back to full-scan planning or store write
+     * - consume durable revisions
+     * - emit identicalSkipped after an O(N) envelope construction
+     * They MUST:
+     * - emit a sequence-safe planningDecision with planningMode = "no_work"
+     * - acknowledge the pending sequence safely
+     * - permit a subsequent confirmed change to persist cleanly as a delta
+     */
+    @Test
+    fun localMutationsProduceNoWorkAndDoNotConsumeRevision() = runTest {
+        val db = inMemoryDatabase()
+        val scope = TimelineScope(backendId = "backend", conversationId = "conv-local-nowork", agentId = "agent")
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val fakeApi = FakeSyncApi()
+        val loop = newLoop(scope, RoomConfirmedTimelineStore(db), dispatcher, fakeApi)
+
+        // Initial commit establishes the durable baseline at revision 1.
+        loop.ingestStreamEvent(UserMessage(id = "msg-0", date = FIXTURE_DATE, contentRaw = JsonPrimitive("seed")))
+        loop.flushSnapshotNow()
+        advanceUntilIdle()
+
+        val store = RoomConfirmedTimelineStore(db)
+        val baseline = store.readSnapshot(scope)
+        assertNotNull(baseline)
+        assertEquals(1L, baseline?.revision)
+
+        // 1. Local append
+        com.letta.mobile.util.Telemetry.clear()
+        loop.appendOptimisticLocalSync(otid = "otid-local", content = "local text")
+        loop.flushSnapshotNow()
+        advanceUntilIdle()
+
+        var telemetry = com.letta.mobile.util.Telemetry.snapshot().filter {
+            it.attrs["conversationId"] == scope.conversationId
+        }
+        val localAppendDecision = telemetry.lastOrNull { it.name == "snapshotPersist.planningDecision" }
+        assertNotNull(localAppendDecision)
+        assertEquals("no_work", localAppendDecision?.attrs?.get("planningMode"))
+        assertEquals("no_work", localAppendDecision?.attrs?.get("reason"))
+        assertFalse(
+            "local-only append must not plan a full scan",
+            telemetry.any { it.name == "snapshotPersist.fullScanPlanned" },
+        )
+        assertFalse(
+            "local-only append must not fall back to identical-skipped after full envelope build",
+            telemetry.any { it.name == "snapshotPersist.identicalSkipped" },
+        )
+        assertEquals(
+            "revision must not advance on local-only mutations",
+            1L,
+            store.readSnapshot(scope)?.revision,
+        )
+
+        // 2. Mark sent transition
+        com.letta.mobile.util.Telemetry.clear()
+        loop.markOptimisticLocalSentSync("otid-local")
+        loop.flushSnapshotNow()
+        advanceUntilIdle()
+
+        telemetry = com.letta.mobile.util.Telemetry.snapshot().filter {
+            it.attrs["conversationId"] == scope.conversationId
+        }
+        val sentDecision = telemetry.lastOrNull { it.name == "snapshotPersist.planningDecision" }
+        assertNotNull(sentDecision)
+        assertEquals("no_work", sentDecision?.attrs?.get("planningMode"))
+        assertEquals(1L, store.readSnapshot(scope)?.revision)
+
+        // 3. Mark failed transition
+        com.letta.mobile.util.Telemetry.clear()
+        loop.markOptimisticLocalFailedSync("otid-local")
+        loop.flushSnapshotNow()
+        advanceUntilIdle()
+
+        telemetry = com.letta.mobile.util.Telemetry.snapshot().filter {
+            it.attrs["conversationId"] == scope.conversationId
+        }
+        val failedDecision = telemetry.lastOrNull { it.name == "snapshotPersist.planningDecision" }
+        assertNotNull(failedDecision)
+        assertEquals("no_work", failedDecision?.attrs?.get("planningMode"))
+        assertEquals(1L, store.readSnapshot(scope)?.revision)
+
+        // 4. Retry send (gate outbound network response so retry mutation stays local)
+        com.letta.mobile.util.Telemetry.clear()
+        fakeApi.sendResponseGate = CompletableDeferred()
+        loop.retry("otid-local")
+        loop.flushSnapshotNow()
+        advanceUntilIdle()
+
+        telemetry = com.letta.mobile.util.Telemetry.snapshot().filter {
+            it.attrs["conversationId"] == scope.conversationId
+        }
+        val retryDecision = telemetry.lastOrNull { it.name == "snapshotPersist.planningDecision" }
+        assertNotNull(retryDecision)
+        assertEquals("no_work", retryDecision?.attrs?.get("planningMode"))
+        assertEquals(1L, store.readSnapshot(scope)?.revision)
+
+        // 5. Subsequent confirmed change persists cleanly as a delta
+        com.letta.mobile.util.Telemetry.clear()
+        fakeApi.sendResponseGate?.complete(Unit)
+        advanceUntilIdle()
+
+        val afterConfirmed = store.readSnapshot(scope)
+        assertNotNull(afterConfirmed)
+        assertEquals(
+            "subsequent confirmed change advances revision to 2",
+            2L,
+            afterConfirmed?.revision,
+        )
+        telemetry = com.letta.mobile.util.Telemetry.snapshot().filter {
+            it.attrs["conversationId"] == scope.conversationId
+        }
+        val confirmedDecision = telemetry.lastOrNull {
+            it.name == "snapshotPersist.planningDecision" && it.attrs["planningMode"] == "delta"
+        }
+        assertNotNull(confirmedDecision)
+        assertEquals("delta", confirmedDecision?.attrs?.get("planningMode"))
+        assertEquals("delta", confirmedDecision?.attrs?.get("reason"))
+
+        loop.closeAndJoin()
+    }
+
+    /**
+     * letta-mobile-94bt8.1: coalescing empty and dirty deltas must preserve dirty rows
+     * regardless of order and acknowledge all merged sequences upon durable commit.
+     */
+    @Test
+    fun coalescingEmptyAndDirtyDeltasPersistsCleanly() = runTest {
+        val db = inMemoryDatabase()
+        val scope = TimelineScope(backendId = "backend", conversationId = "conv-coalesce", agentId = "agent")
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val loop = newLoop(scope, RoomConfirmedTimelineStore(db), dispatcher)
+
+        // Seed baseline at revision 1
+        loop.ingestStreamEvent(UserMessage(id = "msg-0", date = FIXTURE_DATE, contentRaw = JsonPrimitive("seed")))
+        loop.flushSnapshotNow()
+        advanceUntilIdle()
+
+        val store = RoomConfirmedTimelineStore(db)
+        assertEquals(1L, store.readSnapshot(scope)?.revision)
+
+        // Case A: Dirty delta followed by Empty delta before flush
+        loop.ingestStreamEvent(UserMessage(id = "msg-dirty-1", date = FIXTURE_DATE, contentRaw = JsonPrimitive("dirty 1")))
+        loop.appendOptimisticLocalSync(otid = "otid-empty-1", content = "empty 1")
+        loop.flushSnapshotNow()
+        advanceUntilIdle()
+
+        val afterCaseA = store.readSnapshot(scope)
+        assertEquals(
+            "dirty delta followed by empty delta must persist and advance revision to 2",
+            2L,
+            afterCaseA?.revision,
+        )
+        assertTrue(afterCaseA?.events?.any { it.serverId == "msg-dirty-1" } == true)
+
+        // Case B: Empty delta followed by Dirty delta before flush
+        loop.appendOptimisticLocalSync(otid = "otid-empty-2", content = "empty 2")
+        loop.ingestStreamEvent(UserMessage(id = "msg-dirty-2", date = FIXTURE_DATE, contentRaw = JsonPrimitive("dirty 2")))
+        loop.flushSnapshotNow()
+        advanceUntilIdle()
+
+        val afterCaseB = store.readSnapshot(scope)
+        assertEquals(
+            "empty delta followed by dirty delta must persist and advance revision to 3",
+            3L,
+            afterCaseB?.revision,
+        )
+        assertTrue(afterCaseB?.events?.any { it.serverId == "msg-dirty-2" } == true)
+
+        loop.closeAndJoin()
+    }
+
+    /**
+     * letta-mobile-94bt8.1: when a store lacks incremental support (supportsIncrementalCommit=false),
+     * a Planned incremental commit falls back to full scan. Both snapshotPersist.planningDecision
+     * and snapshotPersist.fullScanPlanned must report STORE_UNSUPPORTED (never CHECKPOINT_DUE unless
+     * a checkpoint is actually due).
+     */
+    @Test
+    fun unsupportedStoreReportsStoreUnsupportedInBothPlanningAndFallback() = runTest {
+        val unsupportedStore = InMemoryConfirmedTimelineStore()
+        val scope = TimelineScope(backendId = "backend", conversationId = "conv-unsupported-telemetry", agentId = "agent")
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val loop = newLoop(scope, unsupportedStore, dispatcher)
+
+        // Initial baseline commit (BASELINE_MISSING fallback)
+        loop.ingestStreamEvent(UserMessage(id = "msg-0", date = FIXTURE_DATE, contentRaw = JsonPrimitive("seed")))
+        loop.flushSnapshotNow()
+        advanceUntilIdle()
+
+        // Nonempty delta with nonzero baseline and checkpointDue=false on unsupported store
+        com.letta.mobile.util.Telemetry.clear()
+        loop.ingestStreamEvent(UserMessage(id = "msg-1", date = FIXTURE_DATE, contentRaw = JsonPrimitive("next")))
+        loop.flushSnapshotNow()
+        advanceUntilIdle()
+
+        val telemetry = com.letta.mobile.util.Telemetry.snapshot().filter {
+            it.attrs["conversationId"] == scope.conversationId
+        }
+        val planningDecision = telemetry.lastOrNull {
+            it.name == "snapshotPersist.planningDecision" && it.attrs["planningMode"] == "full_scan"
+        }
+        assertNotNull(planningDecision)
+        assertEquals(
+            "planningDecision must report STORE_UNSUPPORTED",
+            SnapshotPlanningFallback.STORE_UNSUPPORTED.name,
+            planningDecision?.attrs?.get("reason"),
+        )
+
+        val fullScanPlanned = telemetry.lastOrNull { it.name == "snapshotPersist.fullScanPlanned" }
+        assertNotNull(fullScanPlanned)
+        assertEquals(
+            "fullScanPlanned must report STORE_UNSUPPORTED, not CHECKPOINT_DUE",
+            SnapshotPlanningFallback.STORE_UNSUPPORTED.name,
+            fullScanPlanned?.attrs?.get("reason"),
+        )
+
+        loop.closeAndJoin()
+    }
+
+    /**
+     * letta-mobile-94bt8.1: when a checkpoint is due, both planningDecision and fullScanPlanned
+     * must report CHECKPOINT_DUE.
+     */
+    @Test
+    fun dueCheckpointReportsCheckpointDueInBothPlanningAndFallback() = runTest {
+        val db = inMemoryDatabase()
+        val scope = TimelineScope(backendId = "backend", conversationId = "conv-checkpoint-due", agentId = "agent")
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val loop = newLoop(scope, RoomConfirmedTimelineStore(db), dispatcher)
+
+        // Seed initial baseline at revision 1 (always a checkpoint)
+        loop.ingestStreamEvent(UserMessage(id = "msg-0", date = FIXTURE_DATE, contentRaw = JsonPrimitive("seed")))
+        loop.flushSnapshotNow()
+        advanceUntilIdle()
+
+        // Advance until LEGACY_CHECKPOINT_INTERVAL (25) commits to trigger a genuine due checkpoint.
+        // Commit 1 was the seed (resets commitsSinceLegacyCheckpoint to 0). We need 24 more commits.
+        repeat(24) { index ->
+            loop.ingestStreamEvent(UserMessage(id = "msg-${index + 1}", date = FIXTURE_DATE, contentRaw = JsonPrimitive("c")))
+            loop.flushSnapshotNow()
+            advanceUntilIdle()
+        }
+
+        // Commit 26 (25th after checkpoint): checkpoint is due!
+        com.letta.mobile.util.Telemetry.clear()
+        loop.ingestStreamEvent(UserMessage(id = "msg-checkpoint", date = FIXTURE_DATE, contentRaw = JsonPrimitive("checkpoint")))
+        loop.flushSnapshotNow()
+        advanceUntilIdle()
+
+        val telemetry = com.letta.mobile.util.Telemetry.snapshot().filter {
+            it.attrs["conversationId"] == scope.conversationId
+        }
+        val planningDecision = telemetry.lastOrNull {
+            it.name == "snapshotPersist.planningDecision" && it.attrs["planningMode"] == "full_scan"
+        }
+        assertNotNull(planningDecision)
+        assertEquals(
+            "planningDecision must report CHECKPOINT_DUE",
+            SnapshotPlanningFallback.CHECKPOINT_DUE.name,
+            planningDecision?.attrs?.get("reason"),
+        )
+
+        val fullScanPlanned = telemetry.lastOrNull { it.name == "snapshotPersist.fullScanPlanned" }
+        assertNotNull(fullScanPlanned)
+        assertEquals(
+            "fullScanPlanned must report CHECKPOINT_DUE",
+            SnapshotPlanningFallback.CHECKPOINT_DUE.name,
+            fullScanPlanned?.attrs?.get("reason"),
+        )
+
         loop.closeAndJoin()
     }
 

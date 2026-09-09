@@ -122,8 +122,9 @@ class SessionGraphAssembler @Inject constructor(
         val useIroh = binding.bindsIroh()
         return SessionGraph(
             id = request.graphId,
-            backendDescriptor = request.localRuntimeBackend?.descriptor
-                ?: remoteLettaDescriptor(request.activeConfig),
+            capturedConfig = request.activeConfig,
+            backendDescriptor = request.backendDescriptor,
+            conversationCursorStore = request.capturedCursorStore,
             localRuntimeBackend = request.localRuntimeBackend,
             scope = request.scope,
             agentRepository = agentRepository,

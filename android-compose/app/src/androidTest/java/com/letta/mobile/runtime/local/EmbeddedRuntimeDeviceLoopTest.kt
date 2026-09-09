@@ -3,7 +3,7 @@ package com.letta.mobile.runtime.local
 import android.content.Context
 import android.os.SystemClock
 import androidx.test.core.app.ApplicationProvider
-import com.letta.mobile.BuildConfig
+import ca.oculair.meridian.BuildConfig
 import com.letta.mobile.runtime.hardware.AndroidDeviceHardwareControlProvider
 import com.letta.mobile.runtime.sensors.AndroidDeviceSensorSnapshotProvider
 import com.letta.mobile.data.model.AgentId

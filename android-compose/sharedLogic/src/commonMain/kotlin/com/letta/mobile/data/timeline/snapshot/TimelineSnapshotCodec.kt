@@ -12,6 +12,7 @@ import com.letta.mobile.data.timeline.parseTimelineInstantOrNull
 import com.letta.mobile.data.timeline.timelineCurrentTimeMillis
 import com.letta.mobile.data.timeline.timelineNow
 import com.letta.mobile.util.Telemetry
+import kotlinx.atomicfu.atomic
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.collections.immutable.toPersistentMap
 import kotlinx.serialization.json.Json
@@ -30,11 +31,17 @@ object TimelineSnapshotCodec {
         prettyPrint = false
     }
 
+    private val envelopeDecodes = atomic(0L)
+
+    /** Process-wide count of v13 envelope decode attempts, including corrupt payloads. */
+    val envelopeDecodeCount: Long get() = envelopeDecodes.value
+
     fun encode(envelope: StoredTimelineEnvelope): String =
         json.encodeToString(StoredTimelineEnvelope.serializer(), envelope)
 
     fun decode(payload: String): StoredTimelineEnvelope? {
         if (payload.isBlank()) return null
+        envelopeDecodes.incrementAndGet()
         return runCatching {
             val envelope = json.decodeFromString(StoredTimelineEnvelope.serializer(), payload)
             migrateIfNeeded(envelope) ?: return null
@@ -230,26 +237,21 @@ fun TimelineEvent.Confirmed.toStoredTimelineEvent(): StoredTimelineEvent =
         },
         attachments = attachments.mapNotNull {
             val rawBase64 = it.base64
+            if (rawBase64.isEmpty() && it.storedByteSize == null) return@mapNotNull null
             val estimatedBytes = if (rawBase64.isNotEmpty()) {
                 val padding = rawBase64.takeLast(2).count { ch -> ch == '=' }
                 ((rawBase64.length * 3L) / 4L) - padding
             } else {
-                -1L
+                it.storedByteSize ?: -1L
             }
-            val thumbnail = if (rawBase64.isNotEmpty() && rawBase64.length <= 16384) {
-                rawBase64
-            } else {
-                null
-            }
-            if (rawBase64.isEmpty() && thumbnail == null) {
-                null
-            } else {
-                StoredImageAttachmentPointer(
-                    mediaType = it.mediaType,
-                    byteSize = estimatedBytes,
-                    thumbnailBase64 = thumbnail,
-                )
-            }
+            // Keep snapshot bodies bounded. Legacy metadata is not a retrievable
+            // reference; missing payloads must remain explicit until blob resolution exists.
+            val thumbnail = rawBase64.takeIf { it.isNotEmpty() && it.length <= 16384 }
+            StoredImageAttachmentPointer(
+                mediaType = it.mediaType,
+                byteSize = estimatedBytes,
+                thumbnailBase64 = thumbnail,
+            )
         },
     )
 
@@ -294,11 +296,17 @@ fun StoredTimelineEvent.toConfirmedTimelineEvent(): TimelineEvent.Confirmed {
             ToolReturnTruncation(messageId = v.messageId, byteLen = v.byteLen)
         }.toPersistentMap(),
         attachments = attachments.mapNotNull { pointer ->
-            pointer.thumbnailBase64?.let { thumb ->
-                MessageContentPart.Image(
-                    base64 = thumb,
-                    mediaType = pointer.mediaType,
-                )
+            // thumbnailBase64 is null when the source attachment exceeded the
+            // 16 KB inline budget. Preserve the pointer as an empty-base64
+            // attachment so the rehydrated message still surfaces an indicator
+            // that an image is stored locally; renderers show a placeholder.
+            val inline = pointer.thumbnailBase64
+            if (inline != null) {
+                MessageContentPart.Image(base64 = inline, mediaType = pointer.mediaType, storedByteSize = null)
+            } else if (pointer.byteSize > 0) {
+                MessageContentPart.Image(base64 = "", mediaType = pointer.mediaType, storedByteSize = pointer.byteSize)
+            } else {
+                null
             }
         }.toPersistentList(),
         source = MessageSource.LETTA_SERVER,
