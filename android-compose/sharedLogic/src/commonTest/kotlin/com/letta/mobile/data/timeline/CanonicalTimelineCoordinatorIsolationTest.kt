@@ -12,11 +12,16 @@ import kotlin.test.assertFailsWith
 class CanonicalTimelineCoordinatorIsolationTest {
     @Test fun twoConversationsKeepIndependentOwnersAndStaleHandles() = runTest {
         val store = ScopedStore()
+        // Live ingest writes nothing now, so each conversation's rows come from its own sync page.
+        val remote = mutableMapOf<String, List<TimelineRemoteRecord>>()
         val transport = object : TimelineTransport {
             override suspend fun listConversationMessagePage(
                 request: TimelineRemotePageRequest,
                 progress: TimelinePageProgress?,
-            ) = TimelineRemotePageResult.Page(request.requestId, request.selectionGeneration, emptyList(), null, false, 0)
+            ) = TimelineRemotePageResult.Page(
+                request.requestId, request.selectionGeneration,
+                remote[request.scope.conversationId].orEmpty(), null, false, 0,
+            )
             override suspend fun sendConversationMessage(
                 conversationId: String,
                 request: com.letta.mobile.data.model.MessageCreateRequest,
@@ -36,10 +41,19 @@ class CanonicalTimelineCoordinatorIsolationTest {
         val second = coordinator.acquire(secondScope)
         val firstFence = coordinator.beginLive(first)
         val secondFence = coordinator.beginLive(second)
-        assertTrue(coordinator.ingest(first, firstFence, TimelineStreamFrame.Message(message("first", "first-id"))))
-        assertTrue(coordinator.ingest(second, secondFence, TimelineStreamFrame.Message(message("second", "second-id"))))
+        val firstMessage = message("first", "first-id")
+        val secondMessage = message("second", "second-id")
+        assertTrue(coordinator.ingest(first, firstFence, TimelineStreamFrame.Message(firstMessage)))
+        assertTrue(coordinator.ingest(second, secondFence, TimelineStreamFrame.Message(secondMessage)))
         assertTrue(coordinator.ingest(first, firstFence, TimelineStreamFrame.Done))
         assertTrue(coordinator.ingest(second, secondFence, TimelineStreamFrame.Done))
+        assertEquals(0, store.rows(firstScope).size)
+        assertEquals(0, store.rows(secondScope).size)
+        remote["first"] = listOf(TimelineRemoteRecord(TimelineMessageId("first-id"), firstMessage, 0))
+        remote["second"] = listOf(TimelineRemoteRecord(TimelineMessageId("second-id"), secondMessage, 0))
+        assertEquals(TimelineEnginePageOutcome.Applied, coordinator.reconcileRecent(first))
+        assertEquals(TimelineEnginePageOutcome.Applied, coordinator.reconcileRecent(second))
+        // A conversation's sync page lands in its own scope only.
         assertEquals(1, store.rows(firstScope).size)
         assertEquals(1, store.rows(secondScope).size)
         assertEquals(null, coordinator.attach(first, TimelineMessageId("missing")))
@@ -58,8 +72,14 @@ class CanonicalTimelineCoordinatorIsolationTest {
         assertTrue(restarted !== first)
         assertEquals(restarted, coordinator.current(firstScope))
         val restartedFence = coordinator.beginLive(restarted)
-        assertTrue(coordinator.ingest(restarted, restartedFence, TimelineStreamFrame.Message(message("restarted", "restart-id"))))
+        val restartedMessage = message("restarted", "restart-id")
+        assertTrue(coordinator.ingest(restarted, restartedFence, TimelineStreamFrame.Message(restartedMessage)))
         assertTrue(coordinator.ingest(restarted, restartedFence, TimelineStreamFrame.Done))
+        // The replacement owner reuses the same durable scope, and only sync appends to it.
+        assertEquals(1, store.rows(firstScope).size)
+        remote["first"] = remote.getValue("first") +
+            TimelineRemoteRecord(TimelineMessageId("restart-id"), restartedMessage, 0)
+        assertEquals(TimelineEnginePageOutcome.Applied, coordinator.reconcileRecent(restarted))
         assertEquals(2, store.rows(firstScope).size)
         assertFalse(coordinator.ingest(first, firstFence, TimelineStreamFrame.Message(message("after-restart", "late-id"))))
         assertTrue(coordinator.retire(restarted))

@@ -98,6 +98,9 @@ class CanonicalTimelinePresentation private constructor(
         }
     }.cachedIn(scope)
 
+    // Bounded by pending storage: pruned to the records still awaiting their durable echo.
+    private val echoedOtids = mutableSetOf<String>()
+
     private val mutableLive = MutableStateFlow<List<ChatRenderItem>>(emptyList())
 
     /**
@@ -112,10 +115,12 @@ class CanonicalTimelinePresentation private constructor(
         owner.session.live, owner.session.pending, resident,
     ) { publication, pending, presented ->
         val events = publication?.overlayEvents(presented).orEmpty()
-        // Suppress the local bubble from the whole echoing turn, not just the still-drawn overlay,
-        // so it cannot reappear between the overlay draining and pending storage refreshing.
-        val confirmedOtids = publication?.block?.events.orEmpty().mapTo(mutableSetOf()) { it.otid }
-        val optimistic = pending.filterNot { it.otid in confirmedOtids }
+        // Only the sync path's durable echo clears pending storage, and the publication is dropped
+        // the moment settlement is acknowledged. Remember the otids this turn echoed so the local
+        // bubble cannot reappear in the gap between the overlay draining and that write landing.
+        publication?.block?.events?.forEach { if (it.otid.isNotBlank()) echoedOtids += it.otid }
+        echoedOtids.retainAll(pending.mapTo(mutableSetOf()) { it.otid })
+        val optimistic = pending.filterNot { it.otid in echoedOtids }
             .map { it.toRenderItem(owner.selection.scope.agentId) }
         val active = events.mapNotNull { event ->
             timelineEventToUiMessage(event, owner.selection.scope.agentId)?.let {
