@@ -13,6 +13,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.plus
 
 /** Isolated paging-cache lifetime; disposing it never retires ingestion. */
 internal fun createChatPagingPresentation(
@@ -24,7 +25,7 @@ internal fun createChatPagingPresentation(
 ): ChatPagingPresentation {
     val job = SupervisorJob(uiScope.coroutineContext[Job])
     return ChatPagingPresentation(
-        settled = settled.cachedIn(CoroutineScope(uiScope.coroutineContext + job)),
+        settled = settled.cachedIn(uiScope + job),
         live = live,
         missingTarget = missingTarget,
         close = { job.cancel() },
@@ -42,7 +43,7 @@ internal suspend fun createCanonicalChatPagingPresentation(
 ): ChatPagingPresentation {
     val canonical = CanonicalTimelinePresentation.open(coordinator, owner, uiScope, target?.let(::TimelineMessageId))
     val job = SupervisorJob(uiScope.coroutineContext[Job])
-    val scope = CoroutineScope(uiScope.coroutineContext + job)
+    val scope = uiScope + job
     // Bounded metadata only. Evicted keys cannot acknowledge settlement until seen again.
     val rows = java.util.IdentityHashMap<ChatRenderItem, CanonicalTimelinePresentation.Row>()
     val order = java.util.ArrayDeque<ChatRenderItem>()
@@ -77,7 +78,7 @@ internal suspend fun createCanonicalChatPagingPresentation(
             job.cancel()
             synchronized(rows) { rows.clear(); order.clear() }
             // Cleanup must survive UI scope cancellation; canonical.close only detaches the viewport.
-            CoroutineScope(uiScope.coroutineContext + kotlinx.coroutines.NonCancellable).launch { canonical.close() }
+            (uiScope + kotlinx.coroutines.NonCancellable).launch { canonical.close() }
         },
     )
 }

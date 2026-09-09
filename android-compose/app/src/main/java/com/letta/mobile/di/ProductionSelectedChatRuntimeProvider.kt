@@ -125,7 +125,7 @@ internal class CapturedSelectedChatRuntime(
     }
 
     private val job = SupervisorJob(parent.coroutineContext[Job])
-    override val scope = CoroutineScope(parent.coroutineContext + job)
+    override val scope = parent + job
     private val bindings = RuntimeBindingCache<String, AndroidCanonicalTimelineRuntime.BindResult>()
 
     private suspend fun binding(conversation: String) = com.letta.mobile.data.local.retryTimelineOwnership {

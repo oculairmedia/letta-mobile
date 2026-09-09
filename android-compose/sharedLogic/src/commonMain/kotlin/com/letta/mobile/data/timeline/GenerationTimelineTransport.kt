@@ -6,6 +6,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.plus
 
 /** Bounded RPC operations are children of the captured backend, not the requesting UI. */
 class GenerationTimelineTransport(
@@ -13,7 +14,7 @@ class GenerationTimelineTransport(
     parent: CoroutineScope,
 ) : TimelineTransport {
     private val job = SupervisorJob(parent.coroutineContext[Job])
-    private val scope = CoroutineScope(parent.coroutineContext + job)
+    private val scope = parent + job
 
     private suspend fun <T> owned(block: suspend () -> T): T {
         val request = scope.async { block() }

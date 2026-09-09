@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.plus
 
 /** Presentation-only lifetime shared by Android and Desktop. Closing never retires the writer. */
 class CanonicalTimelinePresentation private constructor(
@@ -33,14 +34,14 @@ class CanonicalTimelinePresentation private constructor(
     val missingTarget: String?,
 ) {
     private val job = SupervisorJob(parentScope.coroutineContext[Job])
-    private val scope = CoroutineScope(parentScope.coroutineContext + job)
+    private val scope = parentScope + job
     private val owner = lease.owner
     private val resident = MutableStateFlow<Map<TimelineMessageId, Long>>(emptyMap())
 
     private val detached = kotlinx.coroutines.CompletableDeferred<Unit>()
     init {
         job.invokeOnCompletion {
-            CoroutineScope(parentScope.coroutineContext + NonCancellable).launch {
+            (parentScope + NonCancellable).launch {
                 try {
                     coordinator.detach(lease)
                     detached.complete(Unit)
