@@ -1,8 +1,12 @@
 package com.letta.mobile.data.timeline
 
 import androidx.paging.PagingSource
+import com.letta.mobile.data.model.LettaMessage
+import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -28,40 +32,77 @@ class TimelineLedgerPagingSourceTest {
         )
     }
 
+    @Test fun mediatorOnlyAppendsAndUsesDurableHasMore() = verifyMediator(noProgress = false)
+
+    @Test fun mediatorNoProgressIsAnErrorUntilDurableExhaustion() = verifyMediator(noProgress = true)
+
     @OptIn(androidx.paging.ExperimentalPagingApi::class)
-    @Test fun mediatorOnlyAppendsAndUsesDurableHasMore() = runTest {
+    private fun verifyMediator(noProgress: Boolean) = runTest {
         val store = Store()
         store.hasMore = true
         var calls = 0
         val transport = object : TimelineTransport {
-            override suspend fun streamConversation(conversationId: String) = kotlinx.coroutines.flow.emptyFlow<TimelineStreamFrame>()
-            override suspend fun sendConversationMessage(conversationId: String, request: com.letta.mobile.data.model.MessageCreateRequest): kotlinx.coroutines.flow.Flow<com.letta.mobile.data.model.LettaMessage> = error("unexpected send")
-            override suspend fun listConversationMessages(conversationId: String, limit: Int?, after: String?, order: String?): List<com.letta.mobile.data.model.LettaMessage> = error("unexpected legacy read")
-            override suspend fun listAgentMessages(agentId: String, limit: Int?, order: String?, conversationId: String?): List<com.letta.mobile.data.model.LettaMessage> = error("unexpected agent read")
-            override suspend fun listConversationMessagePage(request: TimelineRemotePageRequest, progress: TimelinePageProgress?): TimelineRemotePageResult =
-                TimelineRemotePageResult.NoProgress(request.requestId, request.selectionGeneration, request.continuation).also { calls++ }
+            override suspend fun sendConversationMessage(
+                conversationId: String,
+                request: MessageCreateRequest,
+            ): Flow<LettaMessage> = emptyFlow()
+
+            override suspend fun streamConversation(conversationId: String): Flow<TimelineStreamFrame> = emptyFlow()
+
+            override suspend fun listConversationMessages(
+                conversationId: String,
+                limit: Int?,
+                after: String?,
+                order: String?,
+            ): List<LettaMessage> = emptyList()
+
+            override suspend fun listAgentMessages(
+                agentId: String,
+                limit: Int?,
+                order: String?,
+                conversationId: String?,
+            ): List<LettaMessage> = emptyList()
+
+            override suspend fun listConversationMessagePage(
+                request: TimelineRemotePageRequest,
+                progress: TimelinePageProgress?,
+            ): TimelineRemotePageResult =
+                (if (noProgress) {
+                    TimelineRemotePageResult.NoProgress(request.requestId, request.selectionGeneration, request.continuation)
+                } else {
+                    TimelineRemotePageResult.Page(request.requestId, request.selectionGeneration, emptyList(), null, false, 0)
+                }).also { calls++ }
         }
         val session = CanonicalTimelineSession(store, transport, TimelineScope("b", "c"), enabled = true)
         val selection = assertIs<TimelineEngineOpen.Opened>(session.open()).selection
         val mediator = TimelineHistoryMediator(session, selection)
         val emptyState = androidx.paging.PagingState<TimelinePageKey, TimelineSettledRecord>(
             pages = emptyList(),
-            anchorPosition = 0,
-            config = androidx.paging.PagingConfig(64),
+            anchorPosition = null,
+            config = androidx.paging.PagingConfig(pageSize = 64),
             leadingPlaceholderCount = 0,
         )
         val prepend = mediator.load(androidx.paging.LoadType.PREPEND, emptyState)
-        kotlin.test.assertIs<androidx.paging.RemoteMediator.MediatorResult.Success>(prepend)
+        val prependSuccess = assertIs<androidx.paging.RemoteMediator.MediatorResult.Success>(prepend)
+        kotlin.test.assertTrue(prependSuccess.endOfPaginationReached)
         assertEquals(0, calls)
-        kotlin.test.assertIs<androidx.paging.RemoteMediator.MediatorResult.Error>(
-            mediator.load(androidx.paging.LoadType.APPEND, emptyState),
-        )
-        assertEquals(1, calls)
-        store.hasMore = false
+
+        if (noProgress) {
+            assertIs<androidx.paging.RemoteMediator.MediatorResult.Error>(
+                mediator.load(androidx.paging.LoadType.APPEND, emptyState),
+            )
+            assertEquals(1, calls)
+            store.hasMore = false
+        }
         val append = mediator.load(androidx.paging.LoadType.APPEND, emptyState)
         assertEquals(1, calls)
-        kotlin.test.assertIs<androidx.paging.RemoteMediator.MediatorResult.Success>(append)
-        kotlin.test.assertTrue((append as androidx.paging.RemoteMediator.MediatorResult.Success).endOfPaginationReached)
+        val appendSuccess = assertIs<androidx.paging.RemoteMediator.MediatorResult.Success>(append)
+        kotlin.test.assertTrue(appendSuccess.endOfPaginationReached)
+
+        val appendExhausted = mediator.load(androidx.paging.LoadType.APPEND, emptyState)
+        assertEquals(1, calls)
+        val exhaustedSuccess = assertIs<androidx.paging.RemoteMediator.MediatorResult.Success>(appendExhausted)
+        kotlin.test.assertTrue(exhaustedSuccess.endOfPaginationReached)
     }
 
     @Test fun cancellationEscapesPagingLoad() = runTest {
@@ -74,11 +115,13 @@ class TimelineLedgerPagingSourceTest {
         }
     }
 
-    private class Store : TimelineBoundedStore, TimelineStoreReader {
+    private class Store : TimelineBoundedStore, TimelineStoreReader, TimelineStoreTransaction {
         var position: TimelineReadPosition? = null
         var hasMore = false
         var cancel = false
         private val tools = mutableMapOf<TimelineScope, TestToolIndexState>()
+        override suspend fun putToolCall(entry: TimelineToolIndexEntry): Unit = error("Use scoped transaction")
+        override suspend fun setToolSweepGeneration(next: Long): Unit = error("Use scoped transaction")
         override suspend fun toolCall(callId: String): TimelineToolIndexEntry? = error("Use scoped read")
         override suspend fun unresolvedTools(afterCallId: String?, maxRows: Int): List<TimelineToolIndexEntry> = error("Use scoped read")
         override suspend fun toolSweepGeneration(): Long = error("Use scoped read")
@@ -90,7 +133,16 @@ class TimelineLedgerPagingSourceTest {
                 override suspend fun toolSweepGeneration() = snapshot.generation
             })
         }
-        override suspend fun <T> transaction(scope: TimelineScope, block: suspend TimelineStoreTransaction.() -> T): T = error("read only")
+        override suspend fun <T> transaction(scope: TimelineScope, block: suspend TimelineStoreTransaction.() -> T): T {
+            val state = tools.getOrPut(scope) { TestToolIndexState() }
+            return block(object : TimelineStoreTransaction by this {
+                override suspend fun toolCall(callId: String) = state.entries[callId]
+                override suspend fun unresolvedTools(afterCallId: String?, maxRows: Int) = state.unresolved(afterCallId, maxRows)
+                override suspend fun toolSweepGeneration() = state.generation
+                override suspend fun putToolCall(entry: TimelineToolIndexEntry) { state.entries[entry.callId] = entry }
+                override suspend fun setToolSweepGeneration(generation: Long) { state.generation = generation }
+            })
+        }
         override suspend fun checkpoint() = TimelineDurableCheckpoint(1, null, hasMore)
         override suspend fun locate(identity: TimelineMessageId): TimelinePageKey? = null
         override suspend fun metadata(position: TimelineReadPosition, maxRows: Int): TimelineMetadataPage {
@@ -102,6 +154,15 @@ class TimelineLedgerPagingSourceTest {
         }
         override suspend fun body(pointer: TimelineBodyPointer, offset: Long, maxBytes: Int) = byteArrayOf(1)
         override suspend fun evidence(key: String, maxBytes: Int): ByteArray? = null
+
+        override suspend fun put(record: TimelineStoredRecord) {}
+        override suspend fun putEvidence(key: String, value: ByteArray) {}
+        override suspend fun deleteEvidence(key: String) {}
+        override suspend fun cursor(continuation: TimelineContinuation?, hasMore: Boolean) {
+            this.hasMore = hasMore
+        }
+        override suspend fun nextRevision(): Long = 2L
+        override suspend fun delete(identity: TimelineMessageId, reason: TimelineDurableDeleteReason) {}
     }
 
     companion object {
