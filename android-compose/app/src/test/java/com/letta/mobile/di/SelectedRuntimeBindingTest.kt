@@ -117,6 +117,7 @@ class SelectedRuntimeBindingTest {
     @Test fun manifestOnlyReadinessDefersWithoutDrainOrEnvelopeDecode() = runTest {
         val scope = com.letta.mobile.data.timeline.snapshot.TimelineScope("backend", "conversation", "agent")
         val storage = mockk<com.letta.mobile.data.local.TimelineOwnedStorageFactory>()
+        coEvery { storage.registerLegacyPair(any(), any()) } returns Unit
         val authority = mockk<com.letta.mobile.data.local.TimelineOwnershipAuthority>()
         val drained = mutableListOf<String>()
         val transport = mockk<com.letta.mobile.data.timeline.GenerationTimelineTransport>(relaxed = true)
@@ -145,6 +146,7 @@ class SelectedRuntimeBindingTest {
     @Test fun readinessMeasurementCountsEnvelopeDecodeDuringClassify() = runTest {
         val scope = com.letta.mobile.data.timeline.snapshot.TimelineScope("backend", "conversation", "agent")
         val storage = mockk<com.letta.mobile.data.local.TimelineOwnedStorageFactory>()
+        coEvery { storage.registerLegacyPair(any(), any()) } returns Unit
         val authority = mockk<com.letta.mobile.data.local.TimelineOwnershipAuthority>()
         val drained = mutableListOf<String>()
         val transport = mockk<com.letta.mobile.data.timeline.GenerationTimelineTransport>(relaxed = true)
