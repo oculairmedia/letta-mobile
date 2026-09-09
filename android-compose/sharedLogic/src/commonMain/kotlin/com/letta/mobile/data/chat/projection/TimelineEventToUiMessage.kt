@@ -217,7 +217,7 @@ fun timelineEventToUiMessage(ev: TimelineEvent, ownAgentId: String? = null): UiM
                     emptyList()
                 } else {
                     ev.attachments.map {
-                        UiImageAttachment(base64 = it.base64, mediaType = it.mediaType)
+                        UiImageAttachment(base64 = it.base64, mediaType = it.mediaType, storedByteSize = it.storedByteSize)
                     }
                 },
                 // letta-mobile-slqfp: Local events have no owning agentId yet,
@@ -370,7 +370,7 @@ fun timelineEventToUiMessage(ev: TimelineEvent, ownAgentId: String? = null): UiM
                     emptyList()
                 } else {
                     ev.attachments.map {
-                        UiImageAttachment(base64 = it.base64, mediaType = it.mediaType)
+                        UiImageAttachment(base64 = it.base64, mediaType = it.mediaType, storedByteSize = it.storedByteSize)
                     }
                 },
                 agentMessageProvenance = if (role == "user") {
@@ -463,7 +463,7 @@ private fun com.letta.mobile.data.model.ToolCall.toUiToolCall(data: ToolCallRend
 private fun com.letta.mobile.data.model.ToolCall.generatedImageAttachments(
     attachments: List<com.letta.mobile.data.model.MessageContentPart.Image>,
 ): List<UiImageAttachment> = if (name == "generate_image") {
-    attachments.map { UiImageAttachment(base64 = it.base64, mediaType = it.mediaType) }
+    attachments.map { UiImageAttachment(base64 = it.base64, mediaType = it.mediaType, storedByteSize = it.storedByteSize) }
 } else {
     emptyList()
 }

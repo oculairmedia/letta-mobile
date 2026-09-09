@@ -229,10 +229,11 @@ private fun PagedChatMessageListContent(
             ),
         )
         LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(top = appearance.topPadding),
             state = listState,
             reverseLayout = true,
             contentPadding = PaddingValues(start = dimens.contentPaddingHorizontal, end = dimens.contentPaddingHorizontal,
-                top = appearance.topPadding, bottom = appearance.bottomPadding),
+                top = 0.dp, bottom = appearance.bottomPadding),
         ) {
             items(live.size, key = { live[it].key }) { index ->
                 Column {

@@ -37,6 +37,52 @@ class RoomTimelineBoundedStoreTest {
     }
     @After fun teardown() { db.close() }
 
+    @Test fun pendingSaveAndDeliveryChangesAllocateExactlyOneRevision() = runBlocking {
+        val pending = CanonicalPendingLocalStore(store)
+        val record = CanonicalPendingLocalStore.Record("send-1", "hello", emptyList(), "2026-09-08T21:00:00Z")
+        pending.save(scope, record)
+        assertEquals(listOf(record), pending.load(scope))
+        assertEquals(1L, store.read(scope) { checkpoint().revision })
+        pending.save(scope, record)
+        pending.mark(scope, "absent", CanonicalPendingLocalStore.Delivery.Failed)
+        assertEquals(1L, store.read(scope) { checkpoint().revision })
+        pending.mark(scope, record.otid, CanonicalPendingLocalStore.Delivery.Sent)
+        assertEquals(2L, store.read(scope) { checkpoint().revision })
+        pending.mark(scope, record.otid, CanonicalPendingLocalStore.Delivery.Sent)
+        assertEquals(2L, store.read(scope) { checkpoint().revision })
+        pending.mark(scope, record.otid, CanonicalPendingLocalStore.Delivery.Failed)
+        assertEquals(3L, store.read(scope) { checkpoint().revision })
+        val reopened = CanonicalPendingLocalStore(RoomTimelineBoundedStore(db, codec))
+        assertEquals(listOf(record.copy(delivery = CanonicalPendingLocalStore.Delivery.Failed)), reopened.load(scope))
+    }
+
+    @Test fun replayedEchoRemovalAndToolSweepCommitRevisions() = runBlocking {
+        val pending = CanonicalPendingLocalStore(store)
+        val local = CanonicalPendingLocalStore.Record("echo-local", "hello", emptyList(), "2026-09-08T21:00:00Z")
+        val writer = TimelineExactCanonicalWriter(scope, 100_000)
+        val echo = TimelineRemoteRecord(TimelineMessageId("echo-server"), com.letta.mobile.data.model.UserMessage(
+            id = "echo-server", contentRaw = kotlinx.serialization.json.JsonPrimitive("hello"), date = local.sentAt, otid = local.otid,
+        ), 0)
+        pending.save(scope, local)
+        store.transaction(scope) { assertTrue(writer.merge(this, echo)); nextRevision() }
+        assertTrue(pending.load(scope).isEmpty())
+        pending.save(scope, local)
+        store.transaction(scope) {
+            assertTrue("Replay removing pending must report mutation", writer.merge(this, echo))
+            nextRevision()
+        }
+        assertEquals(4L, store.read(scope) { checkpoint().revision })
+        assertTrue(pending.load(scope).isEmpty())
+        store.transaction(scope) { assertFalse(writer.merge(this, echo)) }
+        val engine = CanonicalTimelineEngine(store, writer, enabled = true)
+        val selection = (engine.open(scope) as TimelineEngineOpen.Opened).selection
+        assertEquals(1L, engine.advanceToolSweep(selection))
+        assertEquals(5L, store.read(scope) { checkpoint().revision })
+        assertEquals(5L, engine.publication.value.durableRevision)
+        assertEquals(0, engine.settleToolSweep(selection, 1))
+        assertEquals(5L, store.read(scope) { checkpoint().revision })
+    }
+
     @Test fun tiedKeysUseKotlinUtf16OrderAndSqlCaps() = runBlocking {
         val ids = (0..256).map { "id-$it" } + listOf("\uD83D\uDE00", "\uE000", "\uD800", "a\u0000b")
         store.transaction(scope) {

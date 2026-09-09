@@ -14,6 +14,21 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class TimelineExactCanonicalWriterTest {
+    @Test fun assistantAliasRequiresSharedSegmentProvenanceNotTextOrRun() = runTest {
+        val store = Store()
+        val writer = TimelineExactCanonicalWriter(scope, 100_000)
+        val live = kotlin.test.assertNotNull(message("same response").toTimelineEvent(0.0)).copy(
+            serverId = "cm-stream-provider-assistant-0-segment-a", otid = "provider-assistant-0-segment-a",
+        )
+        store.transaction(scope) { writer.mergeEvent(this, live) }
+        // A history producer preserving the exact segment OTID reconciles without text heuristics.
+        store.transaction(scope) { writer.mergeEvent(this, live.copy(serverId = "ui-msg-a")) }
+        assertEquals(1, store.rows.size)
+        // Same content and run with independent provenance must remain a separate response.
+        store.transaction(scope) { writer.mergeEvent(this, live.copy(serverId = "ui-msg-b", otid = "ui-msg-b")) }
+        assertEquals(2, store.rows.size)
+    }
+
     @Test fun capturedTransportScopeRejectsRetiredBackend() = runTest {
         var current = "first"
         val resolver = CanonicalTransportScopeResolver(current) { it == current }
@@ -98,6 +113,51 @@ class TimelineExactCanonicalWriterTest {
         }
     }
 
+    @Test fun legacyToolProjectionsWithDifferentServerIdsAndOtidsShareInvocationOwner() = runTest {
+        val store = Store()
+        val writer = TimelineExactCanonicalWriter(scope, 100_000)
+        val first = kotlin.test.assertNotNull(message("tool").toTimelineEvent(0.0)).copy(
+            serverId = "ui-message:tool:call:request", otid = "server-ui-tool",
+            messageType = TimelineMessageType.TOOL_CALL, runId = null,
+            toolCalls = listOf(com.letta.mobile.data.model.ToolCall(id = "call", name = "test")).toTimelinePersistentList(),
+        )
+        val history = first.copy(serverId = "toolcall-call", otid = "server-toolcall-local-run", runId = "local-run")
+        store.transaction(scope) { writer.mergeEvent(this, first); nextRevision() }
+        store.transaction(scope) { writer.mergeEvent(this, history); nextRevision() }
+        assertEquals(1, store.rows.size)
+        store.read(scope) {
+            assertEquals(TimelineMessageId(first.serverId), toolCall("call")?.owner)
+            assertEquals(TimelineMessageId(first.serverId), writer.canonicalIdentity(this, history.serverId, history.otid))
+        }
+        store.transaction(scope) { writer.mergeEvent(this, history) }
+        assertEquals(1, store.rows.size)
+    }
+
+    @Test fun toolGroupCannotMergeTwoExistingInvocationOwners() = runTest {
+        val store = Store()
+        val writer = TimelineExactCanonicalWriter(scope, 100_000)
+        val event = kotlin.test.assertNotNull(message("tool").toTimelineEvent(0.0)).copy(
+            messageType = TimelineMessageType.TOOL_CALL, otid = "",
+            toolCalls = listOf(com.letta.mobile.data.model.ToolCall(id = "first", name = "test")).toTimelinePersistentList(),
+        )
+        store.transaction(scope) { writer.mergeEvent(this, event); nextRevision() }
+        val other = event.copy(serverId = "other", toolCalls = listOf(
+            com.letta.mobile.data.model.ToolCall(id = "second", name = "test"),
+        ).toTimelinePersistentList())
+        store.transaction(scope) { writer.mergeEvent(this, other); nextRevision() }
+        kotlin.test.assertFailsWith<IllegalStateException> {
+            store.transaction(scope) {
+                writer.mergeEvent(this, event.copy(serverId = "group", toolCalls =
+                    (event.toolCalls + other.toolCalls).toTimelinePersistentList()))
+            }
+        }
+        assertEquals(2, store.rows.size)
+        store.read(scope) {
+            assertEquals(TimelineMessageId(event.serverId), toolCall("first")?.owner)
+            assertEquals(TimelineMessageId(other.serverId), toolCall("second")?.owner)
+        }
+    }
+
     @Test fun undecodedRawEventFailsWithoutCommittingOrConsumingTypedTurn() = runTest {
         val store = Store()
         val engine = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
@@ -111,6 +171,25 @@ class TimelineExactCanonicalWriterTest {
         assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(message("typed"))))
         assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
         assertEquals(1, store.rows.size)
+    }
+
+    @Test fun pendingSendDoesNotFilterPreviouslyLoadedHistoryAndSelectionStillFencesIt() = runTest {
+        val store = Store()
+        val engine = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
+        val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
+        val fence = engine.beginLive(selection)
+        val prior = message("visible history")
+        engine.ingest(fence, TimelineStreamFrame.Message(prior))
+        engine.ingest(fence, TimelineStreamFrame.Done)
+        val revision = engine.publication.value.durableRevision
+        val event = kotlin.test.assertNotNull(prior.toTimelineEvent(0.0))
+        val pending = CanonicalPendingLocalStore(store)
+        pending.save(scope, CanonicalPendingLocalStore.Record("send", "new prompt", emptyList(), "2026-09-09T00:00:00Z"))
+        assertFalse(engine.isSuppressed(selection, TimelineMessageId(prior.id), revision, event))
+        pending.mark(scope, "send", CanonicalPendingLocalStore.Delivery.Sent)
+        assertFalse(engine.isSuppressed(selection, TimelineMessageId(prior.id), revision, event))
+        engine.open(scope.copy(conversationId = "other"))
+        assertTrue(engine.isSuppressed(selection, TimelineMessageId(prior.id), revision, event))
     }
 
     @Test fun semanticSuppressionRetainsRawBodyAndRejectsExactReplay() = runTest {
@@ -128,9 +207,8 @@ class TimelineExactCanonicalWriterTest {
         kotlin.test.assertContentEquals(raw, store.rows.values.single().body)
         val event = kotlin.test.assertNotNull(fragment.toTimelineEvent(0.0))
         assertTrue(engine.isSuppressed(selection, TimelineMessageId(fragment.id), 2L, event))
-        kotlin.test.assertFailsWith<IllegalStateException> {
-            engine.isSuppressed(selection, TimelineMessageId(fragment.id), 1L, event)
-        }
+        // Paging may still transform the previous generation after durable publication.
+        assertTrue(engine.isSuppressed(selection, TimelineMessageId(fragment.id), 1L, event))
         store.transaction(scope) {
             assertFalse(writer.merge(this, TimelineRemoteRecord(TimelineMessageId(fragment.id), fragment, 0)))
         }
@@ -219,13 +297,13 @@ class TimelineExactCanonicalWriterTest {
         assertEquals(null, owner.session.live.value)
         assertEquals(1, store.rows.size)
         val durableBody = store.rows.values.single().body.copyOf()
-        assertEquals(1L, store.current.revision)
+        assertEquals(3L, store.current.revision)
         assertFalse(coordinator.ingest(owner, fence, TimelineStreamFrame.Done))
         assertTrue(coordinator.retire(owner))
         val reopened = coordinator.acquire(scope)
         val page = reopened.session.engine.load(reopened.selection, TimelineReadPosition.Tail, 1)
         kotlin.test.assertContentEquals(durableBody, page.bodies.single())
-        assertEquals(1L, reopened.session.publication.value.durableRevision)
+        assertEquals(3L, reopened.session.publication.value.durableRevision)
         assertEquals(1, store.rows.size)
         val repair = async { coordinator.reconcileRecentDetailed(reopened) }
         repairStarted.await()
@@ -304,7 +382,7 @@ class TimelineExactCanonicalWriterTest {
         store.transaction(scope) { assertTrue(writer.merge(this, record)) }
         assertEquals(emptyList(), pending.load(scope))
         pending.save(scope, local)
-        store.transaction(scope) { assertFalse(writer.merge(this, record)) }
+        store.transaction(scope) { assertTrue(writer.merge(this, record)) }
         assertEquals(emptyList(), pending.load(scope))
         assertEquals(2, store.rows.size)
     }
@@ -460,8 +538,8 @@ class TimelineExactCanonicalWriterTest {
         kotlin.test.assertFailsWith<IllegalArgumentException> { engine.settleToolSweep(selection, generation) }
         assertTrue(store.bodyReads > 0)
         before.forEach { (key, bytes) -> kotlin.test.assertContentEquals(bytes, store.rows.getValue(key).body) }
-        assertEquals(1L, store.current.revision)
-        assertEquals(1L, engine.publication.value.durableRevision)
+        assertEquals(2L, store.current.revision)
+        assertEquals(2L, engine.publication.value.durableRevision)
         store.read(scope) {
             assertEquals(generation, toolSweepGeneration())
             assertEquals(listOf("a", "z"), unresolvedTools(null, 64).map { it.callId })

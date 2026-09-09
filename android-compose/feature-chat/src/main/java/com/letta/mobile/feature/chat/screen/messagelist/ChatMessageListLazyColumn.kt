@@ -144,12 +144,13 @@ internal fun ChatMessageListRenderItem(params: ChatMessageListRenderItemParams) 
         LocalChatFontScale provides perItemFontScale,
         LocalToolCardBodyParentVisible provides itemSeesLiveScale,
     ) {
-        // Reasoning rows animate their own size; a cached minimum can pin the
-        // row at an intermediate expanded height while it collapses.
+        // Reasoning, tool cards and run blocks animate their own size; a cached
+        // minimum can pin an intermediate expanded height while they collapse.
         MeasuredChatRenderItem(
             signature = geometrySignature,
             geometryState = context.itemGeometryState,
-            applyCachedMinHeight = !renderItem.includesReasoningRow(),
+            applyCachedMinHeight = !renderItem.includesReasoningRow() &&
+                renderItem is ChatRenderItem.Single && renderItem.message.toolCalls.isNullOrEmpty(),
         ) {
             ChatMessageListRenderItemBody(
                 params = ChatMessageListRenderItemBodyParams(
@@ -254,7 +255,8 @@ private fun ChatMessageListRenderRunBlockItem(params: ChatMessageListRenderRunBl
         onToggleCollapsed = {
             context.callbacks.onToggleRunCollapsed(renderItem.runId)
         },
-        modifier = highlightModifier.padding(top = params.chatDimens.ungroupedMessageSpacing),
+        modifier = highlightModifier.padding(top = if (renderItem.messages.all { !it.first.toolCalls.isNullOrEmpty() })
+            params.chatDimens.groupedMessageSpacing else params.chatDimens.ungroupedMessageSpacing),
         isStreaming = params.isStreamingRenderItem,
         activeApprovalRequestId = context.itemState.activeApprovalRequestId,
         onApprovalDecision = context.callbacks.onSubmitApproval,

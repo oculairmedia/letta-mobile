@@ -105,6 +105,18 @@ data class LedgerValidationState(val scope: ByteArray, val payload: ByteArray, v
 
 @Dao
 interface TimelineLedgerDao {
+    @Query("""SELECT EXISTS(SELECT 1 FROM ledger_head WHERE scope = :scope)
+        OR EXISTS(SELECT 1 FROM ledger_row WHERE scope = :scope)
+        OR EXISTS(SELECT 1 FROM ledger_blob WHERE scope = :scope)
+        OR EXISTS(SELECT 1 FROM ledger_chunk WHERE scope = :scope)
+        OR EXISTS(SELECT 1 FROM ledger_evidence WHERE scope = :scope)
+        OR EXISTS(SELECT 1 FROM ledger_tool_call WHERE scope = :scope)
+        OR EXISTS(SELECT 1 FROM ledger_tool_sweep WHERE scope = :scope)
+        OR EXISTS(SELECT 1 FROM ledger_migration WHERE scope = :scope)
+        OR EXISTS(SELECT 1 FROM ledger_migration_row WHERE scope = :scope)
+        OR EXISTS(SELECT 1 FROM ledger_validation WHERE scope = :scope)""")
+    suspend fun hasScopeEvidence(scope: ByteArray): Boolean
+
     @Query("SELECT scope, substr(payload, 1, 16385) AS payload, checksum FROM ledger_validation WHERE scope = :scope")
     suspend fun validation(scope: ByteArray): LedgerValidationState?
 

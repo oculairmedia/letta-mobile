@@ -177,7 +177,10 @@ class RoomLegacyCanonicalMigration(
 
     private suspend fun guarded(block: suspend () -> RoomCanonicalMigrationResult): RoomCanonicalMigrationResult = withContext(io) {
         try { block() } catch (cancelled: CancellationException) { throw cancelled }
-        catch (_: Exception) { fallback("integrity_or_storage_failure") }
+        catch (failure: Exception) {
+            android.util.Log.e("CanonicalMigration", "Legacy conversion or validation failed", failure)
+            fallback("integrity_or_storage_failure")
+        }
     }
 
     private suspend fun TimelineStoreReader.progress(): ConversionProgress? =

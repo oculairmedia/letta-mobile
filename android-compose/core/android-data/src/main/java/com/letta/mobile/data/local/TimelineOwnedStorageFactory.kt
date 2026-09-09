@@ -3,6 +3,8 @@ package com.letta.mobile.data.local
 import com.letta.mobile.data.timeline.TimelineBoundedStore
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 
+class TimelineMigrationAlreadyCompletedException : IllegalStateException("Timeline migration already completed")
+
 /** Explicit captured-lease entrypoints. Does not acquire, migrate or activate during construction. */
 class TimelineOwnedStorageFactory(
     private val legacy: LettaDatabase,
@@ -24,9 +26,14 @@ class TimelineOwnedStorageFactory(
             "Manifest-only history defers canonical cutover"
         }
         check(head.supported) { "Canonical copy source is unsupported" }
-        check(ledger.ledger().head(ledgerScopeKey(target)) == null) { "Canonical target occupied" }
-        check(ledger.ledger().migration(ledgerScopeKey(target)) == null) { "Unmapped copy occupies target" }
+        check(!ledger.ledger().hasScopeEvidence(ledgerScopeKey(target))) { "Canonical target occupied" }
     }
+
+    suspend fun registerLegacyPair(source: TimelineScope, target: TimelineScope) =
+        authority.registerLegacyPair(source, target) {
+            check(!ledger.ledger().hasScopeEvidence(ledgerScopeKey(target))) { "Missing ownership for existing canonical evidence" }
+            check(classifyCopySource(source).supported) { "Unsupported legacy source" }
+        }
 
     /** Metadata-only classification. Does not decode envelopes or materialize event lists. */
     suspend fun classifyCopySource(scope: TimelineScope): LegacyLedgerCopyHead =
@@ -48,7 +55,9 @@ class TimelineOwnedStorageFactory(
      */
     suspend fun resumeMappedMigration(source: TimelineScope, target: TimelineScope): TimelineOwnershipAuthority.Lease {
         val state = authority.state(target)
-        check(state.scope == target && state.phase in listOf(
+        check(state.scope == target)
+        if (state.phase == TimelineOwnershipAuthority.Phase.Canonical) throw TimelineMigrationAlreadyCompletedException()
+        check(state.phase in listOf(
             TimelineOwnershipAuthority.Phase.Migrating, TimelineOwnershipAuthority.Phase.Prepared,
         ))
         val lease = TimelineOwnershipAuthority.Lease(target, state.epoch, TimelineOwnershipAuthority.Route.Migration)

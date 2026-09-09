@@ -21,11 +21,11 @@ class OwnershipFencedTimelineStore(
 
     override suspend fun <T> read(scope: TimelineScope, block: suspend TimelineStoreReader.() -> T): T {
         check(scope == lease.scope)
-        return authority.withLease(lease) { delegate.read(scope, block) }
+        return retryTimelineOwnership { authority.withLease(lease) { delegate.read(scope, block) } }
     }
 
     override suspend fun <T> transaction(scope: TimelineScope, block: suspend TimelineStoreTransaction.() -> T): T {
         check(scope == lease.scope)
-        return authority.withLease(lease) { delegate.transaction(scope, block) }
+        return retryTimelineOwnership { authority.withLease(lease) { delegate.transaction(scope, block) } }
     }
 }

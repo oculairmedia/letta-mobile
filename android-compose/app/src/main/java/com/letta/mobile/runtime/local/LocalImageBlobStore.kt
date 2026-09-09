@@ -18,47 +18,79 @@ class LocalImageBlobStore(
     private val conversationDirectory: File,
 ) : ImageBlobStore {
     private val blobsDirectory: File
-        get() = File(conversationDirectory, "blobs").apply { mkdirs() }
+        get() = File(conversationDirectory, "blobs")
 
     override fun putBytes(mediaType: String, bytes: ByteArray): String {
+        require(bytes.size <= MAX_BLOB_BYTES) { "Image exceeds blob budget" }
+        check(blobsDirectory.mkdirs() || blobsDirectory.isDirectory)
+        require(blobsDirectory.canonicalFile.parentFile == conversationDirectory.canonicalFile)
         val hash = sha256Hex(bytes)
         val ext = mediaTypeToExtension(mediaType)
         val ref = "sha256:$hash"
         val blobFile = File(blobsDirectory, "$hash.$ext")
 
-        // Idempotent: if the blob already exists, skip the write.
-        if (blobFile.isFile) return ref
+        require(blobFile.canonicalFile.parentFile == blobsDirectory.canonicalFile)
+        if (getBytes(ref)?.contentEquals(bytes) == true) return ref
 
-        // Atomic write: tmp file → rename.
-        val tmp = File(blobsDirectory, "$hash.$ext.tmp")
-        tmp.writeBytes(bytes)
-        if (!tmp.renameTo(blobFile)) {
-            // Fallback: direct write if rename fails (shouldn't happen).
-            blobFile.writeBytes(bytes)
+        // Unique staging files prevent concurrent writers from truncating each other.
+        val tmp = File.createTempFile("image-", ".tmp", blobsDirectory)
+        try {
+            tmp.outputStream().use { output ->
+                output.write(bytes)
+                output.fd.sync()
+            }
+            check(tmp.renameTo(blobFile)) { "Atomic blob publication failed" }
+        } finally {
             tmp.delete()
         }
         return ref
     }
 
     override fun getBytes(ref: String): ByteArray? {
-        val hash = ref.removePrefix("sha256:").takeIf { it.isNotBlank() } ?: return null
+        val hash = validatedHash(ref) ?: return null
         // Try all known extensions (we don't store mediaType in the ref).
         val candidates = listOf("jpg", "jpeg", "png", "gif", "webp", "bmp")
         for (ext in candidates) {
             val blobFile = File(blobsDirectory, "$hash.$ext")
             if (blobFile.isFile) {
-                return runCatching { blobFile.readBytes() }.getOrNull()
+                return runCatching {
+                    require(blobFile.canonicalFile.parentFile == blobsDirectory.canonicalFile)
+                    require(blobFile.length() <= MAX_BLOB_BYTES)
+                    val bytes = blobFile.inputStream().use { input ->
+                        val output = java.io.ByteArrayOutputStream()
+                        val buffer = ByteArray(64 * 1024)
+                        while (true) {
+                            val count = input.read(buffer)
+                            if (count < 0) break
+                            require(output.size().toLong() + count <= MAX_BLOB_BYTES)
+                            output.write(buffer, 0, count)
+                        }
+                        output.toByteArray()
+                    }
+                    require(bytes.size <= MAX_BLOB_BYTES && sha256Hex(bytes) == hash)
+                    bytes
+                }.getOrNull()
             }
         }
         return null
     }
 
     override fun has(ref: String): Boolean {
-        val hash = ref.removePrefix("sha256:").takeIf { it.isNotBlank() } ?: return false
+        val hash = validatedHash(ref) ?: return false
         val candidates = listOf("jpg", "jpeg", "png", "gif", "webp", "bmp")
         return candidates.any { ext ->
             File(blobsDirectory, "$hash.$ext").isFile
         }
+    }
+
+    private fun validatedHash(ref: String): String? {
+        if (!ref.matches(Regex("sha256:[a-f0-9]{64}"))) return null
+        if (blobsDirectory.canonicalFile.parentFile != conversationDirectory.canonicalFile) return null
+        return ref.removePrefix("sha256:")
+    }
+
+    companion object {
+        const val MAX_BLOB_BYTES = 20 * 1024 * 1024
     }
 
     private fun sha256Hex(bytes: ByteArray): String {

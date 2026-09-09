@@ -56,6 +56,7 @@ class CanonicalPendingLocalStore(private val store: TimelineBoundedStore) {
                 return@transaction
             }
             writePending(previous + record)
+            nextRevision()
         }
     }
 
@@ -63,7 +64,10 @@ class CanonicalPendingLocalStore(private val store: TimelineBoundedStore) {
         store.transaction(scope) {
             val previous = readPending()
             val next = previous.map { if (it.otid == otid) it.copy(delivery = delivery) else it }
-            if (next != previous) writePending(next)
+            if (next != previous) {
+                writePending(next)
+                nextRevision()
+            }
         }
     }
 
@@ -73,12 +77,15 @@ class CanonicalPendingLocalStore(private val store: TimelineBoundedStore) {
     }
 
     companion object {
-        internal suspend fun confirmEcho(transaction: TimelineStoreTransaction, otid: String) {
-            if (otid.isBlank()) return
-            with(transaction) {
+        // The enclosing echo transaction owns revision allocation, including replay-only removal.
+        internal suspend fun confirmEcho(transaction: TimelineStoreTransaction, otid: String): Boolean {
+            if (otid.isBlank()) return false
+            return with(transaction) {
                 val previous = readPending()
                 val next = previous.filterNot { it.otid == otid }
-                if (next != previous) writePending(next)
+                if (next == previous) return@with false
+                writePending(next)
+                true
             }
         }
 

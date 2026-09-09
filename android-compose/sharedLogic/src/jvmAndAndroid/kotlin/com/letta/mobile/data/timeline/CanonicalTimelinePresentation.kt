@@ -81,21 +81,28 @@ class CanonicalTimelinePresentation private constructor(
                     val event = com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec.json.decodeFromString(
                         com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent.serializer(), record.body.decodeToString(),
                     ).toConfirmedTimelineEvent()
-                    !owner.session.engine.isSuppressed(owner.selection, record.key.identity, record.revision, event)
+                    timelineEventToUiMessage(event, owner.selection.scope.agentId) != null &&
+                        !owner.session.engine.isSuppressed(owner.selection, record.key.identity, record.revision, event)
                 }
             }.map { record -> project(record) }
         }
     }.cachedIn(scope)
 
-    val live: StateFlow<List<ChatRenderItem>> = combine(owner.session.live, owner.session.pending, resident) {
-            publication, pending, presented ->
+    // Durability alone is not presentation: retain live until the matching revision is resident.
+    val live: StateFlow<List<ChatRenderItem>> = combine(
+        owner.session.live, owner.session.pending, resident,
+    ) { publication, pending, presented ->
         val events = publication?.unpresentedEvents(presented).orEmpty()
         val confirmedOtids = events.mapTo(mutableSetOf()) { it.otid }
-        val optimistic = pending.filterNot { it.otid in confirmedOtids }.map { it.toRenderItem(owner.selection.scope.agentId) }
+        val optimistic = pending.filterNot { it.otid in confirmedOtids }
+            .map { it.toRenderItem(owner.selection.scope.agentId) }
         val active = events.mapNotNull { event ->
             timelineEventToUiMessage(event, owner.selection.scope.agentId)?.let {
-                val identity = publication?.settlementIdentities?.get(TimelineMessageId(event.serverId))?.value ?: event.serverId
-                ChatRenderItem.Single(it, GroupPosition.None, keyOverride = "segment-$identity")
+                val identity = publication?.settlementIdentities?.get(TimelineMessageId(event.serverId))?.value
+                    ?: event.serverId
+                ChatRenderItem.Single(
+                    it, GroupPosition.None, keyOverride = "segment-$identity",
+                )
             }
         }
         active.asReversed() + optimistic.asReversed()

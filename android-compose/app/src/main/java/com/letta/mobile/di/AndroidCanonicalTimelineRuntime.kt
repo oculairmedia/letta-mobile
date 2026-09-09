@@ -74,7 +74,16 @@ class AndroidCanonicalTimelineRuntime(
         lastMeasurement = com.letta.mobile.data.local.CanonicalReadinessMeasurement()
         val decodeBefore = com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec.envelopeDecodeCount
         try {
-            return readyLeaseGuarded(target)
+            try {
+                return readyLeaseGuarded(target)
+            } catch (failure: com.letta.mobile.data.local.TimelineMigrationAlreadyCompletedException) {
+                // Another captured runtime may finish the durable cutover while this one drains.
+                // Reopen only a verified canonical target; never hide an incomplete migration.
+                if (authority.state(target).phase == TimelineOwnershipAuthority.Phase.Canonical) {
+                    return storage.reopenCanonical(target)
+                }
+                throw failure
+            }
         } finally {
             lastMeasurement = lastMeasurement.copy(
                 envelopeDecodes = com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec.envelopeDecodeCount - decodeBefore,
@@ -83,9 +92,10 @@ class AndroidCanonicalTimelineRuntime(
     }
 
     private suspend fun readyLeaseGuarded(target: TimelineScope): TimelineOwnershipAuthority.Lease? {
+        val source = target.copy(backendId = legacyBackendId)
+        storage.registerLegacyPair(source, target)
         val state = authority.state(target)
         if (state.phase == TimelineOwnershipAuthority.Phase.Canonical) return storage.reopenCanonical(target)
-        val source = target.copy(backendId = legacyBackendId)
         if (state.phase == TimelineOwnershipAuthority.Phase.Legacy &&
             authority.state(source).phase != TimelineOwnershipAuthority.Phase.Migrating) {
             val head = storage.classifyCopySource(source)
@@ -93,7 +103,9 @@ class AndroidCanonicalTimelineRuntime(
                 return null
             }
         }
+        android.util.Log.i("CanonicalTimeline", "drain.start conversation=${target.conversationId}")
         drainLegacy(target.conversationId)
+        android.util.Log.i("CanonicalTimeline", "drain.complete conversation=${target.conversationId}")
         val lease = when (state.phase) {
             TimelineOwnershipAuthority.Phase.Migrating, TimelineOwnershipAuthority.Phase.Prepared ->
                 storage.resumeMappedMigration(source, target)

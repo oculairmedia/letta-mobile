@@ -467,7 +467,7 @@ internal class AdminChatViewModel @Inject constructor(
         val gen = chatConversationCoordinator.currentHydrationGeneration(convId)?.id ?: 0L
         viewModelScope.launch {
             try {
-                timelineRepository.reconcileRecentMessages(
+                (selectedRuntime?.writer ?: timelineRepository).reconcileRecentMessages(
                     agentId = agentId.value,
                     conversationId = convId,
                     reason = "screen_resumed",
@@ -674,7 +674,7 @@ internal class AdminChatViewModel @Inject constructor(
             reconcileLauncher = RecentMessagesReconcileLauncher(
                 scope = viewModelScope,
                 reconcile = { request ->
-                    timelineRepository.reconcileRecentMessages(
+                    (selectedRuntime?.writer ?: timelineRepository).reconcileRecentMessages(
                         agentId = agentId.value,
                         conversationId = request.conversationId,
                         reason = request.reason,

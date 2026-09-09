@@ -30,6 +30,21 @@ import kotlinx.coroutines.withContext
  * errors fail closed. A phase change is not a cross-database transaction: Prepared records are only
  * published after the target commit, Canonical only after validation while the authority is held.
  */
+class TimelineOwnershipBusyException : IllegalStateException("Timeline ownership busy; retry outside locks")
+
+/** Retry only lock acquisition failures, after the failed attempt has released its locks. */
+suspend fun <T> retryTimelineOwnership(block: suspend () -> T): T {
+    repeat(100) { attempt ->
+        try {
+            return block()
+        } catch (busy: TimelineOwnershipBusyException) {
+            if (attempt == 99) throw busy
+        }
+        kotlinx.coroutines.delay(25)
+    }
+    error("Unreachable ownership retry")
+}
+
 class TimelineOwnershipAuthority(private val directory: Path) {
     enum class Phase { Legacy, Migrating, Prepared, Canonical }
     enum class Route { Legacy, Migration, Canonical }
@@ -37,6 +52,25 @@ class TimelineOwnershipAuthority(private val directory: Path) {
     data class Mapping(val source: TimelineScope, val sourceEpoch: Long, val target: TimelineScope, val targetEpoch: Long)
     data class State(val scope: TimelineScope, val epoch: Long, val phase: Phase, val receipt: Receipt? = null, val mapping: Mapping? = null)
     data class Lease(val scope: TimelineScope, val epoch: Long, val route: Route)
+
+    /** Explicit admission of an untouched source/target pair, never a missing migrated record. */
+    suspend fun registerLegacyPair(source: TimelineScope, target: TimelineScope, verifyUnusedTarget: suspend () -> Unit) =
+        pairLocked(source.backendId, target.backendId) {
+            val sourceExists = Files.exists(statePath(source))
+            val targetExists = Files.exists(statePath(target))
+            if (sourceExists && targetExists) return@pairLocked
+            for (scope in listOf(source, target).distinct()) {
+                if (Files.exists(statePath(scope))) {
+                    val state = read(scope)
+                    check(state.phase == Phase.Legacy && state.mapping == null) {
+                        "Missing mapped ownership record; explicit recovery required"
+                    }
+                }
+            }
+            verifyUnusedTarget()
+            if (!sourceExists) publish(State(source, 0, Phase.Legacy))
+            if (!targetExists && target != source) publish(State(target, 0, Phase.Legacy))
+        }
 
     suspend fun state(scope: TimelineScope): State = locked(scope.backendId) { read(scope) }
 
@@ -190,7 +224,7 @@ class TimelineOwnershipAuthority(private val directory: Path) {
         syncDirectory(directory)
         FileChannel.open(backend.resolve("ownership.lock"), StandardOpenOption.CREATE, StandardOpenOption.WRITE).use { channel ->
             val lock = try { channel.tryLock() } catch (_: java.nio.channels.OverlappingFileLockException) { null }
-            checkNotNull(lock) { "Timeline ownership busy; retry outside locks" }.use {
+            (lock ?: throw TimelineOwnershipBusyException()).use {
                 currentCoroutineContext().ensureActive()
                 block()
             }
@@ -224,7 +258,7 @@ class TimelineOwnershipAuthority(private val directory: Path) {
             val epoch = input.readLong()
             val phase = Phase.valueOf(input.readUTF())
             val receipt = if (input.readBoolean()) Receipt(input.readUTF(), input.readUTF(), input.readLong()) else null
-            check(stored.backendId == scope.backendId && stored.conversationId == scope.conversationId && epoch > 0)
+            check(stored.backendId == scope.backendId && stored.conversationId == scope.conversationId && epoch >= 0)
             val boundReceipt = if (receipt != null && input.available() > 0) receipt.copy(certificateId = input.readUTF()) else receipt
             val mapping = if (version == 2 && input.readBoolean()) {
                 fun scope() = TimelineScope(input.readUTF(), input.readUTF(), if (input.readBoolean()) input.readUTF() else null)
@@ -234,6 +268,7 @@ class TimelineOwnershipAuthority(private val directory: Path) {
                 }
             } else null
             check(input.available() == 0)
+            check(epoch != 0L || (phase == Phase.Legacy && mapping == null && boundReceipt == null))
             check((phase == Phase.Prepared || phase == Phase.Canonical) == (boundReceipt != null))
             State(stored, epoch, phase, boundReceipt, mapping)
         }

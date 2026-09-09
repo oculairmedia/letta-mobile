@@ -98,7 +98,12 @@ class CanonicalPendingLocalStoreTest {
             override suspend fun body(pointer: TimelineBodyPointer, offset: Long, maxBytes: Int): ByteArray = error("No history read expected")
             override suspend fun put(record: TimelineStoredRecord): Unit = error("No settled write expected")
             override suspend fun cursor(continuation: TimelineContinuation?, hasMore: Boolean): Unit = error("No cursor write expected")
-            override suspend fun nextRevision(): Long = error("No settled invalidation expected")
+            private var allocated = false
+            override suspend fun nextRevision(): Long {
+                check(!allocated) { "Revision already allocated" }
+                allocated = true
+                return 1L
+            }
             override suspend fun delete(identity: TimelineMessageId, reason: TimelineDurableDeleteReason): Unit = error("No history deletion expected")
         }
     }

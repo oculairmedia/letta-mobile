@@ -222,6 +222,40 @@ class TimelineSnapshotCodecTest {
     }
 
     @Test
+    fun largeAttachmentPreservesPointerMetadataAcrossSnapshotRoundTrip() {
+        // Legacy missing-payload metadata survives repeated persistence without
+        // expanding bounded snapshot bodies. This does not assert image restoration.
+        val largeBase64 = "A".repeat(20_000)
+        val event = TimelineEvent.Confirmed(
+            position = 1.0, otid = "otid-large", content = "with big image",
+            serverId = "srv-large", messageType = TimelineMessageType.USER,
+            date = parseTimelineInstant("2026-08-24T00:00:00Z"),
+            runId = null, stepId = null,
+            attachments = persistentListOf(MessageContentPart.Image(base64 = largeBase64, mediaType = "image/jpeg")),
+        )
+        val envelope = TimelineSnapshotCodec.timelineToStoredEnvelope(
+            timeline = Timeline(
+                conversationId = "conv-large",
+                events = persistentListOf(event),
+            ),
+            scope = TimelineScope("backend-large", "conv-large", "agent-large"),
+            revision = 1L,
+            writtenAtMillis = 1_700_000_000_000L,
+        )
+        val restored = TimelineSnapshotCodec.storedEnvelopeToTimeline(
+            TimelineSnapshotCodec.decode(TimelineSnapshotCodec.encode(envelope))!!,
+        )
+        val restoredEvent = restored.events.single() as TimelineEvent.Confirmed
+        assertEquals(1, restoredEvent.attachments.size, "Pointer metadata must survive round-trip")
+        val restoredImage = restoredEvent.attachments.single()
+        assertEquals("", restoredImage.base64)
+        assertEquals("image/jpeg", restoredImage.mediaType)
+        assertEquals(15_000L, restoredImage.storedByteSize)
+        assertEquals(restoredImage, restoredEvent.toStoredTimelineEvent().toConfirmedTimelineEvent().attachments.single())
+        assertTrue(TimelineSnapshotCodec.encode(envelope).length < 16_384)
+    }
+
+    @Test
     fun envelopeDecodeCountTracksActualDecodeAttempts() {
         val before = TimelineSnapshotCodec.envelopeDecodeCount
         assertNull(TimelineSnapshotCodec.decode(""))

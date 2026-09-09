@@ -128,9 +128,11 @@ internal class CapturedSelectedChatRuntime(
     override val scope = CoroutineScope(parent.coroutineContext + job)
     private val bindings = RuntimeBindingCache<String, AndroidCanonicalTimelineRuntime.BindResult>()
 
-    private suspend fun binding(conversation: String) = bindings.get(conversation) {
-        check(job.isActive) { "Selected runtime retired" }
-        hooks.bind(conversation)
+    private suspend fun binding(conversation: String) = com.letta.mobile.data.local.retryTimelineOwnership {
+        bindings.get(conversation) {
+            check(job.isActive) { "Selected runtime retired" }
+            hooks.bind(conversation)
+        }
     }
 
     override suspend fun ready(conversationId: String) = when (binding(conversationId)) {

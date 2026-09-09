@@ -39,7 +39,7 @@ class TimelineExactCanonicalWriter(
     }
 
     suspend fun mergeEvent(transaction: TimelineStoreTransaction, incoming: TimelineEvent.Confirmed): Boolean {
-        val identity = canonicalIdentity(transaction, incoming.serverId, incoming.otid)
+        val identity = canonicalEventIdentity(transaction, incoming)
         val suppression = transaction.evidence("suppression/server/${identity.value}", 64 * 1024)
         if (suppression != null && incoming.messageType == TimelineMessageType.ASSISTANT) {
             val decision = TimelineSnapshotCodec.json.decodeFromString(
@@ -81,10 +81,10 @@ class TimelineExactCanonicalWriter(
         } else historical?.let { TimelineHydrationReducer.mergeRicherEventFacts(incoming, it).copy(position = it.position, otid = it.otid) } ?: incoming
         // The echo and optimistic removal share the caller's transaction, even on replay.
         // Assistant frames can carry an otid too; only a user echo confirms a local send.
-        if (incoming.messageType == TimelineMessageType.USER) {
-            CanonicalPendingLocalStore.confirmEcho(transaction, incoming.otid)
-        }
         var indexed = false
+        if (incoming.messageType == TimelineMessageType.USER) {
+            indexed = CanonicalPendingLocalStore.confirmEcho(transaction, incoming.otid) || indexed
+        }
         for (call in merged.toolCalls) {
             if (call.effectiveId.isBlank()) continue
             indexed = CanonicalToolIndex.observe(transaction, call.effectiveId, identity,
@@ -92,6 +92,11 @@ class TimelineExactCanonicalWriter(
         }
         for (callId in merged.toolReturnContentByCallId.keys) {
             if (callId.isNotBlank()) indexed = CanonicalToolIndex.observe(transaction, callId, null, true) || indexed
+        }
+        if (incoming.otid.isNotBlank() && incoming.otid != merged.otid &&
+            transaction.evidence("identity/otid/${incoming.otid}", 64 * 1024)?.decodeToString() != identity.value) {
+            transaction.putEvidence("identity/otid/${incoming.otid}", identity.value.encodeToByteArray())
+            indexed = true
         }
         val canonical = merged.copy(serverId = identity.value)
         val bytes = TimelineSnapshotCodec.json.encodeToString(StoredTimelineEvent.serializer(), canonical.toStoredTimelineEvent()).encodeToByteArray()
@@ -103,6 +108,19 @@ class TimelineExactCanonicalWriter(
             transaction.putEvidence(ownerKey, TimelineSnapshotCodec.json.encodeToString(TerminalOwnershipEvidence.serializer(), evidence).encodeToByteArray())
         }
         return true
+    }
+
+    private suspend fun canonicalEventIdentity(reader: TimelineStoreReader, event: TimelineEvent.Confirmed): TimelineMessageId {
+        val identity = canonicalIdentity(reader, event.serverId, event.otid)
+        if (event.messageType != TimelineMessageType.TOOL_CALL) return identity
+        // Legacy live/history projections can give the same invocation different server IDs and otids.
+        val owners = event.toolCalls.mapNotNull { call ->
+            call.effectiveId.takeIf { it.isNotBlank() }?.let { reader.toolCall(it)?.owner }
+        }.distinct()
+        check(owners.size <= 1) { "Tool call group has conflicting canonical owners" }
+        val owner = owners.singleOrNull() ?: return identity
+        check(owner == identity || reader.locate(identity) == null) { "Tool call alias already has a canonical body" }
+        return owner
     }
 
     internal suspend fun canonicalIdentity(reader: TimelineStoreReader, serverId: String, otid: String): TimelineMessageId {

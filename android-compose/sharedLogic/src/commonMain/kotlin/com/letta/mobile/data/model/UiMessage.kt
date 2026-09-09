@@ -87,6 +87,13 @@ data class UiMessage(
 data class UiImageAttachment(
     val base64: String,
     val mediaType: String,
+    /**
+     * Round-tripped from a snapshot pointer whose inline thumbnail exceeded
+     * the 16 KB budget. Non-null + empty base64 means the attachment exists
+     * but the bytes were not rehydrated; renderers show a stored-pointer
+     * placeholder labelled with [storedByteSize].
+     */
+    val storedByteSize: Long? = null,
 )
 
 @Immutable

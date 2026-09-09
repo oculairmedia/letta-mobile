@@ -294,8 +294,8 @@ class CanonicalTimelineEngine(
     }
 
     /**
-     * Presentation calls this for a decoded row before emitting it. A changed revision fails rather
-     * than combining a historical body with a newer suppression decision; reload that page on failure.
+     * Presentation checks explicit suppression without erasing an in-flight page merely
+     * because pending-send metadata advanced the checkpoint. Paging owns generation replacement.
      */
     suspend fun isSuppressed(
         selection: TimelineEngineSelection,
@@ -303,9 +303,9 @@ class CanonicalTimelineEngine(
         revision: Long,
         event: TimelineEvent.Confirmed,
     ): Boolean = mutex.withLock {
-        check(selection === mutablePublication.value.selection) { "Stale selection" }
+        if (selection !== mutablePublication.value.selection) return@withLock true
         store.read(selection.scope) {
-            check(checkpoint().revision == revision) { "Stale suppression revision" }
+            require(revision <= checkpoint().revision) { "Future presentation revision" }
             val exact = writer as? TimelineExactCanonicalWriter ?: error("Exact writer required")
             val canonical = exact.canonicalIdentity(this, event.serverId, event.otid)
             require(identity == canonical) { "Suppression identity mismatch" }
@@ -370,7 +370,11 @@ class CanonicalTimelineEngine(
 
     suspend fun advanceToolSweep(selection: TimelineEngineSelection): Long = mutex.withLock {
         check(selection === mutablePublication.value.selection)
-        store.transaction(selection.scope) { CanonicalToolIndex.advanceGeneration(this) }
+        val (sweepGeneration, revision) = store.transaction(selection.scope) {
+            CanonicalToolIndex.advanceGeneration(this) to nextRevision()
+        }
+        mutablePublication.value = TimelineEnginePublication(selection, revision)
+        sweepGeneration
     }
 
     suspend fun settleToolSweep(selection: TimelineEngineSelection, generation: Long): Int = mutex.withLock {

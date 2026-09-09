@@ -4,6 +4,7 @@ import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import java.nio.file.Files
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.launch
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -111,6 +112,55 @@ class TimelineOwnershipAuthorityTest {
         authority().withLease(canonical) { }
         rejected { authority().acquire(scope, TimelineOwnershipAuthority.Route.Legacy) }
         rejected { authority().beginMappedMigration(legacy, target.copy(backendId = "wrong")) { } }
+    }
+
+    @Test fun busyRetryReleasesAttemptAndRechecksLease() = runBlocking {
+        val owner = authority()
+        val lease = owner.acquire(scope, TimelineOwnershipAuthority.Route.Legacy)
+        val entered = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val release = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val holder = kotlinx.coroutines.CoroutineScope(coroutineContext).launch {
+            owner.withLease(lease) { entered.complete(Unit); release.await() }
+        }
+        entered.await()
+        var attempts = 0
+        retryTimelineOwnership {
+            attempts++
+            try {
+                authority().withLease(lease) { }
+            } catch (busy: TimelineOwnershipBusyException) {
+                release.complete(Unit)
+                holder.join()
+                throw busy
+            }
+        }
+        assertEquals(2, attempts)
+        owner.beginMigration(lease)
+        attempts = 0
+        rejected {
+            retryTimelineOwnership {
+                attempts++
+                owner.withLease(lease) { fail("stale writer entered") }
+            }
+        }
+        assertEquals(1, attempts)
+    }
+
+    @Test fun explicitPairAdmissionAllowsAnotherConversationButDoesNotRecreateMappedHistory() = runBlocking {
+        val owner = authority()
+        val target = scope.copy(backendId = "canonical")
+        val legacy = owner.acquire(scope, TimelineOwnershipAuthority.Route.Legacy)
+        owner.registerLegacyPair(scope, target) { }
+        assertEquals(0L, authority().state(scope).epoch)
+        authority().withLease(legacy) { }
+        val lease = owner.beginMappedMigration(owner.acquire(scope, TimelineOwnershipAuthority.Route.Legacy), target) { }
+        val other = scope.copy(conversationId = "second")
+        owner.registerLegacyPair(other, other.copy(backendId = "canonical")) { }
+        assertEquals(TimelineOwnershipAuthority.Phase.Legacy, owner.state(other).phase)
+        val missing = scope.copy(conversationId = "missing")
+        rejected { owner.registerLegacyPair(missing, missing.copy(backendId = "canonical")) { error("existing ledger") } }
+        assertEquals(TimelineOwnershipAuthority.Phase.Migrating, owner.state(lease.scope).phase)
+        rejected { owner.registerLegacyPair(scope, target.copy(conversationId = "lost")) { fail("mapped source readmitted") } }
     }
 
     @Test fun corruptOrOversizedStateNeverDefaultsToLegacy() = runBlocking {

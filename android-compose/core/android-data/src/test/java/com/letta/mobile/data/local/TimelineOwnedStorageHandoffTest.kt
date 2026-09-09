@@ -19,6 +19,23 @@ class TimelineOwnedStorageHandoffTest {
     @get:Rule val temporary = TemporaryFolder()
     private val scope = TimelineScope("b", "c", "a")
 
+    @Test fun orphanChunkWithoutHeadBlocksAdmission() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val legacy = Room.inMemoryDatabaseBuilder(context, LettaDatabase::class.java).build()
+        val target = Room.inMemoryDatabaseBuilder(context, TimelineLedgerDatabase::class.java).build()
+        try {
+            val canonical = scope.copy(backendId = "orphan-target")
+            target.ledger().chunk(LedgerChunk(ledgerScopeKey(canonical), "orphan", 0, byteArrayOf(1), "bad"))
+            assertNull(target.ledger().head(ledgerScopeKey(canonical)))
+            val authority = TimelineOwnershipAuthority(temporary.root.toPath())
+            try {
+                TimelineOwnedStorageFactory(legacy, target, authority).registerLegacyPair(scope, canonical)
+                fail("Orphan canonical evidence admitted")
+            } catch (_: IllegalStateException) { }
+            assertTrue(target.ledger().hasScopeEvidence(ledgerScopeKey(canonical)))
+        } finally { target.close(); legacy.close() }
+    }
+
     @Test fun verifiedPrepareSurvivesAuthorityRestartAndSwitchRechecksSource() = runBlocking {
         fixture { legacy, target, authority, factory, lease, revision ->
             val prepared = factory.prepareAfterDrain(lease, revision)
