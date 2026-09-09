@@ -851,9 +851,8 @@ internal class AdminChatViewModel @Inject constructor(
             val sameSelection = canonicalRoute?.first == conversationId &&
                 canonicalRoute?.second == generation &&
                 canonicalPresentationJob?.isActive == true
-            if (!force && sameSelection &&
-                !pagingBinding.needsFreshCollection(scrollToMessageId, _pagingPresentation.value?.routeTarget)
-            ) {
+            val fresh = pagingBinding.needsFreshCollection(scrollToMessageId, _pagingPresentation.value?.routeTarget)
+            if (!force && sameSelection && !fresh) {
                 return
             }
             stopTimelineObserverLocked()
