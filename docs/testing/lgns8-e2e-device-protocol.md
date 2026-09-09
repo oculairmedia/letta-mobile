@@ -8,7 +8,7 @@ fix (step 4 below). Steps are still awaiting their on-device runs — this docum
 is the protocol, not the evidence.
 
 ## Preconditions
-- Pixel 9 Pro (`com.letta.mobile.dev`) + Compose Desktop, both rebuilt from the
+- Pixel 9 Pro (`ca.oculair.meridian.dev`) + Compose Desktop, both rebuilt from the
   post-train main tip; record `versionName` / git SHA for both.
 - Wrapper + appserver healthy on the Meridian host (`peer list` local dial OK).
 - `adb logcat` capture running for the whole session (`Telemetry/*` tags).

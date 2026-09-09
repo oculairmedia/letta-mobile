@@ -3,7 +3,7 @@ package com.letta.mobile.runtime.sensors
 import android.app.Activity
 import android.os.Bundle
 import android.util.Log
-import com.letta.mobile.BuildConfig
+import ca.oculair.meridian.BuildConfig
 
 /**
  * Dev-only no-display Activity for ADB validation of Stage 1→2 without user
@@ -12,8 +12,8 @@ import com.letta.mobile.BuildConfig
  *
  * Usage:
  *   adb shell am start \
- *     -n com.letta.mobile.dev/com.letta.mobile.runtime.sensors.DeviceSensorSelfTestActivity
- *   adb shell run-as com.letta.mobile.dev cat files/device-sensor-self-test.json
+ *     -n ca.oculair.meridian.dev/com.letta.mobile.runtime.sensors.DeviceSensorSelfTestActivity
+ *   adb shell run-as ca.oculair.meridian.dev cat files/device-sensor-self-test.json
  */
 class DeviceSensorSelfTestActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {

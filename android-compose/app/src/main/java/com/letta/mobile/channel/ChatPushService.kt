@@ -16,7 +16,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.letta.mobile.MainActivity
-import com.letta.mobile.R
+import ca.oculair.meridian.R
 import com.letta.mobile.data.api.ConversationApi
 import com.letta.mobile.data.channel.CurrentConversationTracker
 import com.letta.mobile.data.channel.NotificationCandidatePhase

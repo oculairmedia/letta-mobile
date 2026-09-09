@@ -1,7 +1,7 @@
 package com.letta.mobile.runtime.local
 
 import android.util.Log
-import com.letta.mobile.BuildConfig
+import ca.oculair.meridian.BuildConfig
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton

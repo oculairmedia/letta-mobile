@@ -10,7 +10,7 @@ import com.letta.mobile.data.local.LettaDatabase
  * Debug-only local context cleaner.
  *
  * ADB:
- *   adb shell am broadcast -n com.letta.mobile.dev/com.letta.mobile.runtime.local.LocalContextClearReceiver \
+ *   adb shell am broadcast -n ca.oculair.meridian.dev/com.letta.mobile.runtime.local.LocalContextClearReceiver \
  *     --es agent local-agent-... \
  *     --es conversation local-conv-local-agent-...
  */

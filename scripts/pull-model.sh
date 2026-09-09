@@ -3,7 +3,7 @@
 # 3GB HuggingFace download only ever happens once.
 set -euo pipefail
 DEVICE_SERIAL="${DEVICE_SERIAL:-192.168.50.235:5555}"
-PKG="${PKG:-com.letta.mobile.dev}"
+PKG="${PKG:-ca.oculair.meridian.dev}"
 CACHE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/models-cache"
 mkdir -p "$CACHE_DIR"
 adb -s "$DEVICE_SERIAL" wait-for-device

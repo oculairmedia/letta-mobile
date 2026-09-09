@@ -4,7 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import com.letta.mobile.BuildConfig
+import ca.oculair.meridian.BuildConfig
 import java.io.File
 
 /**
@@ -13,8 +13,8 @@ import java.io.File
  *
  * Usage:
  *   adb shell am broadcast -a com.letta.mobile.DEVICE_SENSOR_SELF_TEST \
- *     -n com.letta.mobile.dev/com.letta.mobile.runtime.sensors.DeviceSensorSelfTestReceiver
- *   adb shell run-as com.letta.mobile.dev cat files/device-sensor-self-test.json
+ *     -n ca.oculair.meridian.dev/com.letta.mobile.runtime.sensors.DeviceSensorSelfTestReceiver
+ *   adb shell run-as ca.oculair.meridian.dev cat files/device-sensor-self-test.json
  */
 class DeviceSensorSelfTestReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {

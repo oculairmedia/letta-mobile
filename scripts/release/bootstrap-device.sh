@@ -8,8 +8,8 @@ BASE_URL=""
 API_KEY=""
 AGENT=""
 CONV=""
-APP_PACKAGE="com.letta.mobile"
-APP_COMPONENT="com.letta.mobile/.MainActivity"
+APP_PACKAGE="ca.oculair.meridian"
+APP_COMPONENT="ca.oculair.meridian/com.letta.mobile.MainActivity"
 
 usage() {
   printf 'Usage: %s --device <serial> --apk <path> --base-url <url> --api-key <token> --agent <id> --conv <id>\n' "$0"

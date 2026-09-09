@@ -8,7 +8,7 @@ All commands run from `android-compose/` with `JAVA_HOME` set per `CONTRIBUTING.
 
 | Platform | Gradle project | Command | Notes |
 |---|---|---|---|
-| Android | `:app` | `./gradlew :app:assembleDebug` / `:app:installRootDebug` | App id `com.letta.mobile.dev` (debug) |
+| Android | `:app` | `./gradlew :app:assembleDebug` / `:app:installRootDebug` | App id `ca.oculair.meridian.dev` (debug) |
 | Compose Desktop | `:desktop` | `./gradlew :desktop:run` | Needs display + JDK 26; software Skiko on headless: `JAVA_TOOL_OPTIONS=-Dskiko.renderApi=SOFTWARE` |
 | Browser (WASM) | `:web` | `./gradlew :web:wasmJsBrowserDevelopmentRun` (or CI `web-wasm` job) | Ship target for Iroh WASM |
 | JVM CLI / probes | `:cli`, `:appserver-cli` | `./gradlew :cli:run` / contract scripts | Prefer `android-compose/cli` over any duplicate root `cli/` |
