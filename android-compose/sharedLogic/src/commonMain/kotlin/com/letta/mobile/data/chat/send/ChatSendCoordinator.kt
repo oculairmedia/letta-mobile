@@ -278,63 +278,69 @@ class ChatSendCoordinator(
         activeAssistantMessageRunIds.addAll(orphan.activeAssistantMessageRunIds)
     }
 
+    /**
+     * A turn that already reached its terminal, or whose otid is fenced as settled, must never be
+     * rebound: a replayed echo would otherwise resurrect a finished turn.
+     */
+    private fun bindableStateLocked(otid: String): ConversationTurnState? {
+        if (isOtidSettledLocked(otid)) return null
+        return turnStates.values.firstOrNull { it.otid == otid }?.takeUnless { it.reachedTerminal }
+    }
+
+    /**
+     * Points the server's name for this conversation at the one the send originated from. When the
+     * turn announced itself first, it left an unlinked state under that server name; absorbing it
+     * here is what makes the ordering safe. Returns the originating conversation when that
+     * happened, because its presence has to be republished, and null when nothing was absorbed.
+     */
+    private fun ConversationTurnState.rebindToServerConversationLocked(
+        serverConversationId: String?,
+        turnId: String?,
+        runId: String?,
+    ): String? {
+        val originatingConv = localConversationId ?: conversationId
+        val serverConv = serverConversationId?.takeIf { it.isNotBlank() } ?: return null
+        if (serverConv == originatingConv) return null
+        recordConversationAliasLocked(serverConv, originatingConv)
+        this.serverConversationId = serverConv
+        val orphan = turnStates.remove(serverConv)?.takeUnless { it === this } ?: return null
+        absorbOrphanLocked(orphan, turnId, runId)
+        val adoptedTurn = this.turnId
+        val adoptedRun = this.runId
+        if (adoptedTurn != null && adoptedRun != null) {
+            identity.turnStarted(originatingConv, adoptedTurn, adoptedRun)
+        }
+        Telemetry.event(
+            "AdminChatVM", "ws.turnState.rekeyedByOtid",
+            "otid" to (otid ?: ""),
+            "serverConversationId" to serverConv,
+            "originatingConversationId" to originatingConv,
+            "turnId" to (this.turnId ?: ""),
+            "runId" to (this.runId ?: ""),
+        )
+        return originatingConv
+    }
+
     private fun bindInboundTurnByOtid(
         otid: String,
         serverConversationId: String?,
         turnId: String?,
         runId: String?,
     ): ConversationTurnState? {
-        var needsTurnStartedUiNotification = false
-        var originatingConvToNotify: String? = null
-
+        var rekeyedConversation: String? = null
         val originating = synchronized(turnStateLock) {
-            if (isOtidSettledLocked(otid)) return@synchronized null
-            val state = turnStates.values.firstOrNull { it.otid == otid } ?: return@synchronized null
-            if (state.reachedTerminal) return@synchronized null
-
-            val originatingConv = state.localConversationId ?: state.conversationId
-            val serverConv = serverConversationId?.takeIf { it.isNotBlank() }
-            if (serverConv != null && serverConv != originatingConv) {
-                recordConversationAliasLocked(serverConv, originatingConv)
-                state.serverConversationId = serverConv
-
-                // Trap 2 (Ordering): TurnStarted arrived before UserMessage echo
-                // and opened an unlinked state under serverConversationId.
-                val orphan = turnStates.remove(serverConv)?.takeUnless { it === state }
-                if (orphan != null) {
-                    state.absorbOrphanLocked(orphan, turnId, runId)
-                    val adoptedTurn = state.turnId
-                    val adoptedRun = state.runId
-                    if (adoptedTurn != null && adoptedRun != null) {
-                        state.identity.turnStarted(originatingConv, adoptedTurn, adoptedRun)
-                    }
-                    Telemetry.event(
-                        "AdminChatVM", "ws.turnState.rekeyedByOtid",
-                        "otid" to otid,
-                        "serverConversationId" to serverConv,
-                        "originatingConversationId" to originatingConv,
-                        "turnId" to (state.turnId ?: ""),
-                        "runId" to (state.runId ?: ""),
-                    )
-                    needsTurnStartedUiNotification = true
-                    originatingConvToNotify = originatingConv
-                }
-            }
-
-            if (turnId != null && state.turnId == null) {
-                state.turnId = turnId
-            }
-            if (runId != null && state.runId == null) {
-                state.runId = runId
-            }
+            val state = bindableStateLocked(otid) ?: return@synchronized null
+            rekeyedConversation = state.rebindToServerConversationLocked(serverConversationId, turnId, runId)
+            if (turnId != null && state.turnId == null) state.turnId = turnId
+            if (runId != null && state.runId == null) state.runId = runId
             state
         }
 
-        if (needsTurnStartedUiNotification && originatingConvToNotify != null) {
-            if (ownsForegroundUi(originatingConvToNotify)) {
-                ui.onTurnStarted(originatingConvToNotify)
+        rekeyedConversation?.let { conversationId ->
+            if (ownsForegroundUi(conversationId)) {
+                ui.onTurnStarted(conversationId)
             } else {
-                reportBackgroundUiSuppressed(originatingConvToNotify, "onTurnStarted")
+                reportBackgroundUiSuppressed(conversationId, "onTurnStarted")
             }
         }
 
