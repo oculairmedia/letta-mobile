@@ -172,7 +172,7 @@ private fun rememberChatMessageListSuppressBottomFade(params: ChatMessageListBod
         derivedStateOf {
             val lastMessage = params.state.messages.lastOrNull()
             val isNearBottom = ChatViewportFollowPolicy.isNearLatest(
-                params.listState.toChatViewportSnapshot(params.isUserScrolling, params.renderItems.size),
+                params.listState.toChatViewportSnapshot(params.isUserScrolling, params.renderItems),
             )
             isNearBottom && lastMessage?.role == "user" && params.state.isStreaming
         }

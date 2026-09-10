@@ -173,10 +173,10 @@ internal fun ChatMessageList(
     }
     val currentLoadPressureSummary by rememberUpdatedState(loadPressureSummary)
 
-    val showScrollFab by remember(renderItems.size) {
+    val showScrollFab by remember(listState, renderItems.size, isUserScrolling) {
         derivedStateOf {
             ChatViewportFollowPolicy.shouldShowScrollToLatest(
-                listState.toChatViewportSnapshot(isUserScrolling, renderItems.size),
+                listState.toChatViewportSnapshot(isUserScrolling, renderItems),
             )
         }
     }

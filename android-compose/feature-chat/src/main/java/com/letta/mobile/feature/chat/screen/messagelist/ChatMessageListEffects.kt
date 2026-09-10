@@ -220,7 +220,7 @@ private fun ChatMessageListViewportFollowEffect(
     tracker: ChatViewportRestorationTracker,
 ) {
     LaunchedEffect(params.listState, params.isUserScrolling, params.renderItems.size, tracker.conversationId) {
-        snapshotFlow { params.listState.toChatViewportSnapshot(params.isUserScrolling, params.renderItems.size) }
+        snapshotFlow { params.listState.toChatViewportSnapshot(params.isUserScrolling, params.renderItems) }
             .distinctUntilChanged()
             .collect { snapshot ->
                 tracker.onViewportFollowModeChanged(
