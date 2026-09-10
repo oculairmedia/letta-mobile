@@ -160,8 +160,11 @@ class CanonicalTimelineEngine(
     ): Boolean = mutex.withLock {
         val current = mutableLive.value ?: return@withLock false
         if (current.fence !== fence) return@withLock false
-        val aliases = resolveAliases(fence.selection.scope, current, presented)
-        if (!current.isSettled(presented, aliases)) return@withLock false
+        val nextAliases = resolveAliases(fence.selection.scope, current, presented)
+        val active = if (nextAliases.isNotEmpty() && nextAliases != current.aliases) {
+            current.copy(aliases = current.aliases + nextAliases).also { mutableLive.value = it }
+        } else current
+        if (!active.isSettled(presented)) return@withLock false
         mutableLive.value = null
         liveFence = null
         liveReduction = null
@@ -173,10 +176,12 @@ class CanonicalTimelineEngine(
         publication: TimelineLivePublication,
         presented: Map<TimelineMessageId, Long>,
     ): Map<String, TimelineMessageId> {
+        // Alias evidence requires the exact canonical writer. Fallback writers without exact
+        // canonical indexing rely on matching event identities directly or the strand guard.
         val exact = writer as? TimelineExactCanonicalWriter ?: return emptyMap()
         val missing = publication.block.events.filter { event ->
-            TimelineMessageId(event.serverId) !in presented &&
-                (event.otid.isBlank() || TimelineMessageId(event.otid) !in presented)
+            val alias = publication.aliases[event.serverId]
+            (alias == null || alias !in presented) && TimelineMessageId(event.serverId) !in presented
         }
         if (missing.isEmpty()) return emptyMap()
         val aliases = mutableMapOf<String, TimelineMessageId>()
@@ -297,6 +302,13 @@ class CanonicalTimelineEngine(
             (if (changed) nextRevision() else checkpoint().revision) to appended
         }
         mutablePublication.value = TimelineEnginePublication(request.selection, revision)
+        val live = mutableLive.value
+        if (live != null && live.settlementRevision != null) {
+            val aliases = resolveAliases(request.selection.scope, live, emptyMap())
+            if (aliases.isNotEmpty() && aliases != live.aliases) {
+                mutableLive.value = live.copy(aliases = live.aliases + aliases)
+            }
+        }
         pendingReconcile = null
         TimelineEngineReconcileResult(TimelineEnginePageOutcome.Applied, appended,
             page.records.mapNotNull { it.message.seqId?.toLong() }.maxOrNull())

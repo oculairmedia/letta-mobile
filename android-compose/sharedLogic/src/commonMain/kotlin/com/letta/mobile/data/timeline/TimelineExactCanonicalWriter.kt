@@ -93,17 +93,14 @@ class TimelineExactCanonicalWriter(
         for (callId in merged.toolReturnContentByCallId.keys) {
             if (callId.isNotBlank()) indexed = CanonicalToolIndex.observe(transaction, callId, null, true) || indexed
         }
-        if (incoming.otid.isNotBlank() && incoming.otid != merged.otid &&
-            transaction.evidence("identity/otid/${incoming.otid}", 64 * 1024)?.decodeToString() != identity.value) {
-            transaction.putEvidence("identity/otid/${incoming.otid}", identity.value.encodeToByteArray())
-            indexed = true
+        if (incoming.otid.isNotBlank() && incoming.otid != merged.otid) {
+            indexed = observeIdentityAlias(transaction, "identity/otid/${incoming.otid}", identity) || indexed
         }
         if (incoming.messageType == TimelineMessageType.ASSISTANT &&
             incoming.serverId.startsWith("ui-msg-") &&
-            incoming.serverId != identity.value &&
-            transaction.evidence("identity/serverId/${incoming.serverId}", 64 * 1024)?.decodeToString() != identity.value) {
-            transaction.putEvidence("identity/serverId/${incoming.serverId}", identity.value.encodeToByteArray())
-            indexed = true
+            incoming.serverId != identity.value
+        ) {
+            indexed = observeIdentityAlias(transaction, "identity/serverId/${incoming.serverId}", identity) || indexed
         }
         val canonical = merged.copy(serverId = identity.value)
         val bytes = TimelineSnapshotCodec.json.encodeToString(StoredTimelineEvent.serializer(), canonical.toStoredTimelineEvent()).encodeToByteArray()
@@ -114,6 +111,16 @@ class TimelineExactCanonicalWriter(
             val evidence = TerminalOwnershipEvidence.checkpoint(scope, canonical)
             transaction.putEvidence(ownerKey, TimelineSnapshotCodec.json.encodeToString(TerminalOwnershipEvidence.serializer(), evidence).encodeToByteArray())
         }
+        return true
+    }
+
+    private suspend fun observeIdentityAlias(
+        transaction: TimelineStoreTransaction,
+        evidenceKey: String,
+        canonicalIdentity: TimelineMessageId,
+    ): Boolean {
+        if (transaction.evidence(evidenceKey, 64 * 1024)?.decodeToString() == canonicalIdentity.value) return false
+        transaction.putEvidence(evidenceKey, canonicalIdentity.value.encodeToByteArray())
         return true
     }
 

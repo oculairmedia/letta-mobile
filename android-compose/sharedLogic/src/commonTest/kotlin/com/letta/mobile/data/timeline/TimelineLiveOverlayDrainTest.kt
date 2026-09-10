@@ -115,14 +115,14 @@ class TimelineLiveOverlayDrainTest {
         // Paging presents the settled row carrying the canonical id
         val presented = mapOf(TimelineMessageId(canonicalId) to SETTLEMENT)
 
-        // Without alias resolution, raw presented map does not match synthesized id
+        // Without alias resolution, raw publication does not match canonical presented row
         assertFalse(live.isSettled(presented))
         assertEquals(live.block.events, live.overlayEvents(presented))
 
-        // With canonical alias resolved from evidence, isSettled is true and overlayEvents drains
-        val aliases = mapOf(synthesizedId to TimelineMessageId(canonicalId))
-        assertTrue(live.isSettled(presented, aliases))
-        assertEquals(emptyList(), live.overlayEvents(presented, aliases))
+        // When publication carries the resolved alias, isSettled is true and overlayEvents drains
+        val aliased = live.copy(aliases = mapOf(synthesizedId to TimelineMessageId(canonicalId)))
+        assertTrue(aliased.isSettled(presented))
+        assertEquals(emptyList(), aliased.overlayEvents(presented))
 
         // Engine resolves the alias from evidence, acknowledges settlement, and releases fence
         assertTrue(engine.acknowledgeSettlement(fence, presented))

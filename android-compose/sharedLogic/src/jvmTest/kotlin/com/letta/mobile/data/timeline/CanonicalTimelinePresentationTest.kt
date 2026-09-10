@@ -79,6 +79,28 @@ class CanonicalTimelinePresentationTest {
         assertTrue(coordinator.retire(owner))
     }
 
+    @Test fun aliasedAssistantReplyDrainsWithoutDoubleRenderingWhenCanonicalRowIsResident() = runTest {
+        val store = EmptyStore()
+        store.putEvidence("identity/serverId/ui-msg-reply", "reply-canonical".encodeToByteArray())
+        val coordinator = CanonicalTimelineCoordinator(store, NoTransport)
+        val owner = coordinator.acquire(TimelineScope("backend", "conversation"))
+        val presentation = CanonicalTimelinePresentation.open(coordinator, owner, backgroundScope)
+        val fence = coordinator.beginLive(owner)
+        assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(assistant("hello", "ui-msg-reply"))))
+        assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Done))
+        runCurrent()
+        assertEquals(listOf("hello"), contents(presentation.live.value))
+
+        // When the settled row carrying the canonical id becomes resident:
+        // presentation acknowledges settlement, the alias is resolved in the engine, and the overlay drains
+        presentation.onResidentRows(listOf(row("reply-canonical", 1L)))
+        runCurrent()
+        assertEquals(emptyList(), contents(presentation.live.value))
+        assertEquals(null, owner.session.live.value)
+        presentation.close()
+        assertTrue(coordinator.retire(owner))
+    }
+
     @Test fun optimisticBubbleStaysSuppressedAcrossTheWholeDrainWindow() = runTest {
         val coordinator = CanonicalTimelineCoordinator(EmptyStore(), NoTransport)
         val owner = coordinator.acquire(TimelineScope("backend", "conversation"))
@@ -146,6 +168,7 @@ class CanonicalTimelinePresentationTest {
 
     private class EmptyStore : TimelineBoundedStore {
         private val evidence = mutableMapOf<String, ByteArray>()
+        fun putEvidence(key: String, value: ByteArray) { evidence[key] = value }
         private val tools = mutableMapOf<String, TimelineToolIndexEntry>()
         private var sweepGeneration = 0L
         private val reader = object : TimelineStoreTransaction {
