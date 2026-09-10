@@ -85,10 +85,10 @@ class TimelineLiveOverlayDrainTest {
         assertEquals(null, engine.live.value)
     }
 
-    @Test fun assistantReplyWithAliasedUiMessageIdDrainsOnCanonicalIdentity() = runTest {
-        // In production: live event carries synthesized ui-msg-*, sync persists canonical msg-*
-        // and records evidence: identity/serverId/<ui-msg-*> -> <canonical-id>
-        val synthesizedId = "ui-msg-streamed"
+    @Test fun assistantReplyWithAliasedStreamIdDrainsOnCanonicalIdentity() = runTest {
+        // In production the live event carries the streamed id, the sync writer persists the
+        // canonical one, and the merge records identity/serverId/<streamed> -> <canonical>.
+        val synthesizedId = "cm-stream-provider-assistant-0-1732a7f3"
         val canonicalId = "msg-canonical"
         val evidenceMap = mapOf(
             "identity/serverId/$synthesizedId" to canonicalId.encodeToByteArray(),
@@ -98,7 +98,7 @@ class TimelineLiveOverlayDrainTest {
         val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
         val fence = engine.beginLive(selection)
 
-        // Live stream emits the reply with synthesized ui-msg-* id
+        // Live stream emits the reply under the id the transport gave it
         assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(message("hello", synthesizedId))))
         assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
         val live = assertNotNull(engine.live.value)
@@ -136,7 +136,7 @@ class TimelineLiveOverlayDrainTest {
     @Test fun aliasedEventLeavesTheOverlayWhileTheRestOfTheTurnIsStillLive() = runTest {
         // The double-render this guards against: the canonical row is on screen and the overlay is
         // still showing the streamed copy of the same message. Draining must not wait for the fence.
-        val synthesizedId = "ui-msg-streamed"
+        val synthesizedId = "cm-stream-provider-assistant-0-1732a7f3"
         val canonicalId = "msg-canonical"
         val store = FixedStore(mapOf("identity/serverId/$synthesizedId" to canonicalId.encodeToByteArray()))
         val engine = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)

@@ -81,12 +81,12 @@ class CanonicalTimelinePresentationTest {
 
     @Test fun aliasedAssistantReplyDrainsWhenTheCanonicalRowBecomesResident() = runTest {
         val store = EmptyStore()
-        store.putEvidence("identity/serverId/ui-msg-reply", "reply-canonical".encodeToByteArray())
+        store.putEvidence("identity/serverId/cm-stream-reply", "reply-canonical".encodeToByteArray())
         val coordinator = CanonicalTimelineCoordinator(store, NoTransport)
         val owner = coordinator.acquire(TimelineScope("backend", "conversation"))
         val presentation = CanonicalTimelinePresentation.open(coordinator, owner, backgroundScope)
         val fence = coordinator.beginLive(owner)
-        assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(assistant("hello", "ui-msg-reply"))))
+        assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(assistant("hello", "cm-stream-reply"))))
         assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Done))
         runCurrent()
         assertEquals(listOf("hello"), contents(presentation.live.value))

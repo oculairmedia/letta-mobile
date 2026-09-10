@@ -108,33 +108,34 @@ class TimelineExactCanonicalWriter(
 
     /**
      * Records how else this message can be named, so a later reader resolves either name to the
-     * canonical identity. A user echo is named by its otid; a streamed assistant reply is named by
-     * the synthesized `ui-msg-*` id the reducer gave it before the sync writer chose a real one.
+     * canonical identity. A user echo is named by its otid. A streamed assistant reply is named by
+     * whatever id the stream gave it before the sync writer chose the canonical one, and the only
+     * reliable test for that is that the two differ - never the shape of the id. Matching a prefix
+     * missed every real reply, because the live transport streams `cm-stream-*` while the guard
+     * looked for the legacy reducer's `ui-msg-*`.
+     *
+     * Both writes are self-limiting: the alias is recorded only when the incoming name differs from
+     * the canonical one, and [observeIdentityAlias] is a no-op when the evidence already says this.
+     * Re-merging an already-canonical row, as a migration replay does, writes nothing.
      */
     private suspend fun TimelineStoreTransaction.indexIdentityAliases(
         incoming: TimelineEvent.Confirmed,
         mergedOtid: String,
         identity: TimelineMessageId,
     ): Boolean {
-        var indexed = false
-        if (incoming.otid.isNotBlank() && incoming.otid != mergedOtid) {
-            indexed = observeIdentityAlias("identity/otid/${incoming.otid}", identity) || indexed
+        val keys = buildList {
+            if (incoming.otid.isNotBlank() && incoming.otid != mergedOtid) add("identity/otid/${incoming.otid}")
+            if (incoming.messageType == TimelineMessageType.ASSISTANT && incoming.serverId.isNotBlank() &&
+                incoming.serverId != identity.value
+            ) add("identity/serverId/${incoming.serverId}")
         }
-        if (incoming.messageType == TimelineMessageType.ASSISTANT && incoming.serverId.startsWith("ui-msg-") &&
-            incoming.serverId != identity.value
-        ) {
-            indexed = observeIdentityAlias("identity/serverId/${incoming.serverId}", identity) || indexed
+        var indexed = false
+        for (key in keys) {
+            if (evidence(key, 64 * 1024)?.decodeToString() == identity.value) continue
+            putEvidence(key, identity.value.encodeToByteArray())
+            indexed = true
         }
         return indexed
-    }
-
-    private suspend fun TimelineStoreTransaction.observeIdentityAlias(
-        evidenceKey: String,
-        canonicalIdentity: TimelineMessageId,
-    ): Boolean {
-        if (evidence(evidenceKey, 64 * 1024)?.decodeToString() == canonicalIdentity.value) return false
-        putEvidence(evidenceKey, canonicalIdentity.value.encodeToByteArray())
-        return true
     }
 
     private suspend fun canonicalEventIdentity(reader: TimelineStoreReader, event: TimelineEvent.Confirmed): TimelineMessageId {
