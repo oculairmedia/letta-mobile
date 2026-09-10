@@ -312,12 +312,16 @@ class TimelineExactCanonicalWriterTest {
                 expectedWatermark: Long?,
             ) { calls += "repair:$fallbackSeq:$expectedWatermark" }
         }
+        // One pinned instant, taken now rather than in 2026-01: this send is meant to stay in
+        // flight, and the lost-echo horizon measures against the wall clock, so a fixed past
+        // timestamp would make the fixture stale by construction.
+        val sentAt = timelineNow().toString()
         val external = CanonicalExternalTransportWriter(coordinator, { agentId, conversationId ->
             assertEquals(scope.agentId, agentId)
             assertEquals(scope.conversationId, conversationId)
             scope
-        }, maintenance, now = { "2026-01-01T00:00:00Z" })
-        val local = CanonicalPendingLocalStore.Record("pending-user", "question", emptyList(), "2026-01-01T00:00:00Z")
+        }, maintenance, now = { sentAt })
+        val local = CanonicalPendingLocalStore.Record("pending-user", "question", emptyList(), sentAt)
         external.appendExternalTransportLocal(scope.agentId, scope.conversationId, local.content, local.otid, local.attachments)
         external.turnStarted(scope.agentId, scope.conversationId, "run", "turn")
         assertEquals(2, external.cleanupAbandonedAssistantFragments(scope.agentId, scope.conversationId, "run", "turn", "cancelled"))
@@ -685,6 +689,47 @@ class TimelineExactCanonicalWriterTest {
         assertEquals(TimelineEnginePageOutcome.Applied, reconcile(engine, selection, record(reply)))
         assertEquals(1, store.rows.size)
         assertTrue(engine.acknowledgeSettlement(fence, mapOf(TimelineMessageId("id") to 1L)))
+    }
+
+    @Test fun aSendWhoseEchoNeverCameIsRetiredButALiveOneIsNot() = runTest {
+        val store = Store()
+        val pending = CanonicalPendingLocalStore(store)
+        val now = parseTimelineInstant("2026-01-01T01:00:00Z")
+        fun record(n: Int, at: String) = CanonicalPendingLocalStore.Record("otid-$n", "attempt $n", emptyList(), at)
+        pending.save(scope, record(1, "2026-01-01T00:00:00Z"))
+        pending.save(scope, record(2, "2026-01-01T00:30:00Z"))
+        pending.save(scope, record(3, "2026-01-01T00:59:59Z"))
+        listOf(1, 2, 3).forEach { pending.mark(scope, "otid-$it", CanonicalPendingLocalStore.Delivery.Sent) }
+
+        // Two are long past any plausible echo; the third was accepted a second ago.
+        assertEquals(2, pending.retireLostEchoes(scope, pending.load(scope), now))
+        val remaining = pending.load(scope)
+        assertEquals(listOf("otid-2", "otid-3"), remaining.map { it.otid })
+        assertEquals(CanonicalPendingLocalStore.Delivery.Failed, remaining.first { it.otid == "otid-2" }.delivery)
+        assertEquals(CanonicalPendingLocalStore.Delivery.Sent, remaining.first { it.otid == "otid-3" }.delivery)
+        // Idempotent: a second pass finds nothing new to retire.
+        assertEquals(0, pending.retireLostEchoes(scope, pending.load(scope), now))
+    }
+
+    @Test fun atMostOneFailedSendSurvivesAndTheNewestWins() = runTest {
+        val store = Store()
+        val pending = CanonicalPendingLocalStore(store)
+        fun record(n: Int) = CanonicalPendingLocalStore.Record("otid-$n", "attempt $n", emptyList(), "2026-01-01T00:00:0${n}Z")
+        pending.save(scope, record(1))
+        pending.mark(scope, "otid-1", CanonicalPendingLocalStore.Delivery.Failed)
+        // Sending again is how a user abandons the last failure: it supersedes rather than stacks.
+        pending.save(scope, record(2))
+        assertEquals(listOf("otid-2"), pending.load(scope).map { it.otid })
+        pending.mark(scope, "otid-2", CanonicalPendingLocalStore.Delivery.Failed)
+
+        // A send still in flight is never superseded: only its own failure can retire it.
+        pending.save(scope, record(3))
+        assertEquals(listOf("otid-3"), pending.load(scope).map { it.otid })
+        pending.save(scope, record(4))
+        assertEquals(listOf("otid-3", "otid-4"), pending.load(scope).map { it.otid })
+        pending.mark(scope, "otid-3", CanonicalPendingLocalStore.Delivery.Failed)
+        pending.mark(scope, "otid-4", CanonicalPendingLocalStore.Delivery.Failed)
+        assertEquals(listOf("otid-4"), pending.load(scope).map { it.otid })
     }
 
     @Test fun onlyAFailedSendCanBeDiscardedAndTheRestSurvive() = runTest {

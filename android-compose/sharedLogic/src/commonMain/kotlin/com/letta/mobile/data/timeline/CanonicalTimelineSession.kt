@@ -199,7 +199,12 @@ class CanonicalTimelineSession(
     }
 
     private suspend fun refreshPending() = pendingMutex.withLock {
-        mutablePending.value = pendingStore.load(scope)
+        // A send whose echo never arrived would otherwise sit here forever: neither superseded by
+        // a new attempt nor dismissible. Retiring it on refresh means reopening the conversation
+        // is enough to clear one, without a restart or a repair pass.
+        val loaded = pendingStore.load(scope)
+        val retired = pendingStore.retireLostEchoes(scope, loaded)
+        mutablePending.value = if (retired > 0) pendingStore.load(scope) else loaded
     }
 
     suspend fun loadOlder(selection: TimelineEngineSelection): TimelineEnginePageOutcome {
