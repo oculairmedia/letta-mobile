@@ -8,10 +8,18 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 
 /** Required indexed maintenance; implementations must never acquire a legacy sync loop. */
+/** The four facts that identify one abandoned turn, carried together rather than as a parameter list. */
+data class TimelineTurnCleanup(
+    val runId: String?,
+    val turnId: String?,
+    val reason: String,
+    val candidateRunIds: Set<String>,
+)
+
 interface CanonicalTimelineMaintenance {
     suspend fun turnStarted(owner: CanonicalTimelineCoordinator.Owner, runId: String?, turnId: String?)
     suspend fun turnEnded(owner: CanonicalTimelineCoordinator.Owner, clean: Boolean)
-    suspend fun cleanup(owner: CanonicalTimelineCoordinator.Owner, runId: String?, turnId: String?, reason: String, candidateRunIds: Set<String>): Int
+    suspend fun cleanup(owner: CanonicalTimelineCoordinator.Owner, request: TimelineTurnCleanup): Int
     suspend fun repairCursor(owner: CanonicalTimelineCoordinator.Owner, fallbackSeq: Long?, expectedWatermark: Long? = null)
 }
 
@@ -88,7 +96,7 @@ class CanonicalExternalTransportWriter(
     }
 
     override suspend fun cleanupAbandonedAssistantFragments(agentId: String?, conversationId: String, runId: String?, turnId: String?, reason: String, candidateRunIds: Set<String>): Int =
-        maintenance.cleanup(owner(agentId, conversationId), runId, turnId, reason, candidateRunIds)
+        maintenance.cleanup(owner(agentId, conversationId), TimelineTurnCleanup(runId, turnId, reason, candidateRunIds))
 
     override suspend fun repairExpiredConversationCursor(conversationId: String, fallbackSeq: Long?) =
         repairExpiredConversationCursorScoped(null, conversationId, fallbackSeq, expectedWatermark = null)

@@ -363,7 +363,7 @@ class TimelineExactCanonicalWriterTest {
         }
         assertEquals("retired backend", retiredFailure.message)
         assertEquals(listOf<Pair<Long?, Long?>>(4L to 7L), watermarks)
-        assertEquals(0, indexed.cleanup(reopened, "missing", null, "test", emptySet()))
+        assertEquals(0, indexed.cleanup(reopened, TimelineTurnCleanup("missing", null, "test", emptySet())))
         for (clean in listOf(true, false)) {
             indexed.turnEnded(reopened, clean)
             assertFalse(coordinator.retire(reopened))
@@ -668,10 +668,14 @@ class TimelineExactCanonicalWriterTest {
         assertTrue(engine.acknowledgeSettlement(fence, mapOf(TimelineMessageId("id") to 1L)))
     }
 
+    /** Fresh pending store plus a record factory: every pending test needs exactly this. */
+    private fun pendingFixture(): Pair<CanonicalPendingLocalStore, (Int, String) -> CanonicalPendingLocalStore.Record> {
+        val store = CanonicalPendingLocalStore(Store())
+        return store to { n, at -> CanonicalPendingLocalStore.Record("otid-$n", "attempt $n", emptyList(), at) }
+    }
+
     @Test fun theNewestFailureSurvivesWhateverOrderOutcomesArriveIn() = runTest {
-        val store = Store()
-        val pending = CanonicalPendingLocalStore(store)
-        fun record(n: Int, at: String) = CanonicalPendingLocalStore.Record("otid-$n", "attempt $n", emptyList(), at)
+        val (pending, record) = pendingFixture()
         pending.save(scope, record(1, "2026-01-01T00:00:00Z"))
         pending.save(scope, record(2, "2026-01-01T00:00:01Z"))
         // Transport outcomes can land out of order: the later send fails first.
@@ -680,10 +684,9 @@ class TimelineExactCanonicalWriterTest {
         assertEquals(listOf("otid-2"), pending.load(scope).map { it.otid })
 
         // Retirement must not resurrect an older send over a newer failure either.
-        val store2 = Store()
-        val pending2 = CanonicalPendingLocalStore(store2)
-        pending2.save(scope, record(3, "2026-01-01T00:00:00Z"))
-        pending2.save(scope, record(4, "2026-01-01T00:00:01Z"))
+        val (pending2, record2) = pendingFixture()
+        pending2.save(scope, record2(3, "2026-01-01T00:00:00Z"))
+        pending2.save(scope, record2(4, "2026-01-01T00:00:01Z"))
         pending2.mark(scope, "otid-3", CanonicalPendingLocalStore.Delivery.Sent)
         pending2.mark(scope, "otid-4", CanonicalPendingLocalStore.Delivery.Failed)
         val now = parseTimelineInstant("2026-01-01T01:00:00Z")
@@ -692,10 +695,8 @@ class TimelineExactCanonicalWriterTest {
     }
 
     @Test fun aSendWhoseEchoNeverCameIsRetiredButALiveOneIsNot() = runTest {
-        val store = Store()
-        val pending = CanonicalPendingLocalStore(store)
+        val (pending, record) = pendingFixture()
         val now = parseTimelineInstant("2026-01-01T01:00:00Z")
-        fun record(n: Int, at: String) = CanonicalPendingLocalStore.Record("otid-$n", "attempt $n", emptyList(), at)
         pending.save(scope, record(1, "2026-01-01T00:00:00Z"))
         pending.save(scope, record(2, "2026-01-01T00:30:00Z"))
         pending.save(scope, record(3, "2026-01-01T00:59:59Z"))
@@ -712,9 +713,8 @@ class TimelineExactCanonicalWriterTest {
     }
 
     @Test fun atMostOneFailedSendSurvivesAndTheNewestWins() = runTest {
-        val store = Store()
-        val pending = CanonicalPendingLocalStore(store)
-        fun record(n: Int) = CanonicalPendingLocalStore.Record("otid-$n", "attempt $n", emptyList(), "2026-01-01T00:00:0${n}Z")
+        val (pending, make) = pendingFixture()
+        fun record(n: Int) = make(n, "2026-01-01T00:00:0${n}Z")
         pending.save(scope, record(1))
         pending.mark(scope, "otid-1", CanonicalPendingLocalStore.Delivery.Failed)
         // Sending again is how a user abandons the last failure: it supersedes rather than stacks.
@@ -898,11 +898,8 @@ private class RecordingMaintenance(private val calls: MutableList<String>) : Can
         calls += "end:$clean"
     }
 
-    override suspend fun cleanup(
-        owner: CanonicalTimelineCoordinator.Owner,
-        runId: String?, turnId: String?, reason: String, candidateRunIds: Set<String>,
-    ): Int {
-        calls += "cleanup:$reason"
+    override suspend fun cleanup(owner: CanonicalTimelineCoordinator.Owner, request: TimelineTurnCleanup): Int {
+        calls += "cleanup:${request.reason}"
         return 2
     }
 
