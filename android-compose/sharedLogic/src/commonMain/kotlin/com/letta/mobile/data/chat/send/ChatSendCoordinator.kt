@@ -94,6 +94,10 @@ class ChatSendCoordinator(
     // owns its own terminal fence ([TurnIdentityLifecycle]).
     private val turnStateLock = SynchronizedObject()
     private val turnStates = linkedMapOf<String, ConversationTurnState>()
+    // letta-mobile-ce2xr: maps server-assigned conversation ids to client originating conversation ids.
+    private val conversationAliases = linkedMapOf<String, String>()
+    // Bounded set of settled otids to ensure idempotent binding on replay/reconnect.
+    private val settledOtids = linkedSetOf<String>()
 
     // Genuinely ambiguous fallback: TurnDone/SubscribeDone/StopReason frames carry
     // no conversationId. When neither the turn id nor the run id identifies an
@@ -133,6 +137,7 @@ class ChatSendCoordinator(
         val identity = TurnIdentityLifecycle()
         @Volatile var otid: String? = null
         @Volatile var localConversationId: String? = null
+        @Volatile var serverConversationId: String? = null
 
         // letta-mobile-i8iw: lcp-cv3 contract — stop_reason and usage_statistics
         // are first-wins per turn on the shim. We capture once and drop later
@@ -183,18 +188,183 @@ class ChatSendCoordinator(
             get() = identity.active != null || otid != null || turnId != null
     }
 
+    private fun recordConversationAliasLocked(serverConversationId: String, originatingConversationId: String) {
+        if (serverConversationId == originatingConversationId) return
+        conversationAliases.remove(serverConversationId)
+        conversationAliases[serverConversationId] = originatingConversationId
+        while (conversationAliases.size > MAX_CONVERSATION_ALIASES) {
+            conversationAliases.remove(conversationAliases.keys.first())
+        }
+    }
+
+    private fun resolveConversationId(conversationId: String?): String? {
+        val key = conversationId?.takeIf { it.isNotBlank() } ?: return null
+        return synchronized(turnStateLock) { conversationAliases[key] ?: key }
+    }
+
+    private fun retainSettledOtidLocked(otid: String?) {
+        val key = otid?.takeIf { it.isNotBlank() } ?: return
+        settledOtids += key
+        while (settledOtids.size > MAX_SETTLED_OTIDS) {
+            settledOtids.remove(settledOtids.first())
+        }
+    }
+
+    private fun retainSettledOtid(otid: String?) {
+        synchronized(turnStateLock) { retainSettledOtidLocked(otid) }
+    }
+
+    private fun isOtidSettledLocked(otid: String?): Boolean =
+        otid?.let { it in settledOtids } ?: false
+
+    private fun isOtidSettled(otid: String?): Boolean =
+        synchronized(turnStateLock) { isOtidSettledLocked(otid) }
+
+    private fun stateForLocked(conversationId: String): ConversationTurnState {
+        val targetId = conversationAliases[conversationId] ?: conversationId
+        val state = turnStates.remove(targetId) ?: ConversationTurnState(targetId)
+        turnStates[targetId] = state
+        evictOverflowStatesLocked(keep = targetId)
+        return state
+    }
+
     private fun stateFor(conversationId: String): ConversationTurnState = synchronized(turnStateLock) {
         // Re-insert on every access so map order is RECENCY, not first-seen: a
         // conversation the user keeps returning to must not age out just because
         // it was created first (PR2 review, finding 3).
-        val state = turnStates.remove(conversationId) ?: ConversationTurnState(conversationId)
-        turnStates[conversationId] = state
-        evictOverflowStatesLocked(keep = conversationId)
-        state
+        stateForLocked(conversationId)
     }
 
     private fun peekState(conversationId: String?): ConversationTurnState? =
-        conversationId?.let { synchronized(turnStateLock) { turnStates[it] } }
+        conversationId?.let {
+            synchronized(turnStateLock) {
+                val targetId = conversationAliases[it] ?: it
+                turnStates[targetId]
+            }
+        }
+
+    /**
+     * letta-mobile-ce2xr: Binds an inbound turn to its originating send by [otid].
+     *
+     * Inbound server frames (e.g. UserMessage echo, AssistantMessage) carry the client's
+     * [otid] alongside the server's `conversation_id` and `turn_id`. When the server
+     * assigns an unseen conversation id, this binds that turn and conversation alias to the
+     * originating send's state (which owns foreground UI) rather than stranding deltas under
+     * an unobserved server id.
+     *
+     * Replay and reconnect safety: settled otids are ignored to guarantee idempotency and
+     * prevent resurrecting terminal states.
+     *
+     * Ordering safety: if TurnStarted arrived before the UserMessage echo, any orphan state
+     * created under [serverConversationId] is re-keyed and merged into the originating state.
+     */
+    /**
+     * The turn announced itself under a name we had not seen and opened its own state there. Fold
+     * what that state recorded into the real one before it is discarded, so nothing the orphan
+     * already observed - a stop reason, a buffered error, delivered content - is lost with it.
+     */
+    private fun ConversationTurnState.absorbOrphanLocked(
+        orphan: ConversationTurnState,
+        turnId: String?,
+        runId: String?,
+    ) {
+        if (this.turnId == null) this.turnId = orphan.turnId ?: turnId
+        if (this.runId == null) this.runId = orphan.runId ?: runId
+        stopReason = stopReason ?: orphan.stopReason
+        usageRecorded = usageRecorded || orphan.usageRecorded
+        bufferedErrorMessage = bufferedErrorMessage ?: orphan.bufferedErrorMessage
+        bufferedErrorKind = bufferedErrorKind ?: orphan.bufferedErrorKind
+        deliveredAssistantContent = deliveredAssistantContent || orphan.deliveredAssistantContent
+        activeAssistantMessageRunIds.addAll(orphan.activeAssistantMessageRunIds)
+    }
+
+    /**
+     * A turn that already reached its terminal, or whose otid is fenced as settled, must never be
+     * rebound: a replayed echo would otherwise resurrect a finished turn.
+     */
+    private fun bindableStateLocked(otid: String): ConversationTurnState? {
+        if (isOtidSettledLocked(otid)) return null
+        return turnStates.values.firstOrNull { it.otid == otid }?.takeUnless { it.reachedTerminal }
+    }
+
+    /**
+     * Points the server's name for this conversation at the one the send originated from. When the
+     * turn announced itself first, it left an unlinked state under that server name; absorbing it
+     * here is what makes the ordering safe. Returns the originating conversation when that
+     * happened, because its presence has to be republished, and null when nothing was absorbed.
+     */
+    private fun ConversationTurnState.rebindToServerConversationLocked(
+        serverConversationId: String?,
+        turnId: String?,
+        runId: String?,
+    ): String? {
+        val originatingConv = localConversationId ?: conversationId
+        val serverConv = serverConversationId?.takeIf { it.isNotBlank() } ?: return null
+        if (serverConv == originatingConv) return null
+        recordConversationAliasLocked(serverConv, originatingConv)
+        this.serverConversationId = serverConv
+        val orphan = turnStates.remove(serverConv)?.takeUnless { it === this } ?: return null
+        absorbOrphanLocked(orphan, turnId, runId)
+        val adoptedTurn = this.turnId
+        val adoptedRun = this.runId
+        if (adoptedTurn != null && adoptedRun != null) {
+            identity.turnStarted(originatingConv, adoptedTurn, adoptedRun)
+        }
+        Telemetry.event(
+            "AdminChatVM", "ws.turnState.rekeyedByOtid",
+            "otid" to (otid ?: ""),
+            "serverConversationId" to serverConv,
+            "originatingConversationId" to originatingConv,
+            "turnId" to (this.turnId ?: ""),
+            "runId" to (this.runId ?: ""),
+        )
+        return originatingConv
+    }
+
+    private fun bindInboundTurnByOtid(
+        otid: String,
+        serverConversationId: String?,
+        turnId: String?,
+        runId: String?,
+    ): ConversationTurnState? {
+        var rekeyedConversation: String? = null
+        val originating = synchronized(turnStateLock) {
+            val state = bindableStateLocked(otid) ?: return@synchronized null
+            rekeyedConversation = state.rebindToServerConversationLocked(serverConversationId, turnId, runId)
+            if (turnId != null && state.turnId == null) state.turnId = turnId
+            if (runId != null && state.runId == null) state.runId = runId
+            state
+        }
+
+        rekeyedConversation?.let { conversationId ->
+            if (ownsForegroundUi(conversationId)) {
+                ui.onTurnStarted(conversationId)
+            } else {
+                reportBackgroundUiSuppressed(conversationId, "onTurnStarted")
+            }
+        }
+
+        return originating
+    }
+
+    /**
+     * Resolves the state for an incoming [TurnStarted] event.
+     *
+     * If an alias was already recorded (e.g. UserMessage echo arrived first with otid),
+     * this returns the originating conversation's state. If a state already tracks this
+     * turnId, that state is returned. Otherwise, state for the event's conversationId is
+     * resolved without heuristic adoption of awaiting sends. If this is an unseen server
+     * conversation id and TurnStarted precedes UserMessage, the subsequent UserMessage echo
+     * carrying the send's otid will re-key and merge the orphan state.
+     */
+    private fun resolveStateForTurnStarted(event: WsTimelineEvent.TurnStarted): ConversationTurnState = synchronized(turnStateLock) {
+        val aliasedConv = conversationAliases[event.conversationId]
+        if (aliasedConv != null && aliasedConv != event.conversationId) {
+            return stateForLocked(aliasedConv)
+        }
+        turnStates.values.firstOrNull { it.turnId == event.turnId }?.let { return it }
+        return stateForLocked(event.conversationId)
+    }
 
     private fun snapshotStates(): List<ConversationTurnState> =
         synchronized(turnStateLock) { turnStates.values.toList() }
@@ -754,53 +924,22 @@ class ChatSendCoordinator(
             "trackedConversations" to trackedConversationCount(),
         )
         val fallbackConversationId = if (event is WsTimelineEvent.MessageDelta) {
-            event.conversationId ?: lastActiveConversationId ?: activeConversationId()
+            resolveConversationId(event.conversationId) ?: event.conversationId ?: lastActiveConversationId ?: activeConversationId()
         } else {
             null
         }
         if (bridgeEventDeduplicator.isDuplicate(event, fallbackConversationId)) return
         when (event) {
             is WsTimelineEvent.TurnStarted -> handleTurnStarted(event)
-            is WsTimelineEvent.MessageDelta -> {
-                val conversationId = event.conversationId ?: lastActiveConversationId ?: activeConversationId()
-                Telemetry.event(
-                    "IrohGate", "gate3.coordinatorMessageDelta",
-                    "resolvedConversationId" to conversationId,
-                    "messageId" to event.message.id,
-                    "messageType" to event.message.messageType,
-                    "isReplay" to event.isReplay,
-                )
-                if (conversationId == null) {
-                    preConversationMessageDeltas.addLast(event)
-                    return
-                }
-                runtimeEventBatcher.enqueue(event, conversationId)
-                rememberActiveAssistantMessageRunId(
-                    state = peekState(conversationId),
-                    message = event.message,
-                    frameConversationId = event.conversationId,
-                    isReplay = event.isReplay,
-                )
-                timelineRepository.ingestExternalTransportMessage(agentId, conversationId, event.message, source = "coordinator")
-                if (!event.isReplay) {
-                    postSendReconciler.recordLiveIngest(conversationId)
-                    // Finding 1: a background conversation's delta must not latch
-                    // the visible screen's typing indicator — that IS the reported
-                    // "B shows A's thinking indicator" symptom.
-                    if (ownsForegroundUi(conversationId)) {
-                        ui.onMessageDelta(conversationId)
-                    } else {
-                        reportBackgroundUiSuppressed(conversationId, "onMessageDelta")
-                    }
-                }
-            }
+            is WsTimelineEvent.MessageDelta -> handleMessageDelta(event)
             is WsTimelineEvent.StopReason -> {
                 val state = liveStateForTurn(event.turnId)
                 if (state == null) {
                     reportUnmatchedFrame(event, event.turnId, event.runId)
                     return
                 }
-                runtimeEventBatcher.enqueue(event, state.conversationId)
+                val effectiveConversationId = state.localConversationId ?: state.conversationId
+                runtimeEventBatcher.enqueue(event, effectiveConversationId)
                 if (ignoreForeignTurnStop(state, event)) return
                 recordStopReasonForTurn(state, event)
                 markTurnVisuallyComplete(state, reason = "stopReason")
@@ -811,7 +950,8 @@ class ChatSendCoordinator(
                     reportUnmatchedFrame(event, event.turnId, event.runId)
                     return
                 }
-                runtimeEventBatcher.enqueue(event, state.conversationId)
+                val effectiveConversationId = state.localConversationId ?: state.conversationId
+                runtimeEventBatcher.enqueue(event, effectiveConversationId)
                 // lcp-cv3 §end-of-turn ordering: usage_statistics is first-wins
                 // on the shim. Multi-step turns may produce per-step usage; the
                 // run-level record reflects the first. Drop subsequent ones.
@@ -872,6 +1012,72 @@ class ChatSendCoordinator(
             is WsTimelineEvent.AgentUpdated -> Unit
             is WsTimelineEvent.UserActionOutcome ->
                 runtimeEventBatcher.enqueue(event, event.conversationId ?: lastActiveConversationId)
+        }
+    }
+
+    /**
+     * Prefer the state the otid bound, then the state that owns this turn, then whatever the
+     * frame's conversation resolves to. The frame's own id is the last thing to trust: it is the
+     * server's name for the conversation, which is the mismatch this binding exists to absorb.
+     */
+    private fun deltaConversationId(
+        event: WsTimelineEvent.MessageDelta,
+        boundState: ConversationTurnState?,
+    ): String? {
+        val rawConv = event.conversationId
+        val aliasedConv = rawConv?.let { resolveConversationId(it) }
+        val state = boundState
+            ?: event.turnId?.let { liveStateForTurn(it) }
+            ?: (aliasedConv ?: rawConv)?.let { peekState(it) }
+        return state?.let { it.localConversationId ?: it.conversationId }
+            ?: aliasedConv
+            ?: rawConv
+            ?: lastActiveConversationId
+            ?: activeConversationId()
+    }
+
+    private suspend fun handleMessageDelta(event: WsTimelineEvent.MessageDelta) {
+        val otid = event.message.otid
+        val boundState = if (otid != null && !event.isReplay) {
+            bindInboundTurnByOtid(
+                otid = otid,
+                serverConversationId = event.conversationId,
+                turnId = event.turnId,
+                runId = event.message.runId,
+            )
+        } else {
+            null
+        }
+        val conversationId = deltaConversationId(event, boundState)
+        Telemetry.event(
+            "IrohGate", "gate3.coordinatorMessageDelta",
+            "resolvedConversationId" to conversationId,
+            "messageId" to event.message.id,
+            "messageType" to event.message.messageType,
+            "isReplay" to event.isReplay,
+        )
+        if (conversationId == null) {
+            preConversationMessageDeltas.addLast(event)
+            return
+        }
+        runtimeEventBatcher.enqueue(event, conversationId)
+        rememberActiveAssistantMessageRunId(
+            state = peekState(conversationId),
+            message = event.message,
+            frameConversationId = event.conversationId,
+            isReplay = event.isReplay,
+        )
+        timelineRepository.ingestExternalTransportMessage(agentId, conversationId, event.message, source = "coordinator")
+        if (!event.isReplay) {
+            postSendReconciler.recordLiveIngest(conversationId)
+            // Finding 1: a background conversation's delta must not latch
+            // the visible screen's typing indicator — that IS the reported
+            // "B shows A's thinking indicator" symptom.
+            if (ownsForegroundUi(conversationId)) {
+                ui.onMessageDelta(conversationId)
+            } else {
+                reportBackgroundUiSuppressed(conversationId, "onMessageDelta")
+            }
         }
     }
 
@@ -1045,9 +1251,10 @@ class ChatSendCoordinator(
     }
 
     private suspend fun handleTurnStarted(event: WsTimelineEvent.TurnStarted) {
-        val state = stateFor(event.conversationId)
+        val state = resolveStateForTurnStarted(event)
+        val effectiveConversationId = state.localConversationId ?: state.conversationId
         val identityTransition = state.identity.turnStarted(
-            conversationId = event.conversationId,
+            conversationId = effectiveConversationId,
             turnId = event.turnId,
             runId = event.runId,
         )
@@ -1063,7 +1270,7 @@ class ChatSendCoordinator(
         if (identityTransition is TurnIdentityTransition.SameTurn && exactActiveTurn) {
             Telemetry.event(
                 "AdminChatVM", "ws.turnStarted.runPromoted",
-                "conversationId" to event.conversationId,
+                "conversationId" to effectiveConversationId,
                 "turnId" to event.turnId,
                 "previousRunId" to (state.runId ?: ""),
                 "runId" to event.runId,
@@ -1082,7 +1289,7 @@ class ChatSendCoordinator(
         // PR2: only THIS conversation's unsettled otid is settled here. The old
         // global read settled (and then dropped) another conversation's live send.
         state.otid?.let { staleOtid ->
-            val staleLocalConv = state.localConversationId ?: event.conversationId
+            val staleLocalConv = state.localConversationId ?: effectiveConversationId
             scope.launch {
                 runCatching {
                     timelineRepository.markExternalTransportLocalSent(agentId, staleLocalConv, staleOtid)
@@ -1092,10 +1299,10 @@ class ChatSendCoordinator(
                 "AdminChatVM", "ws.turnStarted.staleOtidSettled",
                 "staleOtid" to staleOtid,
                 "newTurnId" to event.turnId,
-                "conversationId" to event.conversationId,
+                "conversationId" to effectiveConversationId,
             )
         }
-        lastActiveConversationId = event.conversationId
+        lastActiveConversationId = effectiveConversationId
         state.turnId = event.turnId
         state.runId = event.runId
         state.reachedTerminal = false
@@ -1109,21 +1316,21 @@ class ChatSendCoordinator(
         // supersedes whatever the previous turn's post-turn dangling-
         // tool-call sweep left pending.
         runCatching {
-            timelineRepository.turnStarted(agentId, event.conversationId, event.runId, event.turnId)
+            timelineRepository.turnStarted(agentId, effectiveConversationId, event.runId, event.turnId)
         }
-        runtimeEventBatcher.enqueue(event, event.conversationId)
-        setActiveConversationId(event.conversationId)
-        startTimelineObserver(event.conversationId)
-        if (ownsForegroundUi(event.conversationId)) {
+        runtimeEventBatcher.enqueue(event, effectiveConversationId)
+        setActiveConversationId(effectiveConversationId)
+        startTimelineObserver(effectiveConversationId)
+        if (ownsForegroundUi(effectiveConversationId)) {
             // Replay metadata is carried through the production WS frame mapper
             // so a remotely-started active turn gets the same visible presence
             // as a local send. A replayed start is still active until its
             // terminal frame arrives; suppressing it makes remote work invisible.
-            ui.onTurnStarted(event.conversationId)
+            ui.onTurnStarted(effectiveConversationId)
         } else {
-            reportBackgroundUiSuppressed(event.conversationId, "onTurnStarted")
+            reportBackgroundUiSuppressed(effectiveConversationId, "onTurnStarted")
         }
-        drainPreConversationMessages(event.conversationId)
+        drainPreConversationMessages(effectiveConversationId)
     }
 
     /**
@@ -1220,7 +1427,10 @@ class ChatSendCoordinator(
         frameConversationId: String?,
     ): Boolean {
         val tagged = frameConversationId ?: return true
-        return tagged == state.conversationId
+        val targetConv = state.localConversationId ?: state.conversationId
+        return tagged == targetConv ||
+            tagged == state.serverConversationId ||
+            resolveConversationId(tagged) == targetConv
     }
 
     /**
@@ -1350,6 +1560,47 @@ class ChatSendCoordinator(
         }
     }
 
+    /**
+     * The turn answered for this send, so its otid is settled: fence it against a replayed echo
+     * rebinding a finished turn, and record on the timeline how it ended.
+     */
+    private suspend fun settlePendingSend(
+        state: ConversationTurnState,
+        conversationId: String,
+        deadTurn: Boolean,
+    ) {
+        val otid = state.otid ?: return
+        retainSettledOtid(otid)
+        val localConversationId = state.localConversationId ?: conversationId
+        if (deadTurn) {
+            timelineRepository.markExternalTransportLocalFailed(agentId, localConversationId, otid)
+        } else {
+            timelineRepository.markExternalTransportLocalSent(agentId, localConversationId, otid)
+        }
+    }
+
+    /** Delivered-then-failed keeps whatever was already on screen: the user got their answer. */
+    private fun nextErrorFor(
+        state: ConversationTurnState,
+        status: BridgeTurnStatus,
+        deadTurn: Boolean,
+        terminalNotice: TurnFailureNotice?,
+    ): String? {
+        val stopReasonError = state.stopReason.equals("error", ignoreCase = true)
+        return when (status) {
+            BridgeTurnStatus.Completed -> state.bufferedErrorMessage
+                ?: if (stopReasonError) BARE_STOP_REASON_ERROR_MESSAGE else ui.currentError()
+            BridgeTurnStatus.Cancelled -> ui.currentError()
+            BridgeTurnStatus.Failed -> if (deadTurn) {
+                state.bufferedErrorMessage ?: terminalNotice?.message
+            } else {
+                ui.currentError()
+            }
+            is BridgeTurnStatus.Unknown -> state.bufferedErrorMessage
+                ?: if (stopReasonError) BARE_STOP_REASON_ERROR_MESSAGE else "Turn ended unexpectedly (${status.raw})"
+        }
+    }
+
     private suspend fun finishActiveTurn(
         state: ConversationTurnState,
         status: BridgeTurnStatus,
@@ -1360,7 +1611,7 @@ class ChatSendCoordinator(
         reason: String,
         recordEvent: WsTimelineEvent.TurnDone?,
     ) {
-        val conversationId = state.conversationId.takeIf { it.isNotBlank() }
+        val conversationId = (state.localConversationId ?: state.conversationId).takeIf { it.isNotBlank() }
             ?: defaultShimConversationId(agentId)
         val completion = MainReplyCompletionPolicy.classify(
             deliveredAssistantContent = state.deliveredAssistantContent,
@@ -1401,7 +1652,7 @@ class ChatSendCoordinator(
                 timelineRepository.reconcileExternalTransportSend(
                     conversationId = conversationId,
                     agentId = agentId,
-                    externalConversationId = conversationId,
+                    externalConversationId = state.serverConversationId ?: conversationId,
                     otid = otid,
                 )
             }
@@ -1418,29 +1669,8 @@ class ChatSendCoordinator(
         terminalNotice?.let { notice ->
             appendTurnFailureNotice(conversationId, runId, turnId, notice)
         }
-        state.otid?.let { otid ->
-            val localConversationId = state.localConversationId ?: conversationId
-            if (deadTurn) {
-                timelineRepository.markExternalTransportLocalFailed(agentId, localConversationId, otid)
-            } else {
-                timelineRepository.markExternalTransportLocalSent(agentId, localConversationId, otid)
-            }
-        }
-        val stopReasonError = state.stopReason.equals("error", ignoreCase = true)
-        val nextError = when (status) {
-            BridgeTurnStatus.Completed -> state.bufferedErrorMessage
-                ?: if (stopReasonError) BARE_STOP_REASON_ERROR_MESSAGE else ui.currentError()
-            BridgeTurnStatus.Cancelled -> ui.currentError()
-            // Delivered-then-failed keeps whatever error state was already on
-            // screen (normally none) — the user got their answer.
-            BridgeTurnStatus.Failed -> if (deadTurn) {
-                state.bufferedErrorMessage ?: terminalNotice.message
-            } else {
-                ui.currentError()
-            }
-            is BridgeTurnStatus.Unknown -> state.bufferedErrorMessage
-                ?: if (stopReasonError) BARE_STOP_REASON_ERROR_MESSAGE else "Turn ended unexpectedly (${status.raw})"
-        }
+        settlePendingSend(state, conversationId, deadTurn)
+        val nextError = nextErrorFor(state, status, deadTurn, terminalNotice)
         // Finding 1: only the VISIBLE conversation's terminal may clear presence
         // or paint an error. A background conversation settles its own timeline
         // rows above and leaves the foreground alone.
@@ -1509,6 +1739,7 @@ class ChatSendCoordinator(
             // it failed would show a retry affordance for a message the server
             // most likely has, inviting a duplicate.
             state.otid?.let { otid ->
+                retainSettledOtid(otid)
                 timelineRepository.markExternalTransportLocalSent(
                     agentId,
                     state.localConversationId ?: conversationId,
@@ -1543,9 +1774,11 @@ class ChatSendCoordinator(
             )
         }
         state.retainSettledRunId(state.runId)
+        state.otid?.let { retainSettledOtid(it) }
         state.otid = null
         state.identity.clear()
         state.localConversationId = null
+        state.serverConversationId = null
         state.turnId = null
         state.runId = null
         state.activeAssistantMessageRunIds.clear()
@@ -1659,7 +1892,7 @@ class ChatSendCoordinator(
     }
 
     private suspend fun markTurnVisuallyComplete(state: ConversationTurnState, reason: String) {
-        val conversationId = state.conversationId.takeIf { it.isNotBlank() }
+        val conversationId = (state.localConversationId ?: state.conversationId).takeIf { it.isNotBlank() }
             ?: activeConversationId()
             ?: defaultShimConversationId(agentId)
         state.otid?.let { otid ->
@@ -1694,8 +1927,9 @@ class ChatSendCoordinator(
     private fun resolveStateForError(event: WsTimelineEvent.Error): ConversationTurnState? {
         val named = event.conversationId?.takeIf { it.isNotBlank() }
             ?: return resolveStateByTurnId(event.turnId)
-        peekState(named)?.let { return it }
-        if (named == activeConversationId()) return stateFor(named)
+        val resolved = resolveConversationId(named) ?: named
+        peekState(resolved)?.let { return it }
+        if (resolved == activeConversationId()) return stateFor(resolved)
         return null
     }
 
@@ -1719,6 +1953,8 @@ class ChatSendCoordinator(
         private const val MAX_PENDING_SENDS = 10
         private const val MAX_ACTIVE_ASSISTANT_RUN_IDS = 8
         private const val MAX_SETTLED_RUN_IDS = 8
+        private const val MAX_SETTLED_OTIDS = 16
+        private const val MAX_CONVERSATION_ALIASES = 64
 
         // letta-mobile-or40x PR2: bound on per-conversation turn entries. Real
         // usage keeps a handful live; the cap only stops an unbounded map when

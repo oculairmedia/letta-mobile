@@ -228,6 +228,12 @@ sealed interface WsTimelineEvent {
          * active-turn scoping.
          */
         val conversationId: String? = null,
+        /**
+         * letta-mobile-ce2xr: the wire frame's own `turn_id` when present, enabling
+         * coordinators to route deltas directly to their owning turn even when the
+         * server emits an unseen server-assigned conversation id.
+         */
+        val turnId: String? = null,
     ) : WsTimelineEvent
 
     data class StopReason(
@@ -476,7 +482,12 @@ private fun ServerFrame.serverNoticeEvent(): WsTimelineEvent? = when (this) {
 private fun ServerFrame.messageDeltaEvent(isReplay: Boolean): WsTimelineEvent.MessageDelta? {
     if (this is ServerFrame.ToolCallMessage && isSelfTodoChipFrame()) return null
     return WsFrameMapper.toLettaMessage(this)?.let {
-        WsTimelineEvent.MessageDelta(it, isReplay = isReplay, conversationId = messageFrameConversationId())
+        WsTimelineEvent.MessageDelta(
+            message = it,
+            isReplay = isReplay,
+            conversationId = messageFrameConversationId(),
+            turnId = messageFrameTurnId(),
+        )
     }
 }
 
@@ -492,6 +503,19 @@ private fun ServerFrame.messageFrameConversationId(): String? = when (this) {
     is ServerFrame.ReasoningMessage -> conversationId
     is ServerFrame.ToolCallMessage -> conversationId
     is ServerFrame.ToolReturnMessage -> conversationId
+    else -> null
+}?.takeIf { it.isNotBlank() }
+
+/**
+ * letta-mobile-ce2xr: the `turn_id` the message frame itself carries, normalized to
+ * null when absent or blank.
+ */
+private fun ServerFrame.messageFrameTurnId(): String? = when (this) {
+    is ServerFrame.UserMessage -> turnId
+    is ServerFrame.AssistantMessage -> turnId
+    is ServerFrame.ReasoningMessage -> turnId
+    is ServerFrame.ToolCallMessage -> turnId
+    is ServerFrame.ToolReturnMessage -> turnId
     else -> null
 }?.takeIf { it.isNotBlank() }
 
