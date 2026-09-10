@@ -530,6 +530,35 @@ class TimelineExactCanonicalWriterTest {
         assertEquals(null, engine.live.value)
     }
 
+    @Test fun streamedAssistantIdIsAliasedToItsCanonicalIdentityWhateverItsShape() = runTest {
+        val store = Store()
+        // The turn already has a canonical identity, recorded against the otid the stream carries.
+        store.evidence["identity/otid/server-reply-assistant"] = "msg-canonical".encodeToByteArray()
+        // The shape the live transport actually streams. A guard that matched a prefix instead of
+        // comparing the two names missed every real reply, and the overlay could never drain.
+        val streamedId = "cm-stream-provider-assistant-0-1732a7f3"
+        val streamed = AssistantMessage(
+            id = streamedId, contentRaw = kotlinx.serialization.json.JsonPrimitive("hello"),
+            date = "2026-01-01T00:00:00Z", otid = "server-reply-assistant",
+        )
+        store.transaction(scope) {
+            TimelineExactCanonicalWriter(scope, 100_000)
+                .merge(this, TimelineRemoteRecord(TimelineMessageId(streamedId), streamed, 0))
+        }
+        assertEquals("msg-canonical", store.evidence["identity/serverId/$streamedId"]?.decodeToString())
+    }
+
+    @Test fun anAlreadyCanonicalRowRecordsNoAlias() = runTest {
+        val store = Store()
+        // Re-merging a row whose name is already canonical, as a migration replay does, must not
+        // accumulate evidence: the two names do not differ, so there is nothing to record.
+        store.transaction(scope) {
+            TimelineExactCanonicalWriter(scope, 100_000)
+                .merge(this, TimelineRemoteRecord(TimelineMessageId("id"), message("hello"), 0))
+        }
+        assertEquals(emptyList(), store.evidence.keys.filter { it.startsWith("identity/serverId/") })
+    }
+
     @Test fun oversizedHistoricalMergeRollsBackWithoutLosingRetry() = runTest {
         val store = Store()
         store.transaction(scope) { TimelineExactCanonicalWriter(scope, 100_000).merge(this,
