@@ -55,9 +55,11 @@ class IndexedCanonicalTimelineMaintenance(
         }
     }
 
-    override suspend fun cleanup(owner: CanonicalTimelineCoordinator.Owner, runId: String?, turnId: String?, reason: String, candidateRunIds: Set<String>): Int =
+    override suspend fun cleanup(owner: CanonicalTimelineCoordinator.Owner, request: TimelineTurnCleanup): Int =
         coordinator.withRepairLease(owner) {
-            owner.session.engine.suppressAbandonedTail(owner.selection, runId, turnId, reason, candidateRunIds)
+            owner.session.engine.suppressAbandonedTail(
+                owner.selection, request.runId, request.turnId, request.reason, request.candidateRunIds,
+            )
         }
 
     override suspend fun repairCursor(
