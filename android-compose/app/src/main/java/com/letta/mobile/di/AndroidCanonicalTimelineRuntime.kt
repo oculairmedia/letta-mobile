@@ -185,11 +185,30 @@ class AndroidCanonicalTimelineRuntime(
     }
 
     /** Cursor callback must target the captured backend store, not the active settings store. */
+    /**
+     * Ownership records are keyed by backend and conversation, and they pin the agent that first
+     * touched the conversation. Callers bind from the runtime they happen to have captured, whose
+     * agent is the selected one rather than the conversation's owner, so the requested scope can
+     * name the wrong agent. Ask the record who owns it and bind under that agent: reading it needs
+     * only the backend and conversation, so this costs nothing beyond the read that already
+     * happens, and it keeps the ownership fence meaningful instead of tripping it.
+     */
+    private suspend fun ownedScope(requested: TimelineScope): TimelineScope {
+        val owner = authority.state(requested).scope.agentId ?: return requested
+        if (owner == requested.agentId) return requested
+        android.util.Log.i(
+            "CanonicalTimeline",
+            "ownership.rebound conversation=${requested.conversationId} " +
+                "owner=$owner requested=${requested.agentId}",
+        )
+        return requested.copy(agentId = owner)
+    }
+
     suspend fun bind(
-        scope: TimelineScope,
+        requested: TimelineScope,
         repairCommittedCursor: suspend (CanonicalTimelineCoordinator.Owner, Long? /* expected */, Long? /* committed */) -> Unit,
         reportFailure: (Throwable) -> Unit,
-    ): BindResult = bindingCache.get(scope) {
+    ): BindResult = ownedScope(requested).let { scope -> bindingCache.get(scope) {
         val coordinator = resume(scope)
         if (coordinator == null) BindResult.LegacyDeferred
         else {
@@ -205,13 +224,16 @@ class AndroidCanonicalTimelineRuntime(
         )
         val writer = com.letta.mobile.data.timeline.CanonicalExternalTransportWriter(coordinator, { agent, conversation ->
             check(graphScope.coroutineContext[kotlinx.coroutines.Job]?.isActive == true)
-            check(scope.agentId == agent && scope.conversationId == conversation)
+            check(scope.conversationId == conversation) { "Writer scope names another conversation" }
+            check(agent == null || agent == scope.agentId || agent == requested.agentId) {
+                "Writer scope names an agent that neither owns nor requested this conversation"
+            }
             scope
         }, maintenance)
         val admission = com.letta.mobile.data.timeline.TimelineLegacyAdmission()
         BindResult.Canonical(Binding(coordinator, owner, com.letta.mobile.data.timeline.AdmittedTimelineExternalWriter(writer, admission), admission))
         }
-    }
+    } }
 
     /** Cancels RPCs and invalidates cached canonical owner handles. */
     suspend fun retire() = kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
