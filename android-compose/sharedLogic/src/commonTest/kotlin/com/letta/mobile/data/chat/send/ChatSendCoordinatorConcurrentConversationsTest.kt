@@ -749,6 +749,54 @@ class ChatSendCoordinatorConcurrentConversationsTest {
         assertEquals(1, ui.turnsFinished.size, "no duplicate turn completion")
     }
 
+    /**
+     * letta-mobile-ce2xr: A remotely-started turn on an unseen server conversation ([CONV_SERVER])
+     * arriving while a send is in flight on [CONV_A] must NOT be heuristic-aliased or captured by
+     * [CONV_A] without otid evidence.
+     */
+    @Test
+    fun remotelyStartedTurnOnUnseenConversationIsNotCapturedByAwaitingSend() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val ui = RecordingUiSink()
+        val transport = FakeChannelTransport(mutableListOf(true), activeChatTurn = true)
+        val coordinator = coordinator(timeline, ui, transport) { CONV_A }
+
+        // Start send on CONV_A (awaiting TurnStarted)
+        coordinator.send("send in flight", targetConversationId = CONV_A).join()
+        val sentOtid = timeline.externalLocals.single().otid
+
+        // Remotely started turn arrives on CONV_SERVER without matching otid
+        coordinator.handleEvent(
+            WsTimelineEvent.TurnStarted(
+                agentId = AGENT_ID,
+                conversationId = CONV_SERVER,
+                turnId = "turn-remote-1",
+                runId = "run-remote-1",
+            ),
+        )
+
+        val remoteAssistant = WsTimelineEvent.MessageDelta(
+            message = AssistantMessage(
+                id = "msg-remote-assistant",
+                contentRaw = JsonPrimitive("remote reply"),
+                turnId = "turn-remote-1",
+                runId = "run-remote-1",
+            ),
+            conversationId = CONV_SERVER,
+            turnId = "turn-remote-1",
+        )
+        coordinator.handleEvent(remoteAssistant)
+
+        // Deltas for remote turn must ingest under CONV_SERVER, NOT under CONV_A
+        assertTrue(
+            timeline.ingestedMessages.any { it.id == "msg-remote-assistant" },
+            "remote assistant message must be ingested",
+        )
+        // CONV_A's send must still be awaiting its own turn
+        assertTrue(timeline.sentLocals.none { it.otid == sentOtid }, "CONV_A's send must not be prematurely settled by remote turn")
+        assertEquals(0, ui.turnsFinished.size, "remote turn must not finish CONV_A's turn")
+    }
+
     private fun coordinator(
         timeline: RecordingTimelineWriter,
         ui: RecordingUiSink,
