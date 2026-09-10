@@ -83,6 +83,17 @@ object TimelineHydrationReducer {
         val pendingLocals = currentTimeline.events.filterIsInstance<TimelineEvent.Local>()
             .filter { it.deliveryState.isPendingOrRestorable() }
             .filter { local -> converted.none { it.otid == local.otid } }
+            // letta-mobile-x13xi.13.1.1: cold hydration re-introduced a SENDING
+            // Local as a duplicate bubble whenever the server echoed the user
+            // message back with a different otid. otid-only dedup at line 85
+            // cannot catch this (different otids), and identityKeys() only adds
+            // serverId/semantic keys for Confirmed events — never Local. Drop
+            // the Local whenever the server snapshot contains a USER message
+            // with matching content within the recency window; the Confirmed
+            // row will project the same bubble and SENDING would otherwise
+            // stay stuck forever (no later stream event references the local
+            // otid, so markSent never fires).
+            .filter { local -> converted.none { server -> local.matchesConfirmedUser(server) } }
         val concurrentConfirmed = currentTimeline.events.filterIsInstance<TimelineEvent.Confirmed>()
             .filter { it.identityKeys().none(initialKeys::contains) }
             .filter { it.identityKeys().none(convertedKeys::contains) }
@@ -215,6 +226,27 @@ object TimelineHydrationReducer {
 
     private fun DeliveryState.isPendingOrRestorable(): Boolean {
         return this == DeliveryState.SENDING || this == DeliveryState.SENT || this == DeliveryState.FAILED
+    }
+
+    /**
+     * letta-mobile-x13xi.13.1.1: true when [server] is a Confirmed USER row
+     * that semantically represents the same user message as this pending
+     * Local. Matches regardless of the server's otid, because hydration
+     * snapshots are written by the server under its own otid even when the
+     * server-side record originated from a Local message whose otid was
+     * preserved or rewritten in transit. Recency is bounded by
+     * [CONTENT_FALLBACK_RECENCY_MS] so that old SENDING/SENT Locals cannot
+     * be rewritten by a same-content server message replayed long after
+     * the original send.
+     */
+    private fun TimelineEvent.Local.matchesConfirmedUser(
+        server: TimelineEvent.Confirmed,
+    ): Boolean {
+        if (role != Role.USER) return false
+        if (server.messageType != TimelineMessageType.USER) return false
+        if (server.content.trim() != content.trim()) return false
+        val ageMillis = timelineInstantDurationMillis(sentAt, server.date)
+        return ageMillis in 0..CONTENT_FALLBACK_RECENCY_MS
     }
 
     private fun TimelineEvent.Confirmed.withHydratedToolReturns(
