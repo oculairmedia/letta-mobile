@@ -87,18 +87,26 @@ class CanonicalPendingLocalStore(private val store: TimelineBoundedStore) {
             val previous = readPending()
             val stale = stale(previous)
             if (stale.isEmpty()) return@transaction 0
-            val newestStale = stale.last().otid
-            val next = previous.mapNotNull { record ->
-                when {
-                    record.otid !in stale.map { it.otid } -> record.takeUnless { it.delivery == Delivery.Failed }
-                    record.otid == newestStale -> record.copy(delivery = Delivery.Failed)
-                    else -> null
-                }
+            val staleOtids = stale.mapTo(mutableSetOf()) { it.otid }
+            val retired = previous.map { record ->
+                if (record.otid in staleOtids) record.copy(delivery = Delivery.Failed) else record
             }
-            writePending(next)
+            writePending(keepNewestFailure(retired))
             nextRevision()
             stale.size
         }
+    }
+
+    /**
+     * Keep only the newest failure, judged by position: records are appended in send order, so the
+     * last failed entry is the most recent send that failed. Picking the record a caller happens to
+     * be acting on instead would retain an older one whenever transport outcomes arrive out of
+     * order — an earlier send failing after a later one already had.
+     */
+    private fun keepNewestFailure(records: List<Record>): List<Record> {
+        val newest = records.indexOfLast { it.delivery == Delivery.Failed }
+        if (newest < 0) return records
+        return records.filterIndexed { index, record -> record.delivery != Delivery.Failed || index == newest }
     }
 
     /** An unparsable timestamp is not evidence of staleness, so such a record is left alone. */
@@ -111,12 +119,7 @@ class CanonicalPendingLocalStore(private val store: TimelineBoundedStore) {
         store.transaction(scope) {
             val previous = readPending()
             val marked = previous.map { if (it.otid == otid) it.copy(delivery = delivery) else it }
-            // Only the newest failure survives; an older one has already been superseded.
-            val next = if (delivery == Delivery.Failed) {
-                marked.filterNot { it.delivery == Delivery.Failed && it.otid != otid }
-            } else {
-                marked
-            }
+            val next = if (delivery == Delivery.Failed) keepNewestFailure(marked) else marked
             if (next != previous) {
                 writePending(next)
                 nextRevision()

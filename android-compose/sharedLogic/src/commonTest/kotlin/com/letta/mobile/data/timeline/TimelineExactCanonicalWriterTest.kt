@@ -268,59 +268,36 @@ class TimelineExactCanonicalWriterTest {
         assertTrue(engine.acknowledgeSettlement(second, mapOf(TimelineMessageId("second") to 2L)))
     }
 
+    /**
+     * Pinned once per test: the lost-echo horizon measures against the wall clock, so a fixture
+     * dated in the past would be stale by construction and retire itself mid-test.
+     */
+    private val sentAt = timelineNow().toString()
+
+    private fun externalWriter(
+        coordinator: CanonicalTimelineCoordinator,
+        maintenance: CanonicalTimelineMaintenance,
+        now: String,
+    ) = CanonicalExternalTransportWriter(coordinator, { agentId, conversationId ->
+        assertEquals(scope.agentId, agentId)
+        assertEquals(scope.conversationId, conversationId)
+        scope
+    }, maintenance, now = { now })
+
     @Test fun backgroundCoordinatorCompletionRetainsNonEmptyHistoryAcrossRetirement() = runTest {
         val store = Store()
         var repairStarted = kotlinx.coroutines.CompletableDeferred<Unit>()
         var releaseRepair = kotlinx.coroutines.CompletableDeferred<Unit>()
         var repairSequence: Int? = null
-        val transport = object : TimelineTransport {
-            override suspend fun listConversationMessagePage(request: TimelineRemotePageRequest, progress: TimelinePageProgress?): TimelineRemotePageResult {
-                repairStarted.complete(Unit)
-                releaseRepair.await()
-                assertEquals(TimelineContinuation.Initial, request.continuation)
-                return TimelineRemotePageResult.Page(request.requestId, request.selectionGeneration,
-                    listOf(
-                        TimelineRemoteRecord(TimelineMessageId("echo"), com.letta.mobile.data.model.UserMessage(
-                            id = "echo", contentRaw = kotlinx.serialization.json.JsonPrimitive("question"),
-                            date = "2026-01-01T00:00:00Z", otid = "pending-user", seqId = repairSequence,
-                        ), 0),
-                        // The streamed reply is durable only through this path now.
-                        TimelineRemoteRecord(TimelineMessageId("id"), message("hello"), 0),
-                    ), null, false, 0)
-            }
-            override suspend fun sendConversationMessage(
-                conversationId: String, request: com.letta.mobile.data.model.MessageCreateRequest,
-            ): kotlinx.coroutines.flow.Flow<com.letta.mobile.data.model.LettaMessage> = error("unexpected send")
-            override suspend fun streamConversation(conversationId: String): kotlinx.coroutines.flow.Flow<TimelineStreamFrame> =
-                error("ownership must not open transport")
-            override suspend fun listConversationMessages(
-                conversationId: String, limit: Int?, after: String?, order: String?,
-            ): List<com.letta.mobile.data.model.LettaMessage> = error("unexpected legacy hydration")
-            override suspend fun listAgentMessages(
-                agentId: String, limit: Int?, order: String?, conversationId: String?,
-            ): List<com.letta.mobile.data.model.LettaMessage> = error("unexpected legacy hydration")
-        }
+        val transport = RepairOnlyTransport(
+            repairStarted = { repairStarted },
+            releaseRepair = { releaseRepair },
+            repairSequence = { repairSequence },
+            reply = message("hello"),
+        )
         val coordinator = CanonicalTimelineCoordinator(store, transport)
         val calls = mutableListOf<String>()
-        val maintenance = object : CanonicalTimelineMaintenance {
-            override suspend fun turnStarted(owner: CanonicalTimelineCoordinator.Owner, runId: String?, turnId: String?) { calls += "start:$runId:$turnId" }
-            override suspend fun turnEnded(owner: CanonicalTimelineCoordinator.Owner, clean: Boolean) { calls += "end:$clean" }
-            override suspend fun cleanup(owner: CanonicalTimelineCoordinator.Owner, runId: String?, turnId: String?, reason: String, candidateRunIds: Set<String>): Int { calls += "cleanup:$reason"; return 2 }
-            override suspend fun repairCursor(
-                owner: CanonicalTimelineCoordinator.Owner,
-                fallbackSeq: Long?,
-                expectedWatermark: Long?,
-            ) { calls += "repair:$fallbackSeq:$expectedWatermark" }
-        }
-        // One pinned instant, taken now rather than in 2026-01: this send is meant to stay in
-        // flight, and the lost-echo horizon measures against the wall clock, so a fixed past
-        // timestamp would make the fixture stale by construction.
-        val sentAt = timelineNow().toString()
-        val external = CanonicalExternalTransportWriter(coordinator, { agentId, conversationId ->
-            assertEquals(scope.agentId, agentId)
-            assertEquals(scope.conversationId, conversationId)
-            scope
-        }, maintenance, now = { sentAt })
+        val external = externalWriter(coordinator, RecordingMaintenance(calls), sentAt)
         val local = CanonicalPendingLocalStore.Record("pending-user", "question", emptyList(), sentAt)
         external.appendExternalTransportLocal(scope.agentId, scope.conversationId, local.content, local.otid, local.attachments)
         external.turnStarted(scope.agentId, scope.conversationId, "run", "turn")
@@ -691,6 +668,29 @@ class TimelineExactCanonicalWriterTest {
         assertTrue(engine.acknowledgeSettlement(fence, mapOf(TimelineMessageId("id") to 1L)))
     }
 
+    @Test fun theNewestFailureSurvivesWhateverOrderOutcomesArriveIn() = runTest {
+        val store = Store()
+        val pending = CanonicalPendingLocalStore(store)
+        fun record(n: Int, at: String) = CanonicalPendingLocalStore.Record("otid-$n", "attempt $n", emptyList(), at)
+        pending.save(scope, record(1, "2026-01-01T00:00:00Z"))
+        pending.save(scope, record(2, "2026-01-01T00:00:01Z"))
+        // Transport outcomes can land out of order: the later send fails first.
+        pending.mark(scope, "otid-2", CanonicalPendingLocalStore.Delivery.Failed)
+        pending.mark(scope, "otid-1", CanonicalPendingLocalStore.Delivery.Failed)
+        assertEquals(listOf("otid-2"), pending.load(scope).map { it.otid })
+
+        // Retirement must not resurrect an older send over a newer failure either.
+        val store2 = Store()
+        val pending2 = CanonicalPendingLocalStore(store2)
+        pending2.save(scope, record(3, "2026-01-01T00:00:00Z"))
+        pending2.save(scope, record(4, "2026-01-01T00:00:01Z"))
+        pending2.mark(scope, "otid-3", CanonicalPendingLocalStore.Delivery.Sent)
+        pending2.mark(scope, "otid-4", CanonicalPendingLocalStore.Delivery.Failed)
+        val now = parseTimelineInstant("2026-01-01T01:00:00Z")
+        assertEquals(1, pending2.retireLostEchoes(scope, pending2.load(scope), now))
+        assertEquals(listOf("otid-4"), pending2.load(scope).map { it.otid })
+    }
+
     @Test fun aSendWhoseEchoNeverCameIsRetiredButALiveOneIsNot() = runTest {
         val store = Store()
         val pending = CanonicalPendingLocalStore(store)
@@ -834,5 +834,81 @@ class TimelineExactCanonicalWriterTest {
     companion object {
         private val scope = TimelineScope("backend", "conversation")
         private fun message(content: String) = AssistantMessage(id = "id", contentRaw = kotlinx.serialization.json.JsonPrimitive(content), date = "2026-01-01T00:00:00Z")
+    }
+}
+
+/**
+ * Serves exactly one repair page and refuses every other route. The user echo and the streamed
+ * reply are durable only through the sync path now, so a test that wants either must go through a
+ * repair rather than a live turn.
+ */
+private class RepairOnlyTransport(
+    private val repairStarted: () -> kotlinx.coroutines.CompletableDeferred<Unit>,
+    private val releaseRepair: () -> kotlinx.coroutines.CompletableDeferred<Unit>,
+    private val repairSequence: () -> Int?,
+    private val reply: com.letta.mobile.data.model.LettaMessage,
+) : TimelineTransport {
+    override suspend fun listConversationMessagePage(
+        request: TimelineRemotePageRequest,
+        progress: TimelinePageProgress?,
+    ): TimelineRemotePageResult {
+        repairStarted().complete(Unit)
+        releaseRepair().await()
+        assertEquals(TimelineContinuation.Initial, request.continuation)
+        return TimelineRemotePageResult.Page(
+            request.requestId, request.selectionGeneration,
+            listOf(
+                TimelineRemoteRecord(
+                    TimelineMessageId("echo"),
+                    com.letta.mobile.data.model.UserMessage(
+                        id = "echo", contentRaw = kotlinx.serialization.json.JsonPrimitive("question"),
+                        date = "2026-01-01T00:00:00Z", otid = "pending-user", seqId = repairSequence(),
+                    ),
+                    0,
+                ),
+                TimelineRemoteRecord(TimelineMessageId("id"), reply, 0),
+            ),
+            null, false, 0,
+        )
+    }
+
+    override suspend fun sendConversationMessage(
+        conversationId: String, request: com.letta.mobile.data.model.MessageCreateRequest,
+    ): kotlinx.coroutines.flow.Flow<com.letta.mobile.data.model.LettaMessage> = error("unexpected send")
+
+    override suspend fun streamConversation(conversationId: String): kotlinx.coroutines.flow.Flow<TimelineStreamFrame> =
+        error("ownership must not open transport")
+
+    override suspend fun listConversationMessages(
+        conversationId: String, limit: Int?, after: String?, order: String?,
+    ): List<com.letta.mobile.data.model.LettaMessage> = error("unexpected legacy hydration")
+
+    override suspend fun listAgentMessages(
+        agentId: String, limit: Int?, order: String?, conversationId: String?,
+    ): List<com.letta.mobile.data.model.LettaMessage> = error("unexpected legacy hydration")
+}
+
+/** Records the maintenance callbacks in order so a test can assert the sequence it drove. */
+private class RecordingMaintenance(private val calls: MutableList<String>) : CanonicalTimelineMaintenance {
+    override suspend fun turnStarted(owner: CanonicalTimelineCoordinator.Owner, runId: String?, turnId: String?) {
+        calls += "start:$runId:$turnId"
+    }
+
+    override suspend fun turnEnded(owner: CanonicalTimelineCoordinator.Owner, clean: Boolean) {
+        calls += "end:$clean"
+    }
+
+    override suspend fun cleanup(
+        owner: CanonicalTimelineCoordinator.Owner,
+        runId: String?, turnId: String?, reason: String, candidateRunIds: Set<String>,
+    ): Int {
+        calls += "cleanup:$reason"
+        return 2
+    }
+
+    override suspend fun repairCursor(
+        owner: CanonicalTimelineCoordinator.Owner, fallbackSeq: Long?, expectedWatermark: Long?,
+    ) {
+        calls += "repair:$fallbackSeq:$expectedWatermark"
     }
 }
