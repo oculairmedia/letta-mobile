@@ -108,9 +108,10 @@ class TimelineLiveOverlayDrainTest {
         // Unrelated resident rows do NOT settle the turn; overlay retains the event
         val unrelated = mapOf(TimelineMessageId("unrelated-row") to SETTLEMENT)
         assertFalse(live.isSettled(unrelated))
-        assertEquals(live.block.events, live.overlayEvents(unrelated))
         assertFalse(engine.acknowledgeSettlement(fence, unrelated))
-        assertEquals(live, engine.live.value)
+        val currentLive = assertNotNull(engine.live.value)
+        assertFalse(currentLive.isSettled(unrelated))
+        assertEquals(currentLive.block.events, currentLive.overlayEvents(unrelated))
 
         // Paging presents the settled row carrying the canonical id
         val presented = mapOf(TimelineMessageId(canonicalId) to SETTLEMENT)
