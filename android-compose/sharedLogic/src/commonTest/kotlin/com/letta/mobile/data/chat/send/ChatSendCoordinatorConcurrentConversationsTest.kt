@@ -532,6 +532,223 @@ class ChatSendCoordinatorConcurrentConversationsTest {
         )
     }
 
+    /**
+     * letta-mobile-ce2xr: When a send on [CONV_A] produces an inbound turn on a different
+     * server-assigned conversation id ([CONV_SERVER]), the user message echo carrying [otid]
+     * aliases the server conversation to [CONV_A] and binds the turn so deltas and completions
+     * resolve to [CONV_A] without suppressing the active foreground UI.
+     */
+    @Test
+    fun inboundTurnBoundToOriginatingSendByOtidWhenUserMessageArrivesFirst() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val ui = RecordingUiSink()
+        val transport = FakeChannelTransport(mutableListOf(true), activeChatTurn = true)
+        val coordinator = coordinator(timeline, ui, transport) { CONV_A }
+
+        coordinator.send("hello from user", targetConversationId = CONV_A).join()
+        val sentOtid = timeline.externalLocals.single().otid
+        assertEquals(CONV_A, timeline.externalLocals.single().conversationId)
+
+        // 1. Inbound UserMessage echo arrives on a server-assigned conversation id bearing the otid
+        val userEcho = WsTimelineEvent.MessageDelta(
+            message = LettaMessage(
+                id = "msg-user-echo",
+                role = "user",
+                messageType = "user_message",
+                content = "hello from user",
+                date = "2026-09-10T16:00:00Z",
+                otid = sentOtid,
+                turnId = "turn-server-1",
+                runId = "run-server-1",
+            ),
+            conversationId = CONV_SERVER,
+            turnId = "turn-server-1",
+        )
+        coordinator.handleEvent(userEcho)
+
+        // 2. TurnStarted arrives on CONV_SERVER
+        coordinator.handleEvent(
+            WsTimelineEvent.TurnStarted(
+                agentId = AGENT_ID,
+                conversationId = CONV_SERVER,
+                turnId = "turn-server-1",
+                runId = "run-server-1",
+            ),
+        )
+
+        // 3. Assistant reply arrives on CONV_SERVER
+        val assistantDelta = WsTimelineEvent.MessageDelta(
+            message = AssistantMessage(
+                id = "msg-assistant-1",
+                contentRaw = JsonPrimitive("assistant reply"),
+                turnId = "turn-server-1",
+                runId = "run-server-1",
+            ),
+            conversationId = CONV_SERVER,
+            turnId = "turn-server-1",
+        )
+        coordinator.handleEvent(assistantDelta)
+
+        // 4. TurnDone arrives
+        coordinator.handleEvent(
+            WsTimelineEvent.TurnDone(
+                turnId = "turn-server-1",
+                runId = "run-server-1",
+                status = BridgeTurnStatus.Completed,
+            ),
+        )
+        advanceUntilIdle()
+
+        // Deltas should have ingested under CONV_A, not orphaned under CONV_SERVER
+        assertTrue(
+            timeline.ingestedMessages.any { it.id == "msg-assistant-1" },
+            "assistant message must be ingested into timeline",
+        )
+        assertEquals(1, ui.turnsFinished.size, "exactly one turn completion must fire")
+        assertNull(ui.currentError())
+        assertTrue(
+            timeline.sentLocals.contains(RecordingTimelineWriter.LocalMarker(CONV_A, sentOtid)),
+            "originating local send on CONV_A must be marked sent",
+        )
+    }
+
+    /**
+     * letta-mobile-ce2xr (Trap 2): TurnStarted on [CONV_SERVER] arrives before the UserMessage
+     * echo carrying the [otid]. When the UserMessage echo subsequently arrives, it re-keys and merges
+     * the orphan server state into the originating send's state on [CONV_A].
+     */
+    @Test
+    fun inboundTurnBoundAndRekeyedWhenTurnStartedArrivesBeforeUserMessage() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val ui = RecordingUiSink()
+        val transport = FakeChannelTransport(mutableListOf(true, true), activeChatTurn = true)
+        val coordinator = coordinator(timeline, ui, transport) { CONV_A }
+
+        // Start send A on CONV_A
+        coordinator.send("hello from user", targetConversationId = CONV_A).join()
+        val sentOtid = timeline.externalLocals.single().otid
+
+        // 1. TurnStarted arrives on CONV_SERVER first (before UserMessage echo)
+        coordinator.handleEvent(
+            WsTimelineEvent.TurnStarted(
+                agentId = AGENT_ID,
+                conversationId = CONV_SERVER,
+                turnId = "turn-server-2",
+                runId = "run-server-2",
+            ),
+        )
+
+        // 2. UserMessage echo arrives on CONV_SERVER with the matching otid
+        val userEcho = WsTimelineEvent.MessageDelta(
+            message = LettaMessage(
+                id = "msg-user-echo-2",
+                role = "user",
+                messageType = "user_message",
+                content = "hello from user",
+                date = "2026-09-10T16:00:00Z",
+                otid = sentOtid,
+                turnId = "turn-server-2",
+                runId = "run-server-2",
+            ),
+            conversationId = CONV_SERVER,
+            turnId = "turn-server-2",
+        )
+        coordinator.handleEvent(userEcho)
+
+        // 3. Assistant reply arrives on CONV_SERVER
+        coordinator.handleEvent(
+            WsTimelineEvent.MessageDelta(
+                message = AssistantMessage(
+                    id = "msg-assistant-2",
+                    contentRaw = JsonPrimitive("assistant reply 2"),
+                    turnId = "turn-server-2",
+                    runId = "run-server-2",
+                ),
+                conversationId = CONV_SERVER,
+                turnId = "turn-server-2",
+            ),
+        )
+
+        // 4. TurnDone arrives
+        coordinator.handleEvent(
+            WsTimelineEvent.TurnDone(
+                turnId = "turn-server-2",
+                runId = "run-server-2",
+                status = BridgeTurnStatus.Completed,
+            ),
+        )
+        advanceUntilIdle()
+
+        assertTrue(
+            timeline.ingestedMessages.any { it.id == "msg-assistant-2" },
+            "assistant message must be ingested",
+        )
+        assertEquals(1, ui.turnsFinished.size, "exactly one turn completion must fire")
+        assertTrue(
+            timeline.sentLocals.contains(RecordingTimelineWriter.LocalMarker(CONV_A, sentOtid)),
+            "originating send on CONV_A must be settled as sent",
+        )
+    }
+
+    /**
+     * letta-mobile-ce2xr (Trap 1): Replay and reconnect can emit an echoed [otid] for an
+     * already-settled turn. The coordinator's [settledOtids] fence must ensure binding is idempotent
+     * and does not resurrect streaming state or latch presence.
+     */
+    @Test
+    fun replayedOtidForSettledTurnIsIdempotentAndDoesNotResurrectState() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val ui = RecordingUiSink()
+        val transport = FakeChannelTransport(mutableListOf(true), activeChatTurn = true)
+        val coordinator = coordinator(timeline, ui, transport) { CONV_A }
+
+        coordinator.send("initial send", targetConversationId = CONV_A).join()
+        val sentOtid = timeline.externalLocals.single().otid
+
+        coordinator.handleEvent(
+            WsTimelineEvent.TurnStarted(
+                agentId = AGENT_ID,
+                conversationId = CONV_A,
+                turnId = "turn-1",
+                runId = "run-1",
+            ),
+        )
+        coordinator.handleEvent(
+            WsTimelineEvent.TurnDone(
+                turnId = "turn-1",
+                runId = "run-1",
+                status = BridgeTurnStatus.Completed,
+            ),
+        )
+        advanceUntilIdle()
+
+        // The turn is now settled
+        assertEquals(1, ui.turnsFinished.size)
+        assertTrue(!ui.isStreaming(), "streaming must be false after turn finish")
+
+        // Inbound replay frame arrives with the same otid
+        val replayFrame = WsTimelineEvent.MessageDelta(
+            message = LettaMessage(
+                id = "msg-replay",
+                role = "user",
+                messageType = "user_message",
+                content = "initial send",
+                date = "2026-09-10T16:00:00Z",
+                otid = sentOtid,
+                turnId = "turn-1",
+                runId = "run-1",
+            ),
+            isReplay = true,
+            conversationId = CONV_SERVER,
+            turnId = "turn-1",
+        )
+        coordinator.handleEvent(replayFrame)
+        advanceUntilIdle()
+
+        assertTrue(!ui.isStreaming(), "replayed frame must not resurrect streaming state")
+        assertEquals(1, ui.turnsFinished.size, "no duplicate turn completion")
+    }
+
     private fun coordinator(
         timeline: RecordingTimelineWriter,
         ui: RecordingUiSink,
@@ -669,6 +886,7 @@ class ChatSendCoordinatorConcurrentConversationsTest {
         const val AGENT_ID = "agent-1"
         const val CONV_A = "conv-a"
         const val CONV_B = "conv-b"
+        const val CONV_SERVER = "conv-server-assigned"
         const val OVERFLOW_CONVERSATIONS = 40
         var otid = 0
     }
