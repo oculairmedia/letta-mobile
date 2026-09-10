@@ -183,37 +183,39 @@ class CanonicalTimelineEngine(
         presented: Map<TimelineMessageId, Long>,
     ): Map<TimelineMessageId, Long> {
         if (publication.block.events.isEmpty() || presented.isEmpty()) return presented
-        var resolved: MutableMap<TimelineMessageId, Long>? = null
+        val exact = writer as? TimelineExactCanonicalWriter ?: return presented
+        val resolved = presented.toMutableMap()
+        var changed = false
         store.read(scope) {
             for ((key, rev) in presented) {
-                val canonical = writer.canonicalIdentity(this, key.value, "")
-                if (canonical != key) {
-                    if (resolved == null) resolved = presented.toMutableMap()
+                val canonical = exact.canonicalIdentity(this, key.value, "")
+                if (canonical != key && canonical !in resolved) {
                     resolved[canonical] = rev
+                    changed = true
                 }
             }
             for (event in publication.block.events) {
-                val canonical = writer.canonicalIdentity(this, event.serverId, event.otid)
+                val canonical = exact.canonicalIdentity(this, event.serverId, event.otid)
                 val eventId = TimelineMessageId(event.serverId)
                 val otidId = event.otid.takeIf { it.isNotBlank() }?.let { TimelineMessageId(it) }
-                val currentPresented = resolved ?: presented
-                val rev = currentPresented[canonical]
-                    ?: currentPresented[eventId]
-                    ?: otidId?.let { currentPresented[it] }
+                val rev = resolved[canonical] ?: resolved[eventId] ?: otidId?.let { resolved[it] }
                 if (rev != null) {
-                    if (canonical !in currentPresented ||
-                        eventId !in currentPresented ||
-                        (otidId != null && otidId !in currentPresented)
-                    ) {
-                        if (resolved == null) resolved = presented.toMutableMap()
+                    if (canonical !in resolved) {
                         resolved[canonical] = rev
+                        changed = true
+                    }
+                    if (eventId !in resolved) {
                         resolved[eventId] = rev
-                        if (otidId != null) resolved[otidId] = rev
+                        changed = true
+                    }
+                    if (otidId != null && otidId !in resolved) {
+                        resolved[otidId] = rev
+                        changed = true
                     }
                 }
             }
         }
-        return resolved ?: presented
+        return if (changed) resolved else presented
     }
 
     suspend fun open(scope: TimelineScope, target: TimelineMessageId? = null): TimelineEngineOpen = mutex.withLock {
