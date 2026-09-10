@@ -1,8 +1,13 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.chat.projection.ChatRenderItem
+import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageCreateRequest
+import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
+import com.letta.mobile.ui.common.GroupPosition
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.runCurrent
@@ -49,6 +54,94 @@ class CanonicalTimelinePresentationTest {
         presentation.close()
         assertTrue(coordinator.retire(owner))
     }
+
+    @Test fun overlayStaysResidentUntilAResidentRowCarriesTheTurnsRevision() = runTest {
+        val coordinator = CanonicalTimelineCoordinator(EmptyStore(), NoTransport)
+        val owner = coordinator.acquire(TimelineScope("backend", "conversation"))
+        val presentation = CanonicalTimelinePresentation.open(coordinator, owner, backgroundScope)
+        val fence = coordinator.beginLive(owner)
+        assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(assistant("hello", "reply"))))
+        assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Done))
+        runCurrent()
+        // Live ingest wrote nothing durable, so the overlay is the only copy of this reply.
+        assertEquals(listOf("hello"), contents(presentation.live.value))
+        // Rows the sync writer has not caught up to must not drain it.
+        presentation.onResidentRows(listOf(row("ui-msg-1", 0L)))
+        runCurrent()
+        assertEquals(listOf("hello"), contents(presentation.live.value))
+        assertEquals(fence, owner.session.live.value?.fence)
+        // The rendered ledger reaches the turn's revision: the overlay drains and the fence releases.
+        presentation.onResidentRows(listOf(row("ui-msg-1", 1L)))
+        runCurrent()
+        assertEquals(emptyList(), contents(presentation.live.value))
+        assertEquals(null, owner.session.live.value)
+        presentation.close()
+        assertTrue(coordinator.retire(owner))
+    }
+
+    @Test fun optimisticBubbleStaysSuppressedAcrossTheWholeDrainWindow() = runTest {
+        val coordinator = CanonicalTimelineCoordinator(EmptyStore(), NoTransport)
+        val owner = coordinator.acquire(TimelineScope("backend", "conversation"))
+        val presentation = CanonicalTimelinePresentation.open(coordinator, owner, backgroundScope)
+        coordinator.appendPending(
+            owner, CanonicalPendingLocalStore.Record("local-1", "question", emptyList(), "2026-01-01T00:00:00Z"),
+        )
+        runCurrent()
+        assertEquals(listOf("question"), contents(presentation.live.value))
+        val fence = coordinator.beginLive(owner)
+        assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(echo("question", "echo", "local-1"))))
+        assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(assistant("hello", "reply"))))
+        assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Done))
+        runCurrent()
+        // The send is on screen exactly once, as the turn's own echoed row.
+        assertEquals(listOf("hello", "question"), contents(presentation.live.value))
+        presentation.onResidentRows(listOf(row("ui-msg-1", 0L)))
+        runCurrent()
+        assertEquals(listOf("hello", "question"), contents(presentation.live.value))
+        // Only a durable echo clears pending storage, and that write has not happened yet. The
+        // local bubble must not reappear as the overlay drains out from under it.
+        assertEquals(listOf("local-1"), owner.session.pending.value.map { it.otid })
+        presentation.onResidentRows(listOf(row("ui-msg-1", 1L)))
+        runCurrent()
+        assertEquals(emptyList(), contents(presentation.live.value))
+        assertEquals(listOf("local-1"), owner.session.pending.value.map { it.otid })
+        presentation.close()
+        assertTrue(coordinator.retire(owner))
+    }
+
+    @Test fun turnWithoutEventsReleasesTheFenceWithoutAnyResidentRow() = runTest {
+        val coordinator = CanonicalTimelineCoordinator(EmptyStore(), NoTransport)
+        val owner = coordinator.acquire(TimelineScope("backend", "conversation"))
+        val presentation = CanonicalTimelinePresentation.open(coordinator, owner, backgroundScope)
+        val fence = coordinator.beginLive(owner)
+        assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Done))
+        runCurrent()
+        assertEquals(emptyList(), contents(presentation.live.value))
+        // An empty settled ledger never reports this turn's revision, and the fence must not wait.
+        presentation.onResidentRows(emptyList())
+        runCurrent()
+        assertEquals(null, owner.session.live.value)
+        presentation.close()
+        assertTrue(coordinator.retire(owner))
+    }
+
+    private fun contents(items: List<ChatRenderItem>) =
+        items.map { (it as ChatRenderItem.Single).message.content }
+
+    /** A settled row as the pager hands it back: identity plus the revision it was read at. */
+    private fun row(identity: String, revision: Long) = CanonicalTimelinePresentation.Row(
+        TimelineMessageId(identity), revision,
+        ChatRenderItem.Single(UiMessage(identity, "assistant", "settled", timestamp = ""), GroupPosition.None),
+    )
+
+    private fun assistant(content: String, id: String) = AssistantMessage(
+        id = id, contentRaw = kotlinx.serialization.json.JsonPrimitive(content), date = "2026-01-01T00:00:00Z",
+    )
+
+    private fun echo(content: String, id: String, otid: String) = UserMessage(
+        id = id, contentRaw = kotlinx.serialization.json.JsonPrimitive(content),
+        date = "2026-01-01T00:00:00Z", otid = otid,
+    )
 
     private class EmptyStore : TimelineBoundedStore {
         private val evidence = mutableMapOf<String, ByteArray>()

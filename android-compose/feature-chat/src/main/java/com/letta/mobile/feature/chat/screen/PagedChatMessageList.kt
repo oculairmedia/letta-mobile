@@ -107,7 +107,7 @@ private fun PagedChatMessageListContent(
     LaunchedEffect(live) {
         val newest = (live.firstOrNull() as? ChatRenderItem.Single)?.message
         if (newest?.role == "user" && newest.id != previousLiveUser) {
-            if (presentation.hasBoundRoute) presentation.requestTail()
+            if (presentation.isAnchoredAwayFromTail) presentation.requestTail()
             else {
                 listState.scrollToItem(0)
                 following = true
@@ -268,7 +268,7 @@ private fun PagedChatMessageListContent(
             }
             if (!following) {
                 TextButton(onClick = {
-                    if (presentation.hasBoundRoute) presentation.requestTail()
+                    if (presentation.isAnchoredAwayFromTail) presentation.requestTail()
                     else scope.launch {
                         listState.scrollToItem(0)
                         following = true

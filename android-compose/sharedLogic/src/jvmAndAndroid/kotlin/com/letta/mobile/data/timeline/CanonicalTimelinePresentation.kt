@@ -38,6 +38,7 @@ class CanonicalTimelinePresentation private constructor(
     private val scope = parentScope + job
     private val owner = lease.owner
     private val resident = MutableStateFlow<Map<TimelineMessageId, Long>>(emptyMap())
+    private val residentOtids = MutableStateFlow<Set<String>>(emptySet())
 
     private val detached = kotlinx.coroutines.CompletableDeferred<Unit>()
     init {
@@ -62,6 +63,8 @@ class CanonicalTimelinePresentation private constructor(
         val revision: Long,
         val item: ChatRenderItem,
         val deferred: TimelineBodyReference? = null,
+        // Identities differ between the streamed and stored copy of a send; the otid does not.
+        val otid: String = "",
     )
 
     private val anchor = MutableStateFlow(lease.anchor)
@@ -98,6 +101,9 @@ class CanonicalTimelinePresentation private constructor(
         }
     }.cachedIn(scope)
 
+    // Bounded by pending storage: pruned to the records still awaiting their durable echo.
+    private val echoedOtids = mutableSetOf<String>()
+
     private val mutableLive = MutableStateFlow<List<ChatRenderItem>>(emptyList())
 
     /**
@@ -107,21 +113,25 @@ class CanonicalTimelinePresentation private constructor(
      */
     val live: StateFlow<List<ChatRenderItem>> = mutableLive.asStateFlow()
 
-    // Durability alone is not presentation: retain live until the matching revision is resident.
+    // Durability alone is not presentation: retain live until the settled ledger is at the turn's revision.
     private val liveProjection: Flow<List<ChatRenderItem>> = combine(
-        owner.session.live, owner.session.pending, resident,
-    ) { publication, pending, presented ->
-        val events = publication?.unpresentedEvents(presented).orEmpty()
-        val confirmedOtids = events.mapTo(mutableSetOf()) { it.otid }
-        val optimistic = pending.filterNot { it.otid in confirmedOtids }
+        owner.session.live, owner.session.pending, resident, residentOtids,
+    ) { publication, pending, presented, settledOtids ->
+        // A send is on screen once. The overlay and the optimistic bubble both stand down as soon
+        // as the settled page carries that otid, which is the only identifier the streamed copy and
+        // the stored copy share: their server ids and render keys never match.
+        val events = publication?.overlayEvents(presented).orEmpty()
+            .filterNot { it.otid.isNotBlank() && it.otid in settledOtids }
+        // Only the sync path's durable echo clears pending storage, and the publication is dropped
+        // the moment settlement is acknowledged. Remember the otids this turn echoed so the local
+        // bubble cannot reappear in the gap between the overlay draining and that write landing.
+        publication?.block?.events?.forEach { if (it.otid.isNotBlank()) echoedOtids += it.otid }
+        echoedOtids.retainAll(pending.mapTo(mutableSetOf()) { it.otid })
+        val optimistic = pending.filterNot { it.otid in echoedOtids || it.otid in settledOtids }
             .map { it.toRenderItem(owner.selection.scope.agentId) }
         val active = events.mapNotNull { event ->
             timelineEventToUiMessage(event, owner.selection.scope.agentId)?.let {
-                val identity = publication?.settlementIdentities?.get(TimelineMessageId(event.serverId))?.value
-                    ?: event.serverId
-                ChatRenderItem.Single(
-                    it, GroupPosition.None, keyOverride = "segment-$identity",
-                )
+                ChatRenderItem.Single(it, GroupPosition.None, keyOverride = "segment-${event.serverId}")
             }
         }
         active.asReversed() + optimistic.asReversed()
@@ -136,6 +146,7 @@ class CanonicalTimelinePresentation private constructor(
         if (!job.isActive) return
         val presented = rows.take(128).associate { it.identity to it.revision }
         resident.value = presented
+        residentOtids.value = rows.take(128).mapNotNullTo(mutableSetOf()) { it.otid.takeIf(String::isNotBlank) }
         val fence = owner.session.live.value?.fence ?: return
         scope.launch { coordinator.acknowledgeSettlement(owner, fence, presented) }
     }
@@ -176,7 +187,15 @@ class CanonicalTimelinePresentation private constructor(
                 timestamp = ""),
             GroupPosition.None, keyOverride = "segment-${record.key.identity.value}",
         )
-        return Row(record.key.identity, record.revision, item, deferred)
+        // A deferred body is not decoded here, so its otid stays blank and simply never matches.
+        val otid = if (deferred != null || record.isPreview ||
+            record.contentType != "application/vnd.letta.timeline-event+json;version=1"
+        ) "" else runCatching {
+            com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec.json.decodeFromString(
+                com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent.serializer(), record.body.decodeToString(),
+            ).toConfirmedTimelineEvent().otid
+        }.getOrDefault("")
+        return Row(record.key.identity, record.revision, item, deferred, otid)
     }
 
     companion object {

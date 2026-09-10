@@ -69,6 +69,15 @@ class ChatPagingPresentation(
     internal var saveViewport: (ChatPagingViewport) -> Unit = {}
     internal var clearViewport: () -> Unit = {}
     internal var requestTail: () -> Unit = {}
+
+    /**
+     * A canonical presentation always has a bound route, so `hasBoundRoute` cannot decide whether
+     * reaching the tail needs a new generation. Only a presentation anchored at a specific target
+     * does; one already tailing just scrolls. Rebuilding it instead retires the presentation, which
+     * blanks the list behind the opening placeholder and resets the resident set the live overlay
+     * subtracts against, double-rendering every settled row.
+     */
+    internal val isAnchoredAwayFromTail: Boolean get() = hasBoundRoute && routeTarget != null
     internal var routeTarget: String? = null
     internal var hasBoundRoute = false
 }

@@ -202,7 +202,11 @@ class TimelineOwnershipAuthority(private val directory: Path) {
     }
 
     private fun requireRoute(state: State, scope: TimelineScope, route: Route) {
-        check(state.scope == scope) { "Timeline ownership scope mismatch" }
+        // The record is keyed by backend and conversation only, so agentId is the field that can
+        // disagree here. Name both scopes: the bare message cannot be diagnosed from a crash log.
+        check(state.scope == scope) {
+            "Timeline ownership scope mismatch: stored=${state.scope} requested=$scope"
+        }
         check(when (route) {
             Route.Legacy -> state.phase == Phase.Legacy
             Route.Migration -> state.phase == Phase.Migrating

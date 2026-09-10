@@ -185,8 +185,11 @@ class CanonicalTimelineEngineTest {
         assertEquals(null, replacement.session.engine.live.value)
         assertEquals(false, coordinator.ingest(replacement, nextFence, TimelineStreamFrame.Heartbeat))
         assertEquals(true, coordinator.retire(replacement))
-        assertEquals(3, store.commits)
-        assertEquals(9, store.reads) // Three pending restores and one durable-completion refresh.
+        // Only the two publishLive settlements open a transaction; live ingest is not a durable writer.
+        assertEquals(2, store.commits)
+        // Three opens, three pending restores, one page begin, one locate, plus the terminal frame's
+        // settlement-revision probe and the pending refresh that completion triggers.
+        assertEquals(10, store.reads)
     }
 
     private fun engine(store: Store) = CanonicalTimelineEngine(store, writer, enabled = true)

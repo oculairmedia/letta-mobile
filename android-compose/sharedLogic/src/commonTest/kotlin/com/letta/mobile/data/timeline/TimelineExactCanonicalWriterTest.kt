@@ -39,19 +39,28 @@ class TimelineExactCanonicalWriterTest {
         assertEquals(TimelineScope("second", "conversation", "agent"), replacement.resolve("agent", "conversation"))
     }
 
-    @Test fun liveReductionCommitsOnceAndRejectsStaleFence() = runTest {
+    @Test fun liveReductionNamesSyncSettlementWithoutWritingAndRejectsStaleFence() = runTest {
         val store = Store()
         val engine = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
         val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
         val stale = engine.beginLive(selection)
         val fence = engine.beginLive(selection)
+        val reply = message("hello")
         assertFalse(engine.ingest(stale, TimelineStreamFrame.Message(message("old"))))
-        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(message("hello"))))
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(reply)))
         assertEquals(0L, engine.publication.value.durableRevision)
         assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
+        // The terminal frame only names the first revision the sync writer can reach; it commits nothing.
+        assertEquals(0, store.rows.size)
+        assertEquals(1L, engine.live.value?.settlementRevision)
+        assertEquals(0L, engine.publication.value.durableRevision)
+        assertFalse(engine.acknowledgeSettlement(fence, emptyMap()))
+        assertFalse(engine.acknowledgeSettlement(fence, mapOf(TimelineMessageId("id") to 0L)))
+        // Only the sync path writes the row, and reaching its revision releases the overlay.
+        assertEquals(TimelineEnginePageOutcome.Applied, reconcile(engine, selection, record(reply)))
         assertEquals(1, store.rows.size)
         assertEquals(1L, engine.publication.value.durableRevision)
-        assertFalse(engine.acknowledgeSettlement(fence, emptyMap()))
+        assertFalse(engine.acknowledgeSettlement(stale, mapOf(TimelineMessageId("id") to 1L)))
         assertTrue(engine.acknowledgeSettlement(fence, mapOf(TimelineMessageId("id") to 1L)))
         assertEquals(null, engine.live.value)
     }
@@ -72,6 +81,12 @@ class TimelineExactCanonicalWriterTest {
         assertEquals(selection, engine.publication.value.selection)
         assertEquals(0L, engine.publication.value.durableRevision)
         assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
+        // The terminal frame leaves the settled publication alone too; live ingest never writes.
+        assertTrue(engine.publication.value === published)
+        assertEquals(0, store.rows.size)
+        assertEquals(1L, engine.live.value?.settlementRevision)
+        assertEquals(TimelineEnginePageOutcome.Applied,
+            reconcile(engine, selection, record(message("x".repeat(1_000)))))
         assertEquals(1, store.rows.size)
         assertEquals(1L, engine.publication.value.durableRevision)
         assertFalse(engine.publication.value === published)
@@ -168,8 +183,13 @@ class TimelineExactCanonicalWriterTest {
         }
         assertEquals(0, store.rows.size)
         assertEquals(0L, engine.publication.value.durableRevision)
-        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(message("typed"))))
+        val typed = message("typed")
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(typed)))
         assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
+        // The rejected raw frame consumed neither the fence nor the turn's settlement revision.
+        assertEquals(0, store.rows.size)
+        assertEquals(1L, engine.live.value?.settlementRevision)
+        assertEquals(TimelineEnginePageOutcome.Applied, reconcile(engine, selection, record(typed)))
         assertEquals(1, store.rows.size)
     }
 
@@ -181,7 +201,10 @@ class TimelineExactCanonicalWriterTest {
         val prior = message("visible history")
         engine.ingest(fence, TimelineStreamFrame.Message(prior))
         engine.ingest(fence, TimelineStreamFrame.Done)
+        // Streamed rows are not history until the sync writer commits them, so drive that first.
+        assertEquals(TimelineEnginePageOutcome.Applied, reconcile(engine, selection, record(prior)))
         val revision = engine.publication.value.durableRevision
+        assertEquals(1L, revision)
         val event = kotlin.test.assertNotNull(prior.toTimelineEvent(0.0))
         val pending = CanonicalPendingLocalStore(store)
         pending.save(scope, CanonicalPendingLocalStore.Record("send", "new prompt", emptyList(), "2026-09-09T00:00:00Z"))
@@ -201,6 +224,8 @@ class TimelineExactCanonicalWriterTest {
         val fragment = message("Hi").copy(runId = "run")
         assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(fragment)))
         assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
+        // An abandoned tail is only suppressible once the sync path has made it durable.
+        assertEquals(TimelineEnginePageOutcome.Applied, reconcile(engine, selection, record(fragment)))
         val raw = store.rows.values.single().body.copyOf()
         assertEquals(1, engine.suppressAbandonedTail(selection, "run", null, "cancelled", emptySet()))
         assertEquals(1, store.rows.size)
@@ -214,20 +239,30 @@ class TimelineExactCanonicalWriterTest {
         }
     }
 
-    @Test fun nextTurnHandsOffCommittedOffTailBodyAndRejectsOldAcknowledgment() = runTest {
+    @Test fun nextTurnHandsOffSettledOffTailBodyAndRejectsOldAcknowledgment() = runTest {
         val store = Store()
         val engine = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
         val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
         val first = engine.beginLive(selection)
-        assertTrue(engine.ingest(first, TimelineStreamFrame.Message(message("first"))))
+        val firstMessage = message("first")
+        assertTrue(engine.ingest(first, TimelineStreamFrame.Message(firstMessage)))
         assertTrue(engine.ingest(first, TimelineStreamFrame.Done))
+        assertEquals(TimelineEnginePageOutcome.Applied, reconcile(engine, selection, record(firstMessage)))
         val firstBody = store.rows.values.single().body.copyOf()
         val second = engine.beginLive(selection)
+        // Starting the next turn drops the finished overlay; its acknowledgment can never land.
         assertFalse(engine.acknowledgeSettlement(first, mapOf(TimelineMessageId("id") to 1L)))
-        assertTrue(engine.ingest(second, TimelineStreamFrame.Message(message("second").copy(id = "second", otid = "second"))))
+        val secondMessage = message("second").copy(id = "second", otid = "second")
+        assertTrue(engine.ingest(second, TimelineStreamFrame.Message(secondMessage)))
         kotlin.test.assertContentEquals(firstBody, store.rows.values.single().body)
         assertTrue(engine.ingest(second, TimelineStreamFrame.Done))
+        // The new turn settles one past the revision the previous turn already committed.
+        assertEquals(2L, engine.live.value?.settlementRevision)
+        assertEquals(TimelineEnginePageOutcome.Applied,
+            reconcile(engine, selection, record(firstMessage), record(secondMessage)))
         assertEquals(2, store.rows.size)
+        kotlin.test.assertContentEquals(firstBody,
+            store.rows.getValue(store.rows.keys.single { it.identity == TimelineMessageId("id") }).body)
         assertFalse(engine.acknowledgeSettlement(first, mapOf(TimelineMessageId("id") to 2L)))
         assertEquals(second, engine.live.value?.fence)
         assertTrue(engine.acknowledgeSettlement(second, mapOf(TimelineMessageId("second") to 2L)))
@@ -244,10 +279,14 @@ class TimelineExactCanonicalWriterTest {
                 releaseRepair.await()
                 assertEquals(TimelineContinuation.Initial, request.continuation)
                 return TimelineRemotePageResult.Page(request.requestId, request.selectionGeneration,
-                    listOf(TimelineRemoteRecord(TimelineMessageId("echo"), com.letta.mobile.data.model.UserMessage(
-                        id = "echo", contentRaw = kotlinx.serialization.json.JsonPrimitive("question"),
-                        date = "2026-01-01T00:00:00Z", otid = "pending-user", seqId = repairSequence,
-                    ), 0)), null, false, 0)
+                    listOf(
+                        TimelineRemoteRecord(TimelineMessageId("echo"), com.letta.mobile.data.model.UserMessage(
+                            id = "echo", contentRaw = kotlinx.serialization.json.JsonPrimitive("question"),
+                            date = "2026-01-01T00:00:00Z", otid = "pending-user", seqId = repairSequence,
+                        ), 0),
+                        // The streamed reply is durable only through this path now.
+                        TimelineRemoteRecord(TimelineMessageId("id"), message("hello"), 0),
+                    ), null, false, 0)
             }
             override suspend fun sendConversationMessage(
                 conversationId: String, request: com.letta.mobile.data.model.MessageCreateRequest,
@@ -295,23 +334,25 @@ class TimelineExactCanonicalWriterTest {
         external.turnEnded(scope.agentId, scope.conversationId, clean = false)
         assertEquals(listOf("start:run:turn", "cleanup:cancelled", "repair:10:null", "end:false"), calls)
         assertEquals(null, owner.session.live.value)
-        assertEquals(1, store.rows.size)
-        val durableBody = store.rows.values.single().body.copyOf()
-        assertEquals(3L, store.current.revision)
+        // Live ingest is not a writer: only the two pending-send revisions are durable so far.
+        assertEquals(0, store.rows.size)
+        assertEquals(2L, store.current.revision)
         assertFalse(coordinator.ingest(owner, fence, TimelineStreamFrame.Done))
         assertTrue(coordinator.retire(owner))
         val reopened = coordinator.acquire(scope)
-        val page = reopened.session.engine.load(reopened.selection, TimelineReadPosition.Tail, 1)
-        kotlin.test.assertContentEquals(durableBody, page.bodies.single())
-        assertEquals(3L, reopened.session.publication.value.durableRevision)
-        assertEquals(1, store.rows.size)
+        assertEquals(2L, reopened.session.publication.value.durableRevision)
+        assertEquals(listOf("pending-user"), reopened.session.pending.value.map { it.otid })
+        // The reply reaches the ledger only through this path, concurrently with retirement attempts.
         val repair = async { coordinator.reconcileRecentDetailed(reopened) }
         repairStarted.await()
         assertFalse(coordinator.retire(reopened))
         releaseRepair.complete(Unit)
-        assertEquals(TimelineEngineReconcileResult(TimelineEnginePageOutcome.Applied, appended = 1), repair.await())
-        assertEquals(TimelineEngineReconcileResult(TimelineEnginePageOutcome.Applied, appended = 0), coordinator.reconcileRecentDetailed(reopened))
+        assertEquals(TimelineEngineReconcileResult(TimelineEnginePageOutcome.Applied, appended = 2), repair.await())
         assertEquals(emptyList(), reopened.session.pending.value)
+        val durableBody = store.rows.getValue(
+            store.rows.keys.single { it.identity == TimelineMessageId("id") },
+        ).body.copyOf()
+        assertEquals(TimelineEngineReconcileResult(TimelineEnginePageOutcome.Applied, appended = 0), coordinator.reconcileRecentDetailed(reopened))
         assertEquals(2, store.rows.size)
         assertTrue(store.current.hasMore)
         assertEquals(TimelineContinuation.Initial, store.current.continuation)
@@ -354,6 +395,11 @@ class TimelineExactCanonicalWriterTest {
         }
         assertEquals(emptyList(), failures)
         assertTrue(coordinator.retire(reopened))
+        // Retiring the owner never discards settled history; the reacquired ledger still serves it.
+        val revived = coordinator.acquire(scope)
+        val tail = revived.session.engine.load(revived.selection, TimelineReadPosition.Tail, 2)
+        assertTrue(tail.bodies.any { it.contentEquals(durableBody) })
+        assertTrue(coordinator.retire(revived))
     }
 
     @Test fun userEchoConfirmsPendingAtomicallyIncludingReplay() = runTest {
@@ -485,19 +531,21 @@ class TimelineExactCanonicalWriterTest {
         assertEquals(28_001, store.rows.size)
     }
 
-    @Test fun aliasedSettlementAcknowledgesCanonicalIdentity() = runTest {
+    @Test fun publishedBlockSettlesOnlyWhenItsCommittedRevisionIsResident() = runTest {
         val store = Store()
-        val writer = TimelineExactCanonicalWriter(scope, 100_000)
-        val canonical = message("hello").toTimelineEvent(0.0)!!.copy(serverId = "canonical")
-        store.transaction(scope) { writer.mergeEvent(this, canonical); nextRevision() }
-        val engine = CanonicalTimelineEngine(store, writer, enabled = true)
+        val engine = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
         val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
         val fence = engine.beginLive(selection)
-        engine.publishLive(fence, TimelineLiveBlock(listOf(TimelineRemoteRecord(TimelineMessageId("id"), message("hello"), 0)), true))
+        // publishLive is a sync-side path: it commits, and names the revision it committed.
+        assertTrue(engine.publishLive(fence, TimelineLiveBlock(listOf(record(message("hello"))), true)))
         val revision = engine.publication.value.durableRevision
-        assertFalse(engine.acknowledgeSettlement(fence, mapOf(TimelineMessageId("id") to revision)))
-        assertTrue(engine.acknowledgeSettlement(fence, mapOf(TimelineMessageId("canonical") to revision)))
+        assertEquals(1L, revision)
         assertEquals(1, store.rows.size)
+        // The block carries rows, so it drains on ledger progress rather than settling immediately.
+        assertFalse(engine.acknowledgeSettlement(fence, emptyMap()))
+        assertFalse(engine.acknowledgeSettlement(fence, mapOf(TimelineMessageId("id") to revision - 1)))
+        assertTrue(engine.acknowledgeSettlement(fence, mapOf(TimelineMessageId("id") to revision)))
+        assertEquals(null, engine.live.value)
     }
 
     @Test fun oversizedHistoricalMergeRollsBackWithoutLosingRetry() = runTest {
@@ -551,10 +599,10 @@ class TimelineExactCanonicalWriterTest {
         val store = Store()
         val entered = kotlinx.coroutines.CompletableDeferred<Unit>()
         val release = kotlinx.coroutines.CompletableDeferred<Unit>()
-        val coordinator = CanonicalTimelineCoordinator(store, PageTransport {
+        val coordinator = CanonicalTimelineCoordinator(store, PageTransport(barrier = {
             entered.complete(Unit)
             release.await()
-        })
+        }))
         val owner = coordinator.acquire(scope)
         val failures = mutableListOf<Throwable>()
         val maintenance = IndexedCanonicalTimelineMaintenance(coordinator, this, { _, _, _ -> error("unexpected cursor") }, { failures += it })
@@ -574,25 +622,39 @@ class TimelineExactCanonicalWriterTest {
         assertFalse(coordinator.retire(owner))
     }
 
-    @Test fun attachedCommittedOverlayHandsOffBeforeRepairAndNextTurn() = runTest {
+    @Test fun attachedSettledOverlayDrainsOnSyncWriteBeforeRepairAndNextTurn() = runTest {
         val store = Store()
-        val coordinator = CanonicalTimelineCoordinator(store, PageTransport {})
+        val remote = mutableListOf<TimelineRemoteRecord>()
+        val coordinator = CanonicalTimelineCoordinator(store, PageTransport({}, { remote.toList() }))
         val owner = coordinator.acquire(scope)
         val presentation = kotlin.test.assertNotNull(coordinator.attach(owner))
         val first = coordinator.beginLive(owner)
-        coordinator.ingest(owner, first, TimelineStreamFrame.Message(message("durable off-tail")))
+        val firstMessage = message("durable off-tail")
+        coordinator.ingest(owner, first, TimelineStreamFrame.Message(firstMessage))
         coordinator.ingest(owner, first, TimelineStreamFrame.Done)
-        val bytes = store.rows.values.single().body.copyOf()
+        // While a viewport is attached the overlay is the turn's only copy, and nothing is durable.
+        assertEquals(0, store.rows.size)
         assertEquals(first, owner.session.live.value?.fence)
+        remote += TimelineRemoteRecord(TimelineMessageId(firstMessage.id), firstMessage, 0)
         assertEquals(TimelineEnginePageOutcome.Applied, coordinator.reconcileRecent(owner))
-        assertEquals(null, owner.session.live.value)
+        assertEquals(1, store.rows.size)
         assertEquals(1L, owner.session.publication.value.durableRevision)
+        val bytes = store.rows.values.single().body.copyOf()
+        // Repair no longer force-releases; only an acknowledged resident revision drains the overlay.
+        assertEquals(first, owner.session.live.value?.fence)
+        assertFalse(coordinator.acknowledgeSettlement(owner, first, mapOf(TimelineMessageId("id") to 0L)))
+        assertTrue(coordinator.acknowledgeSettlement(owner, first, mapOf(TimelineMessageId("id") to 1L)))
+        assertEquals(null, owner.session.live.value)
         kotlin.test.assertContentEquals(bytes, store.rows.values.single().body)
         val next = coordinator.beginLive(owner)
-        coordinator.ingest(owner, next, TimelineStreamFrame.Message(message("next").copy(id = "next", otid = "next")))
+        val nextMessage = message("next").copy(id = "next", otid = "next")
+        coordinator.ingest(owner, next, TimelineStreamFrame.Message(nextMessage))
         assertFalse(coordinator.acknowledgeSettlement(owner, first, mapOf(TimelineMessageId("id") to 1L)))
         assertEquals(next, owner.session.live.value?.fence)
         coordinator.ingest(owner, next, TimelineStreamFrame.Done)
+        remote += TimelineRemoteRecord(TimelineMessageId(nextMessage.id), nextMessage, 0)
+        assertEquals(TimelineEnginePageOutcome.Applied, coordinator.reconcileRecent(owner))
+        assertTrue(coordinator.acknowledgeSettlement(owner, next, mapOf(TimelineMessageId("next") to 2L)))
         coordinator.detach(presentation)
         val maintenance = IndexedCanonicalTimelineMaintenance(coordinator, this, { _, _, _ -> error("unexpected cursor") }, { throw it })
         repeat(2) {
@@ -605,10 +667,48 @@ class TimelineExactCanonicalWriterTest {
         assertEquals(2, store.rows.size)
     }
 
-    private class PageTransport(private val barrier: suspend () -> Unit) : TimelineTransport {
+    /** Live ingest writes nothing, so a settled row exists only once this path has run. */
+    @Test fun reconcileRefusesMidStreamThenServesTheSettledTurn() = runTest {
+        val store = Store()
+        val engine = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
+        val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
+        val reply = message("hello")
+        val fence = engine.beginLive(selection)
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(reply)))
+        // Mid-stream the turn is still being reduced, so the sync writer must not commit under it.
+        assertEquals(TimelineEnginePageOutcome.NoProgress, reconcile(engine, selection, record(reply)))
+        assertEquals(0, store.rows.size)
+        assertEquals(0L, engine.publication.value.durableRevision)
+        // Once the turn is settled the fence is still held, but refusing here would strand the reply:
+        // this path is now its only route to durability.
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
+        assertEquals(TimelineEnginePageOutcome.Applied, reconcile(engine, selection, record(reply)))
+        assertEquals(1, store.rows.size)
+        assertTrue(engine.acknowledgeSettlement(fence, mapOf(TimelineMessageId("id") to 1L)))
+    }
+
+    private suspend fun reconcile(
+        engine: CanonicalTimelineEngine,
+        selection: TimelineEngineSelection,
+        vararg records: TimelineRemoteRecord,
+    ): TimelineEnginePageOutcome {
+        val request = engine.beginReconcile(selection)
+        return engine.reconcilePage(request, TimelineRemotePageResult.Page(
+            request.remote.requestId, selection.generation, records.toList(), null, false, 0,
+        ))
+    }
+
+    private fun record(message: com.letta.mobile.data.model.LettaMessage) =
+        TimelineRemoteRecord(TimelineMessageId(message.id), message, 0)
+
+    private class PageTransport(
+        private val barrier: suspend () -> Unit,
+        // The sync page is the only durable writer, so tests supply the rows it is expected to commit.
+        private val records: () -> List<TimelineRemoteRecord> = { emptyList() },
+    ) : TimelineTransport {
         override suspend fun listConversationMessagePage(request: TimelineRemotePageRequest, progress: TimelinePageProgress?): TimelineRemotePageResult {
             barrier()
-            return TimelineRemotePageResult.Page(request.requestId, request.selectionGeneration, emptyList(), null, false, 0)
+            return TimelineRemotePageResult.Page(request.requestId, request.selectionGeneration, records(), null, false, 0)
         }
         override suspend fun sendConversationMessage(conversationId: String, request: com.letta.mobile.data.model.MessageCreateRequest): kotlinx.coroutines.flow.Flow<com.letta.mobile.data.model.LettaMessage> = error("unexpected send")
         override suspend fun streamConversation(conversationId: String): kotlinx.coroutines.flow.Flow<TimelineStreamFrame> = error("unexpected stream")
