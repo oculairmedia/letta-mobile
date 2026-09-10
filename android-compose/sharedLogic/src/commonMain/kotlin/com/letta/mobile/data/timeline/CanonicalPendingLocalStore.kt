@@ -55,19 +55,90 @@ class CanonicalPendingLocalStore(private val store: TimelineBoundedStore) {
                 }
                 return@transaction
             }
-            writePending(previous + record)
+            // At most one failed send is worth keeping, and only the newest one. Sending again is
+            // the ordinary way a user abandons the last failure, so a new attempt supersedes it
+            // rather than stacking another permanent bubble beneath the conversation.
+            writePending(previous.filterNot { it.delivery == Delivery.Failed } + record)
             nextRevision()
         }
+    }
+
+    /**
+     * Retire sends whose echo never came. `Sent` means the transport accepted the message and the
+     * server echo will remove the record; if that echo is long overdue the send has demonstrably
+     * lost it, and leaving the record `Sent` makes it immortal — it is neither superseded by a new
+     * attempt nor dismissible. Past the horizon it becomes an ordinary failure, so the newest-only
+     * rule applies to it like any other. A send still within the horizon is left alone.
+     */
+    suspend fun retireLostEchoes(
+        scope: TimelineScope,
+        loaded: List<Record>,
+        now: TimelineInstant = timelineNow(),
+        horizonMillis: Long = LOST_ECHO_HORIZON_MILLIS,
+    ): Int {
+        require(horizonMillis > 0)
+        // Callers already hold a freshly loaded list, so decide from that: refresh runs on ordinary
+        // traffic and must not bill a read, a commit and a revision when nothing is stale.
+        fun stale(records: List<Record>) = records.filter { record ->
+            record.delivery == Delivery.Sent && overdue(record.sentAt, now, horizonMillis)
+        }
+        if (stale(loaded).isEmpty()) return 0
+        return store.transaction(scope) {
+            val previous = readPending()
+            val stale = stale(previous)
+            if (stale.isEmpty()) return@transaction 0
+            val newestStale = stale.last().otid
+            val next = previous.mapNotNull { record ->
+                when {
+                    record.otid !in stale.map { it.otid } -> record.takeUnless { it.delivery == Delivery.Failed }
+                    record.otid == newestStale -> record.copy(delivery = Delivery.Failed)
+                    else -> null
+                }
+            }
+            writePending(next)
+            nextRevision()
+            stale.size
+        }
+    }
+
+    /** An unparsable timestamp is not evidence of staleness, so such a record is left alone. */
+    private fun overdue(sentAt: String, now: TimelineInstant, horizonMillis: Long): Boolean {
+        val sent = runCatching { parseTimelineInstant(sentAt) }.getOrNull() ?: return false
+        return timelineInstantDurationMillis(sent, now) >= horizonMillis
     }
 
     suspend fun mark(scope: TimelineScope, otid: String, delivery: Delivery) {
         store.transaction(scope) {
             val previous = readPending()
-            val next = previous.map { if (it.otid == otid) it.copy(delivery = delivery) else it }
+            val marked = previous.map { if (it.otid == otid) it.copy(delivery = delivery) else it }
+            // Only the newest failure survives; an older one has already been superseded.
+            val next = if (delivery == Delivery.Failed) {
+                marked.filterNot { it.delivery == Delivery.Failed && it.otid != otid }
+            } else {
+                marked
+            }
             if (next != previous) {
                 writePending(next)
                 nextRevision()
             }
+        }
+    }
+
+    /**
+     * Drop a send the user has given up on. An absent echo is never confirmation, so nothing else
+     * removes a pending record; without this a permanently failed send is durable forever and the
+     * bubble it draws can never be dismissed. Only a failed record qualifies: one still in flight,
+     * or already accepted by the transport, may still be echoed.
+     */
+    suspend fun discardFailed(scope: TimelineScope, otid: String): Boolean {
+        require(otid.isNotBlank())
+        return store.transaction(scope) {
+            val previous = readPending()
+            val target = previous.firstOrNull { it.otid == otid }
+            if (target == null || target.delivery != Delivery.Failed) return@transaction false
+            writePending(previous.filterNot { it.otid == otid })
+            nextRevision()
+            true
         }
     }
 
@@ -117,6 +188,9 @@ class CanonicalPendingLocalStore(private val store: TimelineBoundedStore) {
         require(bytes.size <= MAX_BYTES) { "Pending byte budget exceeded" }
         if (records.isEmpty()) deleteEvidence(KEY) else putEvidence(KEY, bytes)
     }
+
+        /** Long enough that a slow but live send is never retired, short enough to not linger. */
+        const val LOST_ECHO_HORIZON_MILLIS = 5L * 60L * 1000L
 
         private const val KEY = "pending/local/v1"
         const val MAX_RECORDS = 64
