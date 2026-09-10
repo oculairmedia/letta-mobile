@@ -1394,7 +1394,10 @@ class ChatSendCoordinator(
         frameConversationId: String?,
     ): Boolean {
         val tagged = frameConversationId ?: return true
-        return tagged == state.conversationId
+        val targetConv = state.localConversationId ?: state.conversationId
+        return tagged == targetConv ||
+            tagged == state.serverConversationId ||
+            resolveConversationId(tagged) == targetConv
     }
 
     /**
