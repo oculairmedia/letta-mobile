@@ -530,6 +530,42 @@ class TimelineExactCanonicalWriterTest {
         assertEquals(null, engine.live.value)
     }
 
+    @Test fun reconcileAdoptsTheCommittedIdentityForAStreamedReplyThatSharesNoId() = runTest {
+        // The shape observed on device: the stream names the reply cm-stream-* and derives its otid
+        // from that id, the server names it ui-msg-* and derives its otid from ITS id. Nothing links
+        // them, so without adoption the overlay and the settled row both stay on screen and the
+        // reply is visible twice. This page is the one moment both names are in hand.
+        val streamedId = "cm-stream-provider-assistant-0-75ab1210"
+        val committedId = "ui-msg-9154136"
+        val engine = CanonicalTimelineEngine(Store(), TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
+        val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
+        val fence = engine.beginLive(selection)
+        val reply = AssistantMessage(
+            id = streamedId, contentRaw = kotlinx.serialization.json.JsonPrimitive("Hey. What's up?"),
+            date = "2026-01-01T00:00:00Z",
+        )
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(reply)))
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
+        val settlement = kotlin.test.assertNotNull(engine.live.value?.settlementRevision)
+        val presented = mapOf(TimelineMessageId(committedId) to settlement)
+        // Nothing links the two names yet, so the settled row cannot settle the turn.
+        assertFalse(kotlin.test.assertNotNull(engine.live.value).isSettled(presented))
+
+        val committed = AssistantMessage(
+            id = committedId, contentRaw = kotlinx.serialization.json.JsonPrimitive("Hey. What's up?"),
+            date = "2026-01-01T00:00:00Z",
+        )
+        assertEquals(TimelineEnginePageOutcome.Applied, reconcile(engine, selection, record(committed)))
+
+        // Reconcile saw both names at once and adopted the committed one, so the overlay drains.
+        val live = kotlin.test.assertNotNull(engine.live.value)
+        assertEquals(mapOf(streamedId to TimelineMessageId(committedId)), live.aliases)
+        assertTrue(live.isSettled(presented))
+        assertEquals(emptyList(), live.overlayEvents(presented))
+        assertTrue(engine.acknowledgeSettlement(fence, presented))
+        assertEquals(null, engine.live.value)
+    }
+
     @Test fun streamedAssistantIdIsAliasedToItsCanonicalIdentityWhateverItsShape() = runTest {
         val store = Store()
         // The turn already has a canonical identity, recorded against the otid the stream carries.
