@@ -182,7 +182,7 @@ private fun Timeline.mergeViaLegacyAssistantHeuristics(
 }
 
 
-private const val CONTENT_FALLBACK_RECENCY_MS = 2 * 60 * 1000L
+internal const val CONTENT_FALLBACK_RECENCY_MS = 2 * 60 * 1000L
 
 private fun Timeline.replaceEventAt(index: Int, event: TimelineEvent.Confirmed): Timeline {
     val updated = events.toMutableList()

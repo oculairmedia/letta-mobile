@@ -279,4 +279,279 @@ class TimelineHydrationReducerTest {
         val confirmed = result.timeline.events.filterIsInstance<TimelineEvent.Confirmed>()
         assertEquals(2, confirmed.size)
     }
+
+    // letta-mobile-x13xi.13.1.1: SENDING Local USER messages must be replaced
+    // (not preserved alongside) when the server snapshot contains a USER
+    // message with matching content within the recency window — even when
+    // the server's otid differs from the local otid. Without this, cold
+    // hydration re-introduces a duplicate bubble and the original SENDING
+    // row stays stuck forever (no later stream event references the local
+    // otid, so markSent never fires).
+
+    @Test
+    fun `x13xi_13_1_1 hydration replaces sending local user when server snapshot echoes with different otid`() {
+        val sentAt = Instant.parse("2026-09-09T10:00:00Z")
+        val local = TimelineEvent.Local(
+            position = 1.0,
+            otid = "local-A",
+            content = "hi",
+            role = Role.USER,
+            sentAt = sentAt,
+            deliveryState = DeliveryState.SENDING,
+        )
+
+        val result = TimelineHydrationReducer.reduce(
+            conversationId = "conversation-1",
+            serverMessagesChronological = listOf(
+                UserMessage(
+                    id = "server-B",
+                    contentRaw = JsonPrimitive("hi"),
+                    date = "2026-09-09T10:00:30Z",
+                    otid = "server-OTID-B",
+                ),
+            ),
+            timelineBeforeFetch = Timeline("conversation-1"),
+            currentTimeline = Timeline("conversation-1", events = persistentListOf(local)),
+            diskRecords = emptyList(),
+        )
+
+        assertEquals(
+            "Server snapshot must replace the SENDING Local; no duplicate row",
+            1,
+            result.timeline.events.size,
+        )
+        val row = result.timeline.events.single()
+        assertTrue(
+            "Surviving row must be Confirmed (not a Local still in SENDING): ${row::class.simpleName}",
+            row is TimelineEvent.Confirmed,
+        )
+        val confirmed = row as TimelineEvent.Confirmed
+        assertEquals(TimelineMessageType.USER, confirmed.messageType)
+        assertEquals("server-B", confirmed.serverId)
+        assertEquals(
+            "No row in the surviving timeline may carry SENDING delivery state",
+            0,
+            result.timeline.events
+                .filterIsInstance<TimelineEvent.Local>()
+                .count { it.deliveryState == DeliveryState.SENDING },
+        )
+    }
+
+    @Test
+    fun `x13xi_13_1_1 hydration preserves sending local when no server user snapshot arrives`() {
+        // Cold-start offline case: the user was offline when they sent, and the
+        // server snapshot returns no USER message for this content. The Local
+        // must be preserved unchanged — current behavior must not regress.
+        val local = TimelineEvent.Local(
+            position = 1.0,
+            otid = "local-A",
+            content = "hi",
+            role = Role.USER,
+            sentAt = Instant.parse("2026-09-09T10:00:00Z"),
+            deliveryState = DeliveryState.SENDING,
+        )
+
+        val result = TimelineHydrationReducer.reduce(
+            conversationId = "conversation-1",
+            serverMessagesChronological = emptyList(),
+            timelineBeforeFetch = Timeline("conversation-1"),
+            currentTimeline = Timeline("conversation-1", events = persistentListOf(local)),
+            diskRecords = emptyList(),
+        )
+
+        assertEquals(1, result.timeline.events.size)
+        val row = result.timeline.events.single()
+        assertTrue(row is TimelineEvent.Local)
+        assertEquals("local-A", row.otid)
+        assertEquals(DeliveryState.SENDING, (row as TimelineEvent.Local).deliveryState)
+    }
+
+    @Test
+    fun `x13xi_13_1_1 hydration collapses sending local when server echoes with same otid`() {
+        // Direct otid hit (server preserves the local otid): the existing
+        // otid-only dedup at preservedEvents handles this. Must not regress.
+        val local = TimelineEvent.Local(
+            position = 1.0,
+            otid = "local-A",
+            content = "hi",
+            role = Role.USER,
+            sentAt = Instant.parse("2026-09-09T10:00:00Z"),
+            deliveryState = DeliveryState.SENDING,
+        )
+
+        val result = TimelineHydrationReducer.reduce(
+            conversationId = "conversation-1",
+            serverMessagesChronological = listOf(
+                UserMessage(
+                    id = "server-A",
+                    contentRaw = JsonPrimitive("hi"),
+                    date = "2026-09-09T10:00:30Z",
+                    otid = "local-A",
+                ),
+            ),
+            timelineBeforeFetch = Timeline("conversation-1"),
+            currentTimeline = Timeline("conversation-1", events = persistentListOf(local)),
+            diskRecords = emptyList(),
+        )
+
+        assertEquals(1, result.timeline.events.size)
+        val row = result.timeline.events.single()
+        assertTrue(
+            "Same-otid case must collapse to Confirmed, not preserve Local",
+            row is TimelineEvent.Confirmed,
+        )
+        assertEquals("server-A", (row as TimelineEvent.Confirmed).serverId)
+    }
+
+    @Test
+    fun `x13xi_13_1_1 hydration does NOT replace local when content differs even if recency matches`() {
+        // False-pass guard: a same-recency server USER message with DIFFERENT
+        // content is a distinct message and must NOT suppress the Local. We
+        // expect both rows to survive (Local + Confirmed), with the Local
+        // still in SENDING.
+        val local = TimelineEvent.Local(
+            position = 1.0,
+            otid = "local-A",
+            content = "hi",
+            role = Role.USER,
+            sentAt = Instant.parse("2026-09-09T10:00:00Z"),
+            deliveryState = DeliveryState.SENDING,
+        )
+
+        val result = TimelineHydrationReducer.reduce(
+            conversationId = "conversation-1",
+            serverMessagesChronological = listOf(
+                UserMessage(
+                    id = "server-B",
+                    contentRaw = JsonPrimitive("hello there"),
+                    date = "2026-09-09T10:00:30Z",
+                    otid = "server-OTID-B",
+                ),
+            ),
+            timelineBeforeFetch = Timeline("conversation-1"),
+            currentTimeline = Timeline("conversation-1", events = persistentListOf(local)),
+            diskRecords = emptyList(),
+        )
+
+        assertEquals(2, result.timeline.events.size)
+        val locals = result.timeline.events.filterIsInstance<TimelineEvent.Local>()
+        val confirmed = result.timeline.events.filterIsInstance<TimelineEvent.Confirmed>()
+        assertEquals(1, locals.size)
+        assertEquals(DeliveryState.SENDING, locals.single().deliveryState)
+        assertEquals(1, confirmed.size)
+        assertEquals("hello there", confirmed.single().content)
+    }
+
+    @Test
+    fun `x13xi_13_1_1 hydration does NOT replace local when content matches but recency is past the window`() {
+        // False-pass guard: same content, but the server USER message is far
+        // beyond the recency window (10 minutes vs the 2-minute threshold).
+        // The Local must remain so we don't rewrite a stale history with a
+        // server-side replay that happened minutes later for unrelated reasons.
+        val local = TimelineEvent.Local(
+            position = 1.0,
+            otid = "local-A",
+            content = "hi",
+            role = Role.USER,
+            sentAt = Instant.parse("2026-09-09T10:00:00Z"),
+            deliveryState = DeliveryState.SENDING,
+        )
+
+        val result = TimelineHydrationReducer.reduce(
+            conversationId = "conversation-1",
+            serverMessagesChronological = listOf(
+                UserMessage(
+                    id = "server-B",
+                    contentRaw = JsonPrimitive("hi"),
+                    date = "2026-09-09T10:10:00Z", // +10 minutes; > CONTENT_FALLBACK_RECENCY_MS (2 min)
+                    otid = "server-OTID-B",
+                ),
+            ),
+            timelineBeforeFetch = Timeline("conversation-1"),
+            currentTimeline = Timeline("conversation-1", events = persistentListOf(local)),
+            diskRecords = emptyList(),
+        )
+
+        assertEquals(2, result.timeline.events.size)
+        assertTrue(result.timeline.events.filterIsInstance<TimelineEvent.Local>().single()
+            .deliveryState == DeliveryState.SENDING)
+    }
+
+    @Test
+    fun `x13xi_13_1_1 hydration replaces SENT local as well as SENDING`() {
+        // Sanity: isPendingOrRestorable covers SENDING, SENT, and FAILED.
+        // A SENT Local (the request has been sent, waiting for the stream to
+        // observe markSent) must also collapse against a matching server USER.
+        val local = TimelineEvent.Local(
+            position = 1.0,
+            otid = "local-A",
+            content = "hi",
+            role = Role.USER,
+            sentAt = Instant.parse("2026-09-09T10:00:00Z"),
+            deliveryState = DeliveryState.SENT,
+        )
+
+        val result = TimelineHydrationReducer.reduce(
+            conversationId = "conversation-1",
+            serverMessagesChronological = listOf(
+                UserMessage(
+                    id = "server-B",
+                    contentRaw = JsonPrimitive("hi"),
+                    date = "2026-09-09T10:00:30Z",
+                    otid = "server-OTID-B",
+                ),
+            ),
+            timelineBeforeFetch = Timeline("conversation-1"),
+            currentTimeline = Timeline("conversation-1", events = persistentListOf(local)),
+            diskRecords = emptyList(),
+        )
+
+        assertEquals(1, result.timeline.events.size)
+        assertTrue(result.timeline.events.single() is TimelineEvent.Confirmed)
+    }
+
+    @Test
+    fun `x13xi_13_1_1 hydration asserts delivery state on the surviving row not just count`() {
+        // False-pass guard for the 'just count rows' trap. If the Local were
+        // re-inserted via a different code path (e.g. preserved into the
+        // runtimeAndDisk bucket after the replace filter), a pure
+        // size==1 assertion would still pass. Explicitly check that no row in
+        // the surviving timeline carries deliveryState == SENDING, and that
+        // the surviving row's otid is the server's, not the local's.
+        val local = TimelineEvent.Local(
+            position = 1.0,
+            otid = "local-A",
+            content = "hi",
+            role = Role.USER,
+            sentAt = Instant.parse("2026-09-09T10:00:00Z"),
+            deliveryState = DeliveryState.SENDING,
+        )
+
+        val result = TimelineHydrationReducer.reduce(
+            conversationId = "conversation-1",
+            serverMessagesChronological = listOf(
+                UserMessage(
+                    id = "server-B",
+                    contentRaw = JsonPrimitive("hi"),
+                    date = "2026-09-09T10:00:30Z",
+                    otid = "server-OTID-B",
+                ),
+            ),
+            timelineBeforeFetch = Timeline("conversation-1"),
+            currentTimeline = Timeline("conversation-1", events = persistentListOf(local)),
+            diskRecords = emptyList(),
+        )
+
+        val locals = result.timeline.events.filterIsInstance<TimelineEvent.Local>()
+        assertEquals(
+            "No Local row may survive once the server has accepted the message",
+            0,
+            locals.size,
+        )
+        val sending = result.timeline.events
+            .filterIsInstance<TimelineEvent.Local>()
+            .count { it.deliveryState == DeliveryState.SENDING }
+        assertEquals(0, sending)
+        assertEquals("server-OTID-B", result.timeline.events.single().otid)
+    }
 }
