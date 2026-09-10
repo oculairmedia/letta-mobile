@@ -109,7 +109,10 @@ class TimelineLiveOverlayDrainTest {
         val unrelated = mapOf(TimelineMessageId("unrelated-row") to SETTLEMENT)
         assertFalse(live.isSettled(unrelated))
         assertFalse(engine.acknowledgeSettlement(fence, unrelated))
+        // The turn stays live, but the engine caches the alias it had to read to decide that.
         val currentLive = assertNotNull(engine.live.value)
+        assertEquals(fence, currentLive.fence)
+        assertEquals(mapOf(synthesizedId to TimelineMessageId(canonicalId)), currentLive.aliases)
         assertFalse(currentLive.isSettled(unrelated))
         assertEquals(currentLive.block.events, currentLive.overlayEvents(unrelated))
 
@@ -127,6 +130,36 @@ class TimelineLiveOverlayDrainTest {
 
         // Engine resolves the alias from evidence, acknowledges settlement, and releases fence
         assertTrue(engine.acknowledgeSettlement(fence, presented))
+        assertEquals(null, engine.live.value)
+    }
+
+    @Test fun aliasedEventLeavesTheOverlayWhileTheRestOfTheTurnIsStillLive() = runTest {
+        // The double-render this guards against: the canonical row is on screen and the overlay is
+        // still showing the streamed copy of the same message. Draining must not wait for the fence.
+        val synthesizedId = "ui-msg-streamed"
+        val canonicalId = "msg-canonical"
+        val store = FixedStore(mapOf("identity/serverId/$synthesizedId" to canonicalId.encodeToByteArray()))
+        val engine = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
+        val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
+        val fence = engine.beginLive(selection)
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(message("hello", synthesizedId))))
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(message("world", "reply-2"))))
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
+        assertEquals(2, assertNotNull(engine.live.value).block.events.size)
+
+        // Only the aliased message has a settled row; the rest of the turn has not landed yet.
+        val presented = mapOf(TimelineMessageId(canonicalId) to SETTLEMENT)
+        assertFalse(engine.acknowledgeSettlement(fence, presented))
+
+        // The turn is still live, but the engine cached the alias, so the render path already
+        // drops the streamed copy: one message on screen, not two.
+        val live = assertNotNull(engine.live.value)
+        assertEquals(mapOf(synthesizedId to TimelineMessageId(canonicalId)), live.aliases)
+        assertEquals(listOf("reply-2"), live.overlayEvents(presented).map { it.serverId })
+
+        // The rest of the turn lands and the fence releases.
+        val complete = presented + (TimelineMessageId("reply-2") to SETTLEMENT)
+        assertTrue(engine.acknowledgeSettlement(fence, complete))
         assertEquals(null, engine.live.value)
     }
 

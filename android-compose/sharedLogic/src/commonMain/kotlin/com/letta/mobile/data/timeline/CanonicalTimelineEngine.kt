@@ -161,14 +161,26 @@ class CanonicalTimelineEngine(
         val current = mutableLive.value ?: return@withLock false
         if (current.fence !== fence) return@withLock false
         val nextAliases = resolveAliases(fence.selection.scope, current, presented)
-        val active = if (nextAliases.isNotEmpty() && nextAliases != current.aliases) {
-            current.copy(aliases = current.aliases + nextAliases).also { mutableLive.value = it }
-        } else current
+        val active = if (nextAliases.isEmpty()) current
+        else current.copy(aliases = current.aliases + nextAliases).also { mutableLive.value = it }
         if (!active.isSettled(presented)) return@withLock false
         mutableLive.value = null
         liveFence = null
         liveReduction = null
         true
+    }
+
+    /**
+     * The sync writer's commit is the first moment alias evidence exists for this turn, so this
+     * runs there rather than at the terminal frame: at Done the durable row has not been written
+     * and there is nothing yet to resolve against.
+     */
+    private suspend fun attachResolvedAliases(scope: TimelineScope) {
+        val live = mutableLive.value ?: return
+        if (live.settlementRevision == null) return
+        val aliases = resolveAliases(scope, live, emptyMap())
+        if (aliases.isEmpty()) return
+        mutableLive.value = live.copy(aliases = live.aliases + aliases)
     }
 
     private suspend fun resolveAliases(
@@ -179,9 +191,10 @@ class CanonicalTimelineEngine(
         // Alias evidence requires the exact canonical writer. Fallback writers without exact
         // canonical indexing rely on matching event identities directly or the strand guard.
         val exact = writer as? TimelineExactCanonicalWriter ?: return emptyMap()
+        // An alias never changes once recorded, so a known one is never re-read. Events already
+        // resident under their own id need no alias at all.
         val missing = publication.block.events.filter { event ->
-            val alias = publication.aliases[event.serverId]
-            (alias == null || alias !in presented) && TimelineMessageId(event.serverId) !in presented
+            event.serverId !in publication.aliases && TimelineMessageId(event.serverId) !in presented
         }
         if (missing.isEmpty()) return emptyMap()
         val aliases = mutableMapOf<String, TimelineMessageId>()
@@ -302,13 +315,7 @@ class CanonicalTimelineEngine(
             (if (changed) nextRevision() else checkpoint().revision) to appended
         }
         mutablePublication.value = TimelineEnginePublication(request.selection, revision)
-        val live = mutableLive.value
-        if (live != null && live.settlementRevision != null) {
-            val aliases = resolveAliases(request.selection.scope, live, emptyMap())
-            if (aliases.isNotEmpty() && aliases != live.aliases) {
-                mutableLive.value = live.copy(aliases = live.aliases + aliases)
-            }
-        }
+        attachResolvedAliases(request.selection.scope)
         pendingReconcile = null
         TimelineEngineReconcileResult(TimelineEnginePageOutcome.Applied, appended,
             page.records.mapNotNull { it.message.seqId?.toLong() }.maxOrNull())

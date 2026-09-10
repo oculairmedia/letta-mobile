@@ -79,7 +79,7 @@ class CanonicalTimelinePresentationTest {
         assertTrue(coordinator.retire(owner))
     }
 
-    @Test fun aliasedAssistantReplyDrainsWithoutDoubleRenderingWhenCanonicalRowIsResident() = runTest {
+    @Test fun aliasedAssistantReplyDrainsWhenTheCanonicalRowBecomesResident() = runTest {
         val store = EmptyStore()
         store.putEvidence("identity/serverId/ui-msg-reply", "reply-canonical".encodeToByteArray())
         val coordinator = CanonicalTimelineCoordinator(store, NoTransport)
