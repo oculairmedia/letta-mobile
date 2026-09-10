@@ -116,25 +116,19 @@ class TimelineExactCanonicalWriter(
         mergedOtid: String,
         identity: TimelineMessageId,
     ): Boolean {
-        var indexed = false
-        if (incoming.otid.isNotBlank() && incoming.otid != mergedOtid) {
-            indexed = observeIdentityAlias("identity/otid/${incoming.otid}", identity) || indexed
+        val keys = buildList {
+            if (incoming.otid.isNotBlank() && incoming.otid != mergedOtid) add("identity/otid/${incoming.otid}")
+            if (incoming.messageType == TimelineMessageType.ASSISTANT && incoming.serverId.startsWith("ui-msg-") &&
+                incoming.serverId != identity.value
+            ) add("identity/serverId/${incoming.serverId}")
         }
-        if (incoming.messageType == TimelineMessageType.ASSISTANT && incoming.serverId.startsWith("ui-msg-") &&
-            incoming.serverId != identity.value
-        ) {
-            indexed = observeIdentityAlias("identity/serverId/${incoming.serverId}", identity) || indexed
+        var indexed = false
+        for (key in keys) {
+            if (evidence(key, 64 * 1024)?.decodeToString() == identity.value) continue
+            putEvidence(key, identity.value.encodeToByteArray())
+            indexed = true
         }
         return indexed
-    }
-
-    private suspend fun TimelineStoreTransaction.observeIdentityAlias(
-        evidenceKey: String,
-        canonicalIdentity: TimelineMessageId,
-    ): Boolean {
-        if (evidence(evidenceKey, 64 * 1024)?.decodeToString() == canonicalIdentity.value) return false
-        putEvidence(evidenceKey, canonicalIdentity.value.encodeToByteArray())
-        return true
     }
 
     private suspend fun canonicalEventIdentity(reader: TimelineStoreReader, event: TimelineEvent.Confirmed): TimelineMessageId {
