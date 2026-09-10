@@ -258,6 +258,26 @@ class ChatSendCoordinator(
      * Ordering safety: if TurnStarted arrived before the UserMessage echo, any orphan state
      * created under [serverConversationId] is re-keyed and merged into the originating state.
      */
+    /**
+     * The turn announced itself under a name we had not seen and opened its own state there. Fold
+     * what that state recorded into the real one before it is discarded, so nothing the orphan
+     * already observed - a stop reason, a buffered error, delivered content - is lost with it.
+     */
+    private fun ConversationTurnState.absorbOrphanLocked(
+        orphan: ConversationTurnState,
+        turnId: String?,
+        runId: String?,
+    ) {
+        if (this.turnId == null) this.turnId = orphan.turnId ?: turnId
+        if (this.runId == null) this.runId = orphan.runId ?: runId
+        stopReason = stopReason ?: orphan.stopReason
+        usageRecorded = usageRecorded || orphan.usageRecorded
+        bufferedErrorMessage = bufferedErrorMessage ?: orphan.bufferedErrorMessage
+        bufferedErrorKind = bufferedErrorKind ?: orphan.bufferedErrorKind
+        deliveredAssistantContent = deliveredAssistantContent || orphan.deliveredAssistantContent
+        activeAssistantMessageRunIds.addAll(orphan.activeAssistantMessageRunIds)
+    }
+
     private fun bindInboundTurnByOtid(
         otid: String,
         serverConversationId: String?,
@@ -282,16 +302,11 @@ class ChatSendCoordinator(
                 // and opened an unlinked state under serverConversationId.
                 val orphan = turnStates.remove(serverConv)?.takeUnless { it === state }
                 if (orphan != null) {
-                    if (state.turnId == null) state.turnId = orphan.turnId ?: turnId
-                    if (state.runId == null) state.runId = orphan.runId ?: runId
-                    state.stopReason = state.stopReason ?: orphan.stopReason
-                    state.usageRecorded = state.usageRecorded || orphan.usageRecorded
-                    state.bufferedErrorMessage = state.bufferedErrorMessage ?: orphan.bufferedErrorMessage
-                    state.bufferedErrorKind = state.bufferedErrorKind ?: orphan.bufferedErrorKind
-                    state.deliveredAssistantContent = state.deliveredAssistantContent || orphan.deliveredAssistantContent
-                    state.activeAssistantMessageRunIds.addAll(orphan.activeAssistantMessageRunIds)
-                    if (state.turnId != null && state.runId != null) {
-                        state.identity.turnStarted(originatingConv, state.turnId!!, state.runId!!)
+                    state.absorbOrphanLocked(orphan, turnId, runId)
+                    val adoptedTurn = state.turnId
+                    val adoptedRun = state.runId
+                    if (adoptedTurn != null && adoptedRun != null) {
+                        state.identity.turnStarted(originatingConv, adoptedTurn, adoptedRun)
                     }
                     Telemetry.event(
                         "AdminChatVM", "ws.turnState.rekeyedByOtid",
@@ -994,6 +1009,27 @@ class ChatSendCoordinator(
         }
     }
 
+    /**
+     * Prefer the state the otid bound, then the state that owns this turn, then whatever the
+     * frame's conversation resolves to. The frame's own id is the last thing to trust: it is the
+     * server's name for the conversation, which is the mismatch this binding exists to absorb.
+     */
+    private fun deltaConversationId(
+        event: WsTimelineEvent.MessageDelta,
+        boundState: ConversationTurnState?,
+    ): String? {
+        val rawConv = event.conversationId
+        val aliasedConv = rawConv?.let { resolveConversationId(it) }
+        val state = boundState
+            ?: event.turnId?.let { liveStateForTurn(it) }
+            ?: (aliasedConv ?: rawConv)?.let { peekState(it) }
+        return state?.let { it.localConversationId ?: it.conversationId }
+            ?: aliasedConv
+            ?: rawConv
+            ?: lastActiveConversationId
+            ?: activeConversationId()
+    }
+
     private suspend fun handleMessageDelta(event: WsTimelineEvent.MessageDelta) {
         val otid = event.message.otid
         val boundState = if (otid != null && !event.isReplay) {
@@ -1006,16 +1042,7 @@ class ChatSendCoordinator(
         } else {
             null
         }
-        val rawConv = event.conversationId
-        val aliasedConv = rawConv?.let { resolveConversationId(it) }
-        val state = boundState
-            ?: (event.turnId?.let { liveStateForTurn(it) })
-            ?: (aliasedConv ?: rawConv)?.let { peekState(it) }
-        val conversationId = state?.let { it.localConversationId ?: it.conversationId }
-            ?: aliasedConv
-            ?: rawConv
-            ?: lastActiveConversationId
-            ?: activeConversationId()
+        val conversationId = deltaConversationId(event, boundState)
         Telemetry.event(
             "IrohGate", "gate3.coordinatorMessageDelta",
             "resolvedConversationId" to conversationId,
@@ -1527,6 +1554,47 @@ class ChatSendCoordinator(
         }
     }
 
+    /**
+     * The turn answered for this send, so its otid is settled: fence it against a replayed echo
+     * rebinding a finished turn, and record on the timeline how it ended.
+     */
+    private suspend fun settlePendingSend(
+        state: ConversationTurnState,
+        conversationId: String,
+        deadTurn: Boolean,
+    ) {
+        val otid = state.otid ?: return
+        retainSettledOtid(otid)
+        val localConversationId = state.localConversationId ?: conversationId
+        if (deadTurn) {
+            timelineRepository.markExternalTransportLocalFailed(agentId, localConversationId, otid)
+        } else {
+            timelineRepository.markExternalTransportLocalSent(agentId, localConversationId, otid)
+        }
+    }
+
+    /** Delivered-then-failed keeps whatever was already on screen: the user got their answer. */
+    private fun nextErrorFor(
+        state: ConversationTurnState,
+        status: BridgeTurnStatus,
+        deadTurn: Boolean,
+        terminalNotice: TurnFailureNotice?,
+    ): String? {
+        val stopReasonError = state.stopReason.equals("error", ignoreCase = true)
+        return when (status) {
+            BridgeTurnStatus.Completed -> state.bufferedErrorMessage
+                ?: if (stopReasonError) BARE_STOP_REASON_ERROR_MESSAGE else ui.currentError()
+            BridgeTurnStatus.Cancelled -> ui.currentError()
+            BridgeTurnStatus.Failed -> if (deadTurn) {
+                state.bufferedErrorMessage ?: terminalNotice?.message
+            } else {
+                ui.currentError()
+            }
+            is BridgeTurnStatus.Unknown -> state.bufferedErrorMessage
+                ?: if (stopReasonError) BARE_STOP_REASON_ERROR_MESSAGE else "Turn ended unexpectedly (${status.raw})"
+        }
+    }
+
     private suspend fun finishActiveTurn(
         state: ConversationTurnState,
         status: BridgeTurnStatus,
@@ -1595,30 +1663,8 @@ class ChatSendCoordinator(
         terminalNotice?.let { notice ->
             appendTurnFailureNotice(conversationId, runId, turnId, notice)
         }
-        state.otid?.let { otid ->
-            retainSettledOtid(otid)
-            val localConversationId = state.localConversationId ?: conversationId
-            if (deadTurn) {
-                timelineRepository.markExternalTransportLocalFailed(agentId, localConversationId, otid)
-            } else {
-                timelineRepository.markExternalTransportLocalSent(agentId, localConversationId, otid)
-            }
-        }
-        val stopReasonError = state.stopReason.equals("error", ignoreCase = true)
-        val nextError = when (status) {
-            BridgeTurnStatus.Completed -> state.bufferedErrorMessage
-                ?: if (stopReasonError) BARE_STOP_REASON_ERROR_MESSAGE else ui.currentError()
-            BridgeTurnStatus.Cancelled -> ui.currentError()
-            // Delivered-then-failed keeps whatever error state was already on
-            // screen (normally none) — the user got their answer.
-            BridgeTurnStatus.Failed -> if (deadTurn) {
-                state.bufferedErrorMessage ?: terminalNotice.message
-            } else {
-                ui.currentError()
-            }
-            is BridgeTurnStatus.Unknown -> state.bufferedErrorMessage
-                ?: if (stopReasonError) BARE_STOP_REASON_ERROR_MESSAGE else "Turn ended unexpectedly (${status.raw})"
-        }
+        settlePendingSend(state, conversationId, deadTurn)
+        val nextError = nextErrorFor(state, status, deadTurn, terminalNotice)
         // Finding 1: only the VISIBLE conversation's terminal may clear presence
         // or paint an error. A background conversation settles its own timeline
         // rows above and leaves the foreground alone.
