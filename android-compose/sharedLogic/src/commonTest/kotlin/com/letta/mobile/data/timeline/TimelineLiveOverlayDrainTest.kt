@@ -72,13 +72,13 @@ class TimelineLiveOverlayDrainTest {
         assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
         val live = assertNotNull(engine.live.value)
 
-        // Head ahead by less than STRAND_GUARD_REVISION_DELTA (32) does not trigger strand guard
-        val aheadClose = mapOf(TimelineMessageId("unrelated") to SETTLEMENT + 31)
+        // Head ahead by less than STRAND_GUARD_REVISION_DELTA (1024) does not trigger strand guard
+        val aheadClose = mapOf(TimelineMessageId("unrelated") to SETTLEMENT + 1023)
         assertFalse(live.isSettled(aheadClose))
         assertFalse(engine.acknowledgeSettlement(fence, aheadClose))
 
-        // Head ahead by >= 32 triggers strand guard
-        val aheadFar = mapOf(TimelineMessageId("unrelated") to SETTLEMENT + 32)
+        // Head ahead by >= 1024 triggers strand guard
+        val aheadFar = mapOf(TimelineMessageId("unrelated") to SETTLEMENT + 1024)
         assertTrue(live.isSettled(aheadFar))
         assertEquals(emptyList(), live.overlayEvents(aheadFar))
         assertTrue(engine.acknowledgeSettlement(fence, aheadFar))
@@ -86,21 +86,45 @@ class TimelineLiveOverlayDrainTest {
     }
 
     @Test fun assistantReplyWithAliasedUiMessageIdDrainsOnCanonicalIdentity() = runTest {
+        // In production: live event carries synthesized ui-msg-*, sync persists canonical msg-*
+        // and records evidence: identity/serverId/<ui-msg-*> -> <canonical-id>
+        val synthesizedId = "ui-msg-streamed"
+        val canonicalId = "msg-canonical"
         val evidenceMap = mapOf(
-            "identity/serverId/ui-msg-123" to "canonical-assistant-reply".encodeToByteArray(),
+            "identity/serverId/$synthesizedId" to canonicalId.encodeToByteArray(),
         )
         val store = FixedStore(evidenceMap)
         val engine = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
         val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
         val fence = engine.beginLive(selection)
-        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(message("hello", "canonical-assistant-reply"))))
+
+        // Live stream emits the reply with synthesized ui-msg-* id
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(message("hello", synthesizedId))))
         assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
         val live = assertNotNull(engine.live.value)
+        assertEquals(1, live.block.events.size)
+        assertEquals(synthesizedId, live.block.events[0].serverId)
 
-        // Paging presented the synthesized ui-msg-123 row
-        val presented = mapOf(TimelineMessageId("ui-msg-123") to SETTLEMENT)
+        // Unrelated resident rows do NOT settle the turn; overlay retains the event
+        val unrelated = mapOf(TimelineMessageId("unrelated-row") to SETTLEMENT)
+        assertFalse(live.isSettled(unrelated))
+        assertEquals(live.block.events, live.overlayEvents(unrelated))
+        assertFalse(engine.acknowledgeSettlement(fence, unrelated))
+        assertEquals(live, engine.live.value)
 
-        // Engine resolves presented via canonical identity evidence
+        // Paging presents the settled row carrying the canonical id
+        val presented = mapOf(TimelineMessageId(canonicalId) to SETTLEMENT)
+
+        // Without alias resolution, raw presented map does not match synthesized id
+        assertFalse(live.isSettled(presented))
+        assertEquals(live.block.events, live.overlayEvents(presented))
+
+        // With canonical alias resolved from evidence, isSettled is true and overlayEvents drains
+        val aliases = mapOf(synthesizedId to TimelineMessageId(canonicalId))
+        assertTrue(live.isSettled(presented, aliases))
+        assertEquals(emptyList(), live.overlayEvents(presented, aliases))
+
+        // Engine resolves the alias from evidence, acknowledges settlement, and releases fence
         assertTrue(engine.acknowledgeSettlement(fence, presented))
         assertEquals(null, engine.live.value)
     }

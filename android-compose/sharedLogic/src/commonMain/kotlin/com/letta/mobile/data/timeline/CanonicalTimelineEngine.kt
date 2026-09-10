@@ -160,62 +160,35 @@ class CanonicalTimelineEngine(
     ): Boolean = mutex.withLock {
         val current = mutableLive.value ?: return@withLock false
         if (current.fence !== fence) return@withLock false
-        val resolved = resolvePresented(fence.selection.scope, current, presented)
-        if (!current.isSettled(resolved)) return@withLock false
+        val aliases = resolveAliases(fence.selection.scope, current, presented)
+        if (!current.isSettled(presented, aliases)) return@withLock false
         mutableLive.value = null
         liveFence = null
         liveReduction = null
         true
     }
 
-    suspend fun resolvePresented(
-        fence: TimelineLiveFence,
-        presented: Map<TimelineMessageId, Long>,
-    ): Map<TimelineMessageId, Long> = mutex.withLock {
-        val current = mutableLive.value ?: return@withLock presented
-        if (current.fence !== fence) return@withLock presented
-        resolvePresented(fence.selection.scope, current, presented)
-    }
-
-    private suspend fun resolvePresented(
+    private suspend fun resolveAliases(
         scope: TimelineScope,
         publication: TimelineLivePublication,
         presented: Map<TimelineMessageId, Long>,
-    ): Map<TimelineMessageId, Long> {
-        if (publication.block.events.isEmpty() || presented.isEmpty()) return presented
-        val exact = writer as? TimelineExactCanonicalWriter ?: return presented
-        val resolved = presented.toMutableMap()
-        var changed = false
+    ): Map<String, TimelineMessageId> {
+        val exact = writer as? TimelineExactCanonicalWriter ?: return emptyMap()
+        val missing = publication.block.events.filter { event ->
+            TimelineMessageId(event.serverId) !in presented &&
+                (event.otid.isBlank() || TimelineMessageId(event.otid) !in presented)
+        }
+        if (missing.isEmpty()) return emptyMap()
+        val aliases = mutableMapOf<String, TimelineMessageId>()
         store.read(scope) {
-            for ((key, rev) in presented) {
-                val canonical = exact.canonicalIdentity(this, key.value, "")
-                if (canonical != key && canonical !in resolved) {
-                    resolved[canonical] = rev
-                    changed = true
-                }
-            }
-            for (event in publication.block.events) {
+            for (event in missing) {
                 val canonical = exact.canonicalIdentity(this, event.serverId, event.otid)
-                val eventId = TimelineMessageId(event.serverId)
-                val otidId = event.otid.takeIf { it.isNotBlank() }?.let { TimelineMessageId(it) }
-                val rev = resolved[canonical] ?: resolved[eventId] ?: otidId?.let { resolved[it] }
-                if (rev != null) {
-                    if (canonical !in resolved) {
-                        resolved[canonical] = rev
-                        changed = true
-                    }
-                    if (eventId !in resolved) {
-                        resolved[eventId] = rev
-                        changed = true
-                    }
-                    if (otidId != null && otidId !in resolved) {
-                        resolved[otidId] = rev
-                        changed = true
-                    }
+                if (canonical.value != event.serverId) {
+                    aliases[event.serverId] = canonical
                 }
             }
         }
-        return if (changed) resolved else presented
+        return aliases
     }
 
     suspend fun open(scope: TimelineScope, target: TimelineMessageId? = null): TimelineEngineOpen = mutex.withLock {

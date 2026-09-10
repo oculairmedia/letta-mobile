@@ -78,7 +78,7 @@ fun TimelineSettledRecord.toRenderItem(ownAgentId: String? = null): com.letta.mo
     )
 }
 
-internal const val STRAND_GUARD_REVISION_DELTA = 32L
+internal const val STRAND_GUARD_REVISION_DELTA = 1024L
 
 data class TimelineLiveFence(val selection: TimelineEngineSelection, val requestId: TimelineRequestId)
 
@@ -88,20 +88,30 @@ data class TimelineLivePublication(
     /** First durable revision able to carry this turn; only the sync writer can reach it. */
     val settlementRevision: Long? = null,
 ) {
-    private fun isEventResident(event: TimelineEvent.Confirmed, presented: Map<TimelineMessageId, Long>): Boolean =
-        TimelineMessageId(event.serverId) in presented ||
-            (event.otid.isNotBlank() && TimelineMessageId(event.otid) in presented)
+    private fun isEventResident(
+        event: TimelineEvent.Confirmed,
+        presented: Map<TimelineMessageId, Long>,
+        aliases: Map<String, TimelineMessageId> = emptyMap(),
+    ): Boolean {
+        if (TimelineMessageId(event.serverId) in presented) return true
+        val alias = aliases[event.serverId]
+        if (alias != null && alias in presented) return true
+        return event.otid.isNotBlank() && TimelineMessageId(event.otid) in presented
+    }
 
     /**
      * Drain on turn identity, not on a ledger watermark revision.
      * Settled once all events in the block have a resident row in [presented].
-     * Releases via strand guard if the ledger head runs well past settlement revision (+32L).
+     * Releases via strand guard if the ledger head runs well past settlement revision (+1024L).
      */
-    fun isSettled(presented: Map<TimelineMessageId, Long>): Boolean {
+    fun isSettled(
+        presented: Map<TimelineMessageId, Long>,
+        aliases: Map<String, TimelineMessageId> = emptyMap(),
+    ): Boolean {
         val revision = settlementRevision ?: return false
         // A turn that produced nothing has nothing to wait for; never strand the fence on it.
         if (block.events.isEmpty() && block.records.isEmpty()) return true
-        val allEvents = block.events.all { isEventResident(it, presented) }
+        val allEvents = block.events.all { isEventResident(it, presented, aliases) }
         val allRecords = block.records.all { it.identity in presented }
         if (allEvents && allRecords) return true
 
@@ -119,8 +129,11 @@ data class TimelineLivePublication(
     }
 
     /** Overlay stays resident, draining individual events as they become resident in settled rows. */
-    fun overlayEvents(presented: Map<TimelineMessageId, Long>): List<TimelineEvent.Confirmed> {
-        if (isSettled(presented)) return emptyList()
-        return block.events.filterNot { isEventResident(it, presented) }
+    fun overlayEvents(
+        presented: Map<TimelineMessageId, Long>,
+        aliases: Map<String, TimelineMessageId> = emptyMap(),
+    ): List<TimelineEvent.Confirmed> {
+        if (isSettled(presented, aliases)) return emptyList()
+        return block.events.filterNot { isEventResident(it, presented, aliases) }
     }
 }

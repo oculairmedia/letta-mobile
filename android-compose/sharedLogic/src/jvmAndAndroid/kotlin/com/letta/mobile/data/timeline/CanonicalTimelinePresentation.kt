@@ -144,20 +144,11 @@ class CanonicalTimelinePresentation private constructor(
     /** Only actual resident rows count, never prefetched rows or a remembered revision watermark. */
     fun onResidentRows(rows: List<Row>) {
         if (!job.isActive) return
-        val presented = rows.take(128).flatMap { row ->
-            listOfNotNull(
-                row.identity to row.revision,
-                row.otid.takeIf(String::isNotBlank)?.let { TimelineMessageId(it) to row.revision },
-            )
-        }.toMap()
+        val presented = rows.take(128).associate { it.identity to it.revision }
         resident.value = presented
         residentOtids.value = rows.take(128).mapNotNullTo(mutableSetOf()) { it.otid.takeIf(String::isNotBlank) }
         val fence = owner.session.live.value?.fence ?: return
-        scope.launch {
-            val resolved = coordinator.resolvePresented(owner, fence, presented)
-            if (resolved !== presented) resident.value = resolved
-            coordinator.acknowledgeSettlement(owner, fence, resolved)
-        }
+        scope.launch { coordinator.acknowledgeSettlement(owner, fence, presented) }
     }
 
     suspend fun readChunk(row: Row, offset: Long, maxBytes: Int): TimelineBodyChunk {
