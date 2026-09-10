@@ -171,6 +171,47 @@ class CanonicalTimelineEngine(
     }
 
     /**
+     * The one moment both names for a streamed reply are in hand.
+     *
+     * A streamed assistant message and its durable counterpart share no identifier: the stream
+     * names it `cm-stream-*` with an otid derived from that same id, while the server names it and
+     * derives its otid from its own. Neither side can find the other on its own, so the overlay
+     * would sit on screen beside the settled row forever, showing the reply twice.
+     *
+     * This page is where the two meet. The live block holds the streamed events, the page holds the
+     * records being committed for the very same turn, and pairing them here lets the overlay drain
+     * against a row it could never have identified. Matching is by exact content within a single
+     * settling turn, which is the narrowest join available - never across turns, and never on a
+     * turn that is still streaming.
+     */
+    private fun adoptCommittedIdentities(page: TimelineRemotePageResult.Page) {
+        val live = mutableLive.value ?: return
+        if (live.settlementRevision == null) return
+        val adopted = live.adoptionsFrom(page.records.mapNotNull { it.message.toTimelineEvent(0.0) })
+        if (adopted.isEmpty()) return
+        mutableLive.value = live.copy(aliases = live.aliases + adopted)
+    }
+
+    private fun TimelineLivePublication.adoptionsFrom(
+        committed: List<TimelineEvent.Confirmed>,
+    ): Map<String, TimelineMessageId> {
+        val unclaimed = committed.filterTo(mutableListOf()) { it.messageType == TimelineMessageType.ASSISTANT }
+        if (unclaimed.isEmpty()) return emptyMap()
+        return block.events.mapNotNull { it.claimAdoption(unclaimed, aliases) }.toMap()
+    }
+
+    /** Each committed reply answers for at most one streamed event, so claiming it removes it. */
+    private fun TimelineEvent.Confirmed.claimAdoption(
+        unclaimed: MutableList<TimelineEvent.Confirmed>,
+        aliases: Map<String, TimelineMessageId>,
+    ): Pair<String, TimelineMessageId>? {
+        if (messageType != TimelineMessageType.ASSISTANT || serverId in aliases) return null
+        val match = unclaimed.firstOrNull { it.content == content } ?: return null
+        unclaimed.remove(match)
+        return if (match.serverId == serverId) null else serverId to TimelineMessageId(match.serverId)
+    }
+
+    /**
      * The sync writer's commit is the first moment alias evidence exists for this turn, so this
      * runs there rather than at the terminal frame: at Done the durable row has not been written
      * and there is nothing yet to resolve against.
@@ -315,6 +356,7 @@ class CanonicalTimelineEngine(
             (if (changed) nextRevision() else checkpoint().revision) to appended
         }
         mutablePublication.value = TimelineEnginePublication(request.selection, revision)
+        adoptCommittedIdentities(page)
         attachResolvedAliases(request.selection.scope)
         pendingReconcile = null
         TimelineEngineReconcileResult(TimelineEnginePageOutcome.Applied, appended,
