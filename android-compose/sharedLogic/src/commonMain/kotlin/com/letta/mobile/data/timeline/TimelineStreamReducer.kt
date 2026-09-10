@@ -4,10 +4,12 @@ import com.letta.mobile.data.model.ApprovalResponseMessage
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.ReasoningMessage
 import com.letta.mobile.data.model.LettaMessage
+import com.letta.mobile.data.model.ToolCall
 import com.letta.mobile.data.model.ToolReturnMessage
 import com.letta.mobile.util.Telemetry
 import kotlinx.collections.immutable.PersistentList
 import kotlinx.collections.immutable.PersistentMap
+import kotlinx.collections.immutable.toPersistentList
 
 data class TimelineReducerInput(
     val prev: Timeline,
@@ -240,7 +242,7 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
         val newScore = newCalls.count { !it.arguments.isNullOrBlank() }
         val mergedCalls = if (newCalls.isEmpty() && oldCalls.isNotEmpty()) oldCalls
             else if (oldCalls.isEmpty()) newCalls
-            else if (newScore >= oldScore) newCalls
+            else if (newScore >= oldScore) preserveSettledToolCalls(oldCalls, newCalls, existing.toolReturnContentByCallId)
             else oldCalls
         val merged = applyPendingToolReturns(
             confirmed.copy(
@@ -622,6 +624,44 @@ private fun Timeline.findSameRunAssistantPrefixOrBlankTarget(
             if (existingRunId != null && incoming.seqId == 1 && incomingText.length <= 1) return@firstOrNull false
             true
         }
+}
+
+/**
+ * letta-mobile-x13xi.13.1.2: when a cursor re-emit or hydration backfill
+ * replaces `oldCalls` with `newCalls` (the arg-score-wins branch used by
+ * the incoming chat frame), preserve any `oldCalls` entry whose
+ * `effectiveId` already has an entry in `existing.toolReturnContentByCallId`.
+ * Without this, the projection layer at
+ * `TimelineEventToUiMessage.toUiToolCall` reads
+ * `ev.toolReturnContentByCallId[callId]` and gets `null` for calls whose
+ * id was rotated server-side during a re-emit — the tool card flips
+ * back to "Running" (status derived from a now-null result) until the
+ * next tool_return frame arrives. Prepending the old (settled) call is
+ * the cheapest invariant that survives both re-emit shapes:
+ *
+ *   - same effectiveId → no-op (newCalls already contains the entry)
+ *   - rotated effectiveId (rare but observed) → kept in the list so the
+ *     projection keeps its existing map lookup intact.
+ *
+ * Returned list order: the new calls first (so the projection surface
+ * stays consistent with the rest of the chat), with any preserved
+ * settled calls appended at the tail. toolReturnContentByCallId is
+ * keyed by callId and is order-insensitive, so the projection sees the
+ * same `result` either way.
+ */
+private fun preserveSettledToolCalls(
+    oldCalls: List<ToolCall>,
+    newCalls: List<ToolCall>,
+    settledByCallId: PersistentMap<String, String>,
+): PersistentList<ToolCall> {
+    if (oldCalls.isEmpty() || settledByCallId.isEmpty()) return newCalls.toPersistentList()
+    val newIds = newCalls.mapTo(mutableSetOf()) { it.effectiveId.takeIf(String::isNotBlank) ?: "" }
+    val preserved = oldCalls.filter { call ->
+        val id = call.effectiveId.takeIf(String::isNotBlank) ?: return@filter false
+        id in settledByCallId && id !in newIds
+    }
+    if (preserved.isEmpty()) return newCalls.toPersistentList()
+    return (newCalls + preserved).toPersistentList()
 }
 
 /**
