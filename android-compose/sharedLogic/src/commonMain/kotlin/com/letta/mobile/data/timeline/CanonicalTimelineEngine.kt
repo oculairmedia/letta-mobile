@@ -192,20 +192,23 @@ class CanonicalTimelineEngine(
         mutableLive.value = live.copy(aliases = live.aliases + adopted)
     }
 
-    /** Each committed reply answers for at most one streamed event, so a repeat cannot claim it twice. */
     private fun TimelineLivePublication.adoptionsFrom(
         committed: List<TimelineEvent.Confirmed>,
     ): Map<String, TimelineMessageId> {
         val unclaimed = committed.filterTo(mutableListOf()) { it.messageType == TimelineMessageType.ASSISTANT }
         if (unclaimed.isEmpty()) return emptyMap()
-        val adopted = mutableMapOf<String, TimelineMessageId>()
-        for (event in block.events) {
-            if (event.messageType != TimelineMessageType.ASSISTANT || event.serverId in aliases) continue
-            val match = unclaimed.firstOrNull { it.content == event.content } ?: continue
-            unclaimed.remove(match)
-            if (match.serverId != event.serverId) adopted[event.serverId] = TimelineMessageId(match.serverId)
-        }
-        return adopted
+        return block.events.mapNotNull { it.claimAdoption(unclaimed, aliases) }.toMap()
+    }
+
+    /** Each committed reply answers for at most one streamed event, so claiming it removes it. */
+    private fun TimelineEvent.Confirmed.claimAdoption(
+        unclaimed: MutableList<TimelineEvent.Confirmed>,
+        aliases: Map<String, TimelineMessageId>,
+    ): Pair<String, TimelineMessageId>? {
+        if (messageType != TimelineMessageType.ASSISTANT || serverId in aliases) return null
+        val match = unclaimed.firstOrNull { it.content == content } ?: return null
+        unclaimed.remove(match)
+        return if (match.serverId == serverId) null else serverId to TimelineMessageId(match.serverId)
     }
 
     /**
