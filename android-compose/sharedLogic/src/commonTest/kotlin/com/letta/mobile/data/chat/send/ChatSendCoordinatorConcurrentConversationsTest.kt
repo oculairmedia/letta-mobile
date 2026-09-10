@@ -4,6 +4,7 @@ import com.letta.mobile.data.transport.BridgeTurnStatus
 import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AssistantMessage
+import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaConfig
@@ -545,20 +546,17 @@ class ChatSendCoordinatorConcurrentConversationsTest {
         val transport = FakeChannelTransport(mutableListOf(true), activeChatTurn = true)
         val coordinator = coordinator(timeline, ui, transport) { CONV_A }
 
-        coordinator.send("hello from user", targetConversationId = CONV_A).join()
+        coordinator.send("hello from user").join()
         val sentOtid = timeline.externalLocals.single().otid
         assertEquals(CONV_A, timeline.externalLocals.single().conversationId)
 
         // 1. Inbound UserMessage echo arrives on a server-assigned conversation id bearing the otid
         val userEcho = WsTimelineEvent.MessageDelta(
-            message = LettaMessage(
+            message = UserMessage(
                 id = "msg-user-echo",
-                role = "user",
-                messageType = "user_message",
-                content = "hello from user",
+                contentRaw = JsonPrimitive("hello from user"),
                 date = "2026-09-10T16:00:00Z",
                 otid = sentOtid,
-                turnId = "turn-server-1",
                 runId = "run-server-1",
             ),
             conversationId = CONV_SERVER,
@@ -569,9 +567,9 @@ class ChatSendCoordinatorConcurrentConversationsTest {
         // 2. TurnStarted arrives on CONV_SERVER
         coordinator.handleEvent(
             WsTimelineEvent.TurnStarted(
+                turnId = "turn-server-1",
                 agentId = AGENT_ID,
                 conversationId = CONV_SERVER,
-                turnId = "turn-server-1",
                 runId = "run-server-1",
             ),
         )
@@ -581,7 +579,6 @@ class ChatSendCoordinatorConcurrentConversationsTest {
             message = AssistantMessage(
                 id = "msg-assistant-1",
                 contentRaw = JsonPrimitive("assistant reply"),
-                turnId = "turn-server-1",
                 runId = "run-server-1",
             ),
             conversationId = CONV_SERVER,
@@ -625,29 +622,26 @@ class ChatSendCoordinatorConcurrentConversationsTest {
         val coordinator = coordinator(timeline, ui, transport) { CONV_A }
 
         // Start send A on CONV_A
-        coordinator.send("hello from user", targetConversationId = CONV_A).join()
+        coordinator.send("hello from user").join()
         val sentOtid = timeline.externalLocals.single().otid
 
         // 1. TurnStarted arrives on CONV_SERVER first (before UserMessage echo)
         coordinator.handleEvent(
             WsTimelineEvent.TurnStarted(
+                turnId = "turn-server-2",
                 agentId = AGENT_ID,
                 conversationId = CONV_SERVER,
-                turnId = "turn-server-2",
                 runId = "run-server-2",
             ),
         )
 
         // 2. UserMessage echo arrives on CONV_SERVER with the matching otid
         val userEcho = WsTimelineEvent.MessageDelta(
-            message = LettaMessage(
+            message = UserMessage(
                 id = "msg-user-echo-2",
-                role = "user",
-                messageType = "user_message",
-                content = "hello from user",
+                contentRaw = JsonPrimitive("hello from user"),
                 date = "2026-09-10T16:00:00Z",
                 otid = sentOtid,
-                turnId = "turn-server-2",
                 runId = "run-server-2",
             ),
             conversationId = CONV_SERVER,
@@ -661,7 +655,6 @@ class ChatSendCoordinatorConcurrentConversationsTest {
                 message = AssistantMessage(
                     id = "msg-assistant-2",
                     contentRaw = JsonPrimitive("assistant reply 2"),
-                    turnId = "turn-server-2",
                     runId = "run-server-2",
                 ),
                 conversationId = CONV_SERVER,
@@ -702,14 +695,14 @@ class ChatSendCoordinatorConcurrentConversationsTest {
         val transport = FakeChannelTransport(mutableListOf(true), activeChatTurn = true)
         val coordinator = coordinator(timeline, ui, transport) { CONV_A }
 
-        coordinator.send("initial send", targetConversationId = CONV_A).join()
+        coordinator.send("initial send").join()
         val sentOtid = timeline.externalLocals.single().otid
 
         coordinator.handleEvent(
             WsTimelineEvent.TurnStarted(
+                turnId = "turn-1",
                 agentId = AGENT_ID,
                 conversationId = CONV_A,
-                turnId = "turn-1",
                 runId = "run-1",
             ),
         )
@@ -728,14 +721,11 @@ class ChatSendCoordinatorConcurrentConversationsTest {
 
         // Inbound replay frame arrives with the same otid
         val replayFrame = WsTimelineEvent.MessageDelta(
-            message = LettaMessage(
+            message = UserMessage(
                 id = "msg-replay",
-                role = "user",
-                messageType = "user_message",
-                content = "initial send",
+                contentRaw = JsonPrimitive("initial send"),
                 date = "2026-09-10T16:00:00Z",
                 otid = sentOtid,
-                turnId = "turn-1",
                 runId = "run-1",
             ),
             isReplay = true,
@@ -762,15 +752,15 @@ class ChatSendCoordinatorConcurrentConversationsTest {
         val coordinator = coordinator(timeline, ui, transport) { CONV_A }
 
         // Start send on CONV_A (awaiting TurnStarted)
-        coordinator.send("send in flight", targetConversationId = CONV_A).join()
+        coordinator.send("send in flight").join()
         val sentOtid = timeline.externalLocals.single().otid
 
         // Remotely started turn arrives on CONV_SERVER without matching otid
         coordinator.handleEvent(
             WsTimelineEvent.TurnStarted(
+                turnId = "turn-remote-1",
                 agentId = AGENT_ID,
                 conversationId = CONV_SERVER,
-                turnId = "turn-remote-1",
                 runId = "run-remote-1",
             ),
         )
@@ -779,7 +769,6 @@ class ChatSendCoordinatorConcurrentConversationsTest {
             message = AssistantMessage(
                 id = "msg-remote-assistant",
                 contentRaw = JsonPrimitive("remote reply"),
-                turnId = "turn-remote-1",
                 runId = "run-remote-1",
             ),
             conversationId = CONV_SERVER,
