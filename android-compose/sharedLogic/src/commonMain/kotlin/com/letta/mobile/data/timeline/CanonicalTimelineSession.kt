@@ -142,6 +142,15 @@ class CanonicalTimelineCoordinator(
         }
     }
 
+    suspend fun resolvePresented(
+        owner: Owner,
+        fence: TimelineLiveFence,
+        presented: Map<TimelineMessageId, Long>,
+    ): Map<TimelineMessageId, Long> = mutex.withLock {
+        if (owners[owner.selection.scope] !== owner || fence.selection !== owner.selection) return@withLock presented
+        owner.session.resolvePresented(fence, presented)
+    }
+
     /** Not a screen-disposal callback. The runtime must release only after its users detach. */
     suspend fun retire(owner: Owner): Boolean = mutex.withLock {
         if (owners[owner.selection.scope] !== owner) return@withLock false
@@ -243,6 +252,9 @@ class CanonicalTimelineSession(
 
     suspend fun acknowledgeSettlement(fence: TimelineLiveFence, presented: Map<TimelineMessageId, Long>): Boolean =
         engine.acknowledgeSettlement(fence, presented)
+
+    suspend fun resolvePresented(fence: TimelineLiveFence, presented: Map<TimelineMessageId, Long>): Map<TimelineMessageId, Long> =
+        engine.resolvePresented(fence, presented)
 
     suspend fun close(selection: TimelineEngineSelection) = engine.release(selection)
 }

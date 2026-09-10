@@ -153,17 +153,67 @@ class CanonicalTimelineEngine(
         true
     }
 
-    /** Host acknowledges only once the settled ledger it renders carries this turn's revision. */
+    /** Host acknowledges only once the settled ledger it renders carries this turn's identity. */
     suspend fun acknowledgeSettlement(
         fence: TimelineLiveFence,
         presented: Map<TimelineMessageId, Long>,
     ): Boolean = mutex.withLock {
         val current = mutableLive.value ?: return@withLock false
-        if (current.fence !== fence || !current.isSettled(presented)) return@withLock false
+        if (current.fence !== fence) return@withLock false
+        val resolved = resolvePresented(fence.selection.scope, current, presented)
+        if (!current.isSettled(resolved)) return@withLock false
         mutableLive.value = null
         liveFence = null
         liveReduction = null
         true
+    }
+
+    suspend fun resolvePresented(
+        fence: TimelineLiveFence,
+        presented: Map<TimelineMessageId, Long>,
+    ): Map<TimelineMessageId, Long> = mutex.withLock {
+        val current = mutableLive.value ?: return@withLock presented
+        if (current.fence !== fence) return@withLock presented
+        resolvePresented(fence.selection.scope, current, presented)
+    }
+
+    private suspend fun resolvePresented(
+        scope: TimelineScope,
+        publication: TimelineLivePublication,
+        presented: Map<TimelineMessageId, Long>,
+    ): Map<TimelineMessageId, Long> {
+        if (publication.block.events.isEmpty() || presented.isEmpty()) return presented
+        var resolved: MutableMap<TimelineMessageId, Long>? = null
+        store.read(scope) {
+            for ((key, rev) in presented) {
+                val canonical = writer.canonicalIdentity(this, key.value, "")
+                if (canonical != key) {
+                    if (resolved == null) resolved = presented.toMutableMap()
+                    resolved[canonical] = rev
+                }
+            }
+            for (event in publication.block.events) {
+                val canonical = writer.canonicalIdentity(this, event.serverId, event.otid)
+                val eventId = TimelineMessageId(event.serverId)
+                val otidId = event.otid.takeIf { it.isNotBlank() }?.let { TimelineMessageId(it) }
+                val currentPresented = resolved ?: presented
+                val rev = currentPresented[canonical]
+                    ?: currentPresented[eventId]
+                    ?: otidId?.let { currentPresented[it] }
+                if (rev != null) {
+                    if (canonical !in currentPresented ||
+                        eventId !in currentPresented ||
+                        (otidId != null && otidId !in currentPresented)
+                    ) {
+                        if (resolved == null) resolved = presented.toMutableMap()
+                        resolved[canonical] = rev
+                        resolved[eventId] = rev
+                        if (otidId != null) resolved[otidId] = rev
+                    }
+                }
+            }
+        }
+        return resolved ?: presented
     }
 
     suspend fun open(scope: TimelineScope, target: TimelineMessageId? = null): TimelineEngineOpen = mutex.withLock {

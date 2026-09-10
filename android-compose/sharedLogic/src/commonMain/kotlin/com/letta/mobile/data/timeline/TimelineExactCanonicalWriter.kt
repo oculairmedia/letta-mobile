@@ -98,6 +98,13 @@ class TimelineExactCanonicalWriter(
             transaction.putEvidence("identity/otid/${incoming.otid}", identity.value.encodeToByteArray())
             indexed = true
         }
+        if (incoming.messageType == TimelineMessageType.ASSISTANT &&
+            incoming.serverId.startsWith("ui-msg-") &&
+            incoming.serverId != identity.value &&
+            transaction.evidence("identity/serverId/${incoming.serverId}", 64 * 1024)?.decodeToString() != identity.value) {
+            transaction.putEvidence("identity/serverId/${incoming.serverId}", identity.value.encodeToByteArray())
+            indexed = true
+        }
         val canonical = merged.copy(serverId = identity.value)
         val bytes = TimelineSnapshotCodec.json.encodeToString(StoredTimelineEvent.serializer(), canonical.toStoredTimelineEvent()).encodeToByteArray()
         if (historicalBytes != null && bytes.contentEquals(historicalBytes)) return indexed
@@ -126,6 +133,8 @@ class TimelineExactCanonicalWriter(
     internal suspend fun canonicalIdentity(reader: TimelineStoreReader, serverId: String, otid: String): TimelineMessageId {
         val alias = otid.takeIf { it.isNotBlank() }?.let {
             reader.evidence("identity/otid/$it", 64 * 1024)?.decodeToString(throwOnInvalidSequence = true)
+        } ?: serverId.takeIf { it.isNotBlank() }?.let {
+            reader.evidence("identity/serverId/$it", 64 * 1024)?.decodeToString(throwOnInvalidSequence = true)
         }
         return TimelineMessageId(alias ?: serverId)
     }

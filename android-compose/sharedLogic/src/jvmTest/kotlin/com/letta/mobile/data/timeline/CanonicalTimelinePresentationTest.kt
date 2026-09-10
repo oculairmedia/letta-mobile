@@ -66,12 +66,12 @@ class CanonicalTimelinePresentationTest {
         // Live ingest wrote nothing durable, so the overlay is the only copy of this reply.
         assertEquals(listOf("hello"), contents(presentation.live.value))
         // Rows the sync writer has not caught up to must not drain it.
-        presentation.onResidentRows(listOf(row("ui-msg-1", 0L)))
+        presentation.onResidentRows(listOf(row("unrelated", 0L)))
         runCurrent()
         assertEquals(listOf("hello"), contents(presentation.live.value))
         assertEquals(fence, owner.session.live.value?.fence)
-        // The rendered ledger reaches the turn's revision: the overlay drains and the fence releases.
-        presentation.onResidentRows(listOf(row("ui-msg-1", 1L)))
+        // The rendered ledger reaches the turn's identity: the overlay drains and the fence releases.
+        presentation.onResidentRows(listOf(row("reply", 1L)))
         runCurrent()
         assertEquals(emptyList(), contents(presentation.live.value))
         assertEquals(null, owner.session.live.value)
@@ -95,13 +95,13 @@ class CanonicalTimelinePresentationTest {
         runCurrent()
         // The send is on screen exactly once, as the turn's own echoed row.
         assertEquals(listOf("hello", "question"), contents(presentation.live.value))
-        presentation.onResidentRows(listOf(row("ui-msg-1", 0L)))
+        presentation.onResidentRows(listOf(row("unrelated", 0L)))
         runCurrent()
         assertEquals(listOf("hello", "question"), contents(presentation.live.value))
         // Only a durable echo clears pending storage, and that write has not happened yet. The
         // local bubble must not reappear as the overlay drains out from under it.
         assertEquals(listOf("local-1"), owner.session.pending.value.map { it.otid })
-        presentation.onResidentRows(listOf(row("ui-msg-1", 1L)))
+        presentation.onResidentRows(listOf(row("reply", 1L), row("echo", 1L, otid = "local-1")))
         runCurrent()
         assertEquals(emptyList(), contents(presentation.live.value))
         assertEquals(listOf("local-1"), owner.session.pending.value.map { it.otid })
@@ -129,9 +129,10 @@ class CanonicalTimelinePresentationTest {
         items.map { (it as ChatRenderItem.Single).message.content }
 
     /** A settled row as the pager hands it back: identity plus the revision it was read at. */
-    private fun row(identity: String, revision: Long) = CanonicalTimelinePresentation.Row(
+    private fun row(identity: String, revision: Long, otid: String = "") = CanonicalTimelinePresentation.Row(
         TimelineMessageId(identity), revision,
         ChatRenderItem.Single(UiMessage(identity, "assistant", "settled", timestamp = ""), GroupPosition.None),
+        otid = otid,
     )
 
     private fun assistant(content: String, id: String) = AssistantMessage(
