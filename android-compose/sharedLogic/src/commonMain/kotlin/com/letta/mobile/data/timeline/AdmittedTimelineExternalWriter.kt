@@ -25,6 +25,8 @@ class AdmittedTimelineExternalWriter(
         admission.admitted(conversationId) { delegate.markExternalTransportLocalFailed(conversationId, otid) }
     override suspend fun markExternalTransportLocalFailed(agentId: String?, conversationId: String, otid: String) =
         admission.admitted(conversationId) { delegate.markExternalTransportLocalFailed(agentId, conversationId, otid) }
+    override suspend fun discardFailedExternalTransportLocal(agentId: String?, conversationId: String, otid: String) =
+        admission.admitted(conversationId) { delegate.discardFailedExternalTransportLocal(agentId, conversationId, otid) }
     override suspend fun reconcileExternalTransportSend(conversationId: String, agentId: String, externalConversationId: String, otid: String) =
         admission.admitted(conversationId) { delegate.reconcileExternalTransportSend(conversationId, agentId, externalConversationId, otid) }
     override suspend fun reconcileExternalTransportSendScoped(agentId: String?, conversationId: String, externalConversationId: String, otid: String) =

@@ -1025,6 +1025,36 @@ internal class AdminChatViewModel @Inject constructor(
         if (!replacingSendRuntime) composerCoordinator.rerunMessage(message)
     }
 
+    /**
+     * Manual escape hatch for a send that failed: nothing else clears the durable pending
+     * record (no echo ever arrives to confirm it), so this is the only way the "Not sent"
+     * bubble comes off screen. The otid is the same clientMessageId the projection stamped
+     * from the pending record's own otid (see TimelineEventToUiMessage), so it round-trips
+     * back into the writer that created it.
+     */
+    fun discardFailedMessage(message: UiMessage) {
+        val otid = message.clientMessageId
+        val convId = conversationId?.value ?: chatConversationCoordinator.activeConversationId
+        val canonical = selectedRuntime?.writer != null
+        if (otid == null || convId == null) {
+            Telemetry.event(
+                "AdminChatVM", "discardFailed.skipped",
+                "reason" to if (otid == null) "no_otid" else "no_conversation",
+                "messageId" to message.id,
+            )
+            return
+        }
+        viewModelScope.launch {
+            val removed = (selectedRuntime?.writer ?: timelineRepository)
+                .discardFailedExternalTransportLocal(agentId.value, convId, otid)
+            Telemetry.event(
+                "AdminChatVM", "discardFailed.result",
+                "removed" to removed, "canonicalWriter" to canonical,
+                "conversationId" to convId, "otid" to otid,
+            )
+        }
+    }
+
     fun interruptRun() {
         if (!replacingSendRuntime) composerCoordinator.interruptRun { adminChatA2uiCoordinator.clearA2uiThinkingOnResponse() }
     }

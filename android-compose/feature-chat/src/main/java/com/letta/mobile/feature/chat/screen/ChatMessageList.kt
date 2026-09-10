@@ -58,6 +58,7 @@ internal fun ChatMessageList(
     chatBackground: ChatBackground = ChatBackground.Default,
     topPadding: Dp = 0.dp,
     bottomPadding: Dp = 0.dp,
+    onDiscardMessage: ((UiMessage) -> Unit)? = null,
 ) {
     val callbacks = ChatMessageListCallbacks(
         onActiveFontScaleChange = onActiveFontScaleChange,
@@ -70,6 +71,7 @@ internal fun ChatMessageList(
         onToggleRunCollapsed = onToggleRunCollapsed,
         onToggleReasoningExpanded = onToggleReasoningExpanded,
         onAttachmentImageTap = onAttachmentImageTap,
+        onDiscardMessage = onDiscardMessage,
     )
     val appearance = ChatMessageListAppearance(
         chatMode = chatMode,

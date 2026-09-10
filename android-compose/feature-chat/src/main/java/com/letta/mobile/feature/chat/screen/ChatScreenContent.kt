@@ -205,6 +205,7 @@ private fun ChatContentMessageArea(
         onToggleRunCollapsed = callbacks.onToggleRunCollapsed,
         onToggleReasoningExpanded = callbacks.onToggleReasoningExpanded,
         onAttachmentImageTap = callbacks.onAttachmentImageTap,
+        onDiscardMessage = callbacks.onDiscardMessage,
         modifier = Modifier.fillMaxSize(),
         chatBackground = appearance.chatBackground,
         topPadding = appearance.topPadding,

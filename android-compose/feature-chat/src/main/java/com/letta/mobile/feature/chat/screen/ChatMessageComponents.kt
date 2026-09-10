@@ -89,6 +89,7 @@ internal fun ChatMessageItem(
     onToggleReasoning: (() -> Unit)? = null,
     onGeneratedUiMessage: ((String) -> Unit)? = null,
     onRerunMessage: ((UiMessage) -> Unit)? = null,
+    onDiscardMessage: ((UiMessage) -> Unit)? = null,
     rerunEnabled: Boolean = true,
     onApprovalDecision: ((String, List<String>, Boolean, String?) -> Unit)? = null,
     approvalInFlight: Boolean = false,
@@ -106,11 +107,12 @@ internal fun ChatMessageItem(
     // screen/list wiring outside this bead's ownership.
     val onSendAgainMessage = onRerunMessage
     var showMessageActions by remember { mutableStateOf(false) }
-    val actionAvailability = remember(message, copyText, onSendAgainMessage, rerunEnabled) {
+    val actionAvailability = remember(message, copyText, onSendAgainMessage, rerunEnabled, onDiscardMessage) {
         messageActionAvailability(
             message = message,
             copyText = copyText,
             sendAgainAvailable = onSendAgainMessage != null && rerunEnabled,
+            discardAvailable = onDiscardMessage != null,
         )
     }
     val onLongClick: (() -> Unit)? = if (actionAvailability.hasActions) {
@@ -133,6 +135,7 @@ internal fun ChatMessageItem(
             onDismiss = { showMessageActions = false },
             onCopy = { copyMessageText(context, copyText) },
             onSendAgain = { onSendAgainMessage?.invoke(message) },
+            onDiscard = { onDiscardMessage?.invoke(message) },
         ),
     )
 

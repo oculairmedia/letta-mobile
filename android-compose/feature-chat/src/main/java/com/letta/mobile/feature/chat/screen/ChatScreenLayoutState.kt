@@ -62,6 +62,7 @@ internal fun rememberChatScreenLayoutLocalState(params: ChatScreenLayoutParams):
             onAttachmentImageTap = openImageViewer,
             onActiveFontScaleChange = { activeFontScaleChange.value(it) },
             onFontScaleChange = { params.viewModel.setChatFontScale(it) },
+            onDiscardMessage = { params.viewModel.discardFailedMessage(it) },
         )
     }
     val openSubagentTarget: (SubagentTodoSheetTarget) -> Unit = remember(

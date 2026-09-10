@@ -71,6 +71,30 @@ class CanonicalPendingLocalStore(private val store: TimelineBoundedStore) {
         }
     }
 
+    /**
+     * Drop a send the user has given up on. An absent echo is never confirmation, so nothing else
+     * removes a pending record; without this a permanently failed send is durable forever and the
+     * bubble it draws can never be dismissed. Only a failed record qualifies: one still in flight,
+     * or already accepted by the transport, may still be echoed.
+     */
+    suspend fun discardFailed(scope: TimelineScope, otid: String): Boolean {
+        require(otid.isNotBlank())
+        return store.transaction(scope) {
+            val previous = readPending()
+            val target = previous.firstOrNull { it.otid == otid }
+            com.letta.mobile.util.Telemetry.event(
+                "PendingStore", "discard.probe",
+                "scopeAgent" to (scope.agentId ?: "null"), "scopeConversation" to scope.conversationId,
+                "otid" to otid, "seen" to previous.size,
+                "found" to (target != null), "delivery" to (target?.delivery?.name ?: "none"),
+            )
+            if (target == null || target.delivery != Delivery.Failed) return@transaction false
+            writePending(previous.filterNot { it.otid == otid })
+            nextRevision()
+            true
+        }
+    }
+
     /** Called inside the same transaction that durably confirms the server echo. */
     internal suspend fun confirm(transaction: TimelineStoreTransaction, otid: String) {
         confirmEcho(transaction, otid)

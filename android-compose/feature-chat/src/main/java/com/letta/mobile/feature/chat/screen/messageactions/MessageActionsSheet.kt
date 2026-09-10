@@ -41,6 +41,7 @@ internal data class MessageActionsSheetActions(
     val onDismiss: () -> Unit,
     val onCopy: () -> Unit,
     val onSendAgain: () -> Unit,
+    val onDiscard: () -> Unit = {},
 )
 
 @Composable
@@ -72,6 +73,18 @@ internal fun MessageActionsSheet(
                 .heightIn(max = actionListMaxHeight)
                 .verticalScroll(rememberScrollState()),
         ) {
+            if (state.availability.canDiscard) {
+                // Nothing else clears a failed send: the echo that would confirm it never arrived,
+                // and the record is durable, so this is the only way to take the bubble off screen.
+                ActionSheetItem(
+                    text = stringResource(R.string.message_action_discard),
+                    icon = LettaIcons.Delete,
+                    onClick = {
+                        actions.onDismiss()
+                        actions.onDiscard()
+                    },
+                )
+            }
             if (state.availability.canSendAgain) {
                 ActionSheetItem(
                     text = stringResource(R.string.message_action_send_again),

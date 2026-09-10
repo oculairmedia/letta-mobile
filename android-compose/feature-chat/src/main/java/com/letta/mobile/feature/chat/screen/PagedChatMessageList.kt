@@ -226,6 +226,7 @@ private fun PagedChatMessageListContent(
             callbacks = ChatMessageRenderCallbacks(
                 callbacks.onSendMessage, callbacks.onRerunMessage, callbacks.onSubmitApproval,
                 callbacks.onToggleRunCollapsed, callbacks.onToggleReasoningExpanded, callbacks.onAttachmentImageTap,
+                callbacks.onDiscardMessage,
             ),
         )
         LazyColumn(

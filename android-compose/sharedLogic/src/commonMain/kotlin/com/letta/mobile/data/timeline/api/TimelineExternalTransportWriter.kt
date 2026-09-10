@@ -37,6 +37,14 @@ interface TimelineExternalTransportWriter {
 
     suspend fun markExternalTransportLocalFailed(agentId: String?, conversationId: String, otid: String)
 
+    /**
+     * Drop a send the user has given up on, returning whether anything was removed. An absent echo
+     * is never confirmation, so a failed send is durable and nothing else clears it; without this
+     * the bubble it draws cannot be dismissed. Backends that keep no durable pending record have
+     * nothing to discard and answer false.
+     */
+    suspend fun discardFailedExternalTransportLocal(agentId: String?, conversationId: String, otid: String): Boolean = false
+
     suspend fun reconcileExternalTransportSend(
         conversationId: String,
         agentId: String,

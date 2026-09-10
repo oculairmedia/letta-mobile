@@ -25,6 +25,7 @@ internal data class ChatContentCallbacks(
     val onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)?,
     val onActiveFontScaleChange: (Float) -> Unit = {},
     val onFontScaleChange: (Float) -> Unit = {},
+    val onDiscardMessage: ((UiMessage) -> Unit)? = null,
 ) {
     /** User-facing name for the historical rerun callback. */
     val onSendAgainMessage: (UiMessage) -> Unit

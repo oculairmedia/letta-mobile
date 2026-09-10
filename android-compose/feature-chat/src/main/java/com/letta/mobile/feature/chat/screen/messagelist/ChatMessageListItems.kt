@@ -151,6 +151,7 @@ internal fun RenderChatMessage(
             onToggleReasoning = onToggleReasoning,
             onGeneratedUiMessage = callbacks.onSendMessage,
             onRerunMessage = callbacks.onRerunMessage,
+            onDiscardMessage = callbacks.onDiscardMessage,
             rerunEnabled = rerunEnabled,
             onApprovalDecision = { requestId, toolCallIds, approve, reason ->
                 callbacks.onSubmitApproval(requestId, toolCallIds, approve, reason)

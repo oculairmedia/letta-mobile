@@ -687,6 +687,24 @@ class TimelineExactCanonicalWriterTest {
         assertTrue(engine.acknowledgeSettlement(fence, mapOf(TimelineMessageId("id") to 1L)))
     }
 
+    @Test fun onlyAFailedSendCanBeDiscardedAndTheRestSurvive() = runTest {
+        val store = Store()
+        val pending = CanonicalPendingLocalStore(store)
+        val sending = CanonicalPendingLocalStore.Record("otid-sending", "in flight", emptyList(), "2026-01-01T00:00:00Z")
+        val failed = CanonicalPendingLocalStore.Record("otid-failed", "gave up", emptyList(), "2026-01-01T00:00:01Z")
+        pending.save(scope, sending)
+        pending.save(scope, failed)
+        pending.mark(scope, failed.otid, CanonicalPendingLocalStore.Delivery.Failed)
+        // An absent echo is not confirmation, so a send still in flight must not be droppable.
+        assertFalse(pending.discardFailed(scope, sending.otid))
+        assertFalse(pending.discardFailed(scope, "otid-unknown"))
+        assertEquals(2, pending.load(scope).size)
+        assertTrue(pending.discardFailed(scope, failed.otid))
+        assertEquals(listOf(sending.otid), pending.load(scope).map { it.otid })
+        // Discarding is idempotent: the bubble cannot come back on a second tap.
+        assertFalse(pending.discardFailed(scope, failed.otid))
+    }
+
     private suspend fun reconcile(
         engine: CanonicalTimelineEngine,
         selection: TimelineEngineSelection,

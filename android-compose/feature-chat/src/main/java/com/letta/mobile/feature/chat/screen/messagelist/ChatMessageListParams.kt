@@ -18,6 +18,7 @@ internal data class ChatMessageListCallbacks(
     val onToggleRunCollapsed: (String) -> Unit,
     val onToggleReasoningExpanded: (String) -> Unit,
     val onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)?,
+    val onDiscardMessage: ((UiMessage) -> Unit)? = null,
 ) {
     /** User-facing name for the historical rerun callback. */
     val onSendAgainMessage: (UiMessage) -> Unit
@@ -41,6 +42,7 @@ internal data class ChatMessageRenderCallbacks(
     val onToggleRunCollapsed: (String) -> Unit,
     val onToggleReasoningExpanded: (String) -> Unit,
     val onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)?,
+    val onDiscardMessage: ((UiMessage) -> Unit)? = null,
 ) {
     /** User-facing name for the historical rerun callback. */
     val onSendAgainMessage: (UiMessage) -> Unit

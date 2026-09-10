@@ -52,6 +52,7 @@ internal fun ChatMessageListBody(
             onToggleRunCollapsed = params.callbacks.onToggleRunCollapsed,
             onToggleReasoningExpanded = params.callbacks.onToggleReasoningExpanded,
             onAttachmentImageTap = params.callbacks.onAttachmentImageTap,
+            onDiscardMessage = params.callbacks.onDiscardMessage,
         )
     }
     val itemState = remember(

@@ -62,6 +62,9 @@ class CanonicalExternalTransportWriter(
     override suspend fun markExternalTransportLocalFailed(agentId: String?, conversationId: String, otid: String) =
         coordinator.markPending(owner(agentId, conversationId), otid, CanonicalPendingLocalStore.Delivery.Failed)
 
+    override suspend fun discardFailedExternalTransportLocal(agentId: String?, conversationId: String, otid: String): Boolean =
+        coordinator.discardFailedPending(owner(agentId, conversationId), otid)
+
     override suspend fun ingestExternalTransportMessage(conversationId: String, message: LettaMessage, source: String) =
         ingestExternalTransportMessage(null, conversationId, message, source)
 

@@ -65,6 +65,11 @@ class CanonicalTimelineCoordinator(
         owner.session.markPending(otid, delivery)
     }
 
+    suspend fun discardFailedPending(owner: Owner, otid: String): Boolean = mutex.withLock {
+        check(owners[owner.selection.scope] === owner) { "Stale canonical owner" }
+        owner.session.discardFailedPending(otid)
+    }
+
     suspend fun reconcileRecent(owner: Owner): TimelineEnginePageOutcome = reconcileRecentDetailed(owner).outcome
 
     // The overlay is the only copy of a settled turn until this path writes it, so keep it resident;
@@ -187,6 +192,10 @@ class CanonicalTimelineSession(
     suspend fun markPending(otid: String, delivery: CanonicalPendingLocalStore.Delivery) = pendingMutex.withLock {
         pendingStore.mark(scope, otid, delivery)
         mutablePending.value = pendingStore.load(scope)
+    }
+
+    suspend fun discardFailedPending(otid: String): Boolean = pendingMutex.withLock {
+        pendingStore.discardFailed(scope, otid).also { mutablePending.value = pendingStore.load(scope) }
     }
 
     private suspend fun refreshPending() = pendingMutex.withLock {
