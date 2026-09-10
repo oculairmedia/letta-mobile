@@ -21,17 +21,17 @@ class TimelineLiveOverlayDrainTest {
         val engine = engine()
         val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
         val fence = engine.beginLive(selection)
-        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(message("hello"))))
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(message("hello", "reply-id"))))
         // A still-streaming turn has no settlement revision, so nothing can acknowledge it.
-        assertFalse(engine.acknowledgeSettlement(fence, mapOf(TimelineMessageId("ui-msg-1") to 99L)))
+        assertFalse(engine.acknowledgeSettlement(fence, mapOf(TimelineMessageId("reply-id") to 99L)))
         assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
         val live = assertNotNull(engine.live.value)
         assertEquals(SETTLEMENT, live.settlementRevision)
         assertEquals(1, live.block.events.size)
         for (presented in listOf(
             emptyMap<TimelineMessageId, Long>(),
-            mapOf(TimelineMessageId("ui-msg-1") to SETTLEMENT - 1),
-            mapOf(TimelineMessageId("ui-msg-1") to 0L, TimelineMessageId("ui-msg-2") to SETTLEMENT - 1),
+            mapOf(TimelineMessageId("unrelated-id") to SETTLEMENT),
+            mapOf(TimelineMessageId("unrelated-id") to 0L, TimelineMessageId("unrelated-id-2") to SETTLEMENT),
         )) {
             assertFalse(live.isSettled(presented))
             // Draining early would erase a reply that exists nowhere else, so keep every event.
@@ -41,27 +41,125 @@ class TimelineLiveOverlayDrainTest {
         }
     }
 
-    @Test fun overlayDrainsWhenAnyResidentRowReachesSettlementRevision() = runTest {
+    @Test fun overlayDrainsWhenResidentRowsMatchTurnIdentity() = runTest {
         val engine = engine()
         val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
         val fence = engine.beginLive(selection)
-        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(message("hello"))))
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(message("hello", "reply-1"))))
         assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
         val live = assertNotNull(engine.live.value)
-        // The sync writer owns identities the stream never used, so only the revision can decide.
-        val presented = mapOf(TimelineMessageId("ui-msg-1") to SETTLEMENT)
+
+        // Rows ahead of settlement revision with unrelated identity do NOT drain the turn
+        val ahead = mapOf(TimelineMessageId("unrelated-id") to SETTLEMENT + 5)
+        assertFalse(live.isSettled(ahead))
+        assertEquals(live.block.events, live.overlayEvents(ahead))
+        assertFalse(engine.acknowledgeSettlement(fence, ahead))
+        assertEquals(live, engine.live.value)
+
+        // Matching turn identity drains the overlay and acknowledges settlement
+        val presented = mapOf(TimelineMessageId("reply-1") to SETTLEMENT)
         assertTrue(live.isSettled(presented))
         assertEquals(emptyList(), live.overlayEvents(presented))
         assertTrue(engine.acknowledgeSettlement(fence, presented))
         assertEquals(null, engine.live.value)
+    }
 
-        // A ledger that ran further ahead than this turn's revision settles it just as well.
-        val next = engine.beginLive(selection)
-        assertTrue(engine.ingest(next, TimelineStreamFrame.Message(message("second"))))
-        assertTrue(engine.ingest(next, TimelineStreamFrame.Done))
-        val ahead = mapOf(TimelineMessageId("ui-msg-2") to SETTLEMENT + 5)
-        assertTrue(assertNotNull(engine.live.value).isSettled(ahead))
-        assertTrue(engine.acknowledgeSettlement(next, ahead))
+    @Test fun strandGuardDrainsWhenLedgerRunsFarPastSettlementRevision() = runTest {
+        val engine = engine()
+        val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
+        val fence = engine.beginLive(selection)
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(message("hello", "reply-stranded"))))
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
+        val live = assertNotNull(engine.live.value)
+
+        // Head ahead by less than STRAND_GUARD_REVISION_DELTA (1024) does not trigger strand guard
+        val aheadClose = mapOf(TimelineMessageId("unrelated") to SETTLEMENT + 1023)
+        assertFalse(live.isSettled(aheadClose))
+        assertFalse(engine.acknowledgeSettlement(fence, aheadClose))
+
+        // Head ahead by >= 1024 triggers strand guard
+        val aheadFar = mapOf(TimelineMessageId("unrelated") to SETTLEMENT + 1024)
+        assertTrue(live.isSettled(aheadFar))
+        assertEquals(emptyList(), live.overlayEvents(aheadFar))
+        assertTrue(engine.acknowledgeSettlement(fence, aheadFar))
+        assertEquals(null, engine.live.value)
+    }
+
+    @Test fun assistantReplyWithAliasedUiMessageIdDrainsOnCanonicalIdentity() = runTest {
+        // In production: live event carries synthesized ui-msg-*, sync persists canonical msg-*
+        // and records evidence: identity/serverId/<ui-msg-*> -> <canonical-id>
+        val synthesizedId = "ui-msg-streamed"
+        val canonicalId = "msg-canonical"
+        val evidenceMap = mapOf(
+            "identity/serverId/$synthesizedId" to canonicalId.encodeToByteArray(),
+        )
+        val store = FixedStore(evidenceMap)
+        val engine = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
+        val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
+        val fence = engine.beginLive(selection)
+
+        // Live stream emits the reply with synthesized ui-msg-* id
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(message("hello", synthesizedId))))
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
+        val live = assertNotNull(engine.live.value)
+        assertEquals(1, live.block.events.size)
+        assertEquals(synthesizedId, live.block.events[0].serverId)
+
+        // Unrelated resident rows do NOT settle the turn; overlay retains the event
+        val unrelated = mapOf(TimelineMessageId("unrelated-row") to SETTLEMENT)
+        assertFalse(live.isSettled(unrelated))
+        assertFalse(engine.acknowledgeSettlement(fence, unrelated))
+        // The turn stays live, but the engine caches the alias it had to read to decide that.
+        val currentLive = assertNotNull(engine.live.value)
+        assertEquals(fence, currentLive.fence)
+        assertEquals(mapOf(synthesizedId to TimelineMessageId(canonicalId)), currentLive.aliases)
+        assertFalse(currentLive.isSettled(unrelated))
+        assertEquals(currentLive.block.events, currentLive.overlayEvents(unrelated))
+
+        // Paging presents the settled row carrying the canonical id
+        val presented = mapOf(TimelineMessageId(canonicalId) to SETTLEMENT)
+
+        // Without alias resolution, raw publication does not match canonical presented row
+        assertFalse(live.isSettled(presented))
+        assertEquals(live.block.events, live.overlayEvents(presented))
+
+        // When publication carries the resolved alias, isSettled is true and overlayEvents drains
+        val aliased = live.copy(aliases = mapOf(synthesizedId to TimelineMessageId(canonicalId)))
+        assertTrue(aliased.isSettled(presented))
+        assertEquals(emptyList(), aliased.overlayEvents(presented))
+
+        // Engine resolves the alias from evidence, acknowledges settlement, and releases fence
+        assertTrue(engine.acknowledgeSettlement(fence, presented))
+        assertEquals(null, engine.live.value)
+    }
+
+    @Test fun aliasedEventLeavesTheOverlayWhileTheRestOfTheTurnIsStillLive() = runTest {
+        // The double-render this guards against: the canonical row is on screen and the overlay is
+        // still showing the streamed copy of the same message. Draining must not wait for the fence.
+        val synthesizedId = "ui-msg-streamed"
+        val canonicalId = "msg-canonical"
+        val store = FixedStore(mapOf("identity/serverId/$synthesizedId" to canonicalId.encodeToByteArray()))
+        val engine = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
+        val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
+        val fence = engine.beginLive(selection)
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(message("hello", synthesizedId))))
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(message("world", "reply-2"))))
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
+        assertEquals(2, assertNotNull(engine.live.value).block.events.size)
+
+        // Only the aliased message has a settled row; the rest of the turn has not landed yet.
+        val presented = mapOf(TimelineMessageId(canonicalId) to SETTLEMENT)
+        assertFalse(engine.acknowledgeSettlement(fence, presented))
+
+        // The turn is still live, but the engine cached the alias, so the render path already
+        // drops the streamed copy: one message on screen, not two.
+        val live = assertNotNull(engine.live.value)
+        assertEquals(mapOf(synthesizedId to TimelineMessageId(canonicalId)), live.aliases)
+        assertEquals(listOf("reply-2"), live.overlayEvents(presented).map { it.serverId })
+
+        // The rest of the turn lands and the fence releases.
+        val complete = presented + (TimelineMessageId("reply-2") to SETTLEMENT)
+        assertTrue(engine.acknowledgeSettlement(fence, complete))
         assertEquals(null, engine.live.value)
     }
 
@@ -86,14 +184,14 @@ class TimelineLiveOverlayDrainTest {
     @Test fun staleFenceCannotAcknowledgeSettlement() = runTest {
         val engine = engine()
         val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
-        val presented = mapOf(TimelineMessageId("ui-msg-1") to SETTLEMENT)
+        val presented = mapOf(TimelineMessageId("second-id") to SETTLEMENT)
         val stale = engine.beginLive(selection)
-        assertTrue(engine.ingest(stale, TimelineStreamFrame.Message(message("first"))))
+        assertTrue(engine.ingest(stale, TimelineStreamFrame.Message(message("first", "first-id"))))
         assertTrue(engine.ingest(stale, TimelineStreamFrame.Done))
         val current = engine.beginLive(selection)
         // The replacement turn owns the overlay; the finished turn's late acknowledgment is inert.
         assertFalse(engine.acknowledgeSettlement(stale, presented))
-        assertTrue(engine.ingest(current, TimelineStreamFrame.Message(message("second"))))
+        assertTrue(engine.ingest(current, TimelineStreamFrame.Message(message("second", "second-id"))))
         assertTrue(engine.ingest(current, TimelineStreamFrame.Done))
         assertFalse(engine.acknowledgeSettlement(stale, presented))
         assertEquals(current, engine.live.value?.fence)
@@ -105,10 +203,8 @@ class TimelineLiveOverlayDrainTest {
         CanonicalTimelineEngine(FixedStore(), TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
 
     /** Live ingest may only read the checkpoint; every durable mutation here is a contract failure. */
-    private class FixedStore : TimelineBoundedStore {
-        override suspend fun <T> read(scope: TimelineScope, block: suspend TimelineStoreReader.() -> T): T = block(Tx)
-        override suspend fun <T> transaction(scope: TimelineScope, block: suspend TimelineStoreTransaction.() -> T): T = block(Tx)
-        private object Tx : TimelineStoreTransaction {
+    private class FixedStore(private val evidenceMap: Map<String, ByteArray> = emptyMap()) : TimelineBoundedStore {
+        private val tx = object : TimelineStoreTransaction {
             override suspend fun toolCall(callId: String): TimelineToolIndexEntry? = null
             override suspend fun unresolvedTools(afterCallId: String?, maxRows: Int) = emptyList<TimelineToolIndexEntry>()
             override suspend fun toolSweepGeneration() = 0L
@@ -120,7 +216,7 @@ class TimelineLiveOverlayDrainTest {
                 TimelineMetadataPage(emptyList(), null, null, DURABLE)
             override suspend fun body(pointer: TimelineBodyPointer, offset: Long, maxBytes: Int): ByteArray =
                 error("no settled bodies")
-            override suspend fun evidence(key: String, maxBytes: Int): ByteArray? = null
+            override suspend fun evidence(key: String, maxBytes: Int): ByteArray? = evidenceMap[key]
             override suspend fun put(record: TimelineStoredRecord) = error("live ingest must not write")
             override suspend fun putEvidence(key: String, value: ByteArray) = error("live ingest must not write")
             override suspend fun deleteEvidence(key: String) = error("live ingest must not write")
@@ -129,6 +225,8 @@ class TimelineLiveOverlayDrainTest {
             override suspend fun delete(identity: TimelineMessageId, reason: TimelineDurableDeleteReason) =
                 error("live ingest must not write")
         }
+        override suspend fun <T> read(scope: TimelineScope, block: suspend TimelineStoreReader.() -> T): T = block(tx)
+        override suspend fun <T> transaction(scope: TimelineScope, block: suspend TimelineStoreTransaction.() -> T): T = block(tx)
     }
 
     companion object {
@@ -136,8 +234,8 @@ class TimelineLiveOverlayDrainTest {
         private const val DURABLE = 0L
         /** One past the fixed durable revision: the first revision only the sync writer can reach. */
         private const val SETTLEMENT = DURABLE + 1
-        private fun message(content: String) = AssistantMessage(
-            id = "id", contentRaw = kotlinx.serialization.json.JsonPrimitive(content), date = "2026-01-01T00:00:00Z",
+        private fun message(content: String, id: String = "id") = AssistantMessage(
+            id = id, contentRaw = kotlinx.serialization.json.JsonPrimitive(content), date = "2026-01-01T00:00:00Z",
         )
     }
 }

@@ -153,17 +153,60 @@ class CanonicalTimelineEngine(
         true
     }
 
-    /** Host acknowledges only once the settled ledger it renders carries this turn's revision. */
+    /** Host acknowledges only once the settled ledger it renders carries this turn's identity. */
     suspend fun acknowledgeSettlement(
         fence: TimelineLiveFence,
         presented: Map<TimelineMessageId, Long>,
     ): Boolean = mutex.withLock {
         val current = mutableLive.value ?: return@withLock false
-        if (current.fence !== fence || !current.isSettled(presented)) return@withLock false
+        if (current.fence !== fence) return@withLock false
+        val nextAliases = resolveAliases(fence.selection.scope, current, presented)
+        val active = if (nextAliases.isEmpty()) current
+        else current.copy(aliases = current.aliases + nextAliases).also { mutableLive.value = it }
+        if (!active.isSettled(presented)) return@withLock false
         mutableLive.value = null
         liveFence = null
         liveReduction = null
         true
+    }
+
+    /**
+     * The sync writer's commit is the first moment alias evidence exists for this turn, so this
+     * runs there rather than at the terminal frame: at Done the durable row has not been written
+     * and there is nothing yet to resolve against.
+     */
+    private suspend fun attachResolvedAliases(scope: TimelineScope) {
+        val live = mutableLive.value ?: return
+        if (live.settlementRevision == null) return
+        val aliases = resolveAliases(scope, live, emptyMap())
+        if (aliases.isEmpty()) return
+        mutableLive.value = live.copy(aliases = live.aliases + aliases)
+    }
+
+    private suspend fun resolveAliases(
+        scope: TimelineScope,
+        publication: TimelineLivePublication,
+        presented: Map<TimelineMessageId, Long>,
+    ): Map<String, TimelineMessageId> {
+        // Alias evidence requires the exact canonical writer. Fallback writers without exact
+        // canonical indexing rely on matching event identities directly or the strand guard.
+        val exact = writer as? TimelineExactCanonicalWriter ?: return emptyMap()
+        // An alias never changes once recorded, so a known one is never re-read. Events already
+        // resident under their own id need no alias at all.
+        val missing = publication.block.events.filter { event ->
+            event.serverId !in publication.aliases && TimelineMessageId(event.serverId) !in presented
+        }
+        if (missing.isEmpty()) return emptyMap()
+        val aliases = mutableMapOf<String, TimelineMessageId>()
+        store.read(scope) {
+            for (event in missing) {
+                val canonical = exact.canonicalIdentity(this, event.serverId, event.otid)
+                if (canonical.value != event.serverId) {
+                    aliases[event.serverId] = canonical
+                }
+            }
+        }
+        return aliases
     }
 
     suspend fun open(scope: TimelineScope, target: TimelineMessageId? = null): TimelineEngineOpen = mutex.withLock {
@@ -272,6 +315,7 @@ class CanonicalTimelineEngine(
             (if (changed) nextRevision() else checkpoint().revision) to appended
         }
         mutablePublication.value = TimelineEnginePublication(request.selection, revision)
+        attachResolvedAliases(request.selection.scope)
         pendingReconcile = null
         TimelineEngineReconcileResult(TimelineEnginePageOutcome.Applied, appended,
             page.records.mapNotNull { it.message.seqId?.toLong() }.maxOrNull())

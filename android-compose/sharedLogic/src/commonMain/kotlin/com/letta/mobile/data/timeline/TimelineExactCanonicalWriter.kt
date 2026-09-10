@@ -93,11 +93,7 @@ class TimelineExactCanonicalWriter(
         for (callId in merged.toolReturnContentByCallId.keys) {
             if (callId.isNotBlank()) indexed = CanonicalToolIndex.observe(transaction, callId, null, true) || indexed
         }
-        if (incoming.otid.isNotBlank() && incoming.otid != merged.otid &&
-            transaction.evidence("identity/otid/${incoming.otid}", 64 * 1024)?.decodeToString() != identity.value) {
-            transaction.putEvidence("identity/otid/${incoming.otid}", identity.value.encodeToByteArray())
-            indexed = true
-        }
+        indexed = transaction.indexIdentityAliases(incoming, merged.otid, identity) || indexed
         val canonical = merged.copy(serverId = identity.value)
         val bytes = TimelineSnapshotCodec.json.encodeToString(StoredTimelineEvent.serializer(), canonical.toStoredTimelineEvent()).encodeToByteArray()
         if (historicalBytes != null && bytes.contentEquals(historicalBytes)) return indexed
@@ -107,6 +103,37 @@ class TimelineExactCanonicalWriter(
             val evidence = TerminalOwnershipEvidence.checkpoint(scope, canonical)
             transaction.putEvidence(ownerKey, TimelineSnapshotCodec.json.encodeToString(TerminalOwnershipEvidence.serializer(), evidence).encodeToByteArray())
         }
+        return true
+    }
+
+    /**
+     * Records how else this message can be named, so a later reader resolves either name to the
+     * canonical identity. A user echo is named by its otid; a streamed assistant reply is named by
+     * the synthesized `ui-msg-*` id the reducer gave it before the sync writer chose a real one.
+     */
+    private suspend fun TimelineStoreTransaction.indexIdentityAliases(
+        incoming: TimelineEvent.Confirmed,
+        mergedOtid: String,
+        identity: TimelineMessageId,
+    ): Boolean {
+        var indexed = false
+        if (incoming.otid.isNotBlank() && incoming.otid != mergedOtid) {
+            indexed = observeIdentityAlias("identity/otid/${incoming.otid}", identity) || indexed
+        }
+        if (incoming.messageType == TimelineMessageType.ASSISTANT && incoming.serverId.startsWith("ui-msg-") &&
+            incoming.serverId != identity.value
+        ) {
+            indexed = observeIdentityAlias("identity/serverId/${incoming.serverId}", identity) || indexed
+        }
+        return indexed
+    }
+
+    private suspend fun TimelineStoreTransaction.observeIdentityAlias(
+        evidenceKey: String,
+        canonicalIdentity: TimelineMessageId,
+    ): Boolean {
+        if (evidence(evidenceKey, 64 * 1024)?.decodeToString() == canonicalIdentity.value) return false
+        putEvidence(evidenceKey, canonicalIdentity.value.encodeToByteArray())
         return true
     }
 
@@ -126,6 +153,8 @@ class TimelineExactCanonicalWriter(
     internal suspend fun canonicalIdentity(reader: TimelineStoreReader, serverId: String, otid: String): TimelineMessageId {
         val alias = otid.takeIf { it.isNotBlank() }?.let {
             reader.evidence("identity/otid/$it", 64 * 1024)?.decodeToString(throwOnInvalidSequence = true)
+        } ?: serverId.takeIf { it.isNotBlank() }?.let {
+            reader.evidence("identity/serverId/$it", 64 * 1024)?.decodeToString(throwOnInvalidSequence = true)
         }
         return TimelineMessageId(alias ?: serverId)
     }

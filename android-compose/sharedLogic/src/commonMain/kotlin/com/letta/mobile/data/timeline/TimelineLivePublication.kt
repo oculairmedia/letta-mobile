@@ -3,6 +3,7 @@ package com.letta.mobile.data.timeline
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import com.letta.mobile.data.timeline.snapshot.toConfirmedTimelineEvent
+import com.letta.mobile.util.Telemetry
 import kotlinx.collections.immutable.toPersistentList
 
 /** Use the existing semantic mapper for optimistic attachments and delivery flags on every host. */
@@ -77,6 +78,8 @@ fun TimelineSettledRecord.toRenderItem(ownAgentId: String? = null): com.letta.mo
     )
 }
 
+internal const val STRAND_GUARD_REVISION_DELTA = 1024L
+
 data class TimelineLiveFence(val selection: TimelineEngineSelection, val requestId: TimelineRequestId)
 
 data class TimelineLivePublication(
@@ -84,20 +87,46 @@ data class TimelineLivePublication(
     val block: TimelineLiveBlock,
     /** First durable revision able to carry this turn; only the sync writer can reach it. */
     val settlementRevision: Long? = null,
+    val aliases: Map<String, TimelineMessageId> = emptyMap(),
 ) {
+    private fun isEventResident(
+        event: TimelineEvent.Confirmed,
+        presented: Map<TimelineMessageId, Long>,
+    ): Boolean {
+        if (TimelineMessageId(event.serverId) in presented) return true
+        val alias = aliases[event.serverId]
+        return alias != null && alias in presented
+    }
+
     /**
-     * Live ingest writes no durable rows, so its identities never appear in the settled ledger.
-     * Drain on ledger progress instead: the turn is settled once the rendered snapshot is at or
-     * beyond the terminal revision.
+     * Drain on turn identity, not on a ledger watermark revision.
+     * Settled once all events in the block have a resident row in [presented].
+     * Releases via strand guard if the ledger head runs well past settlement revision (+1024L).
      */
     fun isSettled(presented: Map<TimelineMessageId, Long>): Boolean {
         val revision = settlementRevision ?: return false
         // A turn that produced nothing has nothing to wait for; never strand the fence on it.
         if (block.events.isEmpty() && block.records.isEmpty()) return true
-        return presented.values.any { it >= revision }
+        val allEvents = block.events.all { isEventResident(it, presented) }
+        val allRecords = block.records.all { it.identity in presented }
+        if (allEvents && allRecords) return true
+
+        val maxRevision = presented.values.maxOrNull() ?: return false
+        if (maxRevision >= revision + STRAND_GUARD_REVISION_DELTA) {
+            Telemetry.event(
+                "TimelineLivePublication", "strandGuard.drained",
+                "settlementRevision" to revision,
+                "headRevision" to maxRevision,
+                level = Telemetry.Level.WARN,
+            )
+            return true
+        }
+        return false
     }
 
-    /** Overlay stays resident, unchanged, until the settled ledger carries the same turn. */
-    fun overlayEvents(presented: Map<TimelineMessageId, Long>): List<TimelineEvent.Confirmed> =
-        if (isSettled(presented)) emptyList() else block.events
+    /** Overlay stays resident, draining individual events as they become resident in settled rows. */
+    fun overlayEvents(presented: Map<TimelineMessageId, Long>): List<TimelineEvent.Confirmed> {
+        if (isSettled(presented)) return emptyList()
+        return block.events.filterNot { isEventResident(it, presented) }
+    }
 }

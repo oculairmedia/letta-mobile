@@ -55,8 +55,9 @@ class TimelineExactCanonicalWriterTest {
         assertEquals(1L, engine.live.value?.settlementRevision)
         assertEquals(0L, engine.publication.value.durableRevision)
         assertFalse(engine.acknowledgeSettlement(fence, emptyMap()))
-        assertFalse(engine.acknowledgeSettlement(fence, mapOf(TimelineMessageId("id") to 0L)))
-        // Only the sync path writes the row, and reaching its revision releases the overlay.
+        // Other rows being on screen says nothing about this turn; only its own row can settle it.
+        assertFalse(engine.acknowledgeSettlement(fence, mapOf(TimelineMessageId("other") to 0L)))
+        // Only the sync path writes the row, and its identity becoming resident releases the overlay.
         assertEquals(TimelineEnginePageOutcome.Applied, reconcile(engine, selection, record(reply)))
         assertEquals(1, store.rows.size)
         assertEquals(1L, engine.publication.value.durableRevision)
@@ -522,9 +523,9 @@ class TimelineExactCanonicalWriterTest {
         val revision = engine.publication.value.durableRevision
         assertEquals(1L, revision)
         assertEquals(1, store.rows.size)
-        // The block carries rows, so it drains on ledger progress rather than settling immediately.
+        // The block carries rows, so it drains once they are resident rather than settling immediately.
         assertFalse(engine.acknowledgeSettlement(fence, emptyMap()))
-        assertFalse(engine.acknowledgeSettlement(fence, mapOf(TimelineMessageId("id") to revision - 1)))
+        assertFalse(engine.acknowledgeSettlement(fence, mapOf(TimelineMessageId("other") to revision)))
         assertTrue(engine.acknowledgeSettlement(fence, mapOf(TimelineMessageId("id") to revision)))
         assertEquals(null, engine.live.value)
     }
@@ -621,9 +622,9 @@ class TimelineExactCanonicalWriterTest {
         assertEquals(1, store.rows.size)
         assertEquals(1L, owner.session.publication.value.durableRevision)
         val bytes = store.rows.values.single().body.copyOf()
-        // Repair no longer force-releases; only an acknowledged resident revision drains the overlay.
+        // Repair no longer force-releases; only this turn's own resident row drains the overlay.
         assertEquals(first, owner.session.live.value?.fence)
-        assertFalse(coordinator.acknowledgeSettlement(owner, first, mapOf(TimelineMessageId("id") to 0L)))
+        assertFalse(coordinator.acknowledgeSettlement(owner, first, mapOf(TimelineMessageId("other") to 1L)))
         assertTrue(coordinator.acknowledgeSettlement(owner, first, mapOf(TimelineMessageId("id") to 1L)))
         assertEquals(null, owner.session.live.value)
         kotlin.test.assertContentEquals(bytes, store.rows.values.single().body)
