@@ -184,31 +184,54 @@ class CanonicalTimelineEngine(
      * settling turn, which is the narrowest join available - never across turns, and never on a
      * turn that is still streaming.
      */
-    private fun adoptCommittedIdentities(page: TimelineRemotePageResult.Page) {
+    private fun adoptCommittedIdentities(committed: List<Pair<TimelineEvent.Confirmed, TimelineMessageId>>) {
         val live = mutableLive.value ?: return
         if (live.settlementRevision == null) return
-        val adopted = live.adoptionsFrom(page.records.mapNotNull { it.message.toTimelineEvent(0.0) })
+        val adopted = live.adoptionsFrom(committed)
         if (adopted.isEmpty()) return
         mutableLive.value = live.copy(aliases = live.aliases + adopted)
     }
 
     private fun TimelineLivePublication.adoptionsFrom(
-        committed: List<TimelineEvent.Confirmed>,
+        committed: List<Pair<TimelineEvent.Confirmed, TimelineMessageId>>,
     ): Map<String, TimelineMessageId> {
-        val unclaimed = committed.filterTo(mutableListOf()) { it.messageType == TimelineMessageType.ASSISTANT }
+        val unclaimed = committed.filterTo(mutableListOf()) { it.first.adoptionKey() != null }
         if (unclaimed.isEmpty()) return emptyMap()
         return block.events.mapNotNull { it.claimAdoption(unclaimed, aliases) }.toMap()
     }
 
-    /** Each committed reply answers for at most one streamed event, so claiming it removes it. */
+    /**
+     * What names the same message on both sides of the boundary. A tool call and its return are
+     * named by the call, which the stream and the ledger agree on exactly. An assistant reply has
+     * no shared id at all - the stream and the server each derive an otid from their own name - so
+     * its content is the only thing left to match on.
+     */
+    private fun TimelineEvent.Confirmed.adoptionKey(): String? = when (messageType) {
+        TimelineMessageType.TOOL_CALL -> toolCalls.firstNotNullOfOrNull { it.effectiveId.takeIf(String::isNotBlank) }
+        TimelineMessageType.TOOL_RETURN -> toolReturnContentByCallId.keys.firstOrNull { it.isNotBlank() }
+        TimelineMessageType.ASSISTANT -> content.takeIf { it.isNotBlank() }
+        else -> null
+    }
+
+    /**
+     * The types must agree, or a tool call could claim the assistant row it belongs to.
+     *
+     * A content match is consumed, because two replies that happen to read the same are still two
+     * replies and must not collapse onto one row. An id match is not: one call can reach the
+     * overlay under several names - a stream emits a synthetic return before the real one - and
+     * every one of them is the same message as the single committed row, so all of them adopt it.
+     */
     private fun TimelineEvent.Confirmed.claimAdoption(
-        unclaimed: MutableList<TimelineEvent.Confirmed>,
+        unclaimed: MutableList<Pair<TimelineEvent.Confirmed, TimelineMessageId>>,
         aliases: Map<String, TimelineMessageId>,
     ): Pair<String, TimelineMessageId>? {
-        if (messageType != TimelineMessageType.ASSISTANT || serverId in aliases) return null
-        val match = unclaimed.firstOrNull { it.content == content } ?: return null
-        unclaimed.remove(match)
-        return if (match.serverId == serverId) null else serverId to TimelineMessageId(match.serverId)
+        if (serverId in aliases) return null
+        val key = adoptionKey() ?: return null
+        val match = unclaimed.firstOrNull {
+            it.first.messageType == messageType && it.first.adoptionKey() == key
+        } ?: return null
+        if (messageType == TimelineMessageType.ASSISTANT) unclaimed.remove(match)
+        return if (match.second.value == serverId) null else serverId to match.second
     }
 
     /**
@@ -339,6 +362,7 @@ class CanonicalTimelineEngine(
             return@withLock TimelineEngineReconcileResult(TimelineEnginePageOutcome.NoProgress)
         }
         validate(page)
+        val committed = mutableListOf<Pair<TimelineEvent.Confirmed, TimelineMessageId>>()
         val (revision, appended) = store.transaction(request.selection.scope) {
             var changed = false
             var appended = 0
@@ -351,12 +375,17 @@ class CanonicalTimelineEngine(
                 val merged = writer.merge(this, record)
                 if (merged && !existed) appended++
                 changed = merged || changed
+                // After the merge: a tool call's stored key is its group owner, which the tool
+                // index only knows once this record has been written.
+                if (writer is TimelineExactCanonicalWriter && event != null) {
+                    committed += event to writer.canonicalEventIdentity(this, event)
+                }
             }
             currentCoroutineContext().ensureActive()
             (if (changed) nextRevision() else checkpoint().revision) to appended
         }
         mutablePublication.value = TimelineEnginePublication(request.selection, revision)
-        adoptCommittedIdentities(page)
+        adoptCommittedIdentities(committed)
         attachResolvedAliases(request.selection.scope)
         pendingReconcile = null
         TimelineEngineReconcileResult(TimelineEnginePageOutcome.Applied, appended,

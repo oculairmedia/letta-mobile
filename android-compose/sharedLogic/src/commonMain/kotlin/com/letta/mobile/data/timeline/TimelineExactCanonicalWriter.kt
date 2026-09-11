@@ -138,7 +138,11 @@ class TimelineExactCanonicalWriter(
         return indexed
     }
 
-    private suspend fun canonicalEventIdentity(reader: TimelineStoreReader, event: TimelineEvent.Confirmed): TimelineMessageId {
+    /**
+     * The identity this event is stored under. For a tool call that is the group owner, which is
+     * not the event's own server id, so a caller that needs the stored key must ask for it here.
+     */
+    internal suspend fun canonicalEventIdentity(reader: TimelineStoreReader, event: TimelineEvent.Confirmed): TimelineMessageId {
         val identity = canonicalIdentity(reader, event.serverId, event.otid)
         if (event.messageType != TimelineMessageType.TOOL_CALL) return identity
         // Legacy live/history projections can give the same invocation different server IDs and otids.
