@@ -85,6 +85,26 @@ class TimelineSemanticBodyWindowTest {
             com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent.serializer(), stored,
         )
         assertEquals(stored.content, assertIs<TimelineSemanticWindowResult.Text>(decode(json)).value)
+        // What the ledger actually holds. TimelineSnapshotCodec writes messageType as the enum
+        // NAME, so a stored body says TOOL_CALL where the wire says tool_call. Reading the wire
+        // form only is why every deferred body came back UnsupportedType and large tool output
+        // could never be rehydrated.
+        for (type in TimelineMessageType.entries.filter { it.name.lowercase() in setOf(
+            "user", "assistant", "reasoning", "tool_call", "tool_return",
+        ) }) {
+            val asStored = com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent(
+                position = 1.0, otid = "otid", content = "semantic text", serverId = "id",
+                messageType = type.name, dateIso = "2026-01-01T00:00:00Z",
+            )
+            val encoded = kotlinx.serialization.json.Json.encodeToString(
+                com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent.serializer(), asStored,
+            )
+            assertEquals(
+                asStored.content,
+                assertIs<TimelineSemanticWindowResult.Text>(decode(encoded)).value,
+                "a body stored as ${type.name} must still be readable",
+            )
+        }
         for (body in listOf("{\"content\":\"future\"}", "{\"messageType\":\"future_protocol_record\",\"content\":\"future\"}")) {
             assertEquals(TimelineSemanticWindowResult.Reason.UnsupportedType, assertIs<TimelineSemanticWindowResult.Deferred>(decode(body)).reason)
         }
