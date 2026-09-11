@@ -53,6 +53,32 @@ class ToolTimelineProjectionTest {
     }
 
     @Test
+    fun aCallReadBackFromTheLedgerIsNotRunningEvenWithoutItsResult() {
+        // The ledger keeps a call and its return in separate rows, so a rehydrated call never
+        // carries a result. Reading that absence as Running is what made old tool cards announce
+        // "Executing ..." and auto-expand their arguments long after the turn ended.
+        val rehydrated = UiToolCall(
+            name = "Bash",
+            arguments = """{"command":"echo hi"}""",
+            result = null,
+            status = null,
+            toolCallId = "call-settled-1",
+            settled = true,
+        )
+        assertEquals(ToolTimelineState.Succeeded, classifyToolCallState(rehydrated))
+        assertEquals(ToolTimelineState.Succeeded, projectToolTimelineCall(rehydrated).state)
+        // isActive is what auto-expands the card, so pin it at the group the UI actually renders.
+        val settledGroup = projectToolTimelineGroupFromCalls(listOf(rehydrated), groupKey = "g-settled")
+        assertEquals(false, settledGroup?.isActive)
+
+        // A live call with the same shape is still running: only the ledger closes this question.
+        val live = rehydrated.copy(settled = false, toolCallId = "call-live-1")
+        assertEquals(ToolTimelineState.Running, classifyToolCallState(live))
+        val liveGroup = projectToolTimelineGroupFromCalls(listOf(live), groupKey = "g-live")
+        assertEquals(true, liveGroup?.isActive)
+    }
+
+    @Test
     fun liveAndHydratedProjectionsMatch() {
         var liveTimeline = Timeline(conversationId = ToolTimelineFixtures.TEST_CONVERSATION_ID)
         var pendingReturns = persistentMapOf<String, com.letta.mobile.data.model.ToolReturnMessage>()

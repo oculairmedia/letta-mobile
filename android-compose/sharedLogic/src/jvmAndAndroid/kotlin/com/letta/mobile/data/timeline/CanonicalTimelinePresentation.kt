@@ -177,10 +177,27 @@ class CanonicalTimelinePresentation private constructor(
         withContext(NonCancellable) { detached.await() }
     }
 
+    /**
+     * Everything reaching this function came off the durable ledger, so any tool call in it has
+     * already finished. Mark them, because the row carries no result of its own - the return is a
+     * separate row - and the projection would otherwise read that absence as "still running".
+     */
+    private fun ChatRenderItem.settledToolCalls(): ChatRenderItem = when (this) {
+        is ChatRenderItem.Single -> copy(message = message.withSettledToolCalls())
+        is ChatRenderItem.RunBlock -> copy(messages = messages.map { it.first.withSettledToolCalls() to it.second })
+        else -> this
+    }
+
+    private fun UiMessage.withSettledToolCalls(): UiMessage {
+        val calls = toolCalls ?: return this
+        if (calls.isEmpty() || calls.all { it.settled }) return this
+        return copy(toolCalls = calls.map { if (it.settled) it else it.copy(settled = true) })
+    }
+
     private fun project(record: TimelineSettledRecord): Row {
         val projection = record.projectBounded(owner.selection.scope, owner.selection.scope.agentId)
         val deferred = (projection as? TimelineSettledProjection.Deferred)?.reference
-        val item = (projection as? TimelineSettledProjection.Rendered)?.item ?: ChatRenderItem.Single(
+        val item = (projection as? TimelineSettledProjection.Rendered)?.item?.settledToolCalls() ?: ChatRenderItem.Single(
             UiMessage(record.key.identity.value, "assistant",
                 if (deferred != null) "Content stored locally (${deferred.pointer.encodedBytes} bytes). Preview unavailable."
                 else "This stored record cannot be displayed by this client version.",
