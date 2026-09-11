@@ -113,8 +113,16 @@ class CanonicalTimelineCoordinator(
 
     suspend fun ingestExternal(owner: Owner, message: com.letta.mobile.data.model.LettaMessage): Boolean = mutex.withLock {
         if (owners[owner.selection.scope] !== owner) return@withLock false
+        val frame = TimelineStreamFrame.Message(message)
         val fence = owner.liveFence ?: owner.session.beginLive(owner.selection).also { owner.liveFence = it }
-        owner.session.ingest(fence, TimelineStreamFrame.Message(message))
+        if (owner.session.ingest(fence, frame)) return@withLock true
+        // A frame arriving after this conversation's last turn settled belongs to the next turn, not
+        // to an error. The settled overlay refuses it until the screen acknowledges settlement, and
+        // that acknowledgement waits on a reconcile, so an agent replying twice in a row would
+        // otherwise be rejected. Open the fence the absent turnStarted would have opened.
+        if (owner.session.live.value?.settlementRevision == null) return@withLock false
+        val renewed = owner.session.beginLive(owner.selection).also { owner.liveFence = it }
+        owner.session.ingest(renewed, frame)
     }
 
     suspend fun completeExternal(owner: Owner) = mutex.withLock {

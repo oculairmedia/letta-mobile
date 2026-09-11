@@ -194,7 +194,7 @@ class AndroidCanonicalTimelineRuntime(
      * happens, and it keeps the ownership fence meaningful instead of tripping it.
      */
     private suspend fun ownedScope(requested: TimelineScope): TimelineScope {
-        val owner = authority.state(requested).scope.agentId ?: return requested
+        val owner = authority.ownerAgent(requested) ?: return requested
         if (owner == requested.agentId) return requested
         android.util.Log.i(
             "CanonicalTimeline",

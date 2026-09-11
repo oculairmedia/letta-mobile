@@ -74,6 +74,16 @@ class TimelineOwnershipAuthority(private val directory: Path) {
 
     suspend fun state(scope: TimelineScope): State = locked(scope.backendId) { read(scope) }
 
+    /**
+     * Read-only owner lookup that tolerates an unclaimed conversation. A conversation opened for
+     * the first time in a backend that already manages others has no record yet, which is ordinary
+     * traffic, not the lost record [read] demands recovery for: binding is not recovery, and the
+     * write paths still meet that fence. Returns null when nothing has claimed the conversation.
+     */
+    suspend fun ownerAgent(scope: TimelineScope): String? = locked(scope.backendId) {
+        if (Files.exists(statePath(scope))) read(scope).scope.agentId else null
+    }
+
     /** Capture before admitting work; a lease is checked again while holding the storage lock. */
     suspend fun acquire(scope: TimelineScope, route: Route): Lease = locked(scope.backendId) {
         val state = read(scope)

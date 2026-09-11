@@ -275,6 +275,43 @@ class TimelineExactCanonicalWriterTest {
      */
     private val sentAt = timelineNow().toString()
 
+    /**
+     * The agent replying again before the screen has acknowledged the settled turn is ordinary
+     * traffic. It used to be fatal: the settled overlay refused the frame and the writer asserted.
+     */
+    @Test fun externalFrameAfterSettledTurnOpensTheNextTurnInsteadOfFailing() = runTest {
+        val store = Store()
+        val coordinator = CanonicalTimelineCoordinator(store, PageTransport({ }))
+        val external = externalWriter(coordinator, RecordingMaintenance(mutableListOf()), sentAt)
+        val owner = coordinator.acquire(scope)
+        val screen = kotlin.test.assertNotNull(coordinator.attach(owner))
+        external.turnStarted(scope.agentId, scope.conversationId, "run", "turn")
+        external.ingestExternalTransportMessage(scope.agentId, scope.conversationId, message("hello"))
+        external.turnEnded(scope.agentId, scope.conversationId, clean = true)
+        assertEquals(1L, owner.session.live.value?.settlementRevision)
+        external.ingestExternalTransportMessage(scope.agentId, scope.conversationId, reply("second", "next turn"))
+        // The next turn is live again, carrying only its own frame.
+        assertEquals(null, owner.session.live.value?.settlementRevision)
+        assertEquals(listOf(TimelineMessageId("second")),
+            owner.session.live.value?.block?.events?.map { TimelineMessageId(it.serverId) })
+        coordinator.detach(screen)
+    }
+
+    /** A turn longer than the overlay budget must truncate the resident view, never fail the turn. */
+    @Test fun liveOverlayStopsGrowingAtItsBudgetInsteadOfFailingTheTurn() = runTest {
+        val store = Store()
+        val engine = CanonicalTimelineEngine(
+            store, TimelineExactCanonicalWriter(scope, 100_000), TimelinePageBudget(2, 2L * 1024 * 1024), enabled = true,
+        )
+        val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
+        val fence = engine.beginLive(selection)
+        repeat(4) { n -> assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(reply("m$n", "body $n")))) }
+        assertEquals(2, engine.live.value?.block?.events?.size)
+        // The turn still settles, so the durable reconcile can carry the rows the overlay dropped.
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
+        assertEquals(1L, engine.live.value?.settlementRevision)
+    }
+
     private fun externalWriter(
         coordinator: CanonicalTimelineCoordinator,
         maintenance: CanonicalTimelineMaintenance,
@@ -937,6 +974,7 @@ class TimelineExactCanonicalWriterTest {
     companion object {
         private val scope = TimelineScope("backend", "conversation")
         private fun message(content: String) = AssistantMessage(id = "id", contentRaw = kotlinx.serialization.json.JsonPrimitive(content), date = "2026-01-01T00:00:00Z")
+        private fun reply(id: String, content: String) = AssistantMessage(id = id, contentRaw = kotlinx.serialization.json.JsonPrimitive(content), date = "2026-01-01T00:00:00Z")
     }
 }
 

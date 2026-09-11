@@ -4,6 +4,7 @@ import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
+import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 
@@ -74,7 +75,14 @@ class CanonicalExternalTransportWriter(
         ingestExternalTransportMessage(null, conversationId, message, source)
 
     override suspend fun ingestExternalTransportMessage(agentId: String?, conversationId: String, message: LettaMessage, source: String) {
-        check(coordinator.ingestExternal(owner(agentId, conversationId), message)) { "External frame rejected by canonical ownership fence" }
+        // A refused frame is a dropped row on screen until the next reconcile, never a reason to
+        // fail the turn: this runs on the transport's own dispatcher, where throwing killed the app.
+        if (!coordinator.ingestExternal(owner(agentId, conversationId), message)) {
+            Telemetry.event(
+                "CanonicalTimeline", "external.frameRejected",
+                "source" to source, "conversationId" to conversationId,
+            )
+        }
     }
 
     override suspend fun clearExternalTransportActive(conversationId: String) = clearExternalTransportActive(null, conversationId)
