@@ -34,6 +34,8 @@ import com.letta.mobile.ui.ambient.AMBIENT_GLOW_MAIN_UNPREMULTIPLIED
 import com.letta.mobile.ui.ambient.AMBIENT_GLOW_SHADER_SOURCE
 import com.letta.mobile.ui.ambient.AmbientMotion
 import com.letta.mobile.ui.ambient.AmbientMotionStatus
+import androidx.compose.ui.graphics.toArgb
+import com.google.android.material.color.utilities.Hct
 import com.letta.mobile.ui.theme.HctColorHarmonizer
 import com.letta.mobile.util.Telemetry
 import kotlin.math.PI
@@ -158,6 +160,24 @@ fun AmbientShaderAgentBackground(
             envelope.animateTo(ramp.bloomEnvelope, tween(durationMillis = ramp.riseMillis, easing = EaseInOutCubic))
         }
         envelope.animateTo(ramp.settledEnvelope, tween(durationMillis = ramp.settleMillis, easing = EaseOutCubic))
+    }
+
+    // What colour the glow is actually handed, and whether the AGSL path or the gradient
+    // fallback is drawing it. A silent fallback looks exactly like "the colour did not
+    // change" on screen, and pixels alone cannot tell the two apart.
+    val shaderAvailable = rememberAmbientShader() != null
+    LaunchedEffect(status, targetColor, shaderAvailable, onDark) {
+        val hct = runCatching { Hct.fromInt(targetColor.toOpaqueArgbForTelemetry()) }.getOrNull()
+        Telemetry.event(
+            AMBIENT_TELEMETRY_TAG, "tint.resolved",
+            "status" to status.name,
+            "argb" to targetColor.toOpaqueArgbForTelemetry().toUInt().toString(16),
+            "hue" to (hct?.hue?.toInt() ?: -1),
+            "chroma" to (hct?.chroma?.toInt() ?: -1),
+            "tone" to (hct?.tone?.toInt() ?: -1),
+            "onDark" to onDark,
+            "renderer" to if (shaderAvailable) "agsl" else "fallback",
+        )
     }
 
     Box(modifier = modifier) {
@@ -301,6 +321,8 @@ private fun DrawScope.drawAmbientFallback(
         ),
     )
 }
+
+private fun Color.toOpaqueArgbForTelemetry(): Int = copy(alpha = 1f).toArgb()
 
 private const val AMBIENT_TELEMETRY_TAG = "AmbientShader"
 private const val HiddenAlpha = 0.001f

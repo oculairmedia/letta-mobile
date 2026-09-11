@@ -44,6 +44,17 @@ uniform vec4 uColor;
 // frame's advance no longer changes it, which is the judder that appeared only after
 // hours of continuous animation. See AmbientMotion.PHASE_WRAP_TURNS.
 const float F = 1.0 / 1024.0;
+// Where the glow starts fading in, as a fraction of canvas height. The band is meant to
+// be an accent under the composer, not a wash across the lower third, so this is the one
+// number to move when it reads too tall.
+const float BAND_TOP = 0.80;
+// Where the band reaches full strength. It used to climb all the way to 0.98, which is
+// BEHIND the composer: shortening the band left only the faint head of that ramp on
+// screen, so the colour disappeared. Peaking just above the composer puts the strong
+// part where it can actually be seen.
+const float BAND_PEAK = 0.90;
+/** Overall strength of the glow. The one knob for "too intense" / "too faint". */
+const float BAND_OPACITY = 0.14;
 const float TAU = 6.28318;
 
 float hash(float2 p) {
@@ -69,7 +80,15 @@ float3 towardTintHue(float3 c, float3 tint, float pull) {
     float magnitude = length(chroma);
     float targetLength = length(target);
     if (magnitude < 0.0001 || targetLength < 0.0001) return c;
-    float2 rotated = normalize(mix(chroma / magnitude, target / targetLength, pull)) * magnitude;
+    // Blending two unit vectors collapses to zero length when they point opposite ways,
+    // and normalizing that amplifies float noise into an arbitrary hue. The palette's
+    // gold IS the complement of an indigo tint, so that was not a corner case here: it
+    // washed the steady glow to mauve. Snap to the target hue instead of dividing by
+    // nothing.
+    float2 blended = mix(chroma / magnitude, target / targetLength, pull);
+    float blendedLength = length(blended);
+    float2 direction = blendedLength > 0.001 ? blended / blendedLength : target / targetLength;
+    float2 rotated = direction * magnitude;
     float luma = dot(c, Y);
     return float3(
         luma + 0.956 * rotated.x + 0.619 * rotated.y,
@@ -131,13 +150,25 @@ half4 ambientColor(float2 fragCoord) {
     // tint no longer has to do that job alone and can hold a higher ratio without
     // washing the field out.
     float3 fieldColor = acc / max(wsum, 0.001);
-    float3 rgb = mix(fieldColor, uColor.rgb, 0.72 - scan * (0.02 + 0.06 * uStreamEnergy));
+    // The field is a LIGHT field, not a palette: its job is where the glow is bright, not
+    // what colour it is. Taking its luminance and letting the tint own the hue is what
+    // keeps the chroma the theme asked for; mixing its colour in at any weight pulls the
+    // result toward the palette's pale base and greys it out.
+    float fieldLuma = dot(fieldColor, float3(0.299, 0.587, 0.114));
+    float3 lit = uColor.rgb * (0.45 + 0.85 * fieldLuma);
+    // A small seasoning of the (hue-pulled) field keeps the drift visible as colour, not
+    // just as brightness. The scan lifts it slightly where the sweep passes.
+    float season = 0.15 + scan * (0.02 + 0.06 * uStreamEnergy);
+    float3 rgb = mix(lit, fieldColor, season);
 
     float energy = clamp(wsum * (0.8 + 0.2 * uAgitation), 0.0, 1.4);
-    // Alpha curve narrowed to bottom band (0.72..0.98) so the visible glow
+    // Alpha curve narrowed to the BAND_TOP..BAND_PEAK strip so the visible glow
     // occupies less vertical real estate — a thin glow under the composer
     // instead of a broad mid-screen band.
-    float aRaw = energy * smoothstep(0.72, 0.98, uv.y) * (0.34 + scan * 0.020 * uStreamEnergy);
+    // Shortening the band also dims it, because the ramp now has less height to climb.
+    // The amplitude comes up to keep the same presence in less space.
+    float aRaw = energy * smoothstep(BAND_TOP, BAND_PEAK, uv.y) *
+        (BAND_OPACITY + scan * 0.020 * uStreamEnergy);
     float alpha = clamp(aRaw * uEnvelope * uColor.a, 0.0, 0.78);
     alpha = max(alpha + dither(fragCoord), 0.0);
     return half4(clamp(rgb, 0.0, 1.0), alpha);

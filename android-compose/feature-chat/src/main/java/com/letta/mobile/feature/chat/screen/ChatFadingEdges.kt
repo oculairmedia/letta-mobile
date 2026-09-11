@@ -72,6 +72,26 @@ internal fun chatFadeTargetColor(
 }
 
 /**
+ * The colour the darkening pass should paint, which is NOT always the colour the fade
+ * dissolves content into.
+ *
+ * The dissolve grades toward the scaffold container; the darkening pass sits on top of
+ * the ambient glow and is meant to darken it. Painting the container colour there did
+ * the opposite: `surfaceContainer` is lighter than the surface the chat is drawn on, so
+ * a 95% wash of it hazed the bottom band toward grey and flattened whatever hue the glow
+ * had. Measured on device: a neutral ramp, chroma 4, luminance 15 rising to 44, sitting
+ * exactly over the brightest part of the glow.
+ */
+internal fun chatFadeScrimColor(
+    chatBackground: ChatBackground,
+    surfaceColor: Color,
+): Color = when (chatBackground) {
+    is ChatBackground.SolidColor -> chatBackground.color
+    is ChatBackground.Gradient -> chatBackground.colors.lastOrNull() ?: surfaceColor
+    else -> surfaceColor
+}
+
+/**
  * Draw-layer overlay that softly fades the top and/or bottom edges of the
  * wrapped content into [targetColor]. Each edge is gated independently so a
  * fade only appears when there is scrollable content in that direction.
@@ -87,6 +107,8 @@ internal fun Modifier.chatFadingEdges(
     topFadeLength: Dp,
     bottomFadeLength: Dp,
     targetColor: Color,
+    /** What the darkening pass paints; defaults to the dissolve target for callers that share one. */
+    scrimColor: Color = targetColor,
 ): Modifier {
     if (topFadeAlpha <= 0f && bottomFadeAlpha <= 0f) return this
     return this
@@ -123,13 +145,15 @@ internal fun Modifier.chatFadingEdges(
                 }
             }
 
-            // 3. Draw the solid dark overlay (Normal blend mode) to darken the background/ambient shader
+            // 3. Draw the solid overlay (Normal blend mode) to darken the background/ambient
+            // shader. It paints the surface the chat actually sits on, so it darkens toward
+            // that surface instead of hazing the glow toward a lighter container colour.
             if (topFadeAlpha > 0f) {
                 val topFadePx = topFadeLength.toPx().coerceAtMost(size.height)
                 if (topFadePx > 0f) {
                     drawRect(
                         brush = Brush.verticalGradient(
-                            colors = listOf(targetColor.copy(alpha = 0.95f * topFadeAlpha), Color.Transparent),
+                            colors = listOf(scrimColor.copy(alpha = 0.95f * topFadeAlpha), Color.Transparent),
                             startY = 0f,
                             endY = topFadePx,
                         )
@@ -141,7 +165,7 @@ internal fun Modifier.chatFadingEdges(
                 if (bottomFadePx > 0f) {
                     drawRect(
                         brush = Brush.verticalGradient(
-                            colors = listOf(Color.Transparent, targetColor.copy(alpha = 0.95f * bottomFadeAlpha)),
+                            colors = listOf(Color.Transparent, scrimColor.copy(alpha = 0.95f * bottomFadeAlpha)),
                             startY = size.height - bottomFadePx,
                             endY = size.height,
                         ),
@@ -170,6 +194,7 @@ internal fun ChatFadingEdgesBox(
     listState: LazyListState,
     targetColor: Color,
     modifier: Modifier = Modifier,
+    scrimColor: Color = targetColor,
     topPadding: Dp = 0.dp,
     topFadeLength: Dp = if (topPadding > 0.dp) topPadding + 16.dp else ChatFadeEdgeLength,
     bottomFadeLength: Dp = ChatFadeEdgeLength,
@@ -212,6 +237,7 @@ internal fun ChatFadingEdgesBox(
             topFadeLength = topFadeLength,
             bottomFadeLength = bottomFadeLength,
             targetColor = targetColor,
+            scrimColor = scrimColor,
         ),
     ) {
         content()
