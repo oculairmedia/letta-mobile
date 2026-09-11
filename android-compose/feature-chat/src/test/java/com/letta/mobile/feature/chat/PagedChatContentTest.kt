@@ -5,6 +5,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import com.letta.mobile.ui.components.SCROLL_TO_BOTTOM_FAB_TAG
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performTouchInput
@@ -102,7 +104,7 @@ class PagedChatContentTest {
         compose.onNodeWithText("row-50").assertIsDisplayed()
         compose.runOnIdle { live.value = listOf(row("live-new").copy(message = row("live-new").message.copy(role = "assistant"))) }
         compose.onNodeWithText("row-50").assertIsDisplayed()
-        compose.onNodeWithText("Scroll to latest").performClick()
+        compose.onNodeWithTag(SCROLL_TO_BOTTOM_FAB_TAG).performClick()
         compose.onNodeWithText("live-new").assertIsDisplayed()
         compose.runOnIdle { live.value = listOf(row("live-updated")) }
         compose.onNodeWithText("live-updated").assertIsDisplayed()
@@ -300,7 +302,7 @@ class PagedChatContentTest {
             }
         }
         compose.onNodeWithText("row-70").assertIsDisplayed()
-        compose.onNodeWithText("Scroll to latest").assertIsDisplayed()
+        compose.onNodeWithTag(SCROLL_TO_BOTTOM_FAB_TAG).assertIsDisplayed()
     }
 
     @Test fun missingRestoreAnchorRequestsFreshTailRatherThanAroundWindowIndexZero() {

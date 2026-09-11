@@ -8,6 +8,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.Alignment
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.ui.components.DateSeparator
+import com.letta.mobile.ui.components.ScrollToBottomFab
+import com.letta.mobile.ui.theme.LettaSpacing
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
 import java.time.LocalDate
@@ -262,20 +264,29 @@ private fun PagedChatMessageListContent(
                 item(key = "paging-retry") { TextButton(onClick = pages::retry) { Text("Retry history") } }
             }
         }
-        Column(Modifier.align(Alignment.BottomCenter).padding(bottom = appearance.bottomPadding)) {
-            if (missingTarget != null && missingTarget == routeTarget) {
+        if (missingTarget != null && missingTarget == routeTarget) {
+            Column(Modifier.align(Alignment.BottomCenter).padding(bottom = appearance.bottomPadding)) {
                 Text("Message not found")
             }
-            if (!following) {
-                TextButton(onClick = {
-                    if (presentation.isAnchoredAwayFromTail) presentation.requestTail()
-                    else scope.launch {
-                        listState.scrollToItem(0)
-                        following = true
-                    }
-                }) { Text("Scroll to latest") }
-            }
         }
+        // The same affordance the non-paged list shows, placed the same way. A bare text button
+        // here had no chrome of its own, so it read as loose text floating over the conversation.
+        ScrollToBottomFab(
+            visible = !following,
+            onClick = {
+                if (presentation.isAnchoredAwayFromTail) presentation.requestTail()
+                else scope.launch {
+                    listState.scrollToItem(0)
+                    following = true
+                }
+            },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(
+                    end = LettaSpacing.INNER_PADDING,
+                    bottom = LettaSpacing.INNER_PADDING + appearance.bottomPadding,
+                ),
+        )
     }
 }
 
