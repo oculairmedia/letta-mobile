@@ -120,7 +120,12 @@ object TimelineSemanticBodyWindow {
             value(0)
             space()
             if (peek() != -1) invalid()
-            if (messageType !in SUPPORTED_TYPES) return TimelineSemanticWindowResult.Deferred(TimelineSemanticWindowResult.Reason.UnsupportedType)
+            // The ledger stores the enum name (ASSISTANT, TOOL_CALL); the wire uses the lower-case
+            // form. Lower-casing maps every enum name onto the wire name already listed, so a
+            // stored body is readable without widening what counts as supported.
+            if (messageType?.lowercase() !in SUPPORTED_TYPES) {
+                return TimelineSemanticWindowResult.Deferred(TimelineSemanticWindowResult.Reason.UnsupportedType)
+            }
             if (!found) return TimelineSemanticWindowResult.Deferred(TimelineSemanticWindowResult.Reason.MissingField)
             return TimelineSemanticWindowResult.Text(output.toString(),
                 if (full) start + emitted else null, consumed, outputBytes, reads)
