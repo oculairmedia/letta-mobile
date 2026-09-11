@@ -127,9 +127,16 @@ private fun String.toTerminalState(): ToolTimelineState? = when {
     else -> null
 }
 
-/** With no usable status, a call is Succeeded once a result exists and Running until then. */
+/**
+ * With no usable status, a call is Succeeded once a result exists.
+ *
+ * Until then it is only Running if it could still be running. A call read back from the ledger
+ * cannot be: its turn ended long ago, and its result lives in a separate row that this one was
+ * never going to carry. Treating that as Running is what made old tool cards announce themselves
+ * as executing and auto-expand their arguments.
+ */
 private fun UiToolCall.settledStateWithoutStatus(): ToolTimelineState =
-    if (result != null) ToolTimelineState.Succeeded else ToolTimelineState.Running
+    if (result != null || settled) ToolTimelineState.Succeeded else ToolTimelineState.Running
 
 /**
  * Derives a human-readable safe summary for a tool call without risking platform exceptions.

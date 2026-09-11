@@ -113,6 +113,14 @@ data class UiToolCall(
     val executionTimeMs: Long? = null,
     val toolCallId: String? = null,
     /**
+     * True when this call was read back from the durable ledger rather than observed live.
+     *
+     * The ledger stores a call and its return as separate rows, so a call row read on its own
+     * never carries a result. Without this, "no result yet" is indistinguishable from "still
+     * running", and every rehydrated tool call claims to be executing.
+     */
+    val settled: Boolean = false,
+    /**
      * Folded-in approval outcome for this specific tool call, when the mapper
      * absorbed a bare `approve=true` / `approve=false` `APPROVAL_RESPONSE`
      * into the owning tool-call bubble instead of emitting a standalone
