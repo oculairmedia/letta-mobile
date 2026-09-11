@@ -113,8 +113,8 @@ internal fun DesktopAmbientChatBackground(
         envelope.animateTo(ramp.settledEnvelope, tween(durationMillis = ramp.settleMillis, easing = EaseOutCubic))
     }
 
-    // Speed-integrated phase (dt * baseRate * speed): rate changes glide
-    // instead of popping at a loop seam. Only ticks while the glow is visible.
+    // Speed-integrated phase in turns (dt * speed): rate changes glide instead of
+    // popping at a loop seam. Only ticks while the glow is visible.
     var phase by remember { mutableFloatStateOf(0f) }
     val visible = tint.alpha > HiddenAlpha
     if (visible) {
@@ -123,7 +123,10 @@ internal fun DesktopAmbientChatBackground(
             while (true) {
                 withFrameNanos { now ->
                     if (last != 0L) {
-                        phase += ((now - last) / 1_000_000_000f) * BaseRadiansPerSecond * speed
+                        // Turns, wrapped: an unbounded phase loses float resolution and
+                        // eventually judders. See AmbientMotion.PHASE_WRAP_TURNS.
+                        phase = (phase + ((now - last) / 1_000_000_000f) * speed) %
+                            AmbientMotion.PHASE_WRAP_TURNS
                     }
                     last = now
                 }
@@ -176,6 +179,7 @@ internal fun DesktopAmbientChatBackground(
                     shaderBuilder.uniform("uAgitation", agitation)
                     shaderBuilder.uniform("uEnvelope", intensity)
                     shaderBuilder.uniform("uStreamEnergy", 0f)
+                    shaderBuilder.uniform("uPalettePull", AmbientMotion.PALETTE_HUE_PULL)
                     shaderBuilder.uniform("uColor", tint.red, tint.green, tint.blue, tint.alpha)
                     // One native Shader per frame is unavoidable (uniforms bake
                     // in at makeShader time), but leaving it to the cleaner is
@@ -193,8 +197,8 @@ internal fun DesktopAmbientChatBackground(
                     frameShader.close()
                 } else {
                     // Same floats as the shader path — parity by construction.
-                    val breath = 0.5f + 0.5f * sin(phase)
-                    val wobble = sin(phase * 2.7f) * 0.03f * agitation
+                    val breath = 0.5f + 0.5f * sin(TwoPi * 0.0146f * phase)
+                    val wobble = sin(TwoPi * 0.0394f * phase) * 0.03f * agitation
                     val radius = size.maxDimension * (0.52f + 0.12f * breath + wobble)
                     val center = Offset(size.width * 0.5f, size.height * 0.92f)
                     drawRect(
@@ -218,5 +222,4 @@ internal fun DesktopAmbientChatBackground(
 private const val AMBIENT_TELEMETRY_TAG = "DesktopAmbient"
 private const val HiddenAlpha = 0.001f
 private const val IdentityBlend = 0.35f
-private const val BaseRadiansPerSecond =
-    (2 * PI).toFloat() * 1000f / AmbientMotion.BASE_PERIOD_MILLIS
+private val TwoPi = (2 * PI).toFloat()

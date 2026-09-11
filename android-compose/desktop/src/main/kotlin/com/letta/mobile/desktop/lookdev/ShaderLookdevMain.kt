@@ -226,7 +226,16 @@ private fun LookdevRoot() {
         var last = 0L
         while (true) {
             withFrameNanos { now ->
-                if (last != 0L) phase += ((now - last) / 1_000_000_000f) * BaseRate * state.speed
+                if (last != 0L) {
+                    // The ambient shader reads uTime in wrapped turns now; the lookdev's own
+                    // candidate sources still expect radians, so each gets its own unit.
+                    val dt = ((now - last) / 1_000_000_000f) * state.speed
+                    phase = if (state.source.contains("uniform float uPalettePull")) {
+                        (phase + dt) % AmbientMotion.PHASE_WRAP_TURNS
+                    } else {
+                        phase + dt * BaseRate
+                    }
+                }
                 last = now
             }
         }
@@ -396,6 +405,9 @@ private fun PreviewPane(
             active.uniform("uTime", phase())
             active.uniform("uAgitation", state.agitation)
             active.uniform("uEnvelope", state.envelope)
+            if (state.source.contains("uniform float uPalettePull")) {
+                active.uniform("uPalettePull", AmbientMotion.PALETTE_HUE_PULL)
+            }
             if (state.source.contains("uniform float uStreamEnergy")) {
                 active.uniform("uStreamEnergy", 0f)
             }
