@@ -8,6 +8,7 @@ import com.composables.icons.lucide.Brain
 import com.composables.icons.lucide.Camera
 import com.composables.icons.lucide.Check
 import com.composables.icons.lucide.ChevronDown
+import com.composables.icons.lucide.ChevronLeft
 import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.ChevronUp
 import com.composables.icons.lucide.Circle
@@ -72,6 +73,7 @@ object LettaIcons {
     val ArrowBack: ImageVector get() = Lucide.ArrowLeft
     val Close: ImageVector get() = Lucide.X
     val Menu: ImageVector get() = Lucide.Menu
+    val ChevronLeft: ImageVector get() = Lucide.ChevronLeft
     val ChevronRight: ImageVector get() = Lucide.ChevronRight
     val ChevronDown: ImageVector get() = Lucide.ChevronDown
     val ChevronUp: ImageVector get() = Lucide.ChevronUp
