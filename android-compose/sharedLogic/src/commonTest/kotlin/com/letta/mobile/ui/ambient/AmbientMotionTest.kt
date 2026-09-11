@@ -83,18 +83,80 @@ class AmbientMotionTest {
     }
 
     @Test
-    fun aTransientStatusIsHeldForItsWholeDecay() {
+    fun aTransientStatusIsHeldForItsWholeRampNotJustItsDecay() {
         // Both hosts hard-coded a 1400 ms hold, which cancelled Completed's
         // decay at 58% — Idle then animated the envelope back UP, so the
         // afterglow read as a rebound. The hold must come from the same table
-        // as the decay it waits on.
+        // as the ramp it waits on, rise included: a hold that ended mid-rise
+        // would hand Idle a still-climbing envelope and rebound the same way.
         AmbientMotionStatus.entries.filter { AmbientMotion.spec(it).isTransient }.forEach { status ->
+            val spec = AmbientMotion.spec(status)
             assertEquals(
-                AmbientMotion.spec(status).settleMillis,
+                AmbientMotion.ramp(current = 0f, status = status).totalMillis,
                 AmbientMotion.holdMillis(status),
-                "$status must be held for its full settle",
+                "$status must be held for its whole ramp",
             )
-            assertTrue(AmbientMotion.holdMillis(status) > 0, "$status decays, so it needs a hold")
+            assertTrue(
+                AmbientMotion.holdMillis(status) > spec.settleMillis,
+                "$status is held for its rise as well as its decay",
+            )
         }
+    }
+
+    @Test
+    fun aLandingStatusNeverStepsTheIntensityUp() {
+        // The defect this table now forbids: a status used to snap to its bloom, so a
+        // turn ending at the streaming envelope brightened by half between two frames.
+        // Whatever the glow is at, reaching a higher bloom must take time.
+        listOf(0f, 0.3f, 0.9f, 1f, 1.5f, 1.6f).forEach { current ->
+            AmbientMotionStatus.entries.forEach { status ->
+                val ramp = AmbientMotion.ramp(current = current, status = status)
+                // Whichever move the host makes first, it takes time. Nothing is instant.
+                val firstMoveMillis = if (ramp.risesFirst) ramp.riseMillis else ramp.settleMillis
+                assertTrue(firstMoveMillis > 0, "$status from $current must not move instantly")
+                if (AmbientMotion.spec(status).isTransient && ramp.bloomEnvelope > current) {
+                    assertTrue(
+                        ramp.risesFirst,
+                        "$status from $current climbs to ${ramp.bloomEnvelope}, so it needs a rise",
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
+    fun aFinishedTurnClimbsIntoItsBloomFromTheStreamingGlow() {
+        val streaming = AmbientMotion.spec(AmbientMotionStatus.Running).settledEnvelope
+        val completed = AmbientMotion.spec(AmbientMotionStatus.Completed)
+        val ramp = AmbientMotion.ramp(current = streaming, status = AmbientMotionStatus.Completed)
+        assertTrue(ramp.risesFirst, "a turn ends brighter than it streamed, so it rises")
+        assertEquals(AmbientMotion.BLOOM_RISE_MILLIS, ramp.riseMillis)
+        assertEquals(completed.bloomEnvelope, ramp.bloomEnvelope)
+        assertEquals(completed.settleMillis, ramp.settleMillis)
+        assertEquals(completed.settledEnvelope, ramp.settledEnvelope)
+    }
+
+    @Test
+    fun aGlowAlreadyAboveTheBloomDecaysFromWhereItIs() {
+        // Re-entering a transient status mid-decay must not drop the glow to meet the
+        // table either: a downward step is as visible as an upward one.
+        val completed = AmbientMotion.spec(AmbientMotionStatus.Completed)
+        val ramp = AmbientMotion.ramp(current = completed.bloomEnvelope + 0.1f, status = AmbientMotionStatus.Completed)
+        assertEquals(0, ramp.riseMillis, "nothing to climb")
+        assertEquals(completed.settledEnvelope, ramp.settledEnvelope)
+    }
+
+    @Test
+    fun aContinuousStatusJustEasesToItsLevel() {
+        listOf(AmbientMotionStatus.Idle, AmbientMotionStatus.Running, AmbientMotionStatus.Active)
+            .forEach { status ->
+                val ramp = AmbientMotion.ramp(current = 0f, status = status)
+                val spec = AmbientMotion.spec(status)
+                assertEquals(0, ramp.riseMillis, "$status has no bloom to climb")
+                assertEquals(spec.settledEnvelope, ramp.bloomEnvelope, "$status names one level")
+                assertEquals(spec.settledEnvelope, ramp.settledEnvelope)
+                assertTrue(ramp.settleMillis > 0, "$status still eases rather than jumping")
+                assertEquals(0, AmbientMotion.holdMillis(status), "$status is not held")
+            }
     }
 }

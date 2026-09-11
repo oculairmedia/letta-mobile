@@ -102,16 +102,15 @@ internal fun DesktopAmbientChatBackground(
     // Bloom→settle intensity envelope; continuous states just ease to steady.
     val envelope = remember { Animatable(spec.settledEnvelope) }
     LaunchedEffect(status) {
-        val target = AmbientMotion.spec(status.toMotionStatus())
-        if (target.isTransient) {
-            envelope.snapTo(target.bloomEnvelope)
-            envelope.animateTo(
-                target.settledEnvelope,
-                tween(durationMillis = target.settleMillis, easing = EaseOutCubic),
-            )
-        } else {
-            envelope.animateTo(target.settledEnvelope, tween(durationMillis = 300))
+        // Same shared ramp as the Android renderer: climb into a bloom, never step into
+        // one. See AmbientMotion.ramp for the flash this removed.
+        val ramp = AmbientMotion.ramp(current = envelope.value, status = status.toMotionStatus())
+        if (ramp.risesFirst) {
+            // Ease IN to the bloom for the same reason as the Android renderer: an
+            // ease-out climb front-loads the brightening and reads as a flash.
+            envelope.animateTo(ramp.bloomEnvelope, tween(durationMillis = ramp.riseMillis, easing = EaseInOutCubic))
         }
+        envelope.animateTo(ramp.settledEnvelope, tween(durationMillis = ramp.settleMillis, easing = EaseOutCubic))
     }
 
     // Speed-integrated phase (dt * baseRate * speed): rate changes glide

@@ -140,18 +140,21 @@ fun AmbientShaderAgentBackground(
     // jumps straight to settled — no bloom.
     val envelope = remember { Animatable(spec.settledEnvelope) }
     LaunchedEffect(status, reducedMotion) {
-        val target = AmbientMotion.spec(status.toMotionStatus())
-        when {
-            reducedMotion -> envelope.snapTo(target.settledEnvelope)
-            target.isTransient -> {
-                envelope.snapTo(target.bloomEnvelope)
-                envelope.animateTo(
-                    target.settledEnvelope,
-                    tween(durationMillis = target.settleMillis, easing = EaseOutCubic),
-                )
-            }
-            else -> envelope.animateTo(target.settledEnvelope, tween(durationMillis = 300))
+        // The ramp comes from the shared table, and it never steps the intensity: the
+        // bloom is climbed from wherever the glow already is. Snapping to it turned the
+        // end of a turn into a flash (AmbientMotion.ramp carries the measurement).
+        val ramp = AmbientMotion.ramp(current = envelope.value, status = status.toMotionStatus())
+        if (reducedMotion) {
+            envelope.snapTo(ramp.settledEnvelope)
+            return@LaunchedEffect
         }
+        if (ramp.risesFirst) {
+            // Ease IN to the bloom: an ease-out climb puts most of the brightening in its
+            // first frames, which is the flash again in miniature (measured at 39% of the
+            // whole climb in one frame). The decay below keeps its ease-out.
+            envelope.animateTo(ramp.bloomEnvelope, tween(durationMillis = ramp.riseMillis, easing = EaseInOutCubic))
+        }
+        envelope.animateTo(ramp.settledEnvelope, tween(durationMillis = ramp.settleMillis, easing = EaseOutCubic))
     }
 
     Box(modifier = modifier) {
