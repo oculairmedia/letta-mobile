@@ -530,6 +530,43 @@ class TimelineExactCanonicalWriterTest {
         assertEquals(null, engine.live.value)
     }
 
+    @Test fun everyStreamedNameForOneToolCallAdoptsItsCommittedIdentity() = runTest {
+        // A tool call reaches the overlay under names the ledger never uses, and a stream emits a
+        // synthetic return before the real one, so ONE call arrives under several names while the
+        // sync page commits a single row. All of them must drain, or the card renders twice and
+        // keeps running its own lifecycle after the settled row has completed.
+        val callId = "call_3c3732f1a4a54887b0b79b3c"
+        val engine = CanonicalTimelineEngine(Store(), TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
+        val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
+        val fence = engine.beginLive(selection)
+        val streamedCall = com.letta.mobile.data.model.ToolCallMessage(
+            id = "toolcall-$callId", date = "2026-01-01T00:00:00Z",
+            toolCalls = listOf(com.letta.mobile.data.model.ToolCall(toolCallId = callId, name = "Bash", arguments = "{}")),
+        )
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(streamedCall)))
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
+        val streamedNames = kotlin.test.assertNotNull(engine.live.value).block.events
+            .filter { it.messageType == TimelineMessageType.TOOL_CALL }
+            .map { it.serverId }
+        assertEquals(listOf("toolcall-$callId"), streamedNames)
+
+        // The sync page commits the call under the name the ledger uses for it.
+        val committedCall = com.letta.mobile.data.model.ToolCallMessage(
+            id = "ui-msg-9154162", date = "2026-01-01T00:00:00Z",
+            toolCalls = listOf(com.letta.mobile.data.model.ToolCall(toolCallId = callId, name = "Bash", arguments = "{}")),
+        )
+        assertEquals(TimelineEnginePageOutcome.Applied, reconcile(engine, selection, record(committedCall)))
+
+        // The streamed name now resolves to the committed identity, whatever shape that identity has.
+        val aliases = kotlin.test.assertNotNull(engine.live.value).aliases
+        assertTrue("toolcall-$callId" in aliases, "streamed tool call must adopt a committed identity")
+        assertTrue(
+            aliases.getValue("toolcall-$callId").value.contains(callId) ||
+                aliases.getValue("toolcall-$callId").value == "ui-msg-9154162",
+            "adopted identity must be the row the writer stored, not the streamed name",
+        )
+    }
+
     @Test fun reconcileAdoptsTheCommittedIdentityForAStreamedReplyThatSharesNoId() = runTest {
         // The shape observed on device: the stream names the reply cm-stream-* and derives its otid
         // from that id, the server names it ui-msg-* and derives its otid from ITS id. Nothing links
