@@ -230,7 +230,16 @@ private fun PagedChatMessageListContent(
                 callbacks.onToggleRunCollapsed, callbacks.onToggleReasoningExpanded, callbacks.onAttachmentImageTap,
             ),
         )
+        val reducedMotion = com.letta.mobile.ui.components.rememberReducedMotionEnabled()
+        val elasticEffect = ir.farsroidx.overscroll.rememberVerticalElasticOverscroll(
+            maxStretchRatio = 8,
+            springDampingRatio = 0.85f,
+            lockedEdge = if (pages.loadState.append.endOfPaginationReached) null
+                else ir.farsroidx.overscroll.ElasticOverscrollEdge.TOP,
+        )
         LazyColumn(
+            overscrollEffect = if (reducedMotion || pinch.isPinching ||
+                pages.loadState.refresh is LoadState.Loading) null else elasticEffect,
             modifier = Modifier.fillMaxSize().padding(top = appearance.topPadding),
             state = listState,
             reverseLayout = true,
