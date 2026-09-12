@@ -19,6 +19,7 @@ import com.letta.mobile.data.model.BlockCreateParams
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.ModelCatalog
 import com.letta.mobile.data.model.withCatalogModelRouting
@@ -89,12 +90,14 @@ class DesktopChatController(
 
     private val approvalCoordinator = DesktopChatApprovalCoordinator(
         scope = scope,
-        onError = { message ->
-            if (!closed) {
-                _state.update { it.copy(errorMessage = message) }
-            }
-        },
+        onError = ::showApprovalError,
     )
+
+    /** A closed controller no longer owns the surface, so it must not write to it. */
+    private fun showApprovalError(message: String) {
+        if (closed) return
+        _state.update { it.copy(errorMessage = message) }
+    }
 
     /**
      * Approval request ids whose decision (answer / dismiss) is in flight, so the
@@ -235,86 +238,109 @@ class DesktopChatController(
     private val modelCatalogHelper = DesktopChatModelCatalogHelper(
         scope = scope,
         agentByIdProvider = agentByIdProvider,
-        onModelsLoaded = { models ->
-            if (!closed) _availableModels.value = models
-        },
-        getSelectedConversationAgentId = { _state.value.selectedConversation?.agentId },
+        onModelsLoaded = ::publishAvailableModels,
+        getSelectedConversationAgentId = ::selectedConversationAgentId,
     )
+
+    private fun publishAvailableModels(models: List<LlmModel>) {
+        if (closed) return
+        _availableModels.value = models
+    }
+
+    private fun selectedConversationAgentId(): String? = _state.value.selectedConversation?.agentId
 
     private val connectionWatcher = DesktopChatConnectionWatcher(
         scope = scope,
-        onConnected = {
-            runCatching {
-                reloadConversationsAndSelect(
-                    preferConversationId = _state.value.runtimeState.selectedConversationId,
-                )
-            }
-        },
-        onDisconnected = { transportState ->
-            if (transportState.isAuthFailure) {
-                _state.update { current ->
-                    current.withRuntimeState(
-                        ChatSessionReducer.conversationLoadFailed(
-                            state = current.runtimeState,
-                            errorMessage = transportState.reason.ifBlank { "Authentication failed" },
-                        ),
-                    )
-                }
-            } else {
-                _state.update { current ->
-                    current.withRuntimeState(
-                        ChatSessionReducer.streamDisconnected(
-                            state = current.runtimeState,
-                            generation = current.runtimeState.selectionGeneration,
-                            errorMessage = transportState.reason.ifBlank { "Connection lost" },
-                            statusMessage = if (transportState.willReconnect) "Reconnecting…" else "Stream disconnected",
-                        ),
-                    )
-                }
-            }
-        },
-        onEscalateRetryConnection = { retryConnection() },
+        onConnected = ::onTransportConnected,
+        onDisconnected = ::onTransportDisconnected,
+        onEscalateRetryConnection = ::retryConnection,
     )
 
+    /** Reconnecting re-reads the roster, preferring whatever the user was already looking at. */
+    private suspend fun onTransportConnected() {
+        runCatching {
+            reloadConversationsAndSelect(
+                preferConversationId = _state.value.runtimeState.selectedConversationId,
+            )
+        }
+    }
+
+    /**
+     * An auth failure is terminal for the roster, so it reports as a load failure. Anything else is
+     * the stream dropping, which may still reconnect - and the status has to say which, or a blip
+     * and a dead connection read identically.
+     */
+    private fun onTransportDisconnected(transportState: ChannelTransportState.Disconnected) {
+        if (transportState.isAuthFailure) {
+            _state.update { current ->
+                current.withRuntimeState(
+                    ChatSessionReducer.conversationLoadFailed(
+                        state = current.runtimeState,
+                        errorMessage = transportState.reason.ifBlank { "Authentication failed" },
+                    ),
+                )
+            }
+        } else {
+            _state.update { current ->
+                current.withRuntimeState(
+                    ChatSessionReducer.streamDisconnected(
+                        state = current.runtimeState,
+                        generation = current.runtimeState.selectionGeneration,
+                        errorMessage = transportState.reason.ifBlank { "Connection lost" },
+                        statusMessage = if (transportState.willReconnect) "Reconnecting…" else "Stream disconnected",
+                    ),
+                )
+            }
+        }
+    }
+
     private val remoteSender = DesktopChatRemoteSender(
-        onSendSuccess = {
-            _state.update {
-                it.withRuntimeState(ChatSessionReducer.sendSucceeded(it.runtimeState))
-            }
-        },
-        onSendFailed = { attempt, errorMessage ->
-            if (!closed) {
-                if (_thinkingConversationId.value == attempt.conversationId) {
-                    _thinkingConversationId.value = null
-                }
-                _state.update {
-                    it.withRuntimeState(
-                        ChatSessionReducer.sendFailed(
-                            state = it.runtimeState,
-                            text = attempt.text,
-                            attachments = attempt.attachments,
-                            errorMessage = errorMessage,
-                        ),
-                    )
-                }
-            }
-        },
+        onSendSuccess = ::onRemoteSendSucceeded,
+        onSendFailed = ::onRemoteSendFailed,
         persistConversationTitle = ::persistConversationTitle,
-        onAttemptCompleted = { attempt ->
-            if (attempt.streamGen == streamingGeneration &&
-                _streamingConversationId.value == attempt.conversationId
-            ) {
-                _streamingConversationId.value = null
-            }
-            if (cancellingConversationId.value == attempt.conversationId) {
-                interruptCoordinator.clearCancelling()
-                if (_thinkingConversationId.value == attempt.conversationId) {
-                    _thinkingConversationId.value = null
-                }
-                attempt.conversationId?.let(interruptCoordinator::recordTerminalAfterCancel)
-            }
-        },
+        onAttemptCompleted = ::onRemoteSendAttemptCompleted,
     )
+
+    private fun onRemoteSendSucceeded(attempt: RemoteSendAttempt) {
+        _state.update { it.withRuntimeState(ChatSessionReducer.sendSucceeded(it.runtimeState)) }
+    }
+
+    /** The draft comes back with the failure, so a failed send never costs the user what they typed. */
+    private fun onRemoteSendFailed(attempt: RemoteSendAttempt, errorMessage: String) {
+        if (closed) return
+        clearThinkingFor(attempt.conversationId)
+        _state.update {
+            it.withRuntimeState(
+                ChatSessionReducer.sendFailed(
+                    state = it.runtimeState,
+                    text = attempt.text,
+                    attachments = attempt.attachments,
+                    errorMessage = errorMessage,
+                ),
+            )
+        }
+    }
+
+    /**
+     * The end of an attempt, however it ended. The generation check stops a superseded attempt from
+     * clearing the indicator of the one that replaced it, and a cancel is only finished once the
+     * turn's own terminal frame arrives, never optimistically when stop was pressed.
+     */
+    private fun onRemoteSendAttemptCompleted(attempt: RemoteSendAttempt) {
+        if (attempt.streamGen == streamingGeneration &&
+            _streamingConversationId.value == attempt.conversationId
+        ) {
+            _streamingConversationId.value = null
+        }
+        if (cancellingConversationId.value != attempt.conversationId) return
+        interruptCoordinator.clearCancelling()
+        clearThinkingFor(attempt.conversationId)
+        attempt.conversationId?.let(interruptCoordinator::recordTerminalAfterCancel)
+    }
+
+    private fun clearThinkingFor(conversationId: String?) {
+        if (_thinkingConversationId.value == conversationId) _thinkingConversationId.value = null
+    }
 
     private fun bindGateway(next: DesktopChatGateway?) {
         if (gateway !== next) {
@@ -783,6 +809,12 @@ class DesktopChatController(
         }
         val draft = ChatComposerPolicy.beginSend(_state.value.composer) ?: return
         _state.value.selectedConversationId?.let { _lastPromptedConversationId.value = it }
+        // The canonical route owns its own send. It deliberately runs no legacy loop, so falling
+        // through to the loop check below would drop the message on the floor.
+        if (_canonicalPresentation.value != null) {
+            launchCanonicalSend(draft)
+            return
+        }
         val loop = activeLoop
         if (loop == null || !_state.value.isRemoteBacked) {
             _state.update {
@@ -795,6 +827,37 @@ class DesktopChatController(
             return
         }
         launchRemoteSend(loop, draft)
+    }
+
+    /**
+     * Sends through the shared [com.letta.mobile.data.chat.send.ChatSendCoordinator], the same
+     * orchestration Android uses. The optimistic bubble, otid reconciliation and turn lifecycle all
+     * land in the canonical ledger the paginated list is already reading, so there is no second
+     * durable copy of the conversation and no second send path to keep in agreement with this one.
+     */
+    private fun launchCanonicalSend(draft: ChatComposerSendDraft) {
+        val conversationId = _state.value.selectedConversationId
+        val conversation = _state.value.conversations.firstOrNull { it.id == conversationId }
+        val activeGateway = gateway
+        // Resolved by the same routing the presentation used, so the send and the history it lands
+        // beside are indexed against one transport.
+        val coordinator = conversation?.agentId?.let { agentId ->
+            activeGateway?.let { gw ->
+                canonicalSendFor?.invoke(agentId, desktopTimelineTransportFor(gw, conversation))
+            }
+        }
+        if (coordinator == null) {
+            showComposerError("This conversation cannot send on the canonical timeline route.")
+            return
+        }
+        titleCandidateForSend(conversationId, draft.text)?.let { title ->
+            conversationId?.let { persistConversationTitle(it, title) }
+        }
+        clearUnsentIfMatching(conversationId)
+        _state.update { it.withRuntimeState(ChatSessionReducer.beginSend(it.runtimeState, draft)) }
+        // The coordinator drives the indicators through the UI sink from here, including the
+        // failure paths, so nothing else may set them on this route.
+        sendJob = coordinator.send(draft.text, draft.attachments)
     }
 
     private fun launchRemoteSend(loop: DesktopTimelineLoop, draft: ChatComposerSendDraft) {
@@ -961,6 +1024,39 @@ class DesktopChatController(
      */
     var canonicalOpen: (suspend (DesktopCanonicalOpenRequest) -> com.letta.mobile.data.timeline.CanonicalTimelinePresentation)? = null
     var canonicalEligible: (String) -> Boolean = { false }
+
+    /**
+     * Resolves the shared send coordinator for an agent. Installed alongside [canonicalOpen]: a
+     * canonical route without it can render history but cannot send, which is a state the host must
+     * not be able to produce by accident.
+     */
+    var canonicalSendFor: (
+        (agentId: String, transport: com.letta.mobile.data.timeline.TimelineTransport) ->
+        com.letta.mobile.data.chat.send.ChatSendCoordinator
+    )? = null
+
+    /** The turn-indicator and error state the shared send coordinator is allowed to move. */
+    internal val sendSurface: DesktopChatSendSurface = ControllerSendSurface()
+
+    /**
+     * Named rather than an anonymous object in a property initializer: this is the whole contract
+     * the shared coordinator drives the desktop UI through, and it belongs in a declaration that can
+     * be read on its own.
+     */
+    private inner class ControllerSendSurface : DesktopChatSendSurface {
+        override fun currentError(): String? = _state.value.errorMessage
+        override fun setError(message: String?) {
+            _state.update { it.copy(errorMessage = message) }
+        }
+        override fun streamingConversationId(): String? = _streamingConversationId.value
+        override fun thinkingConversationId(): String? = _thinkingConversationId.value
+        override fun setStreaming(conversationId: String?) { _streamingConversationId.value = conversationId }
+        override fun setThinking(conversationId: String?) { _thinkingConversationId.value = conversationId }
+        override fun selectedConversationId(): String? = _state.value.selectedConversationId
+        override fun settleSend(failed: Boolean) {
+            _state.update { it.withRuntimeState(ChatSessionReducer.sendSettled(it.runtimeState, failed)) }
+        }
+    }
     private val _canonicalPresentation = MutableStateFlow<com.letta.mobile.data.timeline.CanonicalTimelinePresentation?>(null)
     val canonicalPresentation = _canonicalPresentation.asStateFlow()
     private val _canonicalStatus = MutableStateFlow<String?>(null)

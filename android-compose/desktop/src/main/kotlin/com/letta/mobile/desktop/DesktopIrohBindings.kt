@@ -15,6 +15,7 @@ import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.data.transport.iroh.IrohConnectConfig
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.createDefaultDesktopChatGateway
+import com.letta.mobile.desktop.data.DesktopCanonicalSendInstall
 import com.letta.mobile.desktop.data.DesktopCanonicalTimelineHost
 import com.letta.mobile.desktop.data.DesktopDataBindings
 import com.letta.mobile.desktop.data.DesktopWsChannelTransport
@@ -247,7 +248,17 @@ internal fun rememberDesktopChatController(
     val canonicalHost = remember(controller) {
         DesktopCanonicalTimelineHost().also { host ->
             if (!host.isEnabled) return@also
-            host.installOn(controller)
+            val graph = runtime.dataBindings.sessionGraphProvider.current
+            host.installOn(
+                controller,
+                DesktopCanonicalSendInstall(
+                    frameSource = graph.channelTransport,
+                    conversationRepository = graph.conversationRepository,
+                    scope = runtime.chatScope,
+                    activeConfig = { runtime.bootstrapState.config },
+                    clientVersion = { DESKTOP_CANONICAL_CLIENT_VERSION },
+                ),
+            )
         }
     }
     // Closing the superseded controller is what cancels its send/select/
@@ -408,3 +419,6 @@ private suspend fun collectScopedActiveSubagents(
     }
     scopedRepository.activeSubagentsFlow(scope).collect { emit(it) }
 }
+
+/** Sent in the handshake so a shim log can tell a desktop canonical client from the Android one. */
+private const val DESKTOP_CANONICAL_CLIENT_VERSION = "letta-desktop-canonical"

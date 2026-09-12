@@ -446,7 +446,8 @@ internal class DesktopTimelineBoundedStore(
                         Files.createDirectory(aux)
                         writeSynced(aux.resolve("data-generation")) { write(dataGeneration.toByteArray(Charsets.US_ASCII)) }
                         writeSynced(aux.resolve("checkpoint")) { write(checkpointBytes) }
-                        FileChannel.open(aux, StandardOpenOption.READ).use { it.force(true) }
+                        // `aux` is a DIRECTORY despite the extension, so this is a directory flush.
+                        syncDirectoryEntry(aux)
                     })
                 return
             }
@@ -492,7 +493,8 @@ internal class DesktopTimelineBoundedStore(
                     writeSynced(path) { writeLong(ordinal) }; ordinal++
                 }
                 writeSynced(aux.resolve("checkpoint")) { write(checkpointBytes) }
-                FileChannel.open(aux, StandardOpenOption.READ).use { it.force(true) }
+                // `aux` is a DIRECTORY despite the extension, so this is a directory flush.
+                syncDirectoryEntry(aux)
             })
         }
     }

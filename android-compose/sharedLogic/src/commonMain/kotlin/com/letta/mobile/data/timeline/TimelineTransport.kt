@@ -19,17 +19,31 @@ interface TimelineTransport {
         order: String? = null,
     ): List<LettaMessage>
 
+    /**
+     * One page strictly older than [before], newest first. Null means this transport has no such
+     * route; the page loader then refuses the request rather than falling back to a tail read,
+     * which would silently re-serve the newest page as "older history".
+     */
+    suspend fun listConversationMessagesBefore(
+        conversationId: String,
+        limit: Int,
+        before: String,
+        order: String,
+    ): List<LettaMessage>? = null
+
     suspend fun listConversationMessagePage(
         request: TimelineRemotePageRequest,
         progress: TimelinePageProgress? = null,
     ): TimelineRemotePageResult {
-        if (request.continuation is TimelineContinuation.Before) {
-            throw TimelineRemotePageException.InvalidRequest(
-                "this transport does not implement before-continuation pages",
-            )
-        }
-        val page = TimelineRemotePageAdapter.load(request) { limit, _, after, order ->
-            listConversationMessages(request.scope.conversationId, limit, after, order)
+        val page = TimelineRemotePageAdapter.load(request) { limit, before, after, order ->
+            if (before != null) {
+                listConversationMessagesBefore(request.scope.conversationId, limit, before, order)
+                    ?: throw TimelineRemotePageException.InvalidRequest(
+                        "this transport does not implement before-continuation pages",
+                    )
+            } else {
+                listConversationMessages(request.scope.conversationId, limit, after, order)
+            }
         }
         return progress?.let { TimelineRemotePageProgressClassifier.classify(request, page, it) } ?: page
     }

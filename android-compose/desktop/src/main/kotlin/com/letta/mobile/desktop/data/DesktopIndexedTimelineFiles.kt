@@ -270,7 +270,7 @@ internal class DesktopIndexedTimelineFiles(private val directory: Path) {
         }
     }
 
-    private fun syncDirectory() = FileChannel.open(directory, READ).use { it.force(true) }
+    private fun syncDirectory() = syncDirectoryEntry(directory)
 
     private companion object {
         const val MAGIC = 0x4c54495800000001L

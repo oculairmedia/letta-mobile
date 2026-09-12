@@ -246,7 +246,7 @@ internal class DesktopPersistentTimelineIndex(private val directory: Path) {
     private fun persist(ref: String, bytes: ByteArray) {
         if (!Files.exists(directory)) {
             Files.createDirectories(directory)
-            FileChannel.open(directory.parent, StandardOpenOption.READ).use { it.force(true) }
+            syncDirectoryEntry(directory.parent)
         }
         val path = directory.resolve(ref)
         if (Files.exists(path)) {
@@ -333,7 +333,7 @@ internal class DesktopPersistentTimelineIndex(private val directory: Path) {
         }
     }
 
-    private fun syncDirectory() = FileChannel.open(directory, StandardOpenOption.READ).use { it.force(true) }
+    private fun syncDirectory() = syncDirectoryEntry(directory)
 
     companion object {
         const val PAGE_BYTES = 4096

@@ -54,15 +54,37 @@ class AppServerLocalAdminGateway(
         limit: Int?,
         after: String?,
         order: String?,
+    ): List<LettaMessage> = listMessages(conversationId, MessagePageQuery(limit, after, null, order))
+
+    /** The older-history read. Separate from the tail read because a page is bounded by one cursor. */
+    suspend fun listConversationMessagesBefore(
+        conversationId: String,
+        limit: Int,
+        before: String,
+        order: String,
+    ): List<LettaMessage> = listMessages(conversationId, MessagePageQuery(limit, null, before, order))
+
+    /** The cursors one `message.list` accepts, so neither read grows a parameter for the other's. */
+    private data class MessagePageQuery(
+        val limit: Int?,
+        val after: String?,
+        val before: String?,
+        val order: String?,
+    )
+
+    private suspend fun listMessages(
+        conversationId: String,
+        query: MessagePageQuery,
     ): List<LettaMessage> {
         val response = client.conversationMessagesList(
             AppServerCommand.ConversationMessagesList(
                 requestId = requestId(Operation.MessageList.requestName),
                 conversationId = conversationId,
                 query = buildJsonObject {
-                    limit?.let { put("limit", it.toString()) }
-                    after?.let { put("after", it) }
-                    order?.let { put("order", it) }
+                    query.limit?.let { put("limit", it.toString()) }
+                    query.after?.let { put("after", it) }
+                    query.before?.let { put("before", it) }
+                    query.order?.let { put("order", it) }
                 },
             ),
         )

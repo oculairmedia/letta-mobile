@@ -345,6 +345,23 @@ object ChatSessionReducer {
         )
     }
 
+    /**
+     * Resolves a send whose outcome is reported by the turn lifecycle rather than by the send call.
+     * [beginSend] raises two gates the composer reads — `isSending` and the `Sending` connection
+     * state — so a route that settles only one leaves the composer dead for the rest of the session.
+     * The error text belongs to whoever reported the failure, so this never writes or clears one.
+     */
+    fun sendSettled(state: ChatSessionState, failed: Boolean): ChatSessionState =
+        if (!state.isSending && state.connectionState != ChatConnectionState.Sending) {
+            state
+        } else {
+            state.copy(
+                isSending = false,
+                connectionState = if (failed) ChatConnectionState.SendFailed else ChatConnectionState.Live,
+                statusMessage = if (failed) "Send failed" else "Live",
+            )
+        }
+
     fun canSend(state: ChatSessionState): Boolean =
         state.isRemoteBacked &&
             !state.isSending &&

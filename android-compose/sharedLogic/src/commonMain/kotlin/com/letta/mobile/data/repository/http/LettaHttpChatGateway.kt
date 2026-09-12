@@ -66,6 +66,7 @@ open class LettaHttpChatGateway(
         val order: String?,
         val after: String? = null,
         val conversationId: String? = null,
+        val before: String? = null,
     )
 
     override suspend fun listConversations(limit: Int, archiveStatus: String?): List<Conversation> {
@@ -144,6 +145,16 @@ open class LettaHttpChatGateway(
         query = MessageListQuery(limit = limit, order = order, after = after),
     )
 
+    override suspend fun listConversationMessagesBefore(
+        conversationId: String,
+        limit: Int,
+        before: String,
+        order: String,
+    ): List<LettaMessage> = listMessages(
+        path = "/v1/conversations/$conversationId/messages",
+        query = MessageListQuery(limit = limit, order = order, before = before),
+    )
+
     override suspend fun listAgentMessages(
         agentId: String,
         limit: Int?,
@@ -160,6 +171,7 @@ open class LettaHttpChatGateway(
             parameter("limit", query.limit)
             parameter("order", query.order)
             parameter("after", query.after)
+            parameter("before", query.before)
             parameter("conversation_id", query.conversationId)
         }
         response.requireSuccess()

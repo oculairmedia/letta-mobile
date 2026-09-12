@@ -112,6 +112,22 @@ class IrohAdminRpcChatGatewayTest {
     }
 
     @Test
+    fun listConversationMessagesBeforeCarriesTheEncodedCursor() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeIrohTransport()
+        transport.rpcResponder = { call ->
+            assertEquals("message.list", call.method)
+            assertEquals("/v1/conversations/conv-1/messages?limit=50&before=id%2Fa%3Fb%26c%3Dd&order=desc", call.path)
+            assertEquals(null, call.body)
+            ok("""[{"message_type":"assistant_message","id":"msg-0","content":"older"}]""")
+        }
+        val gateway = IrohAdminRpcChatGateway(transport)
+
+        val messages = gateway.listConversationMessagesBefore("conv-1", limit = 50, before = "id/a?b&c=d", order = "desc")
+
+        assertEquals(listOf("msg-0"), messages.map { it.id })
+    }
+
+    @Test
     fun sendStreamsTurnDeltasAndCompletesOnTurnDone() = runTest(UnconfinedTestDispatcher()) {
         val transport = FakeIrohTransport()
         transport.rpcResponder = { _ -> ok("""{"id":"conv-1","agent_id":"agent-1"}""") }
