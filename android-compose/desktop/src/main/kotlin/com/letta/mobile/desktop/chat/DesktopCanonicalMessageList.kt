@@ -36,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.paging.CombinedLoadStates
+import androidx.paging.ItemSnapshotList
 import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
@@ -309,8 +310,17 @@ private class CanonicalRows(
 ) {
     val size: Int get() = live.size + settled.itemCount
 
-    /** Changes whenever either source does, so effects keyed on it re-run exactly when they should. */
-    val identity: Pair<List<ChatRenderItem>, Any> get() = live to settled.itemSnapshotList
+    /**
+     * Changes whenever either source does, so effects keyed on it re-run exactly when they should.
+     * Both halves are named: a key is only as trustworthy as the equality behind it, and `Any`
+     * hides which equality that is.
+     */
+    data class Identity(
+        val live: List<ChatRenderItem>,
+        val settled: ItemSnapshotList<CanonicalTimelinePresentation.Row>,
+    )
+
+    val identity: Identity get() = Identity(live, settled.itemSnapshotList)
 
     fun rowAt(index: Int): ChatRenderItem? =
         if (index < live.size) live.getOrNull(index) else settled.peek(index - live.size)?.item
