@@ -259,10 +259,14 @@ private fun RecordReadingPosition(
     listState: LazyListState,
     rows: CanonicalRows,
 ) {
+    // The effect outlives any one CanonicalRows, and the index it resolves is an offset into the
+    // live overlay. When the overlay drains, a captured rows would map the same index onto a
+    // different row and save the wrong reading position, or stop saving one at all.
+    val current by rememberUpdatedState(rows)
     LaunchedEffect(listState) {
         snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
             .collect { (index, offset) ->
-                val row = rows.settledRowAt(index) ?: return@collect
+                val row = current.settledRowAt(index) ?: return@collect
                 presentation.viewport = row.identity.value to offset
             }
     }
