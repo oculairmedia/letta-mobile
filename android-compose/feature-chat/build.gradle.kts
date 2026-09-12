@@ -85,6 +85,10 @@ kotlin {
 }
 
 dependencies {
+    // Trial against this app's existing Compose stack; do not import the library's newer BOM.
+    implementation("ir.farsroidx:compose-overscroll:1.0.0") {
+        isTransitive = false
+    }
     implementation(project(":core:android-data"))
     implementation(project(":sharedLogic"))
     implementation(project(":sharedUI"))
