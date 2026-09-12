@@ -128,6 +128,23 @@ object TimelineSemanticBodyWindow {
         // Storage/stale-reference failures and CancellationException deliberately propagate.
     }
 
+    /** One member of a container as the walk sees it, so the path check takes a value, not a tuple. */
+    private sealed interface Member {
+        data class Named(val key: String, val first: Boolean) : Member
+        data class At(val ordinal: Int) : Member
+    }
+
+    private const val QUOTE = 34
+    private const val OBJECT_OPEN = 123
+    private const val OBJECT_CLOSE = 125
+    private const val ARRAY_OPEN = 91
+    private const val ARRAY_CLOSE = 93
+    private const val COLON = 58
+    private const val COMMA = 44
+
+    /** The only bare literal a selected value may be: `null`, which reads as an absent field. */
+    private const val LITERAL_N = 110
+
     private class Invalid(val reason: TimelineSemanticWindowResult.Reason) : Exception()
     private fun invalid(): Nothing = throw Invalid(TimelineSemanticWindowResult.Reason.Malformed)
     private fun structural(): Nothing = throw Invalid(TimelineSemanticWindowResult.Reason.StructuralLimit)
@@ -200,11 +217,11 @@ object TimelineSemanticBodyWindow {
         suspend fun value(depth: Int, onPath: Boolean = false, selected: Boolean = false) {
             if (depth > 32) structural()
             space()
-            if (selected && peek() != 34 && peek() != 110) invalid()
+            if (selected && peek() != QUOTE && peek() != LITERAL_N) invalid()
             when (peek()) {
-                34 -> string(if (selected) 2 else 0)
-                123 -> obj(depth, onPath)
-                91 -> array(depth, onPath)
+                QUOTE -> string(if (selected) 2 else 0)
+                OBJECT_OPEN -> obj(depth, onPath)
+                ARRAY_OPEN -> array(depth, onPath)
                 else -> {
                     val token = StringBuilder()
                     while (peek() != -1 && peek() !in listOf(32, 9, 10, 13, 44, 93, 125)) {
@@ -223,13 +240,13 @@ object TimelineSemanticBodyWindow {
          * True when this member is the one segment [depth] names. Descending into it keeps the
          * walk on the path; everything else is read and discarded.
          */
-        private fun stepMatches(depth: Int, onPath: Boolean, key: String?, ordinal: Int, first: Boolean): Boolean =
+        private fun onSegment(depth: Int, onPath: Boolean, member: Member): Boolean =
             when (val step = if (onPath) path.getOrNull(depth) else null) {
-                is TimelineSemanticSegment.Key -> key == step.name
+                is TimelineSemanticSegment.Key -> member is Member.Named && member.key == step.name
                 // The first member wins outright; later ones are walked and discarded, so a second
                 // entry is not a malformed body.
-                TimelineSemanticSegment.FirstKey -> key != null && first
-                is TimelineSemanticSegment.Index -> key == null && step.at == ordinal
+                TimelineSemanticSegment.FirstKey -> member is Member.Named && member.first
+                is TimelineSemanticSegment.Index -> member is Member.At && member.ordinal == step.at
                 null -> false
             }
 
@@ -242,13 +259,13 @@ object TimelineSemanticBodyWindow {
 
         suspend fun obj(depth: Int, onPath: Boolean) {
             take(); space()
-            if (peek() == 125) { take(); return }
+            if (peek() == OBJECT_CLOSE) { take(); return }
             var first = true
             while (true) {
                 space()
                 val key = string(1)
-                space(); expect(58)
-                val match = stepMatches(depth, onPath, key, -1, first)
+                space(); expect(COLON)
+                val match = onSegment(depth, onPath, Member.Named(key.orEmpty(), first))
                 val chosen = match && depth + 1 == path.size
                 if (chosen) select()
                 if (depth == 0 && key == "messageType") {
@@ -258,24 +275,24 @@ object TimelineSemanticBodyWindow {
                 } else value(depth + 1, match, chosen)
                 first = false
                 space()
-                if (peek() == 125) { take(); break }
-                expect(44)
+                if (peek() == OBJECT_CLOSE) { take(); break }
+                expect(COMMA)
             }
         }
 
         suspend fun array(depth: Int, onPath: Boolean) {
             take(); space()
-            if (peek() == 93) { take(); return }
+            if (peek() == ARRAY_CLOSE) { take(); return }
             var at = 0
             while (true) {
-                val match = stepMatches(depth, onPath, null, at, false)
+                val match = onSegment(depth, onPath, Member.At(at))
                 val chosen = match && depth + 1 == path.size
                 if (chosen) select()
                 value(depth + 1, match, chosen)
                 at++
                 space()
-                if (peek() == 93) { take(); break }
-                expect(44)
+                if (peek() == ARRAY_CLOSE) { take(); break }
+                expect(COMMA)
             }
         }
 
