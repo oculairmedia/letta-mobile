@@ -119,7 +119,9 @@ object WsFrameMapper {
         id = toolCallId,
         toolCallId = toolCallId,
         name = name,
-        arguments = arguments,
+        // The wire is the last place the extra encoding layer can be recognised for what it is;
+        // past here the arguments are stored verbatim and every reader has to guess.
+        arguments = ToolArgumentsNormalizer.normalize(arguments),
     )
 
     private fun ServerFrame.ToolCallMessage.toLettaToolMessage(): LettaMessage {

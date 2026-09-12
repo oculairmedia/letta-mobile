@@ -147,10 +147,95 @@ class SpecializedSubagentToolCardTest {
 
         composeRule.onNodeWithText("Subagent completed").assertIsDisplayed()
         composeRule.onNodeWithText("Finished research").assertIsDisplayed()
-        composeRule.onNodeWithText("completed").assertIsDisplayed()
+        // The status chip said "completed" beside a header reading "Subagent completed".
+        composeRule.onAllNodesWithText("completed").assertCountEquals(0)
         composeRule.onNodeWithText("Show full report").assertIsDisplayed().performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithText("Hide full report").assertIsDisplayed()
         composeRule.onNodeWithText("View conversation").assertIsDisplayed()
+    }
+
+    /** A status the header does not already say still earns its chip. */
+    @Test
+    fun anUnusualStatusKeepsItsChip() {
+        setNotificationContent(
+            """
+            <task-notification>
+                <status>cancelled</status>
+                <summary>Stopped early</summary>
+            </task-notification>
+            """.trimIndent(),
+        )
+
+        composeRule.onNodeWithText("Subagent completed").assertIsDisplayed()
+        composeRule.onNodeWithText("cancelled").assertIsDisplayed()
+    }
+
+    /** A path on the build host is for whoever goes looking, not for every card at a glance. */
+    @Test
+    fun theTranscriptPathWaitsForTheReportToBeOpened() {
+        setNotificationContent(
+            """
+            <task-notification>
+                <status>completed</status>
+                <summary>Finished research</summary>
+                <result>the full report</result>
+                <transcript>/tmp/letta-background-P2Xz9b/exec_16.log</transcript>
+                <tool_call_id>tool-agent-1</tool_call_id>
+            </task-notification>
+            """.trimIndent(),
+        )
+
+        composeRule.onAllNodesWithText("/tmp/letta-background-P2Xz9b/exec_16.log", substring = true)
+            .assertCountEquals(0)
+        composeRule.onNodeWithText("Show full report").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("/tmp/letta-background-P2Xz9b/exec_16.log", substring = true)
+            .assertIsDisplayed()
+    }
+
+    /** A notification can carry a transcript and no report; the path must still be reachable. */
+    @Test
+    fun aTranscriptWithoutAReportIsStillReachable() {
+        setNotificationContent(
+            """
+            <task-notification>
+                <status>completed</status>
+                <summary>Finished research</summary>
+                <transcript>/tmp/letta-background-P2Xz9b/exec_16.log</transcript>
+            </task-notification>
+            """.trimIndent(),
+        )
+
+        composeRule.onAllNodesWithText("Show full report").assertCountEquals(0)
+        composeRule.onNodeWithText("Show transcript").assertIsDisplayed().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("/tmp/letta-background-P2Xz9b/exec_16.log", substring = true)
+            .assertIsDisplayed()
+    }
+
+    private fun setNotificationContent(notification: String) {
+        composeRule.setContent {
+            LettaTheme(
+                appTheme = AppTheme.LIGHT,
+                themePreset = ThemePreset.DEFAULT,
+                dynamicColor = false,
+            ) {
+                LettaChatTheme {
+                    MessageToolCalls(
+                        toolCalls = persistentListOf(
+                            UiToolCall(
+                                name = "Agent",
+                                arguments = "{}",
+                                result = notification,
+                                status = "success",
+                                toolCallId = "tool-agent-1",
+                            ),
+                        ),
+                        messageId = "msg-notification",
+                    )
+                }
+            }
+        }
     }
 }

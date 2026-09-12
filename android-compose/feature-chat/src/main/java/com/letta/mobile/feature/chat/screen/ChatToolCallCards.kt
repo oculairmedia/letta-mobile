@@ -160,6 +160,7 @@ internal fun SubagentNotificationCard(
     val headerOpenTodosModifier = if (canOpenSubagent) Modifier.clickable { openSubagent() } else Modifier
     val isFailure = notification.status.equals("failed", ignoreCase = true) ||
         notification.status.equals("error", ignoreCase = true)
+    val headline = if (isFailure) "failed" else "completed"
     // Collapse the full report by default — the summary already conveys the
     // outcome; the report is opt-in so a long markdown dump never floods the
     // timeline (recede-by-default).
@@ -167,105 +168,156 @@ internal fun SubagentNotificationCard(
         mutableStateOf(false)
     }
     val report = notification.result?.takeIf { it.isNotBlank() }
-    Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface,
-        ),
-        border = BorderStroke(
-            width = 1.dp,
-            color = if (isFailure) MaterialTheme.colorScheme.error.copy(alpha = 0.62f) else MaterialTheme.colorScheme.outlineVariant,
-        ),
+    // No fill, no border, no side inset. As a message this already sits in a bubble that draws
+    // all three, so the card inside it was a box drawn twice; as a tool row it sits in the
+    // group's chrome. The icon carries the outcome, and failure carries it in colour.
+    // Anything worth opening: the agent's own report, and the transcript path behind it. A
+    // notification can carry either without the other.
+    val hasDetails = report != null || notification.transcriptUri != null
+    Column(
+        modifier = modifier.padding(vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
+        SubagentNotificationHeader(
+            notification = notification,
+            headline = headline,
+            isFailure = isFailure,
+            modifier = Modifier.fillMaxWidth().then(headerOpenTodosModifier),
+        )
+        notification.summary?.let { summary ->
+            Text(
+                text = summary,
+                style = MaterialTheme.typography.listItemSupporting,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            notification.durationMs?.let(::formatToolExecutionTime)?.let { SubagentMetaChip(text = it) }
+            notification.taskId?.let { SubagentMetaChip(text = it) }
+        }
+        SubagentNotificationActions(
+            canOpenSubagent = canOpenSubagent,
+            hasReport = report != null,
+            hasDetails = hasDetails,
+            expanded = reportExpanded,
+            onOpenSubagent = openSubagent,
+            onToggleDetails = {
+                HapticEffects.segmentTick(haptic, view)
+                reportExpanded = !reportExpanded
+            },
+        )
+        AnimatedVisibility(visible = reportExpanded && hasDetails) {
+            SubagentNotificationDetails(report = report, transcriptUri = notification.transcriptUri)
+        }
+    }
+}
+
+@Composable
+private fun SubagentNotificationHeader(
+    notification: UiSubagentNotification,
+    headline: String,
+    isFailure: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            imageVector = if (isFailure) LettaIcons.Error else LettaIcons.CheckCircle,
+            contentDescription = null,
+            modifier = Modifier.size(LettaIconSizing.Inline),
+            tint = if (isFailure) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = "Subagent $headline",
+            style = MaterialTheme.typography.chatBubbleSender,
+            color = if (isFailure) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+        )
+        // Anything the header does not already say. "completed" beside "Subagent completed" was
+        // the same word twice.
+        notification.status.takeIf { !it.equals(headline, ignoreCase = true) }
+            ?.let { SubagentMetaChip(text = it) }
+    }
+}
+
+/**
+ * One row, not one line each: opening the subagent's conversation and opening its report are the
+ * two ways into the same result.
+ */
+@Composable
+private fun SubagentNotificationActions(
+    canOpenSubagent: Boolean,
+    hasReport: Boolean,
+    hasDetails: Boolean,
+    expanded: Boolean,
+    onOpenSubagent: () -> Unit,
+    onToggleDetails: () -> Unit,
+) {
+    if (!canOpenSubagent && !hasDetails) return
+    val disclosure = when {
+        hasReport && expanded -> "Hide full report"
+        hasReport -> "Show full report"
+        expanded -> "Hide transcript"
+        else -> "Show transcript"
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        if (canOpenSubagent) {
+            Text(
+                text = "View conversation",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .defaultMinSize(minHeight = 32.dp)
+                    .clickable(onClick = onOpenSubagent)
+                    .padding(vertical = 8.dp),
+            )
+        }
+        if (hasDetails) {
             Row(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .then(headerOpenTodosModifier),
+                    .defaultMinSize(minHeight = 32.dp)
+                    .clickable(onClick = onToggleDetails)
+                    .padding(vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(
-                    imageVector = if (isFailure) LettaIcons.Error else LettaIcons.CheckCircle,
-                    contentDescription = null,
-                    modifier = Modifier.size(LettaIconSizing.Inline),
-                    tint = if (isFailure) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = "Subagent ${if (isFailure) "failed" else "completed"}",
-                    style = MaterialTheme.typography.chatBubbleSender,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.weight(1f),
-                )
-                SubagentMetaChip(text = notification.status)
-            }
-            notification.summary?.let { summary ->
-                Text(
-                    text = summary,
-                    style = MaterialTheme.typography.listItemSupporting,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                notification.durationMs?.let(::formatToolExecutionTime)?.let { SubagentMetaChip(text = it) }
-                notification.taskId?.let { SubagentMetaChip(text = it) }
-            }
-            if (canOpenSubagent) {
-                Text(
-                    text = "View conversation",
+                    text = disclosure,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
+                )
+                Icon(
+                    imageVector = LettaIcons.ExpandMore,
+                    contentDescription = disclosure,
                     modifier = Modifier
-                        .defaultMinSize(minHeight = 32.dp)
-                        .clickable { openSubagent() }
-                        .padding(vertical = 8.dp),
+                        .size(14.dp)
+                        .rotate(if (expanded) 180f else 0f),
+                    tint = MaterialTheme.colorScheme.primary,
                 )
             }
-            if (report != null) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            HapticEffects.segmentTick(haptic, view)
-                            reportExpanded = !reportExpanded
-                        },
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = if (reportExpanded) "Hide full report" else "Show full report",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Icon(
-                        imageVector = LettaIcons.ExpandMore,
-                        contentDescription = if (reportExpanded) "Hide full report" else "Show full report",
-                        modifier = Modifier
-                            .size(14.dp)
-                            .rotate(if (reportExpanded) 180f else 0f),
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                }
-                AnimatedVisibility(visible = reportExpanded) {
-                    MarkdownText(
-                        text = report,
-                        textColor = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-            }
-            notification.transcriptUri?.let { transcript ->
-                Text(
-                    text = "Transcript: $transcript",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+        }
+    }
+}
+
+@Composable
+private fun SubagentNotificationDetails(report: String?, transcriptUri: String?) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        report?.let {
+            MarkdownText(text = it, textColor = MaterialTheme.colorScheme.onSurface)
+        }
+        // A path on the build host is for whoever goes looking, which is never at a glance. It
+        // used to hold a line of every card whether or not anyone wanted it.
+        transcriptUri?.let { transcript ->
+            Text(
+                text = "Transcript: $transcript",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
@@ -287,81 +339,74 @@ internal fun SubagentDispatchCard(
             opener(SubagentTodoSheetTarget(toolCallId = callId, description = dispatch.description))
         }
     } ?: Modifier
-    Card(
-        modifier = modifier.then(openTodosModifier),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.70f),
-        ),
-        border = BorderStroke(
-            width = 1.dp,
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f),
-        ),
+    // Same reason as the return card: whatever hosts this already draws the chrome, so filling
+    // and outlining it here put a box inside a box.
+    Column(
+        modifier = modifier
+            .then(openTodosModifier)
+            .padding(vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = LettaIcons.Agent,
-                    contentDescription = null,
-                    modifier = Modifier.size(LettaIconSizing.Inline),
-                    tint = MaterialTheme.colorScheme.tertiary,
-                )
-                Spacer(modifier = Modifier.width(6.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = LettaIcons.Agent,
+                contentDescription = null,
+                modifier = Modifier.size(LettaIconSizing.Inline),
+                tint = MaterialTheme.colorScheme.tertiary,
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = "Dispatched: ${dispatch.description}",
+                style = MaterialTheme.typography.chatBubbleSender,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            if (dispatch.runInBackground) {
+                SubagentMetaChip(text = "background")
+                Spacer(modifier = Modifier.width(4.dp))
+            }
+            SubagentMetaChip(text = dispatch.subagentType)
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            status?.let { SubagentMetaChip(text = subagentDispatchStatus(it)) }
+            executionTimeMs?.let(::formatToolExecutionTime)?.let { SubagentMetaChip(text = it) }
+            dispatch.taskId?.let { SubagentMetaChip(text = it) }
+        }
+        if (dispatch.prompt.isNotBlank()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        HapticEffects.segmentTick(haptic, view)
+                        expanded = !expanded
+                    },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text(
-                    text = "Dispatched: ${dispatch.description}",
-                    style = MaterialTheme.typography.chatBubbleSender,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                    text = if (expanded) "Hide prompt" else "Show prompt",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.weight(1f),
                 )
-                if (dispatch.runInBackground) {
-                    SubagentMetaChip(text = "background")
-                    Spacer(modifier = Modifier.width(4.dp))
-                }
-                SubagentMetaChip(text = dispatch.subagentType)
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                status?.let { SubagentMetaChip(text = subagentDispatchStatus(it)) }
-                executionTimeMs?.let(::formatToolExecutionTime)?.let { SubagentMetaChip(text = it) }
-                dispatch.taskId?.let { SubagentMetaChip(text = it) }
-            }
-            if (dispatch.prompt.isNotBlank()) {
-                Row(
+                Icon(
+                    imageVector = LettaIcons.ExpandMore,
+                    contentDescription = if (expanded) "Hide prompt" else "Show prompt",
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            HapticEffects.segmentTick(haptic, view)
-                            expanded = !expanded
-                        },
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = if (expanded) "Hide prompt" else "Show prompt",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Icon(
-                        imageVector = LettaIcons.ExpandMore,
-                        contentDescription = if (expanded) "Hide prompt" else "Show prompt",
-                        modifier = Modifier
-                            .size(14.dp)
-                            .rotate(if (expanded) 180f else 0f),
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                }
-                AnimatedVisibility(visible = expanded) {
-                    Text(
-                        text = dispatch.prompt,
-                        style = MaterialTheme.typography.listItemSupporting,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 12,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+                        .size(14.dp)
+                        .rotate(if (expanded) 180f else 0f),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+            AnimatedVisibility(visible = expanded) {
+                Text(
+                    text = dispatch.prompt,
+                    style = MaterialTheme.typography.listItemSupporting,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 12,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
     }
