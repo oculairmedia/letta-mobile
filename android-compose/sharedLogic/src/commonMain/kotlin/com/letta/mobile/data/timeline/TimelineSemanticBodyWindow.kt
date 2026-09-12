@@ -203,51 +203,8 @@ object TimelineSemanticBodyWindow {
             if (selected && peek() != 34 && peek() != 110) invalid()
             when (peek()) {
                 34 -> string(if (selected) 2 else 0)
-                123 -> {
-                    take(); space()
-                    if (peek() == 125) { take(); return }
-                    var first = true
-                    while (true) {
-                        space()
-                        val key = string(1)
-                        space(); expect(58)
-                        val step = if (onPath) path.getOrNull(depth) else null
-                        val match = when (step) {
-                            is TimelineSemanticSegment.Key -> key == step.name
-                            // The first member wins outright; later ones are walked and discarded,
-                            // so a second entry is not a malformed body.
-                            TimelineSemanticSegment.FirstKey -> first
-                            else -> false
-                        }
-                        val chosen = match && depth + 1 == path.size
-                        if (chosen) { if (seen) invalid(); seen = true; found = true }
-                        if (depth == 0 && key == "messageType") {
-                            if (messageType != null) invalid()
-                            space()
-                            messageType = string(1)
-                        } else value(depth + 1, match, chosen)
-                        first = false
-                        space()
-                        if (peek() == 125) { take(); break }
-                        expect(44)
-                    }
-                }
-                91 -> {
-                    take(); space()
-                    if (peek() == 93) { take(); return }
-                    var at = 0
-                    while (true) {
-                        val step = if (onPath) path.getOrNull(depth) else null
-                        val match = step is TimelineSemanticSegment.Index && step.at == at
-                        val chosen = match && depth + 1 == path.size
-                        if (chosen) { if (seen) invalid(); seen = true; found = true }
-                        value(depth + 1, match, chosen)
-                        at++
-                        space()
-                        if (peek() == 93) { take(); break }
-                        expect(44)
-                    }
-                }
+                123 -> obj(depth, onPath)
+                91 -> array(depth, onPath)
                 else -> {
                     val token = StringBuilder()
                     while (peek() != -1 && peek() !in listOf(32, 9, 10, 13, 44, 93, 125)) {
@@ -259,6 +216,66 @@ object TimelineSemanticBodyWindow {
                     if (text !in listOf("true", "false", "null") && !NUMBER.matches(text)) invalid()
                     if (selected) found = false
                 }
+            }
+        }
+
+        /**
+         * True when this member is the one segment [depth] names. Descending into it keeps the
+         * walk on the path; everything else is read and discarded.
+         */
+        private fun stepMatches(depth: Int, onPath: Boolean, key: String?, ordinal: Int, first: Boolean): Boolean =
+            when (val step = if (onPath) path.getOrNull(depth) else null) {
+                is TimelineSemanticSegment.Key -> key == step.name
+                // The first member wins outright; later ones are walked and discarded, so a second
+                // entry is not a malformed body.
+                TimelineSemanticSegment.FirstKey -> key != null && first
+                is TimelineSemanticSegment.Index -> key == null && step.at == ordinal
+                null -> false
+            }
+
+        /** Marks the one string the request is for; a repeat of it is a malformed body. */
+        private fun select() {
+            if (seen) invalid()
+            seen = true
+            found = true
+        }
+
+        suspend fun obj(depth: Int, onPath: Boolean) {
+            take(); space()
+            if (peek() == 125) { take(); return }
+            var first = true
+            while (true) {
+                space()
+                val key = string(1)
+                space(); expect(58)
+                val match = stepMatches(depth, onPath, key, -1, first)
+                val chosen = match && depth + 1 == path.size
+                if (chosen) select()
+                if (depth == 0 && key == "messageType") {
+                    if (messageType != null) invalid()
+                    space()
+                    messageType = string(1)
+                } else value(depth + 1, match, chosen)
+                first = false
+                space()
+                if (peek() == 125) { take(); break }
+                expect(44)
+            }
+        }
+
+        suspend fun array(depth: Int, onPath: Boolean) {
+            take(); space()
+            if (peek() == 93) { take(); return }
+            var at = 0
+            while (true) {
+                val match = stepMatches(depth, onPath, null, at, false)
+                val chosen = match && depth + 1 == path.size
+                if (chosen) select()
+                value(depth + 1, match, chosen)
+                at++
+                space()
+                if (peek() == 93) { take(); break }
+                expect(44)
             }
         }
 

@@ -6,6 +6,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.assertIsDisplayed
+import com.letta.mobile.feature.chat.screen.DeferredBodyRead
 import com.letta.mobile.feature.chat.screen.DeferredWindowControls
 import com.letta.mobile.data.timeline.TimelineSemanticField
 import com.letta.mobile.data.timeline.TimelineSemanticWindowResult
@@ -20,21 +21,29 @@ import org.robolectric.annotation.Config
 class DeferredWindowControlsTest {
     @get:Rule val compose = createComposeRule()
 
-    private fun text(value: String, next: Long?, type: String) =
+    private fun text(value: String, next: Long? = null, type: String = "assistant") =
         TimelineSemanticWindowResult.Text(value, next, 20, 8, 1, type)
 
-    private fun missing(type: String) =
+    private fun missing(type: String = "assistant") =
         TimelineSemanticWindowResult.Deferred(TimelineSemanticWindowResult.Reason.MissingField, type)
+
+    /** Mounts the card and opens it, which is the only way anything is ever read. */
+    private fun open(read: DeferredBodyRead) {
+        compose.setContent { DeferredWindowControls("row", read) }
+        compose.onNodeWithText("View content").performClick()
+    }
+
+    /** A plain message: only `content` carries anything. */
+    private fun contentOnly(body: (Long) -> TimelineSemanticWindowResult): DeferredBodyRead =
+        { field, offset -> if (field == TimelineSemanticField.Content) body(offset) else missing() }
 
     @Test fun explicitReadReplacesWindowAndPreviousRestoresOffset() {
         val offsets = mutableListOf<Long>()
         compose.setContent {
-            DeferredWindowControls("row") { field, offset ->
-                if (field != TimelineSemanticField.Content) missing("assistant") else {
-                    offsets += offset
-                    text("window-$offset", if (offset == 0L) 10L else null, "assistant")
-                }
-            }
+            DeferredWindowControls("row", contentOnly { offset ->
+                offsets += offset
+                text("window-$offset", if (offset == 0L) 10L else null)
+            })
         }
         compose.runOnIdle { org.junit.Assert.assertTrue(offsets.isEmpty()) }
         compose.onNodeWithText("View content").performClick()
@@ -51,13 +60,7 @@ class DeferredWindowControlsTest {
     }
 
     @Test fun theLastPageOffersNoNextAndTheFirstOffersNoPrevious() {
-        compose.setContent {
-            DeferredWindowControls("row") { field, offset ->
-                if (field != TimelineSemanticField.Content) missing("assistant")
-                else text("window-$offset", null, "assistant")
-            }
-        }
-        compose.onNodeWithText("View content").performClick()
+        open(contentOnly { offset -> text("window-$offset") })
         compose.onNodeWithText("window-0").assertIsDisplayed()
         // A single-page body still reads as a page, but neither direction is offered.
         compose.onNodeWithContentDescription("Next page").assertIsNotEnabled()
@@ -66,39 +69,30 @@ class DeferredWindowControlsTest {
 
     /** letta-mobile-jp78k: `content` on a tool call is `name(arguments)`, and is never what to show. */
     @Test fun aToolCallShowsItsOutputRatherThanItsSynthesizedContent() {
-        compose.setContent {
-            DeferredWindowControls("row") { field, _ ->
-                when (field) {
-                    TimelineSemanticField.toolName() -> text("Bash", null, "tool_call")
-                    TimelineSemanticField.ToolReturnByCallId -> text("total 4 drwx", null, "tool_call")
-                    else -> text("Bash({\\\"command\\\":\\\"ls\\\"})", null, "tool_call")
-                }
+        open { field, _ ->
+            when (field) {
+                TimelineSemanticField.toolName() -> text("Bash", type = "tool_call")
+                TimelineSemanticField.ToolReturnByCallId -> text("total 4 drwx", type = "tool_call")
+                else -> text("""Bash({"command":"ls"})""", type = "tool_call")
             }
         }
-        compose.onNodeWithText("View content").performClick()
         compose.onNodeWithText("total 4 drwx").assertIsDisplayed()
     }
 
     /** A tool call still in flight has no return, so its arguments are the only truthful text. */
     @Test fun aToolCallWithoutAReturnFallsBackToItsArguments() {
-        compose.setContent {
-            DeferredWindowControls("row") { field, _ ->
-                when (field) {
-                    TimelineSemanticField.toolName() -> text("Bash", null, "tool_call")
-                    TimelineSemanticField.toolArguments() -> text("{\"command\":\"ls\"}", null, "tool_call")
-                    else -> missing("tool_call")
-                }
+        open { field, _ ->
+            when (field) {
+                TimelineSemanticField.toolName() -> text("Bash", type = "tool_call")
+                TimelineSemanticField.toolArguments() -> text("""{"command":"ls"}""", type = "tool_call")
+                else -> missing("tool_call")
             }
         }
-        compose.onNodeWithText("View content").performClick()
-        compose.onNodeWithText("{\"command\":\"ls\"}").assertIsDisplayed()
+        compose.onNodeWithText("""{"command":"ls"}""").assertIsDisplayed()
     }
 
     @Test fun aBodyWithNoShowableStringSaysSoInsteadOfShowingNothing() {
-        compose.setContent {
-            DeferredWindowControls("row") { _, _ -> missing("assistant") }
-        }
-        compose.onNodeWithText("View content").performClick()
+        open { _, _ -> missing() }
         compose.onNodeWithText("This record stores no text to show.").assertIsDisplayed()
     }
 }
