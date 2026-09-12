@@ -26,7 +26,12 @@ class AmbientMotionTest {
             val spec = AmbientMotion.spec(status)
             assertTrue(spec.isTransient, "$status must be transient")
             assertTrue(spec.bloomEnvelope > spec.settledEnvelope, "$status bloom > settled")
-            assertTrue(spec.settleMillis > 0, "$status needs a settle duration")
+            // A decay has to be slow enough to read as one and short enough not to outlive
+            // the turn it belongs to. "Not negative" would say nothing.
+            assertTrue(
+                spec.settleMillis in 300..4000,
+                "$status settles in ${spec.settleMillis}ms, outside the readable range",
+            )
         }
     }
 
@@ -113,7 +118,13 @@ class AmbientMotionTest {
                 val ramp = AmbientMotion.ramp(current = current, status = status)
                 // Whichever move the host makes first, it takes time. Nothing is instant.
                 val firstMoveMillis = if (ramp.risesFirst) ramp.riseMillis else ramp.settleMillis
-                assertTrue(firstMoveMillis > 0, "$status from $current must not move instantly")
+                // The first move is a rise into a bloom or the settle itself, so the floor is
+                // the rise and the ceiling is the longest decay in the table. An instant step
+                // reads as a flash; anything slower than the decay it belongs to reads as lag.
+                assertTrue(
+                    firstMoveMillis in AmbientMotion.BLOOM_RISE_MILLIS..2400,
+                    "$status from $current moves in ${firstMoveMillis}ms",
+                )
                 if (AmbientMotion.spec(status).isTransient && ramp.bloomEnvelope > current) {
                     assertTrue(
                         ramp.risesFirst,
@@ -155,7 +166,10 @@ class AmbientMotionTest {
                 assertEquals(0, ramp.riseMillis, "$status has no bloom to climb")
                 assertEquals(spec.settledEnvelope, ramp.bloomEnvelope, "$status names one level")
                 assertEquals(spec.settledEnvelope, ramp.settledEnvelope)
-                assertTrue(ramp.settleMillis > 0, "$status still eases rather than jumping")
+                assertTrue(
+                    ramp.settleMillis in 100..1000,
+                    "$status eases in ${ramp.settleMillis}ms; a continuous status glides, never jumps",
+                )
                 assertEquals(0, AmbientMotion.holdMillis(status), "$status is not held")
             }
     }
