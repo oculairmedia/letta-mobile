@@ -63,7 +63,11 @@ class ChatPagingPresentation(
     val opening: Boolean = false,
     val openError: String? = null,
     val retryOpen: () -> Unit = {},
-    val deferredReader: (ChatRenderItem) -> (suspend (Long) -> com.letta.mobile.data.timeline.TimelineSemanticWindowResult)? = { null },
+    /**
+     * The field is the caller's, not the reader's: which string a stored body should show is
+     * discovered per row by [com.letta.mobile.data.timeline.resolveDeferredBody].
+     */
+    val deferredReader: (ChatRenderItem) -> DeferredBodyRead? = { null },
 ) {
     internal var viewport: ChatPagingViewport? = null
     internal var saveViewport: (ChatPagingViewport) -> Unit = {}
