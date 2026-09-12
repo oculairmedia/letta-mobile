@@ -952,8 +952,14 @@ class DesktopChatController(
         selectedId?.let { selectRemoteConversation(it, loadedRuntime.selectionGeneration) }
     }
 
-    /** Installed by the dev-gated writer host only; null keeps the existing desktop route. */
-    var canonicalOpen: (suspend (String, String, CoroutineScope) -> com.letta.mobile.data.timeline.CanonicalTimelinePresentation)? = null
+    /**
+     * Installed by the dev-gated writer host only; null keeps the existing desktop route.
+     *
+     * The request carries the transport because per-conversation routing lives here, not in the
+     * host: a default-shim conversation is served by a different transport than the gateway, and a
+     * canonical ledger opened against the wrong one would index another conversation's history.
+     */
+    var canonicalOpen: (suspend (DesktopCanonicalOpenRequest) -> com.letta.mobile.data.timeline.CanonicalTimelinePresentation)? = null
     var canonicalEligible: (String) -> Boolean = { false }
     private val _canonicalPresentation = MutableStateFlow<com.letta.mobile.data.timeline.CanonicalTimelinePresentation?>(null)
     val canonicalPresentation = _canonicalPresentation.asStateFlow()
@@ -983,7 +989,14 @@ class DesktopChatController(
             _canonicalStatus.value = "Opening conversation..."
             timelineJob = scope.launch {
                 try {
-                    val presentation = canonical(requireNotNull(conversation.agentId) { "Canonical route requires an agent" }, conversationId, this)
+                    val presentation = canonical(
+                        DesktopCanonicalOpenRequest(
+                            agentId = requireNotNull(conversation.agentId) { "Canonical route requires an agent" },
+                            conversationId = conversationId,
+                            transport = desktopTimelineTransportFor(nextGateway, conversation),
+                            scope = this,
+                        ),
+                    )
                     try {
                         if (!isActiveSelection(generation)) return@launch
                         _canonicalPresentation.value = presentation

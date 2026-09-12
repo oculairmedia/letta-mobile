@@ -78,7 +78,7 @@ class DesktopChatControllerSnapshotTest {
             gatewayFactory = { gateway },
         )
         controller.canonicalEligible = { true }
-        controller.canonicalOpen = { _, _, _ ->
+        controller.canonicalOpen = {
             opened.complete(Unit)
             try { kotlinx.coroutines.awaitCancellation() }
             finally { cancelled.complete(Unit) }
@@ -100,7 +100,7 @@ class DesktopChatControllerSnapshotTest {
             gatewayFactory = { gateway },
         )
         controller.canonicalEligible = { true }
-        controller.canonicalOpen = { _, _, _ -> error("Canonical unavailable") }
+        controller.canonicalOpen = { error("Canonical unavailable") }
         controller.start()
         runCurrent()
         kotlin.test.assertFalse(gateway.hydrationStarted.isCompleted)
@@ -136,12 +136,12 @@ class DesktopChatControllerSnapshotTest {
             gatewayFactory = { gateway },
         )
         controller.canonicalEligible = { true }
-        controller.canonicalOpen = { agent, conversation, scope ->
+        controller.canonicalOpen = { request ->
             val owner = coordinator.acquire(
-                TimelineScope("backend", conversation, agent),
+                TimelineScope("backend", request.conversationId, request.agentId),
             )
-            owners[conversation] = owner
-            com.letta.mobile.desktop.data.openDesktopCanonicalPresentation(coordinator, owner, scope)
+            owners[request.conversationId] = owner
+            com.letta.mobile.desktop.data.openDesktopCanonicalPresentation(coordinator, owner, request.scope)
         }
         controller.start()
         runCurrent()
