@@ -1,9 +1,13 @@
 package com.letta.mobile.desktop.data
 
 import com.letta.mobile.data.timeline.CanonicalTimelineCoordinator
+import com.letta.mobile.data.timeline.CanonicalExternalTransportWriter
 import com.letta.mobile.data.timeline.CanonicalTimelinePresentation
+import com.letta.mobile.data.timeline.IndexedCanonicalTimelineMaintenance
 import com.letta.mobile.data.timeline.TimelineTransport
+import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
+import com.letta.mobile.util.Telemetry
 import java.nio.file.Path
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.NonCancellable
@@ -46,6 +50,43 @@ class DesktopCanonicalTimelineRuntime internal constructor(
             owners.getOrPut(scope) { coordinator.acquire(scope) }
         }
         return openDesktopCanonicalPresentation(coordinator, owner, uiScope, target)
+    }
+
+    /**
+     * The ingestion side of the same conversation writers [open] renders. Send orchestration writes
+     * through this interface, so the ledger the list pages from and the ledger a send lands in are
+     * the same store by construction rather than by agreement between two paths.
+     *
+     * Scoped to one agent because the writer resolves a scope per call and a captured writer must
+     * never answer for a conversation owned by another agent.
+     */
+    fun writer(agentId: String, maintenanceScope: CoroutineScope): TimelineExternalTransportWriter {
+        val maintenance = IndexedCanonicalTimelineMaintenance(
+            coordinator = coordinator,
+            scope = maintenanceScope,
+            repairCommittedCursor = { owner, _, _ ->
+                // Desktop keeps no ConversationCursorStore, so there is no retained watermark to
+                // replace. Only the subscription-resume path asks for this; failing loudly beats a
+                // silent no-op that would let a cursor drift unnoticed.
+                error(
+                    "Desktop has no conversation cursor store to repair for " +
+                        owner.selection.scope.conversationId,
+                )
+            },
+            reportFailure = { failure ->
+                Telemetry.error("DesktopCanonicalTimeline", "maintenance.failed", failure)
+            },
+        )
+        return CanonicalExternalTransportWriter(
+            coordinator = coordinator,
+            resolveScope = { requestedAgent, conversationId ->
+                check(requestedAgent == null || requestedAgent == agentId) {
+                    "Writer scope names an agent this writer was not captured for"
+                }
+                TimelineScope(backendId, conversationId, agentId)
+            },
+            maintenance = maintenance,
+        )
     }
 
     /** Retires every conversation writer this runtime opened. Not reversible. */
