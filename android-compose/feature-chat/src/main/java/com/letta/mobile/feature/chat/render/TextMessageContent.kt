@@ -7,9 +7,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
-import com.letta.mobile.ui.theme.LocalChatFontScale
 import com.letta.mobile.ui.theme.chatTypography
-import com.letta.mobile.ui.theme.scaledBy
 
 internal object TextMessageRenderer : MessageContentRenderer {
     override fun canRender(message: UiMessage) =
@@ -27,7 +25,8 @@ internal object TextMessageRenderer : MessageContentRenderer {
         if (message.role == "user") {
             Text(
                 text = message.content,
-                style = MaterialTheme.chatTypography.messageBody.scaledBy(LocalChatFontScale.current),
+                // Already at the row's zoom: chatTypography is built from it. Scaling again squared it.
+                style = MaterialTheme.chatTypography.messageBody,
                 color = textColor,
                 modifier = modifier,
             )

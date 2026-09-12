@@ -80,6 +80,66 @@ fun TextStyle.scaledBy(factor: Float): TextStyle {
     )
 }
 
+/**
+ * Builds the chat text styles at [fontScale].
+ *
+ * Extracted so the scale can be supplied per timeline row as well as per theme. A pinch moves the
+ * row scale every frame while the committed theme scale only changes on release, so anything that
+ * must track the gesture has to be built from the row's value rather than the theme's.
+ *
+ * Memoized on its inputs: a repeated scale returns the same instance, so readers skip
+ * recomposition, and the six TextStyle allocations happen once per distinct scale rather than once
+ * per Text.
+ */
+@Composable
+fun rememberChatTypography(fontScale: Float): ChatTypography {
+    val materialTypography = MaterialTheme.typography
+    val colorScheme = MaterialTheme.colorScheme
+    return remember(materialTypography, colorScheme, fontScale) {
+        ChatTypography(
+            messageBody = materialTypography.bodyMedium.scaledBy(fontScale),
+            roleLabel = materialTypography.chatBubbleSender
+                .copy(letterSpacing = LettaChatTokens.typography.roleLabelLetterSpacingSp.sp)
+                .scaledBy(fontScale),
+            codeBlock = TextStyle(
+                fontFamily = LettaCodeFont,
+                fontSize = LettaChatTokens.typography.codeBlockFontSizeSp.sp,
+                lineHeight = LettaChatTokens.typography.codeBlockLineHeightSp.sp,
+            ).scaledBy(fontScale),
+            toolLabel = materialTypography.labelMedium.scaledBy(fontScale),
+            toolDetail = materialTypography.labelSmall.copy(
+                fontFamily = LettaCodeFont,
+            ).scaledBy(fontScale),
+            timestamp = materialTypography.labelSmall.copy(
+                color = colorScheme.onSurfaceVariant.copy(alpha = 0.68f),
+            ).scaledBy(fontScale),
+        )
+    }
+}
+
+/**
+ * The timeline's zoom scope: one place that owns what "the current zoom" means for everything
+ * drawn inside it.
+ *
+ * The rule this exists to enforce, because convention alone did not: a style taken from
+ * [chatTypography] is already at [scale] and must never be scaled again, and a style taken from
+ * MaterialTheme.typography is scaled exactly once with [LocalChatFontScale]. Providing both locals
+ * together is what makes those two statements true at the same time - before this, the typography
+ * carried the committed scale while the local carried the live one, so the two disagreed for the
+ * whole length of a pinch and multiplied wherever a caller used both.
+ *
+ * Rows and the content between them (date boundaries, paging notices, stored-content cards) both
+ * wrap in this, which is what makes them zoom together.
+ */
+@Composable
+fun TimelineZoomScope(scale: Float, content: @Composable () -> Unit) {
+    CompositionLocalProvider(
+        LocalChatFontScale provides scale,
+        LocalChatTypography provides rememberChatTypography(scale),
+        content = content,
+    )
+}
+
 @Composable
 fun LettaChatTheme(
     fontScale: Float = 1f,
@@ -110,26 +170,7 @@ fun LettaChatTheme(
     // a new instance (cheap — six TextStyle allocations) but ALL allocations
     // happen here exactly once per distinct fontScale value, not per Text
     // composable like .scaledBy(LocalChatFontScale.current) used to.
-    val chatTypography = remember(materialTypography, colorScheme, fontScale) {
-        ChatTypography(
-            messageBody = materialTypography.bodyMedium.scaledBy(fontScale),
-            roleLabel = materialTypography.chatBubbleSender
-                .copy(letterSpacing = LettaChatTokens.typography.roleLabelLetterSpacingSp.sp)
-                .scaledBy(fontScale),
-            codeBlock = TextStyle(
-                fontFamily = LettaCodeFont,
-                fontSize = LettaChatTokens.typography.codeBlockFontSizeSp.sp,
-                lineHeight = LettaChatTokens.typography.codeBlockLineHeightSp.sp,
-            ).scaledBy(fontScale),
-            toolLabel = materialTypography.labelMedium.scaledBy(fontScale),
-            toolDetail = materialTypography.labelSmall.copy(
-                fontFamily = LettaCodeFont,
-            ).scaledBy(fontScale),
-            timestamp = materialTypography.labelSmall.copy(
-                color = colorScheme.onSurfaceVariant.copy(alpha = 0.68f),
-            ).scaledBy(fontScale),
-        )
-    }
+    val chatTypography = rememberChatTypography(fontScale)
 
     CompositionLocalProvider(
         LocalChatColors provides chatColors,
