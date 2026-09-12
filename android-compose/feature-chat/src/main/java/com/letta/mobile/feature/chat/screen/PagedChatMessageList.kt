@@ -230,38 +230,68 @@ private fun PagedChatMessageListContent(
                 callbacks.onToggleRunCollapsed, callbacks.onToggleReasoningExpanded, callbacks.onAttachmentImageTap,
             ),
         )
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(top = appearance.topPadding),
-            state = listState,
-            reverseLayout = true,
-            contentPadding = PaddingValues(start = dimens.contentPaddingHorizontal, end = dimens.contentPaddingHorizontal,
-                top = 0.dp, bottom = appearance.bottomPadding),
+        val fadeTargetColor = chatFadeTargetColor(
+            chatBackground = appearance.chatBackground,
+            fallbackContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+        )
+        val fadeScrimColor = chatFadeScrimColor(
+            chatBackground = appearance.chatBackground,
+            surfaceColor = MaterialTheme.colorScheme.background,
+        )
+        val topFadeLength = appearance.topPadding + ChatFadeEdgeLength
+        val bottomFadeLength = chatMessageListBottomFadeLength(appearance.bottomPadding)
+        val newestRole = when (val newest = live.firstOrNull() ?: pages.itemSnapshotList.items.firstOrNull()) {
+            is ChatRenderItem.Single -> newest.message.role
+            is ChatRenderItem.RunBlock -> newest.messages.lastOrNull()?.first?.role
+            else -> null
+        }
+        // Paging can briefly report a backward scroll range while the live tail settles.
+        // Keep a streaming user prompt at the newest edge fully visible during that window.
+        val suppressBottomFade = following && newestRole == "user" && state.isStreaming
+        ChatFadingEdgesBox(
+            listState = listState,
+            targetColor = fadeTargetColor,
+            scrimColor = fadeScrimColor,
+            topPadding = 0.dp,
+            topFadeLength = topFadeLength,
+            bottomFadeLength = bottomFadeLength,
+            suppressBottom = suppressBottomFade,
+            // Keep the viewport behind the header; only resting content needs its inset.
+            modifier = Modifier.fillMaxSize(),
         ) {
-            items(live.size, key = { live[it].key }) { index ->
-                Column {
-                    PagedDateBoundary(live[index], live.getOrNull(index + 1)
-                        ?: if (pages.itemCount > 0) pages.peek(0) else null)
-                    ChatMessageListRenderItem(ChatMessageListRenderItemParams(live[index], index, context, dimens, shapes))
-                }
-            }
-            items(pages.itemCount, key = pages.itemKey { it.key }) { index ->
-                val row = pages[index]
-                if (row != null) {
-                    presentation.deferredReader(row)?.let { reader -> DeferredWindowControls(row.key, reader) }
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                state = listState,
+                reverseLayout = true,
+                contentPadding = PaddingValues(start = dimens.contentPaddingHorizontal, end = dimens.contentPaddingHorizontal,
+                    top = appearance.topPadding, bottom = appearance.bottomPadding),
+            ) {
+                items(live.size, key = { live[it].key }) { index ->
                     Column {
-                        PagedDateBoundary(row, if (index + 1 < pages.itemCount) pages.peek(index + 1) else null)
-                        ChatMessageListRenderItem(ChatMessageListRenderItemParams(row, live.size + index, context, dimens, shapes))
+                        PagedDateBoundary(live[index], live.getOrNull(index + 1)
+                            ?: if (pages.itemCount > 0) pages.peek(0) else null)
+                        ChatMessageListRenderItem(ChatMessageListRenderItemParams(live[index], index, context, dimens, shapes))
                     }
-                } else {
-                    Spacer(Modifier.height(48.dp))
                 }
-            }
-            val load = pages.loadState
-            if (load.refresh is LoadState.Loading || load.append is LoadState.Loading) {
-                item(key = "paging-loading") { CircularProgressIndicator() }
-            }
-            if (load.refresh is LoadState.Error || load.append is LoadState.Error || load.prepend is LoadState.Error) {
-                item(key = "paging-retry") { TextButton(onClick = pages::retry) { Text("Retry history") } }
+                items(pages.itemCount, key = pages.itemKey { it.key }) { index ->
+                    val row = pages[index]
+                    if (row != null) {
+                        presentation.deferredReader(row)?.let { reader -> DeferredWindowControls(row.key, reader) }
+                        Column {
+                            PagedDateBoundary(row, if (index + 1 < pages.itemCount) pages.peek(index + 1) else null)
+                            ChatMessageListRenderItem(ChatMessageListRenderItemParams(row, live.size + index, context, dimens, shapes))
+                        }
+                    } else {
+                        Spacer(Modifier.height(48.dp))
+                    }
+                }
+                val load = pages.loadState
+                if (load.refresh is LoadState.Loading || load.append is LoadState.Loading) {
+                    item(key = "paging-loading") { CircularProgressIndicator() }
+                }
+                if (load.refresh is LoadState.Error || load.append is LoadState.Error || load.prepend is LoadState.Error) {
+                    item(key = "paging-retry") { TextButton(onClick = pages::retry) { Text("Retry history") } }
+                }
             }
         }
         if (missingTarget != null && missingTarget == routeTarget) {

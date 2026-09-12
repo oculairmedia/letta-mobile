@@ -5,7 +5,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
@@ -41,7 +40,6 @@ fun ScrollToBottomFab(
                 pressedElevation = 6.dp,
             ),
             modifier = Modifier
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
                 .testTag(SCROLL_TO_BOTTOM_FAB_TAG),
         ) {
             Icon(
@@ -51,4 +49,3 @@ fun ScrollToBottomFab(
         }
     }
 }
-
