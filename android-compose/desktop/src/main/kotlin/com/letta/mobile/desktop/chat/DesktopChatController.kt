@@ -1010,7 +1010,14 @@ class DesktopChatController(
     )? = null
 
     /** The turn-indicator and error state the shared send coordinator is allowed to move. */
-    internal val sendSurface: DesktopChatSendSurface = object : DesktopChatSendSurface {
+    internal val sendSurface: DesktopChatSendSurface = ControllerSendSurface()
+
+    /**
+     * Named rather than an anonymous object in a property initializer: this is the whole contract
+     * the shared coordinator drives the desktop UI through, and it belongs in a declaration that can
+     * be read on its own.
+     */
+    private inner class ControllerSendSurface : DesktopChatSendSurface {
         override fun currentError(): String? = _state.value.errorMessage
         override fun setError(message: String?) {
             _state.update { it.copy(errorMessage = message) }
