@@ -122,7 +122,30 @@ class ChatSendCoordinator(
             wsChatBridge.events.collect { event -> handleEvent(event) }
         }
         scope.launch {
-            wsChatBridge.redialWhileTurnActive.collect { event -> handleRedialWhileTurnActive(event) }
+            wsChatBridge.redialWhileTurnActive.collect { event ->
+                contained("RedialWhileTurnActive") { handleRedialWhileTurnActive(event) }
+            }
+        }
+    }
+
+    /**
+     * One frame must never take the process down. Everything a frame reaches reports a violated
+     * expectation by throwing - the canonical timeline alone holds dozens of such fences - and
+     * frames are dispatched on the main dispatcher, so an escaped failure killed the app mid-turn
+     * and took the transport subscription with it. Contain per frame: that frame is lost and the
+     * reconcile recovers its rows, while the turn and the stream survive.
+     */
+    private suspend fun contained(frame: String?, handle: suspend () -> Unit) {
+        try {
+            handle()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Throwable) {
+            Telemetry.error(
+                "AdminChatVM", "ws.event.handlerFailed", failure,
+                "eventType" to (frame ?: ""),
+                "agentId" to agentId,
+            )
         }
     }
 
@@ -887,8 +910,8 @@ class ChatSendCoordinator(
         } ?: false
     }
 
-    suspend fun handleEvent(event: WsTimelineEvent) = turnStateMutex.withLock {
-        handleEventLocked(event)
+    suspend fun handleEvent(event: WsTimelineEvent) = contained(event::class.simpleName) {
+        turnStateMutex.withLock { handleEventLocked(event) }
     }
 
     private suspend fun handleEventLocked(event: WsTimelineEvent) {

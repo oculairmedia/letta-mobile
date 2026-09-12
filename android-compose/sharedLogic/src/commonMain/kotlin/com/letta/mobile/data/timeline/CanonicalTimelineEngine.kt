@@ -1,6 +1,7 @@
 package com.letta.mobile.data.timeline
 
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
+import com.letta.mobile.util.Telemetry
 import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
 import com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent
 import com.letta.mobile.data.timeline.snapshot.toStoredTimelineEvent
@@ -96,18 +97,21 @@ class CanonicalTimelineEngine(
             is TimelineStreamFrame.RawEvent -> error("Raw events must be decoded by the transport before ingest")
         }
         val events = next.timeline.events.filterIsInstance<TimelineEvent.Confirmed>()
-        require(events.size <= budget.maxMetadataRows) { "Live block row budget exceeded" }
-        var liveBytes = 0L
-        for (event in events) {
-            liveBytes += TimelineSnapshotCodec.json.encodeToString(
-                StoredTimelineEvent.serializer(), event.toStoredTimelineEvent(),
-            ).encodeToByteArray().size
-            require(liveBytes <= budget.maxDecodedBodyBytes) { "Live block byte budget exceeded" }
-        }
         val returnedId = ((frame as? TimelineStreamFrame.Message)?.message as? com.letta.mobile.data.model.ToolReturnMessage)
             ?.toolReturn?.toolCallId?.takeIf { it.isNotBlank() }
         val nextReturns = if (returnedId == null) liveReturns else liveReturns + returnedId
-        require(nextReturns.size <= budget.maxMetadataRows) { "Live return index budget exceeded" }
+        // The overlay is a bounded resident view of a turn, not its record: a turn long enough to
+        // exceed the budget is legal, and the durable rows still arrive through reconcile. Outgrowing
+        // the budget therefore stops the overlay growing - it must never fail the turn, and it used
+        // to kill the process mid-stream. A terminal frame adds no rows, so it can never be dropped.
+        val overflow = overflowReason(events, nextReturns)
+        if (overflow != null) {
+            Telemetry.event(
+                "CanonicalTimeline", "live.overlayFrameDropped",
+                "reason" to overflow, "rows" to events.size,
+            )
+            return@withLock true
+        }
         val terminal = frame == TimelineStreamFrame.Done
         // Sync/reconcile is the single durable writer; a stream-only identity would double the row.
         // Terminal frames only name the first revision that can carry this turn, so the overlay
@@ -117,6 +121,20 @@ class CanonicalTimelineEngine(
         liveReturns = nextReturns
         mutableLive.value = TimelineLivePublication(fence, TimelineLiveBlock(emptyList(), terminal, events), revision)
         true
+    }
+
+    /** Names the budget a frame would outgrow, or null when the overlay can still carry it. */
+    private fun overflowReason(events: List<TimelineEvent.Confirmed>, returns: Set<String>): String? {
+        if (events.size > budget.maxMetadataRows) return "row budget"
+        if (returns.size > budget.maxMetadataRows) return "return index budget"
+        var liveBytes = 0L
+        for (event in events) {
+            liveBytes += TimelineSnapshotCodec.json.encodeToString(
+                StoredTimelineEvent.serializer(), event.toStoredTimelineEvent(),
+            ).encodeToByteArray().size
+            if (liveBytes > budget.maxDecodedBodyBytes) return "byte budget"
+        }
+        return null
     }
 
     suspend fun publishLive(fence: TimelineLiveFence, block: TimelineLiveBlock): Boolean = mutex.withLock {

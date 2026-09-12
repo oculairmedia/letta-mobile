@@ -127,6 +127,9 @@ class SelectedRuntimeBindingTest {
         coEvery { authority.state(any()) } returns com.letta.mobile.data.local.TimelineOwnershipAuthority.State(
             scope, 0, com.letta.mobile.data.local.TimelineOwnershipAuthority.Phase.Legacy,
         )
+        // Binding asks who owns the conversation before it asks for its state, because an
+        // unclaimed conversation must not trip the recovery fence a lost record needs.
+        coEvery { authority.ownerAgent(any()) } returns scope.agentId
         coEvery { storage.classifyCopySource(any()) } returns com.letta.mobile.data.local.LegacyLedgerCopyHead(
             "legacy-manifest", 0, false, com.letta.mobile.data.local.LegacyLedgerCopyKind.ManifestOnly,
         )
@@ -156,6 +159,9 @@ class SelectedRuntimeBindingTest {
         coEvery { authority.state(any()) } returns com.letta.mobile.data.local.TimelineOwnershipAuthority.State(
             scope, 0, com.letta.mobile.data.local.TimelineOwnershipAuthority.Phase.Legacy,
         )
+        // Binding asks who owns the conversation before it asks for its state, because an
+        // unclaimed conversation must not trip the recovery fence a lost record needs.
+        coEvery { authority.ownerAgent(any()) } returns scope.agentId
         val encoded = com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec.encode(
             com.letta.mobile.data.timeline.snapshot.StoredTimelineEnvelope(scope = scope, revision = 1),
         )

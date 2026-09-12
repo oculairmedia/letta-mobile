@@ -761,6 +761,34 @@ class ChatSendCoordinatorCleanupTest {
         assertEquals("turn-failed-turn-1-local-run-1", errorRow.id)
     }
 
+    /**
+     * A timeline fence rejecting one frame used to escape the frame dispatcher and kill the app -
+     * three of the five crashes in one day's device log. The turn must absorb it and keep running.
+     */
+    @Test
+    fun `a timeline failure on one frame does not stop the turn`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val timeline = RecordingTimelineWriter(ingestFailure = IllegalStateException("fence"))
+            val ui = RecordingUiSink()
+            val transport = FakeChannelTransport(mutableListOf(true), activeChatTurn = true)
+            val coordinator = coordinator(timeline, ui, transport)
+
+            coordinator.send("hello").join()
+            coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "local-run-1"))
+            coordinator.handleEvent(WsTimelineEvent.MessageDelta(
+                message = AssistantMessage(id = "m-1", contentRaw = JsonPrimitive("hello"), runId = "local-run-1"),
+                conversationId = "conv-1",
+                turnId = "turn-1",
+            ))
+            coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "local-run-1", BridgeTurnStatus.Completed))
+            advanceUntilIdle()
+
+            // The frame is lost, but the turn still reached its terminal and stood the UI down.
+            assertEquals(emptyList(), timeline.ingestedMessages.filterIsInstance<AssistantMessage>())
+            assertEquals(listOf("conv-1"), timeline.clearedActiveConversations)
+            assertFalse(ui.isStreaming())
+        }
+
     private fun coordinator(
         timeline: RecordingTimelineWriter,
         ui: RecordingUiSink,
@@ -810,7 +838,10 @@ class ChatSendCoordinatorCleanupTest {
         override fun onDisconnectFailure(error: String) { this.error = error; isStreaming = false; isAgentTyping = false }
     }
 
-    private class RecordingTimelineWriter(private val cleanupFailure: Throwable? = null) : TimelineExternalTransportWriter {
+    private class RecordingTimelineWriter(
+        private val cleanupFailure: Throwable? = null,
+        private val ingestFailure: Throwable? = null,
+    ) : TimelineExternalTransportWriter {
         var reconcileOutcome: RecentMessagesReconcileOutcome = RecentMessagesReconcileOutcome.Applied(0)
         val externalLocals = mutableListOf<ExternalLocal>()
         val ingestedMessages = mutableListOf<LettaMessage>()
@@ -821,8 +852,8 @@ class ChatSendCoordinatorCleanupTest {
         val reconciles = mutableListOf<Reconcile>()
         override suspend fun appendExternalTransportLocal(conversationId: String, content: String, otid: String, attachments: List<MessageContentPart.Image>): String { externalLocals += ExternalLocal(conversationId, content, otid); return otid }
         override suspend fun appendExternalTransportLocal(agentId: String?, conversationId: String, content: String, otid: String, attachments: List<MessageContentPart.Image>): String = appendExternalTransportLocal(conversationId, content, otid, attachments)
-        override suspend fun ingestExternalTransportMessage(conversationId: String, message: LettaMessage, source: String) { ingestedMessages += message }
-        override suspend fun ingestExternalTransportMessage(agentId: String?, conversationId: String, message: LettaMessage, source: String) { ingestedMessages += message }
+        override suspend fun ingestExternalTransportMessage(conversationId: String, message: LettaMessage, source: String) { ingestFailure?.let { throw it }; ingestedMessages += message }
+        override suspend fun ingestExternalTransportMessage(agentId: String?, conversationId: String, message: LettaMessage, source: String) = ingestExternalTransportMessage(conversationId, message, source)
         override suspend fun markExternalTransportLocalSent(conversationId: String, otid: String) { sentLocals += LocalMarker(conversationId, otid) }
         override suspend fun markExternalTransportLocalSent(agentId: String?, conversationId: String, otid: String) { sentLocals += LocalMarker(conversationId, otid) }
         override suspend fun markExternalTransportLocalFailed(conversationId: String, otid: String) { failedLocals += LocalMarker(conversationId, otid) }

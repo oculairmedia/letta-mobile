@@ -30,6 +30,20 @@ class TimelineOwnershipAuthorityTest {
         throw AssertionError("Expected ownership rejection")
     }
 
+    /**
+     * Opening a conversation for the first time in a backend that already manages others is
+     * ordinary traffic, and the owner lookup must answer "unclaimed" rather than demanding
+     * recovery the way a state read does - it used to crash the app on a new conversation.
+     */
+    @Test fun ownerLookupTreatsAnUnclaimedConversationAsUnowned() = runBlocking {
+        val authority = authority()
+        authority.beginMigration(authority.acquire(scope, TimelineOwnershipAuthority.Route.Legacy))
+        assertEquals("agent", authority.ownerAgent(scope))
+        val fresh = scope.copy(conversationId = "second-conversation", agentId = "other")
+        assertNull(authority.ownerAgent(fresh))
+        rejected { authority.state(fresh) }
+    }
+
     @Test fun restartFencesOldLeasesAndCanonicalNeverRollsBack() = runBlocking {
         val authority = authority()
         val legacy = authority.acquire(scope, TimelineOwnershipAuthority.Route.Legacy)
