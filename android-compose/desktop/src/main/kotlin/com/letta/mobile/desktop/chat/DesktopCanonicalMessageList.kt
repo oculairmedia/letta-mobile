@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.selection.LocalTextSelectionColors
 import androidx.compose.foundation.text.selection.TextSelectionColors
@@ -87,73 +88,19 @@ private fun CanonicalMessageListContent(
     var following by remember(presentation) { mutableStateOf(restoreAnchor == null) }
     var anchorRestored by remember(presentation) { mutableStateOf(restoreAnchor == null) }
 
-    // Leaving the newest edge stops the follow; coming back to it resumes, but only once the
-    // newest edge is genuinely the end of the list rather than a page boundary.
-    LaunchedEffect(listState, settled.loadState.prepend.endOfPaginationReached) {
-        var wasScrolling = false
-        snapshotFlow { listState.isScrollInProgress }.collect { scrolling ->
-            if (scrolling) {
-                following = false
-            } else if (wasScrolling && !listState.canScrollBackward &&
-                settled.loadState.prepend.endOfPaginationReached
-            ) {
-                following = true
-            }
-            wasScrolling = scrolling
-        }
-    }
+    FollowTheNewestEdge(listState, settled.loadState.prepend.endOfPaginationReached) { following = it }
 
     LaunchedEffect(live, settled.itemSnapshotList, following) {
         if (following && !listState.isScrollInProgress) listState.scrollToItem(0)
     }
 
-    // Restore where the reader left off, once — and only from rows already resident. Hunting for
-    // the anchor through sequential history loads is the behaviour the windowed route exists to
-    // avoid, so an anchor that never becomes resident simply yields to the tail.
-    LaunchedEffect(presentation, settled.itemSnapshotList, live) {
-        if (anchorRestored) return@LaunchedEffect
-        val anchor = restoreAnchor ?: return@LaunchedEffect
-        val index = canonicalRowIndex(live, settled.itemSnapshotList.items, anchor.first)
-        if (index != null) {
-            listState.scrollToItem(index, anchor.second)
-            anchorRestored = true
-        }
+    if (!anchorRestored) {
+        RestoreReadingPosition(presentation, listState, live, settled, restoreAnchor) { anchorRestored = true }
+    } else {
+        RecordReadingPosition(presentation, listState, live, settled)
     }
 
-    LaunchedEffect(presentation, anchorRestored) {
-        if (!anchorRestored) return@LaunchedEffect
-        snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
-            .collect { (index, offset) ->
-                val row = (index - live.size).takeIf { it in 0 until settled.itemCount }
-                    ?.let { settled.peek(it) } ?: return@collect
-                presentation.viewport = row.identity.value to offset
-            }
-    }
-
-    // Which prompt owns the region on screen. This list is laid out in reverse, so the visual top
-    // is the HIGHEST visible index and a prompt's answer — being newer — carries a LOWER index and
-    // renders beneath it. The owning prompt is therefore the first user row at or above the topmost
-    // visible index. Compose's own stickyHeader cannot express this: it pins to the start of the
-    // layout direction, which in a reversed list is the BOTTOM of the pane.
-    val liveRows = rememberUpdatedState(live)
-    val pinnedPrompt: ChatRenderItem? by remember(presentation) {
-        derivedStateOf {
-            val visible = listState.layoutInfo.visibleItemsInfo
-            val top = visible.maxOfOrNull { it.index } ?: return@derivedStateOf null
-            val overlay = liveRows.value
-            val total = overlay.size + settled.itemCount
-            var index = top
-            while (index < total && index - top <= PinnedPromptScanLimit) {
-                val item = canonicalRowAt(overlay, settled, index)
-                // Its own row is on screen, so a pinned copy would just double-render it.
-                if (item != null && item.isUserPrompt()) {
-                    return@derivedStateOf item.takeIf { visible.none { row -> row.index == index } }
-                }
-                index++
-            }
-            null
-        }
-    }
+    val pinnedPrompt = rememberPinnedPrompt(presentation, listState, live, settled)
 
     val selectionColors = TextSelectionColors(
         handleColor = MaterialTheme.colorScheme.primary,
@@ -257,6 +204,115 @@ private fun CanonicalMessageListContent(
             )
         }
     }
+}
+
+/**
+ * Follow mode: leaving the newest edge stops it, coming back resumes — but only once the newest
+ * edge is genuinely the end of the list rather than a page boundary, or a mid-history page load
+ * would silently re-arm the follow and yank the reader to the tail.
+ */
+@Composable
+private fun FollowTheNewestEdge(
+    listState: LazyListState,
+    atNewestEdge: Boolean,
+    onFollowChanged: (Boolean) -> Unit,
+) {
+    LaunchedEffect(listState, atNewestEdge) {
+        var wasScrolling = false
+        snapshotFlow { listState.isScrollInProgress }.collect { scrolling ->
+            if (scrolling) {
+                onFollowChanged(false)
+            } else if (wasScrolling && !listState.canScrollBackward && atNewestEdge) {
+                onFollowChanged(true)
+            }
+            wasScrolling = scrolling
+        }
+    }
+}
+
+/**
+ * Puts the reader back where they left off, once, and only from rows already resident. Hunting for
+ * the anchor through sequential history loads is exactly what the windowed route exists to avoid,
+ * so an anchor that never becomes resident simply yields to the tail.
+ */
+@Composable
+private fun RestoreReadingPosition(
+    presentation: CanonicalTimelinePresentation,
+    listState: LazyListState,
+    live: List<ChatRenderItem>,
+    settled: LazyPagingItems<CanonicalTimelinePresentation.Row>,
+    anchor: Pair<String, Int>?,
+    onRestored: () -> Unit,
+) {
+    LaunchedEffect(presentation, settled.itemSnapshotList, live) {
+        val target = anchor ?: return@LaunchedEffect onRestored()
+        val index = canonicalRowIndex(live, settled.itemSnapshotList.items, target.first)
+            ?: return@LaunchedEffect
+        listState.scrollToItem(index, target.second)
+        onRestored()
+    }
+}
+
+/** Remembers where the reader is, so reopening this conversation lands on the same row. */
+@Composable
+private fun RecordReadingPosition(
+    presentation: CanonicalTimelinePresentation,
+    listState: LazyListState,
+    live: List<ChatRenderItem>,
+    settled: LazyPagingItems<CanonicalTimelinePresentation.Row>,
+) {
+    LaunchedEffect(presentation) {
+        snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
+            .collect { (index, offset) ->
+                val row = (index - live.size).takeIf { it in 0 until settled.itemCount }
+                    ?.let { settled.peek(it) } ?: return@collect
+                presentation.viewport = row.identity.value to offset
+            }
+    }
+}
+
+/**
+ * The prompt that owns the region on screen. This list is laid out in reverse, so the visual top is
+ * the HIGHEST visible index, and a prompt's answer — being newer — carries a LOWER index and renders
+ * beneath it. The owning prompt is therefore the first user row at or above the topmost visible one.
+ * Compose's own stickyHeader cannot express this: it pins to the start of the layout direction,
+ * which in a reversed list is the BOTTOM of the pane.
+ *
+ * Null while the prompt's own row is visible, because a pinned copy would double-render it.
+ */
+@Composable
+private fun rememberPinnedPrompt(
+    presentation: CanonicalTimelinePresentation,
+    listState: LazyListState,
+    live: List<ChatRenderItem>,
+    settled: LazyPagingItems<CanonicalTimelinePresentation.Row>,
+): ChatRenderItem? {
+    val liveRows = rememberUpdatedState(live)
+    val pinned by remember(presentation) {
+        derivedStateOf {
+            val visible = listState.layoutInfo.visibleItemsInfo
+            val top = visible.maxOfOrNull { it.index } ?: return@derivedStateOf null
+            val overlay = liveRows.value
+            owningPrompt(overlay, settled, top)?.let { (index, item) ->
+                item.takeIf { visible.none { row -> row.index == index } }
+            }
+        }
+    }
+    return pinned
+}
+
+/** The first user row at or above [top], with its index, or null within the search budget. */
+private fun owningPrompt(
+    live: List<ChatRenderItem>,
+    settled: LazyPagingItems<CanonicalTimelinePresentation.Row>,
+    top: Int,
+): Pair<Int, ChatRenderItem>? {
+    val total = live.size + settled.itemCount
+    for (index in top until minOf(total, top + PinnedPromptScanLimit)) {
+        val item = canonicalRowAt(live, settled, index) ?: continue
+        if (item.isUserPrompt()) return index to item
+    }
+    return null
 }
 
 /**
