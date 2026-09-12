@@ -264,7 +264,14 @@ class ReasoningCollapseTimelineContractTest {
         assertTrue(
             "the heightFor cache read (and therefore the heightIn(min=…) floor) must be " +
                 "gated on applyCachedMinHeight so reasoning rows never get a floor",
-            region.contains("if (applyCachedMinHeight && hasMeasuredOnce.value)"),
+            region.contains("if (applyCachedMinHeight && hasMeasuredOnce.value && !isPinching)"),
+        )
+        // letta-mobile-tgypm: the floor is additionally gated on the gesture. A cached height
+        // belongs to the zoom it was measured at, and applying it mid-pinch pinned every row at
+        // its pre-pinch size, which is what left a band of empty space under shrinking text.
+        assertTrue(
+            "the floor must also stand down while the row is drawn at a transient zoom",
+            region.contains("!isPinching"),
         )
     }
 
