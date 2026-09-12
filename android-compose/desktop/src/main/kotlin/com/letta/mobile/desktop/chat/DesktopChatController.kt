@@ -19,6 +19,7 @@ import com.letta.mobile.data.model.BlockCreateParams
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.ModelCatalog
 import com.letta.mobile.data.model.withCatalogModelRouting
@@ -89,12 +90,14 @@ class DesktopChatController(
 
     private val approvalCoordinator = DesktopChatApprovalCoordinator(
         scope = scope,
-        onError = { message ->
-            if (!closed) {
-                _state.update { it.copy(errorMessage = message) }
-            }
-        },
+        onError = ::showApprovalError,
     )
+
+    /** A closed controller no longer owns the surface, so it must not write to it. */
+    private fun showApprovalError(message: String) {
+        if (closed) return
+        _state.update { it.copy(errorMessage = message) }
+    }
 
     /**
      * Approval request ids whose decision (answer / dismiss) is in flight, so the
@@ -235,86 +238,109 @@ class DesktopChatController(
     private val modelCatalogHelper = DesktopChatModelCatalogHelper(
         scope = scope,
         agentByIdProvider = agentByIdProvider,
-        onModelsLoaded = { models ->
-            if (!closed) _availableModels.value = models
-        },
-        getSelectedConversationAgentId = { _state.value.selectedConversation?.agentId },
+        onModelsLoaded = ::publishAvailableModels,
+        getSelectedConversationAgentId = ::selectedConversationAgentId,
     )
+
+    private fun publishAvailableModels(models: List<LlmModel>) {
+        if (closed) return
+        _availableModels.value = models
+    }
+
+    private fun selectedConversationAgentId(): String? = _state.value.selectedConversation?.agentId
 
     private val connectionWatcher = DesktopChatConnectionWatcher(
         scope = scope,
-        onConnected = {
-            runCatching {
-                reloadConversationsAndSelect(
-                    preferConversationId = _state.value.runtimeState.selectedConversationId,
-                )
-            }
-        },
-        onDisconnected = { transportState ->
-            if (transportState.isAuthFailure) {
-                _state.update { current ->
-                    current.withRuntimeState(
-                        ChatSessionReducer.conversationLoadFailed(
-                            state = current.runtimeState,
-                            errorMessage = transportState.reason.ifBlank { "Authentication failed" },
-                        ),
-                    )
-                }
-            } else {
-                _state.update { current ->
-                    current.withRuntimeState(
-                        ChatSessionReducer.streamDisconnected(
-                            state = current.runtimeState,
-                            generation = current.runtimeState.selectionGeneration,
-                            errorMessage = transportState.reason.ifBlank { "Connection lost" },
-                            statusMessage = if (transportState.willReconnect) "Reconnecting…" else "Stream disconnected",
-                        ),
-                    )
-                }
-            }
-        },
-        onEscalateRetryConnection = { retryConnection() },
+        onConnected = ::onTransportConnected,
+        onDisconnected = ::onTransportDisconnected,
+        onEscalateRetryConnection = ::retryConnection,
     )
 
+    /** Reconnecting re-reads the roster, preferring whatever the user was already looking at. */
+    private suspend fun onTransportConnected() {
+        runCatching {
+            reloadConversationsAndSelect(
+                preferConversationId = _state.value.runtimeState.selectedConversationId,
+            )
+        }
+    }
+
+    /**
+     * An auth failure is terminal for the roster, so it reports as a load failure. Anything else is
+     * the stream dropping, which may still reconnect - and the status has to say which, or a blip
+     * and a dead connection read identically.
+     */
+    private fun onTransportDisconnected(transportState: ChannelTransportState.Disconnected) {
+        if (transportState.isAuthFailure) {
+            _state.update { current ->
+                current.withRuntimeState(
+                    ChatSessionReducer.conversationLoadFailed(
+                        state = current.runtimeState,
+                        errorMessage = transportState.reason.ifBlank { "Authentication failed" },
+                    ),
+                )
+            }
+        } else {
+            _state.update { current ->
+                current.withRuntimeState(
+                    ChatSessionReducer.streamDisconnected(
+                        state = current.runtimeState,
+                        generation = current.runtimeState.selectionGeneration,
+                        errorMessage = transportState.reason.ifBlank { "Connection lost" },
+                        statusMessage = if (transportState.willReconnect) "Reconnecting…" else "Stream disconnected",
+                    ),
+                )
+            }
+        }
+    }
+
     private val remoteSender = DesktopChatRemoteSender(
-        onSendSuccess = {
-            _state.update {
-                it.withRuntimeState(ChatSessionReducer.sendSucceeded(it.runtimeState))
-            }
-        },
-        onSendFailed = { attempt, errorMessage ->
-            if (!closed) {
-                if (_thinkingConversationId.value == attempt.conversationId) {
-                    _thinkingConversationId.value = null
-                }
-                _state.update {
-                    it.withRuntimeState(
-                        ChatSessionReducer.sendFailed(
-                            state = it.runtimeState,
-                            text = attempt.text,
-                            attachments = attempt.attachments,
-                            errorMessage = errorMessage,
-                        ),
-                    )
-                }
-            }
-        },
+        onSendSuccess = ::onRemoteSendSucceeded,
+        onSendFailed = ::onRemoteSendFailed,
         persistConversationTitle = ::persistConversationTitle,
-        onAttemptCompleted = { attempt ->
-            if (attempt.streamGen == streamingGeneration &&
-                _streamingConversationId.value == attempt.conversationId
-            ) {
-                _streamingConversationId.value = null
-            }
-            if (cancellingConversationId.value == attempt.conversationId) {
-                interruptCoordinator.clearCancelling()
-                if (_thinkingConversationId.value == attempt.conversationId) {
-                    _thinkingConversationId.value = null
-                }
-                attempt.conversationId?.let(interruptCoordinator::recordTerminalAfterCancel)
-            }
-        },
+        onAttemptCompleted = ::onRemoteSendAttemptCompleted,
     )
+
+    private fun onRemoteSendSucceeded(attempt: RemoteSendAttempt) {
+        _state.update { it.withRuntimeState(ChatSessionReducer.sendSucceeded(it.runtimeState)) }
+    }
+
+    /** The draft comes back with the failure, so a failed send never costs the user what they typed. */
+    private fun onRemoteSendFailed(attempt: RemoteSendAttempt, errorMessage: String) {
+        if (closed) return
+        clearThinkingFor(attempt.conversationId)
+        _state.update {
+            it.withRuntimeState(
+                ChatSessionReducer.sendFailed(
+                    state = it.runtimeState,
+                    text = attempt.text,
+                    attachments = attempt.attachments,
+                    errorMessage = errorMessage,
+                ),
+            )
+        }
+    }
+
+    /**
+     * The end of an attempt, however it ended. The generation check stops a superseded attempt from
+     * clearing the indicator of the one that replaced it, and a cancel is only finished once the
+     * turn's own terminal frame arrives, never optimistically when stop was pressed.
+     */
+    private fun onRemoteSendAttemptCompleted(attempt: RemoteSendAttempt) {
+        if (attempt.streamGen == streamingGeneration &&
+            _streamingConversationId.value == attempt.conversationId
+        ) {
+            _streamingConversationId.value = null
+        }
+        if (cancellingConversationId.value != attempt.conversationId) return
+        interruptCoordinator.clearCancelling()
+        clearThinkingFor(attempt.conversationId)
+        attempt.conversationId?.let(interruptCoordinator::recordTerminalAfterCancel)
+    }
+
+    private fun clearThinkingFor(conversationId: String?) {
+        if (_thinkingConversationId.value == conversationId) _thinkingConversationId.value = null
+    }
 
     private fun bindGateway(next: DesktopChatGateway?) {
         if (gateway !== next) {
