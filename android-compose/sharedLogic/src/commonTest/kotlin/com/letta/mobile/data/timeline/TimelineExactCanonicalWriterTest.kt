@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
 
 class TimelineExactCanonicalWriterTest {
     @Test fun assistantAliasRequiresSharedSegmentProvenanceNotTextOrRun() = runTest {
-        val store = Store()
+        val store = InMemoryTimelineStore()
         val writer = TimelineExactCanonicalWriter(scope, 100_000)
         val live = kotlin.test.assertNotNull(message("same response").toTimelineEvent(0.0)).copy(
             serverId = "cm-stream-provider-assistant-0-segment-a", otid = "provider-assistant-0-segment-a",
@@ -40,7 +40,7 @@ class TimelineExactCanonicalWriterTest {
     }
 
     @Test fun liveReductionNamesSyncSettlementWithoutWritingAndRejectsStaleFence() = runTest {
-        val store = Store()
+        val store = InMemoryTimelineStore()
         val engine = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
         val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
         val stale = engine.beginLive(selection)
@@ -67,7 +67,7 @@ class TimelineExactCanonicalWriterTest {
     }
 
     @Test fun incrementalSameIdLiveUpdatesDoNotAdvanceSettledPublication() = runTest {
-        val store = Store()
+        val store = InMemoryTimelineStore()
         val engine = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
         val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
         val published = engine.publication.value
@@ -94,7 +94,7 @@ class TimelineExactCanonicalWriterTest {
     }
 
     @Test fun toolIndexRollsBackWithBodyAndResolvesCanonicalAlias() = runTest {
-        val store = Store()
+        val store = InMemoryTimelineStore()
         val writer = TimelineExactCanonicalWriter(scope, 100_000)
         val event = kotlin.test.assertNotNull(message("tool").toTimelineEvent(0.0)).copy(
             messageType = TimelineMessageType.TOOL_CALL,
@@ -130,7 +130,7 @@ class TimelineExactCanonicalWriterTest {
     }
 
     @Test fun legacyToolProjectionsWithDifferentServerIdsAndOtidsShareInvocationOwner() = runTest {
-        val store = Store()
+        val store = InMemoryTimelineStore()
         val writer = TimelineExactCanonicalWriter(scope, 100_000)
         val first = kotlin.test.assertNotNull(message("tool").toTimelineEvent(0.0)).copy(
             serverId = "ui-message:tool:call:request", otid = "server-ui-tool",
@@ -150,7 +150,7 @@ class TimelineExactCanonicalWriterTest {
     }
 
     @Test fun toolGroupCannotMergeTwoExistingInvocationOwners() = runTest {
-        val store = Store()
+        val store = InMemoryTimelineStore()
         val writer = TimelineExactCanonicalWriter(scope, 100_000)
         val event = kotlin.test.assertNotNull(message("tool").toTimelineEvent(0.0)).copy(
             messageType = TimelineMessageType.TOOL_CALL, otid = "",
@@ -175,7 +175,7 @@ class TimelineExactCanonicalWriterTest {
     }
 
     @Test fun undecodedRawEventFailsWithoutCommittingOrConsumingTypedTurn() = runTest {
-        val store = Store()
+        val store = InMemoryTimelineStore()
         val engine = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
         val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
         val fence = engine.beginLive(selection)
@@ -195,7 +195,7 @@ class TimelineExactCanonicalWriterTest {
     }
 
     @Test fun pendingSendDoesNotFilterPreviouslyLoadedHistoryAndSelectionStillFencesIt() = runTest {
-        val store = Store()
+        val store = InMemoryTimelineStore()
         val engine = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
         val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
         val fence = engine.beginLive(selection)
@@ -217,7 +217,7 @@ class TimelineExactCanonicalWriterTest {
     }
 
     @Test fun semanticSuppressionRetainsRawBodyAndRejectsExactReplay() = runTest {
-        val store = Store()
+        val store = InMemoryTimelineStore()
         val writer = TimelineExactCanonicalWriter(scope, 100_000)
         val engine = CanonicalTimelineEngine(store, writer, enabled = true)
         val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
@@ -241,7 +241,7 @@ class TimelineExactCanonicalWriterTest {
     }
 
     @Test fun nextTurnHandsOffSettledOffTailBodyAndRejectsOldAcknowledgment() = runTest {
-        val store = Store()
+        val store = InMemoryTimelineStore()
         val engine = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
         val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
         val first = engine.beginLive(selection)
@@ -280,7 +280,7 @@ class TimelineExactCanonicalWriterTest {
      * traffic. It used to be fatal: the settled overlay refused the frame and the writer asserted.
      */
     @Test fun externalFrameAfterSettledTurnOpensTheNextTurnInsteadOfFailing() = runTest {
-        val store = Store()
+        val store = InMemoryTimelineStore()
         val coordinator = CanonicalTimelineCoordinator(store, PageTransport({ }))
         val external = externalWriter(coordinator, RecordingMaintenance(mutableListOf()), sentAt)
         val owner = coordinator.acquire(scope)
@@ -299,7 +299,7 @@ class TimelineExactCanonicalWriterTest {
 
     /** A turn longer than the overlay budget must truncate the resident view, never fail the turn. */
     @Test fun liveOverlayStopsGrowingAtItsBudgetInsteadOfFailingTheTurn() = runTest {
-        val store = Store()
+        val store = InMemoryTimelineStore()
         val engine = CanonicalTimelineEngine(
             store, TimelineExactCanonicalWriter(scope, 100_000), TimelinePageBudget(2, 2L * 1024 * 1024), enabled = true,
         )
@@ -323,7 +323,7 @@ class TimelineExactCanonicalWriterTest {
     }, maintenance, now = { now })
 
     @Test fun backgroundCoordinatorCompletionRetainsNonEmptyHistoryAcrossRetirement() = runTest {
-        val store = Store()
+        val store = InMemoryTimelineStore()
         var repairStarted = kotlinx.coroutines.CompletableDeferred<Unit>()
         var releaseRepair = kotlinx.coroutines.CompletableDeferred<Unit>()
         var repairSequence: Int? = null
@@ -422,7 +422,7 @@ class TimelineExactCanonicalWriterTest {
     }
 
     @Test fun userEchoConfirmsPendingAtomicallyIncludingReplay() = runTest {
-        val store = Store()
+        val store = InMemoryTimelineStore()
         val pending = CanonicalPendingLocalStore(store)
         val writer = TimelineExactCanonicalWriter(scope, 100_000)
         val local = CanonicalPendingLocalStore.Record("local", "hello", emptyList(), "2026-01-01T00:00:00Z")
@@ -453,7 +453,7 @@ class TimelineExactCanonicalWriterTest {
     }
 
     @Test fun recentRepairPreservesOlderCursorAndRejectsSupersededRequests() = runTest {
-        val store = Store()
+        val store = InMemoryTimelineStore()
         val engine = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
         val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
         val older = engine.beginPage(selection)
@@ -479,7 +479,7 @@ class TimelineExactCanonicalWriterTest {
     }
 
     @Test fun exactWriterPreservesKeyOnDuplicateAndReopen() = runTest {
-        val store = Store()
+        val store = InMemoryTimelineStore()
         val writer = TimelineExactCanonicalWriter(scope, 100_000)
         val record = TimelineRemoteRecord(TimelineMessageId("id"), message("hello"), 0)
         store.transaction(scope) { assertTrue(writer.merge(this, record)); nextRevision() }
@@ -490,7 +490,7 @@ class TimelineExactCanonicalWriterTest {
     }
 
     @Test fun previewResolutionChecksRevisionAndReadsOnlySelectedBody() = runTest {
-        val store = Store()
+        val store = InMemoryTimelineStore()
         val writer = TimelineExactCanonicalWriter(scope, 200_000)
         store.transaction(scope) {
             writer.merge(this, TimelineRemoteRecord(TimelineMessageId("id"), message("x".repeat(100_000)), 0))
@@ -513,7 +513,7 @@ class TimelineExactCanonicalWriterTest {
     }
 
     @Test fun historicalBodyReadsRespectPlatformChunkLimit() = runTest {
-        val store = Store()
+        val store = InMemoryTimelineStore()
         val writer = TimelineExactCanonicalWriter(scope, 200_000)
         val record = TimelineRemoteRecord(TimelineMessageId("id"), message("x".repeat(100_000)), 0)
         store.transaction(scope) { writer.merge(this, record); nextRevision() }
@@ -522,7 +522,7 @@ class TimelineExactCanonicalWriterTest {
     }
 
     @Test fun concurrentCursorCompletionsOnlyCommitCurrentRequest() = runTest {
-        val store = Store()
+        val store = InMemoryTimelineStore()
         val engine = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
         val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
         val requests = (1..64).map { engine.beginPage(selection) }
@@ -536,7 +536,7 @@ class TimelineExactCanonicalWriterTest {
     }
 
     @Test fun historicalCorrectionReadsOneBodyAmong28kRows() = runTest {
-        val store = Store()
+        val store = InMemoryTimelineStore()
         val writer = TimelineExactCanonicalWriter(scope, 100_000)
         store.transaction(scope) { writer.merge(this, TimelineRemoteRecord(TimelineMessageId("id"), message("hello"), 0)) }
         val seed = store.rows.values.single()
@@ -551,7 +551,7 @@ class TimelineExactCanonicalWriterTest {
     }
 
     @Test fun publishedBlockSettlesOnlyWhenItsCommittedRevisionIsResident() = runTest {
-        val store = Store()
+        val store = InMemoryTimelineStore()
         val engine = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
         val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
         val fence = engine.beginLive(selection)
@@ -573,7 +573,7 @@ class TimelineExactCanonicalWriterTest {
         // sync page commits a single row. All of them must drain, or the card renders twice and
         // keeps running its own lifecycle after the settled row has completed.
         val callId = "call_3c3732f1a4a54887b0b79b3c"
-        val engine = CanonicalTimelineEngine(Store(), TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
+        val engine = CanonicalTimelineEngine(InMemoryTimelineStore(), TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
         val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
         val fence = engine.beginLive(selection)
         val streamedCall = com.letta.mobile.data.model.ToolCallMessage(
@@ -611,7 +611,7 @@ class TimelineExactCanonicalWriterTest {
         // reply is visible twice. This page is the one moment both names are in hand.
         val streamedId = "cm-stream-provider-assistant-0-75ab1210"
         val committedId = "ui-msg-9154136"
-        val engine = CanonicalTimelineEngine(Store(), TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
+        val engine = CanonicalTimelineEngine(InMemoryTimelineStore(), TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
         val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
         val fence = engine.beginLive(selection)
         val reply = AssistantMessage(
@@ -648,7 +648,7 @@ class TimelineExactCanonicalWriterTest {
         val segmentOtid = "provider-assistant-0-23a84950"
         val streamedId = "cm-stream-$segmentOtid"
         val committedId = "ui-msg-9155077"
-        val engine = CanonicalTimelineEngine(Store(), TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
+        val engine = CanonicalTimelineEngine(InMemoryTimelineStore(), TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
         val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
         val fence = engine.beginLive(selection)
         assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(AssistantMessage(
@@ -678,7 +678,7 @@ class TimelineExactCanonicalWriterTest {
         // Identical text is not identity. With a segment otid each, the rows stay distinct rather
         // than collapsing onto one — the failure a pure content join is always one coincidence away
         // from.
-        val engine = CanonicalTimelineEngine(Store(), TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
+        val engine = CanonicalTimelineEngine(InMemoryTimelineStore(), TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
         val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
         val fence = engine.beginLive(selection)
         val text = kotlinx.serialization.json.JsonPrimitive("Sure.")
@@ -725,7 +725,7 @@ class TimelineExactCanonicalWriterTest {
         // rendered. Position pairs them anyway: one reply streamed, one reply committed.
         val streamedId = "cm-stream-provider-assistant-0-23a84950"
         val committedId = "ui-msg-9155077"
-        val engine = CanonicalTimelineEngine(Store(), TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
+        val engine = CanonicalTimelineEngine(InMemoryTimelineStore(), TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
         val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
         val fence = engine.beginLive(selection)
         assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(AssistantMessage(
@@ -750,7 +750,7 @@ class TimelineExactCanonicalWriterTest {
     }
 
     @Test fun positionPairsSeveralRepliesInTheOrderTheyHappened() = runTest {
-        val engine = CanonicalTimelineEngine(Store(), TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
+        val engine = CanonicalTimelineEngine(InMemoryTimelineStore(), TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
         val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
         val fence = engine.beginLive(selection)
         // Both truncated, so nothing matches by text.
@@ -785,7 +785,7 @@ class TimelineExactCanonicalWriterTest {
         // A reconcile page is a window of recent history, not a turn. An older reply already in
         // the ledger must not be handed to a streamed row just because it is in the page: that is
         // how a positional join would rewrite one reply into another.
-        val store = Store()
+        val store = InMemoryTimelineStore()
         val engine = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
         val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
         val older = AssistantMessage(id = "ui-msg-older",
@@ -810,7 +810,7 @@ class TimelineExactCanonicalWriterTest {
     }
 
     @Test fun streamedAssistantIdIsAliasedToItsCanonicalIdentityWhateverItsShape() = runTest {
-        val store = Store()
+        val store = InMemoryTimelineStore()
         // The turn already has a canonical identity, recorded against the otid the stream carries.
         store.evidence["identity/otid/server-reply-assistant"] = "msg-canonical".encodeToByteArray()
         // The shape the live transport actually streams. A guard that matched a prefix instead of
@@ -828,7 +828,7 @@ class TimelineExactCanonicalWriterTest {
     }
 
     @Test fun anAlreadyCanonicalRowRecordsNoAlias() = runTest {
-        val store = Store()
+        val store = InMemoryTimelineStore()
         // Re-merging a row whose name is already canonical, as a migration replay does, must not
         // accumulate evidence: the two names do not differ, so there is nothing to record.
         store.transaction(scope) {
@@ -839,7 +839,7 @@ class TimelineExactCanonicalWriterTest {
     }
 
     @Test fun oversizedHistoricalMergeRollsBackWithoutLosingRetry() = runTest {
-        val store = Store()
+        val store = InMemoryTimelineStore()
         store.transaction(scope) { TimelineExactCanonicalWriter(scope, 100_000).merge(this,
             TimelineRemoteRecord(TimelineMessageId("id"), message("hello"), 0)); nextRevision() }
         val before = store.rows.values.single().body.copyOf()
@@ -858,7 +858,7 @@ class TimelineExactCanonicalWriterTest {
     }
 
     @Test fun settlementBudgetFailureRollsBackEarlierOwnerBodyAndIndex() = runTest {
-        val store = Store()
+        val store = InMemoryTimelineStore()
         val writer = TimelineExactCanonicalWriter(scope, 100_000)
         fun tool(id: String, content: String) = kotlin.test.assertNotNull(message(content).toTimelineEvent(0.0)).copy(
             serverId = id, otid = id, messageType = TimelineMessageType.TOOL_CALL,
@@ -886,7 +886,7 @@ class TimelineExactCanonicalWriterTest {
     }
 
     @Test fun blockedSweepCancellationReleasesLeaseAndCannotFailNextTurn() = runTest {
-        val store = Store()
+        val store = InMemoryTimelineStore()
         val entered = kotlinx.coroutines.CompletableDeferred<Unit>()
         val release = kotlinx.coroutines.CompletableDeferred<Unit>()
         val coordinator = CanonicalTimelineCoordinator(store, PageTransport(barrier = {
@@ -913,7 +913,7 @@ class TimelineExactCanonicalWriterTest {
     }
 
     @Test fun attachedSettledOverlayDrainsOnSyncWriteBeforeRepairAndNextTurn() = runTest {
-        val store = Store()
+        val store = InMemoryTimelineStore()
         val remote = mutableListOf<TimelineRemoteRecord>()
         val coordinator = CanonicalTimelineCoordinator(store, PageTransport({}, { remote.toList() }))
         val owner = coordinator.acquire(scope)
@@ -959,7 +959,7 @@ class TimelineExactCanonicalWriterTest {
 
     /** Live ingest writes nothing, so a settled row exists only once this path has run. */
     @Test fun reconcileRefusesMidStreamThenServesTheSettledTurn() = runTest {
-        val store = Store()
+        val store = InMemoryTimelineStore()
         val engine = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
         val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
         val reply = message("hello")
@@ -979,7 +979,7 @@ class TimelineExactCanonicalWriterTest {
 
     /** Fresh pending store plus a record factory: every pending test needs exactly this. */
     private fun pendingFixture(): Pair<CanonicalPendingLocalStore, (Int, String) -> CanonicalPendingLocalStore.Record> {
-        val store = CanonicalPendingLocalStore(Store())
+        val store = CanonicalPendingLocalStore(InMemoryTimelineStore())
         return store to { n, at -> CanonicalPendingLocalStore.Record("otid-$n", "attempt $n", emptyList(), at) }
     }
 
@@ -1042,7 +1042,7 @@ class TimelineExactCanonicalWriterTest {
     }
 
     @Test fun onlyAFailedSendCanBeDiscardedAndTheRestSurvive() = runTest {
-        val store = Store()
+        val store = InMemoryTimelineStore()
         val pending = CanonicalPendingLocalStore(store)
         val sending = CanonicalPendingLocalStore.Record("otid-sending", "in flight", emptyList(), "2026-01-01T00:00:00Z")
         val failed = CanonicalPendingLocalStore.Record("otid-failed", "gave up", emptyList(), "2026-01-01T00:00:01Z")
@@ -1088,57 +1088,6 @@ class TimelineExactCanonicalWriterTest {
         override suspend fun listAgentMessages(agentId: String, limit: Int?, order: String?, conversationId: String?): List<com.letta.mobile.data.model.LettaMessage> = error("legacy hydration")
     }
 
-    private class Store : TimelineBoundedStore {
-        var bodyReads = 0
-        var puts = 0
-        var current = TimelineDurableCheckpoint(0, TimelineContinuation.Initial, true)
-        val rows = mutableMapOf<TimelinePageKey, TimelineStoredRecord>()
-        val evidence = mutableMapOf<String, ByteArray>()
-        private val tools = mutableMapOf<TimelineScope, TestToolIndexState>()
-        override suspend fun <T> read(scope: TimelineScope, block: suspend TimelineStoreReader.() -> T): T =
-            block(Tx(tools[scope]?.snapshot() ?: TestToolIndexState()))
-        override suspend fun <T> transaction(scope: TimelineScope, block: suspend TimelineStoreTransaction.() -> T): T {
-            val before = current
-            val oldRows = rows.toMap()
-            val oldEvidence = evidence.toMap()
-            val toolCopy = tools[scope]?.snapshot() ?: TestToolIndexState()
-            return try { block(Tx(toolCopy)).also { tools[scope] = toolCopy } } catch (failure: Throwable) {
-                current = before
-                rows.clear(); rows.putAll(oldRows)
-                evidence.clear(); evidence.putAll(oldEvidence)
-                throw failure
-            }
-        }
-        private inner class Tx(private val tools: TestToolIndexState) : TimelineStoreTransaction {
-            override suspend fun toolCall(callId: String) = tools.entries[callId]
-            override suspend fun unresolvedTools(afterCallId: String?, maxRows: Int) = tools.unresolved(afterCallId, maxRows)
-            override suspend fun toolSweepGeneration() = tools.generation
-            override suspend fun putToolCall(entry: TimelineToolIndexEntry) = tools.put(entry)
-            override suspend fun setToolSweepGeneration(next: Long) = tools.advance(next)
-            override suspend fun checkpoint() = current
-            override suspend fun locate(identity: TimelineMessageId) = rows.keys.singleOrNull { it.identity == identity }
-            override suspend fun metadata(position: TimelineReadPosition, maxRows: Int): TimelineMetadataPage {
-                val selected = rows.values.sortedBy { it.key }.filter { position !is TimelineReadPosition.Around || it.key == position.key }.take(maxRows)
-                return TimelineMetadataPage(selected.map { TimelineLedgerMetadata(it.key, TimelineBodyPointer(it.key.identity.value, it.body.size.toLong()), it.contentType, current.revision) }, null, null, current.revision)
-            }
-            override suspend fun body(pointer: TimelineBodyPointer, offset: Long, maxBytes: Int): ByteArray {
-                require(maxBytes in 0..65_536)
-                bodyReads++
-                val bytes = rows.values.single { it.key.identity.value == pointer.value }.body
-                return bytes.copyOfRange(offset.toInt(), minOf(bytes.size, offset.toInt() + maxBytes))
-            }
-            override suspend fun evidence(key: String, maxBytes: Int): ByteArray? = evidence[key]?.also { check(it.size <= maxBytes) }?.copyOf()
-            override suspend fun put(record: TimelineStoredRecord) {
-                puts++
-                rows[record.key] = record.copy(body = record.body.copyOf())
-            }
-            override suspend fun putEvidence(key: String, value: ByteArray) { evidence[key] = value.copyOf() }
-            override suspend fun deleteEvidence(key: String) { evidence.remove(key) }
-            override suspend fun cursor(continuation: TimelineContinuation?, hasMore: Boolean) { current = current.copy(continuation = continuation, hasMore = hasMore) }
-            override suspend fun nextRevision(): Long { current = current.copy(revision = current.revision + 1); return current.revision }
-            override suspend fun delete(identity: TimelineMessageId, reason: TimelineDurableDeleteReason) { rows.keys.removeAll { it.identity == identity } }
-        }
-    }
 
     companion object {
         private val scope = TimelineScope("backend", "conversation")
