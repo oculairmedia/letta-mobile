@@ -94,13 +94,14 @@ private fun CanonicalMessageListContent(
         if (following && !listState.isScrollInProgress) listState.scrollToItem(0)
     }
 
+    val rows = CanonicalRows(live, settled)
     if (!anchorRestored) {
-        RestoreReadingPosition(presentation, listState, live, settled, restoreAnchor) { anchorRestored = true }
+        RestoreReadingPosition(listState, rows, restoreAnchor) { anchorRestored = true }
     } else {
-        RecordReadingPosition(presentation, listState, live, settled)
+        RecordReadingPosition(presentation, listState, rows)
     }
 
-    val pinnedPrompt = rememberPinnedPrompt(presentation, listState, live, settled)
+    val pinnedPrompt = rememberPinnedPrompt(listState, rows)
 
     val selectionColors = TextSelectionColors(
         handleColor = MaterialTheme.colorScheme.primary,
@@ -237,17 +238,14 @@ private fun FollowTheNewestEdge(
  */
 @Composable
 private fun RestoreReadingPosition(
-    presentation: CanonicalTimelinePresentation,
     listState: LazyListState,
-    live: List<ChatRenderItem>,
-    settled: LazyPagingItems<CanonicalTimelinePresentation.Row>,
+    rows: CanonicalRows,
     anchor: Pair<String, Int>?,
     onRestored: () -> Unit,
 ) {
-    LaunchedEffect(presentation, settled.itemSnapshotList, live) {
+    LaunchedEffect(listState, rows.identity) {
         val target = anchor ?: return@LaunchedEffect onRestored()
-        val index = canonicalRowIndex(live, settled.itemSnapshotList.items, target.first)
-            ?: return@LaunchedEffect
+        val index = rows.indexOf(target.first) ?: return@LaunchedEffect
         listState.scrollToItem(index, target.second)
         onRestored()
     }
@@ -258,14 +256,12 @@ private fun RestoreReadingPosition(
 private fun RecordReadingPosition(
     presentation: CanonicalTimelinePresentation,
     listState: LazyListState,
-    live: List<ChatRenderItem>,
-    settled: LazyPagingItems<CanonicalTimelinePresentation.Row>,
+    rows: CanonicalRows,
 ) {
-    LaunchedEffect(presentation) {
+    LaunchedEffect(listState) {
         snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
             .collect { (index, offset) ->
-                val row = (index - live.size).takeIf { it in 0 until settled.itemCount }
-                    ?.let { settled.peek(it) } ?: return@collect
+                val row = rows.settledRowAt(index) ?: return@collect
                 presentation.viewport = row.identity.value to offset
             }
     }
@@ -281,38 +277,18 @@ private fun RecordReadingPosition(
  * Null while the prompt's own row is visible, because a pinned copy would double-render it.
  */
 @Composable
-private fun rememberPinnedPrompt(
-    presentation: CanonicalTimelinePresentation,
-    listState: LazyListState,
-    live: List<ChatRenderItem>,
-    settled: LazyPagingItems<CanonicalTimelinePresentation.Row>,
-): ChatRenderItem? {
-    val liveRows = rememberUpdatedState(live)
-    val pinned by remember(presentation) {
+private fun rememberPinnedPrompt(listState: LazyListState, rows: CanonicalRows): ChatRenderItem? {
+    val current = rememberUpdatedState(rows)
+    val pinned by remember(listState) {
         derivedStateOf {
             val visible = listState.layoutInfo.visibleItemsInfo
             val top = visible.maxOfOrNull { it.index } ?: return@derivedStateOf null
-            val overlay = liveRows.value
-            owningPrompt(overlay, settled, top)?.let { (index, item) ->
+            current.value.owningPrompt(top)?.let { (index, item) ->
                 item.takeIf { visible.none { row -> row.index == index } }
             }
         }
     }
     return pinned
-}
-
-/** The first user row at or above [top], with its index, or null within the search budget. */
-private fun owningPrompt(
-    live: List<ChatRenderItem>,
-    settled: LazyPagingItems<CanonicalTimelinePresentation.Row>,
-    top: Int,
-): Pair<Int, ChatRenderItem>? {
-    val total = live.size + settled.itemCount
-    for (index in top until minOf(total, top + PinnedPromptScanLimit)) {
-        val item = canonicalRowAt(live, settled, index) ?: continue
-        if (item.isUserPrompt()) return index to item
-    }
-    return null
 }
 
 /**
@@ -323,16 +299,37 @@ private fun owningPrompt(
 private const val PinnedPromptScanLimit = 400
 
 /**
- * The row at a combined list index: live overlay rows first, then settled pages. Reads settled rows
- * with `peek`, because deciding what to pin must not register a load and drag prefetch along with
- * the search.
+ * The two row sources the list renders as one index space: the live overlay ahead of the settled
+ * pages. Reads settled rows with `peek` throughout, because deciding what to pin or where the reader
+ * is must not register a load and drag prefetch along with it.
  */
-private fun canonicalRowAt(
-    live: List<ChatRenderItem>,
-    settled: LazyPagingItems<CanonicalTimelinePresentation.Row>,
-    index: Int,
-): ChatRenderItem? =
-    if (index < live.size) live.getOrNull(index) else settled.peek(index - live.size)?.item
+private class CanonicalRows(
+    val live: List<ChatRenderItem>,
+    val settled: LazyPagingItems<CanonicalTimelinePresentation.Row>,
+) {
+    val size: Int get() = live.size + settled.itemCount
+
+    /** Changes whenever either source does, so effects keyed on it re-run exactly when they should. */
+    val identity: Pair<List<ChatRenderItem>, Any> get() = live to settled.itemSnapshotList
+
+    fun rowAt(index: Int): ChatRenderItem? =
+        if (index < live.size) live.getOrNull(index) else settled.peek(index - live.size)?.item
+
+    fun settledRowAt(index: Int): CanonicalTimelinePresentation.Row? =
+        (index - live.size).takeIf { it in 0 until settled.itemCount }?.let(settled::peek)
+
+    fun indexOf(identity: String): Int? =
+        canonicalRowIndex(live, settled.itemSnapshotList.items, identity)
+
+    /** The first user row at or above [top], with its index, or null within the search budget. */
+    fun owningPrompt(top: Int): Pair<Int, ChatRenderItem>? {
+        for (index in top until minOf(size, top + PinnedPromptScanLimit)) {
+            val item = rowAt(index) ?: continue
+            if (item.isUserPrompt()) return index to item
+        }
+        return null
+    }
+}
 
 /**
  * One settled row, read through [LazyPagingItems.get] so the access registers with Paging and
