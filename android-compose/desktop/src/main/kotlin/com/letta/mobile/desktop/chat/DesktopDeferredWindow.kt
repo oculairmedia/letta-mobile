@@ -31,31 +31,44 @@ private suspend fun DesktopWindowState.page(
     )
 }
 
+/** A body that holds no text is an ordinary outcome, not an internal reason code. */
+private fun TimelineSemanticWindowResult.Deferred.describe(): String =
+    if (reason == TimelineSemanticWindowResult.Reason.MissingField) {
+        "This record stores no text to show."
+    } else {
+        "Content remains deferred: $reason"
+    }
+
+/** Reads one page into [this], replacing whatever it held. Cancellation propagates untouched. */
+private suspend fun DesktopWindowState.show(
+    read: suspend (TimelineSemanticField, Long) -> TimelineSemanticWindowResult,
+    at: Long,
+) {
+    busy = true; text = null; next = null; offset = at
+    try {
+        when (val result = page(read, at)) {
+            is TimelineSemanticWindowResult.Text -> { text = result.value; next = result.nextScalarOffset }
+            is TimelineSemanticWindowResult.Deferred -> text = result.describe()
+        }
+    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+        throw cancelled
+    } catch (failure: Exception) {
+        text = failure.message ?: "Window unavailable; retry"
+    } finally {
+        busy = false
+    }
+}
+
 @Composable
 internal fun DesktopDeferredWindow(presentation: CanonicalTimelinePresentation, row: CanonicalTimelinePresentation.Row, dispatcher: kotlinx.coroutines.CoroutineDispatcher) {
     val scope = rememberCoroutineScope()
     val state = remember(row) { DesktopWindowState() }
     DisposableEffect(presentation, row) { onDispose { state.job?.cancel() } }
+    val read: suspend (TimelineSemanticField, Long) -> TimelineSemanticWindowResult =
+        { field, from -> presentation.readTextWindow(row, field, from, dispatcher) }
     fun load(at: Long) {
         state.job?.cancel()
-        state.job = scope.launch {
-            state.busy = true; state.text = null; state.next = null; state.offset = at
-            try {
-                val result = state.page({ field, from -> presentation.readTextWindow(row, field, from, dispatcher) }, at)
-                when (result) {
-                    is TimelineSemanticWindowResult.Text -> { state.text = result.value; state.next = result.nextScalarOffset }
-                    // A body that holds no text is an ordinary outcome, not an internal reason code.
-                    is TimelineSemanticWindowResult.Deferred -> state.text =
-                        if (result.reason == TimelineSemanticWindowResult.Reason.MissingField) {
-                            "This record stores no text to show."
-                        } else {
-                            "Content remains deferred: ${result.reason}"
-                        }
-                }
-            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
-            catch (failure: Exception) { state.text = failure.message ?: "Window unavailable; retry" }
-            finally { state.busy = false }
-        }
+        state.job = scope.launch { state.show(read, at) }
     }
     androidx.compose.foundation.layout.Column {
         state.text?.let { Text(it) }
