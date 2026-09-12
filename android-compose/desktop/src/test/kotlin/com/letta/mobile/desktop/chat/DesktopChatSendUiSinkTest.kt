@@ -19,6 +19,8 @@ class DesktopChatSendUiSinkTest {
         override fun setStreaming(conversationId: String?) { streaming = conversationId }
         override fun setThinking(conversationId: String?) { thinking = conversationId }
         override fun selectedConversationId() = selected
+        @JvmField var settled: Boolean? = null
+        override fun settleSend(failed: Boolean) { settled = failed }
     }
 
     private fun sink(surface: FakeSurface) = DesktopChatSendUiSink(surface)
@@ -46,12 +48,37 @@ class DesktopChatSendUiSinkTest {
         assertNull(surface.thinking)
     }
 
+    /**
+     * The composer is gated on the send being resolved, and on this route only the turn lifecycle
+     * knows when that happened. A turn that ends without settling leaves the transcript able to
+     * accept exactly one message for the rest of the session.
+     */
+    @Test fun aFinishedTurnReleasesTheComposer() {
+        val surface = FakeSurface().apply { streaming = "conv-1"; thinking = "conv-1" }
+        sink(surface).onTurnFinished(null)
+        assertEquals(false, surface.settled)
+    }
+
+    @Test fun aTurnThatFinishedWithAnErrorSettlesAsAFailure() {
+        val surface = FakeSurface()
+        sink(surface).onTurnFinished("boom")
+        assertEquals(true, surface.settled)
+        assertEquals("boom", surface.error)
+    }
+
+    @Test fun aVisuallyCompleteTurnReleasesTheComposerToo() {
+        val surface = FakeSurface()
+        sink(surface).onTurnVisuallyComplete()
+        assertEquals(false, surface.settled)
+    }
+
     @Test fun aFailedSendStopsTheTurnAndSurfacesTheReason() {
         val surface = FakeSurface().apply { streaming = "conv-1"; thinking = "conv-1" }
         sink(surface).onSendFailed("nope")
         assertNull(surface.streaming)
         assertNull(surface.thinking)
         assertEquals("nope", surface.error)
+        assertEquals(true, surface.settled)
     }
 
     /** An error can arrive while the turn continues, so it must not stop the indicator. */

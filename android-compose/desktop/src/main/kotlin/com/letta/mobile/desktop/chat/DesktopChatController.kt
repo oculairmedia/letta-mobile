@@ -1020,6 +1020,9 @@ class DesktopChatController(
         override fun setStreaming(conversationId: String?) { _streamingConversationId.value = conversationId }
         override fun setThinking(conversationId: String?) { _thinkingConversationId.value = conversationId }
         override fun selectedConversationId(): String? = _state.value.selectedConversationId
+        override fun settleSend(failed: Boolean) {
+            _state.update { it.withRuntimeState(ChatSessionReducer.sendSettled(it.runtimeState, failed)) }
+        }
     }
     private val _canonicalPresentation = MutableStateFlow<com.letta.mobile.data.timeline.CanonicalTimelinePresentation?>(null)
     val canonicalPresentation = _canonicalPresentation.asStateFlow()

@@ -22,6 +22,12 @@ internal interface DesktopChatSendSurface {
 
     /** The conversation the user is looking at, used when an event names none. */
     fun selectedConversationId(): String?
+
+    /**
+     * Releases the composer gates raised when the send began. On this route the send call returns
+     * long before the turn does, so only the lifecycle knows when the send is resolved.
+     */
+    fun settleSend(failed: Boolean)
 }
 
 /**
@@ -49,7 +55,7 @@ internal class DesktopChatSendUiSink(
     override fun onSendQueued(conversationId: String) = beginTurn(conversationId)
 
     override fun onSendFailed(message: String) {
-        endTurn()
+        endTurn(failed = true)
         surface.setError(message)
     }
 
@@ -67,7 +73,7 @@ internal class DesktopChatSendUiSink(
     override fun onUsage(promptTokens: Int, completionTokens: Int, totalTokens: Int) = Unit
 
     override fun onTurnFinished(error: String?) {
-        endTurn()
+        endTurn(failed = error != null)
         surface.setError(error)
     }
 
@@ -85,7 +91,7 @@ internal class DesktopChatSendUiSink(
     }
 
     override fun onDisconnectFailure(error: String) {
-        endTurn()
+        endTurn(failed = true)
         surface.setError(error)
     }
 
@@ -96,8 +102,11 @@ internal class DesktopChatSendUiSink(
         surface.setError(null)
     }
 
-    private fun endTurn() {
+    private fun endTurn(failed: Boolean = false) {
         surface.setStreaming(null)
         surface.setThinking(null)
+        // Stopping the indicators is not the same as resolving the send. The composer reads its own
+        // gates, and leaving those raised is what made the transcript accept exactly one message.
+        surface.settleSend(failed)
     }
 }
