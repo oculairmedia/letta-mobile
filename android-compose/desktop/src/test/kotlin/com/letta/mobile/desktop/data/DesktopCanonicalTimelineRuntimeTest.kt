@@ -4,6 +4,7 @@ import com.letta.mobile.data.timeline.CanonicalTimelineCoordinator
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.defaultDesktopBootstrapState
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
+import com.letta.mobile.data.transport.api.NoOpChannelTransport
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -129,13 +130,57 @@ class DesktopCanonicalTimelineRuntimeTest {
         val controller = DesktopChatController(defaultDesktopBootstrapState(), this)
         try {
             assertFailsWith<IllegalStateException> {
-                DesktopCanonicalTimelineHost(isEnabled = false).installOn(controller)
+                DesktopCanonicalTimelineHost(isEnabled = false).installOn(controller, install(backgroundScope))
             }
             assertNull(controller.canonicalOpen)
+            assertNull(controller.canonicalSendFor)
         } finally {
             controller.close()
         }
     }
+
+    /**
+     * Reading and writing are installed together. A route that can page but not send is a
+     * transcript the user cannot reply in, and nothing downstream would report that as broken.
+     */
+    @Test fun installingTheRouteWiresBothHistoryAndSend() = runTest {
+        val controller = DesktopChatController(defaultDesktopBootstrapState(), this)
+        try {
+            DesktopCanonicalTimelineHost(isEnabled = true).installOn(controller, install(backgroundScope))
+            assertNotNull(controller.canonicalOpen)
+            assertNotNull(controller.canonicalSendFor)
+            assertTrue(controller.canonicalEligible("conv-1"))
+            assertFalse(controller.canonicalEligible("conv-default-1"))
+        } finally {
+            controller.close()
+        }
+    }
+
+    /** One coordinator per agent: rebuilding it would discard a turn still in flight. */
+    @Test fun eachAgentKeepsOneSendCoordinator() = runTest {
+        val controller = DesktopChatController(defaultDesktopBootstrapState(), this)
+        try {
+            DesktopCanonicalTimelineHost(isEnabled = true).installOn(controller, install(backgroundScope))
+            val resolve = assertNotNull(controller.canonicalSendFor)
+            val first = resolve("agent-1", NoTimelineTransport)
+            assertSame(first, resolve("agent-1", NoTimelineTransport))
+            assertTrue(first !== resolve("agent-2", NoTimelineTransport))
+        } finally {
+            controller.close()
+        }
+    }
+
+    /**
+     * The coordinator launches a long-lived event collector, so it must be given a scope the test
+     * cancels rather than the test body's own, which would otherwise never complete.
+     */
+    private fun install(scope: kotlinx.coroutines.CoroutineScope) = DesktopCanonicalSendInstall(
+        frameSource = NoOpChannelTransport(),
+        conversationRepository = unavailableRepository(),
+        scope = scope,
+        activeConfig = { null },
+        clientVersion = { "test" },
+    )
 
     @Test fun theLedgerDirectoryIsNotTheLegacySnapshotDirectory() {
         assertEquals(

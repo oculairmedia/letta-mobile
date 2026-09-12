@@ -783,6 +783,12 @@ class DesktopChatController(
         }
         val draft = ChatComposerPolicy.beginSend(_state.value.composer) ?: return
         _state.value.selectedConversationId?.let { _lastPromptedConversationId.value = it }
+        // The canonical route owns its own send. It deliberately runs no legacy loop, so falling
+        // through to the loop check below would drop the message on the floor.
+        if (_canonicalPresentation.value != null) {
+            launchCanonicalSend(draft)
+            return
+        }
         val loop = activeLoop
         if (loop == null || !_state.value.isRemoteBacked) {
             _state.update {
@@ -795,6 +801,37 @@ class DesktopChatController(
             return
         }
         launchRemoteSend(loop, draft)
+    }
+
+    /**
+     * Sends through the shared [com.letta.mobile.data.chat.send.ChatSendCoordinator], the same
+     * orchestration Android uses. The optimistic bubble, otid reconciliation and turn lifecycle all
+     * land in the canonical ledger the paginated list is already reading, so there is no second
+     * durable copy of the conversation and no second send path to keep in agreement with this one.
+     */
+    private fun launchCanonicalSend(draft: ChatComposerSendDraft) {
+        val conversationId = _state.value.selectedConversationId
+        val conversation = _state.value.conversations.firstOrNull { it.id == conversationId }
+        val activeGateway = gateway
+        // Resolved by the same routing the presentation used, so the send and the history it lands
+        // beside are indexed against one transport.
+        val coordinator = conversation?.agentId?.let { agentId ->
+            activeGateway?.let { gw ->
+                canonicalSendFor?.invoke(agentId, desktopTimelineTransportFor(gw, conversation))
+            }
+        }
+        if (coordinator == null) {
+            showComposerError("This conversation cannot send on the canonical timeline route.")
+            return
+        }
+        titleCandidateForSend(conversationId, draft.text)?.let { title ->
+            conversationId?.let { persistConversationTitle(it, title) }
+        }
+        clearUnsentIfMatching(conversationId)
+        _state.update { it.withRuntimeState(ChatSessionReducer.beginSend(it.runtimeState, draft)) }
+        // The coordinator drives the indicators through the UI sink from here, including the
+        // failure paths, so nothing else may set them on this route.
+        sendJob = coordinator.send(draft.text, draft.attachments)
     }
 
     private fun launchRemoteSend(loop: DesktopTimelineLoop, draft: ChatComposerSendDraft) {
@@ -961,6 +998,29 @@ class DesktopChatController(
      */
     var canonicalOpen: (suspend (DesktopCanonicalOpenRequest) -> com.letta.mobile.data.timeline.CanonicalTimelinePresentation)? = null
     var canonicalEligible: (String) -> Boolean = { false }
+
+    /**
+     * Resolves the shared send coordinator for an agent. Installed alongside [canonicalOpen]: a
+     * canonical route without it can render history but cannot send, which is a state the host must
+     * not be able to produce by accident.
+     */
+    var canonicalSendFor: (
+        (agentId: String, transport: com.letta.mobile.data.timeline.TimelineTransport) ->
+        com.letta.mobile.data.chat.send.ChatSendCoordinator
+    )? = null
+
+    /** The turn-indicator and error state the shared send coordinator is allowed to move. */
+    internal val sendSurface: DesktopChatSendSurface = object : DesktopChatSendSurface {
+        override fun currentError(): String? = _state.value.errorMessage
+        override fun setError(message: String?) {
+            _state.update { it.copy(errorMessage = message) }
+        }
+        override fun streamingConversationId(): String? = _streamingConversationId.value
+        override fun thinkingConversationId(): String? = _thinkingConversationId.value
+        override fun setStreaming(conversationId: String?) { _streamingConversationId.value = conversationId }
+        override fun setThinking(conversationId: String?) { _thinkingConversationId.value = conversationId }
+        override fun selectedConversationId(): String? = _state.value.selectedConversationId
+    }
     private val _canonicalPresentation = MutableStateFlow<com.letta.mobile.data.timeline.CanonicalTimelinePresentation?>(null)
     val canonicalPresentation = _canonicalPresentation.asStateFlow()
     private val _canonicalStatus = MutableStateFlow<String?>(null)
