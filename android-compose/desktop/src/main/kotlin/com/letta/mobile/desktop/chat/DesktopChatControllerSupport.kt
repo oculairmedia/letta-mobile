@@ -133,6 +133,23 @@ internal fun String.isDefaultShimConversationId(): Boolean =
 @JvmInline
 private value class ConversationIdPrefix(val value: String)
 
+/**
+ * What the canonical opener needs from the controller. The transport is resolved here, by the same
+ * routing the legacy loop uses, so the canonical ledger and the legacy loop can never disagree
+ * about which remote conversation a scope names.
+ */
+data class DesktopCanonicalOpenRequest(
+    val agentId: String,
+    val conversationId: String,
+    val transport: TimelineTransport,
+    val scope: kotlinx.coroutines.CoroutineScope,
+)
+
+internal fun desktopTimelineTransportFor(
+    gateway: DesktopChatGateway,
+    conversation: DesktopConversationSummary,
+): TimelineTransport = resolveDesktopTimelineRouting(gateway, conversation).transport
+
 private data class DesktopTimelineRouting(
     val transport: TimelineTransport,
     val loopConversationId: ConversationId,

@@ -15,6 +15,7 @@ import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.data.transport.iroh.IrohConnectConfig
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.createDefaultDesktopChatGateway
+import com.letta.mobile.desktop.data.DesktopCanonicalTimelineHost
 import com.letta.mobile.desktop.data.DesktopDataBindings
 import com.letta.mobile.desktop.data.DesktopWsChannelTransport
 import kotlinx.coroutines.CancellationException
@@ -239,12 +240,28 @@ internal fun rememberDesktopChatController(
     ) {
         buildDesktopChatController(bindings)
     }
+    // The canonical (paginated) route is installed per controller so it retires with the transport
+    // generation that opened it. It stays dormant unless explicitly switched on: while enabled,
+    // selecting a conversation takes the windowed ledger path INSTEAD of legacy whole-history
+    // hydration, and sends are not on that path yet.
+    val canonicalHost = remember(controller) {
+        DesktopCanonicalTimelineHost().also { host ->
+            if (!host.isEnabled) return@also
+            host.installOn(controller)
+        }
+    }
     // Closing the superseded controller is what cancels its send/select/
     // timeline/presence jobs and closes its gateway + timeline loop. Without
     // this, a transport or backend switch leaves the old controller streaming
     // alongside the new one for the life of the app.
     DisposableEffect(controller) {
-        onDispose { controller.close() }
+        onDispose {
+            controller.close()
+            // Retires the conversation writers this controller's route opened. Detaching a view
+            // never does that, so without it the ledger keeps a writer per conversation alive
+            // across a backend switch.
+            runtime.chatScope.launch { canonicalHost.close() }
+        }
     }
     return controller
 }

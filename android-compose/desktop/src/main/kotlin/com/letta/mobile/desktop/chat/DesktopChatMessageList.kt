@@ -315,7 +315,7 @@ private data class MessageListColumnParams(
     val isSending: Boolean,
 )
 
-private fun ChatRenderItem.isUserPrompt(): Boolean =
+internal fun ChatRenderItem.isUserPrompt(): Boolean =
     this is ChatRenderItem.Single && MessageRoleToken(message.role).isUser()
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -425,7 +425,7 @@ private fun MessageListColumn(params: MessageListColumnParams) {
  * names it.
  */
 @Composable
-private fun DesktopDayDividerRow(date: LocalDate, today: LocalDate) {
+internal fun DesktopDayDividerRow(date: LocalDate, today: LocalDate) {
     val ruleColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
     Row(
         modifier = Modifier.widthIn(max = ChatColumnMaxWidth).fillMaxWidth(),
@@ -449,7 +449,7 @@ private fun DayDividerRule(color: Color, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun MessageListItem(
+internal fun MessageListItem(
     item: ChatRenderItem,
     streamingMessageId: StreamingMessageId?,
 ) {
@@ -478,7 +478,7 @@ private fun MessageListItem(
 }
 
 @Composable
-private fun ScrollToLatestButton(
+internal fun ScrollToLatestButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
