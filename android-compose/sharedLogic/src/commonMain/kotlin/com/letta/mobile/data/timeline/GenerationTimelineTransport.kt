@@ -27,6 +27,8 @@ class GenerationTimelineTransport(
 
     override suspend fun listConversationMessages(conversationId: String, limit: Int?, after: String?, order: String?) =
         owned { delegate.listConversationMessages(conversationId, limit, after, order) }
+    override suspend fun listConversationMessagesBefore(conversationId: String, limit: Int, before: String, order: String) =
+        owned { delegate.listConversationMessagesBefore(conversationId, limit, before, order) }
     override suspend fun listConversationMessagePage(request: TimelineRemotePageRequest, progress: TimelinePageProgress?) =
         owned { delegate.listConversationMessagePage(request, progress) }
     override suspend fun listAgentMessages(agentId: String, limit: Int?, order: String?, conversationId: String?) =

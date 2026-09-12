@@ -87,6 +87,35 @@ data: [DONE]
         assertEquals(16_384, model.maxOutputTokens)
     }
 
+    @Test
+    fun listConversationMessagesBeforeSendsTheBeforeCursor() = runTest {
+        var captured: io.ktor.http.Url? = null
+        val client = HttpClient(MockEngine { request ->
+            captured = request.url
+            respond(
+                content = """[{"message_type":"assistant_message","id":"msg-0","content":"older"}]""",
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+            )
+        }) {
+            install(ContentNegotiation) { json(desktopChatJson) }
+        }
+        val gateway = DesktopLettaHttpChatGateway(
+            config = LettaConfig(id = "local", mode = LettaConfig.Mode.LOCAL, serverUrl = "http://localhost:8283"),
+            httpClient = client,
+        )
+
+        val messages = gateway.listConversationMessagesBefore("conv-1", limit = 20, before = "msg-9", order = "desc")
+
+        assertEquals(listOf("msg-0"), messages.map { it.id })
+        val url = requireNotNull(captured)
+        assertEquals("/v1/conversations/conv-1/messages", url.encodedPath)
+        assertEquals("msg-9", url.parameters["before"])
+        assertEquals("20", url.parameters["limit"])
+        assertEquals("desc", url.parameters["order"])
+        assertEquals(null, url.parameters["after"])
+    }
+
     private fun gatewayWithResponse(
         body: String,
         status: HttpStatusCode,

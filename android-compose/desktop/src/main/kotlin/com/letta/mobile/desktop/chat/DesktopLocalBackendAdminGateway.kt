@@ -33,6 +33,13 @@ internal class DesktopLocalBackendAdminGateway(
         order: String?,
     ): List<LettaMessage> = shared.listConversationMessages(conversationId, limit, after, order)
 
+    override suspend fun listConversationMessagesBefore(
+        conversationId: String,
+        limit: Int,
+        before: String,
+        order: String,
+    ): List<LettaMessage> = shared.listConversationMessages(conversationId, limit, after = null, order = order, before = before)
+
     override suspend fun listAgentMessages(
         agentId: String,
         limit: Int?,

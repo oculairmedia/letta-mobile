@@ -54,6 +54,7 @@ class AppServerLocalAdminGateway(
         limit: Int?,
         after: String?,
         order: String?,
+        before: String? = null,
     ): List<LettaMessage> {
         val response = client.conversationMessagesList(
             AppServerCommand.ConversationMessagesList(
@@ -62,6 +63,7 @@ class AppServerLocalAdminGateway(
                 query = buildJsonObject {
                     limit?.let { put("limit", it.toString()) }
                     after?.let { put("after", it) }
+                    before?.let { put("before", it) }
                     order?.let { put("order", it) }
                 },
             ),
