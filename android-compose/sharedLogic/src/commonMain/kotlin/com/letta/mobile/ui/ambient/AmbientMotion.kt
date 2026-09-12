@@ -97,7 +97,94 @@ object AmbientMotion {
      * decay off at 58%: the envelope was still falling when Idle took over and
      * animated it back up, so the promised decay-to-afterglow read as a brief
      * intensity rebound. The hold has to come from the same table as the decay
-     * it is waiting on, or the two drift by construction.
+     * it is waiting on, or the two drift by construction. It covers the rise
+     * as well as the decay, for the same reason: a hold that expired mid-rise
+     * would hand the envelope to Idle while it was still climbing.
      */
-    fun holdMillis(status: AmbientMotionStatus): Int = spec(status).settleMillis
+    fun holdMillis(status: AmbientMotionStatus): Int =
+        if (spec(status).isTransient) ramp(current = 0f, status = status).totalMillis else 0
+
+    /**
+     * How a landing status moves the intensity envelope from where it already is.
+     *
+     * Hosts used to snap to [AmbientMotionSpec.bloomEnvelope] before starting the decay.
+     * On a 120 Hz screen that is a flash: a finished turn arrives from Running at 1.0 and
+     * the Completed bloom is 1.5, so the glow jumped half again brighter between two
+     * frames and then spent 2.4s falling. Measured on device at turn end, the bottom band
+     * of the timeline rose 51% in a single frame.
+     *
+     * Intensity therefore never steps. A bloom above the current glow is climbed over
+     * [BLOOM_RISE_MILLIS]; a bloom at or below it is already a decay, so the settle starts
+     * from where the glow actually is rather than dropping to meet the table.
+     */
+    fun ramp(current: Float, status: AmbientMotionStatus): AmbientEnvelopeRamp {
+        val spec = spec(status)
+        if (!spec.isTransient) {
+            return AmbientEnvelopeRamp(
+                riseMillis = 0,
+                bloomEnvelope = spec.settledEnvelope,
+                settleMillis = CONTINUOUS_SETTLE_MILLIS,
+                settledEnvelope = spec.settledEnvelope,
+            )
+        }
+        return AmbientEnvelopeRamp(
+            riseMillis = if (current < spec.bloomEnvelope) BLOOM_RISE_MILLIS else 0,
+            bloomEnvelope = spec.bloomEnvelope,
+            settleMillis = spec.settleMillis,
+            settledEnvelope = spec.settledEnvelope,
+        )
+    }
+
+    /** Long enough that a 50% brightening reads as a swell rather than a flash. */
+    const val BLOOM_RISE_MILLIS: Int = 200
+
+    /**
+     * Where the renderer wraps its integrated phase, in turns.
+     *
+     * The phase used to accumulate without bound, and a Float loses resolution as it
+     * grows: after about a day of continuous animation its step reaches a frame's
+     * advance, so frames land on the same value and then jump two at once. That is the
+     * judder that only ever appeared in long-running sessions.
+     *
+     * 1024 is exactly representable and every frequency in the shader is an integer
+     * multiple of 1/1024 turns, so the whole field is periodic here and the wrap is
+     * seamless. The phase stays small enough that its resolution never decays: a frame
+     * advances ~1/120 of a turn against a float step of ~6e-5 at this magnitude.
+     */
+    const val PHASE_WRAP_TURNS: Float = 1024f
+
+    /**
+     * How far the shader rotates its curated palette's hues toward the tint.
+     *
+     * The palette is an indigo→teal→gold cosine ramp that owes nothing to the theme, so
+     * at low pull the glow shows olive and dusty pink smears belonging to no palette in
+     * the app. Rotating hue (not replacing colour) keeps the field's internal variation
+     * while making all of it adjacent to the theme's own hue.
+     */
+    const val PALETTE_HUE_PULL: Float = 0.6f
+
+    /** Tone and chroma the ambient tint is built at, rather than a Material container role. */
+    const val TINT_TONE_ON_DARK: Float = 30f
+    const val TINT_TONE_ON_LIGHT: Float = 62f
+    const val TINT_CHROMA: Float = 72f
+
+    /** A continuous status has nothing to decay from, so it just eases to its level. */
+    private const val CONTINUOUS_SETTLE_MILLIS = 300
+}
+
+/**
+ * The two moves a host plays, in order, when a status lands: climb to the bloom, then
+ * settle. Either may be absent - [risesFirst] is false when the glow is already at or
+ * above the bloom, and a continuous status names its level in both fields.
+ */
+data class AmbientEnvelopeRamp(
+    val riseMillis: Int,
+    val bloomEnvelope: Float,
+    val settleMillis: Int,
+    val settledEnvelope: Float,
+) {
+    val risesFirst: Boolean get() = riseMillis > 0
+
+    /** Total time before the envelope is at rest, which is what a host must hold for. */
+    val totalMillis: Int get() = riseMillis + settleMillis
 }

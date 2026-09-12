@@ -43,6 +43,20 @@ object HctColorHarmonizer {
             .toComposeColor(alpha = stateColor.alpha)
     }
 
+    /**
+     * Rebuilds a colour at an explicit tone and chroma, keeping only its hue.
+     *
+     * Material's container roles are low-chroma and lightish by construction, which is
+     * right for a surface behind text and wrong for a light source. The ambient glow
+     * wants the hue the theme already means, at its own tone and chroma, so it asks for
+     * those directly. HCT clamps the request into the sRGB gamut for that hue.
+     */
+    fun atToneAndChroma(hueSource: Color, tone: Float, chroma: Float): Color {
+        val hct = Hct.fromInt(hueSource.toOpaqueArgb())
+        return Hct.from(hct.hue, chroma.toDouble(), tone.toDouble())
+            .toComposeColor(alpha = hueSource.alpha)
+    }
+
     fun harmonizeContainer(
         containerColor: Color,
         seedColor: Color,
