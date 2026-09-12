@@ -166,11 +166,11 @@ private fun ChatMessageListLazyColumnContent(params: ChatMessageListLazyColumnPa
     }
 }
 
-private fun chatMessageListTopFadeLength(topPadding: Dp): Dp {
+internal fun chatMessageListTopFadeLength(topPadding: Dp): Dp {
     return if (topPadding > 0.dp) topPadding + 16.dp else ChatFadeEdgeLength
 }
 
-private fun chatMessageListBottomFadeLength(bottomPadding: Dp): Dp {
+internal fun chatMessageListBottomFadeLength(bottomPadding: Dp): Dp {
     return if (bottomPadding > 0.dp) bottomPadding + 48.dp else ChatFadeEdgeLength + 48.dp
 }
 
