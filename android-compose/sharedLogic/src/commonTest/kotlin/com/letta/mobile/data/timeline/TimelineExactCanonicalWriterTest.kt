@@ -718,6 +718,97 @@ class TimelineExactCanonicalWriterTest {
         )
     }
 
+    @Test fun aTruncatedStreamAdoptsByPositionWhenNothingElsePairsThem() = runTest {
+        // Stock letta-code shares no identifier for an assistant reply, so the join falls to text —
+        // and text is only as good as the stream being complete. On device 2026-09-11 a dropped
+        // tail delta left the streamed row at 368 characters against a stored 369 and both
+        // rendered. Position pairs them anyway: one reply streamed, one reply committed.
+        val streamedId = "cm-stream-provider-assistant-0-23a84950"
+        val committedId = "ui-msg-9155077"
+        val engine = CanonicalTimelineEngine(Store(), TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
+        val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
+        val fence = engine.beginLive(selection)
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(AssistantMessage(
+            id = streamedId,
+            contentRaw = kotlinx.serialization.json.JsonPrimitive("What color did you want it to be"),
+            date = "2026-01-01T00:00:00Z",
+        ))))
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
+        val settlement = kotlin.test.assertNotNull(engine.live.value?.settlementRevision)
+        val presented = mapOf(TimelineMessageId(committedId) to settlement)
+
+        assertEquals(TimelineEnginePageOutcome.Applied, reconcile(engine, selection, record(AssistantMessage(
+            id = committedId,
+            contentRaw = kotlinx.serialization.json.JsonPrimitive("What color did you want it to be?"),
+            date = "2026-01-01T00:00:00Z",
+        ))))
+
+        val live = kotlin.test.assertNotNull(engine.live.value)
+        assertEquals(mapOf(streamedId to TimelineMessageId(committedId)), live.aliases)
+        assertTrue(live.isSettled(presented), "position pairs them even though the texts differ")
+        assertEquals(emptyList(), live.overlayEvents(presented))
+    }
+
+    @Test fun positionPairsSeveralRepliesInTheOrderTheyHappened() = runTest {
+        val engine = CanonicalTimelineEngine(Store(), TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
+        val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
+        val fence = engine.beginLive(selection)
+        // Both truncated, so nothing matches by text.
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(AssistantMessage(
+            id = "cm-stream-a", contentRaw = kotlinx.serialization.json.JsonPrimitive("first repl"),
+            date = "2026-01-01T00:00:00Z",
+        ))))
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(AssistantMessage(
+            id = "cm-stream-b", contentRaw = kotlinx.serialization.json.JsonPrimitive("second rep"),
+            date = "2026-01-01T00:00:01Z",
+        ))))
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
+
+        assertEquals(TimelineEnginePageOutcome.Applied, reconcile(
+            engine, selection,
+            record(AssistantMessage(id = "ui-msg-1",
+                contentRaw = kotlinx.serialization.json.JsonPrimitive("first reply"),
+                date = "2026-01-01T00:00:00Z")),
+            record(AssistantMessage(id = "ui-msg-2",
+                contentRaw = kotlinx.serialization.json.JsonPrimitive("second reply"),
+                date = "2026-01-01T00:00:01Z")),
+        ))
+
+        assertEquals(
+            mapOf("cm-stream-a" to TimelineMessageId("ui-msg-1"), "cm-stream-b" to TimelineMessageId("ui-msg-2")),
+            kotlin.test.assertNotNull(engine.live.value).aliases,
+            "the k-th streamed reply is the k-th reply the turn committed",
+        )
+    }
+
+    @Test fun positionNeverPairsAgainstRowsThePageDidNotAppend() = runTest {
+        // A reconcile page is a window of recent history, not a turn. An older reply already in
+        // the ledger must not be handed to a streamed row just because it is in the page: that is
+        // how a positional join would rewrite one reply into another.
+        val store = Store()
+        val engine = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
+        val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
+        val older = AssistantMessage(id = "ui-msg-older",
+            contentRaw = kotlinx.serialization.json.JsonPrimitive("an older reply"),
+            date = "2026-01-01T00:00:00Z")
+        assertEquals(TimelineEnginePageOutcome.Applied, reconcile(engine, selection, record(older)))
+
+        val fence = engine.beginLive(selection)
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(AssistantMessage(
+            id = "cm-stream-new", contentRaw = kotlinx.serialization.json.JsonPrimitive("a new repl"),
+            date = "2026-01-01T00:00:02Z",
+        ))))
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
+
+        // The page carries the older row again and nothing new: there is nothing to pair with.
+        assertEquals(TimelineEnginePageOutcome.Applied, reconcile(engine, selection, record(older)))
+        assertEquals(
+            emptyMap(),
+            kotlin.test.assertNotNull(engine.live.value).aliases,
+            "a resident row is not a candidate for position",
+        )
+    }
+
     @Test fun streamedAssistantIdIsAliasedToItsCanonicalIdentityWhateverItsShape() = runTest {
         val store = Store()
         // The turn already has a canonical identity, recorded against the otid the stream carries.
