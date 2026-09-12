@@ -16,12 +16,23 @@ internal fun DesktopDeferredWindow(presentation: CanonicalTimelinePresentation, 
     var busy by remember(row) { mutableStateOf(false) }
     var job by remember(row) { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     DisposableEffect(presentation, row) { onDispose { job?.cancel() } }
+    var chosenField by remember(row) { mutableStateOf<TimelineSemanticField?>(null) }
     fun load(at: Long) {
         job?.cancel()
         job = scope.launch {
             busy = true; text = null; next = null; offset = at
             try {
-                when (val result = presentation.readTextWindow(row, TimelineSemanticField.Content, at, dispatcher)) {
+                // Which string a stored body shows is discovered per row, not assumed to be
+                // `content` - for a tool call that field holds a serialization artifact.
+                val read: suspend (TimelineSemanticField, Long) -> TimelineSemanticWindowResult =
+                    { chosen, from -> presentation.readTextWindow(row, chosen, from, dispatcher) }
+                val result = chosenField?.let { read(it, at) } ?: resolveDeferredBody(read).let { body ->
+                    chosenField = body.field
+                    body.first ?: TimelineSemanticWindowResult.Deferred(
+                        body.reason ?: TimelineSemanticWindowResult.Reason.MissingField, body.messageType,
+                    )
+                }
+                when (result) {
                     is TimelineSemanticWindowResult.Text -> { text = result.value; next = result.nextScalarOffset }
                     is TimelineSemanticWindowResult.Deferred -> text = "Content remains deferred: ${result.reason}"
                 }

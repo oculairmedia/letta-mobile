@@ -3,8 +3,60 @@ package com.letta.mobile.data.timeline
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 
-/** Plain semantic text only: never treat serialized event slices as displayable content. */
-enum class TimelineSemanticField(val wireName: String) { Content("content"), ToolReturn("toolReturnContent") }
+/** One step of the path from the event root down to the string that holds displayable text. */
+sealed interface TimelineSemanticSegment {
+    /** A named member of an object. */
+    data class Key(val name: String) : TimelineSemanticSegment
+
+    /**
+     * The first member of an object, whatever it is called. Lets a map keyed by a call id be read
+     * without first learning the call id, which would cost a whole extra pass over the body.
+     */
+    data object FirstKey : TimelineSemanticSegment
+
+    /** One element of an array, by position. */
+    data class Index(val at: Int) : TimelineSemanticSegment
+}
+
+/**
+ * Plain semantic text only: never treat serialized event slices as displayable content.
+ *
+ * A field names one string inside the stored event, at most three steps from the root. Everything
+ * off that path is walked and discarded, so reaching a nested string costs the same streaming pass
+ * as a top-level one.
+ */
+sealed interface TimelineSemanticField {
+    val path: List<TimelineSemanticSegment>
+
+    /** A string directly on the event: `content`, `toolReturnContent`. */
+    data class Root(val key: String) : TimelineSemanticField {
+        override val path: List<TimelineSemanticSegment> get() = listOf(TimelineSemanticSegment.Key(key))
+    }
+
+    /** The first value of an object of strings: `toolReturnContentByCallId` keyed by call id. */
+    data class FirstEntry(val key: String) : TimelineSemanticField {
+        override val path: List<TimelineSemanticSegment>
+            get() = listOf(TimelineSemanticSegment.Key(key), TimelineSemanticSegment.FirstKey)
+    }
+
+    /** One field of one element of an array of objects: `toolCalls[0].arguments`. */
+    data class Element(val key: String, val index: Int, val member: String) : TimelineSemanticField {
+        override val path: List<TimelineSemanticSegment> get() = listOf(
+            TimelineSemanticSegment.Key(key), TimelineSemanticSegment.Index(index), TimelineSemanticSegment.Key(member),
+        )
+    }
+
+    companion object {
+        val Content: TimelineSemanticField = Root("content")
+        val ToolReturn: TimelineSemanticField = Root("toolReturnContent")
+
+        /** A tool return addressed by call id; the deferred bodies in practice carry exactly one. */
+        val ToolReturnByCallId: TimelineSemanticField = FirstEntry("toolReturnContentByCallId")
+
+        fun toolName(index: Int = 0): TimelineSemanticField = Element("toolCalls", index, "name")
+        fun toolArguments(index: Int = 0): TimelineSemanticField = Element("toolCalls", index, "arguments")
+    }
+}
 
 class TimelineSemanticBudget(
     val maxInputBytes: Long = 2L * 1024 * 1024,
@@ -27,8 +79,11 @@ sealed interface TimelineSemanticWindowResult {
         val inputBytes: Long,
         val outputBytes: Int,
         val reads: Int,
+        /** The stored event's type, in the wire spelling. Known whenever the body parsed. */
+        val messageType: String = "",
     ) : TimelineSemanticWindowResult
-    data class Deferred(val reason: Reason) : TimelineSemanticWindowResult
+    /** [messageType] is blank when the body did not parse far enough to carry one. */
+    data class Deferred(val reason: Reason, val messageType: String = "") : TimelineSemanticWindowResult
     enum class Reason { UnsupportedType, InputBudget, ReadBudget, Malformed, MissingField, StructuralLimit }
 }
 
@@ -41,8 +96,10 @@ sealed interface TimelineSemanticWindowResult {
  * one output builder plus its returned string (each <= 2 * maxOutputBytes UTF-16 bytes),
  * and depth-32 structural/key state (keys <= 128 UTF-16 units). No cursor retains prior text.
  * Hosts must replace, not append,
- * windows and run this on their injected decode dispatcher. Only top-level content/tool return
- * strings are supported; tool arguments, attachments and opaque schemas remain explicitly deferred.
+ * windows and run this on their injected decode dispatcher. Only a string named by a
+ * [TimelineSemanticField] is ever returned - at most three steps from the root, and every step is
+ * either a named member, the first member of an object, or an array position. Attachments and
+ * opaque schemas remain explicitly deferred, and no structure is ever rendered as text.
  */
 object TimelineSemanticBodyWindow {
     suspend fun read(
@@ -89,6 +146,7 @@ object TimelineSemanticBodyWindow {
         var found = false
         var seen = false
         var messageType: String? = null
+        val path = field.path
         var scalars = 0L
         var outputBytes = 0
         var emitted = 0L
@@ -117,21 +175,29 @@ object TimelineSemanticBodyWindow {
         suspend fun parse(): TimelineSemanticWindowResult {
             space()
             if (peek() != 123) invalid()
-            value(0)
+            value(0, onPath = true)
             space()
             if (peek() != -1) invalid()
             // The ledger stores the enum name (ASSISTANT, TOOL_CALL); the wire uses the lower-case
             // form. Lower-casing maps every enum name onto the wire name already listed, so a
             // stored body is readable without widening what counts as supported.
-            if (messageType?.lowercase() !in SUPPORTED_TYPES) {
-                return TimelineSemanticWindowResult.Deferred(TimelineSemanticWindowResult.Reason.UnsupportedType)
+            val type = messageType?.lowercase().orEmpty()
+            if (type !in SUPPORTED_TYPES) {
+                return TimelineSemanticWindowResult.Deferred(TimelineSemanticWindowResult.Reason.UnsupportedType, type)
             }
-            if (!found) return TimelineSemanticWindowResult.Deferred(TimelineSemanticWindowResult.Reason.MissingField)
+            if (!found) {
+                return TimelineSemanticWindowResult.Deferred(TimelineSemanticWindowResult.Reason.MissingField, type)
+            }
             return TimelineSemanticWindowResult.Text(output.toString(),
-                if (full) start + emitted else null, consumed, outputBytes, reads)
+                if (full) start + emitted else null, consumed, outputBytes, reads, type)
         }
 
-        suspend fun value(depth: Int, selected: Boolean = false) {
+        /**
+         * [onPath] means every segment above this value matched, so this value's own members are
+         * the ones segment [depth] applies to. Only one branch of the body can ever be on the path,
+         * so nothing about the walk is retained once it leaves.
+         */
+        suspend fun value(depth: Int, onPath: Boolean = false, selected: Boolean = false) {
             if (depth > 32) structural()
             space()
             if (selected && peek() != 34 && peek() != 110) invalid()
@@ -140,17 +206,27 @@ object TimelineSemanticBodyWindow {
                 123 -> {
                     take(); space()
                     if (peek() == 125) { take(); return }
+                    var first = true
                     while (true) {
                         space()
                         val key = string(1)
                         space(); expect(58)
-                        val match = depth == 0 && key == field.wireName
-                        if (match) { if (seen) invalid(); seen = true; found = true }
+                        val step = if (onPath) path.getOrNull(depth) else null
+                        val match = when (step) {
+                            is TimelineSemanticSegment.Key -> key == step.name
+                            // The first member wins outright; later ones are walked and discarded,
+                            // so a second entry is not a malformed body.
+                            TimelineSemanticSegment.FirstKey -> first
+                            else -> false
+                        }
+                        val chosen = match && depth + 1 == path.size
+                        if (chosen) { if (seen) invalid(); seen = true; found = true }
                         if (depth == 0 && key == "messageType") {
                             if (messageType != null) invalid()
                             space()
                             messageType = string(1)
-                        } else value(depth + 1, match)
+                        } else value(depth + 1, match, chosen)
+                        first = false
                         space()
                         if (peek() == 125) { take(); break }
                         expect(44)
@@ -159,8 +235,15 @@ object TimelineSemanticBodyWindow {
                 91 -> {
                     take(); space()
                     if (peek() == 93) { take(); return }
+                    var at = 0
                     while (true) {
-                        value(depth + 1); space()
+                        val step = if (onPath) path.getOrNull(depth) else null
+                        val match = step is TimelineSemanticSegment.Index && step.at == at
+                        val chosen = match && depth + 1 == path.size
+                        if (chosen) { if (seen) invalid(); seen = true; found = true }
+                        value(depth + 1, match, chosen)
+                        at++
+                        space()
                         if (peek() == 93) { take(); break }
                         expect(44)
                     }
