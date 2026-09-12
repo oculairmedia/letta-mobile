@@ -9,6 +9,7 @@ import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.projection.timelineEventToUiMessage
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.common.GroupPosition
+import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -89,13 +90,12 @@ class CanonicalTimelinePresentation private constructor(
     val settled: Flow<PagingData<Row>> = anchor.flatMapLatest { key ->
         owner.session.paging(owner.selection, key).map { page ->
             page.filter { record ->
-                if (record.isPreview || record.contentType != "application/vnd.letta.timeline-event+json;version=1") true
-                else {
-                    val event = com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec.json.decodeFromString(
-                        com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent.serializer(), record.body.decodeToString(),
-                    ).toConfirmedTimelineEvent()
-                    timelineEventToUiMessage(event, owner.selection.scope.agentId) != null &&
-                        !owner.session.engine.isSuppressed(owner.selection, record.key.identity, record.revision, event)
+                when (val presentation = record.presentation(owner.selection.scope.agentId)) {
+                    is TimelineSettledPresentation.Drop -> false
+                    is TimelineSettledPresentation.Defer -> true
+                    is TimelineSettledPresentation.Render -> !owner.session.engine.isSuppressed(
+                        owner.selection, record.key.identity, record.revision, presentation.event,
+                    )
                 }
             }.map { record -> project(record) }
         }
@@ -197,16 +197,22 @@ class CanonicalTimelinePresentation private constructor(
     private fun project(record: TimelineSettledRecord): Row {
         val projection = record.projectBounded(owner.selection.scope, owner.selection.scope.agentId)
         val deferred = (projection as? TimelineSettledProjection.Deferred)?.reference
+        // A deferred row carries no text of its own: the card above it reads the stored body a
+        // page at a time. NotRenderable cannot reach here - `settled` drops those records before
+        // projection - so it is recorded rather than described to the user.
+        if (projection is TimelineSettledProjection.NotRenderable) {
+            Telemetry.event(
+                "CanonicalTimelinePresentation", "settled_row_not_renderable",
+                "identity" to record.key.identity.value, "contentType" to record.contentType,
+            )
+        }
         val item = (projection as? TimelineSettledProjection.Rendered)?.item?.settledToolCalls() ?: ChatRenderItem.Single(
-            UiMessage(record.key.identity.value, "assistant",
-                if (deferred != null) "Content stored locally (${deferred.pointer.encodedBytes} bytes). Preview unavailable."
-                else "This stored record cannot be displayed by this client version.",
-                timestamp = ""),
+            UiMessage(record.key.identity.value, "assistant", "", timestamp = ""),
             GroupPosition.None, keyOverride = "segment-${record.key.identity.value}",
         )
         // A deferred body is not decoded here, so its otid stays blank and simply never matches.
         val otid = if (deferred != null || record.isPreview ||
-            record.contentType != "application/vnd.letta.timeline-event+json;version=1"
+            record.contentType != TIMELINE_EVENT_CONTENT_TYPE
         ) "" else runCatching {
             com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec.json.decodeFromString(
                 com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent.serializer(), record.body.decodeToString(),
