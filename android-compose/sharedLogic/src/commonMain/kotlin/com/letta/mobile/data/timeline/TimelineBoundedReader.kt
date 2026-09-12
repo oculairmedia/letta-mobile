@@ -2,6 +2,12 @@ package com.letta.mobile.data.timeline
 
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 
+/**
+ * The one body shape this client can decode into a rendered message. Anything else is durable but
+ * opaque: it has no renderer and no pager, so it belongs nowhere in the conversation.
+ */
+const val TIMELINE_EVENT_CONTENT_TYPE = "application/vnd.letta.timeline-event+json;version=1"
+
 /** Revision is the metadata PAGE revision, not the individual row revision. */
 data class TimelineBodyReference(
     val scope: TimelineScope,

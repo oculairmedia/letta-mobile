@@ -59,11 +59,49 @@ fun TimelineSettledRecord.projectBounded(
         ?: TimelineSettledProjection.NotRenderable
 }
 
+/**
+ * What a settled record can become on screen, decided before any suppression lookup so the
+ * decision is testable without a session behind it.
+ */
+sealed interface TimelineSettledPresentation {
+    /**
+     * Durable, and absent from the conversation. Either the body is opaque to this client - a
+     * compaction marker, or anything a newer protocol writes - or it is an event type the chat
+     * surface deliberately does not show, such as a system seed or a standalone tool return.
+     * Neither has a renderer or a pager, so the only thing presenting one could produce is a
+     * placeholder where the user expects their own history (letta-mobile-r5v5t).
+     */
+    data object Drop : TimelineSettledPresentation
+
+    /** Stored whole but held back from inline decoding; the card reads it a page at a time. */
+    data object Defer : TimelineSettledPresentation
+
+    /** Decoded and renderable. Carries the event so the caller need not decode it twice. */
+    data class Render(val event: TimelineEvent.Confirmed) : TimelineSettledPresentation
+}
+
+/** Malformed bodies still throw: a body that cannot be read is a fault, not an empty conversation. */
+fun TimelineSettledRecord.presentation(ownAgentId: String? = null): TimelineSettledPresentation = when {
+    contentType != TIMELINE_EVENT_CONTENT_TYPE -> TimelineSettledPresentation.Drop
+    isPreview -> TimelineSettledPresentation.Defer
+    else -> {
+        val event = com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec.json.decodeFromString(
+            com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent.serializer(),
+            body.decodeToString(throwOnInvalidSequence = true),
+        ).toConfirmedTimelineEvent()
+        if (com.letta.mobile.data.chat.projection.timelineEventToUiMessage(event, ownAgentId) == null) {
+            TimelineSettledPresentation.Drop
+        } else {
+            TimelineSettledPresentation.Render(event)
+        }
+    }
+}
+
 /** Project only complete canonical bodies; partial JSON must never become a missing message. */
 fun TimelineSettledRecord.toRenderItem(ownAgentId: String? = null): com.letta.mobile.data.chat.projection.ChatRenderItem? {
     require(!isPreview) { "Resolve bounded body before projection" }
     // Opaque protocol records remain durable but have no renderer in this client version.
-    if (contentType != "application/vnd.letta.timeline-event+json;version=1") return null
+    if (contentType != TIMELINE_EVENT_CONTENT_TYPE) return null
     val stored = com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec.json.decodeFromString(
         com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent.serializer(),
         body.decodeToString(throwOnInvalidSequence = true),

@@ -504,7 +504,7 @@ class CanonicalTimelineEngine(
             var remaining = budget.maxDecodedBodyBytes
             val events = mutableListOf<TimelineEvent.Confirmed>()
             for (row in metadata.rows.asReversed()) {
-                if (row.contentType != "application/vnd.letta.timeline-event+json;version=1") break
+                if (row.contentType != TIMELINE_EVENT_CONTENT_TYPE) break
                 require(row.body.encodedBytes <= remaining && row.body.encodedBytes <= Int.MAX_VALUE) { "Cleanup body budget exceeded" }
                 val bytes = ByteArray(row.body.encodedBytes.toInt())
                 var offset = 0
