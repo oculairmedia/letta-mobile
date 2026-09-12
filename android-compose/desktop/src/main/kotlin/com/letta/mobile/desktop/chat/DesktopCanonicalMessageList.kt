@@ -22,11 +22,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -34,8 +36,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.paging.CombinedLoadStates
 import androidx.paging.LoadState
+import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
-import androidx.paging.compose.itemKey
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.timeline.CanonicalTimelinePresentation
 import com.letta.mobile.desktop.fadingEdges
@@ -128,6 +130,31 @@ private fun CanonicalMessageListContent(
             }
     }
 
+    // Which prompt owns the region on screen. This list is laid out in reverse, so the visual top
+    // is the HIGHEST visible index and a prompt's answer — being newer — carries a LOWER index and
+    // renders beneath it. The owning prompt is therefore the first user row at or above the topmost
+    // visible index. Compose's own stickyHeader cannot express this: it pins to the start of the
+    // layout direction, which in a reversed list is the BOTTOM of the pane.
+    val liveRows = rememberUpdatedState(live)
+    val pinnedPrompt: ChatRenderItem? by remember(presentation) {
+        derivedStateOf {
+            val visible = listState.layoutInfo.visibleItemsInfo
+            val top = visible.maxOfOrNull { it.index } ?: return@derivedStateOf null
+            val overlay = liveRows.value
+            val total = overlay.size + settled.itemCount
+            var index = top
+            while (index < total && index - top <= PinnedPromptScanLimit) {
+                val item = canonicalRowAt(overlay, settled, index)
+                // Its own row is on screen, so a pinned copy would just double-render it.
+                if (item != null && item.isUserPrompt()) {
+                    return@derivedStateOf item.takeIf { visible.none { row -> row.index == index } }
+                }
+                index++
+            }
+            null
+        }
+    }
+
     val selectionColors = TextSelectionColors(
         handleColor = MaterialTheme.colorScheme.primary,
         backgroundColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.32f),
@@ -169,24 +196,11 @@ private fun CanonicalMessageListContent(
                         ?: settled.itemSnapshotList.items.firstOrNull()?.item
                     CanonicalRow(live[index], older, today)
                 }
-                items(settled.itemCount, key = settled.itemKey { "settled-" + it.item.key }) { index ->
-                    val row = settled[index]
-                    if (row == null) {
-                        // A placeholder must still occupy space, or the list collapses toward the
-                        // tail while a page loads and drags the reader with it.
-                        Box(Modifier.height(48.dp))
-                    } else {
-                        Column {
-                            row.deferred?.let {
-                                DesktopDeferredWindow(presentation, row, Dispatchers.Default)
-                            }
-                            CanonicalRow(
-                                row.item,
-                                if (index + 1 < settled.itemCount) settled.peek(index + 1)?.item else null,
-                                today,
-                            )
-                        }
-                    }
+                items(
+                    settled.itemCount,
+                    key = { index -> settled.peek(index)?.let { "settled-" + it.item.key } ?: "settled-slot-$index" },
+                ) { index ->
+                    CanonicalSettledRow(presentation, settled, index, today)
                 }
                 val load = settled.loadState
                 if (load.refresh is LoadState.Loading || load.append is LoadState.Loading) {
@@ -206,6 +220,18 @@ private fun CanonicalMessageListContent(
                         }
                     }
                 }
+            }
+        }
+        pinnedPrompt?.let { prompt ->
+            // Aligned with the list's own horizontal padding so the pinned copy sits exactly where
+            // the inline row sat. No backdrop fill: an opaque strip here would paint over the
+            // ambient glow as a band, and the prompt card is itself opaque.
+            Box(
+                modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth()
+                    .padding(horizontal = 28.dp, vertical = 12.dp),
+                contentAlignment = Alignment.TopCenter,
+            ) {
+                MessageListItem(item = prompt, streamingMessageId = null)
             }
         }
         presentation.missingTarget?.let { missing ->
@@ -228,6 +254,52 @@ private fun CanonicalMessageListContent(
                     }
                 },
                 modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp),
+            )
+        }
+    }
+}
+
+/**
+ * How far above the viewport the owning prompt is looked for. A conversation can hold a very long
+ * answer, but the search runs on every scroll frame, so it is bounded: past the limit the transcript
+ * simply scrolls with no pinned prompt rather than walking the whole loaded window.
+ */
+private const val PinnedPromptScanLimit = 400
+
+/**
+ * The row at a combined list index: live overlay rows first, then settled pages. Reads settled rows
+ * with `peek`, because deciding what to pin must not register a load and drag prefetch along with
+ * the search.
+ */
+private fun canonicalRowAt(
+    live: List<ChatRenderItem>,
+    settled: LazyPagingItems<CanonicalTimelinePresentation.Row>,
+    index: Int,
+): ChatRenderItem? =
+    if (index < live.size) live.getOrNull(index) else settled.peek(index - live.size)?.item
+
+/**
+ * One settled row, read through [LazyPagingItems.get] so the access registers with Paging and
+ * drives prefetch. A not-yet-loaded row still occupies space, or the list collapses toward the
+ * tail while a page loads and drags the reader with it.
+ */
+@Composable
+private fun CanonicalSettledRow(
+    presentation: CanonicalTimelinePresentation,
+    settled: LazyPagingItems<CanonicalTimelinePresentation.Row>,
+    index: Int,
+    today: LocalDate,
+) {
+    val row = settled[index]
+    if (row == null) {
+        Box(Modifier.height(48.dp))
+    } else {
+        Column {
+            row.deferred?.let { DesktopDeferredWindow(presentation, row, Dispatchers.Default) }
+            CanonicalRow(
+                row.item,
+                if (index + 1 < settled.itemCount) settled.peek(index + 1)?.item else null,
+                today,
             )
         }
     }
