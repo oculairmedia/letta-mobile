@@ -612,7 +612,7 @@ internal fun ToolCallCard(
             Spacer(modifier = Modifier.width(6.dp))
             Text(
                 text = compactTitle,
-                style = MaterialTheme.typography.chatBubbleSender.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
+                style = MaterialTheme.typography.chatBubbleSender.copy(fontFamily = codeStyle.fontFamily),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSurface,
@@ -972,7 +972,7 @@ private fun ToolCallExpandedBodyContentInner(
             executionTimeText?.let { time ->
                 Text(
                     text = "Execution time: $time",
-                    style = MaterialTheme.typography.listItemSupporting.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
+                    style = MaterialTheme.typography.listItemSupporting.copy(fontFamily = codeStyle.fontFamily),
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.76f),
                 )
             }
@@ -980,7 +980,7 @@ private fun ToolCallExpandedBodyContentInner(
             display.detailLine?.let { detail ->
                 Text(
                     text = detail,
-                    style = MaterialTheme.typography.listItemSupporting.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
+                    style = MaterialTheme.typography.listItemSupporting.copy(fontFamily = codeStyle.fontFamily),
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.76f),
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
@@ -1021,7 +1021,7 @@ private fun ToolCallExpandedBodyContentInner(
                 ) {
                     Text(
                         text = if (isError) "Error" else "Output",
-                        style = MaterialTheme.typography.sectionTitle.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
+                        style = MaterialTheme.typography.sectionTitle.copy(fontFamily = codeStyle.fontFamily),
                         color = if (isError) {
                             MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
                         } else {
@@ -1033,7 +1033,7 @@ private fun ToolCallExpandedBodyContentInner(
                     if (lineCount > 1 || result.length > 80) {
                         Text(
                             text = if (resultExpanded) "collapse" else "$lineCount line${if (lineCount == 1) "" else "s"}",
-                            style = MaterialTheme.typography.labelSmall.scaledBy(fontScale),
+                            style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.68f),
                         )
                         Spacer(modifier = Modifier.width(4.dp))
@@ -1171,7 +1171,7 @@ internal fun ToolSummaryLine(
     Row(modifier = Modifier.fillMaxWidth()) {
         Text(
             text = "$label: ",
-            style = MaterialTheme.typography.sectionTitle.scaledBy(fontScale),
+            style = MaterialTheme.typography.sectionTitle,
             color = if (isError) {
                 MaterialTheme.colorScheme.error.copy(alpha = 0.8f)
             } else if (isWarning) {
@@ -1182,7 +1182,7 @@ internal fun ToolSummaryLine(
         )
         Text(
             text = value,
-            style = MaterialTheme.typography.listItemSupporting.scaledBy(fontScale),
+            style = MaterialTheme.typography.listItemSupporting,
             color = if (isError) MaterialTheme.colorScheme.error else if (isWarning) MaterialTheme.customColors.warningTextColor else MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = maxLines,
             overflow = TextOverflow.Ellipsis,
