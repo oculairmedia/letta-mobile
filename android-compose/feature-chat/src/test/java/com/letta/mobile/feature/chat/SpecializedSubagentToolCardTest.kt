@@ -194,6 +194,26 @@ class SpecializedSubagentToolCardTest {
             .assertIsDisplayed()
     }
 
+    /** A notification can carry a transcript and no report; the path must still be reachable. */
+    @Test
+    fun aTranscriptWithoutAReportIsStillReachable() {
+        setNotificationContent(
+            """
+            <task-notification>
+                <status>completed</status>
+                <summary>Finished research</summary>
+                <transcript>/tmp/letta-background-P2Xz9b/exec_16.log</transcript>
+            </task-notification>
+            """.trimIndent(),
+        )
+
+        composeRule.onAllNodesWithText("Show full report").assertCountEquals(0)
+        composeRule.onNodeWithText("Show transcript").assertIsDisplayed().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("/tmp/letta-background-P2Xz9b/exec_16.log", substring = true)
+            .assertIsDisplayed()
+    }
+
     private fun setNotificationContent(notification: String) {
         composeRule.setContent {
             LettaTheme(
