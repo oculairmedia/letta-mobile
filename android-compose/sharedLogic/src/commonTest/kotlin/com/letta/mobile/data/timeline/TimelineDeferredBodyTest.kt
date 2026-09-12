@@ -90,6 +90,17 @@ class TimelineDeferredBodyTest {
         assertNull(resolved.first)
     }
 
+    /**
+     * The ledger stores the message type as the enum name, and ERROR is not one the window reads.
+     * Such a body resolves to nothing rather than to a field that would show the wrong string.
+     */
+    @Test fun aTypeTheWindowDoesNotReadResolvesToNoField() = runTest {
+        val resolved = resolve("""{"messageType":"ERROR","content":"run aborted"}""")
+        assertNull(resolved.field)
+        assertNull(resolved.first)
+        assertEquals(TimelineSemanticWindowResult.Reason.UnsupportedType, resolved.reason)
+    }
+
     private suspend fun resolve(body: String): TimelineDeferredBody =
         resolveDeferredBody { field, offset -> read(body, field, offset) }
 

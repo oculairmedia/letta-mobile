@@ -64,7 +64,9 @@ suspend fun resolveDeferredBody(
  * are calls whose arguments were the large part.
  */
 private fun candidates(messageType: String): List<TimelineSemanticField> = when (messageType) {
-    "tool_call", "tool_call_message", "approval_request_message" -> listOf(
+    // The ledger stores the enum name, so only the plain spellings occur in practice; the wire
+    // spellings are here because the same window can be pointed at a wire-shaped body.
+    "tool_call", "tool_call_message" -> listOf(
         TimelineSemanticField.ToolReturnByCallId,
         TimelineSemanticField.ToolReturn,
         TimelineSemanticField.toolArguments(),

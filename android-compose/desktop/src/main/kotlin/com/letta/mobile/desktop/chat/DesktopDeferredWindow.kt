@@ -44,7 +44,13 @@ internal fun DesktopDeferredWindow(presentation: CanonicalTimelinePresentation, 
                 val result = state.page({ field, from -> presentation.readTextWindow(row, field, from, dispatcher) }, at)
                 when (result) {
                     is TimelineSemanticWindowResult.Text -> { state.text = result.value; state.next = result.nextScalarOffset }
-                    is TimelineSemanticWindowResult.Deferred -> state.text = "Content remains deferred: ${result.reason}"
+                    // A body that holds no text is an ordinary outcome, not an internal reason code.
+                    is TimelineSemanticWindowResult.Deferred -> state.text =
+                        if (result.reason == TimelineSemanticWindowResult.Reason.MissingField) {
+                            "This record stores no text to show."
+                        } else {
+                            "Content remains deferred: ${result.reason}"
+                        }
                 }
             } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
             catch (failure: Exception) { state.text = failure.message ?: "Window unavailable; retry" }

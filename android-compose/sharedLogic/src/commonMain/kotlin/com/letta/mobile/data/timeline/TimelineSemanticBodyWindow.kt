@@ -131,6 +131,15 @@ object TimelineSemanticBodyWindow {
     /** What a scanned string leaves behind. */
     private enum class Capture { Nothing, Name, Window }
 
+    /**
+     * Where the walk is: how deep, and whether every segment above this point matched. The two
+     * always travel together, because neither means anything without the other.
+     */
+    private data class Cursor(val depth: Int, val onPath: Boolean) {
+        /** The container's members are one step deeper, and on the path only if this one is. */
+        fun into(matched: Boolean) = Cursor(depth + 1, matched)
+    }
+
     /** One member of a container as the walk sees it, so the path check takes a value, not a tuple. */
     private sealed interface Member {
         data class Named(val key: String, val first: Boolean) : Member
@@ -195,7 +204,7 @@ object TimelineSemanticBodyWindow {
         suspend fun parse(): TimelineSemanticWindowResult {
             space()
             if (peek() != 123) invalid()
-            value(0, onPath = true)
+            value(Cursor(depth = 0, onPath = true))
             space()
             if (peek() != -1) invalid()
             // The ledger stores the enum name (ASSISTANT, TOOL_CALL); the wire uses the lower-case
@@ -217,14 +226,14 @@ object TimelineSemanticBodyWindow {
          * the ones segment [depth] applies to. Only one branch of the body can ever be on the path,
          * so nothing about the walk is retained once it leaves.
          */
-        suspend fun value(depth: Int, onPath: Boolean = false, selected: Boolean = false) {
-            if (depth > 32) structural()
+        suspend fun value(at: Cursor, selected: Boolean = false) {
+            if (at.depth > 32) structural()
             space()
             if (selected && peek() != QUOTE && peek() != LITERAL_N) invalid()
             when (peek()) {
                 QUOTE -> string(if (selected) Capture.Window else Capture.Nothing)
-                OBJECT_OPEN -> obj(depth, onPath)
-                ARRAY_OPEN -> array(depth, onPath)
+                OBJECT_OPEN -> obj(at)
+                ARRAY_OPEN -> array(at)
                 else -> {
                     val token = StringBuilder()
                     while (peek() != -1 && peek() !in listOf(32, 9, 10, 13, 44, 93, 125)) {
@@ -243,8 +252,8 @@ object TimelineSemanticBodyWindow {
          * True when this member is the one segment [depth] names. Descending into it keeps the
          * walk on the path; everything else is read and discarded.
          */
-        private fun onSegment(depth: Int, onPath: Boolean, member: Member): Boolean =
-            when (val step = if (onPath) path.getOrNull(depth) else null) {
+        private fun onSegment(at: Cursor, member: Member): Boolean =
+            when (val step = if (at.onPath) path.getOrNull(at.depth) else null) {
                 is TimelineSemanticSegment.Key -> member is Member.Named && member.key == step.name
                 // The first member wins outright; later ones are walked and discarded, so a second
                 // entry is not a malformed body.
@@ -260,7 +269,7 @@ object TimelineSemanticBodyWindow {
             found = true
         }
 
-        suspend fun obj(depth: Int, onPath: Boolean) {
+        suspend fun obj(at: Cursor) {
             take(); space()
             if (peek() == OBJECT_CLOSE) { take(); return }
             var first = true
@@ -268,14 +277,14 @@ object TimelineSemanticBodyWindow {
                 space()
                 val key = string(Capture.Name)
                 space(); expect(COLON)
-                val match = onSegment(depth, onPath, Member.Named(key.orEmpty(), first))
-                val chosen = match && depth + 1 == path.size
+                val match = onSegment(at, Member.Named(key.orEmpty(), first))
+                val chosen = match && at.depth + 1 == path.size
                 if (chosen) select()
-                if (depth == 0 && key == "messageType") {
+                if (at.depth == 0 && key == "messageType") {
                     if (messageType != null) invalid()
                     space()
                     messageType = string(Capture.Name)
-                } else value(depth + 1, match, chosen)
+                } else value(at.into(match), chosen)
                 first = false
                 space()
                 if (peek() == OBJECT_CLOSE) { take(); break }
@@ -283,16 +292,16 @@ object TimelineSemanticBodyWindow {
             }
         }
 
-        suspend fun array(depth: Int, onPath: Boolean) {
+        suspend fun array(at: Cursor) {
             take(); space()
             if (peek() == ARRAY_CLOSE) { take(); return }
-            var at = 0
+            var ordinal = 0
             while (true) {
-                val match = onSegment(depth, onPath, Member.At(at))
-                val chosen = match && depth + 1 == path.size
+                val match = onSegment(at, Member.At(ordinal))
+                val chosen = match && at.depth + 1 == path.size
                 if (chosen) select()
-                value(depth + 1, match, chosen)
-                at++
+                value(at.into(match), chosen)
+                ordinal++
                 space()
                 if (peek() == ARRAY_CLOSE) { take(); break }
                 expect(COMMA)
@@ -357,15 +366,29 @@ object TimelineSemanticBodyWindow {
                     if (key!!.length + (if (code < 65536) 1 else 2) > 128) structural()
                     append(key, code)
                 }
-                if (capture == Capture.Window && scalars++ >= start && !full) {
-                    val bytes = when { code < 128 -> 1; code < 2048 -> 2; code < 65536 -> 3; else -> 4 }
-                    if (outputBytes + bytes > budget.maxOutputBytes) full = true
-                    else { append(output, code); outputBytes += bytes; emitted++ }
-                }
+                if (capture == Capture.Window) window(code)
             }
             take()
             return key?.toString()
         }
+        /**
+         * Offers one scalar to the output window. Scalars before the requested offset are counted
+         * and dropped, and the first one that would overrun the budget closes the window, which is
+         * what makes the next page start exactly where this one stopped.
+         */
+        fun window(code: Int) {
+            if (scalars++ < start) return
+            if (full) return
+            val bytes = when { code < 128 -> 1; code < 2048 -> 2; code < 65536 -> 3; else -> 4 }
+            if (outputBytes + bytes > budget.maxOutputBytes) {
+                full = true
+                return
+            }
+            append(output, code)
+            outputBytes += bytes
+            emitted++
+        }
+
         fun append(target: StringBuilder, code: Int) {
             if (code < 65536) target.append(code.toChar())
             else { target.append((0xD800 + ((code - 65536) shr 10)).toChar()); target.append((0xDC00 + ((code - 65536) and 1023)).toChar()) }
