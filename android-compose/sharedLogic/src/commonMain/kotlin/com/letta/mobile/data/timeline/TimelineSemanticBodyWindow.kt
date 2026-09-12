@@ -53,7 +53,7 @@ object TimelineSemanticBodyWindow {
         readChunk: suspend (Long, Int) -> TimelineBodyChunk,
     ): TimelineSemanticWindowResult {
         require(scalarOffset >= 0)
-        if (reference.contentType != "application/vnd.letta.timeline-event+json;version=1") {
+        if (reference.contentType != TIMELINE_EVENT_CONTENT_TYPE) {
             return TimelineSemanticWindowResult.Deferred(TimelineSemanticWindowResult.Reason.UnsupportedType)
         }
         if (reference.pointer.encodedBytes > budget.maxInputBytes) {

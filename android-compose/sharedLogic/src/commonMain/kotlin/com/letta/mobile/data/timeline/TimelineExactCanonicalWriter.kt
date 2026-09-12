@@ -98,7 +98,7 @@ class TimelineExactCanonicalWriter(
         val bytes = TimelineSnapshotCodec.json.encodeToString(StoredTimelineEvent.serializer(), canonical.toStoredTimelineEvent()).encodeToByteArray()
         if (historicalBytes != null && bytes.contentEquals(historicalBytes)) return indexed
         if (canonical.otid.isNotBlank()) transaction.putEvidence("identity/otid/${canonical.otid}", identity.value.encodeToByteArray())
-        transaction.put(TimelineStoredRecord(key, "application/vnd.letta.timeline-event+json;version=1", bytes))
+        transaction.put(TimelineStoredRecord(key, TIMELINE_EVENT_CONTENT_TYPE, bytes))
         if (merged.messageType == TimelineMessageType.ASSISTANT) {
             val evidence = TerminalOwnershipEvidence.checkpoint(scope, canonical)
             transaction.putEvidence(ownerKey, TimelineSnapshotCodec.json.encodeToString(TerminalOwnershipEvidence.serializer(), evidence).encodeToByteArray())
