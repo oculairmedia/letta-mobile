@@ -238,7 +238,7 @@ private fun PagedChatMessageListContent(
             chatBackground = appearance.chatBackground,
             surfaceColor = MaterialTheme.colorScheme.background,
         )
-        val topFadeLength = chatMessageListTopFadeLength(appearance.topPadding)
+        val topFadeLength = appearance.topPadding + ChatFadeEdgeLength
         val bottomFadeLength = chatMessageListBottomFadeLength(appearance.bottomPadding)
         val newestRole = when (val newest = live.firstOrNull() ?: pages.itemSnapshotList.items.firstOrNull()) {
             is ChatRenderItem.Single -> newest.message.role
@@ -252,18 +252,19 @@ private fun PagedChatMessageListContent(
             listState = listState,
             targetColor = fadeTargetColor,
             scrimColor = fadeScrimColor,
-            topPadding = appearance.topPadding,
+            topPadding = 0.dp,
             topFadeLength = topFadeLength,
             bottomFadeLength = bottomFadeLength,
             suppressBottom = suppressBottomFade,
+            // Keep the viewport behind the header; only resting content needs its inset.
             modifier = Modifier.fillMaxSize(),
         ) {
             LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(top = appearance.topPadding),
+                modifier = Modifier.fillMaxSize(),
                 state = listState,
                 reverseLayout = true,
                 contentPadding = PaddingValues(start = dimens.contentPaddingHorizontal, end = dimens.contentPaddingHorizontal,
-                    top = 0.dp, bottom = appearance.bottomPadding),
+                    top = appearance.topPadding, bottom = appearance.bottomPadding),
             ) {
                 items(live.size, key = { live[it].key }) { index ->
                     Column {
