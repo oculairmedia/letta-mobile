@@ -61,8 +61,8 @@ internal suspend fun createCanonicalChatPagingPresentation(
         deferredReader = { item ->
             val row = synchronized(rows) { rows[item] }
             if (row?.deferred == null) null else {
-                val read: suspend (Long) -> com.letta.mobile.data.timeline.TimelineSemanticWindowResult = { offset ->
-                    canonical.readTextWindow(row, com.letta.mobile.data.timeline.TimelineSemanticField.Content, offset, decodeDispatcher)
+                val read: DeferredBodyRead = { field, offset ->
+                    canonical.readTextWindow(row, field, offset, decodeDispatcher)
                 }
                 read
             }
