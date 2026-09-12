@@ -190,7 +190,19 @@ dependencies {
     implementation(libs.nucleus.energy.manager)
     implementation(libs.nucleus.media.control)
     implementation(libs.nucleus.linux.hidpi)
-    implementation(libs.nucleus.composenativetray.jvm)
+    // The tray drags in Nucleus's Tao window backend, which registers a
+    // MainDispatcherFactory at load priority 100 and so wins Dispatchers.Main
+    // over kotlinx-coroutines-swing for the WHOLE process. Its dispatcher only
+    // queues: it drains when the native Tao event loop pumps, and this app runs
+    // NucleusBackend.Awt, so that loop never exists and every task dispatched to
+    // Dispatchers.Main is lost forever. paging-compose hardcodes Dispatchers.Main
+    // as its presenter dispatcher on desktop, which is why the canonical
+    // transcript sat on a spinner with rows already loaded (letta-mobile-x13xi).
+    // We never call Tao — the backend below is AWT + JNI — so keep it off the
+    // classpath entirely rather than leaving a dead Main dispatcher installed.
+    implementation(libs.nucleus.composenativetray.jvm) {
+        exclude(group = "dev.nucleusframework", module = "nucleus.decorated-window-tao")
+    }
     // Letta Desktop embeds JCEF and uses Swing/AWT integration, so Nucleus must
     // use its portable JNI-backed AWT window backend rather than Tao.
     //
