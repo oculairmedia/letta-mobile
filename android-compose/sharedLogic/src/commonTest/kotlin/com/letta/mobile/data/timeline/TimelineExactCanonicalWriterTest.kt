@@ -640,6 +640,84 @@ class TimelineExactCanonicalWriterTest {
         assertEquals(null, engine.live.value)
     }
 
+    @Test fun aTruncatedStreamStillAdoptsWhenBothSidesCarryTheSegmentOtid() = runTest {
+        // The duplicate seen on device 2026-09-11: the stream stopped one character short of the
+        // stored reply, so a content join found nothing and BOTH rows rendered. The App Server
+        // mints a stable otid per streamed segment and now persists it, so the two sides share an
+        // identifier and the missing tail stops mattering.
+        val segmentOtid = "provider-assistant-0-23a84950"
+        val streamedId = "cm-stream-$segmentOtid"
+        val committedId = "ui-msg-9155077"
+        val engine = CanonicalTimelineEngine(Store(), TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
+        val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
+        val fence = engine.beginLive(selection)
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(AssistantMessage(
+            id = streamedId, otid = segmentOtid,
+            contentRaw = kotlinx.serialization.json.JsonPrimitive("What color did you want it to be"),
+            date = "2026-01-01T00:00:00Z",
+        ))))
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
+        val settlement = kotlin.test.assertNotNull(engine.live.value?.settlementRevision)
+        val presented = mapOf(TimelineMessageId(committedId) to settlement)
+
+        // One character longer than the stream ever showed — the final "?" never arrived.
+        val committed = AssistantMessage(
+            id = committedId, otid = segmentOtid,
+            contentRaw = kotlinx.serialization.json.JsonPrimitive("What color did you want it to be?"),
+            date = "2026-01-01T00:00:00Z",
+        )
+        assertEquals(TimelineEnginePageOutcome.Applied, reconcile(engine, selection, record(committed)))
+
+        val live = kotlin.test.assertNotNull(engine.live.value)
+        assertEquals(mapOf(streamedId to TimelineMessageId(committedId)), live.aliases)
+        assertTrue(live.isSettled(presented), "the otid pairs them even though the texts differ")
+        assertEquals(emptyList(), live.overlayEvents(presented))
+    }
+
+    @Test fun twoRepliesReadingTheSameAdoptTheirOwnRows() = runTest {
+        // Identical text is not identity. With a segment otid each, the rows stay distinct rather
+        // than collapsing onto one — the failure a pure content join is always one coincidence away
+        // from.
+        val engine = CanonicalTimelineEngine(Store(), TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
+        val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
+        val fence = engine.beginLive(selection)
+        val text = kotlinx.serialization.json.JsonPrimitive("Sure.")
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(AssistantMessage(
+            id = "cm-stream-provider-assistant-0-aaa", otid = "provider-assistant-0-aaa",
+            contentRaw = text, date = "2026-01-01T00:00:00Z",
+        ))))
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(AssistantMessage(
+            id = "cm-stream-provider-assistant-2-bbb", otid = "provider-assistant-2-bbb",
+            contentRaw = text, date = "2026-01-01T00:00:01Z",
+        ))))
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
+
+        assertEquals(
+            TimelineEnginePageOutcome.Applied,
+            reconcile(
+                engine, selection,
+                record(AssistantMessage(
+                    id = "ui-msg-1", otid = "provider-assistant-0-aaa",
+                    contentRaw = text, date = "2026-01-01T00:00:00Z",
+                )),
+                record(AssistantMessage(
+                    id = "ui-msg-2", otid = "provider-assistant-2-bbb",
+                    contentRaw = text, date = "2026-01-01T00:00:01Z",
+                )),
+            ),
+        )
+
+        val live = kotlin.test.assertNotNull(engine.live.value)
+        assertEquals(
+            mapOf(
+                "cm-stream-provider-assistant-0-aaa" to TimelineMessageId("ui-msg-1"),
+                "cm-stream-provider-assistant-2-bbb" to TimelineMessageId("ui-msg-2"),
+            ),
+            live.aliases,
+            "each reply adopts the row that carries its own otid",
+        )
+    }
+
     @Test fun streamedAssistantIdIsAliasedToItsCanonicalIdentityWhateverItsShape() = runTest {
         val store = Store()
         // The turn already has a canonical identity, recorded against the otid the stream carries.
