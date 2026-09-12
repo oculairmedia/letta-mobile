@@ -97,12 +97,18 @@ class DesktopCanonicalTimelineRuntimeTest {
         }
     }
 
+    /** A second close must not retire a writer twice, nor resurrect the map it already cleared. */
     @Test fun closeIsIdempotent() = runTest {
         val coordinator = CanonicalTimelineCoordinator(EmptyTimelineStore(), NoTimelineTransport)
         val runtime = DesktopCanonicalTimelineRuntime(coordinator, "backend")
+        val scope = TimelineScope("backend", "conversation", "agent")
         runtime.open("agent", "conversation", backgroundScope).close()
+
         runtime.close()
+        assertNull(coordinator.current(scope))
         runtime.close()
+        assertNull(coordinator.current(scope))
+        assertFailsWith<IllegalStateException> { runtime.open("agent", "conversation", backgroundScope) }
     }
 
     /**
