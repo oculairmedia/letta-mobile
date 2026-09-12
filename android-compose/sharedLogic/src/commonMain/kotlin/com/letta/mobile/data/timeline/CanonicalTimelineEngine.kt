@@ -202,7 +202,18 @@ class CanonicalTimelineEngine(
      * settling turn, which is the narrowest join available - never across turns, and never on a
      * turn that is still streaming.
      */
-    private fun adoptCommittedIdentities(committed: List<Pair<TimelineEvent.Confirmed, TimelineMessageId>>) {
+    /**
+     * A row this page committed, and whether the page is what put it there. Position may pair only
+     * against rows the page appended: a reconcile page is a window of recent history, not a turn,
+     * so a row that was already resident would shift the count and pair the wrong two together.
+     */
+    private data class CommittedRow(
+        val event: TimelineEvent.Confirmed,
+        val identity: TimelineMessageId,
+        val isNew: Boolean,
+    )
+
+    private fun adoptCommittedIdentities(committed: List<CommittedRow>) {
         val live = mutableLive.value ?: return
         if (live.settlementRevision == null) return
         val adopted = live.adoptionsFrom(committed)
@@ -211,11 +222,49 @@ class CanonicalTimelineEngine(
     }
 
     private fun TimelineLivePublication.adoptionsFrom(
-        committed: List<Pair<TimelineEvent.Confirmed, TimelineMessageId>>,
+        committed: List<CommittedRow>,
     ): Map<String, TimelineMessageId> {
-        val unclaimed = committed.filterTo(mutableListOf()) { it.first.adoptionKey() != null }
+        val unclaimed = committed.filterTo(mutableListOf()) { it.event.adoptionKey() != null }
         if (unclaimed.isEmpty()) return emptyMap()
-        return block.events.mapNotNull { it.claimAdoption(unclaimed, aliases) }.toMap()
+        val adopted = linkedMapOf<String, TimelineMessageId>()
+        val unpaired = mutableListOf<TimelineEvent.Confirmed>()
+        for (event in block.events) {
+            when (val claim = event.claimAdoption(unclaimed, aliases)) {
+                is Adoption.Alias -> adopted[claim.streamedId] = claim.identity
+                Adoption.AlreadyNamed -> Unit
+                null -> if (event.messageType == TimelineMessageType.ASSISTANT) unpaired += event
+            }
+        }
+        return adopted + positionalAdoptions(unpaired, unclaimed, adopted)
+    }
+
+    /**
+     * The last honest join: what is left, in the order it happened.
+     *
+     * Both sides describe the same turn in the same order — the k-th streamed reply is the k-th
+     * reply that turn committed — so when the two share no id and their text does not match,
+     * position still pairs them. That is the case content cannot survive: a dropped tail delta
+     * leaves the streamed row short of the stored one, the texts stop matching, and both render.
+     * Measured on device 2026-09-11 at 368 characters against a stored 369.
+     *
+     * Deliberately narrow. Assistant rows only, rows this page appended only, inside one settling
+     * turn, and only after every id and text match has been taken. Pairing stops at the shorter of
+     * the two lists, so an unequal count leaves the remainder unadopted instead of guessing.
+     */
+    private fun positionalAdoptions(
+        unpaired: List<TimelineEvent.Confirmed>,
+        unclaimed: List<CommittedRow>,
+        alreadyAdopted: Map<String, TimelineMessageId>,
+    ): Map<String, TimelineMessageId> {
+        if (unpaired.isEmpty()) return emptyMap()
+        val taken = alreadyAdopted.values.toSet()
+        val candidates = unclaimed.filter {
+            it.isNew && it.event.messageType == TimelineMessageType.ASSISTANT && it.identity !in taken
+        }
+        if (candidates.isEmpty()) return emptyMap()
+        return unpaired.zip(candidates)
+            .filter { (event, row) -> row.identity.value != event.serverId }
+            .associate { (event, row) -> event.serverId to row.identity }
     }
 
     /**
@@ -239,17 +288,24 @@ class CanonicalTimelineEngine(
      * overlay under several names - a stream emits a synthetic return before the real one - and
      * every one of them is the same message as the single committed row, so all of them adopt it.
      */
+    /** Paired under a new name, paired under the name it already has, or not paired at all. */
+    private sealed interface Adoption {
+        data class Alias(val streamedId: String, val identity: TimelineMessageId) : Adoption
+        data object AlreadyNamed : Adoption
+    }
+
     private fun TimelineEvent.Confirmed.claimAdoption(
-        unclaimed: MutableList<Pair<TimelineEvent.Confirmed, TimelineMessageId>>,
+        unclaimed: MutableList<CommittedRow>,
         aliases: Map<String, TimelineMessageId>,
-    ): Pair<String, TimelineMessageId>? {
-        if (serverId in aliases) return null
+    ): Adoption? {
+        if (serverId in aliases) return Adoption.AlreadyNamed
         val key = adoptionKey() ?: return null
         val match = unclaimed.firstOrNull {
-            it.first.messageType == messageType && it.first.adoptionKey() == key
+            it.event.messageType == messageType && it.event.adoptionKey() == key
         } ?: return null
         if (messageType == TimelineMessageType.ASSISTANT) unclaimed.remove(match)
-        return if (match.second.value == serverId) null else serverId to match.second
+        return if (match.identity.value == serverId) Adoption.AlreadyNamed
+        else Adoption.Alias(serverId, match.identity)
     }
 
     /**
@@ -380,7 +436,7 @@ class CanonicalTimelineEngine(
             return@withLock TimelineEngineReconcileResult(TimelineEnginePageOutcome.NoProgress)
         }
         validate(page)
-        val committed = mutableListOf<Pair<TimelineEvent.Confirmed, TimelineMessageId>>()
+        val committed = mutableListOf<CommittedRow>()
         val (revision, appended) = store.transaction(request.selection.scope) {
             var changed = false
             var appended = 0
@@ -396,7 +452,7 @@ class CanonicalTimelineEngine(
                 // After the merge: a tool call's stored key is its group owner, which the tool
                 // index only knows once this record has been written.
                 if (writer is TimelineExactCanonicalWriter && event != null) {
-                    committed += event to writer.canonicalEventIdentity(this, event)
+                    committed += CommittedRow(event, writer.canonicalEventIdentity(this, event), isNew = !existed)
                 }
             }
             currentCoroutineContext().ensureActive()
