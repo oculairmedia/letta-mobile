@@ -128,6 +128,9 @@ object TimelineSemanticBodyWindow {
         // Storage/stale-reference failures and CancellationException deliberately propagate.
     }
 
+    /** What a scanned string leaves behind. */
+    private enum class Capture { Nothing, Name, Window }
+
     /** One member of a container as the walk sees it, so the path check takes a value, not a tuple. */
     private sealed interface Member {
         data class Named(val key: String, val first: Boolean) : Member
@@ -219,7 +222,7 @@ object TimelineSemanticBodyWindow {
             space()
             if (selected && peek() != QUOTE && peek() != LITERAL_N) invalid()
             when (peek()) {
-                QUOTE -> string(if (selected) 2 else 0)
+                QUOTE -> string(if (selected) Capture.Window else Capture.Nothing)
                 OBJECT_OPEN -> obj(depth, onPath)
                 ARRAY_OPEN -> array(depth, onPath)
                 else -> {
@@ -263,7 +266,7 @@ object TimelineSemanticBodyWindow {
             var first = true
             while (true) {
                 space()
-                val key = string(1)
+                val key = string(Capture.Name)
                 space(); expect(COLON)
                 val match = onSegment(depth, onPath, Member.Named(key.orEmpty(), first))
                 val chosen = match && depth + 1 == path.size
@@ -271,7 +274,7 @@ object TimelineSemanticBodyWindow {
                 if (depth == 0 && key == "messageType") {
                     if (messageType != null) invalid()
                     space()
-                    messageType = string(1)
+                    messageType = string(Capture.Name)
                 } else value(depth + 1, match, chosen)
                 first = false
                 space()
@@ -340,21 +343,24 @@ object TimelineSemanticBodyWindow {
             return result
         }
 
-        suspend fun string(mode: Int): String? {
-            expect(34)
-            val key = if (mode == 1) StringBuilder() else null
-            while (peek() != 34) {
+        /**
+         * Scans one JSON string. [capture] decides what survives it: a member name is returned,
+         * the selected value goes to the output window, and everything else is walked and dropped
+         * so the body can be larger than memory.
+         */
+        suspend fun string(capture: Capture): String? {
+            expect(QUOTE)
+            val key = if (capture == Capture.Name) StringBuilder() else null
+            while (peek() != QUOTE) {
                 val code = scalar()
-                if (mode == 1) {
+                if (capture == Capture.Name) {
                     if (key!!.length + (if (code < 65536) 1 else 2) > 128) structural()
                     append(key, code)
                 }
-                if (mode == 2) {
-                    if (scalars++ >= start && !full) {
-                        val bytes = when { code < 128 -> 1; code < 2048 -> 2; code < 65536 -> 3; else -> 4 }
-                        if (outputBytes + bytes > budget.maxOutputBytes) full = true
-                        else { append(output, code); outputBytes += bytes; emitted++ }
-                    }
+                if (capture == Capture.Window && scalars++ >= start && !full) {
+                    val bytes = when { code < 128 -> 1; code < 2048 -> 2; code < 65536 -> 3; else -> 4 }
+                    if (outputBytes + bytes > budget.maxOutputBytes) full = true
+                    else { append(output, code); outputBytes += bytes; emitted++ }
                 }
             }
             take()
