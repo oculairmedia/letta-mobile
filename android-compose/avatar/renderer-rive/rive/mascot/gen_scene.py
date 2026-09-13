@@ -148,6 +148,23 @@ SINE = "0.37 0 0.63 1"
 LINEAR = "0 0 1 1"
 # SPEC section 9 (Material 3 motion tokens)
 EMPH_ACCEL = "0.3 0 0.8 0.15"
+# Mass. A cubic with y outside 0..1 pulls back before it goes (BACK_IN) or overshoots and
+# settles (BACK_OUT); Elastic is a real damped spring on the landing.
+BACK_IN = "0.36 0 0.66 -0.56"
+BACK_OUT = "0.34 1.56 0.64 1"
+BACK_IN_OUT = "0.68 -0.6 0.32 1.6"
+
+
+class Elastic(str):
+    """Marker: `Elastic(amplitude, period)` as a key's outgoing interpolation (spring on arrival)."""
+    def __new__(cls, amplitude=1.0, period=0.4, easing="easeOut"):
+        o = str.__new__(cls, f"elastic {amplitude} {period} {easing}")
+        o.amplitude, o.period, o.easing = amplitude, period, easing
+        return o
+
+
+ELASTIC_OUT = Elastic(1.0, 0.45)     # a whip settles with two visible bounces
+ELASTIC_SOFT = Elastic(0.6, 0.6)     # a glance settles with one
 EMPH_DECEL = "0.05 0.7 0.1 1"
 M3_STANDARD = "0.2 0 0 1"
 STD_DECEL = "0 0 0 1"
@@ -173,6 +190,9 @@ def kf(value, frame, bezier=None):
         return f'<KeyFrameId value="{value}" frame="{frame}"/>'
     if isinstance(value, str):  # colour
         return f'<KeyFrameColor value="{value}" frame="{frame}"/>'
+    if isinstance(bezier, Elastic):
+        return (f'<KeyFrameDouble value="{value}" frame="{frame}" interpolationType="elastic">'
+                f'<ElasticInterpolator easingValue="{bezier.easing}" amplitude="{bezier.amplitude}" period="{bezier.period}"/></KeyFrameDouble>')
     if bezier:
         return f'<KeyFrameDouble value="{value}" frame="{frame}" interpolationType="cubic">{interp(bezier)}</KeyFrameDouble>'
     return f'<KeyFrameDouble value="{value}" frame="{frame}"/>'
@@ -558,9 +578,9 @@ def turn_animations():
 def spin_keys(start, dur, trails=True):
     """A whip-around: facing 0 -> +1 -> -1 -> 0 over `dur` frames from `start`, trails lagging."""
     a, b, c, d = start, start + round(dur * 0.25), start + round(dur * 0.62), start + dur
-    x = [(a, 0, ACCEL), (b, 1, STANDARD), (c, -1, SOFT_OUT), (d, 0)]
+    x = [(a, 0, BACK_IN), (b, 1, STANDARD), (c, -1, ELASTIC_OUT), (d, 0)]
     keys = {JOYSTICK: {JX: x},
-            BODY_NODE: {ROT: [(a, 0, ACCEL), (b, rad(14), STANDARD), (c, rad(-14), SOFT_OUT), (d, 0)]}}
+            BODY_NODE: {ROT: [(a, 0, BACK_IN), (b, rad(14), STANDARD), (c, rad(-14), ELASTIC_OUT), (d, 0)]}}
     if trails:
         def lagged(lag, scale):
             # the facing curve, delayed `lag` frames and mapped through `scale`, keeping each key's bezier
@@ -576,10 +596,10 @@ def spin_keys(start, dur, trails=True):
 
 def wander_animations():
     glance = animation("WanderGlance", WANDER_GLANCE, frames(1600), {JOYSTICK: {
-        JX: [(0, 0, SOFT_OUT), (frames(400), -0.8, None), (frames(900), -0.8, SOFT_OUT), (frames(1300), 0.4, SOFT_OUT), (frames(1600), 0)]}})
+        JX: [(0, 0, BACK_IN_OUT), (frames(450), -0.8, None), (frames(900), -0.8, BACK_IN_OUT), (frames(1250), 0.4, ELASTIC_SOFT), (frames(1600), 0)]}})
     peek = animation("WanderPeek", WANDER_PEEK, frames(1400), {JOYSTICK: {
-        JY: [(0, 0, SOFT_OUT), (frames(350), 0.7, None), (frames(900), 0.7, SOFT_OUT), (frames(1400), 0)],
-        JX: [(0, 0, SOFT_OUT), (frames(350), 0.3, None), (frames(900), 0.3, SOFT_OUT), (frames(1400), 0)]}})
+        JY: [(0, 0, BACK_IN_OUT), (frames(400), 0.7, None), (frames(900), 0.7, ELASTIC_SOFT), (frames(1400), 0)],
+        JX: [(0, 0, BACK_IN_OUT), (frames(400), 0.3, None), (frames(900), 0.3, ELASTIC_SOFT), (frames(1400), 0)]}})
     spin = animation("WanderSpin", WANDER_SPIN, frames(700), spin_keys(0, frames(700)))
     # Asleep: one slow, small shift every ~30 s, nothing else.
     sleep_shift = animation("WanderSleepShift", WANDER_SLEEP_SHIFT, frames(3000), {JOYSTICK: {
@@ -595,7 +615,7 @@ def sine(amplitude, period_ms, base=0.0):
     return [(0, base, SINE), (q, base + amplitude, SINE), (2 * q, base, SINE), (3 * q, base - amplitude, SINE), (4 * q, base)]
 
 
-BREATH_MS, BREATH_PX, BREATH_SCALE = 4600, 11, 1.06
+BREATH_MS, BREATH_PX, BREATH_SCALE = 6500, 11, 1.06   # ~9 breaths a minute (SPEC 4600 felt hurried)
 INFLATE_NODE = "0:233"  # BodyPlacement: the breath's inflate lives here, away from the turn's body keys
 HALO_OPACITY, HALO_SLEEP, HALO_FAILED = 0.10, 0.06, 0
 
@@ -611,7 +631,7 @@ def breath_scale(period_ms=BREATH_MS, lo=1.0, hi=BREATH_SCALE):
 
 
 BREATHING = {"idle": (BREATH_MS, 1.0, BREATH_SCALE), "listening": (BREATH_MS, 1.0, BREATH_SCALE),
-             "speaking": (BREATH_MS, 1.0, BREATH_SCALE), "sleeping": (6800, 0.985, 1.045)}
+             "speaking": (BREATH_MS, 1.0, BREATH_SCALE), "sleeping": (9000, 0.985, 1.045)}
 
 # Lumen: the breath's light (a white radial fill on the body, gradient opacity 0 at rest).
 LUMEN, LUMEN_R, LUMEN_Y0, LUMEN_Y1, LUMEN_PEAK = "0:234", 150, 70, -70, 0.16
@@ -662,7 +682,7 @@ def sustained_animations():
         "waitingInput": ({"y": sine(19, 1200)}, 1200, 0, (0, -2), "00000000", None),
         "speaking": ({"y": breath()}, BREATH_MS, 0, (0, 0), "00000000", None),
         "error": ({"y": 24}, 0, 5, (0, 4), "14000000", None),
-        "sleeping": ({"y": breath(6800)}, 6800, 3, (0, 4), "38000000", None),   # slow, deep, same phase as the inflate
+        "sleeping": ({"y": breath(9000)}, 9000, 3, (0, 4), "38000000", None),   # slow, deep, same phase as the inflate
         "loading": ({}, 1400, 0, (0, 0), "10000000", [(0, 0.8, SINE), (frames(700), 1.0, SINE), (frames(1400), 0.8)]),
         "failed": ({}, 0, 0, (0, 0), "66808080", None),
         "degraded": ({}, 0, 4, (0, 0), "00000000", None),
@@ -713,15 +733,16 @@ def enter_animations():
         fx0, fy0 = F[frm]; fx1, fy1 = F[to]
         d, bez = enter_duration(frm, to)
         n = frames(d)
+        turn = BACK_OUT if abs(fx1 - fx0) + abs(fy1 - fy0) > 0.2 else bez   # a real turn lands with overshoot
         keys = {PLATE_EXPR: {NESTED_VALUE: [(0, EXPR[frm], None), (3, EXPR[to])]},
-                JOYSTICK: {JX: [(0, fx0, bez), (n, fx1)], JY: [(0, fy0, bez), (n, fy1)]}}
+                JOYSTICK: {JX: [(0, fx0, turn), (n, fx1)], JY: [(0, fy0, turn), (n, fy1)]}}
         if (frm, to) == ("idle", "listening"):
             # SPEC 9.4: 50 ms anticipation down (+3, +1 deg), lean past to -16/-3 deg at 200 ms, settle -14/-2 deg.
             keys[FACE] = {Y: [(0, 0, EMPH_ACCEL), (frames(50), 3, EMPH_DECEL), (frames(200), -16, M3_STANDARD), (n, -14)],
                           ROT: [(0, 0, EMPH_ACCEL), (frames(50), rad(1), EMPH_DECEL), (frames(200), rad(-3), M3_STANDARD), (n, rad(-2))]}
         elif (frm, to) == ("listening", "thinking"):
             # hold the gaze 60 ms, then turn away and tilt.
-            keys[JOYSTICK] = {JX: [(0, fx0, None), (frames(60), fx0, STANDARD), (n, fx1)], JY: [(0, fy0, None), (frames(60), fy0, STANDARD), (n, fy1)]}
+            keys[JOYSTICK] = {JX: [(0, fx0, None), (frames(60), fx0, BACK_IN_OUT), (n, fx1)], JY: [(0, fy0, None), (frames(60), fy0, BACK_IN_OUT), (n, fy1)]}
             keys[FACE] = {Y: [(0, -14, STANDARD), (n, 0)], ROT: [(0, rad(-2), STANDARD), (n, rad(-6))]}
         elif (frm, to) == ("thinking", "speaking"):
             keys[FACE] = {ROT: [(0, rad(-6), SOFT_OUT), (frames(140), 0, None), (n, 0)]}
@@ -769,8 +790,8 @@ def momentary_animations():
 def idle_variety_animations():
     m, h, r = frames(250), frames(650), frames(300)
     glance = animation("IdleGlance", IDLE_GLANCE_ANIM, m + h + r, {
-        FACE: {ROT: [(0, 0, SOFT_OUT), (m, rad(2), None), (m + h, rad(2), SOFT_OUT), (m + h + r, 0)],
-               X: [(0, 0, SOFT_OUT), (m, 2, None), (m + h, 2, SOFT_OUT), (m + h + r, 0)]}})
+        FACE: {ROT: [(0, 0, BACK_IN_OUT), (m, rad(2), None), (m + h, rad(2), ELASTIC_SOFT), (m + h + r, 0)],
+               X: [(0, 0, BACK_IN_OUT), (m, 2, None), (m + h, 2, ELASTIC_SOFT), (m + h + r, 0)]}})
     return [animation("IdleWaitA", IDLE_WAIT_A, frames(4000), {}), animation("IdleWaitB", IDLE_WAIT_B, frames(7000), {}), glance]
 
 
