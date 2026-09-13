@@ -37,9 +37,19 @@ internal fun MeasuredChatRenderItem(
     signature: ChatRenderItemGeometrySignature,
     geometryState: ChatMessageGeometryState,
     applyCachedMinHeight: Boolean = true,
+    /**
+     * True while this row is drawn at a zoom the signature does not describe, which is every frame
+     * of a pinch. A cached height belongs to the size it was measured at, so neither reading nor
+     * writing one is meaningful here: reading pins the row at its pre-pinch height, and text
+     * shrinking inside a floor that does not is where the empty space under a zoomed-out message
+     * came from.
+     */
+    scaleIsTransient: Boolean = false,
     content: @Composable () -> Unit,
 ) {
-    val isPinching = LocalChatIsPinching.current
+    // The legacy list publishes the gesture through this local; the paged list does not, so the
+    // caller's own comparison of live against committed scale is what covers both.
+    val isPinching = LocalChatIsPinching.current || scaleIsTransient
     // letta-mobile-geom-cache-wireup: read the cached height for this
     // signature and seed the Box's measured height so Compose skips the
     // initial measure pass when the cache hits. The cache is filled by
@@ -72,7 +82,7 @@ internal fun MeasuredChatRenderItem(
     // Reasoning rows bypass the floor entirely because their content animates
     // its own size. Re-reading a mid-animation height would pin the row and
     // prevent a collapse from finishing.
-    val cachedHeightPx = if (applyCachedMinHeight && hasMeasuredOnce.value) {
+    val cachedHeightPx = if (applyCachedMinHeight && hasMeasuredOnce.value && !isPinching) {
         geometryState.heightFor(signature)
     } else {
         null

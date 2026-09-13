@@ -5,6 +5,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.ThemePreset
@@ -145,17 +146,17 @@ class SpecializedSubagentToolCardTest {
             }
         }
 
-        composeRule.onNodeWithText("Subagent completed").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Completed").assertIsDisplayed()
         composeRule.onNodeWithText("Finished research").assertIsDisplayed()
         // The status chip said "completed" beside a header reading "Subagent completed".
         composeRule.onAllNodesWithText("completed").assertCountEquals(0)
-        composeRule.onNodeWithText("Show full report").assertIsDisplayed().performClick()
+        composeRule.onNodeWithContentDescription("Show full report").assertIsDisplayed().performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithText("Hide full report").assertIsDisplayed()
         composeRule.onNodeWithText("View conversation").assertIsDisplayed()
     }
 
-    /** A status the header does not already say still earns its chip. */
+    /** Cancellation must not be presented as successful completion. */
     @Test
     fun anUnusualStatusKeepsItsChip() {
         setNotificationContent(
@@ -167,8 +168,9 @@ class SpecializedSubagentToolCardTest {
             """.trimIndent(),
         )
 
-        composeRule.onNodeWithText("Subagent completed").assertIsDisplayed()
-        composeRule.onNodeWithText("cancelled").assertIsDisplayed()
+        composeRule.onNodeWithText("Task cancelled").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Subagent completed").assertCountEquals(0)
+        composeRule.onNodeWithText("Stopped early").assertIsDisplayed()
     }
 
     /** A path on the build host is for whoever goes looking, not for every card at a glance. */
@@ -188,7 +190,7 @@ class SpecializedSubagentToolCardTest {
 
         composeRule.onAllNodesWithText("/tmp/letta-background-P2Xz9b/exec_16.log", substring = true)
             .assertCountEquals(0)
-        composeRule.onNodeWithText("Show full report").performClick()
+        composeRule.onNodeWithContentDescription("Show full report").performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithText("/tmp/letta-background-P2Xz9b/exec_16.log", substring = true)
             .assertIsDisplayed()
@@ -208,7 +210,7 @@ class SpecializedSubagentToolCardTest {
         )
 
         composeRule.onAllNodesWithText("Show full report").assertCountEquals(0)
-        composeRule.onNodeWithText("Show transcript").assertIsDisplayed().performClick()
+        composeRule.onNodeWithContentDescription("Show details").assertIsDisplayed().performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithText("/tmp/letta-background-P2Xz9b/exec_16.log", substring = true)
             .assertIsDisplayed()

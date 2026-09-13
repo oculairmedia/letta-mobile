@@ -101,6 +101,7 @@ autolinktext = "2.0.2"
 texty = "1.0.0-alpha"
 calendar = "2.10.1"
 jcefmaven = "146.0.10"
+rive = "11.12.0"
 jna = "5.17.0"
 skiko = "0.9.37.3"
 kotzilla = "2.3.3"
@@ -298,6 +299,7 @@ autolinktext = { module = "sh.calvin.autolinktext:autolinktext", version.ref = "
 texty = { module = "com.arjunjadeja:texty", version.ref = "texty" }
 calendar-compose-multiplatform = { module = "com.kizitonwose.calendar:compose-multiplatform", version.ref = "calendar" }
 jcefmaven = { module = "me.friwi:jcefmaven", version.ref = "jcefmaven" }
+rive-android = { module = "app.rive:rive-android", version.ref = "rive" }
 jna-platform = { module = "net.java.dev.jna:jna-platform", version.ref = "jna" }
 kotzilla-sdk-compose-jvm = { module = "io.kotzilla:kotzilla-sdk-compose-jvm", version.ref = "kotzilla" }
 compose-desktop-ui-test = { module = "org.jetbrains.compose.ui:ui-test", version.ref = "compose-desktop-ui-test" }
