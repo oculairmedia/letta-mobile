@@ -468,8 +468,8 @@ private fun ProjectedToolCommandBlock(
     SelectionContainer {
         Text(
             text = command,
-            style = MaterialTheme.chatTypography.codeBlock
-                .scaledBy(LocalChatFontScale.current),
+            // Already at the row's zoom; see TimelineZoomScope.
+            style = MaterialTheme.chatTypography.codeBlock,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             // Soft wrap rather than horizontal scroll: a nested horizontal scroller
             // inside the vertically scrolling chat list fights the parent for drags,

@@ -10,7 +10,7 @@ import com.letta.mobile.feature.chat.screen.chatRenderItemSeesLiveScale
 import com.letta.mobile.ui.components.DateSeparator
 import com.letta.mobile.ui.theme.ChatDimens
 import com.letta.mobile.ui.theme.ChatShapes
-import com.letta.mobile.ui.theme.LocalChatFontScale
+import com.letta.mobile.ui.theme.TimelineZoomScope
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -140,28 +140,29 @@ internal fun ChatMessageListRenderItem(params: ChatMessageListRenderItemParams) 
         itemIndex = params.index,
     )
     val perItemFontScale = if (itemSeesLiveScale) context.liveFontScale else context.activeFontScale
-    CompositionLocalProvider(
-        LocalChatFontScale provides perItemFontScale,
-        LocalToolCardBodyParentVisible provides itemSeesLiveScale,
-    ) {
-        // Reasoning, tool cards and run blocks animate their own size; a cached
-        // minimum can pin an intermediate expanded height while they collapse.
-        MeasuredChatRenderItem(
-            signature = geometrySignature,
-            geometryState = context.itemGeometryState,
-            applyCachedMinHeight = !renderItem.includesReasoningRow() &&
-                renderItem is ChatRenderItem.Single && renderItem.message.toolCalls.isNullOrEmpty(),
-        ) {
-            ChatMessageListRenderItemBody(
-                params = ChatMessageListRenderItemBodyParams(
-                    renderItem = renderItem,
-                    context = context,
-                    chatDimens = params.chatDimens,
-                    chatShapes = params.chatShapes,
-                    isStreamingRenderItem = isStreamingRenderItem,
-                    showTimestamp = params.index == 0,
-                ),
-            )
+    // The row's zoom scope owns both the scale and the styles built from it, so text inside a row
+    // tracks the gesture whether it reads chatTypography or scales a Material style itself.
+    TimelineZoomScope(perItemFontScale) {
+        CompositionLocalProvider(LocalToolCardBodyParentVisible provides itemSeesLiveScale) {
+            // Reasoning, tool cards and run blocks animate their own size; a cached
+            // minimum can pin an intermediate expanded height while they collapse.
+            MeasuredChatRenderItem(
+                signature = geometrySignature,
+                geometryState = context.itemGeometryState,
+                applyCachedMinHeight = !renderItem.includesReasoningRow() &&
+                    renderItem is ChatRenderItem.Single && renderItem.message.toolCalls.isNullOrEmpty(),
+            ) {
+                ChatMessageListRenderItemBody(
+                    params = ChatMessageListRenderItemBodyParams(
+                        renderItem = renderItem,
+                        context = context,
+                        chatDimens = params.chatDimens,
+                        chatShapes = params.chatShapes,
+                        isStreamingRenderItem = isStreamingRenderItem,
+                        showTimestamp = params.index == 0,
+                    ),
+                )
+            }
         }
     }
 }
