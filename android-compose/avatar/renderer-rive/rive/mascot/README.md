@@ -201,6 +201,37 @@ Should / deliberately not:
 - [ ] `reduceMotion` — needs a contract property and a host write; follow-up bead.
 - [x] `rive inspect . --json` is the structural check; `check_contract.py` reads it.
 
+## Gaze and attention: what the rig does, what the host does
+
+References, read and applied (numbers below come from them):
+- Pan et al., *Realistic and Interactive Robot Gaze*, Disney Research, IROS 2020 - attention with
+  curiosity + habituation (eq. 2: interest decays while attended, restores while not), eyes lead the
+  head, per-actuator bandwidth (eyes fast, head slow), mutual gaze as saccades between eyes and
+  nose every 0.1-0.5 s, a "read" show with the head sweeping the line.
+- Trutoiu, Carter, Matthews, Hodgins, *Modeling and Animating Eye Blinks*, Disney Research 2011 -
+  blinks are asymmetric (fast close, slow decelerating open), ~250-300 ms reads most natural.
+- Lee, Badler, Badler, *Eyes Alive*, SIGGRAPH 2002 - saccade direction statistics (down 20 %, up
+  18 %, left 17 %, right 16 %, diagonals 6-8 %), small magnitudes dominate, 50-100 ms minimum
+  inter-saccade interval, blinks accompany large gaze shifts.
+- Lasseter, *Principles of Traditional Animation Applied to 3D*, SIGGRAPH 1987 - anticipation,
+  overshoot, arcs, overlapping action, slow-in/slow-out.
+
+**Rig (always on, no host needed):** still resting fixation per state (`GAZE`); `Saccade` layer
+in the plate hops to a new fixation on random waits with the Eyes Alive direction weights, hold
+0.7-2.4 s, parked asleep; blink 4/1/10 frames with a fast close (`STD_DECEL`) and slow open
+(`EMPH_DECEL`), entries flip the glyph at frame 6 while shut, no auto-blink asleep; turns are arcs
+(`Arc` node lifts 7 px through the centre), roll and recede; anticipation/overshoot/elastic curves.
+
+**Host (the director's reference lives in the bench, `RiveDesktopSpike.kt`):**
+- every look has a nameable target: own thoughts, you, the cursor, the input (typing), the
+  timeline (reading); a per-state plan with weights, dwell and gap (`GAZE_PLAN`)
+- habituation: interest per target, -1/4 s while attended, +1/12 s otherwise; plan weights scale
+  with it; a cursor only grabs attention while its interest is above 0.3
+- eyes lead, head follows after ~350 ms on an under-damped spring (omega 11, zeta 0.5) through
+  `turnX`/`turnY`; a head turn > 0.4 fires `blink`; the body shifts 6 px and rolls 5 deg with it
+- looking at you: saccade between eyes and nose every 100-500 ms; reading: uneven left-to-right
+  steps, return sweep, three lines, the head sweeping slowly along the line; typing: ride the caret
+
 ## Host rules (for the identity slice, 1zti3)
 
 - Write `shape`, `color` and `state` **before the first `advance`/render**, or the first frame is

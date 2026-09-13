@@ -87,14 +87,19 @@ TUNABLES = {  # name: (vm id, timeline id, node id, property keys, (value at 0, 
 PLATE_SCALE_NODE, GLYPH_SCALE_NODE, MOUTH_NODE, SACCADE_NODE = "7:25", "7:26", "7:27", "7:28"
 # Saccade layer: random waits, then a 60 ms hop to one of a few small fixations, a hold, a hop back.
 SACCADE_WAITS = [("7:170", 1800), ("7:171", 3600), ("7:172", 5200)]          # (anim id, ms)
-SACCADE_FIX = [("7:173", (-5, -3)), ("7:174", (4, -2)), ("7:175", (-3, 4)), ("7:176", (6, 2)), ("7:177", (0, -5)), ("7:178", (-6, 1))]
+# (anim id, (dx, dy) px, weight %): Eyes Alive direction distribution - down 20, up 18, left 17,
+# right 16, diagonals 6-8 - with cardinal hops larger than diagonal ones (magnitudes skew small).
+SACCADE_FIX = [("7:173", (0, 5), 20), ("7:174", (0, -5), 18), ("7:175", (-6, 0), 17), ("7:176", (6, 0), 16),
+               ("7:177", (-3, -3), 7), ("7:178", (3, -3), 6), ("7:190", (-3, 3), 8), ("7:191", (3, 3), 8)]
 SACCADE_WAIT_NODES = ["7:180", "7:181", "7:182"]
-SACCADE_FIX_NODES = ["7:183", "7:184", "7:185", "7:186", "7:187", "7:188"]
+SACCADE_FIX_NODES = ["7:183", "7:184", "7:185", "7:186", "7:187", "7:188", "7:192", "7:193"]
 SACCADE_SLEEP_NODE = "7:189"
 VM_TUNE_SCALE, CONV_SCALE, ENTITY = "1:16", "2:3", "0:230"      # whole-entity scale, 0..1 -> 0.5..1.5
 # Host facing: two -1..1 numbers the host writes (the head turning toward what it looks at),
 # bound to a HostTurn node above the rig's own Turn so the two add. Body rolls with it too.
 VM_TURN_X, VM_TURN_Y, HOST_TURN = "1:17", "1:18", "0:235"
+ARC_NODE, TURN_ARC = "0:236", 7    # a turn is an arc, not a slide: the plate lifts TURN_ARC px through the centre
+CONV_BODY_X, HOST_BODY_PX = "2:8", 6   # the body shifts toward what the head turns to (commit motion)
 CONV_TURN_X, CONV_TURN_Y, CONV_TURN_ROT, CONV_BODY_ROT = "2:4", "2:5", "2:6", "2:7"
 HOST_TURN_PX, HOST_TURN_PY, HOST_TURN_DEG, HOST_BODY_DEG = 48, 18, 10, 5
 # Default gaze life: root-keyed remaps of two small plate ranges (+-6 / +-4 px on the glyph's
@@ -146,6 +151,8 @@ plate_expr_anim = {s: f"7:{100 + i}" for i, s in enumerate(STATES)}
 plate_expr_node = {s: f"7:{130 + i}" for i, s in enumerate(STATES)}
 PLATE_BLINK_NODE, PLATE_BLINK_REST_NODE = "7:160", "7:161"
 PLATE_AUTO_A, PLATE_AUTO_B, PLATE_AUTO_BLINK, PLATE_AUTO_SLEEP = "7:162", "7:163", "7:164", "7:165"
+BLINK_SHUT, BLINK_FRAMES = 4, 15   # frames to fully shut / total
+BLINK_FLIP = 6                     # entries flip the glyph here: the plate sees the trigger a frame or two late
 
 INK = "FF111111"
 PLATE_WHITE = "FFF7F7F7"
@@ -357,6 +364,7 @@ def body():
     bound = f'<SolidColor colorValue="FF79B7DF" name="Color">\n            {bind(VM_COLOR, COLOR)}\n        </SolidColor>'
     return f'''<Node x="0" y="0" name="BodyPlacement" id="{INFLATE_NODE}">
     {bind(VM_TURN_X, ROT, CONV_BODY_ROT)}
+    {bind(VM_TURN_X, X, CONV_BODY_X)}
 <Node x="0" y="0" name="Body" id="{BODY_NODE}">
     <!-- Paints on one shape; the LATER paint draws on top. -->
     <Shape name="BodyShape" id="{HITBOX}">
@@ -442,8 +450,10 @@ def plate_component():
         for key, idx in ((VX, 0), (VY, 1), (VIN_ROT, 2), (VIN_DIST, 3), (VOUT_ROT, 4), (VOUT_DIST, 5)):
             mouth_keys[vid][key] = [(f, s[idx], LINEAR) for f, s in zip((0, 30, 60), samples)]
     open_anim = animation("Open", PLATE_OPEN, 60, mouth_keys)
-    # Blink: close 55 ms, hold 25 ms, open 90 ms (3 / 2 / 5 frames), squash the glyph only.
-    blink = animation("Blink", PLATE_BLINK_ANIM, 10, {GLYPHS_NODE: {SY: [(0, 1, ACCEL), (3, 0, None), (5, 0, SPRING), (10, 1)]}})
+    # Blink (Trutoiu, Carter, Matthews, Hodgins - Disney Research 2011): human blinks are
+    # asymmetric - a fast close and a slow, decelerating open - and ~250-300 ms reads most
+    # natural. Close 4 frames (67 ms), hold 1, open 10 (167 ms). Squashes the glyph only.
+    blink = animation("Blink", PLATE_BLINK_ANIM, BLINK_FRAMES, {GLYPHS_NODE: {SY: [(0, 1, STD_DECEL), (BLINK_SHUT, 0, None), (BLINK_SHUT + 1, 0, EMPH_DECEL), (BLINK_FRAMES, 1)]}})
     wait_a = animation("WaitA", PLATE_WAIT_A, frames(2500), {})
     wait_b = animation("WaitB", PLATE_WAIT_B, frames(4500), {})
 
@@ -455,11 +465,11 @@ def plate_component():
                f'    <TransitionNumberCondition inputId="{PLATE_IN_EXPR}" opValue="lessThan" value="{EXPR["sleeping"] - 0.5}"/>\n</StateTransition>\n'
                f'<StateTransition stateToId="{SACCADE_WAIT_NODES[0]}" duration="0">\n'
                f'    <TransitionNumberCondition inputId="{PLATE_IN_EXPR}" opValue="greaterThanOrEqual" value="{EXPR["sleeping"] + 0.5}"/>\n</StateTransition>')
-    to_fix = "\n".join(weighted(exit_transition(n), 10) for n in SACCADE_FIX_NODES)
+    to_fix = "\n".join(weighted(exit_transition(n), w) for n, (_, _, w) in zip(SACCADE_FIX_NODES, SACCADE_FIX))
     to_wait = "\n".join(weighted(exit_transition(n), 10) for n in SACCADE_WAIT_NODES)
     sac_states = [anim_state(aid, nid, i, ' random="true"', asleep_s + "\n" + to_fix) for i, ((aid, _), nid) in enumerate(zip(SACCADE_WAITS, SACCADE_WAIT_NODES))]
-    sac_states += [anim_state(aid, nid, 3 + i, ' reset="true" random="true"', to_wait) for i, ((aid, _), nid) in enumerate(zip(SACCADE_FIX, SACCADE_FIX_NODES))]
-    sac_states.append(anim_state(SACCADE_WAITS[0][0], SACCADE_SLEEP_NODE, 9, "", awake_s))
+    sac_states += [anim_state(aid, nid, 3 + i, ' reset="true" random="true"', to_wait) for i, ((aid, _, _), nid) in enumerate(zip(SACCADE_FIX, SACCADE_FIX_NODES))]
+    sac_states.append(anim_state(SACCADE_WAITS[0][0], SACCADE_SLEEP_NODE, 12, "", awake_s))
     saccade_layer = layer_frame("Saccade", "7:13", SACCADE_WAIT_NODES[0], "", "\n".join(sac_states))
     trigger_layer = layer_frame(
         "Blink", "7:11", PLATE_BLINK_REST_NODE,
@@ -501,8 +511,8 @@ def plate_component():
     # Saccades: each fixation is one animation - hop out in 60 ms (overshoot), hold, hop back in 80 ms.
     for aid, ms in SACCADE_WAITS:
         tune_anims.append(animation(f"SaccadeWait{ms}", aid, frames(ms), {}))
-    for i, (aid, (dx, dy)) in enumerate(SACCADE_FIX):
-        hold = frames([900, 1600, 2400][i % 3])
+    for i, (aid, (dx, dy), _) in enumerate(SACCADE_FIX):
+        hold = frames([700, 1100, 1600, 2400][i % 4])
         tune_anims.append(animation(f"Saccade{i + 1}", aid, hold + 8, {SACCADE_NODE: {
             X: [(0, 0, BACK_OUT), (4, dx, None), (hold, dx, SOFT_OUT), (hold + 8, 0)],
             Y: [(0, 0, BACK_OUT), (4, dy, None), (hold, dy, SOFT_OUT), (hold + 8, 0)]}}))
@@ -580,6 +590,7 @@ def face():
     {bind(VM_TURN_X, ROT, CONV_TURN_ROT)}
     {bind(VM_TURN_Y, Y, CONV_TURN_Y)}
 <Node x="0" y="0" name="Turn" id="{TURN_NODE}">
+<Node x="0" y="0" name="Arc" id="{ARC_NODE}">
 <Node x="0" y="0" name="Face" id="{FACE}">
     <NestedArtboard artboardId="{PLATE_AB}" x="-100" y="-108" name="Plate" id="{PLATE}">
         <NestedStateMachine animationId="{PLATE_SM}" name="SM">
@@ -602,6 +613,7 @@ def face():
 </Node>
 </Node>
 </Node>
+</Node>
 {indent(trail("Trail1", TRAIL1), "")}
 {indent(trail("Trail2", TRAIL2), "")}
 </Node>'''
@@ -617,6 +629,7 @@ def turn_animations():
                     # foreshorten (SX) and recede (SY too): the feature moves away as it turns
                     SX: [(0, TURN_SQUASH * TURN_RECEDE, LINEAR), (30, 1, LINEAR), (60, TURN_SQUASH * TURN_RECEDE)],
                     SY: [(0, TURN_RECEDE, LINEAR), (30, 1, LINEAR), (60, TURN_RECEDE)]},
+        ARC_NODE: {Y: [(0, 0, SINE), (30, -TURN_ARC, SINE), (60, 0)]},
         BODY_NODE: {ROT: [(0, rad(-6), LINEAR), (60, rad(6))],
                     SX: [(0, 0.93, LINEAR), (30, 1, LINEAR), (60, 0.93)]}})
     ty = animation("TurnY", TURN_Y_ANIM, 60, {
@@ -788,7 +801,7 @@ def enter_animations():
         d, bez = enter_duration(frm, to)
         n = frames(d)
         turn = BACK_OUT if abs(fx1 - fx0) + abs(fy1 - fy0) > 0.2 else bez   # a real turn lands with overshoot
-        keys = {PLATE_EXPR: {NESTED_VALUE: [(0, EXPR[frm], None), (3, EXPR[to])]},
+        keys = {PLATE_EXPR: {NESTED_VALUE: [(0, EXPR[frm], None), (BLINK_FLIP, EXPR[to])]},
                 JOYSTICK: {JX: [(0, fx0, turn), (n, fx1)], JY: [(0, fy0, turn), (n, fy1)]}}
         if (frm, to) == ("idle", "listening"):
             # SPEC 9.4: 50 ms anticipation down (+3, +1 deg), lean past to -16/-3 deg at 200 ms, settle -14/-2 deg.
@@ -993,6 +1006,8 @@ def data():
                           clampLower="true" clampUpper="true" name="TurnToRoll" id="{CONV_TURN_ROT}"/>
 <DataConverterRangeMapper minInput="-1" maxInput="1" minOutput="{rad(-HOST_BODY_DEG)}" maxOutput="{rad(HOST_BODY_DEG)}"
                           clampLower="true" clampUpper="true" name="TurnToBodyRoll" id="{CONV_BODY_ROT}"/>
+<DataConverterRangeMapper minInput="-1" maxInput="1" minOutput="{-HOST_BODY_PX}" maxOutput="{HOST_BODY_PX}"
+                          clampLower="true" clampUpper="true" name="TurnToBodyX" id="{CONV_BODY_X}"/>
 
 <ViewModel defaultInstanceId="{VM_INSTANCE}" name="Avatar" id="{VM}">
     <ViewModelPropertyEnumCustom enumId="{ENUM_STATE}" name="state" id="{VM_STATE}"/>

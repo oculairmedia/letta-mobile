@@ -218,12 +218,17 @@ private fun MascotBench(file: File, modifier: Modifier) {
     var headTarget by remember { mutableStateOf(0f to 0f) }     // where the head is turning (host facing, -1..1)
     var headLead by remember { mutableFloatStateOf(350f) }      // ms the eyes lead the head by
     var scan by remember { mutableStateOf(0f to 0f) }           // reading / caret-tracking offset on top of the target
+    var headScan by remember { mutableFloatStateOf(0f) }        // the head's slow sweep along a line while reading
+    // Habituation (Disney Research, "Realistic and Interactive Robot Gaze", eq. 2): interest in a
+    // target decays while it is looked at and restores while it is not, so nothing holds the gaze
+    // forever and a cursor that keeps waving stops being interesting.
+    val interest = remember { mutableStateMapOf<GazeTarget, Float>().also { m -> GazeTarget.entries.forEach { m[it] = 1f } } }
 
     // Reading and typing are the two looks with structure of their own. Reading the timeline:
     // saccades left to right in small uneven steps, a return sweep, the next line. Watching the
     // input: the eyes ride the caret slowly rightward and jump back at a new line, with pauses.
     LaunchedEffect(target) {
-        scan = 0f to 0f
+        scan = 0f to 0f; headScan = 0f
         when (target) {
             GazeTarget.TIMELINE -> {
                 var line = 0
@@ -231,11 +236,23 @@ private fun MascotBench(file: File, modifier: Modifier) {
                     var x = -0.22f
                     while (x < 0.22f) {
                         scan = x to (line * 0.05f)
+                        headScan = x * 0.5f                 // the head sweeps slowly along the line (Disney's read show)
                         delay((180L..340L).random())
                         x += (0.05f + Math.random().toFloat() * 0.05f)
                     }
                     delay((120L..260L).random())          // end of line
                     line = (line + 1) % 3                  // return sweep, next line; back to top after three
+                }
+            }
+            GazeTarget.USER -> {
+                // Mutual gaze is not a stare: the eyes saccade between the other person's eyes and
+                // nose every 100-500 ms (Disney Research) - the thing that makes a look feel focused.
+                val triangle = listOf(-0.05f to -0.04f, 0.05f to -0.04f, 0f to 0.05f)
+                var i = 0
+                while (true) {
+                    scan = triangle[i]
+                    i = (i + 1 + (Math.random() * 2).toInt()) % 3
+                    delay((100L..500L).random())
                 }
             }
             GazeTarget.INPUT -> {
@@ -308,10 +325,12 @@ private fun MascotBench(file: File, modifier: Modifier) {
         target = when (gazeMode) { GazeMode.CURSOR -> GazeTarget.CURSOR; else -> GazeTarget.OWN }
         if (gazeMode != GazeMode.JUSTIFIED) return@LaunchedEffect
         val plan = GAZE_PLAN[current] ?: listOf(Look(GazeTarget.OWN, 1, 60_000L..60_000L))
-        val total = plan.sumOf { it.weight }
         while (true) {
-            var pick = (Math.random() * total).toInt()
-            val look = plan.first { pick -= it.weight; pick < 0 }
+            // Weights scaled by current interest (habituation), so a target it has just stared at
+            // is less likely to be picked again until interest has recovered.
+            val scored = plan.map { it to it.weight * (0.15f + 0.85f * (interest[it.target] ?: 1f)) }
+            var pick = Math.random().toFloat() * scored.sumOf { it.second.toDouble() }.toFloat()
+            val look = scored.first { pick -= it.second; pick < 0 }.first
             target = look.target
             delay(look.dwellMs.random())
             target = GazeTarget.OWN
@@ -333,8 +352,16 @@ private fun MascotBench(file: File, modifier: Modifier) {
             withFrameNanos { now ->
                 val dt = ((now - last) / 1e9f).coerceIn(0f, 0.1f); last = now
                 // A cursor moving within a mascot width in the last half second demands a look
-                // (unless asleep), the way a hand waved in front of a face does.
-                val near = current != AvatarState.SLEEPING && kotlin.math.hypot(cursorLook.first, cursorLook.second) < 1f / trackReach && now - lastCursorMove < 500_000_000L
+                // (unless asleep), the way a hand waved in front of a face does - until it has
+                // been waved enough to be boring (interest habituates while it holds the gaze).
+                val near = current != AvatarState.SLEEPING && (interest[GazeTarget.CURSOR] ?: 1f) > 0.3f &&
+                    kotlin.math.hypot(cursorLook.first, cursorLook.second) < 1f / trackReach && now - lastCursorMove < 500_000_000L
+                // Habituation: the attended target loses interest at 1/4 s, everything else recovers at 1/12 s.
+                val attended = if (near) GazeTarget.CURSOR else target
+                for (t in GazeTarget.entries) {
+                    val v = interest[t] ?: 1f
+                    interest[t] = (if (t == attended && t != GazeTarget.OWN) v - dt / 4f else v + dt / 12f).coerceIn(0f, 1f)
+                }
                 val (baseX, baseY) = when {
                     gazeMode == GazeMode.CURSOR || near -> cursorLook
                     target == GazeTarget.CURSOR -> cursorLook
@@ -347,7 +374,12 @@ private fun MascotBench(file: File, modifier: Modifier) {
                 // The head only commits once the eyes have held a direction for the lead time, and
                 // it turns toward the thing, not toward each reading step.
                 if (kotlin.math.abs(baseX - lastWantX) > 0.15f || kotlin.math.abs(baseY - lastWantY) > 0.15f) { lastWantX = baseX; lastWantY = baseY; wantSince = now }
-                if (now - wantSince > headLead * 1_000_000L) headTarget = (baseX * 0.85f) to (baseY * 0.7f)
+                if (now - wantSince > headLead * 1_000_000L) {
+                    val next = (baseX * 0.85f + headScan) to (baseY * 0.7f)
+                    // A big head turn comes with a blink (Eyes Alive: blinks accompany large gaze shifts).
+                    if (kotlin.math.abs(next.first - headTarget.first) > 0.4f) scene.inputSink.fire(RiveAvatarContract.TRIGGER_BLINK)
+                    headTarget = next
+                }
                 // Eyes: exponential ease - quick when saccading between reading steps, softer otherwise.
                 // Head: spring (omega, zeta) with overshoot.
                 val tau = if (target == GazeTarget.TIMELINE || target == GazeTarget.INPUT) 0.08f else 0.25f
