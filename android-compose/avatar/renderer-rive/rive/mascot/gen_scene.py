@@ -344,6 +344,15 @@ def body():
                 <GradientStop colorValue="00FFFFFF" position="1"/>
             </RadialGradient>
         </Fill>
+        <Fill name="Lumen">
+            <!-- The breath's light: a very low white radial that rises through the body with the
+                 inhale and fades out on the exhale. Opacity and centre are keyed per state. -->
+            <RadialGradient startX="0" startY="{LUMEN_Y0}" endX="{LUMEN_R}" endY="{LUMEN_Y0}" opacity="0" name="Gradient" id="{LUMEN}">
+                <GradientStop colorValue="FFFFFFFF" position="0"/>
+                <GradientStop colorValue="66FFFFFF" position="0.45"/>
+                <GradientStop colorValue="00FFFFFF" position="1"/>
+            </RadialGradient>
+        </Fill>
         <Fill name="Tint">
             <SolidColor colorValue="00000000" name="TintColor" id="{TINT}"/>
         </Fill>
@@ -579,7 +588,7 @@ def sine(amplitude, period_ms, base=0.0):
     return [(0, base, SINE), (q, base + amplitude, SINE), (2 * q, base, SINE), (3 * q, base - amplitude, SINE), (4 * q, base)]
 
 
-BREATH_MS, BREATH_PX, BREATH_SCALE = 4600, 11, 1.03
+BREATH_MS, BREATH_PX, BREATH_SCALE = 4600, 11, 1.06
 INFLATE_NODE = "0:233"  # BodyPlacement: the breath's inflate lives here, away from the turn's body keys
 HALO_OPACITY, HALO_SLEEP, HALO_FAILED = 0.10, 0.06, 0
 
@@ -595,7 +604,24 @@ def breath_scale(period_ms=BREATH_MS, lo=1.0, hi=BREATH_SCALE):
 
 
 BREATHING = {"idle": (BREATH_MS, 1.0, BREATH_SCALE), "listening": (BREATH_MS, 1.0, BREATH_SCALE),
-             "speaking": (BREATH_MS, 1.0, BREATH_SCALE), "sleeping": (6800, 0.99, 1.025)}
+             "speaking": (BREATH_MS, 1.0, BREATH_SCALE), "sleeping": (6800, 0.985, 1.045)}
+
+# Lumen: the breath's light (a white radial fill on the body, gradient opacity 0 at rest).
+LUMEN, LUMEN_R, LUMEN_Y0, LUMEN_Y1, LUMEN_PEAK = "0:234", 150, 70, -70, 0.16
+G_START_X, G_START_Y, G_END_X, G_END_Y = 42, 33, 34, 35   # LinearGradient property keys
+
+
+def lumen_keys(period_ms=BREATH_MS, peak=LUMEN_PEAK):
+    """Rises from low in the body to high with the inhale, brightening on the way; gone at rest."""
+    top = frames(period_ms * 0.55)
+    end = frames(period_ms)
+    return {GRADIENT_OPACITY: [(0, 0, SINE), (top, peak, SINE), (end, 0)],
+            G_START_Y: [(0, LUMEN_Y0, SINE), (top, LUMEN_Y1, SINE), (end, LUMEN_Y0)],
+            G_END_Y: [(0, LUMEN_Y0, SINE), (top, LUMEN_Y1, SINE), (end, LUMEN_Y0)],
+            G_START_X: 0, G_END_X: LUMEN_R}
+
+
+LUMEN_REST = {GRADIENT_OPACITY: 0, G_START_Y: LUMEN_Y0, G_END_Y: LUMEN_Y0, G_START_X: 0, G_END_X: LUMEN_R}
 
 
 # Default gaze life per state, on the AutoLookX/AutoLookY remaps (0..1, 0.5 = centre). A value
@@ -652,6 +678,7 @@ def sustained_animations():
         bs = breath_scale(*BREATHING[st]) if st in BREATHING else 1
         objs = {BODY_NODE: body_keys, FACE: face_keys, TINT: {COLOR: tint}, PLATE_EXPR: {NESTED_VALUE: EXPR[st]},
                 INFLATE_NODE: {SX: bs, SY: bs},
+                LUMEN: lumen_keys(BREATHING[st][0], LUMEN_PEAK * (0.6 if st == "sleeping" else 1)) if st in BREATHING else LUMEN_REST,
                 GLOSS: {GRADIENT_OPACITY: gloss if gloss else 1}, JOYSTICK: {JX: jx, JY: jy}, HALO: {OPACITY: halo},
                 AUTO_X: {REMAP_TIME: gx(period) if callable(gx) else gx}, AUTO_Y: {REMAP_TIME: gy(period) if callable(gy) else gy}}
         duration = frames(period) if period else 1
