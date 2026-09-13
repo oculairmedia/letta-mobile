@@ -1,0 +1,45 @@
+    <Node x="7.058" y="65.699" name="Node11" id="8:12">
+        <Shape x="-4.058" y="-11.199" name="Shape12" id="8:13">
+            <PointsPath isClosed="true" name="PointsPath13" id="8:14">
+                <CubicDetachedVertex inRotation="3.142" inDistance="48.601" outRotation="0" outDistance="48.601" x="-0.993" y="-88" name="CubicDetachedVertex"/>
+                <CubicDetachedVertex inRotation="-1.571" inDistance="48.601" outRotation="1.571" outDistance="48.601" x="88" name="CubicDetachedVertex"/>
+                <CubicDetachedVertex inRotation="0" inDistance="48.601" outRotation="3.142" outDistance="48.601" y="88" name="CubicDetachedVertex"/>
+                <CubicDetachedVertex inRotation="1.571" inDistance="48.601" outRotation="-1.571" outDistance="48.601" x="-88" name="CubicDetachedVertex"/>
+            </PointsPath>
+            <Stroke thickness="10" cap="butt" join="miter" name="Stroke">
+                <SolidColor colorValue="FFBC2445" name="SolidColor"/>
+            </Stroke>
+        </Shape>
+        <Node x="-3.43" y="4.135" name="Node28" id="8:29">
+            <Shape y="-39.445" name="Shape29" id="8:30">
+                <Rectangle cornerRadiusTL="19.16" width="165.83" height="40.98" name="Rectangle30" id="8:31"/>
+                <Fill fillRule="nonZero" name="Fill">
+                    <SolidColor colorValue="FFFFFFFF" name="SolidColor"/>
+                </Fill>
+            </Shape>
+            <Shape x="0.005" y="39.445" name="Shape34" id="8:35">
+                <Rectangle cornerRadiusTL="14.95" width="100.98" height="40.98" name="Rectangle35" id="8:36"/>
+                <Fill fillRule="nonZero" name="Fill">
+                    <SolidColor colorValue="FFFFFFFF" name="SolidColor"/>
+                </Fill>
+            </Shape>
+            <Shape x="-0.273" y="31.368" rotation="-1.545" name="Shape37" id="8:38">
+                <Ellipse width="46.74" height="80.92" name="Ellipse38" id="8:39"/>
+                <Fill fillRule="nonZero" name="Fill">
+                    <SolidColor colorValue="FFFC2D50" name="SolidColor"/>
+                </Fill>
+            </Shape>
+            <ClippingShape sourceId="8:42" fillRule="nonZero" name="ClippingShape"/>
+        </Node>
+        <Shape x="-4.058" y="-11.199" name="Shape41" id="8:42">
+            <PointsPath isClosed="true" name="PointsPath42" id="8:43">
+                <CubicDetachedVertex inRotation="3.142" inDistance="48.601" outRotation="0" outDistance="48.601" y="-88" name="CubicDetachedVertex"/>
+                <CubicDetachedVertex inRotation="-1.571" inDistance="48.601" outRotation="1.571" outDistance="48.601" x="88" name="CubicDetachedVertex"/>
+                <CubicDetachedVertex inRotation="0" inDistance="48.601" outRotation="3.142" outDistance="48.601" y="88" name="CubicDetachedVertex"/>
+                <CubicDetachedVertex inRotation="1.571" inDistance="48.601" outRotation="-1.571" outDistance="48.601" x="-88" name="CubicDetachedVertex"/>
+            </PointsPath>
+            <Fill fillRule="nonZero" name="Fill">
+                <SolidColor colorValue="FF721733" name="SolidColor"/>
+            </Fill>
+        </Shape>
+    </Node>

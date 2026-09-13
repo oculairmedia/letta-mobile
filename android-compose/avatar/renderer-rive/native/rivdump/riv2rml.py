@@ -42,7 +42,7 @@ def fmt(v):
     return str(v)
 
 
-def lift(dump, artboard_name, client=9):
+def lift(dump, artboard_name, client=9, subtree=None):
     ab = next(a for a in dump["artboards"] if a["name"] == artboard_name)
     objs = {o["index"]: o for o in ab["objects"] if o.get("type")}
     kids = {}
@@ -79,8 +79,10 @@ def lift(dump, artboard_name, client=9):
         return [head + ">"] + children + [f"{pad}</{t}>"]
 
     lines = []
-    for c in kids.get(0, []):
+    for c in kids.get(subtree, []) if subtree is not None else kids.get(0, []):
         lines += emit(c, 1)
+    if subtree is not None and subtree in objs:
+        lines = emit(objs[subtree], 1)
     root = objs[0]
     return root, lines
 
@@ -89,7 +91,8 @@ if __name__ == "__main__":
     dump = json.load(open(sys.argv[1], encoding="utf-8"))
     name = sys.argv[2]
     client = int(sys.argv[sys.argv.index("--id-client") + 1]) if "--id-client" in sys.argv else 9
-    root, lines = lift(dump, name, client)
+    subtree = int(sys.argv[sys.argv.index("--subtree") + 1]) if "--subtree" in sys.argv else None
+    root, lines = lift(dump, name, client, subtree)
     body = "\n".join(lines)
     if "--standalone" in sys.argv:
         out = sys.argv[sys.argv.index("--standalone") + 1]

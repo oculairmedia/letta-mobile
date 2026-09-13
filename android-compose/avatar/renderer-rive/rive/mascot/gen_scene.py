@@ -298,12 +298,33 @@ def eye_component():
 # ================================================================================================
 # Brow component. 80x40. One bar; expression keys y and rotation. Placed mirrored for the right.
 # ================================================================================================
+import os
+import re
+
+LIFTED = os.path.join(os.path.dirname(os.path.abspath(__file__)), "lifted")
+
+
+def lifted(fragment, **first_line_attrs):
+    """A fragment from native/rivdump/riv2rml.py, with its root element's attributes overridden.
+
+    The fragments are rest-pose art lifted from the community expression-grid file
+    (CC BY 4.0, erdemediz - credit it wherever the mascot ships). Colours are normalised to INK.
+    """
+    text = open(os.path.join(LIFTED, fragment), encoding="utf-8").read().strip()
+    first, rest = text.split("\n", 1)
+    for k, v in first_line_attrs.items():
+        first = re.sub(rf'\s{k}="[^"]*"', "", first)
+        first = first.replace(">", f' {k}="{v}">', 1) if not first.endswith("/>") else first[:-2] + f' {k}="{v}"/>'
+    text = first + "\n" + rest
+    return re.sub(r'colorValue="FF(440E1E|721733)"', f'colorValue="{INK}"', text)
+
+
 def brow_component():
-    REST = {Y: 20, ROT: 0}
+    REST = {Y: 30, ROT: 0}
     poses = {
-        "idle": {}, "listening": {Y: 12}, "dragged": {Y: 24, ROT: rad(-8)}, "thinking": {Y: 10, ROT: rad(-14)},
-        "waitingInput": {Y: 6}, "speaking": {}, "success": {Y: 12, ROT: rad(-4)}, "error": {Y: 22, ROT: rad(16)},
-        "sleeping": {Y: 26}, "loading": {}, "failed": {Y: 24, ROT: rad(14)}, "degraded": {Y: 20, ROT: rad(8)},
+        "idle": {}, "listening": {Y: 22}, "dragged": {Y: 34, ROT: rad(-8)}, "thinking": {Y: 20, ROT: rad(-14)},
+        "waitingInput": {Y: 16}, "speaking": {}, "success": {Y: 22, ROT: rad(-4)}, "error": {Y: 32, ROT: rad(16)},
+        "sleeping": {Y: 36}, "loading": {}, "failed": {Y: 34, ROT: rad(14)}, "degraded": {Y: 30, ROT: rad(8)},
     }
     anims = []
     for s in STATES:
@@ -311,11 +332,10 @@ def brow_component():
         vals.update(poses[s])
         anims.append(animation("Expr" + s[0].upper() + s[1:], brow_expr_anim[s], 1, {BROW_BAR: vals}))
     layer = expression_layer("Expression", "5:10", BROW_IN_EXPR, brow_expr_anim, brow_expr_node)
-    return f'''<Artboard isComponent="true" defaultStateMachineId="{BROW_SM}" clip="false" width="80" height="40" name="Brow" id="{BROW_AB}">
-    <Shape x="40" y="20" name="Bar" id="{BROW_BAR}">
-        {rrect(56, 12, 6)}
-        {fill(INK)}
-    </Shape>
+    # The lifted brow is ~83x46 at the board's centre; it keeps its own id so the poses key it.
+    brow = lifted("brow.rml.txt", x="50", y="30", id=BROW_BAR, name="Brow")
+    return f'''<Artboard isComponent="true" defaultStateMachineId="{BROW_SM}" clip="false" width="100" height="60" name="Brow" id="{BROW_AB}">
+{indent(brow, "    ")}
 {indent(chr(10).join(anims), "    ")}
     <StateMachine name="Brow" id="{BROW_SM}">
         <StateMachineNumber name="expr" id="{BROW_IN_EXPR}"/>
@@ -343,8 +363,9 @@ def mouth_component():
         for g in show[s]:
             objs[g] = {OPACITY: 1}
         anims.append(animation("Expr" + s[0].upper() + s[1:], mouth_expr_anim[s], 1, objs))
-    # Open: scrubbed 0..1 by mouthOpen. Keys only the open mouth's path, so it composes with Expr.
-    open_anim = animation("Open", MOUTH_OPEN_ANIM, 60, {MOUTH_OPEN_PATH: {HEIGHT: [(0, 6), (60, 56)], WIDTH: [(0, 60), (60, 70)]}})
+    # Open: scrubbed 0..1 by mouthOpen. The lifted mouth (lips, teeth, tongue) sits in a node whose
+    # scale is the opening; keying scale rather than a path keeps the lifted art untouched.
+    open_anim = animation("Open", MOUTH_OPEN_ANIM, 60, {MOUTH_OPEN: {SY: [(0, 0.08), (60, 0.42)], SX: [(0, 0.34), (60, 0.42)]}})
     layer = expression_layer("Expression", "6:10", MOUTH_IN_EXPR, mouth_expr_anim, mouth_expr_node)
     arc = lambda name, sid, flip: f'''<Shape x="80" y="{36 if not flip else 44}" opacity="0" name="{name}" id="{sid}">
         <PointsPath isClosed="false" name="Path">
@@ -355,10 +376,9 @@ def mouth_component():
         <Stroke thickness="9" cap="round" join="round" name="Stroke"><SolidColor colorValue="{INK}" name="Color"/></Stroke>
     </Shape>'''
     return f'''<Artboard isComponent="true" defaultStateMachineId="{MOUTH_SM}" clip="false" width="160" height="80" name="Mouth" id="{MOUTH_AB}">
-    <Shape x="80" y="40" opacity="0" name="Open" id="{MOUTH_OPEN}">
-        <Ellipse width="60" height="6" name="Path" id="{MOUTH_OPEN_PATH}"/>
-        {fill(INK)}
-    </Shape>
+    <Node x="80" y="40" scaleX="0.34" scaleY="0.08" opacity="0" name="Open" id="{MOUTH_OPEN}">
+{indent(lifted("mouth.rml.txt", x="0", y="0", name="LiftedMouth"), "        ")}
+    </Node>
     {arc("Smile", MOUTH_SMILE, False)}
     {arc("Frown", MOUTH_FROWN, True)}
     <Shape x="80" y="40" opacity="0" name="Line" id="{MOUTH_LINE}">

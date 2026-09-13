@@ -1576,15 +1576,27 @@
     </Artboard>
     <ComponentAsset artboardId="4:2" name="Eye"/>
 
-    <Artboard isComponent="true" defaultStateMachineId="5:5" clip="false" width="80" height="40" name="Brow" id="5:2">
-        <Shape x="40" y="20" name="Bar" id="5:20">
-            <Rectangle width="56" height="12" linkCornerRadius="true" cornerRadiusTL="6" cornerRadiusTR="6" cornerRadiusBL="6" cornerRadiusBR="6" name="Path"/>
-            <Fill name="Fill"><SolidColor colorValue="FF1A1A1A" name="Color"/></Fill>
-        </Shape>
+    <Artboard isComponent="true" defaultStateMachineId="5:5" clip="false" width="100" height="60" name="Brow" id="5:2">
+        <Shape x="50" y="30" id="5:20" name="Brow">
+                <PointsPath isClosed="true" name="PointsPath17" id="7:18">
+                    <StraightVertex x="34.74" y="-2.66" name="StraightVertex"/>
+                    <CubicDetachedVertex inRotation="0" inDistance="0" outRotation="2.784" outDistance="5.968" x="-24.79" y="23.1" name="CubicDetachedVertex"/>
+                    <CubicDetachedVertex inRotation="1.213" inDistance="5.284" outRotation="0" outDistance="0" x="-38.27" y="17.92" name="CubicDetachedVertex"/>
+                    <CubicDetachedVertex inRotation="0" inDistance="0" outRotation="-1.928" outDistance="5.284" x="-41.51" y="9.26" name="CubicDetachedVertex"/>
+                    <CubicDetachedVertex inRotation="2.784" inDistance="5.968" outRotation="0" outDistance="0" x="-34.74" y="-3.49" name="CubicDetachedVertex"/>
+                    <CubicDetachedVertex inRotation="0" inDistance="0" outRotation="-0.358" outDistance="5.968" x="27.09" y="-23.1" name="CubicDetachedVertex"/>
+                    <CubicDetachedVertex inRotation="-1.928" inDistance="5.284" outRotation="0" outDistance="0" x="40.57" y="-17.92" name="CubicDetachedVertex"/>
+                    <CubicDetachedVertex inRotation="0" inDistance="0" outRotation="1.213" outDistance="5.284" x="41.51" y="-15.4" name="CubicDetachedVertex"/>
+                    <CubicDetachedVertex inRotation="-0.358" inDistance="5.968" outRotation="0" outDistance="0" x="34.74" y="-2.65" name="CubicDetachedVertex"/>
+                </PointsPath>
+                <Fill fillRule="nonZero" name="Fill">
+                    <SolidColor colorValue="FF1A1A1A" name="SolidColor"/>
+                </Fill>
+            </Shape>
         <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="ExprIdle" id="5:100">
             <KeyedObject objectId="5:20">
                 <KeyedProperty propertyKey="14">
-                    <KeyFrameDouble value="20" frame="0"/>
+                    <KeyFrameDouble value="30" frame="0"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="15">
                     <KeyFrameDouble value="0" frame="0"/>
@@ -1594,7 +1606,7 @@
         <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="ExprListening" id="5:101">
             <KeyedObject objectId="5:20">
                 <KeyedProperty propertyKey="14">
-                    <KeyFrameDouble value="12" frame="0"/>
+                    <KeyFrameDouble value="22" frame="0"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="15">
                     <KeyFrameDouble value="0" frame="0"/>
@@ -1604,7 +1616,7 @@
         <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="ExprDragged" id="5:102">
             <KeyedObject objectId="5:20">
                 <KeyedProperty propertyKey="14">
-                    <KeyFrameDouble value="24" frame="0"/>
+                    <KeyFrameDouble value="34" frame="0"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="15">
                     <KeyFrameDouble value="-0.13963" frame="0"/>
@@ -1614,7 +1626,7 @@
         <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="ExprThinking" id="5:103">
             <KeyedObject objectId="5:20">
                 <KeyedProperty propertyKey="14">
-                    <KeyFrameDouble value="10" frame="0"/>
+                    <KeyFrameDouble value="20" frame="0"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="15">
                     <KeyFrameDouble value="-0.24435" frame="0"/>
@@ -1624,7 +1636,7 @@
         <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="ExprWaitingInput" id="5:104">
             <KeyedObject objectId="5:20">
                 <KeyedProperty propertyKey="14">
-                    <KeyFrameDouble value="6" frame="0"/>
+                    <KeyFrameDouble value="16" frame="0"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="15">
                     <KeyFrameDouble value="0" frame="0"/>
@@ -1634,7 +1646,7 @@
         <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="ExprSpeaking" id="5:105">
             <KeyedObject objectId="5:20">
                 <KeyedProperty propertyKey="14">
-                    <KeyFrameDouble value="20" frame="0"/>
+                    <KeyFrameDouble value="30" frame="0"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="15">
                     <KeyFrameDouble value="0" frame="0"/>
@@ -1644,7 +1656,7 @@
         <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="ExprSuccess" id="5:106">
             <KeyedObject objectId="5:20">
                 <KeyedProperty propertyKey="14">
-                    <KeyFrameDouble value="12" frame="0"/>
+                    <KeyFrameDouble value="22" frame="0"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="15">
                     <KeyFrameDouble value="-0.06981" frame="0"/>
@@ -1654,7 +1666,7 @@
         <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="ExprError" id="5:107">
             <KeyedObject objectId="5:20">
                 <KeyedProperty propertyKey="14">
-                    <KeyFrameDouble value="22" frame="0"/>
+                    <KeyFrameDouble value="32" frame="0"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="15">
                     <KeyFrameDouble value="0.27925" frame="0"/>
@@ -1664,7 +1676,7 @@
         <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="ExprSleeping" id="5:108">
             <KeyedObject objectId="5:20">
                 <KeyedProperty propertyKey="14">
-                    <KeyFrameDouble value="26" frame="0"/>
+                    <KeyFrameDouble value="36" frame="0"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="15">
                     <KeyFrameDouble value="0" frame="0"/>
@@ -1674,7 +1686,7 @@
         <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="ExprLoading" id="5:109">
             <KeyedObject objectId="5:20">
                 <KeyedProperty propertyKey="14">
-                    <KeyFrameDouble value="20" frame="0"/>
+                    <KeyFrameDouble value="30" frame="0"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="15">
                     <KeyFrameDouble value="0" frame="0"/>
@@ -1684,7 +1696,7 @@
         <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="ExprFailed" id="5:110">
             <KeyedObject objectId="5:20">
                 <KeyedProperty propertyKey="14">
-                    <KeyFrameDouble value="24" frame="0"/>
+                    <KeyFrameDouble value="34" frame="0"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="15">
                     <KeyFrameDouble value="0.24435" frame="0"/>
@@ -1694,7 +1706,7 @@
         <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="ExprDegraded" id="5:111">
             <KeyedObject objectId="5:20">
                 <KeyedProperty propertyKey="14">
-                    <KeyFrameDouble value="20" frame="0"/>
+                    <KeyFrameDouble value="30" frame="0"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="15">
                     <KeyFrameDouble value="0.13963" frame="0"/>
@@ -1764,10 +1776,53 @@
     <ComponentAsset artboardId="5:2" name="Brow"/>
 
     <Artboard isComponent="true" defaultStateMachineId="6:5" clip="false" width="160" height="80" name="Mouth" id="6:2">
-        <Shape x="80" y="40" opacity="0" name="Open" id="6:20">
-            <Ellipse width="60" height="6" name="Path" id="6:21"/>
-            <Fill name="Fill"><SolidColor colorValue="FF1A1A1A" name="Color"/></Fill>
-        </Shape>
+        <Node x="80" y="40" scaleX="0.34" scaleY="0.08" opacity="0" name="Open" id="6:20">
+            <Node id="8:12" x="0" y="0" name="LiftedMouth">
+                    <Shape x="-4.058" y="-11.199" name="Shape12" id="8:13">
+                        <PointsPath isClosed="true" name="PointsPath13" id="8:14">
+                            <CubicDetachedVertex inRotation="3.142" inDistance="48.601" outRotation="0" outDistance="48.601" x="-0.993" y="-88" name="CubicDetachedVertex"/>
+                            <CubicDetachedVertex inRotation="-1.571" inDistance="48.601" outRotation="1.571" outDistance="48.601" x="88" name="CubicDetachedVertex"/>
+                            <CubicDetachedVertex inRotation="0" inDistance="48.601" outRotation="3.142" outDistance="48.601" y="88" name="CubicDetachedVertex"/>
+                            <CubicDetachedVertex inRotation="1.571" inDistance="48.601" outRotation="-1.571" outDistance="48.601" x="-88" name="CubicDetachedVertex"/>
+                        </PointsPath>
+                        <Stroke thickness="10" cap="butt" join="miter" name="Stroke">
+                            <SolidColor colorValue="FFBC2445" name="SolidColor"/>
+                        </Stroke>
+                    </Shape>
+                    <Node x="-3.43" y="4.135" name="Node28" id="8:29">
+                        <Shape y="-39.445" name="Shape29" id="8:30">
+                            <Rectangle cornerRadiusTL="19.16" width="165.83" height="40.98" name="Rectangle30" id="8:31"/>
+                            <Fill fillRule="nonZero" name="Fill">
+                                <SolidColor colorValue="FFFFFFFF" name="SolidColor"/>
+                            </Fill>
+                        </Shape>
+                        <Shape x="0.005" y="39.445" name="Shape34" id="8:35">
+                            <Rectangle cornerRadiusTL="14.95" width="100.98" height="40.98" name="Rectangle35" id="8:36"/>
+                            <Fill fillRule="nonZero" name="Fill">
+                                <SolidColor colorValue="FFFFFFFF" name="SolidColor"/>
+                            </Fill>
+                        </Shape>
+                        <Shape x="-0.273" y="31.368" rotation="-1.545" name="Shape37" id="8:38">
+                            <Ellipse width="46.74" height="80.92" name="Ellipse38" id="8:39"/>
+                            <Fill fillRule="nonZero" name="Fill">
+                                <SolidColor colorValue="FFFC2D50" name="SolidColor"/>
+                            </Fill>
+                        </Shape>
+                        <ClippingShape sourceId="8:42" fillRule="nonZero" name="ClippingShape"/>
+                    </Node>
+                    <Shape x="-4.058" y="-11.199" name="Shape41" id="8:42">
+                        <PointsPath isClosed="true" name="PointsPath42" id="8:43">
+                            <CubicDetachedVertex inRotation="3.142" inDistance="48.601" outRotation="0" outDistance="48.601" y="-88" name="CubicDetachedVertex"/>
+                            <CubicDetachedVertex inRotation="-1.571" inDistance="48.601" outRotation="1.571" outDistance="48.601" x="88" name="CubicDetachedVertex"/>
+                            <CubicDetachedVertex inRotation="0" inDistance="48.601" outRotation="3.142" outDistance="48.601" y="88" name="CubicDetachedVertex"/>
+                            <CubicDetachedVertex inRotation="1.571" inDistance="48.601" outRotation="-1.571" outDistance="48.601" x="-88" name="CubicDetachedVertex"/>
+                        </PointsPath>
+                        <Fill fillRule="nonZero" name="Fill">
+                            <SolidColor colorValue="FF1A1A1A" name="SolidColor"/>
+                        </Fill>
+                    </Shape>
+                </Node>
+        </Node>
         <Shape x="80" y="36" opacity="0" name="Smile" id="6:22">
             <PointsPath isClosed="false" name="Path">
                 <StraightVertex x="-26" y="-8"/>
@@ -2117,14 +2172,14 @@
             </KeyedObject>
         </LinearAnimation>
         <LinearAnimation fps="60" duration="60" loopValue="oneShot" name="Open" id="6:30">
-            <KeyedObject objectId="6:21">
-                <KeyedProperty propertyKey="21">
-                    <KeyFrameDouble value="6" frame="0" interpolationType="cubic"><CubicEaseInterpolator x1="0.25" y1="0.1" x2="0.25" y2="1"/></KeyFrameDouble>
-                    <KeyFrameDouble value="56" frame="60" interpolationType="cubic"><CubicEaseInterpolator x1="0.25" y1="0.1" x2="0.25" y2="1"/></KeyFrameDouble>
+            <KeyedObject objectId="6:20">
+                <KeyedProperty propertyKey="17">
+                    <KeyFrameDouble value="0.08" frame="0" interpolationType="cubic"><CubicEaseInterpolator x1="0.25" y1="0.1" x2="0.25" y2="1"/></KeyFrameDouble>
+                    <KeyFrameDouble value="0.42" frame="60" interpolationType="cubic"><CubicEaseInterpolator x1="0.25" y1="0.1" x2="0.25" y2="1"/></KeyFrameDouble>
                 </KeyedProperty>
-                <KeyedProperty propertyKey="20">
-                    <KeyFrameDouble value="60" frame="0" interpolationType="cubic"><CubicEaseInterpolator x1="0.25" y1="0.1" x2="0.25" y2="1"/></KeyFrameDouble>
-                    <KeyFrameDouble value="70" frame="60" interpolationType="cubic"><CubicEaseInterpolator x1="0.25" y1="0.1" x2="0.25" y2="1"/></KeyFrameDouble>
+                <KeyedProperty propertyKey="16">
+                    <KeyFrameDouble value="0.34" frame="0" interpolationType="cubic"><CubicEaseInterpolator x1="0.25" y1="0.1" x2="0.25" y2="1"/></KeyFrameDouble>
+                    <KeyFrameDouble value="0.42" frame="60" interpolationType="cubic"><CubicEaseInterpolator x1="0.25" y1="0.1" x2="0.25" y2="1"/></KeyFrameDouble>
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
