@@ -185,6 +185,17 @@ Should / deliberately not:
 - [ ] `reduceMotion` — needs a contract property and a host write; follow-up bead.
 - [x] `rive inspect . --json` is the structural check; `check_contract.py` reads it.
 
+## Host rules (for the identity slice, 1zti3)
+
+- Write `shape`, `color` and `state` **before the first `advance`/render**, or the first frame is
+  a black body in the default pose (the colour bind only delivers after a runtime write). The
+  spike does this by writing in the same effect that loads the runtime; production surfaces
+  should hold the node until identity has been applied - no startup flash.
+- Fit is `contain` on a fixed 500x500 artboard; the mascot is an element, not a layout, so the
+  responsive `layout` fit does not apply.
+- The interaction logic (hover, drag, blink, wander, entries) lives in the file. The host only
+  writes the contract properties; it must not try to sequence transitions itself.
+
 ## Open items
 
 - `-small` profile (SPEC) needs a host size signal the contract does not carry.
