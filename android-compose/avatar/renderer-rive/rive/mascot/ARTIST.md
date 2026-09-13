@@ -11,11 +11,10 @@ It is already in the Rive workspace: project **oculair / Shared Project**, file 
 (id 2578084, first revision "rive-cli push"). Open it there. A `.rev` of the same state is in
 `build/mascot.rev` if you want a local copy.
 
-**The editor file is now the source of truth.** `scene.rml` in this folder is the pushed
-snapshot with the editor's ids stamped in; `gen_scene.py` produced it but must not be re-run
-against this project - it reassigns ids, which breaks the mapping in `rive.yaml` and would make
-the next push re-create every object. If the rig logic ever needs regenerating, do it in a fresh
-project and push that as a new file.
+**Once you start editing in the editor, the editor file is the source of truth.** Until then,
+the repo side can still regenerate (`python gen_scene.py`) and `rive push` a new revision - the
+generator's ids are stable, so pushes update objects in place. After your first edit, no more
+CLI pushes: they would overwrite your work. Tell the engineers when you begin.
 
 When you are done, export the `.riv` and replace `src/androidMain/res/raw/mascot.riv`. Then run
 the contract check so a renamed input cannot slip through:
