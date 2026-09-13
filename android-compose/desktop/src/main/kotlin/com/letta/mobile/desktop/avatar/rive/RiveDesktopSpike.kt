@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -51,6 +52,10 @@ import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInParent
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
@@ -158,8 +163,37 @@ private enum class FrameShape(val label: String, val shape: Shape) {
 
 private enum class Ground(val label: String) { PAGE("page"), FRAME("frame") }
 
-/** How the host lends the cursor to the character's gaze. SOMETIMES is the product behaviour. */
-private enum class GazeMode(val label: String) { SOMETIMES("sometimes"), ALWAYS("always"), OFF("sliders") }
+/** How the host drives the gaze. JUSTIFIED is the product behaviour; CURSOR is for checking range. */
+private enum class GazeMode(val label: String) { JUSTIFIED("justified"), CURSOR("cursor"), OFF("sliders") }
+
+/**
+ * What the character can be looking at. Every look has one of these, so a viewer could name
+ * the reason. OWN is "its own thoughts": the host writes no gaze and the rig's per-state default
+ * shows through (thinking up-left, error down, idle drifting).
+ */
+private enum class GazeTarget(val label: String, val reason: String) {
+    OWN("own thoughts", "the rig's default for this state"),
+    USER("you", "addressing the person: straight at the camera"),
+    CURSOR("the cursor", "your hand moved"),
+    INPUT("the input", "watching you type"),
+    TIMELINE("the timeline", "reading the code / its own reply"),
+}
+
+/** One justified look: the target, how likely, how long it holds, and the pause before the next. */
+private data class Look(val target: GazeTarget, val weight: Int, val dwellMs: LongRange, val gapMs: LongRange = 500L..2500L)
+
+/** The director's gaze plan per state: who it would plausibly be looking at, and how much. */
+private val GAZE_PLAN: Map<AvatarState, List<Look>> = mapOf(
+    AvatarState.IDLE to listOf(Look(GazeTarget.OWN, 50, 3000L..7000L), Look(GazeTarget.USER, 25, 1500L..3500L), Look(GazeTarget.CURSOR, 25, 1500L..3000L)),
+    AvatarState.LISTENING to listOf(Look(GazeTarget.INPUT, 70, 3000L..8000L, 300L..1200L), Look(GazeTarget.USER, 20, 1000L..2500L), Look(GazeTarget.CURSOR, 10, 1000L..2000L)),
+    AvatarState.THINKING to listOf(Look(GazeTarget.OWN, 60, 3000L..8000L), Look(GazeTarget.TIMELINE, 30, 2000L..5000L), Look(GazeTarget.INPUT, 10, 1000L..2500L)),
+    AvatarState.SPEAKING to listOf(Look(GazeTarget.USER, 55, 2500L..6000L, 300L..1500L), Look(GazeTarget.TIMELINE, 35, 1500L..4000L), Look(GazeTarget.CURSOR, 10, 1000L..2000L)),
+    AvatarState.WAITING_INPUT to listOf(Look(GazeTarget.USER, 80, 4000L..9000L, 300L..1000L), Look(GazeTarget.CURSOR, 20, 1500L..3000L)),
+    AvatarState.DRAGGED to listOf(Look(GazeTarget.CURSOR, 100, 10_000L..10_000L, 0L..0L)),
+    AvatarState.SUCCESS to listOf(Look(GazeTarget.USER, 100, 3000L..3000L, 0L..0L)),
+    AvatarState.ERROR to listOf(Look(GazeTarget.OWN, 70, 3000L..7000L), Look(GazeTarget.USER, 30, 1500L..3000L)),
+    AvatarState.SLEEPING to listOf(Look(GazeTarget.OWN, 100, 60_000L..60_000L)),
+)
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -173,11 +207,16 @@ private fun MascotBench(file: File, modifier: Modifier) {
     var mouth by remember { mutableFloatStateOf(0f) }
     var lookX by remember { mutableFloatStateOf(0f) }
     var lookY by remember { mutableFloatStateOf(0f) }
-    var gazeMode by remember { mutableStateOf(GazeMode.SOMETIMES) }
+    var gazeMode by remember { mutableStateOf(GazeMode.JUSTIFIED) }
     var trackReach by remember { mutableFloatStateOf(2.5f) }   // how far (in mascot widths) the gaze saturates
     var cursorLook by remember { mutableStateOf(0f to 0f) }    // where the cursor is, in gaze units
-    var attending by remember { mutableStateOf(false) }         // is the character looking at the cursor right now
     var lastCursorMove by remember { mutableStateOf(0L) }
+    var target by remember { mutableStateOf(GazeTarget.OWN) }  // what it is looking at right now
+    var showTargets by remember { mutableStateOf(true) }
+    var stageSize by remember { mutableStateOf(IntSize.Zero) }
+    var mascotBounds by remember { mutableStateOf(Rect.Zero) }
+    var headTarget by remember { mutableStateOf(0f to 0f) }     // where the head is turning (host facing, -1..1)
+    var headLead by remember { mutableFloatStateOf(350f) }      // ms the eyes lead the head by
 
     var page by remember { mutableStateOf(Surround(0xFF1A1A1A.toInt())) }
     var frame by remember { mutableStateOf(Surround(0xFF2E2E33.toInt())) }
@@ -214,36 +253,75 @@ private fun MascotBench(file: File, modifier: Modifier) {
         loaded = true
     }
 
-    // Attention: the reference for the director's gaze rule. The rig has its own gaze life; the
-    // host only borrows it now and then. Every few seconds decide whether to look at the cursor,
-    // hold that for a short while, then let go. A cursor that starts moving near the character
-    // grabs attention at once, the way a hand waved in front of a face does.
-    LaunchedEffect(gazeMode) {
-        attending = gazeMode == GazeMode.ALWAYS
-        if (gazeMode != GazeMode.SOMETIMES) return@LaunchedEffect
+    // Where the UI's things are, in gaze units from the mascot's centre. The bench fakes an input
+    // field below and a timeline to the left; the product supplies the real rectangles.
+    fun lookAt(px: Float, py: Float): Pair<Float, Float> {
+        if (mascotBounds.isEmpty) return 0f to 0f
+        val reach = mascotBounds.width * trackReach / 2f
+        return ((px - mascotBounds.center.x) / reach).coerceIn(-1f, 1f) to ((py - mascotBounds.center.y) / reach).coerceIn(-1f, 1f)
+    }
+    val inputSpot = androidx.compose.ui.geometry.Offset(stageSize.width / 2f, stageSize.height - 60f)
+    val timelineSpot = androidx.compose.ui.geometry.Offset(150f, stageSize.height / 2f - 80f)
+
+    // Justified attention: the reference for the director's gaze rule. The rig has its own
+    // per-state gaze; the host lends it a target the viewer could name - the input while they
+    // type, the timeline while it reads or writes, the person when it addresses them, the cursor
+    // when their hand moves - holds it for a while, then hands the gaze back.
+    LaunchedEffect(gazeMode, current) {
+        target = when (gazeMode) { GazeMode.CURSOR -> GazeTarget.CURSOR; else -> GazeTarget.OWN }
+        if (gazeMode != GazeMode.JUSTIFIED) return@LaunchedEffect
+        val plan = GAZE_PLAN[current] ?: listOf(Look(GazeTarget.OWN, 1, 60_000L..60_000L))
+        val total = plan.sumOf { it.weight }
         while (true) {
-            delay((3000L..8000L).random())
-            if (Math.random() < 0.6) {
-                attending = true
-                delay((1500L..4000L).random())
-                attending = false
-            }
+            var pick = (Math.random() * total).toInt()
+            val look = plan.first { pick -= it.weight; pick < 0 }
+            target = look.target
+            delay(look.dwellMs.random())
+            target = GazeTarget.OWN
+            delay(look.gapMs.random())
         }
     }
-    // The gaze eases toward its target (~250 ms) so attention reads as a drift, never a snap.
+    // Eyes first, then the head. The gaze eases toward its target (~250 ms) and locks; after
+    // `headLead` ms the head follows on an under-damped spring - the dramatic turn - and the eyes,
+    // being carried by the head, settle back toward centre on the plate. Back to OWN, the head
+    // returns to the rig's own facing (turnX/turnY -> 0).
     LaunchedEffect(gazeMode) {
-        if (gazeMode == GazeMode.OFF) { setLook(0f, 0f); return@LaunchedEffect }
-        var x = lookX; var y = lookY
+        if (gazeMode == GazeMode.OFF) { setLook(0f, 0f); headTarget = 0f to 0f; return@LaunchedEffect }
+        var x = lookX; var y = lookY                   // eyes
+        var hx = 0f; var hy = 0f; var vx = 0f; var vy = 0f   // head position and velocity
+        var wx = 0f; var wy = 0f                        // head written last
+        var lastWantX = 0f; var lastWantY = 0f; var wantSince = 0L
         var last = System.nanoTime()
         while (true) {
             withFrameNanos { now ->
                 val dt = ((now - last) / 1e9f).coerceIn(0f, 0.1f); last = now
-                // A cursor moving within a mascot width in the last half second demands a look.
-                val near = kotlin.math.hypot(cursorLook.first, cursorLook.second) < 1f / trackReach && now - lastCursorMove < 500_000_000L
-                val (tx, ty) = if (attending || (gazeMode == GazeMode.SOMETIMES && near)) cursorLook else 0f to 0f
+                // A cursor moving within a mascot width in the last half second demands a look
+                // (unless asleep), the way a hand waved in front of a face does.
+                val near = current != AvatarState.SLEEPING && kotlin.math.hypot(cursorLook.first, cursorLook.second) < 1f / trackReach && now - lastCursorMove < 500_000_000L
+                val (wantX, wantY) = when {
+                    gazeMode == GazeMode.CURSOR || near -> cursorLook
+                    target == GazeTarget.CURSOR -> cursorLook
+                    target == GazeTarget.INPUT -> lookAt(inputSpot.x, inputSpot.y)
+                    target == GazeTarget.TIMELINE -> lookAt(timelineSpot.x, timelineSpot.y)
+                    else -> 0f to 0f   // USER and OWN: centre; the rig's own gaze life shows through
+                }
+                // The head only commits once the eyes have held a direction for the lead time.
+                if (kotlin.math.abs(wantX - lastWantX) > 0.15f || kotlin.math.abs(wantY - lastWantY) > 0.15f) { lastWantX = wantX; lastWantY = wantY; wantSince = now }
+                if (now - wantSince > headLead * 1_000_000L) headTarget = (wantX * 0.85f) to (wantY * 0.7f)
+                // Eyes: exponential ease. Head: spring (omega, zeta) with overshoot.
                 val k = 1f - kotlin.math.exp(-dt / 0.25f)
-                x += (tx - x) * k; y += (ty - y) * k
+                val (htx, hty) = headTarget
+                // The eyes aim at the target minus what the head already covers, so they lead and then relax.
+                val ex = wantX - hx * 0.6f; val ey = wantY - hy * 0.6f
+                x += (ex - x) * k; y += (ey - y) * k
+                val omega = 11f; val zeta = 0.5f
+                vx += ((htx - hx) * omega * omega - 2f * zeta * omega * vx) * dt; hx += vx * dt
+                vy += ((hty - hy) * omega * omega - 2f * zeta * omega * vy) * dt; hy += vy * dt
                 if (kotlin.math.abs(x - lookX) > 0.002f || kotlin.math.abs(y - lookY) > 0.002f) setLook(x, y)
+                if (kotlin.math.abs(hx - wx) > 0.002f || kotlin.math.abs(hy - wy) > 0.002f) {
+                    wx = hx; wy = hy
+                    scene.inputSink.setNumber("turnX", hx.coerceIn(-1f, 1f)); scene.inputSink.setNumber("turnY", hy.coerceIn(-1f, 1f))
+                }
             }
         }
     }
@@ -277,12 +355,10 @@ private fun MascotBench(file: File, modifier: Modifier) {
         // ---- stage: page ground, frame ground, the mascot scaled inside the frame ----
         var pagePalette by remember { mutableStateOf(false) }
         var framePalette by remember { mutableStateOf(false) }
-        var mascotBounds by remember { mutableStateOf(Rect.Zero) }
-
         SurroundLayer(
             spec = page, editing = editGradients, selected = selPage,
             onSelect = { selPage = it; ground = Ground.PAGE }, onChange = { page = it }, onTap = { pagePalette = true },
-            modifier = Modifier.weight(1f).fillMaxHeight()
+            modifier = Modifier.weight(1f).fillMaxHeight().onSizeChanged { stageSize = it }
                 // Gaze from the cursor anywhere on the stage, relative to the mascot's centre.
                 .pointerInput(Unit) {
                     awaitPointerEventScope {
@@ -317,9 +393,14 @@ private fun MascotBench(file: File, modifier: Modifier) {
                         MascotBox(scene, frameSize * mascotScale) { mascotBounds = it }
                     }
                 }
+                if (showTargets && gazeMode == GazeMode.JUSTIFIED) {
+                    val ink = if (isDark(page.base)) Color(0x55FFFFFF) else Color(0x55000000)
+                    Hotspot("input (you typing)", inputSpot, 260f, 44f, ink, target == GazeTarget.INPUT)
+                    Hotspot("timeline / code", timelineSpot, 220f, 160f, ink, target == GazeTarget.TIMELINE)
+                }
                 Text(
                     if (editGradients) "drag the rings to place lights; tap a ground to pick its base colour"
-                    else "tap the page or the frame to pick its colour; wave the cursor near the mascot to get its attention",
+                    else "looking at ${target.label}: ${target.reason}",
                     color = if (isDark(page.base)) Color(0x66FFFFFF) else Color(0x66000000),
                     modifier = Modifier.align(Alignment.BottomStart).padding(12.dp),
                 )
@@ -361,15 +442,21 @@ private fun MascotBench(file: File, modifier: Modifier) {
             Section("mouthOpen %.2f  (visible in speaking / dragged only)".format(mouth))
             Slider(mouth, onValueChange = { autoCycle = false; mouth = it; runtime.setMouthOpen(it) })
 
-            Section("gaze  " + when (gazeMode) { GazeMode.SOMETIMES -> if (attending) "(looking at you)" else "(its own life)"; GazeMode.ALWAYS -> "(locked on the cursor)"; GazeMode.OFF -> "(sliders)" })
+            Section("gaze: looking at ${target.label}")
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 GazeMode.entries.forEach { m ->
                     if (m == gazeMode) Button({ gazeMode = m }) { Text(m.label) } else OutlinedButton({ gazeMode = m }) { Text(m.label) }
                 }
             }
             if (gazeMode != GazeMode.OFF) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Switch(showTargets, onCheckedChange = { showTargets = it })
+                    Text("show what it can look at", color = Color.LightGray)
+                }
                 Section("reach %.1f mascot widths to full gaze".format(trackReach))
                 Slider(trackReach, valueRange = 0.6f..6f, onValueChange = { trackReach = it })
+                Section("eyes lead the head by %.0f ms".format(headLead))
+                Slider(headLead, valueRange = 0f..1200f, onValueChange = { headLead = it })
             } else {
                 Section("lookX %.2f".format(lookX))
                 Slider(lookX, valueRange = -1f..1f, onValueChange = { setLook(it, lookY) })
@@ -456,6 +543,17 @@ private fun MascotBench(file: File, modifier: Modifier) {
             }
         }
     }
+}
+
+/** A labelled rectangle on the stage standing in for a piece of UI the character can look at. */
+@Composable
+private fun Hotspot(label: String, centre: androidx.compose.ui.geometry.Offset, w: Float, h: Float, ink: Color, hot: Boolean) {
+    Box(
+        Modifier.offset { IntOffset((centre.x - w / 2).toInt(), (centre.y - h / 2).toInt()) }
+            .size(w.dp / LocalDensity.current.density, h.dp / LocalDensity.current.density)
+            .border(if (hot) 2.dp else 1.dp, if (hot) ink.copy(alpha = 0.9f) else ink, RoundedCornerShape(8.dp))
+            .padding(6.dp),
+    ) { Text(label, color = ink, style = MaterialTheme.typography.labelSmall) }
 }
 
 /** One rig tunable: a 0..1 view-model number the file maps onto a pose range; `shown` renders the real value. */

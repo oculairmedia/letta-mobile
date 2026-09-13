@@ -86,6 +86,11 @@ TUNABLES = {  # name: (vm id, timeline id, node id, property keys, (value at 0, 
 }
 PLATE_SCALE_NODE, GLYPH_SCALE_NODE, MOUTH_NODE = "7:25", "7:26", "7:27"
 VM_TUNE_SCALE, CONV_SCALE, ENTITY = "1:16", "2:3", "0:230"      # whole-entity scale, 0..1 -> 0.5..1.5
+# Host facing: two -1..1 numbers the host writes (the head turning toward what it looks at),
+# bound to a HostTurn node above the rig's own Turn so the two add. Body rolls with it too.
+VM_TURN_X, VM_TURN_Y, HOST_TURN = "1:17", "1:18", "0:235"
+CONV_TURN_X, CONV_TURN_Y, CONV_TURN_ROT, CONV_BODY_ROT = "2:4", "2:5", "2:6", "2:7"
+HOST_TURN_PX, HOST_TURN_PY, HOST_TURN_DEG, HOST_BODY_DEG = 48, 18, 10, 5
 # Default gaze life: root-keyed remaps of two small plate ranges (+-6 / +-4 px on the glyph's
 # wrapper), additive with the host's lookX/lookY on the glyph itself.
 AUTO_X, AUTO_Y, PLATE_AUTO_X, PLATE_AUTO_Y = "0:231", "0:232", "7:80", "7:81"
@@ -134,7 +139,7 @@ PLATE_LOOKX, PLATE_LOOKY, PLATE_OPEN, PLATE_BLINK_ANIM, PLATE_WAIT_A, PLATE_WAIT
 plate_expr_anim = {s: f"7:{100 + i}" for i, s in enumerate(STATES)}
 plate_expr_node = {s: f"7:{130 + i}" for i, s in enumerate(STATES)}
 PLATE_BLINK_NODE, PLATE_BLINK_REST_NODE = "7:160", "7:161"
-PLATE_AUTO_A, PLATE_AUTO_B, PLATE_AUTO_BLINK = "7:162", "7:163", "7:164"
+PLATE_AUTO_A, PLATE_AUTO_B, PLATE_AUTO_BLINK, PLATE_AUTO_SLEEP = "7:162", "7:163", "7:164", "7:165"
 
 INK = "FF111111"
 PLATE_WHITE = "FFF7F7F7"
@@ -345,6 +350,7 @@ def shape_keys(shape):
 def body():
     bound = f'<SolidColor colorValue="FF79B7DF" name="Color">\n            {bind(VM_COLOR, COLOR)}\n        </SolidColor>'
     return f'''<Node x="0" y="0" name="BodyPlacement" id="{INFLATE_NODE}">
+    {bind(VM_TURN_X, ROT, CONV_BODY_ROT)}
 <Node x="0" y="0" name="Body" id="{BODY_NODE}">
     <!-- Paints on one shape; the LATER paint draws on top. -->
     <Shape name="BodyShape" id="{HITBOX}">
@@ -441,12 +447,19 @@ def plate_component():
         f'<StateTransition stateToId="{PLATE_BLINK_NODE}">\n    <TransitionTriggerCondition inputId="{PLATE_IN_BLINK}"/>\n</StateTransition>',
         f'<AnimationState x="200" y="40" animationId="{PLATE_WAIT_A}" id="{PLATE_BLINK_REST_NODE}"/>\n'
         + anim_state(PLATE_BLINK_ANIM, PLATE_BLINK_NODE, 1, ' reset="true"', exit_transition(PLATE_BLINK_REST_NODE)))
+    # Eyes closed do not blink: the waits park while expr is sleeping and resume when it is not.
+    asleep = input_transition(PLATE_AUTO_SLEEP, PLATE_IN_EXPR, EXPR["sleeping"], 0)
+    awake = (f'<StateTransition stateToId="{PLATE_AUTO_A}" duration="0">\n'
+             f'    <TransitionNumberCondition inputId="{PLATE_IN_EXPR}" opValue="lessThan" value="{EXPR["sleeping"] - 0.5}"/>\n</StateTransition>\n'
+             f'<StateTransition stateToId="{PLATE_AUTO_A}" duration="0">\n'
+             f'    <TransitionNumberCondition inputId="{PLATE_IN_EXPR}" opValue="greaterThanOrEqual" value="{EXPR["sleeping"] + 0.5}"/>\n</StateTransition>')
     auto_layer = layer_frame(
         "AutoBlink", "7:12", PLATE_AUTO_A, "",
-        anim_state(PLATE_WAIT_A, PLATE_AUTO_A, 0, ' random="true"', exit_transition(PLATE_AUTO_BLINK)) + "\n"
-        + anim_state(PLATE_WAIT_B, PLATE_AUTO_B, 1, "", exit_transition(PLATE_AUTO_BLINK)) + "\n"
+        anim_state(PLATE_WAIT_A, PLATE_AUTO_A, 0, ' random="true"', asleep + "\n" + exit_transition(PLATE_AUTO_BLINK)) + "\n"
+        + anim_state(PLATE_WAIT_B, PLATE_AUTO_B, 1, "", asleep + "\n" + exit_transition(PLATE_AUTO_BLINK)) + "\n"
         + anim_state(PLATE_BLINK_ANIM, PLATE_AUTO_BLINK, 2, ' reset="true" random="true"',
-                     weighted(exit_transition(PLATE_AUTO_A), 50) + "\n" + weighted(exit_transition(PLATE_AUTO_B), 50)))
+                     weighted(exit_transition(PLATE_AUTO_A), 50) + "\n" + weighted(exit_transition(PLATE_AUTO_B), 50)) + "\n"
+        + anim_state(PLATE_WAIT_A, PLATE_AUTO_SLEEP, 3, "", awake))
 
     glyphs = "\n".join(svgpath.path_rml(art(f"glyph-{n}.svg"), n[0].upper() + n[1:], GLYPH[n], INK) for n in GLYPH_ORDER)
     mv = "\n".join(
@@ -531,6 +544,10 @@ def face():
     # FacePlacement > Turn (keyed only by the joystick's TurnX/TurnY) > Face (keyed by state motion).
     # Trails are declared after Turn so they draw underneath the plate.
     return f'''<Node x="0" y="-8" name="FacePlacement">
+<Node x="0" y="0" name="HostTurn" id="{HOST_TURN}">
+    {bind(VM_TURN_X, X, CONV_TURN_X)}
+    {bind(VM_TURN_X, ROT, CONV_TURN_ROT)}
+    {bind(VM_TURN_Y, Y, CONV_TURN_Y)}
 <Node x="0" y="0" name="Turn" id="{TURN_NODE}">
 <Node x="0" y="0" name="Face" id="{FACE}">
     <NestedArtboard artboardId="{PLATE_AB}" x="-100" y="-108" name="Plate" id="{PLATE}">
@@ -551,6 +568,7 @@ def face():
         <NestedRemapAnimation animationId="{PLATE_AUTO_X}" time="0.5" name="AutoLookX" id="{AUTO_X}"/>
         <NestedRemapAnimation animationId="{PLATE_AUTO_Y}" time="0.5" name="AutoLookY" id="{AUTO_Y}"/>
     </NestedArtboard>
+</Node>
 </Node>
 </Node>
 {indent(trail("Trail1", TRAIL1), "")}
@@ -931,6 +949,14 @@ def data():
                           clampLower="true" clampUpper="true" name="MouthToTime" id="{CONV_MOUTH}"/>
 <DataConverterRangeMapper minInput="0" maxInput="1" minOutput="0.5" maxOutput="1.5"
                           clampLower="true" clampUpper="true" name="TuneToScale" id="{CONV_SCALE}"/>
+<DataConverterRangeMapper minInput="-1" maxInput="1" minOutput="{-HOST_TURN_PX}" maxOutput="{HOST_TURN_PX}"
+                          clampLower="true" clampUpper="true" name="TurnToX" id="{CONV_TURN_X}"/>
+<DataConverterRangeMapper minInput="-1" maxInput="1" minOutput="{-HOST_TURN_PY}" maxOutput="{HOST_TURN_PY}"
+                          clampLower="true" clampUpper="true" name="TurnToY" id="{CONV_TURN_Y}"/>
+<DataConverterRangeMapper minInput="-1" maxInput="1" minOutput="{rad(-HOST_TURN_DEG)}" maxOutput="{rad(HOST_TURN_DEG)}"
+                          clampLower="true" clampUpper="true" name="TurnToRoll" id="{CONV_TURN_ROT}"/>
+<DataConverterRangeMapper minInput="-1" maxInput="1" minOutput="{rad(-HOST_BODY_DEG)}" maxOutput="{rad(HOST_BODY_DEG)}"
+                          clampLower="true" clampUpper="true" name="TurnToBodyRoll" id="{CONV_BODY_ROT}"/>
 
 <ViewModel defaultInstanceId="{VM_INSTANCE}" name="Avatar" id="{VM}">
     <ViewModelPropertyEnumCustom enumId="{ENUM_STATE}" name="state" id="{VM_STATE}"/>
@@ -946,10 +972,14 @@ def data():
     <ViewModelPropertyBoolean name="dragged" id="{VM_DRAGGED}"/>
 {indent(chr(10).join(f'<ViewModelPropertyNumber name="{n}" id="{t[0]}"/>' for n, t in TUNABLES.items()), "    ")}
     <ViewModelPropertyNumber name="tuneScale" id="{VM_TUNE_SCALE}"/>
+    <ViewModelPropertyNumber name="turnX" id="{VM_TURN_X}"/>
+    <ViewModelPropertyNumber name="turnY" id="{VM_TURN_Y}"/>
 
     <ViewModelInstance exports="true" name="Default" id="{VM_INSTANCE}">
 {indent(chr(10).join(f'<ViewModelInstanceNumber propertyValue="0.5" viewModelPropertyId="{t[0]}"/>' for t in TUNABLES.values()), "        ")}
         <ViewModelInstanceNumber propertyValue="0.5" viewModelPropertyId="{VM_TUNE_SCALE}"/>
+        <ViewModelInstanceNumber propertyValue="0" viewModelPropertyId="{VM_TURN_X}"/>
+        <ViewModelInstanceNumber propertyValue="0" viewModelPropertyId="{VM_TURN_Y}"/>
         <ViewModelInstanceEnum propertyValue="{state_enum_ids['idle']}" viewModelPropertyId="{VM_STATE}"/>
         <ViewModelInstanceNumber propertyValue="0" viewModelPropertyId="{VM_MOUTH}"/>
         <ViewModelInstanceNumber propertyValue="0" viewModelPropertyId="{VM_LOOKX}"/>
