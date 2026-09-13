@@ -18,7 +18,7 @@ fun LatencyText(
     Text(
         text = latencyMs.humanReadableDuration(),
         modifier = modifier.alpha(0.5f),
-        style = MaterialTheme.typography.labelSmall.scaledBy(LocalChatFontScale.current),
+        style = MaterialTheme.typography.labelSmall,
     )
 }
 

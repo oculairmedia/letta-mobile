@@ -408,7 +408,7 @@ private fun StreamingMarkdownDocumentBlocks(
                 Text(
                     text = textToDraw,
                     color = textColor,
-                    style = MaterialTheme.typography.bodyMedium.scaledBy(LocalChatFontScale.current),
+                    style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }

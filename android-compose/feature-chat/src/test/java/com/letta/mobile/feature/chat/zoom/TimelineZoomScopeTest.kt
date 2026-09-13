@@ -68,10 +68,11 @@ class TimelineZoomScopeTest {
                         Text("body", style = MaterialTheme.chatTypography.messageBody)
                         Text("code", style = MaterialTheme.chatTypography.codeBlock)
                         Text("stamp", style = MaterialTheme.chatTypography.timestamp)
-                        Text(
-                            "material",
-                            style = MaterialTheme.typography.bodyMedium.scaledBy(LocalChatFontScale.current),
-                        )
+                        // Inside the scope a Material style is already at this zoom, so it is read
+                        // plainly. Multiplying it again is the bug the removed call sites had.
+                        Text("material", style = MaterialTheme.typography.bodyMedium)
+                        Text("chip", style = MaterialTheme.typography.labelSmall)
+                        Text("handMultiplied", style = MaterialTheme.typography.bodyMedium.scaledBy(LocalChatFontScale.current))
                         // Width-constrained so the laid-out box has to respond to the text size;
                         // an unconstrained word is sized by its container and hides the change.
                         Text(
@@ -106,7 +107,7 @@ class TimelineZoomScopeTest {
      */
     @Test fun everyStyleFollowsTheGestureBeforeItIsCommitted() {
         val scale = mount(committed = 1f)
-        val before = listOf("body", "code", "stamp", "material").associateWith { sp(it) }
+        val before = listOf("body", "code", "stamp", "material", "chip").associateWith { sp(it) }
         pinchTo(scale, 2f)
         before.forEach { (tag, was) -> assertEquals("$tag did not follow the gesture", was * 2f, sp(tag), 0.01f) }
     }
@@ -118,6 +119,18 @@ class TimelineZoomScopeTest {
         // shipped before this scope existed.
         assertEquals(21f, sp("body"), 0.01f)
         assertEquals(21f, sp("material"), 0.01f)
+    }
+
+    /**
+     * Why the eleven hand-written multipliers had to go when the scope started scaling the Material
+     * set: a style that is scaled again lands at the square of the zoom.
+     */
+    @Test fun multiplyingAMaterialStyleAgainDoubleScalesIt() {
+        val scale = mount(committed = 1f)
+        val atRest = sp("handMultiplied")
+        pinchTo(scale, 2f)
+        assertEquals(atRest * 4f, sp("handMultiplied"), 0.01f)
+        assertEquals(atRest * 2f, sp("material"), 0.01f)
     }
 
     /** Shrinking is the same rule in the other direction, with no floor of its own. */

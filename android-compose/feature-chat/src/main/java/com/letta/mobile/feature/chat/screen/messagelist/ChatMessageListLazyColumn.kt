@@ -151,6 +151,9 @@ internal fun ChatMessageListRenderItem(params: ChatMessageListRenderItemParams) 
                 geometryState = context.itemGeometryState,
                 applyCachedMinHeight = !renderItem.includesReasoningRow() &&
                     renderItem is ChatRenderItem.Single && renderItem.message.toolCalls.isNullOrEmpty(),
+                // The signature carries the committed scale, so while the live scale differs the
+                // cached height describes a size this row is no longer drawn at.
+                scaleIsTransient = perItemFontScale != context.activeFontScale,
             ) {
                 ChatMessageListRenderItemBody(
                     params = ChatMessageListRenderItemBodyParams(

@@ -58,7 +58,7 @@ fun ThinkingSection(
         ) {
             Text(
                 text = if (inProgress) "Thinking\u2026" else "Show thinking",
-                style = MaterialTheme.typography.sectionTitle.scaledBy(fontScale),
+                style = MaterialTheme.typography.sectionTitle,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Icon(

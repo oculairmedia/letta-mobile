@@ -514,7 +514,7 @@ private fun ProjectedToolOutcomeLabel(
         )
         Text(
             text = label,
-            style = MaterialTheme.typography.labelSmall.scaledBy(LocalChatFontScale.current),
+            style = MaterialTheme.typography.labelSmall,
             color = tint,
         )
     }

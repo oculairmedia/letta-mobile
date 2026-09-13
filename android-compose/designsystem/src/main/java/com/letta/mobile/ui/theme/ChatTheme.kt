@@ -3,6 +3,7 @@ package com.letta.mobile.ui.theme
 
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
@@ -118,6 +119,50 @@ fun rememberChatTypography(fontScale: Float): ChatTypography {
 }
 
 /**
+ * Every text style in the Material set at [factor].
+ *
+ * The timeline scales its whole type system rather than each call site, so a card's title, its
+ * chips, its supporting copy and a Material button's label all move together and new text is
+ * covered without anyone remembering to opt in. The derived styles in TypeHierarchy.kt read from
+ * this same object, so they follow for free.
+ */
+fun Typography.scaledBy(factor: Float): Typography {
+    if (factor == 1f) return this
+    return copy(
+        bodyLarge = bodyLarge.scaledBy(factor),
+        bodyLargeEmphasized = bodyLargeEmphasized.scaledBy(factor),
+        bodyMedium = bodyMedium.scaledBy(factor),
+        bodyMediumEmphasized = bodyMediumEmphasized.scaledBy(factor),
+        bodySmall = bodySmall.scaledBy(factor),
+        bodySmallEmphasized = bodySmallEmphasized.scaledBy(factor),
+        displayLarge = displayLarge.scaledBy(factor),
+        displayLargeEmphasized = displayLargeEmphasized.scaledBy(factor),
+        displayMedium = displayMedium.scaledBy(factor),
+        displayMediumEmphasized = displayMediumEmphasized.scaledBy(factor),
+        displaySmall = displaySmall.scaledBy(factor),
+        displaySmallEmphasized = displaySmallEmphasized.scaledBy(factor),
+        headlineLarge = headlineLarge.scaledBy(factor),
+        headlineLargeEmphasized = headlineLargeEmphasized.scaledBy(factor),
+        headlineMedium = headlineMedium.scaledBy(factor),
+        headlineMediumEmphasized = headlineMediumEmphasized.scaledBy(factor),
+        headlineSmall = headlineSmall.scaledBy(factor),
+        headlineSmallEmphasized = headlineSmallEmphasized.scaledBy(factor),
+        labelLarge = labelLarge.scaledBy(factor),
+        labelLargeEmphasized = labelLargeEmphasized.scaledBy(factor),
+        labelMedium = labelMedium.scaledBy(factor),
+        labelMediumEmphasized = labelMediumEmphasized.scaledBy(factor),
+        labelSmall = labelSmall.scaledBy(factor),
+        labelSmallEmphasized = labelSmallEmphasized.scaledBy(factor),
+        titleLarge = titleLarge.scaledBy(factor),
+        titleLargeEmphasized = titleLargeEmphasized.scaledBy(factor),
+        titleMedium = titleMedium.scaledBy(factor),
+        titleMediumEmphasized = titleMediumEmphasized.scaledBy(factor),
+        titleSmall = titleSmall.scaledBy(factor),
+        titleSmallEmphasized = titleSmallEmphasized.scaledBy(factor),
+    )
+}
+
+/**
  * The timeline's zoom scope: one place that owns what "the current zoom" means for everything
  * drawn inside it.
  *
@@ -133,11 +178,24 @@ fun rememberChatTypography(fontScale: Float): ChatTypography {
  */
 @Composable
 fun TimelineZoomScope(scale: Float, content: @Composable () -> Unit) {
+    val baseTypography = MaterialTheme.typography
+    val baseColors = MaterialTheme.colorScheme
+    val baseShapes = MaterialTheme.shapes
+    val scaledTypography = remember(baseTypography, scale) { baseTypography.scaledBy(scale) }
     CompositionLocalProvider(
         LocalChatFontScale provides scale,
         LocalChatTypography provides rememberChatTypography(scale),
-        content = content,
-    )
+    ) {
+        // The Material set is replaced too, so a style read straight from MaterialTheme.typography
+        // inside the timeline is already at this zoom. That is what reaches the text nobody
+        // remembered to scale: chips, card headers, button labels, paging notices.
+        MaterialTheme(
+            colorScheme = baseColors,
+            shapes = baseShapes,
+            typography = scaledTypography,
+            content = content,
+        )
+    }
 }
 
 @Composable

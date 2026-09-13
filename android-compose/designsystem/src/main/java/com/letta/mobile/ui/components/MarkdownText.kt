@@ -183,7 +183,7 @@ private fun InlineRichTextChunk(text: String, textColor: Color) {
     val fontScale = LocalChatFontScale.current
     Text(
         text = text,
-        style = MaterialTheme.typography.bodyMedium.scaledBy(fontScale),
+        style = MaterialTheme.typography.bodyMedium,
         color = textColor,
     )
 }
