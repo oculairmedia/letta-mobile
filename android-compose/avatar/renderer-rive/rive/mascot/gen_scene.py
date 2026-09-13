@@ -76,6 +76,8 @@ CONV_LOOK, CONV_MOUTH = "2:1", "2:2"
 
 ROOT, BODY_NODE, FACE, HITBOX, HALO, SOFT, TINT, GLOSS = "0:2", "0:100", "0:200", "0:90", "0:91", "0:93", "0:92", "0:94"
 PLATE, PLATE_EXPR, PLATE_BLINK = "0:210", "0:211", "0:212"
+TURN_NODE, JOYSTICK, TRAIL1, TRAIL2 = "0:220", "0:221", "0:222", "0:223"
+JX, JY = 299, 300  # Joystick x / y
 body_vertex_ids = [f"0:{300 + i}" for i in range(8)]
 soft_vertex_ids = [f"0:{310 + i}" for i in range(8)]
 halo_vertex_ids = [f"0:{320 + i}" for i in range(8)]
@@ -91,6 +93,9 @@ HOVER_ANIM, HOVER_REST_ANIM, HOVER_NODE, HOVER_REST_NODE, HOVER_HELD_NODE = "3:1
 FLASH_REST_ANIM, FLASH_REST_NODE, SUCCESS_ANIM, SUCCESS_NODE, ERROR_ANIM, ERROR_NODE = "3:190", "3:191", "3:192", "3:193", "3:194", "3:195"
 DRAG_REST_ANIM, DRAG_REST_NODE, DRAG_ANIM, DRAG_NODE = "3:200", "3:201", "3:202", "3:203"
 IDLE_WAIT_A, IDLE_WAIT_B, IDLE_GLANCE_ANIM, IDLE_A_NODE, IDLE_B_NODE, IDLE_GLANCE_NODE = "3:210", "3:211", "3:212", "3:213", "3:214", "3:215"
+TURN_X_ANIM, TURN_Y_ANIM = "3:220", "3:221"
+WANDER_WAIT_A, WANDER_WAIT_B, WANDER_GLANCE, WANDER_PEEK, WANDER_SPIN = "3:230", "3:231", "3:232", "3:233", "3:234"
+WANDER_A_NODE, WANDER_B_NODE, WANDER_GLANCE_NODE, WANDER_PEEK_NODE, WANDER_SPIN_NODE = "3:240", "3:241", "3:242", "3:243", "3:244"
 
 PLATE_AB, PLATE_SM, PLATE_IN_EXPR, PLATE_IN_BLINK = "7:2", "7:5", "7:6", "7:7"
 PLATE_ROOT, PLATE_CARD, GLYPHS_NODE, MOUTH_MORPH, PLATE_SHADOW = "7:20", "7:21", "7:22", "7:23", "7:24"
@@ -423,8 +428,22 @@ def plate_component():
 # ================================================================================================
 # Root
 # ================================================================================================
+TURN_PX, TURN_PY = 70, 24          # plate travel at facing +-1
+TURN_SQUASH = 0.7                  # plate scaleX at the edges (foreshortening)
+
+
+def trail(name, sid):
+    return f'''<Shape x="0" y="0" opacity="0" name="{name}" id="{sid}">
+    {rrect(120, 120, 27)}
+    {fill(PLATE_WHITE)}
+</Shape>'''
+
+
 def face():
+    # FacePlacement > Turn (keyed only by the joystick's TurnX/TurnY) > Face (keyed by state motion).
+    # Trails are declared after Turn so they draw underneath the plate.
     return f'''<Node x="250" y="262" name="FacePlacement">
+<Node x="0" y="0" name="Turn" id="{TURN_NODE}">
 <Node x="0" y="0" name="Face" id="{FACE}">
     <NestedArtboard artboardId="{PLATE_AB}" x="-100" y="-108" name="Plate" id="{PLATE}">
         <NestedStateMachine animationId="{PLATE_SM}" name="SM">
@@ -442,7 +461,45 @@ def face():
         </NestedRemapAnimation>
     </NestedArtboard>
 </Node>
+</Node>
+{indent(trail("Trail1", TRAIL1), "")}
+{indent(trail("Trail2", TRAIL2), "")}
 </Node>'''
+
+
+def turn_animations():
+    """Pose ranges the joystick scrubs: frame 0 = facing -1 (left), 60 = +1 (right)."""
+    tx = animation("TurnX", TURN_X_ANIM, 60, {TURN_NODE: {
+        X: [(0, -TURN_PX, LINEAR), (60, TURN_PX)],
+        SX: [(0, TURN_SQUASH, LINEAR), (30, 1, LINEAR), (60, TURN_SQUASH)]}})
+    ty = animation("TurnY", TURN_Y_ANIM, 60, {TURN_NODE: {
+        Y: [(0, -TURN_PY, LINEAR), (60, TURN_PY)],
+        SY: [(0, 0.9, LINEAR), (30, 1, LINEAR), (60, 0.9)]}})
+    return [tx, ty]
+
+
+def spin_keys(start, dur, trails=True):
+    """A whip-around: facing 0 -> +1 -> -1 -> 0 over `dur` frames from `start`, trails lagging."""
+    a, b, c, d = start, start + round(dur * 0.25), start + round(dur * 0.62), start + dur
+    x = [(a, 0, ACCEL), (b, 1, STANDARD), (c, -1, SOFT_OUT), (d, 0)]
+    keys = {JOYSTICK: {JX: x}}
+    if trails:
+        for tid, lag, alpha in ((TRAIL1, 2, 0.28), (TRAIL2, 4, 0.14)):
+            keys[tid] = {
+                X: [(f + lag, v * TURN_PX) + ((bez,) if bez else ()) for (f, v, *rest) in [(k[0], k[1], *(k[2:] or [None])) for k in x] for bez in [rest[0] if rest else None]],
+                OPACITY: [(a, 0, LINEAR), (a + lag + 1, alpha, None), (c, alpha, LINEAR), (d, 0)],
+            }
+    return keys
+
+
+def wander_animations():
+    glance = animation("WanderGlance", WANDER_GLANCE, frames(1600), {JOYSTICK: {
+        JX: [(0, 0, SOFT_OUT), (frames(400), -0.8, None), (frames(900), -0.8, SOFT_OUT), (frames(1300), 0.4, SOFT_OUT), (frames(1600), 0)]}})
+    peek = animation("WanderPeek", WANDER_PEEK, frames(1400), {JOYSTICK: {
+        JY: [(0, 0, SOFT_OUT), (frames(350), 0.7, None), (frames(900), 0.7, SOFT_OUT), (frames(1400), 0)],
+        JX: [(0, 0, SOFT_OUT), (frames(350), 0.3, None), (frames(900), 0.3, SOFT_OUT), (frames(1400), 0)]}})
+    spin = animation("WanderSpin", WANDER_SPIN, frames(700), spin_keys(0, frames(700)))
+    return [animation("WanderWaitA", WANDER_WAIT_A, frames(6000), {}), animation("WanderWaitB", WANDER_WAIT_B, frames(12000), {}), glance, peek, spin]
 
 
 def sine(amplitude, period_ms, base=0.0):
@@ -454,6 +511,9 @@ def sine(amplitude, period_ms, base=0.0):
 def sustained_animations():
     """SPEC section 1: root motion (Body and Face move together), plate rotation/offset, tint,
     gloss pulse, and the glyph index. Nothing keys body scale or body vertices."""
+    FACING = {"idle": (-0.15, 0), "listening": (0, 0), "thinking": (-0.6, -0.2), "waitingInput": (0, 0),
+              "speaking": (0.15, 0), "error": (-0.3, 0.25), "sleeping": (0.4, 0.5), "loading": (0, 0),
+              "failed": (0, 0.1), "degraded": (0.5, -0.1)}
     ROW = {  # key: (root motion, period ms, plate rot deg, face offset, tint, gloss pulse)
         "idle": ({"y": sine(1, 4600)}, 4600, 0, (0, 0), "00000000", None),
         "listening": ({"y": sine(1, 4600)}, 4600, -2, (0, -3), "00000000", None),
@@ -478,8 +538,9 @@ def sustained_animations():
         mx, my = motion.get("x", 0), motion.get("y", 0)
         body_keys = {X: mx, Y: my}
         face_keys = {X: shifted(mx, fx), Y: shifted(my, fy), ROT: rad(rot)}
+        jx, jy = FACING[st]
         objs = {BODY_NODE: body_keys, FACE: face_keys, TINT: {COLOR: tint}, PLATE_EXPR: {NESTED_VALUE: EXPR[st]},
-                GLOSS: {GRADIENT_OPACITY: gloss if gloss else 1}}
+                GLOSS: {GRADIENT_OPACITY: gloss if gloss else 1}, JOYSTICK: {JX: jx, JY: jy}}
         duration = frames(period) if period else 1
         out.append(animation("State" + st[0].upper() + st[1:], root_state_anim[st], duration, objs, "loop" if duration > 1 else "oneShot"))
     return out
@@ -494,10 +555,12 @@ def momentary_animations():
     S = frames(800)
     f = lambda pct: round(S * pct / 100)
     hop = [(0, 0, ACCEL), (f(10), 2, SPRING), (f(37.5), -10, ACCEL), (f(70), 1, SOFT_OUT), (S, 0)]
-    success = animation("SuccessFlash", SUCCESS_ANIM, S, {
+    success_keys = {
         BODY_NODE: {Y: hop},
         FACE: {Y: hop, ROT: [(0, 0, ACCEL), (f(10), rad(-2), SPRING), (f(37.5), rad(2), ACCEL), (f(70), rad(-1), SOFT_OUT), (S, 0)]},
-        PLATE_EXPR: {NESTED_VALUE: EXPR["success"]}})
+        PLATE_EXPR: {NESTED_VALUE: EXPR["success"]}}
+    success_keys.update(spin_keys(f(10), f(70) - f(10)))
+    success = animation("SuccessFlash", SUCCESS_ANIM, S, success_keys)
     E = frames(600)
     g = lambda pct: round(E * pct / 100)
     ex = [(0, 0, STANDARD), (g(16.6667), -4, STANDARD), (g(33.3333), 4, STANDARD), (g(50), -2, STANDARD), (g(66.6667), 0, None), (E, 0)]
@@ -560,6 +623,19 @@ def root_machine():
         + anim_state(IDLE_GLANCE_ANIM, IDLE_GLANCE_NODE, 2, ' reset="true" random="true"',
                      weighted(exit_transition(IDLE_A_NODE), 50) + "\n" + weighted(exit_transition(IDLE_B_NODE), 50)))
 
+    wander = layer_frame(
+        "Wander", "3:10", WANDER_A_NODE, "",
+        anim_state(WANDER_WAIT_A, WANDER_A_NODE, 0, ' random="true"',
+                   weighted(exit_transition(WANDER_GLANCE_NODE), 55) + "\n" + weighted(exit_transition(WANDER_PEEK_NODE), 35) + "\n" + weighted(exit_transition(WANDER_SPIN_NODE), 10)) + "\n"
+        + anim_state(WANDER_WAIT_B, WANDER_B_NODE, 1, ' random="true"',
+                     weighted(exit_transition(WANDER_GLANCE_NODE), 55) + "\n" + weighted(exit_transition(WANDER_PEEK_NODE), 35) + "\n" + weighted(exit_transition(WANDER_SPIN_NODE), 10)) + "\n"
+        + anim_state(WANDER_GLANCE, WANDER_GLANCE_NODE, 2, ' reset="true" random="true"',
+                     weighted(exit_transition(WANDER_A_NODE, 200, SOFT_OUT), 50) + "\n" + weighted(exit_transition(WANDER_B_NODE, 200, SOFT_OUT), 50)) + "\n"
+        + anim_state(WANDER_PEEK, WANDER_PEEK_NODE, 3, ' reset="true" random="true"',
+                     weighted(exit_transition(WANDER_A_NODE, 200, SOFT_OUT), 50) + "\n" + weighted(exit_transition(WANDER_B_NODE, 200, SOFT_OUT), 50)) + "\n"
+        + anim_state(WANDER_SPIN, WANDER_SPIN_NODE, 4, ' reset="true" random="true"',
+                     weighted(exit_transition(WANDER_A_NODE, 200, SOFT_OUT), 50) + "\n" + weighted(exit_transition(WANDER_B_NODE, 200, SOFT_OUT), 50)))
+
     def bool_listener(name, kind, prop, value):
         b = bind(prop, BIND_BOOL).replace("/>", ' direction="true"/>')
         return (f'<StateMachineListenerSingle targetId="{HITBOX}" listenerTypeValue="{kind}" name="{name}">\n'
@@ -578,6 +654,7 @@ def root_machine():
 {indent(flash, "    ")}
 {indent(drag, "    ")}
 {indent(idle, "    ")}
+{indent(wander, "    ")}
 {indent(listeners, "    ")}
 </StateMachine>'''
 
@@ -588,10 +665,13 @@ def root_artboard():
     blink = animation("BlinkFire", BLINK_ANIM, 2, {}, callbacks=(PLATE_BLINK,))
     hover_rest = animation("HoverRest", HOVER_REST_ANIM, 1, {})
     hover = animation("HoverWiggle", HOVER_ANIM, frames(240), {FACE: {ROT: [(0, 0, STANDARD), (frames(60), rad(2), STANDARD), (frames(150), rad(-2), STANDARD), (frames(240), 0)]}})
-    anims = shape_animations() + sustained_animations() + momentary_animations() + idle_variety_animations() + [breath, blink_rest, blink, hover_rest, hover]
+    anims = (shape_animations() + sustained_animations() + momentary_animations() + idle_variety_animations()
+             + turn_animations() + wander_animations() + [breath, blink_rest, blink, hover_rest, hover])
     return f'''<Artboard defaultStateMachineId="{SM}" viewModelId="{VM}" viewModelInstanceId="{VM_INSTANCE}"
           x="0" y="0" styleId="0:3" clip="false" width="500" height="500" name="Mascot" id="{ROOT}">
     <LayoutComponentStyle name="Style" id="0:3"/>
+    <!-- Facing: one 2-D value scrubbing TurnX/TurnY; keyed by state entries, Wander and flashes. -->
+    <Joystick posX="250" posY="262" width="140" height="48" xId="{TURN_X_ANIM}" yId="{TURN_Y_ANIM}" x="-0.15" y="0" name="Facing" id="{JOYSTICK}"/>
 {indent(face(), "    ")}
 {indent(body(), "    ")}
 

@@ -57,6 +57,13 @@ sources are cited in `MOTION-REFERENCES.md`.
   `Shade`, `Gloss` (its opacity breathes), `Tint` (colour keyed per state: darker for `sleeping`,
   grey for `failed`, overlays over the palette colour). `SoftEdge` and `Halo` are faint feathered
   strokes of the same path behind it.
+- **Facing** is a `Joystick` (`Facing`, on the root): its x/y scrub the `TurnX`/`TurnY` pose
+  ranges, which slide the `Turn` node (plate) ±70/±24 px across the body and foreshorten it at
+  the edges. Nothing else keys `Turn`. Whoever wants the character to turn keys the joystick:
+  every state row has a facing (idle −0.15, thinking −0.6 away, listening 0 square-on, sleeping
+  down-and-away…), so a state change is a turn blended over the transition; the `Wander` layer
+  waits 6–12 s then plays a side glance, a peek, or rarely a spin; the `success` flash spins
+  (0 → +1 → −1 → 0) with `Trail1`/`Trail2`, two ghost plates lagging 2 and 4 frames.
 - Root layers: `Shape` (identity), `Expression` (sustained states: root y/x motion on Body and
   Face together, plate rotation and offset on Face, tint, glyph index; designed transition pairs
   from SPEC §3), `Flash` (`success` 800 ms / `error` 600 ms triggers per SPEC §2, self-returning),
