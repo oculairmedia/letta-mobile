@@ -44,17 +44,20 @@ fun RiveDesktopSurface(
     DisposableEffect(Unit) { onDispose { images.forEach { it?.close() }; images.fill(null) } }
 
     LaunchedEffect(scene, size) {
-        if (size.width <= 0 || size.height <= 0) return@LaunchedEffect
-        val info = ImageInfo(size.width, size.height, ColorType.RGBA_8888, ColorAlphaType.PREMUL)
+        // Pin the size for this loop: `size` is state and can change under a frame callback before
+        // the effect restarts, and a buffer of one size in an ImageInfo of another is a crash.
+        val (w, h) = size
+        if (w <= 0 || h <= 0) return@LaunchedEffect
+        val info = ImageInfo(w, h, ColorType.RGBA_8888, ColorAlphaType.PREMUL)
         var last = withFrameNanos { it }
         while (true) {
             withFrameNanos { now ->
                 scene.advance(((now - last) / 1e9).toFloat())
                 last = now
                 val started = System.nanoTime()
-                val pixels = scene.render(size.width, size.height)
+                val pixels = scene.render(w, h)
                 onFrameStats?.invoke((System.nanoTime() - started) / 1e6)
-                val image = Image.makeRaster(info, pixels, size.width * 4)
+                val image = Image.makeRaster(info, pixels, w * 4)
                 images[1]?.close()
                 images[1] = images[0]
                 images[0] = image
