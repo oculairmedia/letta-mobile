@@ -65,8 +65,11 @@ sources are cited in `MOTION-REFERENCES.md`.
   waits 6–12 s then plays a side glance, a peek, or rarely a spin; the `success` flash spins
   (0 → +1 → −1 → 0) with `Trail1`/`Trail2`, two ghost plates lagging 2 and 4 frames.
 - Root layers: `Shape` (identity), `Expression` (sustained states: root y/x motion on Body and
-  Face together, plate rotation and offset on Face, tint, glyph index; designed transition pairs
-  from SPEC §3), `Flash` (`success` 800 ms / `error` 600 ms triggers per SPEC §2, self-returning),
+  Face together, plate rotation and offset on Face, tint, glyph index; **every state change
+  goes through an `Enter_<from>_<to>` one-shot** that fires the plate blink at frame 0 and
+  flips the glyph at frame 3 while the eye is shut, turning the facing to the new state's;
+  the SPEC §3 pairs carry designed body/face motion, the rest hold and ease in on the hand-off.
+  Inside `Plate`, glyph switches are instant cuts - the shutter is what hides them), `Flash` (`success` 800 ms / `error` 600 ms triggers per SPEC §2, self-returning),
   `Drag` (boolean + the file's dragStart/dragEnd listeners), `IdleVariety` (random 4–7 s waits,
   a glance), `Breath` (gloss opacity), `Blink`, `Hover` (one wiggle per enter).
 - `Plate` is the one component: `Card` (120 px, radius 27) with a soft `Shadow`, a `Glyphs` node

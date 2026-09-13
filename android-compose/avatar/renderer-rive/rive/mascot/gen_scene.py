@@ -94,6 +94,11 @@ FLASH_REST_ANIM, FLASH_REST_NODE, SUCCESS_ANIM, SUCCESS_NODE, ERROR_ANIM, ERROR_
 DRAG_REST_ANIM, DRAG_REST_NODE, DRAG_ANIM, DRAG_NODE = "3:200", "3:201", "3:202", "3:203"
 IDLE_WAIT_A, IDLE_WAIT_B, IDLE_GLANCE_ANIM, IDLE_A_NODE, IDLE_B_NODE, IDLE_GLANCE_NODE = "3:210", "3:211", "3:212", "3:213", "3:214", "3:215"
 TURN_X_ANIM, TURN_Y_ANIM = "3:220", "3:221"
+DESIGNED_PAIRS = {("idle", "listening"): 200, ("listening", "thinking"): 300, ("thinking", "speaking"): 200,
+                  ("speaking", "idle"): 240, ("error", "idle"): 300}  # SPEC section 3, ms
+ENTER_PAIRS = [(a, b) for a in SUSTAINED for b in SUSTAINED if a != b]  # every change gets an entry
+enter_anim = {pair: f"3:{250 + i}" for i, pair in enumerate(ENTER_PAIRS)}   # 3:250..3:339
+enter_node = {pair: f"3:{350 + i}" for i, pair in enumerate(ENTER_PAIRS)}   # 3:350..3:439
 WANDER_WAIT_A, WANDER_WAIT_B, WANDER_GLANCE, WANDER_PEEK, WANDER_SPIN = "3:230", "3:231", "3:232", "3:233", "3:234"
 WANDER_A_NODE, WANDER_B_NODE, WANDER_GLANCE_NODE, WANDER_PEEK_NODE, WANDER_SPIN_NODE = "3:240", "3:241", "3:242", "3:243", "3:244"
 
@@ -245,9 +250,13 @@ def weighted(t, weight):
 
 
 def expression_layer(name, lid, input_id, anim_ids, node_ids):
-    trans = "\n".join(input_transition(node_ids[s], input_id, EXPR[s]) for s in STATES)
-    states = "\n".join(anim_state(anim_ids[s], node_ids[s], i) for i, s in enumerate(STATES))
-    return layer_frame(name, lid, node_ids["idle"], trans, states)
+    # Explicit matrix, instant cuts: the root hides every swap inside a blink shutter, and an
+    # AnyState fan-out would keep re-entering the current state (a self-blend that fades the glyph).
+    states = []
+    for i, s in enumerate(STATES):
+        own = "\n".join(input_transition(node_ids[t], input_id, EXPR[t], 0) for t in STATES if t != s)
+        states.append(anim_state(anim_ids[s], node_ids[s], i, "", own))
+    return layer_frame(name, lid, node_ids["idle"], "", "\n".join(states))
 
 
 def fill(color):
@@ -469,12 +478,15 @@ def face():
 
 def turn_animations():
     """Pose ranges the joystick scrubs: frame 0 = facing -1 (left), 60 = +1 (right)."""
-    tx = animation("TurnX", TURN_X_ANIM, 60, {TURN_NODE: {
-        X: [(0, -TURN_PX, LINEAR), (60, TURN_PX)],
-        SX: [(0, TURN_SQUASH, LINEAR), (30, 1, LINEAR), (60, TURN_SQUASH)]}})
-    ty = animation("TurnY", TURN_Y_ANIM, 60, {TURN_NODE: {
-        Y: [(0, -TURN_PY, LINEAR), (60, TURN_PY)],
-        SY: [(0, 0.9, LINEAR), (30, 1, LINEAR), (60, 0.9)]}})
+    tx = animation("TurnX", TURN_X_ANIM, 60, {
+        TURN_NODE: {X: [(0, -TURN_PX, LINEAR), (60, TURN_PX)],
+                    SX: [(0, TURN_SQUASH, LINEAR), (30, 1, LINEAR), (60, TURN_SQUASH)]},
+        BODY_NODE: {ROT: [(0, rad(-6), LINEAR), (60, rad(6))],
+                    SX: [(0, 0.93, LINEAR), (30, 1, LINEAR), (60, 0.93)]}})
+    ty = animation("TurnY", TURN_Y_ANIM, 60, {
+        TURN_NODE: {Y: [(0, -TURN_PY, LINEAR), (60, TURN_PY)],
+                    SY: [(0, 0.9, LINEAR), (30, 1, LINEAR), (60, 0.9)]},
+        BODY_NODE: {SY: [(0, 1.03, LINEAR), (30, 1, LINEAR), (60, 0.96)]}})
     return [tx, ty]
 
 
@@ -482,7 +494,8 @@ def spin_keys(start, dur, trails=True):
     """A whip-around: facing 0 -> +1 -> -1 -> 0 over `dur` frames from `start`, trails lagging."""
     a, b, c, d = start, start + round(dur * 0.25), start + round(dur * 0.62), start + dur
     x = [(a, 0, ACCEL), (b, 1, STANDARD), (c, -1, SOFT_OUT), (d, 0)]
-    keys = {JOYSTICK: {JX: x}}
+    keys = {JOYSTICK: {JX: x},
+            BODY_NODE: {ROT: [(a, 0, ACCEL), (b, rad(14), STANDARD), (c, rad(-14), SOFT_OUT), (d, 0)]}}
     if trails:
         for tid, lag, alpha in ((TRAIL1, 2, 0.28), (TRAIL2, 4, 0.14)):
             keys[tid] = {
@@ -508,12 +521,16 @@ def sine(amplitude, period_ms, base=0.0):
     return [(0, base, SINE), (q, base + amplitude, SINE), (2 * q, base, SINE), (3 * q, base - amplitude, SINE), (4 * q, base)]
 
 
+def sustained_facing():
+    return {"idle": (-0.15, 0), "listening": (0, 0), "thinking": (-0.6, -0.2), "waitingInput": (0, 0),
+              "speaking": (0.15, 0), "error": (-0.3, 0.25), "sleeping": (0.4, 0.5), "loading": (0, 0),
+              "failed": (0, 0.1), "degraded": (0.5, -0.1)}
+
+
 def sustained_animations():
     """SPEC section 1: root motion (Body and Face move together), plate rotation/offset, tint,
     gloss pulse, and the glyph index. Nothing keys body scale or body vertices."""
-    FACING = {"idle": (-0.15, 0), "listening": (0, 0), "thinking": (-0.6, -0.2), "waitingInput": (0, 0),
-              "speaking": (0.15, 0), "error": (-0.3, 0.25), "sleeping": (0.4, 0.5), "loading": (0, 0),
-              "failed": (0, 0.1), "degraded": (0.5, -0.1)}
+    FACING = sustained_facing()
     ROW = {  # key: (root motion, period ms, plate rot deg, face offset, tint, gloss pulse)
         "idle": ({"y": sine(1, 4600)}, 4600, 0, (0, 0), "00000000", None),
         "listening": ({"y": sine(1, 4600)}, 4600, -2, (0, -3), "00000000", None),
@@ -543,6 +560,49 @@ def sustained_animations():
                 GLOSS: {GRADIENT_OPACITY: gloss if gloss else 1}, JOYSTICK: {JX: jx, JY: jy}}
         duration = frames(period) if period else 1
         out.append(animation("State" + st[0].upper() + st[1:], root_state_anim[st], duration, objs, "loop" if duration > 1 else "oneShot"))
+    return out
+
+
+def enter_duration(frm, to):
+    """ms and bezier of the entry from `frm` to `to`: SPEC section 3 for the designed pairs,
+    otherwise the target's default (sleeping settles slowly, waitingInput springs)."""
+    if (frm, to) in DESIGNED_PAIRS:
+        return DESIGNED_PAIRS[(frm, to)], SOFT_OUT
+    return {"sleeping": (600, STANDARD), "waitingInput": (160, SPRING)}.get(to, (160, EASE_OUT))
+
+
+def enter_animations():
+    """One entry per pair of sustained states: a one-shot whose glyph swap hides inside a blink
+    fired at frame 0 (the shutter, closed by frame 3); the plate's expression flips while the
+    eye is closed and the facing travels to the target's. The SPEC section 3 pairs add designed
+    body/face motion that lands on the target's rest; the generic ones key nothing else, so
+    face, body and tint hold and then ease into the target over the hand-off blend."""
+    F = sustained_facing()
+    out = []
+    for (frm, to), aid in enter_anim.items():
+        fx0, fy0 = F[frm]; fx1, fy1 = F[to]
+        d, bez = enter_duration(frm, to)
+        n = frames(d)
+        keys = {PLATE_EXPR: {NESTED_VALUE: [(0, EXPR[frm], None), (3, EXPR[to])]},
+                JOYSTICK: {JX: [(0, fx0, bez), (n, fx1)], JY: [(0, fy0, bez), (n, fy1)]}}
+        if (frm, to) == ("idle", "listening"):
+            # 40 ms anticipation down, then the lean up to the listening offset (-3), plate -2 degrees.
+            keys[FACE] = {Y: [(0, 0, ACCEL), (frames(40), 1, SOFT_OUT), (n, -3)], ROT: [(0, 0, SOFT_OUT), (n, rad(-2))]}
+        elif (frm, to) == ("listening", "thinking"):
+            # hold the gaze 60 ms, then turn away and tilt.
+            keys[JOYSTICK] = {JX: [(0, fx0, None), (frames(60), fx0, STANDARD), (n, fx1)], JY: [(0, fy0, None), (frames(60), fy0, STANDARD), (n, fy1)]}
+            keys[FACE] = {Y: [(0, -3, STANDARD), (n, 0)], ROT: [(0, rad(-2), STANDARD), (n, rad(-6))]}
+        elif (frm, to) == ("thinking", "speaking"):
+            keys[FACE] = {ROT: [(0, rad(-6), SOFT_OUT), (frames(140), 0, None), (n, 0)]}
+        elif (frm, to) == ("speaking", "idle"):
+            # the small exhale: +1 at 120 ms, then rest.
+            keys[FACE] = {Y: [(0, 0, SOFT_OUT), (frames(120), 1, SOFT_OUT), (n, 0)]}
+            keys[BODY_NODE] = {Y: [(0, 0, SOFT_OUT), (frames(120), 1, SOFT_OUT), (n, 0)]}
+        elif (frm, to) == ("error", "idle"):
+            keys[FACE] = {Y: [(0, 4, SOFT_OUT), (n, 0)], ROT: [(0, rad(5), SOFT_OUT), (n, 0)]}
+            keys[BODY_NODE] = {Y: [(0, 5, SOFT_OUT), (n, 0)]}
+            keys[TINT] = {COLOR: [(0, "14000000"), (frames(100), "00000000")]}
+        out.append(animation(f"Enter_{frm}_{to}", aid, n, keys, callbacks=(PLATE_BLINK,)))
     return out
 
 
@@ -585,17 +645,21 @@ def root_machine():
     shape_states = "\n".join(anim_state(shape_anim[s], shape_node[s], i) for i, s in enumerate(SHAPES))
     shape_layer = layer_frame("Shape", "3:9", shape_node[DEFAULT_SHAPE], shape_trans, shape_states)
 
-    target_dur = {"sleeping": (600, STANDARD), "waitingInput": (160, SPRING)}
-    expr_trans = "\n".join(enum_transition(root_state_node[st], state_enum_ids[st], *target_dur.get(st, (160, EASE_OUT))) for st in SUSTAINED)
-    pairs = {("idle", "listening"): (200, SOFT_OUT), ("listening", "thinking"): (300, STANDARD),
-             ("thinking", "speaking"): (200, SOFT_OUT), ("speaking", "idle"): (240, SOFT_OUT), ("error", "idle"): (300, SOFT_OUT)}
+    # No AnyState fan-out: Rive evaluates AnyState before a state's own transitions, which would
+    # swallow the entries. Every sustained state cuts (0 ms) into the entry for the requested
+    # state; the entry hands off to the sustained loop at its end. Designed entries land on the
+    # target's rest and cut; generic ones blend the hand-off so held face/body/tint ease in.
     states = []
     for i, st in enumerate(SUSTAINED):
-        own = [enum_transition(root_state_node[to], state_enum_ids[to], d, b) for (frm, to), (d, b) in pairs.items() if frm == st]
-        if st == "sleeping":
-            own += [enum_transition(root_state_node[to], state_enum_ids[to], 600, STANDARD) for to in SUSTAINED if to != "sleeping"]
+        own = [enum_transition(enter_node[(st, to)], state_enum_ids[to], 0, None) for to in SUSTAINED if to != st]
         states.append(anim_state(root_state_anim[st], root_state_node[st], i, "", "\n".join(own)))
-    expression = layer_frame("Expression", "3:1", root_state_node["idle"], expr_trans, "\n".join(states))
+    for j, ((frm, to), nid) in enumerate(enter_node.items()):
+        # An entry can be interrupted by any other request (through that state's own entry).
+        hand_off = (0, None) if (frm, to) in DESIGNED_PAIRS else (min(120, enter_duration(frm, to)[0]), EASE_OUT)
+        own = [exit_transition(root_state_node[to], *hand_off)]
+        own += [enum_transition(enter_node[(to, other)], state_enum_ids[other], 0, None) for other in SUSTAINED if other != to]
+        states.append(anim_state(enter_anim[(frm, to)], nid, len(SUSTAINED) + j, ' reset="true"', "\n".join(own)))
+    expression = layer_frame("Expression", "3:1", root_state_node["idle"], "", "\n".join(states))
 
     breath = layer_frame("Breath", "3:2", BREATH_NODE, "", anim_state(BREATH_ANIM, BREATH_NODE, 0))
     blink = layer_frame("Blink", "3:3", BLINK_REST_NODE, trigger_transition(BLINK_NODE, VM_BLINK),
@@ -665,7 +729,7 @@ def root_artboard():
     blink = animation("BlinkFire", BLINK_ANIM, 2, {}, callbacks=(PLATE_BLINK,))
     hover_rest = animation("HoverRest", HOVER_REST_ANIM, 1, {})
     hover = animation("HoverWiggle", HOVER_ANIM, frames(240), {FACE: {ROT: [(0, 0, STANDARD), (frames(60), rad(2), STANDARD), (frames(150), rad(-2), STANDARD), (frames(240), 0)]}})
-    anims = (shape_animations() + sustained_animations() + momentary_animations() + idle_variety_animations()
+    anims = (shape_animations() + sustained_animations() + enter_animations() + momentary_animations() + idle_variety_animations()
              + turn_animations() + wander_animations() + [breath, blink_rest, blink, hover_rest, hover])
     return f'''<Artboard defaultStateMachineId="{SM}" viewModelId="{VM}" viewModelInstanceId="{VM_INSTANCE}"
           x="0" y="0" styleId="0:3" clip="false" width="500" height="500" name="Mascot" id="{ROOT}">
