@@ -63,6 +63,13 @@ cd android-compose
 cycles every state and identity and prints each step.) If the window dies on relaunch with a
 Skiko D3D redrawer error, the previous instance was still exiting; launch again.
 
+**Order matters: push before you commit.** `rive push` assigns ids to every object the
+generator left unnamed and writes them back into `scene.rml` (that is how the next push updates
+those objects in place instead of recreating them). Regenerating throws those ids away, so a
+freshly generated `scene.rml` always shows a huge diff against the committed one - that is not
+a change. Commit the file the push wrote. Objects the generator does name (`id="0:100"` etc.)
+are stable across pushes and are what the artist's edits attach to.
+
 **Push rule.** The CLI regenerates and pushes freely *until the artist makes their first edit in
 the editor*. From then on the editor file is the source of truth and a CLI push would overwrite
 it. Ask before pushing if you do not know whether that has happened.
