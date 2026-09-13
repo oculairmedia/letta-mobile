@@ -531,6 +531,7 @@ def plate_component():
 TURN_PX, TURN_PY = 70, 24          # plate travel at facing +-1
 TURN_SQUASH = 0.7                  # plate scaleX at the edges (foreshortening)
 TURN_ROT = 14                      # plate roll (deg) at facing +-1; the body adds +-6 of its own
+TURN_RECEDE = 0.84                 # plate scale at facing +-1: it is further from the viewer there
 
 
 def trail(name, sid):
@@ -583,12 +584,15 @@ def turn_animations():
     tx = animation("TurnX", TURN_X_ANIM, 60, {
         TURN_NODE: {X: [(0, -TURN_PX, LINEAR), (60, TURN_PX)],
                     ROT: [(0, rad(-TURN_ROT), LINEAR), (60, rad(TURN_ROT))],
-                    SX: [(0, TURN_SQUASH, LINEAR), (30, 1, LINEAR), (60, TURN_SQUASH)]},
+                    # foreshorten (SX) and recede (SY too): the feature moves away as it turns
+                    SX: [(0, TURN_SQUASH * TURN_RECEDE, LINEAR), (30, 1, LINEAR), (60, TURN_SQUASH * TURN_RECEDE)],
+                    SY: [(0, TURN_RECEDE, LINEAR), (30, 1, LINEAR), (60, TURN_RECEDE)]},
         BODY_NODE: {ROT: [(0, rad(-6), LINEAR), (60, rad(6))],
                     SX: [(0, 0.93, LINEAR), (30, 1, LINEAR), (60, 0.93)]}})
     ty = animation("TurnY", TURN_Y_ANIM, 60, {
         TURN_NODE: {Y: [(0, -TURN_PY, LINEAR), (60, TURN_PY)],
-                    SY: [(0, 0.9, LINEAR), (30, 1, LINEAR), (60, 0.9)]},
+                    SY: [(0, 0.9 * TURN_RECEDE, LINEAR), (30, 1, LINEAR), (60, 0.9 * TURN_RECEDE)],
+                    SX: [(0, TURN_RECEDE, LINEAR), (30, 1, LINEAR), (60, TURN_RECEDE)]},
         BODY_NODE: {SY: [(0, 1.03, LINEAR), (30, 1, LINEAR), (60, 0.96)]}})
     return [tx, ty]
 
