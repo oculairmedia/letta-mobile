@@ -249,3 +249,24 @@
 | State silhouette invariant | Each state uses identical selected body d; only identity changes body d. Profile scales are uniform and do not depend on state. |
 | Review target | Render each state and mouthOpen=0/0.5/1 at exact 22/44/72 px on light/dark backgrounds, plus enlarged nearest-neighbour copies; these are SVG assembly checks, not Rive runtime claims |
 | Contract boundary | Fable still owns conversion/integration and the runtime gate; this package supplies the path geometry, numeric poses, paint recipe and preserved object mapping |
+
+## 8. Rive implementation notes (Fable, after conversion)
+
+How the generator realises sections 1–7, and where it deviates. `README.md` in this directory
+is the operating manual; `RIVE-PLATFORM-POWER.md` is the platform brief this was audited against.
+
+| Mechanism | Implementation |
+| --- | --- |
+| App surface | View Model `Avatar` only (enum `state`, enum `shape`, colour `color`, numbers `mouthOpen`/`lookX`/`lookY`, triggers `success`/`error`/`blink`, booleans `dragged`/`hovered`). No legacy inputs at the root. |
+| Plate component | Nested artboard driven by inputs `expr` (number) and `blink` (trigger) from the root's animations, because a view-model-driven machine inside a nested artboard never fires. `LookX`/`LookY`/`Open` are pose-range timelines scrubbed through `NestedRemapAnimation.time` with range-mapper converters bound to the numbers (§4 "0 ms scrub"). |
+| Glyphs | A `Solo` (`Glyphs`): one keyed reference picks the drawn glyph per `expr`; no opacity stack. Mouths stay opacity-switched (§4 "allowed mouth expr"). |
+| Sustained states (§1) | One looping `State<X>` animation per key on the root `Expression` layer; body motion on `Body` and `Face` together, plate rotation/offset on `Face`, tint colour, gloss opacity, `expr`, and the facing (below). |
+| Transitions (§3) | Every sustained→sustained change runs an `Enter_<from>_<to>` one-shot. The five designed rows carry their anticipation/target keys; unlisted pairs use the target's default (160 ms ease-out; sleeping 600 ms standard; waitingInput 160 ms spring) and blend the hand-off. |
+| Glyph shutter (§3 rule) | Realised as the plate blink (55/25/90 ms, §4) fired at the entry's frame 0, with the glyph reference flipped at frame 3 while the eye is shut — not the 30 %/70 % proportional shutter. Same read, one mechanism, and it also covers the flash returns. |
+| Flashes (§2) | `Flash` layer, self-returning; success adds a facing spin with two trailing ghost plates. |
+| Facing (not in SPEC; product ask) | A `Joystick` (`Facing`) scrubs `TurnX`/`TurnY`: the plate slides ±70/±24 px and foreshortens, the body rotates ±6° and squeezes. Each state has a facing; entries turn to it; a `Wander` layer glances/peeks/spins on its own every 6–12 s. |
+| Idle life (§5) | `Breath` (gloss), `IdleVariety` (glance on the plate, not the glyph — the root cannot key a nested node), `AutoBlink` inside the Plate. Random waits are two-state alternations with `random` selection. |
+| Body render (§6) | Fill bound to `color`; `Shade`/`Gloss`/`Tint` neutral overlays; `SoftEdge`/`Halo` are feathered *strokes* bound to `color` — the CLI cannot feather a fill; the editor pass can. |
+| Sizes (§7) | Standard profile only. The `-small` profile needs a host size signal the contract does not carry. |
+| Smoothing | None in-file. The host envelope in §4 owns `mouthOpen` smoothing; adding a converter interpolator would double-smooth. |
+| Not used, by choice | Blend states (the scrubbed pose ranges are the equivalent and are what the CLI can verify headless); scripts; runtime events; nested view models; `reduceMotion` (needs a contract change — filed as follow-up). |

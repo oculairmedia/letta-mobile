@@ -70,6 +70,7 @@ COLOR, GRADIENT_OPACITY = 37, 46
 VX, VY, VROT, VDIST = 24, 25, 82, 83                      # mirrored vertex
 VIN_ROT, VIN_DIST, VOUT_ROT, VOUT_DIST = 84, 85, 86, 87   # detached vertex
 NESTED_VALUE, NESTED_FIRE, REMAP_TIME = 239, 401, 202
+ACTIVE_CHILD = 296  # Solo.activeComponentId
 BIND_ENUM, BIND_TRIGGER, BIND_BOOL = 637, 686, 634
 
 # --- ids ----------------------------------------------------------------------------------------
@@ -144,7 +145,13 @@ def interp(bezier):
     return f'<CubicEaseInterpolator x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}"/>'
 
 
+class Id(str):
+    """A keyed object reference (Solo.activeComponentId): KeyFrameId, always hold."""
+
+
 def kf(value, frame, bezier=None):
+    if isinstance(value, Id):
+        return f'<KeyFrameId value="{value}" frame="{frame}"/>'
     if isinstance(value, str):  # colour
         return f'<KeyFrameColor value="{value}" frame="{frame}"/>'
     if bezier:
@@ -356,9 +363,9 @@ STATE_PLATE_SCALE = {"listening": 1.04, "waitingInput": 1.06}
 def plate_component():
     expr_anims = []
     for st in STATES:
-        objs = {gid: {OPACITY: 0} for gid in GLYPH.values()}
+        # Glyphs live in a Solo: one keyed reference picks the drawn child (no opacity stack).
+        objs = {GLYPHS_NODE: {ACTIVE_CHILD: Id(GLYPH[STATE_GLYPH[st]])}}
         objs.update({MOUTH_MORPH: {OPACITY: 0}, MOUTH_O: {OPACITY: 0}, FROWN: {OPACITY: 0}})
-        objs[GLYPH[STATE_GLYPH[st]]] = {OPACITY: 1}
         if st in STATE_MOUTH:
             objs[STATE_MOUTH[st]] = {OPACITY: 1}
         sc = STATE_PLATE_SCALE.get(st, 1)
@@ -393,7 +400,7 @@ def plate_component():
         + anim_state(PLATE_BLINK_ANIM, PLATE_AUTO_BLINK, 2, ' reset="true" random="true"',
                      weighted(exit_transition(PLATE_AUTO_A), 50) + "\n" + weighted(exit_transition(PLATE_AUTO_B), 50)))
 
-    glyphs = "\n".join(svgpath.path_rml(art(f"glyph-{n}.svg"), n[0].upper() + n[1:], GLYPH[n], INK, opacity=0) for n in GLYPH_ORDER)
+    glyphs = "\n".join(svgpath.path_rml(art(f"glyph-{n}.svg"), n[0].upper() + n[1:], GLYPH[n], INK) for n in GLYPH_ORDER)
     mv = "\n".join(
         f'<CubicDetachedVertex x="{s[0]}" y="{s[1]}" inRotation="{s[2]}" inDistance="{s[3]}" outRotation="{s[4]}" outDistance="{s[5]}" name="M{i}" id="{vid}"/>'
         for i, (s, vid) in enumerate(zip(MOUTH_SAMPLES[0], mouth_vertex_ids)))
@@ -412,9 +419,9 @@ def plate_component():
 {indent(mouth_morph, "        ")}
 {indent(mouth_o, "        ")}
 {indent(frown, "        ")}
-        <Node x="0" y="0" name="Glyphs" id="{GLYPHS_NODE}">
+        <Solo activeComponentId="{GLYPH[STATE_GLYPH['idle']]}" x="0" y="0" name="Glyphs" id="{GLYPHS_NODE}">
 {indent(glyphs, "            ")}
-        </Node>
+        </Solo>
         <Shape x="0" y="0" name="Card" id="{PLATE_CARD}">
             {rrect(120, 120, 27)}
             {fill(PLATE_WHITE)}

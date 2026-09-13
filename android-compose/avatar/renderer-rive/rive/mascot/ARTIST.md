@@ -72,10 +72,10 @@ sources are cited in `MOTION-REFERENCES.md`.
   Inside `Plate`, glyph switches are instant cuts - the shutter is what hides them), `Flash` (`success` 800 ms / `error` 600 ms triggers per SPEC §2, self-returning),
   `Drag` (boolean + the file's dragStart/dragEnd listeners), `IdleVariety` (random 4–7 s waits,
   a glance), `Breath` (gloss opacity), `Blink`, `Hover` (one wiggle per enter).
-- `Plate` is the one component: `Card` (120 px, radius 27) with a soft `Shadow`, a `Glyphs` node
+- `Plate` is the one component: `Card` (120 px, radius 27) with a soft `Shadow`, a `Glyphs` Solo
   holding one shape per state glyph (`Idle`, `Listening`, `Thinking`, `WaitingInput`, `Speaking`,
-  `Success`, `Error`, `Sleeping`, `Loading`, `Failed`, `Degraded` - the SVGs by name) switched by
-  opacity on `expr`, and three mouths below the plate: `Mouth` (morphs closed/half/open on the
+  `Success`, `Error`, `Sleeping`, `Loading`, `Failed`, `Degraded` - the SVGs by name; the Solo's
+  active child is keyed per `expr`), and three mouths below the plate: `Mouth` (morphs closed/half/open on the
   `Open` timeline from the three mouth SVGs), `MouthO` (waitingInput), `FrownLine` (error).
   `LookX`/`LookY` move the glyph ±7/±5 px; `Blink` squashes the `Glyphs` node (55/25/90 ms);
   `AutoBlink` waits 2.5–4.5 s.

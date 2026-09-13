@@ -19,7 +19,8 @@ Beads: `letta-mobile-kh094` (this asset), `letta-mobile-1zti3` (identity picker 
 | `build/mascot.riv` | Built by the CLI; copied to `src/androidMain/res/raw/mascot.riv` (what the app loads) | no |
 | `rive.yaml` | Push mapping: project 1882737 "oculair / Shared Project", file 2578084 "mascot" | no |
 | `sheet.py` | Contact sheets from screenshots (the review tool) | - |
-| `SPEC.md`, `MOTION-REFERENCES.md` | Numbers and references from the design agent | with them |
+| `SPEC.md`, `MOTION-REFERENCES.md` | Numbers and references from the design agent; SPEC §8 is the implementation map | with them |
+| `RIVE-PLATFORM-POWER.md` | The design agent's platform brief; the audit below answers it | - |
 | `ARTIST.md` | Handoff for the human art pass; the names the app depends on | keep current |
 
 Tooling: Rive CLI 1.0.2 at `~/.rive/bin/rive.exe` (`rive docs`, `rive schema <Type>`), Python 3
@@ -91,8 +92,8 @@ Mascot (root artboard, view-model "Avatar")
   Facing ("0:221")     Joystick, x -> TurnX ("3:220"), y -> TurnY ("3:221"); property keys JX=299, JY=300
 
 Plate (component, input driven, ids "7:*")
-  Card 120 r27 + Shadow; Glyphs node ("7:22") with one shape per state glyph (7:30-7:40),
-  switched by opacity on `expr`; Mouth morph (7:23, vertex ids 7:70-73, keyed on Open at
+  Card 120 r27 + Shadow; Glyphs Solo ("7:22") with one shape per state glyph (7:30-7:40),
+  `activeComponentId` keyed per `expr` (KeyFrameId, hold); Mouth morph (7:23, vertex ids 7:70-73, keyed on Open at
   0/30/60), MouthO (7:43), FrownLine (7:42). Blink squashes Glyphs scaleY 3/2/5 frames.
   Layers: Expression (explicit matrix, instant cuts), Blink (trigger), AutoBlink (2.5-4.5 s).
 ```
@@ -156,6 +157,33 @@ fading when they should cut, brows colliding with eyes, rotations in the wrong u
 placement overwritten to 0, glow drowning the body, the eye too small against the sheet.
 
 Sheets from previous rounds are in `C:/rive-spike/v2/` on the Windows box (not committed).
+
+## Platform audit (against `RIVE-PLATFORM-POWER.md` §3)
+
+Must:
+
+- [x] App-facing names are View Model properties on `Avatar`; no legacy inputs at the root
+- [x] `state` keys match `RiveAvatarContract.stateKey` (`check_contract.py` enforces it)
+- [x] `success` / `error` / `blink` are triggers; `Flash` self-returns
+- [x] `color` bound to the body fill and the halo/soft-edge strokes; no identity hex
+- [x] `shape` enum wired as a vertex morph (Shape layer)
+- [x] `mouthOpen` / `lookX` / `lookY` scrub pose-range timelines through range-mapper converters (no keyframe hops); facing is a Joystick
+- [x] `dragged` / `hovered` written by file listeners and by the app
+- [x] One SM `Avatar`, ten layers
+- [x] Glyphs in a `Solo` (keyed `activeComponentId`), mouths opacity-switched per SPEC §4
+- [x] `check_contract.py` passes on the shipped `.riv`
+- [x] Feathering is stroke-only and rendered through the Rive Renderer on both targets
+
+Should / deliberately not:
+
+- [x] Plate is a component with an input boundary (`expr`, `blink`). Body is not a component: its vertices are keyed by the root's Shape layer, and a nested body would need its own input plumbing for no gain.
+- [ ] Nested view model for the face — **no**: a VM-driven machine in a nested artboard never fires; inputs are the working pattern.
+- [x] Converters: range mappers on look/mouth. **No interpolator**: SPEC §4's host envelope owns smoothing.
+- [ ] Blend states — **not used**: the scrubbed ranges are the equivalent and verify headless. Revisit if the editor pass wants additive look layers.
+- [ ] Scripts / test scripts — not used; random waits are two-state alternations, which the runtime handles natively.
+- [ ] Transition actions — not needed; the error flash lands on the sustained error pose by construction.
+- [ ] `reduceMotion` — needs a contract property and a host write; follow-up bead.
+- [x] `rive inspect . --json` is the structural check; `check_contract.py` reads it.
 
 ## Open items
 
