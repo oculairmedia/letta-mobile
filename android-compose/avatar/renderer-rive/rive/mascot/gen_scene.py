@@ -486,6 +486,7 @@ def plate_component():
 # ================================================================================================
 TURN_PX, TURN_PY = 70, 24          # plate travel at facing +-1
 TURN_SQUASH = 0.7                  # plate scaleX at the edges (foreshortening)
+TURN_ROT = 14                      # plate roll (deg) at facing +-1; the body adds +-6 of its own
 
 
 def trail(name, sid):
@@ -528,8 +529,11 @@ def face():
 
 def turn_animations():
     """Pose ranges the joystick scrubs: frame 0 = facing -1 (left), 60 = +1 (right)."""
+    # The plate slides, foreshortens AND rolls with the turn (+-TURN_ROT): a face turning on a
+    # ball tilts its features; without the roll a turn reads as a flat slide.
     tx = animation("TurnX", TURN_X_ANIM, 60, {
         TURN_NODE: {X: [(0, -TURN_PX, LINEAR), (60, TURN_PX)],
+                    ROT: [(0, rad(-TURN_ROT), LINEAR), (60, rad(TURN_ROT))],
                     SX: [(0, TURN_SQUASH, LINEAR), (30, 1, LINEAR), (60, TURN_SQUASH)]},
         BODY_NODE: {ROT: [(0, rad(-6), LINEAR), (60, rad(6))],
                     SX: [(0, 0.93, LINEAR), (30, 1, LINEAR), (60, 0.93)]}})
@@ -547,9 +551,13 @@ def spin_keys(start, dur, trails=True):
     keys = {JOYSTICK: {JX: x},
             BODY_NODE: {ROT: [(a, 0, ACCEL), (b, rad(14), STANDARD), (c, rad(-14), SOFT_OUT), (d, 0)]}}
     if trails:
+        def lagged(lag, scale):
+            # the facing curve, delayed `lag` frames and mapped through `scale`, keeping each key's bezier
+            return [(k[0] + lag, scale(k[1])) + tuple(k[2:]) for k in x]
         for tid, lag, alpha in ((TRAIL1, 2, 0.28), (TRAIL2, 4, 0.14)):
             keys[tid] = {
-                X: [(f + lag, v * TURN_PX) + ((bez,) if bez else ()) for (f, v, *rest) in [(k[0], k[1], *(k[2:] or [None])) for k in x] for bez in [rest[0] if rest else None]],
+                X: lagged(lag, lambda v: v * TURN_PX),
+                ROT: lagged(lag, lambda v: rad(v * TURN_ROT)),
                 OPACITY: [(a, 0, LINEAR), (a + lag + 1, alpha, None), (c, alpha, LINEAR), (d, 0)],
             }
     return keys
