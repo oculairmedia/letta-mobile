@@ -32,6 +32,10 @@ def rad(deg):
 STATES = ["idle", "listening", "dragged", "thinking", "waitingInput", "speaking",
           "success", "error", "sleeping", "loading", "failed", "degraded"]
 EXPR = {s: i for i, s in enumerate(STATES)}
+# Rive convention: the enum carries only SUSTAINED states. success is a trigger the machine plays
+# and returns from; dragged is a boolean the drag listeners (and the host) write.
+MOMENTARY = ["success", "dragged"]
+SUSTAINED = [s for s in STATES if s not in MOMENTARY]
 
 # --- property keys (rive schema) --------------------------------------------------------------
 X, Y, ROT, SX, SY, OPACITY = 13, 14, 15, 16, 17, 18
@@ -44,6 +48,7 @@ BIND_ENUM, BIND_TRIGGER, BIND_BOOL = 637, 686, 634
 #     4:* Eye, 5:* Brow, 6:* Mouth ----------------------------------------------------------------
 VM, VM_STATE, VM_MOUTH, VM_LOOKX, VM_LOOKY, VM_BLINK, VM_SHAPE, VM_COLOR, VM_HOVER = (
     "1:50", "1:1", "1:2", "1:3", "1:4", "1:5", "1:6", "1:7", "1:8")
+VM_SUCCESS, VM_ERROR, VM_DRAGGED = "1:9", "1:10", "1:11"
 VM_INSTANCE, ENUM_STATE, ENUM_SHAPE = "1:20", "1:100", "1:200"
 state_enum_ids = {s: f"1:{101 + i}" for i, s in enumerate(STATES)}
 SHAPES = ["circle", "blob", "roundedSquare", "pill", "triangle", "hexagon", "cloud", "drop"]
@@ -61,6 +66,9 @@ SM = "3:5"
 root_state_anim = {s: f"3:{100 + i}" for i, s in enumerate(STATES)}
 root_state_node = {s: f"3:{130 + i}" for i, s in enumerate(STATES)}
 BREATH_ANIM, BREATH_NODE = "3:160", "3:161"
+FLASH_REST_ANIM, FLASH_REST_NODE, SUCCESS_ANIM, SUCCESS_NODE, ERROR_ANIM, ERROR_NODE = "3:190", "3:191", "3:192", "3:193", "3:194", "3:195"
+DRAG_REST_ANIM, DRAG_REST_NODE, DRAG_ANIM, DRAG_NODE = "3:200", "3:201", "3:202", "3:203"
+IDLE_WAIT_A, IDLE_WAIT_B, IDLE_GLANCE_ANIM, IDLE_A_NODE, IDLE_B_NODE, IDLE_GLANCE_NODE = "3:210", "3:211", "3:212", "3:213", "3:214", "3:215"
 BLINK_ANIM, BLINK_REST_ANIM, BLINK_NODE, BLINK_REST_NODE = "3:170", "3:171", "3:172", "3:173"
 HOVER_ANIM, HOVER_REST_ANIM, HOVER_NODE, HOVER_REST_NODE = "3:180", "3:181", "3:182", "3:183"
 
@@ -539,37 +547,59 @@ def face():
 
 
 def root_state_animations():
-    """Per state: forward the expression index to every component, and move the body/face."""
+    """Per sustained state: forward the expression index to every component, and pose the body."""
     BODY_REST = {BODY_NODE: {SX: 1, SY: 1, X: 0, Y: 0, OPACITY: 1}, FACE: {X: 0, Y: 0}}
     motion = {
         "idle": ({}, 1, "oneShot"),
         "listening": ({BODY_NODE: {SX: 1.04, SY: 1.04}, FACE: {Y: -6}}, 1, "oneShot"),
-        "dragged": ({BODY_NODE: {SX: [(0, 1.08), (20, 1.05), (40, 1.08)], SY: [(0, 0.92), (20, 0.95), (40, 0.92)]}}, 40, "loop"),
         "thinking": ({BODY_NODE: {X: [(0, -4), (60, 4), (120, -4)]}, FACE: {X: [(0, 6), (60, 10), (120, 6)], Y: -4}}, 120, "loop"),
         "waitingInput": ({BODY_NODE: {Y: [(0, 0), (24, -8), (48, 0)]}}, 48, "loop"),
         "speaking": ({}, 1, "oneShot"),
-        "success": ({BODY_NODE: {Y: [(0, 0), (10, -18), (24, 0)], SX: [(0, 1), (10, 1.06), (24, 1)], SY: [(0, 1), (10, 1.06), (24, 1)]}}, 24, "oneShot"),
-        "error": ({BODY_NODE: {Y: [(0, 0), (8, 6), (30, 6)], X: [(0, 0), (4, -5), (8, 5), (12, -4), (16, 0)]}, FACE: {Y: 4}}, 30, "oneShot"),
+        "error": ({BODY_NODE: {Y: 6}, FACE: {Y: 4}}, 1, "oneShot"),          # the settle; the flash is a trigger
         "sleeping": ({BODY_NODE: {OPACITY: 0.85}, FACE: {Y: 8}}, 1, "oneShot"),
         "loading": ({BODY_NODE: {OPACITY: [(0, 0.7), (36, 1.0), (72, 0.7)]}}, 72, "loop"),
         "failed": ({BODY_NODE: {OPACITY: 0.6}}, 1, "oneShot"),
         "degraded": ({BODY_NODE: {OPACITY: 0.8}}, 1, "oneShot"),
     }
     out = []
-    for s in STATES:
-        overrides, duration, loop = motion[s]
+    for st in SUSTAINED:
+        overrides, duration, loop = motion[st]
         objs = {o: dict(p) for o, p in BODY_REST.items()}
         for o, p in overrides.items():
             objs.setdefault(o, {}).update(p)
         for nested in (EYES_EXPR, BROWS_EXPR, MOUTH_EXPR):
-            objs[nested] = {NESTED_VALUE: EXPR[s]}
-        out.append(animation("State" + s[0].upper() + s[1:], root_state_anim[s], duration, objs, loop))
+            objs[nested] = {NESTED_VALUE: EXPR[st]}
+        out.append(animation("State" + st[0].upper() + st[1:], root_state_anim[st], duration, objs, loop))
     return out
 
 
+def momentary_animations():
+    """Flashes and drag. These layers sit AFTER Expression, so while they are in their active state
+    they win the body pose and the components' expression; their Rest animations key nothing, so
+    the sustained layer shows through the moment they return."""
+    exprs = lambda st: {n: {NESTED_VALUE: EXPR[st]} for n in (EYES_EXPR, BROWS_EXPR, MOUTH_EXPR)}
+    success = animation("SuccessFlash", SUCCESS_ANIM, 48,
+                        {BODY_NODE: {Y: [(0, 0), (10, -18), (24, 0), (48, 0)], SX: [(0, 1), (10, 1.06), (24, 1), (48, 1)], SY: [(0, 1), (10, 1.06), (24, 1), (48, 1)]},
+                         **exprs("success")})
+    error = animation("ErrorFlash", ERROR_ANIM, 36,
+                      {BODY_NODE: {Y: [(0, 0), (8, 6), (36, 6)], X: [(0, 0), (4, -5), (8, 5), (12, -4), (16, 0), (36, 0)]}, FACE: {Y: [(0, 0), (8, 4), (36, 4)]},
+                       **exprs("error")})
+    drag = animation("Dragged", DRAG_ANIM, 40,
+                     {BODY_NODE: {SX: [(0, 1.08), (20, 1.05), (40, 1.08)], SY: [(0, 0.92), (20, 0.95), (40, 0.92)]}, **exprs("dragged")}, "loop")
+    return [animation("FlashRest", FLASH_REST_ANIM, 1, {}), success, error,
+            animation("DragRest", DRAG_REST_ANIM, 1, {}), drag]
+
+
+def idle_variety_animations():
+    """Idle is not one loop: random-length waits, then a small glance/tilt, then back."""
+    glance = animation("IdleGlance", IDLE_GLANCE_ANIM, 90,
+                       {FACE: {ROT: [(0, 0), (30, rad(3)), (60, rad(-2)), (90, 0)], X: [(0, 0), (30, 5), (60, -3), (90, 0)]}})
+    return [animation("IdleWaitA", IDLE_WAIT_A, 240, {}), animation("IdleWaitB", IDLE_WAIT_B, 420, {}), glance]
+
+
 def root_machine():
-    expr_trans = "\n".join(vm_enum_transition(root_state_node[s], state_enum_ids[s]) for s in STATES)
-    expr_states = "\n".join(anim_state(root_state_anim[s], root_state_node[s], i) for i, s in enumerate(STATES))
+    expr_trans = "\n".join(vm_enum_transition(root_state_node[st], state_enum_ids[st]) for st in SUSTAINED)
+    expr_states = "\n".join(anim_state(root_state_anim[st], root_state_node[st], i) for i, st in enumerate(SUSTAINED))
     expression = layer_frame("Expression", "3:1", root_state_node["idle"], expr_trans, expr_states)
 
     breath = layer_frame("Breath", "3:2", BREATH_NODE, "", anim_state(BREATH_ANIM, BREATH_NODE, 0))
@@ -585,6 +615,35 @@ def root_machine():
         vm_bool_transition(HOVER_NODE, VM_HOVER, "true") + "\n" + vm_bool_transition(HOVER_REST_NODE, VM_HOVER, "false"),
         f'<AnimationState x="200" y="40" animationId="{HOVER_REST_ANIM}" id="{HOVER_REST_NODE}"/>\n'
         f'<AnimationState x="200" y="100" animationId="{HOVER_ANIM}" id="{HOVER_NODE}"/>')
+
+    flash = layer_frame(
+        "Flash", "3:6", FLASH_REST_NODE,
+        vm_trigger_transition(SUCCESS_NODE, VM_SUCCESS) + "\n" + vm_trigger_transition(ERROR_NODE, VM_ERROR),
+        f'<AnimationState x="200" y="40" animationId="{FLASH_REST_ANIM}" id="{FLASH_REST_NODE}"/>\n'
+        f'<AnimationState x="200" y="100" animationId="{SUCCESS_ANIM}" reset="true" id="{SUCCESS_NODE}">\n'
+        f'    {exit_transition(FLASH_REST_NODE, 120)}\n</AnimationState>\n'
+        f'<AnimationState x="200" y="160" animationId="{ERROR_ANIM}" reset="true" id="{ERROR_NODE}">\n'
+        f'    {exit_transition(FLASH_REST_NODE, 120)}\n</AnimationState>')
+
+    drag = layer_frame(
+        "Drag", "3:7", DRAG_REST_NODE,
+        vm_bool_transition(DRAG_NODE, VM_DRAGGED, "true") + "\n" + vm_bool_transition(DRAG_REST_NODE, VM_DRAGGED, "false"),
+        f'<AnimationState x="200" y="40" animationId="{DRAG_REST_ANIM}" id="{DRAG_REST_NODE}"/>\n'
+        f'<AnimationState x="200" y="100" animationId="{DRAG_ANIM}" id="{DRAG_NODE}"/>')
+
+    idle = layer_frame(
+        "IdleVariety", "3:8", IDLE_A_NODE, "",
+        f'<AnimationState x="200" y="40" animationId="{IDLE_WAIT_A}" id="{IDLE_A_NODE}">\n    {exit_transition(IDLE_GLANCE_NODE)}\n</AnimationState>\n'
+        f'<AnimationState x="200" y="100" animationId="{IDLE_WAIT_B}" id="{IDLE_B_NODE}">\n    {exit_transition(IDLE_GLANCE_NODE)}\n</AnimationState>\n'
+        f'<AnimationState x="200" y="160" animationId="{IDLE_GLANCE_ANIM}" reset="true" random="true" id="{IDLE_GLANCE_NODE}">\n'
+        f'    {weighted(exit_transition(IDLE_A_NODE), 50)}\n    {weighted(exit_transition(IDLE_B_NODE), 50)}\n</AnimationState>')
+
+    def bool_listener(name, kind, prop, value):
+        return (f'<StateMachineListenerSingle targetId="{HITBOX}" listenerTypeValue="{kind}" name="{name}">\n'
+                f'    <ListenerViewModelChange>\n        <BindablePropertyBoolean propertyValue="{value}">\n'
+                f'            {bind(prop, BIND_BOOL).replace("/>", chr(32) + "direction=" + chr(34) + "true" + chr(34) + "/>")}\n'
+                f'        </BindablePropertyBoolean>\n    </ListenerViewModelChange>\n</StateMachineListenerSingle>')
+    drag_listeners = bool_listener("DragStart", "dragStart", VM_DRAGGED, "true") + "\n" + bool_listener("DragEnd", "dragEnd", VM_DRAGGED, "false")
 
     listeners = f'''<StateMachineListenerSingle targetId="{HITBOX}" listenerTypeValue="enter" name="HoverIn">
     <ListenerViewModelChange>
@@ -606,7 +665,11 @@ def root_machine():
 {indent(breath, "    ")}
 {indent(blink, "    ")}
 {indent(hover, "    ")}
+{indent(flash, "    ")}
+{indent(drag, "    ")}
+{indent(idle, "    ")}
 {indent(listeners, "    ")}
+{indent(drag_listeners, "    ")}
 </StateMachine>'''
 
 
@@ -626,14 +689,14 @@ def root_artboard():
 {indent(face(), "    ")}
 {indent(body(), "    ")}
 
-{indent(chr(10).join(state_anims + [breath, blink_rest, blink, hover_rest, hover]), "    ")}
+{indent(chr(10).join(state_anims + momentary_animations() + idle_variety_animations() + [breath, blink_rest, blink, hover_rest, hover]), "    ")}
 
 {indent(root_machine(), "    ")}
 </Artboard>'''
 
 
 def data():
-    states = "\n".join(f'    <DataEnumValue key="{s}" value="{s[0].upper() + s[1:]}" id="{state_enum_ids[s]}"/>' for s in STATES)
+    states = "\n".join(f'    <DataEnumValue key="{s}" value="{s[0].upper() + s[1:]}" id="{state_enum_ids[s]}"/>' for s in SUSTAINED)
     shapes = "\n".join(f'    <DataEnumValue key="{s}" value="{s[0].upper() + s[1:]}" id="{shape_enum_ids[s]}"/>' for s in SHAPES)
     return f'''<DataEnumCustom name="AvatarState" id="{ENUM_STATE}">
 {states}
@@ -658,6 +721,9 @@ def data():
     <ViewModelPropertyEnumCustom enumId="{ENUM_SHAPE}" name="shape" id="{VM_SHAPE}"/>
     <ViewModelPropertyColor name="color" id="{VM_COLOR}"/>
     <ViewModelPropertyBoolean name="hovered" id="{VM_HOVER}"/>
+    <ViewModelPropertyTrigger name="success" id="{VM_SUCCESS}"/>
+    <ViewModelPropertyTrigger name="error" id="{VM_ERROR}"/>
+    <ViewModelPropertyBoolean name="dragged" id="{VM_DRAGGED}"/>
 
     <ViewModelInstance exports="true" name="Default" id="{VM_INSTANCE}">
         <ViewModelInstanceEnum propertyValue="{state_enum_ids['idle']}" viewModelPropertyId="{VM_STATE}"/>
@@ -668,6 +734,9 @@ def data():
         <ViewModelInstanceEnum propertyValue="{shape_enum_ids['circle']}" viewModelPropertyId="{VM_SHAPE}"/>
         <ViewModelInstanceColor propertyValue="FF1E7BF0" viewModelPropertyId="{VM_COLOR}"/>
         <ViewModelInstanceBoolean propertyValue="false" viewModelPropertyId="{VM_HOVER}"/>
+        <ViewModelInstanceTrigger viewModelPropertyId="{VM_SUCCESS}"/>
+        <ViewModelInstanceTrigger viewModelPropertyId="{VM_ERROR}"/>
+        <ViewModelInstanceBoolean propertyValue="false" viewModelPropertyId="{VM_DRAGGED}"/>
     </ViewModelInstance>
 </ViewModel>'''
 

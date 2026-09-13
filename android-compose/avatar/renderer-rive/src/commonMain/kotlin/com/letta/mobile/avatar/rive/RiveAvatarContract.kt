@@ -19,8 +19,22 @@ object RiveAvatarContract {
     /** The state machine the renderer instantiates; a `.riv` may hold several. */
     const val STATE_MACHINE: String = "Avatar"
 
-    /** Custom enum `AvatarState`. The director's arbitrated state, as its [stateKey]. */
+    /**
+     * Custom enum `AvatarState`: the director's *sustained* state, as its [stateKey]. Momentary
+     * states are not enum values - Rive convention is that a flash is a trigger and the machine
+     * itself plays it and returns, so the file owns the timing: [TRIGGER_SUCCESS], [TRIGGER_ERROR],
+     * and dragging is the boolean [INPUT_DRAGGED] (which the file's own drag listeners also write).
+     */
     const val INPUT_STATE: String = "state"
+
+    /** Trigger. A task completed: the file plays its happy flash and returns to the sustained state. */
+    const val TRIGGER_SUCCESS: String = "success"
+
+    /** Trigger. Something failed: the sad flash; the sustained `error` state settles after it. */
+    const val TRIGGER_ERROR: String = "error"
+
+    /** Boolean. The pet is being dragged; the file's drag listeners write it too. */
+    const val INPUT_DRAGGED: String = "dragged"
 
     /** Number, 0..1. Jaw/mouth-open level, driven from speech amplitude. */
     const val INPUT_MOUTH_OPEN: String = "mouthOpen"
@@ -65,19 +79,19 @@ object RiveAvatarContract {
      * the declared list, so an index contract breaks silently the day someone reorders the art: the
      * build stays clean and the mascot simply plays the wrong state forever.
      */
-    fun stateKey(state: AvatarState): String = when (state) {
+    fun stateKey(state: AvatarState): String? = when (state) {
         AvatarState.IDLE -> "idle"
         AvatarState.LISTENING -> "listening"
-        AvatarState.DRAGGED -> "dragged"
         AvatarState.THINKING -> "thinking"
         AvatarState.WAITING_INPUT -> "waitingInput"
         AvatarState.SPEAKING -> "speaking"
-        AvatarState.SUCCESS -> "success"
         AvatarState.ERROR -> "error"
         AvatarState.SLEEPING -> "sleeping"
         AvatarState.LOADING -> "loading"
         AvatarState.FAILED -> "failed"
         AvatarState.DEGRADED -> "degraded"
+        // Momentary: written as a trigger / a boolean, never as the sustained enum.
+        AvatarState.SUCCESS, AvatarState.DRAGGED -> null
     }
 }
 

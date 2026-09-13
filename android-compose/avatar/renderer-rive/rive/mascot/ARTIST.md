@@ -29,7 +29,10 @@ On the `Avatar` view model of the `Mascot` artboard, state machine `Avatar`:
 
 | Property | Type | Meaning |
 |---|---|---|
-| `state` | enum `AvatarState` | which expression; keys `idle listening dragged thinking waitingInput speaking success error sleeping loading failed degraded` |
+| `state` | enum `AvatarState` | the **sustained** expression; keys `idle listening thinking waitingInput speaking error sleeping loading failed degraded` |
+| `success` | trigger | a task completed: the `Flash` layer plays the happy flash and returns on its own |
+| `error` | trigger | something failed: the sad flash; `state` then settles to `error` |
+| `dragged` | boolean | held while the pet is dragged; the file's own drag listeners write it too |
 | `mouthOpen` | number 0..1 | speech amplitude, updated every frame while speaking |
 | `lookX`, `lookY` | number -1..1 | gaze; 0,0 is straight ahead |
 | `blink` | trigger | one blink (the eyes also blink on their own) |

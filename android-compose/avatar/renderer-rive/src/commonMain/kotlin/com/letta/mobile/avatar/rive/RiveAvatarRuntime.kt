@@ -107,10 +107,31 @@ class RiveAvatarRuntime(
         _state.value = AvatarRuntimeState.Idle
     }
 
-    /** The director's arbitrated state, which is what the mascot's state machine actually reads. */
+    private var dragged = false
+
+    /**
+     * The director's arbitrated state, written the way the file's state machine reads it:
+     * sustained states as the enum, SUCCESS as a trigger the file plays and returns from, ERROR as
+     * a trigger for the flash plus the sustained `error` settle, DRAGGED as a boolean held until
+     * the next non-dragged state. The director still owns priority; the file owns choreography.
+     */
     fun applyState(state: AvatarState) {
         if (disposed) return
-        sink.setEnum(RiveAvatarContract.INPUT_STATE, RiveAvatarContract.stateKey(state))
+        when (state) {
+            AvatarState.SUCCESS -> sink.fire(RiveAvatarContract.TRIGGER_SUCCESS)
+            AvatarState.DRAGGED -> {
+                dragged = true
+                sink.setBoolean(RiveAvatarContract.INPUT_DRAGGED, true)
+            }
+            else -> {
+                if (dragged) {
+                    dragged = false
+                    sink.setBoolean(RiveAvatarContract.INPUT_DRAGGED, false)
+                }
+                if (state == AvatarState.ERROR) sink.fire(RiveAvatarContract.TRIGGER_ERROR)
+                sink.setEnum(RiveAvatarContract.INPUT_STATE, checkNotNull(RiveAvatarContract.stateKey(state)))
+            }
+        }
     }
 
     private fun ready(): Boolean = !disposed && _state.value is AvatarRuntimeState.Ready
