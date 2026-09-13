@@ -74,10 +74,10 @@ sources are cited in `MOTION-REFERENCES.md`.
   a glance), `Breath` (gloss opacity), `Blink`, `Hover` (one wiggle per enter).
 - `Plate` is the one component: `Card` (120 px, radius 27) with a soft `Shadow`, a `Glyphs` Solo
   holding one shape per state glyph (`Idle`, `Listening`, `Thinking`, `WaitingInput`, `Speaking`,
-  `Success`, `Error`, `Sleeping`, `Loading`, `Failed`, `Degraded` - the SVGs by name; the Solo's
-  active child is keyed per `expr`), and three mouths below the plate: `Mouth` (morphs closed/half/open on the
+  `Success`, `Error`, `Sleeping`, `Loading`, `Failed`, `Degraded`, `Dragged` - the SVGs by name;
+  the Solo's active child is keyed per `expr`), and three mouths below the plate: `Mouth` (morphs closed/half/open on the
   `Open` timeline from the three mouth SVGs), `MouthO` (waitingInput), `FrownLine` (error).
-  `LookX`/`LookY` move the glyph ±7/±5 px; `Blink` squashes the `Glyphs` node (55/25/90 ms);
+  `LookX`/`LookY` move the glyph ±23/±17 px; `Blink` squashes the `Glyphs` node (55/25/90 ms);
   `AutoBlink` waits 2.5–4.5 s.
 - To change a glyph or a body: edit the SVG, regenerate. To change timing: edit SPEC.md and the
   matching table in the generator. In the editor, keep the object names and ids so the poses

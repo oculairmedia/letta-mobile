@@ -19,7 +19,8 @@ Beads: `letta-mobile-kh094` (this asset), `letta-mobile-1zti3` (identity picker 
 | `build/mascot.riv` | Built by the CLI; copied to `src/androidMain/res/raw/mascot.riv` (what the app loads) | no |
 | `rive.yaml` | Push mapping: project 1882737 "oculair / Shared Project", file 2578084 "mascot" | no |
 | `sheet.py` | Contact sheets from screenshots (the review tool) | - |
-| `SPEC.md`, `MOTION-REFERENCES.md` | Numbers and references from the design agent; SPEC §8 is the implementation map | with them |
+| `SPEC.md`, `MOTION-REFERENCES.md` | Numbers and references from the design agent; §8 is the implementation map, §9 the human-touch patch (amplitudes, alphas, glyphs) the rig now follows | with them |
+| `art/validation/` | The design agent's static proofs and `validate.py` (needs numpy, Pillow, CairoSVG); not part of the build | - |
 | `RIVE-PLATFORM-POWER.md` | The design agent's platform brief; the audit below answers it | - |
 | `ARTIST.md` | Handoff for the human art pass; the names the app depends on | keep current |
 
@@ -47,7 +48,7 @@ $R push                            # new revision in the Rive workspace (see the
 
 `--screenshot` starts the state machine with the given view-model data and advances N frames
 at 60 fps, so `--advance=N` is "frame N of whatever the data triggered from idle". Use
-`--data=state=<key>` for sustained states, `--data=state=success` / `error` for the flashes,
+`--data=state=<key>` for sustained states, `--data=success=true` / `--data=error=true` to fire the flashes, `--data=dragged=true`,
 `--data=lookX=-1 --data=lookY=1 --data=mouthOpen=0.8` for the numbers, `--data=shape=drop`
 for identity. Render a state past its entry (advance 40+) to see its loop, and frames
 1/3/5/8/12/20 to see an entry.
@@ -92,7 +93,7 @@ Mascot (root artboard, view-model "Avatar")
   Facing ("0:221")     Joystick, x -> TurnX ("3:220"), y -> TurnY ("3:221"); property keys JX=299, JY=300
 
 Plate (component, input driven, ids "7:*")
-  Card 120 r27 + Shadow; Glyphs Solo ("7:22") with one shape per state glyph (7:30-7:40),
+  Card 120 r27 + Shadow; Glyphs Solo ("7:22") with one shape per state glyph (7:30-7:41, dragged last),
   `activeComponentId` keyed per `expr` (KeyFrameId, hold); Mouth morph (7:23, vertex ids 7:70-73, keyed on Open at
   0/30/60), MouthO (7:43), FrownLine (7:42). Blink squashes Glyphs scaleY 3/2/5 frames.
   Layers: Expression (explicit matrix, instant cuts), Blink (trigger), AutoBlink (2.5-4.5 s).

@@ -102,7 +102,7 @@ FLASH_REST_ANIM, FLASH_REST_NODE, SUCCESS_ANIM, SUCCESS_NODE, ERROR_ANIM, ERROR_
 DRAG_REST_ANIM, DRAG_REST_NODE, DRAG_ANIM, DRAG_NODE = "3:200", "3:201", "3:202", "3:203"
 IDLE_WAIT_A, IDLE_WAIT_B, IDLE_GLANCE_ANIM, IDLE_A_NODE, IDLE_B_NODE, IDLE_GLANCE_NODE = "3:210", "3:211", "3:212", "3:213", "3:214", "3:215"
 TURN_X_ANIM, TURN_Y_ANIM = "3:220", "3:221"
-DESIGNED_PAIRS = {("idle", "listening"): 200, ("listening", "thinking"): 300, ("thinking", "speaking"): 200,
+DESIGNED_PAIRS = {("idle", "listening"): 300, ("listening", "thinking"): 300, ("thinking", "speaking"): 200,
                   ("speaking", "idle"): 240, ("error", "idle"): 300}  # SPEC section 3, ms
 ENTER_PAIRS = [(a, b) for a in SUSTAINED for b in SUSTAINED if a != b]  # every change gets an entry
 enter_anim = {pair: f"3:{250 + i}" for i, pair in enumerate(ENTER_PAIRS)}   # 3:250..3:339
@@ -112,7 +112,7 @@ WANDER_A_NODE, WANDER_B_NODE, WANDER_GLANCE_NODE, WANDER_PEEK_NODE, WANDER_SPIN_
 
 PLATE_AB, PLATE_SM, PLATE_IN_EXPR, PLATE_IN_BLINK = "7:2", "7:5", "7:6", "7:7"
 PLATE_ROOT, PLATE_CARD, GLYPHS_NODE, MOUTH_MORPH, PLATE_SHADOW = "7:20", "7:21", "7:22", "7:23", "7:24"
-GLYPH_ORDER = ["idle", "listening", "thinking", "waitingInput", "speaking", "success", "error", "sleeping", "loading", "failed", "degraded"]
+GLYPH_ORDER = ["idle", "listening", "thinking", "waitingInput", "speaking", "success", "error", "sleeping", "loading", "failed", "degraded", "dragged"]  # 7:30..7:41
 GLYPH = {name: f"7:{30 + i}" for i, name in enumerate(GLYPH_ORDER)}
 FROWN, MOUTH_O = "7:42", "7:43"
 mouth_vertex_ids = [f"7:{70 + i}" for i in range(4)]
@@ -132,6 +132,11 @@ SPRING = "0.16 1 0.3 1"
 ACCEL = "0.4 0 1 1"
 SINE = "0.37 0 0.63 1"
 LINEAR = "0 0 1 1"
+# SPEC section 9 (Material 3 motion tokens)
+EMPH_ACCEL = "0.3 0 0.8 0.15"
+EMPH_DECEL = "0.05 0.7 0.1 1"
+M3_STANDARD = "0.2 0 0 1"
+STD_DECEL = "0 0 0 1"
 
 
 # --- small builders ----------------------------------------------------------------------------
@@ -331,14 +336,14 @@ def body():
             <SolidColor colorValue="00000000" name="TintColor" id="{TINT}"/>
         </Fill>
     </Shape>
-    <Shape opacity="0.08" name="SoftEdge" id="{SOFT}">
+    <Shape opacity="0.14" name="SoftEdge" id="{SOFT}">
 {indent(body_path(soft_vertex_ids, "Path"), "        ")}
         <Stroke thickness="8" name="Stroke">
             {bound}
             <Feather strength="4" name="Feather"/>
         </Stroke>
     </Shape>
-    <Shape scaleX="1.02" scaleY="1.02" opacity="0.04" name="Halo" id="{HALO}">
+    <Shape scaleX="1.02" scaleY="1.02" opacity="{HALO_OPACITY}" name="Halo" id="{HALO}">
 {indent(body_path(halo_vertex_ids, "Path"), "        ")}
         <Stroke thickness="12" name="Stroke">
             {bound}
@@ -353,7 +358,7 @@ def body():
 # Plate component (SPEC sections 1, 4, 7 standard profile).
 # ================================================================================================
 MOUTH_SAMPLES = [svgpath.mouth_vertices(art(f"glyph-mouth-{n}.svg")) for n in ("closed", "half", "open")]
-STATE_GLYPH = {"idle": "idle", "listening": "listening", "dragged": "thinking", "thinking": "thinking",
+STATE_GLYPH = {"idle": "idle", "listening": "listening", "dragged": "dragged", "thinking": "thinking",
                "waitingInput": "waitingInput", "speaking": "speaking", "success": "success", "error": "error",
                "sleeping": "sleeping", "loading": "loading", "failed": "failed", "degraded": "degraded"}
 STATE_MOUTH = {"dragged": MOUTH_MORPH, "waitingInput": MOUTH_O, "speaking": MOUTH_MORPH, "error": FROWN}
@@ -373,8 +378,8 @@ def plate_component():
         objs[PLATE_SHADOW] = {SX: sc, SY: sc}
         expr_anims.append(animation("Expr" + st[0].upper() + st[1:], plate_expr_anim[st], 1, objs))
 
-    look_x = animation("LookX", PLATE_LOOKX, 60, {GLYPHS_NODE: {X: [(0, -7, LINEAR), (60, 7)]}})
-    look_y = animation("LookY", PLATE_LOOKY, 60, {GLYPHS_NODE: {Y: [(0, -5, LINEAR), (60, 5)]}})
+    look_x = animation("LookX", PLATE_LOOKX, 60, {GLYPHS_NODE: {X: [(0, -23, LINEAR), (60, 23)]}})  # SPEC 9.1
+    look_y = animation("LookY", PLATE_LOOKY, 60, {GLYPHS_NODE: {Y: [(0, -17, LINEAR), (60, 17)]}})
     # Open: the mouth morphs closed -> half -> open through the three SVG samples (linear).
     mouth_keys = {}
     for vid, samples in zip(mouth_vertex_ids, zip(*MOUTH_SAMPLES)):
@@ -535,6 +540,15 @@ def sine(amplitude, period_ms, base=0.0):
     return [(0, base, SINE), (q, base + amplitude, SINE), (2 * q, base, SINE), (3 * q, base - amplitude, SINE), (4 * q, base)]
 
 
+BREATH_MS, BREATH_PX = 4600, 11
+HALO_OPACITY, HALO_SLEEP, HALO_FAILED = 0.10, 0.06, 0
+
+
+def breath():
+    """SPEC section 9.3: root y 0 -> -11 -> 0, inhale 55 % / exhale 45 % of 4600 ms."""
+    return [(0, 0, SINE), (frames(BREATH_MS * 0.55), -BREATH_PX, SINE), (frames(BREATH_MS), 0)]
+
+
 def sustained_facing():
     return {"idle": (-0.15, 0), "listening": (0, 0), "thinking": (-0.6, -0.2), "waitingInput": (0, 0),
               "speaking": (0.15, 0), "error": (-0.3, 0.25), "sleeping": (0.4, 0.5), "loading": (0, 0),
@@ -545,13 +559,13 @@ def sustained_animations():
     """SPEC section 1: root motion (Body and Face move together), plate rotation/offset, tint,
     gloss pulse, and the glyph index. Nothing keys body scale or body vertices."""
     FACING = sustained_facing()
-    ROW = {  # key: (root motion, period ms, plate rot deg, face offset, tint, gloss pulse)
-        "idle": ({"y": sine(1, 4600)}, 4600, 0, (0, 0), "00000000", None),
-        "listening": ({"y": sine(1, 4600)}, 4600, -2, (0, -3), "00000000", None),
+    ROW = {  # key: (root motion, period ms, plate rot deg, face offset, tint, gloss pulse) - SPEC 1 + 9.1
+        "idle": ({"y": breath()}, BREATH_MS, 0, (0, 0), "00000000", None),
+        "listening": ({"y": breath()}, BREATH_MS, -2, (0, -14), "00000000", None),
         "thinking": ({"x": sine(2, 3200)}, 3200, -6, (0, 0), "00000000", None),
-        "waitingInput": ({"y": sine(2, 1200)}, 1200, 0, (0, -2), "00000000", None),
-        "speaking": ({"y": sine(1, 4600)}, 4600, 0, (0, 0), "00000000", None),
-        "error": ({"y": 5}, 0, 5, (0, 4), "14000000", None),
+        "waitingInput": ({"y": sine(19, 1200)}, 1200, 0, (0, -2), "00000000", None),
+        "speaking": ({"y": breath()}, BREATH_MS, 0, (0, 0), "00000000", None),
+        "error": ({"y": 24}, 0, 5, (0, 4), "14000000", None),
         "sleeping": ({"y": sine(1, 6800)}, 6800, 3, (0, 4), "38000000", None),
         "loading": ({}, 1400, 0, (0, 0), "10000000", [(0, 0.8, SINE), (frames(700), 1.0, SINE), (frames(1400), 0.8)]),
         "failed": ({}, 0, 0, (0, 0), "66808080", None),
@@ -570,8 +584,9 @@ def sustained_animations():
         body_keys = {X: mx, Y: my}
         face_keys = {X: shifted(mx, fx), Y: shifted(my, fy), ROT: rad(rot)}
         jx, jy = FACING[st]
+        halo = {"sleeping": HALO_SLEEP, "failed": HALO_FAILED}.get(st, HALO_OPACITY)
         objs = {BODY_NODE: body_keys, FACE: face_keys, TINT: {COLOR: tint}, PLATE_EXPR: {NESTED_VALUE: EXPR[st]},
-                GLOSS: {GRADIENT_OPACITY: gloss if gloss else 1}, JOYSTICK: {JX: jx, JY: jy}}
+                GLOSS: {GRADIENT_OPACITY: gloss if gloss else 1}, JOYSTICK: {JX: jx, JY: jy}, HALO: {OPACITY: halo}}
         duration = frames(period) if period else 1
         out.append(animation("State" + st[0].upper() + st[1:], root_state_anim[st], duration, objs, "loop" if duration > 1 else "oneShot"))
     return out
@@ -600,12 +615,13 @@ def enter_animations():
         keys = {PLATE_EXPR: {NESTED_VALUE: [(0, EXPR[frm], None), (3, EXPR[to])]},
                 JOYSTICK: {JX: [(0, fx0, bez), (n, fx1)], JY: [(0, fy0, bez), (n, fy1)]}}
         if (frm, to) == ("idle", "listening"):
-            # 40 ms anticipation down, then the lean up to the listening offset (-3), plate -2 degrees.
-            keys[FACE] = {Y: [(0, 0, ACCEL), (frames(40), 1, SOFT_OUT), (n, -3)], ROT: [(0, 0, SOFT_OUT), (n, rad(-2))]}
+            # SPEC 9.4: 50 ms anticipation down (+3, +1 deg), lean past to -16/-3 deg at 200 ms, settle -14/-2 deg.
+            keys[FACE] = {Y: [(0, 0, EMPH_ACCEL), (frames(50), 3, EMPH_DECEL), (frames(200), -16, M3_STANDARD), (n, -14)],
+                          ROT: [(0, 0, EMPH_ACCEL), (frames(50), rad(1), EMPH_DECEL), (frames(200), rad(-3), M3_STANDARD), (n, rad(-2))]}
         elif (frm, to) == ("listening", "thinking"):
             # hold the gaze 60 ms, then turn away and tilt.
             keys[JOYSTICK] = {JX: [(0, fx0, None), (frames(60), fx0, STANDARD), (n, fx1)], JY: [(0, fy0, None), (frames(60), fy0, STANDARD), (n, fy1)]}
-            keys[FACE] = {Y: [(0, -3, STANDARD), (n, 0)], ROT: [(0, rad(-2), STANDARD), (n, rad(-6))]}
+            keys[FACE] = {Y: [(0, -14, STANDARD), (n, 0)], ROT: [(0, rad(-2), STANDARD), (n, rad(-6))]}
         elif (frm, to) == ("thinking", "speaking"):
             keys[FACE] = {ROT: [(0, rad(-6), SOFT_OUT), (frames(140), 0, None), (n, 0)]}
         elif (frm, to) == ("speaking", "idle"):
@@ -613,8 +629,9 @@ def enter_animations():
             keys[FACE] = {Y: [(0, 0, SOFT_OUT), (frames(120), 1, SOFT_OUT), (n, 0)]}
             keys[BODY_NODE] = {Y: [(0, 0, SOFT_OUT), (frames(120), 1, SOFT_OUT), (n, 0)]}
         elif (frm, to) == ("error", "idle"):
-            keys[FACE] = {Y: [(0, 4, SOFT_OUT), (n, 0)], ROT: [(0, rad(5), SOFT_OUT), (n, 0)]}
-            keys[BODY_NODE] = {Y: [(0, 5, SOFT_OUT), (n, 0)]}
+            # SPEC 9.5: root +24 -> 0 (face carries its +4 offset on top), plate +5 deg -> 0.
+            keys[FACE] = {Y: [(0, 28, SOFT_OUT), (n, 0)], ROT: [(0, rad(5), SOFT_OUT), (n, 0)]}
+            keys[BODY_NODE] = {Y: [(0, 24, SOFT_OUT), (n, 0)]}
             keys[TINT] = {COLOR: [(0, "14000000"), (frames(100), "00000000")]}
         out.append(animation(f"Enter_{frm}_{to}", aid, n, keys, callbacks=(PLATE_BLINK,)))
     return out
@@ -628,17 +645,19 @@ def momentary_animations():
     """SPEC section 2. Root delta on Body and Face together; plate rotation on Face."""
     S = frames(800)
     f = lambda pct: round(S * pct / 100)
-    hop = [(0, 0, ACCEL), (f(10), 2, SPRING), (f(37.5), -10, ACCEL), (f(70), 1, SOFT_OUT), (S, 0)]
+    # SPEC 9.4: the bezier on a key is the *incoming* curve of the next row.
+    hop = [(0, 0, EMPH_ACCEL), (f(10), 6, STD_DECEL), (f(37.5), -48, EMPH_ACCEL), (f(70), 4, EMPH_DECEL), (f(87.5), -1, M3_STANDARD), (S, 0)]
     success_keys = {
         BODY_NODE: {Y: hop},
-        FACE: {Y: hop, ROT: [(0, 0, ACCEL), (f(10), rad(-2), SPRING), (f(37.5), rad(2), ACCEL), (f(70), rad(-1), SOFT_OUT), (S, 0)]},
+        FACE: {Y: hop, ROT: [(0, 0, EMPH_ACCEL), (f(10), rad(-2), STD_DECEL), (f(37.5), rad(2), EMPH_ACCEL), (f(70), rad(-1), EMPH_DECEL), (f(87.5), 0, M3_STANDARD), (S, 0)]},
         PLATE_EXPR: {NESTED_VALUE: EXPR["success"]}}
     success_keys.update(spin_keys(f(10), f(70) - f(10)))
     success = animation("SuccessFlash", SUCCESS_ANIM, S, success_keys)
     E = frames(600)
     g = lambda pct: round(E * pct / 100)
-    ex = [(0, 0, STANDARD), (g(16.6667), -4, STANDARD), (g(33.3333), 4, STANDARD), (g(50), -2, STANDARD), (g(66.6667), 0, None), (E, 0)]
-    ey = [(0, 0, STANDARD), (g(16.6667), 5, STANDARD), (g(33.3333), 5, STANDARD), (g(50), 5, STANDARD), (g(66.6667), 5, None), (E, 5)]
+    # SPEC 9.5 endpoints
+    ex = [(0, 0, STANDARD), (g(16.6667), -24, STANDARD), (g(33.3333), 24, STANDARD), (g(50), -12, STANDARD), (g(66.6667), 0, None), (E, 0)]
+    ey = [(0, 0, STANDARD), (g(16.6667), 24, STANDARD), (g(33.3333), 24, STANDARD), (g(50), 24, STANDARD), (g(66.6667), 24, None), (E, 24)]
     er = [(0, 0, STANDARD), (g(16.6667), rad(-7), STANDARD), (g(33.3333), rad(7), STANDARD), (g(50), rad(-3), STANDARD), (g(66.6667), rad(5), None), (E, rad(5))]
     error = animation("ErrorFlash", ERROR_ANIM, E, {BODY_NODE: {X: ex, Y: ey}, FACE: {X: ex, Y: ey, ROT: er},
                                                    PLATE_EXPR: {NESTED_VALUE: EXPR["error"]}})
