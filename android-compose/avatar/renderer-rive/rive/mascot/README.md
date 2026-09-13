@@ -61,8 +61,12 @@ cd android-compose
   -PriveBridge=C:/rive-spike/bridge/rive_desktop_bridge.dll -PriveSelfTest=true
 ```
 
-(The bridge DLL is built once per machine; see `../../native/desktop/README.md`. The self-test
-cycles every state and identity and prints each step.) If the window dies on relaunch with a
+(The bridge DLL is built once per machine; see `../../native/desktop/README.md`. `-PriveSelfTest=true`
+starts with the auto-cycle on.) The window is a review bench: auto-cycle switch, every state,
+shape and colour, gaze from the cursor (or sliders) and mouth, the rig tunables above, and the
+surround - page and frame grounds with a base colour plus draggable radial lights (edit switch,
+`+ light`, drag the rings), frame shapes and sizes, and the mascot scaled inside the frame so it
+can be padded or clipped. If the window dies on relaunch with a
 Skiko D3D redrawer error, the previous instance was still exiting; launch again.
 
 **Order matters: push before you commit.** `rive push` assigns ids to every object the
@@ -92,7 +96,18 @@ Mascot (root artboard, view-model "Avatar")
     Trail1/2           ghost plates for the spin, opacity 0 unless keyed
   Facing ("0:221")     Joystick, x -> TurnX ("3:220"), y -> TurnY ("3:221"); property keys JX=299, JY=300
 
+  Entity ("0:230")     wraps FacePlacement + BodyPlacement at (250,270); scaleX/Y bound to `tuneScale`
+                       (0..1 -> 0.5..1.5) so the whole character scales about the body centre
+  AutoLookX/Y          NestedRemapAnimations ("0:231"/"0:232") on the Plate, keyed per sustained
+                       state (`GAZE` table): the default gaze life (+-6/+-4 px on the glyph wrapper),
+                       additive with the host's lookX/lookY
+
 Plate (component, input driven, ids "7:*")
+  Wrapper nodes carry the bench tunables so state/look/blink keys never collide with them:
+  MouthNode ("7:27", rest y +82) > mouths; GlyphScale ("7:26") > Glyphs Solo; PlateScale ("7:25") > Card, Shadow.
+  Tunables are VM numbers 0..1 (0.5 = shipped) scrubbing pose ranges: tunePlate (x0.6..1.4),
+  tuneGlyph (x0.4..1.6), tuneMouth (x0.5..1.5), tuneMouthY (42..122 px). Not in the app contract;
+  the bench writes them and the numbers you like go back into SPEC as fixed values.
   Card 120 r27 + Shadow; Glyphs Solo ("7:22") with one shape per state glyph (7:30-7:41, dragged last),
   `activeComponentId` keyed per `expr` (KeyFrameId, hold); Mouth morph (7:23, vertex ids 7:70-73, keyed on Open at
   0/30/60), MouthO (7:43), FrownLine (7:42). Blink squashes Glyphs scaleY 3/2/5 frames.

@@ -77,6 +77,18 @@ BIND_ENUM, BIND_TRIGGER, BIND_BOOL = 637, 686, 634
 VM, VM_STATE, VM_MOUTH, VM_LOOKX, VM_LOOKY, VM_BLINK, VM_SHAPE, VM_COLOR, VM_HOVER = (
     "1:50", "1:1", "1:2", "1:3", "1:4", "1:5", "1:6", "1:7", "1:8")
 VM_SUCCESS, VM_ERROR, VM_DRAGGED = "1:9", "1:10", "1:11"
+# Art-direction tunables (bench only, not in the app contract): 0..1 scrubbing a pose range, 0.5 = shipped.
+TUNABLES = {  # name: (vm id, timeline id, node id, property keys, (value at 0, value at 1))
+    "tunePlate": ("1:12", "7:66", "7:25", ("SX", "SY"), (0.6, 1.4)),
+    "tuneGlyph": ("1:13", "7:67", "7:26", ("SX", "SY"), (0.4, 1.6)),
+    "tuneMouth": ("1:14", "7:68", "7:27", ("SX", "SY"), (0.5, 1.5)),
+    "tuneMouthY": ("1:15", "7:69", "7:27", ("Y",), (42, 122)),
+}
+PLATE_SCALE_NODE, GLYPH_SCALE_NODE, MOUTH_NODE = "7:25", "7:26", "7:27"
+VM_TUNE_SCALE, CONV_SCALE, ENTITY = "1:16", "2:3", "0:230"      # whole-entity scale, 0..1 -> 0.5..1.5
+# Default gaze life: root-keyed remaps of two small plate ranges (+-6 / +-4 px on the glyph's
+# wrapper), additive with the host's lookX/lookY on the glyph itself.
+AUTO_X, AUTO_Y, PLATE_AUTO_X, PLATE_AUTO_Y = "0:231", "0:232", "7:80", "7:81"
 VM_INSTANCE, ENUM_STATE, ENUM_SHAPE = "1:20", "1:100", "1:200"
 state_enum_ids = {s: f"1:{101 + i}" for i, s in enumerate(STATES)}
 shape_enum_ids = {s: f"1:{201 + i}" for i, s in enumerate(SHAPES)}
@@ -310,7 +322,7 @@ def shape_keys(shape):
 
 def body():
     bound = f'<SolidColor colorValue="FF79B7DF" name="Color">\n            {bind(VM_COLOR, COLOR)}\n        </SolidColor>'
-    return f'''<Node x="250" y="270" name="BodyPlacement">
+    return f'''<Node x="0" y="0" name="BodyPlacement">
 <Node x="0" y="0" name="Body" id="{BODY_NODE}">
     <!-- Paints on one shape; the LATER paint draws on top. -->
     <Shape name="BodyShape" id="{HITBOX}">
@@ -409,38 +421,54 @@ def plate_component():
     mv = "\n".join(
         f'<CubicDetachedVertex x="{s[0]}" y="{s[1]}" inRotation="{s[2]}" inDistance="{s[3]}" outRotation="{s[4]}" outDistance="{s[5]}" name="M{i}" id="{vid}"/>'
         for i, (s, vid) in enumerate(zip(MOUTH_SAMPLES[0], mouth_vertex_ids)))
-    mouth_morph = f'''<Shape x="0" y="82" opacity="0" name="Mouth" id="{MOUTH_MORPH}">
+    mouth_morph = f'''<Shape x="0" y="0" opacity="0" name="Mouth" id="{MOUTH_MORPH}">
     <PointsPath isClosed="true" name="Path">
 {indent(mv, "        ")}
     </PointsPath>
     {fill(INK)}
 </Shape>'''
-    mouth_o = svgpath.path_rml(art("glyph-mouth-o.svg"), "MouthO", MOUTH_O, INK, opacity=0, y=82)
-    frown = svgpath.path_rml(art("glyph-mouth-frown.svg"), "FrownLine", FROWN, INK, opacity=0, y=82)
+    mouth_o = svgpath.path_rml(art("glyph-mouth-o.svg"), "MouthO", MOUTH_O, INK, opacity=0)
+    frown = svgpath.path_rml(art("glyph-mouth-frown.svg"), "FrownLine", FROWN, INK, opacity=0)
 
+    # Tunable pose ranges (bench art direction): frame 0 = value at 0, frame 60 = value at 1, linear.
+    tune_anims = []
+    for name, (_, aid, nid, props, (lo, hi)) in TUNABLES.items():
+        key = {"SX": SX, "SY": SY, "Y": Y}
+        tune_anims.append(animation("Tune" + name[4:], aid, 60, {nid: {key[p]: [(0, lo, LINEAR), (60, hi)] for p in props}}))
+    tune_anims.append(animation("AutoX", PLATE_AUTO_X, 60, {GLYPH_SCALE_NODE: {X: [(0, -6, LINEAR), (60, 6)]}}))
+    tune_anims.append(animation("AutoY", PLATE_AUTO_Y, 60, {GLYPH_SCALE_NODE: {Y: [(0, -4, LINEAR), (60, 4)]}}))
+
+    # Wrapper nodes carry the tunables so the state, look and blink keys on the inner objects
+    # never collide with them. MouthNode's rest y is the SPEC mouth anchor (0, +82).
     return f'''<Artboard isComponent="true" defaultStateMachineId="{PLATE_SM}" x="700" y="0" styleId="7:3" clip="false" width="200" height="200" name="Plate" id="{PLATE_AB}">
     <LayoutComponentStyle name="Style" id="7:3"/>
     <Node x="100" y="100" name="PlateRoot" id="{PLATE_ROOT}">
-{indent(mouth_morph, "        ")}
-{indent(mouth_o, "        ")}
-{indent(frown, "        ")}
-        <Solo activeComponentId="{GLYPH[STATE_GLYPH['idle']]}" x="0" y="0" name="Glyphs" id="{GLYPHS_NODE}">
-{indent(glyphs, "            ")}
-        </Solo>
-        <Shape x="0" y="0" name="Card" id="{PLATE_CARD}">
-            {rrect(120, 120, 27)}
-            {fill(PLATE_WHITE)}
-        </Shape>
-        <Shape x="0" y="2" name="Shadow" id="{PLATE_SHADOW}">
-            {rrect(120, 120, 27)}
-            <Stroke thickness="4" name="Stroke">
-                <SolidColor colorValue="14000000" name="Color"/>
-                <Feather strength="3" name="Feather"/>
-            </Stroke>
-        </Shape>
+        <Node x="0" y="82" name="MouthNode" id="{MOUTH_NODE}">
+{indent(mouth_morph, "            ")}
+{indent(mouth_o, "            ")}
+{indent(frown, "            ")}
+        </Node>
+        <Node x="0" y="0" name="GlyphScale" id="{GLYPH_SCALE_NODE}">
+            <Solo activeComponentId="{GLYPH[STATE_GLYPH['idle']]}" x="0" y="0" name="Glyphs" id="{GLYPHS_NODE}">
+{indent(glyphs, "                ")}
+            </Solo>
+        </Node>
+        <Node x="0" y="0" name="PlateScale" id="{PLATE_SCALE_NODE}">
+            <Shape x="0" y="0" name="Card" id="{PLATE_CARD}">
+                {rrect(120, 120, 27)}
+                {fill(PLATE_WHITE)}
+            </Shape>
+            <Shape x="0" y="2" name="Shadow" id="{PLATE_SHADOW}">
+                {rrect(120, 120, 27)}
+                <Stroke thickness="4" name="Stroke">
+                    <SolidColor colorValue="14000000" name="Color"/>
+                    <Feather strength="3" name="Feather"/>
+                </Stroke>
+            </Shape>
+        </Node>
     </Node>
 
-{indent(chr(10).join(expr_anims + [look_x, look_y, open_anim, blink, wait_a, wait_b]), "    ")}
+{indent(chr(10).join(expr_anims + [look_x, look_y, open_anim, blink, wait_a, wait_b] + tune_anims), "    ")}
 
     <StateMachine name="Plate" id="{PLATE_SM}">
         <StateMachineNumber name="expr" id="{PLATE_IN_EXPR}"/>
@@ -470,7 +498,7 @@ def trail(name, sid):
 def face():
     # FacePlacement > Turn (keyed only by the joystick's TurnX/TurnY) > Face (keyed by state motion).
     # Trails are declared after Turn so they draw underneath the plate.
-    return f'''<Node x="250" y="262" name="FacePlacement">
+    return f'''<Node x="0" y="-8" name="FacePlacement">
 <Node x="0" y="0" name="Turn" id="{TURN_NODE}">
 <Node x="0" y="0" name="Face" id="{FACE}">
     <NestedArtboard artboardId="{PLATE_AB}" x="-100" y="-108" name="Plate" id="{PLATE}">
@@ -487,6 +515,9 @@ def face():
         <NestedRemapAnimation animationId="{PLATE_OPEN}" time="0" name="Open">
             {bind(VM_MOUTH, REMAP_TIME, CONV_MOUTH)}
         </NestedRemapAnimation>
+{indent(chr(10).join(f'<NestedRemapAnimation animationId="{aid}" time="0.5" name="{n}">{chr(10)}    {bind(vid, REMAP_TIME)}{chr(10)}</NestedRemapAnimation>' for n, (vid, aid, *_) in TUNABLES.items()), "        ")}
+        <NestedRemapAnimation animationId="{PLATE_AUTO_X}" time="0.5" name="AutoLookX" id="{AUTO_X}"/>
+        <NestedRemapAnimation animationId="{PLATE_AUTO_Y}" time="0.5" name="AutoLookY" id="{AUTO_Y}"/>
     </NestedArtboard>
 </Node>
 </Node>
@@ -549,6 +580,20 @@ def breath():
     return [(0, 0, SINE), (frames(BREATH_MS * 0.55), -BREATH_PX, SINE), (frames(BREATH_MS), 0)]
 
 
+# Default gaze life per state, on the AutoLookX/AutoLookY remaps (0..1, 0.5 = centre). A value
+# or a function of the state's loop period (ms) returning keys, so drifts loop with the state.
+# Small on purpose: the host's lookX/lookY adds on top (+-23/+-17) and both must fit the card.
+GAZE = {
+    "idle": (lambda p: sine(0.3, p, 0.5), lambda p: sine(-0.15, p, 0.5)),      # slow look-around
+    "listening": (lambda p: sine(0.08, p, 0.5), 0.35),                         # up at you, barely swaying
+    "thinking": (lambda p: sine(0.1, p, 0.22), 0.25),                           # up-left, drifting
+    "waitingInput": (0.5, 0.4),                                                 # straight at you
+    "speaking": (lambda p: sine(0.15, p, 0.5), 0.5),
+    "error": (0.5, 0.65),                                                       # down
+    "sleeping": (0.5, 0.75),
+}
+
+
 def sustained_facing():
     return {"idle": (-0.15, 0), "listening": (0, 0), "thinking": (-0.6, -0.2), "waitingInput": (0, 0),
               "speaking": (0.15, 0), "error": (-0.3, 0.25), "sleeping": (0.4, 0.5), "loading": (0, 0),
@@ -585,8 +630,10 @@ def sustained_animations():
         face_keys = {X: shifted(mx, fx), Y: shifted(my, fy), ROT: rad(rot)}
         jx, jy = FACING[st]
         halo = {"sleeping": HALO_SLEEP, "failed": HALO_FAILED}.get(st, HALO_OPACITY)
+        gx, gy = GAZE.get(st, (0.5, 0.5))
         objs = {BODY_NODE: body_keys, FACE: face_keys, TINT: {COLOR: tint}, PLATE_EXPR: {NESTED_VALUE: EXPR[st]},
-                GLOSS: {GRADIENT_OPACITY: gloss if gloss else 1}, JOYSTICK: {JX: jx, JY: jy}, HALO: {OPACITY: halo}}
+                GLOSS: {GRADIENT_OPACITY: gloss if gloss else 1}, JOYSTICK: {JX: jx, JY: jy}, HALO: {OPACITY: halo},
+                AUTO_X: {REMAP_TIME: gx(period) if callable(gx) else gx}, AUTO_Y: {REMAP_TIME: gy(period) if callable(gy) else gy}}
         duration = frames(period) if period else 1
         out.append(animation("State" + st[0].upper() + st[1:], root_state_anim[st], duration, objs, "loop" if duration > 1 else "oneShot"))
     return out
@@ -769,8 +816,13 @@ def root_artboard():
     <LayoutComponentStyle name="Style" id="0:3"/>
     <!-- Facing: one 2-D value scrubbing TurnX/TurnY; keyed by state entries, Wander and flashes. -->
     <Joystick posX="250" posY="262" width="140" height="48" xId="{TURN_X_ANIM}" yId="{TURN_Y_ANIM}" x="-0.15" y="0" name="Facing" id="{JOYSTICK}"/>
-{indent(face(), "    ")}
-{indent(body(), "    ")}
+    <!-- Entity: everything drawn, scaled as one about the body centre by the tuneScale number. -->
+    <Node x="250" y="270" name="Entity" id="{ENTITY}">
+        {bind(VM_TUNE_SCALE, SX, CONV_SCALE)}
+        {bind(VM_TUNE_SCALE, SY, CONV_SCALE)}
+{indent(face(), "        ")}
+{indent(body(), "        ")}
+    </Node>
 
 {indent(chr(10).join(anims), "    ")}
 
@@ -792,6 +844,8 @@ def data():
                           clampLower="true" clampUpper="true" name="LookToTime" id="{CONV_LOOK}"/>
 <DataConverterRangeMapper minInput="0" maxInput="1" minOutput="0" maxOutput="1"
                           clampLower="true" clampUpper="true" name="MouthToTime" id="{CONV_MOUTH}"/>
+<DataConverterRangeMapper minInput="0" maxInput="1" minOutput="0.5" maxOutput="1.5"
+                          clampLower="true" clampUpper="true" name="TuneToScale" id="{CONV_SCALE}"/>
 
 <ViewModel defaultInstanceId="{VM_INSTANCE}" name="Avatar" id="{VM}">
     <ViewModelPropertyEnumCustom enumId="{ENUM_STATE}" name="state" id="{VM_STATE}"/>
@@ -805,8 +859,12 @@ def data():
     <ViewModelPropertyTrigger name="success" id="{VM_SUCCESS}"/>
     <ViewModelPropertyTrigger name="error" id="{VM_ERROR}"/>
     <ViewModelPropertyBoolean name="dragged" id="{VM_DRAGGED}"/>
+{indent(chr(10).join(f'<ViewModelPropertyNumber name="{n}" id="{t[0]}"/>' for n, t in TUNABLES.items()), "    ")}
+    <ViewModelPropertyNumber name="tuneScale" id="{VM_TUNE_SCALE}"/>
 
     <ViewModelInstance exports="true" name="Default" id="{VM_INSTANCE}">
+{indent(chr(10).join(f'<ViewModelInstanceNumber propertyValue="0.5" viewModelPropertyId="{t[0]}"/>' for t in TUNABLES.values()), "        ")}
+        <ViewModelInstanceNumber propertyValue="0.5" viewModelPropertyId="{VM_TUNE_SCALE}"/>
         <ViewModelInstanceEnum propertyValue="{state_enum_ids['idle']}" viewModelPropertyId="{VM_STATE}"/>
         <ViewModelInstanceNumber propertyValue="0" viewModelPropertyId="{VM_MOUTH}"/>
         <ViewModelInstanceNumber propertyValue="0" viewModelPropertyId="{VM_LOOKX}"/>
