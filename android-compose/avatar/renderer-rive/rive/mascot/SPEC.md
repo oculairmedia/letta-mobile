@@ -1,5 +1,7 @@
 # Mascot — locked art / Fable ingestion contract
 
+Design revision: §9 is the human-touch numeric/path patch against `c6bea8dd780169cf2e57d670da50ea2987b78234`. §§1–6 retain the v4 input record; §9 overrides the listed numbers and glyph geometry. §7 reports the patched asset measurements. §8 and the current README remain authoritative for object mapping and mechanisms, including where the historical §§1–7 mapping differs.
+
 ## 1. Per-state table
 
 | Coordinate / ingestion rule | Value |
@@ -227,16 +229,18 @@
 | idle plate span | 8.36 dp | 13.2 dp | 21.6 dp |
 | idle square span | 3.08 dp | 5.28 dp | 8.64 dp |
 | listening square span | 3.52 dp | 6.16 dp | 10.08 dp |
-| waitingInput ring outer / hole diameter | 3.96 / 1.76 dp | 6.38 / 3.30 dp | 10.44 / 5.40 dp |
-| waitingInput eye radial ink width | 1.10 dp | 1.54 dp | 2.52 dp |
+| waitingInput ring outer / hole diameter | 3.96 / 1.76 dp | 6.38 / 3.08 dp | 10.44 / 5.04 dp |
+| waitingInput eye minimum radial ink width (off-centre hole; conservative bound) | 1.02 dp | 1.49 dp | 2.44 dp |
+| speaking eye width×height | 3.08 × 3.30 dp | 4.84 × 5.72 dp | 7.92 × 9.36 dp |
 | speaking mouth at a=0.5 width×height | 1.65 × 1.43 dp | 2.42 × 1.54 dp | 3.96 × 2.52 dp |
 | speaking mouth at a=1 width×height | 1.98 × 1.98 dp | 2.64 × 3.08 dp | 4.32 × 5.04 dp |
 | closed mouth | 0 visible pixels | 0 visible pixels | 0 visible pixels |
 | waitingInput mouth | solid round 1.98 dp, hole dropped | ring 2.64 dp outer | ring 4.32 dp outer |
 | success/sleeping/degraded stroke | 1.10 dp | 1.32 dp | 2.16 dp |
-| failed X stroke | 1.10 dp | 1.54 dp | 2.52 dp |
+| failed X stroke | 1.10 dp | 1.76 dp | 2.88 dp |
 | loading dot diameter | 1.54 dp | 2.42 dp | 3.96 dp |
-| gaze max x/y | 0.22 / 0.165 dp | 0.77 / 0.55 dp | 1.26 / 0.90 dp |
+| gaze max x/y | 0.22 / 0.165 dp | 2.53 / 1.87 dp | 4.14 / 3.06 dp |
+| root breath peak from rest | 0 dp (pruned) | 1.21 dp | 1.98 dp |
 
 | Small-size selection / verification | Exact rule |
 | --- | --- |
@@ -270,3 +274,135 @@ is the operating manual; `RIVE-PLATFORM-POWER.md` is the platform brief this was
 | Sizes (§7) | Standard profile only. The `-small` profile needs a host size signal the contract does not carry. |
 | Smoothing | None in-file. The host envelope in §4 owns `mouthOpen` smoothing; adding a converter interpolator would double-smooth. |
 | Not used, by choice | Blend states (the scrubbed pose ranges are the equivalent and are what the CLI can verify headless); scripts; runtime events; nested view models; `reduceMotion` (needs a contract change — filed as follow-up). |
+
+## 9. Human-touch patch — illustration and numeric handoff
+
+| Revision / authority | Exact value |
+| --- | --- |
+| Baseline | `c6bea8dd780169cf2e57d670da50ea2987b78234`; target `feat/kh094-mascot-identity-art` |
+| Geometry | Existing filenames; one dark eye symbol; no catchlight/second pupil; body paths and mouth paths byte-identical to baseline |
+| Scope | SPEC, eye SVG paths, static validation; no Rive scene, generator, editor or CLI changes |
+| P0 source `[brief]` | Supplied **Astra — human-touch pass (no Rive access)**, P0 amplitude floors; reproduced below. These are product design targets, not published perceptual thresholds. `HUMAN-TOUCH-GAPS.md` and named `/workspace/mascot-lock/` refs were unavailable; the supplied low-glow sheet and current repo assets were inspected. |
+| Timing source `[M3]` | [Material Components Android motion tokens](https://github.com/material-components/material-components-android/blob/master/docs/theming/Motion.md); local [MOTION-REFERENCES.md](MOTION-REFERENCES.md) §§1.1–1.4, 3.5–3.6. Token choices are sourced; the selected poses, phase splits and amplitude targets are authored here. |
+| Paint source `[paint]` | Supplied P0 material ranges; side-by-side assembly in `art/validation/materials.png`. No claim that an opacity is a research-derived visibility threshold. |
+| Mechanism boundary | §8 is unchanged. Existing facing travel/foreshortening, Solo, shutter, host mouth envelope, Wander and priority rules remain Fable-owned. |
+
+### 9.1 P0 — translation deltas
+
+All values are local artboard px before the existing display scale 1.25. At 44 dp, multiply by 44/500×1.25 = 0.11. Amplitudes are peak displacement from rest, not peak-to-peak. `lookX`/`lookY` remain clamped −1..1.
+
+| signal | SPEC path (section/row) | old artboard px | new artboard px | implied @44 dp ×0.11 | target @44 dp | cite |
+| --- | --- | --- | --- | --- | --- | --- |
+| Breath root y | §1 idle/listening/speaking; §5 Breathing scale | 1 | 11 | 1.21 dp | 1.2–1.5 dp | [brief]; §9.3 |
+| Gaze lookX max | §4 lookX; §7 gaze | 7 | 23 | 2.53 dp | 2.2–2.8 dp | [brief]; containment below |
+| Gaze lookY max | §4 lookY; §7 gaze | 5 | 17 | 1.87 dp | 1.6–2.2 dp | [brief]; containment below |
+| Success hop peak | §1 success; §2 success at 37.5% | 10 | 48 | 5.28 dp | 5–7 dp | [brief]; §9.4 |
+| Waiting bounce | §1 waitingInput | 2 | 19 | 2.09 dp | 2–2.5 dp | [brief]; same 1200 ms period |
+| Error shake | §1 error flash; §2 error x | 4 | 24 | 2.64 dp | 2.5–3.5 dp | [brief]; §9.5 |
+| Error settle | §1 sustained error; §2 error y; §3 error→idle | 5 | 24 | 2.64 dp | 2.5–3.5 dp | [brief]; same endpoint for flash and sustained |
+| Listening lean | §1 listening face y; §3 idle→listening | 3 | 14 | 1.54 dp | ≥1.5 dp | [brief]; §9.4 |
+
+| Dependent field | old → new | exact ownership / limit |
+| --- | --- | --- |
+| Root translation cap, §3 | x ±14 → ±24; y ±14 → [−48,+24] px | applied after expression/flash composition; never clips the new hop/shake; no body vertex changes |
+| Listening face offset, §1 | (0,−3) → (0,−14) px | plate, eye and mouth together; root breath separately; state Card scale remains 1.040 |
+| Waiting root y, §1 | ±2 sine → ±19 sine px | 1200 ms, loop; no normal root breath added |
+| Sustained error root y, §1 | +5 → +24 px | one absolute endpoint, not +24 again after flash; face y stays +4 |
+| Error recovery, §3 | +5→0 → +24→0 px | same 300 ms and cubic-bezier 0.22 1 0.36 1 |
+| Gaze endpoints, §4 | x=7×input, y=5×input → x=23×input, y=17×input | retune existing LookX/LookY pose ranges only; retain 0 ms scrub/range mappers |
+| Thinking default gaze, derived | (−2.45,−1.75) → (−8.05,−5.95) px | normalized (−0.35,−0.35) unchanged; host gaze still wins |
+| Historical glyph-glance calculation, §5 | max ±4.2/±2 → ±13.8/±6.8 px if evaluated | calculation only; §8 implements IdleVariety on the plate; do not move its writer into the nested glyph or amplify existing plate/Wander keys in this pass |
+| Normal root breath writer | historical ±1 → 0…−11…0 px | retune idle/listening/speaking state keys; keep §8 Breath on Gloss; pause this root loop when Expression/Flash owns waiting/error/success/dragged |
+| Rotation / facing | root ±5°, combined plate ±10°, Facing ±70/±24 px → unchanged | facing's existing body ±6° remains §8's separate product behavior; no added rotation or squeeze |
+| Small profile | breath 0, idle glance 0, gaze ±4/±3 px → unchanged | §8 currently ships standard only; small-profile pruning still needs the existing host size follow-up |
+| Other motion | thinking x ±2/3200 ms; sleeping y ±1/6800 ms → unchanged | lifecycle translations stay 0; no new priorities or states |
+
+| Geometric gate | Numeric acceptance rule |
+| --- | --- |
+| Eye containment | Sample actual path ink including stroke at all nine gaze combinations x∈{−23,0,23}, y∈{−17,0,17}; every sample inside the state-scaled 120 px rounded Card; minimum inward clearance ≥2 px. Eye and Card inherit facing foreshortening together, so no extra local gaze space is consumed. |
+| Root envelope | Sample all eight unchanged bodies through root ±5° plus existing facing ±6° (conservative combined ±11°); translated/rotated fill must stay inside 500×500 at x ±24, y −48/+24. Validation reports minimum clearance. |
+| Paint / live limit | Fill containment does not prove feather support or trailing-plate containment. Fable must inspect those in live/Rive renders after applying keys; static SVG proofs do not emulate those runtime mechanisms. |
+
+### 9.2 P0 — material deltas
+
+| paint / field | old | new | ARGB / binding | cite / measured reason |
+| --- | --- | --- | --- | --- |
+| Halo normal effective opacity, §6 | 0.04 | 0.10 | bound identity RGB; full bound colour at object opacity 0.10; equivalent opaque-blue ARGB `1A79B7DF` after byte rounding | [paint]; choose lower bound of 0.10–0.14 |
+| Halo sleeping opacity, §6 | 0.02 | 0.06 | bound identity RGB; equivalent blue `0F79B7DF` | [paint]; sleep target 0.06 |
+| Halo failed / small opacity | 0 / 0 | 0 / 0 | `00000000` | unchanged |
+| SoftEdge effective alpha, §6 | 0.08 | 0.14 | bound identity RGB; equivalent blue `2479B7DF` | [paint]; within 0.12–0.16 |
+| GlassRing | width 0, alpha 0 | width 0, alpha 0 | `00FFFFFF` | keep off: proposed 1–1.5 px maps to 0.11–0.165 dp at 44; below one output pixel in V1, so a hard rim adds aliasing without a stable contour. Existing feathered edge carries the boundary. This is a geometric design judgement. |
+| Halo geometry | scale 1.02; width 12; feather 10 px | unchanged | same identity path | no new silhouette or particle geometry |
+| SoftEdge geometry | width 8; feather 4 px | unchanged | same identity path | 22 dp omitted in pending small profile |
+| Shade / Gloss / Card | §6 positions, stops, dimensions | unchanged | plate `FFF7F7F7`; eye `FF111111` | neutral overlays and plate retained |
+
+The effective opacity is applied once. The ARGB examples show byte-equivalent output, not an additional colour-alpha multiplier. Validation's Gaussian feather is an illustration of this recipe, not an assertion of Rive's feather kernel.
+
+### 9.3 P1 — glyph and breath craft
+
+| Existing file stem (also `-small`) | old → new geometry | ingestion |
+| --- | --- | --- |
+| glyph-idle | uniform rounded square → eight cubic edges with 1–3 px edge/corner imbalance; normal bounds remain 48×48; small 56×56 px | same idle Solo child; solid default eye |
+| glyph-listening | uniform enlarged square → heavier asymmetric square; bounds remain 56×56; small 64×64 px | same listening child; visibly larger than idle |
+| glyph-thinking | symmetric 52×12 dash → bent 52×16 dash; small 58×20 remains | same thinking child; no mouth |
+| glyph-dragged | identical thinking path → one slanted filled squint, independent path; both thinking/dragged now M+6C+Z with six corresponding vertices | preserve expr=2 and the shared Thinking Solo slot; key/import the matching six-vertex geometry for expr 2/3; mouthOpen unchanged |
+| glyph-speaking | idle 48×48 square → narrower/taller 44×52 eye; small 56×56 → 56×60 px | same speaking child; the mouth remains primary speech cue |
+| glyph-waitingInput | normal outer/hole Ø58/30 → Ø58/28; hole centre (0,0)→(−1,−1) px; small Ø72/32 unchanged, same centre shift | compound single ring; opposite contour winding; no pupil |
+| glyph-success | symmetric upper arc → upper arc with endpoints (−24,9)/(24,7), off-centre crest; old endpoint y=8/8 → 9/7 | stroke stays 12 px, small 20; one upper crescent |
+| glyph-sleeping | symmetric lower arc → lower arc with endpoints (−24,−9)/(24,−7), off-centre trough; old endpoint y=−8/−8 → −9/−7 | stroke stays 12 px, small 20; one lower crescent |
+| glyph-error / glyph-error-flash | soft diamond → unchanged | same path for flash and sustained; frown remains separate |
+| glyph-failed | normal X endpoints ±18→±24 px, stroke 14→16 px; small remains endpoints ±25, stroke 20 | standard ink span 50→64 px = 2.75→3.52 dp at 22; opens the four corner gaps; same failed child |
+| glyph-loading / glyph-degraded | dot / bent diagonal → unchanged | preserve 22 dp silhouettes; lifecycle colours stay overlays |
+| All five mouth stems | four-vertex ellipses / fixed o / frown → unchanged | closed/half/open point order right,bottom,left,top; no change to host envelope or anchors |
+| All eight body stems | eight mirrored cubics → unchanged | same identity body across all expressions |
+
+| Timing field | old → new | duration_ms / cubic-bezier x1 y1 x2 y2 | cite |
+| --- | --- | --- | --- |
+| Normal root breath phase | symmetric quarters 1150/1150/1150/1150 → inhale 2530, exhale 2070 ms (55/45) | 4600 loop; (t,y)=(0,0),(2530,−11),(4600,0); 0.37 0 0.63 1 each leg | [brief] optional breath asymmetry; existing easing retained |
+| Gloss breathing | 0.95…1.05 over 4600 → unchanged | existing §8 Breath layer | no second writer |
+| Blink / hover / Wander | 55/25/90; 2500–4500 wait; ±2° once/240; existing Wander → unchanged | existing §4 and §8 | no double-blink or spin gating introduced |
+
+### 9.4 P2 — two signatures
+
+| signature | duration_ms old → new | entry / return | timing citation |
+| --- | --- | --- | --- |
+| idle→listening lean | 200 → 300 | existing Enter_idle_listening; retain frame-0 blink and frame-3 glyph switch, per §8 | [M3] Medium2=300; longer travel warrants the next duration tier |
+| success hop | 800 → 800 (+120 return unchanged) | existing SuccessFlash; preserve Fable's facing spin and two trails; return to live sustained | [M3] ExtraLong2=800; MOTION-REFERENCES §3.6 |
+
+Rows specify the easing **from the previous row**. All percentages are of the authored signature duration. Numeric pose endpoints override the old §2/§3 endpoints. Root scale stays (1,1); root rotation stays 0° for these two signatures. Existing facing animation is separate.
+
+| signature | t_ms | time % | channel | old → new endpoint | incoming cubic-bezier x1 y1 x2 y2 |
+| --- | --- | --- | --- | --- | --- |
+| listening | 0 | 0 | face y / plate rotation | 0/0° → 0/0° | 0 0 1 1 |
+| listening | 50 | 16.6667 | face y / plate rotation | anticipation +1 at 40 ms/0° → +3 at 50 ms/+1° | 0.3 0 0.8 0.15 |
+| listening | 200 | 66.6667 | face y / plate rotation | −3/−2° → −16/−3° | 0.05 0.7 0.1 1 |
+| listening | 300 | 100 | face y / plate rotation | hold −3/−2° → −14/−2° | 0.2 0 0 1 |
+| success | 0 | 0 | root y / plate rotation | 0/0° → 0/0° | 0 0 1 1 |
+| success | 80 | 10 | root y / plate rotation | +2/−2° → +6/−2° | 0.3 0 0.8 0.15 |
+| success | 300 | 37.5 | root y / plate rotation | −10/+2° → −48/+2° | 0 0 0 1 |
+| success | 560 | 70 | root y / plate rotation | +1/−1° → +4/−1° | 0.3 0 0.8 0.15 |
+| success | 700 | 87.5 | root y / plate rotation | interpolation toward 0/0° → −1/0° keyed | 0.05 0.7 0.1 1 |
+| success | 800 | 100 | root y / plate rotation | 0/0° → 0/0° | 0.2 0 0 1 |
+
+| Easing delta | old → new | source |
+| --- | --- | --- |
+| Listening anticipation | 0.22 1 0.36 1 → 0.3 0 0.8 0.15 | [M3] emphasized accelerate |
+| Listening lean / settle | 0.22 1 0.36 1 → 0.05 0.7 0.1 1 / 0.2 0 0 1 | [M3] emphasized decelerate / standard |
+| Success dip / fall | 0.4 0 1 1 → 0.3 0 0.8 0.15 | [M3] emphasized accelerate |
+| Success rise | 0.16 1 0.3 1 → 0 0 0 1 | [M3] standard decelerate |
+| Success settle | 0.22 1 0.36 1 → 0.05 0.7 0.1 1 then 0.2 0 0 1 | [M3] emphasized decelerate then standard; authored extra key stays inside 800 ms |
+
+### 9.5 Error endpoint retune
+
+| t_ms | time % of 600 ms | root x,y old → new px | plate rotation old → new | incoming cubic-bezier x1 y1 x2 y2 |
+| --- | --- | --- | --- | --- |
+| 0 | 0 | (0,0) → (0,0) | 0° → 0° | 0 0 1 1 |
+| 100 | 16.6667 | (−4,+5) → (−24,+24) | −7° → −7° | 0.4 0 0.2 1 |
+| 200 | 33.3333 | (+4,+5) → (+24,+24) | +7° → +7° | 0.4 0 0.2 1 |
+| 300 | 50 | (−2,+5) → (−12,+24) | −3° → −3° | 0.4 0 0.2 1 |
+| 400 | 66.6667 | (0,+5) → (0,+24) | +5° → +5° | 0.4 0 0.2 1 |
+| 600 | 100 | (0,+5) → (0,+24) | +5° → +5° | 0 0 1 1 (hold) |
+
+Duration 600 ms, easing, error glyph, frown and return-to-error behavior are unchanged; only root translation changes. `error→idle` releases +24→0 once over the existing 300 ms. At 22 dp the pending small profile still prunes ambient breath/glance; it does not suppress requested error/success feedback.
+
+Fable: ingest SPEC numbers → swap SVGs → regenerate; retune existing State/Enter/Flash keys and LookX/LookY endpoints. Preserve §8's Solo, shutter, facing, trails and smoothing. Current expr=2 shares Thinking: the delivered thinking/dragged paths share six-vertex topology so expr 2/3 can key the corresponding path coordinates in that existing Solo child; no new slot, ID or external key is required. Keep the geometry swap inside the existing shutter. Standard-only 22 dp rendering, feather/trail clipping and the runtime contract remain post-ingest checks; see `art/validation/VALIDATION.md`.
