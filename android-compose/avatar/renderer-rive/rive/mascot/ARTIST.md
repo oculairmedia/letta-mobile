@@ -47,25 +47,31 @@ degraded` = 0..11) and `blink` (trigger), and keep the timelines the root scrubs
 
 ## How it is built (so you know what you are editing)
 
-The language is the "plate" sheet: one eye, one glyph on a white plate, a soft body that morphs.
+The language is the "plate" sheet: one eye, one glyph on a white plate, a soft body. The rig
+is generated from `SPEC.md` (numbers) and `art/*.svg` (geometry) by `gen_scene.py`; the motion
+sources are cited in `MOTION-REFERENCES.md`.
 
-- `Mascot` is the root. `Body` is **one 8-vertex path** whose vertices are keyed per sustained
-  state (circle; teardrop for `listening`; blob for `degraded`; squash while `dragged`). Its
-  paints, bottom to top: feathered soft edge, the bound identity fill, shade, gloss, a `Tint`
-  fill whose colour is keyed per state (darker for `sleeping`, grey for `failed` - overlays, so
-  the palette colour underneath still works), and a thin glass ring. `Halo` is the same path
-  enlarged, as a wide feathered stroke.
-- Root layers: `Expression` (sustained states: morph + tint + motion + glyph index), `Flash`
-  (`success`/`error` triggers, self-returning), `Drag` (boolean + the file's dragStart/dragEnd
-  listeners), `IdleVariety` (random waits, a glance), `Breath`, `Blink`, `Hover`.
-- `Plate` is the one component: a white card, a `Glyphs` node with one shape per glyph
-  (square, ring, dash, small ring, open arc, smile, diamond, arch, dot, cross) switched by opacity
-  on `expr`, plus the `TellDot` under the plate for `waitingInput` and the `FrownLine` for
-  `error`. `LookX`/`LookY` shift the glyph inside the plate (and the plate a little);
-  `Open` scales the speaking arc; `Blink` squashes the whole plate to a line. `AutoBlink` runs
-  on random-length waits.
-- Everything in `Glyphs` is placeholder geometry for the sheet's symbols - redraw freely, keep
-  the shape names and ids so the poses still find them.
+- `Mascot` is the root. `Body` is **one 8-vertex path whose shape is an identity**: the `shape`
+  enum picks one of the eight `art/body-*.svg` (240 ms morph on the `Shape` layer). States never
+  change the silhouette or scale the body. Paints, bottom to top: the bound identity `Fill`,
+  `Shade`, `Gloss` (its opacity breathes), `Tint` (colour keyed per state: darker for `sleeping`,
+  grey for `failed`, overlays over the palette colour). `SoftEdge` and `Halo` are faint feathered
+  strokes of the same path behind it.
+- Root layers: `Shape` (identity), `Expression` (sustained states: root y/x motion on Body and
+  Face together, plate rotation and offset on Face, tint, glyph index; designed transition pairs
+  from SPEC §3), `Flash` (`success` 800 ms / `error` 600 ms triggers per SPEC §2, self-returning),
+  `Drag` (boolean + the file's dragStart/dragEnd listeners), `IdleVariety` (random 4–7 s waits,
+  a glance), `Breath` (gloss opacity), `Blink`, `Hover` (one wiggle per enter).
+- `Plate` is the one component: `Card` (120 px, radius 27) with a soft `Shadow`, a `Glyphs` node
+  holding one shape per state glyph (`Idle`, `Listening`, `Thinking`, `WaitingInput`, `Speaking`,
+  `Success`, `Error`, `Sleeping`, `Loading`, `Failed`, `Degraded` - the SVGs by name) switched by
+  opacity on `expr`, and three mouths below the plate: `Mouth` (morphs closed/half/open on the
+  `Open` timeline from the three mouth SVGs), `MouthO` (waitingInput), `FrownLine` (error).
+  `LookX`/`LookY` move the glyph ±7/±5 px; `Blink` squashes the `Glyphs` node (55/25/90 ms);
+  `AutoBlink` waits 2.5–4.5 s.
+- To change a glyph or a body: edit the SVG, regenerate. To change timing: edit SPEC.md and the
+  matching table in the generator. In the editor, keep the object names and ids so the poses
+  still find them.
 
 ## The finishing touches this needs
 
