@@ -31,6 +31,10 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.letta.mobile.avatar.core.AvatarState
+import com.letta.mobile.avatar.core.MascotIdentity
+import com.letta.mobile.avatar.core.MascotPalette
+import com.letta.mobile.avatar.core.MascotShape
+import com.letta.mobile.avatar.rive.RiveAvatarContract
 import com.letta.mobile.avatar.rive.MASCOT_MODEL
 import com.letta.mobile.avatar.rive.RiveAvatarRuntime
 import java.io.File
@@ -114,8 +118,17 @@ private fun MascotColumn(file: File, modifier: Modifier) {
         runtime.load(MASCOT_MODEL)
         if (!SELF_TEST) return@LaunchedEffect
         // Hands-free contract check: every state through the shared runtime, mouth pulsed while speaking.
+        var tick = 0
         while (true) {
             for (state in AvatarState.entries) {
+                // Identity rotates independently of state, so every screenshot shows both moving.
+                val identity = MascotIdentity(
+                    MascotShape.entries[tick % MascotShape.entries.size],
+                    MascotPalette.ALL[tick % MascotPalette.ALL.size],
+                )
+                RiveAvatarContract.applyIdentity(scene.inputSink, identity)
+                println("rive-spike self-test: identity=${identity.encode()}")
+                tick++
                 current = state
                 runtime.applyState(state)
                 mouth = if (state == AvatarState.SPEAKING) 0.9f else 0f

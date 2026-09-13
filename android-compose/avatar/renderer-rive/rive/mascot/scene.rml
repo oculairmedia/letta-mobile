@@ -37,18 +37,18 @@
             <Shape x="205" y="232" opacity="0" name="HappyLeft" id="0:25">
                 <PointsPath isClosed="false" name="Path">
                     <StraightVertex x="-16" y="6"/>
-                    <CubicMirroredVertex x="0" y="-8" rotation="0" distance="12"/>
+                    <CubicMirroredVertex x="0" y="-8" rotation="0.0" distance="12"/>
                     <StraightVertex x="16" y="6"/>
                 </PointsPath>
-                <Stroke thickness="8" cap="1" join="1" name="Stroke"><SolidColor colorValue="FF0B0B0B" name="Color"/></Stroke>
+                <Stroke thickness="8" cap="round" join="round" name="Stroke"><SolidColor colorValue="FF0B0B0B" name="Color"/></Stroke>
             </Shape>
             <Shape x="295" y="232" opacity="0" name="HappyRight" id="0:26">
                 <PointsPath isClosed="false" name="Path">
                     <StraightVertex x="-16" y="6"/>
-                    <CubicMirroredVertex x="0" y="-8" rotation="0" distance="12"/>
+                    <CubicMirroredVertex x="0" y="-8" rotation="0.0" distance="12"/>
                     <StraightVertex x="16" y="6"/>
                 </PointsPath>
-                <Stroke thickness="8" cap="1" join="1" name="Stroke"><SolidColor colorValue="FF0B0B0B" name="Color"/></Stroke>
+                <Stroke thickness="8" cap="round" join="round" name="Stroke"><SolidColor colorValue="FF0B0B0B" name="Color"/></Stroke>
             </Shape>
             <Shape x="205" y="230" rotation="0" opacity="0" name="ClosedLeft" id="0:27">
                 <Rectangle width="30" height="8" linkCornerRadius="true" cornerRadiusTL="4" cornerRadiusTR="4"
@@ -61,24 +61,24 @@
                 <Fill name="Fill"><SolidColor colorValue="FF0B0B0B" name="Color"/></Fill>
             </Shape>
             <Node x="205" y="230" opacity="0" name="CrossLeft" id="0:29">
-                <Shape x="0" y="0" rotation="45" name="CrossLeftA" id="0:29:a">
+                <Shape x="0" y="0" rotation="0.7854" name="CrossLeftA" id="0:40">
                 <Rectangle width="30" height="8" linkCornerRadius="true" cornerRadiusTL="4" cornerRadiusTR="4"
                            cornerRadiusBL="4" cornerRadiusBR="4" name="Path"/>
                 <Fill name="Fill"><SolidColor colorValue="FF0B0B0B" name="Color"/></Fill>
             </Shape>
-                <Shape x="0" y="0" rotation="-45" name="CrossLeftB" id="0:29:b">
+                <Shape x="0" y="0" rotation="-0.7854" name="CrossLeftB" id="0:41">
                 <Rectangle width="30" height="8" linkCornerRadius="true" cornerRadiusTL="4" cornerRadiusTR="4"
                            cornerRadiusBL="4" cornerRadiusBR="4" name="Path"/>
                 <Fill name="Fill"><SolidColor colorValue="FF0B0B0B" name="Color"/></Fill>
             </Shape>
             </Node>
             <Node x="295" y="230" opacity="0" name="CrossRight" id="0:33">
-                <Shape x="0" y="0" rotation="45" name="CrossRightA" id="0:33:a">
+                <Shape x="0" y="0" rotation="0.7854" name="CrossRightA" id="0:42">
                 <Rectangle width="30" height="8" linkCornerRadius="true" cornerRadiusTL="4" cornerRadiusTR="4"
                            cornerRadiusBL="4" cornerRadiusBR="4" name="Path"/>
                 <Fill name="Fill"><SolidColor colorValue="FF0B0B0B" name="Color"/></Fill>
             </Shape>
-                <Shape x="0" y="0" rotation="-45" name="CrossRightB" id="0:33:b">
+                <Shape x="0" y="0" rotation="-0.7854" name="CrossRightB" id="0:43">
                 <Rectangle width="30" height="8" linkCornerRadius="true" cornerRadiusTL="4" cornerRadiusTR="4"
                            cornerRadiusBL="4" cornerRadiusBR="4" name="Path"/>
                 <Fill name="Fill"><SolidColor colorValue="FF0B0B0B" name="Color"/></Fill>
@@ -106,11 +106,11 @@
             </Shape>
             <Shape x="250" y="270" opacity="0" name="Blob" id="0:111">
                 <PointsPath isClosed="true" name="Path">
-                    <CubicMirroredVertex x="0" y="-150" rotation="0" distance="85"/>
-                    <CubicMirroredVertex x="150" y="-30" rotation="90" distance="70"/>
-                    <CubicMirroredVertex x="95" y="135" rotation="165" distance="70"/>
-                    <CubicMirroredVertex x="-105" y="125" rotation="195" distance="70"/>
-                    <CubicMirroredVertex x="-150" y="-40" rotation="270" distance="70"/>
+                    <CubicMirroredVertex x="0" y="-150" rotation="0.0" distance="85"/>
+                    <CubicMirroredVertex x="150" y="-30" rotation="1.5708" distance="70"/>
+                    <CubicMirroredVertex x="95" y="135" rotation="2.87979" distance="70"/>
+                    <CubicMirroredVertex x="-105" y="125" rotation="3.40339" distance="70"/>
+                    <CubicMirroredVertex x="-150" y="-40" rotation="4.71239" distance="70"/>
                 </PointsPath>
                 <Fill name="Fill">
                     <SolidColor colorValue="FF1E7BF0" name="Color">
@@ -152,12 +152,12 @@
             </Shape>
             <Shape x="250" y="270" opacity="0" name="Cloud" id="0:116">
                 <PointsPath isClosed="true" name="Path">
-                    <CubicMirroredVertex x="-60" y="-120" rotation="0" distance="60"/>
-                    <CubicMirroredVertex x="70" y="-130" rotation="20" distance="55"/>
-                    <CubicMirroredVertex x="160" y="-20" rotation="100" distance="60"/>
-                    <CubicMirroredVertex x="110" y="120" rotation="175" distance="70"/>
-                    <CubicMirroredVertex x="-110" y="120" rotation="185" distance="70"/>
-                    <CubicMirroredVertex x="-160" y="-10" rotation="260" distance="60"/>
+                    <CubicMirroredVertex x="-60" y="-120" rotation="0.0" distance="60"/>
+                    <CubicMirroredVertex x="70" y="-130" rotation="0.34907" distance="55"/>
+                    <CubicMirroredVertex x="160" y="-20" rotation="1.74533" distance="60"/>
+                    <CubicMirroredVertex x="110" y="120" rotation="3.05433" distance="70"/>
+                    <CubicMirroredVertex x="-110" y="120" rotation="3.22886" distance="70"/>
+                    <CubicMirroredVertex x="-160" y="-10" rotation="4.53786" distance="60"/>
                 </PointsPath>
                 <Fill name="Fill">
                     <SolidColor colorValue="FF1E7BF0" name="Color">
@@ -168,9 +168,9 @@
             <Shape x="250" y="270" opacity="0" name="Drop" id="0:117">
                 <PointsPath isClosed="true" name="Path">
                     <StraightVertex x="0" y="-165" radius="18"/>
-                    <CubicMirroredVertex x="135" y="40" rotation="120" distance="90"/>
-                    <CubicMirroredVertex x="0" y="150" rotation="180" distance="80"/>
-                    <CubicMirroredVertex x="-135" y="40" rotation="240" distance="90"/>
+                    <CubicMirroredVertex x="135" y="40" rotation="2.0944" distance="90"/>
+                    <CubicMirroredVertex x="0" y="150" rotation="3.14159" distance="80"/>
+                    <CubicMirroredVertex x="-135" y="40" rotation="4.18879" distance="90"/>
                 </PointsPath>
                 <Fill name="Fill">
                     <SolidColor colorValue="FF1E7BF0" name="Color">
@@ -180,7 +180,7 @@
             </Shape>
         </Node>
 
-        <LinearAnimation fps="60" duration="180" loopValue="1" name="Idle" id="3:10">
+        <LinearAnimation fps="60" duration="180" loopValue="loop" name="Idle" id="3:100">
             <KeyedObject objectId="0:23">
                 <KeyedProperty propertyKey="20">
                     <KeyFrameDouble value="14" frame="0"/>
@@ -276,7 +276,7 @@
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
-        <LinearAnimation fps="60" duration="1" loopValue="0" name="Listening" id="3:11">
+        <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="Listening" id="3:101">
             <KeyedObject objectId="0:23">
                 <KeyedProperty propertyKey="20">
                     <KeyFrameDouble value="14" frame="0"/>
@@ -368,7 +368,7 @@
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
-        <LinearAnimation fps="60" duration="40" loopValue="1" name="Dragged" id="3:12">
+        <LinearAnimation fps="60" duration="40" loopValue="loop" name="Dragged" id="3:102">
             <KeyedObject objectId="0:23">
                 <KeyedProperty propertyKey="20">
                     <KeyFrameDouble value="14" frame="0"/>
@@ -464,7 +464,7 @@
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
-        <LinearAnimation fps="60" duration="120" loopValue="1" name="Thinking" id="3:13">
+        <LinearAnimation fps="60" duration="120" loopValue="loop" name="Thinking" id="3:103">
             <KeyedObject objectId="0:23">
                 <KeyedProperty propertyKey="20">
                     <KeyFrameDouble value="14" frame="0"/>
@@ -558,7 +558,7 @@
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
-        <LinearAnimation fps="60" duration="48" loopValue="1" name="WaitingInput" id="3:14">
+        <LinearAnimation fps="60" duration="48" loopValue="loop" name="WaitingInput" id="3:104">
             <KeyedObject objectId="0:23">
                 <KeyedProperty propertyKey="20">
                     <KeyFrameDouble value="21" frame="0"/>
@@ -652,7 +652,7 @@
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
-        <LinearAnimation fps="60" duration="1" loopValue="0" name="Speaking" id="3:15">
+        <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="Speaking" id="3:105">
             <KeyedObject objectId="0:23">
                 <KeyedProperty propertyKey="20">
                     <KeyFrameDouble value="14" frame="0"/>
@@ -744,7 +744,7 @@
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
-        <LinearAnimation fps="60" duration="24" loopValue="0" name="Success" id="3:16">
+        <LinearAnimation fps="60" duration="24" loopValue="oneShot" name="Success" id="3:106">
             <KeyedObject objectId="0:23">
                 <KeyedProperty propertyKey="20">
                     <KeyFrameDouble value="14" frame="0"/>
@@ -838,7 +838,7 @@
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
-        <LinearAnimation fps="60" duration="30" loopValue="0" name="Error" id="3:17">
+        <LinearAnimation fps="60" duration="30" loopValue="oneShot" name="Error" id="3:107">
             <KeyedObject objectId="0:23">
                 <KeyedProperty propertyKey="20">
                     <KeyFrameDouble value="14" frame="0"/>
@@ -857,7 +857,7 @@
             </KeyedObject>
             <KeyedObject objectId="0:21">
                 <KeyedProperty propertyKey="15">
-                    <KeyFrameDouble value="-12" frame="0"/>
+                    <KeyFrameDouble value="-0.20944" frame="0"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="14">
                     <KeyFrameDouble value="230" frame="0"/>
@@ -868,7 +868,7 @@
             </KeyedObject>
             <KeyedObject objectId="0:22">
                 <KeyedProperty propertyKey="15">
-                    <KeyFrameDouble value="12" frame="0"/>
+                    <KeyFrameDouble value="0.20944" frame="0"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="14">
                     <KeyFrameDouble value="230" frame="0"/>
@@ -936,7 +936,7 @@
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
-        <LinearAnimation fps="60" duration="300" loopValue="1" name="Sleeping" id="3:18">
+        <LinearAnimation fps="60" duration="300" loopValue="loop" name="Sleeping" id="3:108">
             <KeyedObject objectId="0:23">
                 <KeyedProperty propertyKey="20">
                     <KeyFrameDouble value="14" frame="0"/>
@@ -1032,7 +1032,7 @@
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
-        <LinearAnimation fps="60" duration="72" loopValue="1" name="Loading" id="3:19">
+        <LinearAnimation fps="60" duration="72" loopValue="loop" name="Loading" id="3:109">
             <KeyedObject objectId="0:23">
                 <KeyedProperty propertyKey="20">
                     <KeyFrameDouble value="14" frame="0"/>
@@ -1126,7 +1126,7 @@
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
-        <LinearAnimation fps="60" duration="1" loopValue="0" name="Failed" id="3:20">
+        <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="Failed" id="3:110">
             <KeyedObject objectId="0:23">
                 <KeyedProperty propertyKey="20">
                     <KeyFrameDouble value="14" frame="0"/>
@@ -1218,7 +1218,7 @@
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
-        <LinearAnimation fps="60" duration="1" loopValue="0" name="Degraded" id="3:21">
+        <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="Degraded" id="3:111">
             <KeyedObject objectId="0:23">
                 <KeyedProperty propertyKey="20">
                     <KeyFrameDouble value="14" frame="0"/>
@@ -1311,7 +1311,7 @@
             </KeyedObject>
         </LinearAnimation>
 
-        <LinearAnimation fps="60" duration="1" loopValue="0" name="ShapeCircle" id="3:40">
+        <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="ShapeCircle" id="3:160">
             <KeyedObject objectId="0:110">
                 <KeyedProperty propertyKey="18">
                     <KeyFrameDouble value="1" frame="0"/>
@@ -1353,7 +1353,7 @@
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
-        <LinearAnimation fps="60" duration="1" loopValue="0" name="ShapeBlob" id="3:41">
+        <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="ShapeBlob" id="3:161">
             <KeyedObject objectId="0:110">
                 <KeyedProperty propertyKey="18">
                     <KeyFrameDouble value="0" frame="0"/>
@@ -1395,7 +1395,7 @@
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
-        <LinearAnimation fps="60" duration="1" loopValue="0" name="ShapeRoundedSquare" id="3:42">
+        <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="ShapeRoundedSquare" id="3:162">
             <KeyedObject objectId="0:110">
                 <KeyedProperty propertyKey="18">
                     <KeyFrameDouble value="0" frame="0"/>
@@ -1437,7 +1437,7 @@
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
-        <LinearAnimation fps="60" duration="1" loopValue="0" name="ShapePill" id="3:43">
+        <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="ShapePill" id="3:163">
             <KeyedObject objectId="0:110">
                 <KeyedProperty propertyKey="18">
                     <KeyFrameDouble value="0" frame="0"/>
@@ -1479,7 +1479,7 @@
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
-        <LinearAnimation fps="60" duration="1" loopValue="0" name="ShapeTriangle" id="3:44">
+        <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="ShapeTriangle" id="3:164">
             <KeyedObject objectId="0:110">
                 <KeyedProperty propertyKey="18">
                     <KeyFrameDouble value="0" frame="0"/>
@@ -1521,7 +1521,7 @@
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
-        <LinearAnimation fps="60" duration="1" loopValue="0" name="ShapeHexagon" id="3:45">
+        <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="ShapeHexagon" id="3:165">
             <KeyedObject objectId="0:110">
                 <KeyedProperty propertyKey="18">
                     <KeyFrameDouble value="0" frame="0"/>
@@ -1563,7 +1563,7 @@
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
-        <LinearAnimation fps="60" duration="1" loopValue="0" name="ShapeCloud" id="3:46">
+        <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="ShapeCloud" id="3:166">
             <KeyedObject objectId="0:110">
                 <KeyedProperty propertyKey="18">
                     <KeyFrameDouble value="0" frame="0"/>
@@ -1605,7 +1605,7 @@
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
-        <LinearAnimation fps="60" duration="1" loopValue="0" name="ShapeDrop" id="3:47">
+        <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="ShapeDrop" id="3:167">
             <KeyedObject objectId="0:110">
                 <KeyedProperty propertyKey="18">
                     <KeyFrameDouble value="0" frame="0"/>
@@ -1651,10 +1651,10 @@
         <StateMachine name="Avatar" id="3:5">
             <StateMachineLayer name="Shape" id="3:2">
                 <EntryState>
-                    <StateTransition stateToId="3:50"/>
+                    <StateTransition stateToId="3:170"/>
                 </EntryState>
                 <AnyState x="220" y="-140">
-                    <StateTransition stateToId="3:50" duration="160">
+                    <StateTransition stateToId="3:170" duration="160">
                         <TransitionViewModelCondition opValue="equal">
                             <TransitionPropertyViewModelComparator>
                                 <BindablePropertyEnum>
@@ -1664,7 +1664,7 @@
                             <TransitionValueEnumComparator value="1:201"/>
                         </TransitionViewModelCondition>
                     </StateTransition>
-                    <StateTransition stateToId="3:51" duration="160">
+                    <StateTransition stateToId="3:171" duration="160">
                         <TransitionViewModelCondition opValue="equal">
                             <TransitionPropertyViewModelComparator>
                                 <BindablePropertyEnum>
@@ -1674,7 +1674,7 @@
                             <TransitionValueEnumComparator value="1:202"/>
                         </TransitionViewModelCondition>
                     </StateTransition>
-                    <StateTransition stateToId="3:52" duration="160">
+                    <StateTransition stateToId="3:172" duration="160">
                         <TransitionViewModelCondition opValue="equal">
                             <TransitionPropertyViewModelComparator>
                                 <BindablePropertyEnum>
@@ -1684,7 +1684,7 @@
                             <TransitionValueEnumComparator value="1:203"/>
                         </TransitionViewModelCondition>
                     </StateTransition>
-                    <StateTransition stateToId="3:53" duration="160">
+                    <StateTransition stateToId="3:173" duration="160">
                         <TransitionViewModelCondition opValue="equal">
                             <TransitionPropertyViewModelComparator>
                                 <BindablePropertyEnum>
@@ -1694,7 +1694,7 @@
                             <TransitionValueEnumComparator value="1:204"/>
                         </TransitionViewModelCondition>
                     </StateTransition>
-                    <StateTransition stateToId="3:54" duration="160">
+                    <StateTransition stateToId="3:174" duration="160">
                         <TransitionViewModelCondition opValue="equal">
                             <TransitionPropertyViewModelComparator>
                                 <BindablePropertyEnum>
@@ -1704,7 +1704,7 @@
                             <TransitionValueEnumComparator value="1:205"/>
                         </TransitionViewModelCondition>
                     </StateTransition>
-                    <StateTransition stateToId="3:55" duration="160">
+                    <StateTransition stateToId="3:175" duration="160">
                         <TransitionViewModelCondition opValue="equal">
                             <TransitionPropertyViewModelComparator>
                                 <BindablePropertyEnum>
@@ -1714,7 +1714,7 @@
                             <TransitionValueEnumComparator value="1:206"/>
                         </TransitionViewModelCondition>
                     </StateTransition>
-                    <StateTransition stateToId="3:56" duration="160">
+                    <StateTransition stateToId="3:176" duration="160">
                         <TransitionViewModelCondition opValue="equal">
                             <TransitionPropertyViewModelComparator>
                                 <BindablePropertyEnum>
@@ -1724,7 +1724,7 @@
                             <TransitionValueEnumComparator value="1:207"/>
                         </TransitionViewModelCondition>
                     </StateTransition>
-                    <StateTransition stateToId="3:57" duration="160">
+                    <StateTransition stateToId="3:177" duration="160">
                         <TransitionViewModelCondition opValue="equal">
                             <TransitionPropertyViewModelComparator>
                                 <BindablePropertyEnum>
@@ -1736,21 +1736,21 @@
                     </StateTransition>
                 </AnyState>
                 <ExitState x="430" y="-140"/>
-                <AnimationState x="200" y="40" animationId="3:40" id="3:50"/>
-                <AnimationState x="200" y="100" animationId="3:41" id="3:51"/>
-                <AnimationState x="200" y="160" animationId="3:42" id="3:52"/>
-                <AnimationState x="200" y="220" animationId="3:43" id="3:53"/>
-                <AnimationState x="200" y="280" animationId="3:44" id="3:54"/>
-                <AnimationState x="200" y="340" animationId="3:45" id="3:55"/>
-                <AnimationState x="200" y="400" animationId="3:46" id="3:56"/>
-                <AnimationState x="200" y="460" animationId="3:47" id="3:57"/>
+                <AnimationState x="200" y="40" animationId="3:160" id="3:170"/>
+                <AnimationState x="200" y="100" animationId="3:161" id="3:171"/>
+                <AnimationState x="200" y="160" animationId="3:162" id="3:172"/>
+                <AnimationState x="200" y="220" animationId="3:163" id="3:173"/>
+                <AnimationState x="200" y="280" animationId="3:164" id="3:174"/>
+                <AnimationState x="200" y="340" animationId="3:165" id="3:175"/>
+                <AnimationState x="200" y="400" animationId="3:166" id="3:176"/>
+                <AnimationState x="200" y="460" animationId="3:167" id="3:177"/>
             </StateMachineLayer>
             <StateMachineLayer name="State" id="3:1">
                 <EntryState>
-                    <StateTransition stateToId="3:20"/>
+                    <StateTransition stateToId="3:130"/>
                 </EntryState>
                 <AnyState x="220" y="-140">
-                    <StateTransition stateToId="3:20" duration="160">
+                    <StateTransition stateToId="3:130" duration="160">
                         <TransitionViewModelCondition opValue="equal">
                             <TransitionPropertyViewModelComparator>
                                 <BindablePropertyEnum>
@@ -1760,7 +1760,7 @@
                             <TransitionValueEnumComparator value="1:101"/>
                         </TransitionViewModelCondition>
                     </StateTransition>
-                    <StateTransition stateToId="3:21" duration="160">
+                    <StateTransition stateToId="3:131" duration="160">
                         <TransitionViewModelCondition opValue="equal">
                             <TransitionPropertyViewModelComparator>
                                 <BindablePropertyEnum>
@@ -1770,7 +1770,7 @@
                             <TransitionValueEnumComparator value="1:102"/>
                         </TransitionViewModelCondition>
                     </StateTransition>
-                    <StateTransition stateToId="3:22" duration="160">
+                    <StateTransition stateToId="3:132" duration="160">
                         <TransitionViewModelCondition opValue="equal">
                             <TransitionPropertyViewModelComparator>
                                 <BindablePropertyEnum>
@@ -1780,7 +1780,7 @@
                             <TransitionValueEnumComparator value="1:103"/>
                         </TransitionViewModelCondition>
                     </StateTransition>
-                    <StateTransition stateToId="3:23" duration="160">
+                    <StateTransition stateToId="3:133" duration="160">
                         <TransitionViewModelCondition opValue="equal">
                             <TransitionPropertyViewModelComparator>
                                 <BindablePropertyEnum>
@@ -1790,7 +1790,7 @@
                             <TransitionValueEnumComparator value="1:104"/>
                         </TransitionViewModelCondition>
                     </StateTransition>
-                    <StateTransition stateToId="3:24" duration="160">
+                    <StateTransition stateToId="3:134" duration="160">
                         <TransitionViewModelCondition opValue="equal">
                             <TransitionPropertyViewModelComparator>
                                 <BindablePropertyEnum>
@@ -1800,7 +1800,7 @@
                             <TransitionValueEnumComparator value="1:105"/>
                         </TransitionViewModelCondition>
                     </StateTransition>
-                    <StateTransition stateToId="3:25" duration="160">
+                    <StateTransition stateToId="3:135" duration="160">
                         <TransitionViewModelCondition opValue="equal">
                             <TransitionPropertyViewModelComparator>
                                 <BindablePropertyEnum>
@@ -1810,7 +1810,7 @@
                             <TransitionValueEnumComparator value="1:106"/>
                         </TransitionViewModelCondition>
                     </StateTransition>
-                    <StateTransition stateToId="3:26" duration="160">
+                    <StateTransition stateToId="3:136" duration="160">
                         <TransitionViewModelCondition opValue="equal">
                             <TransitionPropertyViewModelComparator>
                                 <BindablePropertyEnum>
@@ -1820,7 +1820,7 @@
                             <TransitionValueEnumComparator value="1:107"/>
                         </TransitionViewModelCondition>
                     </StateTransition>
-                    <StateTransition stateToId="3:27" duration="160">
+                    <StateTransition stateToId="3:137" duration="160">
                         <TransitionViewModelCondition opValue="equal">
                             <TransitionPropertyViewModelComparator>
                                 <BindablePropertyEnum>
@@ -1830,7 +1830,7 @@
                             <TransitionValueEnumComparator value="1:108"/>
                         </TransitionViewModelCondition>
                     </StateTransition>
-                    <StateTransition stateToId="3:28" duration="160">
+                    <StateTransition stateToId="3:138" duration="160">
                         <TransitionViewModelCondition opValue="equal">
                             <TransitionPropertyViewModelComparator>
                                 <BindablePropertyEnum>
@@ -1840,7 +1840,7 @@
                             <TransitionValueEnumComparator value="1:109"/>
                         </TransitionViewModelCondition>
                     </StateTransition>
-                    <StateTransition stateToId="3:29" duration="160">
+                    <StateTransition stateToId="3:139" duration="160">
                         <TransitionViewModelCondition opValue="equal">
                             <TransitionPropertyViewModelComparator>
                                 <BindablePropertyEnum>
@@ -1850,7 +1850,7 @@
                             <TransitionValueEnumComparator value="1:110"/>
                         </TransitionViewModelCondition>
                     </StateTransition>
-                    <StateTransition stateToId="3:30" duration="160">
+                    <StateTransition stateToId="3:140" duration="160">
                         <TransitionViewModelCondition opValue="equal">
                             <TransitionPropertyViewModelComparator>
                                 <BindablePropertyEnum>
@@ -1860,7 +1860,7 @@
                             <TransitionValueEnumComparator value="1:111"/>
                         </TransitionViewModelCondition>
                     </StateTransition>
-                    <StateTransition stateToId="3:31" duration="160">
+                    <StateTransition stateToId="3:141" duration="160">
                         <TransitionViewModelCondition opValue="equal">
                             <TransitionPropertyViewModelComparator>
                                 <BindablePropertyEnum>
@@ -1872,18 +1872,18 @@
                     </StateTransition>
                 </AnyState>
                 <ExitState x="430" y="-140"/>
-                <AnimationState x="200" y="40" animationId="3:10" id="3:20"/>
-                <AnimationState x="200" y="100" animationId="3:11" id="3:21"/>
-                <AnimationState x="200" y="160" animationId="3:12" id="3:22"/>
-                <AnimationState x="200" y="220" animationId="3:13" id="3:23"/>
-                <AnimationState x="200" y="280" animationId="3:14" id="3:24"/>
-                <AnimationState x="200" y="340" animationId="3:15" id="3:25"/>
-                <AnimationState x="200" y="400" animationId="3:16" id="3:26"/>
-                <AnimationState x="200" y="460" animationId="3:17" id="3:27"/>
-                <AnimationState x="200" y="520" animationId="3:18" id="3:28"/>
-                <AnimationState x="200" y="580" animationId="3:19" id="3:29"/>
-                <AnimationState x="200" y="640" animationId="3:20" id="3:30"/>
-                <AnimationState x="200" y="700" animationId="3:21" id="3:31"/>
+                <AnimationState x="200" y="40" animationId="3:100" id="3:130"/>
+                <AnimationState x="200" y="100" animationId="3:101" id="3:131"/>
+                <AnimationState x="200" y="160" animationId="3:102" id="3:132"/>
+                <AnimationState x="200" y="220" animationId="3:103" id="3:133"/>
+                <AnimationState x="200" y="280" animationId="3:104" id="3:134"/>
+                <AnimationState x="200" y="340" animationId="3:105" id="3:135"/>
+                <AnimationState x="200" y="400" animationId="3:106" id="3:136"/>
+                <AnimationState x="200" y="460" animationId="3:107" id="3:137"/>
+                <AnimationState x="200" y="520" animationId="3:108" id="3:138"/>
+                <AnimationState x="200" y="580" animationId="3:109" id="3:139"/>
+                <AnimationState x="200" y="640" animationId="3:110" id="3:140"/>
+                <AnimationState x="200" y="700" animationId="3:111" id="3:141"/>
             </StateMachineLayer>
         </StateMachine>
     </Artboard>
