@@ -1,0 +1,84 @@
+package com.letta.mobile.avatar.rive
+
+import com.letta.mobile.avatar.core.AvatarState
+
+/**
+ * The names a `.riv` mascot must expose for this renderer to drive it.
+ *
+ * A Rive state machine is addressed by string, so the asset and the app agree by convention or not
+ * at all. Writing those strings at each call site is how that agreement rots, so they live here and
+ * the authoring side is generated from the same list (see `mascot.rml` in this module's `assets`).
+ *
+ * The sustained condition is one enum property rather than a boolean each: the director's states are
+ * mutually exclusive, and parallel booleans let the asset sit in two of them at once, which is a bug
+ * the asset can express but the director cannot.
+ */
+object RiveAvatarContract {
+    /** The state machine the renderer instantiates; a `.riv` may hold several. */
+    const val STATE_MACHINE: String = "Avatar"
+
+    /** Custom enum `AvatarState`. The director's arbitrated state, as its [stateKey]. */
+    const val INPUT_STATE: String = "state"
+
+    /** Number, 0..1. Jaw/mouth-open level, driven from speech amplitude. */
+    const val INPUT_MOUTH_OPEN: String = "mouthOpen"
+
+    /** Number, -1..1. Horizontal gaze; 0 is straight ahead. */
+    const val INPUT_LOOK_X: String = "lookX"
+
+    /** Number, -1..1. Vertical gaze; 0 is straight ahead. */
+    const val INPUT_LOOK_Y: String = "lookY"
+
+    /** Trigger. One blink, on the director's randomized idle schedule. */
+    const val TRIGGER_BLINK: String = "blink"
+
+    /**
+     * The enum key for [state], matching a `DataEnumValue key` in the asset.
+     *
+     * A key rather than an index on purpose. Rive delivers a custom enum's value as its position in
+     * the declared list, so an index contract breaks silently the day someone reorders the art: the
+     * build stays clean and the mascot simply plays the wrong state forever.
+     */
+    fun stateKey(state: AvatarState): String = when (state) {
+        AvatarState.IDLE -> "idle"
+        AvatarState.LISTENING -> "listening"
+        AvatarState.DRAGGED -> "dragged"
+        AvatarState.THINKING -> "thinking"
+        AvatarState.WAITING_INPUT -> "waitingInput"
+        AvatarState.SPEAKING -> "speaking"
+        AvatarState.SUCCESS -> "success"
+        AvatarState.ERROR -> "error"
+        AvatarState.SLEEPING -> "sleeping"
+        AvatarState.LOADING -> "loading"
+        AvatarState.FAILED -> "failed"
+        AvatarState.DEGRADED -> "degraded"
+    }
+}
+
+/**
+ * Where input writes go. Implemented per platform: by the Rive Android runtime today, and by the
+ * JCEF-hosted web runtime when desktop lands. Keeping it an interface is what lets the runtime and
+ * every mapping decision above it be shared code with tests that need no device.
+ */
+interface RiveInputSink {
+    fun setNumber(input: String, value: Float)
+
+    fun setBoolean(input: String, value: Boolean)
+
+    /** Writes a custom-enum property by its value key. */
+    fun setEnum(input: String, key: String)
+
+    fun fire(input: String)
+}
+
+/**
+ * The mascot this module ships. Packaged as a raw resource rather than imported through the avatar
+ * pipeline: a Rive file is not an [com.letta.mobile.avatar.core.AvatarFormat] yet, and the pipeline
+ * switches exhaustively on that enum.
+ */
+val MASCOT_MODEL: com.letta.mobile.avatar.core.AvatarModel = com.letta.mobile.avatar.core.AvatarModel(
+    id = "letta-mascot",
+    displayName = "Letta Mascot",
+    uri = "res://raw/mascot.riv",
+    format = com.letta.mobile.avatar.core.AvatarFormat.GLB,
+)
