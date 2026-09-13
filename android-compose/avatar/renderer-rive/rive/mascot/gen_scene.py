@@ -322,7 +322,7 @@ def shape_keys(shape):
 
 def body():
     bound = f'<SolidColor colorValue="FF79B7DF" name="Color">\n            {bind(VM_COLOR, COLOR)}\n        </SolidColor>'
-    return f'''<Node x="0" y="0" name="BodyPlacement">
+    return f'''<Node x="0" y="0" name="BodyPlacement" id="{INFLATE_NODE}">
 <Node x="0" y="0" name="Body" id="{BODY_NODE}">
     <!-- Paints on one shape; the LATER paint draws on top. -->
     <Shape name="BodyShape" id="{HITBOX}">
@@ -579,13 +579,23 @@ def sine(amplitude, period_ms, base=0.0):
     return [(0, base, SINE), (q, base + amplitude, SINE), (2 * q, base, SINE), (3 * q, base - amplitude, SINE), (4 * q, base)]
 
 
-BREATH_MS, BREATH_PX = 4600, 11
+BREATH_MS, BREATH_PX, BREATH_SCALE = 4600, 11, 1.03
+INFLATE_NODE = "0:233"  # BodyPlacement: the breath's inflate lives here, away from the turn's body keys
 HALO_OPACITY, HALO_SLEEP, HALO_FAILED = 0.10, 0.06, 0
 
 
-def breath():
-    """SPEC section 9.3: root y 0 -> -11 -> 0, inhale 55 % / exhale 45 % of 4600 ms."""
-    return [(0, 0, SINE), (frames(BREATH_MS * 0.55), -BREATH_PX, SINE), (frames(BREATH_MS), 0)]
+def breath(period_ms=BREATH_MS):
+    """SPEC section 9.3: root y 0 -> -11 -> 0, inhale 55 % / exhale 45 %."""
+    return [(0, 0, SINE), (frames(period_ms * 0.55), -BREATH_PX, SINE), (frames(period_ms), 0)]
+
+
+def breath_scale(period_ms=BREATH_MS, lo=1.0, hi=BREATH_SCALE):
+    """The volume of the breath: the body inflates on the inhale, same phase as the rise."""
+    return [(0, lo, SINE), (frames(period_ms * 0.55), hi, SINE), (frames(period_ms), lo)]
+
+
+BREATHING = {"idle": (BREATH_MS, 1.0, BREATH_SCALE), "listening": (BREATH_MS, 1.0, BREATH_SCALE),
+             "speaking": (BREATH_MS, 1.0, BREATH_SCALE), "sleeping": (6800, 0.99, 1.025)}
 
 
 # Default gaze life per state, on the AutoLookX/AutoLookY remaps (0..1, 0.5 = centre). A value
@@ -619,7 +629,7 @@ def sustained_animations():
         "waitingInput": ({"y": sine(19, 1200)}, 1200, 0, (0, -2), "00000000", None),
         "speaking": ({"y": breath()}, BREATH_MS, 0, (0, 0), "00000000", None),
         "error": ({"y": 24}, 0, 5, (0, 4), "14000000", None),
-        "sleeping": ({"y": sine(1, 6800)}, 6800, 3, (0, 4), "38000000", None),
+        "sleeping": ({"y": breath(6800)}, 6800, 3, (0, 4), "38000000", None),   # slow, deep, same phase as the inflate
         "loading": ({}, 1400, 0, (0, 0), "10000000", [(0, 0.8, SINE), (frames(700), 1.0, SINE), (frames(1400), 0.8)]),
         "failed": ({}, 0, 0, (0, 0), "66808080", None),
         "degraded": ({}, 0, 4, (0, 0), "00000000", None),
@@ -639,7 +649,9 @@ def sustained_animations():
         jx, jy = FACING[st]
         halo = {"sleeping": HALO_SLEEP, "failed": HALO_FAILED}.get(st, HALO_OPACITY)
         gx, gy = GAZE.get(st, (0.5, 0.5))
+        bs = breath_scale(*BREATHING[st]) if st in BREATHING else 1
         objs = {BODY_NODE: body_keys, FACE: face_keys, TINT: {COLOR: tint}, PLATE_EXPR: {NESTED_VALUE: EXPR[st]},
+                INFLATE_NODE: {SX: bs, SY: bs},
                 GLOSS: {GRADIENT_OPACITY: gloss if gloss else 1}, JOYSTICK: {JX: jx, JY: jy}, HALO: {OPACITY: halo},
                 AUTO_X: {REMAP_TIME: gx(period) if callable(gx) else gx}, AUTO_Y: {REMAP_TIME: gy(period) if callable(gy) else gy}}
         duration = frames(period) if period else 1
