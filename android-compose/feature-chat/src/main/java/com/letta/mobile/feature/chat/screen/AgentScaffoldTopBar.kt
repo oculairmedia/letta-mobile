@@ -44,6 +44,12 @@ internal fun AgentScaffoldTopBar(state: AgentScaffoldRuntimeState) {
 
     TopAppBar(
         title = {
+            androidx.compose.material3.Surface(
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(50),
+                color = Color.Black,
+                contentColor = Color.White,
+            ) {
+                androidx.compose.foundation.layout.Box(Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
             if (showSearchField) {
                 AgentScaffoldSearchTopBarTitle(
                     searchQuery = state.uiState.searchQuery,
@@ -69,6 +75,8 @@ internal fun AgentScaffoldTopBar(state: AgentScaffoldRuntimeState) {
                         },
                     ),
                 )
+            }
+                }
             }
         },
         modifier = Modifier.padding(top = with(LocalDensity.current) { WindowInsets.safeDrawing.getTop(this).toDp() }),
@@ -130,7 +138,6 @@ internal data class AgentScaffoldAgentTopBarTitleParams(
 private fun AgentScaffoldAgentTopBarTitle(params: AgentScaffoldAgentTopBarTitleParams) {
     Row(
         modifier = Modifier
-            .fillMaxWidth()
             .testTag(AgentScaffoldTestTags.CONVERSATION_PICKER_TRIGGER)
             .combinedClickable(
                 onClick = params.onAgentTitleClick,
@@ -166,7 +173,7 @@ private fun AgentScaffoldAgentTopBarTitle(params: AgentScaffoldAgentTopBarTitleP
             LettaIcons.ArrowDropDown,
             contentDescription = "Switch agent",
             modifier = Modifier.size(LettaIconSizing.Inline),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = Color.White,
         )
     }
 }
@@ -178,6 +185,10 @@ private fun AgentScaffoldTopBarActions(
     IconButton(
         onClick = onMenuClick,
         modifier = Modifier.testTag(AgentScaffoldTestTags.MENU_BUTTON),
+        colors = androidx.compose.material3.IconButtonDefaults.iconButtonColors(
+            containerColor = Color.Black,
+            contentColor = Color.White,
+        ),
     ) {
         Icon(LettaIcons.Menu, "Menu")
     }
