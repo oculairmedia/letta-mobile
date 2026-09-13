@@ -40,45 +40,54 @@ On the `Avatar` view model of the `Mascot` artboard, state machine `Avatar`:
 | `shape` | enum `MascotShape` | reserved; one body for now |
 | `hovered` | boolean | written by the file's own pointer listeners, not by the app |
 
-Inside the components, keep the input names `expr` (number, the expression index in the order
-above) and `blink` (trigger), and keep the timelines the root scrubs: `LookX`/`LookY` in `Eye`,
-`Open` in `Mouth`. Their *content* is yours.
+Inside the `Plate` component, keep the input names `expr` (number, the expression index:
+`idle listening dragged thinking waitingInput speaking success error sleeping loading failed
+degraded` = 0..11) and `blink` (trigger), and keep the timelines the root scrubs: `LookX`,
+`LookY`, `Open`. Their *content* is yours.
 
 ## How it is built (so you know what you are editing)
 
-- `Mascot` is the root: body paints, three `NestedArtboard` placements (two `Eye`, two `Brow`
-  with the right one mirrored, one `Mouth`), and four state-machine layers - `Expression`
-  (one animation per state; each forwards the expression index to the components and moves the
-  body), `Breath` (loops forever), `Blink`, `Hover`.
-- `Eye`, `Brow`, `Mouth` are components with their own `Expression` layer switching on `expr`.
-  `Eye` also has `Blink` (from the trigger) and `AutoBlink` (random-length waits).
-- Gaze and mouth are *scrubbed*: `lookX` sets the frame of `LookX` (authored as left pose -> right
-  pose), `mouthOpen` sets the frame of `Open` (closed -> open). Redraw the poses, keep the ranges.
-- Eyelids are a clip: the unpainted `Aperture` ellipse masks sclera and pupil; its height/offset
-  is the lid position in every pose and in the blink. Replace with drawn lids if you prefer, but
-  keep them colour-agnostic - the body colour changes per agent.
+The language is the "plate" sheet: one eye, one glyph on a white plate, a soft body that morphs.
+
+- `Mascot` is the root. `Body` is **one 8-vertex path** whose vertices are keyed per sustained
+  state (circle; teardrop for `listening`; blob for `degraded`; squash while `dragged`). Its
+  paints, bottom to top: feathered soft edge, the bound identity fill, shade, gloss, a `Tint`
+  fill whose colour is keyed per state (darker for `sleeping`, grey for `failed` - overlays, so
+  the palette colour underneath still works), and a thin glass ring. `Halo` is the same path
+  enlarged, as a wide feathered stroke.
+- Root layers: `Expression` (sustained states: morph + tint + motion + glyph index), `Flash`
+  (`success`/`error` triggers, self-returning), `Drag` (boolean + the file's dragStart/dragEnd
+  listeners), `IdleVariety` (random waits, a glance), `Breath`, `Blink`, `Hover`.
+- `Plate` is the one component: a white card, a `Glyphs` node with one shape per glyph
+  (square, ring, dash, small ring, open arc, smile, diamond, arch, dot, cross) switched by opacity
+  on `expr`, plus the `TellDot` under the plate for `waitingInput` and the `FrownLine` for
+  `error`. `LookX`/`LookY` shift the glyph inside the plate (and the plate a little);
+  `Open` scales the speaking arc; `Blink` squashes the whole plate to a line. `AutoBlink` runs
+  on random-length waits.
+- Everything in `Glyphs` is placeholder geometry for the sheet's symbols - redraw freely, keep
+  the shape names and ids so the poses still find them.
 
 ## The finishing touches this needs
 
 In rough priority:
 
-1. **Body**: a real soft body like the mood-orb reference - feathered fill, layered highlight and
-   shading, a subtle rim. The current glow is stroke-based because the CLI cannot feather fills;
-   the editor can. Keep the fill and glow bound to `color`.
-2. **Eyes**: rim light / catchlight, a softer sclera edge, pupils with some depth.
-3. **Mouth**: drawn shapes per expression (smile, frown, o, line) replacing the placeholder
-   glyphs; the lifted open mouth (lips, teeth, tongue) is a decent base for `speaking`.
-4. **Brows**: the lifted brow is fine as a base; taper and weight to taste; check every pose
-   still clears the eyes (they do now - keep it that way).
-5. **Motion**: the twelve state animations are one-frame poses with a few simple loops. Add
-   anticipation and settle, especially `success` (hop) and `error` (dip + shake).
-6. **Twelve distinct states**: `loading`, `failed`, `degraded` are the weakest today.
+1. **Body**: the soft body of the plate sheet - feathered fill, the light from upper-left,
+   the subtle rim. The current glow is stroke-based because the CLI cannot feather fills; the
+   editor can. Keep the fill and halo bound to `color`; keep the tints as overlays.
+2. **Plate and glyphs**: the plate's shadow and edge; each glyph redrawn to the sheet (the
+   placeholders are primitives). The glyph set is fixed by the states; its drawing is yours.
+3. **Body morphs**: `listening` teardrop and `degraded` blob are numeric guesses - shape them.
+   Consider a morph for `thinking` (lean) and `sleeping` (settle) too.
+4. **Motion**: poses are one frame with a few simple loops. Add anticipation and settle,
+   especially the `success` hop and the `error` shake, and design the transition pairs in the
+   product list (`idle→listening`, `listening→thinking`, `thinking→speaking`, `→sleeping`).
+5. **Not yet on the sheet**: `success` flash, `error` flash, `dragged`, `hovered`, gaze poses
+   (look left / look up), and the blink - decide whether the plate squashes or the glyph winks.
 
 ## Attribution
 
-The brow and the open mouth were lifted from erdemediz's "Expression Grid" on the Rive community
-(CC BY 4.0). If they survive your pass, the app's credits need the attribution; if you redraw
-them, it can go.
+Nothing lifted from third-party files remains in this rig. (Earlier revisions used brow and
+mouth art from erdemediz's "Expression Grid", CC BY 4.0; if you bring any of it back, credit it.)
 
 ## Checking your work without the app
 
