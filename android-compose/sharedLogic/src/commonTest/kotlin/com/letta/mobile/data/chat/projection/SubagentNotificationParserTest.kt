@@ -7,6 +7,18 @@ import kotlin.test.assertNull
 class SubagentNotificationParserTest {
 
     @Test
+    fun transcriptLineInsideLegacyNotificationIsPreserved() {
+        val raw = """
+            <task-notification>
+                <status>success</status>
+                <task_id>task-123</task_id>
+                Full transcript at: task://task-123
+            </task-notification>
+        """.trimIndent()
+        assertEquals("task://task-123", extractSubagentNotification(raw)?.transcriptUri)
+    }
+
+    @Test
     fun testParseWellFormed() {
         val raw = """
             <task-notification>
