@@ -235,12 +235,19 @@ private fun PagedChatMessageListContent(
             ),
         )
         val reducedMotion = com.letta.mobile.ui.components.rememberReducedMotionEnabled()
-        val elasticEffect = ir.farsroidx.overscroll.rememberVerticalElasticOverscroll(
-            maxStretchRatio = 8,
-            springDampingRatio = 0.85f,
-            lockedEdge = if (pages.loadState.append.endOfPaginationReached) null
-                else ir.farsroidx.overscroll.ElasticOverscrollEdge.TOP,
+        val kineticOverscroll = rememberTimelineKineticOverscroll(
+            enabled = !reducedMotion && !pinch.isPinching &&
+                pages.loadState.refresh !is LoadState.Loading,
+            canFlingPastPositiveEdge = {
+                !listState.canScrollForward && pages.loadState.append.endOfPaginationReached
+            },
+            canFlingPastNegativeEdge = {
+                !listState.canScrollBackward && pages.loadState.prepend.endOfPaginationReached
+            },
         )
+        DisposableEffect(kineticOverscroll) {
+            onDispose(kineticOverscroll::cancelAndClear)
+        }
         val fadeTargetColor = chatFadeTargetColor(
             chatBackground = appearance.chatBackground,
             fallbackContainerColor = MaterialTheme.colorScheme.surfaceContainer,
@@ -271,8 +278,7 @@ private fun PagedChatMessageListContent(
             modifier = Modifier.fillMaxSize(),
         ) {
             LazyColumn(
-                overscrollEffect = if (reducedMotion || pinch.isPinching ||
-                    pages.loadState.refresh is LoadState.Loading) null else elasticEffect,
+                overscrollEffect = kineticOverscroll,
                 modifier = Modifier.fillMaxSize(),
                 state = listState,
                 reverseLayout = true,
@@ -315,7 +321,10 @@ private fun PagedChatMessageListContent(
         // The same affordance the non-paged list shows, placed the same way. A bare text button
         // here had no chrome of its own, so it read as loose text floating over the conversation.
         ScrollToBottomFab(
-            visible = !following,
+            visible = shouldShowNewestAffordance(
+                isAnchoredAwayFromTail = presentation.isAnchoredAwayFromTail,
+                canScrollTowardNewest = listState.canScrollBackward,
+            ),
             onClick = {
                 if (presentation.isAnchoredAwayFromTail) presentation.requestTail()
                 else scope.launch {
