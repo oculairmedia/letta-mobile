@@ -84,7 +84,13 @@ TUNABLES = {  # name: (vm id, timeline id, node id, property keys, (value at 0, 
     "tuneMouth": ("1:14", "7:68", "7:27", ("SX", "SY"), (0.5, 1.5)),
     "tuneMouthY": ("1:15", "7:69", "7:27", ("Y",), (42, 122)),
 }
-PLATE_SCALE_NODE, GLYPH_SCALE_NODE, MOUTH_NODE = "7:25", "7:26", "7:27"
+PLATE_SCALE_NODE, GLYPH_SCALE_NODE, MOUTH_NODE, SACCADE_NODE = "7:25", "7:26", "7:27", "7:28"
+# Saccade layer: random waits, then a 60 ms hop to one of a few small fixations, a hold, a hop back.
+SACCADE_WAITS = [("7:170", 1800), ("7:171", 3600), ("7:172", 5200)]          # (anim id, ms)
+SACCADE_FIX = [("7:173", (-5, -3)), ("7:174", (4, -2)), ("7:175", (-3, 4)), ("7:176", (6, 2)), ("7:177", (0, -5)), ("7:178", (-6, 1))]
+SACCADE_WAIT_NODES = ["7:180", "7:181", "7:182"]
+SACCADE_FIX_NODES = ["7:183", "7:184", "7:185", "7:186", "7:187", "7:188"]
+SACCADE_SLEEP_NODE = "7:189"
 VM_TUNE_SCALE, CONV_SCALE, ENTITY = "1:16", "2:3", "0:230"      # whole-entity scale, 0..1 -> 0.5..1.5
 # Host facing: two -1..1 numbers the host writes (the head turning toward what it looks at),
 # bound to a HostTurn node above the rig's own Turn so the two add. Body rolls with it too.
@@ -442,6 +448,19 @@ def plate_component():
     wait_b = animation("WaitB", PLATE_WAIT_B, frames(4500), {})
 
     expr_layer = expression_layer("Expression", "7:10", PLATE_IN_EXPR, plate_expr_anim, plate_expr_node)
+
+    # Saccade layer: waits pick a fixation at random; fixations return to a random wait. Asleep, parked.
+    asleep_s = input_transition(SACCADE_SLEEP_NODE, PLATE_IN_EXPR, EXPR["sleeping"], 0)
+    awake_s = (f'<StateTransition stateToId="{SACCADE_WAIT_NODES[0]}" duration="0">\n'
+               f'    <TransitionNumberCondition inputId="{PLATE_IN_EXPR}" opValue="lessThan" value="{EXPR["sleeping"] - 0.5}"/>\n</StateTransition>\n'
+               f'<StateTransition stateToId="{SACCADE_WAIT_NODES[0]}" duration="0">\n'
+               f'    <TransitionNumberCondition inputId="{PLATE_IN_EXPR}" opValue="greaterThanOrEqual" value="{EXPR["sleeping"] + 0.5}"/>\n</StateTransition>')
+    to_fix = "\n".join(weighted(exit_transition(n), 10) for n in SACCADE_FIX_NODES)
+    to_wait = "\n".join(weighted(exit_transition(n), 10) for n in SACCADE_WAIT_NODES)
+    sac_states = [anim_state(aid, nid, i, ' random="true"', asleep_s + "\n" + to_fix) for i, ((aid, _), nid) in enumerate(zip(SACCADE_WAITS, SACCADE_WAIT_NODES))]
+    sac_states += [anim_state(aid, nid, 3 + i, ' reset="true" random="true"', to_wait) for i, ((aid, _), nid) in enumerate(zip(SACCADE_FIX, SACCADE_FIX_NODES))]
+    sac_states.append(anim_state(SACCADE_WAITS[0][0], SACCADE_SLEEP_NODE, 9, "", awake_s))
+    saccade_layer = layer_frame("Saccade", "7:13", SACCADE_WAIT_NODES[0], "", "\n".join(sac_states))
     trigger_layer = layer_frame(
         "Blink", "7:11", PLATE_BLINK_REST_NODE,
         f'<StateTransition stateToId="{PLATE_BLINK_NODE}">\n    <TransitionTriggerCondition inputId="{PLATE_IN_BLINK}"/>\n</StateTransition>',
@@ -479,6 +498,14 @@ def plate_component():
     for name, (_, aid, nid, props, (lo, hi)) in TUNABLES.items():
         key = {"SX": SX, "SY": SY, "Y": Y}
         tune_anims.append(animation("Tune" + name[4:], aid, 60, {nid: {key[p]: [(0, lo, LINEAR), (60, hi)] for p in props}}))
+    # Saccades: each fixation is one animation - hop out in 60 ms (overshoot), hold, hop back in 80 ms.
+    for aid, ms in SACCADE_WAITS:
+        tune_anims.append(animation(f"SaccadeWait{ms}", aid, frames(ms), {}))
+    for i, (aid, (dx, dy)) in enumerate(SACCADE_FIX):
+        hold = frames([900, 1600, 2400][i % 3])
+        tune_anims.append(animation(f"Saccade{i + 1}", aid, hold + 8, {SACCADE_NODE: {
+            X: [(0, 0, BACK_OUT), (4, dx, None), (hold, dx, SOFT_OUT), (hold + 8, 0)],
+            Y: [(0, 0, BACK_OUT), (4, dy, None), (hold, dy, SOFT_OUT), (hold + 8, 0)]}}))
     tune_anims.append(animation("AutoX", PLATE_AUTO_X, 60, {GLYPH_SCALE_NODE: {X: [(0, -6, LINEAR), (60, 6)]}}))
     tune_anims.append(animation("AutoY", PLATE_AUTO_Y, 60, {GLYPH_SCALE_NODE: {Y: [(0, -4, LINEAR), (60, 4)]}}))
 
@@ -493,9 +520,11 @@ def plate_component():
 {indent(frown, "            ")}
         </Node>
         <Node x="0" y="0" name="GlyphScale" id="{GLYPH_SCALE_NODE}">
-            <Solo activeComponentId="{GLYPH[STATE_GLYPH['idle']]}" x="0" y="0" name="Glyphs" id="{GLYPHS_NODE}">
-{indent(glyphs, "                ")}
-            </Solo>
+            <Node x="0" y="0" name="Saccade" id="{SACCADE_NODE}">
+                <Solo activeComponentId="{GLYPH[STATE_GLYPH['idle']]}" x="0" y="0" name="Glyphs" id="{GLYPHS_NODE}">
+{indent(glyphs, "                    ")}
+                </Solo>
+            </Node>
         </Node>
         <Node x="0" y="0" name="PlateScale" id="{PLATE_SCALE_NODE}">
             <Shape x="0" y="0" name="Card" id="{PLATE_CARD}">
@@ -520,6 +549,7 @@ def plate_component():
 {indent(expr_layer, "        ")}
 {indent(trigger_layer, "        ")}
 {indent(auto_layer, "        ")}
+{indent(saccade_layer, "        ")}
     </StateMachine>
 </Artboard>
 <ComponentAsset artboardId="{PLATE_AB}" name="Plate"/>'''
@@ -676,13 +706,15 @@ LUMEN_REST = {GRADIENT_OPACITY: 0, G_START_Y: LUMEN_Y0, G_END_Y: LUMEN_Y0, G_STA
 # Default gaze life per state, on the AutoLookX/AutoLookY remaps (0..1, 0.5 = centre). A value
 # or a function of the state's loop period (ms) returning keys, so drifts loop with the state.
 # Small on purpose: the host's lookX/lookY adds on top (+-23/+-17) and both must fit the card.
+# Eyes fixate; they do not drift. These are the resting fixations; the plate's Saccade layer
+# adds the quick, random re-fixations that make a still gaze alive.
 GAZE = {
-    "idle": (lambda p: sine(0.3, p, 0.5), lambda p: sine(-0.15, p, 0.5)),      # slow look-around
-    "listening": (lambda p: sine(0.08, p, 0.5), 0.35),                         # up at you, barely swaying
-    "thinking": (lambda p: sine(0.1, p, 0.22), 0.25),                           # up-left, drifting
-    "waitingInput": (0.5, 0.4),                                                 # straight at you
-    "speaking": (lambda p: sine(0.15, p, 0.5), 0.5),
-    "error": (0.5, 0.65),                                                       # down
+    "idle": (0.5, 0.5),
+    "listening": (0.5, 0.35),        # up at you
+    "thinking": (0.22, 0.25),        # up-left, into its own thoughts
+    "waitingInput": (0.5, 0.4),      # straight at you
+    "speaking": (0.5, 0.5),
+    "error": (0.5, 0.65),            # down
     "sleeping": (0.5, 0.75),
 }
 

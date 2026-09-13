@@ -217,6 +217,43 @@ private fun MascotBench(file: File, modifier: Modifier) {
     var mascotBounds by remember { mutableStateOf(Rect.Zero) }
     var headTarget by remember { mutableStateOf(0f to 0f) }     // where the head is turning (host facing, -1..1)
     var headLead by remember { mutableFloatStateOf(350f) }      // ms the eyes lead the head by
+    var scan by remember { mutableStateOf(0f to 0f) }           // reading / caret-tracking offset on top of the target
+
+    // Reading and typing are the two looks with structure of their own. Reading the timeline:
+    // saccades left to right in small uneven steps, a return sweep, the next line. Watching the
+    // input: the eyes ride the caret slowly rightward and jump back at a new line, with pauses.
+    LaunchedEffect(target) {
+        scan = 0f to 0f
+        when (target) {
+            GazeTarget.TIMELINE -> {
+                var line = 0
+                while (true) {
+                    var x = -0.22f
+                    while (x < 0.22f) {
+                        scan = x to (line * 0.05f)
+                        delay((180L..340L).random())
+                        x += (0.05f + Math.random().toFloat() * 0.05f)
+                    }
+                    delay((120L..260L).random())          // end of line
+                    line = (line + 1) % 3                  // return sweep, next line; back to top after three
+                }
+            }
+            GazeTarget.INPUT -> {
+                while (true) {
+                    var x = -0.15f
+                    val speed = 0.03f + Math.random().toFloat() * 0.03f
+                    while (x < 0.15f) {
+                        scan = x to 0f
+                        delay((80L..160L).random())
+                        x += speed * 0.4f
+                        if (Math.random() < 0.06) delay((300L..900L).random())   // a pause in the typing
+                    }
+                    delay((100L..300L).random())
+                }
+            }
+            else -> Unit
+        }
+    }
 
     var page by remember { mutableStateOf(Surround(0xFF1A1A1A.toInt())) }
     var frame by remember { mutableStateOf(Surround(0xFF2E2E33.toInt())) }
@@ -298,18 +335,23 @@ private fun MascotBench(file: File, modifier: Modifier) {
                 // A cursor moving within a mascot width in the last half second demands a look
                 // (unless asleep), the way a hand waved in front of a face does.
                 val near = current != AvatarState.SLEEPING && kotlin.math.hypot(cursorLook.first, cursorLook.second) < 1f / trackReach && now - lastCursorMove < 500_000_000L
-                val (wantX, wantY) = when {
+                val (baseX, baseY) = when {
                     gazeMode == GazeMode.CURSOR || near -> cursorLook
                     target == GazeTarget.CURSOR -> cursorLook
                     target == GazeTarget.INPUT -> lookAt(inputSpot.x, inputSpot.y)
                     target == GazeTarget.TIMELINE -> lookAt(timelineSpot.x, timelineSpot.y)
                     else -> 0f to 0f   // USER and OWN: centre; the rig's own gaze life shows through
                 }
-                // The head only commits once the eyes have held a direction for the lead time.
-                if (kotlin.math.abs(wantX - lastWantX) > 0.15f || kotlin.math.abs(wantY - lastWantY) > 0.15f) { lastWantX = wantX; lastWantY = wantY; wantSince = now }
-                if (now - wantSince > headLead * 1_000_000L) headTarget = (wantX * 0.85f) to (wantY * 0.7f)
-                // Eyes: exponential ease. Head: spring (omega, zeta) with overshoot.
-                val k = 1f - kotlin.math.exp(-dt / 0.25f)
+                val (sx, sy) = if (near || gazeMode == GazeMode.CURSOR) 0f to 0f else scan
+                val wantX = (baseX + sx).coerceIn(-1f, 1f); val wantY = (baseY + sy).coerceIn(-1f, 1f)
+                // The head only commits once the eyes have held a direction for the lead time, and
+                // it turns toward the thing, not toward each reading step.
+                if (kotlin.math.abs(baseX - lastWantX) > 0.15f || kotlin.math.abs(baseY - lastWantY) > 0.15f) { lastWantX = baseX; lastWantY = baseY; wantSince = now }
+                if (now - wantSince > headLead * 1_000_000L) headTarget = (baseX * 0.85f) to (baseY * 0.7f)
+                // Eyes: exponential ease - quick when saccading between reading steps, softer otherwise.
+                // Head: spring (omega, zeta) with overshoot.
+                val tau = if (target == GazeTarget.TIMELINE || target == GazeTarget.INPUT) 0.08f else 0.25f
+                val k = 1f - kotlin.math.exp(-dt / tau)
                 val (htx, hty) = headTarget
                 // The eyes aim at the target minus what the head already covers, so they lead and then relax.
                 val ex = wantX - hx * 0.6f; val ey = wantY - hy * 0.6f
