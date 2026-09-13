@@ -16,7 +16,8 @@
         model: a view-model-driven machine inside a nested artboard silently never fires.
     -->
     <Artboard defaultStateMachineId="3:5" viewModelId="1:50" viewModelInstanceId="1:20"
-              clip="false" width="500" height="500" name="Mascot" id="0:2">
+              x="0" y="0" styleId="0:3" clip="false" width="500" height="500" name="Mascot" id="0:2">
+        <LayoutComponentStyle name="Style" id="0:3"/>
         <Node x="250" y="262" name="FacePlacement">
         <Node x="0" y="0" name="Face" id="0:200">
             <NestedArtboard artboardId="4:2" x="-122" y="-102" scaleX="1.2" scaleY="1.2" name="EyeLeft" id="0:210">
@@ -53,7 +54,7 @@
                     <NestedNumber inputId="5:6" nestedValue="0" name="expr" id="0:241"/>
                 </NestedStateMachine>
             </NestedArtboard>
-            <NestedArtboard artboardId="6:2" x="-80" y="14" name="Mouth" id="0:250">
+            <NestedArtboard artboardId="6:2" x="-80" y="8" name="Mouth" id="0:250">
                 <NestedStateMachine animationId="6:5" name="SM">
                     <NestedNumber inputId="6:6" nestedValue="0" name="expr" id="0:251"/>
                 </NestedStateMachine>
@@ -1033,7 +1034,8 @@
         </StateMachine>
     </Artboard>
 
-    <Artboard isComponent="true" defaultStateMachineId="4:5" clip="false" width="120" height="120" name="Eye" id="4:2">
+    <Artboard isComponent="true" defaultStateMachineId="4:5" x="700" y="0" styleId="4:3" clip="false" width="120" height="120" name="Eye" id="4:2">
+        <LayoutComponentStyle name="Style" id="4:3"/>
         <Node x="60" y="60" name="EyeRoot" id="4:24">
             <!-- Pupil over sclera (first child on top); both clipped by the unpainted aperture. -->
             <Shape x="0" y="2" name="Pupil" id="4:20">
@@ -1318,7 +1320,7 @@
         <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="ExprSleeping" id="4:108">
             <KeyedObject objectId="4:26">
                 <KeyedProperty propertyKey="21">
-                    <KeyFrameDouble value="3" frame="0"/>
+                    <KeyFrameDouble value="1" frame="0"/>
                 </KeyedProperty>
             </KeyedObject>
             <KeyedObject objectId="4:25">
@@ -1576,7 +1578,8 @@
     </Artboard>
     <ComponentAsset artboardId="4:2" name="Eye"/>
 
-    <Artboard isComponent="true" defaultStateMachineId="5:5" clip="false" width="100" height="60" name="Brow" id="5:2">
+    <Artboard isComponent="true" defaultStateMachineId="5:5" x="900" y="0" styleId="5:3" clip="false" width="100" height="60" name="Brow" id="5:2">
+        <LayoutComponentStyle name="Style" id="5:3"/>
         <Shape x="50" y="32" id="5:20" name="Brow">
                 <PointsPath isClosed="true" name="PointsPath17" id="7:18">
                     <StraightVertex x="34.74" y="-2.66" name="StraightVertex"/>
@@ -1775,7 +1778,8 @@
     </Artboard>
     <ComponentAsset artboardId="5:2" name="Brow"/>
 
-    <Artboard isComponent="true" defaultStateMachineId="6:5" clip="false" width="160" height="80" name="Mouth" id="6:2">
+    <Artboard isComponent="true" defaultStateMachineId="6:5" x="1100" y="0" styleId="6:3" clip="false" width="160" height="80" name="Mouth" id="6:2">
+        <LayoutComponentStyle name="Style" id="6:3"/>
         <Node x="80" y="40" scaleX="0.34" scaleY="0.08" opacity="0" name="Open" id="6:20">
             <Node id="8:12" x="0" y="0" name="LiftedMouth">
                     <Shape x="-4.058" y="-11.199" name="Shape12" id="8:13">

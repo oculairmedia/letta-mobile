@@ -226,7 +226,7 @@ def eye_component():
         "speaking": {},
         "success": {A_H: 26, A_Y: -18},                                     # happy: a raised crescent
         "error": {A_H: 44, A_Y: 4, (EYE_ROOT, ROT): rad(14)},              # sad slant; mirrored eye reads as brows-in
-        "sleeping": {A_H: 3},                                              # closed
+        "sleeping": {A_H: 1},                                              # closed
         "loading": {(EYE_PUPIL, SX): 0.5, (EYE_PUPIL, SY): 0.5},
         "failed": {A_H: 22, (EYE_PUPIL, SX): 0.6, (EYE_PUPIL, SY): 0.6},
         "degraded": {A_H: 30},
@@ -264,7 +264,8 @@ def eye_component():
         f'    {weighted(exit_transition(EYE_AUTO_A), 60)}\n'
         f'    {weighted(exit_transition(EYE_AUTO_B), 40)}\n</AnimationState>')
 
-    return f'''<Artboard isComponent="true" defaultStateMachineId="{EYE_SM}" clip="false" width="120" height="120" name="Eye" id="{EYE_AB}">
+    return f'''<Artboard isComponent="true" defaultStateMachineId="{EYE_SM}" x="700" y="0" styleId="4:3" clip="false" width="120" height="120" name="Eye" id="{EYE_AB}">
+    <LayoutComponentStyle name="Style" id="4:3"/>
     <Node x="60" y="60" name="EyeRoot" id="{EYE_ROOT}">
         <!-- Pupil over sclera (first child on top); both clipped by the unpainted aperture. -->
         <Shape x="0" y="2" name="Pupil" id="{EYE_PUPIL}">
@@ -338,7 +339,8 @@ def brow_component():
     layer = expression_layer("Expression", "5:10", BROW_IN_EXPR, brow_expr_anim, brow_expr_node)
     # The lifted brow is ~83x46 at the board's centre; it keeps its own id so the poses key it.
     brow = lifted("brow.rml.txt", x="50", y="32", id=BROW_BAR, name="Brow")
-    return f'''<Artboard isComponent="true" defaultStateMachineId="{BROW_SM}" clip="false" width="100" height="60" name="Brow" id="{BROW_AB}">
+    return f'''<Artboard isComponent="true" defaultStateMachineId="{BROW_SM}" x="900" y="0" styleId="5:3" clip="false" width="100" height="60" name="Brow" id="{BROW_AB}">
+    <LayoutComponentStyle name="Style" id="5:3"/>
 {indent(brow, "    ")}
 {indent(chr(10).join(anims), "    ")}
     <StateMachine name="Brow" id="{BROW_SM}">
@@ -379,7 +381,8 @@ def mouth_component():
         </PointsPath>
         <Stroke thickness="9" cap="round" join="round" name="Stroke"><SolidColor colorValue="{INK}" name="Color"/></Stroke>
     </Shape>'''
-    return f'''<Artboard isComponent="true" defaultStateMachineId="{MOUTH_SM}" clip="false" width="160" height="80" name="Mouth" id="{MOUTH_AB}">
+    return f'''<Artboard isComponent="true" defaultStateMachineId="{MOUTH_SM}" x="1100" y="0" styleId="6:3" clip="false" width="160" height="80" name="Mouth" id="{MOUTH_AB}">
+    <LayoutComponentStyle name="Style" id="6:3"/>
     <Node x="80" y="40" scaleX="0.34" scaleY="0.08" opacity="0" name="Open" id="{MOUTH_OPEN}">
 {indent(lifted("mouth.rml.txt", x="0", y="0", name="LiftedMouth"), "        ")}
     </Node>
@@ -496,7 +499,7 @@ def face():
 {indent(eye("EyeRight", EYE_R, EYE_R_EXPR, EYE_R_BLINK, -22), "    ")}
 {indent(brow("BrowLeft", BROW_L, BROW_L_EXPR, -94, False), "    ")}
 {indent(brow("BrowRight", BROW_R, BROW_R_EXPR, 94, True), "    ")}
-    <NestedArtboard artboardId="{MOUTH_AB}" x="-80" y="14" name="Mouth" id="{MOUTH}">
+    <NestedArtboard artboardId="{MOUTH_AB}" x="-80" y="8" name="Mouth" id="{MOUTH}">
         <NestedStateMachine animationId="{MOUTH_SM}" name="SM">
             <NestedNumber inputId="{MOUTH_IN_EXPR}" nestedValue="0" name="expr" id="{MOUTH_EXPR}"/>
         </NestedStateMachine>
@@ -591,7 +594,8 @@ def root_artboard():
     hover = animation("HoverWiggle", HOVER_ANIM, 40, {FACE: {ROT: [(0, 0), (10, rad(6)), (30, rad(-6)), (40, 0)]}}, "loop")
 
     return f'''<Artboard defaultStateMachineId="{SM}" viewModelId="{VM}" viewModelInstanceId="{VM_INSTANCE}"
-          clip="false" width="500" height="500" name="Mascot" id="{ROOT}">
+          x="0" y="0" styleId="0:3" clip="false" width="500" height="500" name="Mascot" id="{ROOT}">
+    <LayoutComponentStyle name="Style" id="0:3"/>
 {indent(face(), "    ")}
 {indent(body(), "    ")}
 
