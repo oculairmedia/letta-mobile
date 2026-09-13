@@ -1,82 +1,392 @@
-"""One-shot generator for rive/mascot/scene.rml (see MASCOT.md).
+"""Generator for rive/mascot/scene.rml - the v2 rig (see MASCOT.md).
 
-Twelve state animations must each key EVERY mutable face/body property, or states leak into
-each other; that exhaustiveness is why this is generated rather than typed. The output is the
-committed source of truth and is meant to be hand-edited afterwards.
+One character, built the way the reference files are: the root artboard owns the body and the
+view model; the face is three component artboards (Eye x2, Brow x2, Mouth) driven from the root
+through nested inputs and scrubbed timelines. Everything the host writes stays on the root's
+view model - the components are internal and never see it.
+
+Why generated: twelve expressions x five components x every keyed property must be exhaustive or
+states leak into each other. Regenerate with `python gen_scene.py`, then `rive . --verify`.
+
+Conventions learned the hard way (all silent in the compiler):
+  - rotations are radians; LinearAnimation.duration is frames; StateTransition.duration is ms
+  - keyframes default to `hold`; motion needs interpolationType="cubic" + a nested interpolator
+  - the first child of a node draws on TOP
+  - a view-model-driven machine inside a nested artboard never fires; components use inputs
+  - NestedRemapAnimation.time is a 0..1 fraction of the timeline
+  - Feather on a Fill renders nothing; feather strokes, glow with gradients
 """
-from textwrap import indent
 import math
+from textwrap import indent
 
 
 def rad(deg):
     return round(math.radians(deg), 5)
 
 
-# Property keys, from rive-runtime's generated headers.
-X, Y, ROT, SX, SY, OPACITY = 13, 14, 15, 16, 17, 18
-WIDTH, HEIGHT, COLOR = 20, 21, 37
-
-SHAPES = ["circle", "blob", "roundedSquare", "pill", "triangle", "hexagon", "cloud", "drop"]
 STATES = ["idle", "listening", "dragged", "thinking", "waitingInput", "speaking",
           "success", "error", "sleeping", "loading", "failed", "degraded"]
+EXPR = {s: i for i, s in enumerate(STATES)}
 
-# --- ids ------------------------------------------------------------------------------------
-VM, VM_STATE, VM_MOUTH, VM_LOOKX, VM_LOOKY, VM_BLINK, VM_SHAPE, VM_COLOR = (
-    "1:50", "1:1", "1:2", "1:3", "1:4", "1:5", "1:6", "1:7")
-VM_INSTANCE = "1:20"
-ENUM_STATE, ENUM_SHAPE = "1:100", "1:200"
-CONV_GAZE_X, CONV_GAZE_Y, CONV_MOUTH = "2:1", "2:2", "2:3"
-SM = "3:5"
+# --- property keys (rive schema) --------------------------------------------------------------
+X, Y, ROT, SX, SY, OPACITY = 13, 14, 15, 16, 17, 18
+WIDTH, HEIGHT, COLOR = 20, 21, 37
+NESTED_VALUE, NESTED_FIRE, REMAP_TIME = 239, 401, 202
+GRADIENT_STOP_COLOR = 38
+BIND_ENUM, BIND_TRIGGER, BIND_BOOL = 637, 686, 634
 
+# --- ids: "client:object". 0:* root scene, 1:* data, 2:* converters, 3:* root machine,
+#     4:* Eye, 5:* Brow, 6:* Mouth ----------------------------------------------------------------
+VM, VM_STATE, VM_MOUTH, VM_LOOKX, VM_LOOKY, VM_BLINK, VM_SHAPE, VM_COLOR, VM_HOVER = (
+    "1:50", "1:1", "1:2", "1:3", "1:4", "1:5", "1:6", "1:7", "1:8")
+VM_INSTANCE, ENUM_STATE, ENUM_SHAPE = "1:20", "1:100", "1:200"
 state_enum_ids = {s: f"1:{101 + i}" for i, s in enumerate(STATES)}
+SHAPES = ["circle", "blob", "roundedSquare", "pill", "triangle", "hexagon", "cloud", "drop"]
 shape_enum_ids = {s: f"1:{201 + i}" for i, s in enumerate(SHAPES)}
-body_shape_ids = {s: f"0:{110 + i}" for i, s in enumerate(SHAPES)}
 
-BODY_NODE = "0:100"
-EYE_L, EYE_R = "0:21", "0:22"          # Shape (rotation, y)
-EYE_L_PATH, EYE_R_PATH = "0:23", "0:24"  # Rectangle (width, height)
-HAPPY_L, HAPPY_R = "0:25", "0:26"
-CLOSED_L, CLOSED_R = "0:27", "0:28"
-CROSS_L, CROSS_R = "0:29", "0:33"
-CROSS_IDS = {"0:29": ("0:40", "0:41"), "0:33": ("0:42", "0:43")}
-MOUTH = "0:30"
+CONV_LOOK, CONV_MOUTH = "2:1", "2:2"
 
-state_anim_ids = {s: f"3:{100 + i}" for i, s in enumerate(STATES)}
-state_node_ids = {s: f"3:{130 + i}" for i, s in enumerate(STATES)}
-shape_anim_ids = {s: f"3:{160 + i}" for i, s in enumerate(SHAPES)}
-shape_node_ids = {s: f"3:{170 + i}" for i, s in enumerate(SHAPES)}
+ROOT, BODY_NODE, FACE, HITBOX = "0:2", "0:100", "0:200", "0:90"
+EYE_L, EYE_R, BROW_L, BROW_R, MOUTH = "0:210", "0:220", "0:230", "0:240", "0:250"
+# nested-input / remap ids per placement
+EYE_L_EXPR, EYE_R_EXPR, BROW_L_EXPR, BROW_R_EXPR, MOUTH_EXPR = "0:211", "0:221", "0:231", "0:241", "0:251"
+EYE_L_BLINK, EYE_R_BLINK = "0:212", "0:222"
+
+SM = "3:5"
+root_state_anim = {s: f"3:{100 + i}" for i, s in enumerate(STATES)}
+root_state_node = {s: f"3:{130 + i}" for i, s in enumerate(STATES)}
+BREATH_ANIM, BREATH_NODE = "3:160", "3:161"
+BLINK_ANIM, BLINK_REST_ANIM, BLINK_NODE, BLINK_REST_NODE = "3:170", "3:171", "3:172", "3:173"
+HOVER_ANIM, HOVER_REST_ANIM, HOVER_NODE, HOVER_REST_NODE = "3:180", "3:181", "3:182", "3:183"
+
+EYE_AB, EYE_SM, EYE_IN_EXPR, EYE_IN_BLINK = "4:2", "4:5", "4:6", "4:7"
+EYE_PUPIL, EYE_SCLERA, EYE_ROOT, EYE_APERTURE, EYE_APERTURE_PATH = "4:20", "4:23", "4:24", "4:25", "4:26"
+EYE_LOOKX, EYE_LOOKY, EYE_BLINK_ANIM = "4:30", "4:31", "4:32"
+EYE_WAIT_A, EYE_WAIT_B = "4:33", "4:34"
+eye_expr_anim = {s: f"4:{100 + i}" for i, s in enumerate(STATES)}
+eye_expr_node = {s: f"4:{130 + i}" for i, s in enumerate(STATES)}
+EYE_BLINK_NODE, EYE_BLINK_REST_NODE = "4:160", "4:161"
+EYE_AUTO_A, EYE_AUTO_B, EYE_AUTO_BLINK = "4:162", "4:163", "4:164"
+
+BROW_AB, BROW_SM, BROW_IN_EXPR, BROW_BAR = "5:2", "5:5", "5:6", "5:20"
+brow_expr_anim = {s: f"5:{100 + i}" for i, s in enumerate(STATES)}
+brow_expr_node = {s: f"5:{130 + i}" for i, s in enumerate(STATES)}
+
+MOUTH_AB, MOUTH_SM, MOUTH_IN_EXPR = "6:2", "6:5", "6:6"
+MOUTH_OPEN, MOUTH_OPEN_PATH, MOUTH_SMILE, MOUTH_FROWN, MOUTH_LINE, MOUTH_O = "6:20", "6:21", "6:22", "6:23", "6:24", "6:25"
+MOUTH_OPEN_ANIM = "6:30"
+mouth_expr_anim = {s: f"6:{100 + i}" for i, s in enumerate(STATES)}
+mouth_expr_node = {s: f"6:{130 + i}" for i, s in enumerate(STATES)}
+
+INK = "FF1A1A1A"
+EASE = '<CubicEaseInterpolator x1="0.25" y1="0.1" x2="0.25" y2="1"/>'
 
 
+# --- small builders ----------------------------------------------------------------------------
 def bind(source, key, converter=None):
     conv = f' converterId="{converter}"' if converter else ""
     return f'<DataBindContext sourcePathIds="{VM}-{source}" propertyKey="{key}"{conv}/>'
 
 
-STYLE = "glossy"  # "flat" is the Grokbot-like matte look; "glossy" is the mood-orb look.
+def kf(value, frame, ease=True):
+    if ease:
+        return f'<KeyFrameDouble value="{value}" frame="{frame}" interpolationType="cubic">{EASE}</KeyFrameDouble>'
+    return f'<KeyFrameDouble value="{value}" frame="{frame}"/>'
 
 
-def body(name, sid, inner):
-    """One body = a Node the Shape layer fades, holding the paint layers for that silhouette.
+def keyed(objects):
+    """objects: {objectId: {propertyKey: [(frame, value)] | value}} -> KeyedObject xml."""
+    out = []
+    for obj, props in objects.items():
+        kp = []
+        for key, frames in props.items():
+            if not isinstance(frames, list):
+                frames = [(0, frames)]
+            body = "\n".join("        " + kf(v, f, ease=len(frames) > 1) for f, v in frames)
+            kp.append(f'    <KeyedProperty propertyKey="{key}">\n{body}\n    </KeyedProperty>')
+        out.append(f'<KeyedObject objectId="{obj}">\n' + "\n".join(kp) + '\n</KeyedObject>')
+    return "\n".join(out)
 
-    Colour-agnostic on purpose: the single bound `color` fills the body and the glow, and the
-    gloss, shading and rim are fixed translucent white/black on top, so every palette entry gets
-    the same finish. Feather on a fill renders nothing through the CLI (see `rive docs drawing`),
-    so the glow is a radial gradient fading to alpha 0 and only the rim stroke is feathered.
-    """
-    bound_fill = f'''<Fill name="Fill">
-        <SolidColor colorValue="FF1E7BF0" name="Color">
-            {bind(VM_COLOR, COLOR)}
-        </SolidColor>
-    </Fill>'''
-    if STYLE == "flat":
-        return f'''<Node x="250" y="270" opacity="0" name="{name}" id="{sid}">
-    <Shape name="Body">
-        {inner}
-        {bound_fill}
+
+def callback_keyed(objects, frame=0):
+    return "\n".join(
+        f'<KeyedObject objectId="{o}">\n    <KeyedProperty propertyKey="{NESTED_FIRE}">\n'
+        f'        <KeyFrameCallback frame="{frame}"/>\n    </KeyedProperty>\n</KeyedObject>' for o in objects)
+
+
+def animation(name, aid, duration, objects, loop="oneShot", callbacks=()):
+    body = keyed(objects) + ("\n" + callback_keyed(callbacks) if callbacks else "")
+    return (f'<LinearAnimation fps="60" duration="{duration}" loopValue="{loop}" name="{name}" id="{aid}">\n'
+            + indent(body, "    ") + '\n</LinearAnimation>')
+
+
+def anim_state(aid, nid, i, extra=""):
+    return f'<AnimationState x="200" y="{40 + 60 * i}" animationId="{aid}"{extra} id="{nid}"/>'
+
+
+def layer_frame(name, lid, entry_to, any_transitions, states):
+    return f'''<StateMachineLayer name="{name}" id="{lid}">
+    <EntryState>
+        <StateTransition stateToId="{entry_to}"/>
+    </EntryState>
+    <AnyState x="220" y="-140">
+{indent(any_transitions, "        ")}
+    </AnyState>
+    <ExitState x="430" y="-140"/>
+{indent(states, "    ")}
+</StateMachineLayer>'''
+
+
+def vm_enum_transition(to_id, enum_value_id, prop=VM_STATE):
+    return f'''<StateTransition stateToId="{to_id}" duration="160">
+    <TransitionViewModelCondition opValue="equal">
+        <TransitionPropertyViewModelComparator>
+            <BindablePropertyEnum>
+                {bind(prop, BIND_ENUM)}
+            </BindablePropertyEnum>
+        </TransitionPropertyViewModelComparator>
+        <TransitionValueEnumComparator value="{enum_value_id}"/>
+    </TransitionViewModelCondition>
+</StateTransition>'''
+
+
+def vm_trigger_transition(to_id, prop):
+    return f'''<StateTransition stateToId="{to_id}">
+    <TransitionViewModelCondition opValue="equal">
+        <TransitionPropertyViewModelComparator>
+            <BindablePropertyTrigger>
+                {bind(prop, BIND_TRIGGER)}
+            </BindablePropertyTrigger>
+        </TransitionPropertyViewModelComparator>
+        <TransitionValueTriggerComparator/>
+    </TransitionViewModelCondition>
+</StateTransition>'''
+
+
+def vm_bool_transition(to_id, prop, value, duration=120):
+    return f'''<StateTransition stateToId="{to_id}" duration="{duration}">
+    <TransitionViewModelCondition opValue="equal">
+        <TransitionPropertyViewModelComparator>
+            <BindablePropertyBoolean>
+                {bind(prop, BIND_BOOL)}
+            </BindablePropertyBoolean>
+        </TransitionPropertyViewModelComparator>
+        <TransitionValueBooleanComparator value="{value}"/>
+    </TransitionViewModelCondition>
+</StateTransition>'''
+
+
+def input_transition(to_id, input_id, value, duration=160):
+    return (f'<StateTransition stateToId="{to_id}" duration="{duration}">\n'
+            f'    <TransitionNumberCondition inputId="{input_id}" opValue="equal" value="{value}"/>\n'
+            f'</StateTransition>')
+
+
+def exit_transition(to_id, duration=0):
+    return (f'<StateTransition stateToId="{to_id}" duration="{duration}" enableExitTime="true" '
+            f'exitTimeIsPercetange="true" exitTime="100"/>')
+
+
+def weighted(transition, weight):
+    return transition.replace("/>", f' randomWeight="{weight}"/>')
+
+
+def expression_layer(name, lid, input_id, anim_ids, node_ids):
+    """The per-component expression layer: AnyState -> Expr_i on `expr == i`."""
+    trans = "\n".join(input_transition(node_ids[s], input_id, EXPR[s]) for s in STATES)
+    states = "\n".join(anim_state(anim_ids[s], node_ids[s], i) for i, s in enumerate(STATES))
+    return layer_frame(name, lid, node_ids["idle"], trans, states)
+
+
+def fill(color):
+    return f'<Fill name="Fill"><SolidColor colorValue="{color}" name="Color"/></Fill>'
+
+
+def rrect(w, h, r):
+    return (f'<Rectangle width="{w}" height="{h}" linkCornerRadius="true" cornerRadiusTL="{r}" '
+            f'cornerRadiusTR="{r}" cornerRadiusBL="{r}" cornerRadiusBR="{r}" name="Path"/>')
+
+
+# ================================================================================================
+# Eye component. 120x120, centred. Sclera, pupil (gaze), upper + lower lids (expression + blink).
+# ================================================================================================
+def eye_component():
+    # The lids are a clip: sclera and pupil are masked by an unpainted "aperture" ellipse, so the
+    # eye opening is its height and its vertical offset. Colour-agnostic, unlike drawn lids.
+    # Poses: aperture height/y, pupil scale, sclera scale, eye rotation.
+    A_H, A_Y = (EYE_APERTURE_PATH, HEIGHT), (EYE_APERTURE, Y)
+    REST = {A_H: 70, A_Y: 0, (EYE_PUPIL, SX): 1, (EYE_PUPIL, SY): 1,
+            (EYE_ROOT, ROT): 0, (EYE_SCLERA, SX): 1, (EYE_SCLERA, SY): 1}
+    poses = {
+        "idle": {},
+        "listening": {(EYE_SCLERA, SX): 1.1, (EYE_SCLERA, SY): 1.15, A_H: 80},
+        "dragged": {A_H: 34},                                              # squint
+        "thinking": {A_H: 48, A_Y: -6, (EYE_ROOT, ROT): rad(-6)},          # half-lidded, glancing
+        "waitingInput": {(EYE_SCLERA, SX): 1.2, (EYE_SCLERA, SY): 1.25, A_H: 84, (EYE_PUPIL, SX): 0.75, (EYE_PUPIL, SY): 0.75},
+        "speaking": {},
+        "success": {A_H: 26, A_Y: -18},                                     # happy: a raised crescent
+        "error": {A_H: 44, A_Y: 4, (EYE_ROOT, ROT): rad(14)},              # sad slant; mirrored eye reads as brows-in
+        "sleeping": {A_H: 3},                                              # closed
+        "loading": {(EYE_PUPIL, SX): 0.5, (EYE_PUPIL, SY): 0.5},
+        "failed": {A_H: 22, (EYE_PUPIL, SX): 0.6, (EYE_PUPIL, SY): 0.6},
+        "degraded": {A_H: 30},
+    }
+    expr_anims = []
+    for s in STATES:
+        vals = dict(REST)
+        vals.update(poses[s])
+        objs = {}
+        for (obj, key), v in vals.items():
+            objs.setdefault(obj, {})[key] = v
+        expr_anims.append(animation("Expr" + s[0].upper() + s[1:], eye_expr_anim[s], 1, objs))
+
+    look_x = animation("LookX", EYE_LOOKX, 60, {EYE_PUPIL: {X: [(0, -16), (60, 16)]}})
+    look_y = animation("LookY", EYE_LOOKY, 60, {EYE_PUPIL: {Y: [(0, -12), (60, 12)]}})
+    blink = animation("Blink", EYE_BLINK_ANIM, 10, {EYE_APERTURE_PATH: {HEIGHT: [(0, 70), (4, 2), (10, 70)]}})
+    # Two idle waits of different lengths, chosen at random, so blinks do not tick like a clock.
+    wait_a = animation("WaitA", EYE_WAIT_A, 150, {})
+    wait_b = animation("WaitB", EYE_WAIT_B, 270, {})
+
+    expr_layer = expression_layer("Expression", "4:10", EYE_IN_EXPR, eye_expr_anim, eye_expr_node)
+    trigger_layer = layer_frame(
+        "Blink", "4:11", EYE_BLINK_REST_NODE,
+        f'<StateTransition stateToId="{EYE_BLINK_NODE}">\n    <TransitionTriggerCondition inputId="{EYE_IN_BLINK}"/>\n</StateTransition>',
+        f'<AnimationState x="200" y="40" animationId="{EYE_WAIT_A}" id="{EYE_BLINK_REST_NODE}"/>\n'
+        f'<AnimationState x="200" y="100" animationId="{EYE_BLINK_ANIM}" reset="true" id="{EYE_BLINK_NODE}">\n'
+        f'    {exit_transition(EYE_BLINK_REST_NODE)}\n</AnimationState>')
+    auto_layer = layer_frame(
+        "AutoBlink", "4:12", EYE_AUTO_A, "",
+        f'<AnimationState x="200" y="40" animationId="{EYE_WAIT_A}" random="true" id="{EYE_AUTO_A}">\n'
+        f'    {exit_transition(EYE_AUTO_BLINK)}\n</AnimationState>\n'
+        f'<AnimationState x="200" y="100" animationId="{EYE_WAIT_B}" id="{EYE_AUTO_B}">\n'
+        f'    {exit_transition(EYE_AUTO_BLINK)}\n</AnimationState>\n'
+        f'<AnimationState x="200" y="160" animationId="{EYE_BLINK_ANIM}" reset="true" random="true" id="{EYE_AUTO_BLINK}">\n'
+        f'    {weighted(exit_transition(EYE_AUTO_A), 60)}\n'
+        f'    {weighted(exit_transition(EYE_AUTO_B), 40)}\n</AnimationState>')
+
+    return f'''<Artboard isComponent="true" defaultStateMachineId="{EYE_SM}" clip="false" width="120" height="120" name="Eye" id="{EYE_AB}">
+    <Node x="60" y="60" name="EyeRoot" id="{EYE_ROOT}">
+        <!-- Pupil over sclera (first child on top); both clipped by the unpainted aperture. -->
+        <Shape x="0" y="2" name="Pupil" id="{EYE_PUPIL}">
+            <Ellipse width="30" height="34" name="Path"/>
+            {fill(INK)}
+            <ClippingShape sourceId="{EYE_APERTURE}" name="Lids"/>
+        </Shape>
+        <Shape x="0" y="0" name="Sclera" id="{EYE_SCLERA}">
+            <Ellipse width="60" height="66" name="Path"/>
+            {fill("FFFFFFFF")}
+            <ClippingShape sourceId="{EYE_APERTURE}" name="Lids"/>
+        </Shape>
+        <Shape x="0" y="0" name="Aperture" id="{EYE_APERTURE}">
+            <Ellipse width="64" height="70" name="Path" id="{EYE_APERTURE_PATH}"/>
+        </Shape>
+    </Node>
+
+{indent(chr(10).join(expr_anims + [look_x, look_y, blink, wait_a, wait_b]), "    ")}
+
+    <StateMachine name="Eye" id="{EYE_SM}">
+        <StateMachineNumber name="expr" id="{EYE_IN_EXPR}"/>
+        <StateMachineTrigger name="blink" id="{EYE_IN_BLINK}"/>
+{indent(expr_layer, "        ")}
+{indent(trigger_layer, "        ")}
+{indent(auto_layer, "        ")}
+    </StateMachine>
+</Artboard>
+<ComponentAsset artboardId="{EYE_AB}" name="Eye"/>'''
+
+
+# ================================================================================================
+# Brow component. 80x40. One bar; expression keys y and rotation. Placed mirrored for the right.
+# ================================================================================================
+def brow_component():
+    REST = {Y: 20, ROT: 0}
+    poses = {
+        "idle": {}, "listening": {Y: 12}, "dragged": {Y: 24, ROT: rad(-8)}, "thinking": {Y: 10, ROT: rad(-14)},
+        "waitingInput": {Y: 6}, "speaking": {}, "success": {Y: 12, ROT: rad(-4)}, "error": {Y: 22, ROT: rad(16)},
+        "sleeping": {Y: 26}, "loading": {}, "failed": {Y: 24, ROT: rad(14)}, "degraded": {Y: 20, ROT: rad(8)},
+    }
+    anims = []
+    for s in STATES:
+        vals = dict(REST)
+        vals.update(poses[s])
+        anims.append(animation("Expr" + s[0].upper() + s[1:], brow_expr_anim[s], 1, {BROW_BAR: vals}))
+    layer = expression_layer("Expression", "5:10", BROW_IN_EXPR, brow_expr_anim, brow_expr_node)
+    return f'''<Artboard isComponent="true" defaultStateMachineId="{BROW_SM}" clip="false" width="80" height="40" name="Brow" id="{BROW_AB}">
+    <Shape x="40" y="20" name="Bar" id="{BROW_BAR}">
+        {rrect(56, 12, 6)}
+        {fill(INK)}
     </Shape>
-</Node>'''
-    return f'''<Node x="250" y="270" opacity="0" name="{name}" id="{sid}">
-    <!-- Glass rim: a soft white stroke inside the edge. -->
+{indent(chr(10).join(anims), "    ")}
+    <StateMachine name="Brow" id="{BROW_SM}">
+        <StateMachineNumber name="expr" id="{BROW_IN_EXPR}"/>
+{indent(layer, "        ")}
+    </StateMachine>
+</Artboard>
+<ComponentAsset artboardId="{BROW_AB}" name="Brow"/>'''
+
+
+# ================================================================================================
+# Mouth component. 160x80. Static glyphs picked by expression; an open mouth scrubbed by data.
+# ================================================================================================
+def mouth_component():
+    GLYPHS = [MOUTH_SMILE, MOUTH_FROWN, MOUTH_LINE, MOUTH_O]
+    REST = {g: {OPACITY: 0} for g in GLYPHS}
+    REST[MOUTH_OPEN] = {OPACITY: 0}
+    show = {
+        "idle": [], "listening": [MOUTH_LINE], "dragged": [MOUTH_O], "thinking": [MOUTH_LINE],
+        "waitingInput": [MOUTH_O], "speaking": [MOUTH_OPEN], "success": [MOUTH_SMILE], "error": [MOUTH_FROWN],
+        "sleeping": [], "loading": [], "failed": [MOUTH_FROWN], "degraded": [MOUTH_LINE],
+    }
+    anims = []
+    for s in STATES:
+        objs = {o: dict(p) for o, p in REST.items()}
+        for g in show[s]:
+            objs[g] = {OPACITY: 1}
+        anims.append(animation("Expr" + s[0].upper() + s[1:], mouth_expr_anim[s], 1, objs))
+    # Open: scrubbed 0..1 by mouthOpen. Keys only the open mouth's path, so it composes with Expr.
+    open_anim = animation("Open", MOUTH_OPEN_ANIM, 60, {MOUTH_OPEN_PATH: {HEIGHT: [(0, 6), (60, 56)], WIDTH: [(0, 60), (60, 70)]}})
+    layer = expression_layer("Expression", "6:10", MOUTH_IN_EXPR, mouth_expr_anim, mouth_expr_node)
+    arc = lambda name, sid, flip: f'''<Shape x="80" y="{36 if not flip else 44}" opacity="0" name="{name}" id="{sid}">
+        <PointsPath isClosed="false" name="Path">
+            <StraightVertex x="-26" y="{-8 if not flip else 8}"/>
+            <CubicMirroredVertex x="0" y="{10 if not flip else -10}" rotation="0" distance="16"/>
+            <StraightVertex x="26" y="{-8 if not flip else 8}"/>
+        </PointsPath>
+        <Stroke thickness="9" cap="round" join="round" name="Stroke"><SolidColor colorValue="{INK}" name="Color"/></Stroke>
+    </Shape>'''
+    return f'''<Artboard isComponent="true" defaultStateMachineId="{MOUTH_SM}" clip="false" width="160" height="80" name="Mouth" id="{MOUTH_AB}">
+    <Shape x="80" y="40" opacity="0" name="Open" id="{MOUTH_OPEN}">
+        <Ellipse width="60" height="6" name="Path" id="{MOUTH_OPEN_PATH}"/>
+        {fill(INK)}
+    </Shape>
+    {arc("Smile", MOUTH_SMILE, False)}
+    {arc("Frown", MOUTH_FROWN, True)}
+    <Shape x="80" y="40" opacity="0" name="Line" id="{MOUTH_LINE}">
+        {rrect(44, 8, 4)}
+        {fill(INK)}
+    </Shape>
+    <Shape x="80" y="40" opacity="0" name="O" id="{MOUTH_O}">
+        <Ellipse width="26" height="30" name="Path"/>
+        {fill(INK)}
+    </Shape>
+{indent(chr(10).join(anims + [open_anim]), "    ")}
+    <StateMachine name="Mouth" id="{MOUTH_SM}">
+        <StateMachineNumber name="expr" id="{MOUTH_IN_EXPR}"/>
+{indent(layer, "        ")}
+    </StateMachine>
+</Artboard>
+<ComponentAsset artboardId="{MOUTH_AB}" name="Mouth"/>'''
+
+
+# ================================================================================================
+# Root: body (glossy), face placements, view model, layers.
+# ================================================================================================
+def body():
+    inner = '<Ellipse width="300" height="300" name="Path"/>'
+    # The outer node places the body; the inner one is what animations key, so its rest is the
+    # origin and scale pivots on the body centre.
+    return f'''<Node x="250" y="270" name="BodyPlacement">
+<Node x="0" y="0" name="Body" id="{BODY_NODE}">
     <Shape name="Rim">
         {inner}
         <Stroke thickness="10" name="Stroke">
@@ -84,7 +394,6 @@ def body(name, sid, inner):
             <Feather strength="8" inner="true" name="Feather"/>
         </Stroke>
     </Shape>
-    <!-- Gloss: the highlight up-left, fixed white alpha. -->
     <Shape name="Gloss">
         {inner}
         <Fill name="Fill">
@@ -94,7 +403,6 @@ def body(name, sid, inner):
             </RadialGradient>
         </Fill>
     </Shape>
-    <!-- Shading: darker toward the bottom-right, fixed black alpha. -->
     <Shape name="Shade">
         {inner}
         <Fill name="Fill">
@@ -104,311 +412,234 @@ def body(name, sid, inner):
             </RadialGradient>
         </Fill>
     </Shape>
-    <Shape name="Body">
+    <Shape name="Fill" id="{HITBOX}">
         {inner}
-        {bound_fill}
+        <Fill name="Fill">
+            <SolidColor colorValue="FF1E7BF0" name="Color">
+                {bind(VM_COLOR, COLOR)}
+            </SolidColor>
+        </Fill>
     </Shape>
-    <!-- Glow: the silhouette enlarged, bound colour at the centre fading out. Last sibling draws underneath. -->
     <Shape scaleX="1.32" scaleY="1.32" opacity="0.55" name="Glow">
         {inner}
         <Fill name="Fill">
             <RadialGradient startX="0" startY="0" endX="0" endY="150" name="Gradient">
                 <GradientStop colorValue="FF1E7BF0" position="0.55">
-                    {bind(VM_COLOR, 38)}
+                    {bind(VM_COLOR, GRADIENT_STOP_COLOR)}
                 </GradientStop>
                 <GradientStop colorValue="00FFFFFF" position="1"/>
             </RadialGradient>
         </Fill>
     </Shape>
+</Node>
 </Node>'''
 
 
-def points(verts):
-    return "\n        ".join(verts)
+def face():
+    def eye(name, sid, expr_id, blink_id, x):
+        return f'''<NestedArtboard artboardId="{EYE_AB}" x="{x}" y="0" name="{name}" id="{sid}">
+    <NestedStateMachine animationId="{EYE_SM}" name="SM">
+        <NestedNumber inputId="{EYE_IN_EXPR}" nestedValue="0" name="expr" id="{expr_id}"/>
+        <NestedTrigger inputId="{EYE_IN_BLINK}" name="blink" id="{blink_id}"/>
+    </NestedStateMachine>
+    <NestedRemapAnimation animationId="{EYE_LOOKX}" time="0.5" name="LookX">
+        {bind(VM_LOOKX, REMAP_TIME, CONV_LOOK)}
+    </NestedRemapAnimation>
+    <NestedRemapAnimation animationId="{EYE_LOOKY}" time="0.5" name="LookY">
+        {bind(VM_LOOKY, REMAP_TIME, CONV_LOOK)}
+    </NestedRemapAnimation>
+</NestedArtboard>'''
 
+    def brow(name, sid, expr_id, x, mirror):
+        return f'''<NestedArtboard artboardId="{BROW_AB}" x="{x}" y="-70" scaleX="{-1 if mirror else 1}" name="{name}" id="{sid}">
+    <NestedStateMachine animationId="{BROW_SM}" name="SM">
+        <NestedNumber inputId="{BROW_IN_EXPR}" nestedValue="0" name="expr" id="{expr_id}"/>
+    </NestedStateMachine>
+</NestedArtboard>'''
 
-BODIES = {
-    "circle": '<Ellipse width="300" height="300" name="Path"/>',
-    "roundedSquare": '<Rectangle width="280" height="280" linkCornerRadius="true" cornerRadiusTL="64" '
-                     'cornerRadiusTR="64" cornerRadiusBL="64" cornerRadiusBR="64" name="Path"/>',
-    "pill": '<Rectangle width="320" height="220" linkCornerRadius="true" cornerRadiusTL="110" '
-            'cornerRadiusTR="110" cornerRadiusBL="110" cornerRadiusBR="110" name="Path"/>',
-    "triangle": '<Polygon width="320" height="290" points="3" cornerRadius="40" name="Path"/>',
-    "hexagon": '<Polygon width="310" height="310" points="6" cornerRadius="28" name="Path"/>',
-    # Organic bodies: closed paths of mirrored cubics. Placeholder silhouettes for the editor pass.
-    "blob": f'''<PointsPath isClosed="true" name="Path">
-        {points([
-            f'<CubicMirroredVertex x="0" y="-150" rotation="{rad(0)}" distance="85"/>',
-            f'<CubicMirroredVertex x="150" y="-30" rotation="{rad(90)}" distance="70"/>',
-            f'<CubicMirroredVertex x="95" y="135" rotation="{rad(165)}" distance="70"/>',
-            f'<CubicMirroredVertex x="-105" y="125" rotation="{rad(195)}" distance="70"/>',
-            f'<CubicMirroredVertex x="-150" y="-40" rotation="{rad(270)}" distance="70"/>',
-        ])}
-    </PointsPath>''',
-    "cloud": f'''<PointsPath isClosed="true" name="Path">
-        {points([
-            f'<CubicMirroredVertex x="-60" y="-120" rotation="{rad(0)}" distance="60"/>',
-            f'<CubicMirroredVertex x="70" y="-130" rotation="{rad(20)}" distance="55"/>',
-            f'<CubicMirroredVertex x="160" y="-20" rotation="{rad(100)}" distance="60"/>',
-            f'<CubicMirroredVertex x="110" y="120" rotation="{rad(175)}" distance="70"/>',
-            f'<CubicMirroredVertex x="-110" y="120" rotation="{rad(185)}" distance="70"/>',
-            f'<CubicMirroredVertex x="-160" y="-10" rotation="{rad(260)}" distance="60"/>',
-        ])}
-    </PointsPath>''',
-    "drop": f'''<PointsPath isClosed="true" name="Path">
-        {points([
-            '<StraightVertex x="0" y="-165" radius="18"/>',
-            f'<CubicMirroredVertex x="135" y="40" rotation="{rad(120)}" distance="90"/>',
-            f'<CubicMirroredVertex x="0" y="150" rotation="{rad(180)}" distance="80"/>',
-            f'<CubicMirroredVertex x="-135" y="40" rotation="{rad(240)}" distance="90"/>',
-        ])}
-    </PointsPath>''',
-}
-
-# --- the face ---------------------------------------------------------------------------------
-INK = "FF0B0B0B"
-
-
-def eye(name, sid, path_id, x):
-    return f'''<Shape x="{x}" y="230" name="{name}" id="{sid}">
-    <Rectangle width="14" height="44" linkCornerRadius="true" cornerRadiusTL="7" cornerRadiusTR="7"
-               cornerRadiusBL="7" cornerRadiusBR="7" name="Path" id="{path_id}"/>
-    <Fill name="Fill"><SolidColor colorValue="{INK}" name="Color"/></Fill>
-</Shape>'''
-
-
-def overlay_bar(name, sid, x, rotation=0, width=30, height=8):
-    return f'''<Shape x="{x}" y="230" rotation="{rotation}" opacity="0" name="{name}" id="{sid}">
-    <Rectangle width="{width}" height="{height}" linkCornerRadius="true" cornerRadiusTL="4" cornerRadiusTR="4"
-               cornerRadiusBL="4" cornerRadiusBR="4" name="Path"/>
-    <Fill name="Fill"><SolidColor colorValue="{INK}" name="Color"/></Fill>
-</Shape>'''
-
-
-def overlay_arc(name, sid, x):
-    # A happy eye: an upward arc, stroked.
-    return f'''<Shape x="{x}" y="232" opacity="0" name="{name}" id="{sid}">
-    <PointsPath isClosed="false" name="Path">
-        <StraightVertex x="-16" y="6"/>
-        <CubicMirroredVertex x="0" y="-8" rotation="{rad(0)}" distance="12"/>
-        <StraightVertex x="16" y="6"/>
-    </PointsPath>
-    <Stroke thickness="8" cap="round" join="round" name="Stroke"><SolidColor colorValue="{INK}" name="Color"/></Stroke>
-</Shape>'''
-
-
-def cross(name, sid, x):
-    return f'''<Node x="{x}" y="230" opacity="0" name="{name}" id="{sid}">
-    {overlay_bar(name + "A", CROSS_IDS[sid][0], 0, rotation=rad(45)).replace(' x="0" y="230"', ' x="0" y="0"').replace(' opacity="0"', '')}
-    {overlay_bar(name + "B", CROSS_IDS[sid][1], 0, rotation=rad(-45)).replace(' x="0" y="230"', ' x="0" y="0"').replace(' opacity="0"', '')}
+    return f'''<Node x="250" y="245" name="FacePlacement">
+<Node x="0" y="0" name="Face" id="{FACE}">
+{indent(eye("EyeLeft", EYE_L, EYE_L_EXPR, EYE_L_BLINK, -110), "    ")}
+{indent(eye("EyeRight", EYE_R, EYE_R_EXPR, EYE_R_BLINK, -10), "    ")}
+{indent(brow("BrowLeft", BROW_L, BROW_L_EXPR, -90, False), "    ")}
+{indent(brow("BrowRight", BROW_R, BROW_R_EXPR, 90, True), "    ")}
+    <NestedArtboard artboardId="{MOUTH_AB}" x="-80" y="60" name="Mouth" id="{MOUTH}">
+        <NestedStateMachine animationId="{MOUTH_SM}" name="SM">
+            <NestedNumber inputId="{MOUTH_IN_EXPR}" nestedValue="0" name="expr" id="{MOUTH_EXPR}"/>
+        </NestedStateMachine>
+        <NestedRemapAnimation animationId="{MOUTH_OPEN_ANIM}" time="0" name="Open">
+            {bind(VM_MOUTH, REMAP_TIME, CONV_MOUTH)}
+        </NestedRemapAnimation>
+    </NestedArtboard>
+</Node>
 </Node>'''
 
 
-# --- per-state poses --------------------------------------------------------------------------
-# Every state sets all of these (hold keys), so switching states never leaves residue.
-BASE = {
-    (EYE_L_PATH, WIDTH): 14, (EYE_L_PATH, HEIGHT): 44, (EYE_R_PATH, WIDTH): 14, (EYE_R_PATH, HEIGHT): 44,
-    (EYE_L, ROT): 0, (EYE_R, ROT): 0, (EYE_L, Y): 230, (EYE_R, Y): 230,
-    (EYE_L, OPACITY): 1, (EYE_R, OPACITY): 1,
-    (HAPPY_L, OPACITY): 0, (HAPPY_R, OPACITY): 0, (CLOSED_L, OPACITY): 0, (CLOSED_R, OPACITY): 0,
-    (CROSS_L, OPACITY): 0, (CROSS_R, OPACITY): 0,
-    (MOUTH, OPACITY): 0,
-    (BODY_NODE, OPACITY): 1, (BODY_NODE, SX): 1, (BODY_NODE, SY): 1, (BODY_NODE, Y): 0, (BODY_NODE, X): 0,
-}
-
-# state -> (overrides, motion) where motion is a list of (objectId, key, [(frame, value)...]) and loop.
-POSES = {
-    "idle": ({}, [(BODY_NODE, SX, [(0, 1.0), (90, 1.02), (180, 1.0)]),
-                  (BODY_NODE, SY, [(0, 1.0), (90, 1.02), (180, 1.0)])], 180, True),
-    "listening": ({(EYE_L_PATH, HEIGHT): 57, (EYE_R_PATH, HEIGHT): 57, (EYE_L, Y): 226, (EYE_R, Y): 226,
-                   (BODY_NODE, SX): 1.04, (BODY_NODE, SY): 1.04}, [], 1, False),
-    "dragged": ({(EYE_L_PATH, HEIGHT): 22, (EYE_R_PATH, HEIGHT): 22},
-                [(BODY_NODE, SX, [(0, 1.08), (20, 1.05), (40, 1.08)]),
-                 (BODY_NODE, SY, [(0, 0.92), (20, 0.95), (40, 0.92)])], 40, True),
-    "thinking": ({(EYE_L, Y): 224, (EYE_R, Y): 224, (EYE_R_PATH, HEIGHT): 31},
-                 [(BODY_NODE, X, [(0, -3), (60, 3), (120, -3)])], 120, True),
-    "waitingInput": ({(EYE_L_PATH, WIDTH): 21, (EYE_R_PATH, WIDTH): 21,
-                      (EYE_L_PATH, HEIGHT): 57, (EYE_R_PATH, HEIGHT): 57},
-                     [(BODY_NODE, Y, [(0, 0), (24, -6), (48, 0)])], 48, True),
-    "speaking": ({(MOUTH, OPACITY): 1}, [], 1, False),
-    "success": ({(EYE_L, OPACITY): 0, (EYE_R, OPACITY): 0, (HAPPY_L, OPACITY): 1, (HAPPY_R, OPACITY): 1},
-                [(BODY_NODE, Y, [(0, 0), (12, -14), (24, 0)])], 24, False),
-    "error": ({(EYE_L, ROT): rad(-12), (EYE_R, ROT): rad(12)},
-              [(BODY_NODE, Y, [(0, 0), (6, 6), (30, 6)]),
-               (BODY_NODE, X, [(0, 0), (4, -4), (8, 4), (12, -4), (16, 0)])], 30, False),
-    "sleeping": ({(EYE_L, OPACITY): 0, (EYE_R, OPACITY): 0, (CLOSED_L, OPACITY): 1, (CLOSED_R, OPACITY): 1,
-                  (BODY_NODE, OPACITY): 0.85},
-                 [(BODY_NODE, SX, [(0, 0.98), (150, 1.03), (300, 0.98)]),
-                  (BODY_NODE, SY, [(0, 0.98), (150, 1.03), (300, 0.98)])], 300, True),
-    "loading": ({(EYE_L_PATH, HEIGHT): 15, (EYE_R_PATH, HEIGHT): 15},
-                [(BODY_NODE, OPACITY, [(0, 0.7), (36, 1.0), (72, 0.7)])], 72, True),
-    "failed": ({(EYE_L, OPACITY): 0, (EYE_R, OPACITY): 0, (CROSS_L, OPACITY): 1, (CROSS_R, OPACITY): 1,
-                (BODY_NODE, OPACITY): 0.6}, [], 1, False),
-    "degraded": ({(EYE_L, OPACITY): 0, (CLOSED_L, OPACITY): 1, (EYE_R_PATH, HEIGHT): 26,
-                  (BODY_NODE, OPACITY): 0.8}, [], 1, False),
-}
+def root_state_animations():
+    """Per state: forward the expression index to every component, and move the body/face."""
+    BODY_REST = {BODY_NODE: {SX: 1, SY: 1, X: 0, Y: 0, OPACITY: 1}, FACE: {X: 0, Y: 0}}
+    motion = {
+        "idle": ({}, 1, "oneShot"),
+        "listening": ({BODY_NODE: {SX: 1.04, SY: 1.04}, FACE: {Y: -6}}, 1, "oneShot"),
+        "dragged": ({BODY_NODE: {SX: [(0, 1.08), (20, 1.05), (40, 1.08)], SY: [(0, 0.92), (20, 0.95), (40, 0.92)]}}, 40, "loop"),
+        "thinking": ({BODY_NODE: {X: [(0, -4), (60, 4), (120, -4)]}, FACE: {X: [(0, 6), (60, 10), (120, 6)], Y: -4}}, 120, "loop"),
+        "waitingInput": ({BODY_NODE: {Y: [(0, 0), (24, -8), (48, 0)]}}, 48, "loop"),
+        "speaking": ({}, 1, "oneShot"),
+        "success": ({BODY_NODE: {Y: [(0, 0), (10, -18), (24, 0)], SX: [(0, 1), (10, 1.06), (24, 1)], SY: [(0, 1), (10, 1.06), (24, 1)]}}, 24, "oneShot"),
+        "error": ({BODY_NODE: {Y: [(0, 0), (8, 6), (30, 6)], X: [(0, 0), (4, -5), (8, 5), (12, -4), (16, 0)]}, FACE: {Y: 4}}, 30, "oneShot"),
+        "sleeping": ({BODY_NODE: {OPACITY: 0.85}, FACE: {Y: 8}}, 1, "oneShot"),
+        "loading": ({BODY_NODE: {OPACITY: [(0, 0.7), (36, 1.0), (72, 0.7)]}}, 72, "loop"),
+        "failed": ({BODY_NODE: {OPACITY: 0.6}}, 1, "oneShot"),
+        "degraded": ({BODY_NODE: {OPACITY: 0.8}}, 1, "oneShot"),
+    }
+    out = []
+    for s in STATES:
+        overrides, duration, loop = motion[s]
+        objs = {o: dict(p) for o, p in BODY_REST.items()}
+        for o, p in overrides.items():
+            objs.setdefault(o, {}).update(p)
+        for nested in (EYE_L_EXPR, EYE_R_EXPR, BROW_L_EXPR, BROW_R_EXPR, MOUTH_EXPR):
+            objs[nested] = {NESTED_VALUE: EXPR[s]}
+        out.append(animation("State" + s[0].upper() + s[1:], root_state_anim[s], duration, objs, loop))
+    return out
 
 
-def state_animation(state):
-    overrides, motion, duration, loop = POSES[state]
-    values = dict(BASE)
-    values.update(overrides)
-    animated = {(o, k): frames for o, k, frames in motion}
-    by_object = {}
-    for (obj, key), value in values.items():
-        frames = animated.get((obj, key), [(0, value)])
-        by_object.setdefault(obj, []).append((key, frames))
-    keyed = []
-    for obj, props in by_object.items():
-        kp = "\n".join(
-            f'    <KeyedProperty propertyKey="{key}">\n' +
-            "".join(f'        <KeyFrameDouble value="{v}" frame="{f}"/>\n' for f, v in frames) +
-            '    </KeyedProperty>'
-            for key, frames in props)
-        keyed.append(f'<KeyedObject objectId="{obj}">\n{kp}\n</KeyedObject>')
-    loop_attr = ' loopValue="loop"' if loop else ' loopValue="oneShot"'
-    return (f'<LinearAnimation fps="60" duration="{duration}"{loop_attr} name="{state[0].upper() + state[1:]}" '
-            f'id="{state_anim_ids[state]}">\n' + indent("\n".join(keyed), "    ") + '\n</LinearAnimation>')
+def root_machine():
+    expr_trans = "\n".join(vm_enum_transition(root_state_node[s], state_enum_ids[s]) for s in STATES)
+    expr_states = "\n".join(anim_state(root_state_anim[s], root_state_node[s], i) for i, s in enumerate(STATES))
+    expression = layer_frame("Expression", "3:1", root_state_node["idle"], expr_trans, expr_states)
+
+    breath = layer_frame("Breath", "3:2", BREATH_NODE, "", anim_state(BREATH_ANIM, BREATH_NODE, 0))
+
+    blink = layer_frame(
+        "Blink", "3:3", BLINK_REST_NODE, vm_trigger_transition(BLINK_NODE, VM_BLINK),
+        f'<AnimationState x="200" y="40" animationId="{BLINK_REST_ANIM}" id="{BLINK_REST_NODE}"/>\n'
+        f'<AnimationState x="200" y="100" animationId="{BLINK_ANIM}" reset="true" id="{BLINK_NODE}">\n'
+        f'    {exit_transition(BLINK_REST_NODE)}\n</AnimationState>')
+
+    hover = layer_frame(
+        "Hover", "3:4", HOVER_REST_NODE,
+        vm_bool_transition(HOVER_NODE, VM_HOVER, "true") + "\n" + vm_bool_transition(HOVER_REST_NODE, VM_HOVER, "false"),
+        f'<AnimationState x="200" y="40" animationId="{HOVER_REST_ANIM}" id="{HOVER_REST_NODE}"/>\n'
+        f'<AnimationState x="200" y="100" animationId="{HOVER_ANIM}" id="{HOVER_NODE}"/>')
+
+    listeners = f'''<StateMachineListenerSingle targetId="{HITBOX}" listenerTypeValue="enter" name="HoverIn">
+    <ListenerViewModelChange>
+        <BindablePropertyBoolean propertyValue="true">
+            {bind(VM_HOVER, BIND_BOOL).replace("/>", ' direction="true"/>')}
+        </BindablePropertyBoolean>
+    </ListenerViewModelChange>
+</StateMachineListenerSingle>
+<StateMachineListenerSingle targetId="{HITBOX}" listenerTypeValue="exit" name="HoverOut">
+    <ListenerViewModelChange>
+        <BindablePropertyBoolean propertyValue="false">
+            {bind(VM_HOVER, BIND_BOOL).replace("/>", ' direction="true"/>')}
+        </BindablePropertyBoolean>
+    </ListenerViewModelChange>
+</StateMachineListenerSingle>'''
+
+    return f'''<StateMachine name="Avatar" id="{SM}">
+{indent(expression, "    ")}
+{indent(breath, "    ")}
+{indent(blink, "    ")}
+{indent(hover, "    ")}
+{indent(listeners, "    ")}
+</StateMachine>'''
 
 
-def shape_animation(shape):
-    keyed = "\n".join(
-        f'<KeyedObject objectId="{body_shape_ids[s]}">\n    <KeyedProperty propertyKey="{OPACITY}">\n'
-        f'        <KeyFrameDouble value="{1 if s == shape else 0}" frame="0"/>\n    </KeyedProperty>\n</KeyedObject>'
-        for s in SHAPES)
-    return (f'<LinearAnimation fps="60" duration="1" loopValue="oneShot" name="Shape{shape[0].upper() + shape[1:]}" '
-            f'id="{shape_anim_ids[shape]}">\n' + indent(keyed, "    ") + '\n</LinearAnimation>')
+def root_artboard():
+    state_anims = root_state_animations()
+    # Breath keys only the Body node's scale; it is on its own layer, so the later layer wins where
+    # a state also keys scale (dragged, success), which is the intent.
+    breath = animation("Breath", BREATH_ANIM, 180, {BODY_NODE: {SX: [(0, 1.0), (180, 1.02)], SY: [(0, 1.0), (180, 1.02)]}}, "pingPong")
+    blink_rest = animation("BlinkRest", BLINK_REST_ANIM, 1, {})
+    blink = animation("BlinkFire", BLINK_ANIM, 2, {}, callbacks=(EYE_L_BLINK, EYE_R_BLINK))
+    hover_rest = animation("HoverRest", HOVER_REST_ANIM, 1, {FACE: {ROT: 0}})
+    hover = animation("HoverWiggle", HOVER_ANIM, 40, {FACE: {ROT: [(0, 0), (10, rad(6)), (30, rad(-6)), (40, 0)]}}, "loop")
+
+    return f'''<Artboard defaultStateMachineId="{SM}" viewModelId="{VM}" viewModelInstanceId="{VM_INSTANCE}"
+          clip="false" width="500" height="500" name="Mascot" id="{ROOT}">
+{indent(face(), "    ")}
+{indent(body(), "    ")}
+
+{indent(chr(10).join(state_anims + [breath, blink_rest, blink, hover_rest, hover]), "    ")}
+
+{indent(root_machine(), "    ")}
+</Artboard>'''
 
 
-def transition(to_id, vm_prop, enum_value_id):
-    return f'''<StateTransition stateToId="{to_id}" duration="160">
-    <TransitionViewModelCondition opValue="equal">
-        <TransitionPropertyViewModelComparator>
-            <BindablePropertyEnum>
-                {bind(vm_prop, 637)}
-            </BindablePropertyEnum>
-        </TransitionPropertyViewModelComparator>
-        <TransitionValueEnumComparator value="{enum_value_id}"/>
-    </TransitionViewModelCondition>
-</StateTransition>'''
+def data():
+    states = "\n".join(f'    <DataEnumValue key="{s}" value="{s[0].upper() + s[1:]}" id="{state_enum_ids[s]}"/>' for s in STATES)
+    shapes = "\n".join(f'    <DataEnumValue key="{s}" value="{s[0].upper() + s[1:]}" id="{shape_enum_ids[s]}"/>' for s in SHAPES)
+    return f'''<DataEnumCustom name="AvatarState" id="{ENUM_STATE}">
+{states}
+</DataEnumCustom>
+<!-- Declared so the host's identity write stays legal; v2 has one body and ignores it for now. -->
+<DataEnumCustom name="MascotShape" id="{ENUM_SHAPE}">
+{shapes}
+</DataEnumCustom>
 
+<!-- -1..1 gaze -> 0..1 timeline fraction; 0..1 amplitude -> 0..1 fraction, clamped. -->
+<DataConverterRangeMapper minInput="-1" maxInput="1" minOutput="0" maxOutput="1"
+                          clampLower="true" clampUpper="true" name="LookToTime" id="{CONV_LOOK}"/>
+<DataConverterRangeMapper minInput="0" maxInput="1" minOutput="0" maxOutput="1"
+                          clampLower="true" clampUpper="true" name="MouthToTime" id="{CONV_MOUTH}"/>
 
-def layer(name, lid, entries, node_ids, anim_ids, enum_ids, vm_prop, default):
-    transitions = "\n".join(transition(node_ids[e], vm_prop, enum_ids[e]) for e in entries)
-    states = "\n".join(f'<AnimationState x="200" y="{40 + 60 * i}" animationId="{anim_ids[e]}" id="{node_ids[e]}"/>'
-                       for i, e in enumerate(entries))
-    return f'''<StateMachineLayer name="{name}" id="{lid}">
-    <EntryState>
-        <StateTransition stateToId="{node_ids[default]}"/>
-    </EntryState>
-    <AnyState x="220" y="-140">
-{indent(transitions, "        ")}
-    </AnyState>
-    <ExitState x="430" y="-140"/>
-{indent(states, "    ")}
-</StateMachineLayer>'''
+<ViewModel defaultInstanceId="{VM_INSTANCE}" name="Avatar" id="{VM}">
+    <ViewModelPropertyEnumCustom enumId="{ENUM_STATE}" name="state" id="{VM_STATE}"/>
+    <ViewModelPropertyNumber name="mouthOpen" id="{VM_MOUTH}"/>
+    <ViewModelPropertyNumber name="lookX" id="{VM_LOOKX}"/>
+    <ViewModelPropertyNumber name="lookY" id="{VM_LOOKY}"/>
+    <ViewModelPropertyTrigger name="blink" id="{VM_BLINK}"/>
+    <ViewModelPropertyEnumCustom enumId="{ENUM_SHAPE}" name="shape" id="{VM_SHAPE}"/>
+    <ViewModelPropertyColor name="color" id="{VM_COLOR}"/>
+    <ViewModelPropertyBoolean name="hovered" id="{VM_HOVER}"/>
 
-
-def enum_block(name, eid, entries, ids):
-    values = "\n".join(f'    <DataEnumValue key="{e}" value="{e[0].upper() + e[1:]}" id="{ids[e]}"/>' for e in entries)
-    return f'<DataEnumCustom name="{name}" id="{eid}">\n{values}\n</DataEnumCustom>'
+    <ViewModelInstance exports="true" name="Default" id="{VM_INSTANCE}">
+        <ViewModelInstanceEnum propertyValue="{state_enum_ids['idle']}" viewModelPropertyId="{VM_STATE}"/>
+        <ViewModelInstanceNumber propertyValue="0" viewModelPropertyId="{VM_MOUTH}"/>
+        <ViewModelInstanceNumber propertyValue="0" viewModelPropertyId="{VM_LOOKX}"/>
+        <ViewModelInstanceNumber propertyValue="0" viewModelPropertyId="{VM_LOOKY}"/>
+        <ViewModelInstanceTrigger viewModelPropertyId="{VM_BLINK}"/>
+        <ViewModelInstanceEnum propertyValue="{shape_enum_ids['circle']}" viewModelPropertyId="{VM_SHAPE}"/>
+        <ViewModelInstanceColor propertyValue="FF1E7BF0" viewModelPropertyId="{VM_COLOR}"/>
+        <ViewModelInstanceBoolean propertyValue="false" viewModelPropertyId="{VM_HOVER}"/>
+    </ViewModelInstance>
+</ViewModel>'''
 
 
 doc = f'''<Rive version="1" kind="fragment">
     <!--
-        The Letta agent mascot. GENERATED by scratch gen_mascot_rml.py from the spec in MASCOT.md,
-        then hand-edited: treat this file as the source of truth.
+        The Letta agent mascot, v2. GENERATED by gen_scene.py from the spec in MASCOT.md; regenerate
+        rather than hand-edit the exhaustive parts, hand-edit the art freely.
 
-        Inputs the host writes on the Avatar view model (names are the contract with
-        RiveAvatarContract.kt; renaming one breaks the app silently):
-          shape     - identity, MascotShape enum key; written once on load
-          color     - identity, ARGB; every body fill is bound to it
+        Inputs the host writes on the Avatar view model (the contract with RiveAvatarContract.kt):
           state     - the director's arbitrated AvatarState, as an enum key
-          mouthOpen - 0..1 speech amplitude
-          lookX/Y   - -1..1 gaze
-          blink     - fire-once
+          mouthOpen - 0..1 speech amplitude -> scrubs the Mouth component's Open timeline
+          lookX/Y   - -1..1 gaze -> scrubs each Eye component's LookX/LookY timelines
+          blink     - fire-once -> forwarded to both eyes; the eyes also blink on their own
+          color     - identity; body and glow are bound to it
+          shape     - identity; accepted, not yet drawn (one body in v2)
+          hovered   - written by the file's own pointer listeners, read by the Hover layer
 
-        Two state-machine layers, both keyed from AnyState by view-model enum: `Shape` shows one
-        of eight bodies by opacity, `State` poses the face and moves the body. State animations
-        never key body colour - colour is identity.
+        The face is three component artboards. Components are driven by inputs, never by the view
+        model: a view-model-driven machine inside a nested artboard silently never fires.
     -->
-    <Artboard defaultStateMachineId="{SM}" viewModelId="{VM}" viewModelInstanceId="{VM_INSTANCE}"
-              clip="true" width="500" height="500" name="Mascot" id="0:2">
+{indent(root_artboard(), "    ")}
 
-        <!-- Face first: the first sibling draws on top. -->
-        <Node x="0" y="0" name="Gaze" id="0:20">
-            {bind(VM_LOOKX, X, CONV_GAZE_X)}
-            {bind(VM_LOOKY, Y, CONV_GAZE_Y)}
+{indent(eye_component(), "    ")}
 
-{indent(eye("EyeLeft", EYE_L, EYE_L_PATH, 205), "            ")}
-{indent(eye("EyeRight", EYE_R, EYE_R_PATH, 295), "            ")}
-{indent(overlay_arc("HappyLeft", HAPPY_L, 205), "            ")}
-{indent(overlay_arc("HappyRight", HAPPY_R, 295), "            ")}
-{indent(overlay_bar("ClosedLeft", CLOSED_L, 205), "            ")}
-{indent(overlay_bar("ClosedRight", CLOSED_R, 295), "            ")}
-{indent(cross("CrossLeft", CROSS_L, 205), "            ")}
-{indent(cross("CrossRight", CROSS_R, 295), "            ")}
-        </Node>
+{indent(brow_component(), "    ")}
 
-        <!-- Mouth: hidden except while speaking; height grows from the closed size with mouthOpen. -->
-        <Shape x="250" y="330" opacity="0" name="Mouth" id="{MOUTH}">
-            <Ellipse width="90" height="10" name="Path" id="0:31">
-                {bind(VM_MOUTH, HEIGHT, CONV_MOUTH)}
-            </Ellipse>
-            <Fill name="Fill"><SolidColor colorValue="{INK}" name="Color"/></Fill>
-        </Shape>
+{indent(mouth_component(), "    ")}
 
-        <!-- Bodies, all at one origin; the Shape layer shows exactly one. Declared last so they draw under the face. -->
-        <Node x="0" y="0" name="Body" id="{BODY_NODE}">
-{indent(chr(10).join(body(s[0].upper() + s[1:], body_shape_ids[s], BODIES[s]) for s in SHAPES), "            ")}
-        </Node>
-
-{indent(chr(10).join(state_animation(s) for s in STATES), "        ")}
-
-{indent(chr(10).join(shape_animation(s) for s in SHAPES), "        ")}
-
-        <StateMachine name="Avatar" id="{SM}">
-{indent(layer("Shape", "3:2", SHAPES, shape_node_ids, shape_anim_ids, shape_enum_ids, VM_SHAPE, "circle"), "            ")}
-{indent(layer("State", "3:1", STATES, state_node_ids, state_anim_ids, state_enum_ids, VM_STATE, "idle"), "            ")}
-        </StateMachine>
-    </Artboard>
-
-{indent(enum_block("AvatarState", ENUM_STATE, STATES, state_enum_ids), "    ")}
-{indent(enum_block("MascotShape", ENUM_SHAPE, SHAPES, shape_enum_ids), "    ")}
-
-    <!-- -1..1 gaze into pixels of eye travel, clamped so a bad value cannot fling the eyes off. -->
-    <DataConverterRangeMapper minInput="-1" maxInput="1" minOutput="-22" maxOutput="22"
-                              clampLower="true" clampUpper="true" name="GazeX" id="{CONV_GAZE_X}"/>
-    <DataConverterRangeMapper minInput="-1" maxInput="1" minOutput="-14" maxOutput="14"
-                              clampLower="true" clampUpper="true" name="GazeY" id="{CONV_GAZE_Y}"/>
-    <!-- 0..1 amplitude into mouth height. The floor is the closed mouth, not zero. -->
-    <DataConverterRangeMapper minInput="0" maxInput="1" minOutput="10" maxOutput="86"
-                              clampLower="true" clampUpper="true" name="MouthHeight" id="{CONV_MOUTH}"/>
-
-    <ViewModel defaultInstanceId="{VM_INSTANCE}" name="Avatar" id="{VM}">
-        <ViewModelPropertyEnumCustom enumId="{ENUM_STATE}" name="state" id="{VM_STATE}"/>
-        <ViewModelPropertyNumber name="mouthOpen" id="{VM_MOUTH}"/>
-        <ViewModelPropertyNumber name="lookX" id="{VM_LOOKX}"/>
-        <ViewModelPropertyNumber name="lookY" id="{VM_LOOKY}"/>
-        <ViewModelPropertyTrigger name="blink" id="{VM_BLINK}"/>
-        <ViewModelPropertyEnumCustom enumId="{ENUM_SHAPE}" name="shape" id="{VM_SHAPE}"/>
-        <ViewModelPropertyColor name="color" id="{VM_COLOR}"/>
-
-        <ViewModelInstance exports="true" name="Default" id="{VM_INSTANCE}">
-            <ViewModelInstanceEnum propertyValue="{state_enum_ids['idle']}" viewModelPropertyId="{VM_STATE}"/>
-            <ViewModelInstanceNumber propertyValue="0" viewModelPropertyId="{VM_MOUTH}"/>
-            <ViewModelInstanceNumber propertyValue="0" viewModelPropertyId="{VM_LOOKX}"/>
-            <ViewModelInstanceNumber propertyValue="0" viewModelPropertyId="{VM_LOOKY}"/>
-            <ViewModelInstanceTrigger viewModelPropertyId="{VM_BLINK}"/>
-            <ViewModelInstanceEnum propertyValue="{shape_enum_ids['circle']}" viewModelPropertyId="{VM_SHAPE}"/>
-            <ViewModelInstanceColor propertyValue="FF1E7BF0" viewModelPropertyId="{VM_COLOR}"/>
-        </ViewModelInstance>
-    </ViewModel>
+{indent(data(), "    ")}
 </Rive>
 '''
 
-import sys
-out = sys.argv[1]
-with open(out, "w", encoding="utf-8", newline="\n") as f:
-    f.write(doc)
-print(f"wrote {out} ({doc.count(chr(10))} lines)")
+if __name__ == "__main__":
+    import os
+    out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scene.rml")
+    with open(out, "w", encoding="utf-8", newline="\n") as f:
+        f.write(doc)
+    print(f"wrote {out} ({doc.count(chr(10))} lines)")

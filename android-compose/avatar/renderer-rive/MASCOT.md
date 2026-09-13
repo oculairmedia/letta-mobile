@@ -7,7 +7,44 @@ The model is the Grokbot one: a user picks a **shape** and a **colour** for each
 character's **face** is driven by the app. Shape and colour are identity and never change on their
 own; the face is state and never persists. One `.riv`, one artboard, three inputs.
 
-## 1. Art spec
+## 0. The v2 rig (current)
+
+After reading Rive's Brilliant/Koji post and the community reference files (mood orb, cursor
+follower, expression grid), the rig was rebuilt the way real character files are built. One
+character; the eight-shape picker from section 1 is parked (the `shape` property is still
+declared so the host's identity write stays legal, but one body is drawn).
+
+```
+Mascot (root, view-model driven)          Eye (component, x2)      Brow (component, x2)   Mouth (component)
+  Body: glow/fill/shade/gloss/rim   -->     expr number input        expr number input      expr number input
+  Face: NestedArtboards             -->     LookX/LookY timelines    Expression layer       Expression layer
+  Layers: Expression, Breath,                (scrubbed by data)                             Open timeline
+          Blink, Hover                       Blink + AutoBlink                                (scrubbed by data)
+  Listeners: hover in/out -> hovered
+```
+
+- **Components are driven by inputs, the root by the view model.** A view-model-driven machine
+  inside a nested artboard silently never fires (CLI docs); the root's state animations key each
+  component's `expr` input via `NestedNumber.nestedValue`, which is the editor's own pattern.
+- **Gaze and mouth are scrubbed, not animated.** `lookX/Y` and `mouthOpen` bind to
+  `NestedRemapAnimation.time` (a 0..1 fraction) through range mappers, so the timelines are
+  authored as pose ranges and the data picks the frame. This is the Koji "bind the volume"
+  technique and the cursor file's joystick idea in component form.
+- **Lids are a clip.** Sclera and pupil are masked by an unpainted aperture ellipse; its height
+  and offset are the expression (crescent, squint, closed) and the blink. Colour-agnostic.
+- **Layers compose.** Breath runs forever on its own layer; Blink fires from the contract's
+  trigger *and* the eyes blink on their own from two random-length waits; Hover wiggles the face
+  from the file's own pointer listeners writing `hovered`.
+- **Eased keyframes.** `hold` is the default and made v1's motion a slideshow.
+
+Check any state headless, no app needed:
+`rive . --screenshot=out.png --data=state=success --data=lookX=-1 --advance=30`.
+
+Still to do on the rig: the eight shapes as a body layer again; brows and mouth deserve drawn
+art (the editor can open the built `.rev`); a `CubicEaseInterpolator` on the look/mouth range
+mappers to smooth the data; nested-artboard parallax on the glow.
+
+## 1. Art spec (original brief; shapes parked, face rules superseded by v2)
 
 ### Identity
 
