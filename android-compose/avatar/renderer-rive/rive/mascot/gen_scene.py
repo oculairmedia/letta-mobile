@@ -6,7 +6,12 @@ through nested inputs and scrubbed timelines. Everything the host writes stays o
 view model - the components are internal and never see it.
 
 Why generated: twelve expressions x five components x every keyed property must be exhaustive or
-states leak into each other. Regenerate with `python gen_scene.py`, then `rive . --verify`.
+states leak into each other.
+
+RETIRED for this project: scene.rml was pushed to the Rive workspace (see ARTIST.md) and now
+carries the editor's stamped ids and rive.yaml's file mapping. Re-running this script reassigns
+ids and breaks the push. Keep it as the record of how the rig was built; to regenerate, target a
+fresh project directory.
 
 Conventions learned the hard way (all silent in the compiler):
   - rotations are radians; LinearAnimation.duration is frames; StateTransition.duration is ms
