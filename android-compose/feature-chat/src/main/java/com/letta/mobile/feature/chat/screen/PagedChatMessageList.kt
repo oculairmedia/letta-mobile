@@ -93,11 +93,15 @@ private fun PagedChatMessageListContent(
     var following by remember(presentation, routeTarget) {
         mutableStateOf(routeTarget == null && restoreAnchor == null)
     }
+    LaunchedEffect(listState) {
+        listState.interactionSource.interactions.collect { interaction ->
+            if (interaction is androidx.compose.foundation.interaction.DragInteraction.Start) following = false
+        }
+    }
     LaunchedEffect(listState, pages.loadState.prepend.endOfPaginationReached) {
         var wasScrolling = false
         snapshotFlow { listState.isScrollInProgress }.collect { scrolling ->
-            if (scrolling) following = false
-            else if (followNewestEdge(wasScrolling, !listState.canScrollBackward, pages.loadState.prepend.endOfPaginationReached)) {
+            if (!scrolling && followNewestEdge(wasScrolling, !listState.canScrollBackward, pages.loadState.prepend.endOfPaginationReached)) {
                 following = true
             }
             wasScrolling = scrolling

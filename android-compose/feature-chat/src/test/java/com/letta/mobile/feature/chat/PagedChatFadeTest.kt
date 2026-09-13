@@ -1,18 +1,23 @@
 package com.letta.mobile.feature.chat
 
+import android.graphics.Bitmap
 import androidx.compose.foundation.background
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.swipeUp
+import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.unit.dp
 import androidx.paging.PagingData
 import com.letta.mobile.data.chat.projection.ChatRenderItem
@@ -25,6 +30,7 @@ import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.theme.ChatBackground
 import com.letta.mobile.ui.theme.LettaChatTheme
+import com.letta.mobile.ui.theme.chatColors
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import org.junit.Assert.assertTrue
@@ -35,6 +41,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.io.File
+import java.io.FileOutputStream
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], manifest = Config.NONE)
@@ -45,31 +53,35 @@ class PagedChatFadeTest {
 
     @Test
     fun populatedPagedListDissolvesTopEdgeIntoLightChatBackground() {
-        assertTopFadeOnRenderedMessage(Color(0xFFFFE0E0))
+        assertTopFadeOnRenderedMessage("top-light", Color(0xFFFFE0E0))
     }
 
     @Test
     fun populatedPagedListDissolvesTopEdgeIntoDarkChatBackground() {
-        assertTopFadeOnRenderedMessage(Color(0xFF240018))
+        assertTopFadeOnRenderedMessage("top-dark", Color(0xFF240018))
     }
 
     @Test
     fun scrollingAwayFromNewestPageDissolvesBottomEdgeOnRenderedMessage() {
         val fixture = setPagedContent(Color(0xFF240018), pageRole = "user")
         compose.mainClock.advanceTimeBy(FadeDurationMillis)
-        compose.onRoot().performTouchInput { swipeUp() }
+        compose.onRoot().performTouchInput { swipeDown() }
         compose.mainClock.advanceTimeBy(FadeDurationMillis)
 
         val image = compose.onRoot().captureToImage()
+        emitFadeDiagnostics("bottom-after-swipe", image, fixture.background, "page=user")
         assertTrue(
             "The bottom fade must reduce the rendered user bubble colour at the center of the visible bottom edge",
             image.edgePixelAt(CenterX, image.height - EdgeInsetPx)
                 .distanceTo(fixture.background) < MaxFadedDistance,
         )
         assertTrue(
-            "The visible message above the bottom fade must retain its rendered colour",
-            image.edgePixelAt(CenterX, image.height - UnfadedInsetPx)
-                .distanceTo(fixture.background) > MinUnfadedDistance,
+            "The unfaded middle must contain the theme's rendered user-bubble colour",
+            // A fixed post-fling y can land in an inter-message gap. Require a visible
+            // run of bubble-colored pixels in the middle, outside either fade region.
+            (image.height / 3 until image.height * 2 / 3).count { y ->
+                image.edgePixelAt(CenterX, y).distanceTo(fixture.userBubble) < 0.02f
+            } >= 16,
         )
     }
 
@@ -82,6 +94,7 @@ class PagedChatFadeTest {
         compose.mainClock.advanceTimeBy(FadeDurationMillis)
 
         val whileLive = compose.onRoot().captureToImage()
+        emitFadeDiagnostics("handoff-live", whileLive, background, "live=user,page=assistant")
         assertTrue(whileLive.edgePixelAt(CenterX, whileLive.height - EdgeInsetPx).distanceTo(background) > MinUnfadedDistance)
 
         compose.runOnIdle {
@@ -91,13 +104,15 @@ class PagedChatFadeTest {
         compose.mainClock.advanceTimeBy(FadeDurationMillis)
 
         val afterSettlement = compose.onRoot().captureToImage()
+        emitFadeDiagnostics("handoff-settled", afterSettlement, background, "page=user+assistant")
         assertTrue(afterSettlement.edgePixelAt(CenterX, afterSettlement.height - EdgeInsetPx).distanceTo(background) > MinUnfadedDistance)
     }
 
-    private fun assertTopFadeOnRenderedMessage(background: Color) {
+    private fun assertTopFadeOnRenderedMessage(label: String, background: Color) {
         val fixture = setPagedContent(background, pageRole = "user")
         compose.mainClock.advanceTimeBy(FadeDurationMillis)
         val image = compose.onRoot().captureToImage()
+        emitFadeDiagnostics(label, image, fixture.background, "page=user")
 
         // x=CenterX lies in the wide user bubble, not in the list's side padding.
         // Without ChatFadingEdgesBox this pixel retains the bubble colour and exceeds the faded threshold.
@@ -106,8 +121,9 @@ class PagedChatFadeTest {
             image.edgePixelAt(CenterX, EdgeInsetPx).distanceTo(fixture.background) < MaxFadedDistance,
         )
         assertTrue(
-            "The assistant bubble below the fade must remain visibly distinct from the chat background",
-            image.edgePixelAt(CenterX, UnfadedInsetPx).distanceTo(fixture.background) > MinUnfadedDistance,
+            "The control pixel must retain the theme's user-bubble color, not a fade or blank background",
+            image.edgePixelAt(CenterX, UnfadedInsetPx).distanceTo(fixture.userBubble) < 0.02f &&
+                fixture.userBubble.distanceTo(fixture.background) > MaxFadedDistance,
         )
     }
 
@@ -120,8 +136,10 @@ class PagedChatFadeTest {
         ),
     ): Fixture {
         val presentation = ChatPagingPresentation(settled, live, {})
+        val fixture = Fixture(background)
         compose.setContent {
             LettaChatTheme {
+                fixture.userBubble = MaterialTheme.chatColors.userBubble
                 Box(
                     modifier = Modifier
                         .size(360.dp)
@@ -139,7 +157,7 @@ class PagedChatFadeTest {
                 }
             }
         }
-        return Fixture(background)
+        return fixture
     }
 
     private fun row(id: String, role: String = "assistant") = ChatRenderItem.Single(
@@ -152,6 +170,35 @@ class PagedChatFadeTest {
         GroupPosition.None,
     )
 
+    private fun emitFadeDiagnostics(label: String, image: ImageBitmap, background: Color, roles: String) {
+        val artifact = File("build/test-artifacts/fade", "$label.png")
+        artifact.parentFile.mkdirs()
+        FileOutputStream(artifact).use { output ->
+            image.asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, output)
+        }
+
+        val samples = listOf(
+            "top" to image.edgePixelAt(CenterX, EdgeInsetPx),
+            "top-unfaded" to image.edgePixelAt(CenterX, UnfadedInsetPx),
+            "bottom" to image.edgePixelAt(CenterX, image.height - EdgeInsetPx),
+            "bottom-unfaded" to image.edgePixelAt(CenterX, image.height - UnfadedInsetPx),
+        ).joinToString { (name, color) ->
+            "$name=#${color.toArgb().toUInt().toString(16).padStart(8, '0')} distance=${color.distanceTo(background)}"
+        }
+        val messageNodes = compose.onAllNodes(hasText("Paged message", substring = true), useUnmergedTree = true)
+            .fetchSemanticsNodes()
+            .take(MaxDiagnosticMessageNodes)
+            .joinToString { node ->
+                "bounds=${node.boundsInRoot}, semantics=${node.config}"
+            }
+        println(
+            "fade-diagnostic label=$label artifact=${artifact.absolutePath} " +
+                "image=${image.width}x${image.height}px density=${compose.density.density} " +
+                "background=#${background.toArgb().toUInt().toString(16).padStart(8, '0')} roles=$roles samples=[$samples] " +
+                "visibleMessageNodes=[$messageNodes]",
+        )
+    }
+
     private fun ImageBitmap.edgePixelAt(x: Int, y: Int): Color = toPixelMap()[x, y]
 
     private fun Color.distanceTo(other: Color): Float =
@@ -159,7 +206,7 @@ class PagedChatFadeTest {
             kotlin.math.abs(green - other.green) +
             kotlin.math.abs(blue - other.blue)
 
-    private data class Fixture(val background: Color)
+    private data class Fixture(val background: Color, var userBubble: Color = Color.Unspecified)
 
     private companion object {
         const val CenterX = 180
@@ -168,6 +215,7 @@ class PagedChatFadeTest {
         const val FadeDurationMillis = 350L
         const val MaxFadedDistance = 0.20f
         const val MinUnfadedDistance = 0.35f
+        const val MaxDiagnosticMessageNodes = 8
 
         val callbacks = ChatContentCallbacks(
             onSendMessage = {},
