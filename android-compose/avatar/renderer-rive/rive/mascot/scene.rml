@@ -19,7 +19,7 @@
               clip="false" width="500" height="500" name="Mascot" id="0:2">
         <Node x="250" y="262" name="FacePlacement">
         <Node x="0" y="0" name="Face" id="0:200">
-            <NestedArtboard artboardId="4:2" x="-132" y="-118" scaleX="1.3" scaleY="1.3" name="EyeLeft" id="0:210">
+            <NestedArtboard artboardId="4:2" x="-122" y="-102" scaleX="1.2" scaleY="1.2" name="EyeLeft" id="0:210">
                 <NestedStateMachine animationId="4:5" name="SM">
                     <NestedNumber inputId="4:6" nestedValue="0" name="expr" id="0:211"/>
                     <NestedTrigger inputId="4:7" name="blink" id="0:212"/>
@@ -31,7 +31,7 @@
                     <DataBindContext sourcePathIds="1:50-1:4" propertyKey="202" converterId="2:1"/>
                 </NestedRemapAnimation>
             </NestedArtboard>
-            <NestedArtboard artboardId="4:2" x="-24" y="-118" scaleX="1.3" scaleY="1.3" name="EyeRight" id="0:220">
+            <NestedArtboard artboardId="4:2" x="-22" y="-102" scaleX="1.2" scaleY="1.2" name="EyeRight" id="0:220">
                 <NestedStateMachine animationId="4:5" name="SM">
                     <NestedNumber inputId="4:6" nestedValue="0" name="expr" id="0:221"/>
                     <NestedTrigger inputId="4:7" name="blink" id="0:222"/>
@@ -43,12 +43,12 @@
                     <DataBindContext sourcePathIds="1:50-1:4" propertyKey="202" converterId="2:1"/>
                 </NestedRemapAnimation>
             </NestedArtboard>
-            <NestedArtboard artboardId="5:2" x="-94" y="-118" scaleX="1" name="BrowLeft" id="0:230">
+            <NestedArtboard artboardId="5:2" x="-94" y="-134" scaleX="1" name="BrowLeft" id="0:230">
                 <NestedStateMachine animationId="5:5" name="SM">
                     <NestedNumber inputId="5:6" nestedValue="0" name="expr" id="0:231"/>
                 </NestedStateMachine>
             </NestedArtboard>
-            <NestedArtboard artboardId="5:2" x="94" y="-118" scaleX="-1" name="BrowRight" id="0:240">
+            <NestedArtboard artboardId="5:2" x="94" y="-134" scaleX="-1" name="BrowRight" id="0:240">
                 <NestedStateMachine animationId="5:5" name="SM">
                     <NestedNumber inputId="5:6" nestedValue="0" name="expr" id="0:241"/>
                 </NestedStateMachine>
@@ -1577,7 +1577,7 @@
     <ComponentAsset artboardId="4:2" name="Eye"/>
 
     <Artboard isComponent="true" defaultStateMachineId="5:5" clip="false" width="100" height="60" name="Brow" id="5:2">
-        <Shape x="50" y="30" id="5:20" name="Brow">
+        <Shape x="50" y="32" id="5:20" name="Brow">
                 <PointsPath isClosed="true" name="PointsPath17" id="7:18">
                     <StraightVertex x="34.74" y="-2.66" name="StraightVertex"/>
                     <CubicDetachedVertex inRotation="0" inDistance="0" outRotation="2.784" outDistance="5.968" x="-24.79" y="23.1" name="CubicDetachedVertex"/>
@@ -1596,10 +1596,10 @@
         <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="ExprIdle" id="5:100">
             <KeyedObject objectId="5:20">
                 <KeyedProperty propertyKey="14">
-                    <KeyFrameDouble value="30" frame="0"/>
+                    <KeyFrameDouble value="32" frame="0"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="15">
-                    <KeyFrameDouble value="0" frame="0"/>
+                    <KeyFrameDouble value="0.45379" frame="0"/>
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
@@ -1609,107 +1609,107 @@
                     <KeyFrameDouble value="22" frame="0"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="15">
-                    <KeyFrameDouble value="0" frame="0"/>
+                    <KeyFrameDouble value="0.45379" frame="0"/>
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
         <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="ExprDragged" id="5:102">
             <KeyedObject objectId="5:20">
                 <KeyedProperty propertyKey="14">
-                    <KeyFrameDouble value="34" frame="0"/>
+                    <KeyFrameDouble value="36" frame="0"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="15">
-                    <KeyFrameDouble value="-0.13963" frame="0"/>
+                    <KeyFrameDouble value="0.31416" frame="0"/>
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
         <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="ExprThinking" id="5:103">
             <KeyedObject objectId="5:20">
                 <KeyedProperty propertyKey="14">
-                    <KeyFrameDouble value="20" frame="0"/>
+                    <KeyFrameDouble value="24" frame="0"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="15">
-                    <KeyFrameDouble value="-0.24435" frame="0"/>
+                    <KeyFrameDouble value="0.20944" frame="0"/>
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
         <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="ExprWaitingInput" id="5:104">
             <KeyedObject objectId="5:20">
                 <KeyedProperty propertyKey="14">
-                    <KeyFrameDouble value="16" frame="0"/>
+                    <KeyFrameDouble value="20" frame="0"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="15">
-                    <KeyFrameDouble value="0" frame="0"/>
+                    <KeyFrameDouble value="0.45379" frame="0"/>
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
         <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="ExprSpeaking" id="5:105">
             <KeyedObject objectId="5:20">
                 <KeyedProperty propertyKey="14">
-                    <KeyFrameDouble value="30" frame="0"/>
+                    <KeyFrameDouble value="32" frame="0"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="15">
-                    <KeyFrameDouble value="0" frame="0"/>
+                    <KeyFrameDouble value="0.45379" frame="0"/>
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
         <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="ExprSuccess" id="5:106">
             <KeyedObject objectId="5:20">
                 <KeyedProperty propertyKey="14">
-                    <KeyFrameDouble value="22" frame="0"/>
+                    <KeyFrameDouble value="26" frame="0"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="15">
-                    <KeyFrameDouble value="-0.06981" frame="0"/>
+                    <KeyFrameDouble value="0.38398" frame="0"/>
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
         <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="ExprError" id="5:107">
             <KeyedObject objectId="5:20">
                 <KeyedProperty propertyKey="14">
-                    <KeyFrameDouble value="32" frame="0"/>
+                    <KeyFrameDouble value="36" frame="0"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="15">
-                    <KeyFrameDouble value="0.27925" frame="0"/>
+                    <KeyFrameDouble value="0.17454" frame="0"/>
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
         <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="ExprSleeping" id="5:108">
             <KeyedObject objectId="5:20">
                 <KeyedProperty propertyKey="14">
-                    <KeyFrameDouble value="36" frame="0"/>
+                    <KeyFrameDouble value="40" frame="0"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="15">
-                    <KeyFrameDouble value="0" frame="0"/>
+                    <KeyFrameDouble value="0.45379" frame="0"/>
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
         <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="ExprLoading" id="5:109">
             <KeyedObject objectId="5:20">
                 <KeyedProperty propertyKey="14">
-                    <KeyFrameDouble value="30" frame="0"/>
+                    <KeyFrameDouble value="32" frame="0"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="15">
-                    <KeyFrameDouble value="0" frame="0"/>
+                    <KeyFrameDouble value="0.45379" frame="0"/>
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
         <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="ExprFailed" id="5:110">
             <KeyedObject objectId="5:20">
                 <KeyedProperty propertyKey="14">
-                    <KeyFrameDouble value="34" frame="0"/>
+                    <KeyFrameDouble value="38" frame="0"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="15">
-                    <KeyFrameDouble value="0.24435" frame="0"/>
+                    <KeyFrameDouble value="0.20944" frame="0"/>
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
         <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="ExprDegraded" id="5:111">
             <KeyedObject objectId="5:20">
                 <KeyedProperty propertyKey="14">
-                    <KeyFrameDouble value="30" frame="0"/>
+                    <KeyFrameDouble value="34" frame="0"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="15">
-                    <KeyFrameDouble value="0.13963" frame="0"/>
+                    <KeyFrameDouble value="0.59342" frame="0"/>
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>

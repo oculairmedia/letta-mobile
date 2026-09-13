@@ -320,20 +320,24 @@ def lifted(fragment, **first_line_attrs):
 
 
 def brow_component():
-    REST = {Y: 30, ROT: 0}
+    # The lifted brow's neutral rises toward the centre ("worried"); the rest angle flattens it and
+    # every pose's rotation is relative to that.
+    BASE_ROT = rad(26)
+    REST = {Y: 32, ROT: 0}
     poses = {
-        "idle": {}, "listening": {Y: 22}, "dragged": {Y: 34, ROT: rad(-8)}, "thinking": {Y: 20, ROT: rad(-14)},
-        "waitingInput": {Y: 16}, "speaking": {}, "success": {Y: 22, ROT: rad(-4)}, "error": {Y: 32, ROT: rad(16)},
-        "sleeping": {Y: 36}, "loading": {}, "failed": {Y: 34, ROT: rad(14)}, "degraded": {Y: 30, ROT: rad(8)},
+        "idle": {}, "listening": {Y: 22}, "dragged": {Y: 36, ROT: rad(-8)}, "thinking": {Y: 24, ROT: rad(-14)},
+        "waitingInput": {Y: 20}, "speaking": {}, "success": {Y: 26, ROT: rad(-4)}, "error": {Y: 36, ROT: rad(-16)},
+        "sleeping": {Y: 40}, "loading": {}, "failed": {Y: 38, ROT: rad(-14)}, "degraded": {Y: 34, ROT: rad(8)},
     }
     anims = []
     for s in STATES:
         vals = dict(REST)
         vals.update(poses[s])
+        vals[ROT] = round(vals[ROT] + BASE_ROT, 5)
         anims.append(animation("Expr" + s[0].upper() + s[1:], brow_expr_anim[s], 1, {BROW_BAR: vals}))
     layer = expression_layer("Expression", "5:10", BROW_IN_EXPR, brow_expr_anim, brow_expr_node)
     # The lifted brow is ~83x46 at the board's centre; it keeps its own id so the poses key it.
-    brow = lifted("brow.rml.txt", x="50", y="30", id=BROW_BAR, name="Brow")
+    brow = lifted("brow.rml.txt", x="50", y="32", id=BROW_BAR, name="Brow")
     return f'''<Artboard isComponent="true" defaultStateMachineId="{BROW_SM}" clip="false" width="100" height="60" name="Brow" id="{BROW_AB}">
 {indent(brow, "    ")}
 {indent(chr(10).join(anims), "    ")}
@@ -466,7 +470,7 @@ def face():
     # NestedArtboard x/y place the child's top-left. Eye is 120 square at scale 1.3 (156 px), so
     # its centre sits 78 px in; the brow bar is at (40,20) of an 80x40 board.
     def eye(name, sid, expr_id, blink_id, x):
-        return f'''<NestedArtboard artboardId="{EYE_AB}" x="{x}" y="-118" scaleX="1.3" scaleY="1.3" name="{name}" id="{sid}">
+        return f'''<NestedArtboard artboardId="{EYE_AB}" x="{x}" y="-102" scaleX="1.2" scaleY="1.2" name="{name}" id="{sid}">
     <NestedStateMachine animationId="{EYE_SM}" name="SM">
         <NestedNumber inputId="{EYE_IN_EXPR}" nestedValue="0" name="expr" id="{expr_id}"/>
         <NestedTrigger inputId="{EYE_IN_BLINK}" name="blink" id="{blink_id}"/>
@@ -480,7 +484,7 @@ def face():
 </NestedArtboard>'''
 
     def brow(name, sid, expr_id, x, mirror):
-        return f'''<NestedArtboard artboardId="{BROW_AB}" x="{x}" y="-118" scaleX="{-1 if mirror else 1}" name="{name}" id="{sid}">
+        return f'''<NestedArtboard artboardId="{BROW_AB}" x="{x}" y="-134" scaleX="{-1 if mirror else 1}" name="{name}" id="{sid}">
     <NestedStateMachine animationId="{BROW_SM}" name="SM">
         <NestedNumber inputId="{BROW_IN_EXPR}" nestedValue="0" name="expr" id="{expr_id}"/>
     </NestedStateMachine>
@@ -488,8 +492,8 @@ def face():
 
     return f'''<Node x="250" y="262" name="FacePlacement">
 <Node x="0" y="0" name="Face" id="{FACE}">
-{indent(eye("EyeLeft", EYE_L, EYE_L_EXPR, EYE_L_BLINK, -132), "    ")}
-{indent(eye("EyeRight", EYE_R, EYE_R_EXPR, EYE_R_BLINK, -24), "    ")}
+{indent(eye("EyeLeft", EYE_L, EYE_L_EXPR, EYE_L_BLINK, -122), "    ")}
+{indent(eye("EyeRight", EYE_R, EYE_R_EXPR, EYE_R_BLINK, -22), "    ")}
 {indent(brow("BrowLeft", BROW_L, BROW_L_EXPR, -94, False), "    ")}
 {indent(brow("BrowRight", BROW_R, BROW_R_EXPR, 94, True), "    ")}
     <NestedArtboard artboardId="{MOUTH_AB}" x="-80" y="14" name="Mouth" id="{MOUTH}">
