@@ -39,6 +39,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -157,6 +158,9 @@ private enum class FrameShape(val label: String, val shape: Shape) {
 
 private enum class Ground(val label: String) { PAGE("page"), FRAME("frame") }
 
+/** How the host lends the cursor to the character's gaze. SOMETIMES is the product behaviour. */
+private enum class GazeMode(val label: String) { SOMETIMES("sometimes"), ALWAYS("always"), OFF("sliders") }
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun MascotBench(file: File, modifier: Modifier) {
@@ -169,8 +173,11 @@ private fun MascotBench(file: File, modifier: Modifier) {
     var mouth by remember { mutableFloatStateOf(0f) }
     var lookX by remember { mutableFloatStateOf(0f) }
     var lookY by remember { mutableFloatStateOf(0f) }
-    var trackCursor by remember { mutableStateOf(true) }
+    var gazeMode by remember { mutableStateOf(GazeMode.SOMETIMES) }
     var trackReach by remember { mutableFloatStateOf(2.5f) }   // how far (in mascot widths) the gaze saturates
+    var cursorLook by remember { mutableStateOf(0f to 0f) }    // where the cursor is, in gaze units
+    var attending by remember { mutableStateOf(false) }         // is the character looking at the cursor right now
+    var lastCursorMove by remember { mutableStateOf(0L) }
 
     var page by remember { mutableStateOf(Surround(0xFF1A1A1A.toInt())) }
     var frame by remember { mutableStateOf(Surround(0xFF2E2E33.toInt())) }
@@ -205,6 +212,40 @@ private fun MascotBench(file: File, modifier: Modifier) {
         RiveAvatarContract.applyIdentity(scene.inputSink, identity)
         runtime.load(MASCOT_MODEL)
         loaded = true
+    }
+
+    // Attention: the reference for the director's gaze rule. The rig has its own gaze life; the
+    // host only borrows it now and then. Every few seconds decide whether to look at the cursor,
+    // hold that for a short while, then let go. A cursor that starts moving near the character
+    // grabs attention at once, the way a hand waved in front of a face does.
+    LaunchedEffect(gazeMode) {
+        attending = gazeMode == GazeMode.ALWAYS
+        if (gazeMode != GazeMode.SOMETIMES) return@LaunchedEffect
+        while (true) {
+            delay((3000L..8000L).random())
+            if (Math.random() < 0.6) {
+                attending = true
+                delay((1500L..4000L).random())
+                attending = false
+            }
+        }
+    }
+    // The gaze eases toward its target (~250 ms) so attention reads as a drift, never a snap.
+    LaunchedEffect(gazeMode) {
+        if (gazeMode == GazeMode.OFF) { setLook(0f, 0f); return@LaunchedEffect }
+        var x = lookX; var y = lookY
+        var last = System.nanoTime()
+        while (true) {
+            withFrameNanos { now ->
+                val dt = ((now - last) / 1e9f).coerceIn(0f, 0.1f); last = now
+                // A cursor moving within a mascot width in the last half second demands a look.
+                val near = kotlin.math.hypot(cursorLook.first, cursorLook.second) < 1f / trackReach && now - lastCursorMove < 500_000_000L
+                val (tx, ty) = if (attending || (gazeMode == GazeMode.SOMETIMES && near)) cursorLook else 0f to 0f
+                val k = 1f - kotlin.math.exp(-dt / 0.25f)
+                x += (tx - x) * k; y += (ty - y) * k
+                if (kotlin.math.abs(x - lookX) > 0.002f || kotlin.math.abs(y - lookY) > 0.002f) setLook(x, y)
+            }
+        }
     }
 
     // Tunables are plain view-model numbers; write each on change (the map is snapshot state).
@@ -247,10 +288,11 @@ private fun MascotBench(file: File, modifier: Modifier) {
                     awaitPointerEventScope {
                         while (true) {
                             val e = awaitPointerEvent()
-                            if (e.type != PointerEventType.Move || !trackCursor || mascotBounds.isEmpty) continue
+                            if (e.type != PointerEventType.Move || mascotBounds.isEmpty) continue
                             val p = e.changes.firstOrNull()?.position ?: continue
                             val reach = mascotBounds.width * trackReach / 2f
-                            setLook((p.x - mascotBounds.center.x) / reach, (p.y - mascotBounds.center.y) / reach)
+                            cursorLook = ((p.x - mascotBounds.center.x) / reach).coerceIn(-1f, 1f) to ((p.y - mascotBounds.center.y) / reach).coerceIn(-1f, 1f)
+                            lastCursorMove = System.nanoTime()
                         }
                     }
                 },
@@ -277,7 +319,7 @@ private fun MascotBench(file: File, modifier: Modifier) {
                 }
                 Text(
                     if (editGradients) "drag the rings to place lights; tap a ground to pick its base colour"
-                    else "tap the page or the frame to pick its colour; gaze follows the cursor",
+                    else "tap the page or the frame to pick its colour; wave the cursor near the mascot to get its attention",
                     color = if (isDark(page.base)) Color(0x66FFFFFF) else Color(0x66000000),
                     modifier = Modifier.align(Alignment.BottomStart).padding(12.dp),
                 )
@@ -319,11 +361,13 @@ private fun MascotBench(file: File, modifier: Modifier) {
             Section("mouthOpen %.2f  (visible in speaking / dragged only)".format(mouth))
             Slider(mouth, onValueChange = { autoCycle = false; mouth = it; runtime.setMouthOpen(it) })
 
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Switch(trackCursor, onCheckedChange = { trackCursor = it; if (!it) setLook(0f, 0f) })
-                Text("gaze follows the cursor", color = Color.LightGray)
+            Section("gaze  " + when (gazeMode) { GazeMode.SOMETIMES -> if (attending) "(looking at you)" else "(its own life)"; GazeMode.ALWAYS -> "(locked on the cursor)"; GazeMode.OFF -> "(sliders)" })
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                GazeMode.entries.forEach { m ->
+                    if (m == gazeMode) Button({ gazeMode = m }) { Text(m.label) } else OutlinedButton({ gazeMode = m }) { Text(m.label) }
+                }
             }
-            if (trackCursor) {
+            if (gazeMode != GazeMode.OFF) {
                 Section("reach %.1f mascot widths to full gaze".format(trackReach))
                 Slider(trackReach, valueRange = 0.6f..6f, onValueChange = { trackReach = it })
             } else {

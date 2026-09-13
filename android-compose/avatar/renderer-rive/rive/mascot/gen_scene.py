@@ -120,6 +120,8 @@ ENTER_PAIRS = [(a, b) for a in SUSTAINED for b in SUSTAINED if a != b]  # every 
 enter_anim = {pair: f"3:{250 + i}" for i, pair in enumerate(ENTER_PAIRS)}   # 3:250..3:339
 enter_node = {pair: f"3:{350 + i}" for i, pair in enumerate(ENTER_PAIRS)}   # 3:350..3:439
 WANDER_WAIT_A, WANDER_WAIT_B, WANDER_GLANCE, WANDER_PEEK, WANDER_SPIN = "3:230", "3:231", "3:232", "3:233", "3:234"
+WANDER_SLEEP_WAIT, WANDER_SLEEP_SHIFT, WANDER_SLEEP_WAIT_NODE, WANDER_SLEEP_SHIFT_NODE = "3:235", "3:236", "3:245", "3:246"
+IDLE_SLEEP_NODE = "3:217"
 WANDER_A_NODE, WANDER_B_NODE, WANDER_GLANCE_NODE, WANDER_PEEK_NODE, WANDER_SPIN_NODE = "3:240", "3:241", "3:242", "3:243", "3:244"
 
 PLATE_AB, PLATE_SM, PLATE_IN_EXPR, PLATE_IN_BLINK = "7:2", "7:5", "7:6", "7:7"
@@ -226,9 +228,9 @@ def layer_frame(name, lid, entry_to, any_transitions, states):
 </StateMachineLayer>'''
 
 
-def vm_condition(kind, prop, literal):
+def vm_condition(kind, prop, literal, op="equal"):
     key = {"Enum": BIND_ENUM, "Trigger": BIND_TRIGGER, "Boolean": BIND_BOOL}[kind]
-    return f'''<TransitionViewModelCondition opValue="equal">
+    return f'''<TransitionViewModelCondition opValue="{op}">
     <TransitionPropertyViewModelComparator>
         <BindableProperty{kind}>
             {bind(prop, key)}
@@ -251,8 +253,8 @@ def transition(to_id, duration_ms, bezier, condition=None, exit_time=False):
     return f'<StateTransition {attrs}/>'
 
 
-def enum_transition(to_id, enum_value_id, duration_ms=160, bezier=EASE_OUT, prop=VM_STATE):
-    return transition(to_id, duration_ms, bezier, vm_condition("Enum", prop, f'<TransitionValueEnumComparator value="{enum_value_id}"/>'))
+def enum_transition(to_id, enum_value_id, duration_ms=160, bezier=EASE_OUT, prop=VM_STATE, op="equal"):
+    return transition(to_id, duration_ms, bezier, vm_condition("Enum", prop, f'<TransitionValueEnumComparator value="{enum_value_id}"/>', op))
 
 
 def trigger_transition(to_id, prop):
@@ -579,7 +581,12 @@ def wander_animations():
         JY: [(0, 0, SOFT_OUT), (frames(350), 0.7, None), (frames(900), 0.7, SOFT_OUT), (frames(1400), 0)],
         JX: [(0, 0, SOFT_OUT), (frames(350), 0.3, None), (frames(900), 0.3, SOFT_OUT), (frames(1400), 0)]}})
     spin = animation("WanderSpin", WANDER_SPIN, frames(700), spin_keys(0, frames(700)))
-    return [animation("WanderWaitA", WANDER_WAIT_A, frames(6000), {}), animation("WanderWaitB", WANDER_WAIT_B, frames(12000), {}), glance, peek, spin]
+    # Asleep: one slow, small shift every ~30 s, nothing else.
+    sleep_shift = animation("WanderSleepShift", WANDER_SLEEP_SHIFT, frames(3000), {JOYSTICK: {
+        JX: [(0, 0.4, SINE), (frames(1500), 0.22, SINE), (frames(3000), 0.4)],
+        JY: [(0, 0.5, SINE), (frames(1500), 0.62, SINE), (frames(3000), 0.5)]}})
+    return [animation("WanderWaitA", WANDER_WAIT_A, frames(6000), {}), animation("WanderWaitB", WANDER_WAIT_B, frames(12000), {}),
+            animation("WanderSleepWait", WANDER_SLEEP_WAIT, frames(30000), {}), sleep_shift, glance, peek, spin]
 
 
 def sine(amplitude, period_ms, base=0.0):
@@ -807,25 +814,35 @@ def root_machine():
         bool_transition(DRAG_NODE, VM_DRAGGED, "true", 80, SPRING) + "\n" + bool_transition(DRAG_REST_NODE, VM_DRAGGED, "false", 350, SOFT_OUT),
         f'<AnimationState x="200" y="40" animationId="{DRAG_REST_ANIM}" id="{DRAG_REST_NODE}"/>\n'
         f'<AnimationState x="200" y="100" animationId="{DRAG_ANIM}" id="{DRAG_NODE}"/>')
+    # Asleep, the character holds still: the waits divert to a parked state until it is awake
+    # again. Transitions are ordered, so the park check comes first.
+    sleeping = state_enum_ids["sleeping"]
+    to_park = lambda node, dur=0: enum_transition(node, sleeping, dur, None)
+    from_park = lambda node: enum_transition(node, sleeping, 0, None, op="notEqual")
     idle = layer_frame(
         "IdleVariety", "3:8", IDLE_A_NODE, "",
-        anim_state(IDLE_WAIT_A, IDLE_A_NODE, 0, "", exit_transition(IDLE_GLANCE_NODE)) + "\n"
-        + anim_state(IDLE_WAIT_B, IDLE_B_NODE, 1, "", exit_transition(IDLE_GLANCE_NODE)) + "\n"
+        anim_state(IDLE_WAIT_A, IDLE_A_NODE, 0, "", to_park(IDLE_SLEEP_NODE) + "\n" + exit_transition(IDLE_GLANCE_NODE)) + "\n"
+        + anim_state(IDLE_WAIT_B, IDLE_B_NODE, 1, "", to_park(IDLE_SLEEP_NODE) + "\n" + exit_transition(IDLE_GLANCE_NODE)) + "\n"
         + anim_state(IDLE_GLANCE_ANIM, IDLE_GLANCE_NODE, 2, ' reset="true" random="true"',
-                     weighted(exit_transition(IDLE_A_NODE), 50) + "\n" + weighted(exit_transition(IDLE_B_NODE), 50)))
+                     weighted(exit_transition(IDLE_A_NODE), 50) + "\n" + weighted(exit_transition(IDLE_B_NODE), 50)) + "\n"
+        + anim_state(IDLE_WAIT_A, IDLE_SLEEP_NODE, 3, "", from_park(IDLE_A_NODE)))
 
     wander = layer_frame(
         "Wander", "3:10", WANDER_A_NODE, "",
         anim_state(WANDER_WAIT_A, WANDER_A_NODE, 0, ' random="true"',
-                   weighted(exit_transition(WANDER_GLANCE_NODE), 55) + "\n" + weighted(exit_transition(WANDER_PEEK_NODE), 35) + "\n" + weighted(exit_transition(WANDER_SPIN_NODE), 10)) + "\n"
+                   to_park(WANDER_SLEEP_WAIT_NODE) + "\n" + weighted(exit_transition(WANDER_GLANCE_NODE), 55) + "\n" + weighted(exit_transition(WANDER_PEEK_NODE), 35) + "\n" + weighted(exit_transition(WANDER_SPIN_NODE), 10)) + "\n"
         + anim_state(WANDER_WAIT_B, WANDER_B_NODE, 1, ' random="true"',
-                     weighted(exit_transition(WANDER_GLANCE_NODE), 55) + "\n" + weighted(exit_transition(WANDER_PEEK_NODE), 35) + "\n" + weighted(exit_transition(WANDER_SPIN_NODE), 10)) + "\n"
+                     to_park(WANDER_SLEEP_WAIT_NODE) + "\n" + weighted(exit_transition(WANDER_GLANCE_NODE), 55) + "\n" + weighted(exit_transition(WANDER_PEEK_NODE), 35) + "\n" + weighted(exit_transition(WANDER_SPIN_NODE), 10)) + "\n"
         + anim_state(WANDER_GLANCE, WANDER_GLANCE_NODE, 2, ' reset="true" random="true"',
-                     weighted(exit_transition(WANDER_A_NODE, 200, SOFT_OUT), 50) + "\n" + weighted(exit_transition(WANDER_B_NODE, 200, SOFT_OUT), 50)) + "\n"
+                     to_park(WANDER_SLEEP_WAIT_NODE, 400) + "\n" + weighted(exit_transition(WANDER_A_NODE, 200, SOFT_OUT), 50) + "\n" + weighted(exit_transition(WANDER_B_NODE, 200, SOFT_OUT), 50)) + "\n"
         + anim_state(WANDER_PEEK, WANDER_PEEK_NODE, 3, ' reset="true" random="true"',
-                     weighted(exit_transition(WANDER_A_NODE, 200, SOFT_OUT), 50) + "\n" + weighted(exit_transition(WANDER_B_NODE, 200, SOFT_OUT), 50)) + "\n"
+                     to_park(WANDER_SLEEP_WAIT_NODE, 400) + "\n" + weighted(exit_transition(WANDER_A_NODE, 200, SOFT_OUT), 50) + "\n" + weighted(exit_transition(WANDER_B_NODE, 200, SOFT_OUT), 50)) + "\n"
         + anim_state(WANDER_SPIN, WANDER_SPIN_NODE, 4, ' reset="true" random="true"',
-                     weighted(exit_transition(WANDER_A_NODE, 200, SOFT_OUT), 50) + "\n" + weighted(exit_transition(WANDER_B_NODE, 200, SOFT_OUT), 50)))
+                     weighted(exit_transition(WANDER_A_NODE, 200, SOFT_OUT), 50) + "\n" + weighted(exit_transition(WANDER_B_NODE, 200, SOFT_OUT), 50)) + "\n"
+        + anim_state(WANDER_SLEEP_WAIT, WANDER_SLEEP_WAIT_NODE, 5, "",
+                     from_park(WANDER_A_NODE) + "\n" + exit_transition(WANDER_SLEEP_SHIFT_NODE)) + "\n"
+        + anim_state(WANDER_SLEEP_SHIFT, WANDER_SLEEP_SHIFT_NODE, 6, ' reset="true"',
+                     from_park(WANDER_A_NODE) + "\n" + exit_transition(WANDER_SLEEP_WAIT_NODE, 200, SOFT_OUT)))
 
     def bool_listener(name, kind, prop, value):
         b = bind(prop, BIND_BOOL).replace("/>", ' direction="true"/>')
