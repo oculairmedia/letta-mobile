@@ -52,10 +52,10 @@ shape_enum_ids = {s: f"1:{201 + i}" for i, s in enumerate(SHAPES)}
 CONV_LOOK, CONV_MOUTH = "2:1", "2:2"
 
 ROOT, BODY_NODE, FACE, HITBOX = "0:2", "0:100", "0:200", "0:90"
-EYE_L, EYE_R, BROW_L, BROW_R, MOUTH = "0:210", "0:220", "0:230", "0:240", "0:250"
+EYES, BROWS, MOUTH = "0:210", "0:230", "0:250"
 # nested-input / remap ids per placement
-EYE_L_EXPR, EYE_R_EXPR, BROW_L_EXPR, BROW_R_EXPR, MOUTH_EXPR = "0:211", "0:221", "0:231", "0:241", "0:251"
-EYE_L_BLINK, EYE_R_BLINK = "0:212", "0:222"
+EYES_EXPR, BROWS_EXPR, MOUTH_EXPR = "0:211", "0:231", "0:251"
+EYES_BLINK = "0:212"
 
 SM = "3:5"
 root_state_anim = {s: f"3:{100 + i}" for i, s in enumerate(STATES)}
@@ -65,7 +65,9 @@ BLINK_ANIM, BLINK_REST_ANIM, BLINK_NODE, BLINK_REST_NODE = "3:170", "3:171", "3:
 HOVER_ANIM, HOVER_REST_ANIM, HOVER_NODE, HOVER_REST_NODE = "3:180", "3:181", "3:182", "3:183"
 
 EYE_AB, EYE_SM, EYE_IN_EXPR, EYE_IN_BLINK = "4:2", "4:5", "4:6", "4:7"
-EYE_PUPIL, EYE_SCLERA, EYE_ROOT, EYE_APERTURE, EYE_APERTURE_PATH = "4:20", "4:23", "4:24", "4:25", "4:26"
+# Both eyes live in ONE component so blink and gaze are shared; L/R ids per side.
+EYE_L_PUPIL, EYE_L_SCLERA, EYE_L_ROOT, EYE_L_APERTURE, EYE_L_APERTURE_PATH = "4:20", "4:23", "4:24", "4:25", "4:26"
+EYE_R_PUPIL, EYE_R_SCLERA, EYE_R_ROOT, EYE_R_APERTURE, EYE_R_APERTURE_PATH = "4:40", "4:43", "4:44", "4:45", "4:46"
 EYE_LOOKX, EYE_LOOKY, EYE_BLINK_ANIM = "4:30", "4:31", "4:32"
 EYE_WAIT_A, EYE_WAIT_B = "4:33", "4:34"
 eye_expr_anim = {s: f"4:{100 + i}" for i, s in enumerate(STATES)}
@@ -73,7 +75,7 @@ eye_expr_node = {s: f"4:{130 + i}" for i, s in enumerate(STATES)}
 EYE_BLINK_NODE, EYE_BLINK_REST_NODE = "4:160", "4:161"
 EYE_AUTO_A, EYE_AUTO_B, EYE_AUTO_BLINK = "4:162", "4:163", "4:164"
 
-BROW_AB, BROW_SM, BROW_IN_EXPR, BROW_BAR = "5:2", "5:5", "5:6", "5:20"
+BROW_AB, BROW_SM, BROW_IN_EXPR, BROW_L_SHAPE, BROW_R_SHAPE = "5:2", "5:5", "5:6", "5:20", "5:21"
 brow_expr_anim = {s: f"5:{100 + i}" for i, s in enumerate(STATES)}
 brow_expr_node = {s: f"5:{130 + i}" for i, s in enumerate(STATES)}
 
@@ -215,39 +217,52 @@ def rrect(w, h, r):
 # ================================================================================================
 # Eye component. 120x120, centred. Sclera, pupil (gaze), upper + lower lids (expression + blink).
 # ================================================================================================
-def eye_component():
+def eyes_component():
+    """Both eyes in one component: one expression input, one blink trigger, one auto-blink,
+    one pair of gaze timelines. Two nested single eyes blinked out of sync - each ran its own
+    random waits - which is the tell of a rig that was assembled, not designed."""
     # The lids are a clip: sclera and pupil are masked by an unpainted "aperture" ellipse, so the
     # eye opening is its height and its vertical offset. Colour-agnostic, unlike drawn lids.
-    # Poses: aperture height/y, pupil scale, sclera scale, eye rotation.
-    A_H, A_Y = (EYE_APERTURE_PATH, HEIGHT), (EYE_APERTURE, Y)
-    REST = {A_H: 70, A_Y: 0, (EYE_PUPIL, SX): 1, (EYE_PUPIL, SY): 1,
-            (EYE_ROOT, ROT): 0, (EYE_SCLERA, SX): 1, (EYE_SCLERA, SY): 1}
+    SIDES = {
+        "L": (EYE_L_PUPIL, EYE_L_SCLERA, EYE_L_ROOT, EYE_L_APERTURE, EYE_L_APERTURE_PATH, -50),
+        "R": (EYE_R_PUPIL, EYE_R_SCLERA, EYE_R_ROOT, EYE_R_APERTURE, EYE_R_APERTURE_PATH, 50),
+    }
+    # Pose fields: aperture height/y, pupil scale, sclera scale, eye rotation (mirrored on R).
+    REST = {"ah": 70, "ay": 0, "ps": 1, "ss": (1, 1), "rot": 0}
     poses = {
         "idle": {},
-        "listening": {(EYE_SCLERA, SX): 1.1, (EYE_SCLERA, SY): 1.15, A_H: 80},
-        "dragged": {A_H: 34},                                              # squint
-        "thinking": {A_H: 48, A_Y: -6, (EYE_ROOT, ROT): rad(-6)},          # half-lidded, glancing
-        "waitingInput": {(EYE_SCLERA, SX): 1.2, (EYE_SCLERA, SY): 1.25, A_H: 84, (EYE_PUPIL, SX): 0.75, (EYE_PUPIL, SY): 0.75},
+        "listening": {"ss": (1.1, 1.15), "ah": 80},
+        "dragged": {"ah": 34},
+        "thinking": {"ah": 48, "ay": -6, "rot": rad(-6)},
+        "waitingInput": {"ss": (1.2, 1.25), "ah": 84, "ps": 0.75},
         "speaking": {},
-        "success": {A_H: 26, A_Y: -18},                                     # happy: a raised crescent
-        "error": {A_H: 44, A_Y: 4, (EYE_ROOT, ROT): rad(14)},              # sad slant; mirrored eye reads as brows-in
-        "sleeping": {A_H: 0},                                              # closed
-        "loading": {(EYE_PUPIL, SX): 0.5, (EYE_PUPIL, SY): 0.5},
-        "failed": {A_H: 22, (EYE_PUPIL, SX): 0.6, (EYE_PUPIL, SY): 0.6},
-        "degraded": {A_H: 30},
+        "success": {"ah": 26, "ay": -18},
+        "error": {"ah": 44, "ay": 4, "rot": rad(14)},
+        "sleeping": {"ah": 0},
+        "loading": {"ps": 0.5},
+        "failed": {"ah": 22, "ps": 0.6},
+        "degraded": {"ah": 30},
     }
-    expr_anims = []
-    for s in STATES:
-        vals = dict(REST)
-        vals.update(poses[s])
-        objs = {}
-        for (obj, key), v in vals.items():
-            objs.setdefault(obj, {})[key] = v
-        expr_anims.append(animation("Expr" + s[0].upper() + s[1:], eye_expr_anim[s], 1, objs))
+    # Per-side overrides for the asymmetric looks.
+    side_overrides = {"thinking": {"R": {"ah": 36}}, "degraded": {"L": {"ah": 2}}}
 
-    look_x = animation("LookX", EYE_LOOKX, 60, {EYE_PUPIL: {X: [(0, -16), (60, 16)]}})
-    look_y = animation("LookY", EYE_LOOKY, 60, {EYE_PUPIL: {Y: [(0, -12), (60, 12)]}})
-    blink = animation("Blink", EYE_BLINK_ANIM, 10, {EYE_APERTURE_PATH: {HEIGHT: [(0, 70), (4, 2), (10, 70)]}})
+    expr_anims = []
+    for st in STATES:
+        objs = {}
+        for side, (pupil, sclera, root, aperture, path, _) in SIDES.items():
+            vals = dict(REST); vals.update(poses[st]); vals.update(side_overrides.get(st, {}).get(side, {}))
+            sign = 1 if side == "L" else -1
+            objs[path] = {HEIGHT: vals["ah"]}
+            objs[aperture] = {Y: vals["ay"]}
+            objs[pupil] = {SX: vals["ps"], SY: vals["ps"]}
+            objs[sclera] = {SX: vals["ss"][0], SY: vals["ss"][1]}
+            objs[root] = {ROT: round(vals["rot"] * sign, 5)}
+        expr_anims.append(animation("Expr" + st[0].upper() + st[1:], eye_expr_anim[st], 1, objs))
+
+    look_x = animation("LookX", EYE_LOOKX, 60, {EYE_L_PUPIL: {X: [(0, -16), (60, 16)]}, EYE_R_PUPIL: {X: [(0, -16), (60, 16)]}})
+    look_y = animation("LookY", EYE_LOOKY, 60, {EYE_L_PUPIL: {Y: [(0, -12), (60, 12)]}, EYE_R_PUPIL: {Y: [(0, -12), (60, 12)]}})
+    blink = animation("Blink", EYE_BLINK_ANIM, 10, {EYE_L_APERTURE_PATH: {HEIGHT: [(0, 70), (4, 2), (10, 70)]},
+                                                     EYE_R_APERTURE_PATH: {HEIGHT: [(0, 70), (4, 2), (10, 70)]}})
     # Two idle waits of different lengths, chosen at random, so blinks do not tick like a clock.
     wait_a = animation("WaitA", EYE_WAIT_A, 150, {})
     wait_b = animation("WaitB", EYE_WAIT_B, 270, {})
@@ -269,28 +284,34 @@ def eye_component():
         f'    {weighted(exit_transition(EYE_AUTO_A), 60)}\n'
         f'    {weighted(exit_transition(EYE_AUTO_B), 40)}\n</AnimationState>')
 
-    return f'''<Artboard isComponent="true" defaultStateMachineId="{EYE_SM}" x="700" y="0" styleId="4:3" clip="false" width="120" height="120" name="Eye" id="{EYE_AB}">
+    def eye(name, pupil, sclera, root, aperture, path, x):
+        return f'''<Node x="{x}" y="0" name="{name}" id="{root}">
+    <!-- Pupil over sclera (first child on top); both clipped by the unpainted aperture. -->
+    <Shape x="0" y="2" name="Pupil" id="{pupil}">
+        <Ellipse width="30" height="34" name="Path"/>
+        {fill(INK)}
+        <ClippingShape sourceId="{aperture}" name="Lids"/>
+    </Shape>
+    <Shape x="0" y="0" name="Sclera" id="{sclera}">
+        <Ellipse width="60" height="66" name="Path"/>
+        {fill("FFFFFFFF")}
+        <ClippingShape sourceId="{aperture}" name="Lids"/>
+    </Shape>
+    <Shape x="0" y="0" name="Aperture" id="{aperture}">
+        <Ellipse width="64" height="70" name="Path" id="{path}"/>
+    </Shape>
+</Node>'''
+
+    return f'''<Artboard isComponent="true" defaultStateMachineId="{EYE_SM}" x="700" y="0" styleId="4:3" clip="false" width="220" height="120" name="Eyes" id="{EYE_AB}">
     <LayoutComponentStyle name="Style" id="4:3"/>
-    <Node x="60" y="60" name="EyeRoot" id="{EYE_ROOT}">
-        <!-- Pupil over sclera (first child on top); both clipped by the unpainted aperture. -->
-        <Shape x="0" y="2" name="Pupil" id="{EYE_PUPIL}">
-            <Ellipse width="30" height="34" name="Path"/>
-            {fill(INK)}
-            <ClippingShape sourceId="{EYE_APERTURE}" name="Lids"/>
-        </Shape>
-        <Shape x="0" y="0" name="Sclera" id="{EYE_SCLERA}">
-            <Ellipse width="60" height="66" name="Path"/>
-            {fill("FFFFFFFF")}
-            <ClippingShape sourceId="{EYE_APERTURE}" name="Lids"/>
-        </Shape>
-        <Shape x="0" y="0" name="Aperture" id="{EYE_APERTURE}">
-            <Ellipse width="64" height="70" name="Path" id="{EYE_APERTURE_PATH}"/>
-        </Shape>
+    <Node x="110" y="60" name="EyesRoot">
+{indent(eye("EyeLeft", *SIDES["L"]), "        ")}
+{indent(eye("EyeRight", *SIDES["R"]), "        ")}
     </Node>
 
 {indent(chr(10).join(expr_anims + [look_x, look_y, blink, wait_a, wait_b]), "    ")}
 
-    <StateMachine name="Eye" id="{EYE_SM}">
+    <StateMachine name="Eyes" id="{EYE_SM}">
         <StateMachineNumber name="expr" id="{EYE_IN_EXPR}"/>
         <StateMachineTrigger name="blink" id="{EYE_IN_BLINK}"/>
 {indent(expr_layer, "        ")}
@@ -298,7 +319,7 @@ def eye_component():
 {indent(auto_layer, "        ")}
     </StateMachine>
 </Artboard>
-<ComponentAsset artboardId="{EYE_AB}" name="Eye"/>'''
+<ComponentAsset artboardId="{EYE_AB}" name="Eyes"/>'''
 
 
 # ================================================================================================
@@ -325,35 +346,44 @@ def lifted(fragment, **first_line_attrs):
     return re.sub(r'colorValue="FF(440E1E|721733)"', f'colorValue="{INK}"', text)
 
 
-def brow_component():
+def brows_component():
+    """Both brows in one component. The right brow is the same lifted shape under a mirrored node,
+    so one pose table drives both and rotations mirror for free."""
     # The lifted brow's neutral rises toward the centre ("worried"); the rest angle flattens it and
     # every pose's rotation is relative to that.
     BASE_ROT = rad(26)
-    REST = {Y: 32, ROT: 0}
+    REST = {Y: 0, ROT: 0}
     poses = {
-        "idle": {}, "listening": {Y: 22}, "dragged": {Y: 36, ROT: rad(-8)}, "thinking": {Y: 24, ROT: rad(-14)},
-        "waitingInput": {Y: 20}, "speaking": {}, "success": {Y: 26, ROT: rad(-4)}, "error": {Y: 36, ROT: rad(-16)},
-        "sleeping": {Y: 40}, "loading": {}, "failed": {Y: 38, ROT: rad(-14)}, "degraded": {Y: 34, ROT: rad(8)},
+        "idle": {}, "listening": {Y: -10}, "dragged": {Y: 4, ROT: rad(-8)}, "thinking": {Y: -8, ROT: rad(-14)},
+        "waitingInput": {Y: -12}, "speaking": {}, "success": {Y: -6, ROT: rad(-4)}, "error": {Y: 4, ROT: rad(-16)},
+        "sleeping": {Y: 8}, "loading": {}, "failed": {Y: 6, ROT: rad(-14)}, "degraded": {Y: 2, ROT: rad(8)},
     }
     anims = []
-    for s in STATES:
+    for st in STATES:
         vals = dict(REST)
-        vals.update(poses[s])
+        vals.update(poses[st])
         vals[ROT] = round(vals[ROT] + BASE_ROT, 5)
-        anims.append(animation("Expr" + s[0].upper() + s[1:], brow_expr_anim[s], 1, {BROW_BAR: vals}))
+        anims.append(animation("Expr" + st[0].upper() + st[1:], brow_expr_anim[st], 1, {BROW_L_SHAPE: dict(vals), BROW_R_SHAPE: dict(vals)}))
     layer = expression_layer("Expression", "5:10", BROW_IN_EXPR, brow_expr_anim, brow_expr_node)
-    # The lifted brow is ~83x46 at the board's centre; it keeps its own id so the poses key it.
-    brow = lifted("brow.rml.txt", x="50", y="32", id=BROW_BAR, name="Brow")
-    return f'''<Artboard isComponent="true" defaultStateMachineId="{BROW_SM}" x="900" y="0" styleId="5:3" clip="false" width="100" height="60" name="Brow" id="{BROW_AB}">
+    left = lifted("brow.rml.txt", x="0", y="0", id=BROW_L_SHAPE, name="BrowLeft")
+    right = re.sub(r'id="7:(\d+)"', r'id="8:\1"', lifted("brow.rml.txt", x="0", y="0", id=BROW_R_SHAPE, name="BrowRight"))
+    return f'''<Artboard isComponent="true" defaultStateMachineId="{BROW_SM}" x="1000" y="0" styleId="5:3" clip="false" width="220" height="80" name="Brows" id="{BROW_AB}">
     <LayoutComponentStyle name="Style" id="5:3"/>
-{indent(brow, "    ")}
+    <Node x="110" y="40" name="BrowsRoot">
+        <Node x="-48" y="0" name="Left">
+{indent(left, "            ")}
+        </Node>
+        <Node x="48" y="0" scaleX="-1" name="Right">
+{indent(right, "            ")}
+        </Node>
+    </Node>
 {indent(chr(10).join(anims), "    ")}
-    <StateMachine name="Brow" id="{BROW_SM}">
+    <StateMachine name="Brows" id="{BROW_SM}">
         <StateMachineNumber name="expr" id="{BROW_IN_EXPR}"/>
 {indent(layer, "        ")}
     </StateMachine>
 </Artboard>
-<ComponentAsset artboardId="{BROW_AB}" name="Brow"/>'''
+<ComponentAsset artboardId="{BROW_AB}" name="Brows"/>'''
 
 
 # ================================================================================================
@@ -386,7 +416,7 @@ def mouth_component():
         </PointsPath>
         <Stroke thickness="9" cap="round" join="round" name="Stroke"><SolidColor colorValue="{INK}" name="Color"/></Stroke>
     </Shape>'''
-    return f'''<Artboard isComponent="true" defaultStateMachineId="{MOUTH_SM}" x="1100" y="0" styleId="6:3" clip="false" width="160" height="80" name="Mouth" id="{MOUTH_AB}">
+    return f'''<Artboard isComponent="true" defaultStateMachineId="{MOUTH_SM}" x="1300" y="0" styleId="6:3" clip="false" width="160" height="80" name="Mouth" id="{MOUTH_AB}">
     <LayoutComponentStyle name="Style" id="6:3"/>
     <Node x="80" y="40" scaleX="0.34" scaleY="0.08" opacity="0" name="Open" id="{MOUTH_OPEN}">
 {indent(lifted("mouth.rml.txt", x="0", y="0", name="LiftedMouth"), "        ")}
@@ -475,35 +505,27 @@ def body():
 
 
 def face():
-    # NestedArtboard x/y place the child's top-left. Eye is 120 square at scale 1.3 (156 px), so
-    # its centre sits 78 px in; the brow bar is at (40,20) of an 80x40 board.
-    def eye(name, sid, expr_id, blink_id, x):
-        return f'''<NestedArtboard artboardId="{EYE_AB}" x="{x}" y="-102" scaleX="1.2" scaleY="1.2" name="{name}" id="{sid}">
-    <NestedStateMachine animationId="{EYE_SM}" name="SM">
-        <NestedNumber inputId="{EYE_IN_EXPR}" nestedValue="0" name="expr" id="{expr_id}"/>
-        <NestedTrigger inputId="{EYE_IN_BLINK}" name="blink" id="{blink_id}"/>
-    </NestedStateMachine>
-    <NestedRemapAnimation animationId="{EYE_LOOKX}" time="0.5" name="LookX">
-        {bind(VM_LOOKX, REMAP_TIME, CONV_LOOK)}
-    </NestedRemapAnimation>
-    <NestedRemapAnimation animationId="{EYE_LOOKY}" time="0.5" name="LookY">
-        {bind(VM_LOOKY, REMAP_TIME, CONV_LOOK)}
-    </NestedRemapAnimation>
-</NestedArtboard>'''
-
-    def brow(name, sid, expr_id, x, mirror):
-        return f'''<NestedArtboard artboardId="{BROW_AB}" x="{x}" y="-134" scaleX="{-1 if mirror else 1}" name="{name}" id="{sid}">
-    <NestedStateMachine animationId="{BROW_SM}" name="SM">
-        <NestedNumber inputId="{BROW_IN_EXPR}" nestedValue="0" name="expr" id="{expr_id}"/>
-    </NestedStateMachine>
-</NestedArtboard>'''
-
+    # NestedArtboard x/y place the child's top-left. Eyes is 220x120 at scale 1.2 (264x144): centre
+    # offset (132,72), eye centres at +-60. Brows is 220x80 at scale 1: centre offset (110,40).
     return f'''<Node x="250" y="262" name="FacePlacement">
 <Node x="0" y="0" name="Face" id="{FACE}">
-{indent(eye("EyeLeft", EYE_L, EYE_L_EXPR, EYE_L_BLINK, -122), "    ")}
-{indent(eye("EyeRight", EYE_R, EYE_R_EXPR, EYE_R_BLINK, -22), "    ")}
-{indent(brow("BrowLeft", BROW_L, BROW_L_EXPR, -94, False), "    ")}
-{indent(brow("BrowRight", BROW_R, BROW_R_EXPR, 94, True), "    ")}
+    <NestedArtboard artboardId="{EYE_AB}" x="-132" y="-102" scaleX="1.2" scaleY="1.2" name="Eyes" id="{EYES}">
+        <NestedStateMachine animationId="{EYE_SM}" name="SM">
+            <NestedNumber inputId="{EYE_IN_EXPR}" nestedValue="0" name="expr" id="{EYES_EXPR}"/>
+            <NestedTrigger inputId="{EYE_IN_BLINK}" name="blink" id="{EYES_BLINK}"/>
+        </NestedStateMachine>
+        <NestedRemapAnimation animationId="{EYE_LOOKX}" time="0.5" name="LookX">
+            {bind(VM_LOOKX, REMAP_TIME, CONV_LOOK)}
+        </NestedRemapAnimation>
+        <NestedRemapAnimation animationId="{EYE_LOOKY}" time="0.5" name="LookY">
+            {bind(VM_LOOKY, REMAP_TIME, CONV_LOOK)}
+        </NestedRemapAnimation>
+    </NestedArtboard>
+    <NestedArtboard artboardId="{BROW_AB}" x="-110" y="-142" name="Brows" id="{BROWS}">
+        <NestedStateMachine animationId="{BROW_SM}" name="SM">
+            <NestedNumber inputId="{BROW_IN_EXPR}" nestedValue="0" name="expr" id="{BROWS_EXPR}"/>
+        </NestedStateMachine>
+    </NestedArtboard>
     <NestedArtboard artboardId="{MOUTH_AB}" x="-80" y="8" name="Mouth" id="{MOUTH}">
         <NestedStateMachine animationId="{MOUTH_SM}" name="SM">
             <NestedNumber inputId="{MOUTH_IN_EXPR}" nestedValue="0" name="expr" id="{MOUTH_EXPR}"/>
@@ -539,7 +561,7 @@ def root_state_animations():
         objs = {o: dict(p) for o, p in BODY_REST.items()}
         for o, p in overrides.items():
             objs.setdefault(o, {}).update(p)
-        for nested in (EYE_L_EXPR, EYE_R_EXPR, BROW_L_EXPR, BROW_R_EXPR, MOUTH_EXPR):
+        for nested in (EYES_EXPR, BROWS_EXPR, MOUTH_EXPR):
             objs[nested] = {NESTED_VALUE: EXPR[s]}
         out.append(animation("State" + s[0].upper() + s[1:], root_state_anim[s], duration, objs, loop))
     return out
@@ -594,7 +616,7 @@ def root_artboard():
     # a state also keys scale (dragged, success), which is the intent.
     breath = animation("Breath", BREATH_ANIM, 180, {BODY_NODE: {SX: [(0, 1.0), (180, 1.02)], SY: [(0, 1.0), (180, 1.02)]}}, "pingPong")
     blink_rest = animation("BlinkRest", BLINK_REST_ANIM, 1, {})
-    blink = animation("BlinkFire", BLINK_ANIM, 2, {}, callbacks=(EYE_L_BLINK, EYE_R_BLINK))
+    blink = animation("BlinkFire", BLINK_ANIM, 2, {}, callbacks=(EYES_BLINK,))
     hover_rest = animation("HoverRest", HOVER_REST_ANIM, 1, {FACE: {ROT: 0}})
     hover = animation("HoverWiggle", HOVER_ANIM, 40, {FACE: {ROT: [(0, 0), (10, rad(6)), (30, rad(-6)), (40, 0)]}}, "loop")
 
@@ -669,9 +691,9 @@ doc = f'''<Rive version="1" kind="fragment">
     -->
 {indent(root_artboard(), "    ")}
 
-{indent(eye_component(), "    ")}
+{indent(eyes_component(), "    ")}
 
-{indent(brow_component(), "    ")}
+{indent(brows_component(), "    ")}
 
 {indent(mouth_component(), "    ")}
 
