@@ -20,7 +20,7 @@
         <LayoutComponentStyle name="Style" id="0:3"/>
         <Node x="250" y="262" name="FacePlacement" id="0:328">
         <Node x="0" y="0" name="Face" id="0:200">
-            <NestedArtboard artboardId="7:2" x="-100" y="-118" name="Plate" id="0:210">
+            <NestedArtboard artboardId="7:2" x="-100" y="-108" name="Plate" id="0:210">
                 <NestedStateMachine animationId="7:5" name="SM" id="0:329">
                     <NestedNumber inputId="7:6" nestedValue="0" name="expr" id="0:211"/>
                     <NestedTrigger inputId="7:7" name="blink" id="0:212"/>
@@ -64,25 +64,25 @@
                 </Fill>
                 <Fill name="Shade" id="0:345">
                     <RadialGradient startX="-30" startY="-50" endX="150" endY="130" name="Gradient" id="0:346">
-                        <GradientStop colorValue="00000000" position="0.45" id="0:347"/>
-                        <GradientStop colorValue="55000000" position="1" id="0:348"/>
+                        <GradientStop colorValue="00000000" position="0.4" id="0:347"/>
+                        <GradientStop colorValue="66000000" position="1" id="0:348"/>
                     </RadialGradient>
                 </Fill>
                 <Fill name="Gloss" id="0:349">
                     <RadialGradient startX="-55" startY="-75" endX="60" endY="30" name="Gradient" id="0:350">
-                        <GradientStop colorValue="B8FFFFFF" position="0" id="0:351"/>
+                        <GradientStop colorValue="D0FFFFFF" position="0" id="0:351"/>
                         <GradientStop colorValue="00FFFFFF" position="1" id="0:352"/>
                     </RadialGradient>
                 </Fill>
                 <Fill name="Tint" id="0:353">
                     <SolidColor colorValue="00000000" name="TintColor" id="0:92"/>
                 </Fill>
-                <Stroke thickness="3" name="GlassRing" id="0:354">
-                    <SolidColor colorValue="8CFFFFFF" name="Color" id="0:355"/>
-                    <Feather strength="4" name="Feather" id="0:356"/>
+                <Stroke thickness="2" name="GlassRing" id="0:354">
+                    <SolidColor colorValue="4DFFFFFF" name="Color" id="0:355"/>
+                    <Feather strength="3" name="Feather" id="0:356"/>
                 </Stroke>
             </Shape>
-            <Shape scaleX="1.12" scaleY="1.12" opacity="0.45" name="Halo" id="0:91">
+            <Shape scaleX="1.06" scaleY="1.06" opacity="0.22" name="Halo" id="0:91">
                 <PointsPath isClosed="true" name="Path" id="0:357">
                     <CubicMirroredVertex x="0.0" y="-150.0" rotation="0.0" distance="39.782" name="V0" id="0:320"/>
                     <CubicMirroredVertex x="106.066" y="-106.066" rotation="0.7854" distance="39.782" name="V1" id="0:321"/>
@@ -93,11 +93,11 @@
                     <CubicMirroredVertex x="-150.0" y="0.0" rotation="4.71239" distance="39.782" name="V6" id="0:326"/>
                     <CubicMirroredVertex x="-106.066" y="-106.066" rotation="5.49779" distance="39.782" name="V7" id="0:327"/>
                 </PointsPath>
-                <Stroke thickness="70" name="Stroke" id="0:358">
+                <Stroke thickness="44" name="Stroke" id="0:358">
                     <SolidColor colorValue="FF5FA8FF" name="Color" id="0:359">
                     <DataBindContext sourcePathIds="1:50-1:7" propertyKey="37" id="0:360"/>
                 </SolidColor>
-                    <Feather strength="60" name="Feather" id="0:361"/>
+                    <Feather strength="40" name="Feather" id="0:361"/>
                 </Stroke>
             </Shape>
         </Node>
@@ -2854,970 +2854,974 @@
         <LayoutComponentStyle name="Style" id="7:3"/>
         <Node x="100" y="100" name="PlateRoot" id="7:20">
             <!-- The "asking you" tell: a small dot below the plate, on the body. -->
-            <Shape x="0" y="66" opacity="0" name="TellDot" id="7:23">
+            <Shape x="0" y="82" opacity="0" name="TellDot" id="7:23">
                 <Ellipse width="12" height="12" name="Path" id="0:2106"/>
                 <Fill name="Fill" id="0:2107"><SolidColor colorValue="FF1A1A1A" name="Color" id="0:2108"/></Fill>
             </Shape>
             <Node x="0" y="0" name="Glyphs" id="7:22">
                 <Shape x="0" y="0" opacity="0" name="Square" id="7:30">
-                    <Rectangle width="30" height="30" linkCornerRadius="true" cornerRadiusTL="6" cornerRadiusTR="6" cornerRadiusBL="6" cornerRadiusBR="6" name="Path" id="0:2109"/><Fill name="Fill" id="0:2110"><SolidColor colorValue="FF1A1A1A" name="Color" id="0:2111"/></Fill>
+                    <Rectangle width="42" height="42" linkCornerRadius="true" cornerRadiusTL="8" cornerRadiusTR="8" cornerRadiusBL="8" cornerRadiusBR="8" name="Path" id="0:2109"/><Fill name="Fill" id="0:2110"><SolidColor colorValue="FF1A1A1A" name="Color" id="0:2111"/></Fill>
                 </Shape>
                 <Shape x="0" y="0" opacity="0" name="Ring" id="7:31">
-                    <Ellipse width="30" height="30" name="Path" id="0:2112"/>
-                    <Stroke thickness="9" cap="round" join="round" name="Stroke" id="0:2113"><SolidColor colorValue="FF1A1A1A" name="Color" id="0:2114"/></Stroke>
+                    <Ellipse width="40" height="40" name="Path" id="0:2112"/>
+                    <Stroke thickness="12" cap="round" join="round" name="Stroke" id="0:2113"><SolidColor colorValue="FF1A1A1A" name="Color" id="0:2114"/></Stroke>
                 </Shape>
                 <Shape x="0" y="0" opacity="0" name="Dash" id="7:32">
-                    <Rectangle width="42" height="10" linkCornerRadius="true" cornerRadiusTL="5" cornerRadiusTR="5" cornerRadiusBL="5" cornerRadiusBR="5" name="Path" id="0:2115"/><Fill name="Fill" id="0:2116"><SolidColor colorValue="FF1A1A1A" name="Color" id="0:2117"/></Fill>
+                    <Rectangle width="52" height="13" linkCornerRadius="true" cornerRadiusTL="6" cornerRadiusTR="6" cornerRadiusBL="6" cornerRadiusBR="6" name="Path" id="0:2115"/><Fill name="Fill" id="0:2116"><SolidColor colorValue="FF1A1A1A" name="Color" id="0:2117"/></Fill>
                 </Shape>
                 <Shape x="0" y="0" opacity="0" name="RingSmall" id="7:33">
-                    <Ellipse width="24" height="24" name="Path" id="0:2118"/>
-                    <Stroke thickness="8" cap="round" join="round" name="Stroke" id="0:2119"><SolidColor colorValue="FF1A1A1A" name="Color" id="0:2120"/></Stroke>
+                    <Ellipse width="34" height="34" name="Path" id="0:2118"/>
+                    <Stroke thickness="11" cap="round" join="round" name="Stroke" id="0:2119"><SolidColor colorValue="FF1A1A1A" name="Color" id="0:2120"/></Stroke>
                 </Shape>
                 <Shape x="0" y="0" opacity="0" name="ArcOpen" id="7:34">
-                    <Ellipse width="34" height="20" name="Path" id="0:2121"/>
-                    <Fill name="Fill" id="0:2122"><SolidColor colorValue="FF1A1A1A" name="Color" id="0:2123"/></Fill>
+                    <PointsPath isClosed="false" name="Path" id="0:2121">
+                        <StraightVertex x="-28.6" y="10.4" id="0:2122"/>
+                        <CubicMirroredVertex x="0" y="-15.600000000000001" rotation="0" distance="19.5" id="0:2123"/>
+                        <StraightVertex x="28.6" y="10.4" id="0:2124"/>
+                    </PointsPath>
+                    <Stroke thickness="15.6" cap="round" join="round" name="Stroke" id="0:2125"><SolidColor colorValue="FF1A1A1A" name="Color" id="0:2126"/></Stroke>
                 </Shape>
                 <Shape x="0" y="0" opacity="0" name="Smile" id="7:35">
-                    <PointsPath isClosed="false" name="Path" id="0:2124">
-                        <StraightVertex x="-18" y="-6" id="0:2125"/>
-                        <CubicMirroredVertex x="0" y="10" rotation="0" distance="12" id="0:2126"/>
-                        <StraightVertex x="18" y="-6" id="0:2127"/>
+                    <PointsPath isClosed="false" name="Path" id="0:2127">
+                        <StraightVertex x="-22.0" y="-8.0" id="0:2128"/>
+                        <CubicMirroredVertex x="0" y="12.0" rotation="0" distance="15.0" id="0:2129"/>
+                        <StraightVertex x="22.0" y="-8.0" id="0:2130"/>
                     </PointsPath>
-                    <Stroke thickness="9" cap="round" join="round" name="Stroke" id="0:2128"><SolidColor colorValue="FF1A1A1A" name="Color" id="0:2129"/></Stroke>
+                    <Stroke thickness="12.0" cap="round" join="round" name="Stroke" id="0:2131"><SolidColor colorValue="FF1A1A1A" name="Color" id="0:2132"/></Stroke>
                 </Shape>
                 <Shape x="0" y="0" opacity="0" name="Diamond" id="7:36">
-                    <Shape rotation="0.7854" name="Rot" id="0:2130">
-                        <Rectangle width="26" height="26" linkCornerRadius="true" cornerRadiusTL="4" cornerRadiusTR="4" cornerRadiusBL="4" cornerRadiusBR="4" name="Path" id="0:2131"/>
-                        <Fill name="Fill" id="0:2132"><SolidColor colorValue="FF1A1A1A" name="Color" id="0:2133"/></Fill>
+                    <Shape rotation="0.7854" name="Rot" id="0:2133">
+                        <Rectangle width="34" height="34" linkCornerRadius="true" cornerRadiusTL="5" cornerRadiusTR="5" cornerRadiusBL="5" cornerRadiusBR="5" name="Path" id="0:2134"/>
+                        <Fill name="Fill" id="0:2135"><SolidColor colorValue="FF1A1A1A" name="Color" id="0:2136"/></Fill>
                     </Shape>
                 </Shape>
                 <Shape x="0" y="0" opacity="0" name="Arch" id="7:37">
-                    <PointsPath isClosed="false" name="Path" id="0:2134">
-                        <StraightVertex x="-18" y="6" id="0:2135"/>
-                        <CubicMirroredVertex x="0" y="-10" rotation="0" distance="12" id="0:2136"/>
-                        <StraightVertex x="18" y="6" id="0:2137"/>
+                    <PointsPath isClosed="false" name="Path" id="0:2137">
+                        <StraightVertex x="-22.0" y="8.0" id="0:2138"/>
+                        <CubicMirroredVertex x="0" y="-12.0" rotation="0" distance="15.0" id="0:2139"/>
+                        <StraightVertex x="22.0" y="8.0" id="0:2140"/>
                     </PointsPath>
-                    <Stroke thickness="9" cap="round" join="round" name="Stroke" id="0:2138"><SolidColor colorValue="FF1A1A1A" name="Color" id="0:2139"/></Stroke>
+                    <Stroke thickness="12.0" cap="round" join="round" name="Stroke" id="0:2141"><SolidColor colorValue="FF1A1A1A" name="Color" id="0:2142"/></Stroke>
                 </Shape>
                 <Shape x="0" y="0" opacity="0" name="Dot" id="7:38">
-                    <Ellipse width="16" height="16" name="Path" id="0:2140"/>
-                    <Fill name="Fill" id="0:2141"><SolidColor colorValue="FF1A1A1A" name="Color" id="0:2142"/></Fill>
+                    <Ellipse width="22" height="22" name="Path" id="0:2143"/>
+                    <Fill name="Fill" id="0:2144"><SolidColor colorValue="FF1A1A1A" name="Color" id="0:2145"/></Fill>
                 </Shape>
                 <Shape x="0" y="0" opacity="0" name="Cross" id="7:39">
-                    <Shape rotation="0.7854" name="A" id="0:2143">
-                        <Rectangle width="34" height="9" linkCornerRadius="true" cornerRadiusTL="4" cornerRadiusTR="4" cornerRadiusBL="4" cornerRadiusBR="4" name="Path" id="0:2144"/>
-                        <Fill name="Fill" id="0:2145"><SolidColor colorValue="FF1A1A1A" name="Color" id="0:2146"/></Fill>
+                    <Shape rotation="0.7854" name="A" id="0:2146">
+                        <Rectangle width="46" height="12" linkCornerRadius="true" cornerRadiusTL="5" cornerRadiusTR="5" cornerRadiusBL="5" cornerRadiusBR="5" name="Path" id="0:2147"/>
+                        <Fill name="Fill" id="0:2148"><SolidColor colorValue="FF1A1A1A" name="Color" id="0:2149"/></Fill>
                     </Shape>
-                    <Shape rotation="-0.7854" name="B" id="0:2147">
-                        <Rectangle width="34" height="9" linkCornerRadius="true" cornerRadiusTL="4" cornerRadiusTR="4" cornerRadiusBL="4" cornerRadiusBR="4" name="Path" id="0:2148"/>
-                        <Fill name="Fill" id="0:2149"><SolidColor colorValue="FF1A1A1A" name="Color" id="0:2150"/></Fill>
+                    <Shape rotation="-0.7854" name="B" id="0:2150">
+                        <Rectangle width="46" height="12" linkCornerRadius="true" cornerRadiusTL="5" cornerRadiusTR="5" cornerRadiusBL="5" cornerRadiusBR="5" name="Path" id="0:2151"/>
+                        <Fill name="Fill" id="0:2152"><SolidColor colorValue="FF1A1A1A" name="Color" id="0:2153"/></Fill>
                     </Shape>
                 </Shape>
-                <Shape x="0" y="88" opacity="0" name="FrownLine" id="7:40">
-                    <PointsPath isClosed="false" name="Path" id="0:2151">
-                        <StraightVertex x="-16" y="4" id="0:2152"/>
-                        <CubicMirroredVertex x="0" y="-6" rotation="0" distance="10" id="0:2153"/>
-                        <StraightVertex x="16" y="4" id="0:2154"/>
+                <Shape x="0" y="100" opacity="0" name="FrownLine" id="7:40">
+                    <PointsPath isClosed="false" name="Path" id="0:2154">
+                        <StraightVertex x="-16" y="4" id="0:2155"/>
+                        <CubicMirroredVertex x="0" y="-6" rotation="0" distance="10" id="0:2156"/>
+                        <StraightVertex x="16" y="4" id="0:2157"/>
                     </PointsPath>
-                    <Stroke thickness="7" cap="round" join="round" name="Stroke" id="0:2155"><SolidColor colorValue="FF1A1A1A" name="Color" id="0:2156"/></Stroke>
+                    <Stroke thickness="7" cap="round" join="round" name="Stroke" id="0:2158"><SolidColor colorValue="FF1A1A1A" name="Color" id="0:2159"/></Stroke>
                 </Shape>
             </Node>
             <Shape x="0" y="0" name="Card" id="7:21">
-                <Rectangle width="84" height="84" linkCornerRadius="true" cornerRadiusTL="20" cornerRadiusTR="20" cornerRadiusBL="20" cornerRadiusBR="20" name="Path" id="0:2157"/>
-                <Stroke thickness="14" name="Shadow" id="0:2158">
-                    <SolidColor colorValue="33000000" name="Color" id="0:2159"/>
-                    <Feather strength="14" name="Feather" id="0:2160"/>
+                <Rectangle width="112" height="112" linkCornerRadius="true" cornerRadiusTL="26" cornerRadiusTR="26" cornerRadiusBL="26" cornerRadiusBR="26" name="Path" id="0:2160"/>
+                <Stroke thickness="14" name="Shadow" id="0:2161">
+                    <SolidColor colorValue="33000000" name="Color" id="0:2162"/>
+                    <Feather strength="14" name="Feather" id="0:2163"/>
                 </Stroke>
-                <Fill name="Fill" id="0:2161"><SolidColor colorValue="FFF7F7F7" name="Color" id="0:2162"/></Fill>
+                <Fill name="Fill" id="0:2164"><SolidColor colorValue="FFF7F7F7" name="Color" id="0:2165"/></Fill>
             </Shape>
         </Node>
 
         <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="ExprIdle" id="7:100">
-            <KeyedObject objectId="7:30" id="0:2163">
-                <KeyedProperty propertyKey="18" id="0:2164">
-                    <KeyFrameDouble value="1" frame="0" id="0:2165"/>
-                </KeyedProperty>
-            </KeyedObject>
-            <KeyedObject objectId="7:31" id="0:2166">
+            <KeyedObject objectId="7:30" id="0:2166">
                 <KeyedProperty propertyKey="18" id="0:2167">
-                    <KeyFrameDouble value="0" frame="0" id="0:2168"/>
+                    <KeyFrameDouble value="1" frame="0" id="0:2168"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:32" id="0:2169">
+            <KeyedObject objectId="7:31" id="0:2169">
                 <KeyedProperty propertyKey="18" id="0:2170">
                     <KeyFrameDouble value="0" frame="0" id="0:2171"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:33" id="0:2172">
+            <KeyedObject objectId="7:32" id="0:2172">
                 <KeyedProperty propertyKey="18" id="0:2173">
                     <KeyFrameDouble value="0" frame="0" id="0:2174"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:34" id="0:2175">
+            <KeyedObject objectId="7:33" id="0:2175">
                 <KeyedProperty propertyKey="18" id="0:2176">
                     <KeyFrameDouble value="0" frame="0" id="0:2177"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:35" id="0:2178">
+            <KeyedObject objectId="7:34" id="0:2178">
                 <KeyedProperty propertyKey="18" id="0:2179">
                     <KeyFrameDouble value="0" frame="0" id="0:2180"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:36" id="0:2181">
+            <KeyedObject objectId="7:35" id="0:2181">
                 <KeyedProperty propertyKey="18" id="0:2182">
                     <KeyFrameDouble value="0" frame="0" id="0:2183"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:37" id="0:2184">
+            <KeyedObject objectId="7:36" id="0:2184">
                 <KeyedProperty propertyKey="18" id="0:2185">
                     <KeyFrameDouble value="0" frame="0" id="0:2186"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:38" id="0:2187">
+            <KeyedObject objectId="7:37" id="0:2187">
                 <KeyedProperty propertyKey="18" id="0:2188">
                     <KeyFrameDouble value="0" frame="0" id="0:2189"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:39" id="0:2190">
+            <KeyedObject objectId="7:38" id="0:2190">
                 <KeyedProperty propertyKey="18" id="0:2191">
                     <KeyFrameDouble value="0" frame="0" id="0:2192"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:40" id="0:2193">
+            <KeyedObject objectId="7:39" id="0:2193">
                 <KeyedProperty propertyKey="18" id="0:2194">
                     <KeyFrameDouble value="0" frame="0" id="0:2195"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:23" id="0:2196">
+            <KeyedObject objectId="7:40" id="0:2196">
                 <KeyedProperty propertyKey="18" id="0:2197">
                     <KeyFrameDouble value="0" frame="0" id="0:2198"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:21" id="0:2199">
-                <KeyedProperty propertyKey="16" id="0:2200">
-                    <KeyFrameDouble value="1" frame="0" id="0:2201"/>
+            <KeyedObject objectId="7:23" id="0:2199">
+                <KeyedProperty propertyKey="18" id="0:2200">
+                    <KeyFrameDouble value="0" frame="0" id="0:2201"/>
                 </KeyedProperty>
-                <KeyedProperty propertyKey="17" id="0:2202">
-                    <KeyFrameDouble value="1" frame="0" id="0:2203"/>
+            </KeyedObject>
+            <KeyedObject objectId="7:21" id="0:2202">
+                <KeyedProperty propertyKey="16" id="0:2203">
+                    <KeyFrameDouble value="1" frame="0" id="0:2204"/>
+                </KeyedProperty>
+                <KeyedProperty propertyKey="17" id="0:2205">
+                    <KeyFrameDouble value="1" frame="0" id="0:2206"/>
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
         <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="ExprListening" id="7:101">
-            <KeyedObject objectId="7:30" id="0:2204">
-                <KeyedProperty propertyKey="18" id="0:2205">
-                    <KeyFrameDouble value="0" frame="0" id="0:2206"/>
-                </KeyedProperty>
-            </KeyedObject>
-            <KeyedObject objectId="7:31" id="0:2207">
+            <KeyedObject objectId="7:30" id="0:2207">
                 <KeyedProperty propertyKey="18" id="0:2208">
-                    <KeyFrameDouble value="1" frame="0" id="0:2209"/>
+                    <KeyFrameDouble value="0" frame="0" id="0:2209"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:32" id="0:2210">
+            <KeyedObject objectId="7:31" id="0:2210">
                 <KeyedProperty propertyKey="18" id="0:2211">
-                    <KeyFrameDouble value="0" frame="0" id="0:2212"/>
+                    <KeyFrameDouble value="1" frame="0" id="0:2212"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:33" id="0:2213">
+            <KeyedObject objectId="7:32" id="0:2213">
                 <KeyedProperty propertyKey="18" id="0:2214">
                     <KeyFrameDouble value="0" frame="0" id="0:2215"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:34" id="0:2216">
+            <KeyedObject objectId="7:33" id="0:2216">
                 <KeyedProperty propertyKey="18" id="0:2217">
                     <KeyFrameDouble value="0" frame="0" id="0:2218"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:35" id="0:2219">
+            <KeyedObject objectId="7:34" id="0:2219">
                 <KeyedProperty propertyKey="18" id="0:2220">
                     <KeyFrameDouble value="0" frame="0" id="0:2221"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:36" id="0:2222">
+            <KeyedObject objectId="7:35" id="0:2222">
                 <KeyedProperty propertyKey="18" id="0:2223">
                     <KeyFrameDouble value="0" frame="0" id="0:2224"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:37" id="0:2225">
+            <KeyedObject objectId="7:36" id="0:2225">
                 <KeyedProperty propertyKey="18" id="0:2226">
                     <KeyFrameDouble value="0" frame="0" id="0:2227"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:38" id="0:2228">
+            <KeyedObject objectId="7:37" id="0:2228">
                 <KeyedProperty propertyKey="18" id="0:2229">
                     <KeyFrameDouble value="0" frame="0" id="0:2230"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:39" id="0:2231">
+            <KeyedObject objectId="7:38" id="0:2231">
                 <KeyedProperty propertyKey="18" id="0:2232">
                     <KeyFrameDouble value="0" frame="0" id="0:2233"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:40" id="0:2234">
+            <KeyedObject objectId="7:39" id="0:2234">
                 <KeyedProperty propertyKey="18" id="0:2235">
                     <KeyFrameDouble value="0" frame="0" id="0:2236"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:23" id="0:2237">
+            <KeyedObject objectId="7:40" id="0:2237">
                 <KeyedProperty propertyKey="18" id="0:2238">
                     <KeyFrameDouble value="0" frame="0" id="0:2239"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:21" id="0:2240">
-                <KeyedProperty propertyKey="16" id="0:2241">
-                    <KeyFrameDouble value="1.06" frame="0" id="0:2242"/>
+            <KeyedObject objectId="7:23" id="0:2240">
+                <KeyedProperty propertyKey="18" id="0:2241">
+                    <KeyFrameDouble value="0" frame="0" id="0:2242"/>
                 </KeyedProperty>
-                <KeyedProperty propertyKey="17" id="0:2243">
-                    <KeyFrameDouble value="1.06" frame="0" id="0:2244"/>
+            </KeyedObject>
+            <KeyedObject objectId="7:21" id="0:2243">
+                <KeyedProperty propertyKey="16" id="0:2244">
+                    <KeyFrameDouble value="1.06" frame="0" id="0:2245"/>
+                </KeyedProperty>
+                <KeyedProperty propertyKey="17" id="0:2246">
+                    <KeyFrameDouble value="1.06" frame="0" id="0:2247"/>
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
         <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="ExprDragged" id="7:102">
-            <KeyedObject objectId="7:30" id="0:2245">
-                <KeyedProperty propertyKey="18" id="0:2246">
-                    <KeyFrameDouble value="0" frame="0" id="0:2247"/>
-                </KeyedProperty>
-            </KeyedObject>
-            <KeyedObject objectId="7:31" id="0:2248">
+            <KeyedObject objectId="7:30" id="0:2248">
                 <KeyedProperty propertyKey="18" id="0:2249">
                     <KeyFrameDouble value="0" frame="0" id="0:2250"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:32" id="0:2251">
+            <KeyedObject objectId="7:31" id="0:2251">
                 <KeyedProperty propertyKey="18" id="0:2252">
-                    <KeyFrameDouble value="1" frame="0" id="0:2253"/>
+                    <KeyFrameDouble value="0" frame="0" id="0:2253"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:33" id="0:2254">
+            <KeyedObject objectId="7:32" id="0:2254">
                 <KeyedProperty propertyKey="18" id="0:2255">
-                    <KeyFrameDouble value="0" frame="0" id="0:2256"/>
+                    <KeyFrameDouble value="1" frame="0" id="0:2256"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:34" id="0:2257">
+            <KeyedObject objectId="7:33" id="0:2257">
                 <KeyedProperty propertyKey="18" id="0:2258">
                     <KeyFrameDouble value="0" frame="0" id="0:2259"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:35" id="0:2260">
+            <KeyedObject objectId="7:34" id="0:2260">
                 <KeyedProperty propertyKey="18" id="0:2261">
                     <KeyFrameDouble value="0" frame="0" id="0:2262"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:36" id="0:2263">
+            <KeyedObject objectId="7:35" id="0:2263">
                 <KeyedProperty propertyKey="18" id="0:2264">
                     <KeyFrameDouble value="0" frame="0" id="0:2265"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:37" id="0:2266">
+            <KeyedObject objectId="7:36" id="0:2266">
                 <KeyedProperty propertyKey="18" id="0:2267">
                     <KeyFrameDouble value="0" frame="0" id="0:2268"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:38" id="0:2269">
+            <KeyedObject objectId="7:37" id="0:2269">
                 <KeyedProperty propertyKey="18" id="0:2270">
                     <KeyFrameDouble value="0" frame="0" id="0:2271"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:39" id="0:2272">
+            <KeyedObject objectId="7:38" id="0:2272">
                 <KeyedProperty propertyKey="18" id="0:2273">
                     <KeyFrameDouble value="0" frame="0" id="0:2274"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:40" id="0:2275">
+            <KeyedObject objectId="7:39" id="0:2275">
                 <KeyedProperty propertyKey="18" id="0:2276">
                     <KeyFrameDouble value="0" frame="0" id="0:2277"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:23" id="0:2278">
+            <KeyedObject objectId="7:40" id="0:2278">
                 <KeyedProperty propertyKey="18" id="0:2279">
                     <KeyFrameDouble value="0" frame="0" id="0:2280"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:21" id="0:2281">
-                <KeyedProperty propertyKey="16" id="0:2282">
-                    <KeyFrameDouble value="1" frame="0" id="0:2283"/>
+            <KeyedObject objectId="7:23" id="0:2281">
+                <KeyedProperty propertyKey="18" id="0:2282">
+                    <KeyFrameDouble value="0" frame="0" id="0:2283"/>
                 </KeyedProperty>
-                <KeyedProperty propertyKey="17" id="0:2284">
-                    <KeyFrameDouble value="1" frame="0" id="0:2285"/>
+            </KeyedObject>
+            <KeyedObject objectId="7:21" id="0:2284">
+                <KeyedProperty propertyKey="16" id="0:2285">
+                    <KeyFrameDouble value="1" frame="0" id="0:2286"/>
+                </KeyedProperty>
+                <KeyedProperty propertyKey="17" id="0:2287">
+                    <KeyFrameDouble value="1" frame="0" id="0:2288"/>
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
         <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="ExprThinking" id="7:103">
-            <KeyedObject objectId="7:30" id="0:2286">
-                <KeyedProperty propertyKey="18" id="0:2287">
-                    <KeyFrameDouble value="0" frame="0" id="0:2288"/>
-                </KeyedProperty>
-            </KeyedObject>
-            <KeyedObject objectId="7:31" id="0:2289">
+            <KeyedObject objectId="7:30" id="0:2289">
                 <KeyedProperty propertyKey="18" id="0:2290">
                     <KeyFrameDouble value="0" frame="0" id="0:2291"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:32" id="0:2292">
+            <KeyedObject objectId="7:31" id="0:2292">
                 <KeyedProperty propertyKey="18" id="0:2293">
-                    <KeyFrameDouble value="1" frame="0" id="0:2294"/>
+                    <KeyFrameDouble value="0" frame="0" id="0:2294"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:33" id="0:2295">
+            <KeyedObject objectId="7:32" id="0:2295">
                 <KeyedProperty propertyKey="18" id="0:2296">
-                    <KeyFrameDouble value="0" frame="0" id="0:2297"/>
+                    <KeyFrameDouble value="1" frame="0" id="0:2297"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:34" id="0:2298">
+            <KeyedObject objectId="7:33" id="0:2298">
                 <KeyedProperty propertyKey="18" id="0:2299">
                     <KeyFrameDouble value="0" frame="0" id="0:2300"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:35" id="0:2301">
+            <KeyedObject objectId="7:34" id="0:2301">
                 <KeyedProperty propertyKey="18" id="0:2302">
                     <KeyFrameDouble value="0" frame="0" id="0:2303"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:36" id="0:2304">
+            <KeyedObject objectId="7:35" id="0:2304">
                 <KeyedProperty propertyKey="18" id="0:2305">
                     <KeyFrameDouble value="0" frame="0" id="0:2306"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:37" id="0:2307">
+            <KeyedObject objectId="7:36" id="0:2307">
                 <KeyedProperty propertyKey="18" id="0:2308">
                     <KeyFrameDouble value="0" frame="0" id="0:2309"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:38" id="0:2310">
+            <KeyedObject objectId="7:37" id="0:2310">
                 <KeyedProperty propertyKey="18" id="0:2311">
                     <KeyFrameDouble value="0" frame="0" id="0:2312"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:39" id="0:2313">
+            <KeyedObject objectId="7:38" id="0:2313">
                 <KeyedProperty propertyKey="18" id="0:2314">
                     <KeyFrameDouble value="0" frame="0" id="0:2315"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:40" id="0:2316">
+            <KeyedObject objectId="7:39" id="0:2316">
                 <KeyedProperty propertyKey="18" id="0:2317">
                     <KeyFrameDouble value="0" frame="0" id="0:2318"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:23" id="0:2319">
+            <KeyedObject objectId="7:40" id="0:2319">
                 <KeyedProperty propertyKey="18" id="0:2320">
                     <KeyFrameDouble value="0" frame="0" id="0:2321"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:21" id="0:2322">
-                <KeyedProperty propertyKey="16" id="0:2323">
-                    <KeyFrameDouble value="1" frame="0" id="0:2324"/>
+            <KeyedObject objectId="7:23" id="0:2322">
+                <KeyedProperty propertyKey="18" id="0:2323">
+                    <KeyFrameDouble value="0" frame="0" id="0:2324"/>
                 </KeyedProperty>
-                <KeyedProperty propertyKey="17" id="0:2325">
-                    <KeyFrameDouble value="1" frame="0" id="0:2326"/>
+            </KeyedObject>
+            <KeyedObject objectId="7:21" id="0:2325">
+                <KeyedProperty propertyKey="16" id="0:2326">
+                    <KeyFrameDouble value="1" frame="0" id="0:2327"/>
+                </KeyedProperty>
+                <KeyedProperty propertyKey="17" id="0:2328">
+                    <KeyFrameDouble value="1" frame="0" id="0:2329"/>
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
         <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="ExprWaitingInput" id="7:104">
-            <KeyedObject objectId="7:30" id="0:2327">
-                <KeyedProperty propertyKey="18" id="0:2328">
-                    <KeyFrameDouble value="0" frame="0" id="0:2329"/>
-                </KeyedProperty>
-            </KeyedObject>
-            <KeyedObject objectId="7:31" id="0:2330">
+            <KeyedObject objectId="7:30" id="0:2330">
                 <KeyedProperty propertyKey="18" id="0:2331">
                     <KeyFrameDouble value="0" frame="0" id="0:2332"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:32" id="0:2333">
+            <KeyedObject objectId="7:31" id="0:2333">
                 <KeyedProperty propertyKey="18" id="0:2334">
                     <KeyFrameDouble value="0" frame="0" id="0:2335"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:33" id="0:2336">
+            <KeyedObject objectId="7:32" id="0:2336">
                 <KeyedProperty propertyKey="18" id="0:2337">
-                    <KeyFrameDouble value="1" frame="0" id="0:2338"/>
+                    <KeyFrameDouble value="0" frame="0" id="0:2338"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:34" id="0:2339">
+            <KeyedObject objectId="7:33" id="0:2339">
                 <KeyedProperty propertyKey="18" id="0:2340">
-                    <KeyFrameDouble value="0" frame="0" id="0:2341"/>
+                    <KeyFrameDouble value="1" frame="0" id="0:2341"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:35" id="0:2342">
+            <KeyedObject objectId="7:34" id="0:2342">
                 <KeyedProperty propertyKey="18" id="0:2343">
                     <KeyFrameDouble value="0" frame="0" id="0:2344"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:36" id="0:2345">
+            <KeyedObject objectId="7:35" id="0:2345">
                 <KeyedProperty propertyKey="18" id="0:2346">
                     <KeyFrameDouble value="0" frame="0" id="0:2347"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:37" id="0:2348">
+            <KeyedObject objectId="7:36" id="0:2348">
                 <KeyedProperty propertyKey="18" id="0:2349">
                     <KeyFrameDouble value="0" frame="0" id="0:2350"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:38" id="0:2351">
+            <KeyedObject objectId="7:37" id="0:2351">
                 <KeyedProperty propertyKey="18" id="0:2352">
                     <KeyFrameDouble value="0" frame="0" id="0:2353"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:39" id="0:2354">
+            <KeyedObject objectId="7:38" id="0:2354">
                 <KeyedProperty propertyKey="18" id="0:2355">
                     <KeyFrameDouble value="0" frame="0" id="0:2356"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:40" id="0:2357">
+            <KeyedObject objectId="7:39" id="0:2357">
                 <KeyedProperty propertyKey="18" id="0:2358">
                     <KeyFrameDouble value="0" frame="0" id="0:2359"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:23" id="0:2360">
+            <KeyedObject objectId="7:40" id="0:2360">
                 <KeyedProperty propertyKey="18" id="0:2361">
-                    <KeyFrameDouble value="1" frame="0" id="0:2362"/>
+                    <KeyFrameDouble value="0" frame="0" id="0:2362"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:21" id="0:2363">
-                <KeyedProperty propertyKey="16" id="0:2364">
-                    <KeyFrameDouble value="1.08" frame="0" id="0:2365"/>
+            <KeyedObject objectId="7:23" id="0:2363">
+                <KeyedProperty propertyKey="18" id="0:2364">
+                    <KeyFrameDouble value="1" frame="0" id="0:2365"/>
                 </KeyedProperty>
-                <KeyedProperty propertyKey="17" id="0:2366">
-                    <KeyFrameDouble value="1.08" frame="0" id="0:2367"/>
+            </KeyedObject>
+            <KeyedObject objectId="7:21" id="0:2366">
+                <KeyedProperty propertyKey="16" id="0:2367">
+                    <KeyFrameDouble value="1.08" frame="0" id="0:2368"/>
+                </KeyedProperty>
+                <KeyedProperty propertyKey="17" id="0:2369">
+                    <KeyFrameDouble value="1.08" frame="0" id="0:2370"/>
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
         <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="ExprSpeaking" id="7:105">
-            <KeyedObject objectId="7:30" id="0:2368">
-                <KeyedProperty propertyKey="18" id="0:2369">
-                    <KeyFrameDouble value="0" frame="0" id="0:2370"/>
-                </KeyedProperty>
-            </KeyedObject>
-            <KeyedObject objectId="7:31" id="0:2371">
+            <KeyedObject objectId="7:30" id="0:2371">
                 <KeyedProperty propertyKey="18" id="0:2372">
                     <KeyFrameDouble value="0" frame="0" id="0:2373"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:32" id="0:2374">
+            <KeyedObject objectId="7:31" id="0:2374">
                 <KeyedProperty propertyKey="18" id="0:2375">
                     <KeyFrameDouble value="0" frame="0" id="0:2376"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:33" id="0:2377">
+            <KeyedObject objectId="7:32" id="0:2377">
                 <KeyedProperty propertyKey="18" id="0:2378">
                     <KeyFrameDouble value="0" frame="0" id="0:2379"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:34" id="0:2380">
+            <KeyedObject objectId="7:33" id="0:2380">
                 <KeyedProperty propertyKey="18" id="0:2381">
-                    <KeyFrameDouble value="1" frame="0" id="0:2382"/>
+                    <KeyFrameDouble value="0" frame="0" id="0:2382"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:35" id="0:2383">
+            <KeyedObject objectId="7:34" id="0:2383">
                 <KeyedProperty propertyKey="18" id="0:2384">
-                    <KeyFrameDouble value="0" frame="0" id="0:2385"/>
+                    <KeyFrameDouble value="1" frame="0" id="0:2385"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:36" id="0:2386">
+            <KeyedObject objectId="7:35" id="0:2386">
                 <KeyedProperty propertyKey="18" id="0:2387">
                     <KeyFrameDouble value="0" frame="0" id="0:2388"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:37" id="0:2389">
+            <KeyedObject objectId="7:36" id="0:2389">
                 <KeyedProperty propertyKey="18" id="0:2390">
                     <KeyFrameDouble value="0" frame="0" id="0:2391"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:38" id="0:2392">
+            <KeyedObject objectId="7:37" id="0:2392">
                 <KeyedProperty propertyKey="18" id="0:2393">
                     <KeyFrameDouble value="0" frame="0" id="0:2394"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:39" id="0:2395">
+            <KeyedObject objectId="7:38" id="0:2395">
                 <KeyedProperty propertyKey="18" id="0:2396">
                     <KeyFrameDouble value="0" frame="0" id="0:2397"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:40" id="0:2398">
+            <KeyedObject objectId="7:39" id="0:2398">
                 <KeyedProperty propertyKey="18" id="0:2399">
                     <KeyFrameDouble value="0" frame="0" id="0:2400"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:23" id="0:2401">
+            <KeyedObject objectId="7:40" id="0:2401">
                 <KeyedProperty propertyKey="18" id="0:2402">
                     <KeyFrameDouble value="0" frame="0" id="0:2403"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:21" id="0:2404">
-                <KeyedProperty propertyKey="16" id="0:2405">
-                    <KeyFrameDouble value="1" frame="0" id="0:2406"/>
+            <KeyedObject objectId="7:23" id="0:2404">
+                <KeyedProperty propertyKey="18" id="0:2405">
+                    <KeyFrameDouble value="0" frame="0" id="0:2406"/>
                 </KeyedProperty>
-                <KeyedProperty propertyKey="17" id="0:2407">
-                    <KeyFrameDouble value="1" frame="0" id="0:2408"/>
+            </KeyedObject>
+            <KeyedObject objectId="7:21" id="0:2407">
+                <KeyedProperty propertyKey="16" id="0:2408">
+                    <KeyFrameDouble value="1" frame="0" id="0:2409"/>
+                </KeyedProperty>
+                <KeyedProperty propertyKey="17" id="0:2410">
+                    <KeyFrameDouble value="1" frame="0" id="0:2411"/>
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
         <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="ExprSuccess" id="7:106">
-            <KeyedObject objectId="7:30" id="0:2409">
-                <KeyedProperty propertyKey="18" id="0:2410">
-                    <KeyFrameDouble value="0" frame="0" id="0:2411"/>
-                </KeyedProperty>
-            </KeyedObject>
-            <KeyedObject objectId="7:31" id="0:2412">
+            <KeyedObject objectId="7:30" id="0:2412">
                 <KeyedProperty propertyKey="18" id="0:2413">
                     <KeyFrameDouble value="0" frame="0" id="0:2414"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:32" id="0:2415">
+            <KeyedObject objectId="7:31" id="0:2415">
                 <KeyedProperty propertyKey="18" id="0:2416">
                     <KeyFrameDouble value="0" frame="0" id="0:2417"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:33" id="0:2418">
+            <KeyedObject objectId="7:32" id="0:2418">
                 <KeyedProperty propertyKey="18" id="0:2419">
                     <KeyFrameDouble value="0" frame="0" id="0:2420"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:34" id="0:2421">
+            <KeyedObject objectId="7:33" id="0:2421">
                 <KeyedProperty propertyKey="18" id="0:2422">
                     <KeyFrameDouble value="0" frame="0" id="0:2423"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:35" id="0:2424">
+            <KeyedObject objectId="7:34" id="0:2424">
                 <KeyedProperty propertyKey="18" id="0:2425">
-                    <KeyFrameDouble value="1" frame="0" id="0:2426"/>
+                    <KeyFrameDouble value="0" frame="0" id="0:2426"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:36" id="0:2427">
+            <KeyedObject objectId="7:35" id="0:2427">
                 <KeyedProperty propertyKey="18" id="0:2428">
-                    <KeyFrameDouble value="0" frame="0" id="0:2429"/>
+                    <KeyFrameDouble value="1" frame="0" id="0:2429"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:37" id="0:2430">
+            <KeyedObject objectId="7:36" id="0:2430">
                 <KeyedProperty propertyKey="18" id="0:2431">
                     <KeyFrameDouble value="0" frame="0" id="0:2432"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:38" id="0:2433">
+            <KeyedObject objectId="7:37" id="0:2433">
                 <KeyedProperty propertyKey="18" id="0:2434">
                     <KeyFrameDouble value="0" frame="0" id="0:2435"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:39" id="0:2436">
+            <KeyedObject objectId="7:38" id="0:2436">
                 <KeyedProperty propertyKey="18" id="0:2437">
                     <KeyFrameDouble value="0" frame="0" id="0:2438"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:40" id="0:2439">
+            <KeyedObject objectId="7:39" id="0:2439">
                 <KeyedProperty propertyKey="18" id="0:2440">
                     <KeyFrameDouble value="0" frame="0" id="0:2441"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:23" id="0:2442">
+            <KeyedObject objectId="7:40" id="0:2442">
                 <KeyedProperty propertyKey="18" id="0:2443">
                     <KeyFrameDouble value="0" frame="0" id="0:2444"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:21" id="0:2445">
-                <KeyedProperty propertyKey="16" id="0:2446">
-                    <KeyFrameDouble value="1" frame="0" id="0:2447"/>
+            <KeyedObject objectId="7:23" id="0:2445">
+                <KeyedProperty propertyKey="18" id="0:2446">
+                    <KeyFrameDouble value="0" frame="0" id="0:2447"/>
                 </KeyedProperty>
-                <KeyedProperty propertyKey="17" id="0:2448">
-                    <KeyFrameDouble value="1" frame="0" id="0:2449"/>
+            </KeyedObject>
+            <KeyedObject objectId="7:21" id="0:2448">
+                <KeyedProperty propertyKey="16" id="0:2449">
+                    <KeyFrameDouble value="1" frame="0" id="0:2450"/>
+                </KeyedProperty>
+                <KeyedProperty propertyKey="17" id="0:2451">
+                    <KeyFrameDouble value="1" frame="0" id="0:2452"/>
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
         <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="ExprError" id="7:107">
-            <KeyedObject objectId="7:30" id="0:2450">
-                <KeyedProperty propertyKey="18" id="0:2451">
-                    <KeyFrameDouble value="0" frame="0" id="0:2452"/>
-                </KeyedProperty>
-            </KeyedObject>
-            <KeyedObject objectId="7:31" id="0:2453">
+            <KeyedObject objectId="7:30" id="0:2453">
                 <KeyedProperty propertyKey="18" id="0:2454">
                     <KeyFrameDouble value="0" frame="0" id="0:2455"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:32" id="0:2456">
+            <KeyedObject objectId="7:31" id="0:2456">
                 <KeyedProperty propertyKey="18" id="0:2457">
                     <KeyFrameDouble value="0" frame="0" id="0:2458"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:33" id="0:2459">
+            <KeyedObject objectId="7:32" id="0:2459">
                 <KeyedProperty propertyKey="18" id="0:2460">
                     <KeyFrameDouble value="0" frame="0" id="0:2461"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:34" id="0:2462">
+            <KeyedObject objectId="7:33" id="0:2462">
                 <KeyedProperty propertyKey="18" id="0:2463">
                     <KeyFrameDouble value="0" frame="0" id="0:2464"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:35" id="0:2465">
+            <KeyedObject objectId="7:34" id="0:2465">
                 <KeyedProperty propertyKey="18" id="0:2466">
                     <KeyFrameDouble value="0" frame="0" id="0:2467"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:36" id="0:2468">
+            <KeyedObject objectId="7:35" id="0:2468">
                 <KeyedProperty propertyKey="18" id="0:2469">
-                    <KeyFrameDouble value="1" frame="0" id="0:2470"/>
+                    <KeyFrameDouble value="0" frame="0" id="0:2470"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:37" id="0:2471">
+            <KeyedObject objectId="7:36" id="0:2471">
                 <KeyedProperty propertyKey="18" id="0:2472">
-                    <KeyFrameDouble value="0" frame="0" id="0:2473"/>
+                    <KeyFrameDouble value="1" frame="0" id="0:2473"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:38" id="0:2474">
+            <KeyedObject objectId="7:37" id="0:2474">
                 <KeyedProperty propertyKey="18" id="0:2475">
                     <KeyFrameDouble value="0" frame="0" id="0:2476"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:39" id="0:2477">
+            <KeyedObject objectId="7:38" id="0:2477">
                 <KeyedProperty propertyKey="18" id="0:2478">
                     <KeyFrameDouble value="0" frame="0" id="0:2479"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:40" id="0:2480">
+            <KeyedObject objectId="7:39" id="0:2480">
                 <KeyedProperty propertyKey="18" id="0:2481">
-                    <KeyFrameDouble value="1" frame="0" id="0:2482"/>
+                    <KeyFrameDouble value="0" frame="0" id="0:2482"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:23" id="0:2483">
+            <KeyedObject objectId="7:40" id="0:2483">
                 <KeyedProperty propertyKey="18" id="0:2484">
-                    <KeyFrameDouble value="0" frame="0" id="0:2485"/>
+                    <KeyFrameDouble value="1" frame="0" id="0:2485"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:21" id="0:2486">
-                <KeyedProperty propertyKey="16" id="0:2487">
-                    <KeyFrameDouble value="1" frame="0" id="0:2488"/>
+            <KeyedObject objectId="7:23" id="0:2486">
+                <KeyedProperty propertyKey="18" id="0:2487">
+                    <KeyFrameDouble value="0" frame="0" id="0:2488"/>
                 </KeyedProperty>
-                <KeyedProperty propertyKey="17" id="0:2489">
-                    <KeyFrameDouble value="1" frame="0" id="0:2490"/>
+            </KeyedObject>
+            <KeyedObject objectId="7:21" id="0:2489">
+                <KeyedProperty propertyKey="16" id="0:2490">
+                    <KeyFrameDouble value="1" frame="0" id="0:2491"/>
+                </KeyedProperty>
+                <KeyedProperty propertyKey="17" id="0:2492">
+                    <KeyFrameDouble value="1" frame="0" id="0:2493"/>
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
         <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="ExprSleeping" id="7:108">
-            <KeyedObject objectId="7:30" id="0:2491">
-                <KeyedProperty propertyKey="18" id="0:2492">
-                    <KeyFrameDouble value="0" frame="0" id="0:2493"/>
-                </KeyedProperty>
-            </KeyedObject>
-            <KeyedObject objectId="7:31" id="0:2494">
+            <KeyedObject objectId="7:30" id="0:2494">
                 <KeyedProperty propertyKey="18" id="0:2495">
                     <KeyFrameDouble value="0" frame="0" id="0:2496"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:32" id="0:2497">
+            <KeyedObject objectId="7:31" id="0:2497">
                 <KeyedProperty propertyKey="18" id="0:2498">
                     <KeyFrameDouble value="0" frame="0" id="0:2499"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:33" id="0:2500">
+            <KeyedObject objectId="7:32" id="0:2500">
                 <KeyedProperty propertyKey="18" id="0:2501">
                     <KeyFrameDouble value="0" frame="0" id="0:2502"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:34" id="0:2503">
+            <KeyedObject objectId="7:33" id="0:2503">
                 <KeyedProperty propertyKey="18" id="0:2504">
                     <KeyFrameDouble value="0" frame="0" id="0:2505"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:35" id="0:2506">
+            <KeyedObject objectId="7:34" id="0:2506">
                 <KeyedProperty propertyKey="18" id="0:2507">
                     <KeyFrameDouble value="0" frame="0" id="0:2508"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:36" id="0:2509">
+            <KeyedObject objectId="7:35" id="0:2509">
                 <KeyedProperty propertyKey="18" id="0:2510">
                     <KeyFrameDouble value="0" frame="0" id="0:2511"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:37" id="0:2512">
+            <KeyedObject objectId="7:36" id="0:2512">
                 <KeyedProperty propertyKey="18" id="0:2513">
-                    <KeyFrameDouble value="1" frame="0" id="0:2514"/>
+                    <KeyFrameDouble value="0" frame="0" id="0:2514"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:38" id="0:2515">
+            <KeyedObject objectId="7:37" id="0:2515">
                 <KeyedProperty propertyKey="18" id="0:2516">
-                    <KeyFrameDouble value="0" frame="0" id="0:2517"/>
+                    <KeyFrameDouble value="1" frame="0" id="0:2517"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:39" id="0:2518">
+            <KeyedObject objectId="7:38" id="0:2518">
                 <KeyedProperty propertyKey="18" id="0:2519">
                     <KeyFrameDouble value="0" frame="0" id="0:2520"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:40" id="0:2521">
+            <KeyedObject objectId="7:39" id="0:2521">
                 <KeyedProperty propertyKey="18" id="0:2522">
                     <KeyFrameDouble value="0" frame="0" id="0:2523"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:23" id="0:2524">
+            <KeyedObject objectId="7:40" id="0:2524">
                 <KeyedProperty propertyKey="18" id="0:2525">
                     <KeyFrameDouble value="0" frame="0" id="0:2526"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:21" id="0:2527">
-                <KeyedProperty propertyKey="16" id="0:2528">
-                    <KeyFrameDouble value="0.94" frame="0" id="0:2529"/>
+            <KeyedObject objectId="7:23" id="0:2527">
+                <KeyedProperty propertyKey="18" id="0:2528">
+                    <KeyFrameDouble value="0" frame="0" id="0:2529"/>
                 </KeyedProperty>
-                <KeyedProperty propertyKey="17" id="0:2530">
-                    <KeyFrameDouble value="0.94" frame="0" id="0:2531"/>
+            </KeyedObject>
+            <KeyedObject objectId="7:21" id="0:2530">
+                <KeyedProperty propertyKey="16" id="0:2531">
+                    <KeyFrameDouble value="0.94" frame="0" id="0:2532"/>
+                </KeyedProperty>
+                <KeyedProperty propertyKey="17" id="0:2533">
+                    <KeyFrameDouble value="0.94" frame="0" id="0:2534"/>
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
         <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="ExprLoading" id="7:109">
-            <KeyedObject objectId="7:30" id="0:2532">
-                <KeyedProperty propertyKey="18" id="0:2533">
-                    <KeyFrameDouble value="0" frame="0" id="0:2534"/>
-                </KeyedProperty>
-            </KeyedObject>
-            <KeyedObject objectId="7:31" id="0:2535">
+            <KeyedObject objectId="7:30" id="0:2535">
                 <KeyedProperty propertyKey="18" id="0:2536">
                     <KeyFrameDouble value="0" frame="0" id="0:2537"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:32" id="0:2538">
+            <KeyedObject objectId="7:31" id="0:2538">
                 <KeyedProperty propertyKey="18" id="0:2539">
                     <KeyFrameDouble value="0" frame="0" id="0:2540"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:33" id="0:2541">
+            <KeyedObject objectId="7:32" id="0:2541">
                 <KeyedProperty propertyKey="18" id="0:2542">
                     <KeyFrameDouble value="0" frame="0" id="0:2543"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:34" id="0:2544">
+            <KeyedObject objectId="7:33" id="0:2544">
                 <KeyedProperty propertyKey="18" id="0:2545">
                     <KeyFrameDouble value="0" frame="0" id="0:2546"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:35" id="0:2547">
+            <KeyedObject objectId="7:34" id="0:2547">
                 <KeyedProperty propertyKey="18" id="0:2548">
                     <KeyFrameDouble value="0" frame="0" id="0:2549"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:36" id="0:2550">
+            <KeyedObject objectId="7:35" id="0:2550">
                 <KeyedProperty propertyKey="18" id="0:2551">
                     <KeyFrameDouble value="0" frame="0" id="0:2552"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:37" id="0:2553">
+            <KeyedObject objectId="7:36" id="0:2553">
                 <KeyedProperty propertyKey="18" id="0:2554">
                     <KeyFrameDouble value="0" frame="0" id="0:2555"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:38" id="0:2556">
+            <KeyedObject objectId="7:37" id="0:2556">
                 <KeyedProperty propertyKey="18" id="0:2557">
-                    <KeyFrameDouble value="1" frame="0" id="0:2558"/>
+                    <KeyFrameDouble value="0" frame="0" id="0:2558"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:39" id="0:2559">
+            <KeyedObject objectId="7:38" id="0:2559">
                 <KeyedProperty propertyKey="18" id="0:2560">
-                    <KeyFrameDouble value="0" frame="0" id="0:2561"/>
+                    <KeyFrameDouble value="1" frame="0" id="0:2561"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:40" id="0:2562">
+            <KeyedObject objectId="7:39" id="0:2562">
                 <KeyedProperty propertyKey="18" id="0:2563">
                     <KeyFrameDouble value="0" frame="0" id="0:2564"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:23" id="0:2565">
+            <KeyedObject objectId="7:40" id="0:2565">
                 <KeyedProperty propertyKey="18" id="0:2566">
                     <KeyFrameDouble value="0" frame="0" id="0:2567"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:21" id="0:2568">
-                <KeyedProperty propertyKey="16" id="0:2569">
-                    <KeyFrameDouble value="1" frame="0" id="0:2570"/>
+            <KeyedObject objectId="7:23" id="0:2568">
+                <KeyedProperty propertyKey="18" id="0:2569">
+                    <KeyFrameDouble value="0" frame="0" id="0:2570"/>
                 </KeyedProperty>
-                <KeyedProperty propertyKey="17" id="0:2571">
-                    <KeyFrameDouble value="1" frame="0" id="0:2572"/>
+            </KeyedObject>
+            <KeyedObject objectId="7:21" id="0:2571">
+                <KeyedProperty propertyKey="16" id="0:2572">
+                    <KeyFrameDouble value="1" frame="0" id="0:2573"/>
+                </KeyedProperty>
+                <KeyedProperty propertyKey="17" id="0:2574">
+                    <KeyFrameDouble value="1" frame="0" id="0:2575"/>
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
         <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="ExprFailed" id="7:110">
-            <KeyedObject objectId="7:30" id="0:2573">
-                <KeyedProperty propertyKey="18" id="0:2574">
-                    <KeyFrameDouble value="0" frame="0" id="0:2575"/>
-                </KeyedProperty>
-            </KeyedObject>
-            <KeyedObject objectId="7:31" id="0:2576">
+            <KeyedObject objectId="7:30" id="0:2576">
                 <KeyedProperty propertyKey="18" id="0:2577">
                     <KeyFrameDouble value="0" frame="0" id="0:2578"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:32" id="0:2579">
+            <KeyedObject objectId="7:31" id="0:2579">
                 <KeyedProperty propertyKey="18" id="0:2580">
                     <KeyFrameDouble value="0" frame="0" id="0:2581"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:33" id="0:2582">
+            <KeyedObject objectId="7:32" id="0:2582">
                 <KeyedProperty propertyKey="18" id="0:2583">
                     <KeyFrameDouble value="0" frame="0" id="0:2584"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:34" id="0:2585">
+            <KeyedObject objectId="7:33" id="0:2585">
                 <KeyedProperty propertyKey="18" id="0:2586">
                     <KeyFrameDouble value="0" frame="0" id="0:2587"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:35" id="0:2588">
+            <KeyedObject objectId="7:34" id="0:2588">
                 <KeyedProperty propertyKey="18" id="0:2589">
                     <KeyFrameDouble value="0" frame="0" id="0:2590"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:36" id="0:2591">
+            <KeyedObject objectId="7:35" id="0:2591">
                 <KeyedProperty propertyKey="18" id="0:2592">
                     <KeyFrameDouble value="0" frame="0" id="0:2593"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:37" id="0:2594">
+            <KeyedObject objectId="7:36" id="0:2594">
                 <KeyedProperty propertyKey="18" id="0:2595">
                     <KeyFrameDouble value="0" frame="0" id="0:2596"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:38" id="0:2597">
+            <KeyedObject objectId="7:37" id="0:2597">
                 <KeyedProperty propertyKey="18" id="0:2598">
                     <KeyFrameDouble value="0" frame="0" id="0:2599"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:39" id="0:2600">
+            <KeyedObject objectId="7:38" id="0:2600">
                 <KeyedProperty propertyKey="18" id="0:2601">
-                    <KeyFrameDouble value="1" frame="0" id="0:2602"/>
+                    <KeyFrameDouble value="0" frame="0" id="0:2602"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:40" id="0:2603">
+            <KeyedObject objectId="7:39" id="0:2603">
                 <KeyedProperty propertyKey="18" id="0:2604">
-                    <KeyFrameDouble value="0" frame="0" id="0:2605"/>
+                    <KeyFrameDouble value="1" frame="0" id="0:2605"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:23" id="0:2606">
+            <KeyedObject objectId="7:40" id="0:2606">
                 <KeyedProperty propertyKey="18" id="0:2607">
                     <KeyFrameDouble value="0" frame="0" id="0:2608"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:21" id="0:2609">
-                <KeyedProperty propertyKey="16" id="0:2610">
-                    <KeyFrameDouble value="0.96" frame="0" id="0:2611"/>
+            <KeyedObject objectId="7:23" id="0:2609">
+                <KeyedProperty propertyKey="18" id="0:2610">
+                    <KeyFrameDouble value="0" frame="0" id="0:2611"/>
                 </KeyedProperty>
-                <KeyedProperty propertyKey="17" id="0:2612">
-                    <KeyFrameDouble value="0.96" frame="0" id="0:2613"/>
+            </KeyedObject>
+            <KeyedObject objectId="7:21" id="0:2612">
+                <KeyedProperty propertyKey="16" id="0:2613">
+                    <KeyFrameDouble value="0.96" frame="0" id="0:2614"/>
+                </KeyedProperty>
+                <KeyedProperty propertyKey="17" id="0:2615">
+                    <KeyFrameDouble value="0.96" frame="0" id="0:2616"/>
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
         <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="ExprDegraded" id="7:111">
-            <KeyedObject objectId="7:30" id="0:2614">
-                <KeyedProperty propertyKey="18" id="0:2615">
-                    <KeyFrameDouble value="0" frame="0" id="0:2616"/>
-                </KeyedProperty>
-            </KeyedObject>
-            <KeyedObject objectId="7:31" id="0:2617">
+            <KeyedObject objectId="7:30" id="0:2617">
                 <KeyedProperty propertyKey="18" id="0:2618">
                     <KeyFrameDouble value="0" frame="0" id="0:2619"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:32" id="0:2620">
+            <KeyedObject objectId="7:31" id="0:2620">
                 <KeyedProperty propertyKey="18" id="0:2621">
                     <KeyFrameDouble value="0" frame="0" id="0:2622"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:33" id="0:2623">
+            <KeyedObject objectId="7:32" id="0:2623">
                 <KeyedProperty propertyKey="18" id="0:2624">
                     <KeyFrameDouble value="0" frame="0" id="0:2625"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:34" id="0:2626">
+            <KeyedObject objectId="7:33" id="0:2626">
                 <KeyedProperty propertyKey="18" id="0:2627">
                     <KeyFrameDouble value="0" frame="0" id="0:2628"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:35" id="0:2629">
+            <KeyedObject objectId="7:34" id="0:2629">
                 <KeyedProperty propertyKey="18" id="0:2630">
-                    <KeyFrameDouble value="1" frame="0" id="0:2631"/>
+                    <KeyFrameDouble value="0" frame="0" id="0:2631"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:36" id="0:2632">
+            <KeyedObject objectId="7:35" id="0:2632">
                 <KeyedProperty propertyKey="18" id="0:2633">
-                    <KeyFrameDouble value="0" frame="0" id="0:2634"/>
+                    <KeyFrameDouble value="1" frame="0" id="0:2634"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:37" id="0:2635">
+            <KeyedObject objectId="7:36" id="0:2635">
                 <KeyedProperty propertyKey="18" id="0:2636">
                     <KeyFrameDouble value="0" frame="0" id="0:2637"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:38" id="0:2638">
+            <KeyedObject objectId="7:37" id="0:2638">
                 <KeyedProperty propertyKey="18" id="0:2639">
                     <KeyFrameDouble value="0" frame="0" id="0:2640"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:39" id="0:2641">
+            <KeyedObject objectId="7:38" id="0:2641">
                 <KeyedProperty propertyKey="18" id="0:2642">
                     <KeyFrameDouble value="0" frame="0" id="0:2643"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:40" id="0:2644">
+            <KeyedObject objectId="7:39" id="0:2644">
                 <KeyedProperty propertyKey="18" id="0:2645">
                     <KeyFrameDouble value="0" frame="0" id="0:2646"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:23" id="0:2647">
+            <KeyedObject objectId="7:40" id="0:2647">
                 <KeyedProperty propertyKey="18" id="0:2648">
                     <KeyFrameDouble value="0" frame="0" id="0:2649"/>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:21" id="0:2650">
-                <KeyedProperty propertyKey="16" id="0:2651">
-                    <KeyFrameDouble value="1" frame="0" id="0:2652"/>
+            <KeyedObject objectId="7:23" id="0:2650">
+                <KeyedProperty propertyKey="18" id="0:2651">
+                    <KeyFrameDouble value="0" frame="0" id="0:2652"/>
                 </KeyedProperty>
-                <KeyedProperty propertyKey="17" id="0:2653">
-                    <KeyFrameDouble value="1" frame="0" id="0:2654"/>
+            </KeyedObject>
+            <KeyedObject objectId="7:21" id="0:2653">
+                <KeyedProperty propertyKey="16" id="0:2654">
+                    <KeyFrameDouble value="1" frame="0" id="0:2655"/>
+                </KeyedProperty>
+                <KeyedProperty propertyKey="17" id="0:2656">
+                    <KeyFrameDouble value="1" frame="0" id="0:2657"/>
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
         <LinearAnimation fps="60" duration="60" loopValue="oneShot" name="LookX" id="7:60">
-            <KeyedObject objectId="7:22" id="0:2655">
-                <KeyedProperty propertyKey="13" id="0:2656">
-                    <KeyFrameDouble value="-12" frame="0" interpolationType="cubic" id="0:2657"><CubicEaseInterpolator x1="0.25" y1="0.1" x2="0.25" y2="1" id="0:2658"/></KeyFrameDouble>
-                    <KeyFrameDouble value="12" frame="60" interpolationType="cubic" id="0:2659"><CubicEaseInterpolator x1="0.25" y1="0.1" x2="0.25" y2="1" id="0:2660"/></KeyFrameDouble>
+            <KeyedObject objectId="7:22" id="0:2658">
+                <KeyedProperty propertyKey="13" id="0:2659">
+                    <KeyFrameDouble value="-12" frame="0" interpolationType="cubic" id="0:2660"><CubicEaseInterpolator x1="0.25" y1="0.1" x2="0.25" y2="1" id="0:2661"/></KeyFrameDouble>
+                    <KeyFrameDouble value="12" frame="60" interpolationType="cubic" id="0:2662"><CubicEaseInterpolator x1="0.25" y1="0.1" x2="0.25" y2="1" id="0:2663"/></KeyFrameDouble>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:21" id="0:2661">
-                <KeyedProperty propertyKey="13" id="0:2662">
-                    <KeyFrameDouble value="-4" frame="0" interpolationType="cubic" id="0:2663"><CubicEaseInterpolator x1="0.25" y1="0.1" x2="0.25" y2="1" id="0:2664"/></KeyFrameDouble>
-                    <KeyFrameDouble value="4" frame="60" interpolationType="cubic" id="0:2665"><CubicEaseInterpolator x1="0.25" y1="0.1" x2="0.25" y2="1" id="0:2666"/></KeyFrameDouble>
+            <KeyedObject objectId="7:21" id="0:2664">
+                <KeyedProperty propertyKey="13" id="0:2665">
+                    <KeyFrameDouble value="-4" frame="0" interpolationType="cubic" id="0:2666"><CubicEaseInterpolator x1="0.25" y1="0.1" x2="0.25" y2="1" id="0:2667"/></KeyFrameDouble>
+                    <KeyFrameDouble value="4" frame="60" interpolationType="cubic" id="0:2668"><CubicEaseInterpolator x1="0.25" y1="0.1" x2="0.25" y2="1" id="0:2669"/></KeyFrameDouble>
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
         <LinearAnimation fps="60" duration="60" loopValue="oneShot" name="LookY" id="7:61">
-            <KeyedObject objectId="7:22" id="0:2667">
-                <KeyedProperty propertyKey="14" id="0:2668">
-                    <KeyFrameDouble value="-10" frame="0" interpolationType="cubic" id="0:2669"><CubicEaseInterpolator x1="0.25" y1="0.1" x2="0.25" y2="1" id="0:2670"/></KeyFrameDouble>
-                    <KeyFrameDouble value="10" frame="60" interpolationType="cubic" id="0:2671"><CubicEaseInterpolator x1="0.25" y1="0.1" x2="0.25" y2="1" id="0:2672"/></KeyFrameDouble>
+            <KeyedObject objectId="7:22" id="0:2670">
+                <KeyedProperty propertyKey="14" id="0:2671">
+                    <KeyFrameDouble value="-10" frame="0" interpolationType="cubic" id="0:2672"><CubicEaseInterpolator x1="0.25" y1="0.1" x2="0.25" y2="1" id="0:2673"/></KeyFrameDouble>
+                    <KeyFrameDouble value="10" frame="60" interpolationType="cubic" id="0:2674"><CubicEaseInterpolator x1="0.25" y1="0.1" x2="0.25" y2="1" id="0:2675"/></KeyFrameDouble>
                 </KeyedProperty>
             </KeyedObject>
-            <KeyedObject objectId="7:21" id="0:2673">
-                <KeyedProperty propertyKey="14" id="0:2674">
-                    <KeyFrameDouble value="-3" frame="0" interpolationType="cubic" id="0:2675"><CubicEaseInterpolator x1="0.25" y1="0.1" x2="0.25" y2="1" id="0:2676"/></KeyFrameDouble>
-                    <KeyFrameDouble value="3" frame="60" interpolationType="cubic" id="0:2677"><CubicEaseInterpolator x1="0.25" y1="0.1" x2="0.25" y2="1" id="0:2678"/></KeyFrameDouble>
+            <KeyedObject objectId="7:21" id="0:2676">
+                <KeyedProperty propertyKey="14" id="0:2677">
+                    <KeyFrameDouble value="-3" frame="0" interpolationType="cubic" id="0:2678"><CubicEaseInterpolator x1="0.25" y1="0.1" x2="0.25" y2="1" id="0:2679"/></KeyFrameDouble>
+                    <KeyFrameDouble value="3" frame="60" interpolationType="cubic" id="0:2680"><CubicEaseInterpolator x1="0.25" y1="0.1" x2="0.25" y2="1" id="0:2681"/></KeyFrameDouble>
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
         <LinearAnimation fps="60" duration="60" loopValue="oneShot" name="Open" id="7:62">
-            <KeyedObject objectId="7:34" id="0:2679">
-                <KeyedProperty propertyKey="17" id="0:2680">
-                    <KeyFrameDouble value="0.35" frame="0" interpolationType="cubic" id="0:2681"><CubicEaseInterpolator x1="0.25" y1="0.1" x2="0.25" y2="1" id="0:2682"/></KeyFrameDouble>
-                    <KeyFrameDouble value="1.15" frame="60" interpolationType="cubic" id="0:2683"><CubicEaseInterpolator x1="0.25" y1="0.1" x2="0.25" y2="1" id="0:2684"/></KeyFrameDouble>
+            <KeyedObject objectId="7:34" id="0:2682">
+                <KeyedProperty propertyKey="17" id="0:2683">
+                    <KeyFrameDouble value="0.55" frame="0" interpolationType="cubic" id="0:2684"><CubicEaseInterpolator x1="0.25" y1="0.1" x2="0.25" y2="1" id="0:2685"/></KeyFrameDouble>
+                    <KeyFrameDouble value="1.6" frame="60" interpolationType="cubic" id="0:2686"><CubicEaseInterpolator x1="0.25" y1="0.1" x2="0.25" y2="1" id="0:2687"/></KeyFrameDouble>
                 </KeyedProperty>
-                <KeyedProperty propertyKey="16" id="0:2685">
-                    <KeyFrameDouble value="0.9" frame="0" interpolationType="cubic" id="0:2686"><CubicEaseInterpolator x1="0.25" y1="0.1" x2="0.25" y2="1" id="0:2687"/></KeyFrameDouble>
-                    <KeyFrameDouble value="1.05" frame="60" interpolationType="cubic" id="0:2688"><CubicEaseInterpolator x1="0.25" y1="0.1" x2="0.25" y2="1" id="0:2689"/></KeyFrameDouble>
+                <KeyedProperty propertyKey="16" id="0:2688">
+                    <KeyFrameDouble value="0.95" frame="0" interpolationType="cubic" id="0:2689"><CubicEaseInterpolator x1="0.25" y1="0.1" x2="0.25" y2="1" id="0:2690"/></KeyFrameDouble>
+                    <KeyFrameDouble value="1.1" frame="60" interpolationType="cubic" id="0:2691"><CubicEaseInterpolator x1="0.25" y1="0.1" x2="0.25" y2="1" id="0:2692"/></KeyFrameDouble>
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
         <LinearAnimation fps="60" duration="10" loopValue="oneShot" name="Blink" id="7:63">
-            <KeyedObject objectId="7:20" id="0:2690">
-                <KeyedProperty propertyKey="17" id="0:2691">
-                    <KeyFrameDouble value="1" frame="0" interpolationType="cubic" id="0:2692"><CubicEaseInterpolator x1="0.25" y1="0.1" x2="0.25" y2="1" id="0:2693"/></KeyFrameDouble>
-                    <KeyFrameDouble value="0.06" frame="4" interpolationType="cubic" id="0:2694"><CubicEaseInterpolator x1="0.25" y1="0.1" x2="0.25" y2="1" id="0:2695"/></KeyFrameDouble>
-                    <KeyFrameDouble value="1" frame="10" interpolationType="cubic" id="0:2696"><CubicEaseInterpolator x1="0.25" y1="0.1" x2="0.25" y2="1" id="0:2697"/></KeyFrameDouble>
+            <KeyedObject objectId="7:20" id="0:2693">
+                <KeyedProperty propertyKey="17" id="0:2694">
+                    <KeyFrameDouble value="1" frame="0" interpolationType="cubic" id="0:2695"><CubicEaseInterpolator x1="0.25" y1="0.1" x2="0.25" y2="1" id="0:2696"/></KeyFrameDouble>
+                    <KeyFrameDouble value="0.06" frame="4" interpolationType="cubic" id="0:2697"><CubicEaseInterpolator x1="0.25" y1="0.1" x2="0.25" y2="1" id="0:2698"/></KeyFrameDouble>
+                    <KeyFrameDouble value="1" frame="10" interpolationType="cubic" id="0:2699"><CubicEaseInterpolator x1="0.25" y1="0.1" x2="0.25" y2="1" id="0:2700"/></KeyFrameDouble>
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
@@ -3832,48 +3836,48 @@
             <StateMachineNumber name="expr" id="7:6"/>
             <StateMachineTrigger name="blink" id="7:7"/>
             <StateMachineLayer name="Expression" id="7:10">
-                <EntryState id="0:2698">
-                    <StateTransition stateToId="7:130" id="0:2699"/>
+                <EntryState id="0:2701">
+                    <StateTransition stateToId="7:130" id="0:2702"/>
                 </EntryState>
-                <AnyState x="220" y="-140" id="0:2700">
-                    <StateTransition stateToId="7:130" duration="160" id="0:2701">
-                        <TransitionNumberCondition inputId="7:6" opValue="equal" value="0" id="0:2702"/>
+                <AnyState x="220" y="-140" id="0:2703">
+                    <StateTransition stateToId="7:130" duration="160" id="0:2704">
+                        <TransitionNumberCondition inputId="7:6" opValue="equal" value="0" id="0:2705"/>
                     </StateTransition>
-                    <StateTransition stateToId="7:131" duration="160" id="0:2703">
-                        <TransitionNumberCondition inputId="7:6" opValue="equal" value="1" id="0:2704"/>
+                    <StateTransition stateToId="7:131" duration="160" id="0:2706">
+                        <TransitionNumberCondition inputId="7:6" opValue="equal" value="1" id="0:2707"/>
                     </StateTransition>
-                    <StateTransition stateToId="7:132" duration="160" id="0:2705">
-                        <TransitionNumberCondition inputId="7:6" opValue="equal" value="2" id="0:2706"/>
+                    <StateTransition stateToId="7:132" duration="160" id="0:2708">
+                        <TransitionNumberCondition inputId="7:6" opValue="equal" value="2" id="0:2709"/>
                     </StateTransition>
-                    <StateTransition stateToId="7:133" duration="160" id="0:2707">
-                        <TransitionNumberCondition inputId="7:6" opValue="equal" value="3" id="0:2708"/>
+                    <StateTransition stateToId="7:133" duration="160" id="0:2710">
+                        <TransitionNumberCondition inputId="7:6" opValue="equal" value="3" id="0:2711"/>
                     </StateTransition>
-                    <StateTransition stateToId="7:134" duration="160" id="0:2709">
-                        <TransitionNumberCondition inputId="7:6" opValue="equal" value="4" id="0:2710"/>
+                    <StateTransition stateToId="7:134" duration="160" id="0:2712">
+                        <TransitionNumberCondition inputId="7:6" opValue="equal" value="4" id="0:2713"/>
                     </StateTransition>
-                    <StateTransition stateToId="7:135" duration="160" id="0:2711">
-                        <TransitionNumberCondition inputId="7:6" opValue="equal" value="5" id="0:2712"/>
+                    <StateTransition stateToId="7:135" duration="160" id="0:2714">
+                        <TransitionNumberCondition inputId="7:6" opValue="equal" value="5" id="0:2715"/>
                     </StateTransition>
-                    <StateTransition stateToId="7:136" duration="160" id="0:2713">
-                        <TransitionNumberCondition inputId="7:6" opValue="equal" value="6" id="0:2714"/>
+                    <StateTransition stateToId="7:136" duration="160" id="0:2716">
+                        <TransitionNumberCondition inputId="7:6" opValue="equal" value="6" id="0:2717"/>
                     </StateTransition>
-                    <StateTransition stateToId="7:137" duration="160" id="0:2715">
-                        <TransitionNumberCondition inputId="7:6" opValue="equal" value="7" id="0:2716"/>
+                    <StateTransition stateToId="7:137" duration="160" id="0:2718">
+                        <TransitionNumberCondition inputId="7:6" opValue="equal" value="7" id="0:2719"/>
                     </StateTransition>
-                    <StateTransition stateToId="7:138" duration="160" id="0:2717">
-                        <TransitionNumberCondition inputId="7:6" opValue="equal" value="8" id="0:2718"/>
+                    <StateTransition stateToId="7:138" duration="160" id="0:2720">
+                        <TransitionNumberCondition inputId="7:6" opValue="equal" value="8" id="0:2721"/>
                     </StateTransition>
-                    <StateTransition stateToId="7:139" duration="160" id="0:2719">
-                        <TransitionNumberCondition inputId="7:6" opValue="equal" value="9" id="0:2720"/>
+                    <StateTransition stateToId="7:139" duration="160" id="0:2722">
+                        <TransitionNumberCondition inputId="7:6" opValue="equal" value="9" id="0:2723"/>
                     </StateTransition>
-                    <StateTransition stateToId="7:140" duration="160" id="0:2721">
-                        <TransitionNumberCondition inputId="7:6" opValue="equal" value="10" id="0:2722"/>
+                    <StateTransition stateToId="7:140" duration="160" id="0:2724">
+                        <TransitionNumberCondition inputId="7:6" opValue="equal" value="10" id="0:2725"/>
                     </StateTransition>
-                    <StateTransition stateToId="7:141" duration="160" id="0:2723">
-                        <TransitionNumberCondition inputId="7:6" opValue="equal" value="11" id="0:2724"/>
+                    <StateTransition stateToId="7:141" duration="160" id="0:2726">
+                        <TransitionNumberCondition inputId="7:6" opValue="equal" value="11" id="0:2727"/>
                     </StateTransition>
                 </AnyState>
-                <ExitState x="430" y="-140" id="0:2725"/>
+                <ExitState x="430" y="-140" id="0:2728"/>
                 <AnimationState x="200" y="40" animationId="7:100" id="7:130"/>
                 <AnimationState x="200" y="100" animationId="7:101" id="7:131"/>
                 <AnimationState x="200" y="160" animationId="7:102" id="7:132"/>
@@ -3888,42 +3892,42 @@
                 <AnimationState x="200" y="700" animationId="7:111" id="7:141"/>
             </StateMachineLayer>
             <StateMachineLayer name="Blink" id="7:11">
-                <EntryState id="0:2726">
-                    <StateTransition stateToId="7:161" id="0:2727"/>
+                <EntryState id="0:2729">
+                    <StateTransition stateToId="7:161" id="0:2730"/>
                 </EntryState>
-                <AnyState x="220" y="-140" id="0:2728">
-                    <StateTransition stateToId="7:160" id="0:2729">
-                        <TransitionTriggerCondition inputId="7:7" id="0:2730"/>
+                <AnyState x="220" y="-140" id="0:2731">
+                    <StateTransition stateToId="7:160" id="0:2732">
+                        <TransitionTriggerCondition inputId="7:7" id="0:2733"/>
                     </StateTransition>
                 </AnyState>
-                <ExitState x="430" y="-140" id="0:2731"/>
+                <ExitState x="430" y="-140" id="0:2734"/>
                 <AnimationState x="200" y="40" animationId="7:64" id="7:161"/>
                 <AnimationState x="200" y="100" animationId="7:63" reset="true" id="7:160">
-                    <StateTransition stateToId="7:161" duration="0" enableExitTime="true" exitTimeIsPercetange="true" exitTime="100" id="0:2732"/>
+                    <StateTransition stateToId="7:161" duration="0" enableExitTime="true" exitTimeIsPercetange="true" exitTime="100" id="0:2735"/>
                 </AnimationState>
             </StateMachineLayer>
             <StateMachineLayer name="AutoBlink" id="7:12">
-                <EntryState id="0:2733">
-                    <StateTransition stateToId="7:162" id="0:2734"/>
+                <EntryState id="0:2736">
+                    <StateTransition stateToId="7:162" id="0:2737"/>
                 </EntryState>
-                <AnyState x="220" y="-140" id="0:2735">
+                <AnyState x="220" y="-140" id="0:2738">
 
                 </AnyState>
-                <ExitState x="430" y="-140" id="0:2736"/>
+                <ExitState x="430" y="-140" id="0:2739"/>
                 <AnimationState x="200" y="40" animationId="7:64" random="true" id="7:162">
-                    <StateTransition stateToId="7:164" duration="0" enableExitTime="true" exitTimeIsPercetange="true" exitTime="100" id="0:2737"/>
+                    <StateTransition stateToId="7:164" duration="0" enableExitTime="true" exitTimeIsPercetange="true" exitTime="100" id="0:2740"/>
                 </AnimationState>
                 <AnimationState x="200" y="100" animationId="7:65" id="7:163">
-                    <StateTransition stateToId="7:164" duration="0" enableExitTime="true" exitTimeIsPercetange="true" exitTime="100" id="0:2738"/>
+                    <StateTransition stateToId="7:164" duration="0" enableExitTime="true" exitTimeIsPercetange="true" exitTime="100" id="0:2741"/>
                 </AnimationState>
                 <AnimationState x="200" y="160" animationId="7:63" reset="true" random="true" id="7:164">
-                    <StateTransition stateToId="7:162" duration="0" enableExitTime="true" exitTimeIsPercetange="true" exitTime="100" randomWeight="60" id="0:2739"/>
-                    <StateTransition stateToId="7:163" duration="0" enableExitTime="true" exitTimeIsPercetange="true" exitTime="100" randomWeight="40" id="0:2740"/>
+                    <StateTransition stateToId="7:162" duration="0" enableExitTime="true" exitTimeIsPercetange="true" exitTime="100" randomWeight="60" id="0:2742"/>
+                    <StateTransition stateToId="7:163" duration="0" enableExitTime="true" exitTimeIsPercetange="true" exitTime="100" randomWeight="40" id="0:2743"/>
                 </AnimationState>
             </StateMachineLayer>
         </StateMachine>
     </Artboard>
-    <ComponentAsset artboardId="7:2" name="Plate" id="0:2741"/>
+    <ComponentAsset artboardId="7:2" name="Plate" id="0:2744"/>
 
     <DataEnumCustom name="AvatarState" id="1:100">
         <DataEnumValue key="idle" value="Idle" id="1:101"/>
@@ -3968,17 +3972,17 @@
         <ViewModelPropertyBoolean name="dragged" id="1:11"/>
 
         <ViewModelInstance exports="true" name="Default" id="1:20">
-            <ViewModelInstanceEnum propertyValue="1:101" viewModelPropertyId="1:1" id="0:2742"/>
-            <ViewModelInstanceNumber propertyValue="0" viewModelPropertyId="1:2" id="0:2743"/>
-            <ViewModelInstanceNumber propertyValue="0" viewModelPropertyId="1:3" id="0:2744"/>
-            <ViewModelInstanceNumber propertyValue="0" viewModelPropertyId="1:4" id="0:2745"/>
-            <ViewModelInstanceTrigger viewModelPropertyId="1:5" id="0:2746"/>
-            <ViewModelInstanceEnum propertyValue="1:201" viewModelPropertyId="1:6" id="0:2747"/>
-            <ViewModelInstanceColor propertyValue="FF5FA8FF" viewModelPropertyId="1:7" id="0:2748"/>
-            <ViewModelInstanceBoolean propertyValue="false" viewModelPropertyId="1:8" id="0:2749"/>
-            <ViewModelInstanceTrigger viewModelPropertyId="1:9" id="0:2750"/>
-            <ViewModelInstanceTrigger viewModelPropertyId="1:10" id="0:2751"/>
-            <ViewModelInstanceBoolean propertyValue="false" viewModelPropertyId="1:11" id="0:2752"/>
+            <ViewModelInstanceEnum propertyValue="1:101" viewModelPropertyId="1:1" id="0:2745"/>
+            <ViewModelInstanceNumber propertyValue="0" viewModelPropertyId="1:2" id="0:2746"/>
+            <ViewModelInstanceNumber propertyValue="0" viewModelPropertyId="1:3" id="0:2747"/>
+            <ViewModelInstanceNumber propertyValue="0" viewModelPropertyId="1:4" id="0:2748"/>
+            <ViewModelInstanceTrigger viewModelPropertyId="1:5" id="0:2749"/>
+            <ViewModelInstanceEnum propertyValue="1:201" viewModelPropertyId="1:6" id="0:2750"/>
+            <ViewModelInstanceColor propertyValue="FF5FA8FF" viewModelPropertyId="1:7" id="0:2751"/>
+            <ViewModelInstanceBoolean propertyValue="false" viewModelPropertyId="1:8" id="0:2752"/>
+            <ViewModelInstanceTrigger viewModelPropertyId="1:9" id="0:2753"/>
+            <ViewModelInstanceTrigger viewModelPropertyId="1:10" id="0:2754"/>
+            <ViewModelInstanceBoolean propertyValue="false" viewModelPropertyId="1:11" id="0:2755"/>
         </ViewModelInstance>
     </ViewModel>
 </Rive>

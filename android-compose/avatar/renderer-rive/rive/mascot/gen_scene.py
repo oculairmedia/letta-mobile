@@ -291,29 +291,29 @@ def body():
         </Fill>
         <Fill name="Shade">
             <RadialGradient startX="-30" startY="-50" endX="150" endY="130" name="Gradient">
-                <GradientStop colorValue="00000000" position="0.45"/>
-                <GradientStop colorValue="55000000" position="1"/>
+                <GradientStop colorValue="00000000" position="0.4"/>
+                <GradientStop colorValue="66000000" position="1"/>
             </RadialGradient>
         </Fill>
         <Fill name="Gloss">
             <RadialGradient startX="-55" startY="-75" endX="60" endY="30" name="Gradient">
-                <GradientStop colorValue="B8FFFFFF" position="0"/>
+                <GradientStop colorValue="D0FFFFFF" position="0"/>
                 <GradientStop colorValue="00FFFFFF" position="1"/>
             </RadialGradient>
         </Fill>
         <Fill name="Tint">
             <SolidColor colorValue="00000000" name="TintColor" id="{TINT}"/>
         </Fill>
-        <Stroke thickness="3" name="GlassRing">
-            <SolidColor colorValue="8CFFFFFF" name="Color"/>
-            <Feather strength="4" name="Feather"/>
+        <Stroke thickness="2" name="GlassRing">
+            <SolidColor colorValue="4DFFFFFF" name="Color"/>
+            <Feather strength="3" name="Feather"/>
         </Stroke>
     </Shape>
-    <Shape scaleX="1.12" scaleY="1.12" opacity="0.45" name="Halo" id="{HALO}">
+    <Shape scaleX="1.06" scaleY="1.06" opacity="0.22" name="Halo" id="{HALO}">
 {indent(body_path(halo_vertex_ids, "Path"), "        ")}
-        <Stroke thickness="70" name="Stroke">
+        <Stroke thickness="44" name="Stroke">
             {bound}
-            <Feather strength="60" name="Feather"/>
+            <Feather strength="40" name="Feather"/>
         </Stroke>
     </Shape>
 </Node>
@@ -349,7 +349,7 @@ def plate_component():
     look_x = animation("LookX", PLATE_LOOKX, 60, {GLYPHS_NODE: {X: [(0, -12), (60, 12)]}, PLATE_CARD: {X: [(0, -4), (60, 4)]}})
     look_y = animation("LookY", PLATE_LOOKY, 60, {GLYPHS_NODE: {Y: [(0, -10), (60, 10)]}, PLATE_CARD: {Y: [(0, -3), (60, 3)]}})
     # Speaking: the arc opens with the amplitude. Keyed on the glyph's own scale so the art stays.
-    open_anim = animation("Open", PLATE_OPEN, 60, {G["arcOpen"]: {SY: [(0, 0.35), (60, 1.15)], SX: [(0, 0.9), (60, 1.05)]}})
+    open_anim = animation("Open", PLATE_OPEN, 60, {G["arcOpen"]: {SY: [(0, 0.55), (60, 1.6)], SX: [(0, 0.95), (60, 1.1)]}})
     # Blink: the whole plate squashes to a line and back.
     blink = animation("Blink", PLATE_BLINK_ANIM, 10, {PLATE_ROOT: {SY: [(0, 1), (4, 0.06), (10, 1)]}})
     wait_a = animation("WaitA", PLATE_WAIT_A, 150, {})
@@ -375,29 +375,30 @@ def plate_component():
     def glyph(name, sid, inner):
         return f'<Shape x="0" y="0" opacity="0" name="{name}" id="{sid}">\n{indent(inner, "    ")}\n</Shape>'
 
-    def arc(down):
+    def arc(down, size=1.0):
         """down=True is the smile (ends up, middle down); down=False the arch - a closed eye."""
         s = -1 if down else 1  # y grows downward
+        k = size
         return (f'<PointsPath isClosed="false" name="Path">\n'
-                f'    <StraightVertex x="-18" y="{6 * s}"/>\n'
-                f'    <CubicMirroredVertex x="0" y="{-10 * s}" rotation="0" distance="12"/>\n'
-                f'    <StraightVertex x="18" y="{6 * s}"/>\n'
-                f'</PointsPath>\n{stroke(INK, 9)}')
+                f'    <StraightVertex x="{-22 * k}" y="{8 * s * k}"/>\n'
+                f'    <CubicMirroredVertex x="0" y="{-12 * s * k}" rotation="0" distance="{15 * k}"/>\n'
+                f'    <StraightVertex x="{22 * k}" y="{8 * s * k}"/>\n'
+                f'</PointsPath>\n{stroke(INK, round(12 * k, 1))}')
 
     glyphs = "\n".join([
-        glyph("Square", G["square"], rrect(30, 30, 6) + fill(INK)),
-        glyph("Ring", G["ring"], f'<Ellipse width="30" height="30" name="Path"/>\n{stroke(INK, 9)}'),
-        glyph("Dash", G["dash"], rrect(42, 10, 5) + fill(INK)),
-        glyph("RingSmall", G["ringSmall"], f'<Ellipse width="24" height="24" name="Path"/>\n{stroke(INK, 8)}'),
-        glyph("ArcOpen", G["arcOpen"], f'<Ellipse width="34" height="20" name="Path"/>\n{fill(INK)}'),
+        glyph("Square", G["square"], rrect(42, 42, 8) + fill(INK)),
+        glyph("Ring", G["ring"], f'<Ellipse width="40" height="40" name="Path"/>\n{stroke(INK, 12)}'),
+        glyph("Dash", G["dash"], rrect(52, 13, 6) + fill(INK)),
+        glyph("RingSmall", G["ringSmall"], f'<Ellipse width="34" height="34" name="Path"/>\n{stroke(INK, 11)}'),
+        glyph("ArcOpen", G["arcOpen"], arc(down=False, size=1.3)),
         glyph("Smile", G["smile"], arc(down=True)),
-        glyph("Diamond", G["diamond"], f'<Shape rotation="{rad(45)}" name="Rot">\n    {rrect(26, 26, 4)}\n    {fill(INK)}\n</Shape>'),
+        glyph("Diamond", G["diamond"], f'<Shape rotation="{rad(45)}" name="Rot">\n    {rrect(34, 34, 5)}\n    {fill(INK)}\n</Shape>'),
         glyph("Arch", G["arch"], arc(down=False)),
-        glyph("Dot", G["dot"], f'<Ellipse width="16" height="16" name="Path"/>\n{fill(INK)}'),
-        glyph("Cross", G["cross"], f'<Shape rotation="{rad(45)}" name="A">\n    {rrect(34, 9, 4)}\n    {fill(INK)}\n</Shape>\n'
-                                    f'<Shape rotation="{rad(-45)}" name="B">\n    {rrect(34, 9, 4)}\n    {fill(INK)}\n</Shape>'),
+        glyph("Dot", G["dot"], f'<Ellipse width="22" height="22" name="Path"/>\n{fill(INK)}'),
+        glyph("Cross", G["cross"], f'<Shape rotation="{rad(45)}" name="A">\n    {rrect(46, 12, 5)}\n    {fill(INK)}\n</Shape>\n'
+                                    f'<Shape rotation="{rad(-45)}" name="B">\n    {rrect(46, 12, 5)}\n    {fill(INK)}\n</Shape>'),
         # The error frown sits on the body below the plate, like the sheet.
-        f'<Shape x="0" y="88" opacity="0" name="FrownLine" id="{G["frownLine"]}">\n'
+        f'<Shape x="0" y="100" opacity="0" name="FrownLine" id="{G["frownLine"]}">\n'
         f'    <PointsPath isClosed="false" name="Path">\n        <StraightVertex x="-16" y="4"/>\n'
         f'        <CubicMirroredVertex x="0" y="-6" rotation="0" distance="10"/>\n        <StraightVertex x="16" y="4"/>\n'
         f'    </PointsPath>\n    {stroke(INK, 7)}\n</Shape>',
@@ -407,7 +408,7 @@ def plate_component():
     <LayoutComponentStyle name="Style" id="7:3"/>
     <Node x="100" y="100" name="PlateRoot" id="{PLATE_ROOT}">
         <!-- The "asking you" tell: a small dot below the plate, on the body. -->
-        <Shape x="0" y="66" opacity="0" name="TellDot" id="{TELL_DOT}">
+        <Shape x="0" y="82" opacity="0" name="TellDot" id="{TELL_DOT}">
             <Ellipse width="12" height="12" name="Path"/>
             {fill(INK)}
         </Shape>
@@ -415,7 +416,7 @@ def plate_component():
 {indent(glyphs, "            ")}
         </Node>
         <Shape x="0" y="0" name="Card" id="{PLATE_CARD}">
-            {rrect(84, 84, 20)}
+            {rrect(112, 112, 26)}
             <Stroke thickness="14" name="Shadow">
                 <SolidColor colorValue="33000000" name="Color"/>
                 <Feather strength="14" name="Feather"/>
@@ -443,7 +444,7 @@ def plate_component():
 def face():
     return f'''<Node x="250" y="262" name="FacePlacement">
 <Node x="0" y="0" name="Face" id="{FACE}">
-    <NestedArtboard artboardId="{PLATE_AB}" x="-100" y="-118" name="Plate" id="{PLATE}">
+    <NestedArtboard artboardId="{PLATE_AB}" x="-100" y="-108" name="Plate" id="{PLATE}">
         <NestedStateMachine animationId="{PLATE_SM}" name="SM">
             <NestedNumber inputId="{PLATE_IN_EXPR}" nestedValue="0" name="expr" id="{PLATE_EXPR}"/>
             <NestedTrigger inputId="{PLATE_IN_BLINK}" name="blink" id="{PLATE_BLINK}"/>
