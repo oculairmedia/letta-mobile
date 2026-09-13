@@ -1,0 +1,24 @@
+﻿diff --git a/renderer/src/gl/pls_impl_rw_texture.cpp b/renderer/src/gl/pls_impl_rw_texture.cpp
+index e2ede41..4aebc19 100644
+--- a/renderer/src/gl/pls_impl_rw_texture.cpp
++++ b/renderer/src/gl/pls_impl_rw_texture.cpp
+@@ -2,6 +2,7 @@
+  * Copyright 2023 Rive
+  */
+ 
++#include "rive/renderer/texture.hpp"
+ #include "rive/renderer/gl/render_context_gl_impl.hpp"
+ 
+ #include "rive/renderer/gl/render_target_gl.hpp"
+diff --git a/renderer/src/gl/pls_impl_webgl.cpp b/renderer/src/gl/pls_impl_webgl.cpp
+index 5da7f84..d6b0fd2 100644
+--- a/renderer/src/gl/pls_impl_webgl.cpp
++++ b/renderer/src/gl/pls_impl_webgl.cpp
+@@ -2,6 +2,7 @@
+  * Copyright 2022 Rive
+  */
+ 
++#include "rive/renderer/texture.hpp"
+ #include "rive/renderer/gl/render_context_gl_impl.hpp"
+ 
+ #include "rive/renderer/gl/gl_utils.hpp"
