@@ -205,3 +205,6 @@ Should / deliberately not:
   glyph-only glance belongs in the editor pass.
 - Wander is not gated during `speaking`/`sleeping`; decide if it should be.
 - Kotlin identity slice (`1zti3`): picker, persistence, chat-header hero.
+- `WORKING` (tool execution) as a state distinct from `THINKING` - decided as a v2 gap, filed as
+  its own bead; needs `glyph-working.svg` (+ `-small`) from the design side, a sustained state
+  with square-on facing and Wander gated off, and the director wired to tool-call events.
