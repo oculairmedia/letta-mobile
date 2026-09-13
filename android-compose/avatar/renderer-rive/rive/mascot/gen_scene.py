@@ -52,16 +52,75 @@ def bind(source, key, converter=None):
     return f'<DataBindContext sourcePathIds="{VM}-{source}" propertyKey="{key}"{conv}/>'
 
 
+STYLE = "glossy"  # "flat" is the Grokbot-like matte look; "glossy" is the mood-orb look.
+
+
 def body(name, sid, inner):
-    # Every body: same origin, fill bound to `color`, hidden until the Shape layer shows it.
-    return f'''<Shape x="250" y="270" opacity="0" name="{name}" id="{sid}">
-    {inner}
-    <Fill name="Fill">
+    """One body = a Node the Shape layer fades, holding the paint layers for that silhouette.
+
+    Colour-agnostic on purpose: the single bound `color` fills the body and the glow, and the
+    gloss, shading and rim are fixed translucent white/black on top, so every palette entry gets
+    the same finish. Feather on a fill renders nothing through the CLI (see `rive docs drawing`),
+    so the glow is a radial gradient fading to alpha 0 and only the rim stroke is feathered.
+    """
+    bound_fill = f'''<Fill name="Fill">
         <SolidColor colorValue="FF1E7BF0" name="Color">
             {bind(VM_COLOR, COLOR)}
         </SolidColor>
-    </Fill>
-</Shape>'''
+    </Fill>'''
+    if STYLE == "flat":
+        return f'''<Node x="250" y="270" opacity="0" name="{name}" id="{sid}">
+    <Shape name="Body">
+        {inner}
+        {bound_fill}
+    </Shape>
+</Node>'''
+    return f'''<Node x="250" y="270" opacity="0" name="{name}" id="{sid}">
+    <!-- Glass rim: a soft white stroke inside the edge. -->
+    <Shape name="Rim">
+        {inner}
+        <Stroke thickness="10" name="Stroke">
+            <SolidColor colorValue="66FFFFFF" name="Color"/>
+            <Feather strength="8" inner="true" name="Feather"/>
+        </Stroke>
+    </Shape>
+    <!-- Gloss: the highlight up-left, fixed white alpha. -->
+    <Shape name="Gloss">
+        {inner}
+        <Fill name="Fill">
+            <RadialGradient startX="-55" startY="-75" endX="60" endY="30" name="Gradient">
+                <GradientStop colorValue="B8FFFFFF" position="0"/>
+                <GradientStop colorValue="00FFFFFF" position="1"/>
+            </RadialGradient>
+        </Fill>
+    </Shape>
+    <!-- Shading: darker toward the bottom-right, fixed black alpha. -->
+    <Shape name="Shade">
+        {inner}
+        <Fill name="Fill">
+            <RadialGradient startX="-30" startY="-50" endX="150" endY="130" name="Gradient">
+                <GradientStop colorValue="00000000" position="0.45"/>
+                <GradientStop colorValue="55000000" position="1"/>
+            </RadialGradient>
+        </Fill>
+    </Shape>
+    <Shape name="Body">
+        {inner}
+        {bound_fill}
+    </Shape>
+    <!-- Glow: the silhouette enlarged, bound colour at the centre fading out. Last sibling draws underneath. -->
+    <Shape scaleX="1.32" scaleY="1.32" opacity="0.55" name="Glow">
+        {inner}
+        <Fill name="Fill">
+            <RadialGradient startX="0" startY="0" endX="0" endY="150" name="Gradient">
+                <GradientStop colorValue="FF1E7BF0" position="0.55">
+                    {bind(VM_COLOR, 38)}
+                </GradientStop>
+                <GradientStop colorValue="00FFFFFF" position="1"/>
+            </RadialGradient>
+        </Fill>
+    </Shape>
+</Node>'''
 
 
 def points(verts):

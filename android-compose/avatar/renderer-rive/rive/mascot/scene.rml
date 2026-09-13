@@ -96,62 +96,340 @@
 
         <!-- Bodies, all at one origin; the Shape layer shows exactly one. Declared last so they draw under the face. -->
         <Node x="0" y="0" name="Body" id="0:100">
-            <Shape x="250" y="270" opacity="0" name="Circle" id="0:110">
-                <Ellipse width="300" height="300" name="Path"/>
-                <Fill name="Fill">
+            <Node x="250" y="270" opacity="0" name="Circle" id="0:110">
+                <!-- Glass rim: a soft white stroke inside the edge. -->
+                <Shape name="Rim">
+                    <Ellipse width="300" height="300" name="Path"/>
+                    <Stroke thickness="10" name="Stroke">
+                        <SolidColor colorValue="66FFFFFF" name="Color"/>
+                        <Feather strength="8" inner="true" name="Feather"/>
+                    </Stroke>
+                </Shape>
+                <!-- Gloss: the highlight up-left, fixed white alpha. -->
+                <Shape name="Gloss">
+                    <Ellipse width="300" height="300" name="Path"/>
+                    <Fill name="Fill">
+                        <RadialGradient startX="-55" startY="-75" endX="60" endY="30" name="Gradient">
+                            <GradientStop colorValue="B8FFFFFF" position="0"/>
+                            <GradientStop colorValue="00FFFFFF" position="1"/>
+                        </RadialGradient>
+                    </Fill>
+                </Shape>
+                <!-- Shading: darker toward the bottom-right, fixed black alpha. -->
+                <Shape name="Shade">
+                    <Ellipse width="300" height="300" name="Path"/>
+                    <Fill name="Fill">
+                        <RadialGradient startX="-30" startY="-50" endX="150" endY="130" name="Gradient">
+                            <GradientStop colorValue="00000000" position="0.45"/>
+                            <GradientStop colorValue="55000000" position="1"/>
+                        </RadialGradient>
+                    </Fill>
+                </Shape>
+                <Shape name="Body">
+                    <Ellipse width="300" height="300" name="Path"/>
+                    <Fill name="Fill">
                     <SolidColor colorValue="FF1E7BF0" name="Color">
                         <DataBindContext sourcePathIds="1:50-1:7" propertyKey="37"/>
                     </SolidColor>
                 </Fill>
-            </Shape>
-            <Shape x="250" y="270" opacity="0" name="Blob" id="0:111">
-                <PointsPath isClosed="true" name="Path">
+                </Shape>
+                <!-- Glow: the silhouette enlarged, bound colour at the centre fading out. Last sibling draws underneath. -->
+                <Shape scaleX="1.32" scaleY="1.32" opacity="0.55" name="Glow">
+                    <Ellipse width="300" height="300" name="Path"/>
+                    <Fill name="Fill">
+                        <RadialGradient startX="0" startY="0" endX="0" endY="150" name="Gradient">
+                            <GradientStop colorValue="FF1E7BF0" position="0.55">
+                                <DataBindContext sourcePathIds="1:50-1:7" propertyKey="38"/>
+                            </GradientStop>
+                            <GradientStop colorValue="00FFFFFF" position="1"/>
+                        </RadialGradient>
+                    </Fill>
+                </Shape>
+            </Node>
+            <Node x="250" y="270" opacity="0" name="Blob" id="0:111">
+                <!-- Glass rim: a soft white stroke inside the edge. -->
+                <Shape name="Rim">
+                    <PointsPath isClosed="true" name="Path">
                     <CubicMirroredVertex x="0" y="-150" rotation="0.0" distance="85"/>
                     <CubicMirroredVertex x="150" y="-30" rotation="1.5708" distance="70"/>
                     <CubicMirroredVertex x="95" y="135" rotation="2.87979" distance="70"/>
                     <CubicMirroredVertex x="-105" y="125" rotation="3.40339" distance="70"/>
                     <CubicMirroredVertex x="-150" y="-40" rotation="4.71239" distance="70"/>
                 </PointsPath>
-                <Fill name="Fill">
+                    <Stroke thickness="10" name="Stroke">
+                        <SolidColor colorValue="66FFFFFF" name="Color"/>
+                        <Feather strength="8" inner="true" name="Feather"/>
+                    </Stroke>
+                </Shape>
+                <!-- Gloss: the highlight up-left, fixed white alpha. -->
+                <Shape name="Gloss">
+                    <PointsPath isClosed="true" name="Path">
+                    <CubicMirroredVertex x="0" y="-150" rotation="0.0" distance="85"/>
+                    <CubicMirroredVertex x="150" y="-30" rotation="1.5708" distance="70"/>
+                    <CubicMirroredVertex x="95" y="135" rotation="2.87979" distance="70"/>
+                    <CubicMirroredVertex x="-105" y="125" rotation="3.40339" distance="70"/>
+                    <CubicMirroredVertex x="-150" y="-40" rotation="4.71239" distance="70"/>
+                </PointsPath>
+                    <Fill name="Fill">
+                        <RadialGradient startX="-55" startY="-75" endX="60" endY="30" name="Gradient">
+                            <GradientStop colorValue="B8FFFFFF" position="0"/>
+                            <GradientStop colorValue="00FFFFFF" position="1"/>
+                        </RadialGradient>
+                    </Fill>
+                </Shape>
+                <!-- Shading: darker toward the bottom-right, fixed black alpha. -->
+                <Shape name="Shade">
+                    <PointsPath isClosed="true" name="Path">
+                    <CubicMirroredVertex x="0" y="-150" rotation="0.0" distance="85"/>
+                    <CubicMirroredVertex x="150" y="-30" rotation="1.5708" distance="70"/>
+                    <CubicMirroredVertex x="95" y="135" rotation="2.87979" distance="70"/>
+                    <CubicMirroredVertex x="-105" y="125" rotation="3.40339" distance="70"/>
+                    <CubicMirroredVertex x="-150" y="-40" rotation="4.71239" distance="70"/>
+                </PointsPath>
+                    <Fill name="Fill">
+                        <RadialGradient startX="-30" startY="-50" endX="150" endY="130" name="Gradient">
+                            <GradientStop colorValue="00000000" position="0.45"/>
+                            <GradientStop colorValue="55000000" position="1"/>
+                        </RadialGradient>
+                    </Fill>
+                </Shape>
+                <Shape name="Body">
+                    <PointsPath isClosed="true" name="Path">
+                    <CubicMirroredVertex x="0" y="-150" rotation="0.0" distance="85"/>
+                    <CubicMirroredVertex x="150" y="-30" rotation="1.5708" distance="70"/>
+                    <CubicMirroredVertex x="95" y="135" rotation="2.87979" distance="70"/>
+                    <CubicMirroredVertex x="-105" y="125" rotation="3.40339" distance="70"/>
+                    <CubicMirroredVertex x="-150" y="-40" rotation="4.71239" distance="70"/>
+                </PointsPath>
+                    <Fill name="Fill">
                     <SolidColor colorValue="FF1E7BF0" name="Color">
                         <DataBindContext sourcePathIds="1:50-1:7" propertyKey="37"/>
                     </SolidColor>
                 </Fill>
-            </Shape>
-            <Shape x="250" y="270" opacity="0" name="RoundedSquare" id="0:112">
-                <Rectangle width="280" height="280" linkCornerRadius="true" cornerRadiusTL="64" cornerRadiusTR="64" cornerRadiusBL="64" cornerRadiusBR="64" name="Path"/>
-                <Fill name="Fill">
+                </Shape>
+                <!-- Glow: the silhouette enlarged, bound colour at the centre fading out. Last sibling draws underneath. -->
+                <Shape scaleX="1.32" scaleY="1.32" opacity="0.55" name="Glow">
+                    <PointsPath isClosed="true" name="Path">
+                    <CubicMirroredVertex x="0" y="-150" rotation="0.0" distance="85"/>
+                    <CubicMirroredVertex x="150" y="-30" rotation="1.5708" distance="70"/>
+                    <CubicMirroredVertex x="95" y="135" rotation="2.87979" distance="70"/>
+                    <CubicMirroredVertex x="-105" y="125" rotation="3.40339" distance="70"/>
+                    <CubicMirroredVertex x="-150" y="-40" rotation="4.71239" distance="70"/>
+                </PointsPath>
+                    <Fill name="Fill">
+                        <RadialGradient startX="0" startY="0" endX="0" endY="150" name="Gradient">
+                            <GradientStop colorValue="FF1E7BF0" position="0.55">
+                                <DataBindContext sourcePathIds="1:50-1:7" propertyKey="38"/>
+                            </GradientStop>
+                            <GradientStop colorValue="00FFFFFF" position="1"/>
+                        </RadialGradient>
+                    </Fill>
+                </Shape>
+            </Node>
+            <Node x="250" y="270" opacity="0" name="RoundedSquare" id="0:112">
+                <!-- Glass rim: a soft white stroke inside the edge. -->
+                <Shape name="Rim">
+                    <Rectangle width="280" height="280" linkCornerRadius="true" cornerRadiusTL="64" cornerRadiusTR="64" cornerRadiusBL="64" cornerRadiusBR="64" name="Path"/>
+                    <Stroke thickness="10" name="Stroke">
+                        <SolidColor colorValue="66FFFFFF" name="Color"/>
+                        <Feather strength="8" inner="true" name="Feather"/>
+                    </Stroke>
+                </Shape>
+                <!-- Gloss: the highlight up-left, fixed white alpha. -->
+                <Shape name="Gloss">
+                    <Rectangle width="280" height="280" linkCornerRadius="true" cornerRadiusTL="64" cornerRadiusTR="64" cornerRadiusBL="64" cornerRadiusBR="64" name="Path"/>
+                    <Fill name="Fill">
+                        <RadialGradient startX="-55" startY="-75" endX="60" endY="30" name="Gradient">
+                            <GradientStop colorValue="B8FFFFFF" position="0"/>
+                            <GradientStop colorValue="00FFFFFF" position="1"/>
+                        </RadialGradient>
+                    </Fill>
+                </Shape>
+                <!-- Shading: darker toward the bottom-right, fixed black alpha. -->
+                <Shape name="Shade">
+                    <Rectangle width="280" height="280" linkCornerRadius="true" cornerRadiusTL="64" cornerRadiusTR="64" cornerRadiusBL="64" cornerRadiusBR="64" name="Path"/>
+                    <Fill name="Fill">
+                        <RadialGradient startX="-30" startY="-50" endX="150" endY="130" name="Gradient">
+                            <GradientStop colorValue="00000000" position="0.45"/>
+                            <GradientStop colorValue="55000000" position="1"/>
+                        </RadialGradient>
+                    </Fill>
+                </Shape>
+                <Shape name="Body">
+                    <Rectangle width="280" height="280" linkCornerRadius="true" cornerRadiusTL="64" cornerRadiusTR="64" cornerRadiusBL="64" cornerRadiusBR="64" name="Path"/>
+                    <Fill name="Fill">
                     <SolidColor colorValue="FF1E7BF0" name="Color">
                         <DataBindContext sourcePathIds="1:50-1:7" propertyKey="37"/>
                     </SolidColor>
                 </Fill>
-            </Shape>
-            <Shape x="250" y="270" opacity="0" name="Pill" id="0:113">
-                <Rectangle width="320" height="220" linkCornerRadius="true" cornerRadiusTL="110" cornerRadiusTR="110" cornerRadiusBL="110" cornerRadiusBR="110" name="Path"/>
-                <Fill name="Fill">
+                </Shape>
+                <!-- Glow: the silhouette enlarged, bound colour at the centre fading out. Last sibling draws underneath. -->
+                <Shape scaleX="1.32" scaleY="1.32" opacity="0.55" name="Glow">
+                    <Rectangle width="280" height="280" linkCornerRadius="true" cornerRadiusTL="64" cornerRadiusTR="64" cornerRadiusBL="64" cornerRadiusBR="64" name="Path"/>
+                    <Fill name="Fill">
+                        <RadialGradient startX="0" startY="0" endX="0" endY="150" name="Gradient">
+                            <GradientStop colorValue="FF1E7BF0" position="0.55">
+                                <DataBindContext sourcePathIds="1:50-1:7" propertyKey="38"/>
+                            </GradientStop>
+                            <GradientStop colorValue="00FFFFFF" position="1"/>
+                        </RadialGradient>
+                    </Fill>
+                </Shape>
+            </Node>
+            <Node x="250" y="270" opacity="0" name="Pill" id="0:113">
+                <!-- Glass rim: a soft white stroke inside the edge. -->
+                <Shape name="Rim">
+                    <Rectangle width="320" height="220" linkCornerRadius="true" cornerRadiusTL="110" cornerRadiusTR="110" cornerRadiusBL="110" cornerRadiusBR="110" name="Path"/>
+                    <Stroke thickness="10" name="Stroke">
+                        <SolidColor colorValue="66FFFFFF" name="Color"/>
+                        <Feather strength="8" inner="true" name="Feather"/>
+                    </Stroke>
+                </Shape>
+                <!-- Gloss: the highlight up-left, fixed white alpha. -->
+                <Shape name="Gloss">
+                    <Rectangle width="320" height="220" linkCornerRadius="true" cornerRadiusTL="110" cornerRadiusTR="110" cornerRadiusBL="110" cornerRadiusBR="110" name="Path"/>
+                    <Fill name="Fill">
+                        <RadialGradient startX="-55" startY="-75" endX="60" endY="30" name="Gradient">
+                            <GradientStop colorValue="B8FFFFFF" position="0"/>
+                            <GradientStop colorValue="00FFFFFF" position="1"/>
+                        </RadialGradient>
+                    </Fill>
+                </Shape>
+                <!-- Shading: darker toward the bottom-right, fixed black alpha. -->
+                <Shape name="Shade">
+                    <Rectangle width="320" height="220" linkCornerRadius="true" cornerRadiusTL="110" cornerRadiusTR="110" cornerRadiusBL="110" cornerRadiusBR="110" name="Path"/>
+                    <Fill name="Fill">
+                        <RadialGradient startX="-30" startY="-50" endX="150" endY="130" name="Gradient">
+                            <GradientStop colorValue="00000000" position="0.45"/>
+                            <GradientStop colorValue="55000000" position="1"/>
+                        </RadialGradient>
+                    </Fill>
+                </Shape>
+                <Shape name="Body">
+                    <Rectangle width="320" height="220" linkCornerRadius="true" cornerRadiusTL="110" cornerRadiusTR="110" cornerRadiusBL="110" cornerRadiusBR="110" name="Path"/>
+                    <Fill name="Fill">
                     <SolidColor colorValue="FF1E7BF0" name="Color">
                         <DataBindContext sourcePathIds="1:50-1:7" propertyKey="37"/>
                     </SolidColor>
                 </Fill>
-            </Shape>
-            <Shape x="250" y="270" opacity="0" name="Triangle" id="0:114">
-                <Polygon width="320" height="290" points="3" cornerRadius="40" name="Path"/>
-                <Fill name="Fill">
+                </Shape>
+                <!-- Glow: the silhouette enlarged, bound colour at the centre fading out. Last sibling draws underneath. -->
+                <Shape scaleX="1.32" scaleY="1.32" opacity="0.55" name="Glow">
+                    <Rectangle width="320" height="220" linkCornerRadius="true" cornerRadiusTL="110" cornerRadiusTR="110" cornerRadiusBL="110" cornerRadiusBR="110" name="Path"/>
+                    <Fill name="Fill">
+                        <RadialGradient startX="0" startY="0" endX="0" endY="150" name="Gradient">
+                            <GradientStop colorValue="FF1E7BF0" position="0.55">
+                                <DataBindContext sourcePathIds="1:50-1:7" propertyKey="38"/>
+                            </GradientStop>
+                            <GradientStop colorValue="00FFFFFF" position="1"/>
+                        </RadialGradient>
+                    </Fill>
+                </Shape>
+            </Node>
+            <Node x="250" y="270" opacity="0" name="Triangle" id="0:114">
+                <!-- Glass rim: a soft white stroke inside the edge. -->
+                <Shape name="Rim">
+                    <Polygon width="320" height="290" points="3" cornerRadius="40" name="Path"/>
+                    <Stroke thickness="10" name="Stroke">
+                        <SolidColor colorValue="66FFFFFF" name="Color"/>
+                        <Feather strength="8" inner="true" name="Feather"/>
+                    </Stroke>
+                </Shape>
+                <!-- Gloss: the highlight up-left, fixed white alpha. -->
+                <Shape name="Gloss">
+                    <Polygon width="320" height="290" points="3" cornerRadius="40" name="Path"/>
+                    <Fill name="Fill">
+                        <RadialGradient startX="-55" startY="-75" endX="60" endY="30" name="Gradient">
+                            <GradientStop colorValue="B8FFFFFF" position="0"/>
+                            <GradientStop colorValue="00FFFFFF" position="1"/>
+                        </RadialGradient>
+                    </Fill>
+                </Shape>
+                <!-- Shading: darker toward the bottom-right, fixed black alpha. -->
+                <Shape name="Shade">
+                    <Polygon width="320" height="290" points="3" cornerRadius="40" name="Path"/>
+                    <Fill name="Fill">
+                        <RadialGradient startX="-30" startY="-50" endX="150" endY="130" name="Gradient">
+                            <GradientStop colorValue="00000000" position="0.45"/>
+                            <GradientStop colorValue="55000000" position="1"/>
+                        </RadialGradient>
+                    </Fill>
+                </Shape>
+                <Shape name="Body">
+                    <Polygon width="320" height="290" points="3" cornerRadius="40" name="Path"/>
+                    <Fill name="Fill">
                     <SolidColor colorValue="FF1E7BF0" name="Color">
                         <DataBindContext sourcePathIds="1:50-1:7" propertyKey="37"/>
                     </SolidColor>
                 </Fill>
-            </Shape>
-            <Shape x="250" y="270" opacity="0" name="Hexagon" id="0:115">
-                <Polygon width="310" height="310" points="6" cornerRadius="28" name="Path"/>
-                <Fill name="Fill">
+                </Shape>
+                <!-- Glow: the silhouette enlarged, bound colour at the centre fading out. Last sibling draws underneath. -->
+                <Shape scaleX="1.32" scaleY="1.32" opacity="0.55" name="Glow">
+                    <Polygon width="320" height="290" points="3" cornerRadius="40" name="Path"/>
+                    <Fill name="Fill">
+                        <RadialGradient startX="0" startY="0" endX="0" endY="150" name="Gradient">
+                            <GradientStop colorValue="FF1E7BF0" position="0.55">
+                                <DataBindContext sourcePathIds="1:50-1:7" propertyKey="38"/>
+                            </GradientStop>
+                            <GradientStop colorValue="00FFFFFF" position="1"/>
+                        </RadialGradient>
+                    </Fill>
+                </Shape>
+            </Node>
+            <Node x="250" y="270" opacity="0" name="Hexagon" id="0:115">
+                <!-- Glass rim: a soft white stroke inside the edge. -->
+                <Shape name="Rim">
+                    <Polygon width="310" height="310" points="6" cornerRadius="28" name="Path"/>
+                    <Stroke thickness="10" name="Stroke">
+                        <SolidColor colorValue="66FFFFFF" name="Color"/>
+                        <Feather strength="8" inner="true" name="Feather"/>
+                    </Stroke>
+                </Shape>
+                <!-- Gloss: the highlight up-left, fixed white alpha. -->
+                <Shape name="Gloss">
+                    <Polygon width="310" height="310" points="6" cornerRadius="28" name="Path"/>
+                    <Fill name="Fill">
+                        <RadialGradient startX="-55" startY="-75" endX="60" endY="30" name="Gradient">
+                            <GradientStop colorValue="B8FFFFFF" position="0"/>
+                            <GradientStop colorValue="00FFFFFF" position="1"/>
+                        </RadialGradient>
+                    </Fill>
+                </Shape>
+                <!-- Shading: darker toward the bottom-right, fixed black alpha. -->
+                <Shape name="Shade">
+                    <Polygon width="310" height="310" points="6" cornerRadius="28" name="Path"/>
+                    <Fill name="Fill">
+                        <RadialGradient startX="-30" startY="-50" endX="150" endY="130" name="Gradient">
+                            <GradientStop colorValue="00000000" position="0.45"/>
+                            <GradientStop colorValue="55000000" position="1"/>
+                        </RadialGradient>
+                    </Fill>
+                </Shape>
+                <Shape name="Body">
+                    <Polygon width="310" height="310" points="6" cornerRadius="28" name="Path"/>
+                    <Fill name="Fill">
                     <SolidColor colorValue="FF1E7BF0" name="Color">
                         <DataBindContext sourcePathIds="1:50-1:7" propertyKey="37"/>
                     </SolidColor>
                 </Fill>
-            </Shape>
-            <Shape x="250" y="270" opacity="0" name="Cloud" id="0:116">
-                <PointsPath isClosed="true" name="Path">
+                </Shape>
+                <!-- Glow: the silhouette enlarged, bound colour at the centre fading out. Last sibling draws underneath. -->
+                <Shape scaleX="1.32" scaleY="1.32" opacity="0.55" name="Glow">
+                    <Polygon width="310" height="310" points="6" cornerRadius="28" name="Path"/>
+                    <Fill name="Fill">
+                        <RadialGradient startX="0" startY="0" endX="0" endY="150" name="Gradient">
+                            <GradientStop colorValue="FF1E7BF0" position="0.55">
+                                <DataBindContext sourcePathIds="1:50-1:7" propertyKey="38"/>
+                            </GradientStop>
+                            <GradientStop colorValue="00FFFFFF" position="1"/>
+                        </RadialGradient>
+                    </Fill>
+                </Shape>
+            </Node>
+            <Node x="250" y="270" opacity="0" name="Cloud" id="0:116">
+                <!-- Glass rim: a soft white stroke inside the edge. -->
+                <Shape name="Rim">
+                    <PointsPath isClosed="true" name="Path">
                     <CubicMirroredVertex x="-60" y="-120" rotation="0.0" distance="60"/>
                     <CubicMirroredVertex x="70" y="-130" rotation="0.34907" distance="55"/>
                     <CubicMirroredVertex x="160" y="-20" rotation="1.74533" distance="60"/>
@@ -159,25 +437,155 @@
                     <CubicMirroredVertex x="-110" y="120" rotation="3.22886" distance="70"/>
                     <CubicMirroredVertex x="-160" y="-10" rotation="4.53786" distance="60"/>
                 </PointsPath>
-                <Fill name="Fill">
+                    <Stroke thickness="10" name="Stroke">
+                        <SolidColor colorValue="66FFFFFF" name="Color"/>
+                        <Feather strength="8" inner="true" name="Feather"/>
+                    </Stroke>
+                </Shape>
+                <!-- Gloss: the highlight up-left, fixed white alpha. -->
+                <Shape name="Gloss">
+                    <PointsPath isClosed="true" name="Path">
+                    <CubicMirroredVertex x="-60" y="-120" rotation="0.0" distance="60"/>
+                    <CubicMirroredVertex x="70" y="-130" rotation="0.34907" distance="55"/>
+                    <CubicMirroredVertex x="160" y="-20" rotation="1.74533" distance="60"/>
+                    <CubicMirroredVertex x="110" y="120" rotation="3.05433" distance="70"/>
+                    <CubicMirroredVertex x="-110" y="120" rotation="3.22886" distance="70"/>
+                    <CubicMirroredVertex x="-160" y="-10" rotation="4.53786" distance="60"/>
+                </PointsPath>
+                    <Fill name="Fill">
+                        <RadialGradient startX="-55" startY="-75" endX="60" endY="30" name="Gradient">
+                            <GradientStop colorValue="B8FFFFFF" position="0"/>
+                            <GradientStop colorValue="00FFFFFF" position="1"/>
+                        </RadialGradient>
+                    </Fill>
+                </Shape>
+                <!-- Shading: darker toward the bottom-right, fixed black alpha. -->
+                <Shape name="Shade">
+                    <PointsPath isClosed="true" name="Path">
+                    <CubicMirroredVertex x="-60" y="-120" rotation="0.0" distance="60"/>
+                    <CubicMirroredVertex x="70" y="-130" rotation="0.34907" distance="55"/>
+                    <CubicMirroredVertex x="160" y="-20" rotation="1.74533" distance="60"/>
+                    <CubicMirroredVertex x="110" y="120" rotation="3.05433" distance="70"/>
+                    <CubicMirroredVertex x="-110" y="120" rotation="3.22886" distance="70"/>
+                    <CubicMirroredVertex x="-160" y="-10" rotation="4.53786" distance="60"/>
+                </PointsPath>
+                    <Fill name="Fill">
+                        <RadialGradient startX="-30" startY="-50" endX="150" endY="130" name="Gradient">
+                            <GradientStop colorValue="00000000" position="0.45"/>
+                            <GradientStop colorValue="55000000" position="1"/>
+                        </RadialGradient>
+                    </Fill>
+                </Shape>
+                <Shape name="Body">
+                    <PointsPath isClosed="true" name="Path">
+                    <CubicMirroredVertex x="-60" y="-120" rotation="0.0" distance="60"/>
+                    <CubicMirroredVertex x="70" y="-130" rotation="0.34907" distance="55"/>
+                    <CubicMirroredVertex x="160" y="-20" rotation="1.74533" distance="60"/>
+                    <CubicMirroredVertex x="110" y="120" rotation="3.05433" distance="70"/>
+                    <CubicMirroredVertex x="-110" y="120" rotation="3.22886" distance="70"/>
+                    <CubicMirroredVertex x="-160" y="-10" rotation="4.53786" distance="60"/>
+                </PointsPath>
+                    <Fill name="Fill">
                     <SolidColor colorValue="FF1E7BF0" name="Color">
                         <DataBindContext sourcePathIds="1:50-1:7" propertyKey="37"/>
                     </SolidColor>
                 </Fill>
-            </Shape>
-            <Shape x="250" y="270" opacity="0" name="Drop" id="0:117">
-                <PointsPath isClosed="true" name="Path">
+                </Shape>
+                <!-- Glow: the silhouette enlarged, bound colour at the centre fading out. Last sibling draws underneath. -->
+                <Shape scaleX="1.32" scaleY="1.32" opacity="0.55" name="Glow">
+                    <PointsPath isClosed="true" name="Path">
+                    <CubicMirroredVertex x="-60" y="-120" rotation="0.0" distance="60"/>
+                    <CubicMirroredVertex x="70" y="-130" rotation="0.34907" distance="55"/>
+                    <CubicMirroredVertex x="160" y="-20" rotation="1.74533" distance="60"/>
+                    <CubicMirroredVertex x="110" y="120" rotation="3.05433" distance="70"/>
+                    <CubicMirroredVertex x="-110" y="120" rotation="3.22886" distance="70"/>
+                    <CubicMirroredVertex x="-160" y="-10" rotation="4.53786" distance="60"/>
+                </PointsPath>
+                    <Fill name="Fill">
+                        <RadialGradient startX="0" startY="0" endX="0" endY="150" name="Gradient">
+                            <GradientStop colorValue="FF1E7BF0" position="0.55">
+                                <DataBindContext sourcePathIds="1:50-1:7" propertyKey="38"/>
+                            </GradientStop>
+                            <GradientStop colorValue="00FFFFFF" position="1"/>
+                        </RadialGradient>
+                    </Fill>
+                </Shape>
+            </Node>
+            <Node x="250" y="270" opacity="0" name="Drop" id="0:117">
+                <!-- Glass rim: a soft white stroke inside the edge. -->
+                <Shape name="Rim">
+                    <PointsPath isClosed="true" name="Path">
                     <StraightVertex x="0" y="-165" radius="18"/>
                     <CubicMirroredVertex x="135" y="40" rotation="2.0944" distance="90"/>
                     <CubicMirroredVertex x="0" y="150" rotation="3.14159" distance="80"/>
                     <CubicMirroredVertex x="-135" y="40" rotation="4.18879" distance="90"/>
                 </PointsPath>
-                <Fill name="Fill">
+                    <Stroke thickness="10" name="Stroke">
+                        <SolidColor colorValue="66FFFFFF" name="Color"/>
+                        <Feather strength="8" inner="true" name="Feather"/>
+                    </Stroke>
+                </Shape>
+                <!-- Gloss: the highlight up-left, fixed white alpha. -->
+                <Shape name="Gloss">
+                    <PointsPath isClosed="true" name="Path">
+                    <StraightVertex x="0" y="-165" radius="18"/>
+                    <CubicMirroredVertex x="135" y="40" rotation="2.0944" distance="90"/>
+                    <CubicMirroredVertex x="0" y="150" rotation="3.14159" distance="80"/>
+                    <CubicMirroredVertex x="-135" y="40" rotation="4.18879" distance="90"/>
+                </PointsPath>
+                    <Fill name="Fill">
+                        <RadialGradient startX="-55" startY="-75" endX="60" endY="30" name="Gradient">
+                            <GradientStop colorValue="B8FFFFFF" position="0"/>
+                            <GradientStop colorValue="00FFFFFF" position="1"/>
+                        </RadialGradient>
+                    </Fill>
+                </Shape>
+                <!-- Shading: darker toward the bottom-right, fixed black alpha. -->
+                <Shape name="Shade">
+                    <PointsPath isClosed="true" name="Path">
+                    <StraightVertex x="0" y="-165" radius="18"/>
+                    <CubicMirroredVertex x="135" y="40" rotation="2.0944" distance="90"/>
+                    <CubicMirroredVertex x="0" y="150" rotation="3.14159" distance="80"/>
+                    <CubicMirroredVertex x="-135" y="40" rotation="4.18879" distance="90"/>
+                </PointsPath>
+                    <Fill name="Fill">
+                        <RadialGradient startX="-30" startY="-50" endX="150" endY="130" name="Gradient">
+                            <GradientStop colorValue="00000000" position="0.45"/>
+                            <GradientStop colorValue="55000000" position="1"/>
+                        </RadialGradient>
+                    </Fill>
+                </Shape>
+                <Shape name="Body">
+                    <PointsPath isClosed="true" name="Path">
+                    <StraightVertex x="0" y="-165" radius="18"/>
+                    <CubicMirroredVertex x="135" y="40" rotation="2.0944" distance="90"/>
+                    <CubicMirroredVertex x="0" y="150" rotation="3.14159" distance="80"/>
+                    <CubicMirroredVertex x="-135" y="40" rotation="4.18879" distance="90"/>
+                </PointsPath>
+                    <Fill name="Fill">
                     <SolidColor colorValue="FF1E7BF0" name="Color">
                         <DataBindContext sourcePathIds="1:50-1:7" propertyKey="37"/>
                     </SolidColor>
                 </Fill>
-            </Shape>
+                </Shape>
+                <!-- Glow: the silhouette enlarged, bound colour at the centre fading out. Last sibling draws underneath. -->
+                <Shape scaleX="1.32" scaleY="1.32" opacity="0.55" name="Glow">
+                    <PointsPath isClosed="true" name="Path">
+                    <StraightVertex x="0" y="-165" radius="18"/>
+                    <CubicMirroredVertex x="135" y="40" rotation="2.0944" distance="90"/>
+                    <CubicMirroredVertex x="0" y="150" rotation="3.14159" distance="80"/>
+                    <CubicMirroredVertex x="-135" y="40" rotation="4.18879" distance="90"/>
+                </PointsPath>
+                    <Fill name="Fill">
+                        <RadialGradient startX="0" startY="0" endX="0" endY="150" name="Gradient">
+                            <GradientStop colorValue="FF1E7BF0" position="0.55">
+                                <DataBindContext sourcePathIds="1:50-1:7" propertyKey="38"/>
+                            </GradientStop>
+                            <GradientStop colorValue="00FFFFFF" position="1"/>
+                        </RadialGradient>
+                    </Fill>
+                </Shape>
+            </Node>
         </Node>
 
         <LinearAnimation fps="60" duration="180" loopValue="loop" name="Idle" id="3:100">

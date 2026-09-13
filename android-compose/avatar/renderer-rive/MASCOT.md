@@ -61,6 +61,16 @@ around the mascot) if the product still wants it.
 
 Transitions between states are 160 ms from `AnyState`, as in the spike.
 
+### Finish
+
+Two finishes exist in `gen_scene.py` (`STYLE`): **glossy** (the default, after the mood-orb
+reference) and **flat** (Grokbot-like matte). Glossy is colour-agnostic on purpose — every body
+is five paints on one silhouette: a glow (the silhouette enlarged, bound colour fading to
+transparent), the body (bound colour), a fixed translucent black shade bottom-right, a fixed
+translucent white gloss up-left, and a feathered white rim stroke. The palette therefore needs no
+per-colour art. Feather on a fill renders nothing through the CLI, which is why the glow is a
+gradient and only the rim is feathered.
+
 ### Authoring path
 
 RML in `rive/mascot/scene.rml`, compiled with the Rive CLI (`rive . --verify`, then
@@ -77,6 +87,10 @@ scaleX/Y 16/17, rotation 15, Rectangle corner radii 31/161/162/163 (link 164), P
 
 `RiveAvatarRuntime` is unchanged. Identity is written **by the surface, once, on load**, not by
 the runtime: the runtime is about behaviour, and shape/colour are not behaviour.
+
+That write is not optional. The instance's authored default colour is in the file, but the
+data bind only delivers a value once the property is set at runtime — a scene that never calls
+`applyIdentity` draws a black body. Observed on the desktop bridge; verify on Android.
 
 ## 3. Where each piece lives (KMP)
 
