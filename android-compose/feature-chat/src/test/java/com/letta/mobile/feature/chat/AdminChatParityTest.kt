@@ -22,13 +22,16 @@ import com.letta.mobile.feature.chat.coordination.ConversationAccessMode
 import com.letta.mobile.feature.chat.coordination.RecentMessagesReconcileLauncher
 import com.letta.mobile.testutil.TestData
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -158,6 +161,71 @@ class AdminChatParityTest {
     }
 
     @Test
+    fun `cold metadata lookup cannot block timeline observer startup`() = runTest {
+        val harness = Harness(this)
+        val metadataRelease = CompletableDeferred<Unit>()
+        harness.routeConversationId = "conversation-1"
+        coEvery { harness.agentRepository.getAgent(AgentId("agent-1")) } returns flow {
+            metadataRelease.await()
+            emit(TestData.agent(id = "agent-1", name = "Ada"))
+        }
+
+        harness.coordinator.resolveConversationAndLoad(ConversationAccessMode.Timeline)
+        runCurrent()
+
+        try {
+            assertEquals(listOf("conversation-1"), harness.startedObservers)
+            assertEquals(1, harness.coordinator.rosterNameResolverForTest.resolveCallsForTest())
+            coVerify(exactly = 1) { harness.agentRepository.getAgent(AgentId("agent-1")) }
+        } finally {
+            metadataRelease.complete(Unit)
+        }
+        advanceUntilIdle()
+        assertEquals("Ada", harness.uiState.value.agentName)
+    }
+
+    @Test
+    fun `failed metadata lookup does not erase loaded timeline`() = runTest {
+        val harness = Harness(this)
+        harness.routeConversationId = "conversation-1"
+        coEvery { harness.agentRepository.getAgent(AgentId("agent-1")) } throws RuntimeException("metadata unavailable")
+
+        harness.coordinator.resolveConversationAndLoad(ConversationAccessMode.Timeline)
+        advanceUntilIdle()
+
+        assertEquals(listOf("conversation-1"), harness.startedObservers)
+        assertEquals("", harness.uiState.value.agentName)
+        assertEquals(ChatConnectionState.Live, harness.sessionState.value.connectionState)
+    }
+
+    @Test
+    fun `stale metadata completion after returning to same conversation cannot replace current name`() = runTest {
+        val harness = Harness(this)
+        val firstNameRelease = CompletableDeferred<Unit>()
+        harness.routeConversationId = "conversation-a"
+        coEvery { harness.agentRepository.getAgent(AgentId("agent-1")) } returns flow {
+            firstNameRelease.await()
+            emit(TestData.agent(id = "agent-1", name = "Stale Ada"))
+        }
+
+        harness.coordinator.resolveConversationAndLoad(ConversationAccessMode.Timeline)
+        runCurrent()
+        every { harness.agentRepository.getCachedAgent(AgentId("agent-1")) } returns
+            TestData.agent(id = "agent-1", name = "Current Ada")
+        harness.routeConversationId = "conversation-b"
+        harness.coordinator.resolveConversationAndLoad(ConversationAccessMode.Timeline)
+        runCurrent()
+        harness.routeConversationId = "conversation-a"
+        harness.coordinator.resolveConversationAndLoad(ConversationAccessMode.Timeline)
+        runCurrent()
+        firstNameRelease.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(listOf("conversation-a", "conversation-b", "conversation-a"), harness.startedObservers)
+        assertEquals("Current Ada", harness.uiState.value.agentName)
+    }
+
+    @Test
     fun `cache miss resolver is a no-op when the cache already has the agent`() = runTest {
         val harness = Harness(this)
         harness.routeConversationId = "conversation-1"
@@ -167,12 +235,10 @@ class AdminChatParityTest {
         harness.coordinator.resolveConversationAndLoad(ConversationAccessMode.Timeline)
         advanceUntilIdle()
 
-        // letta-mobile-xl1o2 AC: when the cache already has the agent, the
-        // resolver MUST NOT trigger a per-id fetch. The only getAgent call
-        // the harness ever sees is the one from loadMessagesInternal, not
-        // the resolver's getAgent.
+        // A cached display name must never trigger the asynchronous resolver.
         val resolverCalls = harness.coordinator.rosterNameResolverForTest.resolveCallsForTest()
         assertEquals(0, resolverCalls)
+        coVerify(exactly = 0) { harness.agentRepository.getAgent(AgentId("agent-1")) }
     }
 
     @Test
@@ -251,7 +317,7 @@ class AdminChatParityTest {
     }
 
     @Test
-    fun `failed initial resolution remains initial on retry`() = runTest {
+    fun `metadata failure completes timeline resolution before retry`() = runTest {
         val harness = Harness(this, pinnedConversationId = "pinned-conversation")
         harness.routeConversationId = "stale-before-first-attempt"
         coEvery { harness.agentRepository.getAgent(AgentId("agent-1")) } throws RuntimeException("Network error")
@@ -265,7 +331,8 @@ class AdminChatParityTest {
         harness.coordinator.resolveConversationAndLoad(ConversationAccessMode.Timeline)
         advanceUntilIdle()
 
-        assertEquals("pinned-conversation", harness.routeConversationId)
+        assertEquals("stale-before-retry", harness.routeConversationId)
+        assertEquals(listOf("pinned-conversation", "stale-before-retry"), harness.startedObservers)
     }
 
     @Test
@@ -312,6 +379,7 @@ class AdminChatParityTest {
 
         var routeConversationId: String? = null
         var pendingBootstrapMessages = persistentListOf<UiMessage>()
+        val startedObservers = mutableListOf<String>()
 
         val coordinator by lazy {
             ChatConversationCoordinator(
@@ -335,7 +403,7 @@ class AdminChatParityTest {
                         setPendingUserMessage = { pendingBootstrapMessages = persistentListOf(it) },
                         currentConversationId = { null },
                     ),
-                    observer = TimelineObserverConfig(start = {}, stop = {}),
+                    observer = TimelineObserverConfig(start = { startedObservers += it }, stop = {}),
                     reconcileLauncher = RecentMessagesReconcileLauncher(scope = scope, reconcile = { }),
                     send = ConversationSendConfig({}, {}, {}),
                     hydration = HydrationRouteConfig(
