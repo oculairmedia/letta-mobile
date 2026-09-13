@@ -20,7 +20,10 @@ fun extractSubagentNotification(raw: String): UiSubagentNotification? {
         transcriptUri = block.xmlTag("transcript")
             ?: tail.lineAfter("Full transcript available at")
             ?: tail.lineAfter("Full transcript at")
-            ?: tail.lineAfter("Full transcript:"),
+            ?: tail.lineAfter("Full transcript:")
+            ?: block.lineAfter("Full transcript available at")
+            ?: block.lineAfter("Full transcript at")
+            ?: block.lineAfter("Full transcript:"),
         taskId = block.xmlTag("task-id") ?: block.xmlTag("task_id") ?: block.xmlTag("taskId"),
         subagentAgentId = block.xmlTag("agent_id") ?: block.xmlTag("agentId"),
     )

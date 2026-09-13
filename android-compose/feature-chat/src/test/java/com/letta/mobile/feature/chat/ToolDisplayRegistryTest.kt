@@ -15,10 +15,20 @@ class ToolDisplayRegistryTest {
     }
 
     @Test
-    fun `resolves known tool - Bash with command`() {
+    fun `Bash without a description uses a friendly fallback`() {
         val info = ToolDisplayRegistry.resolve("Bash", """{"command": "echo hello"}""")
         assertEquals("⚡", info.emoji)
-        assertEquals("echo hello", info.label)
+        assertEquals("Running command", info.label)
+        assertNull(info.detailLine)
+    }
+
+    @Test
+    fun `Bash description takes priority over command syntax`() {
+        val info = ToolDisplayRegistry.resolve(
+            "Bash", """{"command":"echo hello", "description":"Check shell output"}""",
+        )
+        assertEquals("Check shell output", info.label)
+        assertNull(info.detailLine)
     }
 
     @Test
