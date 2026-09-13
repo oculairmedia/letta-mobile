@@ -28,6 +28,7 @@ internal interface RiveBridgeNative : Library {
     fun rive_bridge_vm_set_number(bridge: Pointer, name: String, value: Float): Int
     fun rive_bridge_vm_set_enum(bridge: Pointer, name: String, key: String): Int
     fun rive_bridge_vm_fire(bridge: Pointer, name: String): Int
+    fun rive_bridge_vm_set_color(bridge: Pointer, name: String, argb: Int): Int
 
     companion object {
         /** `-Drive.bridge.path=...\rive_desktop_bridge.dll`; the spike does not package the DLL. */
@@ -92,6 +93,10 @@ class RiveDesktopScene private constructor(
 
         override fun setEnum(input: String, key: String) {
             native.rive_bridge_vm_set_enum(handle, input, key)
+        }
+
+        override fun setColor(input: String, argb: Int) {
+            native.rive_bridge_vm_set_color(handle, input, argb)
         }
 
         override fun fire(input: String) {

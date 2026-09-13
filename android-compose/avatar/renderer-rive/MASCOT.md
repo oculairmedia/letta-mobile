@@ -1,0 +1,119 @@
+# The mascot: art spec and how it fits the codebase
+
+Beads: letta-mobile-kh094 (asset), letta-mobile-1zti3 (identity slice), letta-mobile-bn0y6
+(orbs everywhere). Proven by the native desktop spike, letta-mobile-0s5bi (`native/desktop/`).
+
+The model is the Grokbot one: a user picks a **shape** and a **colour** for each agent, and the
+character's **face** is driven by the app. Shape and colour are identity and never change on their
+own; the face is state and never persists. One `.riv`, one artboard, three inputs.
+
+## 1. Art spec
+
+### Identity
+
+| Input | Type | Values |
+|---|---|---|
+| `shape` | enum `MascotShape` | `circle`, `blob`, `roundedSquare`, `pill`, `triangle`, `hexagon`, `cloud`, `drop` |
+| `color` | colour | any; the app offers a palette of 10 + grey, but the property is unrestricted |
+
+All eight bodies exist in the artboard at once, stacked at the same origin. A state-machine
+layer (`Shape`) shows exactly one by keying opacity — the same mechanism the spike uses for
+state, so it is known to round-trip through the CLI. Every body's fill is data-bound to `color`,
+so a state animation must **never** key body colour. (The spike did; that is the one thing this
+asset drops.)
+
+Bodies are drawn in a 500×500 artboard on a **transparent** background — the host draws the
+ground. Each body is roughly 300 px across, centred at (250, 270), so the face lands in the same
+place on every shape.
+
+### Face
+
+Eyes only, at rest. Two vertical slits, dark, slightly inset from the centre line. The mouth
+exists but is invisible except in `speaking`. Gaze (`lookX`/`lookY`) offsets the eye pair by a
+few pixels; `blink` collapses eye height for ~120 ms.
+
+Each eye is a rounded rectangle whose width, height, rotation and y can be keyed. Three overlay
+glyphs per eye sit on top at opacity 0 and are switched on by the states that need them: a happy
+arc, a closed line, and a cross. Keeping the eye a rectangle rather than a path is what makes
+twelve expressions authorable in RML without vertex editing; the editor pass can replace any of
+these with drawn art without touching the contract.
+
+### The twelve states
+
+Body colour is identity, so **presence is carried by the face and the body's motion, not its
+paint.** The amber/green/red presence tint the spike used moves to the host (a ring or glow
+around the mascot) if the product still wants it.
+
+| `state` | Eyes | Mouth | Body motion |
+|---|---|---|---|
+| `idle` | slits | hidden | slow breathe, scale 1.00→1.02, 3 s loop |
+| `listening` | slits, +30 % taller; gaze biased up | hidden | scale 1.04, held |
+| `dragged` | squint (height ×0.5) | hidden | squash scaleX 1.08 / scaleY 0.92, small wobble |
+| `thinking` | gaze up-right; right eye 70 % height | hidden | 2 s side sway, ±3 px |
+| `waitingInput` | wide and round (width ×1.5, height ×1.3) | hidden | 0.8 s bounce, 6 px |
+| `speaking` | slits | **visible**, height bound to `mouthOpen` | none (mouth is the motion) |
+| `success` | happy arcs replace slits | hidden | one hop, 14 px, 400 ms, then hold |
+| `error` | slits rotated ±12° (sad slant) | hidden | dip 6 px, 3 quick 4 px shakes, then hold |
+| `sleeping` | closed lines replace slits | hidden | deep breathe, scale 0.98→1.03, 5 s; body opacity 0.85 |
+| `loading` | slits shrunk to dots (height ×0.35) | hidden | pulse opacity 0.7→1.0, 1.2 s |
+| `failed` | crosses replace slits | hidden | body opacity 0.6, no motion |
+| `degraded` | left eye closed line, right eye 60 % height | hidden | body opacity 0.8, no motion |
+
+Transitions between states are 160 ms from `AnyState`, as in the spike.
+
+### Authoring path
+
+RML in `rive/mascot/scene.rml`, compiled with the Rive CLI (`rive . --verify`, then
+`rive . --once`), which lives on the Linux agent's box. Property keys were taken from the
+runtime's generated headers rather than guessed: opacity 18, colorValue 37, x/y 13/14,
+scaleX/Y 16/17, rotation 15, Rectangle corner radii 31/161/162/163 (link 164), Polygon points
+125 / cornerRadius 126, view-model colour value 555.
+
+## 2. Contract
+
+`RiveAvatarContract` gains `INPUT_SHAPE = "shape"`, `INPUT_COLOR = "color"` and
+`shapeKey(MascotShape)`. `RiveInputSink` gains `setColor(input, argb)`: Android maps it to
+`ViewModelInstance.setColor(String, Int)`, desktop to `rive_bridge_vm_set_color`.
+
+`RiveAvatarRuntime` is unchanged. Identity is written **by the surface, once, on load**, not by
+the runtime: the runtime is about behaviour, and shape/colour are not behaviour.
+
+## 3. Where each piece lives (KMP)
+
+The cardinal rule applies: logic in shared modules, platforms bind.
+
+| Piece | Module | Notes |
+|---|---|---|
+| `MascotShape` enum, `MascotIdentity(shape, color)`, palette, legacy-index mapping | `avatar/core` (commonMain) | Already the shared home of `AvatarState`. |
+| Contract + runtime | `avatar/renderer-rive` (commonMain) | As today. |
+| `MascotPicker` composable (shape grid + colour dots, Grokbot layout) | `sharedUI` (commonMain) | Pure Compose, no renderer. Previews the identity with a static render. |
+| `MascotAvatar(identity, state, size)` — the public composable | `sharedUI` (commonMain) via `expect`/`actual` | The one thing surfaces call. Chooses live vs cached rendering by size. |
+| Android live surface | `renderer-rive` androidMain (`RiveAvatarSurface`) | Exists; gains identity writes. |
+| Desktop live surface | `desktop` (`RiveDesktopSurface`) | From the spike. |
+| Native bridge | `renderer-rive/native/desktop` | From the spike; +`vm_set_color`. |
+| Per-agent persistence | today: desktop `secureSettingsStore` key `agent.<id>.avatar_style` (an int 0–5) | Becomes a serialised `MascotIdentity`; an old int reads as `circle` + palette[index]. Android gets the same key in its settings store. |
+
+### Rendering budget
+
+Live scenes (advance + render + readback every frame, ~5 ms each on desktop) are for **hero**
+avatars only: chat header (72 dp), edit-agent preview (64 dp), the active agent in the Now-active
+bar. Everything smaller — rail 28 dp, sidebar 30 dp, list rows 22–44 dp, ~15 call sites — draws
+a **cached bitmap** keyed by `(shape, color, state, sizePx)`, rendered by one shared scene when
+first needed and again when that agent's state changes. A list of 20 agents costs 20 cache hits
+per frame, not 20 native renders. `MascotAvatar` makes this choice from `size`; callers do not.
+
+### Fallback
+
+When the native bridge cannot load (not Windows yet, DLL missing, no D3D11), `MascotAvatar` draws
+the existing gradient `AgentOrb`/`AgentSphere`. Identity still resolves and persists, so the day
+macOS/Linux land, every agent already has a shape and colour.
+
+## 4. Slices
+
+1. **Asset** (kh094): this spec in RML, compiled and inspected by the Linux agent; the spike
+   window (`:desktop:runRiveSpike -PriveSelfTest=true`) is the visual check, since it cycles
+   every state.
+2. **Identity** (1zti3): contract, sink, bridge, `MascotIdentity`, picker in `sharedUI`, desktop
+   edit-agent wired to it, chat-header hero becomes live. Small orbs unchanged.
+3. **Orbs** (bn0y6): `MascotAvatar` + cache, all call sites, Android parity.
+4. **Presence tint** (unfiled): host-drawn ring/glow for amber/green/red if wanted after 1–3.

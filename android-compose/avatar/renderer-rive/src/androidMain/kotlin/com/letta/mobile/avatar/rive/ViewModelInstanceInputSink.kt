@@ -29,6 +29,10 @@ class ViewModelInstanceInputSink(
         instance.setEnum(input, key)
     }
 
+    override fun setColor(input: String, argb: Int) {
+        instance.setColor(input, argb)
+    }
+
     override fun fire(input: String) {
         instance.fireTrigger(input)
     }

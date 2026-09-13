@@ -1,6 +1,8 @@
 package com.letta.mobile.avatar.rive
 
 import com.letta.mobile.avatar.core.AvatarState
+import com.letta.mobile.avatar.core.MascotIdentity
+import com.letta.mobile.avatar.core.MascotShape
 
 /**
  * The names a `.riv` mascot must expose for this renderer to drive it.
@@ -31,6 +33,30 @@ object RiveAvatarContract {
 
     /** Trigger. One blink, on the director's randomized idle schedule. */
     const val TRIGGER_BLINK: String = "blink"
+
+    /** Custom enum `MascotShape`. Identity, written once on load; see MASCOT.md. */
+    const val INPUT_SHAPE: String = "shape"
+
+    /** Colour. Identity; every body fill in the asset is bound to it. */
+    const val INPUT_COLOR: String = "color"
+
+    /** The enum key for [shape], matching a `DataEnumValue key` in the asset. A key, not an index, for the same reason as [stateKey]. */
+    fun shapeKey(shape: MascotShape): String = when (shape) {
+        MascotShape.CIRCLE -> "circle"
+        MascotShape.BLOB -> "blob"
+        MascotShape.ROUNDED_SQUARE -> "roundedSquare"
+        MascotShape.PILL -> "pill"
+        MascotShape.TRIANGLE -> "triangle"
+        MascotShape.HEXAGON -> "hexagon"
+        MascotShape.CLOUD -> "cloud"
+        MascotShape.DROP -> "drop"
+    }
+
+    /** Writes an identity into the asset. Surfaces call this once after load; the runtime never does. */
+    fun applyIdentity(sink: RiveInputSink, identity: MascotIdentity) {
+        sink.setEnum(INPUT_SHAPE, shapeKey(identity.shape))
+        sink.setColor(INPUT_COLOR, identity.argb)
+    }
 
     /**
      * The enum key for [state], matching a `DataEnumValue key` in the asset.
@@ -67,6 +93,9 @@ interface RiveInputSink {
 
     /** Writes a custom-enum property by its value key. */
     fun setEnum(input: String, key: String)
+
+    /** Writes a colour property as packed ARGB, the layout both Rive runtimes take. */
+    fun setColor(input: String, argb: Int)
 
     fun fire(input: String)
 }

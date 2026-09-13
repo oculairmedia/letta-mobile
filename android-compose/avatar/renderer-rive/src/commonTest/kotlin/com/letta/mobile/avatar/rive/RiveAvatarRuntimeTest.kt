@@ -187,6 +187,10 @@ class RiveAvatarRuntimeTest {
             writes += input to key
         }
 
+        override fun setColor(input: String, argb: Int) {
+            writes += input to argb
+        }
+
         override fun fire(input: String) {
             writes += input to Unit
             fired += input

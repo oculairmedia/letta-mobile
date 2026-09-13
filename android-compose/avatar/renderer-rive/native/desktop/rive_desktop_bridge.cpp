@@ -20,6 +20,7 @@
 #include "rive/renderer/rive_renderer.hpp"
 #include "rive/animation/state_machine_input_instance.hpp"
 #include "rive/viewmodel/viewmodel_instance.hpp"
+#include "rive/viewmodel/viewmodel_instance_color.hpp"
 #include "rive/viewmodel/viewmodel_instance_enum.hpp"
 #include "rive/viewmodel/viewmodel_instance_number.hpp"
 #include "rive/viewmodel/viewmodel_instance_trigger.hpp"
@@ -284,6 +285,15 @@ __declspec(dllexport) int rive_bridge_vm_set_enum(RiveBridge* bridge, const char
     if (!property || !property->is<ViewModelInstanceEnum>())
         return 1;
     return property->as<ViewModelInstanceEnum>()->value(std::string(key)) ? 0 : 2;
+}
+
+__declspec(dllexport) int rive_bridge_vm_set_color(RiveBridge* bridge, const char* name, int argb)
+{
+    auto* property = bridge->viewModel ? bridge->viewModel->propertyValue(std::string(name)) : nullptr;
+    if (!property || !property->is<ViewModelInstanceColor>())
+        return 1;
+    property->as<ViewModelInstanceColor>()->propertyValue(argb);
+    return 0;
 }
 
 __declspec(dllexport) int rive_bridge_vm_fire(RiveBridge* bridge, const char* name)
