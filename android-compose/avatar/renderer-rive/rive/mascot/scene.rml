@@ -1320,7 +1320,7 @@
         <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="ExprSleeping" id="4:108">
             <KeyedObject objectId="4:26">
                 <KeyedProperty propertyKey="21">
-                    <KeyFrameDouble value="1" frame="0"/>
+                    <KeyFrameDouble value="0" frame="0"/>
                 </KeyedProperty>
             </KeyedObject>
             <KeyedObject objectId="4:25">

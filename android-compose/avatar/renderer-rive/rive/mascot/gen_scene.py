@@ -226,7 +226,7 @@ def eye_component():
         "speaking": {},
         "success": {A_H: 26, A_Y: -18},                                     # happy: a raised crescent
         "error": {A_H: 44, A_Y: 4, (EYE_ROOT, ROT): rad(14)},              # sad slant; mirrored eye reads as brows-in
-        "sleeping": {A_H: 1},                                              # closed
+        "sleeping": {A_H: 0},                                              # closed
         "loading": {(EYE_PUPIL, SX): 0.5, (EYE_PUPIL, SY): 0.5},
         "failed": {A_H: 22, (EYE_PUPIL, SX): 0.6, (EYE_PUPIL, SY): 0.6},
         "degraded": {A_H: 30},
