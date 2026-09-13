@@ -54,10 +54,11 @@ private val SELF_TEST = System.getProperty("rive.spike.selfTest").toBoolean()
  * Args: `<file.riv> [stateMachine] [trigger,trigger,...] [mascot.riv]`.
  */
 fun main(args: Array<String>) = application {
-    val file = args.getOrNull(0)?.let(::File)
+    // Gradle passes every arg, blank when the property is unset; a blank path is "not given".
+    val file = args.getOrNull(0)?.takeIf { it.isNotBlank() }?.let(::File)
     val stateMachine = args.getOrNull(1)?.takeIf { it.isNotBlank() }
     val triggers = args.getOrNull(2)?.split(',')?.filter { it.isNotBlank() }.orEmpty()
-    val mascot = args.getOrNull(3)?.let(::File)
+    val mascot = args.getOrNull(3)?.takeIf { it.isNotBlank() }?.let(::File)
 
     Window(
         onCloseRequest = ::exitApplication,

@@ -11,18 +11,25 @@ Structure (Rive conventions):
     Body     - one path, vertices keyed per IDENTITY on the Shape layer, never per state
                paints: bound fill, shade, gloss (breathing opacity), tint (per state); soft edge
                and halo as faint feathered strokes behind it
+    Turn     - keyed only by the Facing joystick (TurnX/TurnY): slides and foreshortens the plate,
+               rotates and squeezes the body; state entries, Wander and the success spin key it
     Plate    - NestedArtboard; `expr` picks the glyph and the mouth, LookX/LookY move the glyph,
                Open morphs the mouth, `blink` squashes the glyph
-    Layers   - Shape (identity), Expression (sustained, per-pair transitions), Breath (gloss),
-               Flash (success/error, self-returning), Drag, IdleVariety, Blink, Hover
-  Plate (component, input driven)
+    Layers   - Shape (identity), Expression (sustained loops + one Enter_<from>_<to> one-shot per
+               pair: blink shutter, glyph flip under it, facing eased), Breath (gloss),
+               Flash (success/error, self-returning), Drag, IdleVariety, Wander, Blink, Hover
+  Plate (component, input driven; its Expression layer is an explicit matrix of instant cuts)
+
+No AnyState anywhere: it is evaluated before a state's own transitions and re-enters the
+current state while its condition holds (a self-blend that faded every glyph in).
+See README.md for the loop, ids and the full gotcha list.
 
 DEVIATIONS from SPEC.md, all intentional and small:
   - no `-small` profile yet (no host signal); standard geometry everywhere
   - drag tilt needs pointer velocity the file cannot see: 0 degrees
   - the idle glance moves the plate 2 degrees / 2 px instead of the glyph (the root cannot key a
     nested artboard's node); the eye-only glance belongs in the editor pass
-  - glyph "shutter" on change is a cross-fade over the transition, not a scaleY shutter
+  - the glyph shutter is the plate blink (scaleY on the Glyphs node), fired by every entry
   - speaking mouth opacity is smoothstep-free: visible while expr is speaking/dragged
 """
 import math

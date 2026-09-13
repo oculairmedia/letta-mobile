@@ -48,14 +48,22 @@ Nothing beyond VS 2022 C++ tools, the Windows SDK, Git for Windows and Python 3 
    .\build.ps1 -RiveRuntime C:\path\to\rive-runtime
    ```
 
-3. Run the spike window:
+3. Run the spike window. The mascot column always shows the shipped
+   `avatar/renderer-rive/src/androidMain/res/raw/mascot.riv`; `-PriveFile` adds a second column
+   for any other file (its trigger inputs become buttons):
 
    ```bash
-   ./gradlew :desktop:runRiveSpike -PriveBridge=<...>\rive_desktop_bridge.dll \
+   cd android-compose
+   ./gradlew --no-daemon -q :desktop:runRiveSpike -PriveBridge=C:/rive-spike/bridge/rive_desktop_bridge.dll -PriveSelfTest=true
+   ./gradlew :desktop:runRiveSpike -PriveBridge=<...>/rive_desktop_bridge.dll \
      -PriveFile=<file.riv> -PriveStateMachine="State Machine 1" -PriveTriggers=Happy,Sad,Angry,Crazy
    ```
 
-   Add `-PriveSelfTest=true` to cycle every mascot state and fire each trigger without input.
+   `-PriveSelfTest=true` cycles every mascot state and identity (and fires each `-PriveTriggers`
+   trigger) without input, printing each step - run it in the background and tail the log.
+   On this machine the DLL lives at `C:/rive-spike/bridge/`, built from a rive-runtime clone in
+   `C:/rive-spike/`. If a relaunch dies in Skiko's D3D redrawer, the previous window was still
+   exiting; launch again.
 
 ## Result (Windows 11, RTX 3090)
 
