@@ -48,6 +48,9 @@ import kotlinx.coroutines.isActive
 class MascotDebugActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // The Compose worker calls JNI immediately; initialize Rive before composition.
+        // Keep this lazy and debug-only rather than adding native work to app startup.
+        app.rive.runtime.kotlin.core.Rive.init(applicationContext)
         setContent {
             MaterialTheme {
                 Surface(modifier = Modifier.fillMaxSize()) { MascotBench() }
