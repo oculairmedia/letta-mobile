@@ -385,13 +385,24 @@ def body():
     inner = '<Ellipse width="300" height="300" name="Path"/>'
     # The outer node places the body; the inner one is what animations key, so its rest is the
     # origin and scale pivots on the body centre.
+    bound = lambda: f'<SolidColor colorValue="FF1E7BF0" name="Color">\n                {bind(VM_COLOR, COLOR)}\n            </SolidColor>'
+    # After the mood-orb reference: a soft body (feathered edge stroke in the body colour), a
+    # thin glass ring just outside it, and a wide soft halo. Feather only works on strokes, so
+    # every soft element here is a stroke; the fill stays crisp underneath its feathered edge.
     return f'''<Node x="250" y="270" name="BodyPlacement">
 <Node x="0" y="0" name="Body" id="{BODY_NODE}">
-    <Shape name="Rim">
+    <Shape scaleX="1.09" scaleY="1.09" name="GlassRing">
         {inner}
-        <Stroke thickness="10" name="Stroke">
-            <SolidColor colorValue="66FFFFFF" name="Color"/>
-            <Feather strength="8" inner="true" name="Feather"/>
+        <Stroke thickness="3" name="Stroke">
+            <SolidColor colorValue="8CFFFFFF" name="Color"/>
+            <Feather strength="4" name="Feather"/>
+        </Stroke>
+    </Shape>
+    <Shape name="SoftEdge">
+        {inner}
+        <Stroke thickness="26" name="Stroke">
+            {bound()}
+            <Feather strength="22" name="Feather"/>
         </Stroke>
     </Shape>
     <Shape name="Gloss">
@@ -420,24 +431,22 @@ def body():
             </SolidColor>
         </Fill>
     </Shape>
-    <Shape scaleX="1.32" scaleY="1.32" opacity="0.55" name="Glow">
+    <Shape scaleX="1.12" scaleY="1.12" opacity="0.45" name="Halo">
         {inner}
-        <Fill name="Fill">
-            <RadialGradient startX="0" startY="0" endX="0" endY="150" name="Gradient">
-                <GradientStop colorValue="FF1E7BF0" position="0.55">
-                    {bind(VM_COLOR, GRADIENT_STOP_COLOR)}
-                </GradientStop>
-                <GradientStop colorValue="00FFFFFF" position="1"/>
-            </RadialGradient>
-        </Fill>
+        <Stroke thickness="70" name="Stroke">
+            {bound()}
+            <Feather strength="60" name="Feather"/>
+        </Stroke>
     </Shape>
 </Node>
 </Node>'''
 
 
 def face():
+    # NestedArtboard x/y place the child's top-left. Eye is 120 square at scale 1.3 (156 px), so
+    # its centre sits 78 px in; the brow bar is at (40,20) of an 80x40 board.
     def eye(name, sid, expr_id, blink_id, x):
-        return f'''<NestedArtboard artboardId="{EYE_AB}" x="{x}" y="0" name="{name}" id="{sid}">
+        return f'''<NestedArtboard artboardId="{EYE_AB}" x="{x}" y="-118" scaleX="1.3" scaleY="1.3" name="{name}" id="{sid}">
     <NestedStateMachine animationId="{EYE_SM}" name="SM">
         <NestedNumber inputId="{EYE_IN_EXPR}" nestedValue="0" name="expr" id="{expr_id}"/>
         <NestedTrigger inputId="{EYE_IN_BLINK}" name="blink" id="{blink_id}"/>
@@ -451,19 +460,19 @@ def face():
 </NestedArtboard>'''
 
     def brow(name, sid, expr_id, x, mirror):
-        return f'''<NestedArtboard artboardId="{BROW_AB}" x="{x}" y="-70" scaleX="{-1 if mirror else 1}" name="{name}" id="{sid}">
+        return f'''<NestedArtboard artboardId="{BROW_AB}" x="{x}" y="-118" scaleX="{-1 if mirror else 1}" name="{name}" id="{sid}">
     <NestedStateMachine animationId="{BROW_SM}" name="SM">
         <NestedNumber inputId="{BROW_IN_EXPR}" nestedValue="0" name="expr" id="{expr_id}"/>
     </NestedStateMachine>
 </NestedArtboard>'''
 
-    return f'''<Node x="250" y="245" name="FacePlacement">
+    return f'''<Node x="250" y="262" name="FacePlacement">
 <Node x="0" y="0" name="Face" id="{FACE}">
-{indent(eye("EyeLeft", EYE_L, EYE_L_EXPR, EYE_L_BLINK, -110), "    ")}
-{indent(eye("EyeRight", EYE_R, EYE_R_EXPR, EYE_R_BLINK, -10), "    ")}
-{indent(brow("BrowLeft", BROW_L, BROW_L_EXPR, -90, False), "    ")}
-{indent(brow("BrowRight", BROW_R, BROW_R_EXPR, 90, True), "    ")}
-    <NestedArtboard artboardId="{MOUTH_AB}" x="-80" y="60" name="Mouth" id="{MOUTH}">
+{indent(eye("EyeLeft", EYE_L, EYE_L_EXPR, EYE_L_BLINK, -132), "    ")}
+{indent(eye("EyeRight", EYE_R, EYE_R_EXPR, EYE_R_BLINK, -24), "    ")}
+{indent(brow("BrowLeft", BROW_L, BROW_L_EXPR, -94, False), "    ")}
+{indent(brow("BrowRight", BROW_R, BROW_R_EXPR, 94, True), "    ")}
+    <NestedArtboard artboardId="{MOUTH_AB}" x="-80" y="14" name="Mouth" id="{MOUTH}">
         <NestedStateMachine animationId="{MOUTH_SM}" name="SM">
             <NestedNumber inputId="{MOUTH_IN_EXPR}" nestedValue="0" name="expr" id="{MOUTH_EXPR}"/>
         </NestedStateMachine>
