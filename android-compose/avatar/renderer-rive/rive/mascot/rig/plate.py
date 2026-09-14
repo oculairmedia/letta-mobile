@@ -5,6 +5,7 @@ import svgpath
 from rml import *  # noqa: F401,F403
 from rig.constants import *  # noqa: F401,F403
 from rig.body import fill, rrect
+from rig.layers import Exit, Layer, OnInput, Raw, State
 
 
 # ================================================================================================
@@ -140,22 +141,33 @@ def plate_component():
     expr_layer = expression_layer("Expression", "7:10", PLATE_IN_EXPR, plate_expr_anim, plate_expr_node)
 
     # Saccade layer: waits pick a fixation at random; fixations return to a random wait. Asleep, parked.
-    asleep_s = input_transition(SACCADE_SLEEP_NODE, PLATE_IN_EXPR, EXPR["sleeping"], 0)
-    awake_s = (f'<StateTransition stateToId="{SACCADE_WAIT_NODES[0]}" duration="0">\n'
-               f'    <TransitionNumberCondition inputId="{PLATE_IN_EXPR}" opValue="lessThan" value="{EXPR["sleeping"] - 0.5}"/>\n</StateTransition>\n'
-               f'<StateTransition stateToId="{SACCADE_WAIT_NODES[0]}" duration="0">\n'
-               f'    <TransitionNumberCondition inputId="{PLATE_IN_EXPR}" opValue="greaterThanOrEqual" value="{EXPR["sleeping"] + 0.5}"/>\n</StateTransition>')
-    to_fix = "\n".join(weighted(exit_transition(n), w) for n, (_, _, w) in zip(SACCADE_FIX_NODES, SACCADE_FIX))
-    to_wait = "\n".join(weighted(exit_transition(n), 10) for n in SACCADE_WAIT_NODES)
-    sac_states = [anim_state(aid, nid, i, ' random="true"', asleep_s + "\n" + to_fix) for i, ((aid, _), nid) in enumerate(zip(SACCADE_WAITS, SACCADE_WAIT_NODES))]
-    sac_states += [anim_state(aid, nid, 3 + i, ' reset="true" random="true"', asleep_s + "\n" + to_wait) for i, ((aid, _, _), nid) in enumerate(zip(SACCADE_FIX, SACCADE_FIX_NODES))]
-    sac_states.append(anim_state(SACCADE_WAITS[0][0], SACCADE_SLEEP_NODE, 12, "", awake_s))
-    saccade_layer = layer_frame("Saccade", "7:13", SACCADE_WAIT_NODES[0], "", "\n".join(sac_states))
-    trigger_layer = layer_frame(
+    # Transitions are ordered, so the park check comes first.
+    asleep_s = OnInput(SACCADE_SLEEP_NODE, PLATE_IN_EXPR, EXPR["sleeping"], 0)
+    # Awake is "anything but sleeping": a band cannot express that, so it is two open-ended
+    # conditions on separate transitions (either one firing wakes the layer).
+    awake_s = [Raw(SACCADE_WAIT_NODES[0],
+                   f'<StateTransition stateToId="{SACCADE_WAIT_NODES[0]}" duration="0">\n'
+                   f'    <TransitionNumberCondition inputId="{PLATE_IN_EXPR}" opValue="lessThan" value="{EXPR["sleeping"] - 0.5}"/>\n</StateTransition>'),
+              Raw(SACCADE_WAIT_NODES[0],
+                  f'<StateTransition stateToId="{SACCADE_WAIT_NODES[0]}" duration="0">\n'
+                  f'    <TransitionNumberCondition inputId="{PLATE_IN_EXPR}" opValue="greaterThanOrEqual" value="{EXPR["sleeping"] + 0.5}"/>\n</StateTransition>')]
+    to_fix = [Exit(n, weight=w) for n, (_, _, w) in zip(SACCADE_FIX_NODES, SACCADE_FIX)]
+    to_wait = [Exit(n, weight=10) for n in SACCADE_WAIT_NODES]
+    sac_states = [State(aid, nid, i, random=True, transitions=[asleep_s] + to_fix)
+                  for i, ((aid, _), nid) in enumerate(zip(SACCADE_WAITS, SACCADE_WAIT_NODES))]
+    sac_states += [State(aid, nid, 3 + i, reset=True, random=True, transitions=[asleep_s] + to_wait)
+                   for i, ((aid, _, _), nid) in enumerate(zip(SACCADE_FIX, SACCADE_FIX_NODES))]
+    sac_states.append(State(SACCADE_WAITS[0][0], SACCADE_SLEEP_NODE, 12, transitions=awake_s))
+    saccade_layer = Layer("Saccade", "7:13", SACCADE_WAIT_NODES[0], states=sac_states).rml()
+    # The blink trigger is a nested-artboard input, not a view-model trigger: hand-rolled XML.
+    trigger_layer = Layer(
         "Blink", "7:11", PLATE_BLINK_REST_NODE,
-        f'<StateTransition stateToId="{PLATE_BLINK_NODE}">\n    <TransitionTriggerCondition inputId="{PLATE_IN_BLINK}"/>\n</StateTransition>',
-        f'<AnimationState x="200" y="40" animationId="{PLATE_WAIT_A}" id="{PLATE_BLINK_REST_NODE}"/>\n'
-        + anim_state(PLATE_BLINK_ANIM, PLATE_BLINK_NODE, 1, ' reset="true"', exit_transition(PLATE_BLINK_REST_NODE)))
+        any_transitions=[Raw(PLATE_BLINK_NODE,
+                             f'<StateTransition stateToId="{PLATE_BLINK_NODE}">\n'
+                             f'    <TransitionTriggerCondition inputId="{PLATE_IN_BLINK}"/>\n</StateTransition>')],
+        states=[State(PLATE_WAIT_A, PLATE_BLINK_REST_NODE, 0),
+                State(PLATE_BLINK_ANIM, PLATE_BLINK_NODE, 1, reset=True,
+                      transitions=[Exit(PLATE_BLINK_REST_NODE)])]).rml()
     # Eyes closed do not blink: the waits park while expr is sleeping and resume when it is not.
     asleep = input_transition(PLATE_AUTO_SLEEP, PLATE_IN_EXPR, EXPR["sleeping"], 0)
     awake = (f'<StateTransition stateToId="{PLATE_AUTO_A}" duration="0">\n'
