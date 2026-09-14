@@ -13,9 +13,10 @@ Rive rules that bite here:
 """
 from textwrap import indent
 
-from rml import (BACK_IN, ELASTIC_OUT, LINEAR, OPACITY, REMAP_TIME, ROT, SINE, STANDARD, SX, SY,
-                 VM_LOOKX, VM_LOOKY, VM_MOUTH, X, Y, animation, bind)
+from rml import (LINEAR, OPACITY, REMAP_TIME, ROT, SINE, SX, SY, VM_LOOKX, VM_LOOKY, VM_MOUTH, X, Y,
+                 animation, bind)
 from rig.body import fill, rrect
+from rig.chart import Chart
 from rig.constants import JX, LEAN_BASE, PLATE_WHITE, TUNABLES, TURN_ARC, TURN_LEAN_DEG, rad
 from rig.ids import (
     ARC_NODE, AUTO_X, AUTO_Y, BODY_NODE, CONV_LOOK, CONV_MOUTH, CONV_TURN_ROT, CONV_TURN_X,
@@ -88,33 +89,62 @@ def face():
 
 
 def turn_animations():
-    """Pose ranges the joystick scrubs: frame 0 = facing -1 (left), 60 = +1 (right)."""
+    """Pose ranges the joystick scrubs: frame 0 = facing -1 (left), 60 = +1 (right).
+
+    **One property, one axis.** The Facing joystick applies both pose ranges every frame, and the
+    one applied last wins outright - there is no mixing between them. TurnX used to key Turn's
+    scaleY as well as its scaleX, and TurnY the other way round, so whichever landed second
+    flattened the other: `Turn.scaleX` read exactly 1.000 through every horizontal turn while
+    `Turn.x` swung the full +-70 px, and the plate slid without ever foreshortening
+    (letta-mobile-72r3a). So each axis now owns whole properties - TurnX: x, rotation, scaleX;
+    TurnY: y, scaleY - and the recede is folded into whichever scale the owning axis carries.
+    """
     # The plate slides, foreshortens AND rolls with the turn (+-TURN_ROT): a face turning on a
     # ball tilts its features; without the roll a turn reads as a flat slide.
+    # TurnX owns scaleX: the horizontal foreshortening (TURN_SQUASH) and the recede together.
     tx = animation("TurnX", TURN_X_ANIM, 60, {
         TURN_NODE: {X: [(0, -TURN_PX, LINEAR), (60, TURN_PX)],
                     ROT: [(0, rad(-TURN_ROT), LINEAR), (60, rad(TURN_ROT))],
-                    # foreshorten (SX) and recede (SY too): the feature moves away as it turns
-                    SX: [(0, TURN_SQUASH * TURN_RECEDE, LINEAR), (30, 1, LINEAR), (60, TURN_SQUASH * TURN_RECEDE)],
-                    SY: [(0, TURN_RECEDE, LINEAR), (30, 1, LINEAR), (60, TURN_RECEDE)]},
+                    SX: [(0, TURN_SQUASH * TURN_RECEDE, LINEAR), (30, 1, LINEAR), (60, TURN_SQUASH * TURN_RECEDE)]},
         ARC_NODE: {Y: [(0, 0, SINE), (30, -TURN_ARC, SINE), (60, 0)]},
         LEAN_NODE: {ROT: [(0, rad(-TURN_LEAN_DEG), LINEAR), (60, rad(TURN_LEAN_DEG))]},
         BODY_NODE: {ROT: [(0, rad(-6), LINEAR), (60, rad(6))],
                     SX: [(0, 0.93, LINEAR), (30, 1, LINEAR), (60, 0.93)]}})
+    # TurnY owns scaleY: the vertical foreshortening and the recede together.
     ty = animation("TurnY", TURN_Y_ANIM, 60, {
         TURN_NODE: {Y: [(0, -TURN_PY, LINEAR), (60, TURN_PY)],
-                    SY: [(0, 0.9 * TURN_RECEDE, LINEAR), (30, 1, LINEAR), (60, 0.9 * TURN_RECEDE)],
-                    SX: [(0, TURN_RECEDE, LINEAR), (30, 1, LINEAR), (60, TURN_RECEDE)]},
+                    SY: [(0, 0.9 * TURN_RECEDE, LINEAR), (30, 1, LINEAR), (60, 0.9 * TURN_RECEDE)]},
         BODY_NODE: {SY: [(0, 1.03, LINEAR), (30, 1, LINEAR), (60, 0.96)]}})
     return [tx, ty]
 
 
+# The ticks of one swing, as distance fractions at evenly spaced frames: 18 / 32 / 32 / 18 % of
+# the travel per quarter, so the swing eases out of one extreme and into the next without any
+# quarter carrying more than a third. The in-betweens ARE the spacing, so the smoothing between
+# them is linear - a bezier on every tick would re-ease each segment and put the snap back.
+SPIN_SPACING = (0.18, 0.5, 0.82)
+
+
 def spin_keys(start, dur, trails=True):
-    """A whip-around: facing 0 -> +1 -> -1 -> 0 over `dur` frames from `start`, trails lagging."""
-    a, b, c, d = start, start + round(dur * 0.25), start + round(dur * 0.62), start + dur
-    x = [(a, 0, BACK_IN), (b, 1, STANDARD), (c, -1, ELASTIC_OUT), (d, 0)]
-    keys = {JOYSTICK: {JX: x},
-            BODY_NODE: {ROT: [(a, 0, BACK_IN), (b, rad(14), STANDARD), (c, rad(-14), ELASTIC_OUT), (d, 0)]}}
+    """A whip-around: facing 0 -> +1 -> -1 -> 0 over `dur` frames from `start`, trails lagging.
+
+    Authored as a timing chart, not as beziers. The old version leaned on BACK_IN into the first
+    extreme and ELASTIC_OUT out of the last, and both are front-loaded to the point of a cut: the
+    facing ran -1 -> -0.33 in a single frame, which is `Turn.x` moving 47 px and `Arc.y` 5.3 px
+    between two frames - the largest delta anywhere in the probe set (letta-mobile-72r3a). Every
+    swing now lays its in-betweens down as real keys (`rig/chart.py`: spacing IS the weight) with
+    the travel spread evenly across the middle and eased only at the extremes, so the whip reads
+    as a whip and no frame carries more than about a seventh of a swing.
+
+    `dur` has to be long enough to hold that: the swing 1 -> -1 is two full units of facing, and
+    at 70 px a unit a per-frame delta under 14 px needs roughly 16 frames for that swing alone.
+    """
+    a, b, c, d = start, start + round(dur * 0.26), start + round(dur * 0.68), start + dur
+    swing = lambda f0, v0, f1, v1: Chart(extremes=[(f0, v0), (f1, v1)], spacing=list(SPIN_SPACING),
+                                         smooth=LINEAR).keys()
+    x = swing(a, 0, b, 1)[:-1] + swing(b, 1, c, -1)[:-1] + swing(c, -1, d, 0)
+    roll = [(f, rad(TURN_ROT * v)) + tuple(rest) for (f, v, *rest) in x]
+    keys = {JOYSTICK: {JX: x}, BODY_NODE: {ROT: roll}}
     if trails:
         def lagged(lag, scale):
             # the facing curve, delayed `lag` frames and mapped through `scale`, keeping each key's bezier

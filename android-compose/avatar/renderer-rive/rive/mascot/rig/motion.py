@@ -12,7 +12,12 @@ Rive rules that bite here:
   - frames() is milliseconds -> frames: a LinearAnimation duration is frames, so every ms number
     in this module passes through frames() or beat() before it reaches animation().
   - these keys mix over lower layers (Breath, the host turn) on the same nodes, so a beat that
-    does not key a property leaves the lower layer showing - which the generic entries rely on.
+    does not key a property leaves the lower layer showing. A beat may want that; an entry must
+    not - an unkeyed property snaps back to rest at the 0 ms cut into the entry, which is what
+    letta-mobile-r4bbm was, so every entry keys Face, Body and BodyPlacement at both ends.
+  - merge(), not dict.update(): update() replaces a whole object's property map, and two recipes
+    that key different properties of the same node (the hop's Body.y and the spin's Body.rotation)
+    silently lose one of the two.
 """
 from typing import NamedTuple
 
@@ -34,6 +39,27 @@ from rig.ids import (
 )
 
 
+def merge(into, more):
+    """Merge one key recipe into another, per object AND per property; returns `into`.
+
+    `dict.update` replaces a whole object's property map. That is how the success hop lost its
+    body: `success_keys.update(spin_keys(...))` overwrote `{BODY_NODE: {Y: hop}}` with
+    spin_keys' `{BODY_NODE: {ROT: ...}}`, so `SuccessFlash` never keyed Body.y at all and the
+    48 px rise the telemetry could not find (letta-mobile-uesod) was never in the document.
+    Merging refuses a genuine collision instead of silently keeping one of the two.
+    """
+    for obj, props in more.items():
+        if obj not in into:
+            into[obj] = dict(props)
+            continue
+        clash = sorted(set(into[obj]) & set(props))
+        if clash:
+            raise ValueError(f"merge: object {obj} is already keyed on property {clash}; "
+                             f"one of the two recipes has to give it up")
+        into[obj].update(props)
+    return into
+
+
 def wander_animations():
     """The Wander layer's animations: four unequal waits, the glance, peek, spin and the sleep shift."""
     glance = animation("WanderGlance", WANDER_GLANCE, beat(1600), {JOYSTICK: {
@@ -43,7 +69,7 @@ def wander_animations():
         JX: [(0, 0, BACK_IN_OUT), (beat(400), 0.3, None), (beat(900), 0.3, ELASTIC_SOFT), (beat(1400), 0)]}})
     spin_k = spin_keys(0, beat(700))
     d7 = beat(700)
-    spin_k.update(squash(INFLATE_NODE, [(0, 1, BACK_IN), (round(d7 * 0.25), 1.05, STANDARD), (round(d7 * 0.62), 1.05, ELASTIC_SOFT), (d7, 1)]))
+    merge(spin_k, squash(INFLATE_NODE, [(0, 1, BACK_IN), (round(d7 * 0.25), 1.05, STANDARD), (round(d7 * 0.62), 1.05, ELASTIC_SOFT), (d7, 1)]))
     spin = animation("WanderSpin", WANDER_SPIN, d7, spin_k)
     # Asleep: one slow, small shift every ~30 s, nothing else.
     sleep_shift = animation("WanderSleepShift", WANDER_SLEEP_SHIFT, beat(3000), {JOYSTICK: {
@@ -86,25 +112,51 @@ class StateRow(NamedTuple):
     gloss_pulse: list     # gradient-opacity keys, or None for a flat gloss
 
 
+STATE_ROWS = {  # SPEC 1 + 9.1
+    "idle": StateRow({"y": breath2()}, 2 * BREATH_MS, 0, (0, 0), "00000000", None),
+    "listening": StateRow({"y": breath2()}, 2 * BREATH_MS, -2, (0, -14), "00000000", None),
+    "thinking": StateRow({"x": sine(2, 3200)}, 3200, -6, (0, 0), "00000000", None),
+    "waitingInput": StateRow({"y": sine(19, 1200)}, 1200, 0, (0, -2), "00000000", None),
+    "speaking": StateRow({"y": breath2()}, 2 * BREATH_MS, 0, (0, 0), "00000000", None),
+    "error": StateRow({"y": 24}, 0, 5, (0, 4), "14000000", None),
+    "sleeping": StateRow({"y": breath2(9000)}, 18000, 3, (0, 4), "38000000", None),   # slow, deep; one inflate per two bobs
+    "loading": StateRow({}, 1400, 0, (0, 0), "10000000", [(0, 0.8, SINE), (frames(700), 1.0, SINE), (frames(1400), 0.8)]),
+    "failed": StateRow({}, 0, 0, (0, 0), "66808080", None),
+    "degraded": StateRow({}, 0, 4, (0, 0), "00000000", None),
+}
+
+
+class Rest(NamedTuple):
+    """Where a sustained loop sits on its own frame 0: the pose an entry starts from, or lands on."""
+    body_x: float
+    body_y: float
+    face_x: float
+    face_y: float
+    face_rot: float     # radians
+    inflate: float      # BodyPlacement scale (the breath's low point)
+
+
+def sustained_rest(state):
+    """The `Rest` of a sustained state, derived from the same StateRow table the loop is built
+    from: the root motion's first value, the face offset on top of it, the plate's rotation, and
+    the low point of the breath's inflate. A generic entry uses it at both ends, so the pose the
+    state before it was holding travels to the pose the next one holds instead of snapping to
+    zero at a 0 ms hand-off (letta-mobile-r4bbm)."""
+    row = STATE_ROWS[state]
+    first = lambda keys: keys[0][1] if isinstance(keys, list) else keys
+    mx, my = first(row.motion.get("x", 0)), first(row.motion.get("y", 0))
+    fx, fy = row.face_offset
+    return Rest(mx, my, mx + fx, my + fy, rad(row.plate_rot_deg),
+                BREATHING[state].lo if state in BREATHING else 1)
+
+
 def sustained_animations():
     """SPEC section 1: root motion (Body and Face move together), plate rotation/offset, tint,
     gloss pulse, and the glyph index. Nothing keys body scale or body vertices."""
     FACING = sustained_facing()
-    ROW = {  # SPEC 1 + 9.1
-        "idle": StateRow({"y": breath2()}, 2 * BREATH_MS, 0, (0, 0), "00000000", None),
-        "listening": StateRow({"y": breath2()}, 2 * BREATH_MS, -2, (0, -14), "00000000", None),
-        "thinking": StateRow({"x": sine(2, 3200)}, 3200, -6, (0, 0), "00000000", None),
-        "waitingInput": StateRow({"y": sine(19, 1200)}, 1200, 0, (0, -2), "00000000", None),
-        "speaking": StateRow({"y": breath2()}, 2 * BREATH_MS, 0, (0, 0), "00000000", None),
-        "error": StateRow({"y": 24}, 0, 5, (0, 4), "14000000", None),
-        "sleeping": StateRow({"y": breath2(9000)}, 18000, 3, (0, 4), "38000000", None),   # slow, deep; one inflate per two bobs
-        "loading": StateRow({}, 1400, 0, (0, 0), "10000000", [(0, 0.8, SINE), (frames(700), 1.0, SINE), (frames(1400), 0.8)]),
-        "failed": StateRow({}, 0, 0, (0, 0), "66808080", None),
-        "degraded": StateRow({}, 0, 4, (0, 0), "00000000", None),
-    }
     out = []
     for st in SUSTAINED:
-        row = ROW[st]
+        row = STATE_ROWS[st]
         motion, period, rot, tint, gloss = row.motion, row.period_ms, row.plate_rot_deg, row.tint, row.gloss_pulse
         fx, fy = row.face_offset
 
@@ -151,8 +203,15 @@ def enter_animations():
     """One entry per pair of sustained states: a one-shot whose glyph swap hides inside a blink
     fired at frame 0 (the shutter, closed by frame 3); the plate's expression flips while the
     eye is closed and the facing travels to the target's. The SPEC section 3 pairs add designed
-    body/face motion that lands on the target's rest; the generic ones key nothing else, so
-    face, body and tint hold and then ease into the target over the hand-off blend."""
+    body/face motion that lands on the target's rest; a generic one travels the SOURCE state's
+    held pose to the TARGET's over the entry's own curve.
+
+    That last part is letta-mobile-r4bbm. A generic entry used to key nothing on Face, Body or
+    BodyPlacement, so a state that holds a pose - error's 24 px drop and 5 deg roll, listening's
+    -14 px lift, degraded's 4 deg, sleeping's 0.985 inflate - handed that pose back to rest across
+    a 0 ms cut the moment the entry started: 61 seams on the ledger. The poses are derivable from
+    the same StateRow table the loops are built from (`sustained_rest`), so the entry now starts
+    where the state before it was and eases to where the next one holds."""
     F = sustained_facing()
     out = []
     for (frm, to), aid in enter_anim.items():
@@ -161,9 +220,17 @@ def enter_animations():
         bez = timing.bezier
         n = frames(timing.ms)
         turn = BACK_OUT if abs(fx1 - fx0) + abs(fy1 - fy0) > 0.2 else bez   # a real turn lands with overshoot
+        r0, r1 = sustained_rest(frm), sustained_rest(to)
         keys = {PLATE_EXPR: {NESTED_VALUE: [(0, EXPR[frm], None), (BLINK_FLIP, EXPR[to])]},
                 JOYSTICK: {JX: [(0, fx0, turn), (n, fx1)], JY: [(0, fy0, turn), (n, fy1)]}}
-        if (frm, to) == ("idle", "listening"):
+        if (frm, to) not in DESIGNED_PAIRS:
+            # The generic entry: hold nothing, travel everything. Every property is keyed at both
+            # ends even when the two rests agree, so no earlier pose can leak through the one-shot.
+            ramp = lambda v0, v1: [(0, v0, bez), (n, v1)]
+            keys[BODY_NODE] = {X: ramp(r0.body_x, r1.body_x), Y: ramp(r0.body_y, r1.body_y)}
+            keys[FACE] = {X: ramp(r0.face_x, r1.face_x), Y: ramp(r0.face_y, r1.face_y),
+                          ROT: ramp(r0.face_rot, r1.face_rot)}
+        elif (frm, to) == ("idle", "listening"):
             # SPEC 9.4: 50 ms anticipation down (+3, +1 deg), lean past to -16/-3 deg at 200 ms, settle -14/-2 deg.
             keys[FACE] = {Y: [(0, 0, EMPH_ACCEL), (frames(50), 3, EMPH_DECEL), (frames(200), -16, M3_STANDARD), (n, -14)],
                           ROT: [(0, 0, EMPH_ACCEL), (frames(50), rad(1), EMPH_DECEL), (frames(200), rad(-3), M3_STANDARD), (n, rad(-2))]}
@@ -182,8 +249,16 @@ def enter_animations():
             keys[FACE] = {Y: [(0, 28, SOFT_OUT), (n, 0)], ROT: [(0, rad(5), SOFT_OUT), (n, 0)]}
             keys[BODY_NODE] = {Y: [(0, 24, SOFT_OUT), (n, 0)]}
             keys[TINT] = {COLOR: [(0, "14000000"), (frames(100), "00000000")]}
+        # The inflate travels from the source state's breath low point to the target's (sleeping
+        # rests at 0.985, everything else at 1), with the turn's own squash riding on top of it.
+        base = lambda f: r0.inflate + (r1.inflate - r0.inflate) * (f / n)
         if turn is BACK_OUT and n >= 10:
-            keys.update(squash(INFLATE_NODE, [(0, 1, EMPH_ACCEL), (3, 1.04, SOFT_OUT), (min(n - 2, 9), 0.98, SOFT_OUT), (n, 1)]))
+            sq = squash(INFLATE_NODE, [(0, 1, EMPH_ACCEL), (3, 1.04, SOFT_OUT), (min(n - 2, 9), 0.98, SOFT_OUT), (n, 1)])
+            merge(keys, {INFLATE_NODE: {k: [(f, round(v * base(f), 4)) + tuple(rest) for (f, v, *rest) in ks]
+                                        for k, ks in sq[INFLATE_NODE].items()}})
+        elif r0.inflate != r1.inflate:
+            merge(keys, {INFLATE_NODE: {SX: [(0, r0.inflate, bez), (n, r1.inflate)],
+                                        SY: [(0, r0.inflate, bez), (n, r1.inflate)]}})
         out.append(animation(f"Enter_{frm}_{to}", aid, n, keys, callbacks=(PLATE_BLINK,)))
     return out
 
@@ -206,12 +281,14 @@ def momentary_animations():
     # Squash and stretch, volume preserved: crouch before the jump, stretch on the way up,
     # neutral at the apex, stretch falling, squash on landing, elastic settle. The plate joins in.
     # SPEC 10.5 success deformation keys (S, L, H); the inflate node holds 1 while the bones own the body.
-    success_keys.update(bone_pose([(0, 1, 0, 0, EMPH_ACCEL), (f(10), 1.06, 0.008, 0, STD_DECEL), (f(22), 0.93, -0.008, 0, SOFT_OUT),
+    merge(success_keys, bone_pose([(0, 1, 0, 0, EMPH_ACCEL), (f(10), 1.06, 0.008, 0, STD_DECEL), (f(22), 0.93, -0.008, 0, SOFT_OUT),
                                    (f(37.5), 1, 0, 0, EMPH_ACCEL), (f(60), 0.96, -0.006, 0, ACCEL), (f(70), 1.10, 0.012, 0, SOFT_OUT),
                                    (f(87.5), 1.02, 0.003, 0, M3_STANDARD), (S, 1, 0, 0)]))
     success_keys[INFLATE_NODE] = {SX: 1, SY: 1}
-    success_keys[FACE].update(squash(FACE, [(0, 1, EMPH_ACCEL), (f(22), 0.97, SOFT_OUT), (f(37.5), 1, EMPH_ACCEL), (f(70), 1.05, ELASTIC_SOFT), (S, 1)])[FACE])
-    success_keys.update(spin_keys(f(10), f(70) - f(10)))
+    merge(success_keys, squash(FACE, [(0, 1, EMPH_ACCEL), (f(22), 0.97, SOFT_OUT), (f(37.5), 1, EMPH_ACCEL), (f(70), 1.05, ELASTIC_SOFT), (S, 1)]))
+    # The spin also keys BODY_NODE (its roll), so this MUST merge: `update` would replace the
+    # body's whole property map and take the hop's Y with it (letta-mobile-uesod).
+    merge(success_keys, spin_keys(f(6), f(92) - f(6)))
     success = animation("SuccessFlash", SUCCESS_ANIM, S, success_keys)
     E = frames(600)
     g = lambda pct: round(E * pct / 100)
@@ -220,12 +297,12 @@ def momentary_animations():
     ey = [(0, 0, STANDARD), (g(16.6667), 24, STANDARD), (g(33.3333), 24, STANDARD), (g(50), 24, STANDARD), (g(66.6667), 24, None), (E, 24)]
     er = [(0, 0, STANDARD), (g(16.6667), rad(-7), STANDARD), (g(33.3333), rad(7), STANDARD), (g(50), rad(-3), STANDARD), (g(66.6667), rad(5), None), (E, rad(5))]
     error_keys = {BODY_NODE: {X: ex, Y: ey}, FACE: {X: ex, Y: ey, ROT: er}, PLATE_EXPR: {NESTED_VALUE: EXPR["error"]}}
-    error_keys.update(bone_pose([(0, 1, 0, 0, STANDARD), (g(16.6667), 1.07, 0, 0, STANDARD), (g(33.3333), 0.97, 0, 0, STANDARD),
+    merge(error_keys, bone_pose([(0, 1, 0, 0, STANDARD), (g(16.6667), 1.07, 0, 0, STANDARD), (g(33.3333), 0.97, 0, 0, STANDARD),
                                  (g(50), 1.04, 0, 0, STANDARD), (g(66.6667), 1, 0, 0, None), (E, 1, 0, 0)]))
     error_keys[INFLATE_NODE] = {SX: 1, SY: 1}
     error = animation("ErrorFlash", ERROR_ANIM, E, error_keys)
     drag_keys = {PLATE_EXPR: {NESTED_VALUE: EXPR["dragged"]}, INFLATE_NODE: {SX: 1, SY: 1}}
-    drag_keys.update(bone_pose([(0, round(1 / 0.92, 4), -0.008, 0, None)]))   # vertical compression, horizontal spread
+    merge(drag_keys, bone_pose([(0, round(1 / 0.92, 4), -0.008, 0, None)]))   # vertical compression, horizontal spread
     drag = animation("Dragged", DRAG_ANIM, 1, drag_keys)
     return [animation("FlashRest", FLASH_REST_ANIM, 1, {}), success, error, animation("DragRest", DRAG_REST_ANIM, 1, {}), drag]
 

@@ -65,13 +65,13 @@
   "scenario": "beat:WanderSpin",
   "signature": {
     "Arc.y": {
-      "max_delta": 3.1853,
+      "max_delta": 1.1768,
       "overshoot_pct": 0.0,
       "peak": 0.0,
       "peak_frame": 16,
       "range": 7.0,
-      "settle_frame": 41,
-      "spacing": "ease-in"
+      "settle_frame": 57,
+      "spacing": "s"
     },
     "Body.x": {
       "max_delta": 0.0,
@@ -119,13 +119,13 @@
       "spacing": "hold"
     },
     "Joystick.x": {
-      "max_delta": 0.3718,
+      "max_delta": 0.15,
       "overshoot_pct": 0.0,
       "peak": 1.0,
       "peak_frame": 16,
       "range": 2.0,
-      "settle_frame": 46,
-      "spacing": "ease-in"
+      "settle_frame": 57,
+      "spacing": "s"
     },
     "Joystick.y": {
       "max_delta": 0.0,
@@ -137,13 +137,13 @@
       "spacing": "hold"
     },
     "Lean.rotation": {
-      "max_delta": 0.0324,
+      "max_delta": 0.0131,
       "overshoot_pct": 0.0,
       "peak": 0.0873,
       "peak_frame": 16,
       "range": 0.1745,
-      "settle_frame": 46,
-      "spacing": "ease-in"
+      "settle_frame": 57,
+      "spacing": "s"
     },
     "Lumen.opacity": {
       "max_delta": 0.0,
@@ -182,31 +182,31 @@
       "spacing": "ease-in"
     },
     "Turn.rotation": {
-      "max_delta": 0.0908,
+      "max_delta": 0.0367,
       "overshoot_pct": 0.0,
       "peak": 0.2444,
       "peak_frame": 16,
       "range": 0.4887,
-      "settle_frame": 46,
-      "spacing": "ease-in"
+      "settle_frame": 57,
+      "spacing": "s"
     },
     "Turn.scaleX": {
-      "max_delta": 0.0,
+      "max_delta": 0.0618,
       "overshoot_pct": 0.0,
-      "peak": 1.0,
-      "peak_frame": 0,
-      "range": 0.0,
-      "settle_frame": 0,
-      "spacing": "hold"
+      "peak": 0.588,
+      "peak_frame": 16,
+      "range": 0.412,
+      "settle_frame": 58,
+      "spacing": "s"
     },
     "Turn.x": {
-      "max_delta": 26.0262,
+      "max_delta": 10.5,
       "overshoot_pct": 0.0,
       "peak": 70.0,
       "peak_frame": 16,
-      "range": 139.9999,
-      "settle_frame": 46,
-      "spacing": "ease-in"
+      "range": 140.0,
+      "settle_frame": 57,
+      "spacing": "s"
     },
     "Turn.y": {
       "max_delta": 0.0,

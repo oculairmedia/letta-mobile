@@ -167,12 +167,15 @@ class TestTimeline(unittest.TestCase):
 class TestSeams(unittest.TestCase):
     """The seam ledger and the blend policy (MOTION-PIPELINE step A)."""
 
-    # Every seam in the committed scene.rml that nobody has signed `cut=True`. All of them are
-    # hand-backs: a one-shot ends holding Face/Body where the state that follows never keys it,
-    # so the pose snaps back to rest at a 0 ms hand-off. They are findings, not accidents of the
-    # tooling, and fixing them changes the output - so the number is pinned here instead, and a
-    # NEW hard cut (which the Layer policy would refuse outright) or a new hand-back moves it.
-    UNEXPLAINED = 61
+    # Every seam in the committed scene.rml that nobody has signed. It is zero, and it stays zero.
+    # It was 61, all hand-backs: a one-shot ended holding Face/Body where the state that followed
+    # never keyed it, so the pose snapped back to rest at a 0 ms hand-off. 57 of those were the
+    # generic entries, which now travel the source state's held pose to the target's rest
+    # (letta-mobile-r4bbm); the remaining four are the error flash, three of them signed
+    # `hold=True` because the Expression layer underneath is holding that same pose, and one that
+    # became an ordinary signed cut once SuccessFlash keyed Body.y again (letta-mobile-uesod).
+    # A new hard cut is refused outright by the Layer policy; a new hand-back fails here.
+    UNEXPLAINED = 0
 
     @classmethod
     def setUpClass(cls):

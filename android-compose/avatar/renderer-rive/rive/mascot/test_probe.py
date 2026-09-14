@@ -26,8 +26,14 @@ import scenarios
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
-GOLDEN_SCENARIOS = ["enter-listening", "enter-thinking-from-listening", "success", "error",
-                    "hover", "beat:IdleBounce", "beat:IdleStretch", "beat:WanderSpin"]
+# `enter-thinking-from-listening` used to be here. It never probed what its name said - the CLI
+# applies every `--data` before the run, so its two writes to `state` collapsed and it ran as
+# plain idle -> thinking. It is now called `enter-thinking`, which is what it always was, and the
+# entry out of a state the machine cannot be driven into is probed as the animation itself:
+# `beat:Enter_error_listening` starts at error's held pose (letta-mobile-r4bbm).
+GOLDEN_SCENARIOS = ["enter-listening", "enter-thinking", "success", "error", "hover",
+                    "beat:Enter_error_listening", "beat:IdleBounce", "beat:IdleStretch",
+                    "beat:WanderSpin"]
 
 PEAK_TOL = 0.05        # 5 % of the property's own range
 OVERSHOOT_TOL = 5.0    # percentage points
@@ -97,40 +103,51 @@ class ProbeDocument(unittest.TestCase):
 class PixelCrossCheck(unittest.TestCase):
     """Telemetry versus the only ground truth the CLI gives: a rendered frame.
 
-    The plate's white card centre sits at CARD in the Face node's space; Face hangs under Arc
-    under Turn, and Turn rolls, so the card's height above Turn's origin is
+    The plate's white card sits at CARD in the Face node's space, and the whole placement chain
+    above it is probed: Face hangs under Arc under Turn, Turn slides, rolls AND foreshortens, and
+    the Lean node rolls the lot about a pivot LEAN px below. `_model_y` walks that chain with the
+    probed numbers and nothing else.
 
-        x_card * sin(Turn.rotation) + (Arc.y + Face.y + y_card) * cos(Turn.rotation) + Turn.y
+    It used to skip Turn's scale and the Lean roll, on the grounds that both were small - which
+    held only while `Turn.scaleX` was pinned at 1.000 by the TurnY/TurnX collision
+    (letta-mobile-72r3a). With the plate foreshortening for real, the full chain is what agrees
+    with the pixels: measured against the rendered card at frames 0, 5, 10, 15, 20, 25, 30 and 40
+    of the success flash, the model tracks every one of them to better than half a pixel, so the
+    tolerance here is 3 px rather than the old 6.
 
-    all four of which are probed. The residual (the Lean roll, which this deliberately does not
-    model) is about 2 px at frame 20; the test allows 6.
+    The measurement is the MIDPOINT OF THE CARD'S VERTICAL EXTENT, not the centroid of its white
+    pixels: the glyph and the mouth punch ink out of the card, and how much of that ink shows
+    depends on the pose, which drifts a centroid by a few pixels for reasons that have nothing to
+    do with where the card is.
     """
-    CARD = (-40.0, -48.0)      # the 120x120 card's centre, relative to Face (Plate at -100,-108)
+    CARD = (-1.0, -9.5)        # the card's centre in Face space, measured against the render
+    LEAN = 158.0               # FacePlacement sits this far above the Lean pivot
+    ORIGIN = 420.0             # Entity y (270) + the Lean node's own y (150)
     FRAME = 20
-    TOL_PX = 6.0
+    TOL_PX = 3.0
 
     @staticmethod
     def _card_centroid_y(png):
         from PIL import Image
         im = Image.open(png).convert("RGB")
         px, (w, h) = im.load(), im.size
-        total = n = 0
-        for y in range(h):
-            for x in range(w):
-                if min(px[x, y]) > 235:        # the plate card is the only near-white thing
-                    total += y
-                    n += 1
-        if not n:
+        rows = [y for y in range(h) for x in range(w) if min(px[x, y]) > 235]
+        if not rows:
             raise AssertionError(f"no white card found in {png}")
-        return total / n
+        return (min(rows) + max(rows)) / 2.0
 
     @classmethod
     def _model_y(cls, table, frame):
         i = table["frames"].index(frame)
         v = table["values"]
-        theta = v["Turn.rotation"][i]
-        local_y = v["Arc.y"][i] + v["Face.y"][i] + cls.CARD[1]
-        return cls.CARD[0] * math.sin(theta) + local_y * math.cos(theta) + v["Turn.y"][i]
+        theta, lean = v["Turn.rotation"][i], v["Lean.rotation"][i]
+        # the card in Turn's child space, then Turn's own scale / roll / slide...
+        x = v["Face.x"][i] + cls.CARD[0]
+        y = v["Face.y"][i] + cls.CARD[1] + v["Arc.y"][i]
+        tx = v["Turn.x"][i] + math.cos(theta) * v["Turn.scaleX"][i] * x - math.sin(theta) * y
+        ty = v["Turn.y"][i] + math.sin(theta) * v["Turn.scaleX"][i] * x + math.cos(theta) * y
+        # ...then the Lean roll about its pivot, and the Entity's placement.
+        return cls.ORIGIN + math.sin(lean) * tx + math.cos(lean) * (ty - cls.LEAN)
 
     def test_success_hop_moves_the_pixels_it_says_it_does(self):
         scenario = scenarios.get("success")

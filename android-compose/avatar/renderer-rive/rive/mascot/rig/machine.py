@@ -88,7 +88,8 @@ def _static_layers():
     # cuts. Interrupting one flash with the other cuts across the error drop (24 px) on purpose -
     # the new flash re-poses the body from its own frame 0.
     FLASH_CUT = "trigger flash, self-returning: it re-poses from its own frame 0"
-    ERROR_HOLD = "error flash holds its drop; `state` settles to error behind it"
+    ERROR_HOLD = ("error flash holds its drop; `state` settles to error behind it, so the "
+                  "Expression layer is already holding that pose when Flash lets go")
     flash = Layer(
         "Flash", "3:6", FLASH_REST_NODE,
         any_transitions=[OnTrigger(SUCCESS_NODE, VM_SUCCESS, cut=True, reason=FLASH_CUT),
@@ -97,7 +98,8 @@ def _static_layers():
                 State(SUCCESS_ANIM, SUCCESS_NODE, 1, reset=True,
                       transitions=[Exit(FLASH_REST_NODE, 120, SOFT_OUT)]),
                 State(ERROR_ANIM, ERROR_NODE, 2, reset=True,
-                      transitions=[Exit(FLASH_REST_NODE, 0, cut=True, reason=ERROR_HOLD)])]).rml()
+                      transitions=[Exit(FLASH_REST_NODE, 0, cut=True, hold=True,
+                                        reason=ERROR_HOLD)])]).rml()
     drag = Layer(
         "Drag", "3:7", DRAG_REST_NODE,
         any_transitions=[OnBool(DRAG_NODE, VM_DRAGGED, "true", 80, SPRING),

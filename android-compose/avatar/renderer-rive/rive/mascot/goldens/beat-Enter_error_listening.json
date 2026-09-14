@@ -1,0 +1,172 @@
+{
+  "every": 1,
+  "frames": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10
+  ],
+  "scenario": "beat:Enter_error_listening",
+  "signature": {
+    "Arc.y": {
+      "max_delta": 1.0535,
+      "overshoot_pct": 0.0,
+      "peak": -5.571,
+      "peak_frame": 1,
+      "range": 1.4289,
+      "settle_frame": 4,
+      "spacing": "ease-in"
+    },
+    "Body.x": {
+      "max_delta": 0.0,
+      "overshoot_pct": 0.0,
+      "peak": 0.0,
+      "peak_frame": 0,
+      "range": 0.0,
+      "settle_frame": 0,
+      "spacing": "hold"
+    },
+    "Body.y": {
+      "max_delta": 24.0,
+      "overshoot_pct": 0.0,
+      "peak": 24.0,
+      "peak_frame": 1,
+      "range": 24.0,
+      "settle_frame": 9,
+      "spacing": "pop"
+    },
+    "Face.rotation": {
+      "max_delta": 0.0873,
+      "overshoot_pct": 0.0,
+      "peak": 0.0873,
+      "peak_frame": 1,
+      "range": 0.1201,
+      "settle_frame": 9,
+      "spacing": "ease-in"
+    },
+    "Face.x": {
+      "max_delta": 0.0,
+      "overshoot_pct": 0.0,
+      "peak": 0.0,
+      "peak_frame": 0,
+      "range": 0.0,
+      "settle_frame": 0,
+      "spacing": "hold"
+    },
+    "Face.y": {
+      "max_delta": 28.0,
+      "overshoot_pct": 0.0,
+      "peak": 28.0,
+      "peak_frame": 1,
+      "range": 41.2849,
+      "settle_frame": 9,
+      "spacing": "ease-in"
+    },
+    "Joystick.x": {
+      "max_delta": 0.15,
+      "overshoot_pct": 3.93,
+      "peak": 0.0077,
+      "peak_frame": 8,
+      "range": 0.3077,
+      "settle_frame": 6,
+      "spacing": "ease-in"
+    },
+    "Joystick.y": {
+      "max_delta": 0.25,
+      "overshoot_pct": 0.0,
+      "peak": 0.25,
+      "peak_frame": 1,
+      "range": 0.2564,
+      "settle_frame": 6,
+      "spacing": "pop"
+    },
+    "Lean.rotation": {
+      "max_delta": 0.0131,
+      "overshoot_pct": 3.93,
+      "peak": 0.0007,
+      "peak_frame": 8,
+      "range": 0.0269,
+      "settle_frame": 6,
+      "spacing": "ease-in"
+    },
+    "Lumen.opacity": {
+      "max_delta": 0.0,
+      "overshoot_pct": 0.0,
+      "peak": 0.0,
+      "peak_frame": 0,
+      "range": 0.0,
+      "settle_frame": 0,
+      "spacing": "hold"
+    },
+    "Placement.scaleX": {
+      "max_delta": 0.0404,
+      "overshoot_pct": 0.0,
+      "peak": 1.04,
+      "peak_frame": 4,
+      "range": 0.06,
+      "settle_frame": 9,
+      "spacing": "s"
+    },
+    "Placement.scaleY": {
+      "max_delta": 0.0397,
+      "overshoot_pct": 0.0,
+      "peak": 0.9615,
+      "peak_frame": 4,
+      "range": 0.0589,
+      "settle_frame": 9,
+      "spacing": "s"
+    },
+    "Trail1.opacity": {
+      "max_delta": 0.0,
+      "overshoot_pct": 0.0,
+      "peak": 0.0,
+      "peak_frame": 0,
+      "range": 0.0,
+      "settle_frame": 0,
+      "spacing": "hold"
+    },
+    "Turn.rotation": {
+      "max_delta": 0.0367,
+      "overshoot_pct": 3.93,
+      "peak": 0.0019,
+      "peak_frame": 8,
+      "range": 0.0752,
+      "settle_frame": 6,
+      "spacing": "ease-in"
+    },
+    "Turn.scaleX": {
+      "max_delta": 0.0618,
+      "overshoot_pct": 0.0,
+      "peak": 0.8764,
+      "peak_frame": 1,
+      "range": 0.1229,
+      "settle_frame": 5,
+      "spacing": "ease-in"
+    },
+    "Turn.x": {
+      "max_delta": 10.5,
+      "overshoot_pct": 3.93,
+      "peak": 0.5409,
+      "peak_frame": 8,
+      "range": 21.5409,
+      "settle_frame": 6,
+      "spacing": "ease-in"
+    },
+    "Turn.y": {
+      "max_delta": 6.0,
+      "overshoot_pct": 0.0,
+      "peak": 6.0,
+      "peak_frame": 1,
+      "range": 6.1545,
+      "settle_frame": 6,
+      "spacing": "pop"
+    }
+  }
+}

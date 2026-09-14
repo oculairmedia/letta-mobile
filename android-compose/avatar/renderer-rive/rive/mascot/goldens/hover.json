@@ -195,7 +195,7 @@
     "Turn.scaleX": {
       "max_delta": 0.0,
       "overshoot_pct": 0.0,
-      "peak": 1.0,
+      "peak": 0.9382,
       "peak_frame": 0,
       "range": 0.0,
       "settle_frame": 0,

@@ -66,10 +66,10 @@
   "scenario": "success",
   "signature": {
     "Arc.y": {
-      "max_delta": 5.3015,
+      "max_delta": 1.725,
       "overshoot_pct": 0.0,
       "peak": 0.0,
-      "peak_frame": 13,
+      "peak_frame": 15,
       "range": 7.0,
       "settle_frame": 57,
       "spacing": "ease-in"
@@ -84,13 +84,13 @@
       "spacing": "hold"
     },
     "Body.y": {
-      "max_delta": 0.0604,
+      "max_delta": 20.9936,
       "overshoot_pct": 0.0,
-      "peak": -1.8995,
-      "peak_frame": 60,
-      "range": 1.8995,
-      "settle_frame": 59,
-      "spacing": "ease-out"
+      "peak": -48.0,
+      "peak_frame": 19,
+      "range": 54.0,
+      "settle_frame": 57,
+      "spacing": "ease-in"
     },
     "Face.rotation": {
       "max_delta": 0.0271,
@@ -120,10 +120,10 @@
       "spacing": "ease-in"
     },
     "Joystick.x": {
-      "max_delta": 0.6707,
+      "max_delta": 0.16,
       "overshoot_pct": 0.0,
       "peak": 1.0,
-      "peak_frame": 13,
+      "peak_frame": 15,
       "range": 2.0,
       "settle_frame": 57,
       "spacing": "ease-in"
@@ -138,10 +138,10 @@
       "spacing": "hold"
     },
     "Lean.rotation": {
-      "max_delta": 0.0585,
+      "max_delta": 0.014,
       "overshoot_pct": 0.0,
       "peak": 0.0873,
-      "peak_frame": 13,
+      "peak_frame": 15,
       "range": 0.1745,
       "settle_frame": 57,
       "spacing": "ease-in"
@@ -177,35 +177,35 @@
       "max_delta": 0.0933,
       "overshoot_pct": 0.0,
       "peak": 0.28,
-      "peak_frame": 9,
+      "peak_frame": 7,
       "range": 0.28,
-      "settle_frame": 34,
+      "settle_frame": 44,
       "spacing": "ease-in"
     },
     "Turn.rotation": {
-      "max_delta": 0.1639,
+      "max_delta": 0.0391,
       "overshoot_pct": 0.0,
       "peak": 0.2444,
-      "peak_frame": 13,
+      "peak_frame": 15,
       "range": 0.4887,
       "settle_frame": 57,
       "spacing": "ease-in"
     },
     "Turn.scaleX": {
-      "max_delta": 0.0,
+      "max_delta": 0.0659,
       "overshoot_pct": 0.0,
-      "peak": 1.0,
-      "peak_frame": 0,
-      "range": 0.0,
-      "settle_frame": 0,
-      "spacing": "hold"
+      "peak": 0.588,
+      "peak_frame": 15,
+      "range": 0.412,
+      "settle_frame": 57,
+      "spacing": "ease-in"
     },
     "Turn.x": {
-      "max_delta": 46.9458,
+      "max_delta": 11.2,
       "overshoot_pct": 0.0,
       "peak": 70.0,
-      "peak_frame": 13,
-      "range": 139.9996,
+      "peak_frame": 15,
+      "range": 140.0,
       "settle_frame": 57,
       "spacing": "ease-in"
     },

@@ -11,9 +11,11 @@ the value snaps back to whatever the layers below are showing (rest) at the cut.
     python -m rig.seams /tmp/x.rml    # any generated document
 
 A `cut=True` signature (rig/layers.py) accounts for the *hard cut* it sits on: the two animations
-keyed that property and the author decided the jump is the design. It does not account for a
-hand-back, which is a question about the layers below rather than about the transition, so a
-hand-back stays on the ledger as a finding even when its transition is signed.
+keyed that property and the author decided the jump is the design. It does NOT account for a
+hand-back, which is a question about the layers below rather than about the transition. A
+hand-back has its own signature, `hold=True` with a reason, which says the pose the one-shot lets
+go of is the pose the layers underneath are already holding - so the value the ledger computes as
+a snap to rest is not one. An unsigned hand-back stays on the ledger as a finding.
 
 As a library this module gives `rig/layers.py` its blend policy: `animation_index()` turns a
 generated document (or just the joined animation XML, before it is wrapped in an artboard) into
@@ -294,34 +296,39 @@ class Row(NamedTuple):
 
 
 def cut_marks():
-    """The `cut=True` marks the rig declares, as {(layer, source node, target node): reason}.
+    """The signatures the rig declares, as (cuts, holds), each
+    {(layer, source node, target node): reason}.
 
     They live in Python (rig/machine.py, rig/plate.py), not in the document, so reading them
     means building the layers: importing the two modules and running their builders populates
-    rig.layers.CUT_MARKS as a side effect."""
+    rig.layers.CUT_MARKS and rig.layers.HOLD_MARKS as a side effect."""
     from rig import layers as layer_mod
     from rig.machine import root_machine
     from rig.plate import plate_component
     layer_mod.CUT_MARKS.clear()
+    layer_mod.HOLD_MARKS.clear()
     root_machine()
     plate_component()
-    return dict(layer_mod.CUT_MARKS)
+    return dict(layer_mod.CUT_MARKS), dict(layer_mod.HOLD_MARKS)
 
 
 def ledger(document, marks=None):
     """Every seam in the document, worst first by normalised delta."""
     root = parse(document)
     index = animation_index(root)
-    marks = cut_marks() if marks is None else marks
+    marks, holds = cut_marks() if marks is None else marks
     rows = []
     for t in transitions(root):
         if t.ms != 0:
             continue
-        reason = marks.get((t.layer, t.from_node, t.to_node), marks.get((t.layer, None, t.to_node)))
+        look = lambda m: m.get((t.layer, t.from_node, t.to_node), m.get((t.layer, None, t.to_node)))
+        reason, held = look(marks), look(holds)
         for c in crossings(index, t.from_anim, t.to_anim):
-            # A signature covers the hard cut it sits on, never the hand-back underneath it:
-            # what the lower layers do with a property nobody keys is not the transition's to give.
-            signed = None if c.hand_back else reason
+            # A cut signature covers the hard cut it sits on, never the hand-back underneath it:
+            # what the lower layers do with a property nobody keys is not the transition's to
+            # give. A hand-back needs its own signature (`hold=True`), which says the pose the
+            # one-shot lets go of is the pose the layers below are already holding.
+            signed = held if c.hand_back else reason
             rows.append(Row(t.machine, t.layer, _anim_name(index, t.from_anim),
                             _anim_name(index, t.to_anim), t.kind, t.ms, c.obj, prop_name(c.key),
                             c.from_value, c.to_value, c.delta, c.normalised, c.hand_back,
@@ -359,7 +366,8 @@ def table(rows, names=None):
                      r.kind + ("/handback" if r.hand_back else ""),
                      f"{r.ms}", names.get(r.obj, r.obj), r.prop,
                      display(key, r.from_value), display(key, r.to_value),
-                     f"{num(r.normalised, 1)}x", "cut: " + r.reason if r.reason else ""])
+                     f"{num(r.normalised, 1)}x",
+                     (("hold: " if r.hand_back else "cut: ") + r.reason) if r.reason else ""])
     head = ["layer", "from", "to", "kind", "ms", "object", "property", "from", "to", "delta", "why"]
     widths = [max(len(head[i]), *(len(row[i]) for row in body)) if body else len(head[i])
               for i in range(len(head))]

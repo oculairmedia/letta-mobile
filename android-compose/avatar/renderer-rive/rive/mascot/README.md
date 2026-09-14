@@ -24,10 +24,10 @@ there are no star imports, so the definition of anything is one jump away.
 | `rig/body.py` | The body: one 8-vertex path per identity, the three bones and their weights, the paint stack, and the breath / lumen / squash / bone-pose key recipes | yes |
 | `rig/face.py` | The face assembly: the FacePlacement > HostTurn > Turn > Arc > Face chain that carries the plate, the TurnX/TurnY pose ranges, the trails, `spin_keys()` | yes |
 | `rig/plate.py` | The Plate component: glyph per state, mouth morph, pupil overlay, tunable ranges, and the plate's own four layers (Expression, Blink, AutoBlink, Saccade) | yes |
-| `rig/motion.py` | Every root animation: sustained loops (`ROW`), the 90 entries, the flashes, the nine idle beats, wander | yes |
+| `rig/motion.py` | Every root animation: sustained loops (`STATE_ROWS` / `sustained_rest`), the 90 entries, the flashes, the nine idle beats, wander | yes |
 | `rig/machine.py` | The `Avatar` state machine: ten layers, their states and transitions, and the file's hover/drag listeners | yes |
 | `rig/layers.py` | Typed layer builder (`Layer` / `State` / `Exit` / `OnEnum` / `OnBool` / `OnTrigger` / `OnInput` / `Raw`). Validates targets, weights and exit-time-on-a-loop in Python instead of at runtime | rarely |
-| `rig/seams.py` | The seam ledger and the blend policy: what each animation leaves a property at, what the next one picks it up at, and which 0 ms hand-offs tear. `python -m rig.seams` lists them worst first; `Layer.rml()` refuses an unsigned one | rarely |
+| `rig/seams.py` | The seam ledger and the blend policy: what each animation leaves a property at, what the next one picks it up at, and which 0 ms hand-offs tear. `python -m rig.seams` lists them worst first; `Layer.rml()` refuses an unsigned one. A hard cut is signed `cut=True`, a deliberate hand-back `hold=True`, both with a reason | rarely |
 | `rig/chart.py` | Timing charts, both ways: `Chart(extremes, breakdown, spacing).keys()` authors a beat as poses and spacing (the in-betweens are real keys, not a bezier's guess), `Chart.of(keys)` / `Chart.of_samples(values)` read a curve or a telemetry series back and classify it (ease-in / ease-out / s / linear / hold / pop), `chart.text()` draws the margin chart | yes |
 | `rig/probe.py` | The probe list: which node properties telemetry exposes (name, object, property key, unit) and `inject()`, which adds the view-model numbers and the two-way binds to a built document. Probe ids (`1:900+`) are deliberately outside `ids.py` - they must never be pushed | add probes |
 | `rml.py` | RML primitives: Rive property keys, view-model ids, easing tokens, XML builders (keyframes, animations, states, transitions). No mascot knowledge | rarely |
@@ -41,7 +41,7 @@ there are no star imports, so the definition of anything is one jump away.
 | `onion.py` | Onion skins: several frames of one motion overlaid, older ones fainter (`--tint`, `--edges`), so arcs, spacing and overshoot read at a glance; `--diff` prints the per-pair % changed as a pop detector. Drives the CLI itself and caches frames | rarely |
 | `timeline.py` | Read a curve without building: keyframes, easing and an ASCII plot per animation (`--list`, `--layers`, `--chart`) - the review tool when the editor is not available | rarely |
 | `xsheet.py` | The exposure sheet: frames down, one column per (object, property) the named animations key, `[K]` on an extreme, `(B)` on an interior key, `-` on an in-between, with the per-frame delta; a driver column for callbacks and expression flips, a timing chart under each level and a spacing class per level in the footer (`--wide`, `--range`) | rarely |
-| `scenarios.py` | Named driver sequences as data (`enter-listening`, `success`, `conversation`, `beat:<Animation>`, ...). Each step is one CLI flag, applied in order, so a scenario settles in one state before asking for the next | add scenarios |
+| `scenarios.py` | Named driver sequences as data (`enter-listening`, `enter-thinking`, `success`, `beat:<Animation>`, ...). Each step is one CLI flag. `--data` does NOT sequence, so a scenario that writes one property twice is refused outright: one run per leg, and `CONVERSATION` is a list of runs rather than a scenario | add scenarios |
 | `probe.py` | Pose telemetry: run a scenario headless and read the motion back as numbers - sparklines, motion signatures, an exposure-sheet grid, `goldens/*.json`. `--probe` binds node properties two-way into view-model numbers and `--data-dump` prints them per frame, so this is the pencil test without pixels | rarely |
 | `goldens/*.json` | Committed motion signatures per scenario, diffed by `test_probe.py`. Re-golden on purpose (`probe.py <scenario> --golden`) with the diff in the commit | on purpose |
 | `test_rig.py` | `python -m unittest test_rig`: regenerate parity, unique ids, resolvable state/animation references, the contract check, a `timeline.py` smoke | rarely |
@@ -101,7 +101,8 @@ and `rig/layers.py` raises on a layer whose transition leaves its own layer, who
 a non-random state, whose random state has fewer than two weighted ways out, or whose exit-time
 transition hangs off a looping animation - and, once `gen_scene.py` has handed it the animation
 index, on a 0 ms transition that tears a property both animations key, unless that transition is
-signed `cut=True` with a reason (`python -m rig.seams` lists every seam and says which are signed).
+signed `cut=True` with a reason (`python -m rig.seams` lists every seam and says which are signed;
+the unsigned count is pinned at zero by `test_rig.py`).
 A refactor that is meant to change nothing should also
 survive a byte check against the committed file:
 
@@ -281,7 +282,8 @@ that first; open an image only when a number is surprising.
 
 ```bash
 python probe.py success                  # sparklines + motion signatures for the happy flash
-python probe.py conversation --every 2   # idle -> listening -> thinking -> speaking -> idle, one run
+python probe.py enter-thinking           # idle -> thinking (the only entry a driver can reach)
+python probe.py beat:Enter_error_listening   # an entry OUT of a held pose, through --solo
 python probe.py beat:IdleBounce --sheet  # one animation (through --solo), with the frame grid
 python probe.py error --golden           # re-record goldens/error.json, on purpose
 python -m unittest test_probe            # every golden, plus the screenshot cross-check
@@ -289,13 +291,16 @@ python -m unittest test_probe            # every golden, plus the screenshot cro
 
 ```
   Face.y  ▁▁▁▁▁▁▃▆▆▇▇███████████▇▆▆▅▃▂▁▁▁▁▁  peak  -48.000px @19  settle 57  max|Δ|  20.994  spacing ease-in
-  Body.y  ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▂▂▂▂▂▂▃▃▃▃▃▄▄▄▄  peak   -1.899px @60  settle 59  max|Δ|   0.060  spacing ease-out
+  Body.y  ▁▁▁▁▁▁▃▆▆▇▇███████████▇▆▆▅▃▂▁▁▁▁▁  peak  -48.000px @19  settle 57  max|Δ|  20.994  spacing ease-in
 ```
 
 The bars are distance from rest, so a rise and a drop read the same; a vertical wall in them is a
-snap. That pair is the success hop, and it is also the bug: the flash keys 48 px on Body and Face
-together, and only Face gets it (`letta-mobile-uesod`). The authored keys cannot see that - only
-telemetry can - so when authored and actual disagree, believe the probe.
+snap. That pair is the success hop, and it is the reason this instrument exists: `Body.y` used to
+read `peak -1.899px @60` there - the breath, nothing else - while the flash's authored keys said
+48 px on Body and Face together (`letta-mobile-uesod`; the cause turned out to be a `dict.update`
+in `rig/motion.py` that dropped the body's keys on the floor, which no amount of reading the
+generator would have shown). The authored keys cannot see that - only telemetry can - so when
+authored and actual disagree, believe the probe.
 
 Screenshots are still the only ground truth the CLI gives, and `test_probe.py` keeps one honest
 cross-check between them. Before claiming anything moves correctly,

@@ -11,10 +11,15 @@ glance without playing anything - which the CLI cannot do anyway.
 Two ways to pick a motion:
 
   --state <name>      start in idle (the default) and write `state`, so the Enter_idle_<name>
-                      one-shot plays. `--from <state>` starts somewhere else instead (that state
-                      is set, settled for --settle, then switched). `--trigger success|error|blink`
-                      fires a trigger, `--hover` moves the pointer onto the character, `--drag`
-                      presses and drags it.
+                      one-shot plays. `--trigger success|error|blink` fires a trigger, `--hover`
+                      moves the pointer onto the character, `--drag` presses and drags it.
+
+                      There is no `--from`. There was, and it was a lie: it wrote the starting
+                      state, advanced, then wrote the target - but the CLI applies every `--data`
+                      before the run whatever its position, so only the last write ever happened
+                      and `--state x --from error` rendered exactly `--state x`. An entry out of
+                      a state other than idle is seen with `--animation Enter_error_x`, which
+                      plays that one-shot from its own frame 0 through a solo document.
   --animation <name>  a LinearAnimation by name (IdleBounce, WanderSpin, HoverPerk...). These sit
                       behind random waits in the state machine, so this asks gen_scene.py for a
                       SOLO document - the artboard's default state machine becomes a throwaway
@@ -120,15 +125,8 @@ def build_spec(a):
     if a.animation:
         label_bits.append(a.animation)
     if a.state:
-        if a.from_:
-            # Settle in the starting state first, then ask for the new one: the Enter_<from>_<to>
-            # one-shot is what we want to see, not the load-time pose.
-            data += [f"--data=state={a.from_}"]
-            gestures += [f"--advance={a.settle}", f"--data=state={a.state}"]
-            label_bits.append(f"{a.from_}-to-{a.state}")
-        else:
-            data.append(f"--data=state={a.state}")
-            label_bits.append(a.state)
+        data.append(f"--data=state={a.state}")
+        label_bits.append(a.state)
     if a.trigger:
         gestures.append(f"--data={a.trigger}=true")
         label_bits.append(a.trigger)
@@ -328,8 +326,6 @@ def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0],
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--state", help="sustained state to switch into (plays Enter_<from>_<state>)")
-    p.add_argument("--from", dest="from_", help="state to start in instead of idle")
-    p.add_argument("--settle", default="600ms", help="how long to hold --from before switching (600ms)")
     p.add_argument("--animation", help="LinearAnimation name, played through a solo state machine")
     p.add_argument("--trigger", choices=("success", "error", "blink"), help="fire a contract trigger")
     p.add_argument("--hover", action="store_true", help="move the pointer onto the character")
@@ -349,7 +345,6 @@ def main(argv=None):
     p.add_argument("--out", help="output png (default build/onion/<key>.png)")
     a = p.parse_args(argv)
 
-    a.settle = parse_time(a.settle, "--settle")
     label, args, needs_solo = build_spec(a)
     key = label.replace("/", "-") + "-" + hashlib.sha1(" ".join([label] + args).encode()).hexdigest()[:8]
     cache = os.path.join(BUILD, key)

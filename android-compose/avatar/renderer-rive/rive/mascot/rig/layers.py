@@ -43,6 +43,13 @@ _ANIMATION_INDEX = None
 # finding.
 CUT_MARKS = {}
 
+# The same, for hand-backs: `hold=True` on a transition says the one-shot it leaves ends holding
+# a pose ON PURPOSE, because the layers underneath are already showing that pose - so the value
+# the ledger reads as "snaps back to rest" does not, in fact, snap. A cut signature never covers
+# a hand-back (see rig/seams.py); this is the signature that does, and like `cut` it needs a
+# reason. {(layer name, source state node or None, target node): reason}.
+HOLD_MARKS = {}
+
 
 def set_animation_index(index):
     """Install the animation index the blend policy checks against (None turns it off)."""
@@ -74,6 +81,7 @@ class Exit:
     weight: int = None
     cut: bool = False
     reason: str = None
+    hold: bool = False
 
     def rml(self):
         t = exit_transition(self.to, self.ms, self.bezier)
@@ -91,6 +99,7 @@ class OnEnum:
     op: str = "equal"
     cut: bool = False
     reason: str = None
+    hold: bool = False
     weight = None
 
     def rml(self):
@@ -107,6 +116,7 @@ class OnBool:
     bezier: str = None
     cut: bool = False
     reason: str = None
+    hold: bool = False
     weight = None
 
     def rml(self):
@@ -120,6 +130,7 @@ class OnTrigger:
     prop: str
     cut: bool = False
     reason: str = None
+    hold: bool = False
     weight = None
     ms = 0
 
@@ -137,6 +148,7 @@ class OnInput:
     ms: int = 160
     cut: bool = False
     reason: str = None
+    hold: bool = False
     weight = None
 
     def rml(self):
@@ -151,6 +163,7 @@ class Raw:
     xml: str
     cut: bool = False
     reason: str = None
+    hold: bool = False
     weight = None
 
     def rml(self):
@@ -258,12 +271,15 @@ class Layer:
         out = []
         for src, t in pairs:
             cut = bool(t.cut or (src is not None and src.cut))
+            hold = bool(getattr(t, "hold", False))
             reason = t.reason or (src.reason if src is not None else None)
-            if cut and not reason:
+            if (cut or hold) and not reason:
                 raise ValueError(f'layer "{self.name}": {src.node if src else "AnyState"} -> '
-                                 f'{t.to} is marked cut=True with no reason; say why it cuts')
+                                 f'{t.to} is marked cut/hold with no reason; say why')
             if cut:
                 CUT_MARKS[(self.name, src.node if src else None, t.to)] = reason
+            if hold:
+                HOLD_MARKS[(self.name, src.node if src else None, t.to)] = reason
             out.append((src, t, cut, reason))
         return out
 
