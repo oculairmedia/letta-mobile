@@ -36,8 +36,9 @@ fun DesktopMascotHero(
         AgentSphere(size = size, modifier = modifier)
         return
     }
+    LaunchedEffect(entry) { entry.ensureLoaded() }
     val presence = MascotIdentityRegistry.presence[agentId] ?: AgentPresence.IDLE
-    LaunchedEffect(entry, presence) { entry.apply(presence) }
+    LaunchedEffect(entry, presence) { entry.ensureLoaded(); entry.apply(presence) }
     // The director's timers (listening release, success hold, blink schedule) need a clock;
     // tickTo is idempotent per frame so several surfaces of one agent tick it once.
     LaunchedEffect(entry) {
@@ -50,13 +51,24 @@ fun DesktopMascotHero(
     // (attention, habituation) land there for both platforms.
     var bounds by remember { mutableStateOf(androidx.compose.ui.geometry.Rect.Zero) }
     val cursor = MascotIdentityRegistry.cursor.value
-    LaunchedEffect(entry, cursor, bounds) {
+    val minReachPx = with(androidx.compose.ui.platform.LocalDensity.current) { GAZE_MIN_REACH.toPx() }
+    LaunchedEffect(entry, cursor, bounds, minReachPx) {
         if (bounds.isEmpty) return@LaunchedEffect
         if (cursor == null) { entry.director.setLookTarget(null); return@LaunchedEffect }
-        val reach = bounds.width * 2.5f / 2f
-        val nx = ((cursor.x - bounds.center.x) / reach).coerceIn(-1f, 1f)
-        val ny = ((cursor.y - bounds.center.y) / reach).coerceIn(-1f, 1f)
+        // Reach is a window-scale distance, never the tile's own width: a 32 dp tile would
+        // otherwise saturate for any cursor a few px away and pin the eyes to the rim.
+        val reach = maxOf(bounds.width * 1.25f, minReachPx)
+        val nx = softLook((cursor.x - bounds.center.x) / reach)
+        val ny = softLook((cursor.y - bounds.center.y) / reach)
         entry.director.setLookTarget(com.letta.mobile.avatar.core.AvatarLookTarget.Screen((nx + 1f) / 2f, (ny + 1f) / 2f))
     }
     RiveDesktopSurface(entry.scene, modifier.requiredSize(size).onGloballyPositioned { bounds = it.boundsInWindow() })
 }
+
+/** Cursors nearer than this (in dp) map linearly; the eyes never get to swing on a few pixels. */
+private val GAZE_MIN_REACH = androidx.compose.ui.unit.Dp(360f)
+
+/** Smooth saturation: linear near zero, asymptotic to +-[GAZE_MAX] so the eyes never sit pinned on the rim. */
+private fun softLook(d: Float): Float = GAZE_MAX * d / kotlin.math.sqrt(1f + d * d)
+
+private const val GAZE_MAX = 0.85f

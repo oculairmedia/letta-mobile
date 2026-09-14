@@ -8,9 +8,6 @@ import com.letta.mobile.avatar.rive.RiveAvatarContract
 import com.letta.mobile.avatar.rive.RiveAvatarRuntime
 import com.letta.mobile.data.presence.AgentActivityKind
 import com.letta.mobile.data.presence.AgentPresence
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 
 /**
  * One live mascot per agent, kept for the life of the process: the native scene, the shared
@@ -30,6 +27,14 @@ object DesktopMascotScenes {
         }
         private var lastPresence = AgentPresence.IDLE
         private var lastTickNanos = 0L
+        private var loaded = false
+
+        /** Loads the runtime once, from whichever surface first draws this agent (its own lifecycle, no ad hoc scope). */
+        suspend fun ensureLoaded() {
+            if (loaded) return
+            loaded = true
+            runtime.load(MASCOT_MODEL)
+        }
 
         /** Feeds the director; a run that ends without an error is a completed task. */
         fun apply(presence: AgentPresence) {
@@ -61,7 +66,6 @@ object DesktopMascotScenes {
     }
 
     private val entries = HashMap<String, Entry>()
-    private val scope = CoroutineScope(Dispatchers.Main)
 
     /** The scene for [key] (an agent id), created on first use; null when the bridge or the file is unavailable. */
     @Synchronized
@@ -82,9 +86,7 @@ object DesktopMascotScenes {
                 RiveAvatarContract.applyIdentity(it.inputSink, identity)
             }
         }.getOrNull() ?: return null
-        val runtime = RiveAvatarRuntime(scene.inputSink)
-        scope.launch { runtime.load(MASCOT_MODEL) }
-        return Entry(scene, runtime, identity).also { entries[key] = it }
+        return Entry(scene, RiveAvatarRuntime(scene.inputSink), identity).also { entries[key] = it }
     }
 
     @Synchronized
