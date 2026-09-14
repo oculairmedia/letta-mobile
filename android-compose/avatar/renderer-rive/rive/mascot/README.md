@@ -10,16 +10,43 @@ Beads: `letta-mobile-kh094` (this asset), `letta-mobile-1zti3` (identity picker 
 
 ## Files
 
+The generator is `gen_scene.py` plus the `rig/` package. `gen_scene.py` only assembles: the
+artboard shell, the data section (enums, converters, view model) and the document. Everything
+else lives in one module per concern, and the dependency runs one way - `ids` -> `constants` ->
+`body` / `face` / `plate` -> `motion` -> `machine` -> `gen_scene`. Every module imports by name;
+there are no star imports, so the definition of anything is one jump away.
+
 | Path | What | Edit? |
 |---|---|---|
-| `gen_scene.py` | The generator. Structure, ids, timings, state machine. **Source of truth.** | yes |
+| `gen_scene.py` | Assembly only: artboard shell, enums / converters / view model, the document, `--solo`. **Entry point.** | yes |
+| `rig/ids.py` | Every named Rive object id, plus the state / shape / glyph vocabulary the id ranges are indexed by. Uniqueness checked at import; new ids come from `alloc(space, name)`, recorded in `ids.json`. **Existing ids are frozen.** | add only |
+| `rig/constants.py` | The design numbers: waits, saccade table, designed entry pairs, turn / lean amplitudes, tints, tunables, and the unit helpers `art` / `rad` / `frames` / `beat` | yes |
+| `rig/body.py` | The body: one 8-vertex path per identity, the three bones and their weights, the paint stack, and the breath / lumen / squash / bone-pose key recipes | yes |
+| `rig/face.py` | The face assembly: the FacePlacement > HostTurn > Turn > Arc > Face chain that carries the plate, the TurnX/TurnY pose ranges, the trails, `spin_keys()` | yes |
+| `rig/plate.py` | The Plate component: glyph per state, mouth morph, pupil overlay, tunable ranges, and the plate's own four layers (Expression, Blink, AutoBlink, Saccade) | yes |
+| `rig/motion.py` | Every root animation: sustained loops (`STATE_ROWS` / `sustained_rest`), the 90 entries, the flashes, the nine idle beats, wander | yes |
+| `rig/machine.py` | The `Avatar` state machine: ten layers, their states and transitions, and the file's hover/drag listeners | yes |
+| `rig/layers.py` | Typed layer builder (`Layer` / `State` / `Exit` / `OnEnum` / `OnBool` / `OnTrigger` / `OnInput` / `Raw`). Validates targets, weights and exit-time-on-a-loop in Python instead of at runtime | rarely |
+| `rig/seams.py` | The seam ledger and the blend policy: what each animation leaves a property at, what the next one picks it up at, and which 0 ms hand-offs tear. `python -m rig.seams` lists them worst first; `Layer.rml()` refuses an unsigned one. A hard cut is signed `cut=True`, a deliberate hand-back `hold=True`, both with a reason | rarely |
+| `rig/chart.py` | Timing charts, both ways: `Chart(extremes, breakdown, spacing).keys()` authors a beat as poses and spacing (the in-betweens are real keys, not a bezier's guess), `Chart.of(keys)` / `Chart.of_samples(values)` read a curve or a telemetry series back and classify it (ease-in / ease-out / s / linear / hold / pop), `chart.text()` draws the margin chart | yes |
+| `rig/probe.py` | The probe list: which node properties telemetry exposes (name, object, property key, unit) and `inject()`, which adds the view-model numbers and the two-way binds to a built document. Probe ids (`1:900+`) are deliberately outside `ids.py` - they must never be pushed | add probes |
 | `rml.py` | RML primitives: Rive property keys, view-model ids, easing tokens, XML builders (keyframes, animations, states, transitions). No mascot knowledge | rarely |
 | `svgpath.py` | SVG path -> RML vertices (M/L/C/Z, evenodd, strokes; 8-cubic mirrored bodies, 4-vertex mouths) | rarely |
 | `art/*.svg` | The locked art: `body-*.svg` (8 identities), one glyph per state, three mouths | via SPEC owner |
 | `scene.rml` | Generated. Committed so diffs are reviewable. Never hand-edit. | no |
 | `build/mascot.riv` | Built by the CLI; copied to `src/androidMain/res/raw/mascot.riv` (what the app loads) | no |
 | `rive.yaml` | Push mapping: project 1882737 "oculair / Shared Project", file 2578084 "mascot" | no |
+| `pull_editor.py` | Editor round trip: diff a `.rev` export (or converted dir) against `scene.rml` by animation / layer / node | when the artist edits |
 | `sheet.py` | Contact sheets from screenshots (the review tool) | - |
+| `onion.py` | Onion skins: several frames of one motion overlaid, older ones fainter (`--tint`, `--edges`), so arcs, spacing and overshoot read at a glance; `--diff` prints the per-pair % changed as a pop detector. Drives the CLI itself and caches frames | rarely |
+| `timeline.py` | Read a curve without building: keyframes, easing and an ASCII plot per animation (`--list`, `--layers`, `--chart`) - the review tool when the editor is not available | rarely |
+| `xsheet.py` | The exposure sheet: frames down, one column per (object, property) the named animations key, `[K]` on an extreme, `(B)` on an interior key, `-` on an in-between, with the per-frame delta; a driver column for callbacks and expression flips, a timing chart under each level and a spacing class per level in the footer (`--wide`, `--range`) | rarely |
+| `scenarios.py` | Named driver sequences as data (`enter-listening`, `enter-thinking`, `success`, `beat:<Animation>`, ...). Each step is one CLI flag. `--data` does NOT sequence, so a scenario that writes one property twice is refused outright: one run per leg, and `CONVERSATION` is a list of runs rather than a scenario | add scenarios |
+| `probe.py` | Pose telemetry: run a scenario headless and read the motion back as numbers - sparklines, motion signatures, an exposure-sheet grid, `goldens/*.json`. `--probe` binds node properties two-way into view-model numbers and `--data-dump` prints them per frame, so this is the pencil test without pixels | rarely |
+| `goldens/*.json` | Committed motion signatures per scenario, diffed by `test_probe.py`. Re-golden on purpose (`probe.py <scenario> --golden`) with the diff in the commit | on purpose |
+| `test_rig.py` | `python -m unittest test_rig`: regenerate parity, unique ids, resolvable state/animation references, the contract check, a `timeline.py` smoke | rarely |
+| `test_probe.py` | `python -m unittest test_probe`: every golden scenario's signature, plus one pixel cross-check (a screenshot at frame 20 of `success` against the probed plate height) | rarely |
+| `test_tools.py` | `python -m unittest test_tools`: the review tools themselves - halving fractions, spacing classification, the pop detector, a `Chart.keys()` round trip, x-sheet and `timeline --chart` smokes | rarely |
 | `SPEC.md`, `MOTION-REFERENCES.md` | Numbers and references from the design agent; §8 is the implementation map, §9 the human-touch patch (amplitudes, alphas, glyphs) the rig now follows | with them |
 | `art/validation/` | The design agent's static proofs and `validate.py` (needs numpy, Pillow, CairoSVG); not part of the build | - |
 | `RIVE-PLATFORM-POWER.md` | The design agent's platform brief; the audit below answers it | - |
@@ -28,6 +55,19 @@ Beads: `letta-mobile-kh094` (this asset), `letta-mobile-1zti3` (identity picker 
 Tooling: Rive CLI 1.0.2 at `~/.rive/bin/rive.exe` (`rive docs`, `rive schema <Type>`), Python 3
 with Pillow. The user has run `rive login`; `rive push` works from this directory.
 
+## Which module to open
+
+| The change | Where |
+|---|---|
+| A new idle or wander beat | the animation in `rig/motion.py`, its two ids from `alloc(3, ...)` in `rig/ids.py`, its state and weight in `_idle_layer` / `_wander_layer` in `rig/machine.py` |
+| A new sustained state | the `STATES` vocabulary in `rig/ids.py` (append - the id ranges are indexed by that order), a `ROW` entry and a facing in `rig/motion.py`, a glyph in `rig/plate.py`'s `STATE_GLYPH` plus `art/glyph-<name>.svg`, then `RiveAvatarContract.kt` (`check_contract.py` enforces the match) |
+| Body shape or geometry | `art/*.svg` first, then `rig/body.py` (paths, bones, weights, paints) |
+| The plate: glyph, mouth, card, blink, saccade | `rig/plate.py` |
+| Timings, amplitudes, waits, tints | `rig/constants.py` - almost nothing else should carry a number |
+| What plays when: layers, transitions, blends | `rig/machine.py` (the plate's own layers are at the end of `rig/plate.py`) |
+| The face's placement, turn or trails | `rig/face.py` |
+| A new kind of XML (a property, an element) | `rml.py`, then use it from the rig |
+
 ## The loop
 
 Every change, no exceptions - the user's standing instruction is "review your own work":
@@ -35,6 +75,7 @@ Every change, no exceptions - the user's standing instruction is "review your ow
 ```bash
 cd android-compose/avatar/renderer-rive/rive/mascot
 R=~/.rive/bin/rive.exe
+python -m unittest test_rig        # the cheap gate: regenerate parity, ids, references, contract
 python gen_scene.py                # writes scene.rml
 $R . --verify                      # 0 errors, 0 warnings, or stop
 $R . --once                        # writes build/mascot.riv
@@ -48,12 +89,59 @@ python ../../native/rivdump/check_contract.py . ../../src/commonMain/kotlin/com/
 $R push                            # new revision in the Rive workspace (see the rule below)
 ```
 
+**Checks.** `python -m unittest test_rig` (about 15 s, standard library only) is the cheap gate
+that does not need the CLI: it regenerates into a tempdir and compares against the committed
+`scene.rml` with push-assigned ids stripped, asserts every id is unique, checks that every
+transition target and `animationId` resolves, runs `check_contract.py`, and smoke-tests
+`timeline.py`. Run it before `$R --verify`; a failing regenerate check means the committed file
+is a hand-edit or a stale commit, not a code bug.
+
+Two checks run before that without being asked: `rig/ids.py` raises on a duplicate id at import,
+and `rig/layers.py` raises on a layer whose transition leaves its own layer, whose weight sits on
+a non-random state, whose random state has fewer than two weighted ways out, or whose exit-time
+transition hangs off a looping animation - and, once `gen_scene.py` has handed it the animation
+index, on a 0 ms transition that tears a property both animations key, unless that transition is
+signed `cut=True` with a reason (`python -m rig.seams` lists every seam and says which are signed;
+the unsigned count is pinned at zero by `test_rig.py`).
+A refactor that is meant to change nothing should also
+survive a byte check against the committed file:
+
+```bash
+python gen_scene.py /tmp/check.rml
+diff <(sed -E 's/ id="0:[0-9]+"//g' scene.rml) <(sed -E 's/ id="0:[0-9]+"//g' /tmp/check.rml)
+```
+
+**Review tools.** Five, none of which need the editor:
+
+```bash
+python timeline.py IdleBounce --chart  # keyframes, easing and an ASCII plot per property, plus
+                                       # the timing chart: [0]-|---------------|---------------|[59]  ease-in
+                                       # (--list every animation, --layers the state machine)
+python xsheet.py --animation IdleBounce   # the exposure sheet: every frame down, one column per
+                                       # level, [K] extremes / (B) breakdowns / - in-betweens with
+                                       # deltas, the driver column, a chart and a class per level
+                                       # (--animations a,b sheets two together; --wide, --range)
+python -m rig.chart ease-in linear     # what a named spacing lays down, as chart and as keys
+python onion.py --state listening --frames 10 --diff    # frames of one motion overlaid, older
+                                       # fainter; --diff prints % changed per pair (a spike = a snap)
+python sheet.py /c/rive-spike/v2/sheet.png 6 /c/rive-spike/v2 e-1 e-3 e-5 e-8 e-12 e-20
+                                       # a contact sheet from screenshots you captured above
+```
+
+The chart is the tell an ASCII plot cannot give: marks bunched at one end are an ease, evenly
+spread marks are a float, and `pop` is one frame carrying the move. `rig/chart.py` also runs the
+other way - `Chart(extremes=[(0, 0), (22, -48)], breakdown=(8, -40), spacing="ease-in").keys()`
+returns the keyframe list `rig/motion.py` already passes to `animation()`, with the in-betweens as
+real keys (spacing is the weight; a bezier is only a guess at it).
+
 `--screenshot` starts the state machine with the given view-model data and advances N frames
 at 60 fps, so `--advance=N` is "frame N of whatever the data triggered from idle". Use
 `--data=state=<key>` for sustained states, `--data=success=true` / `--data=error=true` to fire the flashes, `--data=dragged=true`,
 `--data=lookX=-1 --data=lookY=1 --data=mouthOpen=0.8` for the numbers, `--data=shape=drop`
 for identity. Render a state past its entry (advance 40+) to see its loop, and frames
-1/3/5/8/12/20 to see an entry.
+1/3/5/8/12/20 to see an entry. For a motion rather than a pose, `onion.py` captures and overlays
+the frames itself; `--animation IdleBounce` plays a beat that normally hides behind a random wait
+(it asks `gen_scene.py` for a `--solo` document, so `Avatar` itself is untouched).
 
 The desktop demo renders the built file through the same native runtime the product uses:
 
@@ -81,6 +169,26 @@ are stable across pushes and are what the artist's edits attach to.
 **Push rule.** The CLI regenerates and pushes freely *until the artist makes their first edit in
 the editor*. From then on the editor file is the source of truth and a CLI push would overwrite
 it. Ask before pushing if you do not know whether that has happened.
+
+**Pulling editor changes back - and the paywall.** The CLI (1.0.2) cannot download the cloud
+file's current revision, and on the free plan the editor exports nothing either: `.rev` download
+and `.riv` download are both behind a paid plan. So on this plan the editor is read-only for us:
+push into it to look, never author in it, because an edit made there cannot come back and the
+next `rive push` overwrites it. Author in the generator; review with `--screenshot` and
+`sheet.py`; describe a change you want in editor terms (which animation, which keys, what
+timing) and port it here.
+
+If a paid plan ever lands, the loop is: File > Export > Download `.rev`, then
+
+```bash
+python pull_editor.py path/to/mascot.rev --write-report build/pull-report.md
+```
+
+which converts it with `rive create --from-rev`, strips push-assigned ids, and lists every
+animation (with the keyed object/property whose keyframes moved), state-machine layer and named
+node that differs from the committed `scene.rml` - the map for porting the edit into the
+right `rig/` module (the table above says which). Regenerate, verify, screenshot, push: the edited ids are the generator's named
+ones, so the push updates them in place.
 
 ## How the rig is put together
 
@@ -140,9 +248,25 @@ objects, `3:*` root animations/nodes (60-77 shapes, 100-140 states, 160-244 misc
 ## Rive gotchas (each of these was learned the hard way)
 
 - Rotations are **radians**; `LinearAnimation.duration` is **frames**; `StateTransition.duration`
-  is **ms**. `gen_scene.py` has `rad()` and `frames()`.
+  is **ms**. `rig/constants.py` has `rad()` and `frames()`.
 - Keyframes default to `hold`. Motion needs `interpolationType="cubic"` plus a nested
   `CubicEaseInterpolator`; the bezier on a key shapes the segment *leaving* it.
+- **An `ElasticInterpolator` is damped by its period, not by its amplitude.** Rive clamps any
+  amplitude at or below 1 to 1, so `ELASTIC_OUT` (0.75), `ELASTIC_SOFT` (0.9) and `ELASTIC_HEAVY`
+  (1.0) differ only in period: about 7 %, 4 % and 3 % of overshoot on the single bounce. Reach for
+  `ELASTIC_HEAVY` when a **rotation** settles - a head has more mass than the offset it rides on.
+- **An elastic release is front-loaded whatever its period**, so a token swap barely moves
+  `max|delta|`: about a fifth of the travel lands in the segment's first frame either way. The
+  only real damping an elastic settle has is *frames*. When a beat rings too hard, give the return
+  leg more of the beat by shortening the hold (the tilt and the glance both do this) - the beat's
+  own length and the frame it is back at rest by need not change. Better still, chart the return
+  and let the spring govern only a short tail (the wander beats do this): `max|delta|` on
+  `WanderGlance`'s facing fell 62 % that way, against 15 % for the token alone.
+- **A bezier's control point is not its overshoot.** `BACK_IN_OUT`'s `y2 = 1.35` overshoots the
+  value by 4.7 %, not 35 %, and dips 6 % under the start. What actually reads as snap is the
+  steepest frame: 4.27x the average for `BACK_IN_OUT`, 4.47x for `SOFT_OUT` (the most front-loaded
+  token in `rml.py`, and the animation default - so a *dropped* bezier lands there), 3.70x for
+  `BACK_OUT`, 3.08x for `BACK_SOFT`, 1.59x for `SINE`. `timeline.Ease.at()` samples any of them.
 - First child of a node draws on top; the later paint in a shape draws on top.
 - `Feather` on a Fill renders nothing through the CLI; feather strokes only. (The editor can
   feather fills - that is on the artist list.)
@@ -163,12 +287,48 @@ objects, `3:*` root animations/nodes (60-77 shapes, 100-140 states, 160-244 misc
   `applyIdentity` on load. A scene that never writes `color` draws a black body.
 - Placement and keyed motion must live on different nodes (a keyed `x=0` overwrites placement) -
   hence `FacePlacement > Turn > Face`.
+- **A `beat:` probe's first frame is the joystick's authored default, not the animation.** The
+  `Facing` joystick declares `x="-0.15"`, so frame 0 of any `--solo` run reads -0.15 and frame 1
+  reads whatever the beat keys - a phantom 0.150 step that becomes the reported `Joystick.x
+  max|delta|` as soon as the real motion falls below it. Judge a facing beat on the deltas from
+  frame 1 on; `Lean.rotation` carries the same phantom, scaled by `TURN_LEAN_DEG` (0.0131 rad).
+- **`(f, v, *rest)` already strips the frame and the value**, so `tuple(rest[2:])` throws the
+  bezier away and the key silently falls back to the animation default. That is how `IdleWobble`'s
+  face rocked on `SOFT_OUT` while its body rocked on `SINE` - the same authored curve, 2.7x the
+  snap on the half that was meant to lag. Copy the pattern in `spin_keys`, not the typo.
 - The CLI compiles every `*.rml` in the directory; scratch fragments go elsewhere.
 - PowerShell `>` writes UTF-16; redirect from bash.
 
 ## Reviewing motion
 
-Screenshots are the only ground truth the CLI gives. Before claiming anything moves correctly,
+**Numbers before pixels.** `probe.py` reads the real, mixed, post-state-machine value of every
+probed node property for every frame of a scenario, in one headless run of about a second. Do
+that first; open an image only when a number is surprising.
+
+```bash
+python probe.py success                  # sparklines + motion signatures for the happy flash
+python probe.py enter-thinking           # idle -> thinking (the only entry a driver can reach)
+python probe.py beat:Enter_error_listening   # an entry OUT of a held pose, through --solo
+python probe.py beat:IdleBounce --sheet  # one animation (through --solo), with the frame grid
+python probe.py error --golden           # re-record goldens/error.json, on purpose
+python -m unittest test_probe            # every golden, plus the screenshot cross-check
+```
+
+```
+  Face.y  ▁▁▁▁▁▁▃▆▆▇▇███████████▇▆▆▅▃▂▁▁▁▁▁  peak  -48.000px @19  settle 57  max|Δ|  20.994  spacing ease-in
+  Body.y  ▁▁▁▁▁▁▃▆▆▇▇███████████▇▆▆▅▃▂▁▁▁▁▁  peak  -48.000px @19  settle 57  max|Δ|  20.994  spacing ease-in
+```
+
+The bars are distance from rest, so a rise and a drop read the same; a vertical wall in them is a
+snap. That pair is the success hop, and it is the reason this instrument exists: `Body.y` used to
+read `peak -1.899px @60` there - the breath, nothing else - while the flash's authored keys said
+48 px on Body and Face together (`letta-mobile-uesod`; the cause turned out to be a `dict.update`
+in `rig/motion.py` that dropped the body's keys on the floor, which no amount of reading the
+generator would have shown). The authored keys cannot see that - only telemetry can - so when
+authored and actual disagree, believe the probe.
+
+Screenshots are still the only ground truth the CLI gives, and `test_probe.py` keeps one honest
+cross-check between them. Before claiming anything moves correctly,
 render the frames where it could fail and read the sheet: a transition at 1/3/5/8/12/20, a loop
 at 0/25/50/75 %, a flash at 10/37/70/100 %. Things that have slipped through before: glyphs
 fading when they should cut, brows colliding with eyes, rotations in the wrong unit, a

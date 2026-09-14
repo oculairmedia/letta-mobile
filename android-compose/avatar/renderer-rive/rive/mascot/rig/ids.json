@@ -1,0 +1,18 @@
+{
+  "IdleBeatLookAround": "3:474",
+  "IdleBeatLookAroundNode": "3:475",
+  "IdleBeatShift": "3:472",
+  "IdleBeatShiftNode": "3:473",
+  "IdleBeatSigh": "3:468",
+  "IdleBeatSighNode": "3:469",
+  "IdleBeatWobble": "3:470",
+  "IdleBeatWobbleNode": "3:471",
+  "IdleWaitC": "3:460",
+  "IdleWaitCNode": "3:462",
+  "IdleWaitD": "3:461",
+  "IdleWaitDNode": "3:463",
+  "WanderWaitC": "3:464",
+  "WanderWaitCNode": "3:466",
+  "WanderWaitD": "3:465",
+  "WanderWaitDNode": "3:467"
+}

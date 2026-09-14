@@ -106,21 +106,33 @@ fun main(args: Array<String>) = application {
         state = rememberWindowState(width = 1320.dp, height = 900.dp),
     ) {
         MaterialTheme(colorScheme = darkColorScheme()) {
+            // A bare `-PriveFile` (no state machine, no triggers) is a build of the mascot itself -
+            // a `--solo` or a `--probe` variant - so the bench reviews THAT instead of the shipped
+            // file: the scenarios, the onion skin and the telemetry panel all want the same scene.
+            // `-PriveFile` with a state machine or triggers is still the second column.
+            val benchFile = benchFileOf(file, stateMachine, triggers) ?: mascot
+            val secondColumn = file?.takeIf { it != benchFile }
             Row(Modifier.fillMaxSize().background(Color(0xFF1A1A1A)), horizontalArrangement = Arrangement.spacedBy(0.dp)) {
-                if (file != null) {
-                    SceneColumn(file, stateMachine, triggers, Modifier.weight(1f).padding(16.dp))
+                if (secondColumn != null) {
+                    SceneColumn(secondColumn, stateMachine, triggers, Modifier.weight(1f).padding(16.dp))
                 }
-                if (mascot != null) {
-                    MascotBench(mascot, Modifier.weight(if (file != null) 1.4f else 1f))
+                if (benchFile != null) {
+                    MascotBench(benchFile, Modifier.weight(if (secondColumn != null) 1.4f else 1f))
                 }
             }
         }
     }
 }
 
+/** `file` when it is a bare build of the mascot (no state machine, no triggers), else null. */
+private fun benchFileOf(file: File?, stateMachine: String?, triggers: List<String>): File? {
+    val bare = stateMachine == null && triggers.isEmpty()
+    return file?.takeIf { bare }
+}
+
 @Composable
 private fun rememberScene(bytes: ByteArray, stateMachine: String?): RiveDesktopScene {
-    val scene = remember(bytes) { RiveDesktopScene.create().also { it.load(bytes, stateMachine) } }
+    val scene = remember(bytes) { RiveDesktopScene.create().also { it.load(bytes, RiveSceneTarget(stateMachine)) } }
     DisposableEffect(scene) { onDispose { scene.close() } }
     return scene
 }
@@ -207,6 +219,9 @@ private fun MascotBench(file: File, modifier: Modifier) {
     var loaded by remember { mutableStateOf(false) }
     val tune = remember { mutableStateMapOf("tuneScale" to 0.5f, "tunePlate" to 0.5f, "tuneGlyph" to 0.5f, "tuneMouth" to 0.5f, "tuneMouthY" to 0.5f) }
 
+    val bench = remember { BenchInstruments() }   // onion skin, telemetry, signatures (MOTION-PIPELINE section 6)
+    val onion = bench.onion
+
     fun setState(state: AvatarState) {
         current = state
         runtime.applyState(state)
@@ -281,6 +296,8 @@ private fun MascotBench(file: File, modifier: Modifier) {
         }
     }
 
+    BenchInstrumentEffects(scene, loaded, bench) { autoCycle = false; it.play(::setState, runtime) }
+
     // Tunables are plain view-model numbers; write each on change (the map is snapshot state).
     LaunchedEffect(loaded) {
         if (!loaded) return@LaunchedEffect
@@ -341,11 +358,11 @@ private fun MascotBench(file: File, modifier: Modifier) {
                         ) {
                             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                 PalettePopup(framePalette, { framePalette = false }, frame.base) { frame = frame.copy(base = it) }
-                                MascotBox(scene, frameSize * mascotScale) { mascotBounds = it }
+                                MascotBox(scene, frameSize * mascotScale, onion) { mascotBounds = it }
                             }
                         }
                     } else {
-                        MascotBox(scene, frameSize * mascotScale) { mascotBounds = it }
+                        MascotBox(scene, frameSize * mascotScale, onion) { mascotBounds = it }
                     }
                 }
                 if (showTargets && gazeMode == GazeMode.JUSTIFIED) {
@@ -361,6 +378,9 @@ private fun MascotBench(file: File, modifier: Modifier) {
                 )
             }
         }
+
+        // ---- the instrument panel, beside the character: sparkline, value, delta, spacing ----
+        TelemetryColumn(bench)
 
         // ---- controls ----
         Column(
@@ -419,32 +439,14 @@ private fun MascotBench(file: File, modifier: Modifier) {
                 Slider(lookY, valueRange = -1f..1f, onValueChange = { setLook(lookX, it) })
             }
 
-            Section("frame")
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                FrameShape.entries.forEach { f ->
-                    if (f == frameShape) Button({ frameShape = f }) { Text(f.label) }
-                    else OutlinedButton({ frameShape = f }) { Text(f.label) }
-                }
-            }
-            Section("frame size ${frameSize.toInt()} dp")
-            Slider(frameSize, valueRange = 22f..520f, onValueChange = { frameSize = it })
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                listOf(22f, 44f, 72f, 120f, 240f, 360f).forEach { s -> OutlinedButton({ frameSize = s }) { Text("${s.toInt()}") } }
-            }
-            Section("mascot in frame x%.2f  (%s)".format(mascotScale, if (mascotScale > 1f) "clipped" else "padded"))
-            Slider(mascotScale, valueRange = 0.4f..2.2f, onValueChange = { mascotScale = it })
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                listOf(0.8f, 1f, 1.2f, 1.5f).forEach { s -> OutlinedButton({ mascotScale = s }) { Text("x$s") } }
-            }
+            FrameShapeControls(frameShape) { frameShape = it }
+            FrameSizeControls(frameSize) { frameSize = it }
+            OnionControls(bench)
+            SignatureControls(bench)
 
-            // ---- rig tunables: art-direct the plate, glyph and mouth; read the numbers back into SPEC ----
-            Section("rig tunables (0.5 = as shipped; numbers are what to put in SPEC)")
-            TuneSlider("entity scale", tune, "tuneScale") { t -> "x%.2f".format(0.5f + t) }
-            TuneSlider("plate scale", tune, "tunePlate") { t -> "x%.2f".format(0.6f + 0.8f * t) }
-            TuneSlider("glyph scale", tune, "tuneGlyph") { t -> "x%.2f".format(0.4f + 1.2f * t) }
-            TuneSlider("mouth scale", tune, "tuneMouth") { t -> "x%.2f".format(0.5f + t) }
-            TuneSlider("mouth distance below plate", tune, "tuneMouthY") { t -> "%.0f px".format(42f + 80f * t) }
-            OutlinedButton({ tune.keys.toList().forEach { tune[it] = 0.5f; scene.inputSink.setNumber(it, 0.5f) } }) { Text("reset tunables") }
+            MascotScaleControls(mascotScale) { mascotScale = it }
+
+            RigTunableControls(tune, scene)
 
             // ---- grounds: base colour plus radial lights, dragged on the canvas ----
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -528,11 +530,118 @@ private fun TuneSlider(label: String, tune: MutableMap<String, Float>, key: Stri
     Slider(v, onValueChange = { tune[key] = it })
 }
 
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun FrameShapeControls(frameShape: FrameShape, onShape: (FrameShape) -> Unit) {
+    Section("frame")
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        FrameShape.entries.forEach { f ->
+            if (f == frameShape) Button({ onShape(f) }) { Text(f.label) }
+            else OutlinedButton({ onShape(f) }) { Text(f.label) }
+        }
+    }
+}
+
+@Composable
+private fun FrameSizeControls(frameSize: Float, onSize: (Float) -> Unit) {
+    Section("frame size ${frameSize.toInt()} dp")
+    Slider(frameSize, valueRange = 22f..520f, onValueChange = onSize)
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        listOf(22f, 44f, 72f, 120f, 240f, 360f).forEach { s -> OutlinedButton({ onSize(s) }) { Text("${s.toInt()}") } }
+    }
+}
+
+/** The mascot box as a multiple of the frame; above 1 the frame clips it. */
+@Composable
+private fun MascotScaleControls(mascotScale: Float, onScale: (Float) -> Unit) {
+    Section("mascot in frame x%.2f  (%s)".format(mascotScale, if (mascotScale > 1f) "clipped" else "padded"))
+    Slider(mascotScale, valueRange = 0.4f..2.2f, onValueChange = onScale)
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        listOf(0.8f, 1f, 1.2f, 1.5f).forEach { s -> OutlinedButton({ onScale(s) }) { Text("x$s") } }
+    }
+}
+
+/** Rig tunables: art-direct the plate, glyph and mouth; read the numbers back into SPEC. */
+@Composable
+private fun RigTunableControls(tune: MutableMap<String, Float>, scene: RiveDesktopScene) {
+    Section("rig tunables (0.5 = as shipped; numbers are what to put in SPEC)")
+    TuneSlider("entity scale", tune, "tuneScale") { t -> "x%.2f".format(0.5f + t) }
+    TuneSlider("plate scale", tune, "tunePlate") { t -> "x%.2f".format(0.6f + 0.8f * t) }
+    TuneSlider("glyph scale", tune, "tuneGlyph") { t -> "x%.2f".format(0.4f + 1.2f * t) }
+    TuneSlider("mouth scale", tune, "tuneMouth") { t -> "x%.2f".format(0.5f + t) }
+    TuneSlider("mouth distance below plate", tune, "tuneMouthY") { t -> "%.0f px".format(42f + 80f * t) }
+    OutlinedButton({ tune.keys.toList().forEach { tune[it] = 0.5f; scene.inputSink.setNumber(it, 0.5f) } }) { Text("reset tunables") }
+}
+
+/** Play a bench scenario: a state entry through [setState], a gesture straight on the runtime. */
+private fun BenchScenario.play(setState: (AvatarState) -> Unit, runtime: RiveAvatarRuntime) {
+    when (this) {
+        is BenchScenario.Enter -> setState(state)
+        is BenchScenario.Gesture -> runtime.playGesture(AvatarGesture(gesture))
+    }
+}
+
+@Composable
+private fun TelemetryColumn(bench: BenchInstruments) {
+    if (bench.tracks.isEmpty()) return
+    Column(
+        Modifier.width(260.dp).fillMaxHeight().background(Color(0xFF101010))
+            .verticalScroll(rememberScrollState()).padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        TelemetryPanel(bench.tracks, TELEMETRY_WINDOW_SECONDS)
+        if (bench.lastSignature.isNotEmpty()) {
+            Section("last signature (also on stdout)")
+            Text(bench.lastSignature, color = Color(0xFF9FD0A0), style = MaterialTheme.typography.labelSmall)
+        }
+    }
+}
+
+/** Onion skin: the last N rendered frames under the live one, onion.py's ramp. */
+@Composable
+private fun OnionControls(bench: BenchInstruments) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Switch(bench.onionOn, onCheckedChange = { bench.onionOn = it })
+        Text(if (bench.onionOn) "onion: on" else "onion: off", color = Color.LightGray)
+        Switch(bench.onionTint, onCheckedChange = { bench.onionTint = it }, enabled = bench.onionOn)
+        Text("tint", color = Color.LightGray)
+    }
+    if (!bench.onionOn) return
+    Section("onion frames ${bench.onionFrames}")
+    Slider(bench.onionFrames.toFloat(), valueRange = 2f..24f, onValueChange = { bench.onionFrames = it.toInt() })
+    Section("onion stride every ${bench.onionStride} frame(s)")
+    Slider(bench.onionStride.toFloat(), valueRange = 1f..12f, onValueChange = { bench.onionStride = it.toInt() })
+}
+
+/** Signatures: play a scenario and print probe.py's JSON per probed property. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SignatureControls(bench: BenchInstruments) {
+    val tracks = bench.tracks
+    Section(
+        if (tracks.isEmpty()) "record signature (no telemetry probes in this file)"
+        else "record signature - ${tracks.size} probes, %.1f s".format(RECORD_MILLIS / 1000f),
+    )
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        BENCH_SCENARIOS.forEach { candidate -> ScenarioButton(bench, candidate) }
+    }
+    Button({ bench.requestRecording() }, enabled = tracks.isNotEmpty() && !bench.recording) {
+        Text(if (bench.recording) "recording ${bench.scenario.label}..." else "record ${bench.scenario.label}")
+    }
+}
+
+@Composable
+private fun ScenarioButton(bench: BenchInstruments, candidate: BenchScenario) {
+    val onClick = { bench.scenario = candidate }
+    if (candidate == bench.scenario) Button(onClick) { Text(candidate.label) }
+    else OutlinedButton(onClick) { Text(candidate.label) }
+}
+
 /** The mascot at a given size, reporting its bounds in the stage so the cursor gaze can aim at it. */
 @Composable
-private fun MascotBox(scene: RiveDesktopScene, sizeDp: Float, onBounds: (Rect) -> Unit) {
+private fun MascotBox(scene: RiveDesktopScene, sizeDp: Float, onion: RiveOnionSkin?, onBounds: (Rect) -> Unit) {
     Box(Modifier.size(sizeDp.dp).onGloballyPositioned { onBounds(it.boundsInParent()) }) {
-        RiveDesktopSurface(scene, Modifier.fillMaxSize())
+        RiveDesktopSurface(scene, Modifier.fillMaxSize(), onion = onion)
     }
 }
 

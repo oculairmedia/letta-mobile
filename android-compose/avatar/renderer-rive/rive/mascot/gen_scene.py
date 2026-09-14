@@ -32,1046 +32,68 @@ DEVIATIONS from SPEC.md, all intentional and small:
   - the glyph shutter is the plate blink (scaleY on the Glyphs node), fired by every entry
   - speaking mouth opacity is smoothstep-free: visible while expr is speaking/dragged
 """
-import math
 import os
+import re
 from textwrap import indent
 
-import svgpath
-from rml import *  # noqa: F401,F403 - property keys, ids, easings, XML builders
-
-ART = os.path.join(os.path.dirname(os.path.abspath(__file__)), "art")
-
-
-def art(name):
-    return os.path.join(ART, name)
-
-
-def rad(deg):
-    return round(math.radians(deg), 5)
-
-
-def frames(ms):
-    return round(ms * 60 / 1000)
-
-
-# Art direction: every beat (idle, wander, hover, saccade holds) was read as too quick at product
-# sizes. beat() stretches a beat's timing; waits, breath and state entries keep frames().
-BEAT_TEMPO = 1.4
-
-
-def beat(ms):
-    return frames(ms * BEAT_TEMPO)
-
-
-STATES = ["idle", "listening", "dragged", "thinking", "waitingInput", "speaking",
-          "success", "error", "sleeping", "loading", "failed", "degraded"]
-EXPR = {s: i for i, s in enumerate(STATES)}
-MOMENTARY = ["success", "dragged"]
-SUSTAINED = [s for s in STATES if s not in MOMENTARY]
-SHAPES = ["circle", "blob", "roundedSquare", "pill", "triangle", "hexagon", "cloud", "drop"]
-SHAPE_SVG = {"circle": "body-circle.svg", "blob": "body-blob.svg", "roundedSquare": "body-squircle.svg",
-             "pill": "body-pill.svg", "triangle": "body-triangle.svg", "hexagon": "body-hexagon.svg",
-             "cloud": "body-cloud.svg", "drop": "body-drop.svg"}
-DEFAULT_SHAPE = "blob"
-
-# Art-direction tunables (bench only, not in the app contract): 0..1 scrubbing a pose range, 0.5 = shipped.
-TUNABLES = {  # name: (vm id, timeline id, node id, property keys, (value at 0, value at 1))
-    "tunePlate": ("1:12", "7:66", "7:25", ("SX", "SY"), (0.6, 1.4)),
-    "tuneGlyph": ("1:13", "7:67", "7:26", ("SX", "SY"), (0.4, 1.6)),
-    "tuneMouth": ("1:14", "7:68", "7:27", ("SX", "SY"), (0.5, 1.5)),
-    "tuneMouthY": ("1:15", "7:69", "7:27", ("Y",), (42, 122)),
-}
-PLATE_SCALE_NODE, GLYPH_SCALE_NODE, MOUTH_NODE, SACCADE_NODE = "7:25", "7:26", "7:27", "7:28"
-# Pupil overlay (SPEC 10.2 / art/pupil/PUPIL-SPEC.md): one shared assembly drawn above the glyph
-# Solo, visible only for idle/listening/speaking. Keyed four-target fallback for the wave.
-PUPIL_OVERLAY, PUPIL_ROOT, IRIS, WAVE, CORE, CATCH = "7:29", "7:96", "7:95", "7:97", "7:98", "7:99"
-wave_vertex_ids = [f"7:{200 + i}" for i in range(5)]
-# Astra Max pupil overlay (SPEC 10.2): built, reviewed, and dropped - the pure glyph stays. The
-# assembly remains in the file at opacity 0 so the art pass can revisit it; PUPIL is empty.
-PUPIL = {}   # state: (period ms, amplitude px); empty = never shown
-WAVE_STROKE = 5   # spec says 8; that reads as a bar at hero size
-PUPIL_PARALLAX = (1.5, 1.0)
-# Saccade layer: random waits, then a 60 ms hop to one of a few small fixations, a hold, a hop back.
-SACCADE_WAITS = [("7:170", 3600), ("7:171", 7200), ("7:172", 10400)]          # (anim id, ms)
-# (anim id, (dx, dy) px, weight %): Eyes Alive direction distribution - down 20, up 18, left 17,
-# right 16, diagonals 6-8 - with cardinal hops larger than diagonal ones (magnitudes skew small).
-SACCADE_FIX = [("7:173", (0, 5), 20), ("7:174", (0, -5), 18), ("7:175", (-6, 0), 17), ("7:176", (6, 0), 16),
-               ("7:177", (-3, -3), 7), ("7:178", (3, -3), 6), ("7:190", (-3, 3), 8), ("7:191", (3, 3), 8)]
-SACCADE_WAIT_NODES = ["7:180", "7:181", "7:182"]
-SACCADE_FIX_NODES = ["7:183", "7:184", "7:185", "7:186", "7:187", "7:188", "7:192", "7:193"]
-SACCADE_SLEEP_NODE = "7:189"
-VM_TUNE_SCALE, CONV_SCALE, ENTITY = "1:16", "2:3", "0:230"      # whole-entity scale, 0..1 -> 0.5..1.5
-# Host facing: two -1..1 numbers the host writes (the head turning toward what it looks at),
-# bound to a HostTurn node above the rig's own Turn so the two add. Body rolls with it too.
-VM_TURN_X, VM_TURN_Y, HOST_TURN = "1:17", "1:18", "0:235"
-ARC_NODE, TURN_ARC = "0:236", 7    # a turn is an arc, not a slide: the plate lifts TURN_ARC px through the centre
-CONV_BODY_X, HOST_BODY_PX = "2:8", 6   # the body shifts toward what the head turns to (commit motion)
-LEAN_NODE, CONV_LEAN, LEAN_BASE = "0:237", "2:9", 150   # pivot at the body's base, LEAN_BASE px below centre
-# Vector deformation (SPEC 10.5 / art/mesh/DEFORMATION-SPEC.md): three bones - crown (0,-150),
-# middle (0,0), base (0,+150) - skinned to every body path. A force pose scales each bone's X by
-# S-L / S / S+L and Y by 1/S, and shears crown/base by -+150 H. Weights come from each vertex's
-# rest y (wc = -y/150, wb = y/150, wm = the rest) on the default body; Rive weights are static per
-# vertex, so the other identities share them (their vertex order matches, positions nearly do).
-BONE_CROWN, BONE_MID, BONE_BASE = "0:240", "0:241", "0:242"
-BONE_REACH = 150
-HOST_LEAN_DEG, TURN_LEAN_DEG = 9, 5                      # lean at host turn +-1 / at state facing +-1
-CONV_TURN_X, CONV_TURN_Y, CONV_TURN_ROT, CONV_BODY_ROT = "2:4", "2:5", "2:6", "2:7"
-HOST_TURN_PX, HOST_TURN_PY, HOST_TURN_DEG, HOST_BODY_DEG = 48, 18, 10, 5
-# Default gaze life: root-keyed remaps of two small plate ranges (+-6 / +-4 px on the glyph's
-# wrapper), additive with the host's lookX/lookY on the glyph itself.
-AUTO_X, AUTO_Y, PLATE_AUTO_X, PLATE_AUTO_Y = "0:231", "0:232", "7:80", "7:81"
-VM_INSTANCE, ENUM_STATE, ENUM_SHAPE = "1:20", "1:100", "1:200"
-state_enum_ids = {s: f"1:{101 + i}" for i, s in enumerate(STATES)}
-shape_enum_ids = {s: f"1:{201 + i}" for i, s in enumerate(SHAPES)}
-CONV_LOOK, CONV_MOUTH = "2:1", "2:2"
-
-ROOT, BODY_NODE, FACE, HITBOX, HALO, SOFT, TINT, GLOSS = "0:2", "0:100", "0:200", "0:90", "0:91", "0:93", "0:92", "0:94"
-PLATE, PLATE_EXPR, PLATE_BLINK = "0:210", "0:211", "0:212"
-TURN_NODE, JOYSTICK, TRAIL1, TRAIL2 = "0:220", "0:221", "0:222", "0:223"
-JX, JY = 299, 300  # Joystick x / y
-body_vertex_ids = [f"0:{300 + i}" for i in range(8)]
-soft_vertex_ids = [f"0:{310 + i}" for i in range(8)]
-halo_vertex_ids = [f"0:{320 + i}" for i in range(8)]
-
-SM = "3:5"
-root_state_anim = {s: f"3:{100 + i}" for i, s in enumerate(STATES)}
-root_state_node = {s: f"3:{130 + i}" for i, s in enumerate(STATES)}
-shape_anim = {s: f"3:{60 + i}" for i, s in enumerate(SHAPES)}
-shape_node = {s: f"3:{70 + i}" for i, s in enumerate(SHAPES)}
-BREATH_ANIM, BREATH_NODE = "3:160", "3:161"
-BLINK_ANIM, BLINK_REST_ANIM, BLINK_NODE, BLINK_REST_NODE = "3:170", "3:171", "3:172", "3:173"
-HOVER_ANIM, HOVER_REST_ANIM, HOVER_NODE, HOVER_REST_NODE, HOVER_HELD_NODE = "3:180", "3:181", "3:182", "3:183", "3:184"
-FLASH_REST_ANIM, FLASH_REST_NODE, SUCCESS_ANIM, SUCCESS_NODE, ERROR_ANIM, ERROR_NODE = "3:190", "3:191", "3:192", "3:193", "3:194", "3:195"
-DRAG_REST_ANIM, DRAG_REST_NODE, DRAG_ANIM, DRAG_NODE = "3:200", "3:201", "3:202", "3:203"
-IDLE_WAIT_A, IDLE_WAIT_B, IDLE_GLANCE_ANIM, IDLE_A_NODE, IDLE_B_NODE, IDLE_GLANCE_NODE = "3:210", "3:211", "3:212", "3:213", "3:214", "3:215"
-# More idle beats (anim id, state node id): a glance is not enough for a character on screen all day.
-IDLE_BEATS = {"stretch": ("3:222", "3:226"), "tilt": ("3:223", "3:227"), "bounce": ("3:224", "3:228"), "shiver": ("3:225", "3:229"),
-              "sigh": ("3:468", "3:469"), "wobble": ("3:470", "3:471"), "shift": ("3:472", "3:473"), "lookaround": ("3:474", "3:475")}
-HOVER_HELD_ANIM = "3:185"
-TURN_X_ANIM, TURN_Y_ANIM = "3:220", "3:221"
-DESIGNED_PAIRS = {("idle", "listening"): 300, ("listening", "thinking"): 300, ("thinking", "speaking"): 200,
-                  ("speaking", "idle"): 240, ("error", "idle"): 300}  # SPEC section 3, ms
-ENTER_PAIRS = [(a, b) for a in SUSTAINED for b in SUSTAINED if a != b]  # every change gets an entry
-enter_anim = {pair: f"3:{250 + i}" for i, pair in enumerate(ENTER_PAIRS)}   # 3:250..3:339
-enter_node = {pair: f"3:{350 + i}" for i, pair in enumerate(ENTER_PAIRS)}   # 3:350..3:439
-WANDER_WAIT_A, WANDER_WAIT_B, WANDER_GLANCE, WANDER_PEEK, WANDER_SPIN = "3:230", "3:231", "3:232", "3:233", "3:234"
-WANDER_SLEEP_WAIT, WANDER_SLEEP_SHIFT, WANDER_SLEEP_WAIT_NODE, WANDER_SLEEP_SHIFT_NODE = "3:235", "3:236", "3:245", "3:246"
-IDLE_SLEEP_NODE = "3:217"
-WANDER_A_NODE, WANDER_B_NODE, WANDER_GLANCE_NODE, WANDER_PEEK_NODE, WANDER_SPIN_NODE = "3:240", "3:241", "3:242", "3:243", "3:244"
-# Waits of unequal, non-multiple lengths picked at random: several mascots on one screen must not
-# fire their beats in lockstep (they all start at the same instant), so the cycle never repeats.
-IDLE_WAITS = [(IDLE_WAIT_A, IDLE_A_NODE, 8000), (IDLE_WAIT_B, IDLE_B_NODE, 14000), ("3:460", "3:462", 6100), ("3:461", "3:463", 10700)]
-WANDER_WAITS = [(WANDER_WAIT_A, WANDER_A_NODE, 12000), (WANDER_WAIT_B, WANDER_B_NODE, 24000), ("3:464", "3:466", 9300), ("3:465", "3:467", 17500)]
-
-PLATE_AB, PLATE_SM, PLATE_IN_EXPR, PLATE_IN_BLINK = "7:2", "7:5", "7:6", "7:7"
-PLATE_ROOT, PLATE_CARD, GLYPHS_NODE, MOUTH_MORPH, PLATE_SHADOW = "7:20", "7:21", "7:22", "7:23", "7:24"
-GLYPH_ORDER = ["idle", "listening", "thinking", "waitingInput", "speaking", "success", "error", "sleeping", "loading", "failed", "degraded", "dragged"]  # 7:30..7:41
-GLYPH = {name: f"7:{30 + i}" for i, name in enumerate(GLYPH_ORDER)}
-FROWN, MOUTH_O = "7:42", "7:43"
-mouth_vertex_ids = [f"7:{70 + i}" for i in range(4)]
-PLATE_LOOKX, PLATE_LOOKY, PLATE_OPEN, PLATE_BLINK_ANIM, PLATE_WAIT_A, PLATE_WAIT_B = "7:60", "7:61", "7:62", "7:63", "7:64", "7:65"
-plate_expr_anim = {s: f"7:{100 + i}" for i, s in enumerate(STATES)}
-plate_expr_node = {s: f"7:{130 + i}" for i, s in enumerate(STATES)}
-PLATE_BLINK_NODE, PLATE_BLINK_REST_NODE = "7:160", "7:161"
-PLATE_AUTO_A, PLATE_AUTO_B, PLATE_AUTO_BLINK, PLATE_AUTO_SLEEP = "7:162", "7:163", "7:164", "7:165"
-BLINK_SHUT, BLINK_FRAMES = 4, 15   # frames to fully shut / total
-BLINK_FLIP = 6                     # entries flip the glyph here: the plate sees the trigger a frame or two late
-
-INK = "FF111111"
-PLATE_WHITE = "FFF7F7F7"
-def expression_layer(*parts):
-    # Explicit matrix, instant cuts: the root hides every swap inside a blink shutter, and an
-    # AnyState fan-out would keep re-entering the current state (a self-blend that fades the glyph).
-    name, lid, input_id, anim_ids, node_ids = parts
-    states = []
-    for i, s in enumerate(STATES):
-        own = "\n".join(input_transition(node_ids[t], input_id, EXPR[t], 0) for t in STATES if t != s)
-        states.append(anim_state(anim_ids[s], node_ids[s], i, "", own))
-    return layer_frame(name, lid, node_ids["idle"], "", "\n".join(states))
-
-
-def fill(color):
-    return f'<Fill name="Fill"><SolidColor colorValue="{color}" name="Color"/></Fill>'
-
-
-def rrect(w, h, r, name="Path"):
-    return (f'<Rectangle width="{w}" height="{h}" linkCornerRadius="true" cornerRadiusTL="{r}" '
-            f'cornerRadiusTR="{r}" cornerRadiusBL="{r}" cornerRadiusBR="{r}" name="{name}"/>')
-
-
-# ================================================================================================
-# Body: identity path (SPEC section 1, body import mechanics) + paint recipe (section 6).
-# ================================================================================================
-BODY = {s: svgpath.body_vertices(art(SHAPE_SVG[s])) for s in SHAPES}
-
-
-def bone_weight(y):
-    """Packed CubicWeight attributes for a vertex at rest y: three tendons (1, 2, 3), 0..255 each."""
-    wc = min(max(-y / BONE_REACH, 0.0), 1.0)
-    wb = min(max(y / BONE_REACH, 0.0), 1.0)
-    wm = 1.0 - wc - wb
-    vc, vb = round(255 * wc), round(255 * wb)
-    vm = 255 - vc - vb
-    indices = 1 | (2 << 8) | (3 << 16)
-    values = vc | (vm << 8) | (vb << 16)
-    return (f'<CubicWeight values="{values}" indices="{indices}" inValues="{values}" inIndices="{indices}" '
-            f'outValues="{values}" outIndices="{indices}"/>')
-
-
-def body_skin():
-    return (f'<Skin tx="0" ty="0" name="Skin">\n'
-            f'    <Tendon boneId="{BONE_CROWN}" tx="0" ty="{-BONE_REACH}" name="Crown"/>\n'
-            f'    <Tendon boneId="{BONE_MID}" tx="0" ty="0" name="Middle"/>\n'
-            f'    <Tendon boneId="{BONE_BASE}" tx="0" ty="{BONE_REACH}" name="Base"/>\n'
-            f'</Skin>')
-
-
-def body_path(vertex_ids, name):
-    verts = "\n".join(
-        f'<CubicMirroredVertex x="{x}" y="{y}" rotation="{rot}" distance="{d}" name="V{i}" id="{vid}">\n    {bone_weight(y)}\n</CubicMirroredVertex>'
-        for i, ((x, y, rot, d), vid) in enumerate(zip(BODY[DEFAULT_SHAPE], vertex_ids)))
-    verts += "\n" + body_skin()
-    return f'<PointsPath isClosed="true" name="{name}">\n{indent(verts, "    ")}\n</PointsPath>'
-
-
-def shape_keys(shape):
-    objs = {}
-    for (x, y, rot, d), vb, vs, vh in zip(BODY[shape], body_vertex_ids, soft_vertex_ids, halo_vertex_ids):
-        for vid in (vb, vs, vh):
-            objs[vid] = {VX: x, VY: y, VROT: rot, VDIST: d}
-    return objs
-
-
-def body():
-    bound = f'<SolidColor colorValue="FF79B7DF" name="Color">\n            {bind(VM_COLOR, COLOR)}\n        </SolidColor>'
-    return f'''<Node x="0" y="{-LEAN_BASE}" name="BodyPlacement" id="{INFLATE_NODE}">
-    {bind(VM_TURN_X, ROT, CONV_BODY_ROT)}
-    {bind(VM_TURN_X, X, CONV_BODY_X)}
-<Node x="0" y="0" name="Body" id="{BODY_NODE}">
-    <RootBone x="0" y="{-BONE_REACH}" length="1" rotation="0" name="Crown" id="{BONE_CROWN}"/>
-    <RootBone x="0" y="0" length="1" rotation="0" name="Middle" id="{BONE_MID}"/>
-    <RootBone x="0" y="{BONE_REACH}" length="1" rotation="0" name="Base" id="{BONE_BASE}"/>
-    <!-- Paints on one shape; the LATER paint draws on top. -->
-    <Shape name="BodyShape" id="{HITBOX}">
-{indent(body_path(body_vertex_ids, "Path"), "        ")}
-        <Fill name="Fill">
-            {bound}
-        </Fill>
-        <Fill name="Shade">
-            <RadialGradient startX="-40" startY="-65" endX="130" endY="120" name="Gradient">
-                <GradientStop colorValue="00000000" position="0"/>
-                <GradientStop colorValue="08000000" position="0.55"/>
-                <GradientStop colorValue="40000000" position="1"/>
-            </RadialGradient>
-        </Fill>
-        <Fill name="Gloss">
-            <RadialGradient startX="-65" startY="-85" endX="65" endY="45" name="Gradient" id="{GLOSS}">
-                <GradientStop colorValue="52FFFFFF" position="0"/>
-                <GradientStop colorValue="24FFFFFF" position="0.45"/>
-                <GradientStop colorValue="00FFFFFF" position="1"/>
-            </RadialGradient>
-        </Fill>
-        <Fill name="Lumen">
-            <!-- The breath's light: a very low white radial that rises through the body with the
-                 inhale and fades out on the exhale. Opacity and centre are keyed per state. -->
-            <RadialGradient startX="0" startY="{LUMEN_Y0}" endX="{LUMEN_R}" endY="{LUMEN_Y0}" opacity="0" name="Gradient" id="{LUMEN}">
-                <GradientStop colorValue="FFFFFFFF" position="0"/>
-                <GradientStop colorValue="66FFFFFF" position="0.45"/>
-                <GradientStop colorValue="00FFFFFF" position="1"/>
-            </RadialGradient>
-        </Fill>
-        <Fill name="Tint">
-            <SolidColor colorValue="00000000" name="TintColor" id="{TINT}"/>
-        </Fill>
-    </Shape>
-    <Shape opacity="0.14" name="SoftEdge" id="{SOFT}">
-{indent(body_path(soft_vertex_ids, "Path"), "        ")}
-        <Stroke thickness="8" name="Stroke">
-            {bound}
-            <Feather strength="4" name="Feather"/>
-        </Stroke>
-    </Shape>
-    <Shape scaleX="1.02" scaleY="1.02" opacity="{HALO_OPACITY}" name="Halo" id="{HALO}">
-{indent(body_path(halo_vertex_ids, "Path"), "        ")}
-        <Stroke thickness="12" name="Stroke">
-            {bound}
-            <Feather strength="10" name="Feather"/>
-        </Stroke>
-    </Shape>
-</Node>
-</Node>'''
-
-
-# ================================================================================================
-# Plate component (SPEC sections 1, 4, 7 standard profile).
-# ================================================================================================
-MOUTH_SAMPLES = [svgpath.mouth_vertices(art(f"glyph-mouth-{n}.svg")) for n in ("closed", "half", "open")]
-STATE_GLYPH = {"idle": "idle", "listening": "listening", "dragged": "dragged", "thinking": "thinking",
-               "waitingInput": "waitingInput", "speaking": "speaking", "success": "success", "error": "error",
-               "sleeping": "sleeping", "loading": "loading", "failed": "failed", "degraded": "degraded"}
-# No mouth while speaking (the user: a moving mouth looks stupid); the glyph and the head carry speech.
-STATE_MOUTH = {"dragged": MOUTH_MORPH, "waitingInput": MOUTH_O, "error": FROWN}
-STATE_PLATE_SCALE = {"listening": 1.04, "waitingInput": 1.06}
-
-
-def wave_samples(amplitude):
-    """The four squiggle phase targets as detached-vertex tuples, y and handle-y scaled by the
-    amplitude (x and the stroke untouched, per PUPIL-SPEC 3). Handle rotations are unwrapped
-    across phases so a linear key never spins a handle the long way round."""
-    phases = []
-    for k in range(4):
-        verts = svgpath.parse_path(svgpath.read_svg(art(f"pupil/squiggle-{k}.svg"))["d"])[0]["verts"]
-        row = []
-        for (x, y, cin, cout) in verts:
-            sy = lambda c: None if c is None else (c[0], c[1] * amplitude)
-            ir, idist = svgpath._handle((x, y * amplitude), sy(cin))
-            orot, odist = svgpath._handle((x, y * amplitude), sy(cout))
-            row.append([x, y * amplitude, ir, idist, orot, odist])
-        phases.append(row)
-    for vi in range(5):
-        for prop in (2, 4):
-            for k in range(1, 4):
-                prev, cur = phases[k - 1][vi][prop], phases[k][vi][prop]
-                while cur - prev > math.pi: cur -= 2 * math.pi
-                while cur - prev < -math.pi: cur += 2 * math.pi
-                phases[k][vi][prop] = cur
-    return phases
-
-
-def wave_keys(period_ms, amplitude):
-    """Loop of one wave cycle: phases 0, 1, 2, 3 at the quarters, back to 0 at the end."""
-    n = frames(period_ms)
-    q = [0, round(n / 4), round(n / 2), round(3 * n / 4), n]
-    ph = wave_samples(amplitude)
-    order = [0, 1, 2, 3, 0]
-    keys = {}
-    for vi, vid in enumerate(wave_vertex_ids):
-        keys[vid] = {}
-        for key, idx in ((VX, 0), (VY, 1), (VIN_ROT, 2), (VIN_DIST, 3), (VOUT_ROT, 4), (VOUT_DIST, 5)):
-            keys[vid][key] = [(q[j], round(ph[order[j]][vi][idx], 4), LINEAR) for j in range(5)]
-            # the last key's bezier is ignored; keep the tuple shape uniform
-    return n, keys
-
-
-def pupil_overlay():
-    """iris field (neutral, stationary) with the clipped pupil root: wave behind core, catchlight above."""
-    wave_verts = "\n".join(
-        f'<CubicDetachedVertex x="{x}" y="{y}" inRotation="{ir}" inDistance="{idist}" outRotation="{orot}" outDistance="{odist}" name="W{i}" id="{vid}"/>'
-        for i, ((x, y, ir, idist, orot, odist), vid) in enumerate(zip(wave_samples(1.0)[0], wave_vertex_ids)))
-    wave = f'''<Shape x="0" y="0" name="Wave" id="{WAVE}">
-    <PointsPath isClosed="false" name="Path">
-{indent(wave_verts, "        ")}
-    </PointsPath>
-    <Stroke thickness="{WAVE_STROKE}" cap="round" join="round" name="Stroke"><SolidColor colorValue="{INK}" name="Color"/></Stroke>
-</Shape>'''
-    core = svgpath.path_rml(art("pupil/pupil-core.svg"), "Core", CORE, INK)
-    catch = svgpath.path_rml(art("pupil/catchlight.svg"), "Catchlight", CATCH, "FFFFFFFF", opacity=0.9)
-    iris = svgpath.path_rml(art("pupil/iris-field.svg"), "Iris", IRIS, "FFF7F7F7")
-    return f'''<Node x="0" y="0" opacity="0" name="PupilOverlay" id="{PUPIL_OVERLAY}">
-    <Node x="0" y="0" name="PupilRoot" id="{PUPIL_ROOT}">
-        <ClippingShape sourceId="{IRIS}" name="IrisClip"/>
-{indent(catch, "        ")}
-{indent(core, "        ")}
-{indent(wave, "        ")}
-    </Node>
-{indent(iris, "    ")}
-</Node>'''
-
-
-def plate_component():
-    expr_anims = []
-    for st in STATES:
-        # Glyphs live in a Solo: one keyed reference picks the drawn child (no opacity stack).
-        objs = {GLYPHS_NODE: {ACTIVE_CHILD: Id(GLYPH[STATE_GLYPH[st]])}}
-        objs.update({MOUTH_MORPH: {OPACITY: 0}, MOUTH_O: {OPACITY: 0}, FROWN: {OPACITY: 0}})
-        if st in STATE_MOUTH:
-            objs[STATE_MOUTH[st]] = {OPACITY: 1}
-        sc = STATE_PLATE_SCALE.get(st, 1)
-        objs[PLATE_CARD] = {SX: sc, SY: sc}
-        objs[PLATE_SHADOW] = {SX: sc, SY: sc}
-        # The pupil overlay: on for idle/listening/speaking with that state's wave loop, off elsewhere.
-        if st in PUPIL:
-            n, wk = wave_keys(*PUPIL[st])
-            objs[PUPIL_OVERLAY] = {OPACITY: 1}
-            # The stroke wave read as a bar at every size; the core bobs on the same sine instead.
-            objs[WAVE] = {OPACITY: 0}
-            objs.update(wk)
-            A = PUPIL[st][1]
-            q = [0, round(n / 4), round(n / 2), round(3 * n / 4), n]
-            objs[CORE] = {Y: [(q[0], 0, SINE), (q[1], A, SINE), (q[2], 0, SINE), (q[3], -A, SINE), (q[4], 0)]}
-            expr_anims.append(animation("Expr" + st[0].upper() + st[1:], plate_expr_anim[st], n, objs, "loop"))
-        else:
-            objs[PUPIL_OVERLAY] = {OPACITY: 0}
-            expr_anims.append(animation("Expr" + st[0].upper() + st[1:], plate_expr_anim[st], 1, objs))
-
-    px, py = PUPIL_PARALLAX
-    look_x = animation("LookX", PLATE_LOOKX, 60, {GLYPHS_NODE: {X: [(0, -23, LINEAR), (60, 23)]},  # SPEC 9.1
-                                                  PUPIL_OVERLAY: {X: [(0, -23, LINEAR), (60, 23)]},
-                                                  PUPIL_ROOT: {X: [(0, -px, LINEAR), (60, px)]}})
-    look_y = animation("LookY", PLATE_LOOKY, 60, {GLYPHS_NODE: {Y: [(0, -17, LINEAR), (60, 17)]},
-                                                  PUPIL_OVERLAY: {Y: [(0, -17, LINEAR), (60, 17)]},
-                                                  PUPIL_ROOT: {Y: [(0, -py, LINEAR), (60, py)]}})
-    # Open: the mouth morphs closed -> half -> open through the three SVG samples (linear).
-    mouth_keys = {}
-    for vid, samples in zip(mouth_vertex_ids, zip(*MOUTH_SAMPLES)):
-        mouth_keys[vid] = {}
-        for key, idx in ((VX, 0), (VY, 1), (VIN_ROT, 2), (VIN_DIST, 3), (VOUT_ROT, 4), (VOUT_DIST, 5)):
-            mouth_keys[vid][key] = [(f, s[idx], LINEAR) for f, s in zip((0, 30, 60), samples)]
-    open_anim = animation("Open", PLATE_OPEN, 60, mouth_keys)
-    # Blink (Trutoiu, Carter, Matthews, Hodgins - Disney Research 2011): human blinks are
-    # asymmetric - a fast close and a slow, decelerating open - and ~250-300 ms reads most
-    # natural. Close 4 frames (67 ms), hold 1, open 10 (167 ms). Squashes the glyph only.
-    shutter = [(0, 1, STD_DECEL), (BLINK_SHUT, 0, None), (BLINK_SHUT + 1, 0, EMPH_DECEL), (BLINK_FRAMES, 1)]
-    blink = animation("Blink", PLATE_BLINK_ANIM, BLINK_FRAMES, {GLYPHS_NODE: {SY: shutter}, PUPIL_OVERLAY: {SY: list(shutter)}})
-    wait_a = animation("WaitA", PLATE_WAIT_A, frames(4000), {})
-    wait_b = animation("WaitB", PLATE_WAIT_B, frames(8000), {})
-
-    expr_layer = expression_layer("Expression", "7:10", PLATE_IN_EXPR, plate_expr_anim, plate_expr_node)
-
-    # Saccade layer: waits pick a fixation at random; fixations return to a random wait. Asleep, parked.
-    asleep_s = input_transition(SACCADE_SLEEP_NODE, PLATE_IN_EXPR, EXPR["sleeping"], 0)
-    awake_s = (f'<StateTransition stateToId="{SACCADE_WAIT_NODES[0]}" duration="0">\n'
-               f'    <TransitionNumberCondition inputId="{PLATE_IN_EXPR}" opValue="lessThan" value="{EXPR["sleeping"] - 0.5}"/>\n</StateTransition>\n'
-               f'<StateTransition stateToId="{SACCADE_WAIT_NODES[0]}" duration="0">\n'
-               f'    <TransitionNumberCondition inputId="{PLATE_IN_EXPR}" opValue="greaterThanOrEqual" value="{EXPR["sleeping"] + 0.5}"/>\n</StateTransition>')
-    to_fix = "\n".join(weighted(exit_transition(n), w) for n, (_, _, w) in zip(SACCADE_FIX_NODES, SACCADE_FIX))
-    to_wait = "\n".join(weighted(exit_transition(n), 10) for n in SACCADE_WAIT_NODES)
-    sac_states = [anim_state(aid, nid, i, ' random="true"', asleep_s + "\n" + to_fix) for i, ((aid, _), nid) in enumerate(zip(SACCADE_WAITS, SACCADE_WAIT_NODES))]
-    sac_states += [anim_state(aid, nid, 3 + i, ' reset="true" random="true"', asleep_s + "\n" + to_wait) for i, ((aid, _, _), nid) in enumerate(zip(SACCADE_FIX, SACCADE_FIX_NODES))]
-    sac_states.append(anim_state(SACCADE_WAITS[0][0], SACCADE_SLEEP_NODE, 12, "", awake_s))
-    saccade_layer = layer_frame("Saccade", "7:13", SACCADE_WAIT_NODES[0], "", "\n".join(sac_states))
-    trigger_layer = layer_frame(
-        "Blink", "7:11", PLATE_BLINK_REST_NODE,
-        f'<StateTransition stateToId="{PLATE_BLINK_NODE}">\n    <TransitionTriggerCondition inputId="{PLATE_IN_BLINK}"/>\n</StateTransition>',
-        f'<AnimationState x="200" y="40" animationId="{PLATE_WAIT_A}" id="{PLATE_BLINK_REST_NODE}"/>\n'
-        + anim_state(PLATE_BLINK_ANIM, PLATE_BLINK_NODE, 1, ' reset="true"', exit_transition(PLATE_BLINK_REST_NODE)))
-    # Eyes closed do not blink: the waits park while expr is sleeping and resume when it is not.
-    asleep = input_transition(PLATE_AUTO_SLEEP, PLATE_IN_EXPR, EXPR["sleeping"], 0)
-    awake = (f'<StateTransition stateToId="{PLATE_AUTO_A}" duration="0">\n'
-             f'    <TransitionNumberCondition inputId="{PLATE_IN_EXPR}" opValue="lessThan" value="{EXPR["sleeping"] - 0.5}"/>\n</StateTransition>\n'
-             f'<StateTransition stateToId="{PLATE_AUTO_A}" duration="0">\n'
-             f'    <TransitionNumberCondition inputId="{PLATE_IN_EXPR}" opValue="greaterThanOrEqual" value="{EXPR["sleeping"] + 0.5}"/>\n</StateTransition>')
-    auto_layer = layer_frame(
-        "AutoBlink", "7:12", PLATE_AUTO_A, "",
-        anim_state(PLATE_WAIT_A, PLATE_AUTO_A, 0, ' random="true"', asleep + "\n" + exit_transition(PLATE_AUTO_BLINK)) + "\n"
-        + anim_state(PLATE_WAIT_B, PLATE_AUTO_B, 1, "", asleep + "\n" + exit_transition(PLATE_AUTO_BLINK)) + "\n"
-        + anim_state(PLATE_BLINK_ANIM, PLATE_AUTO_BLINK, 2, ' reset="true" random="true"',
-                     weighted(exit_transition(PLATE_AUTO_A), 50) + "\n" + weighted(exit_transition(PLATE_AUTO_B), 50)) + "\n"
-        + anim_state(PLATE_WAIT_A, PLATE_AUTO_SLEEP, 3, "", awake))
-
-    glyphs = "\n".join(svgpath.path_rml(art(f"glyph-{n}.svg"), n[0].upper() + n[1:], GLYPH[n], INK) for n in GLYPH_ORDER)
-    mv = "\n".join(
-        f'<CubicDetachedVertex x="{s[0]}" y="{s[1]}" inRotation="{s[2]}" inDistance="{s[3]}" outRotation="{s[4]}" outDistance="{s[5]}" name="M{i}" id="{vid}"/>'
-        for i, (s, vid) in enumerate(zip(MOUTH_SAMPLES[0], mouth_vertex_ids)))
-    mouth_morph = f'''<Shape x="0" y="0" opacity="0" name="Mouth" id="{MOUTH_MORPH}">
-    <PointsPath isClosed="true" name="Path">
-{indent(mv, "        ")}
-    </PointsPath>
-    {fill(INK)}
-</Shape>'''
-    mouth_o = svgpath.path_rml(art("glyph-mouth-o.svg"), "MouthO", MOUTH_O, INK, opacity=0)
-    frown = svgpath.path_rml(art("glyph-mouth-frown.svg"), "FrownLine", FROWN, INK, opacity=0)
-
-    # Tunable pose ranges (bench art direction): frame 0 = value at 0, frame 60 = value at 1, linear.
-    tune_anims = []
-    for name, (_, aid, nid, props, (lo, hi)) in TUNABLES.items():
-        key = {"SX": SX, "SY": SY, "Y": Y}
-        tune_anims.append(animation("Tune" + name[4:], aid, 60, {nid: {key[p]: [(0, lo, LINEAR), (60, hi)] for p in props}}))
-    # Saccades: each fixation is one animation - hop out in 60 ms (overshoot), hold, hop back in 80 ms.
-    for aid, ms in SACCADE_WAITS:
-        tune_anims.append(animation(f"SaccadeWait{ms}", aid, frames(ms), {}))
-    for i, (aid, (dx, dy), _) in enumerate(SACCADE_FIX):
-        hold = beat([700, 1100, 1600, 2400][i % 4])
-        tune_anims.append(animation(f"Saccade{i + 1}", aid, hold + 8, {SACCADE_NODE: {
-            X: [(0, 0, BACK_OUT), (4, dx, None), (hold, dx, SOFT_OUT), (hold + 8, 0)],
-            Y: [(0, 0, BACK_OUT), (4, dy, None), (hold, dy, SOFT_OUT), (hold + 8, 0)]}}))
-    tune_anims.append(animation("AutoX", PLATE_AUTO_X, 60, {GLYPH_SCALE_NODE: {X: [(0, -6, LINEAR), (60, 6)]}}))
-    tune_anims.append(animation("AutoY", PLATE_AUTO_Y, 60, {GLYPH_SCALE_NODE: {Y: [(0, -4, LINEAR), (60, 4)]}}))
-
-    # Wrapper nodes carry the tunables so the state, look and blink keys on the inner objects
-    # never collide with them. MouthNode's rest y is the SPEC mouth anchor (0, +82).
-    return f'''<Artboard isComponent="true" defaultStateMachineId="{PLATE_SM}" x="700" y="0" styleId="7:3" clip="false" width="200" height="200" name="Plate" id="{PLATE_AB}">
-    <LayoutComponentStyle name="Style" id="7:3"/>
-    <Node x="100" y="100" name="PlateRoot" id="{PLATE_ROOT}">
-        <Node x="0" y="82" name="MouthNode" id="{MOUTH_NODE}">
-{indent(mouth_morph, "            ")}
-{indent(mouth_o, "            ")}
-{indent(frown, "            ")}
-        </Node>
-        <Node x="0" y="0" name="GlyphScale" id="{GLYPH_SCALE_NODE}">
-            <Node x="0" y="0" name="Saccade" id="{SACCADE_NODE}">
-{indent(pupil_overlay(), "                ")}
-                <Solo activeComponentId="{GLYPH[STATE_GLYPH['idle']]}" x="0" y="0" name="Glyphs" id="{GLYPHS_NODE}">
-{indent(glyphs, "                    ")}
-                </Solo>
-            </Node>
-        </Node>
-        <Node x="0" y="0" name="PlateScale" id="{PLATE_SCALE_NODE}">
-            <Shape x="0" y="0" name="Card" id="{PLATE_CARD}">
-                {rrect(120, 120, 27)}
-                {fill(PLATE_WHITE)}
-            </Shape>
-            <Shape x="0" y="2" name="Shadow" id="{PLATE_SHADOW}">
-                {rrect(120, 120, 27)}
-                <Stroke thickness="4" name="Stroke">
-                    <SolidColor colorValue="14000000" name="Color"/>
-                    <Feather strength="3" name="Feather"/>
-                </Stroke>
-            </Shape>
-        </Node>
-    </Node>
-
-{indent(chr(10).join(expr_anims + [look_x, look_y, open_anim, blink, wait_a, wait_b] + tune_anims), "    ")}
-
-    <StateMachine name="Plate" id="{PLATE_SM}">
-        <StateMachineNumber name="expr" id="{PLATE_IN_EXPR}"/>
-        <StateMachineTrigger name="blink" id="{PLATE_IN_BLINK}"/>
-{indent(expr_layer, "        ")}
-{indent(trigger_layer, "        ")}
-{indent(auto_layer, "        ")}
-{indent(saccade_layer, "        ")}
-    </StateMachine>
-</Artboard>
-<ComponentAsset artboardId="{PLATE_AB}" name="Plate"/>'''
-
-
-# ================================================================================================
-# Root
-# ================================================================================================
-TURN_PX, TURN_PY = 70, 24          # plate travel at facing +-1
-TURN_SQUASH = 0.7                  # plate scaleX at the edges (foreshortening)
-TURN_ROT = 14                      # plate roll (deg) at facing +-1; the body adds +-6 of its own
-TURN_RECEDE = 0.84                 # plate scale at facing +-1: it is further from the viewer there
-
-
-def trail(name, sid):
-    return f'''<Shape x="0" y="0" opacity="0" name="{name}" id="{sid}">
-    {rrect(120, 120, 27)}
-    {fill(PLATE_WHITE)}
-</Shape>'''
-
-
-def face():
-    # FacePlacement > Turn (keyed only by the joystick's TurnX/TurnY) > Face (keyed by state motion).
-    # Trails are declared after Turn so they draw underneath the plate.
-    return f'''<Node x="0" y="{-8 - LEAN_BASE}" name="FacePlacement">
-<Node x="0" y="0" name="HostTurn" id="{HOST_TURN}">
-    {bind(VM_TURN_X, X, CONV_TURN_X)}
-    {bind(VM_TURN_X, ROT, CONV_TURN_ROT)}
-    {bind(VM_TURN_Y, Y, CONV_TURN_Y)}
-<Node x="0" y="0" name="Turn" id="{TURN_NODE}">
-<Node x="0" y="0" name="Arc" id="{ARC_NODE}">
-<Node x="0" y="0" name="Face" id="{FACE}">
-    <NestedArtboard artboardId="{PLATE_AB}" x="-100" y="-108" name="Plate" id="{PLATE}">
-        <NestedStateMachine animationId="{PLATE_SM}" name="SM">
-            <NestedNumber inputId="{PLATE_IN_EXPR}" nestedValue="0" name="expr" id="{PLATE_EXPR}"/>
-            <NestedTrigger inputId="{PLATE_IN_BLINK}" name="blink" id="{PLATE_BLINK}"/>
-        </NestedStateMachine>
-        <NestedRemapAnimation animationId="{PLATE_LOOKX}" time="0.5" name="LookX">
-            {bind(VM_LOOKX, REMAP_TIME, CONV_LOOK)}
-        </NestedRemapAnimation>
-        <NestedRemapAnimation animationId="{PLATE_LOOKY}" time="0.5" name="LookY">
-            {bind(VM_LOOKY, REMAP_TIME, CONV_LOOK)}
-        </NestedRemapAnimation>
-        <NestedRemapAnimation animationId="{PLATE_OPEN}" time="0" name="Open">
-            {bind(VM_MOUTH, REMAP_TIME, CONV_MOUTH)}
-        </NestedRemapAnimation>
-{indent(chr(10).join(f'<NestedRemapAnimation animationId="{aid}" time="0.5" name="{n}">{chr(10)}    {bind(vid, REMAP_TIME)}{chr(10)}</NestedRemapAnimation>' for n, (vid, aid, *_) in TUNABLES.items()), "        ")}
-        <NestedRemapAnimation animationId="{PLATE_AUTO_X}" time="0.5" name="AutoLookX" id="{AUTO_X}"/>
-        <NestedRemapAnimation animationId="{PLATE_AUTO_Y}" time="0.5" name="AutoLookY" id="{AUTO_Y}"/>
-    </NestedArtboard>
-</Node>
-</Node>
-</Node>
-</Node>
-{indent(trail("Trail1", TRAIL1), "")}
-{indent(trail("Trail2", TRAIL2), "")}
-</Node>'''
-
-
-def turn_animations():
-    """Pose ranges the joystick scrubs: frame 0 = facing -1 (left), 60 = +1 (right)."""
-    # The plate slides, foreshortens AND rolls with the turn (+-TURN_ROT): a face turning on a
-    # ball tilts its features; without the roll a turn reads as a flat slide.
-    tx = animation("TurnX", TURN_X_ANIM, 60, {
-        TURN_NODE: {X: [(0, -TURN_PX, LINEAR), (60, TURN_PX)],
-                    ROT: [(0, rad(-TURN_ROT), LINEAR), (60, rad(TURN_ROT))],
-                    # foreshorten (SX) and recede (SY too): the feature moves away as it turns
-                    SX: [(0, TURN_SQUASH * TURN_RECEDE, LINEAR), (30, 1, LINEAR), (60, TURN_SQUASH * TURN_RECEDE)],
-                    SY: [(0, TURN_RECEDE, LINEAR), (30, 1, LINEAR), (60, TURN_RECEDE)]},
-        ARC_NODE: {Y: [(0, 0, SINE), (30, -TURN_ARC, SINE), (60, 0)]},
-        LEAN_NODE: {ROT: [(0, rad(-TURN_LEAN_DEG), LINEAR), (60, rad(TURN_LEAN_DEG))]},
-        BODY_NODE: {ROT: [(0, rad(-6), LINEAR), (60, rad(6))],
-                    SX: [(0, 0.93, LINEAR), (30, 1, LINEAR), (60, 0.93)]}})
-    ty = animation("TurnY", TURN_Y_ANIM, 60, {
-        TURN_NODE: {Y: [(0, -TURN_PY, LINEAR), (60, TURN_PY)],
-                    SY: [(0, 0.9 * TURN_RECEDE, LINEAR), (30, 1, LINEAR), (60, 0.9 * TURN_RECEDE)],
-                    SX: [(0, TURN_RECEDE, LINEAR), (30, 1, LINEAR), (60, TURN_RECEDE)]},
-        BODY_NODE: {SY: [(0, 1.03, LINEAR), (30, 1, LINEAR), (60, 0.96)]}})
-    return [tx, ty]
-
-
-def spin_keys(start, dur, trails=True):
-    """A whip-around: facing 0 -> +1 -> -1 -> 0 over `dur` frames from `start`, trails lagging."""
-    a, b, c, d = start, start + round(dur * 0.25), start + round(dur * 0.62), start + dur
-    x = [(a, 0, BACK_IN), (b, 1, STANDARD), (c, -1, ELASTIC_OUT), (d, 0)]
-    keys = {JOYSTICK: {JX: x},
-            BODY_NODE: {ROT: [(a, 0, BACK_IN), (b, rad(14), STANDARD), (c, rad(-14), ELASTIC_OUT), (d, 0)]}}
-    if trails:
-        def lagged(lag, scale):
-            # the facing curve, delayed `lag` frames and mapped through `scale`, keeping each key's bezier
-            return [(k[0] + lag, scale(k[1])) + tuple(k[2:]) for k in x]
-        for tid, lag, alpha in ((TRAIL1, 2, 0.28), (TRAIL2, 4, 0.14)):
-            keys[tid] = {
-                X: lagged(lag, lambda v: v * TURN_PX),
-                ROT: lagged(lag, lambda v: rad(v * TURN_ROT)),
-                OPACITY: [(a, 0, LINEAR), (a + lag + 1, alpha, None), (c, alpha, LINEAR), (d, 0)],
-            }
-    return keys
-
-
-def wander_animations():
-    glance = animation("WanderGlance", WANDER_GLANCE, beat(1600), {JOYSTICK: {
-        JX: [(0, 0, BACK_IN_OUT), (beat(450), -0.8, None), (beat(900), -0.8, BACK_IN_OUT), (beat(1250), 0.4, ELASTIC_SOFT), (beat(1600), 0)]}})
-    peek = animation("WanderPeek", WANDER_PEEK, beat(1400), {JOYSTICK: {
-        JY: [(0, 0, BACK_IN_OUT), (beat(400), 0.7, None), (beat(900), 0.7, ELASTIC_SOFT), (beat(1400), 0)],
-        JX: [(0, 0, BACK_IN_OUT), (beat(400), 0.3, None), (beat(900), 0.3, ELASTIC_SOFT), (beat(1400), 0)]}})
-    spin_k = spin_keys(0, beat(700))
-    d7 = beat(700)
-    spin_k.update(squash(INFLATE_NODE, [(0, 1, BACK_IN), (round(d7 * 0.25), 1.05, STANDARD), (round(d7 * 0.62), 1.05, ELASTIC_SOFT), (d7, 1)]))
-    spin = animation("WanderSpin", WANDER_SPIN, d7, spin_k)
-    # Asleep: one slow, small shift every ~30 s, nothing else.
-    sleep_shift = animation("WanderSleepShift", WANDER_SLEEP_SHIFT, beat(3000), {JOYSTICK: {
-        JX: [(0, 0.4, SINE), (beat(1500), 0.22, SINE), (beat(3000), 0.4)],
-        JY: [(0, 0.5, SINE), (beat(1500), 0.62, SINE), (beat(3000), 0.5)]}})
-    return ([animation("WanderWait" + str(k), aid, frames(ms), {}) for k, (aid, _, ms) in enumerate(WANDER_WAITS)]
-            + [animation("WanderSleepWait", WANDER_SLEEP_WAIT, frames(30000), {}), sleep_shift, glance, peek, spin])
-
-
-def sine(amplitude, period_ms, base=0.0):
-    """0,+a,0,-a,0 over one period with sine-ish easing per quarter; loops seamlessly."""
-    q = frames(period_ms) // 4
-    return [(0, base, SINE), (q, base + amplitude, SINE), (2 * q, base, SINE), (3 * q, base - amplitude, SINE), (4 * q, base)]
-
-
-BREATH_MS, BREATH_PX, BREATH_SCALE = 6500, 11, 1.06   # ~9 breaths a minute (SPEC 4600 felt hurried)
-INFLATE_NODE = "0:233"  # BodyPlacement: the breath's inflate lives here, away from the turn's body keys
-HALO_OPACITY, HALO_SLEEP, HALO_FAILED = 0.10, 0.06, 0
-
-
-def breath(period_ms=BREATH_MS):
-    """SPEC section 9.3: root y 0 -> -11 -> 0, inhale 55 % / exhale 45 %."""
-    return [(0, 0, SINE), (frames(period_ms * 0.55), -BREATH_PX, SINE), (frames(period_ms), 0)]
-
-
-def breath2(period_ms=BREATH_MS):
-    """Two bobs per inflate: the rise/fall at its own period, twice, so the loop can carry a
-    slower inflate (the user: 'the bob speed is right, the breathing is twice too fast')."""
-    n = frames(period_ms)
-    first = breath(period_ms)
-    second = [(f + n, v) + tuple(rest) for (f, v, *rest) in first[1:]]
-    return first + second
-
-
-def breath_scale(period_ms=BREATH_MS, lo=1.0, hi=BREATH_SCALE):
-    """The volume of the breath: the body inflates on the inhale, same phase as the rise."""
-    return [(0, lo, SINE), (frames(period_ms * 0.55), hi, SINE), (frames(period_ms), lo)]
-
-
-# Inflate (and the light) run at twice the bob's period: one slow breath per two bobs.
-BREATHING = {"idle": (2 * BREATH_MS, 1.0, BREATH_SCALE), "listening": (2 * BREATH_MS, 1.0, BREATH_SCALE),
-             "speaking": (2 * BREATH_MS, 1.0, BREATH_SCALE), "sleeping": (18000, 0.985, 1.045)}
-
-# Lumen: the breath's light (a white radial fill on the body, gradient opacity 0 at rest).
-LUMEN, LUMEN_R, LUMEN_Y0, LUMEN_Y1, LUMEN_PEAK = "0:234", 150, 70, -70, 0.16
-G_START_X, G_START_Y, G_END_X, G_END_Y = 42, 33, 34, 35   # LinearGradient property keys
-
-
-def lumen_keys(period_ms=BREATH_MS, peak=LUMEN_PEAK):
-    """Rises from low in the body to high with the inhale, brightening on the way; gone at rest."""
-    top = frames(period_ms * 0.55)
-    end = frames(period_ms)
-    return {GRADIENT_OPACITY: [(0, 0, SINE), (top, peak, SINE), (end, 0)],
-            G_START_Y: [(0, LUMEN_Y0, SINE), (top, LUMEN_Y1, SINE), (end, LUMEN_Y0)],
-            G_END_Y: [(0, LUMEN_Y0, SINE), (top, LUMEN_Y1, SINE), (end, LUMEN_Y0)],
-            G_START_X: 0, G_END_X: LUMEN_R}
-
-
-LUMEN_REST = {GRADIENT_OPACITY: 0, G_START_Y: LUMEN_Y0, G_END_Y: LUMEN_Y0, G_START_X: 0, G_END_X: LUMEN_R}
-
-
-# Default gaze life per state, on the AutoLookX/AutoLookY remaps (0..1, 0.5 = centre). A value
-# or a function of the state's loop period (ms) returning keys, so drifts loop with the state.
-# Small on purpose: the host's lookX/lookY adds on top (+-23/+-17) and both must fit the card.
-# Eyes fixate; they do not drift. These are the resting fixations; the plate's Saccade layer
-# adds the quick, random re-fixations that make a still gaze alive.
-GAZE = {
-    "idle": (0.5, 0.5),
-    "listening": (0.5, 0.35),        # up at you
-    "thinking": (0.22, 0.25),        # up-left, into its own thoughts
-    "waitingInput": (0.5, 0.4),      # straight at you
-    "speaking": (0.5, 0.5),
-    "error": (0.5, 0.65),            # down
-    "sleeping": (0.5, 0.75),
-}
-
-
-def sustained_facing():
-    return {"idle": (-0.15, 0), "listening": (0, 0), "thinking": (-0.6, -0.2), "waitingInput": (0, 0),
-              "speaking": (0.15, 0), "error": (-0.3, 0.25), "sleeping": (0.4, 0.5), "loading": (0, 0),
-              "failed": (0, 0.1), "degraded": (0.5, -0.1)}
-
-
-def sustained_animations():
-    """SPEC section 1: root motion (Body and Face move together), plate rotation/offset, tint,
-    gloss pulse, and the glyph index. Nothing keys body scale or body vertices."""
-    FACING = sustained_facing()
-    ROW = {  # key: (root motion, period ms, plate rot deg, face offset, tint, gloss pulse) - SPEC 1 + 9.1
-        "idle": ({"y": breath2()}, 2 * BREATH_MS, 0, (0, 0), "00000000", None),
-        "listening": ({"y": breath2()}, 2 * BREATH_MS, -2, (0, -14), "00000000", None),
-        "thinking": ({"x": sine(2, 3200)}, 3200, -6, (0, 0), "00000000", None),
-        "waitingInput": ({"y": sine(19, 1200)}, 1200, 0, (0, -2), "00000000", None),
-        "speaking": ({"y": breath2()}, 2 * BREATH_MS, 0, (0, 0), "00000000", None),
-        "error": ({"y": 24}, 0, 5, (0, 4), "14000000", None),
-        "sleeping": ({"y": breath2(9000)}, 18000, 3, (0, 4), "38000000", None),   # slow, deep; one inflate per two bobs
-        "loading": ({}, 1400, 0, (0, 0), "10000000", [(0, 0.8, SINE), (frames(700), 1.0, SINE), (frames(1400), 0.8)]),
-        "failed": ({}, 0, 0, (0, 0), "66808080", None),
-        "degraded": ({}, 0, 4, (0, 0), "00000000", None),
-    }
-    out = []
-    for st in SUSTAINED:
-        motion, period, rot, (fx, fy), tint, gloss = ROW[st]
-
-        def shifted(keys, offset):
-            if isinstance(keys, list):
-                return [(f, v + offset) + tuple(k[2:]) for k, (f, v) in zip(keys, [(k[0], k[1]) for k in keys])]
-            return keys + offset
-
-        mx, my = motion.get("x", 0), motion.get("y", 0)
-        body_keys = {X: mx, Y: my}
-        face_keys = {X: shifted(mx, fx), Y: shifted(my, fy), ROT: rad(rot)}
-        jx, jy = FACING[st]
-        halo = {"sleeping": HALO_SLEEP, "failed": HALO_FAILED}.get(st, HALO_OPACITY)
-        gx, gy = GAZE.get(st, (0.5, 0.5))
-        bs = breath_scale(*BREATHING[st]) if st in BREATHING else 1
-        objs = {BODY_NODE: body_keys, FACE: face_keys, TINT: {COLOR: tint}, PLATE_EXPR: {NESTED_VALUE: EXPR[st]},
-                INFLATE_NODE: {SX: bs, SY: bs},
-                **bone_pose([(0, 1, 0, 0)]),
-                LUMEN: lumen_keys(BREATHING[st][0], LUMEN_PEAK * (0.6 if st == "sleeping" else 1)) if st in BREATHING else LUMEN_REST,
-                GLOSS: {GRADIENT_OPACITY: gloss if gloss else 1}, JOYSTICK: {JX: jx, JY: jy}, HALO: {OPACITY: halo},
-                AUTO_X: {REMAP_TIME: gx(period) if callable(gx) else gx}, AUTO_Y: {REMAP_TIME: gy(period) if callable(gy) else gy}}
-        duration = frames(period) if period else 1
-        out.append(animation("State" + st[0].upper() + st[1:], root_state_anim[st], duration, objs, "loop" if duration > 1 else "oneShot"))
-    return out
-
-
-def enter_duration(frm, to):
-    """ms and bezier of the entry from `frm` to `to`: SPEC section 3 for the designed pairs,
-    otherwise the target's default (sleeping settles slowly, waitingInput springs)."""
-    if (frm, to) in DESIGNED_PAIRS:
-        return DESIGNED_PAIRS[(frm, to)], SOFT_OUT
-    return {"sleeping": (600, STANDARD), "waitingInput": (160, SPRING)}.get(to, (160, EASE_OUT))
-
-
-def enter_animations():
-    """One entry per pair of sustained states: a one-shot whose glyph swap hides inside a blink
-    fired at frame 0 (the shutter, closed by frame 3); the plate's expression flips while the
-    eye is closed and the facing travels to the target's. The SPEC section 3 pairs add designed
-    body/face motion that lands on the target's rest; the generic ones key nothing else, so
-    face, body and tint hold and then ease into the target over the hand-off blend."""
-    F = sustained_facing()
-    out = []
-    for (frm, to), aid in enter_anim.items():
-        fx0, fy0 = F[frm]; fx1, fy1 = F[to]
-        d, bez = enter_duration(frm, to)
-        n = frames(d)
-        turn = BACK_OUT if abs(fx1 - fx0) + abs(fy1 - fy0) > 0.2 else bez   # a real turn lands with overshoot
-        keys = {PLATE_EXPR: {NESTED_VALUE: [(0, EXPR[frm], None), (BLINK_FLIP, EXPR[to])]},
-                JOYSTICK: {JX: [(0, fx0, turn), (n, fx1)], JY: [(0, fy0, turn), (n, fy1)]}}
-        if (frm, to) == ("idle", "listening"):
-            # SPEC 9.4: 50 ms anticipation down (+3, +1 deg), lean past to -16/-3 deg at 200 ms, settle -14/-2 deg.
-            keys[FACE] = {Y: [(0, 0, EMPH_ACCEL), (frames(50), 3, EMPH_DECEL), (frames(200), -16, M3_STANDARD), (n, -14)],
-                          ROT: [(0, 0, EMPH_ACCEL), (frames(50), rad(1), EMPH_DECEL), (frames(200), rad(-3), M3_STANDARD), (n, rad(-2))]}
-        elif (frm, to) == ("listening", "thinking"):
-            # hold the gaze 60 ms, then turn away and tilt.
-            keys[JOYSTICK] = {JX: [(0, fx0, None), (frames(60), fx0, BACK_IN_OUT), (n, fx1)], JY: [(0, fy0, None), (frames(60), fy0, BACK_IN_OUT), (n, fy1)]}
-            keys[FACE] = {Y: [(0, -14, STANDARD), (n, 0)], ROT: [(0, rad(-2), STANDARD), (n, rad(-6))]}
-        elif (frm, to) == ("thinking", "speaking"):
-            keys[FACE] = {ROT: [(0, rad(-6), SOFT_OUT), (frames(140), 0, None), (n, 0)]}
-        elif (frm, to) == ("speaking", "idle"):
-            # the small exhale: +1 at 120 ms, then rest.
-            keys[FACE] = {Y: [(0, 0, SOFT_OUT), (frames(120), 1, SOFT_OUT), (n, 0)]}
-            keys[BODY_NODE] = {Y: [(0, 0, SOFT_OUT), (frames(120), 1, SOFT_OUT), (n, 0)]}
-        elif (frm, to) == ("error", "idle"):
-            # SPEC 9.5: root +24 -> 0 (face carries its +4 offset on top), plate +5 deg -> 0.
-            keys[FACE] = {Y: [(0, 28, SOFT_OUT), (n, 0)], ROT: [(0, rad(5), SOFT_OUT), (n, 0)]}
-            keys[BODY_NODE] = {Y: [(0, 24, SOFT_OUT), (n, 0)]}
-            keys[TINT] = {COLOR: [(0, "14000000"), (frames(100), "00000000")]}
-        if turn is BACK_OUT and n >= 10:
-            keys.update(squash(INFLATE_NODE, [(0, 1, EMPH_ACCEL), (3, 1.04, SOFT_OUT), (min(n - 2, 9), 0.98, SOFT_OUT), (n, 1)]))
-        out.append(animation(f"Enter_{frm}_{to}", aid, n, keys, callbacks=(PLATE_BLINK,)))
-    return out
-
-
-def shape_animations():
-    return [animation("Shape" + s[0].upper() + s[1:], shape_anim[s], 1, shape_keys(s)) for s in SHAPES]
-
-
-def bone_pose(keys):
-    """keys: (frame, S, L, H[, bezier]) -> bone transforms for the three-band deformation."""
-    out = {BONE_CROWN: {SX: [], SY: [], X: []}, BONE_MID: {SX: [], SY: []}, BONE_BASE: {SX: [], SY: [], X: []}}
-    for k in keys:
-        f, S, L, H = k[0], k[1], k[2], k[3]
-        bez = tuple(k[4:])
-        out[BONE_CROWN][SX].append((f, round(S - L, 4)) + bez)
-        out[BONE_MID][SX].append((f, round(S, 4)) + bez)
-        out[BONE_BASE][SX].append((f, round(S + L, 4)) + bez)
-        for b in (BONE_CROWN, BONE_MID, BONE_BASE):
-            out[b][SY].append((f, round(1 / S, 4)) + bez)
-        out[BONE_CROWN][X].append((f, round(-BONE_REACH * H, 3)) + bez)
-        out[BONE_BASE][X].append((f, round(BONE_REACH * H, 3)) + bez)
-    return out
-
-
-def squash(node, keys):
-    """Volume-preserving squash and stretch: keys of (frame, scaleX[, bezier]); scaleY = 1/scaleX."""
-    sx = [(k[0], k[1]) + tuple(k[2:]) for k in keys]
-    sy = [(k[0], round(1 / k[1], 4)) + tuple(k[2:]) for k in keys]
-    return {node: {SX: sx, SY: sy}}
-
-
-def momentary_animations():
-    """SPEC section 2. Root delta on Body and Face together; plate rotation on Face."""
-    S = frames(800)
-    f = lambda pct: round(S * pct / 100)
-    # SPEC 9.4: the bezier on a key is the *incoming* curve of the next row.
-    hop = [(0, 0, EMPH_ACCEL), (f(10), 6, STD_DECEL), (f(37.5), -48, EMPH_ACCEL), (f(70), 4, EMPH_DECEL), (f(87.5), -1, M3_STANDARD), (S, 0)]
-    success_keys = {
-        BODY_NODE: {Y: hop},
-        FACE: {Y: hop, ROT: [(0, 0, EMPH_ACCEL), (f(10), rad(-2), STD_DECEL), (f(37.5), rad(2), EMPH_ACCEL), (f(70), rad(-1), EMPH_DECEL), (f(87.5), 0, M3_STANDARD), (S, 0)]},
-        PLATE_EXPR: {NESTED_VALUE: EXPR["success"]}}
-    # Squash and stretch, volume preserved: crouch before the jump, stretch on the way up,
-    # neutral at the apex, stretch falling, squash on landing, elastic settle. The plate joins in.
-    # SPEC 10.5 success deformation keys (S, L, H); the inflate node holds 1 while the bones own the body.
-    success_keys.update(bone_pose([(0, 1, 0, 0, EMPH_ACCEL), (f(10), 1.06, 0.008, 0, STD_DECEL), (f(22), 0.93, -0.008, 0, SOFT_OUT),
-                                   (f(37.5), 1, 0, 0, EMPH_ACCEL), (f(60), 0.96, -0.006, 0, ACCEL), (f(70), 1.10, 0.012, 0, SOFT_OUT),
-                                   (f(87.5), 1.02, 0.003, 0, M3_STANDARD), (S, 1, 0, 0)]))
-    success_keys[INFLATE_NODE] = {SX: 1, SY: 1}
-    success_keys[FACE].update(squash(FACE, [(0, 1, EMPH_ACCEL), (f(22), 0.97, SOFT_OUT), (f(37.5), 1, EMPH_ACCEL), (f(70), 1.05, ELASTIC_SOFT), (S, 1)])[FACE])
-    success_keys.update(spin_keys(f(10), f(70) - f(10)))
-    success = animation("SuccessFlash", SUCCESS_ANIM, S, success_keys)
-    E = frames(600)
-    g = lambda pct: round(E * pct / 100)
-    # SPEC 9.5 endpoints
-    ex = [(0, 0, STANDARD), (g(16.6667), -24, STANDARD), (g(33.3333), 24, STANDARD), (g(50), -12, STANDARD), (g(66.6667), 0, None), (E, 0)]
-    ey = [(0, 0, STANDARD), (g(16.6667), 24, STANDARD), (g(33.3333), 24, STANDARD), (g(50), 24, STANDARD), (g(66.6667), 24, None), (E, 24)]
-    er = [(0, 0, STANDARD), (g(16.6667), rad(-7), STANDARD), (g(33.3333), rad(7), STANDARD), (g(50), rad(-3), STANDARD), (g(66.6667), rad(5), None), (E, rad(5))]
-    error_keys = {BODY_NODE: {X: ex, Y: ey}, FACE: {X: ex, Y: ey, ROT: er}, PLATE_EXPR: {NESTED_VALUE: EXPR["error"]}}
-    error_keys.update(bone_pose([(0, 1, 0, 0, STANDARD), (g(16.6667), 1.07, 0, 0, STANDARD), (g(33.3333), 0.97, 0, 0, STANDARD),
-                                 (g(50), 1.04, 0, 0, STANDARD), (g(66.6667), 1, 0, 0, None), (E, 1, 0, 0)]))
-    error_keys[INFLATE_NODE] = {SX: 1, SY: 1}
-    error = animation("ErrorFlash", ERROR_ANIM, E, error_keys)
-    drag_keys = {PLATE_EXPR: {NESTED_VALUE: EXPR["dragged"]}, INFLATE_NODE: {SX: 1, SY: 1}}
-    drag_keys.update(bone_pose([(0, round(1 / 0.92, 4), -0.008, 0, None)]))   # vertical compression, horizontal spread
-    drag = animation("Dragged", DRAG_ANIM, 1, drag_keys)
-    return [animation("FlashRest", FLASH_REST_ANIM, 1, {}), success, error, animation("DragRest", DRAG_REST_ANIM, 1, {}), drag]
-
-
-def idle_variety_animations():
-    m, h, r = beat(250), beat(650), beat(300)
-    glance = animation("IdleGlance", IDLE_GLANCE_ANIM, m + h + r, {
-        FACE: {ROT: [(0, 0, BACK_IN_OUT), (m, rad(2), None), (m + h, rad(2), ELASTIC_SOFT), (m + h + r, 0)],
-               X: [(0, 0, BACK_IN_OUT), (m, 2, None), (m + h, 2, ELASTIC_SOFT), (m + h + r, 0)]}})
-    # Stretch: a slow tall stretch (volume kept), face rides up, then a soft elastic settle.
-    d = beat(1400)
-    stretch = animation("IdleStretch", IDLE_BEATS["stretch"][0], d, dict(
-        squash(INFLATE_NODE, [(0, 1, BACK_IN_OUT), (beat(500), 0.93, None), (beat(900), 0.93, ELASTIC_SOFT), (d, 1)]),
-        **{FACE: {Y: [(0, 0, BACK_IN_OUT), (beat(500), -7, None), (beat(900), -7, ELASTIC_SOFT), (d, 0)]}}))
-    # Tilt: the whole body cocks 6 degrees like a dog hearing something, holds, comes back.
-    d = beat(1600)
-    tilt = animation("IdleTilt", IDLE_BEATS["tilt"][0], d, {
-        BODY_NODE: {ROT: [(0, 0, BACK_IN_OUT), (beat(400), rad(6), None), (beat(1100), rad(6), ELASTIC_SOFT), (d, 0)]},
-        FACE: {ROT: [(0, 0, BACK_IN_OUT), (beat(400), rad(4), None), (beat(1100), rad(4), ELASTIC_SOFT), (d, 0)],
-               X: [(0, 0, BACK_IN_OUT), (beat(400), 4, None), (beat(1100), 4, ELASTIC_SOFT), (d, 0)]}})
-    # Bounce: anticipation squash, a small hop, landing squash, settle.
-    d = beat(700)
-    hop = [(0, 0, EMPH_ACCEL), (beat(120), 3, STD_DECEL), (beat(320), -14, EMPH_ACCEL), (beat(520), 2, EMPH_DECEL), (d, 0)]
-    bounce = animation("IdleBounce", IDLE_BEATS["bounce"][0], d, dict(
-        squash(INFLATE_NODE, [(0, 1, STANDARD), (beat(120), 1.06, STANDARD), (beat(320), 0.96, STANDARD), (beat(520), 1.05, ELASTIC_SOFT), (d, 1)]),
-        **{BODY_NODE: {Y: hop}, FACE: {Y: hop}}))
-    # Shiver: a quick side-to-side shake of the body, the face lagging a frame or two.
-    d = beat(420)
-    def shake(amp, lag):
-        return [(0, 0, STANDARD)] + [(beat(60 * i) + lag, amp * (1 if i % 2 else -1) * (1 - i / 7), STANDARD) for i in range(1, 6)] + [(d, 0)]
-    shiver = animation("IdleShiver", IDLE_BEATS["shiver"][0], d, {BODY_NODE: {X: shake(4, 0)}, FACE: {X: shake(3, 2)}})
-    # Sigh: a slow deflate (wide squash), the face sinks, then it fills back up.
-    d = beat(1800)
-    sigh = animation("IdleSigh", IDLE_BEATS["sigh"][0], d, dict(
-        squash(INFLATE_NODE, [(0, 1, SINE), (beat(700), 1.05, None), (beat(1100), 1.05, SOFT_OUT), (d, 1)]),
-        **{FACE: {Y: [(0, 0, SINE), (beat(700), 5, None), (beat(1100), 5, SOFT_OUT), (d, 0)]}}))
-    # Wobble: a decaying rock about the base, like it was nudged.
-    d = beat(1300)
-    rock = [(0, 0, SINE)] + [(beat(180 * k), rad(4 * (1 if k % 2 else -1) * (1 - k / 7)), SINE) for k in range(1, 6)] + [(d, 0)]
-    wobble = animation("IdleWobble", IDLE_BEATS["wobble"][0], d, {BODY_NODE: {ROT: rock}, FACE: {ROT: [(f, v * 0.6) + tuple(k[2:]) for (f, v, *k) in rock]}})
-    # Shift: settles its weight to one side for a while, then back.
-    d = beat(2600)
-    shift = animation("IdleShift", IDLE_BEATS["shift"][0], d, {
-        BODY_NODE: {X: [(0, 0, BACK_IN_OUT), (beat(500), 7, None), (beat(2000), 7, SOFT_OUT), (d, 0)],
-                    ROT: [(0, 0, BACK_IN_OUT), (beat(500), rad(-2), None), (beat(2000), rad(-2), SOFT_OUT), (d, 0)]},
-        FACE: {X: [(0, 0, BACK_IN_OUT), (beat(500), 9, None), (beat(2000), 9, SOFT_OUT), (d, 0)]}})
-    # Look-around: the whole face turns to one side, pauses, sweeps to the other, comes home.
-    d = beat(2400)
-    lookaround = animation("IdleLookAround", IDLE_BEATS["lookaround"][0], d, {JOYSTICK: {
-        JX: [(0, 0, BACK_IN_OUT), (beat(500), -0.6, None), (beat(1000), -0.6, BACK_IN_OUT), (beat(1600), 0.55, None), (beat(2000), 0.55, ELASTIC_SOFT), (d, 0)]}})
-    return ([animation("IdleWait" + str(k), aid, frames(ms), {}) for k, (aid, _, ms) in enumerate(IDLE_WAITS)]
-            + [glance, stretch, tilt, bounce, shiver, sigh, wobble, shift, lookaround])
-
-
-def _shape_layer():
-    shape_trans = "\n".join(enum_transition(shape_node[s], shape_enum_ids[s], 240, SOFT_OUT, VM_SHAPE) for s in SHAPES)
-    shape_states = "\n".join(anim_state(shape_anim[s], shape_node[s], i) for i, s in enumerate(SHAPES))
-    shape_layer = layer_frame("Shape", "3:9", shape_node[DEFAULT_SHAPE], shape_trans, shape_states)
-
-    return shape_layer
-
-
-def _expression_layer():
-    # No AnyState fan-out: Rive evaluates AnyState before a state's own transitions, which would
-    # swallow the entries. Every sustained state cuts (0 ms) into the entry for the requested
-    # state; the entry hands off to the sustained loop at its end. Designed entries land on the
-    # target's rest and cut; generic ones blend the hand-off so held face/body/tint ease in.
-    states = []
-    for i, st in enumerate(SUSTAINED):
-        own = [enum_transition(enter_node[(st, to)], state_enum_ids[to], 0, None) for to in SUSTAINED if to != st]
-        states.append(anim_state(root_state_anim[st], root_state_node[st], i, "", "\n".join(own)))
-    for j, ((frm, to), nid) in enumerate(enter_node.items()):
-        # An entry can be interrupted by any other request (through that state's own entry).
-        hand_off = (0, None) if (frm, to) in DESIGNED_PAIRS else (min(120, enter_duration(frm, to)[0]), EASE_OUT)
-        own = [exit_transition(root_state_node[to], *hand_off)]
-        own += [enum_transition(enter_node[(to, other)], state_enum_ids[other], 0, None) for other in SUSTAINED if other != to]
-        states.append(anim_state(enter_anim[(frm, to)], nid, len(SUSTAINED) + j, ' reset="true"', "\n".join(own)))
-    expression = layer_frame("Expression", "3:1", root_state_node["idle"], "", "\n".join(states))
-
-    return expression
-
-
-def _static_layers():
-    """Breath, Blink, Hover, Flash, Drag: one animation each, driven by the view model."""
-    breath = layer_frame("Breath", "3:2", BREATH_NODE, "", anim_state(BREATH_ANIM, BREATH_NODE, 0))
-    blink = layer_frame("Blink", "3:3", BLINK_REST_NODE, trigger_transition(BLINK_NODE, VM_BLINK),
-                        f'<AnimationState x="200" y="40" animationId="{BLINK_REST_ANIM}" id="{BLINK_REST_NODE}"/>\n'
-                        + anim_state(BLINK_ANIM, BLINK_NODE, 1, ' reset="true"', exit_transition(BLINK_REST_NODE)))
-    hover = layer_frame(
-        "Hover", "3:4", HOVER_REST_NODE, "",
-        anim_state(HOVER_REST_ANIM, HOVER_REST_NODE, 0, "", bool_transition(HOVER_NODE, VM_HOVER, "true", 0, None)) + "\n"
-        + anim_state(HOVER_ANIM, HOVER_NODE, 1, ' reset="true"', exit_transition(HOVER_HELD_NODE) + "\n" + bool_transition(HOVER_REST_NODE, VM_HOVER, "false", 220, SOFT_OUT)) + "\n"
-        + anim_state(HOVER_HELD_ANIM, HOVER_HELD_NODE, 2, "", bool_transition(HOVER_REST_NODE, VM_HOVER, "false", 260, SOFT_OUT)))
-    flash = layer_frame(
-        "Flash", "3:6", FLASH_REST_NODE, trigger_transition(SUCCESS_NODE, VM_SUCCESS) + "\n" + trigger_transition(ERROR_NODE, VM_ERROR),
-        f'<AnimationState x="200" y="40" animationId="{FLASH_REST_ANIM}" id="{FLASH_REST_NODE}"/>\n'
-        + anim_state(SUCCESS_ANIM, SUCCESS_NODE, 1, ' reset="true"', exit_transition(FLASH_REST_NODE, 120, SOFT_OUT)) + "\n"
-        + anim_state(ERROR_ANIM, ERROR_NODE, 2, ' reset="true"', exit_transition(FLASH_REST_NODE, 0)))
-    drag = layer_frame(
-        "Drag", "3:7", DRAG_REST_NODE,
-        bool_transition(DRAG_NODE, VM_DRAGGED, "true", 80, SPRING) + "\n" + bool_transition(DRAG_REST_NODE, VM_DRAGGED, "false", 350, SOFT_OUT),
-        f'<AnimationState x="200" y="40" animationId="{DRAG_REST_ANIM}" id="{DRAG_REST_NODE}"/>\n'
-        f'<AnimationState x="200" y="100" animationId="{DRAG_ANIM}" id="{DRAG_NODE}"/>')
-    return breath, blink, hover, flash, drag
-
-
-def _park():
-    # Asleep, the character holds still: the waits divert to a parked state until it is awake
-    # again. Transitions are ordered, so the park check comes first.
-    sleeping = state_enum_ids["sleeping"]
-    to_park = lambda node, dur=0: enum_transition(node, sleeping, dur, None)
-    from_park = lambda node: enum_transition(node, sleeping, 0, None, op="notEqual")
-    return to_park, from_park
-
-
-def _idle_layer(to_park, from_park):
-    # Each wait ends by picking one beat at random (weights: the glance is still the most common,
-    # the bounce the rarest); every beat returns to a random wait.
-    # A beat blends in over 160 ms and out over 320 ms: its keys sit on top of Breath / the
-    # host's turn on the same nodes, so a hard cut would snap those values at either end.
-    beat_nodes = [(IDLE_GLANCE_NODE, 22), (IDLE_BEATS["tilt"][1], 14), (IDLE_BEATS["lookaround"][1], 13),
-                  (IDLE_BEATS["shift"][1], 12), (IDLE_BEATS["stretch"][1], 10), (IDLE_BEATS["sigh"][1], 10),
-                  (IDLE_BEATS["shiver"][1], 8), (IDLE_BEATS["wobble"][1], 6), (IDLE_BEATS["bounce"][1], 5)]
-    pick_beat = "\n".join(weighted(exit_transition(n, 160, SOFT_OUT), w) for n, w in beat_nodes)
-    back_to_wait = "\n".join(weighted(exit_transition(n, 320, SOFT_OUT), 25) for _, n, _ in IDLE_WAITS)
-    wait_states = "\n".join(
-        anim_state(aid, n, k, ' random="true"', to_park(IDLE_SLEEP_NODE) + "\n" + pick_beat)
-        for k, (aid, n, _) in enumerate(IDLE_WAITS))
-    beat_states = "\n".join(
-        anim_state(aid, n, 5 + i, ' reset="true" random="true"', to_park(IDLE_SLEEP_NODE) + "\n" + back_to_wait)
-        for i, (aid, n) in enumerate(IDLE_BEATS.values()))
-    idle = layer_frame(
-        "IdleVariety", "3:8", IDLE_A_NODE, "",
-        wait_states + "\n"
-        + anim_state(IDLE_GLANCE_ANIM, IDLE_GLANCE_NODE, 4, ' reset="true" random="true"', to_park(IDLE_SLEEP_NODE) + "\n" + back_to_wait) + "\n"
-        + anim_state(IDLE_WAIT_A, IDLE_SLEEP_NODE, 14, "", from_park(IDLE_A_NODE)) + "\n"
-        + beat_states)
-
-    return idle
-
-
-def _wander_layer(to_park, from_park):
-    # Wander beats key the joystick the host also turns: blend in (200 ms) and out (320 ms).
-    pick_wander = (weighted(exit_transition(WANDER_GLANCE_NODE, 200, SOFT_OUT), 55) + "\n"
-                   + weighted(exit_transition(WANDER_PEEK_NODE, 200, SOFT_OUT), 35) + "\n"
-                   + weighted(exit_transition(WANDER_SPIN_NODE, 200, SOFT_OUT), 10))
-    wander_home = "\n".join(weighted(exit_transition(n, 320, SOFT_OUT), 25) for _, n, _ in WANDER_WAITS)
-    wander_waits = "\n".join(
-        anim_state(aid, n, k, ' random="true"', to_park(WANDER_SLEEP_WAIT_NODE) + "\n" + pick_wander)
-        for k, (aid, n, _) in enumerate(WANDER_WAITS))
-    wander = layer_frame(
-        "Wander", "3:10", WANDER_A_NODE, "",
-        wander_waits + "\n"
-        + anim_state(WANDER_GLANCE, WANDER_GLANCE_NODE, 4, ' reset="true" random="true"',
-                     to_park(WANDER_SLEEP_WAIT_NODE, 400) + "\n" + wander_home) + "\n"
-        + anim_state(WANDER_PEEK, WANDER_PEEK_NODE, 5, ' reset="true" random="true"',
-                     to_park(WANDER_SLEEP_WAIT_NODE, 400) + "\n" + wander_home) + "\n"
-        + anim_state(WANDER_SPIN, WANDER_SPIN_NODE, 6, ' reset="true" random="true"',
-                     to_park(WANDER_SLEEP_WAIT_NODE, 400) + "\n" + wander_home) + "\n"
-        + anim_state(WANDER_SLEEP_WAIT, WANDER_SLEEP_WAIT_NODE, 7, "",
-                     from_park(WANDER_A_NODE) + "\n" + exit_transition(WANDER_SLEEP_SHIFT_NODE)) + "\n"
-        + anim_state(WANDER_SLEEP_SHIFT, WANDER_SLEEP_SHIFT_NODE, 6, ' reset="true"',
-                     from_park(WANDER_A_NODE) + "\n" + exit_transition(WANDER_SLEEP_WAIT_NODE, 200, SOFT_OUT)))
-
-    return wander
-
-
-def _listeners():
-    def bool_listener(name, kind, prop, value):
-        b = bind(prop, BIND_BOOL).replace("/>", ' direction="true"/>')
-        return (f'<StateMachineListenerSingle targetId="{HITBOX}" listenerTypeValue="{kind}" name="{name}">\n'
-                f'    <ListenerViewModelChange>\n        <BindablePropertyBoolean propertyValue="{value}">\n'
-                f'            {b}\n        </BindablePropertyBoolean>\n    </ListenerViewModelChange>\n</StateMachineListenerSingle>')
-    listeners = "\n".join([
-        bool_listener("HoverIn", "enter", VM_HOVER, "true"), bool_listener("HoverOut", "exit", VM_HOVER, "false"),
-        bool_listener("DragStart", "dragStart", VM_DRAGGED, "true"), bool_listener("DragEnd", "dragEnd", VM_DRAGGED, "false"),
-    ])
-    return listeners
-
-
-def root_machine():
-    to_park, from_park = _park()
-    breath, blink, hover, flash, drag = _static_layers()
-    layers = [_shape_layer(), _expression_layer(), breath, blink, hover, flash, drag,
-              _idle_layer(to_park, from_park), _wander_layer(to_park, from_park), _listeners()]
-    return f'<StateMachine name="Avatar" id="{SM}">\n' + "\n".join(indent(layer, "    ") for layer in layers) + '\n</StateMachine>'
-
-
-def root_artboard():
+from rml import (BACK_OUT, BACK_SOFT, ELASTIC_HEAVY, ELASTIC_SOFT, GRADIENT_OPACITY, ROT, SINE, SX, SY, VM, VM_BLINK, VM_COLOR,
+                 VM_DRAGGED, VM_ERROR, VM_HOVER, VM_LOOKX, VM_LOOKY, VM_MOUTH, VM_SHAPE, VM_STATE,
+                 VM_SUCCESS, Y, anim_state, animation, bind, layer_frame)
+from rig.body import INFLATE_NODE, body, sine, squash
+from rig.constants import (DEFAULT_SHAPE, HOST_BODY_DEG, HOST_BODY_PX, HOST_LEAN_DEG, HOST_TURN_DEG,
+                           HOST_TURN_PX, HOST_TURN_PY, LEAN_BASE, TUNABLES, beat, frames, rad)
+from rig.face import face, turn_animations
+from rig.ids import (
+    BLINK_ANIM, BLINK_REST_ANIM, BODY_NODE, BREATH_ANIM, CONV_BODY_ROT, CONV_BODY_X, CONV_LEAN,
+    CONV_LOOK, CONV_MOUTH, CONV_SCALE, CONV_TURN_ROT, CONV_TURN_X, CONV_TURN_Y, ENTITY, ENUM_SHAPE,
+    ENUM_STATE, FACE, GLOSS, HOVER_ANIM, HOVER_HELD_ANIM, HOVER_REST_ANIM, JOYSTICK, LEAN_NODE,
+    PLATE_BLINK, ROOT, SHAPES, SM, SUSTAINED, TURN_X_ANIM, TURN_Y_ANIM, VM_INSTANCE, VM_TUNE_SCALE,
+    VM_TURN_X, VM_TURN_Y, shape_enum_ids, state_enum_ids,
+)
+from rig.layers import set_animation_index
+from rig.machine import root_machine
+from rig.seams import animation_index
+from rig.motion import (enter_animations, idle_variety_animations, momentary_animations,
+                        shape_animations, sustained_animations, wander_animations)
+from rig.plate import plate_component
+
+
+# Solo mode (onion.py --animation): a throwaway extra state machine that plays one named
+# LinearAnimation outright, so an animation that normally sits behind a random wait can be
+# screenshotted. `Avatar` stays in the file untouched; only defaultStateMachineId changes, and
+# only when solo is asked for - the default output must stay byte-identical. The three ids are
+# registered in rig/ids.py's _EXTERNAL so the allocator never hands them out.
+SOLO_SM, SOLO_LAYER, SOLO_STATE = "3:900", "3:901", "3:902"
+
+
+def _animation_id(document, name):
+    m = re.search(r'<LinearAnimation[^>]*\bname="%s" id="([^"]+)"' % re.escape(name), document)
+    if not m:
+        raise SystemExit(f"no animation named {name!r} in the generated document")
+    return m.group(1)
+
+
+def _solo_machine(anim_id):
+    layer = layer_frame("Solo", SOLO_LAYER, SOLO_STATE, "", anim_state(anim_id, SOLO_STATE, 0))
+    return f'<StateMachine name="Solo" id="{SOLO_SM}">\n{indent(layer, "    ")}\n</StateMachine>'
+
+
+def root_artboard(solo=None):
+    """The Mascot artboard: the node tree, every root animation, and the `Avatar` state machine."""
     breath = animation("Breath", BREATH_ANIM, frames(4600), {GLOSS: {GRADIENT_OPACITY: sine(0.05, 4600, 1.0)}}, "loop")
     blink_rest = animation("BlinkRest", BLINK_REST_ANIM, 1, {})
     blink = animation("BlinkFire", BLINK_ANIM, 2, {}, callbacks=(PLATE_BLINK,))
     hover_rest = animation("HoverRest", HOVER_REST_ANIM, 1, {})
+    # The perk takes 200 ms to arrive instead of 160 and its two rolls leave on BACK_SOFT and settle
+    # on ELASTIC_HEAVY: BACK_OUT put a fifth of the whole roll into the second frame, which is what
+    # the product owner was reading as too lively (letta-mobile-q55am). The lift and the inflate are
+    # a translation and a scale and keep their own tokens; they are re-timed only to stay in step.
     d = beat(520)
     hover = animation("HoverPerk", HOVER_ANIM, d, dict(
-        squash(INFLATE_NODE, [(0, 1, BACK_OUT), (beat(160), 0.92, None), (beat(300), 0.92, ELASTIC_SOFT), (d, 0.97)]),
-        **{FACE: {Y: [(0, 0, BACK_OUT), (beat(160), -9, None), (beat(300), -9, ELASTIC_SOFT), (d, -5)],
-                  ROT: [(0, 0, BACK_OUT), (beat(160), rad(-3), None), (beat(300), rad(-3), ELASTIC_SOFT), (d, rad(-2))]},
-           BODY_NODE: {ROT: [(0, 0, BACK_OUT), (beat(160), rad(-4), None), (beat(300), rad(-4), ELASTIC_SOFT), (d, rad(-2))]}}))
+        squash(INFLATE_NODE, [(0, 1, BACK_OUT), (beat(200), 0.92, None), (beat(320), 0.92, ELASTIC_SOFT), (d, 0.97)]),
+        **{FACE: {Y: [(0, 0, BACK_OUT), (beat(200), -9, None), (beat(320), -9, ELASTIC_SOFT), (d, -5)],
+                  ROT: [(0, 0, BACK_SOFT), (beat(200), rad(-3), None), (beat(320), rad(-3), ELASTIC_HEAVY), (d, rad(-2))]},
+           BODY_NODE: {ROT: [(0, 0, BACK_SOFT), (beat(200), rad(-4), None), (beat(320), rad(-4), ELASTIC_HEAVY), (d, rad(-2))]}}))
     # Held while hovered: the perk's end pose, breathing a little faster in the face lift.
     hover_held = animation("HoverHeld", HOVER_HELD_ANIM, beat(2400), dict(
         squash(INFLATE_NODE, [(0, 0.97, SINE), (beat(1200), 0.95, SINE), (beat(2400), 0.97)]),
@@ -1079,7 +101,11 @@ def root_artboard():
            BODY_NODE: {ROT: [(0, rad(-2))]}}), "loop")
     anims = (shape_animations() + sustained_animations() + enter_animations() + momentary_animations() + idle_variety_animations()
              + turn_animations() + wander_animations() + [breath, blink_rest, blink, hover_rest, hover, hover_held])
-    return f'''<Artboard defaultStateMachineId="{SM}" viewModelId="{VM}" viewModelInstanceId="{VM_INSTANCE}"
+    # The blend policy (MOTION-PIPELINE step A): every animation this artboard plays, indexed by
+    # its keyed ends, so root_machine()'s layers can refuse a 0 ms transition that tears a value.
+    # The animations exist before the machine does, so the index is simply the XML just built.
+    set_animation_index(animation_index("\n".join(anims)))
+    board = f'''<Artboard defaultStateMachineId="{SM}" viewModelId="{VM}" viewModelInstanceId="{VM_INSTANCE}"
           x="0" y="0" styleId="0:3" clip="false" width="500" height="500" name="Mascot" id="{ROOT}">
     <LayoutComponentStyle name="Style" id="0:3"/>
     <!-- Facing: one 2-D value scrubbing TurnX/TurnY; keyed by state entries, Wander and flashes. -->
@@ -1100,9 +126,15 @@ def root_artboard():
 
 {indent(root_machine(), "    ")}
 </Artboard>'''
+    if not solo:
+        return board
+    machine = indent(_solo_machine(_animation_id(board, solo)), "    ")
+    return board.replace(f'defaultStateMachineId="{SM}"', f'defaultStateMachineId="{SOLO_SM}"', 1) \
+                .replace("\n</Artboard>", f"\n\n{machine}\n</Artboard>")
 
 
 def data():
+    """The document's data section: the two enums, the converters and the Avatar view model."""
     states = "\n".join(f'    <DataEnumValue key="{s}" value="{s[0].upper() + s[1:]}" id="{state_enum_ids[s]}"/>' for s in SUSTAINED)
     shapes = "\n".join(f'    <DataEnumValue key="{s}" value="{s[0].upper() + s[1:]}" id="{shape_enum_ids[s]}"/>' for s in SHAPES)
     return f'''<DataEnumCustom name="AvatarState" id="{ENUM_STATE}">
@@ -1143,13 +175,13 @@ def data():
     <ViewModelPropertyTrigger name="success" id="{VM_SUCCESS}"/>
     <ViewModelPropertyTrigger name="error" id="{VM_ERROR}"/>
     <ViewModelPropertyBoolean name="dragged" id="{VM_DRAGGED}"/>
-{indent(chr(10).join(f'<ViewModelPropertyNumber name="{n}" id="{t[0]}"/>' for n, t in TUNABLES.items()), "    ")}
+{indent(chr(10).join(f'<ViewModelPropertyNumber name="{n}" id="{t.vm_id}"/>' for n, t in TUNABLES.items()), "    ")}
     <ViewModelPropertyNumber name="tuneScale" id="{VM_TUNE_SCALE}"/>
     <ViewModelPropertyNumber name="turnX" id="{VM_TURN_X}"/>
     <ViewModelPropertyNumber name="turnY" id="{VM_TURN_Y}"/>
 
     <ViewModelInstance exports="true" name="Default" id="{VM_INSTANCE}">
-{indent(chr(10).join(f'<ViewModelInstanceNumber propertyValue="0.5" viewModelPropertyId="{t[0]}"/>' for t in TUNABLES.values()), "        ")}
+{indent(chr(10).join(f'<ViewModelInstanceNumber propertyValue="0.5" viewModelPropertyId="{t.vm_id}"/>' for t in TUNABLES.values()), "        ")}
         <ViewModelInstanceNumber propertyValue="0.5" viewModelPropertyId="{VM_TUNE_SCALE}"/>
         <ViewModelInstanceNumber propertyValue="0" viewModelPropertyId="{VM_TURN_X}"/>
         <ViewModelInstanceNumber propertyValue="0" viewModelPropertyId="{VM_TURN_Y}"/>
@@ -1168,7 +200,8 @@ def data():
 </ViewModel>'''
 
 
-def scene_document():
+def scene_document(solo=None):
+    """The whole scene.rml document: the root artboard, the Plate component and the data section."""
     return f'''<Rive version="1" kind="fragment">
     <!--
         The Letta agent mascot, v4: SPEC.md + art/*.svg through gen_scene.py. Regenerate rather
@@ -1185,7 +218,7 @@ def scene_document():
           color     - identity; body, soft edge and halo are bound to it
           shape     - identity; picks one of eight bodies on the Shape layer
     -->
-{indent(root_artboard(), "    ")}
+{indent(root_artboard(solo), "    ")}
 
 {indent(plate_component(), "    ")}
 
@@ -1194,8 +227,31 @@ def scene_document():
 '''
 
 if __name__ == "__main__":
-    doc = scene_document()
-    out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scene.rml")
+    import sys
+    # `python gen_scene.py [out.rml] [--solo <AnimationName>] [--probe]` - an explicit path lets a
+    # check regenerate without touching scene.rml; --solo is onion.py's single-animation document
+    # and --probe is probe.py's telemetry document. Both post-process the built document string
+    # into a throwaway variant, so the default output stays byte-identical and neither debug
+    # surface can ever reach scene.rml or a push.
+    argv, solo = sys.argv[1:], None
+    if "--solo" in argv:
+        i = argv.index("--solo")
+        if i + 1 >= len(argv):
+            raise SystemExit("--solo needs an animation name")
+        solo = argv[i + 1]
+        del argv[i:i + 2]
+    probe = "--probe" in argv
+    if probe:
+        argv.remove("--probe")
+    if (solo or probe) and not argv:
+        # A debug variant must never fall back onto the shipping document.
+        raise SystemExit("--solo and --probe write a throwaway document: pass its output path "
+                         "(python gen_scene.py <out.rml> --probe)")
+    doc = scene_document(solo)
+    if probe:
+        from rig.probe import inject
+        doc = inject(doc)
+    out = argv[0] if argv else os.path.join(os.path.dirname(os.path.abspath(__file__)), "scene.rml")
     with open(out, "w", encoding="utf-8", newline="\n") as f:
         f.write(doc)
     print(f"wrote {out} ({doc.count(chr(10))} lines)")
