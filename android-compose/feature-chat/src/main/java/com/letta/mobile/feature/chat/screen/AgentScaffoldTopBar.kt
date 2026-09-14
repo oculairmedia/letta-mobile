@@ -33,7 +33,7 @@ import com.letta.mobile.ui.components.LettaSearchBar
 import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
-import com.letta.mobile.ui.mascot.MascotAvatar
+import com.letta.mobile.ui.mascot.AgentAvatar
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -150,15 +150,13 @@ private fun AgentScaffoldAgentTopBarTitle(params: AgentScaffoldAgentTopBarTitleP
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        // The agent's mascot as a chip before its name; nothing when it has none (letta-mobile-8jtf3).
-        // A still: the live one is the composer companion, and two of them moving is confusing.
-        MascotAvatar(
+        // The agent's avatar as a chip before its name (letta-mobile-8jtf3). A still: the live one
+        // is the composer companion, and two of them moving is confusing.
+        AgentAvatar(
             agentId = params.agentId,
+            name = params.agentName.ifBlank { params.screenTitle },
             size = TopBarMascotSize,
-            cornerRadius = TopBarMascotSize / 2,
             modifier = Modifier.padding(end = 4.dp),
-            live = false,
-            fallback = {},
         )
         Text(
             text = params.agentName.ifBlank { params.screenTitle },
