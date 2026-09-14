@@ -44,6 +44,7 @@ _EXTERNAL = {
     "0:3", "0:233", "0:234",                                                    # gen_scene / body
     "3:1", "3:2", "3:3", "3:4", "3:6", "3:7", "3:8", "3:9", "3:10",             # machine.py layers
     "7:3", "7:10", "7:11", "7:12", "7:13",                                      # plate.py
+    "3:900", "3:901", "3:902",                                  # gen_scene.py SOLO_SM / _LAYER / _STATE
 }
 
 # New ids start above everything already taken in the space: 0 runs to 0:327 (the vertex blocks),
@@ -68,14 +69,15 @@ def _defined(namespace):
     """id -> the constant that defines it. Every id in this module is defined exactly once:
     tables that merely *reference* an id (TUNABLES, IDLE_WAITS, ...) stay in constants.py."""
     owner = {}
-    for name, value in namespace.items():
-        if name.startswith("_"):
-            continue
-        for i in _walk(value):
-            if i in owner and owner[i] != name:
-                raise AssertionError(f"id collision: {i} is used by both {owner[i]} and {name}")
-            owner[i] = name
+    for name, i in _public_ids(namespace):
+        if owner.setdefault(i, name) != name:
+            raise AssertionError(f"id collision: {i} is used by both {owner[i]} and {name}")
     return owner
+
+
+def _public_ids(namespace):
+    """(constant name, id) for every id inside every public constant of `namespace`."""
+    return [(name, i) for name, value in namespace.items() if not name.startswith("_") for i in _walk(value)]
 
 
 def _check_unique():

@@ -75,24 +75,39 @@ class TestGenerator(unittest.TestCase):
         self.fail("\n".join(detail))
 
 
+def duplicate_ids(root):
+    """{id: [every element carrying it]} for the ids that appear more than once."""
+    where = {}
+    for el in root.iter():
+        if el.get("id") is not None:
+            where.setdefault(el.get("id"), []).append(f"{el.tag} {el.get('name') or ''}".strip())
+    return {i: places for i, places in where.items() if len(places) > 1}
+
+
+def describe_duplicates(duplicates):
+    return "duplicate ids: " + "; ".join(f"{i} on {' / '.join(w)}" for i, w in sorted(duplicates.items()))
+
+
 class TestIds(unittest.TestCase):
-    def test_every_id_is_unique(self):
+    def test_every_id_in_the_committed_scene_is_unique(self):
+        # The committed file, not a regeneration: `rive push` writes its own 0:n ids into it, and
+        # the parity test strips those, so a duplicate push-assigned id is only visible here.
+        duplicates = duplicate_ids(scene_tree().getroot())
+        self.assertFalse(duplicates, describe_duplicates(duplicates))
+
+    def test_every_generated_id_is_unique(self):
         with tempfile.TemporaryDirectory() as tmp:
             out = os.path.join(tmp, "scene.rml")
             proc = run([sys.executable, "gen_scene.py", out])
             self.assertEqual(proc.returncode, 0, f"gen_scene.py failed:\n{proc.stderr}")
-            root = ET.parse(out).getroot()
-        seen, duplicates = {}, {}
-        for el in root.iter():
-            i = el.get("id")
-            if i is None:
-                continue
-            if i in seen:
-                duplicates.setdefault(i, [seen[i]]).append(f"{el.tag} {el.get('name') or ''}".strip())
-            else:
-                seen[i] = f"{el.tag} {el.get('name') or ''}".strip()
-        self.assertFalse(duplicates, "duplicate ids: " + "; ".join(
-            f"{i} on {' / '.join(where)}" for i, where in sorted(duplicates.items())))
+            duplicates = duplicate_ids(ET.parse(out).getroot())
+        self.assertFalse(duplicates, describe_duplicates(duplicates))
+
+    def test_debug_variants_need_an_explicit_output(self):
+        for flags in (["--probe"], ["--solo", "IdleBounce"]):
+            proc = run([sys.executable, "gen_scene.py"] + flags)
+            self.assertNotEqual(proc.returncode, 0, f"gen_scene.py {flags} fell back to scene.rml")
+            self.assertIn("output path", proc.stderr)
 
     def test_ids_are_client_object_pairs(self):
         bad = [el.get("id") for el in scene_tree().getroot().iter()

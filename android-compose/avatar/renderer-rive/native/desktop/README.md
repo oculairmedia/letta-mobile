@@ -65,7 +65,7 @@ Nothing beyond VS 2022 C++ tools, the Windows SDK, Git for Windows and Python 3 
 
    ```bash
    # MOTION-PIPELINE section 6, tier 2: a probed build in the bench, one signature on startup
-   python gen_scene.py C:/tmp/probe/scene.rml --probe   # then rive C:/tmp/probe --once
+   python avatar/renderer-rive/rive/mascot/gen_scene.py C:/tmp/probe/scene.rml --probe   # then rive C:/tmp/probe --once
    ./gradlew --no-daemon :desktop:runRiveSpike -PriveBridge=C:/rive-spike/bridge/rive_desktop_bridge.dll \
      -PriveFile=C:/tmp/probe/build/mascot.riv -PriveOnion=true -PriveRecord=enter-thinking
    ```

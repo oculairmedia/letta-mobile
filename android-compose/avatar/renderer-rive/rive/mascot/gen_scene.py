@@ -61,7 +61,8 @@ from rig.plate import plate_component
 # Solo mode (onion.py --animation): a throwaway extra state machine that plays one named
 # LinearAnimation outright, so an animation that normally sits behind a random wait can be
 # screenshotted. `Avatar` stays in the file untouched; only defaultStateMachineId changes, and
-# only when solo is asked for - the default output must stay byte-identical.
+# only when solo is asked for - the default output must stay byte-identical. The three ids are
+# registered in rig/ids.py's _EXTERNAL so the allocator never hands them out.
 SOLO_SM, SOLO_LAYER, SOLO_STATE = "3:900", "3:901", "3:902"
 
 
@@ -235,11 +236,17 @@ if __name__ == "__main__":
     argv, solo = sys.argv[1:], None
     if "--solo" in argv:
         i = argv.index("--solo")
+        if i + 1 >= len(argv):
+            raise SystemExit("--solo needs an animation name")
         solo = argv[i + 1]
         del argv[i:i + 2]
     probe = "--probe" in argv
     if probe:
         argv.remove("--probe")
+    if (solo or probe) and not argv:
+        # A debug variant must never fall back onto the shipping document.
+        raise SystemExit("--solo and --probe write a throwaway document: pass its output path "
+                         "(python gen_scene.py <out.rml> --probe)")
     doc = scene_document(solo)
     if probe:
         from rig.probe import inject
