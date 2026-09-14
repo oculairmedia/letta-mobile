@@ -10,6 +10,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.feature.chat.subagent.ActiveSubagent
 import com.letta.mobile.feature.chat.subagent.ActiveSubagentSource
 import com.letta.mobile.feature.chat.subagent.SelfTodoSource
+import com.letta.mobile.feature.chat.subagent.isHiddenReflection
 import com.letta.mobile.feature.chat.subagent.withLingeringTerminals
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
@@ -30,8 +31,17 @@ internal fun rememberChatScreenSubagentBarState(
     val subagentSnapshot by resolvedSubagentSource.activeSubagents
         .collectAsStateWithLifecycle(initialValue = persistentListOf())
     var lingerTick by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    // letta-mobile-l3j5l: the tick loop must only keep ticking while there is
+    // something actually rendered by the bar. Hidden reflections are filtered
+    // before they reach the bar (ActiveSubagentRings / ActiveSubagentBar both
+    // apply `isHiddenReflection()`), so a source that retains only a
+    // completed reflection must NOT keep `lingerTick` updating — the parent
+    // UI would otherwise tick forever and the bar's source-derived layouts
+    // would keep recomposing.
     LaunchedEffect(subagentSnapshot) {
-        while (subagentSnapshot.any { it.isTerminal || it.isActive }) {
+        while (subagentSnapshot.any {
+                !it.isHiddenReflection() && (it.isTerminal || it.isActive)
+            }) {
             lingerTick = System.currentTimeMillis()
             kotlinx.coroutines.delay(1_000.milliseconds)
         }

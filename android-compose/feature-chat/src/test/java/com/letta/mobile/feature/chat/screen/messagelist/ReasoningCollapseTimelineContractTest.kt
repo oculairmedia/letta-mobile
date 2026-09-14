@@ -276,12 +276,20 @@ class ReasoningCollapseTimelineContractTest {
     }
 
     @Test
-    fun `lazy column call site disables the floor for reasoning render items`() {
+    fun `lazy column call site disables the floor for reflowing rows`() {
         val source = lazyColumnSource()
+        // Reasoning rows always animate their own size, so the cached minimum
+        // would pin an intermediate expanded height and prevent a collapse from
+        // finishing. Markdown/text rows also reflow after measurement (and at
+        // a different zoom the cached height describes a size the row is no
+        // longer drawn at), so the call site disables the floor for them too.
+        // The gate inside MeasuredChatRenderItem still records measurements and
+        // applies the floor for rows where it is safe (gated on !isPinching).
         assertTrue(
-            "ChatMessageListRenderItem must pass applyCachedMinHeight = " +
-                "!renderItem.includesReasoningRow() to MeasuredChatRenderItem",
-            source.contains("applyCachedMinHeight = !renderItem.includesReasoningRow()"),
+            "ChatMessageListRenderItem must pass applyCachedMinHeight = false to " +
+                "MeasuredChatRenderItem so reasoning AND reflowing text rows can " +
+                "shrink past any cached outer minimum",
+            source.contains("applyCachedMinHeight = false"),
         )
     }
 
