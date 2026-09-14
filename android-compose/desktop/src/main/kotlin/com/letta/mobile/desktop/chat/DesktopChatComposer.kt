@@ -40,12 +40,13 @@ internal data class ComposerBarActions(
 internal fun ComposerBar(
     state: ComposerBarState,
     actions: ComposerBarActions,
+    modifier: Modifier = Modifier,
 ) {
     val canSend = state.enabled &&
         (state.text.isNotBlank() || state.pendingImageAttachments.isNotEmpty())
     val autocomplete = composerAutocompleteUi(state)
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(start = 28.dp, top = 4.dp, end = 28.dp, bottom = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,

@@ -199,6 +199,9 @@ private fun ChatDetailBody(
                 onChangeDirectory = actions.onChangeWorkingDirectory,
             )
         }
+        val companionAgentId = surface.selectedConversation?.agentId
+        val companionIdentity = companionAgentId?.let { state.agentIdentitiesById[it] }
+        val companion = companionIdentity != null && com.letta.mobile.ui.mascot.mascotAvailable(companionAgentId)
         if (state.canonicalPresentation != null) {
             DesktopCanonicalMessageList(state.canonicalPresentation, Modifier.weight(1f))
         } else if (state.canonicalStatus != null) {
@@ -225,13 +228,26 @@ private fun ChatDetailBody(
                     renderItems = surface.renderItems,
                     isSending = state.isThinking,
                     isStreamingReply = state.isStreamingReply,
-                    thinkingAgentId = surface.selectedConversation?.agentId,
+                    showThinkingRow = !companion,
                 ),
                 modifier = Modifier.weight(1f),
             )
         }
-        ComposerBar(
-            state = ComposerBarState(
+        Row(verticalAlignment = Alignment.Bottom) {
+            // The agent keeps the user company at the prompt: its live mascot, persistent across
+            // the whole conversation, thinking/listening/speaking right where the user types.
+            if (companion && companionAgentId != null && companionIdentity != null) {
+                Box(Modifier.padding(start = 16.dp, bottom = 12.dp)) {
+                    com.letta.mobile.ui.mascot.MascotLive(
+                        agentId = companionAgentId,
+                        identity = companionIdentity,
+                        size = ComposerCompanionSize,
+                    )
+                }
+            }
+            ComposerBar(
+                modifier = Modifier.weight(1f),
+                state = ComposerBarState(
                 text = surface.composerText,
                 pendingImageAttachments = surface.pendingImageAttachments,
                 enabled = surface.canSend,
@@ -251,8 +267,12 @@ private fun ChatDetailBody(
                 onRemoveImageAttachment = actions.onRemoveImageAttachment,
             ),
         )
+        }
     }
 }
+
+/** The composer companion's live size; the body spans ~60 % of it. */
+private val ComposerCompanionSize = 96.dp
 
 /**
  * letta-mobile folder-settings #2: compact row showing the SELECTED
