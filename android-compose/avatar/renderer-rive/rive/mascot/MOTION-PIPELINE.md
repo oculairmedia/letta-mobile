@@ -171,3 +171,43 @@ A and B can run in parallel; C after A; D after B and C; E last; F as its own PR
   through `--solo`, sequences through explicit state drivers.
 - The bead for the success hop is the first F item; its fix may change how one-shots on shared
   nodes are layered (a per-node "owner layer" rule the seam ledger can enforce).
+
+## 6. The same tools inside the harness itself
+
+The CLI path above is the agent's loop. The same instruments also belong in the live harness, in
+two tiers that share the probe list, so a human at the bench and an agent at the CLI look at the
+same numbers.
+
+### Tier 1: a Harness artboard in the file (`gen_scene.py --harness`)
+
+A second artboard, `Harness`, generated only on request (never in the shipped `.riv`): it nests
+the Mascot artboard at the left, exposes the probe view model (the two-way binds from section 0),
+and carries a Luau node script (`harness.luau`, a `ScriptAsset`) that every frame:
+
+- reads the probed nodes through `NodeReadData` (position, rotation, scale, world transform) and
+  the probe numbers through the view model;
+- keeps a ring buffer per property and draws it as a sparkline path with the `path` / `paint`
+  API, plus the timing-chart ticks (spacing of the last N frames along a line) and a trailing
+  path of action (the Face's world position over the last second, the classic arc check);
+- writes text readouts (state, frame, per-property value and per-frame delta) into bound text runs.
+
+That makes `rive . --artboard=Harness --screenshot=... --data=state=listening --advance=N` a
+single image that already contains the mascot, its curves, its chart and its numbers: one
+screenshot per question instead of eight, and a human opening the same file in any player sees the
+instrument panel live. Scripts run in the CLI, the editor and the runtimes alike, so the harness is
+portable. The seam ledger's cut list can be baked in as a bound string so the panel names the
+seam it is crossing when a level tears.
+
+### Tier 2: the desktop bench (`RiveDesktopSpike`)
+
+The bench already holds every rendered frame as a bitmap, so a live onion skin is the last N
+frames composited with the same ramp `onion.py` uses: a toggle, not a tool run. Two small bridge
+additions make the rest possible: load by artboard name (today the bridge takes the default
+artboard) so the bench can show `Harness`, and `rive_bridge_vm_get_number(name)` so the bench reads
+the probe numbers each frame and draws the X-sheet strip and sparklines in Compose beside the
+character. A scenario runner (the same `scenarios.py` list) plays a sequence and records a
+signature on the spot, which `probe.py` can diff against the goldens. The bench is where the
+sweatbox happens; this gives the sweatbox the charts.
+
+Order: Tier 1 after step C (it consumes the probe list), Tier 2 in parallel with D.
+
