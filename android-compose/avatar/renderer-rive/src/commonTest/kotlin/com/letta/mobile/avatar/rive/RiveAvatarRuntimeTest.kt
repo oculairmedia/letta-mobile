@@ -156,6 +156,13 @@ class RiveAvatarRuntimeTest {
     }
 
     @Test
+    fun headTurnContractNamesMatchCheckContractRegex() {
+        // check_contract.py greps `const val (?:INPUT|TRIGGER)_\w+: String = "(\w+)"`.
+        assertEquals("turnX", RiveAvatarContract.INPUT_TURN_X)
+        assertEquals("turnY", RiveAvatarContract.INPUT_TURN_Y)
+    }
+
+    @Test
     fun setHeadTurnWritesTheFacingJoystick() = runTest {
         val sink = RecordingSink()
         val runtime = RiveAvatarRuntime(sink).also { it.load(model()) }

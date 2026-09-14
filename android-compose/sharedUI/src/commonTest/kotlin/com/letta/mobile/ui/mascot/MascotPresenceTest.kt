@@ -67,6 +67,14 @@ class MascotPresenceTest {
     }
 
     @Test
+    fun registryGazeRectsStartUnavailable() {
+        val registry = MascotIdentityRegistry()
+        assertEquals(null, registry.cursor.value)
+        assertEquals(null, registry.inputBounds.value)
+        assertEquals(null, registry.timelineBounds.value)
+    }
+
+    @Test
     fun entryTicksGazeDirectorWhenThePointerIsAbsent() {
         val entry = object : MascotEntry(HeadlessAvatarRuntime(), MascotIdentity(MascotShape.entries.first(), 0xFF00AA88.toInt()), applyState = {}) {
             override suspend fun load() = Unit

@@ -95,9 +95,10 @@ fun MascotAvatar(
 /**
  * The live mascot for one agent at [size], from the process-wide entry so it never restarts
  * when the view changes. Feeds the entry's director the agent's presence and the frame clock,
- * and feeds [com.letta.mobile.avatar.core.GazeDirector] the pointer plus surface bounds so
- * justified attention (not only cursor tracking) runs on every host. Callers that need a
- * fallback check [mascotAvailable] first (or use [MascotAvatar]).
+ * and feeds [com.letta.mobile.avatar.core.GazeDirector] the pointer, this tile, and any
+ * composer / timeline rects the host published on [MascotIdentityRegistry] so justified
+ * attention (not only cursor tracking) runs on every host. Callers that need a fallback
+ * check [mascotAvailable] first (or use [MascotAvatar]).
  */
 @Composable
 fun MascotLive(
@@ -116,23 +117,25 @@ fun MascotLive(
     LaunchedEffect(entry) {
         while (true) withFrameNanos { entry.tickTo(it) }
     }
-    // Gaze: this surface's window bounds vs the pointer (captured once at the window root).
-    // A null pointer still runs the justified plan so the eyes are never dead.
+    // Gaze: this tile vs the pointer plus optional composer / timeline rects
+    // from the registry. Null input/timeline skip those plan rows; OWN/USER
+    // (and CURSOR when the pointer is present) still run so the eyes are never dead.
     var bounds by remember { mutableStateOf(Rect.Zero) }
     val cursor = registry.cursor.value
+    val inputBounds = registry.inputBounds.value
+    val timelineBounds = registry.timelineBounds.value
     val minReachPx = with(LocalDensity.current) { GAZE_MIN_REACH.toPx() }
-    LaunchedEffect(entry, cursor, bounds, minReachPx) {
-        val pointer = if (cursor != null && !bounds.isEmpty) {
-            GazeMath.pointerToGaze(
-                cursor.x,
-                cursor.y,
-                GazeRect(bounds.left, bounds.top, bounds.right, bounds.bottom),
-                minReachPx,
-            )
-        } else {
-            null
-        }
-        entry.setGazeWorld(GazeWorld(pointer = pointer))
+    LaunchedEffect(entry, cursor, bounds, minReachPx, inputBounds, timelineBounds) {
+        entry.setGazeWorld(
+            GazeWorld.fromWindow(
+                mascot = GazeRect(bounds.left, bounds.top, bounds.right, bounds.bottom),
+                minReachPx = minReachPx,
+                pointerX = cursor?.x,
+                pointerY = cursor?.y,
+                inputBounds = inputBounds,
+                timelineBounds = timelineBounds,
+            ),
+        )
     }
     // requiredSize: an overscaled mascot must exceed its tile so the tile's clip crops it;
     // plain size() is coerced down to the parent's constraints and never overscales.

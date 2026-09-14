@@ -61,6 +61,8 @@ import com.letta.mobile.data.composer.MentionCatalog
 import com.letta.mobile.data.composer.MentionKind
 import com.letta.mobile.data.composer.Mentionable
 import com.letta.mobile.desktop.DesktopTooltip
+import com.letta.mobile.ui.mascot.MascotGazeSurface
+import com.letta.mobile.ui.mascot.mascotGazeTarget
 import com.letta.mobile.ui.theme.customColors
 
 internal data class ComposerAutocompleteUi(
@@ -263,6 +265,7 @@ private fun ComposerTextField(params: ComposerInputSurfaceParams) {
             .fillMaxWidth()
             .heightIn(min = 24.dp, max = 120.dp)
             .testTag("composer-input")
+            .mascotGazeTarget(MascotGazeSurface.INPUT)
             .onPreviewKeyEvent { event ->
                 composerEnterKeyHandled(
                     ComposerEnterKeyParams(

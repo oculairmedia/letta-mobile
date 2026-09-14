@@ -19,8 +19,8 @@ enum class GazeDriveMode {
 /**
  * World the director can look at this frame. Pointer / input / timeline are
  * already in gaze units (-1..1). A null optional point makes that target
- * unavailable in the plan (the spike always had fake rects; product hosts
- * supply them later).
+ * unavailable in the plan. Hosts that have window-space rects should build
+ * this with [fromWindow]; OWN / USER still run when input / timeline are null.
  */
 data class GazeWorld(
     val pointer: GazePoint? = null,
@@ -32,7 +32,39 @@ data class GazeWorld(
      * position changes with the same 500 ms window.
      */
     val pointerMovedRecently: Boolean? = null,
-)
+) {
+    companion object {
+        /**
+         * Product host API: [mascot] is the tile in window space; [inputBounds]
+         * / [timelineBounds] are the composer field and message list (nullable
+         * stubs until a host publishes them). Centres go through
+         * [GazeMath.rectCenterToGaze].
+         */
+        fun fromWindow(
+            mascot: GazeRect,
+            minReachPx: Float,
+            pointerX: Float? = null,
+            pointerY: Float? = null,
+            inputBounds: GazeRect? = null,
+            timelineBounds: GazeRect? = null,
+            mode: GazeDriveMode = GazeDriveMode.JUSTIFIED,
+            pointerMovedRecently: Boolean? = null,
+        ): GazeWorld {
+            val pointer = if (pointerX != null && pointerY != null && !mascot.isEmpty) {
+                GazeMath.pointerToGaze(pointerX, pointerY, mascot, minReachPx)
+            } else {
+                null
+            }
+            return GazeWorld(
+                pointer = pointer,
+                input = GazeMath.rectCenterToGaze(inputBounds, mascot, minReachPx),
+                timeline = GazeMath.rectCenterToGaze(timelineBounds, mascot, minReachPx),
+                mode = mode,
+                pointerMovedRecently = pointerMovedRecently,
+            )
+        }
+    }
+}
 
 /** Eyes, head, and a one-tick blink pulse. Look is also packaged as a screen target. */
 data class GazePose(
@@ -441,6 +473,10 @@ class GazeDirector(
         headX += headVx * dt
         headVy += ((headTargetY - headY) * omega * omega - 2f * zeta * omega * headVy) * dt
         headY += headVy * dt
+        // TODO(letta-mobile-kkjyd): SPEC §10.4 combined gaze containment — do not
+        // clamp look+saccade to the card here. Unattenuated H+N can put the
+        // failed X ~2.54 artboard px outside; λ attenuation is that bead (after
+        // 24gbf). coerceIn(-1, 1) is gaze-unit range only, not card clearance.
         return GazePose(
             lookX = eyeX.coerceIn(-1f, 1f),
             lookY = eyeY.coerceIn(-1f, 1f),

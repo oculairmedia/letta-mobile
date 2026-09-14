@@ -62,9 +62,10 @@ abstract class MascotEntry(
     }
 
     /**
-     * Cursor / surface bounds (already converted to gaze units by the surface). A null pointer
-     * still runs the justified plan so the eyes are never dead. Last writer wins when several
-     * surfaces of the same agent compose in one frame.
+     * Cursor / composer / timeline (already converted to gaze units; prefer
+     * [GazeWorld.fromWindow]). A null pointer or missing rect still runs the justified
+     * plan so the eyes are never dead. Last writer wins when several surfaces of the
+     * same agent compose in one frame.
      */
     fun setGazeWorld(world: GazeWorld) {
         gazeWorld = world

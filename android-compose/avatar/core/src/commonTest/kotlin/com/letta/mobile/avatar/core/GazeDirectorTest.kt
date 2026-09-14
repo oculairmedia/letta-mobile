@@ -176,6 +176,35 @@ class GazeDirectorTest {
         assertEquals(0f, center.y)
     }
 
+    @Test
+    fun fromWindowMapsHostRectsAndLeavesMissingOnesUnavailable() {
+        val mascot = GazeRect(0f, 0f, 80f, 80f)
+        val empty = GazeWorld.fromWindow(mascot = mascot, minReachPx = 360f)
+        assertEquals(null, empty.pointer)
+        assertEquals(null, empty.input)
+        assertEquals(null, empty.timeline)
+        assertEquals(null, GazeMath.rectCenterToGaze(null, mascot, 360f))
+        assertEquals(null, GazeMath.rectCenterToGaze(GazeRect(0f, 0f, 0f, 10f), mascot, 360f))
+
+        val with = GazeWorld.fromWindow(
+            mascot = mascot,
+            minReachPx = 360f,
+            pointerX = 200f,
+            pointerY = 40f,
+            inputBounds = GazeRect(0f, 400f, 200f, 440f),
+            timelineBounds = GazeRect(300f, 0f, 500f, 200f),
+        )
+        val pointer = with.pointer
+        val input = with.input
+        val timeline = with.timeline
+        assertTrue(pointer != null && pointer.x > 0f, "pointer right of tile: $pointer")
+        assertTrue(input != null && input.y > 0f, "input below tile: $input")
+        assertTrue(timeline != null && timeline.x > 0f, "timeline right of tile: $timeline")
+
+        val listening = firstPick().tick(0.016f, AvatarState.LISTENING, with)
+        assertEquals(GazeTarget.INPUT, listening.target)
+    }
+
     private class ZeroRandom : Random() {
         override fun nextBits(bitCount: Int): Int = 0
         override fun nextFloat(): Float = 0f

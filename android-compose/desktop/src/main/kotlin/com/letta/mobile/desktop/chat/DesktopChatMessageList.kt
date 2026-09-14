@@ -47,6 +47,8 @@ import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.runtime.ChatViewportFollowPolicy
 import com.letta.mobile.data.chat.runtime.ChatViewportSnapshot
 import com.letta.mobile.desktop.fadingEdges
+import com.letta.mobile.ui.mascot.MascotGazeSurface
+import com.letta.mobile.ui.mascot.mascotGazeTarget
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
@@ -340,7 +342,8 @@ private fun MessageListColumn(params: MessageListColumnParams) {
             state = listState,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 28.dp),
+                .padding(horizontal = 28.dp)
+                .mascotGazeTarget(MascotGazeSurface.TIMELINE),
             // Vertical breathing room as CONTENT padding, not a viewport inset, so
             // the scroll area itself runs to the top/bottom edges. Content then
             // clips exactly where the fade reaches full transparency — no faint

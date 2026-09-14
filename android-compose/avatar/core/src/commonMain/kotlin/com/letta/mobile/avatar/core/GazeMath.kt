@@ -49,6 +49,16 @@ object GazeMath {
         )
     }
 
+    /**
+     * Host input / timeline surfaces: map a window-space rect's centre through
+     * [pointerToGaze] against the mascot tile. Null or empty rects stay
+     * unavailable so the plan skips that row (OWN / USER / CURSOR still run).
+     */
+    fun rectCenterToGaze(target: GazeRect?, mascot: GazeRect, minReachPx: Float): GazePoint? {
+        if (target == null || target.isEmpty || mascot.isEmpty) return null
+        return pointerToGaze(target.centerX, target.centerY, mascot, minReachPx)
+    }
+
     /** Screen space is 0..1; the runtime maps it back to the contract's -1..1. */
     fun toScreen(point: GazePoint): AvatarLookTarget.Screen =
         AvatarLookTarget.Screen((point.x + 1f) / 2f, (point.y + 1f) / 2f)

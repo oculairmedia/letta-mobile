@@ -234,6 +234,9 @@ calls the same class):**
   code, not the older README 11 / 0.5) through `turnX`/`turnY`; a head turn > 0.4 fires `blink`
 - looking at you: saccade between eyes and nose every 100-500 ms; reading: uneven left-to-right
   steps, return sweep, three lines, the head sweeping slowly along the line; typing: ride the caret
+- hosts publish the composer and message-list window rects (`GazeWorld.fromWindow` /
+  `Modifier.mascotGazeTarget`); missing rects skip INPUT/TIMELINE. Combined look+saccade
+  card clamp is letta-mobile-kkjyd (SPEC §10.4), not this director.
 
 ## SPEC section 10 (Astra Max) as built - test rig, pending the user's review
 
