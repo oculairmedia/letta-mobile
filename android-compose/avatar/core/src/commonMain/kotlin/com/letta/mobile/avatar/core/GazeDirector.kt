@@ -32,6 +32,9 @@ class GazeDirector(
     }
 
     private var lastState: AvatarState? = null
+    /** Where an OWN / AWAY dwell parks the eyes (picked per dwell); a PEER dwell's chosen peer. */
+    private var asidePoint: GazePoint = GazePoint(0f, 0f)
+    private var peerIndex: Int = 0
     private var phase: PlanPhase = PlanPhase.PICK
     private var phaseRemaining: Float = 0f
     private var dwellLook: GazeLook? = null
@@ -129,9 +132,25 @@ class GazeDirector(
         dwellLook = look
         phase = PlanPhase.DWELL
         phaseRemaining = pickRange(look.dwellSeconds)
+        when (look.target) {
+            GazeTarget.AWAY -> asidePoint = pickAside(config.awayReach)
+            // Own thoughts mostly wander off-axis too; sometimes they rest at centre.
+            GazeTarget.OWN -> asidePoint =
+                if (random.nextFloat() < config.ownAsideChance) pickAside(config.ownReach) else GazePoint(0f, 0f)
+            GazeTarget.PEER -> peerIndex = if (world.peers.isEmpty()) 0 else random.nextInt(world.peers.size)
+            else -> Unit
+        }
+    }
+
+    /** A point off to one side: |x| in [reach], a little above or below the line of sight. */
+    private fun pickAside(reach: ClosedFloatingPointRange<Float>): GazePoint {
+        val side = if (random.nextFloat() < 0.5f) -1f else 1f
+        return GazePoint(side * pickRange(reach), pickRange(config.asideVertical))
     }
 
     private fun beginGap() {
+        // The gap keeps the last parked point when the dwell was already aside: eyes rest where they
+        // were, they do not snap to centre between every look.
         target = GazeTarget.OWN
         phase = PlanPhase.GAP
         phaseRemaining = dwellLook?.let { pickRange(it.gapSeconds) } ?: 0.5f
@@ -156,10 +175,11 @@ class GazeDirector(
     }
 
     private fun available(target: GazeTarget, world: GazeWorld): Boolean = when (target) {
-        GazeTarget.OWN, GazeTarget.USER -> true
+        GazeTarget.OWN, GazeTarget.USER, GazeTarget.AWAY -> true
         GazeTarget.CURSOR -> world.pointer != null
         GazeTarget.INPUT -> world.input != null
         GazeTarget.TIMELINE -> world.timeline != null
+        GazeTarget.PEER -> world.peers.isNotEmpty()
     }
 
     // --- pointer demand (spike `near`) ----------------------------------------
@@ -420,7 +440,9 @@ class GazeDirector(
             GazeTarget.CURSOR -> (pointer ?: GazePoint(0f, 0f)).coerce()
             GazeTarget.INPUT -> (world.input ?: GazePoint(0f, 0f)).coerce()
             GazeTarget.TIMELINE -> (world.timeline ?: GazePoint(0f, 0f)).coerce()
-            GazeTarget.USER, GazeTarget.OWN -> GazePoint(0f, 0f)
+            GazeTarget.PEER -> (world.peers.getOrNull(peerIndex) ?: asidePoint).coerce()
+            GazeTarget.OWN, GazeTarget.AWAY -> asidePoint.coerce()
+            GazeTarget.USER -> GazePoint(0f, 0f)
         }
     }
 

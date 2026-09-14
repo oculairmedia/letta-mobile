@@ -123,10 +123,10 @@ Root state machine `Avatar`, layers in order:
 | `Expression` | body/face motion, tint, gloss pulse, `expr`, facing | one `State<X>` loop per sustained state; **every change runs `Enter_<from>_<to>`** (90 one-shots, ids 3:250-3:339, nodes 3:350-3:439): plate blink at frame 0, `expr` flipped at frame 3 under the shut eye, facing eased to the target. The SPEC §3 pairs carry designed motion and cut into the target; generic ones hold and blend in over <=120 ms. No AnyState. |
 | `Breath` | gloss opacity | loop |
 | `Blink` | plate blink | contract trigger |
-| `Hover` | face wiggle | Rest -> Wiggle -> Held -> Rest on `hovered` (file listeners) |
+| `Hover` | perk-up: tall stretch, face lift, tilt of interest; attentive hold | Rest -> Perk -> Held -> Rest on `hovered` (file listeners); exit blends 220-260 ms |
 | `Flash` | success/error | triggers; success 800 ms hop + spin with trails, error 600 ms shake; self-returning |
 | `Drag` | `expr` dragged | boolean + dragStart/dragEnd listeners |
-| `IdleVariety` | face | random 4-7 s waits, a glance |
+| `IdleVariety` | face, body | random 8-14 s waits, then one beat by weight: glance 40, tilt 20, stretch 15, shiver 15, bounce 10 |
 | `Wander` | joystick | random 6-12 s waits, then glance 55 % / peek 35 % / spin 10 % |
 
 Facing per state (`sustained_facing()`): idle -0.15, listening 0 (square-on), thinking -0.6/-0.2,
@@ -225,6 +225,9 @@ in the plate hops to a new fixation on random waits with the Eyes Alive directio
 
 **Host (`GazeDirector` in `avatar/core`, ticked from `MascotEntry` / `MascotLive`; the bench
 calls the same class):**
+- straight ahead is the exception: own thoughts and the AWAY target park the eyes off-axis
+  (|x| 0.45-0.85, a little up) most of the time; PEER looks at another live mascot on screen
+  (the registry publishes every mascot tile; `GazeWorld.peers`); USER is the only centred look
 - every look has a nameable target: own thoughts, you, the cursor, the input (typing), the
   timeline (reading); a per-state plan with weights, dwell and gap (`GazePlan`, lifted from the
   bench `GAZE_PLAN`)

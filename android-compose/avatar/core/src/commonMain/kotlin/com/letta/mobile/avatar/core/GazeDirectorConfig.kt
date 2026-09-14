@@ -5,6 +5,14 @@ package com.letta.mobile.avatar.core
  * Defaults match `RiveDesktopSpike.kt` (omega 8.5 / zeta 0.72).
  */
 class GazeDirectorConfig {
+    /** AWAY: how far off-axis the eyes park (gaze units, |x|). */
+    var awayReach: ClosedFloatingPointRange<Float> = 0.45f..0.85f
+    /** OWN: a subtler aside when own thoughts drift off-centre. */
+    var ownReach: ClosedFloatingPointRange<Float> = 0.2f..0.45f
+    /** OWN: how often an own-thoughts dwell parks aside rather than at centre. */
+    var ownAsideChance: Float = 0.65f
+    /** Vertical spread of an aside point (screen y: negative is up, where thinking looks). */
+    var asideVertical: ClosedFloatingPointRange<Float> = -0.35f..0.2f
     var headLeadSeconds: Float = 0.350f
     var eyeTauSeconds: Float = 0.25f
     var scanTauSeconds: Float = 0.08f

@@ -20,14 +20,14 @@ class GazeDirectorTest {
     @Test
     fun planSelectionPicksTheFirstWeightedLookForEachState() {
         val cases = listOf(
-            AvatarState.IDLE to GazeTarget.OWN,
+            AvatarState.IDLE to GazeTarget.AWAY,
             AvatarState.LISTENING to GazeTarget.USER, // INPUT is skipped until the host supplies a rect
-            AvatarState.THINKING to GazeTarget.OWN,
+            AvatarState.THINKING to GazeTarget.AWAY,
             AvatarState.SPEAKING to GazeTarget.USER,
             AvatarState.WAITING_INPUT to GazeTarget.USER,
             AvatarState.DRAGGED to GazeTarget.OWN, // CURSOR remaps away with no pointer
             AvatarState.SUCCESS to GazeTarget.USER,
-            AvatarState.ERROR to GazeTarget.OWN,
+            AvatarState.ERROR to GazeTarget.AWAY,
             AvatarState.SLEEPING to GazeTarget.OWN,
             AvatarState.LOADING to GazeTarget.OWN,
         )
@@ -86,11 +86,12 @@ class GazeDirectorTest {
         }
         val cursor = GazePlan.forState(AvatarState.IDLE).first { it.target == GazeTarget.CURSOR }
         val user = GazePlan.forState(AvatarState.IDLE).first { it.target == GazeTarget.USER }
-        // Equal authored weights (25); after staring at the cursor the user look must win the score.
-        assertEquals(cursor.weight, user.weight)
+        // Per authored weight, the stared-at cursor must score below the fresh user look.
+        val cursorPerWeight = g.score(cursor) / cursor.weight
+        val userPerWeight = g.score(user) / user.weight
         assertTrue(
-            g.score(user) > g.score(cursor),
-            "user ${g.score(user)} should outrank habituated cursor ${g.score(cursor)}",
+            userPerWeight > cursorPerWeight,
+            "user $userPerWeight should outrank habituated cursor $cursorPerWeight per weight",
         )
     }
 
@@ -120,7 +121,7 @@ class GazeDirectorTest {
             targets += last.target
             if (abs(last.lookX) > 0.01f || abs(last.lookY) > 0.01f) sawOffCentre = true
         }
-        assertTrue(GazeTarget.OWN in targets, "own-thought looks: $targets")
+        assertTrue(GazeTarget.OWN in targets || GazeTarget.AWAY in targets, "own-thought / aside looks: $targets")
         assertTrue(
             targets.size >= 2 || GazeTarget.USER in targets,
             "justified plan should not freeze on one dead look: $targets",
@@ -216,6 +217,32 @@ class GazeDirectorTest {
             ),
         )
         assertEquals(GazeTarget.INPUT, listening.target)
+    }
+
+    @Test
+    fun idleGazeSpendsMostOfItsTimeOffAxis() {
+        val g = GazeDirector(Random(11))
+        var offAxis = 0
+        val ticks = 3750 // 60 s at 16 ms
+        repeat(ticks) {
+            val pose = g.tick(0.016f, AvatarState.IDLE, GazeWorld())
+            if (abs(pose.lookX) > 0.2f) offAxis++
+        }
+        assertTrue(offAxis > ticks / 2, "straight ahead should be the exception: $offAxis / $ticks off-axis")
+    }
+
+    @Test
+    fun peerLookAimsAtTheOtherMascot() {
+        val g = GazeDirector(Random(3))
+        val peer = GazePoint(0.8f, 0.1f)
+        var sawPeer = false
+        repeat(3750) {
+            val pose = g.tick(0.016f, AvatarState.IDLE, GazeWorld(peers = listOf(peer)))
+            if (pose.target == GazeTarget.PEER && pose.lookX > 0.5f) sawPeer = true
+        }
+        assertTrue(sawPeer, "an idle mascot with a neighbour should look at it within a minute")
+        val alone = firstPick().tick(0.016f, AvatarState.IDLE, GazeWorld())
+        assertNotEquals(GazeTarget.PEER, alone.target)
     }
 
     private class ZeroRandom : Random() {

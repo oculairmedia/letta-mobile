@@ -147,6 +147,9 @@ HOVER_ANIM, HOVER_REST_ANIM, HOVER_NODE, HOVER_REST_NODE, HOVER_HELD_NODE = "3:1
 FLASH_REST_ANIM, FLASH_REST_NODE, SUCCESS_ANIM, SUCCESS_NODE, ERROR_ANIM, ERROR_NODE = "3:190", "3:191", "3:192", "3:193", "3:194", "3:195"
 DRAG_REST_ANIM, DRAG_REST_NODE, DRAG_ANIM, DRAG_NODE = "3:200", "3:201", "3:202", "3:203"
 IDLE_WAIT_A, IDLE_WAIT_B, IDLE_GLANCE_ANIM, IDLE_A_NODE, IDLE_B_NODE, IDLE_GLANCE_NODE = "3:210", "3:211", "3:212", "3:213", "3:214", "3:215"
+# More idle beats (anim id, state node id): a glance is not enough for a character on screen all day.
+IDLE_BEATS = {"stretch": ("3:222", "3:226"), "tilt": ("3:223", "3:227"), "bounce": ("3:224", "3:228"), "shiver": ("3:225", "3:229")}
+HOVER_HELD_ANIM = "3:185"
 TURN_X_ANIM, TURN_Y_ANIM = "3:220", "3:221"
 DESIGNED_PAIRS = {("idle", "listening"): 300, ("listening", "thinking"): 300, ("thinking", "speaking"): 200,
                   ("speaking", "idle"): 240, ("error", "idle"): 300}  # SPEC section 3, ms
@@ -1040,7 +1043,29 @@ def idle_variety_animations():
     glance = animation("IdleGlance", IDLE_GLANCE_ANIM, m + h + r, {
         FACE: {ROT: [(0, 0, BACK_IN_OUT), (m, rad(2), None), (m + h, rad(2), ELASTIC_SOFT), (m + h + r, 0)],
                X: [(0, 0, BACK_IN_OUT), (m, 2, None), (m + h, 2, ELASTIC_SOFT), (m + h + r, 0)]}})
-    return [animation("IdleWaitA", IDLE_WAIT_A, frames(8000), {}), animation("IdleWaitB", IDLE_WAIT_B, frames(14000), {}), glance]
+    # Stretch: a slow tall stretch (volume kept), face rides up, then a soft elastic settle.
+    d = frames(1400)
+    stretch = animation("IdleStretch", IDLE_BEATS["stretch"][0], d, dict(
+        squash(INFLATE_NODE, [(0, 1, BACK_IN_OUT), (frames(500), 0.93, None), (frames(900), 0.93, ELASTIC_SOFT), (d, 1)]),
+        **{FACE: {Y: [(0, 0, BACK_IN_OUT), (frames(500), -7, None), (frames(900), -7, ELASTIC_SOFT), (d, 0)]}}))
+    # Tilt: the whole body cocks 6 degrees like a dog hearing something, holds, comes back.
+    d = frames(1600)
+    tilt = animation("IdleTilt", IDLE_BEATS["tilt"][0], d, {
+        BODY_NODE: {ROT: [(0, 0, BACK_IN_OUT), (frames(400), rad(6), None), (frames(1100), rad(6), ELASTIC_SOFT), (d, 0)]},
+        FACE: {ROT: [(0, 0, BACK_IN_OUT), (frames(400), rad(4), None), (frames(1100), rad(4), ELASTIC_SOFT), (d, 0)],
+               X: [(0, 0, BACK_IN_OUT), (frames(400), 4, None), (frames(1100), 4, ELASTIC_SOFT), (d, 0)]}})
+    # Bounce: anticipation squash, a small hop, landing squash, settle.
+    d = frames(700)
+    hop = [(0, 0, EMPH_ACCEL), (frames(120), 3, STD_DECEL), (frames(320), -14, EMPH_ACCEL), (frames(520), 2, EMPH_DECEL), (d, 0)]
+    bounce = animation("IdleBounce", IDLE_BEATS["bounce"][0], d, dict(
+        squash(INFLATE_NODE, [(0, 1, STANDARD), (frames(120), 1.06, STANDARD), (frames(320), 0.96, STANDARD), (frames(520), 1.05, ELASTIC_SOFT), (d, 1)]),
+        **{BODY_NODE: {Y: hop}, FACE: {Y: hop}}))
+    # Shiver: a quick side-to-side shake of the body, the face lagging a frame or two.
+    d = frames(420)
+    shake = lambda amp, lag: [(0, 0, STANDARD)] + [(frames(60 * i) + lag, amp * (1 if i % 2 else -1) * (1 - i / 7), STANDARD) for i in range(1, 6)] + [(d, 0)]
+    shiver = animation("IdleShiver", IDLE_BEATS["shiver"][0], d, {BODY_NODE: {X: shake(4, 0)}, FACE: {X: shake(3, 2)}})
+    return [animation("IdleWaitA", IDLE_WAIT_A, frames(8000), {}), animation("IdleWaitB", IDLE_WAIT_B, frames(14000), {}),
+            glance, stretch, tilt, bounce, shiver]
 
 
 def root_machine():
@@ -1071,8 +1096,8 @@ def root_machine():
     hover = layer_frame(
         "Hover", "3:4", HOVER_REST_NODE, "",
         anim_state(HOVER_REST_ANIM, HOVER_REST_NODE, 0, "", bool_transition(HOVER_NODE, VM_HOVER, "true", 0, None)) + "\n"
-        + anim_state(HOVER_ANIM, HOVER_NODE, 1, ' reset="true"', exit_transition(HOVER_HELD_NODE)) + "\n"
-        + anim_state(HOVER_REST_ANIM, HOVER_HELD_NODE, 2, "", bool_transition(HOVER_REST_NODE, VM_HOVER, "false", 0, None)))
+        + anim_state(HOVER_ANIM, HOVER_NODE, 1, ' reset="true"', exit_transition(HOVER_HELD_NODE) + "\n" + bool_transition(HOVER_REST_NODE, VM_HOVER, "false", 220, SOFT_OUT)) + "\n"
+        + anim_state(HOVER_HELD_ANIM, HOVER_HELD_NODE, 2, "", bool_transition(HOVER_REST_NODE, VM_HOVER, "false", 260, SOFT_OUT)))
     flash = layer_frame(
         "Flash", "3:6", FLASH_REST_NODE, trigger_transition(SUCCESS_NODE, VM_SUCCESS) + "\n" + trigger_transition(ERROR_NODE, VM_ERROR),
         f'<AnimationState x="200" y="40" animationId="{FLASH_REST_ANIM}" id="{FLASH_REST_NODE}"/>\n'
@@ -1088,13 +1113,22 @@ def root_machine():
     sleeping = state_enum_ids["sleeping"]
     to_park = lambda node, dur=0: enum_transition(node, sleeping, dur, None)
     from_park = lambda node: enum_transition(node, sleeping, 0, None, op="notEqual")
+    # Each wait ends by picking one beat at random (weights: the glance is still the most common,
+    # the bounce the rarest); every beat returns to a random wait.
+    beat_nodes = [(IDLE_GLANCE_NODE, 40), (IDLE_BEATS["tilt"][1], 20), (IDLE_BEATS["stretch"][1], 15),
+                  (IDLE_BEATS["shiver"][1], 15), (IDLE_BEATS["bounce"][1], 10)]
+    pick_beat = "\n".join(weighted(exit_transition(n), w) for n, w in beat_nodes)
+    back_to_wait = weighted(exit_transition(IDLE_A_NODE), 50) + "\n" + weighted(exit_transition(IDLE_B_NODE), 50)
+    beat_states = "\n".join(
+        anim_state(aid, nid, 4 + i, ' reset="true" random="true"', back_to_wait)
+        for i, (aid, nid) in enumerate(IDLE_BEATS.values()))
     idle = layer_frame(
         "IdleVariety", "3:8", IDLE_A_NODE, "",
-        anim_state(IDLE_WAIT_A, IDLE_A_NODE, 0, "", to_park(IDLE_SLEEP_NODE) + "\n" + exit_transition(IDLE_GLANCE_NODE)) + "\n"
-        + anim_state(IDLE_WAIT_B, IDLE_B_NODE, 1, "", to_park(IDLE_SLEEP_NODE) + "\n" + exit_transition(IDLE_GLANCE_NODE)) + "\n"
-        + anim_state(IDLE_GLANCE_ANIM, IDLE_GLANCE_NODE, 2, ' reset="true" random="true"',
-                     weighted(exit_transition(IDLE_A_NODE), 50) + "\n" + weighted(exit_transition(IDLE_B_NODE), 50)) + "\n"
-        + anim_state(IDLE_WAIT_A, IDLE_SLEEP_NODE, 3, "", from_park(IDLE_A_NODE)))
+        anim_state(IDLE_WAIT_A, IDLE_A_NODE, 0, ' random="true"', to_park(IDLE_SLEEP_NODE) + "\n" + pick_beat) + "\n"
+        + anim_state(IDLE_WAIT_B, IDLE_B_NODE, 1, ' random="true"', to_park(IDLE_SLEEP_NODE) + "\n" + pick_beat) + "\n"
+        + anim_state(IDLE_GLANCE_ANIM, IDLE_GLANCE_NODE, 2, ' reset="true" random="true"', back_to_wait) + "\n"
+        + anim_state(IDLE_WAIT_A, IDLE_SLEEP_NODE, 3, "", from_park(IDLE_A_NODE)) + "\n"
+        + beat_states)
 
     wander = layer_frame(
         "Wander", "3:10", WANDER_A_NODE, "",
@@ -1141,9 +1175,19 @@ def root_artboard():
     blink_rest = animation("BlinkRest", BLINK_REST_ANIM, 1, {})
     blink = animation("BlinkFire", BLINK_ANIM, 2, {}, callbacks=(PLATE_BLINK,))
     hover_rest = animation("HoverRest", HOVER_REST_ANIM, 1, {})
-    hover = animation("HoverWiggle", HOVER_ANIM, frames(240), {FACE: {ROT: [(0, 0, STANDARD), (frames(60), rad(2), STANDARD), (frames(150), rad(-2), STANDARD), (frames(240), 0)]}})
+    d = frames(520)
+    hover = animation("HoverPerk", HOVER_ANIM, d, dict(
+        squash(INFLATE_NODE, [(0, 1, BACK_OUT), (frames(160), 0.92, None), (frames(300), 0.92, ELASTIC_SOFT), (d, 0.97)]),
+        **{FACE: {Y: [(0, 0, BACK_OUT), (frames(160), -9, None), (frames(300), -9, ELASTIC_SOFT), (d, -5)],
+                  ROT: [(0, 0, BACK_OUT), (frames(160), rad(-3), None), (frames(300), rad(-3), ELASTIC_SOFT), (d, rad(-2))]},
+           BODY_NODE: {ROT: [(0, 0, BACK_OUT), (frames(160), rad(-4), None), (frames(300), rad(-4), ELASTIC_SOFT), (d, rad(-2))]}}))
+    # Held while hovered: the perk's end pose, breathing a little faster in the face lift.
+    hover_held = animation("HoverHeld", HOVER_HELD_ANIM, frames(2400), dict(
+        squash(INFLATE_NODE, [(0, 0.97, SINE), (frames(1200), 0.95, SINE), (frames(2400), 0.97)]),
+        **{FACE: {Y: [(0, -5, SINE), (frames(1200), -7, SINE), (frames(2400), -5)], ROT: [(0, rad(-2))]},
+           BODY_NODE: {ROT: [(0, rad(-2))]}}), "loop")
     anims = (shape_animations() + sustained_animations() + enter_animations() + momentary_animations() + idle_variety_animations()
-             + turn_animations() + wander_animations() + [breath, blink_rest, blink, hover_rest, hover])
+             + turn_animations() + wander_animations() + [breath, blink_rest, blink, hover_rest, hover, hover_held])
     return f'''<Artboard defaultStateMachineId="{SM}" viewModelId="{VM}" viewModelInstanceId="{VM_INSTANCE}"
           x="0" y="0" styleId="0:3" clip="false" width="500" height="500" name="Mascot" id="{ROOT}">
     <LayoutComponentStyle name="Style" id="0:3"/>
