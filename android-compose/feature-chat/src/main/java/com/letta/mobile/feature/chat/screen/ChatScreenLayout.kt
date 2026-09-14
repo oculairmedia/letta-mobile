@@ -487,12 +487,6 @@ private fun ChatScreenComposerInputSection(
         limits = viewModel.attachmentLimits,
     )
     val activeAgent by viewModel.activeAgent.collectAsStateWithLifecycle()
-    ChatMascotPresenceSync(
-        agentId = viewModel.agentId.value,
-        conversationId = viewModel.conversationId?.value,
-        state = state,
-        composerText = composerState.inputText,
-    )
     ChatComposer(
         agentId = viewModel.agentId.value,
         // The thinking indicator sits beside the mascot companion, in its row (letta-mobile-8jtf3).

@@ -145,7 +145,11 @@ class MainActivity : ComponentActivity() {
                     LocalSnackbarDispatcher provides snackbarDispatcher,
                     LocalWindowSizeClass provides windowSizeClass,
                 ) {
-                    ProvideMascotShell(agents = deps.agentRepository.agents, settings = deps.secureSettingsStore) {
+                    ProvideMascotShell(
+                        agents = deps.agentRepository.agents,
+                        settings = deps.secureSettingsStore,
+                        runs = deps.conversationRunRegistry,
+                    ) {
                         Scaffold(
                             snackbarHost = { SnackbarHost(snackbarHostState) },
                         ) { _ ->
