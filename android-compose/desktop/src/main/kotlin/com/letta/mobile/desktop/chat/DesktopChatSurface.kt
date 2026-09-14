@@ -233,21 +233,23 @@ private fun ChatDetailBody(
                 modifier = Modifier.weight(1f),
             )
         }
-        Row(verticalAlignment = Alignment.Bottom) {
-            // The agent keeps the user company at the prompt: its live mascot, persistent across
-            // the whole conversation, thinking/listening/speaking right where the user types.
+        // The agent keeps the user company at the prompt: its live mascot beside the text box,
+        // persistent across the whole conversation, thinking/listening/speaking where the user types.
+        val composerCompanion: (@Composable () -> Unit)? =
             if (companion && companionAgentId != null && companionIdentity != null) {
-                Box(Modifier.padding(start = 16.dp, bottom = 12.dp)) {
+                {
                     com.letta.mobile.ui.mascot.MascotLive(
                         agentId = companionAgentId,
                         identity = companionIdentity,
                         size = ComposerCompanionSize,
                     )
                 }
+            } else {
+                null
             }
-            ComposerBar(
-                modifier = Modifier.weight(1f),
-                state = ComposerBarState(
+        ComposerBar(
+            companion = composerCompanion,
+            state = ComposerBarState(
                 text = surface.composerText,
                 pendingImageAttachments = surface.pendingImageAttachments,
                 enabled = surface.canSend,
@@ -267,7 +269,6 @@ private fun ChatDetailBody(
                 onRemoveImageAttachment = actions.onRemoveImageAttachment,
             ),
         )
-        }
     }
 }
 

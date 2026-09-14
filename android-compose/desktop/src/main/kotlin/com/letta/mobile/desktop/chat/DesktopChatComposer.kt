@@ -2,6 +2,10 @@ package com.letta.mobile.desktop.chat
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
@@ -41,6 +45,8 @@ internal fun ComposerBar(
     state: ComposerBarState,
     actions: ComposerBarActions,
     modifier: Modifier = Modifier,
+    /** The agent's live mascot, drawn at the input box's left edge so it sits with the text, not the pane. */
+    companion: (@Composable () -> Unit)? = null,
 ) {
     val canSend = state.enabled &&
         (state.text.isNotBlank() || state.pendingImageAttachments.isNotEmpty())
@@ -64,14 +70,26 @@ internal fun ComposerBar(
             composerText = state.text,
             onTextChanged = actions.onTextChanged,
         )
-        ComposerInputSurface(
-            ComposerInputSurfaceParams(
-                state = state,
-                actions = actions,
-                canSend = canSend,
-                matchedCommands = autocomplete.matchedCommands,
-            ),
-        )
+        // The box keeps its centred max width; the companion hangs off its left edge, so the
+        // pair is centred together and the mascot stays beside the text at any pane width.
+        Row(
+            modifier = Modifier.widthIn(max = ChatColumnMaxWidth + ComposerCompanionSlot).fillMaxWidth(),
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            if (companion != null) {
+                Box(Modifier.width(ComposerCompanionSlot), contentAlignment = Alignment.BottomCenter) { companion() }
+            }
+            Box(Modifier.weight(1f)) {
+                ComposerInputSurface(
+                    ComposerInputSurfaceParams(
+                        state = state,
+                        actions = actions,
+                        canSend = canSend,
+                        matchedCommands = autocomplete.matchedCommands,
+                    ),
+                )
+            }
+        }
         ComposerHintRow(
             visible = composerHintVisible(
                 text = state.text,
@@ -102,3 +120,6 @@ private fun ComposerMentionSuggestions(
         },
     )
 }
+
+/** Width reserved for the composer companion (the mascot) at the box's left edge. */
+internal val ComposerCompanionSlot = 72.dp

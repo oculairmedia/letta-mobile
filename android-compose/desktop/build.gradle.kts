@@ -36,8 +36,8 @@ val desktopNodeArchiveSha256 = "fba577c4bb87df04d54dd87bbdaa5a2272f1f99a2acbf915
 // AWT/InputMethod bridge Compose Multiplatform uses to surface the OS
 // touch-keyboard on text input — Temurin's InputMethod bridge resolves to a
 // no-op for non-Swing text components, so the keyboard never pops on touch
-// devices. The bundled JCEF runtime used by the avatar/pet window is fetched
-// separately via jcefmaven, so we use the vanilla `jbrsdk` (not `jbrsdk_jcef`).
+// devices. The bundled JCEF runtime (Mermaid, tool cards) is fetched separately
+// via jcefmaven, so we use the vanilla `jbrsdk` (not `jbrsdk_jcef`).
 // SHA-512 is published by JetBrains alongside the artifact.
 val jbrVersion = "25.0.4"
 val jbrBuild = "b508.27"
@@ -160,12 +160,8 @@ dependencies {
     // bundles host-OS native libs (linux/darwin/win, x86-64 + aarch64), so no
     // native packaging is needed.
     implementation(libs.iroh)
-    // Avatar companion: renderer bridge + loopback web host (brings :avatar:core).
-    implementation(project(":avatar:renderer-web"))
-    // letta-mobile-0s5bi spike: the shared Rive mapping, driven natively on desktop.
+    // The mascot: the shared Rive mapping (brings :avatar:core), driven natively on desktop.
     implementation(project(":avatar:renderer-rive"))
-    // Avatar library: import pipeline + local catalog (license capture/display).
-    implementation(project(":avatar:asset-pipeline"))
 
     implementation(libs.filekit.core.jvm)
     implementation(libs.filekit.dialogs.compose.jvm)
@@ -259,22 +255,6 @@ dependencies {
 
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
-}
-
-// P4 spike entry point (see avatar/DESIGN-BRIEF.md + docs/design/avatar-system-prd.md):
-// frameless transparent pet window hosting the web avatar renderer off-screen.
-tasks.register<JavaExec>("runPetSpike") {
-    group = "application"
-    description = "Runs the frameless pet-window spike (-PpetVrm=path\\to\\model.vrm to override the avatar)."
-    mainClass.set("com.letta.mobile.desktop.avatar.pet.PetWindowSpikeKt")
-    classpath = sourceSets.main.get().runtimeClasspath
-    jvmArgs(
-        // jcefmaven OSR-mode requirements.
-        "--add-exports=java.base/java.lang=ALL-UNNAMED",
-        "--add-exports=java.desktop/sun.awt=ALL-UNNAMED",
-        "--add-exports=java.desktop/sun.java2d=ALL-UNNAMED",
-    )
-    providers.gradleProperty("petVrm").orNull?.let { args(it) }
 }
 
 // letta-mobile-0s5bi spike: native Rive (rive-runtime + D3D11 Rive Renderer) as a Compose node.

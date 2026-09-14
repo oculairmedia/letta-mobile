@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Face
 import androidx.compose.material.icons.outlined.StopCircle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -47,7 +46,6 @@ internal data class NowActiveBarState(
     val status: NowActiveStatus,
     /** Agent working in a conversation OTHER than the active one, if any. */
     val backgroundWorkAgentName: String?,
-    val avatarCompanionActive: Boolean = false,
 )
 
 @Immutable
@@ -56,8 +54,6 @@ internal data class NowActiveBarActions(
     val onOpenConversation: () -> Unit,
     /** Jump to the conversation doing background work (chip click). */
     val onJumpToBackgroundWork: () -> Unit,
-    /** Toggle the desktop avatar companion (trailing control). */
-    val onAvatarCompanion: () -> Unit = {},
     /** Interrupt the pinned conversation's in-flight run (stop button). */
     val onStopRun: () -> Unit = {},
 )
@@ -77,14 +73,12 @@ internal data class NowActiveBarHostState(
     val isStreamingReplySelected: Boolean,
     val avatarStyleByAgentId: Map<String, Int>,
     val fallbackOrbIndex: Int,
-    val avatarCompanionActive: Boolean,
 )
 
 @Immutable
 internal data class NowActiveBarHostActions(
     /** Select + reveal the given conversation (identity block and work chip). */
     val onOpenConversation: (String) -> Unit,
-    val onAvatarCompanion: () -> Unit,
     /** Interrupt the given conversation's in-flight run. */
     val onStopRun: (String) -> Unit,
 )
@@ -141,7 +135,6 @@ internal fun deriveNowActiveBarPin(
             backgroundWorkAgentName = host.thinkingConversationId
                 ?.takeIf { it != barConversation.id }
                 ?.let { tid -> chatState.conversations.firstOrNull { it.id == tid }?.agentName },
-            avatarCompanionActive = host.avatarCompanionActive,
         ),
     )
 }
@@ -186,7 +179,6 @@ internal fun DesktopNowActiveBarHost(
             onJumpToBackgroundWork = {
                 host.thinkingConversationId?.let(actions.onOpenConversation)
             },
-            onAvatarCompanion = actions.onAvatarCompanion,
             // Scoped to the pinned conversation so an unrelated in-flight
             // send can never be cancelled by mistake.
             onStopRun = { actions.onStopRun(pin.conversationId) },
@@ -256,8 +248,8 @@ internal fun DesktopHeaderIdentityBlock(
 
 /**
  * Trailing controls that used to sit at the end of the footer bar: the
- * background-work chip, the stop-run button (only while a run is live), and
- * the avatar-companion toggle. Rendered to the left of the native window
+ * background-work chip and the stop-run button (only while a run is live).
+ * Rendered to the left of the native window
  * controls so they never collide with minimize/maximize/close.
  */
 @Composable
@@ -280,10 +272,6 @@ internal fun DesktopHeaderTrailingControls(
         ) {
             StopRunButton(stopping = state.status == NowActiveStatus.Stopping, onClick = actions.onStopRun)
         }
-        AvatarCompanionButton(
-            active = state.avatarCompanionActive,
-            onClick = actions.onAvatarCompanion,
-        )
     }
 }
 
@@ -293,16 +281,6 @@ private fun StopRunButton(stopping: Boolean, onClick: () -> Unit) {
         icon = Icons.Outlined.StopCircle,
         description = if (stopping) "Stopping run — click again to force stop" else "Stop run",
         tint = MaterialTheme.colorScheme.error,
-        onClick = onClick,
-    )
-}
-
-@Composable
-private fun AvatarCompanionButton(active: Boolean, onClick: () -> Unit) {
-    BarIconButton(
-        icon = Icons.Outlined.Face,
-        description = if (active) "Stop avatar companion" else "Avatar companion",
-        tint = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
         onClick = onClick,
     )
 }

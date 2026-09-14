@@ -29,7 +29,7 @@ sealed interface AvatarRuntimeState {
 
 /**
  * Renderer-independent avatar control surface. The app talks ONLY to this
- * interface; Filament, three-vrm/WebView, or future renderers implement it.
+ * interface; the Rive renderers (rive-android, the native desktop bridge) implement it.
  *
  * Command semantics:
  * - Commands issued while not [AvatarRuntimeState.Ready] are best-effort and

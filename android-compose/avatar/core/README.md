@@ -1,9 +1,9 @@
 # :avatar:core
 
 Renderer-independent avatar runtime core (commonMain only). This is the ONLY
-avatar module the app is allowed to depend on — renderer adapters (Filament on
-Android, three-vrm/WebView on desktop) implement these contracts and are wired
-in at the platform edge.
+avatar module the app is allowed to depend on — renderer adapters (rive-android
+on Android, the native Rive bridge on desktop) implement these contracts and
+are wired in at the platform edge.
 
 ## Design rules
 
@@ -31,18 +31,13 @@ in at the platform edge.
 
 ## Sibling modules
 
-- `:avatar:catalog` — local/offline catalog: `AvatarCatalog` over a pluggable
-  `AvatarCatalogStore` (in-memory + atomic `catalog.json` file store).
-- `:avatar:asset-pipeline` — JVM import pipeline + `avatar-import` CLI:
-  detect → license-gate → inspect → hash → pack → manifest → catalog register.
-  External glTF-Validator / glTF-Transform integration plugs in behind the
-  `GltfInspector` seam.
+- `:avatar:renderer-rive` — the mascot: the shared Rive contract + runtime
+  (commonMain), rive-android surface (androidMain), the native desktop bridge
+  (`native/desktop`), and the rig sources under `rive/mascot`. See
+  `avatar/renderer-rive/MASCOT.md`.
+- `:sharedUI` `ui/mascot` — `MascotAvatar`, `MascotEntry`, presence → director
+  mapping, the identity registry and the `MascotHost` seam platforms fill.
 
-## Planned (not yet built)
-
-- `:avatar:renderer-filament-android` — Filament/gltfio adapter
-  (subclass `HeadlessAvatarRuntime`, forward to `Animator`/morph weights).
-- `:avatar:renderer-web` — WebView/JCEF + three.js + `@pixiv/three-vrm` adapter
-  bridging the same commands over JS.
-- Pipeline follow-ups: external-buffer GLB packing, thumbnails, external
-  validator integration.
+The 3D VRM/glTF route (three-vrm web renderer, import pipeline, catalog) was
+removed in favour of the mascot; the catalog/manifest/import-policy types in
+this module remain as the model vocabulary the runtime contract uses.
