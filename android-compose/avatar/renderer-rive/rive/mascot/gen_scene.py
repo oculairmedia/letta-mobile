@@ -821,13 +821,23 @@ def breath(period_ms=BREATH_MS):
     return [(0, 0, SINE), (frames(period_ms * 0.55), -BREATH_PX, SINE), (frames(period_ms), 0)]
 
 
+def breath2(period_ms=BREATH_MS):
+    """Two bobs per inflate: the rise/fall at its own period, twice, so the loop can carry a
+    slower inflate (the user: 'the bob speed is right, the breathing is twice too fast')."""
+    n = frames(period_ms)
+    first = breath(period_ms)
+    second = [(f + n, v) + tuple(rest) for (f, v, *rest) in first[1:]]
+    return first + second
+
+
 def breath_scale(period_ms=BREATH_MS, lo=1.0, hi=BREATH_SCALE):
     """The volume of the breath: the body inflates on the inhale, same phase as the rise."""
     return [(0, lo, SINE), (frames(period_ms * 0.55), hi, SINE), (frames(period_ms), lo)]
 
 
-BREATHING = {"idle": (BREATH_MS, 1.0, BREATH_SCALE), "listening": (BREATH_MS, 1.0, BREATH_SCALE),
-             "speaking": (BREATH_MS, 1.0, BREATH_SCALE), "sleeping": (9000, 0.985, 1.045)}
+# Inflate (and the light) run at twice the bob's period: one slow breath per two bobs.
+BREATHING = {"idle": (2 * BREATH_MS, 1.0, BREATH_SCALE), "listening": (2 * BREATH_MS, 1.0, BREATH_SCALE),
+             "speaking": (2 * BREATH_MS, 1.0, BREATH_SCALE), "sleeping": (18000, 0.985, 1.045)}
 
 # Lumen: the breath's light (a white radial fill on the body, gradient opacity 0 at rest).
 LUMEN, LUMEN_R, LUMEN_Y0, LUMEN_Y1, LUMEN_PEAK = "0:234", 150, 70, -70, 0.16
@@ -874,13 +884,13 @@ def sustained_animations():
     gloss pulse, and the glyph index. Nothing keys body scale or body vertices."""
     FACING = sustained_facing()
     ROW = {  # key: (root motion, period ms, plate rot deg, face offset, tint, gloss pulse) - SPEC 1 + 9.1
-        "idle": ({"y": breath()}, BREATH_MS, 0, (0, 0), "00000000", None),
-        "listening": ({"y": breath()}, BREATH_MS, -2, (0, -14), "00000000", None),
+        "idle": ({"y": breath2()}, 2 * BREATH_MS, 0, (0, 0), "00000000", None),
+        "listening": ({"y": breath2()}, 2 * BREATH_MS, -2, (0, -14), "00000000", None),
         "thinking": ({"x": sine(2, 3200)}, 3200, -6, (0, 0), "00000000", None),
         "waitingInput": ({"y": sine(19, 1200)}, 1200, 0, (0, -2), "00000000", None),
-        "speaking": ({"y": breath()}, BREATH_MS, 0, (0, 0), "00000000", None),
+        "speaking": ({"y": breath2()}, 2 * BREATH_MS, 0, (0, 0), "00000000", None),
         "error": ({"y": 24}, 0, 5, (0, 4), "14000000", None),
-        "sleeping": ({"y": breath(9000)}, 9000, 3, (0, 4), "38000000", None),   # slow, deep, same phase as the inflate
+        "sleeping": ({"y": breath2(9000)}, 18000, 3, (0, 4), "38000000", None),   # slow, deep; one inflate per two bobs
         "loading": ({}, 1400, 0, (0, 0), "10000000", [(0, 0.8, SINE), (frames(700), 1.0, SINE), (frames(1400), 0.8)]),
         "failed": ({}, 0, 0, (0, 0), "66808080", None),
         "degraded": ({}, 0, 4, (0, 0), "00000000", None),

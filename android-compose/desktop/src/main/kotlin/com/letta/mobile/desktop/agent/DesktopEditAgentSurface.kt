@@ -278,15 +278,26 @@ internal fun DesktopEditAgentSurface(
                 ) {
             // Avatar + Name
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.Top) {
-                MascotShapeGlyph(identity.shape, identity.argb, 64.dp)
+                // The avatar is the picker: click it, choose shape and colour in a popover.
+                var pickerOpen by remember { mutableStateOf(false) }
+                Box(
+                    Modifier.size(72.dp).clip(RoundedCornerShape(16.dp)).clickable { pickerOpen = true },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (com.letta.mobile.desktop.avatar.rive.RiveBridgeNative.AVAILABLE) {
+                        com.letta.mobile.desktop.avatar.rive.DesktopMascotHero(agentId = agentId, identity = identity, size = 110.dp)
+                    } else {
+                        MascotShapeGlyph(identity.shape, identity.argb, 64.dp)
+                    }
+                    androidx.compose.material3.DropdownMenu(expanded = pickerOpen, onDismissRequest = { pickerOpen = false }) {
+                        Box(Modifier.padding(12.dp)) {
+                            MascotPicker(identity = identity, onChange = { identity = it }, accent = accent)
+                        }
+                    }
+                }
                 LabeledSection("Name", accent, Modifier.weight(1f)) {
                     DesktopTextField(value = name, onValueChange = { name = it }, modifier = Modifier.fillMaxWidth())
                 }
-            }
-
-            // Identity: shape + colour (shared picker, same on every platform)
-            LabeledSection("Avatar", accent) {
-                MascotPicker(identity = identity, onChange = { identity = it }, accent = accent)
             }
 
             // Persona · backstory → persona memory block
