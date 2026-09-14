@@ -100,7 +100,11 @@ fun MascotAvatar(
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
         contentAlignment = Alignment.Center,
     ) {
-        MascotLive(agentId, identity, size = size * overscale, playing = live)
+        if (live) {
+            MascotLive(agentId, identity, size = size * overscale)
+        } else {
+            MascotStill(agentId, identity, size = size * overscale)
+        }
     }
 }
 
@@ -118,20 +122,12 @@ fun MascotLive(
     identity: MascotIdentity,
     size: Dp,
     modifier: Modifier = Modifier,
-    /** False draws a still; the entry's director and gaze still run for the agent's live surfaces. */
-    playing: Boolean = true,
 ) {
     val host = LocalMascotHost.current
     val registry = LocalMascotRegistry.current
     val entry = remember(host, agentId, identity) { host.entry(agentId, identity) } ?: return
     val presence = registry.presence[agentId] ?: AgentPresence.IDLE
     LaunchedEffect(entry, presence) { entry.ensureLoaded(); entry.apply(presence) }
-    // A still has no clock and no gaze: only the agent's live surfaces drive the entry, and a list
-    // of stills must not register one frame callback per row.
-    if (!playing) {
-        host.Surface(entry, modifier.requiredSize(size), playing = false)
-        return
-    }
     // The director's timers (listening release, success hold, blink schedule) need a clock;
     // tickTo is idempotent per frame so several surfaces of one agent tick it once.
     LaunchedEffect(entry) {
@@ -174,8 +170,27 @@ fun MascotLive(
             val slot = MascotSlot(agentId, GazeRect(r.left, r.top, r.right, r.bottom))
             if (registry.mascotBounds[slotKey] != slot) registry.mascotBounds[slotKey] = slot
         },
-        playing,
+        playing = true,
     )
+}
+
+/**
+ * One frame of the agent's mascot at [size], with no clock and no gaze. The agent's live surfaces
+ * still drive the entry; a list of stills must not register one frame callback per row.
+ */
+@Composable
+private fun MascotStill(
+    agentId: String,
+    identity: MascotIdentity,
+    size: Dp,
+    modifier: Modifier = Modifier,
+) {
+    val host = LocalMascotHost.current
+    val registry = LocalMascotRegistry.current
+    val entry = remember(host, agentId, identity) { host.entry(agentId, identity) } ?: return
+    val presence = registry.presence[agentId] ?: AgentPresence.IDLE
+    LaunchedEffect(entry, presence) { entry.ensureLoaded(); entry.apply(presence) }
+    host.Surface(entry, modifier.requiredSize(size), playing = false)
 }
 
 /**
