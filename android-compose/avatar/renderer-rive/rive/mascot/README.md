@@ -233,6 +233,25 @@ in the plate hops to a new fixation on random waits with the Eyes Alive directio
 - looking at you: saccade between eyes and nose every 100-500 ms; reading: uneven left-to-right
   steps, return sweep, three lines, the head sweeping slowly along the line; typing: ride the caret
 
+## SPEC section 10 (Astra Max) as built - test rig, pending the user's review
+
+- **Pupil overlay** (`PupilOverlay` "7:29" > `PupilRoot` "7:96" clipped to `Iris` "7:95"; `Wave`
+  "7:97", `Core` "7:98", `Catchlight` "7:99"; wave vertices 7:200-7:204): above the glyph Solo,
+  under Saccade, so it inherits look/saccade; LookX/LookY/Blink co-key it; inner parallax
+  +-1.5/+-1 px on PupilRoot. Visible for idle/listening/speaking only; the plate's Expr animations
+  for those states are loops carrying the wave's four phase targets (2500 / 1250 / 500 ms,
+  amplitude 1.5 / 4 / 2.5 px) - the spec's keyed fallback. Deviations: phase restarts on a
+  state change (the spec asks for continuity; needs a script); the catchlight is always on (no
+  size signal), which only matters above ~72 dp anyway; no `reduceMotion` yet.
+- **Deformation**: three RootBones inside `Body` (Crown 0:240 at (0,-150), Middle 0:241, Base
+  0:242 at (0,+150)), a Skin with three Tendons in every body path (body, SoftEdge, Halo), a
+  CubicWeight per vertex from its rest y on the default body. Success / error / dragged key the
+  bones (`bone_pose`: X = S-L / S / S+L, Y = 1/S, crown/base X = -+150 H) and hold the inflate
+  node at 1. Deviations: weights are per vertex index, so the other seven identities share the
+  default body's (vertex order matches; positions nearly do); no area correction q (bones
+  cannot); breath stays at the user's 1.06 / 6500 ms rather than the spec's 1.03 / 4600.
+- **Working glyph**: art only; not wired (z4b83).
+
 ## Host rules (for the identity slice, 1zti3)
 
 - Write `shape`, `color` and `state` **before the first `advance`/render**, or the first frame is

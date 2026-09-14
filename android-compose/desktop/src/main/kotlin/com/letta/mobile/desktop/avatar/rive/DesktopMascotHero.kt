@@ -26,13 +26,15 @@ fun DesktopMascotHero(
     identity: MascotIdentity,
     size: Dp,
     modifier: Modifier = Modifier,
-    state: AvatarState = AvatarState.IDLE,
 ) {
     val entry = remember(agentId, identity) { DesktopMascotScenes.get(agentId, identity) }
     if (entry == null) {
         AgentSphere(size = size, modifier = modifier)
         return
     }
+    // The state comes from the app's presence for this agent (thinking, speaking, error...),
+    // so every surface drawing the same agent shows the same thing.
+    val state = com.letta.mobile.desktop.chat.MascotIdentityRegistry.states[agentId] ?: AvatarState.IDLE
     LaunchedEffect(entry, state) { entry.runtime.applyState(state) }
     RiveDesktopSurface(entry.scene, modifier.size(size))
 }

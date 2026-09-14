@@ -74,8 +74,8 @@ fun AgentOrb(
                 .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
             contentAlignment = Alignment.Center,
         ) {
-            // The body fills ~60 % of the artboard; overscale so the character fills the slot.
-            com.letta.mobile.desktop.avatar.rive.DesktopMascotHero(agentId = agentId, identity = identity, size = size * 1.2f)
+            // The body spans ~60 % of the artboard; overscale so the character fills the slot.
+            com.letta.mobile.desktop.avatar.rive.DesktopMascotHero(agentId = agentId, identity = identity, size = size * 1.6f)
         }
         return
     }
@@ -214,6 +214,14 @@ private const val ActivityRingPeriodMs = 1600
  */
 object MascotIdentityRegistry {
     val identities = androidx.compose.runtime.mutableStateMapOf<String, com.letta.mobile.avatar.core.MascotIdentity>()
+
+    /** Each agent's current presence, as the app derives it; absent means idle. The mascot switches state on it. */
+    val states = androidx.compose.runtime.mutableStateMapOf<String, com.letta.mobile.avatar.core.AvatarState>()
+
+    fun updateStates(all: Map<String, com.letta.mobile.avatar.core.AvatarState>) {
+        states.keys.retainAll(all.keys)
+        states.putAll(all)
+    }
 
     fun update(all: Map<String, com.letta.mobile.avatar.core.MascotIdentity>) {
         identities.keys.retainAll(all.keys)

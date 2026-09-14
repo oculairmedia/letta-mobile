@@ -85,6 +85,12 @@ TUNABLES = {  # name: (vm id, timeline id, node id, property keys, (value at 0, 
     "tuneMouthY": ("1:15", "7:69", "7:27", ("Y",), (42, 122)),
 }
 PLATE_SCALE_NODE, GLYPH_SCALE_NODE, MOUTH_NODE, SACCADE_NODE = "7:25", "7:26", "7:27", "7:28"
+# Pupil overlay (SPEC 10.2 / art/pupil/PUPIL-SPEC.md): one shared assembly drawn above the glyph
+# Solo, visible only for idle/listening/speaking. Keyed four-target fallback for the wave.
+PUPIL_OVERLAY, PUPIL_ROOT, IRIS, WAVE, CORE, CATCH = "7:29", "7:96", "7:95", "7:97", "7:98", "7:99"
+wave_vertex_ids = [f"7:{200 + i}" for i in range(5)]
+PUPIL = {"idle": (2500, 1.5), "listening": (1250, 4.0), "speaking": (500, 2.5)}   # period ms, amplitude px
+PUPIL_PARALLAX = (1.5, 1.0)
 # Saccade layer: random waits, then a 60 ms hop to one of a few small fixations, a hold, a hop back.
 SACCADE_WAITS = [("7:170", 1800), ("7:171", 3600), ("7:172", 5200)]          # (anim id, ms)
 # (anim id, (dx, dy) px, weight %): Eyes Alive direction distribution - down 20, up 18, left 17,
@@ -101,6 +107,13 @@ VM_TURN_X, VM_TURN_Y, HOST_TURN = "1:17", "1:18", "0:235"
 ARC_NODE, TURN_ARC = "0:236", 7    # a turn is an arc, not a slide: the plate lifts TURN_ARC px through the centre
 CONV_BODY_X, HOST_BODY_PX = "2:8", 6   # the body shifts toward what the head turns to (commit motion)
 LEAN_NODE, CONV_LEAN, LEAN_BASE = "0:237", "2:9", 150   # pivot at the body's base, LEAN_BASE px below centre
+# Vector deformation (SPEC 10.5 / art/mesh/DEFORMATION-SPEC.md): three bones - crown (0,-150),
+# middle (0,0), base (0,+150) - skinned to every body path. A force pose scales each bone's X by
+# S-L / S / S+L and Y by 1/S, and shears crown/base by -+150 H. Weights come from each vertex's
+# rest y (wc = -y/150, wb = y/150, wm = the rest) on the default body; Rive weights are static per
+# vertex, so the other identities share them (their vertex order matches, positions nearly do).
+BONE_CROWN, BONE_MID, BONE_BASE = "0:240", "0:241", "0:242"
+BONE_REACH = 150
 HOST_LEAN_DEG, TURN_LEAN_DEG = 9, 5                      # lean at host turn +-1 / at state facing +-1
 CONV_TURN_X, CONV_TURN_Y, CONV_TURN_ROT, CONV_BODY_ROT = "2:4", "2:5", "2:6", "2:7"
 HOST_TURN_PX, HOST_TURN_PY, HOST_TURN_DEG, HOST_BODY_DEG = 48, 18, 10, 5
@@ -347,10 +360,32 @@ def rrect(w, h, r, name="Path"):
 BODY = {s: svgpath.body_vertices(art(SHAPE_SVG[s])) for s in SHAPES}
 
 
+def bone_weight(y):
+    """Packed CubicWeight attributes for a vertex at rest y: three tendons (1, 2, 3), 0..255 each."""
+    wc = min(max(-y / BONE_REACH, 0.0), 1.0)
+    wb = min(max(y / BONE_REACH, 0.0), 1.0)
+    wm = 1.0 - wc - wb
+    vc, vb = round(255 * wc), round(255 * wb)
+    vm = 255 - vc - vb
+    indices = 1 | (2 << 8) | (3 << 16)
+    values = vc | (vm << 8) | (vb << 16)
+    return (f'<CubicWeight values="{values}" indices="{indices}" inValues="{values}" inIndices="{indices}" '
+            f'outValues="{values}" outIndices="{indices}"/>')
+
+
+def body_skin():
+    return (f'<Skin tx="0" ty="0" name="Skin">\n'
+            f'    <Tendon boneId="{BONE_CROWN}" tx="0" ty="{-BONE_REACH}" name="Crown"/>\n'
+            f'    <Tendon boneId="{BONE_MID}" tx="0" ty="0" name="Middle"/>\n'
+            f'    <Tendon boneId="{BONE_BASE}" tx="0" ty="{BONE_REACH}" name="Base"/>\n'
+            f'</Skin>')
+
+
 def body_path(vertex_ids, name):
     verts = "\n".join(
-        f'<CubicMirroredVertex x="{x}" y="{y}" rotation="{rot}" distance="{d}" name="V{i}" id="{vid}"/>'
+        f'<CubicMirroredVertex x="{x}" y="{y}" rotation="{rot}" distance="{d}" name="V{i}" id="{vid}">\n    {bone_weight(y)}\n</CubicMirroredVertex>'
         for i, ((x, y, rot, d), vid) in enumerate(zip(BODY[DEFAULT_SHAPE], vertex_ids)))
+    verts += "\n" + body_skin()
     return f'<PointsPath isClosed="true" name="{name}">\n{indent(verts, "    ")}\n</PointsPath>'
 
 
@@ -368,6 +403,9 @@ def body():
     {bind(VM_TURN_X, ROT, CONV_BODY_ROT)}
     {bind(VM_TURN_X, X, CONV_BODY_X)}
 <Node x="0" y="0" name="Body" id="{BODY_NODE}">
+    <RootBone x="0" y="{-BONE_REACH}" length="1" rotation="0" name="Crown" id="{BONE_CROWN}"/>
+    <RootBone x="0" y="0" length="1" rotation="0" name="Middle" id="{BONE_MID}"/>
+    <RootBone x="0" y="{BONE_REACH}" length="1" rotation="0" name="Base" id="{BONE_BASE}"/>
     <!-- Paints on one shape; the LATER paint draws on top. -->
     <Shape name="BodyShape" id="{HITBOX}">
 {indent(body_path(body_vertex_ids, "Path"), "        ")}
@@ -430,6 +468,70 @@ STATE_MOUTH = {"dragged": MOUTH_MORPH, "waitingInput": MOUTH_O, "speaking": MOUT
 STATE_PLATE_SCALE = {"listening": 1.04, "waitingInput": 1.06}
 
 
+def wave_samples(amplitude):
+    """The four squiggle phase targets as detached-vertex tuples, y and handle-y scaled by the
+    amplitude (x and the stroke untouched, per PUPIL-SPEC 3). Handle rotations are unwrapped
+    across phases so a linear key never spins a handle the long way round."""
+    phases = []
+    for k in range(4):
+        verts = svgpath.parse_path(svgpath.read_svg(art(f"pupil/squiggle-{k}.svg"))["d"])[0]["verts"]
+        row = []
+        for (x, y, cin, cout) in verts:
+            sy = lambda c: None if c is None else (c[0], c[1] * amplitude)
+            ir, idist = svgpath._handle((x, y * amplitude), sy(cin))
+            orot, odist = svgpath._handle((x, y * amplitude), sy(cout))
+            row.append([x, y * amplitude, ir, idist, orot, odist])
+        phases.append(row)
+    for vi in range(5):
+        for prop in (2, 4):
+            for k in range(1, 4):
+                prev, cur = phases[k - 1][vi][prop], phases[k][vi][prop]
+                while cur - prev > math.pi: cur -= 2 * math.pi
+                while cur - prev < -math.pi: cur += 2 * math.pi
+                phases[k][vi][prop] = cur
+    return phases
+
+
+def wave_keys(period_ms, amplitude):
+    """Loop of one wave cycle: phases 0, 1, 2, 3 at the quarters, back to 0 at the end."""
+    n = frames(period_ms)
+    q = [0, round(n / 4), round(n / 2), round(3 * n / 4), n]
+    ph = wave_samples(amplitude)
+    order = [0, 1, 2, 3, 0]
+    keys = {}
+    for vi, vid in enumerate(wave_vertex_ids):
+        keys[vid] = {}
+        for key, idx in ((VX, 0), (VY, 1), (VIN_ROT, 2), (VIN_DIST, 3), (VOUT_ROT, 4), (VOUT_DIST, 5)):
+            keys[vid][key] = [(q[j], round(ph[order[j]][vi][idx], 4), LINEAR) for j in range(5)]
+            # the last key's bezier is ignored; keep the tuple shape uniform
+    return n, keys
+
+
+def pupil_overlay():
+    """iris field (neutral, stationary) with the clipped pupil root: wave behind core, catchlight above."""
+    wave_verts = "\n".join(
+        f'<CubicDetachedVertex x="{x}" y="{y}" inRotation="{ir}" inDistance="{idist}" outRotation="{orot}" outDistance="{odist}" name="W{i}" id="{vid}"/>'
+        for i, ((x, y, ir, idist, orot, odist), vid) in enumerate(zip(wave_samples(PUPIL["idle"][1])[0], wave_vertex_ids)))
+    wave = f'''<Shape x="0" y="0" name="Wave" id="{WAVE}">
+    <PointsPath isClosed="false" name="Path">
+{indent(wave_verts, "        ")}
+    </PointsPath>
+    <Stroke thickness="8" cap="round" join="round" name="Stroke"><SolidColor colorValue="{INK}" name="Color"/></Stroke>
+</Shape>'''
+    core = svgpath.path_rml(art("pupil/pupil-core.svg"), "Core", CORE, INK)
+    catch = svgpath.path_rml(art("pupil/catchlight.svg"), "Catchlight", CATCH, "FFFFFFFF", opacity=0.9)
+    iris = svgpath.path_rml(art("pupil/iris-field.svg"), "Iris", IRIS, "FFF7F7F7")
+    return f'''<Node x="0" y="0" opacity="0" name="PupilOverlay" id="{PUPIL_OVERLAY}">
+    <Node x="0" y="0" name="PupilRoot" id="{PUPIL_ROOT}">
+        <ClippingShape sourceId="{IRIS}" name="IrisClip"/>
+{indent(catch, "        ")}
+{indent(core, "        ")}
+{indent(wave, "        ")}
+    </Node>
+{indent(iris, "    ")}
+</Node>'''
+
+
 def plate_component():
     expr_anims = []
     for st in STATES:
@@ -441,10 +543,23 @@ def plate_component():
         sc = STATE_PLATE_SCALE.get(st, 1)
         objs[PLATE_CARD] = {SX: sc, SY: sc}
         objs[PLATE_SHADOW] = {SX: sc, SY: sc}
-        expr_anims.append(animation("Expr" + st[0].upper() + st[1:], plate_expr_anim[st], 1, objs))
+        # The pupil overlay: on for idle/listening/speaking with that state's wave loop, off elsewhere.
+        if st in PUPIL:
+            n, wk = wave_keys(*PUPIL[st])
+            objs[PUPIL_OVERLAY] = {OPACITY: 1}
+            objs.update(wk)
+            expr_anims.append(animation("Expr" + st[0].upper() + st[1:], plate_expr_anim[st], n, objs, "loop"))
+        else:
+            objs[PUPIL_OVERLAY] = {OPACITY: 0}
+            expr_anims.append(animation("Expr" + st[0].upper() + st[1:], plate_expr_anim[st], 1, objs))
 
-    look_x = animation("LookX", PLATE_LOOKX, 60, {GLYPHS_NODE: {X: [(0, -23, LINEAR), (60, 23)]}})  # SPEC 9.1
-    look_y = animation("LookY", PLATE_LOOKY, 60, {GLYPHS_NODE: {Y: [(0, -17, LINEAR), (60, 17)]}})
+    px, py = PUPIL_PARALLAX
+    look_x = animation("LookX", PLATE_LOOKX, 60, {GLYPHS_NODE: {X: [(0, -23, LINEAR), (60, 23)]},  # SPEC 9.1
+                                                  PUPIL_OVERLAY: {X: [(0, -23, LINEAR), (60, 23)]},
+                                                  PUPIL_ROOT: {X: [(0, -px, LINEAR), (60, px)]}})
+    look_y = animation("LookY", PLATE_LOOKY, 60, {GLYPHS_NODE: {Y: [(0, -17, LINEAR), (60, 17)]},
+                                                  PUPIL_OVERLAY: {Y: [(0, -17, LINEAR), (60, 17)]},
+                                                  PUPIL_ROOT: {Y: [(0, -py, LINEAR), (60, py)]}})
     # Open: the mouth morphs closed -> half -> open through the three SVG samples (linear).
     mouth_keys = {}
     for vid, samples in zip(mouth_vertex_ids, zip(*MOUTH_SAMPLES)):
@@ -455,7 +570,8 @@ def plate_component():
     # Blink (Trutoiu, Carter, Matthews, Hodgins - Disney Research 2011): human blinks are
     # asymmetric - a fast close and a slow, decelerating open - and ~250-300 ms reads most
     # natural. Close 4 frames (67 ms), hold 1, open 10 (167 ms). Squashes the glyph only.
-    blink = animation("Blink", PLATE_BLINK_ANIM, BLINK_FRAMES, {GLYPHS_NODE: {SY: [(0, 1, STD_DECEL), (BLINK_SHUT, 0, None), (BLINK_SHUT + 1, 0, EMPH_DECEL), (BLINK_FRAMES, 1)]}})
+    shutter = [(0, 1, STD_DECEL), (BLINK_SHUT, 0, None), (BLINK_SHUT + 1, 0, EMPH_DECEL), (BLINK_FRAMES, 1)]
+    blink = animation("Blink", PLATE_BLINK_ANIM, BLINK_FRAMES, {GLYPHS_NODE: {SY: shutter}, PUPIL_OVERLAY: {SY: list(shutter)}})
     wait_a = animation("WaitA", PLATE_WAIT_A, frames(2500), {})
     wait_b = animation("WaitB", PLATE_WAIT_B, frames(4500), {})
 
@@ -533,6 +649,7 @@ def plate_component():
         </Node>
         <Node x="0" y="0" name="GlyphScale" id="{GLYPH_SCALE_NODE}">
             <Node x="0" y="0" name="Saccade" id="{SACCADE_NODE}">
+{indent(pupil_overlay(), "                ")}
                 <Solo activeComponentId="{GLYPH[STATE_GLYPH['idle']]}" x="0" y="0" name="Glyphs" id="{GLYPHS_NODE}">
 {indent(glyphs, "                    ")}
                 </Solo>
@@ -778,6 +895,7 @@ def sustained_animations():
         bs = breath_scale(*BREATHING[st]) if st in BREATHING else 1
         objs = {BODY_NODE: body_keys, FACE: face_keys, TINT: {COLOR: tint}, PLATE_EXPR: {NESTED_VALUE: EXPR[st]},
                 INFLATE_NODE: {SX: bs, SY: bs},
+                **bone_pose([(0, 1, 0, 0)]),
                 LUMEN: lumen_keys(BREATHING[st][0], LUMEN_PEAK * (0.6 if st == "sleeping" else 1)) if st in BREATHING else LUMEN_REST,
                 GLOSS: {GRADIENT_OPACITY: gloss if gloss else 1}, JOYSTICK: {JX: jx, JY: jy}, HALO: {OPACITY: halo},
                 AUTO_X: {REMAP_TIME: gx(period) if callable(gx) else gx}, AUTO_Y: {REMAP_TIME: gy(period) if callable(gy) else gy}}
@@ -838,6 +956,22 @@ def shape_animations():
     return [animation("Shape" + s[0].upper() + s[1:], shape_anim[s], 1, shape_keys(s)) for s in SHAPES]
 
 
+def bone_pose(keys):
+    """keys: (frame, S, L, H[, bezier]) -> bone transforms for the three-band deformation."""
+    out = {BONE_CROWN: {SX: [], SY: [], X: []}, BONE_MID: {SX: [], SY: []}, BONE_BASE: {SX: [], SY: [], X: []}}
+    for k in keys:
+        f, S, L, H = k[0], k[1], k[2], k[3]
+        bez = tuple(k[4:])
+        out[BONE_CROWN][SX].append((f, round(S - L, 4)) + bez)
+        out[BONE_MID][SX].append((f, round(S, 4)) + bez)
+        out[BONE_BASE][SX].append((f, round(S + L, 4)) + bez)
+        for b in (BONE_CROWN, BONE_MID, BONE_BASE):
+            out[b][SY].append((f, round(1 / S, 4)) + bez)
+        out[BONE_CROWN][X].append((f, round(-BONE_REACH * H, 3)) + bez)
+        out[BONE_BASE][X].append((f, round(BONE_REACH * H, 3)) + bez)
+    return out
+
+
 def squash(node, keys):
     """Volume-preserving squash and stretch: keys of (frame, scaleX[, bezier]); scaleY = 1/scaleX."""
     sx = [(k[0], k[1]) + tuple(k[2:]) for k in keys]
@@ -857,8 +991,11 @@ def momentary_animations():
         PLATE_EXPR: {NESTED_VALUE: EXPR["success"]}}
     # Squash and stretch, volume preserved: crouch before the jump, stretch on the way up,
     # neutral at the apex, stretch falling, squash on landing, elastic settle. The plate joins in.
-    success_keys.update(squash(INFLATE_NODE, [(0, 1, EMPH_ACCEL), (f(10), 1.06, STD_DECEL), (f(22), 0.93, SOFT_OUT), (f(37.5), 1, EMPH_ACCEL),
-                                              (f(60), 0.96, ACCEL), (f(70), 1.10, ELASTIC_SOFT), (S, 1)]))
+    # SPEC 10.5 success deformation keys (S, L, H); the inflate node holds 1 while the bones own the body.
+    success_keys.update(bone_pose([(0, 1, 0, 0, EMPH_ACCEL), (f(10), 1.06, 0.008, 0, STD_DECEL), (f(22), 0.93, -0.008, 0, SOFT_OUT),
+                                   (f(37.5), 1, 0, 0, EMPH_ACCEL), (f(60), 0.96, -0.006, 0, ACCEL), (f(70), 1.10, 0.012, 0, SOFT_OUT),
+                                   (f(87.5), 1.02, 0.003, 0, M3_STANDARD), (S, 1, 0, 0)]))
+    success_keys[INFLATE_NODE] = {SX: 1, SY: 1}
     success_keys[FACE].update(squash(FACE, [(0, 1, EMPH_ACCEL), (f(22), 0.97, SOFT_OUT), (f(37.5), 1, EMPH_ACCEL), (f(70), 1.05, ELASTIC_SOFT), (S, 1)])[FACE])
     success_keys.update(spin_keys(f(10), f(70) - f(10)))
     success = animation("SuccessFlash", SUCCESS_ANIM, S, success_keys)
@@ -869,9 +1006,13 @@ def momentary_animations():
     ey = [(0, 0, STANDARD), (g(16.6667), 24, STANDARD), (g(33.3333), 24, STANDARD), (g(50), 24, STANDARD), (g(66.6667), 24, None), (E, 24)]
     er = [(0, 0, STANDARD), (g(16.6667), rad(-7), STANDARD), (g(33.3333), rad(7), STANDARD), (g(50), rad(-3), STANDARD), (g(66.6667), rad(5), None), (E, rad(5))]
     error_keys = {BODY_NODE: {X: ex, Y: ey}, FACE: {X: ex, Y: ey, ROT: er}, PLATE_EXPR: {NESTED_VALUE: EXPR["error"]}}
-    error_keys.update(squash(INFLATE_NODE, [(0, 1, STANDARD), (g(16.6667), 1.07, STANDARD), (g(33.3333), 0.97, STANDARD), (g(50), 1.04, STANDARD), (g(66.6667), 1, None), (E, 1)]))
+    error_keys.update(bone_pose([(0, 1, 0, 0, STANDARD), (g(16.6667), 1.07, 0, 0, STANDARD), (g(33.3333), 0.97, 0, 0, STANDARD),
+                                 (g(50), 1.04, 0, 0, STANDARD), (g(66.6667), 1, 0, 0, None), (E, 1, 0, 0)]))
+    error_keys[INFLATE_NODE] = {SX: 1, SY: 1}
     error = animation("ErrorFlash", ERROR_ANIM, E, error_keys)
-    drag = animation("Dragged", DRAG_ANIM, 1, {PLATE_EXPR: {NESTED_VALUE: EXPR["dragged"]}, INFLATE_NODE: {SX: 1.08, SY: 0.92}})
+    drag_keys = {PLATE_EXPR: {NESTED_VALUE: EXPR["dragged"]}, INFLATE_NODE: {SX: 1, SY: 1}}
+    drag_keys.update(bone_pose([(0, round(1 / 0.92, 4), -0.008, 0, None)]))   # vertical compression, horizontal spread
+    drag = animation("Dragged", DRAG_ANIM, 1, drag_keys)
     return [animation("FlashRest", FLASH_REST_ANIM, 1, {}), success, error, animation("DragRest", DRAG_REST_ANIM, 1, {}), drag]
 
 

@@ -444,7 +444,8 @@ private fun ExpandedAgentRow(params: AgentRailOrbParams) {
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Box(contentAlignment = Alignment.Center) {
-            if (flags.thinking) {
+            // A live mascot shows thinking itself; the ring is for the gradient orb only.
+            if (flags.thinking && target.identity == null) {
                 ThinkingRing(diameter = 32.dp)
             }
             RailAgentTile(target = target, initial = params.group.name.firstOrNull()?.uppercase() ?: "?", size = 28.dp, cornerRadius = 8.dp)
@@ -610,7 +611,7 @@ private fun AgentRailOrbContent(
         if (flags.selected) {
             SelectedAgentRailMarker(modifier = Modifier.align(Alignment.CenterStart))
         }
-        if (flags.thinking) {
+        if (flags.thinking && target.identity == null) {
             // Concentric with the 30dp orb (2dp gap) and sized to fit the
             // slot so it doesn't crowd neighbouring orbs.
             ThinkingRing(diameter = 34.dp)

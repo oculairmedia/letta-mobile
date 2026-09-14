@@ -449,6 +449,12 @@ internal fun LettaDesktopApp(
     val thinkingAgentId = thinkingConversationId?.let { tid ->
         chatState.conversations.firstOrNull { it.id == tid }?.agentId
     }
+    // Presence -> mascot state (P2 first slice): the thinking agent thinks; everyone else idles.
+    androidx.compose.runtime.SideEffect {
+        com.letta.mobile.desktop.chat.MascotIdentityRegistry.updateStates(
+            buildMap { thinkingAgentId?.let { put(it, com.letta.mobile.avatar.core.AvatarState.THINKING) } },
+        )
+    }
     val isThinkingSelected = thinkingConversationId != null &&
         thinkingConversationId == chatState.selectedConversationId
     // Reply is actively streaming for the selected conversation — outlives
