@@ -131,7 +131,7 @@ class AgentScaffoldHiltTest {
         }
 
         composeRule.onNodeWithTag(AgentScaffoldTestTags.MENU_BUTTON).performClick()
-        composeRule.onNodeWithText("Context utilization").assertIsDisplayed()
+        composeRule.onNodeWithTag(AgentScaffoldTestTags.DRAWER_MODEL_CARD).assertIsDisplayed()
     }
 
     @Test
