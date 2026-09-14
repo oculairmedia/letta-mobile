@@ -95,7 +95,7 @@ PUPIL = {}   # state: (period ms, amplitude px); empty = never shown
 WAVE_STROKE = 5   # spec says 8; that reads as a bar at hero size
 PUPIL_PARALLAX = (1.5, 1.0)
 # Saccade layer: random waits, then a 60 ms hop to one of a few small fixations, a hold, a hop back.
-SACCADE_WAITS = [("7:170", 1800), ("7:171", 3600), ("7:172", 5200)]          # (anim id, ms)
+SACCADE_WAITS = [("7:170", 3600), ("7:171", 7200), ("7:172", 10400)]          # (anim id, ms)
 # (anim id, (dx, dy) px, weight %): Eyes Alive direction distribution - down 20, up 18, left 17,
 # right 16, diagonals 6-8 - with cardinal hops larger than diagonal ones (magnitudes skew small).
 SACCADE_FIX = [("7:173", (0, 5), 20), ("7:174", (0, -5), 18), ("7:175", (-6, 0), 17), ("7:176", (6, 0), 16),
@@ -581,8 +581,8 @@ def plate_component():
     # natural. Close 4 frames (67 ms), hold 1, open 10 (167 ms). Squashes the glyph only.
     shutter = [(0, 1, STD_DECEL), (BLINK_SHUT, 0, None), (BLINK_SHUT + 1, 0, EMPH_DECEL), (BLINK_FRAMES, 1)]
     blink = animation("Blink", PLATE_BLINK_ANIM, BLINK_FRAMES, {GLYPHS_NODE: {SY: shutter}, PUPIL_OVERLAY: {SY: list(shutter)}})
-    wait_a = animation("WaitA", PLATE_WAIT_A, frames(2500), {})
-    wait_b = animation("WaitB", PLATE_WAIT_B, frames(4500), {})
+    wait_a = animation("WaitA", PLATE_WAIT_A, frames(4000), {})
+    wait_b = animation("WaitB", PLATE_WAIT_B, frames(8000), {})
 
     expr_layer = expression_layer("Expression", "7:10", PLATE_IN_EXPR, plate_expr_anim, plate_expr_node)
 
@@ -802,7 +802,7 @@ def wander_animations():
     sleep_shift = animation("WanderSleepShift", WANDER_SLEEP_SHIFT, frames(3000), {JOYSTICK: {
         JX: [(0, 0.4, SINE), (frames(1500), 0.22, SINE), (frames(3000), 0.4)],
         JY: [(0, 0.5, SINE), (frames(1500), 0.62, SINE), (frames(3000), 0.5)]}})
-    return [animation("WanderWaitA", WANDER_WAIT_A, frames(6000), {}), animation("WanderWaitB", WANDER_WAIT_B, frames(12000), {}),
+    return [animation("WanderWaitA", WANDER_WAIT_A, frames(12000), {}), animation("WanderWaitB", WANDER_WAIT_B, frames(24000), {}),
             animation("WanderSleepWait", WANDER_SLEEP_WAIT, frames(30000), {}), sleep_shift, glance, peek, spin]
 
 
@@ -1040,7 +1040,7 @@ def idle_variety_animations():
     glance = animation("IdleGlance", IDLE_GLANCE_ANIM, m + h + r, {
         FACE: {ROT: [(0, 0, BACK_IN_OUT), (m, rad(2), None), (m + h, rad(2), ELASTIC_SOFT), (m + h + r, 0)],
                X: [(0, 0, BACK_IN_OUT), (m, 2, None), (m + h, 2, ELASTIC_SOFT), (m + h + r, 0)]}})
-    return [animation("IdleWaitA", IDLE_WAIT_A, frames(4000), {}), animation("IdleWaitB", IDLE_WAIT_B, frames(7000), {}), glance]
+    return [animation("IdleWaitA", IDLE_WAIT_A, frames(8000), {}), animation("IdleWaitB", IDLE_WAIT_B, frames(14000), {}), glance]
 
 
 def root_machine():

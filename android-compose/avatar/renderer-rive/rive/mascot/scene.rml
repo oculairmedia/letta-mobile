@@ -919,7 +919,7 @@
                     <KeyFrameDouble value="0.0" frame="0" id="0:972"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="83" id="0:973">
-                    <KeyFrameDouble value="58.0" frame="0" id="0:974"/>
+                    <KeyFrameDouble value="95.0" frame="0" id="0:974"/>
                 </KeyedProperty>
             </KeyedObject>
             <KeyedObject objectId="0:310" id="0:975">
@@ -933,7 +933,7 @@
                     <KeyFrameDouble value="0.0" frame="0" id="0:981"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="83" id="0:982">
-                    <KeyFrameDouble value="58.0" frame="0" id="0:983"/>
+                    <KeyFrameDouble value="95.0" frame="0" id="0:983"/>
                 </KeyedProperty>
             </KeyedObject>
             <KeyedObject objectId="0:320" id="0:984">
@@ -947,49 +947,49 @@
                     <KeyFrameDouble value="0.0" frame="0" id="0:990"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="83" id="0:991">
-                    <KeyFrameDouble value="58.0" frame="0" id="0:992"/>
+                    <KeyFrameDouble value="95.0" frame="0" id="0:992"/>
                 </KeyedProperty>
             </KeyedObject>
             <KeyedObject objectId="0:301" id="0:993">
                 <KeyedProperty propertyKey="24" id="0:994">
-                    <KeyFrameDouble value="118.0" frame="0" id="0:995"/>
+                    <KeyFrameDouble value="138.0" frame="0" id="0:995"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="25" id="0:996">
-                    <KeyFrameDouble value="-118.0" frame="0" id="0:997"/>
+                    <KeyFrameDouble value="-138.0" frame="0" id="0:997"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="82" id="0:998">
                     <KeyFrameDouble value="0.7854" frame="0" id="0:999"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="83" id="0:1000">
-                    <KeyFrameDouble value="27.0" frame="0" id="0:1001"/>
+                    <KeyFrameDouble value="16.9706" frame="0" id="0:1001"/>
                 </KeyedProperty>
             </KeyedObject>
             <KeyedObject objectId="0:311" id="0:1002">
                 <KeyedProperty propertyKey="24" id="0:1003">
-                    <KeyFrameDouble value="118.0" frame="0" id="0:1004"/>
+                    <KeyFrameDouble value="138.0" frame="0" id="0:1004"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="25" id="0:1005">
-                    <KeyFrameDouble value="-118.0" frame="0" id="0:1006"/>
+                    <KeyFrameDouble value="-138.0" frame="0" id="0:1006"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="82" id="0:1007">
                     <KeyFrameDouble value="0.7854" frame="0" id="0:1008"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="83" id="0:1009">
-                    <KeyFrameDouble value="27.0" frame="0" id="0:1010"/>
+                    <KeyFrameDouble value="16.9706" frame="0" id="0:1010"/>
                 </KeyedProperty>
             </KeyedObject>
             <KeyedObject objectId="0:321" id="0:1011">
                 <KeyedProperty propertyKey="24" id="0:1012">
-                    <KeyFrameDouble value="118.0" frame="0" id="0:1013"/>
+                    <KeyFrameDouble value="138.0" frame="0" id="0:1013"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="25" id="0:1014">
-                    <KeyFrameDouble value="-118.0" frame="0" id="0:1015"/>
+                    <KeyFrameDouble value="-138.0" frame="0" id="0:1015"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="82" id="0:1016">
                     <KeyFrameDouble value="0.7854" frame="0" id="0:1017"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="83" id="0:1018">
-                    <KeyFrameDouble value="27.0" frame="0" id="0:1019"/>
+                    <KeyFrameDouble value="16.9706" frame="0" id="0:1019"/>
                 </KeyedProperty>
             </KeyedObject>
             <KeyedObject objectId="0:302" id="0:1020">
@@ -1003,7 +1003,7 @@
                     <KeyFrameDouble value="1.5708" frame="0" id="0:1026"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="83" id="0:1027">
-                    <KeyFrameDouble value="58.0" frame="0" id="0:1028"/>
+                    <KeyFrameDouble value="95.0" frame="0" id="0:1028"/>
                 </KeyedProperty>
             </KeyedObject>
             <KeyedObject objectId="0:312" id="0:1029">
@@ -1017,7 +1017,7 @@
                     <KeyFrameDouble value="1.5708" frame="0" id="0:1035"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="83" id="0:1036">
-                    <KeyFrameDouble value="58.0" frame="0" id="0:1037"/>
+                    <KeyFrameDouble value="95.0" frame="0" id="0:1037"/>
                 </KeyedProperty>
             </KeyedObject>
             <KeyedObject objectId="0:322" id="0:1038">
@@ -1031,49 +1031,49 @@
                     <KeyFrameDouble value="1.5708" frame="0" id="0:1044"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="83" id="0:1045">
-                    <KeyFrameDouble value="58.0" frame="0" id="0:1046"/>
+                    <KeyFrameDouble value="95.0" frame="0" id="0:1046"/>
                 </KeyedProperty>
             </KeyedObject>
             <KeyedObject objectId="0:303" id="0:1047">
                 <KeyedProperty propertyKey="24" id="0:1048">
-                    <KeyFrameDouble value="118.0" frame="0" id="0:1049"/>
+                    <KeyFrameDouble value="138.0" frame="0" id="0:1049"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="25" id="0:1050">
-                    <KeyFrameDouble value="118.0" frame="0" id="0:1051"/>
+                    <KeyFrameDouble value="138.0" frame="0" id="0:1051"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="82" id="0:1052">
                     <KeyFrameDouble value="2.35619" frame="0" id="0:1053"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="83" id="0:1054">
-                    <KeyFrameDouble value="27.0" frame="0" id="0:1055"/>
+                    <KeyFrameDouble value="16.9706" frame="0" id="0:1055"/>
                 </KeyedProperty>
             </KeyedObject>
             <KeyedObject objectId="0:313" id="0:1056">
                 <KeyedProperty propertyKey="24" id="0:1057">
-                    <KeyFrameDouble value="118.0" frame="0" id="0:1058"/>
+                    <KeyFrameDouble value="138.0" frame="0" id="0:1058"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="25" id="0:1059">
-                    <KeyFrameDouble value="118.0" frame="0" id="0:1060"/>
+                    <KeyFrameDouble value="138.0" frame="0" id="0:1060"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="82" id="0:1061">
                     <KeyFrameDouble value="2.35619" frame="0" id="0:1062"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="83" id="0:1063">
-                    <KeyFrameDouble value="27.0" frame="0" id="0:1064"/>
+                    <KeyFrameDouble value="16.9706" frame="0" id="0:1064"/>
                 </KeyedProperty>
             </KeyedObject>
             <KeyedObject objectId="0:323" id="0:1065">
                 <KeyedProperty propertyKey="24" id="0:1066">
-                    <KeyFrameDouble value="118.0" frame="0" id="0:1067"/>
+                    <KeyFrameDouble value="138.0" frame="0" id="0:1067"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="25" id="0:1068">
-                    <KeyFrameDouble value="118.0" frame="0" id="0:1069"/>
+                    <KeyFrameDouble value="138.0" frame="0" id="0:1069"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="82" id="0:1070">
                     <KeyFrameDouble value="2.35619" frame="0" id="0:1071"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="83" id="0:1072">
-                    <KeyFrameDouble value="27.0" frame="0" id="0:1073"/>
+                    <KeyFrameDouble value="16.9706" frame="0" id="0:1073"/>
                 </KeyedProperty>
             </KeyedObject>
             <KeyedObject objectId="0:304" id="0:1074">
@@ -1087,7 +1087,7 @@
                     <KeyFrameDouble value="3.14159" frame="0" id="0:1080"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="83" id="0:1081">
-                    <KeyFrameDouble value="58.0" frame="0" id="0:1082"/>
+                    <KeyFrameDouble value="95.0" frame="0" id="0:1082"/>
                 </KeyedProperty>
             </KeyedObject>
             <KeyedObject objectId="0:314" id="0:1083">
@@ -1101,7 +1101,7 @@
                     <KeyFrameDouble value="3.14159" frame="0" id="0:1089"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="83" id="0:1090">
-                    <KeyFrameDouble value="58.0" frame="0" id="0:1091"/>
+                    <KeyFrameDouble value="95.0" frame="0" id="0:1091"/>
                 </KeyedProperty>
             </KeyedObject>
             <KeyedObject objectId="0:324" id="0:1092">
@@ -1115,49 +1115,49 @@
                     <KeyFrameDouble value="3.14159" frame="0" id="0:1098"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="83" id="0:1099">
-                    <KeyFrameDouble value="58.0" frame="0" id="0:1100"/>
+                    <KeyFrameDouble value="95.0" frame="0" id="0:1100"/>
                 </KeyedProperty>
             </KeyedObject>
             <KeyedObject objectId="0:305" id="0:1101">
                 <KeyedProperty propertyKey="24" id="0:1102">
-                    <KeyFrameDouble value="-118.0" frame="0" id="0:1103"/>
+                    <KeyFrameDouble value="-138.0" frame="0" id="0:1103"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="25" id="0:1104">
-                    <KeyFrameDouble value="118.0" frame="0" id="0:1105"/>
+                    <KeyFrameDouble value="138.0" frame="0" id="0:1105"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="82" id="0:1106">
                     <KeyFrameDouble value="-2.35619" frame="0" id="0:1107"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="83" id="0:1108">
-                    <KeyFrameDouble value="27.0" frame="0" id="0:1109"/>
+                    <KeyFrameDouble value="16.9706" frame="0" id="0:1109"/>
                 </KeyedProperty>
             </KeyedObject>
             <KeyedObject objectId="0:315" id="0:1110">
                 <KeyedProperty propertyKey="24" id="0:1111">
-                    <KeyFrameDouble value="-118.0" frame="0" id="0:1112"/>
+                    <KeyFrameDouble value="-138.0" frame="0" id="0:1112"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="25" id="0:1113">
-                    <KeyFrameDouble value="118.0" frame="0" id="0:1114"/>
+                    <KeyFrameDouble value="138.0" frame="0" id="0:1114"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="82" id="0:1115">
                     <KeyFrameDouble value="-2.35619" frame="0" id="0:1116"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="83" id="0:1117">
-                    <KeyFrameDouble value="27.0" frame="0" id="0:1118"/>
+                    <KeyFrameDouble value="16.9706" frame="0" id="0:1118"/>
                 </KeyedProperty>
             </KeyedObject>
             <KeyedObject objectId="0:325" id="0:1119">
                 <KeyedProperty propertyKey="24" id="0:1120">
-                    <KeyFrameDouble value="-118.0" frame="0" id="0:1121"/>
+                    <KeyFrameDouble value="-138.0" frame="0" id="0:1121"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="25" id="0:1122">
-                    <KeyFrameDouble value="118.0" frame="0" id="0:1123"/>
+                    <KeyFrameDouble value="138.0" frame="0" id="0:1123"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="82" id="0:1124">
                     <KeyFrameDouble value="-2.35619" frame="0" id="0:1125"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="83" id="0:1126">
-                    <KeyFrameDouble value="27.0" frame="0" id="0:1127"/>
+                    <KeyFrameDouble value="16.9706" frame="0" id="0:1127"/>
                 </KeyedProperty>
             </KeyedObject>
             <KeyedObject objectId="0:306" id="0:1128">
@@ -1171,7 +1171,7 @@
                     <KeyFrameDouble value="-1.5708" frame="0" id="0:1134"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="83" id="0:1135">
-                    <KeyFrameDouble value="58.0" frame="0" id="0:1136"/>
+                    <KeyFrameDouble value="95.0" frame="0" id="0:1136"/>
                 </KeyedProperty>
             </KeyedObject>
             <KeyedObject objectId="0:316" id="0:1137">
@@ -1185,7 +1185,7 @@
                     <KeyFrameDouble value="-1.5708" frame="0" id="0:1143"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="83" id="0:1144">
-                    <KeyFrameDouble value="58.0" frame="0" id="0:1145"/>
+                    <KeyFrameDouble value="95.0" frame="0" id="0:1145"/>
                 </KeyedProperty>
             </KeyedObject>
             <KeyedObject objectId="0:326" id="0:1146">
@@ -1199,49 +1199,49 @@
                     <KeyFrameDouble value="-1.5708" frame="0" id="0:1152"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="83" id="0:1153">
-                    <KeyFrameDouble value="58.0" frame="0" id="0:1154"/>
+                    <KeyFrameDouble value="95.0" frame="0" id="0:1154"/>
                 </KeyedProperty>
             </KeyedObject>
             <KeyedObject objectId="0:307" id="0:1155">
                 <KeyedProperty propertyKey="24" id="0:1156">
-                    <KeyFrameDouble value="-118.0" frame="0" id="0:1157"/>
+                    <KeyFrameDouble value="-138.0" frame="0" id="0:1157"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="25" id="0:1158">
-                    <KeyFrameDouble value="-118.0" frame="0" id="0:1159"/>
+                    <KeyFrameDouble value="-138.0" frame="0" id="0:1159"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="82" id="0:1160">
                     <KeyFrameDouble value="-0.7854" frame="0" id="0:1161"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="83" id="0:1162">
-                    <KeyFrameDouble value="27.0" frame="0" id="0:1163"/>
+                    <KeyFrameDouble value="16.9706" frame="0" id="0:1163"/>
                 </KeyedProperty>
             </KeyedObject>
             <KeyedObject objectId="0:317" id="0:1164">
                 <KeyedProperty propertyKey="24" id="0:1165">
-                    <KeyFrameDouble value="-118.0" frame="0" id="0:1166"/>
+                    <KeyFrameDouble value="-138.0" frame="0" id="0:1166"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="25" id="0:1167">
-                    <KeyFrameDouble value="-118.0" frame="0" id="0:1168"/>
+                    <KeyFrameDouble value="-138.0" frame="0" id="0:1168"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="82" id="0:1169">
                     <KeyFrameDouble value="-0.7854" frame="0" id="0:1170"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="83" id="0:1171">
-                    <KeyFrameDouble value="27.0" frame="0" id="0:1172"/>
+                    <KeyFrameDouble value="16.9706" frame="0" id="0:1172"/>
                 </KeyedProperty>
             </KeyedObject>
             <KeyedObject objectId="0:327" id="0:1173">
                 <KeyedProperty propertyKey="24" id="0:1174">
-                    <KeyFrameDouble value="-118.0" frame="0" id="0:1175"/>
+                    <KeyFrameDouble value="-138.0" frame="0" id="0:1175"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="25" id="0:1176">
-                    <KeyFrameDouble value="-118.0" frame="0" id="0:1177"/>
+                    <KeyFrameDouble value="-138.0" frame="0" id="0:1177"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="82" id="0:1178">
                     <KeyFrameDouble value="-0.7854" frame="0" id="0:1179"/>
                 </KeyedProperty>
                 <KeyedProperty propertyKey="83" id="0:1180">
-                    <KeyFrameDouble value="27.0" frame="0" id="0:1181"/>
+                    <KeyFrameDouble value="16.9706" frame="0" id="0:1181"/>
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
@@ -7597,10 +7597,10 @@
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
-        <LinearAnimation fps="60" duration="240" loopValue="oneShot" name="IdleWaitA" id="3:210">
+        <LinearAnimation fps="60" duration="480" loopValue="oneShot" name="IdleWaitA" id="3:210">
 
         </LinearAnimation>
-        <LinearAnimation fps="60" duration="420" loopValue="oneShot" name="IdleWaitB" id="3:211">
+        <LinearAnimation fps="60" duration="840" loopValue="oneShot" name="IdleWaitB" id="3:211">
 
         </LinearAnimation>
         <LinearAnimation fps="60" duration="72" loopValue="oneShot" name="IdleGlance" id="3:212">
@@ -7690,10 +7690,10 @@
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
-        <LinearAnimation fps="60" duration="360" loopValue="oneShot" name="WanderWaitA" id="3:230">
+        <LinearAnimation fps="60" duration="720" loopValue="oneShot" name="WanderWaitA" id="3:230">
 
         </LinearAnimation>
-        <LinearAnimation fps="60" duration="720" loopValue="oneShot" name="WanderWaitB" id="3:231">
+        <LinearAnimation fps="60" duration="1440" loopValue="oneShot" name="WanderWaitB" id="3:231">
 
         </LinearAnimation>
         <LinearAnimation fps="60" duration="1800" loopValue="oneShot" name="WanderSleepWait" id="3:235">
@@ -18691,10 +18691,10 @@
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
-        <LinearAnimation fps="60" duration="150" loopValue="oneShot" name="WaitA" id="7:64">
+        <LinearAnimation fps="60" duration="240" loopValue="oneShot" name="WaitA" id="7:64">
 
         </LinearAnimation>
-        <LinearAnimation fps="60" duration="270" loopValue="oneShot" name="WaitB" id="7:65">
+        <LinearAnimation fps="60" duration="480" loopValue="oneShot" name="WaitB" id="7:65">
 
         </LinearAnimation>
         <LinearAnimation fps="60" duration="60" loopValue="oneShot" name="TunePlate" id="7:66">
@@ -18741,13 +18741,13 @@
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
-        <LinearAnimation fps="60" duration="108" loopValue="oneShot" name="SaccadeWait1800" id="7:170">
+        <LinearAnimation fps="60" duration="216" loopValue="oneShot" name="SaccadeWait3600" id="7:170">
 
         </LinearAnimation>
-        <LinearAnimation fps="60" duration="216" loopValue="oneShot" name="SaccadeWait3600" id="7:171">
+        <LinearAnimation fps="60" duration="432" loopValue="oneShot" name="SaccadeWait7200" id="7:171">
 
         </LinearAnimation>
-        <LinearAnimation fps="60" duration="312" loopValue="oneShot" name="SaccadeWait5200" id="7:172">
+        <LinearAnimation fps="60" duration="624" loopValue="oneShot" name="SaccadeWait10400" id="7:172">
 
         </LinearAnimation>
         <LinearAnimation fps="60" duration="50" loopValue="oneShot" name="Saccade1" id="7:173">
