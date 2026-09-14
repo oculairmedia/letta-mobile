@@ -12,6 +12,7 @@ radians. Ids are "<client>:<index>" so a fragment can be pasted into another fil
 """
 import json
 import sys
+from xml.sax.saxutils import escape
 
 DRAWABLE = {
     "Node", "Shape", "PointsPath", "Ellipse", "Rectangle", "Polygon", "Star", "Triangle",
@@ -42,49 +43,68 @@ def fmt(v):
     return str(v)
 
 
-def lift(dump, artboard_name, client=9, subtree=None):
-    ab = next(a for a in dump["artboards"] if a["name"] == artboard_name)
-    objs = {o["index"]: o for o in ab["objects"] if o.get("type")}
+def xml_attr(v):
+    return escape(fmt(v), {'"': "&quot;"})
+
+
+def _remap(k, v, new_id):
+    if k in ID_ATTRS:
+        return f'{k}="{new_id(v)}"'
+    if k in ENUMS and isinstance(v, int) and v < len(ENUMS[k]):
+        v = ENUMS[k][v]
+    if k in DEFAULTS and v == DEFAULTS[k]:
+        return None
+    return f'{k}="{xml_attr(v)}"'
+
+
+def _attrs_for(o, new_id):
+    attrs = []
+    for k, v in o.items():
+        if k in ("index", "typeKey", "type") or k in SKIP_ATTRS:
+            continue
+        mapped = _remap(k, v, new_id)
+        if mapped:
+            attrs.append(mapped)
+    t = o["type"]
+    if t in ("Node", "Shape", "PointsPath", "Ellipse", "Rectangle", "Polygon", "Star", "Solo"):
+        attrs.append(f'name="{t}{o["index"]}" id="{new_id(o["index"])}"')
+    else:
+        attrs.append(f'name="{t}"')
+    return attrs
+
+
+def _emit(o, depth, kids, new_id):
+    t = o["type"]
+    if t not in DRAWABLE:
+        return []
+    children = [line for c in kids.get(o["index"], []) for line in _emit(c, depth + 1, kids, new_id)]
+    pad = "    " * depth
+    head = f'{pad}<{t} {" ".join(_attrs_for(o, new_id))}'
+    if not children:
+        return [head + "/>"]
+    return [head + ">"] + children + [f"{pad}</{t}>"]
+
+
+def _kid_map(objs):
     kids = {}
     for o in objs.values():
         if o["index"] != 0 and "parentId" in o:
             kids.setdefault(o["parentId"], []).append(o)
+    return kids
+
+
+def lift(dump, artboard_name, client=9, subtree=None):
+    ab = next(a for a in dump["artboards"] if a["name"] == artboard_name)
+    objs = {o["index"]: o for o in ab["objects"] if o.get("type")}
+    kids = _kid_map(objs)
     new_id = lambda i: f"{client}:{i + 1}"  # object 0 is reserved in RML ids
-
-    def emit(o, depth):
-        t = o["type"]
-        if t not in DRAWABLE:
-            return []
-        attrs = []
-        for k, v in o.items():
-            if k in ("index", "typeKey", "type") or k in SKIP_ATTRS:
-                continue
-            if k in ID_ATTRS:
-                attrs.append(f'{k}="{new_id(v)}"')
-                continue
-            if k in ENUMS and isinstance(v, int) and v < len(ENUMS[k]):
-                v = ENUMS[k][v]
-            if k in DEFAULTS and v == DEFAULTS[k]:
-                continue
-            attrs.append(f'{k}="{fmt(v)}"')
-        if t in ("Node", "Shape", "PointsPath", "Ellipse", "Rectangle", "Polygon", "Star", "Solo"):
-            attrs.append(f'name="{t}{o["index"]}" id="{new_id(o["index"])}"')
-        else:
-            attrs.append(f'name="{t}"')
-        children = [line for c in kids.get(o["index"], []) for line in emit(c, depth + 1)]
-        pad = "    " * depth
-        head = f'{pad}<{t} {" ".join(attrs)}'
-        if not children:
-            return [head + "/>"]
-        return [head + ">"] + children + [f"{pad}</{t}>"]
-
+    roots = kids.get(subtree, []) if subtree is not None else kids.get(0, [])
     lines = []
-    for c in kids.get(subtree, []) if subtree is not None else kids.get(0, []):
-        lines += emit(c, 1)
+    for c in roots:
+        lines += _emit(c, 1, kids, new_id)
     if subtree is not None and subtree in objs:
-        lines = emit(objs[subtree], 1)
-    root = objs[0]
-    return root, lines
+        lines = _emit(objs[subtree], 1, kids, new_id)
+    return objs[0], lines
 
 
 if __name__ == "__main__":
@@ -97,8 +117,8 @@ if __name__ == "__main__":
     if "--standalone" in sys.argv:
         out = sys.argv[sys.argv.index("--standalone") + 1]
         w, h = root.get("width", 500), root.get("height", 500)
-        doc = (f'<Rive version="1" kind="fragment">\n<Artboard clip="false" width="{fmt(w)}" height="{fmt(h)}" '
-               f'name="{name}" id="{client}:1">\n{body}\n</Artboard>\n</Rive>\n')
+        doc = (f'<Rive version="1" kind="fragment">\n<Artboard clip="false" width="{xml_attr(w)}" height="{xml_attr(h)}" '
+               f'name="{xml_attr(name)}" id="{client}:1">\n{body}\n</Artboard>\n</Rive>\n')
         open(out, "w", encoding="utf-8", newline="\n").write(doc)
         print(f"wrote {out}: {len(lines)} lines, artboard {w}x{h}", file=sys.stderr)
     else:

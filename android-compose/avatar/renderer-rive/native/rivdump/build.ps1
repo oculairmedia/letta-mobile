@@ -6,7 +6,11 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-$vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+$vs = if (Test-Path $vswhere) {
+    & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+} else {
+    $null
+}
 if (-not $vs) { $vs = "C:\Program Files\Microsoft Visual Studio\2022\Community" }
 $vcvars = Join-Path $vs 'VC\Auxiliary\Build\vcvars64.bat'
 $lib = Join-Path $RiveRuntime 'renderer\out\release'

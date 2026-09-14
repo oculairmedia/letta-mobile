@@ -24,15 +24,19 @@ want_shape_keys = set(re.findall(r'MascotShape\.\w+ -> "(\w+)"', kt))
 dump = json.loads(subprocess.run([RIVE, "inspect", ".", "--json"], cwd=project, capture_output=True, text=True).stdout)
 
 
+def _walk(o):
+    stack = [o]
+    while stack:
+        cur = stack.pop()
+        if isinstance(cur, dict):
+            yield cur
+            stack.extend(cur.values())
+        elif isinstance(cur, list):
+            stack.extend(cur)
+
+
 def find(o, t):
-    if isinstance(o, dict):
-        if o.get("type") == t:
-            yield o
-        for v in o.values():
-            yield from find(v, t)
-    elif isinstance(o, list):
-        for x in o:
-            yield from find(x, t)
+    return (node for node in _walk(o) if node.get("type") == t)
 
 
 have_props = {p["name"] for t in ("ViewModelPropertyEnumCustom", "ViewModelPropertyNumber",

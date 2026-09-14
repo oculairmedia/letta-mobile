@@ -29,6 +29,7 @@ internal interface RiveBridgeNative : Library {
     fun rive_bridge_vm_set_enum(bridge: Pointer, name: String, key: String): Int
     fun rive_bridge_vm_fire(bridge: Pointer, name: String): Int
     fun rive_bridge_vm_set_color(bridge: Pointer, name: String, argb: Int): Int
+    fun rive_bridge_vm_set_boolean(bridge: Pointer, name: String, value: Int): Int
 
     companion object {
         /**
@@ -73,15 +74,20 @@ class RiveDesktopScene private constructor(
     private var buffer: Memory? = null
     private var closed = false
 
-    val artboardWidth: Float get() = native.rive_bridge_artboard_width(handle)
-    val artboardHeight: Float get() = native.rive_bridge_artboard_height(handle)
+    val artboardWidth: Float get() = native.rive_bridge_artboard_width(openHandle())
+    val artboardHeight: Float get() = native.rive_bridge_artboard_height(openHandle())
+
+    private fun openHandle(): Pointer {
+        check(!closed) { "RiveDesktopScene is closed" }
+        return handle
+    }
 
     fun load(bytes: ByteArray, stateMachine: String? = null) {
-        val code = native.rive_bridge_load(handle, bytes, bytes.size, stateMachine)
+        val code = native.rive_bridge_load(openHandle(), bytes, bytes.size, stateMachine)
         check(code == 0) { "rive_bridge_load failed ($code)" }
     }
 
-    fun advance(seconds: Float) = native.rive_bridge_advance(handle, seconds)
+    fun advance(seconds: Float) = native.rive_bridge_advance(openHandle(), seconds)
 
     private var lastFrameNanos = 0L
 
@@ -101,36 +107,37 @@ class RiveDesktopScene private constructor(
     fun render(width: Int, height: Int, clearArgb: Int = 0): ByteArray {
         val size = width.toLong() * height * 4
         val target = buffer?.takeIf { it.size() == size } ?: Memory(size).also { buffer = it }
-        val code = native.rive_bridge_render(handle, width, height, clearArgb, target)
+        val code = native.rive_bridge_render(openHandle(), width, height, clearArgb, target)
         check(code == 0) { "rive_bridge_render failed ($code)" }
         return target.getByteArray(0, size.toInt())
     }
 
-    fun pointer(kind: RivePointer, x: Float, y: Float) = native.rive_bridge_pointer(handle, kind.code, x, y)
+    fun pointer(kind: RivePointer, x: Float, y: Float) = native.rive_bridge_pointer(openHandle(), kind.code, x, y)
 
-    fun fireTrigger(name: String): Boolean = native.rive_bridge_fire_trigger(handle, name) == 0
+    fun fireTrigger(name: String): Boolean = native.rive_bridge_fire_trigger(openHandle(), name) == 0
 
-    fun setNumber(name: String, value: Float): Boolean = native.rive_bridge_set_number(handle, name, value) == 0
+    fun setNumber(name: String, value: Float): Boolean = native.rive_bridge_set_number(openHandle(), name, value) == 0
 
     /** The view-model path [com.letta.mobile.avatar.rive.RiveAvatarRuntime] writes through. */
     val inputSink: RiveInputSink = object : RiveInputSink {
         override fun setNumber(input: String, value: Float) {
-            native.rive_bridge_vm_set_number(handle, input, value)
+            native.rive_bridge_vm_set_number(openHandle(), input, value)
         }
 
-        // The mascot contract has no booleans; nothing in the bridge writes one yet.
-        override fun setBoolean(input: String, value: Boolean) = Unit
+        override fun setBoolean(input: String, value: Boolean) {
+            native.rive_bridge_vm_set_boolean(openHandle(), input, if (value) 1 else 0)
+        }
 
         override fun setEnum(input: String, key: String) {
-            native.rive_bridge_vm_set_enum(handle, input, key)
+            native.rive_bridge_vm_set_enum(openHandle(), input, key)
         }
 
         override fun setColor(input: String, argb: Int) {
-            native.rive_bridge_vm_set_color(handle, input, argb)
+            native.rive_bridge_vm_set_color(openHandle(), input, argb)
         }
 
         override fun fire(input: String) {
-            native.rive_bridge_vm_fire(handle, input)
+            native.rive_bridge_vm_fire(openHandle(), input)
         }
     }
 

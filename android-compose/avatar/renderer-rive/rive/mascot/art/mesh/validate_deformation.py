@@ -76,7 +76,16 @@ def area(v):
     return total
 
 
-def deform(v, sx=1, local=0, shear=0, inflate=1, root_y=0):
+def deform(*args, **opts):
+    v = args[0]
+    sx = args[1] if len(args) > 1 else opts.get('sx', 1)
+    local = args[2] if len(args) > 2 else opts.get('local', 0)
+    shear = args[3] if len(args) > 3 else opts.get('shear', 0)
+    inflate = args[4] if len(args) > 4 else opts.get('inflate', 1)
+    return _deform(v, sx, local, shear, inflate)
+
+
+def _deform(v, sx, local, shear, inflate):
     """Weights belong to anchors; each anchor and its two handles share one affine map."""
     out = v.copy()
     for i, points in enumerate(v):
@@ -123,7 +132,10 @@ def has_crossing(p):
     return False
 
 
-def text(draw, pos, value, size=18, fill="#202933"):
+def text(*args, **opts):
+    draw, pos, value = args[0], args[1], args[2]
+    size = args[3] if len(args) > 3 else opts.get('size', 18)
+    fill = args[4] if len(args) > 4 else opts.get('fill', "#202933")
     draw.text(pos, value, font=ImageFont.truetype(FONT, size), fill=fill)
 
 
@@ -220,6 +232,54 @@ def proof_png(bodies, metrics):
     return data.getvalue()
 
 
+def _pose_margin(p, root_y):
+    margin = 500.
+    a = 0
+    R = np.array([[math.cos(a), -math.sin(a)], [math.sin(a), math.cos(a)]])
+    for rx in (-24, 24):
+        pp = 1.25 * (p @ R.T + np.array([rx, root_y])) + np.array([250, 270])
+        margin = min(margin, float(np.min(pp)), float(np.min(500 - pp)))
+    return margin
+
+
+def _measure_pose(name, v, pose, values):
+    out, q = deform(v, *values)
+    assert np.max(np.abs(out[:, 1] + out[:, 2] - 2 * out[:, 0])) < .00022
+    p = sample(out)
+    assert not has_crossing(p), (name, pose, "crossing")
+    area_change = 100 * (area(out) / area(v) - 1)
+    expected = 100 * (values[3] ** 2 - 1)
+    error = abs(area_change - expected)
+    assert error < 1e-9
+    delta = float(np.max(np.linalg.norm(out[:, 0] - v[:, 0], axis=1)) / 150)
+    assert delta <= .12, (name, pose, delta)
+    margin = _pose_margin(p, values[-1])
+    assert margin >= 0, (name, pose, margin)
+    row = {
+        "q": q,
+        "area_change_pct": area_change,
+        "delta_pct": 100 * delta,
+        "margin": margin,
+        "bounds": (float(p[:, 0].min()), float(p[:, 1].min()), float(p[:, 0].max()), float(p[:, 1].max())),
+    }
+    return row, margin, error, delta
+
+
+def _assert_success_blend(name, v):
+    names = ("rest", "crouch", "ascent", "apex", "fall", "land", "settle", "rest")
+    count = 0
+    for left, right in zip(names, names[1:]):
+        for u in np.linspace(0, 1, 41):
+            values = np.array(POSES[left]) * (1 - u) + np.array(POSES[right]) * u
+            out, q = deform(v, *values)
+            p = sample(out, 48)
+            assert not has_crossing(p), (name, left, right, u)
+            assert abs(area(out) / area(v) - 1) < 1e-11
+            assert np.max(np.linalg.norm(out[:, 0] - v[:, 0], axis=1)) / 150 <= .12
+            count += 1
+    return count
+
+
 def main():
     parser=argparse.ArgumentParser();parser.add_argument("--check",action="store_true");args=parser.parse_args()
     paths=sorted(ART.glob("body-*.svg"))
@@ -230,35 +290,11 @@ def main():
     min_margin=500.; max_delta=0.; max_area_error=0.; all_points=0
     for name,v in bodies.items():
         for pose,values in POSES.items():
-            out,q=deform(v,*values)
-            assert np.max(np.abs(out[:,1]+out[:,2]-2*out[:,0])) < .00022
-            p=sample(out);assert not has_crossing(p), (name,pose,"crossing")
-            area_change=100*(area(out)/area(v)-1)
-            expected=100*(values[3]**2-1)
-            error=abs(area_change-expected);assert error<1e-9
-            delta=float(np.max(np.linalg.norm(out[:,0]-v[:,0],axis=1))/150)
-            assert delta<=.12,(name,pose,delta)
-            margin=500.
-            for angle in (0,):
-                a=math.radians(angle);R=np.array([[math.cos(a),-math.sin(a)],[math.sin(a),math.cos(a)]])
-                for rx in (-24,24):
-                    pp=1.25*(p@R.T+np.array([rx,values[-1]]))+np.array([250,270])
-                    margin=min(margin,float(np.min(pp)),float(np.min(500-pp)))
-            assert margin>=0,(name,pose,margin)
-            metrics[(name,pose)]={"q":q,"area_change_pct":area_change,"delta_pct":100*delta,"margin":margin,
-                                  "bounds":(float(p[:,0].min()),float(p[:,1].min()),float(p[:,0].max()),float(p[:,1].max()))}
+            row, margin, error, delta = _measure_pose(name, v, pose, values)
+            metrics[(name,pose)] = row
             min_margin=min(min_margin,margin);max_delta=max(max_delta,delta);max_area_error=max(max_area_error,error)
             all_points+=1
-        # Linear parameter interpolation samples contain all easing progress in [0,1].
-        names=("rest","crouch","ascent","apex","fall","land","settle","rest")
-        for left,right in zip(names,names[1:]):
-            for u in np.linspace(0,1,41):
-                values=np.array(POSES[left])*(1-u)+np.array(POSES[right])*u
-                out,q=deform(v,*values);p=sample(out,48)
-                assert not has_crossing(p),(name,left,right,u)
-                assert abs(area(out)/area(v)-1)<1e-11
-                assert np.max(np.linalg.norm(out[:,0]-v[:,0],axis=1))/150<=.12
-                all_points+=1
+        all_points += _assert_success_blend(name, v)
     assert hashes=={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}
     overlay=lattice(bodies["body-blob"])
     root=ET.fromstring(overlay)
