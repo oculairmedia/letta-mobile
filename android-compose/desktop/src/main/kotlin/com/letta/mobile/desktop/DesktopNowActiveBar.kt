@@ -43,6 +43,7 @@ internal data class NowActiveBarState(
     val conversationTitle: String,
     val agentName: String,
     val orbIndex: Int,
+    val agentId: String? = null,
     val status: NowActiveStatus,
     /** Agent working in a conversation OTHER than the active one, if any. */
     val backgroundWorkAgentName: String?,
@@ -124,6 +125,7 @@ internal fun deriveNowActiveBarPin(
         state = NowActiveBarState(
             conversationTitle = barConversation.title,
             agentName = barConversation.agentName,
+            agentId = barConversation.agentId,
             orbIndex = barConversation.agentId?.let { host.avatarStyleByAgentId[it] }
                 ?: host.fallbackOrbIndex,
             status = nowActiveStatus(
@@ -212,7 +214,7 @@ internal fun DesktopHeaderIdentityBlock(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        AgentOrb(index = state.orbIndex, size = 28.dp, cornerRadius = 7.dp)
+        AgentOrb(agentId = state.agentId, index = state.orbIndex, size = 28.dp, cornerRadius = 7.dp)
         Column {
             Text(
                 text = state.conversationTitle,

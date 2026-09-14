@@ -59,9 +59,26 @@ fun AgentOrb(
     modifier: Modifier = Modifier,
     cornerRadius: Dp = 7.dp,
     onClick: (() -> Unit)? = null,
+    /** The agent this orb stands for. With an identity in [MascotIdentityRegistry], the orb IS the live mascot. */
+    agentId: String? = null,
     content: @Composable (() -> Unit)? = null,
 ) {
     val shape = RoundedCornerShape(cornerRadius)
+    val identity = agentId?.let { MascotIdentityRegistry.identities[it] }
+    if (identity != null && com.letta.mobile.desktop.avatar.rive.RiveBridgeNative.AVAILABLE) {
+        // One shared native scene per agent, advanced once per frame wherever it is drawn.
+        Box(
+            modifier = modifier
+                .size(size)
+                .clip(shape)
+                .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+            contentAlignment = Alignment.Center,
+        ) {
+            // The body fills ~60 % of the artboard; overscale so the character fills the slot.
+            com.letta.mobile.desktop.avatar.rive.DesktopMascotHero(agentId = agentId, identity = identity, size = size * 1.2f)
+        }
+        return
+    }
     Box(
         // clip BEFORE clickable so the hover/press indication follows the orb's
         // rounded shape instead of a rectangle. onClick is applied here (not by
@@ -189,3 +206,17 @@ fun AgentActivityOrb(
 private const val SphereFraction = 0.62f
 private const val ActivityRingCount = 2
 private const val ActivityRingPeriodMs = 1600
+
+/**
+ * Every agent's mascot identity, as the app currently knows it. [LettaDesktopApp] keeps it
+ * current; any surface that draws an agent reads it through [AgentOrb] without the identity
+ * having to be threaded through every row model on the way.
+ */
+object MascotIdentityRegistry {
+    val identities = androidx.compose.runtime.mutableStateMapOf<String, com.letta.mobile.avatar.core.MascotIdentity>()
+
+    fun update(all: Map<String, com.letta.mobile.avatar.core.MascotIdentity>) {
+        identities.keys.retainAll(all.keys)
+        identities.putAll(all)
+    }
+}

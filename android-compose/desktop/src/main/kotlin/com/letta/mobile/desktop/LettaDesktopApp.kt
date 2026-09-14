@@ -404,6 +404,8 @@ internal fun LettaDesktopApp(
     val identityByAgentId = cachedIdentities + avatarOverrides
     // The gradient orbs (until the rollout's P3 replaces them) keep taking a slot index.
     val avatarStyleByAgentId = identityByAgentId.mapValues { it.value.legacyOrbIndex() }
+    // Every AgentOrb in the app reads identities from the registry; keep it current.
+    androidx.compose.runtime.SideEffect { com.letta.mobile.desktop.chat.MascotIdentityRegistry.update(identityByAgentId) }
     val selectedAgentOrbIndex = avatarStyleByAgentId[selectedAgentId]
         ?: railAgents.indexOfFirst { it.first == selectedAgentId }.coerceAtLeast(0)
     val selectedAgentName = railAgents.firstOrNull { it.first == selectedAgentId }?.second

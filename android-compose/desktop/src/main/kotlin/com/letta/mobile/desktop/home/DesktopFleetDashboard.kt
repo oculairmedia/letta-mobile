@@ -298,7 +298,7 @@ private fun FleetAgentIdentity(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        AgentOrb(index = orbIndex, size = 22.dp, cornerRadius = 6.dp)
+        AgentOrb(agentId = agent.agentId, index = orbIndex, size = 22.dp, cornerRadius = 6.dp)
         Text(
             text = agent.name,
             // An unresolved name is the raw backend id; render it as the

@@ -1,15 +1,30 @@
-// rivdump: loads a .riv with rive-runtime and prints every artboard's object tree as JSON,
-// one object per line, with every authored property the runtime can deserialize.
+// rivdump: loads a .riv with rive-runtime and prints every artboard as JSON: its object tree, its
+// animations (keyed objects, properties, keyframes) and its state machines (inputs, layers, states,
+// transitions, conditions, listeners, actions), every authored property the runtime can deserialize.
 //
 // The property list is data (schema.tsv from gen_schema.py), so this stays generic: for each
 // object we read each property whose owning type the object isTypeOf(). Object indices are the
-// artboard's own order, which is what parentId refers to.
+// artboard's own order, which is what parentId refers to. Timelines and machines are printed with
+// the same generic printer, so a new runtime type shows up as soon as the schema knows it.
 //
 // usage: rivdump <file.riv> <schema.tsv>
 #include "rive/artboard.hpp"
 #include "rive/file.hpp"
 #include "rive/core.hpp"
 #include "rive/generated/core_registry.hpp"
+#include "rive/animation/linear_animation.hpp"
+#include "rive/animation/keyed_object.hpp"
+#include "rive/animation/keyed_property.hpp"
+#include "rive/animation/keyframe.hpp"
+#include "rive/animation/state_machine.hpp"
+#include "rive/animation/state_machine_input.hpp"
+#include "rive/animation/state_machine_layer.hpp"
+#include "rive/animation/layer_state.hpp"
+#include "rive/animation/animation_state.hpp"
+#include "rive/animation/state_transition.hpp"
+#include "rive/animation/transition_condition.hpp"
+#include "rive/animation/state_machine_listener.hpp"
+#include "rive/animation/listener_action.hpp"
 #include "utils/no_op_factory.hpp"
 
 #include <cstdio>
@@ -27,6 +42,9 @@ struct Prop
     std::string name;
 };
 
+static std::vector<Prop> g_props;
+static std::string g_typeNameOf[4096];
+
 static std::string json_escape(const std::string& s)
 {
     std::string out;
@@ -38,6 +56,142 @@ static std::string json_escape(const std::string& s)
         else out += c;
     }
     return out;
+}
+
+// Prints `{"type":..., <every schema property the object has>` and leaves the object open so the
+// caller can append children, then closes it. `extra` is raw JSON appended before the close.
+static void print_object(const rive::Core* object, const std::string& extra = "", bool close = true)
+{
+    if (object == nullptr)
+    {
+        printf("{\"type\":null}");
+        return;
+    }
+    int typeKey = object->coreType();
+    printf("{\"typeKey\":%d,\"type\":\"%s\"", typeKey, typeKey < 4096 ? g_typeNameOf[typeKey].c_str() : "");
+    for (const auto& p : g_props)
+    {
+        if (!object->isTypeOf((uint16_t)p.typeKey))
+            continue;
+        printf(",\"%s\":", p.name.c_str());
+        auto* o = const_cast<rive::Core*>(object);
+        if (p.kind == "Double")
+            printf("%g", rive::CoreRegistry::getDouble(o, p.key));
+        else if (p.kind == "Uint")
+            printf("%u", rive::CoreRegistry::getUint(o, p.key));
+        else if (p.kind == "Bool")
+            printf("%s", rive::CoreRegistry::getBool(o, p.key) ? "true" : "false");
+        else if (p.kind == "Color")
+            printf("\"%08X\"", (unsigned)rive::CoreRegistry::getColor(o, p.key));
+        else if (p.kind == "String")
+            printf("\"%s\"", json_escape(rive::CoreRegistry::getString(o, p.key)).c_str());
+        else
+            printf("null");
+    }
+    if (!extra.empty())
+        printf(",%s", extra.c_str());
+    if (close)
+        printf("}");
+}
+
+static void print_animation(const rive::LinearAnimation* anim)
+{
+    print_object(anim, "", false);
+    printf(",\"keyedObjects\":[\n");
+    for (size_t k = 0; k < anim->numKeyedObjects(); ++k)
+    {
+        const rive::KeyedObject* ko = anim->getObject(k);
+        printf("%s", k ? "," : "");
+        print_object(ko, "", false);
+        printf(",\"properties\":[");
+        for (size_t p = 0; p < ko->numKeyedProperties(); ++p)
+        {
+            const rive::KeyedProperty* kp = ko->getProperty(p);
+            printf("%s", p ? "," : "");
+            print_object(kp, "", false);
+            printf(",\"keyframes\":[");
+            for (size_t f = 0; f < kp->numKeyFrames(); ++f)
+            {
+                printf("%s", f ? "," : "");
+                print_object(kp->getKeyFrame(f));
+            }
+            printf("]}");
+        }
+        printf("]}\n");
+    }
+    printf("]}\n");
+}
+
+static int state_index(const rive::StateMachineLayer* layer, const rive::LayerState* state)
+{
+    for (size_t i = 0; i < layer->stateCount(); ++i)
+        if (layer->state(i) == state)
+            return (int)i;
+    return -1;
+}
+
+static void print_state_machine(const rive::StateMachine* sm)
+{
+    print_object(sm, "", false);
+    printf(",\"inputs\":[");
+    for (size_t i = 0; i < sm->inputCount(); ++i)
+    {
+        printf("%s", i ? "," : "");
+        print_object(sm->input(i));
+    }
+    printf("],\"listeners\":[\n");
+    for (size_t i = 0; i < sm->listenerCount(); ++i)
+    {
+        const rive::StateMachineListener* l = sm->listener(i);
+        printf("%s", i ? "," : "");
+        print_object(l, "", false);
+        printf(",\"actions\":[");
+        for (size_t a = 0; a < l->actionCount(); ++a)
+        {
+            printf("%s", a ? "," : "");
+            print_object(l->action(a));
+        }
+        printf("]}\n");
+    }
+    printf("],\"layers\":[\n");
+    for (size_t li = 0; li < sm->layerCount(); ++li)
+    {
+        const rive::StateMachineLayer* layer = sm->layer(li);
+        printf("%s", li ? "," : "");
+        print_object(layer, "", false);
+        printf(",\"states\":[\n");
+        for (size_t si = 0; si < layer->stateCount(); ++si)
+        {
+            const rive::LayerState* st = layer->state(si);
+            std::string extra = "\"stateIndex\":" + std::to_string(si);
+            if (st->is<rive::AnimationState>())
+            {
+                auto* as = st->as<rive::AnimationState>();
+                if (as->animation() != nullptr)
+                    extra += ",\"animationName\":\"" + json_escape(as->animation()->name()) + "\"";
+            }
+            printf("%s", si ? "," : "");
+            print_object(st, extra, false);
+            printf(",\"transitions\":[");
+            for (size_t ti = 0; ti < st->transitionCount(); ++ti)
+            {
+                const rive::StateTransition* tr = st->transition(ti);
+                std::string tx = "\"toStateIndex\":" + std::to_string(state_index(layer, tr->stateTo()));
+                printf("%s", ti ? "," : "");
+                print_object(tr, tx, false);
+                printf(",\"conditions\":[");
+                for (size_t ci = 0; ci < tr->conditionCount(); ++ci)
+                {
+                    printf("%s", ci ? "," : "");
+                    print_object(tr->condition(ci));
+                }
+                printf("]}");
+            }
+            printf("]}\n");
+        }
+        printf("]}\n");
+    }
+    printf("]}\n");
 }
 
 int main(int argc, const char* argv[])
@@ -55,8 +209,6 @@ int main(int argc, const char* argv[])
         return 1;
     }
 
-    std::vector<Prop> props;
-    std::string typeNameOf[4096] = {};
     {
         std::ifstream schema(argv[2]);
         std::string line;
@@ -70,9 +222,9 @@ int main(int argc, const char* argv[])
                 continue;
             p.typeKey = std::stoi(tk);
             p.key = std::stoi(k);
-            if (p.typeKey < 4096) typeNameOf[p.typeKey] = p.typeName;
+            if (p.typeKey < 4096) g_typeNameOf[p.typeKey] = p.typeName;
             if (p.key >= 0)
-                props.push_back(p);
+                g_props.push_back(p);
         }
     }
 
@@ -93,34 +245,22 @@ int main(int argc, const char* argv[])
         const auto& objects = artboard->objects();
         for (size_t i = 0; i < objects.size(); ++i)
         {
-            rive::Core* object = objects[i];
-            if (object == nullptr)
-            {
-                printf("%s{\"index\":%zu,\"type\":null}\n", i ? "," : "", i);
-                continue;
-            }
-            int typeKey = object->coreType();
-            printf("%s{\"index\":%zu,\"typeKey\":%d,\"type\":\"%s\"", i ? "," : "", i, typeKey,
-                   typeKey < 4096 ? typeNameOf[typeKey].c_str() : "");
-            for (const auto& p : props)
-            {
-                if (!object->isTypeOf((uint16_t)p.typeKey))
-                    continue;
-                printf(",\"%s\":", p.name.c_str());
-                if (p.kind == "Double")
-                    printf("%g", rive::CoreRegistry::getDouble(object, p.key));
-                else if (p.kind == "Uint")
-                    printf("%u", rive::CoreRegistry::getUint(object, p.key));
-                else if (p.kind == "Bool")
-                    printf("%s", rive::CoreRegistry::getBool(object, p.key) ? "true" : "false");
-                else if (p.kind == "Color")
-                    printf("\"%08X\"", (unsigned)rive::CoreRegistry::getColor(object, p.key));
-                else if (p.kind == "String")
-                    printf("\"%s\"", json_escape(rive::CoreRegistry::getString(object, p.key)).c_str());
-                else
-                    printf("null");
-            }
-            printf("}\n");
+            printf("%s", i ? "," : "");
+            std::string extra = "\"index\":" + std::to_string(i);
+            print_object(objects[i], extra);
+            printf("\n");
+        }
+        printf("],\"animations\":[\n");
+        for (size_t i = 0; i < artboard->animationCount(); ++i)
+        {
+            printf("%s", i ? "," : "");
+            print_animation(artboard->animation(i));
+        }
+        printf("],\"stateMachines\":[\n");
+        for (size_t i = 0; i < artboard->stateMachineCount(); ++i)
+        {
+            printf("%s", i ? "," : "");
+            print_state_machine(artboard->stateMachine(i));
         }
         printf("]}\n");
     }

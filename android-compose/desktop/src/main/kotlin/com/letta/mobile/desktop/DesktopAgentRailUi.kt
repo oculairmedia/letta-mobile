@@ -627,10 +627,7 @@ private fun AgentRailOrbContent(
     }
 }
 
-/**
- * A rail slot: the agent's mascot silhouette in its colour when it has an identity (the flat
- * tier - no live scene for a list), otherwise the gradient orb with the name's initial.
- */
+/** A rail slot: [AgentOrb] with the agent id, so it is the live mascot when the agent has an identity. */
 @Composable
 private fun RailAgentTile(
     target: AgentRailOrbTarget,
@@ -639,23 +636,8 @@ private fun RailAgentTile(
     cornerRadius: androidx.compose.ui.unit.Dp = 7.dp,
     onClick: (() -> Unit)? = null,
 ) {
-    val identity = target.identity
-    if (identity == null) {
-        AgentOrb(index = target.orbStyle, size = size, cornerRadius = cornerRadius, onClick = onClick) {
-            Text(text = initial, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = Color.White)
-        }
-        return
-    }
-    val shape = RoundedCornerShape(cornerRadius)
-    Box(
-        modifier = Modifier
-            .size(size)
-            .clip(shape)
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
-        contentAlignment = Alignment.Center,
-    ) {
-        com.letta.mobile.ui.mascot.MascotShapeGlyph(identity.shape, identity.argb, size * 0.78f)
+    AgentOrb(index = target.orbStyle, size = size, cornerRadius = cornerRadius, onClick = onClick, agentId = target.agentId) {
+        Text(text = initial, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = Color.White)
     }
 }
 
