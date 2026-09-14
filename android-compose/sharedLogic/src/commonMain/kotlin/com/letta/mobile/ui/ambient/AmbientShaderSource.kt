@@ -44,15 +44,13 @@ uniform vec4 uColor;
 // frame's advance no longer changes it, which is the judder that appeared only after
 // hours of continuous animation. See AmbientMotion.PHASE_WRAP_TURNS.
 const float F = 1.0 / 1024.0;
-// Where the glow starts fading in, as a fraction of canvas height. The band is meant to
-// be an accent under the composer, not a wash across the lower third, so this is the one
-// number to move when it reads too tall.
-const float BAND_TOP = 0.80;
-// Where the band reaches full strength. It used to climb all the way to 0.98, which is
-// BEHIND the composer: shortening the band left only the faint head of that ramp on
-// screen, so the colour disappeared. Peaking just above the composer puts the strong
-// part where it can actually be seen.
-const float BAND_PEAK = 0.90;
+// Where the glow starts fading in, as a fraction of canvas height. The glow creeps up from
+// the bottom EDGE of the pane - it is light leaking in from below, not a band parked at
+// mid-window - so it starts low and is strongest at the very edge. This is the one number
+// to move when it reads too tall.
+const float BAND_TOP = 0.90;
+// Where the band reaches full strength: the edge itself.
+const float BAND_PEAK = 0.995;
 /** Overall strength of the glow. The one knob for "too intense" / "too faint". */
 const float BAND_OPACITY = 0.14;
 const float TAU = 6.28318;
@@ -126,7 +124,7 @@ half4 ambientColor(float2 fragCoord) {
         float drift = F * (5.0 + fi + step(1.5, fi) + step(3.5, fi));
         float2 c = float2(
             (fract(0.19 * fi + t * drift) * 1.4 - 0.7) * aspect,
-            0.78 + 0.06 * fi * (1.0 - 0.12 * fi) + 0.05 * sin(TAU * 15.0 * F * t + fi * 2.0)
+            0.94 + 0.03 * fi * (1.0 - 0.12 * fi) + 0.03 * sin(TAU * 15.0 * F * t + fi * 2.0)
         );
         float2 d = p - c;
         d.x *= 0.38;
@@ -163,8 +161,8 @@ half4 ambientColor(float2 fragCoord) {
 
     float energy = clamp(wsum * (0.8 + 0.2 * uAgitation), 0.0, 1.4);
     // Alpha curve narrowed to the BAND_TOP..BAND_PEAK strip so the visible glow
-    // occupies less vertical real estate — a thin glow under the composer
-    // instead of a broad mid-screen band.
+    // occupies less vertical real estate — a thin glow rising from the pane's
+    // bottom edge instead of a broad mid-screen band.
     // Shortening the band also dims it, because the ramp now has less height to climb.
     // The amplitude comes up to keep the same presence in less space.
     float aRaw = energy * smoothstep(BAND_TOP, BAND_PEAK, uv.y) *
