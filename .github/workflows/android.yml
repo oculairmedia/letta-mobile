@@ -11,11 +11,15 @@ on:
       - "scripts/tests/**"
   pull_request:
     # Required contexts (test / build-apk-pass / shared-multiplatform) must report
-    # on stacked letta/** PRs as well as PRs into main. Do not infer those results
-    # from the base branch.
+    # on stacked letta/**, feat/**, and cursor/** PRs as well as PRs into main.
+    # pull_request.branches filters the PR *base*, not the head — Cloud Agent
+    # reviews targeting feat/* or cursor/* otherwise never get Android APK CI.
+    # Do not infer those results from the base branch.
     branches:
       - main
       - "letta/**"
+      - "feat/**"
+      - "cursor/**"
     paths:
       # Broadened to all workflow files so a PR that only edits CI config still
       # triggers the required checks (test/build-apk-pass/shared-multiplatform).
