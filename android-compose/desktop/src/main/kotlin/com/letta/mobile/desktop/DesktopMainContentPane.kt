@@ -37,7 +37,7 @@ internal data class DesktopMainContentInputs(
 
 internal data class DesktopMainContentActions(
     val onEditAgentClose: () -> Unit,
-    val onEditAgentSaved: (Int, Boolean) -> Unit,
+    val onEditAgentSaved: (com.letta.mobile.avatar.core.MascotIdentity, Boolean) -> Unit,
     val chatDetailActions: ChatDetailPaneActions,
     val destinationActions: DestinationContentActions,
     val onShowBackgroundTasks: () -> Unit,

@@ -31,11 +31,27 @@ internal interface RiveBridgeNative : Library {
     fun rive_bridge_vm_set_color(bridge: Pointer, name: String, argb: Int): Int
 
     companion object {
-        /** `-Drive.bridge.path=...\rive_desktop_bridge.dll`; the spike does not package the DLL. */
+        /**
+         * Where the bridge DLL is: `-Drive.bridge.path`, else `rive_desktop_bridge.dll` in the
+         * packaged app's resources dir, else next to the working directory. Null when none exists,
+         * which is how surfaces decide to fall back to the gradient orb.
+         */
+        val PATH: String? by lazy {
+            val candidates = listOfNotNull(
+                System.getProperty("rive.bridge.path"),
+                System.getProperty("compose.application.resources.dir")?.let { "$it/rive_desktop_bridge.dll" },
+                "rive_desktop_bridge.dll",
+            )
+            candidates.firstOrNull { java.io.File(it).isFile }
+        }
+
+        /** True when a bridge DLL is present and this OS can host it (Windows / D3D11 only today). */
+        val AVAILABLE: Boolean by lazy {
+            PATH != null && System.getProperty("os.name").orEmpty().startsWith("Windows")
+        }
+
         val INSTANCE: RiveBridgeNative by lazy {
-            val path = System.getProperty("rive.bridge.path")
-                ?: error("Set -Drive.bridge.path to rive_desktop_bridge.dll")
-            Native.load(path, RiveBridgeNative::class.java)
+            Native.load(PATH ?: error("Set -Drive.bridge.path to rive_desktop_bridge.dll"), RiveBridgeNative::class.java)
         }
     }
 }

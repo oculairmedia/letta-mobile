@@ -48,6 +48,16 @@ object RiveAvatarContract {
     /** Trigger. One blink, on the director's randomized idle schedule. */
     const val TRIGGER_BLINK: String = "blink"
 
+    /**
+     * Number, -1..1. The head turning toward what the eyes look at (the plate slides and rolls,
+     * the body leans), additive with the file's own per-state facing. Written by the gaze director
+     * after the eyes have led; see rive/mascot/README.md "Gaze and attention".
+     */
+    const val INPUT_TURN_X: String = "turnX"
+
+    /** Number, -1..1. Vertical head turn; 0 is level. */
+    const val INPUT_TURN_Y: String = "turnY"
+
     /** Custom enum `MascotShape`. Identity, written once on load; see MASCOT.md. */
     const val INPUT_SHAPE: String = "shape"
 

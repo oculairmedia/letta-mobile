@@ -78,6 +78,8 @@ internal data class ChatDetailPaneState(
     /** Approval request ids whose answer/dismiss is currently in flight. */
     val submittingApprovalRequestIds: Set<String> = emptySet(),
     val agentNamesById: Map<String, String> = emptyMap(),
+    /** Each agent's mascot identity (shape + colour) for the hero and, in P3, every orb. */
+    val agentIdentitiesById: Map<String, com.letta.mobile.avatar.core.MascotIdentity> = emptyMap(),
     val contextUsage: ContextWindowUsageState = ContextWindowUsageState(),
     /**
      * letta-mobile folder-settings #2: the SELECTED conversation's working
@@ -210,6 +212,7 @@ private fun ChatDetailBody(
         } else if (surface.renderItems.isEmpty() && !state.isThinking) {
             NewConversationWelcome(
                 agentName = surface.selectedConversation?.agentName,
+                identity = surface.selectedConversation?.agentId?.let { state.agentIdentitiesById[it] },
                 onStarterPrompt = actions.onComposerTextChanged,
                 onOnboardingTask = actions.onOnboardingTask,
                 modifier = Modifier.weight(1f),
@@ -315,6 +318,7 @@ private fun DesktopWorkingDirectoryRow(
 @Composable
 private fun NewConversationWelcome(
     agentName: String?,
+    identity: com.letta.mobile.avatar.core.MascotIdentity?,
     onStarterPrompt: (String) -> Unit,
     onOnboardingTask: ((OnboardingTaskKind) -> Unit)?,
     modifier: Modifier = Modifier,
@@ -331,7 +335,12 @@ private fun NewConversationWelcome(
             verticalArrangement = Arrangement.spacedBy(16.dp),
             modifier = Modifier.widthIn(max = ChatColumnMaxWidth),
         ) {
-            AgentSphere(size = 72.dp)
+            // The agent's mascot, live when the native bridge is here; the gradient sphere otherwise.
+            if (identity != null) {
+                com.letta.mobile.desktop.avatar.rive.DesktopMascotHero(identity = identity, size = 96.dp)
+            } else {
+                AgentSphere(size = 72.dp)
+            }
             Text(
                 text = AgentOnboarding.greeting(agentName),
                 style = MaterialTheme.typography.headlineSmall,

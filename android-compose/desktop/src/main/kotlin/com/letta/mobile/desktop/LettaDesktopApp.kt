@@ -54,6 +54,7 @@ import com.letta.mobile.desktop.home.FleetSort
 import com.letta.mobile.desktop.home.buildFleetOverview
 import com.letta.mobile.desktop.home.preferredComposerConversationId
 import com.letta.mobile.desktop.home.toggled
+import com.letta.mobile.avatar.core.MascotIdentity
 import com.letta.mobile.desktop.agent.agentAvatarStyleKey
 import com.letta.mobile.data.commands.AgentSlashCommand
 import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
@@ -94,7 +95,7 @@ internal fun LettaDesktopApp(
     val overlays = remember { DesktopOverlayVisibility() }
     // Avatar styles chosen via the editor this session, applied immediately to the
     // orbs regardless of whether the backend round-trips agent metadata.
-    var avatarOverrides by remember { mutableStateOf(emptyMap<String, Int>()) }
+    var avatarOverrides by remember { mutableStateOf(emptyMap<String, MascotIdentity>()) }
     var editAgentId by remember { mutableStateOf<String?>(null) }
     val bootstrap = rememberDesktopConfigBootstrap()
     val secureSettingsStore = bootstrap.secureSettingsStore
@@ -393,14 +394,16 @@ internal fun LettaDesktopApp(
     // metadata). Re-derived whenever the roster changes — which includes the
     // post-save reload — so a freshly-saved icon is reflected on the orbs.
     // Agents without an override fall back to their position-derived colour.
-    val cachedAvatarStyles = remember(railAgents) {
+    val cachedIdentities = remember(railAgents) {
         railAgents.mapNotNull { (id, _) ->
-            secureSettingsStore.getString(agentAvatarStyleKey(id))?.toIntOrNull()?.let { id to it }
+            MascotIdentity.decode(secureSettingsStore.getString(agentAvatarStyleKey(id)))?.let { id to it }
         }.toMap()
     }
     // Session overrides win over the cached/backend value so a just-saved icon
     // shows instantly.
-    val avatarStyleByAgentId = cachedAvatarStyles + avatarOverrides
+    val identityByAgentId = cachedIdentities + avatarOverrides
+    // The gradient orbs (until the rollout's P3 replaces them) keep taking a slot index.
+    val avatarStyleByAgentId = identityByAgentId.mapValues { it.value.legacyOrbIndex() }
     val selectedAgentOrbIndex = avatarStyleByAgentId[selectedAgentId]
         ?: railAgents.indexOfFirst { it.first == selectedAgentId }.coerceAtLeast(0)
     val selectedAgentName = railAgents.firstOrNull { it.first == selectedAgentId }?.second
@@ -796,6 +799,7 @@ internal fun LettaDesktopApp(
                             ),
                             submittingApprovalRequestIds = submittingApprovals,
                             agentNamesById = rosterAgents.associate { it.id.value to it.name },
+                            agentIdentitiesById = identityByAgentId,
                             workingDirectory = selectedConversationWorkingDirectory,
                             workingDirectorySupported = chatController.supportsWorkingDirectory,
                             workingDirectoryLoading = workingDirectoryLoading,
@@ -833,8 +837,8 @@ internal fun LettaDesktopApp(
                     ),
                     actions = DesktopMainContentActions(
                         onEditAgentClose = { editAgentId = null },
-                        onEditAgentSaved = { style, nameChanged ->
-                            avatarOverrides = avatarOverrides + (editAgentId.orEmpty() to style)
+                        onEditAgentSaved = { identity, nameChanged ->
+                            avatarOverrides = avatarOverrides + (editAgentId.orEmpty() to identity)
                             editAgentId = null
                             if (nameChanged) chatController.retryConnection()
                         },

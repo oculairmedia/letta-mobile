@@ -87,6 +87,16 @@ class RiveAvatarRuntime(
         sink.setNumber(RiveAvatarContract.INPUT_LOOK_Y, y.coerceIn(-1f, 1f))
     }
 
+    /**
+     * The head turning toward the gaze, -1..1 on each axis. Not part of [AvatarRuntime]: it is a
+     * mascot-specific channel the gaze director writes after the eyes have led.
+     */
+    fun setHeadTurn(x: Float, y: Float) {
+        if (!ready()) return
+        sink.setNumber(RiveAvatarContract.INPUT_TURN_X, x.coerceIn(-1f, 1f))
+        sink.setNumber(RiveAvatarContract.INPUT_TURN_Y, y.coerceIn(-1f, 1f))
+    }
+
     /** Blink is the one gesture a flat mascot has; the rest need a rig it does not carry. */
     override fun playGesture(gesture: AvatarGesture, fadeSeconds: Float) {
         if (!ready()) return

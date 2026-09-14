@@ -55,7 +55,9 @@ import com.letta.mobile.desktop.DesktopDefaultButton
 import com.letta.mobile.desktop.DesktopButtonContent
 import com.letta.mobile.desktop.DesktopTextArea
 import com.letta.mobile.desktop.DesktopTextField
-import com.letta.mobile.desktop.chat.AgentOrb
+import com.letta.mobile.avatar.core.MascotIdentity
+import com.letta.mobile.ui.mascot.MascotPicker
+import com.letta.mobile.ui.mascot.MascotShapeGlyph
 import com.letta.mobile.desktop.memory.DesktopBlockApi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
@@ -67,7 +69,6 @@ import org.jetbrains.jewel.ui.component.PopupMenu as JewelPopupMenu
 
 private val ToneOptions = listOf("Concise", "Friendly", "Technical", "Mentor", "Playful", "Formal")
 private val VoiceOptions = listOf("Caring", "Neutral", "Warm", "Energetic", "Calm", "Direct")
-private const val AvatarStyleCount = 6
 
 // Core-memory block labels the editor reads/writes. Persona is the standard
 // Letta persona block; the rest are app-defined labelled blocks so the values
@@ -105,11 +106,11 @@ internal fun DesktopEditAgentSurface(
     settings: SecureSettingsStore,
     scope: CoroutineScope,
     onClose: () -> Unit,
-    onSaved: (avatarStyle: Int, nameChanged: Boolean) -> Unit,
+    onSaved: (identity: MascotIdentity, nameChanged: Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var name by remember(agentId) { mutableStateOf("") }
-    var avatarStyle by remember(agentId) { mutableStateOf(0) }
+    var identity by remember(agentId) { mutableStateOf(MascotIdentity.DEFAULT) }
     var persona by remember(agentId) { mutableStateOf("") }
     var tone by remember(agentId) { mutableStateOf<String?>(null) }
     var customInstructions by remember(agentId) { mutableStateOf("") }
@@ -157,7 +158,8 @@ internal fun DesktopEditAgentSurface(
             interests.clear()
             b?.value?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }?.let { interests.addAll(it) }
         }
-        avatarStyle = settings.getString(agentAvatarStyleKey(agentId))?.toIntOrNull()?.coerceIn(0, AvatarStyleCount - 1) ?: 0
+        // MascotIdentity.decode reads both the new `shape:AARRGGBB` form and the legacy orb index.
+        identity = MascotIdentity.decode(settings.getString(agentAvatarStyleKey(agentId))) ?: MascotIdentity.DEFAULT
         voice = settings.getString(agentVoiceKey(agentId))?.takeIf { it in VoiceOptions } ?: VoiceOptions.first()
         loadedName = name
         loadedModel = modelValue
@@ -220,10 +222,10 @@ internal fun DesktopEditAgentSurface(
                     }.awaitAll()
                 }
                 // Display-only config stays local (and out of the context window).
-                settings.putString(agentAvatarStyleKey(agentId), avatarStyle.toString())
+                settings.putString(agentAvatarStyleKey(agentId), identity.encode())
                 settings.putString(agentVoiceKey(agentId), voice)
             }
-                .onSuccess { onSaved(avatarStyle, nameChanged) }
+                .onSuccess { onSaved(identity, nameChanged) }
                 .onFailure { error = it.message ?: "Save failed"; busy = false }
         }
     }
@@ -276,33 +278,15 @@ internal fun DesktopEditAgentSurface(
                 ) {
             // Avatar + Name
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.Top) {
-                AgentOrb(index = avatarStyle, size = 64.dp, cornerRadius = 12.dp)
+                MascotShapeGlyph(identity.shape, identity.argb, 64.dp)
                 LabeledSection("Name", accent, Modifier.weight(1f)) {
                     DesktopTextField(value = name, onValueChange = { name = it }, modifier = Modifier.fillMaxWidth())
                 }
             }
 
-            // Avatar style swatches
-            LabeledSection("Avatar style", accent) {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    repeat(AvatarStyleCount) { i ->
-                        val selected = i == avatarStyle
-                        Box(
-                            modifier = Modifier
-                                .size(34.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .border(
-                                    width = if (selected) 2.dp else 0.dp,
-                                    color = if (selected) accent else Color.Transparent,
-                                    shape = RoundedCornerShape(8.dp),
-                                )
-                                .clickable { avatarStyle = i }
-                                .padding(if (selected) 3.dp else 0.dp),
-                        ) {
-                            AgentOrb(index = i, size = if (selected) 28.dp else 34.dp, cornerRadius = 6.dp)
-                        }
-                    }
-                }
+            // Identity: shape + colour (shared picker, same on every platform)
+            LabeledSection("Avatar", accent) {
+                MascotPicker(identity = identity, onChange = { identity = it }, accent = accent)
             }
 
             // Persona · backstory → persona memory block

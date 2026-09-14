@@ -30,6 +30,17 @@ data class MascotIdentity(
     /** `shape:AARRGGBB`, the persisted form. */
     fun encode(): String = "${shape.name.lowercase()}:${argb.toUInt().toString(16).padStart(8, '0')}"
 
+    /**
+     * The gradient-orb slot this identity stands in for while the small orbs are still gradients
+     * (the rollout's P3 replaces them): its colour's legacy slot when it has one, else a stable
+     * pick from the colour so an agent keeps the same orb between sessions.
+     */
+    fun legacyOrbIndex(): Int {
+        val legacy = MascotPalette.LEGACY_ORDER.indexOf(argb)
+        if (legacy >= 0) return legacy
+        return (MascotPalette.ALL.indexOf(argb).takeIf { it >= 0 } ?: (argb ushr 8)).mod(MascotPalette.LEGACY_ORDER.size)
+    }
+
     companion object {
         val DEFAULT: MascotIdentity = MascotIdentity(MascotShape.CIRCLE, MascotPalette.BLUE)
 

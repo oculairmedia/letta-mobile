@@ -41,7 +41,8 @@ $R . --once                        # writes build/mascot.riv
 $R . --screenshot=/c/rive-spike/v2/e-5.png --data=state=listening --advance=5
 python sheet.py /c/rive-spike/v2/sheet.png 6 /c/rive-spike/v2 e-1 e-3 e-5 e-8 e-12 e-20
 # LOOK at the sheet (Read the png). Then ship:
-cp build/mascot.riv ../../src/androidMain/res/raw/mascot.riv
+cp build/mascot.riv ../../src/androidMain/res/raw/mascot.riv          # Android (R.raw.mascot)
+cp build/mascot.riv ../../src/jvmMain/resources/mascot/mascot.riv      # desktop (classpath /mascot/mascot.riv)
 python ../../native/rivdump/check_contract.py . ../../src/commonMain/kotlin/com/letta/mobile/avatar/rive/RiveAvatarContract.kt
 $R push                            # new revision in the Rive workspace (see the rule below)
 ```
