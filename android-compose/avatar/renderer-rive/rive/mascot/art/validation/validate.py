@@ -93,11 +93,16 @@ def signature(name):
 
 
 def gate():
-    assert {p.name for p in ART.glob('*.svg')} == EXPECTED
+    # Two Max assets are proposals, not additions to the active state set.
+    proposals = {'glyph-working.svg', 'glyph-working-small.svg'}
+    supplied = {p.name for p in ART.glob('*.svg')}
+    assert supplied == EXPECTED or supplied == EXPECTED | proposals
     baseline_names = set(subprocess.check_output(
         ['git','ls-tree','--name-only',BASE,f'{REL}/art/'],cwd=REPO,text=True).splitlines())
     assert {f'{REL}/art/{n}' for n in EXPECTED} <= baseline_names
-    report = {'baseline':BASE, 'svg_count':len(EXPECTED)}
+    report = {'baseline':BASE, 'svg_count':len(supplied),
+              'proposal_only_svg_count':len(supplied - EXPECTED),
+              'max_appendix_gate':'art/validation/max/validate_max.py'}
     for file in sorted(ART.glob('*.svg')):
         root = ET.parse(file).getroot()
         body = file.name.startswith('body-')
@@ -150,8 +155,12 @@ def gate():
             assert verts[0,0]>0 and verts[2,0]<0
             assert verts[1,1]>=0 and verts[3,1]<=0
     section8=SPEC.split('## 8.',1)[1].split('## 9.',1)[0].rstrip()+'\n'
-    old8=old_file('SPEC.md').decode().split('## 8.',1)[1]
+    # Fable added the evolved blink row after the original art baseline.
+    # Max preserves that implementation record as well as the rest of §§1–9.
+    section8_base = '2e11692c21ddcc971e2acb1609c33794ed892118' if '## 10. Astra Max' in SPEC else BASE
+    old8 = subprocess.check_output(['git','show',f'{section8_base}:{REL}/SPEC.md'],cwd=REPO).decode().split('## 8.',1)[1].split('## 9.',1)[0].rstrip()+'\n'
     assert section8==old8
+    report['section8_baseline']=section8_base
     report['section8_sha256']=hashlib.sha256(section8.encode()).hexdigest()
     targets={'Breath root y':(1.2,1.5),'Gaze lookX max':(2.2,2.8),
        'Gaze lookY max':(1.6,2.2),'Success hop peak':(5,7),'Waiting bounce':(2,2.5),
