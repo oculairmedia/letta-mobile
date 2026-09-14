@@ -1,48 +1,39 @@
 package com.letta.mobile.ui.screens.conversations
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewLightDark
-import androidx.compose.ui.unit.dp
 import ca.oculair.meridian.R
-import com.letta.mobile.ui.components.ExpandableSearchField
-import com.letta.mobile.ui.components.ExpandableTitleSearch
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.preview.LettaPreviewFrame
 
 internal data class ConversationsTopBarState(
-    val searchQuery: String,
-    val isSearchExpanded: Boolean,
-    val activeBackendLabel: String?,
     val showOverflowMenu: Boolean,
     val scrollBehavior: TopAppBarScrollBehavior,
 )
 
 internal data class ConversationsTopBarCallbacks(
-    val onSearchQueryChange: (String) -> Unit,
-    val onSearchExpandedChange: (Boolean) -> Unit,
-    val onNavigateToBackendSwitcher: (() -> Unit)?,
     val onNavigateToSettings: () -> Unit,
     val onShowOverflowMenuChange: (Boolean) -> Unit,
 )
 
+/**
+ * The page's bar: its title and the settings / overflow actions. No search field and no backend
+ * chip (letta-mobile-pus2w) - the list is short enough to scan, and what it shows is chosen by the
+ * filter menu on the list's own header row.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ConversationsTopBar(
@@ -51,73 +42,32 @@ internal fun ConversationsTopBar(
     navigation: ConversationsNavigation,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier.fillMaxWidth()) {
-        TopAppBar(
-            title = {
-                ExpandableTitleSearch(
-                    query = state.searchQuery,
-                    onQueryChange = callbacks.onSearchQueryChange,
-                    onClear = { callbacks.onSearchQueryChange("") },
-                    expanded = state.isSearchExpanded,
-                    onExpandedChange = callbacks.onSearchExpandedChange,
-                    placeholder = stringResource(R.string.screen_conversations_search_hint),
-                    autoFocus = false,
-                    showCollapseButton = false,
-                    titleContent = {
-                        ConversationsTopBarTitle(
-                            activeBackendLabel = state.activeBackendLabel,
-                            onNavigateToBackendSwitcher = callbacks.onNavigateToBackendSwitcher,
-                        )
-                    },
-                )
-            },
-            scrollBehavior = state.scrollBehavior,
-            colors = com.letta.mobile.ui.theme.LettaTopBarDefaults.topAppBarColors(),
-            actions = {
-                IconButton(onClick = callbacks.onNavigateToSettings) {
-                    Icon(LettaIcons.Settings, stringResource(R.string.common_settings))
-                }
-                ConversationsOverflowMenu(
-                    expanded = state.showOverflowMenu,
-                    onDismiss = { callbacks.onShowOverflowMenuChange(false) },
-                    navigation = navigation,
-                )
-            },
-        )
-        ExpandableSearchField(
-            query = state.searchQuery,
-            onQueryChange = callbacks.onSearchQueryChange,
-            onClear = { callbacks.onSearchQueryChange("") },
-            expanded = state.isSearchExpanded,
-            placeholder = stringResource(R.string.screen_conversations_search_hint),
-            autoFocus = false,
-        )
-    }
+    TopAppBar(
+        title = { ConversationsTopBarTitle() },
+        modifier = modifier,
+        scrollBehavior = state.scrollBehavior,
+        colors = com.letta.mobile.ui.theme.LettaTopBarDefaults.topAppBarColors(),
+        actions = {
+            IconButton(onClick = callbacks.onNavigateToSettings) {
+                Icon(LettaIcons.Settings, stringResource(R.string.common_settings))
+            }
+            ConversationsOverflowMenu(
+                expanded = state.showOverflowMenu,
+                onDismiss = { callbacks.onShowOverflowMenuChange(false) },
+                navigation = navigation,
+            )
+        },
+    )
 }
 
 @Composable
-private fun ConversationsTopBarTitle(
-    activeBackendLabel: String?,
-    onNavigateToBackendSwitcher: (() -> Unit)?,
-) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(stringResource(R.string.common_conversations))
-        if (activeBackendLabel != null && onNavigateToBackendSwitcher != null) {
-            AssistChip(
-                onClick = onNavigateToBackendSwitcher,
-                label = {
-                    Text(
-                        activeBackendLabel,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                },
-            )
-        }
-    }
+private fun ConversationsTopBarTitle() {
+    Text(
+        text = stringResource(R.string.common_conversations),
+        style = MaterialTheme.typography.headlineMedium,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
 }
 
 private data class ConversationsOverflowMenuItem(
@@ -168,31 +118,13 @@ private fun conversationsOverflowMenuItems(navigation: ConversationsNavigation):
 
 // region Previews
 
-private val previewNoop: () -> Unit = {}
-
 @PreviewLightDark
 @Composable
 private fun ConversationsTopBarTitlePreview() {
-    // Renders the title row directly: the layoutlib preview renderer cannot
+    // Renders the title directly: the layoutlib preview renderer cannot
     // execute Material3 TopAppBar (NoSuchMethodError), so the full
     // ConversationsTopBar scaffold is not previewable here.
-    LettaPreviewFrame {
-        ConversationsTopBarTitle(
-            activeBackendLabel = "Cloud",
-            onNavigateToBackendSwitcher = previewNoop,
-        )
-    }
-}
-
-@PreviewLightDark
-@Composable
-private fun ConversationsTopBarTitlePlainPreview() {
-    LettaPreviewFrame {
-        ConversationsTopBarTitle(
-            activeBackendLabel = null,
-            onNavigateToBackendSwitcher = null,
-        )
-    }
+    LettaPreviewFrame { ConversationsTopBarTitle() }
 }
 
 // endregion

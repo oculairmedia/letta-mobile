@@ -105,7 +105,7 @@ class ConversationsViewModelTest {
     }
 
     @Test
-    fun `recreated screen never publishes stale cached ordering before refreshed ordering`() = runTest {
+    fun `recreated screen publishes the held ordering at once and the refreshed ordering after`() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         Dispatchers.setMain(dispatcher)
         val oldMostRecent = TestData.conversation(
@@ -136,8 +136,14 @@ class ConversationsViewModelTest {
         advanceUntilIdle()
         collection.cancel()
 
+        // letta-mobile-pus2w: the page is instant - whatever the repository holds shows first
+        // (its cached order), then the refresh's authoritative order replaces it in place. The
+        // list animates placement, so this reads as a row moving, not a swap.
         assertEquals(
-            listOf(listOf("newly-messaged", "old-most-recent")),
+            listOf(
+                listOf("old-most-recent", "newly-messaged"),
+                listOf("newly-messaged", "old-most-recent"),
+            ),
             populatedOrders.distinct(),
         )
     }

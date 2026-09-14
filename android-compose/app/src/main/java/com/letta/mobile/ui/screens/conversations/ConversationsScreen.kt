@@ -9,8 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -72,7 +71,6 @@ fun ConversationsScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showNewChat by rememberSaveable { mutableStateOf(false) }
     var showOverflowMenu by remember { mutableStateOf(false) }
-    var isSearchExpanded by rememberSaveable { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
@@ -135,7 +133,7 @@ fun ConversationsScreen(
         viewModel.clearCreateConversationError()
     }
 
-    val filteredConversations = remember(uiState.conversations, uiState.searchQuery, uiState.showArchived) {
+    val filteredConversations = remember(uiState.conversations, uiState.searchQuery, uiState.filter) {
         viewModel.getFilteredConversations()
     }
     val listActions = remember(onNavigateToChat, viewModel) {
@@ -178,9 +176,7 @@ fun ConversationsScreen(
             hasConversations = uiState.conversations.isNotEmpty(),
             conversations = filteredConversations,
             isRefreshing = uiState.isRefreshing,
-            searchQuery = uiState.searchQuery,
-            isSearchExpanded = isSearchExpanded,
-            showArchived = uiState.showArchived,
+            filter = uiState.filter,
             localReadiness = uiState.localLettaCodeReadiness,
             showFirstRunOnboarding = uiState.shouldShowFirstRunOnboarding(),
             activeBackendLabel = activeBackendLabel,
@@ -190,10 +186,8 @@ fun ConversationsScreen(
             onNewChatClick = { showNewChat = true },
         ),
         callbacks = ConversationsScreenCallbacks(
-            onSearchQueryChange = viewModel::updateSearchQuery,
-            onSearchExpandedChange = { isSearchExpanded = it },
             onShowOverflowMenuChange = { showOverflowMenu = it },
-            onToggleShowArchived = viewModel::toggleShowArchived,
+            onFilterChange = viewModel::setFilter,
             onNavigateToSettings = onNavigateToSettings,
             onNavigateToBackendSwitcher = onNavigateToBackendSwitcher,
             onConversationClick = listActions.onConversationClick,
@@ -254,9 +248,7 @@ internal data class ConversationsScreenState(
     val hasConversations: Boolean,
     val conversations: List<ConversationDisplay>,
     val isRefreshing: Boolean,
-    val searchQuery: String,
-    val isSearchExpanded: Boolean,
-    val showArchived: Boolean,
+    val filter: ConversationFilter,
     val localReadiness: LocalLettaCodeCreateReadiness,
     val showFirstRunOnboarding: Boolean,
     val activeBackendLabel: String?,
@@ -267,10 +259,8 @@ internal data class ConversationsScreenState(
 )
 
 internal data class ConversationsScreenCallbacks(
-    val onSearchQueryChange: (String) -> Unit,
-    val onSearchExpandedChange: (Boolean) -> Unit,
     val onShowOverflowMenuChange: (Boolean) -> Unit,
-    val onToggleShowArchived: () -> Unit,
+    val onFilterChange: (ConversationFilter) -> Unit,
     val onNavigateToSettings: () -> Unit,
     val onNavigateToBackendSwitcher: (() -> Unit)?,
     val onConversationClick: (ConversationDisplay) -> Unit,
@@ -319,16 +309,10 @@ internal fun ConversationsScreenContent(
         topBar = {
             ConversationsTopBar(
                 state = ConversationsTopBarState(
-                    searchQuery = state.searchQuery,
-                    isSearchExpanded = state.isSearchExpanded,
-                    activeBackendLabel = state.activeBackendLabel,
                     showOverflowMenu = state.showOverflowMenu,
                     scrollBehavior = callbacks.scrollBehavior,
                 ),
                 callbacks = ConversationsTopBarCallbacks(
-                    onSearchQueryChange = callbacks.onSearchQueryChange,
-                    onSearchExpandedChange = callbacks.onSearchExpandedChange,
-                    onNavigateToBackendSwitcher = callbacks.onNavigateToBackendSwitcher,
                     onNavigateToSettings = callbacks.onNavigateToSettings,
                     onShowOverflowMenuChange = callbacks.onShowOverflowMenuChange,
                 ),
@@ -336,9 +320,11 @@ internal fun ConversationsScreenContent(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = state.onNewChatClick) {
-                Icon(LettaIcons.Add, stringResource(R.string.screen_conversations_new_action))
-            }
+            ExtendedFloatingActionButton(
+                onClick = state.onNewChatClick,
+                icon = { Icon(LettaIcons.Add, contentDescription = null) },
+                text = { Text(stringResource(R.string.screen_conversations_new_action)) },
+            )
         },
     ) { paddingValues ->
         val error = state.error
@@ -355,31 +341,20 @@ internal fun ConversationsScreenContent(
             }
             else -> {
                 Column(modifier = Modifier.padding(paddingValues)) {
-                    // Archive filter chip row
+                    // The list's header: what it shows (the backend it comes from) and the filter menu.
                     if (state.hasConversations) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            FilterChip(
-                                selected = !state.showArchived,
-                                onClick = { if (state.showArchived) callbacks.onToggleShowArchived() },
-                                label = { Text(stringResource(R.string.screen_conversations_active_label)) },
-                            )
-                            FilterChip(
-                                selected = state.showArchived,
-                                onClick = { if (!state.showArchived) callbacks.onToggleShowArchived() },
-                                label = { Text(stringResource(R.string.screen_conversations_archived_label)) },
-                            )
-                        }
+                        ConversationListHeader(
+                            label = state.activeBackendLabel,
+                            filter = state.filter,
+                            onFilterChange = callbacks.onFilterChange,
+                            onLabelClick = callbacks.onNavigateToBackendSwitcher,
+                        )
                     }
                     ConversationListContent(
                         state = ConversationListContentState(
                             conversations = state.conversations,
                             isRefreshing = state.isRefreshing,
-                            isSearchActive = state.searchQuery.isNotBlank(),
+                            isSearchActive = false,
                             showFirstRunOnboarding = state.showFirstRunOnboarding,
                             localReadiness = state.localReadiness,
                             onCreateFirstAgent = state.onCreateFirstAgent,
@@ -439,7 +414,7 @@ internal fun ConversationsScreenBody(
                     state = ConversationListContentState(
                         conversations = state.conversations,
                         isRefreshing = state.isRefreshing,
-                        isSearchActive = state.searchQuery.isNotBlank(),
+                        isSearchActive = false,
                         showFirstRunOnboarding = state.showFirstRunOnboarding,
                         localReadiness = state.localReadiness,
                         onCreateFirstAgent = state.onCreateFirstAgent,
@@ -504,18 +479,14 @@ private fun previewConversationsScreenState(
     isLoading: Boolean = false,
     error: String? = null,
     showFirstRunOnboarding: Boolean = false,
-    isSearchExpanded: Boolean = false,
-    searchQuery: String = "",
-    showArchived: Boolean = false,
+    filter: ConversationFilter = ConversationFilter.ALL,
 ) = ConversationsScreenState(
     isLoading = isLoading,
     error = error,
     hasConversations = conversations.isNotEmpty(),
     conversations = conversations,
     isRefreshing = false,
-    searchQuery = searchQuery,
-    isSearchExpanded = isSearchExpanded,
-    showArchived = showArchived,
+    filter = filter,
     localReadiness = LocalLettaCodeCreateReadiness(),
     showFirstRunOnboarding = showFirstRunOnboarding,
     activeBackendLabel = null,
@@ -548,10 +519,8 @@ private fun previewConversationsNavigation() = ConversationsNavigation(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun previewConversationsScreenCallbacks() = ConversationsScreenCallbacks(
-    onSearchQueryChange = {},
-    onSearchExpandedChange = {},
     onShowOverflowMenuChange = {},
-    onToggleShowArchived = {},
+    onFilterChange = {},
     onNavigateToSettings = {},
     onNavigateToBackendSwitcher = null,
     onConversationClick = {},
@@ -624,13 +593,12 @@ private fun ConversationsScreenFirstRunPreview() {
 
 @PreviewLightDark
 @Composable
-private fun ConversationsScreenSearchActivePreview() {
+private fun ConversationsScreenArchivedFilterPreview() {
     LettaPreviewFrame {
         ConversationsScreenBody(
             state = previewConversationsScreenState(
-                conversations = previewConversations().filter { "release" in (it.conversation.summary ?: "") },
-                isSearchExpanded = true,
-                searchQuery = "release",
+                conversations = previewConversations().take(1),
+                filter = ConversationFilter.ARCHIVED,
             ),
             callbacks = previewConversationsScreenCallbacks(),
         )
