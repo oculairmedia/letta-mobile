@@ -388,7 +388,7 @@ private fun MascotBench(file: File, modifier: Modifier) {
                 // The eyes aim at the target minus what the head already covers, so they lead and then relax.
                 val ex = wantX - hx * 0.6f; val ey = wantY - hy * 0.6f
                 x += (ex - x) * k; y += (ey - y) * k
-                val omega = 11f; val zeta = 0.5f
+                val omega = 8.5f; val zeta = 0.72f   // heavy head: one soft overshoot, no ring
                 vx += ((htx - hx) * omega * omega - 2f * zeta * omega * vx) * dt; hx += vx * dt
                 vy += ((hty - hy) * omega * omega - 2f * zeta * omega * vy) * dt; hy += vy * dt
                 if (kotlin.math.abs(x - lookX) > 0.002f || kotlin.math.abs(y - lookY) > 0.002f) setLook(x, y)

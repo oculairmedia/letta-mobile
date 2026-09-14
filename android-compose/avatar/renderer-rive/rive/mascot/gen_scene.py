@@ -169,8 +169,8 @@ EMPH_ACCEL = "0.3 0 0.8 0.15"
 # Mass. A cubic with y outside 0..1 pulls back before it goes (BACK_IN) or overshoots and
 # settles (BACK_OUT); Elastic is a real damped spring on the landing.
 BACK_IN = "0.36 0 0.66 -0.56"
-BACK_OUT = "0.34 1.56 0.64 1"
-BACK_IN_OUT = "0.68 -0.6 0.32 1.6"
+BACK_OUT = "0.34 1.28 0.64 1"
+BACK_IN_OUT = "0.68 -0.4 0.32 1.35"
 
 
 class Elastic(str):
@@ -181,8 +181,8 @@ class Elastic(str):
         return o
 
 
-ELASTIC_OUT = Elastic(1.0, 0.45)     # a whip settles with two visible bounces
-ELASTIC_SOFT = Elastic(0.6, 0.6)     # a glance settles with one
+ELASTIC_OUT = Elastic(0.7, 0.75)     # a whip settles with one slow, heavy bounce
+ELASTIC_SOFT = Elastic(0.35, 0.9)    # a glance settles with barely one
 EMPH_DECEL = "0.05 0.7 0.1 1"
 M3_STANDARD = "0.2 0 0 1"
 STD_DECEL = "0 0 0 1"
