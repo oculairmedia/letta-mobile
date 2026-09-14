@@ -100,6 +100,8 @@ VM_TUNE_SCALE, CONV_SCALE, ENTITY = "1:16", "2:3", "0:230"      # whole-entity s
 VM_TURN_X, VM_TURN_Y, HOST_TURN = "1:17", "1:18", "0:235"
 ARC_NODE, TURN_ARC = "0:236", 7    # a turn is an arc, not a slide: the plate lifts TURN_ARC px through the centre
 CONV_BODY_X, HOST_BODY_PX = "2:8", 6   # the body shifts toward what the head turns to (commit motion)
+LEAN_NODE, CONV_LEAN, LEAN_BASE = "0:237", "2:9", 150   # pivot at the body's base, LEAN_BASE px below centre
+HOST_LEAN_DEG, TURN_LEAN_DEG = 9, 5                      # lean at host turn +-1 / at state facing +-1
 CONV_TURN_X, CONV_TURN_Y, CONV_TURN_ROT, CONV_BODY_ROT = "2:4", "2:5", "2:6", "2:7"
 HOST_TURN_PX, HOST_TURN_PY, HOST_TURN_DEG, HOST_BODY_DEG = 48, 18, 10, 5
 # Default gaze life: root-keyed remaps of two small plate ranges (+-6 / +-4 px on the glyph's
@@ -362,7 +364,7 @@ def shape_keys(shape):
 
 def body():
     bound = f'<SolidColor colorValue="FF79B7DF" name="Color">\n            {bind(VM_COLOR, COLOR)}\n        </SolidColor>'
-    return f'''<Node x="0" y="0" name="BodyPlacement" id="{INFLATE_NODE}">
+    return f'''<Node x="0" y="{-LEAN_BASE}" name="BodyPlacement" id="{INFLATE_NODE}">
     {bind(VM_TURN_X, ROT, CONV_BODY_ROT)}
     {bind(VM_TURN_X, X, CONV_BODY_X)}
 <Node x="0" y="0" name="Body" id="{BODY_NODE}">
@@ -584,7 +586,7 @@ def trail(name, sid):
 def face():
     # FacePlacement > Turn (keyed only by the joystick's TurnX/TurnY) > Face (keyed by state motion).
     # Trails are declared after Turn so they draw underneath the plate.
-    return f'''<Node x="0" y="-8" name="FacePlacement">
+    return f'''<Node x="0" y="{-8 - LEAN_BASE}" name="FacePlacement">
 <Node x="0" y="0" name="HostTurn" id="{HOST_TURN}">
     {bind(VM_TURN_X, X, CONV_TURN_X)}
     {bind(VM_TURN_X, ROT, CONV_TURN_ROT)}
@@ -630,6 +632,7 @@ def turn_animations():
                     SX: [(0, TURN_SQUASH * TURN_RECEDE, LINEAR), (30, 1, LINEAR), (60, TURN_SQUASH * TURN_RECEDE)],
                     SY: [(0, TURN_RECEDE, LINEAR), (30, 1, LINEAR), (60, TURN_RECEDE)]},
         ARC_NODE: {Y: [(0, 0, SINE), (30, -TURN_ARC, SINE), (60, 0)]},
+        LEAN_NODE: {ROT: [(0, rad(-TURN_LEAN_DEG), LINEAR), (60, rad(TURN_LEAN_DEG))]},
         BODY_NODE: {ROT: [(0, rad(-6), LINEAR), (60, rad(6))],
                     SX: [(0, 0.93, LINEAR), (30, 1, LINEAR), (60, 0.93)]}})
     ty = animation("TurnY", TURN_Y_ANIM, 60, {
@@ -990,8 +993,12 @@ def root_artboard():
     <Node x="250" y="270" name="Entity" id="{ENTITY}">
         {bind(VM_TUNE_SCALE, SX, CONV_SCALE)}
         {bind(VM_TUNE_SCALE, SY, CONV_SCALE)}
-{indent(face(), "        ")}
-{indent(body(), "        ")}
+        <!-- Lean: pivot at the base; children sit LEAN_BASE above it so the centre stays put. -->
+        <Node x="0" y="{LEAN_BASE}" name="Lean" id="{LEAN_NODE}">
+            {bind(VM_TURN_X, ROT, CONV_LEAN)}
+{indent(face(), "            ")}
+{indent(body(), "            ")}
+        </Node>
     </Node>
 
 {indent(chr(10).join(anims), "    ")}
@@ -1026,6 +1033,8 @@ def data():
                           clampLower="true" clampUpper="true" name="TurnToBodyRoll" id="{CONV_BODY_ROT}"/>
 <DataConverterRangeMapper minInput="-1" maxInput="1" minOutput="{-HOST_BODY_PX}" maxOutput="{HOST_BODY_PX}"
                           clampLower="true" clampUpper="true" name="TurnToBodyX" id="{CONV_BODY_X}"/>
+<DataConverterRangeMapper minInput="-1" maxInput="1" minOutput="{rad(-HOST_LEAN_DEG)}" maxOutput="{rad(HOST_LEAN_DEG)}"
+                          clampLower="true" clampUpper="true" name="TurnToLean" id="{CONV_LEAN}"/>
 
 <ViewModel defaultInstanceId="{VM_INSTANCE}" name="Avatar" id="{VM}">
     <ViewModelPropertyEnumCustom enumId="{ENUM_STATE}" name="state" id="{VM_STATE}"/>
