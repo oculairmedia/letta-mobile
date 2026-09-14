@@ -11,6 +11,9 @@ import com.letta.mobile.desktop.chat.DesktopConversationSummary
 internal data class DesktopAgentSidebarState(
     val agentName: String,
     val agentOrbIndex: Int,
+    /** The selected agent and its mascot identity: the header draws the live mascot when both are known. */
+    val agentId: String? = null,
+    val agentIdentity: com.letta.mobile.avatar.core.MascotIdentity? = null,
     val conversations: List<DesktopConversationSummary>,
     val selectedConversationId: String?,
     val thinkingConversationId: String?,

@@ -212,6 +212,7 @@ private fun ChatDetailBody(
         } else if (surface.renderItems.isEmpty() && !state.isThinking) {
             NewConversationWelcome(
                 agentName = surface.selectedConversation?.agentName,
+                agentId = surface.selectedConversation?.agentId,
                 identity = surface.selectedConversation?.agentId?.let { state.agentIdentitiesById[it] },
                 onStarterPrompt = actions.onComposerTextChanged,
                 onOnboardingTask = actions.onOnboardingTask,
@@ -318,6 +319,7 @@ private fun DesktopWorkingDirectoryRow(
 @Composable
 private fun NewConversationWelcome(
     agentName: String?,
+    agentId: String?,
     identity: com.letta.mobile.avatar.core.MascotIdentity?,
     onStarterPrompt: (String) -> Unit,
     onOnboardingTask: ((OnboardingTaskKind) -> Unit)?,
@@ -327,19 +329,20 @@ private fun NewConversationWelcome(
         modifier = modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = 40.dp, vertical = 28.dp),
+            .padding(horizontal = 40.dp, vertical = 16.dp),
         contentAlignment = Alignment.Center,
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
             modifier = Modifier.widthIn(max = ChatColumnMaxWidth),
         ) {
-            // The agent's mascot, live when the native bridge is here; the gradient sphere otherwise.
-            if (identity != null) {
-                com.letta.mobile.desktop.avatar.rive.DesktopMascotHero(identity = identity, size = 96.dp)
+            // The agent itself, at hero size, live when the native bridge is here; the gradient
+            // sphere otherwise. It is the page: everything below is a compact strip of first moves.
+            if (identity != null && agentId != null) {
+                com.letta.mobile.desktop.avatar.rive.DesktopMascotHero(agentId = agentId, identity = identity, size = 220.dp)
             } else {
-                AgentSphere(size = 72.dp)
+                AgentSphere(size = 96.dp)
             }
             Text(
                 text = AgentOnboarding.greeting(agentName),
@@ -358,24 +361,37 @@ private fun NewConversationWelcome(
             // First-run 2×2 action grid (Phase 5), category-colored. Each card
             // pre-fills the composer so a fresh agent has an obvious first move.
             FirstRunActionGrid(onAction = onStarterPrompt)
+            // Setup tasks as a row of chips: the same three actions, a fifth of the height.
             if (onOnboardingTask != null) {
-                Surface(
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainer,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 ) {
-                    Column {
-                        AgentOnboarding.tasks(agentName).forEachIndexed { index, task ->
-                            if (index > 0) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(1.dp)
-                                        .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                    AgentOnboarding.tasks(agentName).forEach { task ->
+                        Surface(
+                            onClick = { onOnboardingTask(task.kind) },
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainer,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                        ) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            ) {
+                                Icon(
+                                    imageVector = when (task.kind) {
+                                        OnboardingTaskKind.SetPersona -> Icons.Outlined.Edit
+                                        OnboardingTaskKind.ConnectChannel -> Icons.Outlined.Hub
+                                        else -> Icons.Outlined.Build
+                                    },
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp),
                                 )
+                                Text(task.title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
                             }
-                            OnboardingTaskRow(task = task, onClick = { onOnboardingTask(task.kind) })
                         }
                     }
                 }
@@ -421,6 +437,7 @@ private fun NewConversationWelcome(
 @Composable
 private fun FirstRunActionGrid(onAction: (String) -> Unit) {
     val cc = MaterialTheme.customColors
+    // One row of four: the mascot is the page now, the moves are a strip under it.
     Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
             FirstRunCard("Start a conversation", "Just say hello", MaterialTheme.colorScheme.primary, Modifier.weight(1f)) {
@@ -429,8 +446,6 @@ private fun FirstRunActionGrid(onAction: (String) -> Unit) {
             FirstRunCard("Seed a memory", "Tell me about you", cc.categoryHumanColor, Modifier.weight(1f)) {
                 onAction("Remember this about me: ")
             }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
             FirstRunCard("Connect a tool", "See what I can use", cc.categoryProjectColor, Modifier.weight(1f)) {
                 onAction("What tools can you use?")
             }

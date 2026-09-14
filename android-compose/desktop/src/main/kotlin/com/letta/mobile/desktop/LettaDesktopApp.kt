@@ -728,6 +728,8 @@ internal fun LettaDesktopApp(
                     state = DesktopAgentSidebarState(
                         agentName = selectedAgentName,
                         agentOrbIndex = selectedAgentOrbIndex,
+                        agentId = selectedAgentId,
+                        agentIdentity = selectedAgentId?.let { identityByAgentId[it] },
                         conversations = agentConversations,
                         selectedConversationId = chatState.selectedConversationId,
                         thinkingConversationId = thinkingConversationId,
