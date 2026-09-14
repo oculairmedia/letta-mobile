@@ -4,21 +4,20 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
-import com.letta.mobile.avatar.core.AvatarState
 import com.letta.mobile.avatar.core.MascotIdentity
+import com.letta.mobile.data.presence.AgentPresence
 import com.letta.mobile.desktop.chat.AgentSphere
+import com.letta.mobile.desktop.chat.MascotIdentityRegistry
 
 /**
- * The live mascot for one agent on desktop, drawn from the process-wide scene for that agent
- * ([DesktopMascotScenes]) so it never restarts when the view changes. Identity is applied before
- * the first frame; state goes through the shared [com.letta.mobile.avatar.rive.RiveAvatarRuntime].
- * When the native bridge is not available on this machine (no DLL, not Windows) or the scene
- * fails to load, the gradient [AgentSphere] stands in, so callers never care which they got.
- *
- * P1 of the rollout (MASCOT.md section 2): the caller passes the director's state; until the
- * director is wired (P2) that is IDLE and the rig's own life carries it.
+ * The live mascot for one agent on desktop, drawn from the process-wide entry for that agent
+ * ([DesktopMascotScenes]) so it never restarts when the view changes. The agent's presence
+ * (from [MascotIdentityRegistry]) is fed to the entry's director, which owns the state; this
+ * composable only renders and keeps the director's clock running. When the native bridge is not
+ * available (no DLL, not Windows) or the scene fails, the gradient [AgentSphere] stands in.
  */
 @Composable
 fun DesktopMascotHero(
@@ -32,9 +31,12 @@ fun DesktopMascotHero(
         AgentSphere(size = size, modifier = modifier)
         return
     }
-    // The state comes from the app's presence for this agent (thinking, speaking, error...),
-    // so every surface drawing the same agent shows the same thing.
-    val state = com.letta.mobile.desktop.chat.MascotIdentityRegistry.states[agentId] ?: AvatarState.IDLE
-    LaunchedEffect(entry, state) { entry.runtime.applyState(state) }
+    val presence = MascotIdentityRegistry.presence[agentId] ?: AgentPresence.IDLE
+    LaunchedEffect(entry, presence) { entry.apply(presence) }
+    // The director's timers (listening release, success hold, blink schedule) need a clock;
+    // tickTo is idempotent per frame so several surfaces of one agent tick it once.
+    LaunchedEffect(entry) {
+        while (true) withFrameNanos { entry.tickTo(it) }
+    }
     RiveDesktopSurface(entry.scene, modifier.size(size))
 }

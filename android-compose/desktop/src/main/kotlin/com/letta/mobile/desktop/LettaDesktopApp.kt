@@ -449,12 +449,6 @@ internal fun LettaDesktopApp(
     val thinkingAgentId = thinkingConversationId?.let { tid ->
         chatState.conversations.firstOrNull { it.id == tid }?.agentId
     }
-    // Presence -> mascot state (P2 first slice): the thinking agent thinks; everyone else idles.
-    androidx.compose.runtime.SideEffect {
-        com.letta.mobile.desktop.chat.MascotIdentityRegistry.updateStates(
-            buildMap { thinkingAgentId?.let { put(it, com.letta.mobile.avatar.core.AvatarState.THINKING) } },
-        )
-    }
     val isThinkingSelected = thinkingConversationId != null &&
         thinkingConversationId == chatState.selectedConversationId
     // Reply is actively streaming for the selected conversation — outlives
@@ -464,6 +458,20 @@ internal fun LettaDesktopApp(
     // bespoke desktop check, so the "is the agent working" semantics stay in one
     // place across platforms.
     val replyPresence by chatController.replyPresence.collectAsState()
+    // Presence -> the mascots' directors. Busy is the whole run (send -> terminal), speaking while
+    // tokens stream, listening while the user composes, error when the attempt failed.
+    val runningConversationId by chatController.streamingConversationId.collectAsState()
+    val mascotPresence = remember(chatState.conversations, runningConversationId, replyPresence.isStreaming, chatState.selectedConversationId, chatState.composerText, chatState.errorMessage) {
+        com.letta.mobile.data.presence.AgentPresenceResolver.resolve(
+            conversations = chatState.conversations,
+            runningConversationId = runningConversationId,
+            streamingTokens = replyPresence.isStreaming,
+            selectedConversationId = chatState.selectedConversationId,
+            composerText = chatState.composerText,
+            errorConversationId = chatState.selectedConversationId.takeIf { chatState.errorMessage != null },
+        )
+    }
+    androidx.compose.runtime.SideEffect { com.letta.mobile.desktop.chat.MascotIdentityRegistry.updatePresence(mascotPresence) }
     val isStreamingReplySelected = replyPresence.isStreaming
 
     // Background work can belong to a conversation the user has switched away

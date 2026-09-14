@@ -215,12 +215,12 @@ private const val ActivityRingPeriodMs = 1600
 object MascotIdentityRegistry {
     val identities = androidx.compose.runtime.mutableStateMapOf<String, com.letta.mobile.avatar.core.MascotIdentity>()
 
-    /** Each agent's current presence, as the app derives it; absent means idle. The mascot switches state on it. */
-    val states = androidx.compose.runtime.mutableStateMapOf<String, com.letta.mobile.avatar.core.AvatarState>()
+    /** Each agent's presence (activity, typing, approval, error) as the app derives it; absent means idle. */
+    val presence = androidx.compose.runtime.mutableStateMapOf<String, com.letta.mobile.data.presence.AgentPresence>()
 
-    fun updateStates(all: Map<String, com.letta.mobile.avatar.core.AvatarState>) {
-        states.keys.retainAll(all.keys)
-        states.putAll(all)
+    fun updatePresence(all: Map<String, com.letta.mobile.data.presence.AgentPresence>) {
+        presence.keys.retainAll(all.keys)
+        presence.putAll(all)
     }
 
     fun update(all: Map<String, com.letta.mobile.avatar.core.MascotIdentity>) {

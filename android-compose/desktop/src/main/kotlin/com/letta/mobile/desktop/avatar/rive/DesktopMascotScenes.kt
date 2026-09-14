@@ -1,24 +1,63 @@
 package com.letta.mobile.desktop.avatar.rive
 
+import com.letta.mobile.avatar.core.AvatarActivity
+import com.letta.mobile.avatar.core.AvatarDirector
 import com.letta.mobile.avatar.core.MascotIdentity
 import com.letta.mobile.avatar.rive.MASCOT_MODEL
 import com.letta.mobile.avatar.rive.RiveAvatarContract
 import com.letta.mobile.avatar.rive.RiveAvatarRuntime
+import com.letta.mobile.data.presence.AgentActivityKind
+import com.letta.mobile.data.presence.AgentPresence
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 /**
- * One live mascot scene per agent, kept for the life of the process. A scene that is closed
- * whenever its composable leaves composition restarts from its entry pose every time the user
- * switches view - the character keeps "closing". Holding it here means the same scene, with its
- * state, gaze and wander mid-flight, is drawn wherever that agent appears.
+ * One live mascot per agent, kept for the life of the process: the native scene, the shared
+ * [RiveAvatarRuntime], and the shared [AvatarDirector] that arbitrates its state. A scene that is
+ * closed whenever its composable leaves composition restarts from its entry pose every time the
+ * user switches view; holding it here means the same character, mid-thought, is drawn wherever
+ * that agent appears.
  *
- * Memory: a scene is a native artboard plus a D3D target sized on demand; a handful per session
- * is fine. The rollout's P3 adds the bitmap tier for lists, which does not use this.
+ * The director is the only thing that decides the mascot's state. Surfaces feed it presence
+ * ([apply]) and time ([tickTo]); it drives the runtime through its state listener. That is the
+ * same director Android will feed - nothing here is desktop policy.
  */
 object DesktopMascotScenes {
-    class Entry(val scene: RiveDesktopScene, val runtime: RiveAvatarRuntime, var identity: MascotIdentity)
+    class Entry(val scene: RiveDesktopScene, val runtime: RiveAvatarRuntime, var identity: MascotIdentity) {
+        val director = AvatarDirector(runtime).also { d ->
+            d.addStateListener { _, enter -> runtime.applyState(enter) }
+        }
+        private var lastPresence = AgentPresence.IDLE
+        private var lastTickNanos = 0L
+
+        /** Feeds the director; a run that ends without an error is a completed task. */
+        fun apply(presence: AgentPresence) {
+            val was = lastPresence
+            lastPresence = presence
+            director.setActivity(
+                when (presence.activity) {
+                    AgentActivityKind.THINKING -> AvatarActivity.THINKING
+                    AgentActivityKind.SPEAKING -> AvatarActivity.SPEAKING
+                    AgentActivityKind.IDLE -> AvatarActivity.IDLE
+                },
+            )
+            director.setUserTyping(presence.userTyping)
+            director.setAwaitingApproval(presence.awaitingApproval)
+            if (presence.error && !was.error) director.notifyError()
+            if (was.activity != AgentActivityKind.IDLE && presence.activity == AgentActivityKind.IDLE && !presence.error) {
+                director.notifyTaskSucceeded()
+            }
+        }
+
+        /** Advances the director's clocks once per frame, however many surfaces draw this agent. */
+        fun tickTo(nowNanos: Long) {
+            if (nowNanos == lastTickNanos) return
+            val dt = if (lastTickNanos == 0L) 0f else ((nowNanos - lastTickNanos) / 1e9f).coerceIn(0f, 0.1f)
+            lastTickNanos = nowNanos
+            if (dt > 0f) director.tick(dt)
+        }
+    }
 
     private val entries = HashMap<String, Entry>()
     private val scope = CoroutineScope(Dispatchers.Main)
