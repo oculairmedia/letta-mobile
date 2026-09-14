@@ -36,11 +36,12 @@ import math
 import os
 import sys
 import xml.etree.ElementTree as ET
+from dataclasses import dataclass
 from typing import NamedTuple
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from timeline import PROP_NAMES, ROTATION_KEYS, num, prop_name, read_keys  # noqa: E402
+from timeline import PROP_NAMES, ROTATION_KEYS, num, prop_name, property_key, read_keys  # noqa: E402
 
 NESTED_FIRE = 401  # callbacks have no value; never a seam
 
@@ -86,14 +87,16 @@ class Span(NamedTuple):
     last_frame: int
 
 
+@dataclass(repr=False, eq=False, slots=True)
 class Anim:
     """One LinearAnimation's keyed ends. Indexes like the mapping it wraps:
     `index[aid][(objectId, propertyKey)]` is a Span."""
 
-    __slots__ = ("id", "name", "loop", "duration", "props")
-
-    def __init__(self, aid, name, loop, duration, props):
-        self.id, self.name, self.loop, self.duration, self.props = aid, name, loop, duration, props
+    id: str
+    name: str
+    loop: str
+    duration: int
+    props: dict
 
     def __getitem__(self, k):
         return self.props[k]
@@ -138,26 +141,21 @@ def parse(document):
 def animation_index(document):
     """{animation id: Anim} for every LinearAnimation in the document."""
     root = parse(document)
-    index = {}
-    for anim in root.iter("LinearAnimation"):
-        props = {}
-        for ko in anim.findall("KeyedObject"):
-            oid = ko.get("objectId")
-            for kp in ko.findall("KeyedProperty"):
-                try:
-                    key = int(kp.get("propertyKey"))
-                except (TypeError, ValueError):
-                    continue
-                if key == NESTED_FIRE:
-                    continue
-                keys = read_keys(kp)
-                if not keys:
-                    continue
-                props[(oid, key)] = Span(keys[0].value, keys[-1].value, keys[0].frame, keys[-1].frame)
-        index[anim.get("id")] = Anim(anim.get("id"), anim.get("name", "?"),
-                                     anim.get("loopValue", "oneShot"),
-                                     int(float(anim.get("duration", 0))), props)
-    return index
+    return {anim.get("id"): Anim(anim.get("id"), anim.get("name", "?"), anim.get("loopValue", "oneShot"),
+                                 int(float(anim.get("duration", 0))), keyed_spans(anim))
+            for anim in root.iter("LinearAnimation")}
+
+
+def keyed_spans(anim):
+    """{(objectId, propertyKey): Span} for every valued keyed property of one animation."""
+    props = {}
+    for ko in anim.findall("KeyedObject"):
+        for kp in ko.findall("KeyedProperty"):
+            key = property_key(kp.get("propertyKey"))
+            keys = read_keys(kp) if key not in (-1, NESTED_FIRE) else []
+            if keys:
+                props[(ko.get("objectId"), key)] = Span(keys[0].value, keys[-1].value, keys[0].frame, keys[-1].frame)
+    return props
 
 
 def object_names(document):
@@ -200,22 +198,30 @@ def crossings(index, from_anim, to_anim):
     if a is None:
         return []
     b = index.get(to_anim)
-    out = []
-    for (oid, key), span in a.props.items():
-        eps = epsilon(key)
-        if b is not None and (oid, key) in b.props:
-            target = b.props[(oid, key)].first
-            d = _delta(span.last, target)
-            if d > eps:
-                out.append(Cross(oid, key, span.last, target, d, eps, False))
-        elif a.loop == "oneShot":
-            r = rest_value(key)
-            if r is None:
-                continue
-            d = _delta(span.last, r)
-            if d > eps:
-                out.append(Cross(oid, key, span.last, r, d, eps, True))
-    return out
+    moves = (_handoff(a, b, prop, span) for prop, span in a.props.items())
+    return [c for c in moves if c is not None]
+
+
+_UNTAKEN = object()   # the hand-off leaves the property to nobody: no crossing to weigh
+
+
+def _target(a, b, prop):
+    """(the value `prop` lands on after the hand-off, is it a hand-back?). The value is _UNTAKEN
+    when nothing takes the property: a looping source, or a hand-back with no rest value."""
+    if b is not None and prop in b.props:
+        return b.props[prop].first, False
+    rest = rest_value(prop[1]) if a.loop == "oneShot" else None
+    return (_UNTAKEN if rest is None else rest), True
+
+
+def _handoff(a, b, prop, span):
+    """The Cross `prop` makes when `a` hands over to `b`, or None when it stays within epsilon."""
+    target, hand_back = _target(a, b, prop)
+    if target is _UNTAKEN:
+        return None
+    eps = epsilon(prop[1])
+    d = _delta(span.last, target)
+    return Cross(prop[0], prop[1], span.last, target, d, eps, hand_back) if d > eps else None
 
 
 # --- the transitions of a document ------------------------------------------------------------
@@ -251,28 +257,24 @@ def transitions(document):
     every state in its layer: that is what it does at runtime, so every source it could cut from
     is a hand-off the ledger has to weigh."""
     root = parse(document)
-    out = []
-    for sm in root.iter("StateMachine"):
-        machine = sm.get("name", "?")
-        for layer in sm.findall("StateMachineLayer"):
-            name = layer.get("name", "?")
-            states = [(st.get("id"), st.get("animationId")) for st in layer.findall("AnimationState")]
-            anim_of = dict(states)
-            any_state = layer.find("AnyState")
-            if any_state is not None:
-                for t in any_state.findall("StateTransition"):
-                    to = t.get("stateToId")
-                    for node, aid in states:
-                        if node == to:
-                            continue
-                        out.append(Trans(machine, name, node, to, aid, anim_of.get(to),
-                                         int(t.get("duration", 0)), "any"))
-            for st in layer.findall("AnimationState"):
-                for t in st.findall("StateTransition"):
-                    to = t.get("stateToId")
-                    out.append(Trans(machine, name, st.get("id"), to, st.get("animationId"),
-                                     anim_of.get(to), int(t.get("duration", 0)), _kind(t)))
-    return out
+    return [t for sm in root.iter("StateMachine") for layer in sm.findall("StateMachineLayer")
+            for t in layer_transitions(sm.get("name", "?"), layer)]
+
+
+def layer_transitions(machine, layer):
+    """Every state-to-state transition of one layer, AnyState expanded over its states."""
+    name = layer.get("name", "?")
+    states = [(st.get("id"), st.get("animationId")) for st in layer.findall("AnimationState")]
+    anim_of = dict(states)
+    any_state = layer.find("AnyState")
+    any_transitions = [] if any_state is None else any_state.findall("StateTransition")
+    expanded = [Trans(machine, name, node, t.get("stateToId"), aid, anim_of.get(t.get("stateToId")),
+                      int(t.get("duration", 0)), "any")
+                for t in any_transitions for node, aid in states if node != t.get("stateToId")]
+    own = [Trans(machine, name, st.get("id"), t.get("stateToId"), st.get("animationId"),
+                 anim_of.get(t.get("stateToId")), int(t.get("duration", 0)), _kind(t))
+           for st in layer.findall("AnimationState") for t in st.findall("StateTransition")]
+    return expanded + own
 
 
 # --- the ledger ---------------------------------------------------------------------------------
@@ -317,23 +319,30 @@ def ledger(document, marks=None):
     root = parse(document)
     index = animation_index(root)
     marks, holds = cut_marks() if marks is None else marks
-    rows = []
-    for t in transitions(root):
-        if t.ms != 0:
-            continue
-        look = lambda m: m.get((t.layer, t.from_node, t.to_node), m.get((t.layer, None, t.to_node)))
-        reason, held = look(marks), look(holds)
-        for c in crossings(index, t.from_anim, t.to_anim):
-            # A cut signature covers the hard cut it sits on, never the hand-back underneath it:
-            # what the lower layers do with a property nobody keys is not the transition's to
-            # give. A hand-back needs its own signature (`hold=True`), which says the pose the
-            # one-shot lets go of is the pose the layers below are already holding.
-            signed = held if c.hand_back else reason
-            rows.append(Row(t.machine, t.layer, _anim_name(index, t.from_anim),
-                            _anim_name(index, t.to_anim), t.kind, t.ms, c.obj, prop_name(c.key),
-                            c.from_value, c.to_value, c.delta, c.normalised, c.hand_back,
-                            bool(signed), signed))
+    rows = [row for t in transitions(root) if t.ms == 0 for row in seam_rows(index, t, (marks, holds))]
     rows.sort(key=lambda r: (-r.normalised, r.layer, r.frm, r.to, r.obj, r.prop))
+    return rows
+
+
+def _signature(marks, t):
+    """The reason a signature table gives transition `t`: its own edge, else any edge into its target."""
+    return marks.get((t.layer, t.from_node, t.to_node), marks.get((t.layer, None, t.to_node)))
+
+
+def seam_rows(index, t, signatures):
+    """The ledger rows of one 0 ms transition: one per property its hand-off moves."""
+    reason, held = (_signature(m, t) for m in signatures)
+    rows = []
+    for c in crossings(index, t.from_anim, t.to_anim):
+        # A cut signature covers the hard cut it sits on, never the hand-back underneath it: what
+        # the lower layers do with a property nobody keys is not the transition's to give. A
+        # hand-back needs its own signature (`hold=True`), which says the pose the one-shot lets
+        # go of is the pose the layers below are already holding.
+        signed = held if c.hand_back else reason
+        rows.append(Row(t.machine, t.layer, _anim_name(index, t.from_anim),
+                        _anim_name(index, t.to_anim), t.kind, t.ms, c.obj, prop_name(c.key),
+                        c.from_value, c.to_value, c.delta, c.normalised, c.hand_back,
+                        bool(signed), signed))
     return rows
 
 
@@ -359,22 +368,26 @@ def _key_of(prop):
 def table(rows, names=None):
     """The ledger as lines of text, worst first."""
     names = names or {}
-    body = []
-    for r in rows:
-        key = _key_of(r.prop)
-        body.append([f"{r.machine}/{r.layer}", r.frm, r.to,
-                     r.kind + ("/handback" if r.hand_back else ""),
-                     f"{r.ms}", names.get(r.obj, r.obj), r.prop,
-                     display(key, r.from_value), display(key, r.to_value),
-                     f"{num(r.normalised, 1)}x",
-                     (("hold: " if r.hand_back else "cut: ") + r.reason) if r.reason else ""])
-    head = ["layer", "from", "to", "kind", "ms", "object", "property", "from", "to", "delta", "why"]
-    widths = [max(len(head[i]), *(len(row[i]) for row in body)) if body else len(head[i])
-              for i in range(len(head))]
-    out = ["  ".join(h.ljust(w) for h, w in zip(head, widths)).rstrip(),
-           "  ".join("-" * w for w in widths)]
-    out += ["  ".join(c.ljust(w) for c, w in zip(row, widths)).rstrip() for row in body]
-    return out
+    body = [table_cells(r, names) for r in rows]
+    widths = [max([len(h)] + [len(row[i]) for row in body]) for i, h in enumerate(TABLE_HEAD)]
+    out = [_aligned(TABLE_HEAD, widths), "  ".join("-" * w for w in widths)]
+    return out + [_aligned(row, widths) for row in body]
+
+
+TABLE_HEAD = ["layer", "from", "to", "kind", "ms", "object", "property", "from", "to", "delta", "why"]
+
+
+def _aligned(cells, widths):
+    return "  ".join(c.ljust(w) for c, w in zip(cells, widths)).rstrip()
+
+
+def table_cells(r, names):
+    """One ledger row as the table's text cells."""
+    key = _key_of(r.prop)
+    kind = r.kind + ("/handback" if r.hand_back else "")
+    why = (("hold: " if r.hand_back else "cut: ") + r.reason) if r.reason else ""
+    return [f"{r.machine}/{r.layer}", r.frm, r.to, kind, f"{r.ms}", names.get(r.obj, r.obj), r.prop,
+            display(key, r.from_value), display(key, r.to_value), f"{num(r.normalised, 1)}x", why]
 
 
 def summary(rows):
