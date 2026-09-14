@@ -32,6 +32,10 @@ EMPH_ACCEL = "0.3 0 0.8 0.15"
 BACK_IN = "0.36 0 0.66 -0.56"
 BACK_OUT = "0.34 1.28 0.64 1"
 BACK_IN_OUT = "0.68 -0.4 0.32 1.35"
+# Mass without snap. BACK_IN_OUT dips 6 % below the start and its steepest frame carries 4.27x the
+# average; BACK_OUT leaves at 3.70x. BACK_SOFT has no anticipation dip at all, overshoots the target
+# by about 1 %, and its steepest frame carries 3.08x - the same arrival, a heavier departure.
+BACK_SOFT = "0.55 0 0.25 1.10"
 
 
 class Elastic(str):
@@ -44,6 +48,11 @@ class Elastic(str):
 
 ELASTIC_OUT = Elastic(0.7, 0.75)     # a whip settles with one slow, heavy bounce
 ELASTIC_SOFT = Elastic(0.35, 0.9)    # a glance settles with barely one
+# A rotation settles heavier than a translation does: the longer period stretches the single
+# bounce out and shallows it, so a ring reads as mass coming to rest instead of a spring twanging.
+# Amplitude is carried for readability only - Rive clamps any amplitude <= 1 to 1 and the period
+# is what shapes the bounce, which is why all three of these tokens differ only in their period.
+ELASTIC_HEAVY = Elastic(0.4, 1.0)    # a head settles: one shallow bounce, damped
 EMPH_DECEL = "0.05 0.7 0.1 1"
 M3_STANDARD = "0.2 0 0 1"
 STD_DECEL = "0 0 0 1"

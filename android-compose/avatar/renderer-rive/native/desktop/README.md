@@ -59,8 +59,27 @@ Nothing beyond VS 2022 C++ tools, the Windows SDK, Git for Windows and Python 3 
      -PriveFile=<file.riv> -PriveStateMachine="State Machine 1" -PriveTriggers=Happy,Sad,Angry,Crazy
    ```
 
+   A **bare** `-PriveFile` (no `-PriveStateMachine`, no `-PriveTriggers`) is taken as a build of the
+   mascot itself - a `--solo` or `--probe` variant - and drives the bench instead of the shipped
+   file, so the scenarios, the onion skin and the telemetry panel all look at the same scene:
+
+   ```bash
+   # MOTION-PIPELINE section 6, tier 2: a probed build in the bench, one signature on startup
+   python avatar/renderer-rive/rive/mascot/gen_scene.py C:/tmp/probe/scene.rml --probe   # then rive C:/tmp/probe --once
+   ./gradlew --no-daemon :desktop:runRiveSpike -PriveBridge=C:/rive-spike/bridge/rive_desktop_bridge.dll \
+     -PriveFile=C:/tmp/probe/build/mascot.riv -PriveOnion=true -PriveRecord=enter-thinking
+   ```
+
    `-PriveSelfTest=true` cycles every mascot state and identity (and fires each `-PriveTriggers`
    trigger) without input, printing each step - run it in the background and tail the log.
+   `-PriveOnion=true` opens with the live onion skin on; `-PriveRecord=<scenario>` presses "record
+   signature" once the file has loaded and prints `probe.py`'s JSON to stdout, so a signature can be
+   taken without touching the window.
+
+   Bridge entry points the bench needs beyond the original set - `rive_bridge_load_artboard` (load a
+   named artboard, e.g. the `Harness`), `rive_bridge_vm_get_number` (read a probe number back) and
+   `rive_bridge_vm_number_names` (list them) - are looked up by symbol on the Kotlin side, so a DLL
+   built before they existed still runs the bench, with the telemetry panel empty.
    On this machine the DLL lives at `C:/rive-spike/bridge/`, built from a rive-runtime clone in
    `C:/rive-spike/`. If a relaunch dies in Skiko's D3D redrawer, the previous window was still
    exiting; launch again.

@@ -4,6 +4,7 @@ import com.letta.mobile.avatar.rive.RiveInputSink
 import com.sun.jna.Library
 import com.sun.jna.Memory
 import com.sun.jna.Native
+import com.sun.jna.NativeLibrary
 import com.sun.jna.Pointer
 
 /**
@@ -18,6 +19,14 @@ internal interface RiveBridgeNative : Library {
     fun rive_bridge_create(adapterNameOut: ByteArray, adapterNameCap: Int): Pointer?
     fun rive_bridge_destroy(bridge: Pointer)
     fun rive_bridge_load(bridge: Pointer, bytes: ByteArray, length: Int, stateMachine: String?): Int
+    fun rive_bridge_load_artboard(
+        bridge: Pointer,
+        bytes: ByteArray,
+        length: Int,
+        stateMachine: String?,
+        artboard: String?,
+    ): Int
+
     fun rive_bridge_artboard_width(bridge: Pointer): Float
     fun rive_bridge_artboard_height(bridge: Pointer): Float
     fun rive_bridge_advance(bridge: Pointer, seconds: Float)
@@ -26,6 +35,8 @@ internal interface RiveBridgeNative : Library {
     fun rive_bridge_fire_trigger(bridge: Pointer, name: String): Int
     fun rive_bridge_set_number(bridge: Pointer, name: String, value: Float): Int
     fun rive_bridge_vm_set_number(bridge: Pointer, name: String, value: Float): Int
+    fun rive_bridge_vm_get_number(bridge: Pointer, name: String, out: FloatArray): Int
+    fun rive_bridge_vm_number_names(bridge: Pointer, out: ByteArray, cap: Int): Int
     fun rive_bridge_vm_set_enum(bridge: Pointer, name: String, key: String): Int
     fun rive_bridge_vm_fire(bridge: Pointer, name: String): Int
     fun rive_bridge_vm_set_color(bridge: Pointer, name: String, argb: Int): Int
@@ -54,8 +65,40 @@ internal interface RiveBridgeNative : Library {
         val INSTANCE: RiveBridgeNative by lazy {
             Native.load(PATH ?: error("Set -Drive.bridge.path to rive_desktop_bridge.dll"), RiveBridgeNative::class.java)
         }
+
+        /**
+         * A symbol lookup that tolerates a missing export, so a bench built against a newer header
+         * still runs against a DLL someone built before the probe exports existed: JNA only fails
+         * when the method is actually called, and these are the calls the bench guards.
+         */
+        private fun exports(export: BridgeExport): Boolean = PATH != null &&
+            runCatching { NativeLibrary.getInstance(PATH).getFunction(export.symbol) }.isSuccess
+
+        /** `rive_bridge_vm_get_number` + `rive_bridge_vm_number_names`: the telemetry readback. */
+        val PROBE_READBACK: Boolean by lazy {
+            exports(BridgeExport.VM_GET_NUMBER) && exports(BridgeExport.VM_NUMBER_NAMES)
+        }
+
+        /** `rive_bridge_load_artboard`: loading an artboard other than the file's default. */
+        val ARTBOARD_BY_NAME: Boolean by lazy { exports(BridgeExport.LOAD_ARTBOARD) }
     }
 }
+
+/** The bridge exports newer than the original entry points, which an older DLL may not carry. */
+internal enum class BridgeExport(val symbol: String) {
+    LOAD_ARTBOARD("rive_bridge_load_artboard"),
+    VM_GET_NUMBER("rive_bridge_vm_get_number"),
+    VM_NUMBER_NAMES("rive_bridge_vm_number_names"),
+}
+
+/**
+ * What [RiveDesktopScene.load] binds: a state machine by name (null for the artboard's default) on an
+ * artboard by name. [artboard] null takes the file's default artboard - the only thing the bridge
+ * could do before `rive_bridge_load_artboard` existed, and still the production path. A name is how
+ * the bench asks for `Harness`; an old DLL cannot honour it, and says so rather than showing the
+ * default.
+ */
+data class RiveSceneTarget(val stateMachine: String? = null, val artboard: String? = null)
 
 enum class RivePointer(internal val code: Int) { MOVE(0), DOWN(1), UP(2), EXIT(3) }
 
@@ -82,8 +125,17 @@ class RiveDesktopScene private constructor(
         return handle
     }
 
-    fun load(bytes: ByteArray, stateMachine: String? = null) {
-        val code = native.rive_bridge_load(openHandle(), bytes, bytes.size, stateMachine)
+    /** Load a .riv and bind [target] (see [RiveSceneTarget]). */
+    fun load(bytes: ByteArray, target: RiveSceneTarget = RiveSceneTarget()) {
+        val artboard = target.artboard
+        val code = if (artboard == null) {
+            native.rive_bridge_load(openHandle(), bytes, bytes.size, target.stateMachine)
+        } else {
+            check(RiveBridgeNative.ARTBOARD_BY_NAME) {
+                "this rive_desktop_bridge.dll predates rive_bridge_load_artboard; rebuild it to load '$artboard'"
+            }
+            native.rive_bridge_load_artboard(openHandle(), bytes, bytes.size, target.stateMachine, artboard)
+        }
         check(code == 0) { "rive_bridge_load failed ($code)" }
     }
 
@@ -118,6 +170,25 @@ class RiveDesktopScene private constructor(
 
     fun setNumber(name: String, value: Float): Boolean = native.rive_bridge_set_number(openHandle(), name, value) == 0
 
+    /**
+     * Reads a view-model number back: the probe path of MOTION-PIPELINE section 0, where a two-way
+     * data bind mirrors a node property into a number every frame. Null when the property is absent,
+     * is not a number, or the loaded DLL has no readback export at all.
+     */
+    fun getNumber(name: String): Float? {
+        if (!RiveBridgeNative.PROBE_READBACK) return null
+        val out = FloatArray(1)
+        return if (native.rive_bridge_vm_get_number(openHandle(), name, out) == 0) out[0] else null
+    }
+
+    /** Every number property on the bound view model, so a caller can discover `telemetry*` probes. */
+    fun numberNames(): List<String> {
+        if (!RiveBridgeNative.PROBE_READBACK) return emptyList()
+        val out = ByteArray(NAME_BUFFER_BYTES)
+        if (native.rive_bridge_vm_number_names(openHandle(), out, out.size) <= 0) return emptyList()
+        return Native.toString(out).split('\n').filter { it.isNotBlank() }
+    }
+
     /** The view-model path [com.letta.mobile.avatar.rive.RiveAvatarRuntime] writes through. */
     val inputSink: RiveInputSink = object : RiveInputSink {
         override fun setNumber(input: String, value: Float) {
@@ -149,6 +220,9 @@ class RiveDesktopScene private constructor(
     }
 
     companion object {
+        /** Room for a few hundred property names; the bridge refuses rather than truncate. */
+        private const val NAME_BUFFER_BYTES = 16 * 1024
+
         fun create(): RiveDesktopScene {
             val native = RiveBridgeNative.INSTANCE
             val name = ByteArray(256)
