@@ -77,10 +77,27 @@ class AndroidMascotHost(
      */
     private val stills = mutableStateMapOf<Pair<MascotIdentity, Int>, ImageBitmap>()
 
+    /**
+     * Which surface drives each agent's scene. The Rive composable advances its own state machine
+     * every frame, so two live surfaces of one agent would be two clocks over one character: the
+     * first surface that asks to play owns the entry, every other request for it draws the still,
+     * and ownership passes on when the driver leaves composition. Compose state so the waiting
+     * surface upgrades itself the moment the driver is gone.
+     */
+    private val liveDrivers = mutableStateMapOf<AndroidMascotEntry, Any>()
+
     @Composable
     override fun Surface(entry: MascotEntry, modifier: Modifier, playing: Boolean) {
-        val scene = (entry as AndroidMascotEntry).scene
-        if (playing) {
+        val live = entry as AndroidMascotEntry
+        val scene = live.scene
+        val token = remember { Any() }
+        val driver = liveDrivers[live]
+        val drives = playing && (driver == null || driver === token)
+        DisposableEffect(live, playing) {
+            if (playing && liveDrivers[live] == null) liveDrivers[live] = token
+            onDispose { if (liveDrivers[live] === token) liveDrivers.remove(live) }
+        }
+        if (drives) {
             RiveMascotSurface(scene, modifier, playing = true)
             return
         }
@@ -101,6 +118,7 @@ class AndroidMascotHost(
     }
 
     fun close() {
+        liveDrivers.clear()
         stills.clear()
         entries.closeAll()
         file?.let { runCatching { it.close() } }
