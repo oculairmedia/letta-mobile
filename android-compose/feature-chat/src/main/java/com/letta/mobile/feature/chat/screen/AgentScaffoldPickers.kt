@@ -1086,7 +1086,8 @@ private fun DrawerAgentHeader(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        AgentAvatar(agentId = agentId, name = displayName, size = 48.dp)
+        // A still: on this screen the composer companion is the live one.
+        AgentAvatar(agentId = agentId, name = displayName, size = 48.dp, live = false)
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = displayName,

@@ -157,6 +157,7 @@ private fun AgentScaffoldAgentTopBarTitle(params: AgentScaffoldAgentTopBarTitleP
             name = params.agentName.ifBlank { params.screenTitle },
             size = TopBarMascotSize,
             modifier = Modifier.padding(end = 4.dp),
+            live = false,
         )
         Text(
             text = params.agentName.ifBlank { params.screenTitle },

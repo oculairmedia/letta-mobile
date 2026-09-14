@@ -522,6 +522,16 @@ class ConversationsViewModel @Inject constructor(
         )
     }
 
+    /** Re-reads which conversations have a run in flight; publishes only when that changed. No network. */
+    fun refreshWorkingState() {
+        val working = workingConversationIds()
+        val current = _uiState.value.conversations
+        if (current.all { (it.conversation.id.value in working) == it.isWorking }) return
+        _uiState.value = _uiState.value.copy(
+            conversations = current.map { it.copy(isWorking = it.conversation.id.value in working) }.toImmutableList(),
+        )
+    }
+
     /** Conversations with a run in flight, from the run cursor store's non-terminal cursors. */
     private fun workingConversationIds(): Set<String> = runCatching {
         runCursorStore.ensureLoaded()
