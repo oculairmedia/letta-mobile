@@ -77,7 +77,10 @@ internal fun ComposerBar(
             verticalAlignment = Alignment.Bottom,
         ) {
             if (companion != null) {
-                Box(Modifier.width(ComposerCompanionSlot), contentAlignment = Alignment.BottomCenter) { companion() }
+                Box(
+                    Modifier.width(ComposerCompanionSlot).padding(end = ComposerCompanionGap),
+                    contentAlignment = Alignment.BottomCenter,
+                ) { companion() }
             }
             Box(Modifier.weight(1f)) {
                 ComposerInputSurface(
@@ -122,4 +125,7 @@ private fun ComposerMentionSuggestions(
 }
 
 /** Width reserved for the composer companion (the mascot) at the box's left edge. */
-internal val ComposerCompanionSlot = 72.dp
+internal val ComposerCompanionSlot = 88.dp
+
+/** Breathing room between the mascot and the box's edge. */
+private val ComposerCompanionGap = 16.dp
