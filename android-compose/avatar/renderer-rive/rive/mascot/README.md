@@ -123,11 +123,11 @@ Root state machine `Avatar`, layers in order:
 | `Expression` | body/face motion, tint, gloss pulse, `expr`, facing | one `State<X>` loop per sustained state; **every change runs `Enter_<from>_<to>`** (90 one-shots, ids 3:250-3:339, nodes 3:350-3:439): plate blink at frame 0, `expr` flipped at frame 3 under the shut eye, facing eased to the target. The SPEC §3 pairs carry designed motion and cut into the target; generic ones hold and blend in over <=120 ms. No AnyState. |
 | `Breath` | gloss opacity | loop |
 | `Blink` | plate blink | contract trigger |
-| `Hover` | perk-up: tall stretch, face lift, tilt of interest; attentive hold | Rest -> Perk -> Held -> Rest on `hovered` (file listeners); exit blends 220-260 ms |
+| `Hover` | perk-up: tall stretch, face lift, tilt of interest; attentive hold (beat tempo) | Rest -> Perk -> Held -> Rest on `hovered` (file listeners); exit blends 220-260 ms |
 | `Flash` | success/error | triggers; success 800 ms hop + spin with trails, error 600 ms shake; self-returning |
 | `Drag` | `expr` dragged | boolean + dragStart/dragEnd listeners |
-| `IdleVariety` | face, body | random 8-14 s waits, then one beat by weight: glance 40, tilt 20, stretch 15, shiver 15, bounce 10 |
-| `Wander` | joystick | random 6-12 s waits, then glance 55 % / peek 35 % / spin 10 % |
+| `IdleVariety` | face, body, joystick | four waits of unequal length (6.1 / 8 / 10.7 / 14 s) picked at random, then one of nine beats by weight (glance, tilt, look-around, shift, stretch, sigh, shiver, wobble, bounce); beats blend in 160 ms / out 320 ms over Breath and the host turn. `BEAT_TEMPO` 1.4 stretches every beat |
+| `Wander` | joystick | four waits of unequal length (9.3 / 12 / 17.5 / 24 s) at random, then glance 55 % / peek 35 % / spin 10 %; beats blend in 200 ms / out 320 ms |
 
 Facing per state (`sustained_facing()`): idle -0.15, listening 0 (square-on), thinking -0.6/-0.2,
 speaking 0.15, error -0.3/0.25, sleeping 0.4/0.5, degraded 0.5/-0.1, the rest ~0.

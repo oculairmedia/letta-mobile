@@ -273,7 +273,7 @@ private fun ChatDetailBody(
 }
 
 /** The composer companion's live size; the body spans ~60 % of it. */
-private val ComposerCompanionSize = 96.dp
+private val ComposerCompanionSize = 120.dp
 
 /**
  * letta-mobile folder-settings #2: compact row showing the SELECTED

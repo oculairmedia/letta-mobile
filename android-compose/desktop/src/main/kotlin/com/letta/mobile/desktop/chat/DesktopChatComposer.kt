@@ -125,7 +125,7 @@ private fun ComposerMentionSuggestions(
 }
 
 /** Width reserved for the composer companion (the mascot) at the box's left edge. */
-internal val ComposerCompanionSlot = 88.dp
+internal val ComposerCompanionSlot = 108.dp
 
 /** Breathing room between the mascot and the box's edge. */
 private val ComposerCompanionGap = 16.dp

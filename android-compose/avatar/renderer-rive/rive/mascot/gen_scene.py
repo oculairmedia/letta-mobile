@@ -53,6 +53,15 @@ def frames(ms):
     return round(ms * 60 / 1000)
 
 
+# Art direction: every beat (idle, wander, hover, saccade holds) was read as too quick at product
+# sizes. beat() stretches a beat's timing; waits, breath and state entries keep frames().
+BEAT_TEMPO = 1.4
+
+
+def beat(ms):
+    return frames(ms * BEAT_TEMPO)
+
+
 STATES = ["idle", "listening", "dragged", "thinking", "waitingInput", "speaking",
           "success", "error", "sleeping", "loading", "failed", "degraded"]
 EXPR = {s: i for i, s in enumerate(STATES)}
@@ -148,7 +157,8 @@ FLASH_REST_ANIM, FLASH_REST_NODE, SUCCESS_ANIM, SUCCESS_NODE, ERROR_ANIM, ERROR_
 DRAG_REST_ANIM, DRAG_REST_NODE, DRAG_ANIM, DRAG_NODE = "3:200", "3:201", "3:202", "3:203"
 IDLE_WAIT_A, IDLE_WAIT_B, IDLE_GLANCE_ANIM, IDLE_A_NODE, IDLE_B_NODE, IDLE_GLANCE_NODE = "3:210", "3:211", "3:212", "3:213", "3:214", "3:215"
 # More idle beats (anim id, state node id): a glance is not enough for a character on screen all day.
-IDLE_BEATS = {"stretch": ("3:222", "3:226"), "tilt": ("3:223", "3:227"), "bounce": ("3:224", "3:228"), "shiver": ("3:225", "3:229")}
+IDLE_BEATS = {"stretch": ("3:222", "3:226"), "tilt": ("3:223", "3:227"), "bounce": ("3:224", "3:228"), "shiver": ("3:225", "3:229"),
+              "sigh": ("3:468", "3:469"), "wobble": ("3:470", "3:471"), "shift": ("3:472", "3:473"), "lookaround": ("3:474", "3:475")}
 HOVER_HELD_ANIM = "3:185"
 TURN_X_ANIM, TURN_Y_ANIM = "3:220", "3:221"
 DESIGNED_PAIRS = {("idle", "listening"): 300, ("listening", "thinking"): 300, ("thinking", "speaking"): 200,
@@ -160,6 +170,10 @@ WANDER_WAIT_A, WANDER_WAIT_B, WANDER_GLANCE, WANDER_PEEK, WANDER_SPIN = "3:230",
 WANDER_SLEEP_WAIT, WANDER_SLEEP_SHIFT, WANDER_SLEEP_WAIT_NODE, WANDER_SLEEP_SHIFT_NODE = "3:235", "3:236", "3:245", "3:246"
 IDLE_SLEEP_NODE = "3:217"
 WANDER_A_NODE, WANDER_B_NODE, WANDER_GLANCE_NODE, WANDER_PEEK_NODE, WANDER_SPIN_NODE = "3:240", "3:241", "3:242", "3:243", "3:244"
+# Waits of unequal, non-multiple lengths picked at random: several mascots on one screen must not
+# fire their beats in lockstep (they all start at the same instant), so the cycle never repeats.
+IDLE_WAITS = [(IDLE_WAIT_A, IDLE_A_NODE, 8000), (IDLE_WAIT_B, IDLE_B_NODE, 14000), ("3:460", "3:462", 6100), ("3:461", "3:463", 10700)]
+WANDER_WAITS = [(WANDER_WAIT_A, WANDER_A_NODE, 12000), (WANDER_WAIT_B, WANDER_B_NODE, 24000), ("3:464", "3:466", 9300), ("3:465", "3:467", 17500)]
 
 PLATE_AB, PLATE_SM, PLATE_IN_EXPR, PLATE_IN_BLINK = "7:2", "7:5", "7:6", "7:7"
 PLATE_ROOT, PLATE_CARD, GLYPHS_NODE, MOUTH_MORPH, PLATE_SHADOW = "7:20", "7:21", "7:22", "7:23", "7:24"
@@ -642,7 +656,7 @@ def plate_component():
     for aid, ms in SACCADE_WAITS:
         tune_anims.append(animation(f"SaccadeWait{ms}", aid, frames(ms), {}))
     for i, (aid, (dx, dy), _) in enumerate(SACCADE_FIX):
-        hold = frames([700, 1100, 1600, 2400][i % 4])
+        hold = beat([700, 1100, 1600, 2400][i % 4])
         tune_anims.append(animation(f"Saccade{i + 1}", aid, hold + 8, {SACCADE_NODE: {
             X: [(0, 0, BACK_OUT), (4, dx, None), (hold, dx, SOFT_OUT), (hold + 8, 0)],
             Y: [(0, 0, BACK_OUT), (4, dy, None), (hold, dy, SOFT_OUT), (hold + 8, 0)]}}))
@@ -792,21 +806,21 @@ def spin_keys(start, dur, trails=True):
 
 
 def wander_animations():
-    glance = animation("WanderGlance", WANDER_GLANCE, frames(1600), {JOYSTICK: {
-        JX: [(0, 0, BACK_IN_OUT), (frames(450), -0.8, None), (frames(900), -0.8, BACK_IN_OUT), (frames(1250), 0.4, ELASTIC_SOFT), (frames(1600), 0)]}})
-    peek = animation("WanderPeek", WANDER_PEEK, frames(1400), {JOYSTICK: {
-        JY: [(0, 0, BACK_IN_OUT), (frames(400), 0.7, None), (frames(900), 0.7, ELASTIC_SOFT), (frames(1400), 0)],
-        JX: [(0, 0, BACK_IN_OUT), (frames(400), 0.3, None), (frames(900), 0.3, ELASTIC_SOFT), (frames(1400), 0)]}})
-    spin_k = spin_keys(0, frames(700))
-    d7 = frames(700)
+    glance = animation("WanderGlance", WANDER_GLANCE, beat(1600), {JOYSTICK: {
+        JX: [(0, 0, BACK_IN_OUT), (beat(450), -0.8, None), (beat(900), -0.8, BACK_IN_OUT), (beat(1250), 0.4, ELASTIC_SOFT), (beat(1600), 0)]}})
+    peek = animation("WanderPeek", WANDER_PEEK, beat(1400), {JOYSTICK: {
+        JY: [(0, 0, BACK_IN_OUT), (beat(400), 0.7, None), (beat(900), 0.7, ELASTIC_SOFT), (beat(1400), 0)],
+        JX: [(0, 0, BACK_IN_OUT), (beat(400), 0.3, None), (beat(900), 0.3, ELASTIC_SOFT), (beat(1400), 0)]}})
+    spin_k = spin_keys(0, beat(700))
+    d7 = beat(700)
     spin_k.update(squash(INFLATE_NODE, [(0, 1, BACK_IN), (round(d7 * 0.25), 1.05, STANDARD), (round(d7 * 0.62), 1.05, ELASTIC_SOFT), (d7, 1)]))
     spin = animation("WanderSpin", WANDER_SPIN, d7, spin_k)
     # Asleep: one slow, small shift every ~30 s, nothing else.
-    sleep_shift = animation("WanderSleepShift", WANDER_SLEEP_SHIFT, frames(3000), {JOYSTICK: {
-        JX: [(0, 0.4, SINE), (frames(1500), 0.22, SINE), (frames(3000), 0.4)],
-        JY: [(0, 0.5, SINE), (frames(1500), 0.62, SINE), (frames(3000), 0.5)]}})
-    return [animation("WanderWaitA", WANDER_WAIT_A, frames(12000), {}), animation("WanderWaitB", WANDER_WAIT_B, frames(24000), {}),
-            animation("WanderSleepWait", WANDER_SLEEP_WAIT, frames(30000), {}), sleep_shift, glance, peek, spin]
+    sleep_shift = animation("WanderSleepShift", WANDER_SLEEP_SHIFT, beat(3000), {JOYSTICK: {
+        JX: [(0, 0.4, SINE), (beat(1500), 0.22, SINE), (beat(3000), 0.4)],
+        JY: [(0, 0.5, SINE), (beat(1500), 0.62, SINE), (beat(3000), 0.5)]}})
+    return ([animation("WanderWait" + str(k), aid, frames(ms), {}) for k, (aid, _, ms) in enumerate(WANDER_WAITS)]
+            + [animation("WanderSleepWait", WANDER_SLEEP_WAIT, frames(30000), {}), sleep_shift, glance, peek, spin])
 
 
 def sine(amplitude, period_ms, base=0.0):
@@ -1039,33 +1053,52 @@ def momentary_animations():
 
 
 def idle_variety_animations():
-    m, h, r = frames(250), frames(650), frames(300)
+    m, h, r = beat(250), beat(650), beat(300)
     glance = animation("IdleGlance", IDLE_GLANCE_ANIM, m + h + r, {
         FACE: {ROT: [(0, 0, BACK_IN_OUT), (m, rad(2), None), (m + h, rad(2), ELASTIC_SOFT), (m + h + r, 0)],
                X: [(0, 0, BACK_IN_OUT), (m, 2, None), (m + h, 2, ELASTIC_SOFT), (m + h + r, 0)]}})
     # Stretch: a slow tall stretch (volume kept), face rides up, then a soft elastic settle.
-    d = frames(1400)
+    d = beat(1400)
     stretch = animation("IdleStretch", IDLE_BEATS["stretch"][0], d, dict(
-        squash(INFLATE_NODE, [(0, 1, BACK_IN_OUT), (frames(500), 0.93, None), (frames(900), 0.93, ELASTIC_SOFT), (d, 1)]),
-        **{FACE: {Y: [(0, 0, BACK_IN_OUT), (frames(500), -7, None), (frames(900), -7, ELASTIC_SOFT), (d, 0)]}}))
+        squash(INFLATE_NODE, [(0, 1, BACK_IN_OUT), (beat(500), 0.93, None), (beat(900), 0.93, ELASTIC_SOFT), (d, 1)]),
+        **{FACE: {Y: [(0, 0, BACK_IN_OUT), (beat(500), -7, None), (beat(900), -7, ELASTIC_SOFT), (d, 0)]}}))
     # Tilt: the whole body cocks 6 degrees like a dog hearing something, holds, comes back.
-    d = frames(1600)
+    d = beat(1600)
     tilt = animation("IdleTilt", IDLE_BEATS["tilt"][0], d, {
-        BODY_NODE: {ROT: [(0, 0, BACK_IN_OUT), (frames(400), rad(6), None), (frames(1100), rad(6), ELASTIC_SOFT), (d, 0)]},
-        FACE: {ROT: [(0, 0, BACK_IN_OUT), (frames(400), rad(4), None), (frames(1100), rad(4), ELASTIC_SOFT), (d, 0)],
-               X: [(0, 0, BACK_IN_OUT), (frames(400), 4, None), (frames(1100), 4, ELASTIC_SOFT), (d, 0)]}})
+        BODY_NODE: {ROT: [(0, 0, BACK_IN_OUT), (beat(400), rad(6), None), (beat(1100), rad(6), ELASTIC_SOFT), (d, 0)]},
+        FACE: {ROT: [(0, 0, BACK_IN_OUT), (beat(400), rad(4), None), (beat(1100), rad(4), ELASTIC_SOFT), (d, 0)],
+               X: [(0, 0, BACK_IN_OUT), (beat(400), 4, None), (beat(1100), 4, ELASTIC_SOFT), (d, 0)]}})
     # Bounce: anticipation squash, a small hop, landing squash, settle.
-    d = frames(700)
-    hop = [(0, 0, EMPH_ACCEL), (frames(120), 3, STD_DECEL), (frames(320), -14, EMPH_ACCEL), (frames(520), 2, EMPH_DECEL), (d, 0)]
+    d = beat(700)
+    hop = [(0, 0, EMPH_ACCEL), (beat(120), 3, STD_DECEL), (beat(320), -14, EMPH_ACCEL), (beat(520), 2, EMPH_DECEL), (d, 0)]
     bounce = animation("IdleBounce", IDLE_BEATS["bounce"][0], d, dict(
-        squash(INFLATE_NODE, [(0, 1, STANDARD), (frames(120), 1.06, STANDARD), (frames(320), 0.96, STANDARD), (frames(520), 1.05, ELASTIC_SOFT), (d, 1)]),
+        squash(INFLATE_NODE, [(0, 1, STANDARD), (beat(120), 1.06, STANDARD), (beat(320), 0.96, STANDARD), (beat(520), 1.05, ELASTIC_SOFT), (d, 1)]),
         **{BODY_NODE: {Y: hop}, FACE: {Y: hop}}))
     # Shiver: a quick side-to-side shake of the body, the face lagging a frame or two.
-    d = frames(420)
-    shake = lambda amp, lag: [(0, 0, STANDARD)] + [(frames(60 * i) + lag, amp * (1 if i % 2 else -1) * (1 - i / 7), STANDARD) for i in range(1, 6)] + [(d, 0)]
+    d = beat(420)
+    shake = lambda amp, lag: [(0, 0, STANDARD)] + [(beat(60 * i) + lag, amp * (1 if i % 2 else -1) * (1 - i / 7), STANDARD) for i in range(1, 6)] + [(d, 0)]
     shiver = animation("IdleShiver", IDLE_BEATS["shiver"][0], d, {BODY_NODE: {X: shake(4, 0)}, FACE: {X: shake(3, 2)}})
-    return [animation("IdleWaitA", IDLE_WAIT_A, frames(8000), {}), animation("IdleWaitB", IDLE_WAIT_B, frames(14000), {}),
-            glance, stretch, tilt, bounce, shiver]
+    # Sigh: a slow deflate (wide squash), the face sinks, then it fills back up.
+    d = beat(1800)
+    sigh = animation("IdleSigh", IDLE_BEATS["sigh"][0], d, dict(
+        squash(INFLATE_NODE, [(0, 1, SINE), (beat(700), 1.05, None), (beat(1100), 1.05, SOFT_OUT), (d, 1)]),
+        **{FACE: {Y: [(0, 0, SINE), (beat(700), 5, None), (beat(1100), 5, SOFT_OUT), (d, 0)]}}))
+    # Wobble: a decaying rock about the base, like it was nudged.
+    d = beat(1300)
+    rock = [(0, 0, SINE)] + [(beat(180 * k), rad(4 * (1 if k % 2 else -1) * (1 - k / 7)), SINE) for k in range(1, 6)] + [(d, 0)]
+    wobble = animation("IdleWobble", IDLE_BEATS["wobble"][0], d, {BODY_NODE: {ROT: rock}, FACE: {ROT: [(f, v * 0.6) + tuple(k[2:]) for (f, v, *k) in rock]}})
+    # Shift: settles its weight to one side for a while, then back.
+    d = beat(2600)
+    shift = animation("IdleShift", IDLE_BEATS["shift"][0], d, {
+        BODY_NODE: {X: [(0, 0, BACK_IN_OUT), (beat(500), 7, None), (beat(2000), 7, SOFT_OUT), (d, 0)],
+                    ROT: [(0, 0, BACK_IN_OUT), (beat(500), rad(-2), None), (beat(2000), rad(-2), SOFT_OUT), (d, 0)]},
+        FACE: {X: [(0, 0, BACK_IN_OUT), (beat(500), 9, None), (beat(2000), 9, SOFT_OUT), (d, 0)]}})
+    # Look-around: the whole face turns to one side, pauses, sweeps to the other, comes home.
+    d = beat(2400)
+    lookaround = animation("IdleLookAround", IDLE_BEATS["lookaround"][0], d, {JOYSTICK: {
+        JX: [(0, 0, BACK_IN_OUT), (beat(500), -0.6, None), (beat(1000), -0.6, BACK_IN_OUT), (beat(1600), 0.55, None), (beat(2000), 0.55, ELASTIC_SOFT), (d, 0)]}})
+    return ([animation("IdleWait" + str(k), aid, frames(ms), {}) for k, (aid, _, ms) in enumerate(IDLE_WAITS)]
+            + [glance, stretch, tilt, bounce, shiver, sigh, wobble, shift, lookaround])
 
 
 def root_machine():
@@ -1115,34 +1148,43 @@ def root_machine():
     from_park = lambda node: enum_transition(node, sleeping, 0, None, op="notEqual")
     # Each wait ends by picking one beat at random (weights: the glance is still the most common,
     # the bounce the rarest); every beat returns to a random wait.
-    beat_nodes = [(IDLE_GLANCE_NODE, 40), (IDLE_BEATS["tilt"][1], 20), (IDLE_BEATS["stretch"][1], 15),
-                  (IDLE_BEATS["shiver"][1], 15), (IDLE_BEATS["bounce"][1], 10)]
-    pick_beat = "\n".join(weighted(exit_transition(n), w) for n, w in beat_nodes)
-    back_to_wait = weighted(exit_transition(IDLE_A_NODE), 50) + "\n" + weighted(exit_transition(IDLE_B_NODE), 50)
+    # A beat blends in over 160 ms and out over 320 ms: its keys sit on top of Breath / the
+    # host's turn on the same nodes, so a hard cut would snap those values at either end.
+    beat_nodes = [(IDLE_GLANCE_NODE, 22), (IDLE_BEATS["tilt"][1], 14), (IDLE_BEATS["lookaround"][1], 13),
+                  (IDLE_BEATS["shift"][1], 12), (IDLE_BEATS["stretch"][1], 10), (IDLE_BEATS["sigh"][1], 10),
+                  (IDLE_BEATS["shiver"][1], 8), (IDLE_BEATS["wobble"][1], 6), (IDLE_BEATS["bounce"][1], 5)]
+    pick_beat = "\n".join(weighted(exit_transition(n, 160, SOFT_OUT), w) for n, w in beat_nodes)
+    back_to_wait = "\n".join(weighted(exit_transition(n, 320, SOFT_OUT), 25) for _, n, _ in IDLE_WAITS)
+    wait_states = "\n".join(
+        anim_state(aid, n, k, ' random="true"', to_park(IDLE_SLEEP_NODE) + "\n" + pick_beat)
+        for k, (aid, n, _) in enumerate(IDLE_WAITS))
     beat_states = "\n".join(
-        anim_state(aid, nid, 4 + i, ' reset="true" random="true"', back_to_wait)
-        for i, (aid, nid) in enumerate(IDLE_BEATS.values()))
+        anim_state(aid, n, 5 + i, ' reset="true" random="true"', back_to_wait)
+        for i, (aid, n) in enumerate(IDLE_BEATS.values()))
     idle = layer_frame(
         "IdleVariety", "3:8", IDLE_A_NODE, "",
-        anim_state(IDLE_WAIT_A, IDLE_A_NODE, 0, ' random="true"', to_park(IDLE_SLEEP_NODE) + "\n" + pick_beat) + "\n"
-        + anim_state(IDLE_WAIT_B, IDLE_B_NODE, 1, ' random="true"', to_park(IDLE_SLEEP_NODE) + "\n" + pick_beat) + "\n"
-        + anim_state(IDLE_GLANCE_ANIM, IDLE_GLANCE_NODE, 2, ' reset="true" random="true"', back_to_wait) + "\n"
-        + anim_state(IDLE_WAIT_A, IDLE_SLEEP_NODE, 3, "", from_park(IDLE_A_NODE)) + "\n"
+        wait_states + "\n"
+        + anim_state(IDLE_GLANCE_ANIM, IDLE_GLANCE_NODE, 4, ' reset="true" random="true"', back_to_wait) + "\n"
+        + anim_state(IDLE_WAIT_A, IDLE_SLEEP_NODE, 14, "", from_park(IDLE_A_NODE)) + "\n"
         + beat_states)
 
+    # Wander beats key the joystick the host also turns: blend in (200 ms) and out (320 ms).
+    pick_wander = (weighted(exit_transition(WANDER_GLANCE_NODE, 200, SOFT_OUT), 55) + "\n"
+                   + weighted(exit_transition(WANDER_PEEK_NODE, 200, SOFT_OUT), 35) + "\n"
+                   + weighted(exit_transition(WANDER_SPIN_NODE, 200, SOFT_OUT), 10))
+    wander_home = "\n".join(weighted(exit_transition(n, 320, SOFT_OUT), 25) for _, n, _ in WANDER_WAITS)
+    wander_waits = "\n".join(
+        anim_state(aid, n, k, ' random="true"', to_park(WANDER_SLEEP_WAIT_NODE) + "\n" + pick_wander)
+        for k, (aid, n, _) in enumerate(WANDER_WAITS))
     wander = layer_frame(
         "Wander", "3:10", WANDER_A_NODE, "",
-        anim_state(WANDER_WAIT_A, WANDER_A_NODE, 0, ' random="true"',
-                   to_park(WANDER_SLEEP_WAIT_NODE) + "\n" + weighted(exit_transition(WANDER_GLANCE_NODE), 55) + "\n" + weighted(exit_transition(WANDER_PEEK_NODE), 35) + "\n" + weighted(exit_transition(WANDER_SPIN_NODE), 10)) + "\n"
-        + anim_state(WANDER_WAIT_B, WANDER_B_NODE, 1, ' random="true"',
-                     to_park(WANDER_SLEEP_WAIT_NODE) + "\n" + weighted(exit_transition(WANDER_GLANCE_NODE), 55) + "\n" + weighted(exit_transition(WANDER_PEEK_NODE), 35) + "\n" + weighted(exit_transition(WANDER_SPIN_NODE), 10)) + "\n"
-        + anim_state(WANDER_GLANCE, WANDER_GLANCE_NODE, 2, ' reset="true" random="true"',
-                     to_park(WANDER_SLEEP_WAIT_NODE, 400) + "\n" + weighted(exit_transition(WANDER_A_NODE, 200, SOFT_OUT), 50) + "\n" + weighted(exit_transition(WANDER_B_NODE, 200, SOFT_OUT), 50)) + "\n"
-        + anim_state(WANDER_PEEK, WANDER_PEEK_NODE, 3, ' reset="true" random="true"',
-                     to_park(WANDER_SLEEP_WAIT_NODE, 400) + "\n" + weighted(exit_transition(WANDER_A_NODE, 200, SOFT_OUT), 50) + "\n" + weighted(exit_transition(WANDER_B_NODE, 200, SOFT_OUT), 50)) + "\n"
-        + anim_state(WANDER_SPIN, WANDER_SPIN_NODE, 4, ' reset="true" random="true"',
-                     weighted(exit_transition(WANDER_A_NODE, 200, SOFT_OUT), 50) + "\n" + weighted(exit_transition(WANDER_B_NODE, 200, SOFT_OUT), 50)) + "\n"
-        + anim_state(WANDER_SLEEP_WAIT, WANDER_SLEEP_WAIT_NODE, 5, "",
+        wander_waits + "\n"
+        + anim_state(WANDER_GLANCE, WANDER_GLANCE_NODE, 4, ' reset="true" random="true"',
+                     to_park(WANDER_SLEEP_WAIT_NODE, 400) + "\n" + wander_home) + "\n"
+        + anim_state(WANDER_PEEK, WANDER_PEEK_NODE, 5, ' reset="true" random="true"',
+                     to_park(WANDER_SLEEP_WAIT_NODE, 400) + "\n" + wander_home) + "\n"
+        + anim_state(WANDER_SPIN, WANDER_SPIN_NODE, 6, ' reset="true" random="true"', wander_home) + "\n"
+        + anim_state(WANDER_SLEEP_WAIT, WANDER_SLEEP_WAIT_NODE, 7, "",
                      from_park(WANDER_A_NODE) + "\n" + exit_transition(WANDER_SLEEP_SHIFT_NODE)) + "\n"
         + anim_state(WANDER_SLEEP_SHIFT, WANDER_SLEEP_SHIFT_NODE, 6, ' reset="true"',
                      from_park(WANDER_A_NODE) + "\n" + exit_transition(WANDER_SLEEP_WAIT_NODE, 200, SOFT_OUT)))
@@ -1175,16 +1217,16 @@ def root_artboard():
     blink_rest = animation("BlinkRest", BLINK_REST_ANIM, 1, {})
     blink = animation("BlinkFire", BLINK_ANIM, 2, {}, callbacks=(PLATE_BLINK,))
     hover_rest = animation("HoverRest", HOVER_REST_ANIM, 1, {})
-    d = frames(520)
+    d = beat(520)
     hover = animation("HoverPerk", HOVER_ANIM, d, dict(
-        squash(INFLATE_NODE, [(0, 1, BACK_OUT), (frames(160), 0.92, None), (frames(300), 0.92, ELASTIC_SOFT), (d, 0.97)]),
-        **{FACE: {Y: [(0, 0, BACK_OUT), (frames(160), -9, None), (frames(300), -9, ELASTIC_SOFT), (d, -5)],
-                  ROT: [(0, 0, BACK_OUT), (frames(160), rad(-3), None), (frames(300), rad(-3), ELASTIC_SOFT), (d, rad(-2))]},
-           BODY_NODE: {ROT: [(0, 0, BACK_OUT), (frames(160), rad(-4), None), (frames(300), rad(-4), ELASTIC_SOFT), (d, rad(-2))]}}))
+        squash(INFLATE_NODE, [(0, 1, BACK_OUT), (beat(160), 0.92, None), (beat(300), 0.92, ELASTIC_SOFT), (d, 0.97)]),
+        **{FACE: {Y: [(0, 0, BACK_OUT), (beat(160), -9, None), (beat(300), -9, ELASTIC_SOFT), (d, -5)],
+                  ROT: [(0, 0, BACK_OUT), (beat(160), rad(-3), None), (beat(300), rad(-3), ELASTIC_SOFT), (d, rad(-2))]},
+           BODY_NODE: {ROT: [(0, 0, BACK_OUT), (beat(160), rad(-4), None), (beat(300), rad(-4), ELASTIC_SOFT), (d, rad(-2))]}}))
     # Held while hovered: the perk's end pose, breathing a little faster in the face lift.
-    hover_held = animation("HoverHeld", HOVER_HELD_ANIM, frames(2400), dict(
-        squash(INFLATE_NODE, [(0, 0.97, SINE), (frames(1200), 0.95, SINE), (frames(2400), 0.97)]),
-        **{FACE: {Y: [(0, -5, SINE), (frames(1200), -7, SINE), (frames(2400), -5)], ROT: [(0, rad(-2))]},
+    hover_held = animation("HoverHeld", HOVER_HELD_ANIM, beat(2400), dict(
+        squash(INFLATE_NODE, [(0, 0.97, SINE), (beat(1200), 0.95, SINE), (beat(2400), 0.97)]),
+        **{FACE: {Y: [(0, -5, SINE), (beat(1200), -7, SINE), (beat(2400), -5)], ROT: [(0, rad(-2))]},
            BODY_NODE: {ROT: [(0, rad(-2))]}}), "loop")
     anims = (shape_animations() + sustained_animations() + enter_animations() + momentary_animations() + idle_variety_animations()
              + turn_animations() + wander_animations() + [breath, blink_rest, blink, hover_rest, hover, hover_held])

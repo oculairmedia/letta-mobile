@@ -99,13 +99,13 @@ class GazeDirectorTest {
     fun headLagsEyesTowardACursorTarget() {
         val g = GazeDirector(Random(1))
         val world = GazeWorld(pointer = GazePoint(1f, 0f), mode = GazeDriveMode.CURSOR)
-        // Spike: a >0.15 base change resets the 350 ms lead; head stays put until then.
+        // A >0.15 base change resets the head lead (config.headLeadSeconds); head stays put until then.
         var duringLead: GazePose = GazePose.CENTER
         repeat(12) { duringLead = g.tick(0.016f, AvatarState.IDLE, world) } // ~192 ms
         assertTrue(duringLead.lookX > 0.05f, "eyes ease toward the cursor during the lead: ${duringLead.lookX}")
         assertTrue(abs(duringLead.headX) < 0.05f, "head has not committed yet: ${duringLead.headX}")
         var afterLead: GazePose = duringLead
-        repeat(20) { afterLead = g.tick(0.016f, AvatarState.IDLE, world) } // past 350 ms
+        repeat(40) { afterLead = g.tick(0.016f, AvatarState.IDLE, world) } // ~830 ms: past the lead, spring under way
         assertTrue(afterLead.headX > 0.05f, "head follows after the lead: ${afterLead.headX}")
         assertTrue(afterLead.lookX > 0f, "eyes are still on the cursor")
     }
