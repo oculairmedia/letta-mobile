@@ -56,8 +56,8 @@ object RiveAvatarContract {
 }
 
 /**
- * Where input writes go. Implemented per platform: by the Rive Android runtime today, and by the
- * JCEF-hosted web runtime when desktop lands. Keeping it an interface is what lets the runtime and
+ * Where input writes go. Implemented per platform: by the Rive Android runtime, and on desktop by
+ * the native rive-runtime bridge (spike, letta-mobile-0s5bi). Keeping it an interface is what lets the runtime and
  * every mapping decision above it be shared code with tests that need no device.
  */
 interface RiveInputSink {

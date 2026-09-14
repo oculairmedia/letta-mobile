@@ -162,6 +162,8 @@ dependencies {
     implementation(libs.iroh)
     // Avatar companion: renderer bridge + loopback web host (brings :avatar:core).
     implementation(project(":avatar:renderer-web"))
+    // letta-mobile-0s5bi spike: the shared Rive mapping, driven natively on desktop.
+    implementation(project(":avatar:renderer-rive"))
     // Avatar library: import pipeline + local catalog (license capture/display).
     implementation(project(":avatar:asset-pipeline"))
 
@@ -273,6 +275,25 @@ tasks.register<JavaExec>("runPetSpike") {
         "--add-exports=java.desktop/sun.java2d=ALL-UNNAMED",
     )
     providers.gradleProperty("petVrm").orNull?.let { args(it) }
+}
+
+// letta-mobile-0s5bi spike: native Rive (rive-runtime + D3D11 Rive Renderer) as a Compose node.
+// Needs a locally built bridge DLL; see avatar/renderer-rive/native/desktop/README.md.
+//   -PriveBridge=path\to\rive_desktop_bridge.dll -PriveFile=path\to\file.riv
+//   [-PriveStateMachine=name] [-PriveTriggers=a,b,c]
+tasks.register<JavaExec>("runRiveSpike") {
+    group = "application"
+    description = "Runs the native Rive spike window (Windows / D3D11)."
+    mainClass.set("com.letta.mobile.desktop.avatar.rive.RiveDesktopSpikeKt")
+    classpath = sourceSets.main.get().runtimeClasspath
+    providers.gradleProperty("riveBridge").orNull?.let { systemProperty("rive.bridge.path", it) }
+    providers.gradleProperty("riveSelfTest").orNull?.let { systemProperty("rive.spike.selfTest", it) }
+    args(
+        providers.gradleProperty("riveFile").orElse("").get(),
+        providers.gradleProperty("riveStateMachine").orElse("").get(),
+        providers.gradleProperty("riveTriggers").orElse("").get(),
+        rootProject.layout.projectDirectory.file("avatar/renderer-rive/src/androidMain/res/raw/mascot.riv").asFile.absolutePath,
+    )
 }
 
 // Realtime lookdev for the ambient agent-status shader: live-editable SkSL,

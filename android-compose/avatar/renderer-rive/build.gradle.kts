@@ -21,8 +21,8 @@ kotlin {
     }
 
     // Desktop has no official Rive runtime, so this target carries the shared
-    // mapping only. Its renderer lands when the JCEF surface hosts Rive's web
-    // runtime, and it will bind the SAME common runtime this module exposes.
+    // mapping only. The native spike (letta-mobile-0s5bi, native/desktop) drives
+    // rive-runtime directly and binds the SAME common runtime this module exposes.
     jvm {
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
@@ -42,6 +42,13 @@ kotlin {
                 api(libs.rive.android)
                 implementation(compose.runtime)
                 implementation(compose.foundation)
+            }
+        }
+        jvmMain {
+            dependencies {
+                // The Compose compiler plugin applies to every target and refuses to run without a
+                // runtime on the classpath; only androidMain declared one.
+                implementation(compose.runtime)
             }
         }
         commonTest {
