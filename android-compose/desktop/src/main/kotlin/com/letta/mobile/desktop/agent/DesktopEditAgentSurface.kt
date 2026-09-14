@@ -57,6 +57,9 @@ import com.letta.mobile.desktop.DesktopTextArea
 import com.letta.mobile.desktop.DesktopTextField
 import com.letta.mobile.avatar.core.MascotIdentity
 import com.letta.mobile.ui.mascot.MascotPicker
+import com.letta.mobile.ui.mascot.resolveMascotIdentity
+import com.letta.mobile.ui.mascot.withinAgentMetadata
+import kotlinx.serialization.json.JsonElement
 import com.letta.mobile.ui.mascot.MascotShapeGlyph
 import com.letta.mobile.desktop.memory.DesktopBlockApi
 import kotlinx.coroutines.CoroutineScope
@@ -134,6 +137,8 @@ internal fun DesktopEditAgentSurface(
     var loadedTone by remember(agentId) { mutableStateOf<String?>(null) }
     var loadedInstructions by remember(agentId) { mutableStateOf("") }
     var loadedInterests by remember(agentId) { mutableStateOf("") }
+    var loadedIdentity by remember(agentId) { mutableStateOf<MascotIdentity?>(null) }
+    var loadedMetadata by remember(agentId) { mutableStateOf<Map<String, JsonElement>?>(null) }
 
     LaunchedEffect(agentId) {
         // Fetch fresh — the flow's last emission re-fetches and refreshes the
@@ -158,8 +163,11 @@ internal fun DesktopEditAgentSurface(
             interests.clear()
             b?.value?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }?.let { interests.addAll(it) }
         }
-        // MascotIdentity.decode reads both the new `shape:AARRGGBB` form and the legacy orb index.
-        identity = MascotIdentity.decode(settings.getString(agentAvatarStyleKey(agentId))) ?: MascotIdentity.DEFAULT
+        // The agent's own identity (its metadata - the same field mobile writes) first, then this
+        // machine's cached / legacy setting; decode reads both the `shape:AARRGGBB` form and the legacy orb index.
+        loadedIdentity = resolveMascotIdentity(agent, settings.getString(agentAvatarStyleKey(agentId)))
+        loadedMetadata = agent.metadata
+        identity = loadedIdentity ?: MascotIdentity.DEFAULT
         voice = settings.getString(agentVoiceKey(agentId))?.takeIf { it in VoiceOptions } ?: VoiceOptions.first()
         loadedName = name
         loadedModel = modelValue
@@ -211,6 +219,16 @@ internal fun DesktopEditAgentSurface(
                                 Unit
                             },
                         )
+                        // The mascot identity lives on the agent so every client shows the same one.
+                        if (identity != loadedIdentity) add(
+                            async {
+                                agentRepository.updateAgent(
+                                    AgentId(agentId),
+                                    AgentUpdateParams(metadata = identity.withinAgentMetadata(loadedMetadata)),
+                                )
+                                Unit
+                            },
+                        )
                         if (persona != loadedPersona) add(async { personaBlockId = upsertBlock(PersonaLabel, persona, personaBlockId) })
                         if (tone != loadedTone) add(async { toneBlockId = upsertBlock(ToneLabel, tone.orEmpty(), toneBlockId) })
                         if (customInstructions.trim() != loadedInstructions.trim()) {
@@ -221,7 +239,7 @@ internal fun DesktopEditAgentSurface(
                         }
                     }.awaitAll()
                 }
-                // Display-only config stays local (and out of the context window).
+                // Local cache of the identity (offline / pre-refresh); the voice stays local.
                 settings.putString(agentAvatarStyleKey(agentId), identity.encode())
                 settings.putString(agentVoiceKey(agentId), voice)
             }

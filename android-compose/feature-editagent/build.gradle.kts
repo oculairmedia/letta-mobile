@@ -83,6 +83,8 @@ kotlin {
 
 dependencies {
     implementation(project(":core:android-data"))
+    // MascotPicker + the identity registry (shared with desktop).
+    implementation(project(":sharedUI"))
     testImplementation(project(":core:testutil"))
     implementation(project(":designsystem"))
     val composeBom = platform(libs.androidx.compose.bom)

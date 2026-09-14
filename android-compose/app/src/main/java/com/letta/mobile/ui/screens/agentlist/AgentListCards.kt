@@ -42,6 +42,7 @@ import com.letta.mobile.ui.components.LettaCardDefaults
 import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.mascot.MascotAvatar
 import com.letta.mobile.ui.navigation.agentAvatarSharedElementKey
 import com.letta.mobile.ui.navigation.optionalSharedElement
 import com.letta.mobile.ui.theme.listItemHeadline
@@ -49,6 +50,10 @@ import com.letta.mobile.ui.theme.listItemMetadata
 import com.letta.mobile.ui.theme.listItemSupporting
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
+/** The agent's mascot tile in the list: a circle the character fills (letta-mobile-8jtf3); the icon tile when it has none. */
+private val AgentTileSize = 44.dp
+private val CompactAgentTileSize = 30.dp
+
 @Composable
 internal fun FavoriteAgentCard(
     agent: Agent,
@@ -79,22 +84,31 @@ internal fun FavoriteAgentCard(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Surface(
-                modifier = Modifier
-                    .size(44.dp)
-                    .optionalSharedElement(agentAvatarSharedElementKey(agent.id.value)),
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.primaryContainer,
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = LettaIcons.Star,
-                        contentDescription = "Favorite",
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.size(22.dp),
-                    )
-                }
-            }
+            MascotAvatar(
+                agentId = agent.id.value,
+                size = AgentTileSize,
+                cornerRadius = AgentTileSize / 2,
+                live = false,
+                modifier = Modifier.optionalSharedElement(agentAvatarSharedElementKey(agent.id.value)),
+                fallback = {
+                    Surface(
+                        modifier = Modifier
+                            .size(AgentTileSize)
+                            .optionalSharedElement(agentAvatarSharedElementKey(agent.id.value)),
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = LettaIcons.Star,
+                                contentDescription = "Favorite",
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.size(22.dp),
+                            )
+                        }
+                    }
+                },
+            )
 
             Column(
                 modifier = Modifier.weight(1f),
@@ -295,30 +309,39 @@ internal fun AgentCard(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Surface(
-                modifier = Modifier
-                    .size(44.dp)
-                    .optionalSharedElement(agentAvatarSharedElementKey(agent.id.value)),
-                shape = RoundedCornerShape(12.dp),
-                color = if (isPinned) {
-                    MaterialTheme.colorScheme.tertiaryContainer
-                } else {
-                    MaterialTheme.colorScheme.surfaceContainerHighest
-                },
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = LettaIcons.Agent,
-                        contentDescription = null,
-                        tint = if (isPinned) {
-                            MaterialTheme.colorScheme.onTertiaryContainer
+            MascotAvatar(
+                agentId = agent.id.value,
+                size = AgentTileSize,
+                cornerRadius = AgentTileSize / 2,
+                live = false,
+                modifier = Modifier.optionalSharedElement(agentAvatarSharedElementKey(agent.id.value)),
+                fallback = {
+                    Surface(
+                        modifier = Modifier
+                            .size(AgentTileSize)
+                            .optionalSharedElement(agentAvatarSharedElementKey(agent.id.value)),
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isPinned) {
+                            MaterialTheme.colorScheme.tertiaryContainer
                         } else {
-                            MaterialTheme.colorScheme.primary
+                            MaterialTheme.colorScheme.surfaceContainerHighest
                         },
-                        modifier = Modifier.size(22.dp),
-                    )
-                }
-            }
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = LettaIcons.Agent,
+                                contentDescription = null,
+                                tint = if (isPinned) {
+                                    MaterialTheme.colorScheme.onTertiaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.primary
+                                },
+                                modifier = Modifier.size(22.dp),
+                            )
+                        }
+                    }
+                },
+            )
 
             Column(
                 modifier = Modifier.weight(1f),
@@ -464,30 +487,39 @@ internal fun CompactAgentCard(
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(
-                    modifier = Modifier
-                        .size(30.dp)
-                        .optionalSharedElement(agentAvatarSharedElementKey(agent.id.value)),
-                    shape = RoundedCornerShape(10.dp),
-                    color = if (isPinned) {
-                        MaterialTheme.colorScheme.tertiaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.surfaceContainerHighest
-                    },
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = LettaIcons.Agent,
-                            contentDescription = null,
-                            tint = if (isPinned) {
-                                MaterialTheme.colorScheme.onTertiaryContainer
+                MascotAvatar(
+                    agentId = agent.id.value,
+                    size = CompactAgentTileSize,
+                    cornerRadius = CompactAgentTileSize / 2,
+                    live = false,
+                    modifier = Modifier.optionalSharedElement(agentAvatarSharedElementKey(agent.id.value)),
+                    fallback = {
+                        Surface(
+                            modifier = Modifier
+                                .size(CompactAgentTileSize)
+                                .optionalSharedElement(agentAvatarSharedElementKey(agent.id.value)),
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isPinned) {
+                                MaterialTheme.colorScheme.tertiaryContainer
                             } else {
-                                MaterialTheme.colorScheme.primary
+                                MaterialTheme.colorScheme.surfaceContainerHighest
                             },
-                            modifier = Modifier.size(18.dp),
-                        )
-                    }
-                }
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = LettaIcons.Agent,
+                                    contentDescription = null,
+                                    tint = if (isPinned) {
+                                        MaterialTheme.colorScheme.onTertiaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.primary
+                                    },
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            }
+                        }
+                    },
+                )
                 Spacer(modifier = Modifier.weight(1f))
                 if (isFavorite) {
                     Icon(

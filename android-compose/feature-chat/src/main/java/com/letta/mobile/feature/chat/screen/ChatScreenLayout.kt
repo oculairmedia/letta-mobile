@@ -425,7 +425,6 @@ private fun ChatScreenComposerColumn(params: ChatScreenComposerColumnParams) {
             },
     ) {
         ChatScreenGoalStatusSection(params.state, params.viewModel)
-        ChatScreenThinkingTokenSection(params.state, params.reducedMotion)
         ChatScreenComposerInputSection(
             state = params.state,
             composerState = params.composerState,
@@ -469,6 +468,8 @@ private fun ChatScreenThinkingTokenSection(
         delayMessage = state.a2uiThinkingDelayMessage,
         reducedMotion = reducedMotion,
         reserveSpace = thinkingTokenActive,
+        // Beside the mascot companion: no leading inset, the row already places it.
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(end = 16.dp, top = 4.dp, bottom = 4.dp),
     )
 }
 
@@ -479,13 +480,23 @@ private fun ChatScreenComposerInputSection(
     viewModel: AdminChatViewModel,
     navigation: ChatScreenNavigationCallbacks,
 ) {
+    val reducedMotion = rememberReducedMotionEnabled()
     val launchPicker = rememberImageAttachmentPicker(
         onPicked = { viewModel.addAttachment(it) },
         onError = { viewModel.reportComposerError(it) },
         limits = viewModel.attachmentLimits,
     )
     val activeAgent by viewModel.activeAgent.collectAsStateWithLifecycle()
+    ChatMascotPresenceSync(
+        agentId = viewModel.agentId.value,
+        conversationId = viewModel.conversationId?.value,
+        state = state,
+        composerText = composerState.inputText,
+    )
     ChatComposer(
+        agentId = viewModel.agentId.value,
+        // The thinking indicator sits beside the mascot companion, in its row (letta-mobile-8jtf3).
+        companionStatus = { ChatScreenThinkingTokenSection(state, reducedMotion) },
         inputText = composerState.inputText,
         pendingAttachments = composerState.pendingAttachments,
         isStreaming = state.isStreaming,

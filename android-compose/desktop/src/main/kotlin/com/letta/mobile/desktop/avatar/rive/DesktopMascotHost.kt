@@ -36,8 +36,8 @@ object DesktopMascotHost : MascotHost {
         if (RiveBridgeNative.AVAILABLE) entries.get(agentId, identity) else null
 
     @Composable
-    override fun Surface(entry: MascotEntry, modifier: Modifier) {
-        RiveDesktopSurface((entry as DesktopMascotEntry).scene, modifier)
+    override fun Surface(entry: MascotEntry, modifier: Modifier, playing: Boolean) {
+        RiveDesktopSurface((entry as DesktopMascotEntry).scene, modifier, playing = playing)
     }
 
     fun closeAll() = entries.closeAll()

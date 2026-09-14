@@ -33,6 +33,7 @@ import com.letta.mobile.ui.components.LettaSearchBar
 import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.mascot.MascotAvatar
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -60,6 +61,7 @@ internal fun AgentScaffoldTopBar(state: AgentScaffoldRuntimeState) {
             } else {
                 AgentScaffoldAgentTopBarTitle(
                     params = AgentScaffoldAgentTopBarTitleParams(
+                        agentId = state.agentIdValue,
                         agentName = state.agentName,
                         screenTitle = state.screenTitle,
                         currentAgentIsFavorite = state.currentAgentIsFavorite,
@@ -125,6 +127,7 @@ private fun AgentScaffoldSearchTopBarTitle(
 }
 
 internal data class AgentScaffoldAgentTopBarTitleParams(
+    val agentId: String,
     val agentName: String,
     val screenTitle: String,
     val currentAgentIsFavorite: Boolean,
@@ -147,6 +150,16 @@ private fun AgentScaffoldAgentTopBarTitle(params: AgentScaffoldAgentTopBarTitleP
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
+        // The agent's mascot as a chip before its name; nothing when it has none (letta-mobile-8jtf3).
+        // A still: the live one is the composer companion, and two of them moving is confusing.
+        MascotAvatar(
+            agentId = params.agentId,
+            size = TopBarMascotSize,
+            cornerRadius = TopBarMascotSize / 2,
+            modifier = Modifier.padding(end = 4.dp),
+            live = false,
+            fallback = {},
+        )
         Text(
             text = params.agentName.ifBlank { params.screenTitle },
             maxLines = 1,
@@ -177,6 +190,8 @@ private fun AgentScaffoldAgentTopBarTitle(params: AgentScaffoldAgentTopBarTitleP
         )
     }
 }
+
+private val TopBarMascotSize = 28.dp
 
 @Composable
 private fun AgentScaffoldTopBarActions(

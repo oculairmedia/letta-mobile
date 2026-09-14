@@ -12,6 +12,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.letta.mobile.ui.mascot.ProvideMascotShell
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
@@ -144,16 +145,18 @@ class MainActivity : ComponentActivity() {
                     LocalSnackbarDispatcher provides snackbarDispatcher,
                     LocalWindowSizeClass provides windowSizeClass,
                 ) {
-                    Scaffold(
-                        snackbarHost = { SnackbarHost(snackbarHostState) },
-                    ) { _ ->
-                        val navController = rememberNavController()
-                        AdaptiveScaffold(navController = navController) {
-                            AppNavGraph(
-                                navController = navController,
-                                 notificationTarget = launchTarget.value,
-                                 onNotificationTargetConsumed = { launchTarget.value = null },
-                            )
+                    ProvideMascotShell(agents = deps.agentRepository.agents, settings = deps.secureSettingsStore) {
+                        Scaffold(
+                            snackbarHost = { SnackbarHost(snackbarHostState) },
+                        ) { _ ->
+                            val navController = rememberNavController()
+                            AdaptiveScaffold(navController = navController) {
+                                AppNavGraph(
+                                    navController = navController,
+                                    notificationTarget = launchTarget.value,
+                                    onNotificationTargetConsumed = { launchTarget.value = null },
+                                )
+                            }
                         }
                     }
                 }

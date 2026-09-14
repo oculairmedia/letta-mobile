@@ -17,6 +17,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.Alignment
+import com.letta.mobile.ui.mascot.MascotAvatar
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -152,6 +156,8 @@ private fun conversationCardTitle(display: ConversationDisplay): String =
 private val ConversationCardShape = RoundedCornerShape(12.dp)
 
 @OptIn(ExperimentalFoundationApi::class)
+private val ConversationCardMascotSize = 44.dp
+
 @Composable
 private fun ConversationCardSurface(params: ConversationCardSurfaceParams) {
     Card(
@@ -167,21 +173,35 @@ private fun ConversationCardSurface(params: ConversationCardSurfaceParams) {
         colors = LettaCardDefaults.listCardColors(),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = params.title,
-                style = MaterialTheme.typography.listItemHeadline,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
+        Row(
+            modifier = Modifier.padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // The agent's mascot as the row's tile (letta-mobile-8jtf3); no tile when it has none.
+            MascotAvatar(
+                agentId = params.display.conversation.agentId.value,
+                size = ConversationCardMascotSize,
+                cornerRadius = ConversationCardMascotSize / 2,
+                live = false,
+                fallback = {},
             )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = conversationCardMetadata(params.display),
-                style = MaterialTheme.typography.listItemSupporting,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = params.title,
+                    style = MaterialTheme.typography.listItemHeadline,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = conversationCardMetadata(params.display),
+                    style = MaterialTheme.typography.listItemSupporting,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }
