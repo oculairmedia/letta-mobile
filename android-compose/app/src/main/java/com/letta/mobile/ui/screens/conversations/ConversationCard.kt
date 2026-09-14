@@ -20,7 +20,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.ui.Alignment
-import com.letta.mobile.ui.mascot.MascotAvatar
+import com.letta.mobile.ui.mascot.AgentAvatar
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.foundation.layout.size
@@ -190,13 +190,10 @@ private fun ConversationCardRow(params: ConversationCardSurfaceParams) {
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // The agent's mascot as the row's tile (letta-mobile-8jtf3); no tile when it has none.
-        MascotAvatar(
+        AgentAvatar(
             agentId = params.display.conversation.agentId.value,
+            name = params.display.agentName,
             size = ConversationCardMascotSize,
-            cornerRadius = ConversationCardMascotSize / 2,
-            live = false,
-            fallback = {},
         )
         Column(modifier = Modifier.weight(1f)) {
             ConversationCardTitleRow(params)

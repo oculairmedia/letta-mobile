@@ -31,6 +31,7 @@ internal object AgentScaffoldTestTags {
     const val DRAWER_EDIT_AGENT = "agent_scaffold_drawer_edit_agent"
     const val MODEL_PICKER_SHEET = "agent_scaffold_model_picker_sheet"
     const val DRAWER_MODEL_CARD = "agent_scaffold_drawer_model_card"
+    const val DRAWER_CONTEXT_CARD = "agent_scaffold_drawer_context_card"
     fun drawerChatMode(mode: String) = "agent_scaffold_drawer_chat_mode_$mode"
 }
 

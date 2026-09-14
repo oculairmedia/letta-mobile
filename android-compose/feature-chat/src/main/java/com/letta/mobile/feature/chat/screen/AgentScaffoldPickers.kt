@@ -48,6 +48,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import com.letta.mobile.ui.mascot.AgentAvatar
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
@@ -557,6 +561,8 @@ internal class ConversationPickerViewModel @Inject constructor(
                 try {
                     conversationRepository.deleteConversation(ConversationId(id), AgentId(agentId))
                     if (id == activeConversationId) deletedActive = true
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
                 } catch (_: Exception) { /* individual failures are handled by the repository's rollback */ }
             }
             if (deletedActive) onActiveDeleted()
@@ -987,154 +993,49 @@ internal fun DrawerContent(
 ) {
     val haptic = LocalHapticFeedback.current
     val view = LocalView.current
+    val drawerItemColors = contrastDrawerItemColors()
+    // One column, four bands, one rhythm: who (the agent), what it runs on (model, context),
+    // how it talks (chat mode), where to go (navigation, recent conversations). Utilities that
+    // are not destinations - search, reset, the id - sit in a quiet footer.
     Column(
         modifier = modifier
             .fillMaxHeight()
-            .width(300.dp)
+            .width(DrawerWidth)
             .verticalScroll(rememberScrollState())
-            .padding(16.dp)
-            // letta-mobile: pad past the bottom system bar so the agent-id
-            // tail (and any new items below it) stay visible. Previous layout
-            // clipped the last element under the gesture nav.
-            .navigationBarsPadding()
+            .padding(horizontal = DrawerInset, vertical = 12.dp)
+            .navigationBarsPadding(),
     ) {
-        // letta-mobile-7lyb: Inline the Edit Agent action as a trailing
-        // IconButton on the agent header. Removes the giant full-width
-        // NavigationDrawerItem that previously occupied ~64dp for a single
-        // tap target.
-        val drawerDefaultAgentName = stringResource(R.string.screen_drawer_default_agent_name)
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                LettaIcons.Agent,
-                contentDescription = stringResource(R.string.screen_drawer_agent_icon_description),
-                tint = MaterialTheme.colorScheme.primary,
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = agentName.ifBlank { drawerDefaultAgentName },
-                style = MaterialTheme.typography.titleLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-            IconButton(
-                onClick = {
-                    HapticEffects.contextClick(haptic, view)
-                    onEditAgent()
-                },
-                modifier = Modifier.testTag(AgentScaffoldTestTags.DRAWER_EDIT_AGENT),
-            ) {
-                Icon(
-                    LettaIcons.Edit,
-                    contentDescription = stringResource(R.string.screen_drawer_edit_agent),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(4.dp))
-        // letta-mobile: replace the running message-count line with a small
-        // backend-identity indicator. Shows which Letta server the agent is
-        // talking to (matches the active-backend pill on the top-level
-        // surfaces). Falls back to a placeholder when no active config is
-        // configured so the slot doesn't collapse.
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                LettaIcons.Storage,
-                contentDescription = null,
-                modifier = Modifier.size(14.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-                text = activeBackendLabel
-                    ?: stringResource(R.string.screen_drawer_backend_unknown),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-
-        val drawerItemColors = contrastDrawerItemColors()
+        DrawerAgentHeader(
+            agentName = agentName,
+            agentId = agentId,
+            activeBackendLabel = activeBackendLabel,
+            onSearchMessages = {
+                HapticEffects.segmentTick(haptic, view)
+                onSearchMessages()
+            },
+            onEditAgent = {
+                HapticEffects.contextClick(haptic, view)
+                onEditAgent()
+            },
+        )
         Spacer(modifier = Modifier.height(16.dp))
-        DrawerAgentActions(
-            contextWindow = contextWindow,
-            onRefreshContextWindow = onRefreshContextWindow,
+        DrawerFacts(
             currentModel = currentModel,
+            contextWindow = contextWindow,
             onModelTap = onModelTap,
-            onSearchMessages = onSearchMessages,
-            colors = drawerItemColors,
+            onRefreshContextWindow = onRefreshContextWindow,
         )
         Spacer(modifier = Modifier.height(16.dp))
-        HorizontalDivider()
-        Spacer(modifier = Modifier.height(8.dp))
+        DrawerChatMode(chatMode = chatMode, onChatModeSelected = onChatModeSelected)
 
-        // letta-mobile-7lyb: Compact chat-mode selector. The three modes
-        // previously rendered as stacked NavigationDrawerItems (~144dp tall);
-        // a SingleChoiceSegmentedButtonRow gives the same affordance in one
-        // ~48dp row with Material3-native selection visuals.
-        Text(
-            text = stringResource(R.string.screen_drawer_chat_mode_label),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-        )
-        // letta-mobile-w3dl: pair each mode value (transport key sent to the
-        // viewmodel) with its localized label resource. Keeps the chat-mode
-        // string identifier stable for analytics/storage while honoring the
-        // user's locale for the visible button text.
-        val chatModes = listOf(
-            "simple" to R.string.screen_drawer_chat_mode_simple,
-            "interactive" to R.string.screen_drawer_chat_mode_interactive,
-            "debug" to R.string.screen_drawer_chat_mode_debug,
-        )
-        SingleChoiceSegmentedButtonRow(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 4.dp, vertical = 4.dp),
-        ) {
-            chatModes.forEachIndexed { index, (mode, labelRes) ->
-                SegmentedButton(
-                    selected = chatMode == mode,
-                    onClick = {
-                        HapticEffects.segmentTick(haptic, view, enabled = chatMode != mode)
-                        onChatModeSelected(mode)
-                    },
-                    shape = SegmentedButtonDefaults.itemShape(index = index, count = chatModes.size),
-                    modifier = Modifier.testTag(AgentScaffoldTestTags.drawerChatMode(mode)),
-                    // letta-mobile: suppress SegmentedButton's default check
-                    // affordance — the container highlight already conveys
-                    // selection and the icon adds visual noise in a tight
-                    // three-item row.
-                    icon = {},
-                    label = {
-                        Text(
-                            stringResource(labelRes),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    },
-                )
-            }
-        }
-
-        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-
+        DrawerSectionLabel(stringResource(R.string.screen_drawer_navigate_label))
         DrawerNavigationItems(
             navigation = navigation,
             onHapticClick = { HapticEffects.segmentTick(haptic, view) },
             colors = drawerItemColors,
         )
 
-        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-
-        Text(
-            text = stringResource(R.string.common_conversations),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-        )
+        DrawerSectionLabel(stringResource(R.string.common_conversations))
         NavigationDrawerItem(
             icon = { Icon(LettaIcons.Add, contentDescription = null) },
             label = { Text(stringResource(R.string.screen_conversations_new_action)) },
@@ -1145,99 +1046,288 @@ internal fun DrawerContent(
             },
             colors = drawerItemColors,
         )
-        if (conversations.isEmpty()) {
-            Text(
-                text = stringResource(R.string.screen_conversations_empty),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-            )
-        } else {
-            // letta-mobile: cap to the 4 most-recent conversations in the
-            // drawer for now — the full list is reachable via the dedicated
-            // conversation picker. Keeps the drawer scannable on small
-            // screens and stops it from running past the bottom system bar.
-            conversations.take(4).forEach { conversation ->
-                val isActive = conversation.id.value == currentConversationId
-                ConversationMenuItem(
-                    conversation = conversation,
-                    containerColor = if (isActive) {
-                        MaterialTheme.colorScheme.primaryContainer
-                    } else {
-                        LettaCardDefaults.listContainerColor
-                    },
-                    leadingIcon = {
-                        Icon(
-                            if (isActive) LettaIcons.CheckCircle else LettaIcons.ChatOutline,
-                            contentDescription = null,
-                            modifier = Modifier.size(LettaIconSizing.Toolbar),
-                            tint = if (isActive) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                        )
-                    },
-                    onClick = {
-                        HapticEffects.segmentTick(haptic, view, enabled = !isActive)
-                        onConversationSelected(conversation.id.value)
-                    },
-                )
-            }
-        }
-
-        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-
-        NavigationDrawerItem(
-            icon = {
-                Icon(
-                    LettaIcons.Delete,
-                    contentDescription = stringResource(R.string.screen_drawer_reset_icon_description),
-                )
+        DrawerRecentConversations(
+            conversations = conversations,
+            currentConversationId = currentConversationId,
+            onConversationSelected = { id ->
+                HapticEffects.segmentTick(haptic, view, enabled = id != currentConversationId)
+                onConversationSelected(id)
             },
-            label = { Text(stringResource(R.string.action_reset_messages)) },
-            selected = false,
-            onClick = {
+        )
+
+        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+        DrawerFooter(
+            agentId = agentId,
+            onResetMessages = {
                 HapticEffects.reject(haptic, view)
                 onResetMessages()
             },
-            colors = drawerItemColors,
         )
+    }
+}
 
-        Spacer(modifier = Modifier.height(12.dp))
+private val DrawerWidth = 300.dp
+private val DrawerInset = 12.dp
 
-        Text(
-            text = agentId.take(12) + "\u2026",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+/** Who: the agent's avatar (the shared one), its name, the backend it talks to, and its actions. */
+@Composable
+private fun DrawerAgentHeader(
+    agentName: String,
+    agentId: String,
+    activeBackendLabel: String?,
+    onSearchMessages: () -> Unit,
+    onEditAgent: () -> Unit,
+) {
+    val displayName = agentName.ifBlank { stringResource(R.string.screen_drawer_default_agent_name) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        AgentAvatar(agentId = agentId, name = displayName, size = 48.dp)
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = displayName,
+                style = MaterialTheme.typography.titleLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Icon(
+                    LettaIcons.Storage,
+                    contentDescription = null,
+                    modifier = Modifier.size(12.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = activeBackendLabel ?: stringResource(R.string.screen_drawer_backend_unknown),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        IconButton(
+            onClick = onSearchMessages,
+            modifier = Modifier.testTag(AgentScaffoldTestTags.DRAWER_SEARCH_MESSAGES),
+        ) {
+            Icon(
+                LettaIcons.Search,
+                contentDescription = stringResource(R.string.action_search),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        IconButton(
+            onClick = onEditAgent,
+            modifier = Modifier.testTag(AgentScaffoldTestTags.DRAWER_EDIT_AGENT),
+        ) {
+            Icon(
+                LettaIcons.Edit,
+                contentDescription = stringResource(R.string.screen_drawer_edit_agent),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/** What it runs on: two equal tiles, model (tap to pick) and context (tap to refresh). */
+@Composable
+private fun DrawerFacts(
+    currentModel: String?,
+    contextWindow: ContextWindowUiState,
+    onModelTap: () -> Unit,
+    onRefreshContextWindow: () -> Unit,
+) {
+    val modelLabel = currentModel?.takeIf { it.isNotBlank() } ?: stringResource(R.string.screen_drawer_model_unknown)
+    val contextValue = when {
+        contextWindow.maxTokens > 0 -> stringResource(R.string.screen_chat_context_window_percent, contextWindow.usagePercent)
+        contextWindow.error != null -> stringResource(R.string.screen_drawer_context_error)
+        else -> stringResource(R.string.screen_drawer_context_unavailable)
+    }
+    val progress = if (contextWindow.maxTokens > 0) {
+        (contextWindow.currentTokens.toFloat() / contextWindow.maxTokens.toFloat()).coerceIn(0f, 1f)
+    } else {
+        null
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        DrawerFactTile(
+            icon = LettaIcons.Psychology,
+            label = stringResource(R.string.screen_drawer_model_short),
+            value = modelLabel.substringAfter('/', modelLabel),
+            onClick = onModelTap,
+            modifier = Modifier.weight(1f).testTag(AgentScaffoldTestTags.DRAWER_MODEL_CARD),
+        )
+        DrawerFactTile(
+            icon = LettaIcons.Database,
+            label = stringResource(R.string.screen_drawer_context_short),
+            value = contextValue,
+            onClick = onRefreshContextWindow,
+            modifier = Modifier.weight(1f).testTag(AgentScaffoldTestTags.DRAWER_CONTEXT_CARD),
+            progress = progress,
+            loading = contextWindow.isLoading,
         )
     }
 }
 
 @Composable
-private fun DrawerAgentActions(
-    contextWindow: ContextWindowUiState,
-    onRefreshContextWindow: () -> Unit,
-    currentModel: String?,
-    onModelTap: () -> Unit,
-    onSearchMessages: () -> Unit,
-    colors: androidx.compose.material3.NavigationDrawerItemColors,
+private fun DrawerFactTile(
+    icon: ImageVector,
+    label: String,
+    value: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    progress: Float? = null,
+    loading: Boolean = false,
 ) {
+    Card(
+        onClick = onClick,
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.tertiary, modifier = Modifier.size(14.dp))
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+                if (loading) CircularProgressIndicator(modifier = Modifier.size(12.dp), strokeWidth = 2.dp)
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (progress != null) {
+                Spacer(modifier = Modifier.height(6.dp))
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.tertiary,
+                    trackColor = MaterialTheme.colorScheme.tertiaryContainer,
+                )
+            }
+        }
+    }
+}
+
+/** How it talks: the three chat modes as one segmented row (letta-mobile-7lyb). */
+@Composable
+private fun DrawerChatMode(chatMode: String, onChatModeSelected: (String) -> Unit) {
     val haptic = LocalHapticFeedback.current
     val view = LocalView.current
-    ContextWindowCard(state = contextWindow, onRefresh = onRefreshContextWindow)
-    Spacer(modifier = Modifier.height(8.dp))
-    ModelInfoCard(currentModel = currentModel, onTap = onModelTap)
-    NavigationDrawerItem(
-        icon = { Icon(LettaIcons.Search, contentDescription = null) },
-        label = { Text(stringResource(R.string.action_search)) },
-        selected = false,
-        onClick = {
-            HapticEffects.segmentTick(haptic, view)
-            onSearchMessages()
-        },
-        colors = colors,
-        modifier = Modifier.testTag(AgentScaffoldTestTags.DRAWER_SEARCH_MESSAGES),
+    // letta-mobile-w3dl: pair each mode value (transport key sent to the viewmodel) with its
+    // localized label resource.
+    val chatModes = listOf(
+        "simple" to R.string.screen_drawer_chat_mode_simple,
+        "interactive" to R.string.screen_drawer_chat_mode_interactive,
+        "debug" to R.string.screen_drawer_chat_mode_debug,
+    )
+    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
+        chatModes.forEachIndexed { index, (mode, labelRes) ->
+            SegmentedButton(
+                selected = chatMode == mode,
+                onClick = {
+                    HapticEffects.segmentTick(haptic, view, enabled = chatMode != mode)
+                    onChatModeSelected(mode)
+                },
+                shape = SegmentedButtonDefaults.itemShape(index = index, count = chatModes.size),
+                modifier = Modifier.testTag(AgentScaffoldTestTags.drawerChatMode(mode)),
+                icon = {},
+                label = { Text(stringResource(labelRes), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun DrawerSectionLabel(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 6.dp),
+    )
+}
+
+/** The four most recent conversations; the full list is the picker's. */
+@Composable
+private fun DrawerRecentConversations(
+    conversations: List<Conversation>,
+    currentConversationId: String?,
+    onConversationSelected: (String) -> Unit,
+) {
+    if (conversations.isEmpty()) {
+        Text(
+            text = stringResource(R.string.screen_conversations_empty),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        )
+        return
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        conversations.take(RECENT_CONVERSATIONS).forEach { conversation ->
+            val isActive = conversation.id.value == currentConversationId
+            ConversationMenuItem(
+                conversation = conversation,
+                containerColor = if (isActive) MaterialTheme.colorScheme.primaryContainer else LettaCardDefaults.listContainerColor,
+                leadingIcon = {
+                    Icon(
+                        if (isActive) LettaIcons.CheckCircle else LettaIcons.ChatOutline,
+                        contentDescription = null,
+                        modifier = Modifier.size(LettaIconSizing.Toolbar),
+                        tint = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                },
+                onClick = { onConversationSelected(conversation.id.value) },
+            )
+        }
+    }
+}
+
+private const val RECENT_CONVERSATIONS = 4
+
+/** Not a destination: reset the thread, and the agent's id for support. */
+@Composable
+private fun DrawerFooter(
+    agentId: String,
+    onResetMessages: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        TextButton(
+            onClick = onResetMessages,
+            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+        ) {
+            Icon(
+                LettaIcons.Delete,
+                contentDescription = stringResource(R.string.screen_drawer_reset_icon_description),
+                modifier = Modifier.size(LettaIconSizing.Inline),
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(stringResource(R.string.action_reset_messages))
+        }
+    }
+    Text(
+        text = agentId.take(12) + "\u2026",
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
     )
 }
 
