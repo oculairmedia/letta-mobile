@@ -16,10 +16,21 @@ name keeps its id forever; the floors sit above everything already used in that 
 
 Two ids collided recently because nothing checked. `_check_unique()` runs at import and names
 both constants; `all_ids()` exposes the whole set.
+
+Read by every rig module and by gen_scene.py; it imports nothing from them. It also owns the
+state / shape / glyph vocabulary, because the id tables below are ranges indexed by those orders.
+
+Rive rules that bite here:
+  - push before you commit. `rive push` writes an id onto every object the generator left
+    unnamed and saves them back into scene.rml; regenerating throws those away. The ids in this
+    module are the named ones - stable across pushes, and what an editor edit attaches to.
+  - an id is resolved, never matched by name: a duplicate silently rebinds one object onto
+    another rather than failing, which is why the uniqueness check runs at import.
 """
 import json as _json
 import os as _os
 import re as _re
+from typing import NamedTuple as _NamedTuple
 
 _ID = _re.compile(r"^\d+:\d+$")
 
@@ -242,12 +253,19 @@ IDLE_SLEEP_NODE = "3:217"
 TURN_X_ANIM, TURN_Y_ANIM = "3:220", "3:221"
 
 
-# More idle beats (anim id, state node id): a glance is not enough for a character on screen all day.
-IDLE_BEATS = {"stretch": ("3:222", "3:226"), "tilt": ("3:223", "3:227"), "bounce": ("3:224", "3:228"), "shiver": ("3:225", "3:229"),
-              "sigh": (alloc(3, "IdleBeatSigh"), alloc(3, "IdleBeatSighNode")),
-              "wobble": (alloc(3, "IdleBeatWobble"), alloc(3, "IdleBeatWobbleNode")),
-              "shift": (alloc(3, "IdleBeatShift"), alloc(3, "IdleBeatShiftNode")),
-              "lookaround": (alloc(3, "IdleBeatLookAround"), alloc(3, "IdleBeatLookAroundNode"))}
+class Beat(_NamedTuple):
+    """One idle beat: the LinearAnimation that plays it and the state node that holds it."""
+    anim: str
+    node: str
+
+
+# More idle beats: a glance is not enough for a character on screen all day.
+IDLE_BEATS = {"stretch": Beat("3:222", "3:226"), "tilt": Beat("3:223", "3:227"),
+              "bounce": Beat("3:224", "3:228"), "shiver": Beat("3:225", "3:229"),
+              "sigh": Beat(alloc(3, "IdleBeatSigh"), alloc(3, "IdleBeatSighNode")),
+              "wobble": Beat(alloc(3, "IdleBeatWobble"), alloc(3, "IdleBeatWobbleNode")),
+              "shift": Beat(alloc(3, "IdleBeatShift"), alloc(3, "IdleBeatShiftNode")),
+              "lookaround": Beat(alloc(3, "IdleBeatLookAround"), alloc(3, "IdleBeatLookAroundNode"))}
 
 
 WANDER_WAIT_A, WANDER_WAIT_B, WANDER_GLANCE, WANDER_PEEK, WANDER_SPIN = "3:230", "3:231", "3:232", "3:233", "3:234"

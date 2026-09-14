@@ -1,9 +1,28 @@
-"""The face assembly on the root artboard: turn, arc, lean, trails, and the facing joystick."""
-import math
+"""The face assembly on the root artboard: the plate's placement, turn, arc, trails and remaps.
 
-from rml import *  # noqa: F401,F403
-from rig.constants import *  # noqa: F401,F403
-from rig.body import fill, rrect, squash
+Owns the FacePlacement > HostTurn > Turn > Arc > Face chain that carries the nested Plate, the
+TurnX / TurnY pose ranges the Facing joystick scrubs, and spin_keys() (the whip-around the
+success flash and Wander reuse). gen_scene.py draws face(); rig/motion.py reads spin_keys.
+
+Rive rules that bite here:
+  - placement and keyed motion must live on different nodes - a keyed x=0 overwrites a
+    placement. FacePlacement holds the position, Turn takes only the joystick's keys, Face takes
+    the states'. Adding a key to the wrong one silently parks the plate at the origin.
+  - `NestedRemapAnimation.time` is a 0..1 FRACTION, not frames: the look, mouth and tunable
+    remaps scrub a 60-frame pose range through a range-mapper converter, never a frame number.
+"""
+from textwrap import indent
+
+from rml import (BACK_IN, ELASTIC_OUT, LINEAR, OPACITY, REMAP_TIME, ROT, SINE, STANDARD, SX, SY,
+                 VM_LOOKX, VM_LOOKY, VM_MOUTH, X, Y, animation, bind)
+from rig.body import fill, rrect
+from rig.constants import JX, LEAN_BASE, PLATE_WHITE, TUNABLES, TURN_ARC, TURN_LEAN_DEG, rad
+from rig.ids import (
+    ARC_NODE, AUTO_X, AUTO_Y, BODY_NODE, CONV_LOOK, CONV_MOUTH, CONV_TURN_ROT, CONV_TURN_X,
+    CONV_TURN_Y, FACE, HOST_TURN, JOYSTICK, LEAN_NODE, PLATE, PLATE_AB, PLATE_AUTO_X, PLATE_AUTO_Y,
+    PLATE_BLINK, PLATE_EXPR, PLATE_IN_BLINK, PLATE_IN_EXPR, PLATE_LOOKX, PLATE_LOOKY, PLATE_OPEN,
+    PLATE_SM, TRAIL1, TRAIL2, TURN_NODE, TURN_X_ANIM, TURN_Y_ANIM, VM_TURN_X, VM_TURN_Y,
+)
 
 
 # ================================================================================================
@@ -22,6 +41,7 @@ TURN_RECEDE = 0.84                 # plate scale at facing +-1: it is further fr
 
 
 def trail(name, sid):
+    """A ghost copy of the plate card, invisible until the spin keys its opacity."""
     return f'''<Shape x="0" y="0" opacity="0" name="{name}" id="{sid}">
     {rrect(120, 120, 27)}
     {fill(PLATE_WHITE)}
@@ -29,6 +49,7 @@ def trail(name, sid):
 
 
 def face():
+    """The face assembly: the placement chain, the nested Plate with its inputs and remaps, trails."""
     # FacePlacement > Turn (keyed only by the joystick's TurnX/TurnY) > Face (keyed by state motion).
     # Trails are declared after Turn so they draw underneath the plate.
     return f'''<Node x="0" y="{-8 - LEAN_BASE}" name="FacePlacement">
@@ -53,7 +74,7 @@ def face():
         <NestedRemapAnimation animationId="{PLATE_OPEN}" time="0" name="Open">
             {bind(VM_MOUTH, REMAP_TIME, CONV_MOUTH)}
         </NestedRemapAnimation>
-{indent(chr(10).join(f'<NestedRemapAnimation animationId="{aid}" time="0.5" name="{n}">{chr(10)}    {bind(vid, REMAP_TIME)}{chr(10)}</NestedRemapAnimation>' for n, (vid, aid, *_) in TUNABLES.items()), "        ")}
+{indent(chr(10).join(f'<NestedRemapAnimation animationId="{t.anim}" time="0.5" name="{n}">{chr(10)}    {bind(t.vm_id, REMAP_TIME)}{chr(10)}</NestedRemapAnimation>' for n, t in TUNABLES.items()), "        ")}
         <NestedRemapAnimation animationId="{PLATE_AUTO_X}" time="0.5" name="AutoLookX" id="{AUTO_X}"/>
         <NestedRemapAnimation animationId="{PLATE_AUTO_Y}" time="0.5" name="AutoLookY" id="{AUTO_Y}"/>
     </NestedArtboard>

@@ -1,10 +1,36 @@
-"""The plate: the nested face artboard - glyphs per state, mouth morph, pupil overlay, saccades."""
+"""The plate: the nested face artboard - glyphs per state, mouth morph, pupil overlay, saccades.
+
+Owns everything inside the Plate component - its node tree, its animations, and its own four-layer
+state machine (Expression, Blink, AutoBlink, Saccade). rig/face.py mounts it as a NestedArtboard
+and drives it; gen_scene.py writes plate_component() into the document. The glyph per state comes
+from STATE_GLYPH here, the ids from rig/ids.py, the timings from rig/constants.py.
+
+Rive rules that bite here:
+  - a view-model-driven state machine inside a nested artboard NEVER fires. The plate is driven by
+    inputs instead (`expr` NestedNumber, `blink` NestedTrigger) that the root's animations key.
+  - `expr` is keyed by two root states at once, so it INTERPOLATES through a root cross-blend: a
+    condition on it must be a band (>= v-0.5 && < v+0.5), never an exact match. "Anything but
+    sleeping" cannot be one band, hence the pairs of open-ended conditions in the park checks.
+"""
 import math
+from textwrap import indent
 
 import svgpath
-from rml import *  # noqa: F401,F403
-from rig.constants import *  # noqa: F401,F403
+from rml import (ACTIVE_CHILD, BACK_OUT, EMPH_DECEL, Id, LINEAR, OPACITY, SINE, SOFT_OUT, STD_DECEL,
+                 SX, SY, VIN_DIST, VIN_ROT, VOUT_DIST, VOUT_ROT, VX, VY, X, Y, animation)
 from rig.body import fill, rrect
+from rig.constants import (BLINK_FRAMES, BLINK_SHUT, EXPR, INK, PLATE_WHITE, PUPIL, PUPIL_PARALLAX,
+                           SACCADE_FIX, SACCADE_WAITS, TUNABLES, WAVE_STROKE, art, beat,
+                           expression_layer, frames)
+from rig.ids import (
+    CATCH, CORE, FROWN, GLYPH, GLYPHS_NODE, GLYPH_ORDER, GLYPH_SCALE_NODE, IRIS, MOUTH_MORPH,
+    MOUTH_NODE, MOUTH_O, PLATE_AB, PLATE_AUTO_A, PLATE_AUTO_B, PLATE_AUTO_BLINK, PLATE_AUTO_SLEEP,
+    PLATE_AUTO_X, PLATE_AUTO_Y, PLATE_BLINK_ANIM, PLATE_BLINK_NODE, PLATE_BLINK_REST_NODE,
+    PLATE_CARD, PLATE_IN_BLINK, PLATE_IN_EXPR, PLATE_LOOKX, PLATE_LOOKY, PLATE_OPEN, PLATE_ROOT,
+    PLATE_SCALE_NODE, PLATE_SHADOW, PLATE_SM, PLATE_WAIT_A, PLATE_WAIT_B, PUPIL_OVERLAY, PUPIL_ROOT,
+    SACCADE_FIX_NODES, SACCADE_NODE, SACCADE_SLEEP_NODE, SACCADE_WAIT_NODES, STATES, WAVE,
+    mouth_vertex_ids, plate_expr_anim, plate_expr_node, wave_vertex_ids,
+)
 from rig.layers import Exit, Layer, OnInput, Raw, State
 
 
@@ -91,6 +117,7 @@ def pupil_overlay():
 
 
 def plate_component():
+    """The whole Plate artboard: node tree, per-state and pose-range animations, and its machine."""
     expr_anims = []
     for st in STATES:
         # Glyphs live in a Solo: one keyed reference picks the drawn child (no opacity stack).
@@ -103,12 +130,12 @@ def plate_component():
         objs[PLATE_SHADOW] = {SX: sc, SY: sc}
         # The pupil overlay: on for idle/listening/speaking with that state's wave loop, off elsewhere.
         if st in PUPIL:
-            n, wk = wave_keys(*PUPIL[st])
+            n, wk = wave_keys(PUPIL[st].period_ms, PUPIL[st].amplitude)
             objs[PUPIL_OVERLAY] = {OPACITY: 1}
             # The stroke wave read as a bar at every size; the core bobs on the same sine instead.
             objs[WAVE] = {OPACITY: 0}
             objs.update(wk)
-            A = PUPIL[st][1]
+            A = PUPIL[st].amplitude
             q = [0, round(n / 4), round(n / 2), round(3 * n / 4), n]
             objs[CORE] = {Y: [(q[0], 0, SINE), (q[1], A, SINE), (q[2], 0, SINE), (q[3], -A, SINE), (q[4], 0)]}
             expr_anims.append(animation("Expr" + st[0].upper() + st[1:], plate_expr_anim[st], n, objs, "loop"))
@@ -151,13 +178,13 @@ def plate_component():
               Raw(SACCADE_WAIT_NODES[0],
                   f'<StateTransition stateToId="{SACCADE_WAIT_NODES[0]}" duration="0">\n'
                   f'    <TransitionNumberCondition inputId="{PLATE_IN_EXPR}" opValue="greaterThanOrEqual" value="{EXPR["sleeping"] + 0.5}"/>\n</StateTransition>')]
-    to_fix = [Exit(n, weight=w) for n, (_, _, w) in zip(SACCADE_FIX_NODES, SACCADE_FIX)]
+    to_fix = [Exit(n, weight=f.weight) for n, f in zip(SACCADE_FIX_NODES, SACCADE_FIX)]
     to_wait = [Exit(n, weight=10) for n in SACCADE_WAIT_NODES]
-    sac_states = [State(aid, nid, i, random=True, transitions=[asleep_s] + to_fix)
-                  for i, ((aid, _), nid) in enumerate(zip(SACCADE_WAITS, SACCADE_WAIT_NODES))]
-    sac_states += [State(aid, nid, 3 + i, reset=True, random=True, transitions=[asleep_s] + to_wait)
-                   for i, ((aid, _, _), nid) in enumerate(zip(SACCADE_FIX, SACCADE_FIX_NODES))]
-    sac_states.append(State(SACCADE_WAITS[0][0], SACCADE_SLEEP_NODE, 12, transitions=awake_s))
+    sac_states = [State(w.anim, nid, i, random=True, transitions=[asleep_s] + to_fix)
+                  for i, (w, nid) in enumerate(zip(SACCADE_WAITS, SACCADE_WAIT_NODES))]
+    sac_states += [State(f.anim, nid, 3 + i, reset=True, random=True, transitions=[asleep_s] + to_wait)
+                   for i, (f, nid) in enumerate(zip(SACCADE_FIX, SACCADE_FIX_NODES))]
+    sac_states.append(State(SACCADE_WAITS[0].anim, SACCADE_SLEEP_NODE, 12, transitions=awake_s))
     saccade_layer = Layer("Saccade", "7:13", SACCADE_WAIT_NODES[0], states=sac_states).rml()
     # The blink trigger is a nested-artboard input, not a view-model trigger: hand-rolled XML.
     trigger_layer = Layer(
@@ -169,18 +196,22 @@ def plate_component():
                 State(PLATE_BLINK_ANIM, PLATE_BLINK_NODE, 1, reset=True,
                       transitions=[Exit(PLATE_BLINK_REST_NODE)])]).rml()
     # Eyes closed do not blink: the waits park while expr is sleeping and resume when it is not.
-    asleep = input_transition(PLATE_AUTO_SLEEP, PLATE_IN_EXPR, EXPR["sleeping"], 0)
-    awake = (f'<StateTransition stateToId="{PLATE_AUTO_A}" duration="0">\n'
-             f'    <TransitionNumberCondition inputId="{PLATE_IN_EXPR}" opValue="lessThan" value="{EXPR["sleeping"] - 0.5}"/>\n</StateTransition>\n'
-             f'<StateTransition stateToId="{PLATE_AUTO_A}" duration="0">\n'
-             f'    <TransitionNumberCondition inputId="{PLATE_IN_EXPR}" opValue="greaterThanOrEqual" value="{EXPR["sleeping"] + 0.5}"/>\n</StateTransition>')
-    auto_layer = layer_frame(
-        "AutoBlink", "7:12", PLATE_AUTO_A, "",
-        anim_state(PLATE_WAIT_A, PLATE_AUTO_A, 0, ' random="true"', asleep + "\n" + exit_transition(PLATE_AUTO_BLINK)) + "\n"
-        + anim_state(PLATE_WAIT_B, PLATE_AUTO_B, 1, "", asleep + "\n" + exit_transition(PLATE_AUTO_BLINK)) + "\n"
-        + anim_state(PLATE_BLINK_ANIM, PLATE_AUTO_BLINK, 2, ' reset="true" random="true"',
-                     weighted(exit_transition(PLATE_AUTO_A), 50) + "\n" + weighted(exit_transition(PLATE_AUTO_B), 50)) + "\n"
-        + anim_state(PLATE_WAIT_A, PLATE_AUTO_SLEEP, 3, "", awake))
+    # The two waits are not random states - each has exactly one way on, the exit into the blink;
+    # only the blink itself picks (50/50) which wait it returns to.
+    asleep = OnInput(PLATE_AUTO_SLEEP, PLATE_IN_EXPR, EXPR["sleeping"], 0)
+    awake_b = [Raw(PLATE_AUTO_A,
+                   f'<StateTransition stateToId="{PLATE_AUTO_A}" duration="0">\n'
+                   f'    <TransitionNumberCondition inputId="{PLATE_IN_EXPR}" opValue="lessThan" value="{EXPR["sleeping"] - 0.5}"/>\n</StateTransition>'),
+               Raw(PLATE_AUTO_A,
+                   f'<StateTransition stateToId="{PLATE_AUTO_A}" duration="0">\n'
+                   f'    <TransitionNumberCondition inputId="{PLATE_IN_EXPR}" opValue="greaterThanOrEqual" value="{EXPR["sleeping"] + 0.5}"/>\n</StateTransition>')]
+    auto_layer = Layer(
+        "AutoBlink", "7:12", PLATE_AUTO_A,
+        states=[State(PLATE_WAIT_A, PLATE_AUTO_A, 0, transitions=[asleep, Exit(PLATE_AUTO_BLINK)]),
+                State(PLATE_WAIT_B, PLATE_AUTO_B, 1, transitions=[asleep, Exit(PLATE_AUTO_BLINK)]),
+                State(PLATE_BLINK_ANIM, PLATE_AUTO_BLINK, 2, reset=True, random=True,
+                      transitions=[Exit(PLATE_AUTO_A, weight=50), Exit(PLATE_AUTO_B, weight=50)]),
+                State(PLATE_WAIT_A, PLATE_AUTO_SLEEP, 3, transitions=awake_b)]).rml()
 
     glyphs = "\n".join(svgpath.path_rml(art(f"glyph-{n}.svg"), n[0].upper() + n[1:], GLYPH[n], INK) for n in GLYPH_ORDER)
     mv = "\n".join(
@@ -197,15 +228,17 @@ def plate_component():
 
     # Tunable pose ranges (bench art direction): frame 0 = value at 0, frame 60 = value at 1, linear.
     tune_anims = []
-    for name, (_, aid, nid, props, (lo, hi)) in TUNABLES.items():
+    for name, t in TUNABLES.items():
         key = {"SX": SX, "SY": SY, "Y": Y}
-        tune_anims.append(animation("Tune" + name[4:], aid, 60, {nid: {key[p]: [(0, lo, LINEAR), (60, hi)] for p in props}}))
+        lo, hi = t.span
+        tune_anims.append(animation("Tune" + name[4:], t.anim, 60, {t.node: {key[p]: [(0, lo, LINEAR), (60, hi)] for p in t.props}}))
     # Saccades: each fixation is one animation - hop out in 60 ms (overshoot), hold, hop back in 80 ms.
-    for aid, ms in SACCADE_WAITS:
-        tune_anims.append(animation(f"SaccadeWait{ms}", aid, frames(ms), {}))
-    for i, (aid, (dx, dy), _) in enumerate(SACCADE_FIX):
+    for w in SACCADE_WAITS:
+        tune_anims.append(animation(f"SaccadeWait{w.ms}", w.anim, frames(w.ms), {}))
+    for i, f in enumerate(SACCADE_FIX):
+        dx, dy = f.offset
         hold = beat([700, 1100, 1600, 2400][i % 4])
-        tune_anims.append(animation(f"Saccade{i + 1}", aid, hold + 8, {SACCADE_NODE: {
+        tune_anims.append(animation(f"Saccade{i + 1}", f.anim, hold + 8, {SACCADE_NODE: {
             X: [(0, 0, BACK_OUT), (4, dx, None), (hold, dx, SOFT_OUT), (hold + 8, 0)],
             Y: [(0, 0, BACK_OUT), (4, dy, None), (hold, dy, SOFT_OUT), (hold + 8, 0)]}}))
     tune_anims.append(animation("AutoX", PLATE_AUTO_X, 60, {GLYPH_SCALE_NODE: {X: [(0, -6, LINEAR), (60, 6)]}}))

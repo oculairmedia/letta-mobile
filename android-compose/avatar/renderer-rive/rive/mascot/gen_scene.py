@@ -36,14 +36,24 @@ import os
 import re
 from textwrap import indent
 
-from rml import *  # noqa: F401,F403
-from rig.constants import *  # noqa: F401,F403
-from rig.body import body, breath, sine, squash, INFLATE_NODE  # noqa: F401
+from rml import (BACK_OUT, ELASTIC_SOFT, GRADIENT_OPACITY, ROT, SINE, SX, SY, VM, VM_BLINK, VM_COLOR,
+                 VM_DRAGGED, VM_ERROR, VM_HOVER, VM_LOOKX, VM_LOOKY, VM_MOUTH, VM_SHAPE, VM_STATE,
+                 VM_SUCCESS, Y, anim_state, animation, bind, layer_frame)
+from rig.body import INFLATE_NODE, body, sine, squash
+from rig.constants import (DEFAULT_SHAPE, HOST_BODY_DEG, HOST_BODY_PX, HOST_LEAN_DEG, HOST_TURN_DEG,
+                           HOST_TURN_PX, HOST_TURN_PY, LEAN_BASE, TUNABLES, beat, frames, rad)
 from rig.face import face, turn_animations
-from rig.plate import plate_component
-from rig.motion import (enter_animations, idle_variety_animations, momentary_animations, shape_animations,
-                        sustained_animations, wander_animations)
+from rig.ids import (
+    BLINK_ANIM, BLINK_REST_ANIM, BODY_NODE, BREATH_ANIM, CONV_BODY_ROT, CONV_BODY_X, CONV_LEAN,
+    CONV_LOOK, CONV_MOUTH, CONV_SCALE, CONV_TURN_ROT, CONV_TURN_X, CONV_TURN_Y, ENTITY, ENUM_SHAPE,
+    ENUM_STATE, FACE, GLOSS, HOVER_ANIM, HOVER_HELD_ANIM, HOVER_REST_ANIM, JOYSTICK, LEAN_NODE,
+    PLATE_BLINK, ROOT, SHAPES, SM, SUSTAINED, TURN_X_ANIM, TURN_Y_ANIM, VM_INSTANCE, VM_TUNE_SCALE,
+    VM_TURN_X, VM_TURN_Y, shape_enum_ids, state_enum_ids,
+)
 from rig.machine import root_machine
+from rig.motion import (enter_animations, idle_variety_animations, momentary_animations,
+                        shape_animations, sustained_animations, wander_animations)
+from rig.plate import plate_component
 
 
 # Solo mode (onion.py --animation): a throwaway extra state machine that plays one named
@@ -66,6 +76,7 @@ def _solo_machine(anim_id):
 
 
 def root_artboard(solo=None):
+    """The Mascot artboard: the node tree, every root animation, and the `Avatar` state machine."""
     breath = animation("Breath", BREATH_ANIM, frames(4600), {GLOSS: {GRADIENT_OPACITY: sine(0.05, 4600, 1.0)}}, "loop")
     blink_rest = animation("BlinkRest", BLINK_REST_ANIM, 1, {})
     blink = animation("BlinkFire", BLINK_ANIM, 2, {}, callbacks=(PLATE_BLINK,))
@@ -112,6 +123,7 @@ def root_artboard(solo=None):
 
 
 def data():
+    """The document's data section: the two enums, the converters and the Avatar view model."""
     states = "\n".join(f'    <DataEnumValue key="{s}" value="{s[0].upper() + s[1:]}" id="{state_enum_ids[s]}"/>' for s in SUSTAINED)
     shapes = "\n".join(f'    <DataEnumValue key="{s}" value="{s[0].upper() + s[1:]}" id="{shape_enum_ids[s]}"/>' for s in SHAPES)
     return f'''<DataEnumCustom name="AvatarState" id="{ENUM_STATE}">
@@ -152,13 +164,13 @@ def data():
     <ViewModelPropertyTrigger name="success" id="{VM_SUCCESS}"/>
     <ViewModelPropertyTrigger name="error" id="{VM_ERROR}"/>
     <ViewModelPropertyBoolean name="dragged" id="{VM_DRAGGED}"/>
-{indent(chr(10).join(f'<ViewModelPropertyNumber name="{n}" id="{t[0]}"/>' for n, t in TUNABLES.items()), "    ")}
+{indent(chr(10).join(f'<ViewModelPropertyNumber name="{n}" id="{t.vm_id}"/>' for n, t in TUNABLES.items()), "    ")}
     <ViewModelPropertyNumber name="tuneScale" id="{VM_TUNE_SCALE}"/>
     <ViewModelPropertyNumber name="turnX" id="{VM_TURN_X}"/>
     <ViewModelPropertyNumber name="turnY" id="{VM_TURN_Y}"/>
 
     <ViewModelInstance exports="true" name="Default" id="{VM_INSTANCE}">
-{indent(chr(10).join(f'<ViewModelInstanceNumber propertyValue="0.5" viewModelPropertyId="{t[0]}"/>' for t in TUNABLES.values()), "        ")}
+{indent(chr(10).join(f'<ViewModelInstanceNumber propertyValue="0.5" viewModelPropertyId="{t.vm_id}"/>' for t in TUNABLES.values()), "        ")}
         <ViewModelInstanceNumber propertyValue="0.5" viewModelPropertyId="{VM_TUNE_SCALE}"/>
         <ViewModelInstanceNumber propertyValue="0" viewModelPropertyId="{VM_TURN_X}"/>
         <ViewModelInstanceNumber propertyValue="0" viewModelPropertyId="{VM_TURN_Y}"/>
@@ -178,6 +190,7 @@ def data():
 
 
 def scene_document(solo=None):
+    """The whole scene.rml document: the root artboard, the Plate component and the data section."""
     return f'''<Rive version="1" kind="fragment">
     <!--
         The Letta agent mascot, v4: SPEC.md + art/*.svg through gen_scene.py. Regenerate rather

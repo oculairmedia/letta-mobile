@@ -20179,7 +20179,7 @@
 
                 </AnyState>
                 <ExitState x="430" y="-140" id="0:14621"/>
-                <AnimationState x="200" y="40" animationId="7:64" random="true" id="7:162">
+                <AnimationState x="200" y="40" animationId="7:64" id="7:162">
                     <StateTransition stateToId="7:165" duration="0" id="0:14622">
                         <TransitionNumberCondition inputId="7:6" opValue="greaterThanOrEqual" value="7.5" id="0:14623"/>
                         <TransitionNumberCondition inputId="7:6" opValue="lessThan" value="8.5" id="0:14624"/>

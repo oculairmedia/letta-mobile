@@ -1,12 +1,27 @@
-"""Vocabulary and design numbers for the rig: states, shapes, tunables, the timings and distances.
-Every object id lives in rig/ids.py, star-imported here so the rig sees one namespace.
-Pure data plus the unit helpers (art, rad, frames, beat). Star-imported by every rig module."""
+"""The design numbers: state vocabulary lookups, tunables, timings, distances, tint colours.
+
+Owns everything the rig can retune without moving an object - the waits, the saccade table, the
+designed entry pairs, the turn and lean amplitudes - plus the unit helpers (art, rad, frames,
+beat). Object ids live in rig/ids.py and are imported here only where a table names one. Read by
+every other rig module and by gen_scene.py; it imports nothing from them.
+
+Rive rules that bite here:
+  - units are not interchangeable: `LinearAnimation.duration` is FRAMES (frames() converts ms at
+    60 fps), `StateTransition.duration` is MS, and rotations are RADIANS (rad() converts degrees).
+    A number that goes into a transition must stay ms; one that goes into an animation must not.
+  - beat() stretches a beat by BEAT_TEMPO; waits, breath and state entries stay on plain frames().
+"""
 import math
 import os
+from typing import NamedTuple
 
-import svgpath  # noqa: F401 - re-exported for modules that lift geometry
-from rml import *  # noqa: F401,F403
-from rig.ids import *  # noqa: F401,F403 - every "client:index" id, checked unique at import
+from rml import anim_state, input_transition, layer_frame
+from rig.ids import (
+    GLYPH_SCALE_NODE, IDLE_A_NODE, IDLE_B_NODE, IDLE_C_NODE, IDLE_D_NODE, IDLE_WAIT_A, IDLE_WAIT_B,
+    IDLE_WAIT_C, IDLE_WAIT_D, MOUTH_NODE, PLATE_SCALE_NODE, SACCADE_FIX_ANIMS, SACCADE_WAIT_ANIMS,
+    STATES, TUNE_ANIM, VM_TUNE, WANDER_A_NODE, WANDER_B_NODE, WANDER_C_NODE, WANDER_D_NODE,
+    WANDER_WAIT_A, WANDER_WAIT_B, WANDER_WAIT_C, WANDER_WAIT_D,
+)
 
 
 # The art lives beside gen_scene.py, one level above this package.
@@ -14,14 +29,17 @@ ART = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
 
 
 def art(name):
+    """The absolute path of an art file in ./art."""
     return os.path.join(ART, name)
 
 
 def rad(deg):
+    """Degrees as the radians every Rive rotation property wants."""
     return round(math.radians(deg), 5)
 
 
 def frames(ms):
+    """Milliseconds as the whole 60 fps frames a LinearAnimation duration wants."""
     return round(ms * 60 / 1000)
 
 
@@ -31,6 +49,7 @@ BEAT_TEMPO = 1.4
 
 
 def beat(ms):
+    """Milliseconds as frames, stretched by BEAT_TEMPO - the timing for anything read as a beat."""
     return frames(ms * BEAT_TEMPO)
 
 
@@ -45,18 +64,33 @@ SHAPE_SVG = {"circle": "body-circle.svg", "blob": "body-blob.svg", "roundedSquar
 DEFAULT_SHAPE = "blob"
 
 
+class Tunable(NamedTuple):
+    """One bench tunable: the view-model number, the pose-range timeline it scrubs, and its span."""
+    vm_id: str
+    anim: str
+    node: str
+    props: tuple
+    span: tuple      # (value at 0, value at 1)
+
+
 # Art-direction tunables (bench only, not in the app contract): 0..1 scrubbing a pose range, 0.5 = shipped.
-TUNABLES = {  # name: (vm id, timeline id, node id, property keys, (value at 0, value at 1))
-    "tunePlate": (VM_TUNE["tunePlate"], TUNE_ANIM["tunePlate"], PLATE_SCALE_NODE, ("SX", "SY"), (0.6, 1.4)),
-    "tuneGlyph": (VM_TUNE["tuneGlyph"], TUNE_ANIM["tuneGlyph"], GLYPH_SCALE_NODE, ("SX", "SY"), (0.4, 1.6)),
-    "tuneMouth": (VM_TUNE["tuneMouth"], TUNE_ANIM["tuneMouth"], MOUTH_NODE, ("SX", "SY"), (0.5, 1.5)),
-    "tuneMouthY": (VM_TUNE["tuneMouthY"], TUNE_ANIM["tuneMouthY"], MOUTH_NODE, ("Y",), (42, 122)),
+TUNABLES = {
+    "tunePlate": Tunable(VM_TUNE["tunePlate"], TUNE_ANIM["tunePlate"], PLATE_SCALE_NODE, ("SX", "SY"), (0.6, 1.4)),
+    "tuneGlyph": Tunable(VM_TUNE["tuneGlyph"], TUNE_ANIM["tuneGlyph"], GLYPH_SCALE_NODE, ("SX", "SY"), (0.4, 1.6)),
+    "tuneMouth": Tunable(VM_TUNE["tuneMouth"], TUNE_ANIM["tuneMouth"], MOUTH_NODE, ("SX", "SY"), (0.5, 1.5)),
+    "tuneMouthY": Tunable(VM_TUNE["tuneMouthY"], TUNE_ANIM["tuneMouthY"], MOUTH_NODE, ("Y",), (42, 122)),
 }
+
+
+class PupilWave(NamedTuple):
+    """The squiggle loop a state gives the pupil overlay: its period and its travel in px."""
+    period_ms: int
+    amplitude: float
 
 
 # Astra Max pupil overlay (SPEC 10.2): built, reviewed, and dropped - the pure glyph stays. The
 # assembly remains in the file at opacity 0 so the art pass can revisit it; PUPIL is empty.
-PUPIL = {}   # state: (period ms, amplitude px); empty = never shown
+PUPIL = {}   # state: PupilWave(period ms, amplitude px); empty = never shown
 
 
 WAVE_STROKE = 5   # spec says 8; that reads as a bar at hero size
@@ -65,13 +99,26 @@ WAVE_STROKE = 5   # spec says 8; that reads as a bar at hero size
 PUPIL_PARALLAX = (1.5, 1.0)
 
 
+class SaccadeWait(NamedTuple):
+    """One wait the plate's Saccade layer sits in before it re-fixates: its animation and length."""
+    anim: str
+    ms: int
+
+
+class SaccadeFix(NamedTuple):
+    """One fixation the Saccade layer can hop to: its animation, its offset in px, its pick weight."""
+    anim: str
+    offset: tuple
+    weight: int
+
+
 # Saccade layer: random waits, then a 60 ms hop to one of a few small fixations, a hold, a hop back.
-SACCADE_WAITS = list(zip(SACCADE_WAIT_ANIMS, (3600, 7200, 10400)))            # (anim id, ms)
+SACCADE_WAITS = [SaccadeWait(aid, ms) for aid, ms in zip(SACCADE_WAIT_ANIMS, (3600, 7200, 10400))]
 
 
-# (anim id, (dx, dy) px, weight %): Eyes Alive direction distribution - down 20, up 18, left 17,
-# right 16, diagonals 6-8 - with cardinal hops larger than diagonal ones (magnitudes skew small).
-SACCADE_FIX = [(aid, offset, weight) for aid, (offset, weight) in zip(
+# Eyes Alive direction distribution - down 20, up 18, left 17, right 16, diagonals 6-8 - with
+# cardinal hops larger than diagonal ones (magnitudes skew small).
+SACCADE_FIX = [SaccadeFix(aid, offset, weight) for aid, (offset, weight) in zip(
     SACCADE_FIX_ANIMS, [((0, 5), 20), ((0, -5), 18), ((-6, 0), 17), ((6, 0), 16),
                         ((-3, -3), 7), ((3, -3), 6), ((-3, 3), 8), ((3, 3), 8)])]
 
@@ -106,14 +153,21 @@ DESIGNED_PAIRS = {("idle", "listening"): 300, ("listening", "thinking"): 300, ("
                   ("speaking", "idle"): 240, ("error", "idle"): 300}  # SPEC section 3, ms
 
 
+class Wait(NamedTuple):
+    """One do-nothing wait state on the IdleVariety or Wander layer: animation, state node, length."""
+    anim: str
+    node: str
+    ms: int
+
+
 # Waits of unequal, non-multiple lengths picked at random: several mascots on one screen must not
 # fire their beats in lockstep (they all start at the same instant), so the cycle never repeats.
-IDLE_WAITS = [(IDLE_WAIT_A, IDLE_A_NODE, 8000), (IDLE_WAIT_B, IDLE_B_NODE, 14000),
-              (IDLE_WAIT_C, IDLE_C_NODE, 6100), (IDLE_WAIT_D, IDLE_D_NODE, 10700)]
+IDLE_WAITS = [Wait(IDLE_WAIT_A, IDLE_A_NODE, 8000), Wait(IDLE_WAIT_B, IDLE_B_NODE, 14000),
+              Wait(IDLE_WAIT_C, IDLE_C_NODE, 6100), Wait(IDLE_WAIT_D, IDLE_D_NODE, 10700)]
 
 
-WANDER_WAITS = [(WANDER_WAIT_A, WANDER_A_NODE, 12000), (WANDER_WAIT_B, WANDER_B_NODE, 24000),
-                (WANDER_WAIT_C, WANDER_C_NODE, 9300), (WANDER_WAIT_D, WANDER_D_NODE, 17500)]
+WANDER_WAITS = [Wait(WANDER_WAIT_A, WANDER_A_NODE, 12000), Wait(WANDER_WAIT_B, WANDER_B_NODE, 24000),
+                Wait(WANDER_WAIT_C, WANDER_C_NODE, 9300), Wait(WANDER_WAIT_D, WANDER_D_NODE, 17500)]
 
 
 BLINK_SHUT, BLINK_FRAMES = 4, 15   # frames to fully shut / total
@@ -129,8 +183,11 @@ PLATE_WHITE = "FFF7F7F7"
 
 
 def expression_layer(*parts):
-    # Explicit matrix, instant cuts: the root hides every swap inside a blink shutter, and an
-    # AnyState fan-out would keep re-entering the current state (a self-blend that fades the glyph).
+    """The XML of an expression layer: one state per STATES entry, every other state one cut away.
+
+    Explicit matrix, instant cuts: the root hides every swap inside a blink shutter, and an
+    AnyState fan-out would keep re-entering the current state (a self-blend that fades the glyph).
+    """
     name, lid, input_id, anim_ids, node_ids = parts
     states = []
     for i, s in enumerate(STATES):

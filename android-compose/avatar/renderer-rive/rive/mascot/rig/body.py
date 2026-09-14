@@ -1,16 +1,36 @@
-"""The body: one 8-vertex path per identity, bones, breath and the rising light."""
-import math
+"""The body: one 8-vertex path per identity, its three bones, the breath and the rising light.
+
+Owns the BodyPlacement / Body node tree (paths, skin, weights, the paint stack) and the key
+recipes that shape it - breath(), breath_scale(), lumen_keys(), bone_pose(), squash(), sine().
+rig/motion.py reads those recipes into the state loops, flashes and idle beats; gen_scene.py
+draws body() into the artboard. Geometry comes from art/*.svg through svgpath.py.
+
+Rive rules that bite here:
+  - `Feather` on a Fill renders nothing through the CLI - SoftEdge and Halo are feathered
+    STROKES for that reason. Within one shape the LATER paint draws on top.
+  - placement and keyed motion must live on different nodes, or a keyed x=0 overwrites the
+    placement: BodyPlacement (INFLATE_NODE) holds the position and the breath's inflate, the
+    Body node underneath takes the turn's and the states' keys.
+"""
+from textwrap import indent
+from typing import NamedTuple
 
 import svgpath
-from rml import *  # noqa: F401,F403
-from rig.constants import *  # noqa: F401,F403
+from rml import COLOR, GRADIENT_OPACITY, ROT, SINE, SX, SY, VDIST, VM_COLOR, VROT, VX, VY, X, bind
+from rig.constants import BONE_REACH, DEFAULT_SHAPE, LEAN_BASE, SHAPE_SVG, art, frames
+from rig.ids import (
+    BODY_NODE, BONE_BASE, BONE_CROWN, BONE_MID, CONV_BODY_ROT, CONV_BODY_X, GLOSS, HALO, HITBOX,
+    SHAPES, SOFT, TINT, VM_TURN_X, body_vertex_ids, halo_vertex_ids, soft_vertex_ids,
+)
 
 
 def fill(color):
+    """A solid-colour Fill element."""
     return f'<Fill name="Fill"><SolidColor colorValue="{color}" name="Color"/></Fill>'
 
 
 def rrect(w, h, r, name="Path"):
+    """A rounded Rectangle path, all four corners linked to the same radius."""
     return (f'<Rectangle width="{w}" height="{h}" linkCornerRadius="true" cornerRadiusTL="{r}" '
             f'cornerRadiusTR="{r}" cornerRadiusBL="{r}" cornerRadiusBR="{r}" name="{name}"/>')
 
@@ -35,6 +55,7 @@ def bone_weight(y):
 
 
 def body_skin():
+    """The Skin binding a body path to the crown / middle / base bones."""
     return (f'<Skin tx="0" ty="0" name="Skin">\n'
             f'    <Tendon boneId="{BONE_CROWN}" tx="0" ty="{-BONE_REACH}" name="Crown"/>\n'
             f'    <Tendon boneId="{BONE_MID}" tx="0" ty="0" name="Middle"/>\n'
@@ -43,6 +64,7 @@ def body_skin():
 
 
 def body_path(vertex_ids, name):
+    """The default identity's closed 8-vertex path, each vertex weighted to the three bones."""
     verts = "\n".join(
         f'<CubicMirroredVertex x="{x}" y="{y}" rotation="{rot}" distance="{d}" name="V{i}" id="{vid}">\n    {bone_weight(y)}\n</CubicMirroredVertex>'
         for i, ((x, y, rot, d), vid) in enumerate(zip(BODY[DEFAULT_SHAPE], vertex_ids)))
@@ -51,6 +73,7 @@ def body_path(vertex_ids, name):
 
 
 def shape_keys(shape):
+    """Vertex keys that morph body, SoftEdge and Halo onto one identity (the Shape layer)."""
     objs = {}
     for (x, y, rot, d), vb, vs, vh in zip(BODY[shape], body_vertex_ids, soft_vertex_ids, halo_vertex_ids):
         for vid in (vb, vs, vh):
@@ -59,6 +82,7 @@ def shape_keys(shape):
 
 
 def body():
+    """The whole body assembly: placement, bones, the painted path, soft edge and halo."""
     bound = f'<SolidColor colorValue="FF79B7DF" name="Color">\n            {bind(VM_COLOR, COLOR)}\n        </SolidColor>'
     return f'''<Node x="0" y="{-LEAN_BASE}" name="BodyPlacement" id="{INFLATE_NODE}">
     {bind(VM_TURN_X, ROT, CONV_BODY_ROT)}
@@ -152,9 +176,18 @@ def breath_scale(period_ms=BREATH_MS, lo=1.0, hi=BREATH_SCALE):
     return [(0, lo, SINE), (frames(period_ms * 0.55), hi, SINE), (frames(period_ms), lo)]
 
 
+class Breathing(NamedTuple):
+    """A state's inflate: the period it breathes over and the scale it travels between."""
+    period_ms: int
+    lo: float
+    hi: float
+
+
 # Inflate (and the light) run at twice the bob's period: one slow breath per two bobs.
-BREATHING = {"idle": (2 * BREATH_MS, 1.0, BREATH_SCALE), "listening": (2 * BREATH_MS, 1.0, BREATH_SCALE),
-             "speaking": (2 * BREATH_MS, 1.0, BREATH_SCALE), "sleeping": (18000, 0.985, 1.045)}
+BREATHING = {"idle": Breathing(2 * BREATH_MS, 1.0, BREATH_SCALE),
+             "listening": Breathing(2 * BREATH_MS, 1.0, BREATH_SCALE),
+             "speaking": Breathing(2 * BREATH_MS, 1.0, BREATH_SCALE),
+             "sleeping": Breathing(18000, 0.985, 1.045)}
 
 
 # Lumen: the breath's light (a white radial fill on the body, gradient opacity 0 at rest).

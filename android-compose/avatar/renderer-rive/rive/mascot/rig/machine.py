@@ -1,8 +1,34 @@
-"""The root state machine: one function per layer, assembled by root_machine()."""
+"""The root state machine `Avatar`: one function per layer, assembled by root_machine().
+
+Owns which animation plays when - the ten layers, their states, their transitions and the file's
+own hover/drag listeners. The animations themselves come from rig/motion.py and rig/face.py, the
+ids from rig/ids.py; only gen_scene.py reads this module. A new sustained state is a vocabulary
+entry in rig/ids.py, a loop in rig/motion.py, and a state in _expression_layer() here.
+
+Rive rules that bite here:
+  - AnyState transitions are evaluated BEFORE a state's own, so an AnyState fan-out swallows every
+    designed entry, and one whose condition still holds re-enters the current state and self-blends
+    it (that is how every glyph came to fade in). Expression and Shape use explicit matrices.
+  - layers mix: a beat's keys play on top of whatever the layers below put on the same nodes, so
+    a beat blends in and out (160/320 ms) instead of cutting - a cut would snap the lower value.
+    Transitions are also evaluated in declared order, which is why each park check is written first.
+"""
 from textwrap import indent
 
-from rml import *  # noqa: F401,F403
-from rig.constants import *  # noqa: F401,F403
+from rml import (BIND_BOOL, EASE_OUT, SOFT_OUT, SPRING, VM_BLINK, VM_DRAGGED, VM_ERROR, VM_HOVER,
+                 VM_SHAPE, VM_SUCCESS, bind)
+from rig.constants import DEFAULT_SHAPE, DESIGNED_PAIRS, IDLE_WAITS, WANDER_WAITS
+from rig.ids import (
+    BLINK_ANIM, BLINK_NODE, BLINK_REST_ANIM, BLINK_REST_NODE, BREATH_ANIM, BREATH_NODE, DRAG_ANIM,
+    DRAG_NODE, DRAG_REST_ANIM, DRAG_REST_NODE, ERROR_ANIM, ERROR_NODE, FLASH_REST_ANIM,
+    FLASH_REST_NODE, HITBOX, HOVER_ANIM, HOVER_HELD_ANIM, HOVER_HELD_NODE, HOVER_NODE,
+    HOVER_REST_ANIM, HOVER_REST_NODE, IDLE_A_NODE, IDLE_BEATS, IDLE_GLANCE_ANIM, IDLE_GLANCE_NODE,
+    IDLE_SLEEP_NODE, IDLE_WAIT_A, SHAPES, SM, SUCCESS_ANIM, SUCCESS_NODE, SUSTAINED, WANDER_A_NODE,
+    WANDER_GLANCE, WANDER_GLANCE_NODE, WANDER_PEEK, WANDER_PEEK_NODE, WANDER_SLEEP_SHIFT,
+    WANDER_SLEEP_SHIFT_NODE, WANDER_SLEEP_WAIT, WANDER_SLEEP_WAIT_NODE, WANDER_SPIN,
+    WANDER_SPIN_NODE, enter_anim, enter_node, root_state_anim, root_state_node, shape_anim,
+    shape_enum_ids, shape_node, state_enum_ids,
+)
 from rig.layers import Exit, Layer, OnBool, OnEnum, OnTrigger, State
 from rig.motion import enter_duration
 
@@ -25,7 +51,7 @@ def _expression_layer():
         states.append(State(root_state_anim[st], root_state_node[st], i, transitions=own))
     for j, ((frm, to), nid) in enumerate(enter_node.items()):
         # An entry can be interrupted by any other request (through that state's own entry).
-        hand_off = (0, None) if (frm, to) in DESIGNED_PAIRS else (min(120, enter_duration(frm, to)[0]), EASE_OUT)
+        hand_off = (0, None) if (frm, to) in DESIGNED_PAIRS else (min(120, enter_duration(frm, to).ms), EASE_OUT)
         own = [Exit(root_state_node[to], *hand_off)]
         own += [OnEnum(enter_node[(to, other)], state_enum_ids[other], 0, None) for other in SUSTAINED if other != to]
         states.append(State(enter_anim[(frm, to)], nid, len(SUSTAINED) + j, reset=True, transitions=own))
@@ -83,20 +109,20 @@ def _idle_layer(to_park, from_park):
     # the bounce the rarest); every beat returns to a random wait.
     # A beat blends in over 160 ms and out over 320 ms: its keys sit on top of Breath / the
     # host's turn on the same nodes, so a hard cut would snap those values at either end.
-    beat_nodes = [(IDLE_GLANCE_NODE, 22), (IDLE_BEATS["tilt"][1], 14), (IDLE_BEATS["lookaround"][1], 13),
-                  (IDLE_BEATS["shift"][1], 12), (IDLE_BEATS["stretch"][1], 10), (IDLE_BEATS["sigh"][1], 10),
-                  (IDLE_BEATS["shiver"][1], 8), (IDLE_BEATS["wobble"][1], 6), (IDLE_BEATS["bounce"][1], 5)]
+    beat_nodes = [(IDLE_GLANCE_NODE, 22), (IDLE_BEATS["tilt"].node, 14), (IDLE_BEATS["lookaround"].node, 13),
+                  (IDLE_BEATS["shift"].node, 12), (IDLE_BEATS["stretch"].node, 10), (IDLE_BEATS["sigh"].node, 10),
+                  (IDLE_BEATS["shiver"].node, 8), (IDLE_BEATS["wobble"].node, 6), (IDLE_BEATS["bounce"].node, 5)]
     pick_beat = [Exit(n, 160, SOFT_OUT, w) for n, w in beat_nodes]
-    back_to_wait = [Exit(n, 320, SOFT_OUT, 25) for _, n, _ in IDLE_WAITS]
+    back_to_wait = [Exit(w.node, 320, SOFT_OUT, 25) for w in IDLE_WAITS]
 
-    states = [State(aid, n, k, random=True, transitions=[to_park(IDLE_SLEEP_NODE)] + pick_beat)
-              for k, (aid, n, _) in enumerate(IDLE_WAITS)]
+    states = [State(w.anim, w.node, k, random=True, transitions=[to_park(IDLE_SLEEP_NODE)] + pick_beat)
+              for k, w in enumerate(IDLE_WAITS)]
     states.append(State(IDLE_GLANCE_ANIM, IDLE_GLANCE_NODE, 4, reset=True, random=True,
                         transitions=[to_park(IDLE_SLEEP_NODE)] + back_to_wait))
     states.append(State(IDLE_WAIT_A, IDLE_SLEEP_NODE, 14, transitions=[from_park(IDLE_A_NODE)]))
-    states += [State(aid, n, 5 + i, reset=True, random=True,
+    states += [State(b.anim, b.node, 5 + i, reset=True, random=True,
                      transitions=[to_park(IDLE_SLEEP_NODE)] + back_to_wait)
-               for i, (aid, n) in enumerate(IDLE_BEATS.values())]
+               for i, b in enumerate(IDLE_BEATS.values())]
 
     return Layer("IdleVariety", "3:8", IDLE_A_NODE, states=states).rml()
 
@@ -106,10 +132,10 @@ def _wander_layer(to_park, from_park):
     pick_wander = [Exit(WANDER_GLANCE_NODE, 200, SOFT_OUT, 55),
                    Exit(WANDER_PEEK_NODE, 200, SOFT_OUT, 35),
                    Exit(WANDER_SPIN_NODE, 200, SOFT_OUT, 10)]
-    wander_home = [Exit(n, 320, SOFT_OUT, 25) for _, n, _ in WANDER_WAITS]
+    wander_home = [Exit(w.node, 320, SOFT_OUT, 25) for w in WANDER_WAITS]
 
-    states = [State(aid, n, k, random=True, transitions=[to_park(WANDER_SLEEP_WAIT_NODE)] + pick_wander)
-              for k, (aid, n, _) in enumerate(WANDER_WAITS)]
+    states = [State(w.anim, w.node, k, random=True, transitions=[to_park(WANDER_SLEEP_WAIT_NODE)] + pick_wander)
+              for k, w in enumerate(WANDER_WAITS)]
     states += [State(aid, n, i, reset=True, random=True,
                      transitions=[to_park(WANDER_SLEEP_WAIT_NODE, 400)] + wander_home)
                for aid, n, i in ((WANDER_GLANCE, WANDER_GLANCE_NODE, 4),
@@ -138,6 +164,7 @@ def _listeners():
 
 
 def root_machine():
+    """The whole `Avatar` state machine: ten layers in order, plus the file's own listeners."""
     to_park, from_park = _park()
     breath, blink, hover, flash, drag = _static_layers()
     layers = [_shape_layer(), _expression_layer(), breath, blink, hover, flash, drag,

@@ -1,15 +1,41 @@
-"""The motion library: sustained loops, entries, momentary flashes, idle beats, wander."""
-from rml import *  # noqa: F401,F403
-from rig.constants import *  # noqa: F401,F403
-from rig.body import (  # noqa: F401
-    BREATHING, BREATH_MS, BREATH_PX, BREATH_SCALE, G_END_X, G_END_Y, G_START_X, G_START_Y, HALO_FAILED,
-    HALO_OPACITY, HALO_SLEEP, INFLATE_NODE, LUMEN, LUMEN_PEAK, LUMEN_R, LUMEN_REST, LUMEN_Y0, LUMEN_Y1,
-    bone_pose, breath, breath2, breath_scale, lumen_keys, shape_keys, sine, squash,
+"""The motion library: sustained loops, entries, momentary flashes, idle beats, wander.
+
+Owns every LinearAnimation the root artboard plays except the turn ranges (rig/face.py) and the
+hover/breath/blink one-shots gen_scene.py builds inline. It reads its key recipes from
+rig/body.py and rig/face.py, its numbers from rig/constants.py and its ids from rig/ids.py;
+rig/machine.py wires the animations named here into layers, and gen_scene.py collects them.
+A new beat is an animation here plus an id from rig/ids.py alloc() plus a state in rig/machine.py.
+
+Rive rules that bite here:
+  - the bezier on a keyframe shapes the segment LEAVING it, not the one arriving. The last key's
+    bezier is ignored; a pose that should hold needs an explicit key at both ends of the hold.
+  - frames() is milliseconds -> frames: a LinearAnimation duration is frames, so every ms number
+    in this module passes through frames() or beat() before it reaches animation().
+  - these keys mix over lower layers (Breath, the host turn) on the same nodes, so a beat that
+    does not key a property leaves the lower layer showing - which the generic entries rely on.
+"""
+from typing import NamedTuple
+
+from rml import (ACCEL, BACK_IN, BACK_IN_OUT, BACK_OUT, COLOR, EASE_OUT, ELASTIC_SOFT, EMPH_ACCEL,
+                 EMPH_DECEL, GRADIENT_OPACITY, M3_STANDARD, NESTED_VALUE, OPACITY, REMAP_TIME, ROT,
+                 SINE, SOFT_OUT, SPRING, STANDARD, STD_DECEL, SX, SY, X, Y, animation)
+from rig.body import (
+    BREATHING, BREATH_MS, HALO_FAILED, HALO_OPACITY, HALO_SLEEP, INFLATE_NODE, LUMEN, LUMEN_PEAK,
+    LUMEN_REST, bone_pose, breath2, breath_scale, lumen_keys, shape_keys, sine, squash,
 )
-from rig.face import TURN_PX, TURN_ROT, spin_keys  # noqa: F401
+from rig.constants import (BLINK_FLIP, DESIGNED_PAIRS, EXPR, IDLE_WAITS, JX, JY, WANDER_WAITS, beat,
+                           frames, rad)
+from rig.face import spin_keys
+from rig.ids import (
+    AUTO_X, AUTO_Y, BODY_NODE, DRAG_ANIM, DRAG_REST_ANIM, ERROR_ANIM, FACE, FLASH_REST_ANIM, GLOSS,
+    HALO, IDLE_BEATS, IDLE_GLANCE_ANIM, JOYSTICK, PLATE_BLINK, PLATE_EXPR, SHAPES, SUCCESS_ANIM,
+    SUSTAINED, TINT, WANDER_GLANCE, WANDER_PEEK, WANDER_SLEEP_SHIFT, WANDER_SLEEP_WAIT, WANDER_SPIN,
+    enter_anim, root_state_anim, shape_anim,
+)
 
 
 def wander_animations():
+    """The Wander layer's animations: four unequal waits, the glance, peek, spin and the sleep shift."""
     glance = animation("WanderGlance", WANDER_GLANCE, beat(1600), {JOYSTICK: {
         JX: [(0, 0, BACK_IN_OUT), (beat(450), -0.8, None), (beat(900), -0.8, BACK_IN_OUT), (beat(1250), 0.4, ELASTIC_SOFT), (beat(1600), 0)]}})
     peek = animation("WanderPeek", WANDER_PEEK, beat(1400), {JOYSTICK: {
@@ -23,7 +49,7 @@ def wander_animations():
     sleep_shift = animation("WanderSleepShift", WANDER_SLEEP_SHIFT, beat(3000), {JOYSTICK: {
         JX: [(0, 0.4, SINE), (beat(1500), 0.22, SINE), (beat(3000), 0.4)],
         JY: [(0, 0.5, SINE), (beat(1500), 0.62, SINE), (beat(3000), 0.5)]}})
-    return ([animation("WanderWait" + str(k), aid, frames(ms), {}) for k, (aid, _, ms) in enumerate(WANDER_WAITS)]
+    return ([animation("WanderWait" + str(k), w.anim, frames(w.ms), {}) for k, w in enumerate(WANDER_WAITS)]
             + [animation("WanderSleepWait", WANDER_SLEEP_WAIT, frames(30000), {}), sleep_shift, glance, peek, spin])
 
 
@@ -44,30 +70,43 @@ GAZE = {
 
 
 def sustained_facing():
+    """The facing (joystick x, y) each sustained state rests at - SPEC section 1."""
     return {"idle": (-0.15, 0), "listening": (0, 0), "thinking": (-0.6, -0.2), "waitingInput": (0, 0),
               "speaking": (0.15, 0), "error": (-0.3, 0.25), "sleeping": (0.4, 0.5), "loading": (0, 0),
               "failed": (0, 0.1), "degraded": (0.5, -0.1)}
+
+
+class StateRow(NamedTuple):
+    """One sustained state's pose: what moves, how long the loop is, and how the plate reads."""
+    motion: dict          # {"x"|"y": keys or a constant} - the root delta Body and Face share
+    period_ms: int        # loop length; 0 = a single-frame hold
+    plate_rot_deg: float
+    face_offset: tuple    # (x, y) px the Face carries on top of the root motion
+    tint: str             # ARGB over the body
+    gloss_pulse: list     # gradient-opacity keys, or None for a flat gloss
 
 
 def sustained_animations():
     """SPEC section 1: root motion (Body and Face move together), plate rotation/offset, tint,
     gloss pulse, and the glyph index. Nothing keys body scale or body vertices."""
     FACING = sustained_facing()
-    ROW = {  # key: (root motion, period ms, plate rot deg, face offset, tint, gloss pulse) - SPEC 1 + 9.1
-        "idle": ({"y": breath2()}, 2 * BREATH_MS, 0, (0, 0), "00000000", None),
-        "listening": ({"y": breath2()}, 2 * BREATH_MS, -2, (0, -14), "00000000", None),
-        "thinking": ({"x": sine(2, 3200)}, 3200, -6, (0, 0), "00000000", None),
-        "waitingInput": ({"y": sine(19, 1200)}, 1200, 0, (0, -2), "00000000", None),
-        "speaking": ({"y": breath2()}, 2 * BREATH_MS, 0, (0, 0), "00000000", None),
-        "error": ({"y": 24}, 0, 5, (0, 4), "14000000", None),
-        "sleeping": ({"y": breath2(9000)}, 18000, 3, (0, 4), "38000000", None),   # slow, deep; one inflate per two bobs
-        "loading": ({}, 1400, 0, (0, 0), "10000000", [(0, 0.8, SINE), (frames(700), 1.0, SINE), (frames(1400), 0.8)]),
-        "failed": ({}, 0, 0, (0, 0), "66808080", None),
-        "degraded": ({}, 0, 4, (0, 0), "00000000", None),
+    ROW = {  # SPEC 1 + 9.1
+        "idle": StateRow({"y": breath2()}, 2 * BREATH_MS, 0, (0, 0), "00000000", None),
+        "listening": StateRow({"y": breath2()}, 2 * BREATH_MS, -2, (0, -14), "00000000", None),
+        "thinking": StateRow({"x": sine(2, 3200)}, 3200, -6, (0, 0), "00000000", None),
+        "waitingInput": StateRow({"y": sine(19, 1200)}, 1200, 0, (0, -2), "00000000", None),
+        "speaking": StateRow({"y": breath2()}, 2 * BREATH_MS, 0, (0, 0), "00000000", None),
+        "error": StateRow({"y": 24}, 0, 5, (0, 4), "14000000", None),
+        "sleeping": StateRow({"y": breath2(9000)}, 18000, 3, (0, 4), "38000000", None),   # slow, deep; one inflate per two bobs
+        "loading": StateRow({}, 1400, 0, (0, 0), "10000000", [(0, 0.8, SINE), (frames(700), 1.0, SINE), (frames(1400), 0.8)]),
+        "failed": StateRow({}, 0, 0, (0, 0), "66808080", None),
+        "degraded": StateRow({}, 0, 4, (0, 0), "00000000", None),
     }
     out = []
     for st in SUSTAINED:
-        motion, period, rot, (fx, fy), tint, gloss = ROW[st]
+        row = ROW[st]
+        motion, period, rot, tint, gloss = row.motion, row.period_ms, row.plate_rot_deg, row.tint, row.gloss_pulse
+        fx, fy = row.face_offset
 
         def shifted(keys, offset):
             if isinstance(keys, list):
@@ -80,11 +119,12 @@ def sustained_animations():
         jx, jy = FACING[st]
         halo = {"sleeping": HALO_SLEEP, "failed": HALO_FAILED}.get(st, HALO_OPACITY)
         gx, gy = GAZE.get(st, (0.5, 0.5))
-        bs = breath_scale(*BREATHING[st]) if st in BREATHING else 1
+        bs = breath_scale(*BREATHING[st]) if st in BREATHING else 1   # period, lo, hi
         objs = {BODY_NODE: body_keys, FACE: face_keys, TINT: {COLOR: tint}, PLATE_EXPR: {NESTED_VALUE: EXPR[st]},
                 INFLATE_NODE: {SX: bs, SY: bs},
                 **bone_pose([(0, 1, 0, 0)]),
-                LUMEN: lumen_keys(BREATHING[st][0], LUMEN_PEAK * (0.6 if st == "sleeping" else 1)) if st in BREATHING else LUMEN_REST,
+                LUMEN: (lumen_keys(BREATHING[st].period_ms, LUMEN_PEAK * (0.6 if st == "sleeping" else 1))
+                        if st in BREATHING else LUMEN_REST),
                 GLOSS: {GRADIENT_OPACITY: gloss if gloss else 1}, JOYSTICK: {JX: jx, JY: jy}, HALO: {OPACITY: halo},
                 AUTO_X: {REMAP_TIME: gx(period) if callable(gx) else gx}, AUTO_Y: {REMAP_TIME: gy(period) if callable(gy) else gy}}
         duration = frames(period) if period else 1
@@ -92,12 +132,19 @@ def sustained_animations():
     return out
 
 
+class EnterTiming(NamedTuple):
+    """How long an entry one-shot runs and the curve it travels on."""
+    ms: int
+    bezier: str
+
+
 def enter_duration(frm, to):
-    """ms and bezier of the entry from `frm` to `to`: SPEC section 3 for the designed pairs,
+    """The EnterTiming of the entry from `frm` to `to`: SPEC section 3 for the designed pairs,
     otherwise the target's default (sleeping settles slowly, waitingInput springs)."""
     if (frm, to) in DESIGNED_PAIRS:
-        return DESIGNED_PAIRS[(frm, to)], SOFT_OUT
-    return {"sleeping": (600, STANDARD), "waitingInput": (160, SPRING)}.get(to, (160, EASE_OUT))
+        return EnterTiming(DESIGNED_PAIRS[(frm, to)], SOFT_OUT)
+    return {"sleeping": EnterTiming(600, STANDARD),
+            "waitingInput": EnterTiming(160, SPRING)}.get(to, EnterTiming(160, EASE_OUT))
 
 
 def enter_animations():
@@ -110,8 +157,9 @@ def enter_animations():
     out = []
     for (frm, to), aid in enter_anim.items():
         fx0, fy0 = F[frm]; fx1, fy1 = F[to]
-        d, bez = enter_duration(frm, to)
-        n = frames(d)
+        timing = enter_duration(frm, to)
+        bez = timing.bezier
+        n = frames(timing.ms)
         turn = BACK_OUT if abs(fx1 - fx0) + abs(fy1 - fy0) > 0.2 else bez   # a real turn lands with overshoot
         keys = {PLATE_EXPR: {NESTED_VALUE: [(0, EXPR[frm], None), (BLINK_FLIP, EXPR[to])]},
                 JOYSTICK: {JX: [(0, fx0, turn), (n, fx1)], JY: [(0, fy0, turn), (n, fy1)]}}
@@ -141,6 +189,7 @@ def enter_animations():
 
 
 def shape_animations():
+    """One single-frame vertex-morph animation per identity, for the Shape layer."""
     return [animation("Shape" + s[0].upper() + s[1:], shape_anim[s], 1, shape_keys(s)) for s in SHAPES]
 
 
@@ -182,50 +231,51 @@ def momentary_animations():
 
 
 def idle_variety_animations():
+    """The IdleVariety layer's animations: four unequal waits and the nine idle beats."""
     m, h, r = beat(250), beat(650), beat(300)
     glance = animation("IdleGlance", IDLE_GLANCE_ANIM, m + h + r, {
         FACE: {ROT: [(0, 0, BACK_IN_OUT), (m, rad(2), None), (m + h, rad(2), ELASTIC_SOFT), (m + h + r, 0)],
                X: [(0, 0, BACK_IN_OUT), (m, 2, None), (m + h, 2, ELASTIC_SOFT), (m + h + r, 0)]}})
     # Stretch: a slow tall stretch (volume kept), face rides up, then a soft elastic settle.
     d = beat(1400)
-    stretch = animation("IdleStretch", IDLE_BEATS["stretch"][0], d, dict(
+    stretch = animation("IdleStretch", IDLE_BEATS["stretch"].anim, d, dict(
         squash(INFLATE_NODE, [(0, 1, BACK_IN_OUT), (beat(500), 0.93, None), (beat(900), 0.93, ELASTIC_SOFT), (d, 1)]),
         **{FACE: {Y: [(0, 0, BACK_IN_OUT), (beat(500), -7, None), (beat(900), -7, ELASTIC_SOFT), (d, 0)]}}))
     # Tilt: the whole body cocks 6 degrees like a dog hearing something, holds, comes back.
     d = beat(1600)
-    tilt = animation("IdleTilt", IDLE_BEATS["tilt"][0], d, {
+    tilt = animation("IdleTilt", IDLE_BEATS["tilt"].anim, d, {
         BODY_NODE: {ROT: [(0, 0, BACK_IN_OUT), (beat(400), rad(6), None), (beat(1100), rad(6), ELASTIC_SOFT), (d, 0)]},
         FACE: {ROT: [(0, 0, BACK_IN_OUT), (beat(400), rad(4), None), (beat(1100), rad(4), ELASTIC_SOFT), (d, 0)],
                X: [(0, 0, BACK_IN_OUT), (beat(400), 4, None), (beat(1100), 4, ELASTIC_SOFT), (d, 0)]}})
     # Bounce: anticipation squash, a small hop, landing squash, settle.
     d = beat(700)
     hop = [(0, 0, EMPH_ACCEL), (beat(120), 3, STD_DECEL), (beat(320), -14, EMPH_ACCEL), (beat(520), 2, EMPH_DECEL), (d, 0)]
-    bounce = animation("IdleBounce", IDLE_BEATS["bounce"][0], d, dict(
+    bounce = animation("IdleBounce", IDLE_BEATS["bounce"].anim, d, dict(
         squash(INFLATE_NODE, [(0, 1, STANDARD), (beat(120), 1.06, STANDARD), (beat(320), 0.96, STANDARD), (beat(520), 1.05, ELASTIC_SOFT), (d, 1)]),
         **{BODY_NODE: {Y: hop}, FACE: {Y: hop}}))
     # Shiver: a quick side-to-side shake of the body, the face lagging a frame or two.
     d = beat(420)
     def shake(amp, lag):
         return [(0, 0, STANDARD)] + [(beat(60 * i) + lag, amp * (1 if i % 2 else -1) * (1 - i / 7), STANDARD) for i in range(1, 6)] + [(d, 0)]
-    shiver = animation("IdleShiver", IDLE_BEATS["shiver"][0], d, {BODY_NODE: {X: shake(4, 0)}, FACE: {X: shake(3, 2)}})
+    shiver = animation("IdleShiver", IDLE_BEATS["shiver"].anim, d, {BODY_NODE: {X: shake(4, 0)}, FACE: {X: shake(3, 2)}})
     # Sigh: a slow deflate (wide squash), the face sinks, then it fills back up.
     d = beat(1800)
-    sigh = animation("IdleSigh", IDLE_BEATS["sigh"][0], d, dict(
+    sigh = animation("IdleSigh", IDLE_BEATS["sigh"].anim, d, dict(
         squash(INFLATE_NODE, [(0, 1, SINE), (beat(700), 1.05, None), (beat(1100), 1.05, SOFT_OUT), (d, 1)]),
         **{FACE: {Y: [(0, 0, SINE), (beat(700), 5, None), (beat(1100), 5, SOFT_OUT), (d, 0)]}}))
     # Wobble: a decaying rock about the base, like it was nudged.
     d = beat(1300)
     rock = [(0, 0, SINE)] + [(beat(180 * k), rad(4 * (1 if k % 2 else -1) * (1 - k / 7)), SINE) for k in range(1, 6)] + [(d, 0)]
-    wobble = animation("IdleWobble", IDLE_BEATS["wobble"][0], d, {BODY_NODE: {ROT: rock}, FACE: {ROT: [(f, v * 0.6) + tuple(k[2:]) for (f, v, *k) in rock]}})
+    wobble = animation("IdleWobble", IDLE_BEATS["wobble"].anim, d, {BODY_NODE: {ROT: rock}, FACE: {ROT: [(f, v * 0.6) + tuple(k[2:]) for (f, v, *k) in rock]}})
     # Shift: settles its weight to one side for a while, then back.
     d = beat(2600)
-    shift = animation("IdleShift", IDLE_BEATS["shift"][0], d, {
+    shift = animation("IdleShift", IDLE_BEATS["shift"].anim, d, {
         BODY_NODE: {X: [(0, 0, BACK_IN_OUT), (beat(500), 7, None), (beat(2000), 7, SOFT_OUT), (d, 0)],
                     ROT: [(0, 0, BACK_IN_OUT), (beat(500), rad(-2), None), (beat(2000), rad(-2), SOFT_OUT), (d, 0)]},
         FACE: {X: [(0, 0, BACK_IN_OUT), (beat(500), 9, None), (beat(2000), 9, SOFT_OUT), (d, 0)]}})
     # Look-around: the whole face turns to one side, pauses, sweeps to the other, comes home.
     d = beat(2400)
-    lookaround = animation("IdleLookAround", IDLE_BEATS["lookaround"][0], d, {JOYSTICK: {
+    lookaround = animation("IdleLookAround", IDLE_BEATS["lookaround"].anim, d, {JOYSTICK: {
         JX: [(0, 0, BACK_IN_OUT), (beat(500), -0.6, None), (beat(1000), -0.6, BACK_IN_OUT), (beat(1600), 0.55, None), (beat(2000), 0.55, ELASTIC_SOFT), (d, 0)]}})
-    return ([animation("IdleWait" + str(k), aid, frames(ms), {}) for k, (aid, _, ms) in enumerate(IDLE_WAITS)]
+    return ([animation("IdleWait" + str(k), w.anim, frames(w.ms), {}) for k, w in enumerate(IDLE_WAITS)]
             + [glance, stretch, tilt, bounce, shiver, sigh, wobble, shift, lookaround])

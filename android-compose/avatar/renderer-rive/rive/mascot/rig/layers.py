@@ -9,7 +9,12 @@ only declares the shape of a layer and checks it before handing it over.
                         transitions=[Exit(BLINK_REST_NODE)])]).rml()
 
 Transitions keep their declared order - Rive evaluates a state's transitions in order, so the
-park check has to be written first (see README, "Rive gotchas").
+park check has to be written first (see README, "Rive gotchas"). Read by rig/machine.py (the root
+layers) and rig/plate.py (the plate's); it knows nothing about the mascot.
+
+Rive rules this builder checks for you: an exit-time transition never fires on a looping
+animation; a randomWeight only means anything leaving a random="true" state, and such a state
+needs at least two weighted ways out; every transition must target a state in its own layer.
 """
 from dataclasses import dataclass, field
 
@@ -35,6 +40,7 @@ class Exit:
 
 @dataclass(frozen=True)
 class OnEnum:
+    """Fires while a view-model enum property equals (or, with op, differs from) a value."""
     to: str
     enum_value_id: str
     ms: int = 160
@@ -49,6 +55,7 @@ class OnEnum:
 
 @dataclass(frozen=True)
 class OnBool:
+    """Fires while a view-model boolean property holds `value`."""
     to: str
     prop: str
     value: str
@@ -62,6 +69,7 @@ class OnBool:
 
 @dataclass(frozen=True)
 class OnTrigger:
+    """Fires once when a view-model trigger is pulled."""
     to: str
     prop: str
     weight = None
@@ -119,6 +127,7 @@ class State:
 
 @dataclass
 class Layer:
+    """One StateMachineLayer: an entry state, optional AnyState transitions, and its states."""
     name: str
     id: str
     entry: str
@@ -128,6 +137,7 @@ class Layer:
     anim_loops: dict = None
 
     def rml(self):
+        """The layer's XML, after validate() has checked it."""
         self.validate()
         return layer_frame(self.name, self.id, self.entry,
                            "\n".join(t.rml() for t in self.any_transitions),
@@ -135,6 +145,7 @@ class Layer:
 
     # --- validation ------------------------------------------------------------------------
     def validate(self):
+        """Raise ValueError on a layer Rive would accept and then animate wrongly."""
         nodes = []
         for s in self.states:
             if s.node in nodes:

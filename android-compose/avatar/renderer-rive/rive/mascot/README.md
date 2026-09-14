@@ -10,9 +10,23 @@ Beads: `letta-mobile-kh094` (this asset), `letta-mobile-1zti3` (identity picker 
 
 ## Files
 
+The generator is `gen_scene.py` plus the `rig/` package. `gen_scene.py` only assembles: the
+artboard shell, the data section (enums, converters, view model) and the document. Everything
+else lives in one module per concern, and the dependency runs one way - `ids` -> `constants` ->
+`body` / `face` / `plate` -> `motion` -> `machine` -> `gen_scene`. Every module imports by name;
+there are no star imports, so the definition of anything is one jump away.
+
 | Path | What | Edit? |
 |---|---|---|
-| `gen_scene.py` | The generator. Structure, ids, timings, state machine. **Source of truth.** | yes |
+| `gen_scene.py` | Assembly only: artboard shell, enums / converters / view model, the document, `--solo`. **Entry point.** | yes |
+| `rig/ids.py` | Every named Rive object id, plus the state / shape / glyph vocabulary the id ranges are indexed by. Uniqueness checked at import; new ids come from `alloc(space, name)`, recorded in `ids.json`. **Existing ids are frozen.** | add only |
+| `rig/constants.py` | The design numbers: waits, saccade table, designed entry pairs, turn / lean amplitudes, tints, tunables, and the unit helpers `art` / `rad` / `frames` / `beat` | yes |
+| `rig/body.py` | The body: one 8-vertex path per identity, the three bones and their weights, the paint stack, and the breath / lumen / squash / bone-pose key recipes | yes |
+| `rig/face.py` | The face assembly: the FacePlacement > HostTurn > Turn > Arc > Face chain that carries the plate, the TurnX/TurnY pose ranges, the trails, `spin_keys()` | yes |
+| `rig/plate.py` | The Plate component: glyph per state, mouth morph, pupil overlay, tunable ranges, and the plate's own four layers (Expression, Blink, AutoBlink, Saccade) | yes |
+| `rig/motion.py` | Every root animation: sustained loops (`ROW`), the 90 entries, the flashes, the nine idle beats, wander | yes |
+| `rig/machine.py` | The `Avatar` state machine: ten layers, their states and transitions, and the file's hover/drag listeners | yes |
+| `rig/layers.py` | Typed layer builder (`Layer` / `State` / `Exit` / `OnEnum` / `OnBool` / `OnTrigger` / `OnInput` / `Raw`). Validates targets, weights and exit-time-on-a-loop in Python instead of at runtime | rarely |
 | `rml.py` | RML primitives: Rive property keys, view-model ids, easing tokens, XML builders (keyframes, animations, states, transitions). No mascot knowledge | rarely |
 | `svgpath.py` | SVG path -> RML vertices (M/L/C/Z, evenodd, strokes; 8-cubic mirrored bodies, 4-vertex mouths) | rarely |
 | `art/*.svg` | The locked art: `body-*.svg` (8 identities), one glyph per state, three mouths | via SPEC owner |
@@ -32,6 +46,19 @@ Beads: `letta-mobile-kh094` (this asset), `letta-mobile-1zti3` (identity picker 
 Tooling: Rive CLI 1.0.2 at `~/.rive/bin/rive.exe` (`rive docs`, `rive schema <Type>`), Python 3
 with Pillow. The user has run `rive login`; `rive push` works from this directory.
 
+## Which module to open
+
+| The change | Where |
+|---|---|
+| A new idle or wander beat | the animation in `rig/motion.py`, its two ids from `alloc(3, ...)` in `rig/ids.py`, its state and weight in `_idle_layer` / `_wander_layer` in `rig/machine.py` |
+| A new sustained state | the `STATES` vocabulary in `rig/ids.py` (append - the id ranges are indexed by that order), a `ROW` entry and a facing in `rig/motion.py`, a glyph in `rig/plate.py`'s `STATE_GLYPH` plus `art/glyph-<name>.svg`, then `RiveAvatarContract.kt` (`check_contract.py` enforces the match) |
+| Body shape or geometry | `art/*.svg` first, then `rig/body.py` (paths, bones, weights, paints) |
+| The plate: glyph, mouth, card, blink, saccade | `rig/plate.py` |
+| Timings, amplitudes, waits, tints | `rig/constants.py` - almost nothing else should carry a number |
+| What plays when: layers, transitions, blends | `rig/machine.py` (the plate's own layers are at the end of `rig/plate.py`) |
+| The face's placement, turn or trails | `rig/face.py` |
+| A new kind of XML (a property, an element) | `rml.py`, then use it from the rig |
+
 ## The loop
 
 Every change, no exceptions - the user's standing instruction is "review your own work":
@@ -39,6 +66,7 @@ Every change, no exceptions - the user's standing instruction is "review your ow
 ```bash
 cd android-compose/avatar/renderer-rive/rive/mascot
 R=~/.rive/bin/rive.exe
+python -m unittest test_rig        # the cheap gate: regenerate parity, ids, references, contract
 python gen_scene.py                # writes scene.rml
 $R . --verify                      # 0 errors, 0 warnings, or stop
 $R . --once                        # writes build/mascot.riv
@@ -57,19 +85,38 @@ that does not need the CLI: it regenerates into a tempdir and compares against t
 `scene.rml` with push-assigned ids stripped, asserts every id is unique, checks that every
 transition target and `animationId` resolves, runs `check_contract.py`, and smoke-tests
 `timeline.py`. Run it before `$R --verify`; a failing regenerate check means the committed file
-is a hand-edit or a stale commit, not a code bug. To read a curve without building,
-`python timeline.py IdleBounce` prints its keyframes, easing and an ASCII plot; `--list` and
-`--layers` print the whole animation set and the state machine.
+is a hand-edit or a stale commit, not a code bug.
+
+Two checks run before that without being asked: `rig/ids.py` raises on a duplicate id at import,
+and `rig/layers.py` raises on a layer whose transition leaves its own layer, whose weight sits on
+a non-random state, whose random state has fewer than two weighted ways out, or whose exit-time
+transition hangs off a looping animation. A refactor that is meant to change nothing should also
+survive a byte check against the committed file:
+
+```bash
+python gen_scene.py /tmp/check.rml
+diff <(sed -E 's/ id="0:[0-9]+"//g' scene.rml) <(sed -E 's/ id="0:[0-9]+"//g' /tmp/check.rml)
+```
+
+**Review tools.** Three, none of which need the editor:
+
+```bash
+python timeline.py IdleBounce          # keyframes, easing and an ASCII plot per property
+                                       # (--list every animation, --layers the state machine)
+python onion.py --state listening --frames 10 --diff    # frames of one motion overlaid, older
+                                       # fainter; --diff prints % changed per pair (a spike = a snap)
+python sheet.py /c/rive-spike/v2/sheet.png 6 /c/rive-spike/v2 e-1 e-3 e-5 e-8 e-12 e-20
+                                       # a contact sheet from screenshots you captured above
+```
 
 `--screenshot` starts the state machine with the given view-model data and advances N frames
 at 60 fps, so `--advance=N` is "frame N of whatever the data triggered from idle". Use
 `--data=state=<key>` for sustained states, `--data=success=true` / `--data=error=true` to fire the flashes, `--data=dragged=true`,
 `--data=lookX=-1 --data=lookY=1 --data=mouthOpen=0.8` for the numbers, `--data=shape=drop`
 for identity. Render a state past its entry (advance 40+) to see its loop, and frames
-1/3/5/8/12/20 to see an entry. For a motion rather than a pose, `python onion.py --state
-listening --frames 10` captures and overlays the frames itself (`--animation IdleBounce` plays a
-beat that normally hides behind a random wait; `--diff` prints the % changed per pair, where an
-isolated spike is a snap).
+1/3/5/8/12/20 to see an entry. For a motion rather than a pose, `onion.py` captures and overlays
+the frames itself; `--animation IdleBounce` plays a beat that normally hides behind a random wait
+(it asks `gen_scene.py` for a `--solo` document, so `Avatar` itself is untouched).
 
 The desktop demo renders the built file through the same native runtime the product uses:
 
@@ -102,7 +149,7 @@ it. Ask before pushing if you do not know whether that has happened.
 file's current revision, and on the free plan the editor exports nothing either: `.rev` download
 and `.riv` download are both behind a paid plan. So on this plan the editor is read-only for us:
 push into it to look, never author in it, because an edit made there cannot come back and the
-next `rive push` overwrites it. Author in `gen_scene.py`; review with `--screenshot` and
+next `rive push` overwrites it. Author in the generator; review with `--screenshot` and
 `sheet.py`; describe a change you want in editor terms (which animation, which keys, what
 timing) and port it here.
 
@@ -114,8 +161,8 @@ python pull_editor.py path/to/mascot.rev --write-report build/pull-report.md
 
 which converts it with `rive create --from-rev`, strips push-assigned ids, and lists every
 animation (with the keyed object/property whose keyframes moved), state-machine layer and named
-node that differs from the committed `scene.rml` - the map for porting the edit into
-`gen_scene.py`. Regenerate, verify, screenshot, push: the edited ids are the generator's named
+node that differs from the committed `scene.rml` - the map for porting the edit into the
+right `rig/` module (the table above says which). Regenerate, verify, screenshot, push: the edited ids are the generator's named
 ones, so the push updates them in place.
 
 ## How the rig is put together
@@ -176,7 +223,7 @@ objects, `3:*` root animations/nodes (60-77 shapes, 100-140 states, 160-244 misc
 ## Rive gotchas (each of these was learned the hard way)
 
 - Rotations are **radians**; `LinearAnimation.duration` is **frames**; `StateTransition.duration`
-  is **ms**. `gen_scene.py` has `rad()` and `frames()`.
+  is **ms**. `rig/constants.py` has `rad()` and `frames()`.
 - Keyframes default to `hold`. Motion needs `interpolationType="cubic"` plus a nested
   `CubicEaseInterpolator`; the bezier on a key shapes the segment *leaving* it.
 - First child of a node draws on top; the later paint in a shape draws on top.
