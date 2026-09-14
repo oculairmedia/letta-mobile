@@ -5,6 +5,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import com.letta.mobile.data.chat.runtime.ChatConversationSummary
+import com.letta.mobile.data.presence.AgentPresence
 import com.letta.mobile.data.presence.AgentPresenceResolver
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.mascot.LocalMascotRegistry
@@ -13,8 +14,9 @@ import com.letta.mobile.ui.mascot.LocalMascotRegistry
  * Feeds the open conversation's coarse signals to the shared [AgentPresenceResolver] and publishes
  * the result on the shell's mascot registry, so this agent's mascots - the top-bar chip, the
  * composer companion - think, speak, listen and flinch with the run. The chat screen knows one
- * conversation; the resolver still owns the mapping, exactly as on desktop. Presence clears when
- * the screen leaves composition.
+ * conversation; the resolver still owns the mapping, exactly as on desktop. It publishes for this
+ * agent only and forgets only this agent when the screen leaves, so another presence source (a
+ * list-wide one, later) is never wiped by a chat closing.
  */
 @Composable
 internal fun ChatMascotPresenceSync(
@@ -48,6 +50,6 @@ internal fun ChatMascotPresenceSync(
             errorConversationId = runKey.takeIf { state.error != null },
         )
     }
-    SideEffect { registry.updatePresence(presence) }
-    DisposableEffect(registry) { onDispose { registry.updatePresence(emptyMap()) } }
+    SideEffect { registry.setPresence(agentId, presence[agentId] ?: AgentPresence.IDLE) }
+    DisposableEffect(registry, agentId) { onDispose { registry.clearPresence(agentId) } }
 }

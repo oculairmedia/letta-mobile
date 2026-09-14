@@ -12,11 +12,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.letta.mobile.ui.mascot.LocalMascotHost
-import com.letta.mobile.ui.mascot.LocalMascotRegistry
-import com.letta.mobile.ui.mascot.MascotIdentityRegistry
-import com.letta.mobile.ui.mascot.MascotIdentitySync
-import com.letta.mobile.ui.mascot.rememberAndroidMascotHost
+import com.letta.mobile.ui.mascot.ProvideMascotShell
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
@@ -140,12 +136,6 @@ class MainActivity : ComponentActivity() {
                 ChatPushService.start(this@MainActivity)
             }
 
-            // The mascots (letta-mobile-8jtf3): one Rive host and one identity/presence registry for
-            // the activity; every tile, chip and companion reads them through the shared locals.
-            val mascotHost = rememberAndroidMascotHost()
-            val mascotRegistry = remember { MascotIdentityRegistry() }
-            MascotIdentitySync(deps.agentRepository.agents, deps.secureSettingsStore, mascotRegistry)
-
             LettaTheme(
                 appTheme = appThemeState.value,
                 themePreset = themePresetState.value,
@@ -154,19 +144,19 @@ class MainActivity : ComponentActivity() {
                 CompositionLocalProvider(
                     LocalSnackbarDispatcher provides snackbarDispatcher,
                     LocalWindowSizeClass provides windowSizeClass,
-                    LocalMascotHost provides mascotHost,
-                    LocalMascotRegistry provides mascotRegistry,
                 ) {
-                    Scaffold(
-                        snackbarHost = { SnackbarHost(snackbarHostState) },
-                    ) { _ ->
-                        val navController = rememberNavController()
-                        AdaptiveScaffold(navController = navController) {
-                            AppNavGraph(
-                                navController = navController,
-                                 notificationTarget = launchTarget.value,
-                                 onNotificationTargetConsumed = { launchTarget.value = null },
-                            )
+                    ProvideMascotShell(agents = deps.agentRepository.agents, settings = deps.secureSettingsStore) {
+                        Scaffold(
+                            snackbarHost = { SnackbarHost(snackbarHostState) },
+                        ) { _ ->
+                            val navController = rememberNavController()
+                            AdaptiveScaffold(navController = navController) {
+                                AppNavGraph(
+                                    navController = navController,
+                                    notificationTarget = launchTarget.value,
+                                    onNotificationTargetConsumed = { launchTarget.value = null },
+                                )
+                            }
                         }
                     }
                 }

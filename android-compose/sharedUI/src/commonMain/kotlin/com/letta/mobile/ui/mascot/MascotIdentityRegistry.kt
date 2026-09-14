@@ -46,9 +46,20 @@ class MascotIdentityRegistry {
      */
     val mascotBounds = mutableStateMapOf<String, MascotSlot>()
 
+    /** Replaces every agent's presence at once - the shell that knows all agents (desktop) publishes this way. */
     fun updatePresence(all: Map<String, AgentPresence>) {
         presence.keys.retainAll(all.keys)
         presence.putAll(all)
+    }
+
+    /** Sets one agent's presence, leaving the others alone - a screen that knows one agent publishes this way. */
+    fun setPresence(agentId: String, value: AgentPresence) {
+        if (presence[agentId] != value) presence[agentId] = value
+    }
+
+    /** Forgets one agent's presence (it reads as idle); the others stay as they were. */
+    fun clearPresence(agentId: String) {
+        presence.remove(agentId)
     }
 }
 

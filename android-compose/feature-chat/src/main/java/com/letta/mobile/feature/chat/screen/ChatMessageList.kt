@@ -33,6 +33,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.letta.mobile.ui.mascot.MascotGazeSurface
+import com.letta.mobile.ui.mascot.mascotGazeTarget
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
@@ -195,7 +197,9 @@ internal fun ChatMessageList(
             onSuppressPinchLayoutAnimations = { suppressPinchLayoutAnimations = it },
             scope = scope,
         ),
-        modifier = modifier,
+        // The timeline is a gaze target for this agent's mascots (parity with desktop): the eyes can
+        // rest on the thread, not only on the field or the pointer.
+        modifier = modifier.mascotGazeTarget(MascotGazeSurface.TIMELINE),
     ) {
         ChatMessageListBody(
             params = ChatMessageListBodyParams(
