@@ -28,12 +28,19 @@ data class TimelineLiveBlock(
     val events: List<TimelineEvent.Confirmed> = emptyList(),
 )
 
+data class TimelinePreparedPage(
+    val metadata: TimelineMetadataPage,
+    val records: List<TimelineSettledRecord>,
+)
+
 data class TimelineSettledRecord(
     val key: TimelinePageKey,
     val contentType: String,
     val body: ByteArray,
     val revision: Long,
     val pointer: TimelineBodyPointer? = null,
+    /** Page-local result prepared inside the storage snapshot; never persisted or shared across pages. */
+    val preparedPresentation: TimelineSettledPresentation? = null,
 ) {
     val isPreview: Boolean get() = pointer?.encodedBytes?.let { it > body.size } ?: false
 }

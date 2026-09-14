@@ -25,6 +25,7 @@ import kotlinx.coroutines.launch
 fun CanonicalTimelineSession.paging(
     selection: TimelineEngineSelection,
     anchor: TimelinePageKey? = selection.anchor,
+    settledProjectionAdapter: TimelineSettledProjectionAdapter = DefaultTimelineSettledProjectionAdapter,
 ): Flow<PagingData<TimelineSettledRecord>> {
     val active = AtomicReference<TimelineLedgerPagingSource?>(null)
     val pages = Pager(
@@ -34,7 +35,9 @@ fun CanonicalTimelineSession.paging(
         ),
         initialKey = anchor,
         remoteMediator = TimelineHistoryMediator(this, selection),
-        pagingSourceFactory = { TimelineLedgerPagingSource(engine, selection).also(active::set) },
+        pagingSourceFactory = {
+            TimelineLedgerPagingSource(engine, selection, selection.scope.agentId, settledProjectionAdapter).also(active::set)
+        },
     ).flow
     return channelFlow {
         val pump = launch { pages.collect { send(it) } }

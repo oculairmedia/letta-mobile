@@ -79,6 +79,51 @@ class CanonicalTimelinePagingTest {
         }
     }
 
+    @Test fun pagingSourcePreparesThirtyTwoRowsInOneStoreSnapshot() = runBlocking {
+        val store = InMemoryTimelineStore()
+        val session = CanonicalTimelineSession(store, PageTransport(records = 32), scope, enabled = true)
+        val selection = assertIs<TimelineEngineOpen.Opened>(session.open()).selection
+        assertEquals(TimelineEnginePageOutcome.Applied, session.loadOlder(selection))
+        val readsBeforeLoad = store.reads
+
+        val page = assertIs<androidx.paging.PagingSource.LoadResult.Page<TimelinePageKey, TimelineSettledRecord>>(
+            TimelineLedgerPagingSource(session.engine, selection).load(
+                androidx.paging.PagingSource.LoadParams.Refresh(null, 32, false),
+            ),
+        )
+
+        assertEquals(32, page.data.size)
+        page.data.forEach { assertIs<TimelineSettledPresentation.Render>(it.preparedPresentation) }
+        assertEquals(1, store.reads - readsBeforeLoad, "page preparation must not re-enter the store per row")
+    }
+
+    @Test fun consumingPreparedPageDoesNotReadSuppressionPerRow() = runBlocking {
+        val store = InMemoryTimelineStore()
+        val transport = PageTransport(records = 32)
+        val coordinator = CanonicalTimelineCoordinator(store, transport)
+        val owner = coordinator.acquire(scope)
+        assertEquals(TimelineEnginePageOutcome.Applied, owner.session.loadOlder(owner.selection))
+        val ui = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val presentation = CanonicalTimelinePresentation.open(coordinator, owner, ui)
+        val presenter = RecordingPresenter<CanonicalTimelinePresentation.Row>()
+        val readsBeforeCollection = store.reads
+        try {
+            ui.launch { presentation.settled.collectLatest { presenter.collectFrom(it) } }
+            presenter.awaitRows(32) { "reads=${store.reads - readsBeforeCollection}" }
+            // Includes Paging's boundary checkpoint probes, not just the single page snapshot.
+            kotlin.test.assertTrue(store.reads - readsBeforeCollection <= 4,
+                "UI consumption must not add 32 suppression reads: ${store.reads - readsBeforeCollection}")
+            // The newest end is an independent walk and still reconciles once on open, so the local
+            // page is not re-fetched as history: the ledger keeps exactly the rows already prepared.
+            assertEquals(32, store.rows.size, "consuming the prepared page must not refetch it as history")
+            kotlin.test.assertTrue(transport.calls <= 2,
+                "only the one history page plus the bounded newest reconcile: ${transport.calls}")
+        } finally {
+            presentation.close()
+            ui.cancel()
+        }
+    }
+
     @Test fun settledPresentationDecodesAndProjectsEachRenderedRecordOnce() = runBlocking {
         val store = InMemoryTimelineStore()
         val transport = PageTransport(records = 1)
