@@ -76,6 +76,10 @@ fun mascotAvailable(agentId: String?): Boolean {
  * [fallback] when the agent has no identity or the host has no renderer. [live] false draws a
  * still of the character instead of animating it - for a chip that sits next to a live mascot of
  * the same agent, where two of them moving is one too many.
+ *
+ * Default [live] follows [mascotPlaysLiveByDefault]: tiles smaller than [MASCOT_LIVE_MIN_SIZE]
+ * stay still so a list of orbs does not start one Rive clock each. Pass [live] explicitly to
+ * override (heroes use [MascotLive] and stay animated). Cached-bitmap stills are a later slice.
  */
 @Composable
 fun MascotAvatar(
@@ -85,7 +89,7 @@ fun MascotAvatar(
     cornerRadius: Dp = 7.dp,
     onClick: (() -> Unit)? = null,
     overscale: Float = MASCOT_TILE_OVERSCALE,
-    live: Boolean = true,
+    live: Boolean = mascotPlaysLiveByDefault(size),
     fallback: @Composable () -> Unit,
 ) {
     val identity = agentId?.let { LocalMascotRegistry.current.identities[it] }
@@ -211,6 +215,15 @@ fun pointerLook(x: Float, y: Float, bounds: Rect, minReachPx: Float): AvatarLook
 
 /** The body spans ~60 % of the artboard; this fills a tile edge to edge. */
 const val MASCOT_TILE_OVERSCALE = 1.6f
+
+/**
+ * Tiles smaller than this stay still unless [MascotAvatar.live] is overridden. Matches the
+ * companion-size floor so a 56.dp hero can still animate by default.
+ */
+val MASCOT_LIVE_MIN_SIZE: Dp = 56.dp
+
+/** Whether [MascotAvatar] should animate at [size] when the caller does not pass live. */
+fun mascotPlaysLiveByDefault(size: Dp): Boolean = size >= MASCOT_LIVE_MIN_SIZE
 
 /** Distinguishes several surfaces of one agent in [MascotIdentityRegistry.mascotBounds]; composition-thread only. */
 private var slotCounter = 0

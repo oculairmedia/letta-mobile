@@ -230,11 +230,21 @@ internal fun buildPaletteItems(
                 sublabel = agentLabel,
                 kind = PaletteItemKind.Conversation,
                 orbIndex = railIndex.coerceAtLeast(0),
+                agentId = conversation.agentId,
             ),
         )
     }
     railAgents.forEachIndexed { index, (id, name) ->
-        add(PaletteItem(id = id, label = name, sublabel = "agent", kind = PaletteItemKind.Agent, orbIndex = index))
+        add(
+            PaletteItem(
+                id = id,
+                label = name,
+                sublabel = "agent",
+                kind = PaletteItemKind.Agent,
+                orbIndex = index,
+                agentId = id,
+            ),
+        )
     }
     WorkPlayLens.navDestinations(workPlayMode).forEach { lensDestination ->
         val target = lensNavTarget(workPlayMode, lensDestination)

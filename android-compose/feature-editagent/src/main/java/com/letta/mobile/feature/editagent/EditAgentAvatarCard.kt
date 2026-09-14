@@ -47,10 +47,12 @@ internal fun EditAgentAvatarCard(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    // Edit-agent hero: stay live even though the tile is under 56.dp.
                     MascotAvatar(
                         agentId = agentId,
                         size = AvatarTileSize,
                         cornerRadius = AvatarTileSize / 2,
+                        live = true,
                         fallback = {
                             val shown = identity ?: MascotIdentity.DEFAULT
                             MascotShapeGlyph(shown.shape, shown.argb, AvatarTileSize)

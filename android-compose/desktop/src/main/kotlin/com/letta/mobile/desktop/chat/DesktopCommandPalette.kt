@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.search.CommandPalette
 import com.letta.mobile.data.search.PaletteItem
 import com.letta.mobile.data.search.PaletteItemKind
+import com.letta.mobile.data.search.mascotAgentId
 import org.jetbrains.jewel.ui.component.TextField as JewelTextField
 
 /**
@@ -170,7 +171,12 @@ private fun PaletteRow(item: PaletteItem, onClick: () -> Unit) {
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(18.dp),
             )
-            else -> AgentOrb(index = item.orbIndex ?: 0, size = 22.dp, cornerRadius = 6.dp)
+            else -> AgentOrb(
+                index = item.orbIndex ?: 0,
+                size = 22.dp,
+                cornerRadius = 6.dp,
+                agentId = item.mascotAgentId(),
+            )
         }
         Text(
             text = item.label,

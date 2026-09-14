@@ -58,6 +58,7 @@ import androidx.compose.ui.window.rememberWindowState
 import com.letta.mobile.data.search.CommandPalette
 import com.letta.mobile.data.search.PaletteItem
 import com.letta.mobile.data.search.PaletteItemKind
+import com.letta.mobile.data.search.mascotAgentId
 import com.letta.mobile.desktop.chat.AgentOrb
 import dev.nucleusframework.core.runtime.Platform
 import java.awt.event.WindowEvent
@@ -458,7 +459,12 @@ private fun RecentAgentsStrip(
                         .width(64.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    AgentOrb(index = item.orbIndex ?: 0, size = 44.dp, cornerRadius = 12.dp)
+                    AgentOrb(
+                        index = item.orbIndex ?: 0,
+                        size = 44.dp,
+                        cornerRadius = 12.dp,
+                        agentId = item.mascotAgentId(),
+                    )
                     Text(
                         text = item.label,
                         style = MaterialTheme.typography.labelMedium,
@@ -540,7 +546,12 @@ private fun QuickQueryRow(item: PaletteItem, onClick: () -> Unit) {
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(18.dp),
             )
-            else -> AgentOrb(index = item.orbIndex ?: 0, size = 22.dp, cornerRadius = 6.dp)
+            else -> AgentOrb(
+                index = item.orbIndex ?: 0,
+                size = 22.dp,
+                cornerRadius = 6.dp,
+                agentId = item.mascotAgentId(),
+            )
         }
         Text(
             text = item.label,
