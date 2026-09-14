@@ -52,6 +52,95 @@ struct RiveBridge
     Mat2D viewTransform;
 };
 
+// --- Load helpers --------------------------------------------------------------------------------
+
+// Picks the artboard: `artboardName` null/empty takes the file's default. Returns 0, 4 when a named
+// artboard does not exist, or 2 when the file has no default artboard.
+static int pick_artboard(RiveBridge* bridge, const char* artboardName)
+{
+    const bool named = artboardName && *artboardName;
+    bridge->artboard = named ? bridge->file->artboardNamed(std::string(artboardName)) : bridge->file->artboardDefault();
+    if (bridge->artboard)
+        return 0;
+    return named ? 4 : 2;
+}
+
+static std::unique_ptr<StateMachineInstance> state_machine_named(ArtboardInstance* artboard, const char* name)
+{
+    if (!name || !*name)
+        return nullptr;
+    for (size_t i = 0; i < artboard->stateMachineCount(); ++i)
+    {
+        auto candidate = artboard->stateMachineAt(i);
+        if (candidate && candidate->name() == name)
+            return candidate;
+    }
+    return nullptr;
+}
+
+// The named state machine, else the artboard's default, else its first. Returns 0, or 3 when the
+// artboard has none.
+static int pick_state_machine(RiveBridge* bridge, const char* stateMachineName)
+{
+    ArtboardInstance* artboard = bridge->artboard.get();
+    bridge->stateMachine = state_machine_named(artboard, stateMachineName);
+    if (!bridge->stateMachine)
+        bridge->stateMachine = artboard->defaultStateMachine();
+    if (!bridge->stateMachine && artboard->stateMachineCount() > 0)
+        bridge->stateMachine = artboard->stateMachineAt(0);
+    return bridge->stateMachine ? 0 : 3;
+}
+
+// The artboard's view model, as its authored DEFAULT instance: that is what carries the authored
+// colour and enum values. `createViewModelInstance(artboard)` hands back a blank instance, which is
+// why the body drew black until the host wrote a colour. A file with no view model still drives
+// through state machine inputs.
+static void bind_view_model(RiveBridge* bridge)
+{
+    bridge->viewModel = bridge->file->createDefaultViewModelInstance(bridge->artboard.get());
+    if (!bridge->viewModel)
+        bridge->viewModel = bridge->file->createViewModelInstance(bridge->artboard.get());
+    if (!bridge->viewModel)
+        return;
+    bridge->artboard->bindViewModelInstance(bridge->viewModel);
+    bridge->stateMachine->bindViewModelInstance(bridge->viewModel);
+}
+
+// --- View model helpers --------------------------------------------------------------------------
+
+// The named view-model property as a T, or null when there is no view model, no such property, or
+// the property is of another type.
+template <typename T> static T* vm_property(RiveBridge* bridge, const char* name)
+{
+    auto* property = bridge->viewModel ? bridge->viewModel->propertyValue(std::string(name)) : nullptr;
+    return property && property->is<T>() ? property->as<T>() : nullptr;
+}
+
+// Runs `apply` on the named property when it exists as a T and returns its result; 1 otherwise.
+template <typename T, typename Apply> static int with_vm_property(RiveBridge* bridge, const char* name, Apply apply)
+{
+    T* property = vm_property<T>(bridge, name);
+    return property ? apply(property) : 1;
+}
+
+// Newline-joined names of every number property on the bound view model; returns how many.
+static int join_number_names(RiveBridge* bridge, std::string& joined)
+{
+    if (!bridge->viewModel)
+        return 0;
+    int count = 0;
+    for (const auto& value : bridge->viewModel->propertyValues())
+    {
+        if (!value || !value->is<ViewModelInstanceNumber>())
+            continue;
+        if (!joined.empty())
+            joined.push_back('\n');
+        joined += value->name();
+        ++count;
+    }
+    return count;
+}
+
 extern "C" {
 
 __declspec(dllexport) RiveBridge* rive_bridge_create(char* adapterNameOut, int adapterNameCap)
@@ -108,49 +197,11 @@ __declspec(dllexport) int rive_bridge_load_artboard(RiveBridge* bridge, const ui
     bridge->file = File::import(Span<const uint8_t>(bytes, length), bridge->renderContext.get(), &result);
     if (!bridge->file)
         return 1;
-    if (artboardName && *artboardName)
-    {
-        bridge->artboard = bridge->file->artboardNamed(std::string(artboardName));
-        if (!bridge->artboard)
-            return 4;
-    }
-    else
-    {
-        bridge->artboard = bridge->file->artboardDefault();
-    }
-    if (!bridge->artboard)
-        return 2;
-    if (stateMachineName && *stateMachineName)
-    {
-        for (size_t i = 0; i < bridge->artboard->stateMachineCount(); ++i)
-        {
-            auto candidate = bridge->artboard->stateMachineAt(i);
-            if (candidate && candidate->name() == stateMachineName)
-            {
-                bridge->stateMachine = std::move(candidate);
-                break;
-            }
-        }
-    }
-    if (!bridge->stateMachine)
-        bridge->stateMachine = bridge->artboard->defaultStateMachine();
-    if (!bridge->stateMachine && bridge->artboard->stateMachineCount() > 0)
-        bridge->stateMachine = bridge->artboard->stateMachineAt(0);
-    if (!bridge->stateMachine)
-        return 3;
-
-    // The artboard's view model, as its authored DEFAULT instance: that is what carries the
-    // authored colour and enum values. `createViewModelInstance(artboard)` hands back a blank
-    // instance, which is why the body drew black until the host wrote a colour. A file with no
-    // view model still drives through state machine inputs.
-    bridge->viewModel = bridge->file->createDefaultViewModelInstance(bridge->artboard.get());
-    if (!bridge->viewModel)
-        bridge->viewModel = bridge->file->createViewModelInstance(bridge->artboard.get());
-    if (bridge->viewModel)
-    {
-        bridge->artboard->bindViewModelInstance(bridge->viewModel);
-        bridge->stateMachine->bindViewModelInstance(bridge->viewModel);
-    }
+    if (int code = pick_artboard(bridge, artboardName))
+        return code;
+    if (int code = pick_state_machine(bridge, stateMachineName))
+        return code;
+    bind_view_model(bridge);
     bridge->stateMachine->advanceAndApply(0);
     return 0;
 }
@@ -321,11 +372,10 @@ __declspec(dllexport) int rive_bridge_set_number(RiveBridge* bridge, const char*
 
 __declspec(dllexport) int rive_bridge_vm_set_number(RiveBridge* bridge, const char* name, float value)
 {
-    auto* property = bridge->viewModel ? bridge->viewModel->propertyValue(std::string(name)) : nullptr;
-    if (!property || !property->is<ViewModelInstanceNumber>())
-        return 1;
-    property->as<ViewModelInstanceNumber>()->propertyValue(value);
-    return 0;
+    return with_vm_property<ViewModelInstanceNumber>(bridge, name, [&](ViewModelInstanceNumber* number) {
+        number->propertyValue(value);
+        return 0;
+    });
 }
 
 // Reads a view-model number back. This is the probe path: with `--probe`'s two-way data binds in
@@ -335,11 +385,10 @@ __declspec(dllexport) int rive_bridge_vm_get_number(RiveBridge* bridge, const ch
 {
     if (!out)
         return 3;
-    auto* property = bridge->viewModel ? bridge->viewModel->propertyValue(std::string(name)) : nullptr;
-    if (!property || !property->is<ViewModelInstanceNumber>())
-        return 1;
-    *out = property->as<ViewModelInstanceNumber>()->propertyValue();
-    return 0;
+    return with_vm_property<ViewModelInstanceNumber>(bridge, name, [&](ViewModelInstanceNumber* number) {
+        *out = number->propertyValue();
+        return 0;
+    });
 }
 
 // Newline-separated names of every number property on the bound view model, so the bench can find
@@ -350,19 +399,7 @@ __declspec(dllexport) int rive_bridge_vm_number_names(RiveBridge* bridge, char* 
     if (!out || cap <= 0)
         return -1;
     std::string joined;
-    int count = 0;
-    if (bridge->viewModel)
-    {
-        for (const auto& value : bridge->viewModel->propertyValues())
-        {
-            if (!value || !value->is<ViewModelInstanceNumber>())
-                continue;
-            if (!joined.empty())
-                joined.push_back('\n');
-            joined += value->name();
-            ++count;
-        }
-    }
+    const int count = join_number_names(bridge, joined);
     if ((int)joined.size() + 1 > cap)
         return -1;
     std::memcpy(out, joined.c_str(), joined.size() + 1);
@@ -371,37 +408,33 @@ __declspec(dllexport) int rive_bridge_vm_number_names(RiveBridge* bridge, char* 
 
 __declspec(dllexport) int rive_bridge_vm_set_enum(RiveBridge* bridge, const char* name, const char* key)
 {
-    auto* property = bridge->viewModel ? bridge->viewModel->propertyValue(std::string(name)) : nullptr;
-    if (!property || !property->is<ViewModelInstanceEnum>())
-        return 1;
-    return property->as<ViewModelInstanceEnum>()->value(std::string(key)) ? 0 : 2;
+    return with_vm_property<ViewModelInstanceEnum>(bridge, name, [&](ViewModelInstanceEnum* enumeration) {
+        return enumeration->value(std::string(key)) ? 0 : 2;
+    });
 }
 
 __declspec(dllexport) int rive_bridge_vm_set_color(RiveBridge* bridge, const char* name, int argb)
 {
-    auto* property = bridge->viewModel ? bridge->viewModel->propertyValue(std::string(name)) : nullptr;
-    if (!property || !property->is<ViewModelInstanceColor>())
-        return 1;
-    property->as<ViewModelInstanceColor>()->propertyValue(argb);
-    return 0;
+    return with_vm_property<ViewModelInstanceColor>(bridge, name, [&](ViewModelInstanceColor* color) {
+        color->propertyValue(argb);
+        return 0;
+    });
 }
 
 __declspec(dllexport) int rive_bridge_vm_fire(RiveBridge* bridge, const char* name)
 {
-    auto* property = bridge->viewModel ? bridge->viewModel->propertyValue(std::string(name)) : nullptr;
-    if (!property || !property->is<ViewModelInstanceTrigger>())
-        return 1;
-    property->as<ViewModelInstanceTrigger>()->trigger();
-    return 0;
+    return with_vm_property<ViewModelInstanceTrigger>(bridge, name, [](ViewModelInstanceTrigger* trigger) {
+        trigger->trigger();
+        return 0;
+    });
 }
 
 __declspec(dllexport) int rive_bridge_vm_set_boolean(RiveBridge* bridge, const char* name, int value)
 {
-    auto* property = bridge->viewModel ? bridge->viewModel->propertyValue(std::string(name)) : nullptr;
-    if (!property || !property->is<ViewModelInstanceBoolean>())
-        return 1;
-    property->as<ViewModelInstanceBoolean>()->propertyValue(value != 0);
-    return 0;
+    return with_vm_property<ViewModelInstanceBoolean>(bridge, name, [&](ViewModelInstanceBoolean* boolean) {
+        boolean->propertyValue(value != 0);
+        return 0;
+    });
 }
 
 } // extern "C"

@@ -71,18 +71,34 @@ internal interface RiveBridgeNative : Library {
          * still runs against a DLL someone built before the probe exports existed: JNA only fails
          * when the method is actually called, and these are the calls the bench guards.
          */
-        private fun exports(symbol: String): Boolean = PATH != null &&
-            runCatching { NativeLibrary.getInstance(PATH).getFunction(symbol) }.isSuccess
+        private fun exports(export: BridgeExport): Boolean = PATH != null &&
+            runCatching { NativeLibrary.getInstance(PATH).getFunction(export.symbol) }.isSuccess
 
         /** `rive_bridge_vm_get_number` + `rive_bridge_vm_number_names`: the telemetry readback. */
         val PROBE_READBACK: Boolean by lazy {
-            exports("rive_bridge_vm_get_number") && exports("rive_bridge_vm_number_names")
+            exports(BridgeExport.VM_GET_NUMBER) && exports(BridgeExport.VM_NUMBER_NAMES)
         }
 
         /** `rive_bridge_load_artboard`: loading an artboard other than the file's default. */
-        val ARTBOARD_BY_NAME: Boolean by lazy { exports("rive_bridge_load_artboard") }
+        val ARTBOARD_BY_NAME: Boolean by lazy { exports(BridgeExport.LOAD_ARTBOARD) }
     }
 }
+
+/** The bridge exports newer than the original entry points, which an older DLL may not carry. */
+internal enum class BridgeExport(val symbol: String) {
+    LOAD_ARTBOARD("rive_bridge_load_artboard"),
+    VM_GET_NUMBER("rive_bridge_vm_get_number"),
+    VM_NUMBER_NAMES("rive_bridge_vm_number_names"),
+}
+
+/**
+ * What [RiveDesktopScene.load] binds: a state machine by name (null for the artboard's default) on an
+ * artboard by name. [artboard] null takes the file's default artboard - the only thing the bridge
+ * could do before `rive_bridge_load_artboard` existed, and still the production path. A name is how
+ * the bench asks for `Harness`; an old DLL cannot honour it, and says so rather than showing the
+ * default.
+ */
+data class RiveSceneTarget(val stateMachine: String? = null, val artboard: String? = null)
 
 enum class RivePointer(internal val code: Int) { MOVE(0), DOWN(1), UP(2), EXIT(3) }
 
@@ -109,19 +125,16 @@ class RiveDesktopScene private constructor(
         return handle
     }
 
-    /**
-     * [artboard] null takes the file's default artboard - the only thing the bridge could do before
-     * `rive_bridge_load_artboard` existed, and still the production path. A name is how the bench
-     * asks for `Harness`; an old DLL cannot honour it, and says so rather than showing the default.
-     */
-    fun load(bytes: ByteArray, stateMachine: String? = null, artboard: String? = null) {
+    /** Load a .riv and bind [target] (see [RiveSceneTarget]). */
+    fun load(bytes: ByteArray, target: RiveSceneTarget = RiveSceneTarget()) {
+        val artboard = target.artboard
         val code = if (artboard == null) {
-            native.rive_bridge_load(openHandle(), bytes, bytes.size, stateMachine)
+            native.rive_bridge_load(openHandle(), bytes, bytes.size, target.stateMachine)
         } else {
             check(RiveBridgeNative.ARTBOARD_BY_NAME) {
                 "this rive_desktop_bridge.dll predates rive_bridge_load_artboard; rebuild it to load '$artboard'"
             }
-            native.rive_bridge_load_artboard(openHandle(), bytes, bytes.size, stateMachine, artboard)
+            native.rive_bridge_load_artboard(openHandle(), bytes, bytes.size, target.stateMachine, artboard)
         }
         check(code == 0) { "rive_bridge_load failed ($code)" }
     }
