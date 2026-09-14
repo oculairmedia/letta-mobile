@@ -13,6 +13,13 @@ assert_not_contains() { [[ "$1" != *"$2"* ]] || fail "expected output not to con
 # Keep the required Android jobs fanned out. Reintroducing a dependency from
 # build-apk to test adds the full test duration to the workflow critical path.
 android_workflow="$SOURCE_ROOT/.github/workflows/android.yml"
+# Required Android/perf workflows must report on Cloud Agent stacked feat/**
+# and cursor/** PRs, not only main and letta/**. pull_request.branches filters
+# the PR base. Missing these patterns is why stacked reviews never got
+# test / build-apk-pass / shared-multiplatform / perf-gate.
+android_workflow_text="$(<"$android_workflow")"
+assert_contains "$android_workflow_text" '- "feat/**"'
+assert_contains "$android_workflow_text" '- "cursor/**"'
 build_apk_job="$(
   awk '
     /^  build-apk:$/ { in_job = 1; next }
@@ -42,6 +49,8 @@ gradle_invocations="$(grep -Ec '^[[:space:]]*\./gradlew ' <<<"$test_job")"
 assert_eq "$gradle_invocations" '1'
 
 perf_workflow="$(<"$SOURCE_ROOT/.github/workflows/android-perf.yml")"
+assert_contains "$perf_workflow" '- "feat/**"'
+assert_contains "$perf_workflow" '- "cursor/**"'
 assert_contains "$perf_workflow" 'cache-read-only: ${{ github.event_name =='
 assert_contains "$perf_workflow" '  perf-gate:'
 assert_contains "$perf_workflow" 'Classify performance impact'

@@ -7,10 +7,13 @@ on:
       - ".github/workflows/android-perf.yml"
       - "android-compose/**"
   pull_request:
-    # Required perf-gate must report on stacked letta/** PRs, not only PRs into main.
+    # Required perf-gate must report on stacked letta/**, feat/**, and cursor/**
+    # PRs, not only PRs into main. pull_request.branches filters the PR *base*.
     branches:
       - main
       - "letta/**"
+      - "feat/**"
+      - "cursor/**"
   workflow_dispatch:
     inputs:
       rebaseline:
