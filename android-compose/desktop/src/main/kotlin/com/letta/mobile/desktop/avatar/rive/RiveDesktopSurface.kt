@@ -32,6 +32,8 @@ import org.jetbrains.skia.ImageInfo
 fun RiveDesktopSurface(
     scene: RiveDesktopScene,
     modifier: Modifier = Modifier,
+    /** False renders the scene once as it stands and never advances it here - a still. */
+    playing: Boolean = true,
     onFrameStats: ((nativeMs: Double) -> Unit)? = null,
 ) {
     var size by remember { mutableStateOf(IntSize.Zero) }
@@ -43,12 +45,21 @@ fun RiveDesktopSurface(
     val images = remember { arrayOfNulls<Image>(2) }
     DisposableEffect(Unit) { onDispose { images.forEach { it?.close() }; images.fill(null) } }
 
-    LaunchedEffect(scene, size) {
+    LaunchedEffect(scene, size, playing) {
         // Pin the size for this loop: `size` is state and can change under a frame callback before
         // the effect restarts, and a buffer of one size in an ImageInfo of another is a crash.
         val (w, h) = size
         if (w <= 0 || h <= 0) return@LaunchedEffect
         val info = ImageInfo(w, h, ColorType.RGBA_8888, ColorAlphaType.PREMUL)
+        if (!playing) {
+            // One frame of the scene as it stands; whichever live surface shares it advances it.
+            val image = Image.makeRaster(info, scene.render(w, h), w * 4)
+            images[1]?.close()
+            images[1] = images[0]
+            images[0] = image
+            frame = image.toComposeImageBitmap()
+            return@LaunchedEffect
+        }
         while (true) {
             withFrameNanos { now ->
                 // Once per frame even when several surfaces share this scene.

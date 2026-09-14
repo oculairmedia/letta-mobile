@@ -1,7 +1,9 @@
 package com.letta.mobile
 
 import com.letta.mobile.crash.CrashReporter
+import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.data.storage.SecureSettingsStore
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -15,4 +17,7 @@ import javax.inject.Singleton
 class MainActivityDependencies @Inject constructor(
     val settingsRepository: ISettingsRepository,
     val crashReporter: CrashReporter,
+    /** The roster and the per-agent settings the mascot identity registry is derived from. */
+    val agentRepository: IAgentRepository,
+    val secureSettingsStore: SecureSettingsStore,
 )

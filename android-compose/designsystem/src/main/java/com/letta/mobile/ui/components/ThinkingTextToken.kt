@@ -12,6 +12,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.layout.defaultMinSize
@@ -24,6 +25,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -59,6 +61,8 @@ fun ThinkingTextToken(
     reducedMotion: Boolean = false,
     reserveSpace: Boolean = visible || !delayMessage.isNullOrBlank(),
     modifier: Modifier = Modifier,
+    /** Around the text; the default is the standalone strip's inset. Beside a mascot the caller drops the start. */
+    contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
 ) {
     AnimatedVisibility(
         visible = reserveSpace,
@@ -99,7 +103,9 @@ fun ThinkingTextToken(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = ThinkingTextTokenReservedHeight)
-                .padding(horizontal = 16.dp, vertical = 4.dp),
+                .padding(contentPadding),
+            // Centred in the reserved height, so beside a mascot the text sits on its eye line.
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 text = text,

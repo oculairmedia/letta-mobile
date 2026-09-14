@@ -43,9 +43,13 @@ interface MascotHost {
     /** The live entry for [agentId], or null when the renderer is unavailable (draw the fallback). */
     fun entry(agentId: String, identity: MascotIdentity): MascotEntry?
 
-    /** Paints [entry]'s scene, filling [modifier]'s bounds. */
+    /**
+     * Paints [entry]'s scene, filling [modifier]'s bounds. With [playing] false the scene is drawn
+     * once and never advanced: a still of the character for places that must not move (a header
+     * chip beside a live companion), still in the entry's identity and current pose.
+     */
     @Composable
-    fun Surface(entry: MascotEntry, modifier: Modifier)
+    fun Surface(entry: MascotEntry, modifier: Modifier, playing: Boolean)
 }
 
 /** No renderer: every mascot draws its fallback. Platforms provide a real host at their root. */
@@ -53,7 +57,7 @@ object NoMascotHost : MascotHost {
     override fun entry(agentId: String, identity: MascotIdentity): MascotEntry? = null
 
     @Composable
-    override fun Surface(entry: MascotEntry, modifier: Modifier) = Unit
+    override fun Surface(entry: MascotEntry, modifier: Modifier, playing: Boolean) = Unit
 }
 
 val LocalMascotHost = compositionLocalOf<MascotHost> { NoMascotHost }
@@ -69,7 +73,9 @@ fun mascotAvailable(agentId: String?): Boolean {
 /**
  * The agent's avatar: a tile of [size] the live mascot fills edge to edge, overscaled by
  * [overscale] and cropped by the tile's clip - an avatar photo, not a figure in a frame. Draws
- * [fallback] when the agent has no identity or the host has no renderer.
+ * [fallback] when the agent has no identity or the host has no renderer. [live] false draws a
+ * still of the character instead of animating it - for a chip that sits next to a live mascot of
+ * the same agent, where two of them moving is one too many.
  */
 @Composable
 fun MascotAvatar(
@@ -79,6 +85,7 @@ fun MascotAvatar(
     cornerRadius: Dp = 7.dp,
     onClick: (() -> Unit)? = null,
     overscale: Float = MASCOT_TILE_OVERSCALE,
+    live: Boolean = true,
     fallback: @Composable () -> Unit,
 ) {
     val identity = agentId?.let { LocalMascotRegistry.current.identities[it] }
@@ -93,7 +100,7 @@ fun MascotAvatar(
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
         contentAlignment = Alignment.Center,
     ) {
-        MascotLive(agentId, identity, size = size * overscale)
+        MascotLive(agentId, identity, size = size * overscale, playing = live)
     }
 }
 
@@ -111,12 +118,20 @@ fun MascotLive(
     identity: MascotIdentity,
     size: Dp,
     modifier: Modifier = Modifier,
+    /** False draws a still; the entry's director and gaze still run for the agent's live surfaces. */
+    playing: Boolean = true,
 ) {
     val host = LocalMascotHost.current
     val registry = LocalMascotRegistry.current
     val entry = remember(host, agentId, identity) { host.entry(agentId, identity) } ?: return
     val presence = registry.presence[agentId] ?: AgentPresence.IDLE
     LaunchedEffect(entry, presence) { entry.ensureLoaded(); entry.apply(presence) }
+    // A still has no clock and no gaze: only the agent's live surfaces drive the entry, and a list
+    // of stills must not register one frame callback per row.
+    if (!playing) {
+        host.Surface(entry, modifier.requiredSize(size), playing = false)
+        return
+    }
     // The director's timers (listening release, success hold, blink schedule) need a clock;
     // tickTo is idempotent per frame so several surfaces of one agent tick it once.
     LaunchedEffect(entry) {
@@ -159,6 +174,7 @@ fun MascotLive(
             val slot = MascotSlot(agentId, GazeRect(r.left, r.top, r.right, r.bottom))
             if (registry.mascotBounds[slotKey] != slot) registry.mascotBounds[slotKey] = slot
         },
+        playing,
     )
 }
 

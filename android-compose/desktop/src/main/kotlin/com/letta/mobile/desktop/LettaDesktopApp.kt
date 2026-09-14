@@ -392,9 +392,11 @@ internal fun LettaDesktopApp(
     // metadata). Re-derived whenever the roster changes — which includes the
     // post-save reload — so a freshly-saved icon is reflected on the orbs.
     // Agents without an override fall back to their position-derived colour.
-    val cachedIdentities = remember(railAgents) {
+    val cachedIdentities = remember(railAgents, rosterAgents) {
         railAgents.mapNotNull { (id, _) ->
-            MascotIdentity.decode(secureSettingsStore.getString(agentAvatarStyleKey(id)))?.let { id to it }
+            val agent = rosterAgents.firstOrNull { it.id.value == id }
+            com.letta.mobile.ui.mascot.resolveMascotIdentity(agent, secureSettingsStore.getString(agentAvatarStyleKey(id)))
+                ?.let { id to it }
         }.toMap()
     }
     // Session overrides win over the cached/backend value so a just-saved icon

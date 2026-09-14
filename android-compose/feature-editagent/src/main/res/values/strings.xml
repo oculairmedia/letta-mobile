@@ -144,4 +144,10 @@
   <string name="screen_settings_reset_messages_title">Reset Message History</string>
   <string name="screen_tools_empty_attached">No tools attached</string>
   <string name="screen_tools_empty_search">No tools matching â€œ%1$sâ€</string>
+    <!-- Mascot identity picker (letta-mobile-8jtf3) -->
+    <string name="screen_agent_edit_avatar_section">Avatar</string>
+    <string name="screen_agent_edit_avatar_none">No mascot yet</string>
+    <string name="screen_agent_edit_avatar_supporting">The character that stands in for this agent everywhere in the app</string>
+    <string name="screen_agent_edit_avatar_change">Change</string>
+    <string name="screen_agent_edit_avatar_done">Done</string>
 </resources>

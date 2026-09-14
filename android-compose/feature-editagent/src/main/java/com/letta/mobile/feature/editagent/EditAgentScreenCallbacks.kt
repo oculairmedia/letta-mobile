@@ -58,6 +58,7 @@ internal data class EditAgentContentCallbacks(
     val onCompactionModelSettingsJsonChange: (String) -> Unit,
     val onResetMessages: () -> Unit,
     val onDeleteAgent: () -> Unit,
+    val onAvatarIdentityChange: (com.letta.mobile.avatar.core.MascotIdentity) -> Unit,
 )
 
 internal fun EditAgentViewModel.contentCallbacks(
@@ -121,4 +122,5 @@ internal fun EditAgentViewModel.contentCallbacks(
     onCompactionModelSettingsJsonChange = ::updateCompactionModelSettingsJson,
     onResetMessages = onResetMessages,
     onDeleteAgent = onDeleteAgent,
+    onAvatarIdentityChange = ::updateAvatarIdentity,
 )
