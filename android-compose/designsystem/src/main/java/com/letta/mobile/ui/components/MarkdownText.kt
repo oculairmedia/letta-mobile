@@ -505,7 +505,6 @@ private fun MarkdownTextRaw(
                             content = it.content,
                             node = it.node,
                             style = it.typography.code,
-                            highlights = highlightsBuilder,
                         )
                     }
                 }
@@ -637,7 +636,6 @@ private fun CodeFenceWithHeader(
     content: String,
     node: ASTNode,
     style: TextStyle,
-    highlights: Highlights.Builder,
 ) {
     val clipboardManager = LocalClipboardManager.current
 
@@ -649,9 +647,7 @@ private fun CodeFenceWithHeader(
             (codeText.length > A2UI_JSON_FALLBACK_COLLAPSE_CHAR_LIMIT ||
                 codeText.lineSequence().count() > A2UI_JSON_FALLBACK_COLLAPSE_LINE_LIMIT)
     }
-    val isDarkTheme = isSystemInDarkTheme()
     var expanded by remember(content) { mutableStateOf(false) }
-    val scrollState = rememberScrollState()
 
     Surface(
         shape = RoundedCornerShape(8.dp),
@@ -696,44 +692,53 @@ private fun CodeFenceWithHeader(
                 }
             }
 
-            // NOTE: do NOT wrap the fence body in a second horizontalScroll here —
-            // HighlightedCodeText applies its own horizontalScroll internally.
-            // Nesting two horizontal scrollers produces infinite-width constraints
-            // during Compose's lookahead measure pass, which crashes the app with
-            // "Horizontally scrollable component was measured with an infinity
-            // maximum width constraints" (seen when scrolling back to messages
-            // that contain fenced code blocks). See letta-mobile-o2v7 followup.
-            // letta-mobile-pcir: center the code surface horizontally so a
-            // narrow ASCII diagram (e.g. a 30-char tree) sits in the middle
-            // of the fence rather than left-anchored against a wide gutter.
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .then(
-                        if (capA2uiFallback && !expanded) {
-                            Modifier
-                                .heightIn(max = A2UI_JSON_FALLBACK_COLLAPSED_MAX_HEIGHT)
-                                .verticalScroll(scrollState)
-                        } else {
-                            Modifier
-                        }
-                    )
-                    .padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
-                contentAlignment = Alignment.TopCenter,
-            ) {
-                // Our own highlighter, not the library's: it never flips to plain text while a
-                // recompute runs, coalesces streaming updates, and caches finished results, so a
-                // code box no longer relays out twice per token or on every scroll back into view.
-                MarkdownCodeFence(content = content, node = node, style = style) { code, fenceLanguage, codeStyle ->
-                    HighlightedCodeText(
-                        code = code,
-                        language = fenceLanguage,
-                        style = codeStyle,
-                        highlightsBuilder = highlights,
-                        darkTheme = isDarkTheme,
-                    )
+            CodeFenceBody(content = content, node = node, style = style, collapsed = capA2uiFallback && !expanded)
+        }
+    }
+}
+
+@Composable
+private fun CodeFenceBody(
+    content: String,
+    node: ASTNode,
+    style: TextStyle,
+    collapsed: Boolean,
+) {
+    val isDarkTheme = isSystemInDarkTheme()
+    val scrollState = rememberScrollState()
+    // NOTE: do NOT wrap the fence body in a second horizontalScroll here —
+    // HighlightedCodeText applies its own horizontalScroll internally.
+    // Nesting two horizontal scrollers produces infinite-width constraints
+    // during Compose's lookahead measure pass, which crashes the app with
+    // "Horizontally scrollable component was measured with an infinity
+    // maximum width constraints" (seen when scrolling back to messages
+    // that contain fenced code blocks). See letta-mobile-o2v7 followup.
+    // letta-mobile-pcir: center the code surface horizontally so a
+    // narrow ASCII diagram (e.g. a 30-char tree) sits in the middle
+    // of the fence rather than left-anchored against a wide gutter.
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (collapsed) {
+                    Modifier
+                        .heightIn(max = A2UI_JSON_FALLBACK_COLLAPSED_MAX_HEIGHT)
+                        .verticalScroll(scrollState)
+                } else {
+                    Modifier
                 }
-            }
+            )
+            .padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
+        contentAlignment = Alignment.TopCenter,
+    ) {
+        // Our own highlighter, not the library's: it never flips to plain text while a
+        // recompute runs, coalesces streaming updates, and caches finished results, so a
+        // code box no longer relays out twice per token or on every scroll back into view.
+        MarkdownCodeFence(content = content, node = node, style = style) { code, fenceLanguage, codeStyle ->
+            HighlightedCodeText(
+                request = HighlightRequest(code, fenceLanguage, isDarkTheme),
+                style = codeStyle,
+            )
         }
     }
 }
