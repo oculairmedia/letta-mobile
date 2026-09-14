@@ -159,6 +159,18 @@ __declspec(dllexport) void rive_bridge_advance(RiveBridge* bridge, float seconds
         bridge->stateMachine->advanceAndApply(seconds);
 }
 
+static bool create_offscreen_textures(RiveBridge* bridge, D3D11_TEXTURE2D_DESC desc)
+{
+    if (FAILED(bridge->gpu->CreateTexture2D(&desc, nullptr, bridge->drawTexture.ReleaseAndGetAddressOf())))
+        return false;
+    desc.Usage = D3D11_USAGE_STAGING;
+    desc.BindFlags = 0;
+    desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+    if (FAILED(bridge->gpu->CreateTexture2D(&desc, nullptr, bridge->readbackTexture.ReleaseAndGetAddressOf())))
+        return false;
+    return bridge->drawTexture && bridge->readbackTexture;
+}
+
 static bool ensure_target(RiveBridge* bridge, uint32_t width, uint32_t height)
 {
     if (bridge->width == width && bridge->height == height && bridge->drawTexture && bridge->readbackTexture)
@@ -172,13 +184,7 @@ static bool ensure_target(RiveBridge* bridge, uint32_t width, uint32_t height)
     desc.SampleDesc.Count = 1;
     desc.Usage = D3D11_USAGE_DEFAULT;
     desc.BindFlags = D3D11_BIND_RENDER_TARGET;
-    HRESULT drawOk = bridge->gpu->CreateTexture2D(&desc, nullptr, bridge->drawTexture.ReleaseAndGetAddressOf());
-
-    desc.Usage = D3D11_USAGE_STAGING;
-    desc.BindFlags = 0;
-    desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
-    HRESULT readOk = bridge->gpu->CreateTexture2D(&desc, nullptr, bridge->readbackTexture.ReleaseAndGetAddressOf());
-    if (FAILED(drawOk) || FAILED(readOk) || !bridge->drawTexture || !bridge->readbackTexture)
+    if (!create_offscreen_textures(bridge, desc))
         return false;
 
     bridge->renderTarget =

@@ -19,6 +19,23 @@ import cairosvg
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
+def _spec_rows(spec):
+    return [[c.strip() for c in line.strip('|').split('|')]
+            for line in spec.splitlines() if line.startswith('| ')]
+
+
+def _amp_from_rows(rows):
+    keys = ('Breath root y','Gaze lookX max','Gaze lookY max',
+            'Success hop peak','Waiting bounce','Error shake','Error settle','Listening lean')
+    return {r[0]: (float(r[2]), float(r[3])) for r in rows if len(r) == 7 and r[0] in keys}
+
+
+def _expected_art():
+    return {f'body-{s}.svg' for s in SHAPES} | {
+        f'glyph-{s}{tail}.svg' for s in STATES + ['mouth-'+m for m in MOUTHS]
+        for tail in ('','-small')}
+
+
 HERE = Path(__file__).resolve().parent
 ART = HERE.parent
 PROJECT = ART.parent
@@ -29,12 +46,9 @@ STATES = ['idle','listening','thinking','waitingInput','speaking','error',
           'sleeping','loading','failed','degraded','success','error-flash','dragged']
 SHAPES = ['circle','blob','squircle','pill','triangle','hexagon','cloud','drop']
 MOUTHS = ['closed','half','open','o','frown']
-EXPECTED = {f'body-{s}.svg' for s in SHAPES} | {
-    f'glyph-{s}{tail}.svg' for s in STATES + ['mouth-'+m for m in MOUTHS]
-    for tail in ('','-small')}
+EXPECTED = _expected_art()
 SPEC = (PROJECT / 'SPEC.md').read_text()
-ROWS = [[c.strip() for c in line.strip('|').split('|')]
-        for line in SPEC.splitlines() if line.startswith('| ')]
+ROWS = _spec_rows(SPEC)
 loader = importlib.util.spec_from_file_location('svgpath', PROJECT / 'svgpath.py')
 svgpath = importlib.util.module_from_spec(loader)
 loader.loader.exec_module(svgpath)
@@ -57,9 +71,7 @@ def number(text):
     return float(re.search(r'[-+]?\d+(?:\.\d+)?', text.replace('−','-'))[0])
 
 
-AMP = {r[0]: (float(r[2]),float(r[3])) for r in ROWS
-       if len(r)==7 and r[0] in ('Breath root y','Gaze lookX max','Gaze lookY max',
-          'Success hop peak','Waiting bounce','Error shake','Error settle','Listening lean')}
+AMP = _amp_from_rows(ROWS)
 
 
 def samples(d, steps=101):

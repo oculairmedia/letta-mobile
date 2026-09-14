@@ -114,21 +114,35 @@ def lift(dump, artboard_name, client=9, subtree=None):
     return objs[0], lines
 
 
-if __name__ == "__main__":
-    if len(sys.argv) < 3:
+def _flag_value(argv, flag, default=None, cast=int):
+    if flag not in argv:
+        return default
+    return cast(argv[argv.index(flag) + 1])
+
+
+def _write_standalone(out, root, name, client, body, lines):
+    w, h = root.get("width", 500), root.get("height", 500)
+    doc = (f'<Rive version="1" kind="fragment">\n<Artboard clip="false" width="{xml_attr(w)}" height="{xml_attr(h)}" '
+           f'name="{xml_attr(name)}" id="{client}:1">\n{body}\n</Artboard>\n</Rive>\n')
+    out.write_text(doc, encoding="utf-8", newline="\n")
+    print(f"wrote {out}: {len(lines)} lines, artboard {w}x{h}", file=sys.stderr)
+
+
+def main(argv=None):
+    argv = sys.argv if argv is None else argv
+    if len(argv) < 3:
         raise SystemExit("usage: python riv2rml.py <dump.json> <artboard name> [--id-client N] [--standalone out.rml]")
-    dump = json.loads(_cli_path(sys.argv[1]).read_text(encoding="utf-8"))
-    name = sys.argv[2]
-    client = int(sys.argv[sys.argv.index("--id-client") + 1]) if "--id-client" in sys.argv else 9
-    subtree = int(sys.argv[sys.argv.index("--subtree") + 1]) if "--subtree" in sys.argv else None
+    dump = json.loads(_cli_path(argv[1]).read_text(encoding="utf-8"))
+    name = argv[2]
+    client = _flag_value(argv, "--id-client", 9)
+    subtree = _flag_value(argv, "--subtree")
     root, lines = lift(dump, name, client, subtree)
     body = "\n".join(lines)
-    if "--standalone" in sys.argv:
-        out = _cli_path(sys.argv[sys.argv.index("--standalone") + 1])
-        w, h = root.get("width", 500), root.get("height", 500)
-        doc = (f'<Rive version="1" kind="fragment">\n<Artboard clip="false" width="{xml_attr(w)}" height="{xml_attr(h)}" '
-               f'name="{xml_attr(name)}" id="{client}:1">\n{body}\n</Artboard>\n</Rive>\n')
-        out.write_text(doc, encoding="utf-8", newline="\n")
-        print(f"wrote {out}: {len(lines)} lines, artboard {w}x{h}", file=sys.stderr)
+    if "--standalone" in argv:
+        _write_standalone(_cli_path(argv[argv.index("--standalone") + 1]), root, name, client, body, lines)
     else:
         print(body)
+
+
+if __name__ == "__main__":
+    main()

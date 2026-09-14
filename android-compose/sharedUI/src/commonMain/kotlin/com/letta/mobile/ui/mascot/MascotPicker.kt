@@ -51,41 +51,26 @@ fun MascotPicker(
 ) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Shape", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        MascotShapeChoices(identity, accent, onChange)
+        MascotChoiceRows(MascotShape.entries.toList(), columns = 4) { shape ->
+            MascotShapeChoice(shape, identity, accent) { onChange(identity.copy(shape = shape)) }
+        }
         Text("Colour", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        MascotColorChoices(identity, accent, onChange)
-    }
-}
-
-@Composable
-private fun MascotShapeChoices(
-    identity: MascotIdentity,
-    accent: Color,
-    onChange: (MascotIdentity) -> Unit,
-) {
-    Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        MascotShape.entries.chunked(4).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                row.forEach { shape ->
-                    MascotShapeChoice(shape, identity, accent) { onChange(identity.copy(shape = shape)) }
-                }
-            }
+        MascotChoiceRows(MascotPalette.ALL, columns = 5) { argb ->
+            MascotColorChoice(argb, identity, accent) { onChange(identity.copy(argb = argb)) }
         }
     }
 }
 
 @Composable
-private fun MascotColorChoices(
-    identity: MascotIdentity,
-    accent: Color,
-    onChange: (MascotIdentity) -> Unit,
+private fun <T> MascotChoiceRows(
+    items: List<T>,
+    columns: Int,
+    content: @Composable (T) -> Unit,
 ) {
     Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        MascotPalette.ALL.chunked(5).forEach { row ->
+        items.chunked(columns).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                row.forEach { argb ->
-                    MascotColorChoice(argb, identity, accent) { onChange(identity.copy(argb = argb)) }
-                }
+                row.forEach { content(it) }
             }
         }
     }
