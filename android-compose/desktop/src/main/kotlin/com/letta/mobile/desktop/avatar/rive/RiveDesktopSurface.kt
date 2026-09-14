@@ -49,11 +49,10 @@ fun RiveDesktopSurface(
         val (w, h) = size
         if (w <= 0 || h <= 0) return@LaunchedEffect
         val info = ImageInfo(w, h, ColorType.RGBA_8888, ColorAlphaType.PREMUL)
-        var last = withFrameNanos { it }
         while (true) {
             withFrameNanos { now ->
-                scene.advance(((now - last) / 1e9).toFloat())
-                last = now
+                // Once per frame even when several surfaces share this scene.
+                scene.advanceTo(now)
                 val started = System.nanoTime()
                 val pixels = scene.render(w, h)
                 onFrameStats?.invoke((System.nanoTime() - started) / 1e6)

@@ -83,6 +83,20 @@ class RiveDesktopScene private constructor(
 
     fun advance(seconds: Float) = native.rive_bridge_advance(handle, seconds)
 
+    private var lastFrameNanos = 0L
+
+    /**
+     * Advances to the frame clock's [nowNanos] once per frame: a scene shared by several surfaces
+     * (the sidebar and the hero draw the same agent) would otherwise be advanced by each of them
+     * and run at a multiple of real time.
+     */
+    fun advanceTo(nowNanos: Long) {
+        if (nowNanos == lastFrameNanos) return
+        val dt = if (lastFrameNanos == 0L) 0f else ((nowNanos - lastFrameNanos) / 1e9f).coerceIn(0f, 0.1f)
+        lastFrameNanos = nowNanos
+        if (dt > 0f) advance(dt)
+    }
+
     /** Renders into a reused native buffer and returns it: premultiplied RGBA, top row first. */
     fun render(width: Int, height: Int, clearArgb: Int = 0): ByteArray {
         val size = width.toLong() * height * 4
