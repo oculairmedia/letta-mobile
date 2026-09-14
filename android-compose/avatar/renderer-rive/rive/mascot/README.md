@@ -21,6 +21,8 @@ Beads: `letta-mobile-kh094` (this asset), `letta-mobile-1zti3` (identity picker 
 | `rive.yaml` | Push mapping: project 1882737 "oculair / Shared Project", file 2578084 "mascot" | no |
 | `pull_editor.py` | Editor round trip: diff a `.rev` export (or converted dir) against `scene.rml` by animation / layer / node | when the artist edits |
 | `sheet.py` | Contact sheets from screenshots (the review tool) | - |
+| `timeline.py` | Read a curve without building: keyframes, easing and an ASCII plot per animation (`--list`, `--layers`) - the review tool when the editor is not available | rarely |
+| `test_rig.py` | `python -m unittest test_rig`: regenerate parity, unique ids, resolvable state/animation references, the contract check, a `timeline.py` smoke | rarely |
 | `SPEC.md`, `MOTION-REFERENCES.md` | Numbers and references from the design agent; §8 is the implementation map, §9 the human-touch patch (amplitudes, alphas, glyphs) the rig now follows | with them |
 | `art/validation/` | The design agent's static proofs and `validate.py` (needs numpy, Pillow, CairoSVG); not part of the build | - |
 | `RIVE-PLATFORM-POWER.md` | The design agent's platform brief; the audit below answers it | - |
@@ -48,6 +50,15 @@ cp build/mascot.riv ../../src/jvmMain/resources/mascot/mascot.riv      # desktop
 python ../../native/rivdump/check_contract.py . ../../src/commonMain/kotlin/com/letta/mobile/avatar/rive/RiveAvatarContract.kt
 $R push                            # new revision in the Rive workspace (see the rule below)
 ```
+
+**Checks.** `python -m unittest test_rig` (about 15 s, standard library only) is the cheap gate
+that does not need the CLI: it regenerates into a tempdir and compares against the committed
+`scene.rml` with push-assigned ids stripped, asserts every id is unique, checks that every
+transition target and `animationId` resolves, runs `check_contract.py`, and smoke-tests
+`timeline.py`. Run it before `$R --verify`; a failing regenerate check means the committed file
+is a hand-edit or a stale commit, not a code bug. To read a curve without building,
+`python timeline.py IdleBounce` prints its keyframes, easing and an ASCII plot; `--list` and
+`--layers` print the whole animation set and the state machine.
 
 `--screenshot` starts the state machine with the given view-model data and advances N frames
 at 60 fps, so `--advance=N` is "frame N of whatever the data triggered from idle". Use
