@@ -2,6 +2,8 @@ package com.letta.mobile.ui.icons
 
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.composables.icons.lucide.Archive
+import com.composables.icons.lucide.ListFilter
+import com.composables.icons.lucide.LoaderCircle
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.Bot
 import com.composables.icons.lucide.Brain
@@ -110,6 +112,8 @@ object LettaIcons {
 
     // Status
     val Check: ImageVector get() = Lucide.Check
+    val Loader: ImageVector get() = Lucide.LoaderCircle
+    val ListFilter: ImageVector get() = Lucide.ListFilter
     val CheckCircle: ImageVector get() = Lucide.CircleCheck
     val Error: ImageVector get() = Lucide.CircleAlert
     val Warning: ImageVector get() = Lucide.TriangleAlert

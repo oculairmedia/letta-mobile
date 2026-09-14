@@ -658,7 +658,12 @@
     <string name="common_active">ACTIVE</string>
     <string name="common_letta_cloud">Letta Cloud</string>
     <string name="common_local_kotlin_runtime">Local LettaCode</string>
-    <string name="screen_conversations_new_action">New Conversation</string>
+    <string name="screen_conversations_new_action">New conversation</string>
+    <string name="screen_conversations_filter_all">All</string>
+    <string name="screen_conversations_filter_working">Working</string>
+    <string name="screen_conversations_filter_completed">Completed</string>
+    <string name="screen_conversations_filter_archived">Archived</string>
+    <string name="screen_conversations_status_pinned">Pinned</string>
     <string name="action_edit">Edit</string>
     <string name="action_rename">Rename</string>
     <string name="action_fork">Fork</string>
