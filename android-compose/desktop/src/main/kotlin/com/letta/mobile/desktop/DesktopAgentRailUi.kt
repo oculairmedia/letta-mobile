@@ -448,7 +448,7 @@ private fun ExpandedAgentRow(params: AgentRailOrbParams) {
             if (flags.thinking && target.identity == null) {
                 ThinkingRing(diameter = 32.dp)
             }
-            RailAgentTile(target = target, initial = params.group.name.firstOrNull()?.uppercase() ?: "?", size = 44.dp, cornerRadius = 10.dp)
+            RailAgentTile(target = target, initial = params.group.name.firstOrNull()?.uppercase() ?: "?", size = 40.dp, cornerRadius = 10.dp)
         }
         Text(
             text = params.group.name,
@@ -605,7 +605,8 @@ private fun AgentRailOrbContent(
     target: AgentRailOrbTarget,
 ) {
     Box(
-        modifier = Modifier.size(width = 46.dp, height = 34.dp),
+        // Square slot for a square tile (it was 46x34 for the old 30 dp orbs).
+        modifier = Modifier.size(width = 48.dp, height = 48.dp),
         contentAlignment = Alignment.Center,
     ) {
         if (flags.selected) {
@@ -619,7 +620,7 @@ private fun AgentRailOrbContent(
         RailAgentTile(
             target = target,
             initial = params.group.name.firstOrNull()?.uppercase() ?: "?",
-            size = 44.dp,
+            size = 40.dp,
             onClick = { params.onAgentSelected(target.agentId) },
         )
         // No member-count chip on stacked orbs: PM groups aggregate hundreds

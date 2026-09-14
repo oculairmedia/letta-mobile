@@ -76,7 +76,7 @@ fun AgentOrb(
         ) {
             // The body spans ~60 % of the artboard; overscale so the character fills the tile edge
             // to edge and the tile's clip crops the rest - an avatar photo, not a figure in a frame.
-            com.letta.mobile.desktop.avatar.rive.DesktopMascotHero(agentId = agentId, identity = identity, size = size * 2.2f)
+            com.letta.mobile.desktop.avatar.rive.DesktopMascotHero(agentId = agentId, identity = identity, size = size * 1.9f)
         }
         return
     }
