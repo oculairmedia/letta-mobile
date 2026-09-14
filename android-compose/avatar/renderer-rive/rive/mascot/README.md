@@ -27,6 +27,9 @@ there are no star imports, so the definition of anything is one jump away.
 | `rig/motion.py` | Every root animation: sustained loops (`ROW`), the 90 entries, the flashes, the nine idle beats, wander | yes |
 | `rig/machine.py` | The `Avatar` state machine: ten layers, their states and transitions, and the file's hover/drag listeners | yes |
 | `rig/layers.py` | Typed layer builder (`Layer` / `State` / `Exit` / `OnEnum` / `OnBool` / `OnTrigger` / `OnInput` / `Raw`). Validates targets, weights and exit-time-on-a-loop in Python instead of at runtime | rarely |
+| `rig/seams.py` | The seam ledger and the blend policy: what each animation leaves a property at, what the next one picks it up at, and which 0 ms hand-offs tear. `python -m rig.seams` lists them worst first; `Layer.rml()` refuses an unsigned one | rarely |
+| `rig/chart.py` | Timing charts, both ways: `Chart(extremes, breakdown, spacing).keys()` authors a beat as poses and spacing (the in-betweens are real keys, not a bezier's guess), `Chart.of(keys)` / `Chart.of_samples(values)` read a curve or a telemetry series back and classify it (ease-in / ease-out / s / linear / hold / pop), `chart.text()` draws the margin chart | yes |
+| `rig/probe.py` | The probe list: which node properties telemetry exposes (name, object, property key, unit) and `inject()`, which adds the view-model numbers and the two-way binds to a built document. Probe ids (`1:900+`) are deliberately outside `ids.py` - they must never be pushed | add probes |
 | `rml.py` | RML primitives: Rive property keys, view-model ids, easing tokens, XML builders (keyframes, animations, states, transitions). No mascot knowledge | rarely |
 | `svgpath.py` | SVG path -> RML vertices (M/L/C/Z, evenodd, strokes; 8-cubic mirrored bodies, 4-vertex mouths) | rarely |
 | `art/*.svg` | The locked art: `body-*.svg` (8 identities), one glyph per state, three mouths | via SPEC owner |
@@ -36,8 +39,14 @@ there are no star imports, so the definition of anything is one jump away.
 | `pull_editor.py` | Editor round trip: diff a `.rev` export (or converted dir) against `scene.rml` by animation / layer / node | when the artist edits |
 | `sheet.py` | Contact sheets from screenshots (the review tool) | - |
 | `onion.py` | Onion skins: several frames of one motion overlaid, older ones fainter (`--tint`, `--edges`), so arcs, spacing and overshoot read at a glance; `--diff` prints the per-pair % changed as a pop detector. Drives the CLI itself and caches frames | rarely |
-| `timeline.py` | Read a curve without building: keyframes, easing and an ASCII plot per animation (`--list`, `--layers`) - the review tool when the editor is not available | rarely |
+| `timeline.py` | Read a curve without building: keyframes, easing and an ASCII plot per animation (`--list`, `--layers`, `--chart`) - the review tool when the editor is not available | rarely |
+| `xsheet.py` | The exposure sheet: frames down, one column per (object, property) the named animations key, `[K]` on an extreme, `(B)` on an interior key, `-` on an in-between, with the per-frame delta; a driver column for callbacks and expression flips, a timing chart under each level and a spacing class per level in the footer (`--wide`, `--range`) | rarely |
+| `scenarios.py` | Named driver sequences as data (`enter-listening`, `success`, `conversation`, `beat:<Animation>`, ...). Each step is one CLI flag, applied in order, so a scenario settles in one state before asking for the next | add scenarios |
+| `probe.py` | Pose telemetry: run a scenario headless and read the motion back as numbers - sparklines, motion signatures, an exposure-sheet grid, `goldens/*.json`. `--probe` binds node properties two-way into view-model numbers and `--data-dump` prints them per frame, so this is the pencil test without pixels | rarely |
+| `goldens/*.json` | Committed motion signatures per scenario, diffed by `test_probe.py`. Re-golden on purpose (`probe.py <scenario> --golden`) with the diff in the commit | on purpose |
 | `test_rig.py` | `python -m unittest test_rig`: regenerate parity, unique ids, resolvable state/animation references, the contract check, a `timeline.py` smoke | rarely |
+| `test_probe.py` | `python -m unittest test_probe`: every golden scenario's signature, plus one pixel cross-check (a screenshot at frame 20 of `success` against the probed plate height) | rarely |
+| `test_tools.py` | `python -m unittest test_tools`: the review tools themselves - halving fractions, spacing classification, the pop detector, a `Chart.keys()` round trip, x-sheet and `timeline --chart` smokes | rarely |
 | `SPEC.md`, `MOTION-REFERENCES.md` | Numbers and references from the design agent; §8 is the implementation map, §9 the human-touch patch (amplitudes, alphas, glyphs) the rig now follows | with them |
 | `art/validation/` | The design agent's static proofs and `validate.py` (needs numpy, Pillow, CairoSVG); not part of the build | - |
 | `RIVE-PLATFORM-POWER.md` | The design agent's platform brief; the audit below answers it | - |
@@ -90,7 +99,10 @@ is a hand-edit or a stale commit, not a code bug.
 Two checks run before that without being asked: `rig/ids.py` raises on a duplicate id at import,
 and `rig/layers.py` raises on a layer whose transition leaves its own layer, whose weight sits on
 a non-random state, whose random state has fewer than two weighted ways out, or whose exit-time
-transition hangs off a looping animation. A refactor that is meant to change nothing should also
+transition hangs off a looping animation - and, once `gen_scene.py` has handed it the animation
+index, on a 0 ms transition that tears a property both animations key, unless that transition is
+signed `cut=True` with a reason (`python -m rig.seams` lists every seam and says which are signed).
+A refactor that is meant to change nothing should also
 survive a byte check against the committed file:
 
 ```bash
@@ -98,16 +110,28 @@ python gen_scene.py /tmp/check.rml
 diff <(sed -E 's/ id="0:[0-9]+"//g' scene.rml) <(sed -E 's/ id="0:[0-9]+"//g' /tmp/check.rml)
 ```
 
-**Review tools.** Three, none of which need the editor:
+**Review tools.** Five, none of which need the editor:
 
 ```bash
-python timeline.py IdleBounce          # keyframes, easing and an ASCII plot per property
+python timeline.py IdleBounce --chart  # keyframes, easing and an ASCII plot per property, plus
+                                       # the timing chart: [0]-|---------------|---------------|[59]  ease-in
                                        # (--list every animation, --layers the state machine)
+python xsheet.py --animation IdleBounce   # the exposure sheet: every frame down, one column per
+                                       # level, [K] extremes / (B) breakdowns / - in-betweens with
+                                       # deltas, the driver column, a chart and a class per level
+                                       # (--animations a,b sheets two together; --wide, --range)
+python -m rig.chart ease-in linear     # what a named spacing lays down, as chart and as keys
 python onion.py --state listening --frames 10 --diff    # frames of one motion overlaid, older
                                        # fainter; --diff prints % changed per pair (a spike = a snap)
 python sheet.py /c/rive-spike/v2/sheet.png 6 /c/rive-spike/v2 e-1 e-3 e-5 e-8 e-12 e-20
                                        # a contact sheet from screenshots you captured above
 ```
+
+The chart is the tell an ASCII plot cannot give: marks bunched at one end are an ease, evenly
+spread marks are a float, and `pop` is one frame carrying the move. `rig/chart.py` also runs the
+other way - `Chart(extremes=[(0, 0), (22, -48)], breakdown=(8, -40), spacing="ease-in").keys()`
+returns the keyframe list `rig/motion.py` already passes to `animation()`, with the in-betweens as
+real keys (spacing is the weight; a bezier is only a guess at it).
 
 `--screenshot` starts the state machine with the given view-model data and advances N frames
 at 60 fps, so `--advance=N` is "frame N of whatever the data triggered from idle". Use
@@ -251,7 +275,30 @@ objects, `3:*` root animations/nodes (60-77 shapes, 100-140 states, 160-244 misc
 
 ## Reviewing motion
 
-Screenshots are the only ground truth the CLI gives. Before claiming anything moves correctly,
+**Numbers before pixels.** `probe.py` reads the real, mixed, post-state-machine value of every
+probed node property for every frame of a scenario, in one headless run of about a second. Do
+that first; open an image only when a number is surprising.
+
+```bash
+python probe.py success                  # sparklines + motion signatures for the happy flash
+python probe.py conversation --every 2   # idle -> listening -> thinking -> speaking -> idle, one run
+python probe.py beat:IdleBounce --sheet  # one animation (through --solo), with the frame grid
+python probe.py error --golden           # re-record goldens/error.json, on purpose
+python -m unittest test_probe            # every golden, plus the screenshot cross-check
+```
+
+```
+  Face.y  ▁▁▁▁▁▁▃▆▆▇▇███████████▇▆▆▅▃▂▁▁▁▁▁  peak  -48.000px @19  settle 57  max|Δ|  20.994  spacing ease-in
+  Body.y  ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▂▂▂▂▂▂▃▃▃▃▃▄▄▄▄  peak   -1.899px @60  settle 59  max|Δ|   0.060  spacing ease-out
+```
+
+The bars are distance from rest, so a rise and a drop read the same; a vertical wall in them is a
+snap. That pair is the success hop, and it is also the bug: the flash keys 48 px on Body and Face
+together, and only Face gets it (`letta-mobile-uesod`). The authored keys cannot see that - only
+telemetry can - so when authored and actual disagree, believe the probe.
+
+Screenshots are still the only ground truth the CLI gives, and `test_probe.py` keeps one honest
+cross-check between them. Before claiming anything moves correctly,
 render the frames where it could fail and read the sheet: a transition at 1/3/5/8/12/20, a loop
 at 0/25/50/75 %, a flash at 10/37/70/100 %. Things that have slipped through before: glyphs
 fading when they should cut, brows colliding with eyes, rotations in the wrong unit, a

@@ -50,7 +50,9 @@ from rig.ids import (
     PLATE_BLINK, ROOT, SHAPES, SM, SUSTAINED, TURN_X_ANIM, TURN_Y_ANIM, VM_INSTANCE, VM_TUNE_SCALE,
     VM_TURN_X, VM_TURN_Y, shape_enum_ids, state_enum_ids,
 )
+from rig.layers import set_animation_index
 from rig.machine import root_machine
+from rig.seams import animation_index
 from rig.motion import (enter_animations, idle_variety_animations, momentary_animations,
                         shape_animations, sustained_animations, wander_animations)
 from rig.plate import plate_component
@@ -94,6 +96,10 @@ def root_artboard(solo=None):
            BODY_NODE: {ROT: [(0, rad(-2))]}}), "loop")
     anims = (shape_animations() + sustained_animations() + enter_animations() + momentary_animations() + idle_variety_animations()
              + turn_animations() + wander_animations() + [breath, blink_rest, blink, hover_rest, hover, hover_held])
+    # The blend policy (MOTION-PIPELINE step A): every animation this artboard plays, indexed by
+    # its keyed ends, so root_machine()'s layers can refuse a 0 ms transition that tears a value.
+    # The animations exist before the machine does, so the index is simply the XML just built.
+    set_animation_index(animation_index("\n".join(anims)))
     board = f'''<Artboard defaultStateMachineId="{SM}" viewModelId="{VM}" viewModelInstanceId="{VM_INSTANCE}"
           x="0" y="0" styleId="0:3" clip="false" width="500" height="500" name="Mascot" id="{ROOT}">
     <LayoutComponentStyle name="Style" id="0:3"/>
@@ -217,14 +223,23 @@ def scene_document(solo=None):
 
 if __name__ == "__main__":
     import sys
-    # `python gen_scene.py [out.rml] [--solo <AnimationName>]` - an explicit path lets a check
-    # regenerate without touching scene.rml; --solo is onion.py's single-animation document.
+    # `python gen_scene.py [out.rml] [--solo <AnimationName>] [--probe]` - an explicit path lets a
+    # check regenerate without touching scene.rml; --solo is onion.py's single-animation document
+    # and --probe is probe.py's telemetry document. Both post-process the built document string
+    # into a throwaway variant, so the default output stays byte-identical and neither debug
+    # surface can ever reach scene.rml or a push.
     argv, solo = sys.argv[1:], None
     if "--solo" in argv:
         i = argv.index("--solo")
         solo = argv[i + 1]
         del argv[i:i + 2]
+    probe = "--probe" in argv
+    if probe:
+        argv.remove("--probe")
     doc = scene_document(solo)
+    if probe:
+        from rig.probe import inject
+        doc = inject(doc)
     out = argv[0] if argv else os.path.join(os.path.dirname(os.path.abspath(__file__)), "scene.rml")
     with open(out, "w", encoding="utf-8", newline="\n") as f:
         f.write(doc)

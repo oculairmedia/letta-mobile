@@ -1,6 +1,7 @@
 """See a curve without building: read scene.rml and print what an animation actually does.
 
     python timeline.py IdleBounce            # keyframes + an ASCII curve per property
+    python timeline.py IdleBounce --chart    # ...and the timing chart (spacing) under each
     python timeline.py --list                # every animation, grouped by name prefix
     python timeline.py --layers              # the state machine as a tree
 
@@ -277,7 +278,17 @@ def degrees_text(key):
     return f"{num(key.value * 180.0 / 3.141592653589793, 2)} deg"
 
 
-def print_animation(scene, anim, board, width):
+def chart_line(keys, indent="      "):
+    """The timing chart for a curve, as rig/chart.py draws it. Imported late: rig.chart reads
+    this module, so importing it at the top would be a cycle."""
+    from rig.chart import Chart
+    try:
+        return [f"{indent}{Chart.of(keys).text()}"]
+    except ValueError:
+        return []
+
+
+def print_animation(scene, anim, board, width, chart=False):
     duration = int(float(anim.get("duration", 0)))
     ms = duration / FPS * 1000.0
     print(f"{anim.get('name')}   [{board}]  id {anim.get('id')}")
@@ -312,6 +323,9 @@ def print_animation(scene, anim, board, width):
             if all(k.kind == "double" for k in keys):
                 for line in curve(keys, duration, width):
                     print(line)
+                if chart:
+                    for line in chart_line(keys):
+                        print(line)
     print()
 
 
@@ -441,6 +455,8 @@ def main(argv=None):
     p.add_argument("--width", type=int, default=60, help="curve width in columns")
     p.add_argument("--list", action="store_true", help="every animation, grouped by prefix")
     p.add_argument("--layers", action="store_true", help="the state machine layers as a tree")
+    p.add_argument("--chart", action="store_true",
+                   help="a timing chart under each property (rig/chart.py)")
     args = p.parse_args(argv)
 
     scene = Scene(args.rml)
@@ -460,7 +476,7 @@ def main(argv=None):
         print(f"no animation matching {args.pattern!r}; try --list")
         return 1
     for board, anim in hits:
-        print_animation(scene, anim, board, args.width)
+        print_animation(scene, anim, board, args.width, chart=args.chart)
     if len(hits) > 1:
         print(f"{len(hits)} animations matched {args.pattern!r}")
     return 0

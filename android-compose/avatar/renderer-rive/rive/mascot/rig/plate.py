@@ -31,7 +31,8 @@ from rig.ids import (
     SACCADE_FIX_NODES, SACCADE_NODE, SACCADE_SLEEP_NODE, SACCADE_WAIT_NODES, STATES, WAVE,
     mouth_vertex_ids, plate_expr_anim, plate_expr_node, wave_vertex_ids,
 )
-from rig.layers import Exit, Layer, OnInput, Raw, State
+from rig.layers import Exit, Layer, OnInput, Raw, State, set_animation_index
+from rig.seams import animation_index
 
 
 # ================================================================================================
@@ -165,6 +166,30 @@ def plate_component():
     wait_a = animation("WaitA", PLATE_WAIT_A, frames(4000), {})
     wait_b = animation("WaitB", PLATE_WAIT_B, frames(8000), {})
 
+    # Tunable pose ranges (bench art direction): frame 0 = value at 0, frame 60 = value at 1, linear.
+    tune_anims = []
+    for name, t in TUNABLES.items():
+        key = {"SX": SX, "SY": SY, "Y": Y}
+        lo, hi = t.span
+        tune_anims.append(animation("Tune" + name[4:], t.anim, 60, {t.node: {key[p]: [(0, lo, LINEAR), (60, hi)] for p in t.props}}))
+    # Saccades: each fixation is one animation - hop out in 60 ms (overshoot), hold, hop back in 80 ms.
+    for w in SACCADE_WAITS:
+        tune_anims.append(animation(f"SaccadeWait{w.ms}", w.anim, frames(w.ms), {}))
+    for i, f in enumerate(SACCADE_FIX):
+        dx, dy = f.offset
+        hold = beat([700, 1100, 1600, 2400][i % 4])
+        tune_anims.append(animation(f"Saccade{i + 1}", f.anim, hold + 8, {SACCADE_NODE: {
+            X: [(0, 0, BACK_OUT), (4, dx, None), (hold, dx, SOFT_OUT), (hold + 8, 0)],
+            Y: [(0, 0, BACK_OUT), (4, dy, None), (hold, dy, SOFT_OUT), (hold + 8, 0)]}}))
+    tune_anims.append(animation("AutoX", PLATE_AUTO_X, 60, {GLYPH_SCALE_NODE: {X: [(0, -6, LINEAR), (60, 6)]}}))
+    tune_anims.append(animation("AutoY", PLATE_AUTO_Y, 60, {GLYPH_SCALE_NODE: {Y: [(0, -4, LINEAR), (60, 4)]}}))
+
+    # The blend policy (rig/seams.py): the plate's own animations, indexed by their keyed ends,
+    # so its four layers below are checked against what they actually hand each other. Built
+    # before the layers for that reason; the joined XML is written out unchanged further down.
+    set_animation_index(animation_index("\n".join(expr_anims + [look_x, look_y, open_anim, blink,
+                                                               wait_a, wait_b] + tune_anims)))
+
     expr_layer = expression_layer("Expression", "7:10", PLATE_IN_EXPR, plate_expr_anim, plate_expr_node)
 
     # Saccade layer: waits pick a fixation at random; fixations return to a random wait. Asleep, parked.
@@ -225,24 +250,6 @@ def plate_component():
 </Shape>'''
     mouth_o = svgpath.path_rml(art("glyph-mouth-o.svg"), "MouthO", MOUTH_O, INK, opacity=0)
     frown = svgpath.path_rml(art("glyph-mouth-frown.svg"), "FrownLine", FROWN, INK, opacity=0)
-
-    # Tunable pose ranges (bench art direction): frame 0 = value at 0, frame 60 = value at 1, linear.
-    tune_anims = []
-    for name, t in TUNABLES.items():
-        key = {"SX": SX, "SY": SY, "Y": Y}
-        lo, hi = t.span
-        tune_anims.append(animation("Tune" + name[4:], t.anim, 60, {t.node: {key[p]: [(0, lo, LINEAR), (60, hi)] for p in t.props}}))
-    # Saccades: each fixation is one animation - hop out in 60 ms (overshoot), hold, hop back in 80 ms.
-    for w in SACCADE_WAITS:
-        tune_anims.append(animation(f"SaccadeWait{w.ms}", w.anim, frames(w.ms), {}))
-    for i, f in enumerate(SACCADE_FIX):
-        dx, dy = f.offset
-        hold = beat([700, 1100, 1600, 2400][i % 4])
-        tune_anims.append(animation(f"Saccade{i + 1}", f.anim, hold + 8, {SACCADE_NODE: {
-            X: [(0, 0, BACK_OUT), (4, dx, None), (hold, dx, SOFT_OUT), (hold + 8, 0)],
-            Y: [(0, 0, BACK_OUT), (4, dy, None), (hold, dy, SOFT_OUT), (hold + 8, 0)]}}))
-    tune_anims.append(animation("AutoX", PLATE_AUTO_X, 60, {GLYPH_SCALE_NODE: {X: [(0, -6, LINEAR), (60, 6)]}}))
-    tune_anims.append(animation("AutoY", PLATE_AUTO_Y, 60, {GLYPH_SCALE_NODE: {Y: [(0, -4, LINEAR), (60, 4)]}}))
 
     # Wrapper nodes carry the tunables so the state, look and blink keys on the inner objects
     # never collide with them. MouthNode's rest y is the SPEC mouth anchor (0, +82).

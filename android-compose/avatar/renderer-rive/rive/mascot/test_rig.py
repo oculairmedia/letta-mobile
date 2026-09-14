@@ -9,6 +9,9 @@ What they hold down (each was a real way to break the rig):
   references   every transition target and every animationId must resolve, in its own layer.
   contract     check_contract.py: the file still exposes what RiveAvatarContract.kt writes.
   timeline     timeline.py still reads the document (the review tool, README "The loop").
+  seams        rig/seams.py still reads the document, and the count of seams nobody has signed
+               off is exactly what it was: a new hard cut across a real delta, or a new one-shot
+               that hands a node back to the layers below, fails here and names itself.
 
 Standard library only, no pytest. Nothing here writes into the working tree: the regenerate
 goes to a tempfile.TemporaryDirectory.
@@ -159,6 +162,69 @@ class TestTimeline(unittest.TestCase):
         proc = run([sys.executable, "timeline.py", "--layers"])
         self.assertEqual(proc.returncode, 0, f"timeline.py --layers failed:\n{proc.stderr}")
         self.assertIn("layer Expression", proc.stdout)
+
+
+class TestSeams(unittest.TestCase):
+    """The seam ledger and the blend policy (MOTION-PIPELINE step A)."""
+
+    # Every seam in the committed scene.rml that nobody has signed `cut=True`. All of them are
+    # hand-backs: a one-shot ends holding Face/Body where the state that follows never keys it,
+    # so the pose snaps back to rest at a 0 ms hand-off. They are findings, not accidents of the
+    # tooling, and fixing them changes the output - so the number is pinned here instead, and a
+    # NEW hard cut (which the Layer policy would refuse outright) or a new hand-back moves it.
+    UNEXPLAINED = 61
+
+    @classmethod
+    def setUpClass(cls):
+        from rig.seams import ledger, object_names, unexplained
+        cls.rows = ledger(SCENE)
+        cls.loose = unexplained(cls.rows)
+        cls.names = object_names(SCENE)
+
+    def test_the_ledger_reads_the_committed_scene(self):
+        self.assertTrue(self.rows, "rig/seams.py found no seams at all in scene.rml; the ledger "
+                                   "is not reading the document")
+        signed = [r for r in self.rows if r.cut]
+        self.assertTrue(signed, "no seam is signed cut=True; the cut marks are not reaching the "
+                                "ledger (rig.layers.CUT_MARKS)")
+
+    def test_unexplained_seams_are_the_ones_we_know_about(self):
+        listing = "\n".join(
+            f"  {r.machine}/{r.layer}: {r.frm} -> {r.to} ({r.kind}, {r.ms} ms) "
+            f"{self.names.get(r.obj, r.obj)}.{r.prop} {r.from_value} -> {r.to_value} "
+            f"({r.normalised:.1f}x tolerance)" for r in self.loose)
+        self.assertEqual(
+            len(self.loose), self.UNEXPLAINED,
+            f"the seam ledger now finds {len(self.loose)} unsigned seams, not {self.UNEXPLAINED}.\n"
+            f"Either a 0 ms hand-off was added across a real delta (blend it, or mark the "
+            f"transition cut=True with a reason), or one was fixed - in which case move the pin.\n"
+            f"python -m rig.seams prints this list:\n{listing}")
+
+    def test_the_policy_refuses_a_hard_cut_and_takes_a_signed_one(self):
+        from rml import Y, animation
+        from rig.layers import Layer, OnBool, State
+        from rig.seams import animation_index
+
+        index = animation_index("\n".join([
+            animation("Up", "9:1", 10, {"9:90": {Y: [(0, 0), (10, -40)]}}),
+            animation("Down", "9:2", 10, {"9:90": {Y: [(0, 0), (10, 40)]}})]))
+        layer = lambda t: Layer("Synthetic", "9:10", "9:20",
+                                states=[State("9:1", "9:20", 0, transitions=[t]),
+                                        State("9:2", "9:21", 1)])
+        # Up leaves the node at -40, Down starts it at 0: 40 px across a 0 ms cut.
+        with self.assertRaises(ValueError) as caught:
+            layer(OnBool("9:21", "1:8", "true", 0, None)).rml(seams=index)
+        message = str(caught.exception)
+        for expected in ("Synthetic", "9:20", "9:21", "9:90", "y", "40"):
+            self.assertIn(expected, message, f"the refusal should name {expected}: {message}")
+        # Signed, it is the author's decision and the layer builds.
+        signed = layer(OnBool("9:21", "1:8", "true", 0, None, cut=True, reason="a test cut"))
+        self.assertIn('duration="0"', signed.rml(seams=index))
+        # A blend is never a seam, signed or not.
+        self.assertIn('duration="200"', layer(OnBool("9:21", "1:8", "true", 200, None)).rml(seams=index))
+        # And a signature with nothing to say is refused too.
+        with self.assertRaises(ValueError):
+            layer(OnBool("9:21", "1:8", "true", 0, None, cut=True)).rml(seams=index)
 
 
 if __name__ == "__main__":

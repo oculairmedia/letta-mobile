@@ -15,13 +15,13 @@ import math
 import os
 from typing import NamedTuple
 
-from rml import anim_state, input_transition, layer_frame
 from rig.ids import (
     GLYPH_SCALE_NODE, IDLE_A_NODE, IDLE_B_NODE, IDLE_C_NODE, IDLE_D_NODE, IDLE_WAIT_A, IDLE_WAIT_B,
     IDLE_WAIT_C, IDLE_WAIT_D, MOUTH_NODE, PLATE_SCALE_NODE, SACCADE_FIX_ANIMS, SACCADE_WAIT_ANIMS,
     STATES, TUNE_ANIM, VM_TUNE, WANDER_A_NODE, WANDER_B_NODE, WANDER_C_NODE, WANDER_D_NODE,
     WANDER_WAIT_A, WANDER_WAIT_B, WANDER_WAIT_C, WANDER_WAIT_D,
 )
+from rig.layers import Layer, OnInput, State
 
 
 # The art lives beside gen_scene.py, one level above this package.
@@ -46,6 +46,13 @@ def frames(ms):
 # Art direction: every beat (idle, wander, hover, saccade holds) was read as too quick at product
 # sizes. beat() stretches a beat's timing; waits, breath and state entries keep frames().
 BEAT_TEMPO = 1.4
+
+
+# The blend policy, in ms: how long a beat takes to mix in over the layers below it and how long
+# it takes to let go again. A beat's keys sit on top of Breath and the host's turn on the same
+# nodes, so both ends are blends - a cut would snap those values (see rig/seams.py). One table
+# instead of the same numbers retyped per state in rig/machine.py.
+BLEND = {"beat_in": 160, "beat_out": 320, "wander_in": 200, "wander_out": 320, "hover_out": 260}
 
 
 def beat(ms):
@@ -182,15 +189,20 @@ INK = "FF111111"
 PLATE_WHITE = "FFF7F7F7"
 
 
+EXPRESSION_CUT = "the plate's expression matrix: the swap is instant under the blink shutter"
+
+
 def expression_layer(*parts):
     """The XML of an expression layer: one state per STATES entry, every other state one cut away.
 
     Explicit matrix, instant cuts: the root hides every swap inside a blink shutter, and an
     AnyState fan-out would keep re-entering the current state (a self-blend that fades the glyph).
+    Every state is signed `cut=True` once, which is what lets the blend policy in rig/layers.py
+    accept a matrix of 0 ms transitions that swap a glyph and a mouth outright.
     """
     name, lid, input_id, anim_ids, node_ids = parts
-    states = []
-    for i, s in enumerate(STATES):
-        own = "\n".join(input_transition(node_ids[t], input_id, EXPR[t], 0) for t in STATES if t != s)
-        states.append(anim_state(anim_ids[s], node_ids[s], i, "", own))
-    return layer_frame(name, lid, node_ids["idle"], "", "\n".join(states))
+    states = [State(anim_ids[s], node_ids[s], i, cut=True, reason=EXPRESSION_CUT,
+                    transitions=[OnInput(node_ids[t], input_id, EXPR[t], 0)
+                                 for t in STATES if t != s])
+              for i, s in enumerate(STATES)]
+    return Layer(name, lid, node_ids["idle"], states=states).rml()

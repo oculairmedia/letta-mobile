@@ -17,7 +17,7 @@ from textwrap import indent
 
 from rml import (BIND_BOOL, EASE_OUT, SOFT_OUT, SPRING, VM_BLINK, VM_DRAGGED, VM_ERROR, VM_HOVER,
                  VM_SHAPE, VM_SUCCESS, bind)
-from rig.constants import DEFAULT_SHAPE, DESIGNED_PAIRS, IDLE_WAITS, WANDER_WAITS
+from rig.constants import BLEND, DEFAULT_SHAPE, DESIGNED_PAIRS, IDLE_WAITS, WANDER_WAITS
 from rig.ids import (
     BLINK_ANIM, BLINK_NODE, BLINK_REST_ANIM, BLINK_REST_NODE, BREATH_ANIM, BREATH_NODE, DRAG_ANIM,
     DRAG_NODE, DRAG_REST_ANIM, DRAG_REST_NODE, ERROR_ANIM, ERROR_NODE, FLASH_REST_ANIM,
@@ -45,15 +45,20 @@ def _expression_layer():
     # swallow the entries. Every sustained state cuts (0 ms) into the entry for the requested
     # state; the entry hands off to the sustained loop at its end. Designed entries land on the
     # target's rest and cut; generic ones blend the hand-off so held face/body/tint ease in.
+    ENTRY_CUT = "hidden by the blink shutter: the entry fires the blink at frame 0"
+    LANDS = "the designed entry lands on the target's rest pose"
     states = []
     for i, st in enumerate(SUSTAINED):
-        own = [OnEnum(enter_node[(st, to)], state_enum_ids[to], 0, None) for to in SUSTAINED if to != st]
+        own = [OnEnum(enter_node[(st, to)], state_enum_ids[to], 0, None, cut=True, reason=ENTRY_CUT)
+               for to in SUSTAINED if to != st]
         states.append(State(root_state_anim[st], root_state_node[st], i, transitions=own))
     for j, ((frm, to), nid) in enumerate(enter_node.items()):
         # An entry can be interrupted by any other request (through that state's own entry).
-        hand_off = (0, None) if (frm, to) in DESIGNED_PAIRS else (min(120, enter_duration(frm, to).ms), EASE_OUT)
-        own = [Exit(root_state_node[to], *hand_off)]
-        own += [OnEnum(enter_node[(to, other)], state_enum_ids[other], 0, None) for other in SUSTAINED if other != to]
+        designed = (frm, to) in DESIGNED_PAIRS
+        hand_off = (0, None) if designed else (min(120, enter_duration(frm, to).ms), EASE_OUT)
+        own = [Exit(root_state_node[to], *hand_off, cut=designed, reason=LANDS if designed else None)]
+        own += [OnEnum(enter_node[(to, other)], state_enum_ids[other], 0, None, cut=True, reason=ENTRY_CUT)
+                for other in SUSTAINED if other != to]
         states.append(State(enter_anim[(frm, to)], nid, len(SUSTAINED) + j, reset=True, transitions=own))
 
     return Layer("Expression", "3:1", root_state_node["idle"], states=states).rml()
@@ -78,15 +83,21 @@ def _static_layers():
                   transitions=[Exit(HOVER_HELD_NODE),
                                OnBool(HOVER_REST_NODE, VM_HOVER, "false", 220, SOFT_OUT)]),
             State(HOVER_HELD_ANIM, HOVER_HELD_NODE, 2,
-                  transitions=[OnBool(HOVER_REST_NODE, VM_HOVER, "false", 260, SOFT_OUT)])]).rml()
+                  transitions=[OnBool(HOVER_REST_NODE, VM_HOVER, "false", BLEND["hover_out"], SOFT_OUT)])]).rml()
+    # A flash is fired, not requested: it starts from wherever the character is, so the trigger
+    # cuts. Interrupting one flash with the other cuts across the error drop (24 px) on purpose -
+    # the new flash re-poses the body from its own frame 0.
+    FLASH_CUT = "trigger flash, self-returning: it re-poses from its own frame 0"
+    ERROR_HOLD = "error flash holds its drop; `state` settles to error behind it"
     flash = Layer(
         "Flash", "3:6", FLASH_REST_NODE,
-        any_transitions=[OnTrigger(SUCCESS_NODE, VM_SUCCESS), OnTrigger(ERROR_NODE, VM_ERROR)],
+        any_transitions=[OnTrigger(SUCCESS_NODE, VM_SUCCESS, cut=True, reason=FLASH_CUT),
+                         OnTrigger(ERROR_NODE, VM_ERROR, cut=True, reason=FLASH_CUT)],
         states=[State(FLASH_REST_ANIM, FLASH_REST_NODE, 0),
                 State(SUCCESS_ANIM, SUCCESS_NODE, 1, reset=True,
                       transitions=[Exit(FLASH_REST_NODE, 120, SOFT_OUT)]),
                 State(ERROR_ANIM, ERROR_NODE, 2, reset=True,
-                      transitions=[Exit(FLASH_REST_NODE, 0)])]).rml()
+                      transitions=[Exit(FLASH_REST_NODE, 0, cut=True, reason=ERROR_HOLD)])]).rml()
     drag = Layer(
         "Drag", "3:7", DRAG_REST_NODE,
         any_transitions=[OnBool(DRAG_NODE, VM_DRAGGED, "true", 80, SPRING),
@@ -99,8 +110,9 @@ def _park():
     # Asleep, the character holds still: the waits divert to a parked state until it is awake
     # again. Transitions are ordered, so the park check comes first.
     sleeping = state_enum_ids["sleeping"]
-    to_park = lambda node, dur=0: OnEnum(node, sleeping, dur, None)
-    from_park = lambda node: OnEnum(node, sleeping, 0, None, op="notEqual")
+    PARK = "park: sleeping holds still, so the wait drops its beat where it stands"
+    to_park = lambda node, dur=0: OnEnum(node, sleeping, dur, None, cut=True, reason=PARK)
+    from_park = lambda node: OnEnum(node, sleeping, 0, None, op="notEqual", cut=True, reason=PARK)
     return to_park, from_park
 
 
@@ -112,8 +124,8 @@ def _idle_layer(to_park, from_park):
     beat_nodes = [(IDLE_GLANCE_NODE, 22), (IDLE_BEATS["tilt"].node, 14), (IDLE_BEATS["lookaround"].node, 13),
                   (IDLE_BEATS["shift"].node, 12), (IDLE_BEATS["stretch"].node, 10), (IDLE_BEATS["sigh"].node, 10),
                   (IDLE_BEATS["shiver"].node, 8), (IDLE_BEATS["wobble"].node, 6), (IDLE_BEATS["bounce"].node, 5)]
-    pick_beat = [Exit(n, 160, SOFT_OUT, w) for n, w in beat_nodes]
-    back_to_wait = [Exit(w.node, 320, SOFT_OUT, 25) for w in IDLE_WAITS]
+    pick_beat = [Exit(n, BLEND["beat_in"], SOFT_OUT, w) for n, w in beat_nodes]
+    back_to_wait = [Exit(w.node, BLEND["beat_out"], SOFT_OUT, 25) for w in IDLE_WAITS]
 
     states = [State(w.anim, w.node, k, random=True, transitions=[to_park(IDLE_SLEEP_NODE)] + pick_beat)
               for k, w in enumerate(IDLE_WAITS)]
@@ -129,10 +141,10 @@ def _idle_layer(to_park, from_park):
 
 def _wander_layer(to_park, from_park):
     # Wander beats key the joystick the host also turns: blend in (200 ms) and out (320 ms).
-    pick_wander = [Exit(WANDER_GLANCE_NODE, 200, SOFT_OUT, 55),
-                   Exit(WANDER_PEEK_NODE, 200, SOFT_OUT, 35),
-                   Exit(WANDER_SPIN_NODE, 200, SOFT_OUT, 10)]
-    wander_home = [Exit(w.node, 320, SOFT_OUT, 25) for w in WANDER_WAITS]
+    pick_wander = [Exit(WANDER_GLANCE_NODE, BLEND["wander_in"], SOFT_OUT, 55),
+                   Exit(WANDER_PEEK_NODE, BLEND["wander_in"], SOFT_OUT, 35),
+                   Exit(WANDER_SPIN_NODE, BLEND["wander_in"], SOFT_OUT, 10)]
+    wander_home = [Exit(w.node, BLEND["wander_out"], SOFT_OUT, 25) for w in WANDER_WAITS]
 
     states = [State(w.anim, w.node, k, random=True, transitions=[to_park(WANDER_SLEEP_WAIT_NODE)] + pick_wander)
               for k, w in enumerate(WANDER_WAITS)]
