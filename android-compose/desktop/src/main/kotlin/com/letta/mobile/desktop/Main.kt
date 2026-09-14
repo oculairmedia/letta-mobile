@@ -105,9 +105,14 @@ private fun runDesktopApplication(
             // which is a composition sibling — not a descendant — of
             // LettaDesktopApp. See letta-mobile-3arhe.1.
             var headerChrome by remember { mutableStateOf(DesktopHeaderChromeState.Empty) }
+            val mascots = remember { com.letta.mobile.ui.mascot.MascotIdentityRegistry() }
             CompositionLocalProvider(
                 LocalWindowExceptionHandlerFactory provides CrashReportingExceptionHandlerFactory,
                 LocalMermaidDiagramRenderer provides DesktopMermaidDiagramRenderer,
+                // The native Rive bridge draws every live mascot; the shared MascotAvatar reads it here,
+                // with the window-owned registry of identities, presence and the pointer.
+                com.letta.mobile.ui.mascot.LocalMascotHost provides com.letta.mobile.desktop.avatar.rive.DesktopMascotHost,
+                com.letta.mobile.ui.mascot.LocalMascotRegistry provides mascots,
             ) {
                 // Windows touchscreens: every text field that starts an input
                 // session while the last pointer input came from a finger gets
@@ -147,9 +152,9 @@ private fun runDesktopApplication(
                                             val e = awaitPointerEvent(PointerEventPass.Initial)
                                             when (e.type) {
                                                 PointerEventType.Move ->
-                                                    com.letta.mobile.desktop.chat.MascotIdentityRegistry.cursor.value = e.changes.firstOrNull()?.position
+                                                    mascots.cursor.value = e.changes.firstOrNull()?.position
                                                 PointerEventType.Exit ->
-                                                    com.letta.mobile.desktop.chat.MascotIdentityRegistry.cursor.value = null
+                                                    mascots.cursor.value = null
                                                 else -> Unit
                                             }
                                         }

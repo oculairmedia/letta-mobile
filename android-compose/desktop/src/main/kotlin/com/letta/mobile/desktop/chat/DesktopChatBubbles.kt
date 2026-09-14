@@ -428,8 +428,7 @@ private fun PromptExpandButton(expanded: Boolean, onToggle: () -> Unit) {
 internal fun ThinkingMessageRow(agentId: String? = null) {
     // The agent itself thinks in the thread (its live mascot, already in the thinking state
     // via the director); the glow dot stays for agents without an identity.
-    val live = agentId != null && MascotIdentityRegistry.identities.containsKey(agentId) &&
-        com.letta.mobile.desktop.avatar.rive.RiveBridgeNative.AVAILABLE
+    val live = com.letta.mobile.ui.mascot.mascotAvailable(agentId)
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,

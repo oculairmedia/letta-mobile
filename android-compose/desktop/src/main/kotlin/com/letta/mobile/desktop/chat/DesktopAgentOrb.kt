@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.MaterialTheme
+import com.letta.mobile.ui.mascot.MascotAvatar
 import com.letta.mobile.ui.theme.customColors
 
 /**
@@ -59,39 +60,27 @@ fun AgentOrb(
     modifier: Modifier = Modifier,
     cornerRadius: Dp = 7.dp,
     onClick: (() -> Unit)? = null,
-    /** The agent this orb stands for. With an identity in [MascotIdentityRegistry], the orb IS the live mascot. */
+    /** The agent this orb stands for; with a known mascot identity the orb is the live mascot. */
     agentId: String? = null,
     content: @Composable (() -> Unit)? = null,
 ) {
     val shape = RoundedCornerShape(cornerRadius)
-    val identity = agentId?.let { MascotIdentityRegistry.identities[it] }
-    if (identity != null && com.letta.mobile.desktop.avatar.rive.RiveBridgeNative.AVAILABLE) {
-        // One shared native scene per agent, advanced once per frame wherever it is drawn.
+    // With an identity in MascotIdentityRegistry and a renderer in LocalMascotHost, the orb IS
+    // the live mascot (one shared scene per agent); the gradient stands in otherwise.
+    MascotAvatar(agentId = agentId, size = size, modifier = modifier, cornerRadius = cornerRadius, onClick = onClick) {
         Box(
+            // clip BEFORE clickable so the hover/press indication follows the orb's
+            // rounded shape instead of a rectangle. onClick is applied here (not by
+            // the caller's modifier) so it sits inside the clip.
             modifier = modifier
                 .size(size)
                 .clip(shape)
+                .background(agentOrbBrush(index))
                 .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
             contentAlignment = Alignment.Center,
         ) {
-            // The body spans ~60 % of the artboard; overscale so the character fills the tile edge
-            // to edge and the tile's clip crops the rest - an avatar photo, not a figure in a frame.
-            com.letta.mobile.desktop.avatar.rive.DesktopMascotHero(agentId = agentId, identity = identity, size = size * 1.6f)
+            content?.invoke()
         }
-        return
-    }
-    Box(
-        // clip BEFORE clickable so the hover/press indication follows the orb's
-        // rounded shape instead of a rectangle. onClick is applied here (not by
-        // the caller's modifier) so it sits inside the clip.
-        modifier = modifier
-            .size(size)
-            .clip(shape)
-            .background(agentOrbBrush(index))
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
-        contentAlignment = Alignment.Center,
-    ) {
-        content?.invoke()
     }
 }
 
@@ -207,28 +196,3 @@ fun AgentActivityOrb(
 private const val SphereFraction = 0.62f
 private const val ActivityRingCount = 2
 private const val ActivityRingPeriodMs = 1600
-
-/**
- * Every agent's mascot identity, as the app currently knows it. [LettaDesktopApp] keeps it
- * current; any surface that draws an agent reads it through [AgentOrb] without the identity
- * having to be threaded through every row model on the way.
- */
-object MascotIdentityRegistry {
-    val identities = androidx.compose.runtime.mutableStateMapOf<String, com.letta.mobile.avatar.core.MascotIdentity>()
-
-    /** Each agent's presence (activity, typing, approval, error) as the app derives it; absent means idle. */
-    val presence = androidx.compose.runtime.mutableStateMapOf<String, com.letta.mobile.data.presence.AgentPresence>()
-
-    fun updatePresence(all: Map<String, com.letta.mobile.data.presence.AgentPresence>) {
-        presence.keys.retainAll(all.keys)
-        presence.putAll(all)
-    }
-
-    /** The cursor in window coordinates, or null when it has left the window; every mascot looks toward it. */
-    val cursor = androidx.compose.runtime.mutableStateOf<androidx.compose.ui.geometry.Offset?>(null)
-
-    fun update(all: Map<String, com.letta.mobile.avatar.core.MascotIdentity>) {
-        identities.keys.retainAll(all.keys)
-        identities.putAll(all)
-    }
-}

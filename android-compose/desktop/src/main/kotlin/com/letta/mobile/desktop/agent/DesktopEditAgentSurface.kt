@@ -284,8 +284,8 @@ internal fun DesktopEditAgentSurface(
                     Modifier.size(72.dp).clip(RoundedCornerShape(16.dp)).clickable { pickerOpen = true },
                     contentAlignment = Alignment.Center,
                 ) {
-                    if (com.letta.mobile.desktop.avatar.rive.RiveBridgeNative.AVAILABLE) {
-                        com.letta.mobile.desktop.avatar.rive.DesktopMascotHero(agentId = agentId, identity = identity, size = 110.dp)
+                    if (com.letta.mobile.ui.mascot.LocalMascotHost.current.entry(agentId, identity) != null) {
+                        com.letta.mobile.ui.mascot.MascotLive(agentId = agentId, identity = identity, size = 110.dp)
                     } else {
                         MascotShapeGlyph(identity.shape, identity.argb, 64.dp)
                     }

@@ -340,8 +340,8 @@ private fun NewConversationWelcome(
         ) {
             // The agent itself, at hero size, live when the native bridge is here; the gradient
             // sphere otherwise. It is the page: everything below is a compact strip of first moves.
-            if (identity != null && agentId != null) {
-                com.letta.mobile.desktop.avatar.rive.DesktopMascotHero(agentId = agentId, identity = identity, size = 220.dp)
+            if (identity != null && agentId != null && com.letta.mobile.ui.mascot.mascotAvailable(agentId)) {
+                com.letta.mobile.ui.mascot.MascotLive(agentId = agentId, identity = identity, size = 220.dp)
             } else {
                 AgentSphere(size = 96.dp)
             }

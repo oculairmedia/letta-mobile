@@ -405,7 +405,8 @@ internal fun LettaDesktopApp(
     // The gradient orbs (until the rollout's P3 replaces them) keep taking a slot index.
     val avatarStyleByAgentId = identityByAgentId.mapValues { it.value.legacyOrbIndex() }
     // Every AgentOrb in the app reads identities from the registry; keep it current.
-    androidx.compose.runtime.SideEffect { com.letta.mobile.desktop.chat.MascotIdentityRegistry.update(identityByAgentId) }
+    val mascotRegistry = com.letta.mobile.ui.mascot.LocalMascotRegistry.current
+    androidx.compose.runtime.SideEffect { mascotRegistry.update(identityByAgentId) }
     val selectedAgentOrbIndex = avatarStyleByAgentId[selectedAgentId]
         ?: railAgents.indexOfFirst { it.first == selectedAgentId }.coerceAtLeast(0)
     val selectedAgentName = railAgents.firstOrNull { it.first == selectedAgentId }?.second
@@ -474,7 +475,7 @@ internal fun LettaDesktopApp(
             errorConversationId = chatState.selectedConversationId.takeIf { chatState.errorMessage != null },
         )
     }
-    androidx.compose.runtime.SideEffect { com.letta.mobile.desktop.chat.MascotIdentityRegistry.updatePresence(mascotPresence) }
+    androidx.compose.runtime.SideEffect { mascotRegistry.updatePresence(mascotPresence) }
     val isStreamingReplySelected = replyPresence.isStreaming
 
     // Background work can belong to a conversation the user has switched away

@@ -133,17 +133,24 @@ avatar/renderer-rive (commonMain)
   androidMain: RiveAvatarSurface + ViewModelInstanceInputSink  (rive-android; Rive Renderer)
   (desktop scene stays in desktop/ until a second OS bridge exists)
 
-sharedUI (commonMain, android + jvm)
-  NEW MascotAvatar(identity, state, size, gaze) - THE composable every surface calls.
-      size >= 56 dp: live scene.  size < 56 dp: cached bitmap keyed (shape, colour, state, px),
-      rendered by one shared scene per process, refreshed on state change - 20 agents in a list
-      cost 20 cache hits per frame, not 20 renders.
-      Renderer unavailable (no bridge on this OS, load failure): the existing gradient orb.
-  NEW MascotPicker(identity, onChange) - shape grid 4x2 + colour dots 5x2 + grey (Grokbot layout).
+sharedUI (commonMain, android + jvm)  - ui/mascot/, AS BUILT in #1540
+  MascotAvatar(agentId, size, fallback) - THE composable every surface calls: tile, clip,
+      overscale, presence -> director, frame clock, pointer gaze. Fallback (gradient orb) when
+      the agent has no identity or the host has no renderer.
+  MascotLive(agentId, identity, size) - the hero form of the same thing (no tile).
+  MascotEntry (abstract: runtime + director + presence/tick policy; platform supplies load/dispose)
+      + MascotEntries (one live entry per agent for the life of the process).
+  AvatarDirector.applyPresence(previous, presence) - the whole presence -> director mapping (tested).
+  MascotIdentityRegistry (identities, presence, pointer) via LocalMascotRegistry; MascotHost
+      (entry(agentId, identity) + Surface(entry)) via LocalMascotHost - the two seams a platform fills.
+  MascotPicker(identity, onChange) - shape grid 4x2 + colour dots 5x2 + grey (Grokbot layout).
+  STILL TO DO (bn0y6): size < 56 dp cached-bitmap tier keyed (shape, colour, state, px).
 
 desktop/                               app/ (Android)
-  bind presence -> director            bind presence -> director
-  RiveDesktopScene/Surface (Windows)   RiveAvatarSurface
+  DesktopMascotHost: MascotHost over     AndroidMascotHost: MascotHost over
+    RiveDesktopScene/Surface (Windows)     RiveAvatarSurface (P4, jwntc)
+  provides LocalMascotHost +             provides the same two locals at the
+    LocalMascotRegistry at the window root  activity root; feeds presence the same way
   edit-agent picker, chat header hero, edit-agent picker, chat header hero,
   12 AgentOrb/AgentSphere sites        agent list / rail sites
   persistence: agent.<id>.avatar_style persistence: same key in the settings store
