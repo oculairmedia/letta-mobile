@@ -94,9 +94,12 @@ __declspec(dllexport) void rive_bridge_destroy(RiveBridge* bridge)
     delete bridge;
 }
 
-// Returns 0 on success.
-__declspec(dllexport) int rive_bridge_load(RiveBridge* bridge, const uint8_t* bytes, int length,
-                                           const char* stateMachineName)
+// Returns 0 on success. `artboardName` null/empty picks the file's default artboard; a name that
+// no artboard carries is an error (4) rather than a silent fall back to the default, so the bench
+// cannot believe it is looking at `Harness` while showing `Mascot`.
+__declspec(dllexport) int rive_bridge_load_artboard(RiveBridge* bridge, const uint8_t* bytes, int length,
+                                                    const char* stateMachineName,
+                                                    const char* artboardName)
 {
     bridge->stateMachine.reset();
     bridge->artboard.reset();
@@ -105,7 +108,16 @@ __declspec(dllexport) int rive_bridge_load(RiveBridge* bridge, const uint8_t* by
     bridge->file = File::import(Span<const uint8_t>(bytes, length), bridge->renderContext.get(), &result);
     if (!bridge->file)
         return 1;
-    bridge->artboard = bridge->file->artboardDefault();
+    if (artboardName && *artboardName)
+    {
+        bridge->artboard = bridge->file->artboardNamed(std::string(artboardName));
+        if (!bridge->artboard)
+            return 4;
+    }
+    else
+    {
+        bridge->artboard = bridge->file->artboardDefault();
+    }
     if (!bridge->artboard)
         return 2;
     if (stateMachineName && *stateMachineName)
@@ -141,6 +153,13 @@ __declspec(dllexport) int rive_bridge_load(RiveBridge* bridge, const uint8_t* by
     }
     bridge->stateMachine->advanceAndApply(0);
     return 0;
+}
+
+// The original entry point: the file's default artboard.
+__declspec(dllexport) int rive_bridge_load(RiveBridge* bridge, const uint8_t* bytes, int length,
+                                           const char* stateMachineName)
+{
+    return rive_bridge_load_artboard(bridge, bytes, length, stateMachineName, nullptr);
 }
 
 __declspec(dllexport) float rive_bridge_artboard_width(RiveBridge* bridge)
@@ -307,6 +326,47 @@ __declspec(dllexport) int rive_bridge_vm_set_number(RiveBridge* bridge, const ch
         return 1;
     property->as<ViewModelInstanceNumber>()->propertyValue(value);
     return 0;
+}
+
+// Reads a view-model number back. This is the probe path: with `--probe`'s two-way data binds in
+// the file, a node property's real post-state-machine value arrives here every frame. Returns 0 and
+// writes `*out` when the property exists and is a number.
+__declspec(dllexport) int rive_bridge_vm_get_number(RiveBridge* bridge, const char* name, float* out)
+{
+    if (!out)
+        return 3;
+    auto* property = bridge->viewModel ? bridge->viewModel->propertyValue(std::string(name)) : nullptr;
+    if (!property || !property->is<ViewModelInstanceNumber>())
+        return 1;
+    *out = property->as<ViewModelInstanceNumber>()->propertyValue();
+    return 0;
+}
+
+// Newline-separated names of every number property on the bound view model, so the bench can find
+// the `telemetry*` probes without being told what they are. Returns the number of names written, or
+// -1 when the buffer is too small (nothing is written then).
+__declspec(dllexport) int rive_bridge_vm_number_names(RiveBridge* bridge, char* out, int cap)
+{
+    if (!out || cap <= 0)
+        return -1;
+    std::string joined;
+    int count = 0;
+    if (bridge->viewModel)
+    {
+        for (const auto& value : bridge->viewModel->propertyValues())
+        {
+            if (!value || !value->is<ViewModelInstanceNumber>())
+                continue;
+            if (!joined.empty())
+                joined.push_back('\n');
+            joined += value->name();
+            ++count;
+        }
+    }
+    if ((int)joined.size() + 1 > cap)
+        return -1;
+    std::memcpy(out, joined.c_str(), joined.size() + 1);
+    return count;
 }
 
 __declspec(dllexport) int rive_bridge_vm_set_enum(RiveBridge* bridge, const char* name, const char* key)

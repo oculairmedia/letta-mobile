@@ -268,6 +268,10 @@ tasks.register<JavaExec>("runRiveSpike") {
     classpath = sourceSets.main.get().runtimeClasspath
     providers.gradleProperty("riveBridge").orNull?.let { systemProperty("rive.bridge.path", it) }
     providers.gradleProperty("riveSelfTest").orNull?.let { systemProperty("rive.spike.selfTest", it) }
+    // -PriveRecord=enter-thinking takes one motion signature as soon as the file loads and prints it.
+    providers.gradleProperty("riveRecord").orNull?.let { systemProperty("rive.spike.record", it) }
+    // -PriveOnion=true opens with the live onion skin already on.
+    providers.gradleProperty("riveOnion").orNull?.let { systemProperty("rive.spike.onion", it) }
     args(
         providers.gradleProperty("riveFile").orElse("").get(),
         providers.gradleProperty("riveStateMachine").orElse("").get(),

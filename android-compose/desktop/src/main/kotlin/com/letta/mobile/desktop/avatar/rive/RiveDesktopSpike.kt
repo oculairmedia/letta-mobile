@@ -81,6 +81,15 @@ import kotlinx.coroutines.delay
 private val SELF_TEST = System.getProperty("rive.spike.selfTest").toBoolean()
 
 /**
+ * `-Drive.spike.record=enter-thinking` presses "record signature" on that scenario once the file has
+ * loaded, so a signature can be taken from a script - or by an agent that cannot click the window.
+ */
+private val RECORD_ON_START: String? = System.getProperty("rive.spike.record")?.takeIf { it.isNotBlank() }
+
+/** `-Drive.spike.onion=true` opens the bench with the onion skin already on. */
+private val ONION_ON_START = System.getProperty("rive.spike.onion").toBoolean()
+
+/**
  * letta-mobile-0s5bi spike window. Two native Rive scenes side by side, both plain Compose nodes:
  *
  *  - Left (optional): any `.riv` (`-PriveFile`), clickable, with its state machine's trigger inputs
@@ -106,12 +115,18 @@ fun main(args: Array<String>) = application {
         state = rememberWindowState(width = 1320.dp, height = 900.dp),
     ) {
         MaterialTheme(colorScheme = darkColorScheme()) {
+            // A bare `-PriveFile` (no state machine, no triggers) is a build of the mascot itself -
+            // a `--solo` or a `--probe` variant - so the bench reviews THAT instead of the shipped
+            // file: the scenarios, the onion skin and the telemetry panel all want the same scene.
+            // `-PriveFile` with a state machine or triggers is still the second column.
+            val benchFile = if (file != null && stateMachine == null && triggers.isEmpty()) file else mascot
+            val secondColumn = file?.takeIf { it != benchFile }
             Row(Modifier.fillMaxSize().background(Color(0xFF1A1A1A)), horizontalArrangement = Arrangement.spacedBy(0.dp)) {
-                if (file != null) {
-                    SceneColumn(file, stateMachine, triggers, Modifier.weight(1f).padding(16.dp))
+                if (secondColumn != null) {
+                    SceneColumn(secondColumn, stateMachine, triggers, Modifier.weight(1f).padding(16.dp))
                 }
-                if (mascot != null) {
-                    MascotBench(mascot, Modifier.weight(if (file != null) 1.4f else 1f))
+                if (benchFile != null) {
+                    MascotBench(benchFile, Modifier.weight(if (secondColumn != null) 1.4f else 1f))
                 }
             }
         }
@@ -172,6 +187,33 @@ private enum class Ground(val label: String) { PAGE("page"), FRAME("frame") }
 /** How the host drives the gaze. JUSTIFIED is the product behaviour; CURSOR is for checking range. */
 private enum class GazeMode(val label: String) { JUSTIFIED("justified"), CURSOR("cursor"), OFF("sliders") }
 
+/** The telemetry window: four seconds at the frame clock's nominal rate (MOTION-PIPELINE section 6). */
+private const val TELEMETRY_WINDOW_SECONDS = 4f
+private const val NOMINAL_FPS = 60
+private const val TELEMETRY_CAPACITY = (TELEMETRY_WINDOW_SECONDS * NOMINAL_FPS).toInt()
+
+/** How long "record signature" watches a scenario before it prints: long enough for a beat to settle. */
+private const val RECORD_MILLIS = 2500L
+
+/**
+ * A named thing the bench can play and record: a state entry, or one of the gesture triggers the
+ * state buttons already fire. Same list `scenarios.py` will carry on the CLI side.
+ */
+private sealed interface BenchScenario {
+    val label: String
+
+    data class Enter(val state: AvatarState) : BenchScenario {
+        override val label: String get() = "enter-${state.name.lowercase()}"
+    }
+
+    data class Gesture(val gesture: String) : BenchScenario {
+        override val label: String get() = gesture
+    }
+}
+
+private val BENCH_SCENARIOS: List<BenchScenario> =
+    AvatarState.entries.map(BenchScenario::Enter) + BenchScenario.Gesture(RiveAvatarRuntime.BLINK_GESTURE)
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun MascotBench(file: File, modifier: Modifier) {
@@ -206,6 +248,21 @@ private fun MascotBench(file: File, modifier: Modifier) {
     var selFrame by remember { mutableIntStateOf(-1) }
     var loaded by remember { mutableStateOf(false) }
     val tune = remember { mutableStateMapOf("tuneScale" to 0.5f, "tunePlate" to 0.5f, "tuneGlyph" to 0.5f, "tuneMouth" to 0.5f, "tuneMouthY" to 0.5f) }
+
+    // ---- the sweatbox instruments: onion skin, telemetry, signatures (MOTION-PIPELINE section 6) ----
+    var onionOn by remember { mutableStateOf(ONION_ON_START) }
+    var onionFrames by remember { mutableIntStateOf(8) }
+    var onionStride by remember { mutableIntStateOf(3) }
+    var onionTint by remember { mutableStateOf(true) }
+    val onion = if (onionOn) RiveOnionSkin(frames = onionFrames, stride = onionStride, tint = onionTint) else null
+
+    var probeNames by remember { mutableStateOf(emptyList<String>()) }
+    val tracks = remember(probeNames) { probeNames.map { TelemetryTrack(it, TELEMETRY_CAPACITY) } }
+    val recorder = remember { SignatureRecorder() }
+    var recording by remember { mutableStateOf(false) }
+    var scenario by remember { mutableStateOf<BenchScenario>(BenchScenario.Enter(AvatarState.IDLE)) }
+    var recordToken by remember { mutableIntStateOf(0) }
+    var lastSignature by remember { mutableStateOf("") }
 
     fun setState(state: AvatarState) {
         current = state
@@ -281,6 +338,57 @@ private fun MascotBench(file: File, modifier: Modifier) {
         }
     }
 
+    // Which probes the loaded file carries. A file built without `gen_scene.py --probe` has none,
+    // and an older bridge DLL has no readback at all; both come back as an empty list.
+    LaunchedEffect(loaded) {
+        if (!loaded) return@LaunchedEffect
+        probeNames = scene.numberNames().filter { it.startsWith(TELEMETRY_PREFIX) }.sorted()
+        println(
+            "rive-spike telemetry: readback=${RiveBridgeNative.PROBE_READBACK} " +
+                "artboardByName=${RiveBridgeNative.ARTBOARD_BY_NAME} probes=${probeNames.size} $probeNames",
+        )
+        // Only ever the first time: a recomposition that re-ran this must not record a second run.
+        val requested = RECORD_ON_START?.takeIf { recordToken == 0 } ?: return@LaunchedEffect
+        val chosen = BENCH_SCENARIOS.firstOrNull { it.label == requested }
+        if (chosen == null) {
+            println("rive-spike signature: no scenario '$requested'; have ${BENCH_SCENARIOS.map { it.label }}")
+        } else {
+            scenario = chosen
+            recordToken++
+        }
+    }
+
+    // One read per property per frame, on the same frame clock the surface renders on.
+    LaunchedEffect(tracks) {
+        if (tracks.isEmpty()) return@LaunchedEffect
+        while (true) {
+            withFrameNanos {
+                tracks.forEach { track ->
+                    val value = scene.getNumber(track.name) ?: return@forEach
+                    track.push(value)
+                    if (recording) recorder.push(track.name, value)
+                }
+            }
+        }
+    }
+
+    // "Record signature": play the chosen scenario, watch it settle, print probe.py's JSON.
+    LaunchedEffect(recordToken) {
+        if (recordToken == 0) return@LaunchedEffect
+        autoCycle = false
+        recorder.start(scenario.label)
+        recording = true
+        when (val chosen = scenario) {
+            is BenchScenario.Enter -> setState(chosen.state)
+            is BenchScenario.Gesture -> runtime.playGesture(AvatarGesture(chosen.gesture))
+        }
+        delay(RECORD_MILLIS)
+        recording = false
+        val json = signatureJson(recorder.signatures())
+        lastSignature = json
+        println("rive-spike signature: scenario=${recorder.scenario} frames=${recorder.frames} $json")
+    }
+
     // Tunables are plain view-model numbers; write each on change (the map is snapshot state).
     LaunchedEffect(loaded) {
         if (!loaded) return@LaunchedEffect
@@ -341,11 +449,11 @@ private fun MascotBench(file: File, modifier: Modifier) {
                         ) {
                             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                 PalettePopup(framePalette, { framePalette = false }, frame.base) { frame = frame.copy(base = it) }
-                                MascotBox(scene, frameSize * mascotScale) { mascotBounds = it }
+                                MascotBox(scene, frameSize * mascotScale, onion) { mascotBounds = it }
                             }
                         }
                     } else {
-                        MascotBox(scene, frameSize * mascotScale) { mascotBounds = it }
+                        MascotBox(scene, frameSize * mascotScale, onion) { mascotBounds = it }
                     }
                 }
                 if (showTargets && gazeMode == GazeMode.JUSTIFIED) {
@@ -359,6 +467,21 @@ private fun MascotBench(file: File, modifier: Modifier) {
                     color = if (isDark(page.base)) Color(0x66FFFFFF) else Color(0x66000000),
                     modifier = Modifier.align(Alignment.BottomStart).padding(12.dp),
                 )
+            }
+        }
+
+        // ---- the instrument panel, beside the character: sparkline, value, delta, spacing ----
+        if (tracks.isNotEmpty()) {
+            Column(
+                Modifier.width(260.dp).fillMaxHeight().background(Color(0xFF101010))
+                    .verticalScroll(rememberScrollState()).padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                TelemetryPanel(tracks, TELEMETRY_WINDOW_SECONDS)
+                if (lastSignature.isNotEmpty()) {
+                    Section("last signature (also on stdout)")
+                    Text(lastSignature, color = Color(0xFF9FD0A0), style = MaterialTheme.typography.labelSmall)
+                }
             }
         }
 
@@ -431,6 +554,36 @@ private fun MascotBench(file: File, modifier: Modifier) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 listOf(22f, 44f, 72f, 120f, 240f, 360f).forEach { s -> OutlinedButton({ frameSize = s }) { Text("${s.toInt()}") } }
             }
+            // ---- onion skin: the last N rendered frames under the live one, onion.py's ramp ----
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Switch(onionOn, onCheckedChange = { onionOn = it })
+                Text(if (onionOn) "onion: on" else "onion: off", color = Color.LightGray)
+                Switch(onionTint, onCheckedChange = { onionTint = it }, enabled = onionOn)
+                Text("tint", color = Color.LightGray)
+            }
+            if (onionOn) {
+                Section("onion frames $onionFrames")
+                Slider(onionFrames.toFloat(), valueRange = 2f..24f, onValueChange = { onionFrames = it.toInt() })
+                Section("onion stride every $onionStride frame(s)")
+                Slider(onionStride.toFloat(), valueRange = 1f..12f, onValueChange = { onionStride = it.toInt() })
+            }
+
+            // ---- signatures: play a scenario and print probe.py's JSON per probed property ----
+            Section(
+                if (tracks.isEmpty()) "record signature (no telemetry probes in this file)"
+                else "record signature - ${tracks.size} probes, %.1f s".format(RECORD_MILLIS / 1000f),
+            )
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                BENCH_SCENARIOS.forEach { candidate ->
+                    val onClick = { scenario = candidate }
+                    if (candidate == scenario) Button(onClick) { Text(candidate.label) }
+                    else OutlinedButton(onClick) { Text(candidate.label) }
+                }
+            }
+            Button({ recordToken++ }, enabled = tracks.isNotEmpty() && !recording) {
+                Text(if (recording) "recording ${scenario.label}..." else "record ${scenario.label}")
+            }
+
             Section("mascot in frame x%.2f  (%s)".format(mascotScale, if (mascotScale > 1f) "clipped" else "padded"))
             Slider(mascotScale, valueRange = 0.4f..2.2f, onValueChange = { mascotScale = it })
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -530,9 +683,9 @@ private fun TuneSlider(label: String, tune: MutableMap<String, Float>, key: Stri
 
 /** The mascot at a given size, reporting its bounds in the stage so the cursor gaze can aim at it. */
 @Composable
-private fun MascotBox(scene: RiveDesktopScene, sizeDp: Float, onBounds: (Rect) -> Unit) {
+private fun MascotBox(scene: RiveDesktopScene, sizeDp: Float, onion: RiveOnionSkin?, onBounds: (Rect) -> Unit) {
     Box(Modifier.size(sizeDp.dp).onGloballyPositioned { onBounds(it.boundsInParent()) }) {
-        RiveDesktopSurface(scene, Modifier.fillMaxSize())
+        RiveDesktopSurface(scene, Modifier.fillMaxSize(), onion = onion)
     }
 }
 

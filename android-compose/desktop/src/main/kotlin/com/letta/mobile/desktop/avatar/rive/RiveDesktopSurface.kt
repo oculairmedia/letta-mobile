@@ -7,9 +7,14 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.input.pointer.PointerEventType
@@ -20,6 +25,60 @@ import org.jetbrains.skia.ColorAlphaType
 import org.jetbrains.skia.ColorType
 import org.jetbrains.skia.Image
 import org.jetbrains.skia.ImageInfo
+
+/**
+ * A live onion skin over the surface: the last [frames] rendered frames, sampled every [stride]th
+ * frame, drawn under the live one. The ramp is the one `rive/mascot/onion.py` uses so the bench and
+ * the CLI tool read the same - alpha [minAlpha]..[maxAlpha] oldest to newest, and with [tint] a
+ * cool-to-warm paper tint that fades out as the frames approach now.
+ *
+ * Passing null (the default, and what every production call site does) allocates no ring at all.
+ */
+data class RiveOnionSkin(
+    val frames: Int = 8,
+    val stride: Int = 3,
+    val tint: Boolean = true,
+    val minAlpha: Float = 0.15f,
+    val maxAlpha: Float = 0.6f,
+)
+
+/** onion.py's `COOL` and `WARM`: the oldest frame's paper is blue, the newest is nearly untinted. */
+private val ONION_COOL = Color(0.353f, 0.588f, 1f)
+private val ONION_WARM = Color(1f, 0.588f, 0.235f)
+
+/**
+ * Holds the ghost frames. The Skia images are owned here and closed on eviction: a ghost outlives
+ * the two-slot rotation the live frame uses, so it cannot borrow one of those images.
+ */
+private class RiveGhostRing : AutoCloseable {
+    private val owned = ArrayDeque<Image>()
+    var ghosts: List<ImageBitmap> by mutableStateOf(emptyList())
+        private set
+
+    fun push(image: Image, capacity: Int) {
+        owned.addLast(image)
+        while (owned.size > capacity.coerceAtLeast(1)) owned.removeFirst().close()
+        ghosts = owned.map { it.toComposeImageBitmap() }
+    }
+
+    fun clear() {
+        while (owned.isNotEmpty()) owned.removeFirst().close()
+        ghosts = emptyList()
+    }
+
+    override fun close() = clear()
+}
+
+/** onion.py's `ramp`: [lo] at the oldest frame, [hi] at the newest. */
+private fun onionRamp(index: Int, count: Int, lo: Float, hi: Float): Float =
+    if (count < 2) hi else lo + (hi - lo) * (index / (count - 1f))
+
+/** onion.py's tint: pull the frame toward the ramp colour, strongest on the oldest frame. */
+private fun onionTint(index: Int, count: Int): ColorFilter {
+    val t = if (count < 2) 1f else index / (count - 1f)
+    val hue = androidx.compose.ui.graphics.lerp(ONION_COOL, ONION_WARM, t)
+    return ColorFilter.tint(hue.copy(alpha = 0.6f - 0.5f * t), BlendMode.SrcAtop)
+}
 
 /**
  * Draws a [RiveDesktopScene] as an ordinary Compose node: native GPU render, pixel readback, Skia
@@ -35,6 +94,8 @@ fun RiveDesktopSurface(
     /** False renders the scene once as it stands and never advances it here - a still. */
     playing: Boolean = true,
     onFrameStats: ((nativeMs: Double) -> Unit)? = null,
+    /** Non-null turns on the bench's live onion skin; null keeps the production path allocation-free. */
+    onion: RiveOnionSkin? = null,
 ) {
     var size by remember { mutableStateOf(IntSize.Zero) }
     var frame by remember { mutableStateOf<ImageBitmap?>(null) }
@@ -44,6 +105,13 @@ fun RiveDesktopSurface(
     // changes quickly (a resize drag allocates and frees one every frame).
     val images = remember { arrayOfNulls<Image>(2) }
     DisposableEffect(Unit) { onDispose { images.forEach { it?.close() }; images.fill(null) } }
+
+    // The ring exists only while the onion skin is on, and dies with it: turning the toggle off
+    // frees every ghost image immediately rather than keeping a dormant buffer on the hot path.
+    val ring = remember(onion != null) { if (onion != null) RiveGhostRing() else null }
+    DisposableEffect(ring) { onDispose { ring?.close() } }
+    // Read inside the frame loop so moving the N / stride sliders does not restart it.
+    val currentOnion = rememberUpdatedState(onion)
 
     LaunchedEffect(scene, size, playing) {
         // Pin the size for this loop: `size` is state and can change under a frame callback before
@@ -60,6 +128,9 @@ fun RiveDesktopSurface(
             frame = image.toComposeImageBitmap()
             return@LaunchedEffect
         }
+        // Ghosts are sized in pixels, so a resize invalidates every one of them.
+        ring?.clear()
+        var tick = 0L
         while (true) {
             withFrameNanos { now ->
                 // Once per frame even when several surfaces share this scene.
@@ -72,6 +143,13 @@ fun RiveDesktopSurface(
                 images[1] = images[0]
                 images[0] = image
                 frame = image.toComposeImageBitmap()
+                val skin = currentOnion.value
+                if (ring != null && skin != null && tick % skin.stride.coerceAtLeast(1) == 0L) {
+                    // A ghost gets its own image: the two-slot rotation above closes its images a
+                    // frame later, which would pull the pixels out from under the ring.
+                    ring.push(Image.makeRaster(info, pixels, w * 4), skin.frames)
+                }
+                tick++
             }
         }
     }
@@ -95,6 +173,18 @@ fun RiveDesktopSurface(
                 }
             },
     ) {
+        val ghosts = ring?.ghosts.orEmpty()
+        if (onion != null) {
+            // Oldest first, under the live frame: the classic stack, faintest at the back.
+            ghosts.forEachIndexed { i, ghost ->
+                drawImage(
+                    image = ghost,
+                    topLeft = Offset.Zero,
+                    alpha = onionRamp(i, ghosts.size, onion.minAlpha, onion.maxAlpha),
+                    colorFilter = if (onion.tint) onionTint(i, ghosts.size) else null,
+                )
+            }
+        }
         frame?.let { drawImage(it) }
     }
 }
