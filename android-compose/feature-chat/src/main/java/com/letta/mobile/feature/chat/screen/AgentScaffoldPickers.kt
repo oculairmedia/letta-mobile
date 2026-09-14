@@ -561,6 +561,8 @@ internal class ConversationPickerViewModel @Inject constructor(
                 try {
                     conversationRepository.deleteConversation(ConversationId(id), AgentId(agentId))
                     if (id == activeConversationId) deletedActive = true
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
                 } catch (_: Exception) { /* individual failures are handled by the repository's rollback */ }
             }
             if (deletedActive) onActiveDeleted()
