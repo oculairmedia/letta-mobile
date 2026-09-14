@@ -268,56 +268,106 @@ def enter_animations():
     the same StateRow table the loops are built from (`sustained_rest`), so the entry now starts
     where the state before it was and eases to where the next one holds."""
     F = sustained_facing()
-    out = []
-    for (frm, to), aid in enter_anim.items():
-        fx0, fy0 = F[frm]; fx1, fy1 = F[to]
-        timing = enter_duration(frm, to)
-        bez = timing.bezier
-        n = frames(timing.ms)
-        # A real turn lands with overshoot - but a small one, off a heavy departure. BACK_OUT left
-        # the old pose at 3.7x the average speed and BACK_SOFT leaves at 3.1x with no less arrival.
-        turn = BACK_SOFT if turning(frm, to, F) > TURNING else bez
-        r0, r1 = sustained_rest(frm), sustained_rest(to)
-        keys = {PLATE_EXPR: {NESTED_VALUE: [(0, EXPR[frm], None), (BLINK_FLIP, EXPR[to])]},
-                JOYSTICK: {JX: [(0, fx0, turn), (n, fx1)], JY: [(0, fy0, turn), (n, fy1)]}}
-        if (frm, to) not in DESIGNED_PAIRS:
-            # The generic entry: hold nothing, travel everything. Every property is keyed at both
-            # ends even when the two rests agree, so no earlier pose can leak through the one-shot.
-            ramp = lambda v0, v1: [(0, v0, bez), (n, v1)]
-            keys[BODY_NODE] = {X: ramp(r0.body_x, r1.body_x), Y: ramp(r0.body_y, r1.body_y)}
-            keys[FACE] = {X: ramp(r0.face_x, r1.face_x), Y: ramp(r0.face_y, r1.face_y),
-                          ROT: ramp(r0.face_rot, r1.face_rot)}
-        elif (frm, to) == ("idle", "listening"):
-            # SPEC 9.4: 50 ms anticipation down (+3, +1 deg), lean past to -16/-3 deg at 200 ms, settle -14/-2 deg.
-            keys[FACE] = {Y: [(0, 0, EMPH_ACCEL), (frames(50), 3, EMPH_DECEL), (frames(200), -16, M3_STANDARD), (n, -14)],
-                          ROT: [(0, 0, EMPH_ACCEL), (frames(50), rad(1), EMPH_DECEL), (frames(200), rad(-3), M3_STANDARD), (n, rad(-2))]}
-        elif (frm, to) == ("listening", "thinking"):
-            # hold the gaze 60 ms, then turn away and tilt.
-            keys[JOYSTICK] = {JX: [(0, fx0, None), (frames(60), fx0, BACK_SOFT), (n, fx1)], JY: [(0, fy0, None), (frames(60), fy0, BACK_SOFT), (n, fy1)]}
-            keys[FACE] = {Y: [(0, -14, STANDARD), (n, 0)], ROT: [(0, rad(-2), STANDARD), (n, rad(-6))]}
-        elif (frm, to) == ("thinking", "speaking"):
-            keys[FACE] = {ROT: [(0, rad(-6), SOFT_OUT), (frames(140), 0, None), (n, 0)]}
-        elif (frm, to) == ("speaking", "idle"):
-            # the small exhale: +1 at 120 ms, then rest.
-            keys[FACE] = {Y: [(0, 0, SOFT_OUT), (frames(120), 1, SOFT_OUT), (n, 0)]}
-            keys[BODY_NODE] = {Y: [(0, 0, SOFT_OUT), (frames(120), 1, SOFT_OUT), (n, 0)]}
-        elif (frm, to) == ("error", "idle"):
-            # SPEC 9.5: root +24 -> 0 (face carries its +4 offset on top), plate +5 deg -> 0.
-            keys[FACE] = {Y: [(0, 28, SOFT_OUT), (n, 0)], ROT: [(0, rad(5), SOFT_OUT), (n, 0)]}
-            keys[BODY_NODE] = {Y: [(0, 24, SOFT_OUT), (n, 0)]}
-            keys[TINT] = {COLOR: [(0, "14000000"), (frames(100), "00000000")]}
-        # The inflate travels from the source state's breath low point to the target's (sleeping
-        # rests at 0.985, everything else at 1), with the turn's own squash riding on top of it.
-        base = lambda f: r0.inflate + (r1.inflate - r0.inflate) * (f / n)
-        if turn is BACK_SOFT and n >= 10:
-            sq = squash(INFLATE_NODE, [(0, 1, EMPH_ACCEL), (3, 1.04, SOFT_OUT), (min(n - 2, 9), 0.98, SOFT_OUT), (n, 1)])
-            merge(keys, {INFLATE_NODE: {k: [(f, round(v * base(f), 4)) + tuple(rest) for (f, v, *rest) in ks]
-                                        for k, ks in sq[INFLATE_NODE].items()}})
-        elif r0.inflate != r1.inflate:
-            merge(keys, {INFLATE_NODE: {SX: [(0, r0.inflate, bez), (n, r1.inflate)],
-                                        SY: [(0, r0.inflate, bez), (n, r1.inflate)]}})
-        out.append(animation(f"Enter_{frm}_{to}", aid, n, keys, callbacks=(PLATE_BLINK,)))
-    return out
+    return [enter_animation(entry_of(frm, to, F), aid) for (frm, to), aid in enter_anim.items()]
+
+
+class Entry(NamedTuple):
+    """Everything one Enter_<from>_<to> is built from."""
+    frm: str
+    to: str
+    n: int                  # frames
+    bez: object             # the entry's own curve
+    turn: object            # the facing's curve: BACK_SOFT for a real turn, else `bez`
+    face0: tuple            # facing (x, y) held by the source state
+    face1: tuple            # facing (x, y) held by the target state
+    rest0: object           # sustained_rest(frm)
+    rest1: object           # sustained_rest(to)
+
+
+def entry_of(frm, to, F):
+    timing = enter_duration(frm, to)
+    # A real turn lands with overshoot - but a small one, off a heavy departure. BACK_OUT left
+    # the old pose at 3.7x the average speed and BACK_SOFT leaves at 3.1x with no less arrival.
+    turn = BACK_SOFT if turning(frm, to, F) > TURNING else timing.bezier
+    return Entry(frm, to, frames(timing.ms), timing.bezier, turn, F[frm], F[to],
+                 sustained_rest(frm), sustained_rest(to))
+
+
+def generic_entry_keys(e):
+    """The generic entry: hold nothing, travel everything. Every property is keyed at both ends
+    even when the two rests agree, so no earlier pose can leak through the one-shot."""
+    r0, r1 = e.rest0, e.rest1
+    ramp = lambda v0, v1: [(0, v0, e.bez), (e.n, v1)]
+    return {BODY_NODE: {X: ramp(r0.body_x, r1.body_x), Y: ramp(r0.body_y, r1.body_y)},
+            FACE: {X: ramp(r0.face_x, r1.face_x), Y: ramp(r0.face_y, r1.face_y), ROT: ramp(r0.face_rot, r1.face_rot)}}
+
+
+def _idle_listening(e):
+    # SPEC 9.4: 50 ms anticipation down (+3, +1 deg), lean past to -16/-3 deg at 200 ms, settle -14/-2 deg.
+    return {FACE: {Y: [(0, 0, EMPH_ACCEL), (frames(50), 3, EMPH_DECEL), (frames(200), -16, M3_STANDARD), (e.n, -14)],
+                   ROT: [(0, 0, EMPH_ACCEL), (frames(50), rad(1), EMPH_DECEL), (frames(200), rad(-3), M3_STANDARD), (e.n, rad(-2))]}}
+
+
+def _listening_thinking(e):
+    # hold the gaze 60 ms, then turn away and tilt.
+    (fx0, fy0), (fx1, fy1), n = e.face0, e.face1, e.n
+    return {JOYSTICK: {JX: [(0, fx0, None), (frames(60), fx0, BACK_SOFT), (n, fx1)], JY: [(0, fy0, None), (frames(60), fy0, BACK_SOFT), (n, fy1)]},
+            FACE: {Y: [(0, -14, STANDARD), (n, 0)], ROT: [(0, rad(-2), STANDARD), (n, rad(-6))]}}
+
+
+def _thinking_speaking(e):
+    return {FACE: {ROT: [(0, rad(-6), SOFT_OUT), (frames(140), 0, None), (e.n, 0)]}}
+
+
+def _speaking_idle(e):
+    # the small exhale: +1 at 120 ms, then rest.
+    return {FACE: {Y: [(0, 0, SOFT_OUT), (frames(120), 1, SOFT_OUT), (e.n, 0)]},
+            BODY_NODE: {Y: [(0, 0, SOFT_OUT), (frames(120), 1, SOFT_OUT), (e.n, 0)]}}
+
+
+def _error_idle(e):
+    # SPEC 9.5: root +24 -> 0 (face carries its +4 offset on top), plate +5 deg -> 0.
+    return {FACE: {Y: [(0, 28, SOFT_OUT), (e.n, 0)], ROT: [(0, rad(5), SOFT_OUT), (e.n, 0)]},
+            BODY_NODE: {Y: [(0, 24, SOFT_OUT), (e.n, 0)]},
+            TINT: {COLOR: [(0, "14000000"), (frames(100), "00000000")]}}
+
+
+# The SPEC section 3 pairs' designed body/face motion; every other pair is generic_entry_keys.
+DESIGNED_ENTRY_KEYS = {
+    ("idle", "listening"): _idle_listening,
+    ("listening", "thinking"): _listening_thinking,
+    ("thinking", "speaking"): _thinking_speaking,
+    ("speaking", "idle"): _speaking_idle,
+    ("error", "idle"): _error_idle,
+}
+
+
+def inflate_keys(e):
+    """The inflate travels from the source state's breath low point to the target's (sleeping
+    rests at 0.985, everything else at 1), with the turn's own squash riding on top of it."""
+    r0, r1, n = e.rest0, e.rest1, e.n
+    base = lambda f: r0.inflate + (r1.inflate - r0.inflate) * (f / n)
+    if e.turn is BACK_SOFT and n >= 10:
+        sq = squash(INFLATE_NODE, [(0, 1, EMPH_ACCEL), (3, 1.04, SOFT_OUT), (min(n - 2, 9), 0.98, SOFT_OUT), (n, 1)])
+        return {INFLATE_NODE: {k: [(f, round(v * base(f), 4)) + tuple(rest) for (f, v, *rest) in ks]
+                               for k, ks in sq[INFLATE_NODE].items()}}
+    if r0.inflate != r1.inflate:
+        return {INFLATE_NODE: {SX: [(0, r0.inflate, e.bez), (n, r1.inflate)],
+                               SY: [(0, r0.inflate, e.bez), (n, r1.inflate)]}}
+    return {}
+
+
+def enter_animation(e, aid):
+    (fx0, fy0), (fx1, fy1) = e.face0, e.face1
+    keys = {PLATE_EXPR: {NESTED_VALUE: [(0, EXPR[e.frm], None), (BLINK_FLIP, EXPR[e.to])]},
+            JOYSTICK: {JX: [(0, fx0, e.turn), (e.n, fx1)], JY: [(0, fy0, e.turn), (e.n, fy1)]}}
+    designed = DESIGNED_ENTRY_KEYS.get((e.frm, e.to))
+    if (e.frm, e.to) not in DESIGNED_PAIRS:
+        keys.update(generic_entry_keys(e))
+    elif designed is not None:
+        keys.update(designed(e))
+    merge(keys, inflate_keys(e))
+    return animation(f"Enter_{e.frm}_{e.to}", aid, e.n, keys, callbacks=(PLATE_BLINK,))
 
 
 def shape_animations():

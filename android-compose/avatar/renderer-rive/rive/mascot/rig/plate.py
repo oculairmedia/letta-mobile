@@ -12,6 +12,7 @@ Rive rules that bite here:
     condition on it must be a band (>= v-0.5 && < v+0.5), never an exact match. "Anything but
     sleeping" cannot be one band, hence the pairs of open-ended conditions in the park checks.
 """
+import itertools
 import math
 from textwrap import indent
 
@@ -57,24 +58,31 @@ def wave_samples(amplitude):
     """The four squiggle phase targets as detached-vertex tuples, y and handle-y scaled by the
     amplitude (x and the stroke untouched, per PUPIL-SPEC 3). Handle rotations are unwrapped
     across phases so a linear key never spins a handle the long way round."""
-    phases = []
-    for k in range(4):
-        verts = svgpath.parse_path(svgpath.read_svg(art(f"pupil/squiggle-{k}.svg"))["d"])[0]["verts"]
-        row = []
-        for (x, y, cin, cout) in verts:
-            sy = lambda c: None if c is None else (c[0], c[1] * amplitude)
-            ir, idist = svgpath._handle((x, y * amplitude), sy(cin))
-            orot, odist = svgpath._handle((x, y * amplitude), sy(cout))
-            row.append([x, y * amplitude, ir, idist, orot, odist])
-        phases.append(row)
-    for vi in range(5):
-        for prop in (2, 4):
-            for k in range(1, 4):
-                prev, cur = phases[k - 1][vi][prop], phases[k][vi][prop]
-                while cur - prev > math.pi: cur -= 2 * math.pi
-                while cur - prev < -math.pi: cur += 2 * math.pi
-                phases[k][vi][prop] = cur
+    phases = [squiggle_phase(k, amplitude) for k in range(4)]
+    for vi, prop, k in itertools.product(range(5), (2, 4), range(1, 4)):
+        phases[k][vi][prop] = unwrap_angle(phases[k - 1][vi][prop], phases[k][vi][prop])
     return phases
+
+
+def squiggle_phase(k, amplitude):
+    """Squiggle phase k as [x, y, inRotation, inDistance, outRotation, outDistance] per vertex."""
+    verts = svgpath.parse_path(svgpath.read_svg(art(f"pupil/squiggle-{k}.svg"))["d"])[0]["verts"]
+    sy = lambda c: None if c is None else (c[0], c[1] * amplitude)
+    row = []
+    for (x, y, cin, cout) in verts:
+        ir, idist = svgpath._handle((x, y * amplitude), sy(cin))
+        orot, odist = svgpath._handle((x, y * amplitude), sy(cout))
+        row.append([x, y * amplitude, ir, idist, orot, odist])
+    return row
+
+
+def unwrap_angle(prev, cur):
+    """`cur` moved by whole turns to within half a turn of `prev`."""
+    while cur - prev > math.pi:
+        cur -= 2 * math.pi
+    while cur - prev < -math.pi:
+        cur += 2 * math.pi
+    return cur
 
 
 def wave_keys(period_ms, amplitude):
@@ -117,55 +125,49 @@ def pupil_overlay():
 </Node>'''
 
 
-def plate_component():
-    """The whole Plate artboard: node tree, per-state and pose-range animations, and its machine."""
-    expr_anims = []
-    for st in STATES:
-        # Glyphs live in a Solo: one keyed reference picks the drawn child (no opacity stack).
-        objs = {GLYPHS_NODE: {ACTIVE_CHILD: Id(GLYPH[STATE_GLYPH[st]])}}
-        objs.update({MOUTH_MORPH: {OPACITY: 0}, MOUTH_O: {OPACITY: 0}, FROWN: {OPACITY: 0}})
-        if st in STATE_MOUTH:
-            objs[STATE_MOUTH[st]] = {OPACITY: 1}
-        sc = STATE_PLATE_SCALE.get(st, 1)
-        objs[PLATE_CARD] = {SX: sc, SY: sc}
-        objs[PLATE_SHADOW] = {SX: sc, SY: sc}
-        # The pupil overlay: on for idle/listening/speaking with that state's wave loop, off elsewhere.
-        if st in PUPIL:
-            n, wk = wave_keys(PUPIL[st].period_ms, PUPIL[st].amplitude)
-            objs[PUPIL_OVERLAY] = {OPACITY: 1}
-            # The stroke wave read as a bar at every size; the core bobs on the same sine instead.
-            objs[WAVE] = {OPACITY: 0}
-            objs.update(wk)
-            A = PUPIL[st].amplitude
-            q = [0, round(n / 4), round(n / 2), round(3 * n / 4), n]
-            objs[CORE] = {Y: [(q[0], 0, SINE), (q[1], A, SINE), (q[2], 0, SINE), (q[3], -A, SINE), (q[4], 0)]}
-            expr_anims.append(animation("Expr" + st[0].upper() + st[1:], plate_expr_anim[st], n, objs, "loop"))
-        else:
-            objs[PUPIL_OVERLAY] = {OPACITY: 0}
-            expr_anims.append(animation("Expr" + st[0].upper() + st[1:], plate_expr_anim[st], 1, objs))
+def expression_animation(st):
+    """State `st`'s Expr animation: its glyph, its mouth, the card scale and (for the pupil states) the wave loop."""
+    # Glyphs live in a Solo: one keyed reference picks the drawn child (no opacity stack).
+    objs = {GLYPHS_NODE: {ACTIVE_CHILD: Id(GLYPH[STATE_GLYPH[st]])}}
+    objs.update({MOUTH_MORPH: {OPACITY: 0}, MOUTH_O: {OPACITY: 0}, FROWN: {OPACITY: 0}})
+    if st in STATE_MOUTH:
+        objs[STATE_MOUTH[st]] = {OPACITY: 1}
+    sc = STATE_PLATE_SCALE.get(st, 1)
+    objs[PLATE_CARD] = {SX: sc, SY: sc}
+    objs[PLATE_SHADOW] = {SX: sc, SY: sc}
+    name = "Expr" + st[0].upper() + st[1:]
+    # The pupil overlay: on for idle/listening/speaking with that state's wave loop, off elsewhere.
+    if st not in PUPIL:
+        objs[PUPIL_OVERLAY] = {OPACITY: 0}
+        return animation(name, plate_expr_anim[st], 1, objs)
+    n = pupil_loop(objs, PUPIL[st])
+    return animation(name, plate_expr_anim[st], n, objs, "loop")
 
-    px, py = PUPIL_PARALLAX
-    look_x = animation("LookX", PLATE_LOOKX, 60, {GLYPHS_NODE: {X: [(0, -23, LINEAR), (60, 23)]},  # SPEC 9.1
-                                                  PUPIL_OVERLAY: {X: [(0, -23, LINEAR), (60, 23)]},
-                                                  PUPIL_ROOT: {X: [(0, -px, LINEAR), (60, px)]}})
-    look_y = animation("LookY", PLATE_LOOKY, 60, {GLYPHS_NODE: {Y: [(0, -17, LINEAR), (60, 17)]},
-                                                  PUPIL_OVERLAY: {Y: [(0, -17, LINEAR), (60, 17)]},
-                                                  PUPIL_ROOT: {Y: [(0, -py, LINEAR), (60, py)]}})
+
+def pupil_loop(objs, pupil):
+    """Key the pupil overlay's wave loop into `objs`; returns the loop's length in frames."""
+    n, wk = wave_keys(pupil.period_ms, pupil.amplitude)
+    objs[PUPIL_OVERLAY] = {OPACITY: 1}
+    # The stroke wave read as a bar at every size; the core bobs on the same sine instead.
+    objs[WAVE] = {OPACITY: 0}
+    objs.update(wk)
+    A = pupil.amplitude
+    q = [0, round(n / 4), round(n / 2), round(3 * n / 4), n]
+    objs[CORE] = {Y: [(q[0], 0, SINE), (q[1], A, SINE), (q[2], 0, SINE), (q[3], -A, SINE), (q[4], 0)]}
+    return n
+
+
+def mouth_open_animation():
     # Open: the mouth morphs closed -> half -> open through the three SVG samples (linear).
     mouth_keys = {}
     for vid, samples in zip(mouth_vertex_ids, zip(*MOUTH_SAMPLES)):
         mouth_keys[vid] = {}
         for key, idx in ((VX, 0), (VY, 1), (VIN_ROT, 2), (VIN_DIST, 3), (VOUT_ROT, 4), (VOUT_DIST, 5)):
             mouth_keys[vid][key] = [(f, s[idx], LINEAR) for f, s in zip((0, 30, 60), samples)]
-    open_anim = animation("Open", PLATE_OPEN, 60, mouth_keys)
-    # Blink (Trutoiu, Carter, Matthews, Hodgins - Disney Research 2011): human blinks are
-    # asymmetric - a fast close and a slow, decelerating open - and ~250-300 ms reads most
-    # natural. Close 4 frames (67 ms), hold 1, open 10 (167 ms). Squashes the glyph only.
-    shutter = [(0, 1, STD_DECEL), (BLINK_SHUT, 0, None), (BLINK_SHUT + 1, 0, EMPH_DECEL), (BLINK_FRAMES, 1)]
-    blink = animation("Blink", PLATE_BLINK_ANIM, BLINK_FRAMES, {GLYPHS_NODE: {SY: shutter}, PUPIL_OVERLAY: {SY: list(shutter)}})
-    wait_a = animation("WaitA", PLATE_WAIT_A, frames(4000), {})
-    wait_b = animation("WaitB", PLATE_WAIT_B, frames(8000), {})
+    return animation("Open", PLATE_OPEN, 60, mouth_keys)
 
+
+def tune_animations():
     # Tunable pose ranges (bench art direction): frame 0 = value at 0, frame 60 = value at 1, linear.
     tune_anims = []
     for name, t in TUNABLES.items():
@@ -183,15 +185,10 @@ def plate_component():
             Y: [(0, 0, BACK_OUT), (4, dy, None), (hold, dy, SOFT_OUT), (hold + 8, 0)]}}))
     tune_anims.append(animation("AutoX", PLATE_AUTO_X, 60, {GLYPH_SCALE_NODE: {X: [(0, -6, LINEAR), (60, 6)]}}))
     tune_anims.append(animation("AutoY", PLATE_AUTO_Y, 60, {GLYPH_SCALE_NODE: {Y: [(0, -4, LINEAR), (60, 4)]}}))
+    return tune_anims
 
-    # The blend policy (rig/seams.py): the plate's own animations, indexed by their keyed ends,
-    # so its four layers below are checked against what they actually hand each other. Built
-    # before the layers for that reason; the joined XML is written out unchanged further down.
-    set_animation_index(animation_index("\n".join(expr_anims + [look_x, look_y, open_anim, blink,
-                                                               wait_a, wait_b] + tune_anims)))
 
-    expr_layer = expression_layer("Expression", "7:10", PLATE_IN_EXPR, plate_expr_anim, plate_expr_node)
-
+def saccade_layer_rml():
     # Saccade layer: waits pick a fixation at random; fixations return to a random wait. Asleep, parked.
     # Transitions are ordered, so the park check comes first.
     asleep_s = OnInput(SACCADE_SLEEP_NODE, PLATE_IN_EXPR, EXPR["sleeping"], 0)
@@ -210,9 +207,12 @@ def plate_component():
     sac_states += [State(f.anim, nid, 3 + i, reset=True, random=True, transitions=[asleep_s] + to_wait)
                    for i, (f, nid) in enumerate(zip(SACCADE_FIX, SACCADE_FIX_NODES))]
     sac_states.append(State(SACCADE_WAITS[0].anim, SACCADE_SLEEP_NODE, 12, transitions=awake_s))
-    saccade_layer = Layer("Saccade", "7:13", SACCADE_WAIT_NODES[0], states=sac_states).rml()
+    return Layer("Saccade", "7:13", SACCADE_WAIT_NODES[0], states=sac_states).rml()
+
+
+def blink_trigger_layer_rml():
     # The blink trigger is a nested-artboard input, not a view-model trigger: hand-rolled XML.
-    trigger_layer = Layer(
+    return Layer(
         "Blink", "7:11", PLATE_BLINK_REST_NODE,
         any_transitions=[Raw(PLATE_BLINK_NODE,
                              f'<StateTransition stateToId="{PLATE_BLINK_NODE}">\n'
@@ -220,6 +220,9 @@ def plate_component():
         states=[State(PLATE_WAIT_A, PLATE_BLINK_REST_NODE, 0),
                 State(PLATE_BLINK_ANIM, PLATE_BLINK_NODE, 1, reset=True,
                       transitions=[Exit(PLATE_BLINK_REST_NODE)])]).rml()
+
+
+def auto_blink_layer_rml():
     # Eyes closed do not blink: the waits park while expr is sleeping and resume when it is not.
     # The two waits are not random states - each has exactly one way on, the exit into the blink;
     # only the blink itself picks (50/50) which wait it returns to.
@@ -230,13 +233,48 @@ def plate_component():
                Raw(PLATE_AUTO_A,
                    f'<StateTransition stateToId="{PLATE_AUTO_A}" duration="0">\n'
                    f'    <TransitionNumberCondition inputId="{PLATE_IN_EXPR}" opValue="greaterThanOrEqual" value="{EXPR["sleeping"] + 0.5}"/>\n</StateTransition>')]
-    auto_layer = Layer(
+    return Layer(
         "AutoBlink", "7:12", PLATE_AUTO_A,
         states=[State(PLATE_WAIT_A, PLATE_AUTO_A, 0, transitions=[asleep, Exit(PLATE_AUTO_BLINK)]),
                 State(PLATE_WAIT_B, PLATE_AUTO_B, 1, transitions=[asleep, Exit(PLATE_AUTO_BLINK)]),
                 State(PLATE_BLINK_ANIM, PLATE_AUTO_BLINK, 2, reset=True, random=True,
                       transitions=[Exit(PLATE_AUTO_A, weight=50), Exit(PLATE_AUTO_B, weight=50)]),
                 State(PLATE_WAIT_A, PLATE_AUTO_SLEEP, 3, transitions=awake_b)]).rml()
+
+
+def plate_component():
+    """The whole Plate artboard: node tree, per-state and pose-range animations, and its machine."""
+    expr_anims = [expression_animation(st) for st in STATES]
+
+    px, py = PUPIL_PARALLAX
+    look_x = animation("LookX", PLATE_LOOKX, 60, {GLYPHS_NODE: {X: [(0, -23, LINEAR), (60, 23)]},  # SPEC 9.1
+                                                  PUPIL_OVERLAY: {X: [(0, -23, LINEAR), (60, 23)]},
+                                                  PUPIL_ROOT: {X: [(0, -px, LINEAR), (60, px)]}})
+    look_y = animation("LookY", PLATE_LOOKY, 60, {GLYPHS_NODE: {Y: [(0, -17, LINEAR), (60, 17)]},
+                                                  PUPIL_OVERLAY: {Y: [(0, -17, LINEAR), (60, 17)]},
+                                                  PUPIL_ROOT: {Y: [(0, -py, LINEAR), (60, py)]}})
+    open_anim = mouth_open_animation()
+    # Blink (Trutoiu, Carter, Matthews, Hodgins - Disney Research 2011): human blinks are
+    # asymmetric - a fast close and a slow, decelerating open - and ~250-300 ms reads most
+    # natural. Close 4 frames (67 ms), hold 1, open 10 (167 ms). Squashes the glyph only.
+    shutter = [(0, 1, STD_DECEL), (BLINK_SHUT, 0, None), (BLINK_SHUT + 1, 0, EMPH_DECEL), (BLINK_FRAMES, 1)]
+    blink = animation("Blink", PLATE_BLINK_ANIM, BLINK_FRAMES, {GLYPHS_NODE: {SY: shutter}, PUPIL_OVERLAY: {SY: list(shutter)}})
+    wait_a = animation("WaitA", PLATE_WAIT_A, frames(4000), {})
+    wait_b = animation("WaitB", PLATE_WAIT_B, frames(8000), {})
+
+    tune_anims = tune_animations()
+
+    # The blend policy (rig/seams.py): the plate's own animations, indexed by their keyed ends,
+    # so its four layers below are checked against what they actually hand each other. Built
+    # before the layers for that reason; the joined XML is written out unchanged further down.
+    set_animation_index(animation_index("\n".join(expr_anims + [look_x, look_y, open_anim, blink,
+                                                               wait_a, wait_b] + tune_anims)))
+
+    expr_layer = expression_layer("Expression", "7:10", PLATE_IN_EXPR, plate_expr_anim, plate_expr_node)
+
+    saccade_layer = saccade_layer_rml()
+    trigger_layer = blink_trigger_layer_rml()
+    auto_layer = auto_blink_layer_rml()
 
     glyphs = "\n".join(svgpath.path_rml(art(f"glyph-{n}.svg"), n[0].upper() + n[1:], GLYPH[n], INK) for n in GLYPH_ORDER)
     mv = "\n".join(
