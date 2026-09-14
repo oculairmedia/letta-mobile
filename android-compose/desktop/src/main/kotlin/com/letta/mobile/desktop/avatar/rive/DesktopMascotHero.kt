@@ -1,6 +1,6 @@
 package com.letta.mobile.desktop.avatar.rive
 
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -38,5 +38,7 @@ fun DesktopMascotHero(
     LaunchedEffect(entry) {
         while (true) withFrameNanos { entry.tickTo(it) }
     }
-    RiveDesktopSurface(entry.scene, modifier.size(size))
+    // requiredSize: an overscaled mascot must exceed its tile so the tile's clip crops it;
+    // plain size() is coerced down to the parent's constraints and never overscales.
+    RiveDesktopSurface(entry.scene, modifier.requiredSize(size))
 }
