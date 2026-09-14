@@ -425,16 +425,16 @@ private fun PromptExpandButton(expanded: Boolean, onToggle: () -> Unit) {
  * immediate feedback before the response starts streaming.
  */
 @Composable
-internal fun ThinkingMessageRow() {
-    // Quiet, current treatment: a small breathing glow-dot plus a shimmering
-    // "Thinking…" label. The previous 40dp glossy sphere + three grey dots
-    // read as a toy marble in an otherwise flat, dark surface.
+internal fun ThinkingMessageRow(agentId: String? = null) {
+    // The agent itself thinks in the thread (its live mascot, already in the thinking state
+    // via the director); the glow dot stays for agents without an identity.
+    val live = com.letta.mobile.ui.mascot.mascotAvailable(agentId)
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        ThinkingGlowDot(diameter = 18.dp)
+        if (live) AgentOrb(index = 0, size = 32.dp, cornerRadius = 9.dp, agentId = agentId) else ThinkingGlowDot(diameter = 18.dp)
         ThinkingShimmerLabel("Thinking…")
     }
 }

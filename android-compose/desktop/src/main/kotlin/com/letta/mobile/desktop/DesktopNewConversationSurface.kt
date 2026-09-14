@@ -357,7 +357,7 @@ private fun RecentsRow(
                         .width(64.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    AgentOrb(index = row.orbIndex, size = 44.dp, cornerRadius = 12.dp)
+                    AgentOrb(agentId = row.id, index = row.orbIndex, size = 44.dp, cornerRadius = 12.dp)
                     Text(
                         text = row.name,
                         style = MaterialTheme.typography.labelMedium,
@@ -383,7 +383,7 @@ private fun AgentDirectoryRow(row: NewConversationAgentRow, onClick: () -> Unit)
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        AgentOrb(index = row.orbIndex, size = 34.dp, cornerRadius = 9.dp)
+        AgentOrb(agentId = row.id, index = row.orbIndex, size = 34.dp, cornerRadius = 9.dp)
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = row.name,

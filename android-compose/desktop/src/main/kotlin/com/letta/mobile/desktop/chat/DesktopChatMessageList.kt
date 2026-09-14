@@ -56,6 +56,8 @@ internal data class MessageListParams(
     val conversationId: String?,
     val renderItems: List<ChatRenderItem>,
     val isSending: Boolean,
+    /** The conversation's agent, so the thinking row can be its live mascot. */
+    val thinkingAgentId: String? = null,
     val isStreamingReply: Boolean = false,
 )
 
@@ -141,6 +143,7 @@ internal fun MessageList(
                     rows = rows,
                     streamingMessageId = streamingMessageId,
                     isSending = isSending,
+                    thinkingAgentId = params.thinkingAgentId,
                 ),
             )
         }
@@ -313,6 +316,7 @@ private data class MessageListColumnParams(
     val rows: List<DesktopChatRow>,
     val streamingMessageId: StreamingMessageId?,
     val isSending: Boolean,
+    val thinkingAgentId: String? = null,
 )
 
 internal fun ChatRenderItem.isUserPrompt(): Boolean =
@@ -408,7 +412,7 @@ private fun MessageListColumn(params: MessageListColumnParams) {
             if (isSending) {
                 item(key = "__thinking__") {
                     Box(modifier = Modifier.widthIn(max = ChatColumnMaxWidth).fillMaxWidth()) {
-                        ThinkingMessageRow()
+                        ThinkingMessageRow(agentId = params.thinkingAgentId)
                     }
                 }
             }

@@ -17,14 +17,32 @@ import kotlin.test.assertTrue
 class RiveAvatarRuntimeTest {
 
     @Test
-    fun everyDirectorStateHasItsOwnEnumKey() {
-        val keys = AvatarState.entries.map(RiveAvatarContract::stateKey)
+    fun everySustainedStateHasItsOwnEnumKeyAndMomentaryOnesHaveNone() {
+        val momentary = setOf(AvatarState.SUCCESS, AvatarState.DRAGGED)
+        val sustained = AvatarState.entries - momentary
+        val keys = sustained.map { checkNotNull(RiveAvatarContract.stateKey(it)) }
 
-        assertEquals(
-            AvatarState.entries.size,
-            keys.toSet().size,
-            "two states share an enum key, so the asset cannot tell them apart",
-        )
+        assertEquals(sustained.size, keys.toSet().size, "two states share an enum key, so the asset cannot tell them apart")
+        momentary.forEach { assertEquals(null, RiveAvatarContract.stateKey(it), "$it is a trigger/boolean, not an enum value") }
+    }
+
+    @Test
+    fun successIsAFlashTheFilePlaysAndDraggedIsHeldUntilReleased() = runTest {
+        val sink = RecordingSink()
+        val runtime = RiveAvatarRuntime(sink).also { it.load(model()) }
+        sink.writes.clear(); sink.fired.clear()
+
+        runtime.applyState(AvatarState.SUCCESS)
+        assertEquals(listOf(RiveAvatarContract.TRIGGER_SUCCESS), sink.fired)
+        assertEquals(emptyList(), sink.enums(RiveAvatarContract.INPUT_STATE), "success must not become the sustained state")
+
+        runtime.applyState(AvatarState.DRAGGED)
+        runtime.applyState(AvatarState.IDLE)
+        assertEquals(listOf(true, false), sink.booleans(RiveAvatarContract.INPUT_DRAGGED))
+
+        runtime.applyState(AvatarState.ERROR)
+        assertEquals(RiveAvatarContract.TRIGGER_ERROR, sink.fired.last())
+        assertEquals("error", sink.lastEnum(RiveAvatarContract.INPUT_STATE))
     }
 
     @Test
@@ -112,16 +130,18 @@ class RiveAvatarRuntimeTest {
     }
 
     @Test
-    fun anExpressionMovesTheMascotsOneSustainedState() = runTest {
+    fun anExpressionWritesNothingTheStateIsTheOnlyChannel() = runTest {
+        // The director installs an expression on every state it enters; mapping those onto the
+        // sustained enum fought the state it had just set (SPEAKING's Happy fired the success
+        // flash, LISTENING's Neutral reset to idle). Expressions live inside the file's states.
         val sink = RecordingSink()
         val runtime = RiveAvatarRuntime(sink).also { it.load(model()) }
+        val before = sink.lastEnum(RiveAvatarContract.INPUT_STATE)
 
         runtime.setExpression(AvatarExpression.Happy)
 
-        assertEquals(
-            RiveAvatarContract.stateKey(AvatarState.SUCCESS),
-            sink.lastEnum(RiveAvatarContract.INPUT_STATE),
-        )
+        assertEquals(emptyList(), sink.fired)
+        assertEquals(before, sink.lastEnum(RiveAvatarContract.INPUT_STATE))
     }
 
     @Test
@@ -187,6 +207,10 @@ class RiveAvatarRuntimeTest {
             writes += input to key
         }
 
+        override fun setColor(input: String, argb: Int) {
+            writes += input to argb
+        }
+
         override fun fire(input: String) {
             writes += input to Unit
             fired += input
@@ -201,5 +225,8 @@ class RiveAvatarRuntimeTest {
             writes.filter { it.first == input }.map { it.second as String }
 
         fun lastEnum(input: String): String? = enums(input).lastOrNull()
+
+        fun booleans(input: String): List<Boolean> =
+            writes.filter { it.first == input }.map { it.second as Boolean }
     }
 }

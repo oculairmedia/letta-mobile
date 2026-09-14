@@ -20,6 +20,7 @@
 #include "rive/renderer/rive_renderer.hpp"
 #include "rive/animation/state_machine_input_instance.hpp"
 #include "rive/viewmodel/viewmodel_instance.hpp"
+#include "rive/viewmodel/viewmodel_instance_color.hpp"
 #include "rive/viewmodel/viewmodel_instance_enum.hpp"
 #include "rive/viewmodel/viewmodel_instance_number.hpp"
 #include "rive/viewmodel/viewmodel_instance_trigger.hpp"
@@ -125,9 +126,13 @@ __declspec(dllexport) int rive_bridge_load(RiveBridge* bridge, const uint8_t* by
     if (!bridge->stateMachine)
         return 3;
 
-    // Same binding the Android runtime's autoBind performs: the artboard's own view model, else
-    // none. A file with no view model still drives through state machine inputs.
-    bridge->viewModel = bridge->file->createViewModelInstance(bridge->artboard.get());
+    // The artboard's view model, as its authored DEFAULT instance: that is what carries the
+    // authored colour and enum values. `createViewModelInstance(artboard)` hands back a blank
+    // instance, which is why the body drew black until the host wrote a colour. A file with no
+    // view model still drives through state machine inputs.
+    bridge->viewModel = bridge->file->createDefaultViewModelInstance(bridge->artboard.get());
+    if (!bridge->viewModel)
+        bridge->viewModel = bridge->file->createViewModelInstance(bridge->artboard.get());
     if (bridge->viewModel)
     {
         bridge->artboard->bindViewModelInstance(bridge->viewModel);
@@ -284,6 +289,15 @@ __declspec(dllexport) int rive_bridge_vm_set_enum(RiveBridge* bridge, const char
     if (!property || !property->is<ViewModelInstanceEnum>())
         return 1;
     return property->as<ViewModelInstanceEnum>()->value(std::string(key)) ? 0 : 2;
+}
+
+__declspec(dllexport) int rive_bridge_vm_set_color(RiveBridge* bridge, const char* name, int argb)
+{
+    auto* property = bridge->viewModel ? bridge->viewModel->propertyValue(std::string(name)) : nullptr;
+    if (!property || !property->is<ViewModelInstanceColor>())
+        return 1;
+    property->as<ViewModelInstanceColor>()->propertyValue(argb);
+    return 0;
 }
 
 __declspec(dllexport) int rive_bridge_vm_fire(RiveBridge* bridge, const char* name)

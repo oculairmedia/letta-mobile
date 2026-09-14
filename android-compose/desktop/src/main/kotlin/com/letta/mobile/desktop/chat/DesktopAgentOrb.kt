@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.MaterialTheme
+import com.letta.mobile.ui.mascot.MascotAvatar
 import com.letta.mobile.ui.theme.customColors
 
 /**
@@ -59,21 +60,27 @@ fun AgentOrb(
     modifier: Modifier = Modifier,
     cornerRadius: Dp = 7.dp,
     onClick: (() -> Unit)? = null,
+    /** The agent this orb stands for; with a known mascot identity the orb is the live mascot. */
+    agentId: String? = null,
     content: @Composable (() -> Unit)? = null,
 ) {
     val shape = RoundedCornerShape(cornerRadius)
-    Box(
-        // clip BEFORE clickable so the hover/press indication follows the orb's
-        // rounded shape instead of a rectangle. onClick is applied here (not by
-        // the caller's modifier) so it sits inside the clip.
-        modifier = modifier
-            .size(size)
-            .clip(shape)
-            .background(agentOrbBrush(index))
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
-        contentAlignment = Alignment.Center,
-    ) {
-        content?.invoke()
+    // With an identity in MascotIdentityRegistry and a renderer in LocalMascotHost, the orb IS
+    // the live mascot (one shared scene per agent); the gradient stands in otherwise.
+    MascotAvatar(agentId = agentId, size = size, modifier = modifier, cornerRadius = cornerRadius, onClick = onClick) {
+        Box(
+            // clip BEFORE clickable so the hover/press indication follows the orb's
+            // rounded shape instead of a rectangle. onClick is applied here (not by
+            // the caller's modifier) so it sits inside the clip.
+            modifier = modifier
+                .size(size)
+                .clip(shape)
+                .background(agentOrbBrush(index))
+                .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+            contentAlignment = Alignment.Center,
+        ) {
+            content?.invoke()
+        }
     }
 }
 

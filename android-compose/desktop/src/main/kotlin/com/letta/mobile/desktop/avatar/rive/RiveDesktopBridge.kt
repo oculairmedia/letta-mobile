@@ -28,13 +28,30 @@ internal interface RiveBridgeNative : Library {
     fun rive_bridge_vm_set_number(bridge: Pointer, name: String, value: Float): Int
     fun rive_bridge_vm_set_enum(bridge: Pointer, name: String, key: String): Int
     fun rive_bridge_vm_fire(bridge: Pointer, name: String): Int
+    fun rive_bridge_vm_set_color(bridge: Pointer, name: String, argb: Int): Int
 
     companion object {
-        /** `-Drive.bridge.path=...\rive_desktop_bridge.dll`; the spike does not package the DLL. */
+        /**
+         * Where the bridge DLL is: `-Drive.bridge.path`, else `rive_desktop_bridge.dll` in the
+         * packaged app's resources dir, else next to the working directory. Null when none exists,
+         * which is how surfaces decide to fall back to the gradient orb.
+         */
+        val PATH: String? by lazy {
+            val candidates = listOfNotNull(
+                System.getProperty("rive.bridge.path"),
+                System.getProperty("compose.application.resources.dir")?.let { "$it/rive_desktop_bridge.dll" },
+                "rive_desktop_bridge.dll",
+            )
+            candidates.firstOrNull { java.io.File(it).isFile }
+        }
+
+        /** True when a bridge DLL is present and this OS can host it (Windows / D3D11 only today). */
+        val AVAILABLE: Boolean by lazy {
+            PATH != null && System.getProperty("os.name").orEmpty().startsWith("Windows")
+        }
+
         val INSTANCE: RiveBridgeNative by lazy {
-            val path = System.getProperty("rive.bridge.path")
-                ?: error("Set -Drive.bridge.path to rive_desktop_bridge.dll")
-            Native.load(path, RiveBridgeNative::class.java)
+            Native.load(PATH ?: error("Set -Drive.bridge.path to rive_desktop_bridge.dll"), RiveBridgeNative::class.java)
         }
     }
 }
@@ -66,6 +83,20 @@ class RiveDesktopScene private constructor(
 
     fun advance(seconds: Float) = native.rive_bridge_advance(handle, seconds)
 
+    private var lastFrameNanos = 0L
+
+    /**
+     * Advances to the frame clock's [nowNanos] once per frame: a scene shared by several surfaces
+     * (the sidebar and the hero draw the same agent) would otherwise be advanced by each of them
+     * and run at a multiple of real time.
+     */
+    fun advanceTo(nowNanos: Long) {
+        if (nowNanos == lastFrameNanos) return
+        val dt = if (lastFrameNanos == 0L) 0f else ((nowNanos - lastFrameNanos) / 1e9f).coerceIn(0f, 0.1f)
+        lastFrameNanos = nowNanos
+        if (dt > 0f) advance(dt)
+    }
+
     /** Renders into a reused native buffer and returns it: premultiplied RGBA, top row first. */
     fun render(width: Int, height: Int, clearArgb: Int = 0): ByteArray {
         val size = width.toLong() * height * 4
@@ -92,6 +123,10 @@ class RiveDesktopScene private constructor(
 
         override fun setEnum(input: String, key: String) {
             native.rive_bridge_vm_set_enum(handle, input, key)
+        }
+
+        override fun setColor(input: String, argb: Int) {
+            native.rive_bridge_vm_set_color(handle, input, argb)
         }
 
         override fun fire(input: String) {

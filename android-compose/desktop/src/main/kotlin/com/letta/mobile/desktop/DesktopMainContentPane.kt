@@ -1,5 +1,7 @@
 package com.letta.mobile.desktop
 
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -37,7 +39,7 @@ internal data class DesktopMainContentInputs(
 
 internal data class DesktopMainContentActions(
     val onEditAgentClose: () -> Unit,
-    val onEditAgentSaved: (Int, Boolean) -> Unit,
+    val onEditAgentSaved: (com.letta.mobile.avatar.core.MascotIdentity, Boolean) -> Unit,
     val chatDetailActions: ChatDetailPaneActions,
     val destinationActions: DestinationContentActions,
     val onShowBackgroundTasks: () -> Unit,
@@ -49,21 +51,11 @@ internal fun DesktopMainContentPane(
     actions: DesktopMainContentActions,
     modifier: Modifier = Modifier,
 ) {
-    Box(modifier = modifier) {
-        val editing = inputs.editingAgentId
-        if (editing != null) {
-            DesktopEditAgentSurface(
-                agentId = editing,
-                modelOptions = inputs.modelOptions,
-                agentRepository = inputs.agentRepository,
-                blockApi = inputs.blockApi,
-                settings = inputs.secureSettingsStore,
-                scope = inputs.chatScope,
-                onClose = actions.onEditAgentClose,
-                onSaved = actions.onEditAgentSaved,
-                modifier = Modifier.fillMaxSize(),
-            )
-        } else if (inputs.selectedDestination == DesktopDestination.Conversations) {
+    val editing = inputs.editingAgentId
+    // The editor is a panel beside the chat, not a page: the conversation stays in view.
+    androidx.compose.foundation.layout.Row(modifier = modifier) {
+    Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+        if (inputs.selectedDestination == DesktopDestination.Conversations) {
             ChatDetailPane(
                 state = inputs.chatDetailState,
                 actions = actions.chatDetailActions,
@@ -86,5 +78,25 @@ internal fun DesktopMainContentPane(
                 modifier = Modifier.fillMaxSize(),
             )
         }
+    }
+    if (editing != null) {
+        androidx.compose.material3.Surface(
+            modifier = Modifier.width(460.dp).fillMaxHeight(),
+            color = androidx.compose.material3.MaterialTheme.colorScheme.surface,
+            border = androidx.compose.foundation.BorderStroke(1.dp, androidx.compose.material3.MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+        ) {
+            DesktopEditAgentSurface(
+                agentId = editing,
+                modelOptions = inputs.modelOptions,
+                agentRepository = inputs.agentRepository,
+                blockApi = inputs.blockApi,
+                settings = inputs.secureSettingsStore,
+                scope = inputs.chatScope,
+                onClose = actions.onEditAgentClose,
+                onSaved = actions.onEditAgentSaved,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
     }
 }

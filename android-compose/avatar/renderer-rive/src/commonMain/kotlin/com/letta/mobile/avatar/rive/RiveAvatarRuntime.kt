@@ -59,10 +59,14 @@ class RiveAvatarRuntime(
      * one drawing per mood, and blending two of them is exactly what a flat rig cannot do. Weight is
      * therefore a switch - anything at or below zero leaves the current state alone.
      */
-    override fun setExpression(expression: AvatarExpression, weight: Float) {
-        if (!ready() || weight <= 0f) return
-        stateForExpression(expression)?.let(::applyState)
-    }
+    /**
+     * A no-op on purpose. The director installs an expression on every state it enters
+     * (Neutral for LISTENING, Happy 0.2 for SPEAKING...), and mapping those back onto the
+     * sustained enum fought the real state: LISTENING became IDLE, SPEAKING fired the success
+     * flash. The mascot has one channel for state - [applyState], driven from the director's
+     * state transitions by the host - and its expressions live inside the file's states.
+     */
+    override fun setExpression(expression: AvatarExpression, weight: Float) = Unit
 
     /** No viseme rig. Lip sync arrives as [setMouthOpen], which a flat mouth can honour. */
     override fun setViseme(viseme: AvatarViseme, weight: Float) = Unit
@@ -87,6 +91,16 @@ class RiveAvatarRuntime(
         sink.setNumber(RiveAvatarContract.INPUT_LOOK_Y, y.coerceIn(-1f, 1f))
     }
 
+    /**
+     * The head turning toward the gaze, -1..1 on each axis. Not part of [AvatarRuntime]: it is a
+     * mascot-specific channel the gaze director writes after the eyes have led.
+     */
+    fun setHeadTurn(x: Float, y: Float) {
+        if (!ready()) return
+        sink.setNumber(RiveAvatarContract.INPUT_TURN_X, x.coerceIn(-1f, 1f))
+        sink.setNumber(RiveAvatarContract.INPUT_TURN_Y, y.coerceIn(-1f, 1f))
+    }
+
     /** Blink is the one gesture a flat mascot has; the rest need a rig it does not carry. */
     override fun playGesture(gesture: AvatarGesture, fadeSeconds: Float) {
         if (!ready()) return
@@ -107,10 +121,31 @@ class RiveAvatarRuntime(
         _state.value = AvatarRuntimeState.Idle
     }
 
-    /** The director's arbitrated state, which is what the mascot's state machine actually reads. */
+    private var dragged = false
+
+    /**
+     * The director's arbitrated state, written the way the file's state machine reads it:
+     * sustained states as the enum, SUCCESS as a trigger the file plays and returns from, ERROR as
+     * a trigger for the flash plus the sustained `error` settle, DRAGGED as a boolean held until
+     * the next non-dragged state. The director still owns priority; the file owns choreography.
+     */
     fun applyState(state: AvatarState) {
         if (disposed) return
-        sink.setEnum(RiveAvatarContract.INPUT_STATE, RiveAvatarContract.stateKey(state))
+        when (state) {
+            AvatarState.SUCCESS -> sink.fire(RiveAvatarContract.TRIGGER_SUCCESS)
+            AvatarState.DRAGGED -> {
+                dragged = true
+                sink.setBoolean(RiveAvatarContract.INPUT_DRAGGED, true)
+            }
+            else -> {
+                if (dragged) {
+                    dragged = false
+                    sink.setBoolean(RiveAvatarContract.INPUT_DRAGGED, false)
+                }
+                if (state == AvatarState.ERROR) sink.fire(RiveAvatarContract.TRIGGER_ERROR)
+                sink.setEnum(RiveAvatarContract.INPUT_STATE, checkNotNull(RiveAvatarContract.stateKey(state)))
+            }
+        }
     }
 
     private fun ready(): Boolean = !disposed && _state.value is AvatarRuntimeState.Ready
