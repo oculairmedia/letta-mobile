@@ -52,6 +52,7 @@ from rml import SINE, Elastic
 FPS = 60.0
 TICKS = 3                 # the default number of in-betweens a named pattern lays down
 PATTERNS = ("ease-in", "ease-out", "s", "linear")
+READ_ONLY_CLASSES = ("hold", "pop")   # classify() can call a curve these; nothing authors them
 POP_SHARE = 0.45          # one step carrying more than this much of the travel is a pop...
 POP_DOMINANCE = 2.5       # ...if it also dwarfs the next largest step
 FLAT = 0.04               # |mean deviation from the diagonal| below this reads as even
@@ -136,17 +137,18 @@ def classify(values):
     total, share, dev = profile(values)
     if not share:
         return "hold"
-    if is_pop(share):
-        return "pop"
+    return "pop" if is_pop(share) else spacing_class(dev)
+
+
+def spacing_class(dev):
+    """'ease-in' | 'ease-out' | 'linear' | 's' from the travelled curve's deviation from the diagonal."""
     interior = dev[:-1] or dev
     mean_dev = sum(interior) / len(interior)
     if mean_dev > FLAT:
         return "ease-in"     # travelled early, crawls home: slow-in
     if mean_dev < -FLAT:
         return "ease-out"    # holds back, then goes: slow-out
-    if max(abs(d) for d in dev) < EVEN:
-        return "linear"
-    return "s"               # even overall but not even locally: eased at both ends
+    return "linear" if max(abs(d) for d in dev) < EVEN else "s"   # s: even overall, not locally
 
 
 # --- the chart -----------------------------------------------------------------------------------
@@ -171,11 +173,24 @@ class Pen(NamedTuple):
 def spacing_fractions(spacing, ticks):
     """(spacing class, tick fractions) for a pattern name or an explicit list of fractions."""
     if isinstance(spacing, str):
-        return spacing, (Chart.pattern(spacing, ticks) if spacing in PATTERNS else [])
+        # A class that only describes a curve ('hold', 'pop' - what Chart.of reads back) lays down
+        # no ticks; any other name must be a pattern, so a typo fails here and not as a chart
+        # that quietly emits no in-betweens.
+        return spacing, ([] if spacing in READ_ONLY_CLASSES else Chart.pattern(spacing, ticks))
     fr = sorted(float(x) for x in spacing)
     if any(not 0.0 < x < 1.0 for x in fr):
         raise ValueError("tick fractions must lie strictly inside (0, 1)")
     return classify([0.0] + fr + [1.0]), fr
+
+
+def _first_per_frame(poses):
+    """The first pose laid down on each frame, values rounded, in the order they were laid down."""
+    out, seen = [], set()
+    for frame, value in poses:
+        if frame not in seen:
+            out.append((frame, _round(value)))
+            seen.add(frame)
+    return out
 
 
 class Chart:
@@ -248,12 +263,7 @@ class Chart:
             raise ValueError(f"spacing {self.spacing!r} has no ticks to lay down")
         anchors = self.anchors
         poses = [pose for a, b in zip(anchors, anchors[1:]) for pose in self._segment(a, b)] + [anchors[-1]]
-        out, seen = [], set()
-        for frame, value in poses:
-            if frame not in seen:
-                out.append((frame, _round(value)))
-                seen.add(frame)
-        out.sort(key=lambda k: k[0])
+        out = sorted(_first_per_frame(poses), key=lambda k: k[0])
         return [(f, v, self.smooth) for f, v in out[:-1]] + [out[-1]]
 
     # -- reading ----------------------------------------------------------------------------------

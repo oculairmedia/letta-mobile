@@ -18,9 +18,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.max
-import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
@@ -90,30 +90,49 @@ data class MotionSignature(
     val spacing: Spacing,
 )
 
+/** `probe.py`'s FLAT: a step or a range this small is no movement at all. */
+private const val SIGNATURE_FLAT = 1e-6f
+
+/** `probe.py`: overshoot is only read off a move whose rest-to-end step is at least this share of its range. */
+private const val STEP_SHARE_OF_RANGE = 0.2f
+
 /**
- * A signature over one scenario's samples: rest is where the run starts, the peak is the furthest
- * it travels from rest, and it has settled once it stays within [SETTLE_SHARE] of where it ends.
+ * A signature over one scenario's samples, by `probe.py`'s rules so a bench signature and a CLI
+ * golden agree: rest is where the run starts, the peak is the furthest it travels from rest,
+ * overshoot is read only off a real step to a new resting value, and the settle frame is the last
+ * one still outside [SETTLE_SHARE] of the whole range from where the run ends.
  */
 fun signatureOf(samples: List<Float>): MotionSignature {
     if (samples.isEmpty()) return MotionSignature(0f, 0, 0f, 0, 0f, Spacing.STILL)
     val rest = samples.first()
     val end = samples.last()
+    val range = samples.max() - samples.min()
     val peakFrame = samples.indices.maxBy { abs(samples[it] - rest) }
     val peak = samples[peakFrame]
-    val travel = end - rest
-    val overshoot = if (abs(travel) > STILL_EPSILON) ((peak - rest) / travel - 1f) * 100f else 0f
-    val tolerance = max(SETTLE_SHARE * abs(peak - rest), STILL_EPSILON)
-    val settle = samples.indices.lastOrNull { abs(samples[it] - end) > tolerance }?.plus(1) ?: 0
+    val tolerance = max(range * SETTLE_SHARE, SIGNATURE_FLAT)
+    val settle = samples.indices.lastOrNull { abs(samples[it] - end) > tolerance } ?: 0
     val maxDelta = samples.zipWithNext { a, b -> abs(b - a) }.maxOrNull() ?: 0f
-    return MotionSignature(peak, peakFrame, overshoot, min(settle, samples.lastIndex), maxDelta, spacingOf(samples))
+    return MotionSignature(peak, peakFrame, overshootPct(rest, end, peak, range), settle, maxDelta, spacingOf(samples))
+}
+
+/**
+ * How far past the rest-to-end step the peak went, in percent, never below zero. A self-returning
+ * beat ends where it started and a drifting loop ends a hair away from it: neither is a step, so
+ * both read 0 rather than a meaningless thousands of percent.
+ */
+private fun overshootPct(rest: Float, end: Float, peak: Float, range: Float): Float {
+    val step = end - rest
+    if (abs(step) <= SIGNATURE_FLAT || abs(step) < STEP_SHARE_OF_RANGE * range) return 0f
+    return max(0f, ((peak - rest) / step - 1f) * 100f)
 }
 
 /** `probe.py`'s shape: `{property: {peak, peak_frame, overshoot_pct, settle_frame, max_delta, spacing}}`. */
 fun signatureJson(signatures: Map<String, MotionSignature>): String =
     signatures.entries.joinToString(prefix = "{", postfix = "}") { (name, s) ->
+        // Locale.ROOT: a decimal-comma locale would otherwise write `"peak": 1,250`, which is not JSON.
         val body = """"peak": %.3f, "peak_frame": %d, "overshoot_pct": %.1f, "settle_frame": %d, """
-            .format(s.peak, s.peakFrame, s.overshootPct, s.settleFrame) +
-            """"max_delta": %.3f, "spacing": "%s"""".format(s.maxDelta, s.spacing.label)
+            .format(Locale.ROOT, s.peak, s.peakFrame, s.overshootPct, s.settleFrame) +
+            """"max_delta": %.3f, "spacing": "%s"""".format(Locale.ROOT, s.maxDelta, s.spacing.label)
         """"$name": {$body}"""
     }
 

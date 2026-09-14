@@ -18,7 +18,7 @@ import io
 import os
 import sys
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 if HERE not in sys.path:
@@ -205,10 +205,15 @@ class XSheet(unittest.TestCase):
         self.assertNotIn("rerun with --wide", wide)
         self.assertGreater(wide.count("levels "), narrow.count("levels "))
 
-    def test_scenario_is_reserved_for_telemetry(self):
-        code, out = run(xsheet.main, ["--scenario", "enter-listening"])
-        self.assertEqual(code, 0)
-        self.assertEqual(out.strip(), "telemetry not wired yet")
+    def test_scenario_is_refused_until_telemetry_is_wired(self):
+        with redirect_stderr(io.StringIO()) as err, self.assertRaises(SystemExit) as exit_:
+            run(xsheet.main, ["--scenario", "enter-listening"])
+        self.assertEqual(exit_.exception.code, 2)
+        self.assertIn("probe.py enter-listening", err.getvalue())
+
+    def test_the_header_names_the_selected_animations_artboard(self):
+        _code, out = run(xsheet.main, ["--animation", "Blink", "--range", "0:1"])
+        self.assertIn("[Plate]", out.splitlines()[0])
 
     def test_an_unknown_animation_is_a_clean_miss(self):
         code, out = run(xsheet.main, ["--animation", "NoSuchBeat"])

@@ -262,10 +262,16 @@ def print_hidden(groups):
         print(f"    {line}")
 
 
+def board_of(scene, anims):
+    """The artboard the first selected animation lives on; '?' when nothing is selected."""
+    first = anims[0][1] if anims else None
+    return next((board for board, anim in scene.animations if anim is first), "?")
+
+
 def print_sheet(scene, anims, layout=Layout()):
     levels, drivers, span = collect(scene, anims)
     sheet = Sheet(levels, drivers, span, layout)
-    sheet.header([n for n, _a in anims], scene.animations[0][0] if scene.animations else "?")
+    sheet.header([n for n, _a in anims], board_of(scene, anims))
     if not levels:
         print("  (no numeric levels - a rest/placeholder timeline)")
         return
@@ -299,7 +305,8 @@ def parser():
     p.add_argument("--rml", default=os.path.join(here, "scene.rml"), help="the document to read")
     p.add_argument("--animation", help="one animation name")
     p.add_argument("--animations", help="comma-separated animation names, sheeted together")
-    p.add_argument("--scenario", help="a named driver sequence (telemetry track, step C)")
+    p.add_argument("--scenario", help="a named driver sequence (telemetry track, step C) - not wired yet; "
+                                      "use `python probe.py <scenario> --sheet`")
     p.add_argument("--wide", action="store_true", help="every level, wrapped into groups")
     p.add_argument("--chart-width", type=int, default=40, help="width of the timing charts")
     p.add_argument("--range", help="only these frames, FIRST:LAST (the whole span by default)")
@@ -323,8 +330,10 @@ def main(argv=None):
     p = parser()
     args = p.parse_args(argv)
     if args.scenario:
-        print("telemetry not wired yet")
-        return 0
+        # Refused rather than accepted as a no-op: a script that asked for telemetry must not read
+        # an exit status of 0 as having got it.
+        p.error("--scenario (telemetry) is not wired into the x-sheet yet; use `python probe.py "
+                f"{args.scenario} --sheet`")
     names = requested_names(args)
     if not names:
         p.print_help()

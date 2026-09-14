@@ -289,11 +289,11 @@ def diff(paths, frames, cell=200, threshold=12):
 
 
 def is_spike(pcts, i):
-    """Whether pair i moves far more than the pairs either side of it."""
-    near = [pcts[j] for j in (i - 1, i + 1) if 0 <= j < len(pcts)]
-    if not near:
+    """Whether pair i moves far more than the pairs on BOTH sides of it. An end pair has one
+    neighbour, and one neighbour cannot tell a snap from a front- or back-loaded ease."""
+    if not 0 < i < len(pcts) - 1:
         return False
-    return pcts[i] > max(SPIKE_RATIO * max(near), SPIKE_FLOOR)
+    return pcts[i] > max(SPIKE_RATIO * max(pcts[i - 1], pcts[i + 1]), SPIKE_FLOOR)
 
 
 def spikes_of(pcts):

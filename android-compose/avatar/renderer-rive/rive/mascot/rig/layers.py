@@ -287,15 +287,17 @@ class Layer:
         cut = bool(t.cut or getattr(src, "cut", False))
         hold = bool(getattr(t, "hold", False))
         reason = t.reason or getattr(src, "reason", None)
-        marked = cut or hold
-        if marked and not reason:
+        if cut or hold:
+            self._record(source, t, reason, (CUT_MARKS if cut else None, HOLD_MARKS if hold else None))
+        return src, t, cut, reason
+
+    def _record(self, source, t, reason, tables):
+        """File a signed way out in each marks table given; a signature needs a reason."""
+        if not reason:
             raise ValueError(f'layer "{self.name}": {source or "AnyState"} -> '
                              f'{t.to} is marked cut/hold with no reason; say why')
-        if cut:
-            CUT_MARKS[(self.name, source, t.to)] = reason
-        if hold:
-            HOLD_MARKS[(self.name, source, t.to)] = reason
-        return src, t, cut, reason
+        for table in (t for t in tables if t is not None):
+            table[(self.name, source, t.to)] = reason
 
     def _check_blends(self, index):
         """Refuse a 0 ms transition that tears a property both animations key, unless it is

@@ -219,8 +219,7 @@ private fun MascotBench(file: File, modifier: Modifier) {
     var loaded by remember { mutableStateOf(false) }
     val tune = remember { mutableStateMapOf("tuneScale" to 0.5f, "tunePlate" to 0.5f, "tuneGlyph" to 0.5f, "tuneMouth" to 0.5f, "tuneMouthY" to 0.5f) }
 
-    // ---- the sweatbox instruments: onion skin, telemetry, signatures (MOTION-PIPELINE section 6) ----
-    val bench = remember { BenchInstruments() }
+    val bench = remember { BenchInstruments() }   // onion skin, telemetry, signatures (MOTION-PIPELINE section 6)
     val onion = bench.onion
 
     fun setState(state: AvatarState) {
@@ -297,10 +296,7 @@ private fun MascotBench(file: File, modifier: Modifier) {
         }
     }
 
-    BenchInstrumentEffects(scene, loaded, bench) { chosen ->
-        autoCycle = false
-        chosen.play(::setState, runtime)
-    }
+    BenchInstrumentEffects(scene, loaded, bench) { autoCycle = false; it.play(::setState, runtime) }
 
     // Tunables are plain view-model numbers; write each on change (the map is snapshot state).
     LaunchedEffect(loaded) {
@@ -443,35 +439,14 @@ private fun MascotBench(file: File, modifier: Modifier) {
                 Slider(lookY, valueRange = -1f..1f, onValueChange = { setLook(lookX, it) })
             }
 
-            Section("frame")
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                FrameShape.entries.forEach { f ->
-                    if (f == frameShape) Button({ frameShape = f }) { Text(f.label) }
-                    else OutlinedButton({ frameShape = f }) { Text(f.label) }
-                }
-            }
-            Section("frame size ${frameSize.toInt()} dp")
-            Slider(frameSize, valueRange = 22f..520f, onValueChange = { frameSize = it })
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                listOf(22f, 44f, 72f, 120f, 240f, 360f).forEach { s -> OutlinedButton({ frameSize = s }) { Text("${s.toInt()}") } }
-            }
+            FrameShapeControls(frameShape) { frameShape = it }
+            FrameSizeControls(frameSize) { frameSize = it }
             OnionControls(bench)
             SignatureControls(bench)
 
-            Section("mascot in frame x%.2f  (%s)".format(mascotScale, if (mascotScale > 1f) "clipped" else "padded"))
-            Slider(mascotScale, valueRange = 0.4f..2.2f, onValueChange = { mascotScale = it })
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                listOf(0.8f, 1f, 1.2f, 1.5f).forEach { s -> OutlinedButton({ mascotScale = s }) { Text("x$s") } }
-            }
+            MascotScaleControls(mascotScale) { mascotScale = it }
 
-            // ---- rig tunables: art-direct the plate, glyph and mouth; read the numbers back into SPEC ----
-            Section("rig tunables (0.5 = as shipped; numbers are what to put in SPEC)")
-            TuneSlider("entity scale", tune, "tuneScale") { t -> "x%.2f".format(0.5f + t) }
-            TuneSlider("plate scale", tune, "tunePlate") { t -> "x%.2f".format(0.6f + 0.8f * t) }
-            TuneSlider("glyph scale", tune, "tuneGlyph") { t -> "x%.2f".format(0.4f + 1.2f * t) }
-            TuneSlider("mouth scale", tune, "tuneMouth") { t -> "x%.2f".format(0.5f + t) }
-            TuneSlider("mouth distance below plate", tune, "tuneMouthY") { t -> "%.0f px".format(42f + 80f * t) }
-            OutlinedButton({ tune.keys.toList().forEach { tune[it] = 0.5f; scene.inputSink.setNumber(it, 0.5f) } }) { Text("reset tunables") }
+            RigTunableControls(tune, scene)
 
             // ---- grounds: base colour plus radial lights, dragged on the canvas ----
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -553,6 +528,49 @@ private fun TuneSlider(label: String, tune: MutableMap<String, Float>, key: Stri
     val v = tune[key] ?: 0.5f
     Section("$label  ${shown(v)}")
     Slider(v, onValueChange = { tune[key] = it })
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun FrameShapeControls(frameShape: FrameShape, onShape: (FrameShape) -> Unit) {
+    Section("frame")
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        FrameShape.entries.forEach { f ->
+            if (f == frameShape) Button({ onShape(f) }) { Text(f.label) }
+            else OutlinedButton({ onShape(f) }) { Text(f.label) }
+        }
+    }
+}
+
+@Composable
+private fun FrameSizeControls(frameSize: Float, onSize: (Float) -> Unit) {
+    Section("frame size ${frameSize.toInt()} dp")
+    Slider(frameSize, valueRange = 22f..520f, onValueChange = onSize)
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        listOf(22f, 44f, 72f, 120f, 240f, 360f).forEach { s -> OutlinedButton({ onSize(s) }) { Text("${s.toInt()}") } }
+    }
+}
+
+/** The mascot box as a multiple of the frame; above 1 the frame clips it. */
+@Composable
+private fun MascotScaleControls(mascotScale: Float, onScale: (Float) -> Unit) {
+    Section("mascot in frame x%.2f  (%s)".format(mascotScale, if (mascotScale > 1f) "clipped" else "padded"))
+    Slider(mascotScale, valueRange = 0.4f..2.2f, onValueChange = onScale)
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        listOf(0.8f, 1f, 1.2f, 1.5f).forEach { s -> OutlinedButton({ onScale(s) }) { Text("x$s") } }
+    }
+}
+
+/** Rig tunables: art-direct the plate, glyph and mouth; read the numbers back into SPEC. */
+@Composable
+private fun RigTunableControls(tune: MutableMap<String, Float>, scene: RiveDesktopScene) {
+    Section("rig tunables (0.5 = as shipped; numbers are what to put in SPEC)")
+    TuneSlider("entity scale", tune, "tuneScale") { t -> "x%.2f".format(0.5f + t) }
+    TuneSlider("plate scale", tune, "tunePlate") { t -> "x%.2f".format(0.6f + 0.8f * t) }
+    TuneSlider("glyph scale", tune, "tuneGlyph") { t -> "x%.2f".format(0.4f + 1.2f * t) }
+    TuneSlider("mouth scale", tune, "tuneMouth") { t -> "x%.2f".format(0.5f + t) }
+    TuneSlider("mouth distance below plate", tune, "tuneMouthY") { t -> "%.0f px".format(42f + 80f * t) }
+    OutlinedButton({ tune.keys.toList().forEach { tune[it] = 0.5f; scene.inputSink.setNumber(it, 0.5f) } }) { Text("reset tunables") }
 }
 
 /** Play a bench scenario: a state entry through [setState], a gesture straight on the runtime. */

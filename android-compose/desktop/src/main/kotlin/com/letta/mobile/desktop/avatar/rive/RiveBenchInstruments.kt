@@ -29,6 +29,9 @@ private const val TELEMETRY_CAPACITY = (TELEMETRY_WINDOW_SECONDS * NOMINAL_FPS).
 /** How long "record signature" watches a scenario before it prints: long enough for a beat to settle. */
 internal const val RECORD_MILLIS = 2500L
 
+/** How long an Enter recording waits in idle first, so the entry it records starts from StateIdle. */
+private const val RESET_MILLIS = 1200L
+
 /**
  * A named thing the bench can play and record: a state entry, or one of the gesture triggers the
  * state buttons already fire. Same list `scenarios.py` will carry on the CLI side.
@@ -118,9 +121,17 @@ internal class BenchInstruments {
 
     /** "Record signature": play the chosen scenario, watch it settle, print probe.py's JSON. */
     suspend fun record(play: (BenchScenario) -> Unit) {
-        recorder.start(scenario.label)
+        val chosen = scenario
+        if (chosen is BenchScenario.Enter && chosen.state != AvatarState.IDLE) {
+            // Writing `state` does not restart the machine, and the Expression layer has no
+            // self-transition: a run that already sits in the target state would record flat
+            // tracks. Settle in idle first, the way probe.py's driver scenarios start.
+            play(BenchScenario.Enter(AvatarState.IDLE))
+            delay(RESET_MILLIS)
+        }
+        recorder.start(chosen.label)
         recording = true
-        play(scenario)
+        play(chosen)
         delay(RECORD_MILLIS)
         recording = false
         val json = signatureJson(recorder.signatures())

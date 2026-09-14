@@ -177,7 +177,7 @@ one pass, and most of them are text.
    well enough to know it changed and how. Signatures are committed as goldens (`goldens/*.json`)
    and `test_rig.py` diffs them with tolerances, so a regression fails a test with no image at all.
 3. **Text sparklines.** One line per property in the probe output and the X-sheet:
-   `Body.y  ▁▁▂▅▇▇▅▂▁▁  peak -48 @20  settle 44`. Eight-level Unicode bars survive a diff, a log,
+   `Body.y  ▁▁▂▅▇▇▅▂▁▁  peak -48 @19  settle 57`. Eight-level Unicode bars survive a diff, a log,
    and a terminal, and a snap is a vertical wall in the bar.
 4. **The chart as a string.** `[0]---(8)------[22]` with tick positions scaled to the delta: an
    ease reads as clustering, a float as even spacing, a pop as a gap. Cheap to render from

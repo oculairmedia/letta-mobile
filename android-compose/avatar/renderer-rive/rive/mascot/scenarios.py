@@ -47,12 +47,16 @@ class Step(NamedTuple):
     kind: str             # data | pointer | advance
     value: object
 
+    def frames(self, duration=None):
+        """An advance step's frame count, DURATION resolved to `duration`."""
+        n = duration if self.value == DURATION else self.value
+        if not n:
+            raise SystemExit("advance(DURATION) needs a solo animation with a duration")
+        return int(n)
+
     def flag(self, duration=None):
         if self.kind == "advance":
-            n = duration if self.value is DURATION or self.value == DURATION else self.value
-            if not n:
-                raise SystemExit("advance(DURATION) needs a solo animation with a duration")
-            return f"--advance={int(n)}"
+            return f"--advance={self.frames(duration)}"
         return f"--{self.kind}={self.value}"
 
 
@@ -109,11 +113,7 @@ class Scenario(NamedTuple):
 
     def span(self, duration=None):
         """Total frames advanced - the length of the telemetry table."""
-        total = 0
-        for s in self.steps:
-            if s.kind == "advance":
-                total += int(duration if s.value == DURATION else s.value)
-        return total
+        return sum(s.frames(duration) for s in self.steps if s.kind == "advance")
 
 
 def scenario(name, steps, solo=None, note=""):

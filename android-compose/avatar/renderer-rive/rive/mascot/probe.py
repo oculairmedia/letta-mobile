@@ -14,7 +14,7 @@ you, because the keys say what was asked for and telemetry says what happened.
 
 Output, one line per property:
 
-    Body.y  ▁▁▂▅▇▇▅▂▁▁  peak -48.0 @20  settle 44  max|Δ| 6.1  spacing ease-in
+    Body.y  ▁▁▂▅▇▇▅▂▁▁  peak -48.0 @19  settle 57  max|Δ| 21.0  spacing ease-in
 
 peak is the sample furthest from rest and the frame it happens on; settle is the last frame the
 value is still outside 2 % of the span of the whole move; max|Δ| is the largest per-frame change
@@ -118,6 +118,12 @@ def uniform_grid(sparse, every):
     return frames, rows
 
 
+def split_seen(probes, seen):
+    """(names of the probes the dump carried, names of the ones it did not), in probe order."""
+    names = [p.name for p in probes]
+    return [n for n in names if n in seen], [n for n in names if n not in seen]
+
+
 def dense(lines, probes, every=1):
     """JSON Lines -> {frames: [...], values: {name: [...]}, missing: [...]}.
 
@@ -131,8 +137,7 @@ def dense(lines, probes, every=1):
     if not sparse:
         raise SystemExit("no telemetry frames in the dump")
     frames, rows = uniform_grid(sparse, every)
-    names = [p.name for p in probes if p.name in seen]
-    missing = [p.name for p in probes if p.name not in seen]
+    names, missing = split_seen(probes, seen)
     values = {n: [row.get(n, 0.0) for row in rows] for n in names}
     return {"frames": frames, "values": values, "missing": missing,
             "units": {p.name: p.unit for p in probes if p.name in seen}}
@@ -163,8 +168,7 @@ def signature(table):
     max_delta     the largest change between two adjacent FRAMES (samples / --every)
     """
     frames = table["frames"]
-    every = max(1, (frames[1] - frames[0]) if len(frames) > 1 else 1)
-    return {name: series_signature(frames, series, every) for name, series in table["values"].items()}
+    return {name: series_signature(frames, series) for name, series in table["values"].items()}
 
 
 def overshoot_pct(series, peak, span):
@@ -187,12 +191,18 @@ def settle_frame(frames, series, span):
     return outside[-1] if outside else frames[0]
 
 
-def series_signature(frames, series, every):
+def per_frame_deltas(frames, series):
+    """|change| between adjacent samples, each divided by its own frame interval (the grid's last
+    step can be shorter than --every)."""
+    return [abs(b - a) / max(1, fb - fa) for (a, b), (fa, fb) in zip(zip(series, series[1:]), zip(frames, frames[1:]))]
+
+
+def series_signature(frames, series):
     """One property's signature - see `signature`."""
     span = max(series) - min(series)
     i = max(range(len(series)), key=lambda k: abs(series[k] - series[0]))
     peak = series[i]
-    deltas = [abs(b - a) / every for a, b in zip(series, series[1:])]
+    deltas = per_frame_deltas(frames, series)
     return {"peak": round(peak, 4), "peak_frame": frames[i],
             "overshoot_pct": round(overshoot_pct(series, peak, span), 2),
             "settle_frame": settle_frame(frames, series, span),
