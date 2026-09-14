@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.asStateFlow
  *   (override the `on*` hooks to forward to the actual renderer);
  * - a test double the app and tests can assert against.
  */
-open class HeadlessAvatarRuntime : AvatarRuntime {
+open class HeadlessAvatarRuntime : AvatarRuntime, AvatarHeadTurn {
     private val _state = MutableStateFlow<AvatarRuntimeState>(AvatarRuntimeState.Idle)
     override val state: StateFlow<AvatarRuntimeState> = _state.asStateFlow()
 
@@ -30,6 +30,13 @@ open class HeadlessAvatarRuntime : AvatarRuntime {
         private set
 
     var lookTarget: AvatarLookTarget? = null
+        private set
+
+    /** Last [AvatarHeadTurn] written; 0..0 until the gaze director aims the head. */
+    var headTurnX: Float = 0f
+        private set
+
+    var headTurnY: Float = 0f
         private set
 
     /** Accessory ids currently toggled off (default is enabled). */
@@ -146,6 +153,12 @@ open class HeadlessAvatarRuntime : AvatarRuntime {
         onLookTargetChanged(target)
     }
 
+    override fun setHeadTurn(turnX: Float, turnY: Float) {
+        if (readyCapabilities()?.supportsLookAt != true) return
+        headTurnX = if (turnX.isNaN()) 0f else turnX.coerceIn(-1f, 1f)
+        headTurnY = if (turnY.isNaN()) 0f else turnY.coerceIn(-1f, 1f)
+    }
+
     override fun playGesture(gesture: AvatarGesture, fadeSeconds: Float) {
         // Gestures may be procedural, so they have no capability flag —
         // Ready-gated only.
@@ -231,6 +244,8 @@ open class HeadlessAvatarRuntime : AvatarRuntime {
         disabledAccessories.clear()
         mouthOpen = 0f
         lookTarget = null
+        headTurnX = 0f
+        headTurnY = 0f
         cameraFraming = AvatarCameraFraming.FULL_BODY
     }
 

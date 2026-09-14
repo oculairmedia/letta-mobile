@@ -223,13 +223,15 @@ in the plate hops to a new fixation on random waits with the Eyes Alive directio
 (`EMPH_DECEL`), entries flip the glyph at frame 6 while shut, no auto-blink asleep; turns are arcs
 (`Arc` node lifts 7 px through the centre), roll and recede; anticipation/overshoot/elastic curves.
 
-**Host (the director's reference lives in the bench, `RiveDesktopSpike.kt`):**
+**Host (`GazeDirector` in `avatar/core`, ticked from `MascotEntry` / `MascotLive`; the bench
+calls the same class):**
 - every look has a nameable target: own thoughts, you, the cursor, the input (typing), the
-  timeline (reading); a per-state plan with weights, dwell and gap (`GAZE_PLAN`)
+  timeline (reading); a per-state plan with weights, dwell and gap (`GazePlan`, lifted from the
+  bench `GAZE_PLAN`)
 - habituation: interest per target, -1/4 s while attended, +1/12 s otherwise; plan weights scale
   with it; a cursor only grabs attention while its interest is above 0.3
-- eyes lead, head follows after ~350 ms on an under-damped spring (omega 11, zeta 0.5) through
-  `turnX`/`turnY`; a head turn > 0.4 fires `blink`; the body shifts 6 px and rolls 5 deg with it
+- eyes lead, head follows after ~350 ms on an under-damped spring (omega 8.5, zeta 0.72 — spike
+  code, not the older README 11 / 0.5) through `turnX`/`turnY`; a head turn > 0.4 fires `blink`
 - looking at you: saccade between eyes and nose every 100-500 ms; reading: uneven left-to-right
   steps, return sweep, three lines, the head sweeping slowly along the line; typing: ride the caret
 

@@ -156,6 +156,20 @@ class RiveAvatarRuntimeTest {
     }
 
     @Test
+    fun setHeadTurnWritesTheFacingJoystick() = runTest {
+        val sink = RecordingSink()
+        val runtime = RiveAvatarRuntime(sink).also { it.load(model()) }
+
+        runtime.setHeadTurn(1f, -1f)
+        assertEquals(1f, sink.lastNumber(RiveAvatarContract.INPUT_TURN_X))
+        assertEquals(-1f, sink.lastNumber(RiveAvatarContract.INPUT_TURN_Y))
+
+        runtime.setHeadTurn(4f, -4f)
+        assertEquals(1f, sink.lastNumber(RiveAvatarContract.INPUT_TURN_X))
+        assertEquals(-1f, sink.lastNumber(RiveAvatarContract.INPUT_TURN_Y))
+    }
+
+    @Test
     fun blinkFiresTheTriggerAndNothingElseDoes() = runTest {
         val sink = RecordingSink()
         val runtime = RiveAvatarRuntime(sink).also { it.load(model()) }
