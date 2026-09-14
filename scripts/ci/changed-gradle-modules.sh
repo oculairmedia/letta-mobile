@@ -2,7 +2,8 @@
 # Map git changes vs a base ref to additive Gradle unit-test tasks.
 #
 # Usage: changed-gradle-modules.sh [BASE_REF]
-#   BASE_REF defaults to origin/main
+#   BASE_REF defaults to origin/main. CI PRs pass github.event.pull_request.base.sha
+#   so stacked reviews only schedule modules that changed vs their GitHub base.
 #
 # Prints a space-separated list of Gradle tasks to stdout (may be empty).
 # Resolver or diff failures are fatal so CI never silently skips applicable tests.
