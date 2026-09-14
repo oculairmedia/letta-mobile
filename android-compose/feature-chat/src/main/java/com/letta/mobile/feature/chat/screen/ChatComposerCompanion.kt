@@ -8,6 +8,7 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -65,10 +66,13 @@ internal fun ChatComposerCompanion(agentId: String?, status: (@Composable () -> 
                 MascotLive(checkNotNull(agentId), checkNotNull(identity), size = ChatComposerCompanionSize)
             }
         }
-        status?.invoke()
+        // The rig draws the body below its surface's centre (see the 8yee3 framing follow-up), so the
+        // status drops by that much to sit on the eye line rather than on the surface's midline.
+        status?.let { Box(Modifier.padding(top = ChatComposerCompanionBodyDrop)) { it() } }
     }
 }
 
 /** The companion's surface; the body spans ~60 % of it, so this reads as a ~34 dp character. */
 private val ChatComposerCompanionSize = 56.dp
 private val ChatComposerCompanionGap = 2.dp
+private val ChatComposerCompanionBodyDrop = 7.dp
