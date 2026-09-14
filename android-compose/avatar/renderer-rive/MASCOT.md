@@ -153,20 +153,29 @@ desktop/                               app/ (Android)
 The cardinal rule holds: every decision (what state, where to look, when to blink, what size
 gets a live scene) is in common code; the platforms only render and persist.
 
-### 2.2 Timing (working days, one engineer, sequential; P1 and P2 can overlap)
+### 2.2 Order: desktop first, mobile in mind
+
+Build the whole route on desktop first - identity, director wiring, everywhere - and debug it
+there, where the bench and the native bridge give the fastest loop. Then extend to Android.
+"Mobile in mind" is a rule, not a hope: every piece lands in `commonMain` (`avatar/core`,
+`sharedLogic`, `sharedUI`) with the desktop module only binding; a piece that would need
+desktop-only logic is a design error to fix before Android, not after. Android parity (P4)
+is then rive-android surface + host binding + device measurement.
+
+### 2.3 Timing (working days, one engineer; desktop phases sequential, then Android)
 
 | Phase | Bead | Scope | Est. | Exit check |
 |---|---|---|---|---|
 | P0 done | kh094 | rig, bench, contract, native bridge | - | this branch, PR #1540 |
-| P1 identity | 1zti3 | `MascotIdentity` persistence (desktop + Android), `MascotPicker` in sharedUI, edit-agent uses it on both, chat-header hero live on both (desktop bridge / Android surface), contract gains `turnX`/`turnY` | 2-3 d | pick a shape+colour on one platform, see it on the hero; legacy int agents keep a look |
-| P2 director wiring | 24gbf | `AgentPresenceSource` from the turn engine; both hosts feed `AvatarDirector`; `GazeDirector` lifted from the bench into avatar/core with unit tests; hosts supply input/timeline rects; runtime `setHeadTurn` | 3-4 d | a real turn: listening while typing, thinking, speaking with mouth, waitingInput on approval, error flash - on both platforms, no debug buttons |
-| P3 everywhere | bn0y6 | `MascotAvatar` with the size tiers and bitmap cache; replace the 12 desktop orb sites and the Android list/header sites; gradient fallback | 3-4 d | a list of 20 agents at 60 fps; every avatar in the app is the mascot |
-| P4 Android parity + perf | jwntc | Pixel run via `MascotDebugActivity`: feathering, 60 fps hero, pause offscreen, memory; `reduceMotion` (qg77k) gates in rig + host; 22 dp profile decision | 2-3 d | Pixel 9 Pro + Pixel 2XL harness green; no dropped frames on the chat screen |
+| P1 identity (desktop) | 1zti3 | `MascotIdentity` persistence, `MascotPicker` in sharedUI (commonMain), desktop edit-agent uses it, chat-header hero live via the bridge, contract gains `turnX`/`turnY` | 2-3 d | pick a shape+colour, see it on the hero; legacy int agents keep a look |
+| P2 director wiring (desktop) | 24gbf | `AgentPresenceSource` from the turn engine (commonMain); desktop feeds `AvatarDirector`; `GazeDirector` lifted from the bench into avatar/core with unit tests; hosts supply input/timeline rects; runtime `setHeadTurn` | 3-4 d | a real turn: listening while typing, thinking, speaking with mouth, waitingInput on approval, error flash - on both platforms, no debug buttons |
+| P3 everywhere (desktop) | bn0y6 | `MascotAvatar` (sharedUI) with the size tiers and bitmap cache; replace the 12 desktop orb sites; gradient fallback | 3-4 d | a list of 20 agents at 60 fps; every avatar in the app is the mascot |
+| P4 Android: surface binding, presence binding, picker/hero/list sites, perf | jwntc | Pixel run via `MascotDebugActivity`: feathering, 60 fps hero, pause offscreen, memory; `reduceMotion` (qg77k) gates in rig + host; 22 dp profile decision | 2-3 d | Pixel 9 Pro + Pixel 2XL harness green; no dropped frames on the chat screen |
 | Later | z4b83, 0s5bi follow-ups | WORKING state + glyph; macOS/Linux bridge (Metal / Vulkan) or rive-cmp; the artist pass in the editor (then the editor is source of truth) | - | - |
 
 Total to "mascot everywhere on both platforms": ~11-14 working days after P0.
 
-### 2.3 Decisions already made (do not relitigate)
+### 2.4 Decisions already made (do not relitigate)
 
 - One `.riv`, one artboard, one state machine, view-model driven. Identity = shape + colour,
   written once on load; state never persists.
@@ -179,7 +188,7 @@ Total to "mascot everywhere on both platforms": ~11-14 working days after P0.
   tunables can be removed.
 - Rive push before commit; once the artist edits in the editor, the editor is source of truth.
 
-### 2.4 Risks
+### 2.5 Risks
 
 - macOS/Linux have no bridge yet: they get the gradient orb until P5. Acceptable for v1.
 - rive-android feathering/perf on low-end devices: P4 measures; the cached-bitmap tier is the
