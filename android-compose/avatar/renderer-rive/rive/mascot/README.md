@@ -235,14 +235,15 @@ in the plate hops to a new fixation on random waits with the Eyes Alive directio
 
 ## SPEC section 10 (Astra Max) as built - test rig, pending the user's review
 
-- **Pupil overlay** (`PupilOverlay` "7:29" > `PupilRoot` "7:96" clipped to `Iris` "7:95"; `Wave`
-  "7:97", `Core` "7:98", `Catchlight` "7:99"; wave vertices 7:200-7:204): above the glyph Solo,
-  under Saccade, so it inherits look/saccade; LookX/LookY/Blink co-key it; inner parallax
-  +-1.5/+-1 px on PupilRoot. Visible for idle/listening/speaking only; the plate's Expr animations
-  for those states are loops carrying the wave's four phase targets (2500 / 1250 / 500 ms,
-  amplitude 1.5 / 4 / 2.5 px) - the spec's keyed fallback. Deviations: phase restarts on a
-  state change (the spec asks for continuity; needs a script); the catchlight is always on (no
-  size signal), which only matters above ~72 dp anyway; no `reduceMotion` yet.
+- **Pupil overlay: built, reviewed, dropped.** The assembly (`PupilOverlay` "7:29" > `PupilRoot`
+  "7:96" clipped to `Iris` "7:95"; `Wave` "7:97", `Core` "7:98", `Catchlight` "7:99"; wave
+  vertices 7:200-7:204) is still in the file at opacity 0 for the art pass, and `PUPIL = {}` in
+  the generator means no state keys it. Built exactly to spec (keyed four-phase wave, clipped
+  core/catchlight, look/saccade/blink co-keyed, +-1.5/+-1 parallax) and reviewed at hero size
+  and in the app: the 8 px stroke wave read as a bar or ring welded to the core at every size,
+  and even a core-only bobbing pupil lost to the pure glyph. To revive it set `PUPIL` per state.
+- **Speaking has no mouth** (product call): `STATE_MOUTH` keeps the mouth for dragged,
+  waitingInput and error only; the glyph and the head carry speech.
 - **Deformation**: three RootBones inside `Body` (Crown 0:240 at (0,-150), Middle 0:241, Base
   0:242 at (0,+150)), a Skin with three Tendons in every body path (body, SoftEdge, Halo), a
   CubicWeight per vertex from its rest y on the default body. Success / error / dragged key the

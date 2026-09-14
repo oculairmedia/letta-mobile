@@ -36,7 +36,6 @@ object DesktopMascotScenes {
             val was = lastPresence
             if (presence == was) return
             lastPresence = presence
-            println("mascot presence ${identity.encode()}: $presence")
             director.setActivity(
                 when (presence.activity) {
                     AgentActivityKind.THINKING -> AvatarActivity.THINKING

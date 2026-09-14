@@ -3,7 +3,12 @@ package com.letta.mobile.desktop.avatar.rive
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
@@ -40,5 +45,18 @@ fun DesktopMascotHero(
     }
     // requiredSize: an overscaled mascot must exceed its tile so the tile's clip crops it;
     // plain size() is coerced down to the parent's constraints and never overscales.
-    RiveDesktopSurface(entry.scene, modifier.requiredSize(size))
+    // Gaze: this surface's window bounds vs the cursor (captured once at the window root). The
+    // eyes follow within `reach` mascot widths; the director owns the write, so timing rules
+    // (attention, habituation) land there for both platforms.
+    var bounds by remember { mutableStateOf(androidx.compose.ui.geometry.Rect.Zero) }
+    val cursor = MascotIdentityRegistry.cursor.value
+    LaunchedEffect(entry, cursor, bounds) {
+        if (bounds.isEmpty) return@LaunchedEffect
+        if (cursor == null) { entry.director.setLookTarget(null); return@LaunchedEffect }
+        val reach = bounds.width * 2.5f / 2f
+        val nx = ((cursor.x - bounds.center.x) / reach).coerceIn(-1f, 1f)
+        val ny = ((cursor.y - bounds.center.y) / reach).coerceIn(-1f, 1f)
+        entry.director.setLookTarget(com.letta.mobile.avatar.core.AvatarLookTarget.Screen((nx + 1f) / 2f, (ny + 1f) / 2f))
+    }
+    RiveDesktopSurface(entry.scene, modifier.requiredSize(size).onGloballyPositioned { bounds = it.boundsInWindow() })
 }

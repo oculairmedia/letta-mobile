@@ -76,7 +76,7 @@ fun AgentOrb(
         ) {
             // The body spans ~60 % of the artboard; overscale so the character fills the tile edge
             // to edge and the tile's clip crops the rest - an avatar photo, not a figure in a frame.
-            com.letta.mobile.desktop.avatar.rive.DesktopMascotHero(agentId = agentId, identity = identity, size = size * 1.9f)
+            com.letta.mobile.desktop.avatar.rive.DesktopMascotHero(agentId = agentId, identity = identity, size = size * 1.6f)
         }
         return
     }
@@ -223,6 +223,9 @@ object MascotIdentityRegistry {
         presence.keys.retainAll(all.keys)
         presence.putAll(all)
     }
+
+    /** The cursor in window coordinates, or null when it has left the window; every mascot looks toward it. */
+    val cursor = androidx.compose.runtime.mutableStateOf<androidx.compose.ui.geometry.Offset?>(null)
 
     fun update(all: Map<String, com.letta.mobile.avatar.core.MascotIdentity>) {
         identities.keys.retainAll(all.keys)

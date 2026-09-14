@@ -225,6 +225,7 @@ private fun ChatDetailBody(
                     renderItems = surface.renderItems,
                     isSending = state.isThinking,
                     isStreamingReply = state.isStreamingReply,
+                    thinkingAgentId = surface.selectedConversation?.agentId,
                 ),
                 modifier = Modifier.weight(1f),
             )

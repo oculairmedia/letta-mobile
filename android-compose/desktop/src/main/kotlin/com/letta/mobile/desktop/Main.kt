@@ -1,5 +1,11 @@
 package com.letta.mobile.desktop
 
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -133,6 +139,23 @@ private fun runDesktopApplication(
                         // metrics the way browser zoom leaves the browser's own
                         // chrome alone.
                         DesktopChatFontScaleHost {
+                            // Every mascot in the app looks toward the cursor; capture it once, at the root.
+                            Box(
+                                Modifier.fillMaxSize().pointerInput(Unit) {
+                                    awaitPointerEventScope {
+                                        while (true) {
+                                            val e = awaitPointerEvent(PointerEventPass.Initial)
+                                            when (e.type) {
+                                                PointerEventType.Move ->
+                                                    com.letta.mobile.desktop.chat.MascotIdentityRegistry.cursor.value = e.changes.firstOrNull()?.position
+                                                PointerEventType.Exit ->
+                                                    com.letta.mobile.desktop.chat.MascotIdentityRegistry.cursor.value = null
+                                                else -> Unit
+                                            }
+                                        }
+                                    }
+                                },
+                            ) {
                             LettaDesktopApp(
                                 shell = DesktopAppShellBindings(
                                     nucleusApplicationScope = nucleusScope,
@@ -143,6 +166,7 @@ private fun runDesktopApplication(
                                 onActiveTitleChange = { windowTitle = it },
                                 onHeaderChromeChange = { headerChrome = it },
                             )
+                            }
                         }
                     }
                     // Spotlight-style floating query bar, summoned by the global

@@ -502,7 +502,7 @@ private fun ColumnScope.AgentRailOrbList(
         // so this spacing is ON TOP of that: 4dp here is an 8dp gap between
         // adjacent orbs. The slot itself stays 34dp — the thinking ring is
         // exactly that size, so shrinking the slot would crowd it.
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         itemsIndexed(groups, key = { _, group -> "orb-${group.name}" }) { index, group ->
             AgentRailOrb(
@@ -606,7 +606,7 @@ private fun AgentRailOrbContent(
 ) {
     Box(
         // Square slot for a square tile (it was 46x34 for the old 30 dp orbs).
-        modifier = Modifier.size(width = 48.dp, height = 48.dp),
+        modifier = Modifier.size(width = 48.dp, height = 44.dp),
         contentAlignment = Alignment.Center,
     ) {
         if (flags.selected) {
