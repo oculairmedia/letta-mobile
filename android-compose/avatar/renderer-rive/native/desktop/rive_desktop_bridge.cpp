@@ -171,9 +171,24 @@ static bool create_offscreen_textures(RiveBridge* bridge, D3D11_TEXTURE2D_DESC d
     return bridge->drawTexture && bridge->readbackTexture;
 }
 
+static bool target_size_matches(RiveBridge* bridge, uint32_t width, uint32_t height)
+{
+    return bridge->width == width && bridge->height == height;
+}
+
+static bool target_textures_ready(RiveBridge* bridge)
+{
+    return bridge->drawTexture && bridge->readbackTexture;
+}
+
+static bool target_ready(RiveBridge* bridge, uint32_t width, uint32_t height)
+{
+    return target_size_matches(bridge, width, height) && target_textures_ready(bridge);
+}
+
 static bool ensure_target(RiveBridge* bridge, uint32_t width, uint32_t height)
 {
-    if (bridge->width == width && bridge->height == height && bridge->drawTexture && bridge->readbackTexture)
+    if (target_ready(bridge, width, height))
         return true;
     D3D11_TEXTURE2D_DESC desc{};
     desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;

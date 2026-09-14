@@ -120,28 +120,44 @@ def _flag_value(argv, flag, default=None, cast=int):
     return cast(argv[argv.index(flag) + 1])
 
 
-def _write_standalone(out, root, name, client, body, lines):
-    w, h = root.get("width", 500), root.get("height", 500)
-    doc = (f'<Rive version="1" kind="fragment">\n<Artboard clip="false" width="{xml_attr(w)}" height="{xml_attr(h)}" '
-           f'name="{xml_attr(name)}" id="{client}:1">\n{body}\n</Artboard>\n</Rive>\n')
-    out.write_text(doc, encoding="utf-8", newline="\n")
+def _artboard_size(root):
+    return root.get("width", 500), root.get("height", 500)
+
+
+def _standalone_doc(root, name, client, body):
+    w, h = _artboard_size(root)
+    return (f'<Rive version="1" kind="fragment">\n<Artboard clip="false" width="{xml_attr(w)}" height="{xml_attr(h)}" '
+            f'name="{xml_attr(name)}" id="{client}:1">\n{body}\n</Artboard>\n</Rive>\n')
+
+
+def _write_standalone(out, artboard, lines):
+    root, name, client = artboard
+    w, h = _artboard_size(root)
+    out.write_text(_standalone_doc(root, name, client, "\n".join(lines)), encoding="utf-8", newline="\n")
     print(f"wrote {out}: {len(lines)} lines, artboard {w}x{h}", file=sys.stderr)
+
+
+def _standalone_out(argv):
+    if "--standalone" not in argv:
+        return None
+    return _cli_path(argv[argv.index("--standalone") + 1])
+
+
+def _parse_cli(argv):
+    if len(argv) < 3:
+        raise SystemExit("usage: python riv2rml.py <dump.json> <artboard name> [--id-client N] [--standalone out.rml]")
+    dump = json.loads(_cli_path(argv[1]).read_text(encoding="utf-8"))
+    return dump, argv[2], _flag_value(argv, "--id-client", 9), _flag_value(argv, "--subtree"), _standalone_out(argv)
 
 
 def main(argv=None):
     argv = sys.argv if argv is None else argv
-    if len(argv) < 3:
-        raise SystemExit("usage: python riv2rml.py <dump.json> <artboard name> [--id-client N] [--standalone out.rml]")
-    dump = json.loads(_cli_path(argv[1]).read_text(encoding="utf-8"))
-    name = argv[2]
-    client = _flag_value(argv, "--id-client", 9)
-    subtree = _flag_value(argv, "--subtree")
+    dump, name, client, subtree, standalone = _parse_cli(argv)
     root, lines = lift(dump, name, client, subtree)
-    body = "\n".join(lines)
-    if "--standalone" in argv:
-        _write_standalone(_cli_path(argv[argv.index("--standalone") + 1]), root, name, client, body, lines)
+    if standalone:
+        _write_standalone(standalone, (root, name, client), lines)
     else:
-        print(body)
+        print("\n".join(lines))
 
 
 if __name__ == "__main__":

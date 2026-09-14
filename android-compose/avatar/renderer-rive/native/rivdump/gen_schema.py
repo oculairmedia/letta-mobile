@@ -50,21 +50,32 @@ def _rows_from_header(path):
     return rows
 
 
+def _headers_under(root):
+    headers = glob.glob(os.path.join(root, "include", "rive", "generated", "**", "*_base.hpp"), recursive=True)
+    if not headers:
+        raise SystemExit(f"no generated Rive headers found under {root!r}")
+    return headers
+
+
+def _collect_rows(root):
+    rows = [row for path in _headers_under(root) for row in _rows_from_header(path)]
+    if not rows:
+        raise SystemExit("generated headers produced no supported view-model or core types")
+    rows.sort()
+    return rows
+
+
+def _emit_rows(rows):
+    for r in rows:
+        print("\t".join(map(str, r)))
+    print(f"{len(rows)} properties across {len(set(r[0] for r in rows))} types", file=sys.stderr)
+
+
 def main(argv=None):
     argv = sys.argv if argv is None else argv
     if len(argv) < 2:
         raise SystemExit("usage: python gen_schema.py <rive-runtime dir>")
-    root = str(_cli_path(argv[1]))
-    headers = glob.glob(os.path.join(root, "include", "rive", "generated", "**", "*_base.hpp"), recursive=True)
-    if not headers:
-        raise SystemExit(f"no generated Rive headers found under {root!r}")
-    rows = [row for path in headers for row in _rows_from_header(path)]
-    if not rows:
-        raise SystemExit("generated headers produced no supported view-model or core types")
-    rows.sort()
-    for r in rows:
-        print("\t".join(map(str, r)))
-    print(f"{len(rows)} properties across {len(set(r[0] for r in rows))} types", file=sys.stderr)
+    _emit_rows(_collect_rows(str(_cli_path(argv[1]))))
 
 
 if __name__ == "__main__":
