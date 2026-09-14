@@ -201,7 +201,15 @@ class GazeDirectorTest {
         assertTrue(input != null && input.y > 0f, "input below tile: $input")
         assertTrue(timeline != null && timeline.x > 0f, "timeline right of tile: $timeline")
 
-        val listening = firstPick().tick(0.016f, AvatarState.LISTENING, with)
+        val listening = firstPick().tick(
+            0.016f,
+            AvatarState.LISTENING,
+            GazeWorld.fromWindow(
+                mascot = mascot,
+                minReachPx = 360f,
+                inputBounds = GazeRect(0f, 400f, 200f, 440f),
+            ),
+        )
         assertEquals(GazeTarget.INPUT, listening.target)
     }
 
