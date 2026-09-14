@@ -34,6 +34,7 @@ import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.mascot.AgentAvatar
+import com.letta.mobile.ui.mascot.mascotAtWork
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -150,13 +151,15 @@ private fun AgentScaffoldAgentTopBarTitle(params: AgentScaffoldAgentTopBarTitleP
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        // The agent's avatar as a chip before its name (letta-mobile-8jtf3). A still: the live one
-        // is the composer companion, and two of them moving is confusing.
+        // The agent's avatar as a chip before its name (letta-mobile-8jtf3). Alive while the agent
+        // is idle; the moment a run starts it turns into a still and the composer companion carries
+        // the motion - one moving character per screen.
         AgentAvatar(
             agentId = params.agentId,
             name = params.agentName.ifBlank { params.screenTitle },
             size = TopBarMascotSize,
             modifier = Modifier.padding(end = 4.dp),
+            live = !mascotAtWork(params.agentId),
         )
         Text(
             text = params.agentName.ifBlank { params.screenTitle },

@@ -164,6 +164,9 @@ internal class AdminChatViewModel @Inject constructor(
         AttachmentLimits.Default,
     private val pagingHost: ChatPagingHost = ChatPagingHost(),
     private val selectedRuntimeProvider: com.letta.mobile.feature.chat.coordination.SelectedChatRuntimeProvider? = null,
+    /** App-wide run state; this screen publishes its conversation here for the lists and the mascots. */
+    private val runRegistry: com.letta.mobile.data.presence.ConversationRunRegistry =
+        com.letta.mobile.data.presence.ConversationRunRegistry(),
 ) : ViewModel() {
     companion object {
         private const val RESUME_CACHE_MAX_AGE_MS = 60_000L
@@ -1001,6 +1004,7 @@ internal class AdminChatViewModel @Inject constructor(
     fun onScreenResumed() = screenLifecycleCoordinator.onScreenResumed()
 
     override fun onCleared() {
+        publishedRunKey?.let(runRegistry::clear)
         abandonTimelineObserver()
         adminChatA2uiCoordinator.release()
         screenLifecycleCoordinator.onCleared()
@@ -1060,5 +1064,36 @@ internal class AdminChatViewModel @Inject constructor(
         adminChatA2uiCoordinator
         sendPipeline.ensureEagerInit()
         chatSessionInitializer.run()
+        publishRunState()
+    }
+
+    /** The registry key for this screen's conversation; the agent stands in until the conversation has an id. */
+    private var publishedRunKey: String? = null
+
+    /**
+     * Publishes this conversation's run to the app-wide registry on every change: busy from send
+     * to terminal (the streaming flag covers the run, the typing dots the gaps before the first
+     * token and between tool phases), tokens when streaming without the dots, typing while the
+     * composer holds text, error while the last attempt failed. The chat's own screen and every
+     * other surface (the conversation list, the mascots) read presence from that one place.
+     */
+    private fun publishRunState() {
+        viewModelScope.launch {
+            kotlinx.coroutines.flow.combine(uiState, composerState) { ui, composer ->
+                val key = conversationId?.value ?: "agent:${agentId.value}"
+                com.letta.mobile.data.presence.ConversationRunState(
+                    conversationId = key,
+                    agentId = agentId.value,
+                    running = ui.isStreaming || ui.isAgentTyping,
+                    streamingTokens = ui.isStreaming && !ui.isAgentTyping,
+                    userTyping = composer.inputText.isNotBlank(),
+                    error = ui.error != null,
+                )
+            }.collect { state ->
+                publishedRunKey?.takeIf { it != state.conversationId }?.let(runRegistry::clear)
+                publishedRunKey = state.conversationId
+                runRegistry.publish(state)
+            }
+        }
     }
 }

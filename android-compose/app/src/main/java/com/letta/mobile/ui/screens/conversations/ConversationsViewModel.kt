@@ -16,7 +16,7 @@ import com.letta.mobile.data.repository.api.IAllConversationsRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.repository.api.IMessageRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
-import com.letta.mobile.data.transport.RunCursorStore
+import com.letta.mobile.data.presence.ConversationRunRegistry
 import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatusProvider
 import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelRepository
 import com.letta.mobile.ui.screens.agentlist.LocalLettaCodeCreateReadiness
@@ -93,7 +93,7 @@ class ConversationsViewModel @Inject constructor(
     private val settingsRepository: ISettingsRepository,
     private val embeddedRuntimeStatusProvider: EmbeddedLettaCodeRuntimeStatusProvider,
     private val embeddedModelRepository: EmbeddedModelRepository,
-    private val runCursorStore: RunCursorStore = RunCursorStore.inMemory(),
+    private val runRegistry: ConversationRunRegistry = ConversationRunRegistry(),
 ) : ViewModel() {
     companion object {
         private const val LIST_CACHE_TTL_MS = 30_000L
@@ -161,6 +161,8 @@ class ConversationsViewModel @Inject constructor(
                 if (held.isNotEmpty()) publishSnapshot(held)
             }
         }
+        // A run starting or ending anywhere in the app re-marks the rows; no polling, no refresh.
+        viewModelScope.launch { runRegistry.runs.collect { refreshWorkingState() } }
         loadConversations()
     }
 
@@ -522,11 +524,18 @@ class ConversationsViewModel @Inject constructor(
         )
     }
 
-    /** Conversations with a run in flight, from the run cursor store's non-terminal cursors. */
-    private fun workingConversationIds(): Set<String> = runCatching {
-        runCursorStore.ensureLoaded()
-        runCursorStore.allActiveRuns().filterValues { it.isNotEmpty() }.keys
-    }.getOrDefault(emptySet())
+    /** Re-marks which rows have a run in flight; publishes only when that changed. No network. */
+    private fun refreshWorkingState() {
+        val working = workingConversationIds()
+        val current = _uiState.value.conversations
+        if (current.all { (it.conversation.id.value in working) == it.isWorking }) return
+        _uiState.value = _uiState.value.copy(
+            conversations = current.map { it.copy(isWorking = it.conversation.id.value in working) }.toImmutableList(),
+        )
+    }
+
+    /** Conversations with a run in flight, from the app-wide run registry (any transport). */
+    private fun workingConversationIds(): Set<String> = runRegistry.runningConversationIds()
 
     private fun displayAgents(
         agents: List<Agent>,
