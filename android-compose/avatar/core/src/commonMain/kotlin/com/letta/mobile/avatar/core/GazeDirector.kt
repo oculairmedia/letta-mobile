@@ -34,37 +34,37 @@ data class GazeWorld(
     val pointerMovedRecently: Boolean? = null,
 ) {
     companion object {
-        /**
-         * Product host API: [mascot] is the tile in window space; [inputBounds]
-         * / [timelineBounds] are the composer field and message list (nullable
-         * stubs until a host publishes them). Centres go through
-         * [GazeMath.rectCenterToGaze].
-         */
+        /** Product host API: window-space tile + optional composer / timeline. */
         fun fromWindow(
-            mascot: GazeRect,
-            minReachPx: Float,
-            pointerX: Float? = null,
-            pointerY: Float? = null,
-            inputBounds: GazeRect? = null,
-            timelineBounds: GazeRect? = null,
+            window: GazeWindow,
             mode: GazeDriveMode = GazeDriveMode.JUSTIFIED,
             pointerMovedRecently: Boolean? = null,
-        ): GazeWorld {
-            val pointer = if (pointerX != null && pointerY != null && !mascot.isEmpty) {
-                GazeMath.pointerToGaze(pointerX, pointerY, mascot, minReachPx)
-            } else {
-                null
-            }
-            return GazeWorld(
-                pointer = pointer,
-                input = GazeMath.rectCenterToGaze(inputBounds, mascot, minReachPx),
-                timeline = GazeMath.rectCenterToGaze(timelineBounds, mascot, minReachPx),
-                mode = mode,
-                pointerMovedRecently = pointerMovedRecently,
-            )
-        }
+        ): GazeWorld = GazeWorld(
+            pointer = GazeMath.pointerPxToGaze(window.pointerPx, window.mascot, window.minReachPx),
+            input = GazeMath.rectCenterToGaze(window.rects.input, window.mascot, window.minReachPx),
+            timeline = GazeMath.rectCenterToGaze(window.rects.timeline, window.mascot, window.minReachPx),
+            mode = mode,
+            pointerMovedRecently = pointerMovedRecently,
+        )
     }
 }
+
+/** Composer and message-list window rects; either may be null until the host publishes them. */
+data class GazeTargetRects(
+    val input: GazeRect? = null,
+    val timeline: GazeRect? = null,
+)
+
+/**
+ * Window-space surfaces a host publishes for [GazeWorld.fromWindow].
+ * [pointerPx] is pixels (same space as [mascot]), not gaze units.
+ */
+data class GazeWindow(
+    val mascot: GazeRect,
+    val minReachPx: Float,
+    val pointerPx: GazePoint? = null,
+    val rects: GazeTargetRects = GazeTargetRects(),
+)
 
 /** Eyes, head, and a one-tick blink pulse. Look is also packaged as a screen target. */
 data class GazePose(
@@ -337,15 +337,18 @@ class GazeDirector(
     }
 
     private fun tickScan(dt: Float) {
-        if (scanKind != GazeTarget.TIMELINE && scanKind != GazeTarget.INPUT && scanKind != GazeTarget.USER) {
-            return
-        }
+        if (!hasScanOverlay(scanKind)) return
         scanWait -= dt
         var steps = 0
         while (scanWait <= 0f && steps < 8) {
             steps++
             stepScan()
         }
+    }
+
+    private fun hasScanOverlay(kind: GazeTarget): Boolean = when (kind) {
+        GazeTarget.TIMELINE, GazeTarget.INPUT, GazeTarget.USER -> true
+        else -> false
     }
 
     private fun stepScan() {
@@ -436,43 +439,69 @@ class GazeDirector(
 
     private fun tickMotion(dt: Float, world: GazeWorld, near: Boolean): GazePose {
         val base = aimBase(world, near)
-        val useScan = !near && world.mode != GazeDriveMode.CURSOR
+        val want = wantLook(base, near, world.mode)
+        noteWantJump(base, dt)
+        val blink = commitHeadIfLed(base)
+        easeEyes(want, dt)
+        stepHeadSpring(dt)
+        return finishedPose(blink, near)
+    }
+
+    private fun wantLook(base: GazePoint, near: Boolean, mode: GazeDriveMode): GazePoint {
+        val useScan = !near && mode != GazeDriveMode.CURSOR
         val sx = if (useScan) scanX else 0f
         val sy = if (useScan) scanY else 0f
-        val wantX = (base.x + sx).coerceIn(-1f, 1f)
-        val wantY = (base.y + sy).coerceIn(-1f, 1f)
-        var blink = false
-        if (abs(base.x - lastWantX) > config.headCommitDelta || abs(base.y - lastWantY) > config.headCommitDelta) {
+        return GazePoint((base.x + sx).coerceIn(-1f, 1f), (base.y + sy).coerceIn(-1f, 1f))
+    }
+
+    private fun noteWantJump(base: GazePoint, dt: Float) {
+        if (wantJumped(base)) {
             lastWantX = base.x
             lastWantY = base.y
             wantAge = 0f
         } else {
             wantAge += dt
         }
-        if (wantAge > config.headLeadSeconds) {
-            // Spike always adds headScan (0 unless TIMELINE); eyes drop scan when near/cursor.
-            val nextX = base.x * config.headXScale + headScan
-            val nextY = base.y * config.headYScale
-            if (abs(nextX - headTargetX) > config.blinkOnHeadTurn) blink = true
-            headTargetX = nextX
-            headTargetY = nextY
-        }
-        val tau = if (target == GazeTarget.TIMELINE || target == GazeTarget.INPUT) {
-            config.scanTauSeconds
-        } else {
-            config.eyeTauSeconds
+    }
+
+    private fun wantJumped(base: GazePoint): Boolean {
+        if (abs(base.x - lastWantX) > config.headCommitDelta) return true
+        return abs(base.y - lastWantY) > config.headCommitDelta
+    }
+
+    private fun commitHeadIfLed(base: GazePoint): Boolean {
+        if (wantAge <= config.headLeadSeconds) return false
+        // Spike always adds headScan (0 unless TIMELINE); eyes drop scan when near/cursor.
+        val nextX = base.x * config.headXScale + headScan
+        val nextY = base.y * config.headYScale
+        val blink = abs(nextX - headTargetX) > config.blinkOnHeadTurn
+        headTargetX = nextX
+        headTargetY = nextY
+        return blink
+    }
+
+    private fun easeEyes(want: GazePoint, dt: Float) {
+        val tau = when (target) {
+            GazeTarget.TIMELINE, GazeTarget.INPUT -> config.scanTauSeconds
+            else -> config.eyeTauSeconds
         }
         val k = 1f - exp(-dt / tau)
-        val ex = wantX - headX * config.eyeHeadCompensation
-        val ey = wantY - headY * config.eyeHeadCompensation
+        val ex = want.x - headX * config.eyeHeadCompensation
+        val ey = want.y - headY * config.eyeHeadCompensation
         eyeX += (ex - eyeX) * k
         eyeY += (ey - eyeY) * k
+    }
+
+    private fun stepHeadSpring(dt: Float) {
         val omega = config.springOmega
         val zeta = config.springZeta
         headVx += ((headTargetX - headX) * omega * omega - 2f * zeta * omega * headVx) * dt
         headX += headVx * dt
         headVy += ((headTargetY - headY) * omega * omega - 2f * zeta * omega * headVy) * dt
         headY += headVy * dt
+    }
+
+    private fun finishedPose(blink: Boolean, near: Boolean): GazePose {
         // TODO(letta-mobile-kkjyd): SPEC §10.4 combined gaze containment — do not
         // clamp look+saccade to the card here. Unattenuated H+N can put the
         // failed X ~2.54 artboard px outside; λ attenuation is that bead (after

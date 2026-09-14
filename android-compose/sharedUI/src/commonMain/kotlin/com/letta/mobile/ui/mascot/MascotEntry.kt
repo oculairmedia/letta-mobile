@@ -63,7 +63,7 @@ abstract class MascotEntry(
 
     /**
      * Cursor / composer / timeline (already converted to gaze units; prefer
-     * [GazeWorld.fromWindow]). A null pointer or missing rect still runs the justified
+     * [GazeWorld.fromWindow] with a [GazeWindow]). A null pointer or missing rect still runs the justified
      * plan so the eyes are never dead. Last writer wins when several surfaces of the
      * same agent compose in one frame.
      */

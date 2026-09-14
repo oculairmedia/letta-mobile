@@ -179,7 +179,7 @@ class GazeDirectorTest {
     @Test
     fun fromWindowMapsHostRectsAndLeavesMissingOnesUnavailable() {
         val mascot = GazeRect(0f, 0f, 80f, 80f)
-        val empty = GazeWorld.fromWindow(mascot = mascot, minReachPx = 360f)
+        val empty = GazeWorld.fromWindow(GazeWindow(mascot = mascot, minReachPx = 360f))
         assertEquals(null, empty.pointer)
         assertEquals(null, empty.input)
         assertEquals(null, empty.timeline)
@@ -187,12 +187,15 @@ class GazeDirectorTest {
         assertEquals(null, GazeMath.rectCenterToGaze(GazeRect(0f, 0f, 0f, 10f), mascot, 360f))
 
         val with = GazeWorld.fromWindow(
-            mascot = mascot,
-            minReachPx = 360f,
-            pointerX = 200f,
-            pointerY = 40f,
-            inputBounds = GazeRect(0f, 400f, 200f, 440f),
-            timelineBounds = GazeRect(300f, 0f, 500f, 200f),
+            GazeWindow(
+                mascot = mascot,
+                minReachPx = 360f,
+                pointerPx = GazePoint(200f, 40f),
+                rects = GazeTargetRects(
+                    input = GazeRect(0f, 400f, 200f, 440f),
+                    timeline = GazeRect(300f, 0f, 500f, 200f),
+                ),
+            ),
         )
         val pointer = with.pointer
         val input = with.input
@@ -205,9 +208,11 @@ class GazeDirectorTest {
             0.016f,
             AvatarState.LISTENING,
             GazeWorld.fromWindow(
-                mascot = mascot,
-                minReachPx = 360f,
-                inputBounds = GazeRect(0f, 400f, 200f, 440f),
+                GazeWindow(
+                    mascot = mascot,
+                    minReachPx = 360f,
+                    rects = GazeTargetRects(input = GazeRect(0f, 400f, 200f, 440f)),
+                ),
             ),
         )
         assertEquals(GazeTarget.INPUT, listening.target)

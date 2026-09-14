@@ -24,7 +24,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.avatar.core.AvatarLookTarget
 import com.letta.mobile.avatar.core.GazeMath
+import com.letta.mobile.avatar.core.GazePoint
 import com.letta.mobile.avatar.core.GazeRect
+import com.letta.mobile.avatar.core.GazeTargetRects
+import com.letta.mobile.avatar.core.GazeWindow
 import com.letta.mobile.avatar.core.GazeWorld
 import com.letta.mobile.avatar.core.MascotIdentity
 import com.letta.mobile.data.presence.AgentPresence
@@ -128,12 +131,12 @@ fun MascotLive(
     LaunchedEffect(entry, cursor, bounds, minReachPx, inputBounds, timelineBounds) {
         entry.setGazeWorld(
             GazeWorld.fromWindow(
-                mascot = GazeRect(bounds.left, bounds.top, bounds.right, bounds.bottom),
-                minReachPx = minReachPx,
-                pointerX = cursor?.x,
-                pointerY = cursor?.y,
-                inputBounds = inputBounds,
-                timelineBounds = timelineBounds,
+                GazeWindow(
+                    mascot = GazeRect(bounds.left, bounds.top, bounds.right, bounds.bottom),
+                    minReachPx = minReachPx,
+                    pointerPx = cursor?.let { GazePoint(it.x, it.y) },
+                    rects = GazeTargetRects(input = inputBounds, timeline = timelineBounds),
+                ),
             ),
         )
     }

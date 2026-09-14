@@ -55,8 +55,17 @@ object GazeMath {
      * unavailable so the plan skips that row (OWN / USER / CURSOR still run).
      */
     fun rectCenterToGaze(target: GazeRect?, mascot: GazeRect, minReachPx: Float): GazePoint? {
-        if (target == null || target.isEmpty || mascot.isEmpty) return null
+        if (target == null) return null
+        if (target.isEmpty) return null
+        if (mascot.isEmpty) return null
         return pointerToGaze(target.centerX, target.centerY, mascot, minReachPx)
+    }
+
+    /** Window-space pointer, or null when the cursor has left / the tile has no size. */
+    fun pointerPxToGaze(pointerPx: GazePoint?, mascot: GazeRect, minReachPx: Float): GazePoint? {
+        if (pointerPx == null) return null
+        if (mascot.isEmpty) return null
+        return pointerToGaze(pointerPx.x, pointerPx.y, mascot, minReachPx)
     }
 
     /** Screen space is 0..1; the runtime maps it back to the contract's -1..1. */

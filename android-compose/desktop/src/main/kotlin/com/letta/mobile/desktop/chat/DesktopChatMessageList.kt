@@ -137,7 +137,8 @@ internal fun MessageList(
                     bottomFadeAlpha = fadeAlphas.bottom,
                     topFadeLength = 72.dp,
                     bottomFadeLength = 44.dp,
-                ),
+                )
+                .mascotGazeTarget(MascotGazeSurface.TIMELINE),
         ) {
             MessageListColumn(
                 MessageListColumnParams(
@@ -342,8 +343,7 @@ private fun MessageListColumn(params: MessageListColumnParams) {
             state = listState,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 28.dp)
-                .mascotGazeTarget(MascotGazeSurface.TIMELINE),
+                .padding(horizontal = 28.dp),
             // Vertical breathing room as CONTENT padding, not a viewport inset, so
             // the scroll area itself runs to the top/bottom edges. Content then
             // clips exactly where the fade reaches full transparency — no faint
