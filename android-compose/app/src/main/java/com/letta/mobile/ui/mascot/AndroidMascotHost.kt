@@ -127,8 +127,14 @@ class AndroidMascotHost(
             if (playing && liveDrivers[live] == null) liveDrivers[live] = token
             onDispose { if (liveDrivers[live] === token) liveDrivers.remove(live) }
         }
-        if (drives) {
-            CountedSurface { RiveMascotSurface(live.scene, modifier, playing = true) }
+        // A surface that has been live freezes where it is when it stops (same Rive surface, no
+        // more advancing) rather than swapping to the cached first frame: the header chip keeps
+        // the pose the character was in when the run started. One call site, so the bound
+        // artboard + state machine survive the flip. Surfaces that were never live draw the still.
+        var wasLive by remember { mutableStateOf(false) }
+        if (drives) wasLive = true
+        if (drives || wasLive) {
+            CountedSurface { RiveMascotSurface(live.scene, modifier, playing = drives) }
         } else {
             MascotStill(live, modifier)
         }

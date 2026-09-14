@@ -27,6 +27,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
 import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.theme.listItemMetadata
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.draw.rotate
+import com.letta.mobile.ui.components.rememberReducedMotionEnabled
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -236,7 +244,9 @@ private fun ConversationCardStatusRow(params: ConversationCardSurfaceParams) {
                 imageVector = status.icon,
                 contentDescription = null,
                 tint = status.tint,
-                modifier = Modifier.size(LettaIconSizing.Inline),
+                modifier = Modifier
+                    .size(LettaIconSizing.Inline)
+                    .then(if (status.spins) Modifier.rotate(rememberSpinAngle()) else Modifier),
             )
             Text(text = status.label, style = MaterialTheme.typography.listItemSupporting, color = status.tint)
             Text(
@@ -256,7 +266,21 @@ private fun ConversationCardStatusRow(params: ConversationCardSurfaceParams) {
 }
 
 /** The row's status line: what the conversation is doing, in the reference's "Connected" slot. */
-private data class ConversationStatus(val icon: ImageVector, val label: String, val tint: Color)
+private data class ConversationStatus(val icon: ImageVector, val label: String, val tint: Color, val spins: Boolean = false)
+
+/** A smooth full turn per second for the working spinner; frozen under reduced motion. */
+@Composable
+private fun rememberSpinAngle(): Float {
+    if (rememberReducedMotionEnabled()) return 0f
+    val transition = rememberInfiniteTransition(label = "conversation-working-spin")
+    val angle by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(durationMillis = 1000, easing = LinearEasing), RepeatMode.Restart),
+        label = "conversation-working-angle",
+    )
+    return angle
+}
 
 @Composable
 private fun conversationStatus(display: ConversationDisplay): ConversationStatus? = when {
@@ -269,6 +293,7 @@ private fun conversationStatus(display: ConversationDisplay): ConversationStatus
         LettaIcons.Loader,
         stringResource(R.string.screen_conversations_filter_working),
         MaterialTheme.colorScheme.primary,
+        spins = true,
     )
     display.isPinned -> ConversationStatus(
         LettaIcons.Pin,
