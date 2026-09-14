@@ -104,10 +104,9 @@ What exists today (feat/kh094-mascot-identity-art):
   lean + arc + recede on turns, mass curves, breath with inflate and light, saccade layer,
   gaze/blink numbers from the Disney and Eyes Alive papers. Contract stable
   (`RiveAvatarContract`), verified by `check_contract.py`.
-- The desktop bench (`RiveDesktopSpike.kt`): the reference implementation of the **director's
-  attention rules** - justified targets, habituation, eye-lead + spring head turn, mutual-gaze
-  saccades, reading/typing scans - written against the runtime's `setLookTarget` and two new
-  view-model numbers `turnX`/`turnY`.
+- The desktop bench (`RiveDesktopSpike.kt`): review UI over the same `GazeDirector` as product
+  (justified targets, habituation, eye-lead + spring head turn, scans) — the policy now lives
+  in `avatar/core`, not only on the bench. Writes `setLookTarget` and `turnX`/`turnY`.
 - `RiveAvatarRuntime` (common) drives both `RiveAvatarSurface` (Android, rive-android 11.12) and
   `RiveDesktopScene` (Windows, native bridge). `AvatarDirector` (common) arbitrates
   `AvatarState`; only the desktop web companion and the Android debug activity feed it.
@@ -123,10 +122,13 @@ sharedLogic (commonMain)
 
 avatar/core (commonMain, pure Kotlin, tested)
   AvatarState, AvatarDirector, MascotIdentity/Shape/Palette, PresenceSemantics
-  NEW GazeDirector: targets (own/user/cursor/input/timeline), per-state plan, habituation,
-      eye-lead + damped-spring head, mutual-gaze saccades, reading/typing scans.
-      Inputs: state, cursor (optional), target rects (optional). Outputs: look(x,y), head(x,y),
-      blink. Lifted from the bench, one implementation for both platforms.
+  GazeDirector (in core, used by MascotLive): targets (own/user/cursor/input/timeline),
+      per-state plan, habituation, eye-lead + damped-spring head, mutual-gaze saccades,
+      reading/typing scans. Lifted from the bench (`RiveDesktopSpike.kt`). Inputs: state,
+      cursor (optional), input/timeline rects via `GazeWorld.fromWindow` (optional; desktop
+      publishes composer + message list). Outputs: look(x,y), head(x,y), blink.
+      One implementation for both platforms; the bench calls the same class.
+      SPEC §10.4 card clamp is letta-mobile-kkjyd (TODO in GazeDirector; not this PR).
 
 avatar/renderer-rive (commonMain)
   RiveAvatarContract (+ INPUT_TURN_X/Y), RiveAvatarRuntime (+ setHeadTurn), RiveInputSink
@@ -135,14 +137,17 @@ avatar/renderer-rive (commonMain)
 
 sharedUI (commonMain, android + jvm)  - ui/mascot/, AS BUILT in #1540
   MascotAvatar(agentId, size, fallback) - THE composable every surface calls: tile, clip,
-      overscale, presence -> director, frame clock, pointer gaze. Fallback (gradient orb) when
-      the agent has no identity or the host has no renderer.
+      overscale, presence -> director, frame clock, GazeDirector (justified + pointer).
+      Fallback (gradient orb) when the agent has no identity or the host has no renderer.
   MascotLive(agentId, identity, size) - the hero form of the same thing (no tile).
-  MascotEntry (abstract: runtime + director + presence/tick policy; platform supplies load/dispose)
+  MascotEntry (abstract: runtime + AvatarDirector + GazeDirector + presence/tick policy;
+      platform supplies load/dispose)
       + MascotEntries (one live entry per agent for the life of the process).
   AvatarDirector.applyPresence(previous, presence) - the whole presence -> director mapping (tested).
-  MascotIdentityRegistry (identities, presence, pointer) via LocalMascotRegistry; MascotHost
-      (entry(agentId, identity) + Surface(entry)) via LocalMascotHost - the two seams a platform fills.
+  MascotIdentityRegistry (identities, presence, pointer, input/timeline bounds) via
+      LocalMascotRegistry; Modifier.mascotGazeTarget publishes the chat surfaces.
+      MascotHost (entry(agentId, identity) + Surface(entry)) via LocalMascotHost - the
+      two seams a platform fills.
   MascotPicker(identity, onChange) - shape grid 4x2 + colour dots 5x2 + grey (Grokbot layout).
   STILL TO DO (bn0y6): size < 56 dp cached-bitmap tier keyed (shape, colour, state, px).
 
@@ -175,7 +180,7 @@ is then rive-android surface + host binding + device measurement.
 |---|---|---|---|---|
 | P0 done | kh094 | rig, bench, contract, native bridge | - | this branch, PR #1540 |
 | P1 identity (desktop) | 1zti3 | `MascotIdentity` persistence, `MascotPicker` in sharedUI (commonMain), desktop edit-agent uses it, chat-header hero live via the bridge, contract gains `turnX`/`turnY` | 2-3 d | pick a shape+colour, see it on the hero; legacy int agents keep a look |
-| P2 director wiring (desktop) | 24gbf | `AgentPresenceSource` from the turn engine (commonMain); desktop feeds `AvatarDirector`; `GazeDirector` lifted from the bench into avatar/core with unit tests; hosts supply input/timeline rects; runtime `setHeadTurn` | 3-4 d | a real turn: listening while typing, thinking, speaking with mouth, waitingInput on approval, error flash - on both platforms, no debug buttons |
+| P2 director wiring (desktop) | 24gbf | Desktop presence is `AgentPresenceResolver` + `applyPresence` (#1540). `GazeDirector` lifted from the bench into avatar/core and ticked from `MascotEntry` (unit tests); `GazeWorld.fromWindow` + desktop composer/timeline rects; runtime `setHeadTurn`. Remaining 24gbf exit: Android host feed (`jwntc`) | done (desktop gaze) / remaining (Android) | a real turn on desktop without the bench; Android parity is P4 |
 | P3 everywhere (desktop) | bn0y6 | `MascotAvatar` (sharedUI) with the size tiers and bitmap cache; replace the 12 desktop orb sites; gradient fallback | 3-4 d | a list of 20 agents at 60 fps; every avatar in the app is the mascot |
 | P4 Android: surface binding, presence binding, picker/hero/list sites, perf | jwntc | Pixel run via `MascotDebugActivity`: feathering, 60 fps hero, pause offscreen, memory; `reduceMotion` (qg77k) gates in rig + host; 22 dp profile decision | 2-3 d | Pixel 9 Pro + Pixel 2XL harness green; no dropped frames on the chat screen |
 | Later | z4b83, 0s5bi follow-ups | WORKING state + glyph; macOS/Linux bridge (Metal / Vulkan) or rive-cmp; the artist pass in the editor (then the editor is source of truth) | - | - |

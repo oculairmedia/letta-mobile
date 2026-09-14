@@ -60,8 +60,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import com.letta.mobile.avatar.core.AvatarGesture
 import com.letta.mobile.avatar.core.AvatarLookTarget
 import com.letta.mobile.avatar.core.AvatarState
+import com.letta.mobile.avatar.core.GazeDirector
+import com.letta.mobile.avatar.core.GazeDriveMode
+import com.letta.mobile.avatar.core.GazePoint
+import com.letta.mobile.avatar.core.GazeTarget
+import com.letta.mobile.avatar.core.GazeWorld
 import com.letta.mobile.avatar.core.MascotIdentity
 import com.letta.mobile.avatar.core.MascotPalette
 import com.letta.mobile.avatar.core.MascotShape
@@ -166,35 +172,6 @@ private enum class Ground(val label: String) { PAGE("page"), FRAME("frame") }
 /** How the host drives the gaze. JUSTIFIED is the product behaviour; CURSOR is for checking range. */
 private enum class GazeMode(val label: String) { JUSTIFIED("justified"), CURSOR("cursor"), OFF("sliders") }
 
-/**
- * What the character can be looking at. Every look has one of these, so a viewer could name
- * the reason. OWN is "its own thoughts": the host writes no gaze and the rig's per-state default
- * shows through (thinking up-left, error down, idle drifting).
- */
-private enum class GazeTarget(val label: String, val reason: String) {
-    OWN("own thoughts", "the rig's default for this state"),
-    USER("you", "addressing the person: straight at the camera"),
-    CURSOR("the cursor", "your hand moved"),
-    INPUT("the input", "watching you type"),
-    TIMELINE("the timeline", "reading the code / its own reply"),
-}
-
-/** One justified look: the target, how likely, how long it holds, and the pause before the next. */
-private data class Look(val target: GazeTarget, val weight: Int, val dwellMs: LongRange, val gapMs: LongRange = 500L..2500L)
-
-/** The director's gaze plan per state: who it would plausibly be looking at, and how much. */
-private val GAZE_PLAN: Map<AvatarState, List<Look>> = mapOf(
-    AvatarState.IDLE to listOf(Look(GazeTarget.OWN, 50, 3000L..7000L), Look(GazeTarget.USER, 25, 1500L..3500L), Look(GazeTarget.CURSOR, 25, 1500L..3000L)),
-    AvatarState.LISTENING to listOf(Look(GazeTarget.INPUT, 70, 3000L..8000L, 300L..1200L), Look(GazeTarget.USER, 20, 1000L..2500L), Look(GazeTarget.CURSOR, 10, 1000L..2000L)),
-    AvatarState.THINKING to listOf(Look(GazeTarget.OWN, 60, 3000L..8000L), Look(GazeTarget.TIMELINE, 30, 2000L..5000L), Look(GazeTarget.INPUT, 10, 1000L..2500L)),
-    AvatarState.SPEAKING to listOf(Look(GazeTarget.USER, 55, 2500L..6000L, 300L..1500L), Look(GazeTarget.TIMELINE, 35, 1500L..4000L), Look(GazeTarget.CURSOR, 10, 1000L..2000L)),
-    AvatarState.WAITING_INPUT to listOf(Look(GazeTarget.USER, 80, 4000L..9000L, 300L..1000L), Look(GazeTarget.CURSOR, 20, 1500L..3000L)),
-    AvatarState.DRAGGED to listOf(Look(GazeTarget.CURSOR, 100, 10_000L..10_000L, 0L..0L)),
-    AvatarState.SUCCESS to listOf(Look(GazeTarget.USER, 100, 3000L..3000L, 0L..0L)),
-    AvatarState.ERROR to listOf(Look(GazeTarget.OWN, 70, 3000L..7000L), Look(GazeTarget.USER, 30, 1500L..3000L)),
-    AvatarState.SLEEPING to listOf(Look(GazeTarget.OWN, 100, 60_000L..60_000L)),
-)
-
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun MascotBench(file: File, modifier: Modifier) {
@@ -215,62 +192,8 @@ private fun MascotBench(file: File, modifier: Modifier) {
     var showTargets by remember { mutableStateOf(true) }
     var stageSize by remember { mutableStateOf(IntSize.Zero) }
     var mascotBounds by remember { mutableStateOf(Rect.Zero) }
-    var headTarget by remember { mutableStateOf(0f to 0f) }     // where the head is turning (host facing, -1..1)
     var headLead by remember { mutableFloatStateOf(350f) }      // ms the eyes lead the head by
-    var scan by remember { mutableStateOf(0f to 0f) }           // reading / caret-tracking offset on top of the target
-    var headScan by remember { mutableFloatStateOf(0f) }        // the head's slow sweep along a line while reading
-    // Habituation (Disney Research, "Realistic and Interactive Robot Gaze", eq. 2): interest in a
-    // target decays while it is looked at and restores while it is not, so nothing holds the gaze
-    // forever and a cursor that keeps waving stops being interesting.
-    val interest = remember { mutableStateMapOf<GazeTarget, Float>().also { m -> GazeTarget.entries.forEach { m[it] = 1f } } }
-
-    // Reading and typing are the two looks with structure of their own. Reading the timeline:
-    // saccades left to right in small uneven steps, a return sweep, the next line. Watching the
-    // input: the eyes ride the caret slowly rightward and jump back at a new line, with pauses.
-    LaunchedEffect(target) {
-        scan = 0f to 0f; headScan = 0f
-        when (target) {
-            GazeTarget.TIMELINE -> {
-                var line = 0
-                while (true) {
-                    var x = -0.22f
-                    while (x < 0.22f) {
-                        scan = x to (line * 0.05f)
-                        headScan = x * 0.5f                 // the head sweeps slowly along the line (Disney's read show)
-                        delay((180L..340L).random())
-                        x += (0.05f + Math.random().toFloat() * 0.05f)
-                    }
-                    delay((120L..260L).random())          // end of line
-                    line = (line + 1) % 3                  // return sweep, next line; back to top after three
-                }
-            }
-            GazeTarget.USER -> {
-                // Mutual gaze is not a stare: the eyes saccade between the other person's eyes and
-                // nose every 100-500 ms (Disney Research) - the thing that makes a look feel focused.
-                val triangle = listOf(-0.05f to -0.04f, 0.05f to -0.04f, 0f to 0.05f)
-                var i = 0
-                while (true) {
-                    scan = triangle[i]
-                    i = (i + 1 + (Math.random() * 2).toInt()) % 3
-                    delay((100L..500L).random())
-                }
-            }
-            GazeTarget.INPUT -> {
-                while (true) {
-                    var x = -0.15f
-                    val speed = 0.03f + Math.random().toFloat() * 0.03f
-                    while (x < 0.15f) {
-                        scan = x to 0f
-                        delay((80L..160L).random())
-                        x += speed * 0.4f
-                        if (Math.random() < 0.06) delay((300L..900L).random())   // a pause in the typing
-                    }
-                    delay((100L..300L).random())
-                }
-            }
-            else -> Unit
-        }
-    }
+    val gaze = remember { GazeDirector() }
 
     var page by remember { mutableStateOf(Surround(0xFF1A1A1A.toInt())) }
     var frame by remember { mutableStateOf(Surround(0xFF2E2E33.toInt())) }
@@ -317,85 +240,43 @@ private fun MascotBench(file: File, modifier: Modifier) {
     val inputSpot = androidx.compose.ui.geometry.Offset(stageSize.width / 2f, stageSize.height - 60f)
     val timelineSpot = androidx.compose.ui.geometry.Offset(150f, stageSize.height / 2f - 80f)
 
-    // Justified attention: the reference for the director's gaze rule. The rig has its own
-    // per-state gaze; the host lends it a target the viewer could name - the input while they
-    // type, the timeline while it reads or writes, the person when it addresses them, the cursor
-    // when their hand moves - holds it for a while, then hands the gaze back.
-    LaunchedEffect(gazeMode, current) {
-        target = when (gazeMode) { GazeMode.CURSOR -> GazeTarget.CURSOR; else -> GazeTarget.OWN }
-        if (gazeMode != GazeMode.JUSTIFIED) return@LaunchedEffect
-        val plan = GAZE_PLAN[current] ?: listOf(Look(GazeTarget.OWN, 1, 60_000L..60_000L))
-        while (true) {
-            // Weights scaled by current interest (habituation), so a target it has just stared at
-            // is less likely to be picked again until interest has recovered.
-            val scored = plan.map { it to it.weight * (0.15f + 0.85f * (interest[it.target] ?: 1f)) }
-            var pick = Math.random().toFloat() * scored.sumOf { it.second.toDouble() }.toFloat()
-            val look = scored.first { pick -= it.second; pick < 0 }.first
-            target = look.target
-            delay(look.dwellMs.random())
-            target = GazeTarget.OWN
-            delay(look.gapMs.random())
-        }
-    }
-    // Eyes first, then the head. The gaze eases toward its target (~250 ms) and locks; after
-    // `headLead` ms the head follows on an under-damped spring - the dramatic turn - and the eyes,
-    // being carried by the head, settle back toward centre on the plate. Back to OWN, the head
-    // returns to the rig's own facing (turnX/turnY -> 0).
+    // Same GazeDirector the product ticks from MascotEntry — one implementation.
     LaunchedEffect(gazeMode) {
-        if (gazeMode == GazeMode.OFF) { setLook(0f, 0f); headTarget = 0f to 0f; return@LaunchedEffect }
-        var x = lookX; var y = lookY                   // eyes
-        var hx = 0f; var hy = 0f; var vx = 0f; var vy = 0f   // head position and velocity
-        var wx = 0f; var wy = 0f                        // head written last
-        var lastWantX = 0f; var lastWantY = 0f; var wantSince = 0L
+        if (gazeMode == GazeMode.OFF) {
+            setLook(0f, 0f)
+            runtime.setHeadTurn(0f, 0f)
+            return@LaunchedEffect
+        }
         var last = System.nanoTime()
         while (true) {
             withFrameNanos { now ->
-                val dt = ((now - last) / 1e9f).coerceIn(0f, 0.1f); last = now
-                // A cursor moving within a mascot width in the last half second demands a look
-                // (unless asleep), the way a hand waved in front of a face does - until it has
-                // been waved enough to be boring (interest habituates while it holds the gaze).
-                val near = current != AvatarState.SLEEPING && (interest[GazeTarget.CURSOR] ?: 1f) > 0.3f &&
-                    kotlin.math.hypot(cursorLook.first, cursorLook.second) < 1f / trackReach && now - lastCursorMove < 500_000_000L
-                // Habituation: the attended target loses interest at 1/4 s, everything else recovers at 1/12 s.
-                val attended = if (near) GazeTarget.CURSOR else target
-                for (t in GazeTarget.entries) {
-                    val v = interest[t] ?: 1f
-                    interest[t] = (if (t == attended && t != GazeTarget.OWN) v - dt / 4f else v + dt / 12f).coerceIn(0f, 1f)
+                val dt = ((now - last) / 1e9f).coerceIn(0f, 0.1f)
+                last = now
+                gaze.config.headLeadSeconds = headLead / 1000f
+                gaze.config.cursorNearRadius = 1f / trackReach
+                val input = lookAt(inputSpot.x, inputSpot.y)
+                val timeline = lookAt(timelineSpot.x, timelineSpot.y)
+                val pose = gaze.tick(
+                    dt,
+                    current,
+                    GazeWorld(
+                        pointer = GazePoint(cursorLook.first, cursorLook.second),
+                        input = GazePoint(input.first, input.second),
+                        timeline = GazePoint(timeline.first, timeline.second),
+                        mode = when (gazeMode) {
+                            GazeMode.JUSTIFIED -> GazeDriveMode.JUSTIFIED
+                            GazeMode.CURSOR -> GazeDriveMode.CURSOR
+                            GazeMode.OFF -> GazeDriveMode.OFF
+                        },
+                        pointerMovedRecently = now - lastCursorMove < 500_000_000L,
+                    ),
+                )
+                target = pose.target
+                if (kotlin.math.abs(pose.lookX - lookX) > 0.002f || kotlin.math.abs(pose.lookY - lookY) > 0.002f) {
+                    setLook(pose.lookX, pose.lookY)
                 }
-                val (baseX, baseY) = when {
-                    gazeMode == GazeMode.CURSOR || near -> cursorLook
-                    target == GazeTarget.CURSOR -> cursorLook
-                    target == GazeTarget.INPUT -> lookAt(inputSpot.x, inputSpot.y)
-                    target == GazeTarget.TIMELINE -> lookAt(timelineSpot.x, timelineSpot.y)
-                    else -> 0f to 0f   // USER and OWN: centre; the rig's own gaze life shows through
-                }
-                val (sx, sy) = if (near || gazeMode == GazeMode.CURSOR) 0f to 0f else scan
-                val wantX = (baseX + sx).coerceIn(-1f, 1f); val wantY = (baseY + sy).coerceIn(-1f, 1f)
-                // The head only commits once the eyes have held a direction for the lead time, and
-                // it turns toward the thing, not toward each reading step.
-                if (kotlin.math.abs(baseX - lastWantX) > 0.15f || kotlin.math.abs(baseY - lastWantY) > 0.15f) { lastWantX = baseX; lastWantY = baseY; wantSince = now }
-                if (now - wantSince > headLead * 1_000_000L) {
-                    val next = (baseX * 0.85f + headScan) to (baseY * 0.7f)
-                    // A big head turn comes with a blink (Eyes Alive: blinks accompany large gaze shifts).
-                    if (kotlin.math.abs(next.first - headTarget.first) > 0.4f) scene.inputSink.fire(RiveAvatarContract.TRIGGER_BLINK)
-                    headTarget = next
-                }
-                // Eyes: exponential ease - quick when saccading between reading steps, softer otherwise.
-                // Head: spring (omega, zeta) with overshoot.
-                val tau = if (target == GazeTarget.TIMELINE || target == GazeTarget.INPUT) 0.08f else 0.25f
-                val k = 1f - kotlin.math.exp(-dt / tau)
-                val (htx, hty) = headTarget
-                // The eyes aim at the target minus what the head already covers, so they lead and then relax.
-                val ex = wantX - hx * 0.6f; val ey = wantY - hy * 0.6f
-                x += (ex - x) * k; y += (ey - y) * k
-                val omega = 8.5f; val zeta = 0.72f   // heavy head: one soft overshoot, no ring
-                vx += ((htx - hx) * omega * omega - 2f * zeta * omega * vx) * dt; hx += vx * dt
-                vy += ((hty - hy) * omega * omega - 2f * zeta * omega * vy) * dt; hy += vy * dt
-                if (kotlin.math.abs(x - lookX) > 0.002f || kotlin.math.abs(y - lookY) > 0.002f) setLook(x, y)
-                if (kotlin.math.abs(hx - wx) > 0.002f || kotlin.math.abs(hy - wy) > 0.002f) {
-                    wx = hx; wy = hy
-                    scene.inputSink.setNumber("turnX", hx.coerceIn(-1f, 1f)); scene.inputSink.setNumber("turnY", hy.coerceIn(-1f, 1f))
-                }
+                runtime.setHeadTurn(pose.headX, pose.headY)
+                if (pose.blink) runtime.playGesture(AvatarGesture(RiveAvatarRuntime.BLINK_GESTURE))
             }
         }
     }

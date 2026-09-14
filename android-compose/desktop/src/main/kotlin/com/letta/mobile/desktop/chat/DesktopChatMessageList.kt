@@ -47,6 +47,8 @@ import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.runtime.ChatViewportFollowPolicy
 import com.letta.mobile.data.chat.runtime.ChatViewportSnapshot
 import com.letta.mobile.desktop.fadingEdges
+import com.letta.mobile.ui.mascot.MascotGazeSurface
+import com.letta.mobile.ui.mascot.mascotGazeTarget
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
@@ -135,7 +137,8 @@ internal fun MessageList(
                     bottomFadeAlpha = fadeAlphas.bottom,
                     topFadeLength = 72.dp,
                     bottomFadeLength = 44.dp,
-                ),
+                )
+                .mascotGazeTarget(MascotGazeSurface.TIMELINE),
         ) {
             MessageListColumn(
                 MessageListColumnParams(

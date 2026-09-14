@@ -16,6 +16,8 @@ RIVE = str(Path.home() / ".rive" / "bin" / "rive.exe")
 
 project, contract = sys.argv[1], sys.argv[2]
 kt = open(contract, encoding="utf-8").read()
+# Every INPUT_* / TRIGGER_* string const is required on the .riv, including
+# INPUT_TURN_X/Y ("turnX"/"turnY") written by RiveAvatarRuntime.setHeadTurn.
 want_props = set(re.findall(r'const val (?:INPUT|TRIGGER)_\w+: String = "(\w+)"', kt))
 want_machine = re.search(r'const val STATE_MACHINE: String = "(\w+)"', kt).group(1)
 want_state_keys = set(re.findall(r'AvatarState\.\w+ -> "(\w+)"', kt))

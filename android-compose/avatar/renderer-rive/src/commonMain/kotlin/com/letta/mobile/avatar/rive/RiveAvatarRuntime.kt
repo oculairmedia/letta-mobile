@@ -4,6 +4,7 @@ import com.letta.mobile.avatar.core.AvatarCameraFraming
 import com.letta.mobile.avatar.core.AvatarCapabilities
 import com.letta.mobile.avatar.core.AvatarExpression
 import com.letta.mobile.avatar.core.AvatarGesture
+import com.letta.mobile.avatar.core.AvatarHeadTurn
 import com.letta.mobile.avatar.core.AvatarLookTarget
 import com.letta.mobile.avatar.core.AvatarModel
 import com.letta.mobile.avatar.core.AvatarRuntime
@@ -30,7 +31,7 @@ import kotlinx.coroutines.flow.asStateFlow
 class RiveAvatarRuntime(
     private val sink: RiveInputSink,
     private val capabilities: AvatarCapabilities = MASCOT_CAPABILITIES,
-) : AvatarRuntime {
+) : AvatarRuntime, AvatarHeadTurn {
 
     private val _state = MutableStateFlow<AvatarRuntimeState>(AvatarRuntimeState.Idle)
     override val state: StateFlow<AvatarRuntimeState> = _state.asStateFlow()
@@ -92,13 +93,14 @@ class RiveAvatarRuntime(
     }
 
     /**
-     * The head turning toward the gaze, -1..1 on each axis. Not part of [AvatarRuntime]: it is a
-     * mascot-specific channel the gaze director writes after the eyes have led.
+     * The head turning toward the gaze, -1..1 on each axis. [AvatarHeadTurn]
+     * is a mascot-specific channel the [com.letta.mobile.avatar.core.GazeDirector]
+     * writes after the eyes have led; it is not an [AvatarRuntime] command.
      */
-    fun setHeadTurn(x: Float, y: Float) {
+    override fun setHeadTurn(turnX: Float, turnY: Float) {
         if (!ready()) return
-        sink.setNumber(RiveAvatarContract.INPUT_TURN_X, x.coerceIn(-1f, 1f))
-        sink.setNumber(RiveAvatarContract.INPUT_TURN_Y, y.coerceIn(-1f, 1f))
+        sink.setNumber(RiveAvatarContract.INPUT_TURN_X, turnX.coerceIn(-1f, 1f))
+        sink.setNumber(RiveAvatarContract.INPUT_TURN_Y, turnY.coerceIn(-1f, 1f))
     }
 
     /** Blink is the one gesture a flat mascot has; the rest need a rig it does not carry. */

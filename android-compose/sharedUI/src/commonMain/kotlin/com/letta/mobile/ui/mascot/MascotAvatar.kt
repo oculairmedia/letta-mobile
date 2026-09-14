@@ -23,9 +23,15 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.avatar.core.AvatarLookTarget
+import com.letta.mobile.avatar.core.GazeMath
+import com.letta.mobile.avatar.core.GazePoint
+import com.letta.mobile.avatar.core.GazeReach
+import com.letta.mobile.avatar.core.GazeRect
+import com.letta.mobile.avatar.core.GazeTargetRects
+import com.letta.mobile.avatar.core.GazeWindow
+import com.letta.mobile.avatar.core.GazeWorld
 import com.letta.mobile.avatar.core.MascotIdentity
 import com.letta.mobile.data.presence.AgentPresence
-import kotlin.math.sqrt
 
 /**
  * What a platform contributes to draw a live mascot: the per-agent entry (renderer scene +
@@ -93,8 +99,10 @@ fun MascotAvatar(
 /**
  * The live mascot for one agent at [size], from the process-wide entry so it never restarts
  * when the view changes. Feeds the entry's director the agent's presence and the frame clock,
- * and aims it at the pointer; the director owns state and timing for both platforms. Callers
- * that need a fallback check [mascotAvailable] first (or use [MascotAvatar]).
+ * and feeds [com.letta.mobile.avatar.core.GazeDirector] the pointer, this tile, and any
+ * composer / timeline rects the host published on [MascotIdentityRegistry] so justified
+ * attention (not only cursor tracking) runs on every host. Callers that need a fallback
+ * check [mascotAvailable] first (or use [MascotAvatar]).
  */
 @Composable
 fun MascotLive(
@@ -113,13 +121,25 @@ fun MascotLive(
     LaunchedEffect(entry) {
         while (true) withFrameNanos { entry.tickTo(it) }
     }
-    // Gaze: this surface's window bounds vs the pointer (captured once at the window root).
+    // Gaze: this tile vs the pointer plus optional composer / timeline rects
+    // from the registry. Null input/timeline skip those plan rows; OWN/USER
+    // (and CURSOR when the pointer is present) still run so the eyes are never dead.
     var bounds by remember { mutableStateOf(Rect.Zero) }
     val cursor = registry.cursor.value
+    val inputBounds = registry.inputBounds.value
+    val timelineBounds = registry.timelineBounds.value
     val minReachPx = with(LocalDensity.current) { GAZE_MIN_REACH.toPx() }
-    LaunchedEffect(entry, cursor, bounds, minReachPx) {
-        if (bounds.isEmpty) return@LaunchedEffect
-        entry.director.setLookTarget(cursor?.let { pointerLook(it.x, it.y, bounds, minReachPx) })
+    LaunchedEffect(entry, cursor, bounds, minReachPx, inputBounds, timelineBounds) {
+        entry.setGazeWorld(
+            GazeWorld.fromWindow(
+                GazeWindow(
+                    mascot = GazeRect(bounds.left, bounds.top, bounds.right, bounds.bottom),
+                    reach = GazeReach(minReachPx),
+                    pointerPx = cursor?.let { GazePoint(it.x, it.y) },
+                    rects = GazeTargetRects(input = inputBounds, timeline = timelineBounds),
+                ),
+            ),
+        )
     }
     // requiredSize: an overscaled mascot must exceed its tile so the tile's clip crops it;
     // plain size() is coerced down to the parent's constraints and never overscales.
@@ -132,18 +152,16 @@ fun MascotLive(
  * 32 dp tile does not saturate for a cursor a few px away; saturation is smooth and stops short
  * of the rim so the eyes never sit pinned.
  */
-fun pointerLook(x: Float, y: Float, bounds: Rect, minReachPx: Float): AvatarLookTarget.Screen {
-    val reach = maxOf(bounds.width * TILE_REACH, minReachPx)
-    val nx = softLook((x - bounds.center.x) / reach)
-    val ny = softLook((y - bounds.center.y) / reach)
-    return AvatarLookTarget.Screen((nx + 1f) / 2f, (ny + 1f) / 2f)
-}
-
-/** Linear near zero, asymptotic to +-[GAZE_MAX]. */
-private fun softLook(d: Float): Float = GAZE_MAX * d / sqrt(1f + d * d)
+fun pointerLook(x: Float, y: Float, bounds: Rect, minReachPx: Float): AvatarLookTarget.Screen =
+    GazeMath.toScreen(
+        GazeMath.pointerToGaze(
+            x,
+            y,
+            GazeRect(bounds.left, bounds.top, bounds.right, bounds.bottom),
+            minReachPx,
+        ),
+    )
 
 /** The body spans ~60 % of the artboard; this fills a tile edge to edge. */
 const val MASCOT_TILE_OVERSCALE = 1.6f
 private val GAZE_MIN_REACH = 360.dp
-private const val TILE_REACH = 1.25f
-private const val GAZE_MAX = 0.85f
