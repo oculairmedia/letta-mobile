@@ -21,6 +21,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.ui.Alignment
 import com.letta.mobile.ui.mascot.MascotAvatar
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
+import com.letta.mobile.ui.icons.LettaIconSizing
+import com.letta.mobile.ui.theme.listItemMetadata
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -174,7 +180,7 @@ private fun ConversationCardSurface(params: ConversationCardSurfaceParams) {
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -187,41 +193,77 @@ private fun ConversationCardSurface(params: ConversationCardSurfaceParams) {
                 fallback = {},
             )
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = params.title,
-                    style = MaterialTheme.typography.listItemHeadline,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = conversationCardMetadata(params.display),
-                    style = MaterialTheme.typography.listItemSupporting,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = params.title,
+                        style = MaterialTheme.typography.listItemHeadline,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    conversationActivityText(params.display.conversation)?.let { time ->
+                        Text(
+                            text = time,
+                            style = MaterialTheme.typography.listItemMetadata,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            modifier = Modifier.padding(start = 8.dp),
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(2.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    conversationStatus(params.display)?.let { status ->
+                        Icon(
+                            imageVector = status.icon,
+                            contentDescription = null,
+                            tint = status.tint,
+                            modifier = Modifier.size(LettaIconSizing.Inline),
+                        )
+                        Text(text = status.label, style = MaterialTheme.typography.listItemSupporting, color = status.tint)
+                        Text(
+                            text = "\u2022",
+                            style = MaterialTheme.typography.listItemSupporting,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Text(
+                        text = params.display.agentName,
+                        style = MaterialTheme.typography.listItemSupporting,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
     }
 }
 
+/** The row's status line: what the conversation is doing, in the reference's "Connected" slot. */
+private data class ConversationStatus(val icon: ImageVector, val label: String, val tint: Color)
+
 @Composable
-private fun conversationCardMetadata(display: ConversationDisplay): String {
-    val timeText = conversationActivityText(display.conversation)
-    return buildString {
-        if (display.isPinned) {
-            append("Pinned • ")
-        }
-        if (display.conversation.archived == true) {
-            append("Archived • ")
-        }
-        append(display.agentName)
-        if (timeText != null) {
-            append(" • ")
-            append(timeText)
-        }
-    }
+private fun conversationStatus(display: ConversationDisplay): ConversationStatus? = when {
+    display.conversation.archived == true -> ConversationStatus(
+        LettaIcons.Archive,
+        stringResource(R.string.screen_conversations_filter_archived),
+        MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    display.isWorking -> ConversationStatus(
+        LettaIcons.Loader,
+        stringResource(R.string.screen_conversations_filter_working),
+        MaterialTheme.colorScheme.primary,
+    )
+    display.isPinned -> ConversationStatus(
+        LettaIcons.Pin,
+        stringResource(R.string.screen_conversations_status_pinned),
+        MaterialTheme.colorScheme.tertiary,
+    )
+    else -> null
 }
 
 @Composable
@@ -333,12 +375,7 @@ private fun ConversationCardTextInputDialog(params: ConversationCardTextInputDia
 @Composable
 private fun conversationActivityText(conversation: com.letta.mobile.data.model.Conversation): String? {
     val timestamp = conversation.lastMessageAt ?: conversation.createdAt ?: return null
-    val relative = formatRelativeTime(timestamp).takeIf { it.isNotBlank() } ?: return null
-    return if (conversation.lastMessageAt != null) {
-        stringResource(R.string.screen_conversations_last_activity_format, relative)
-    } else {
-        stringResource(R.string.screen_conversations_created_format, relative)
-    }
+    return formatRelativeTime(timestamp).takeIf { it.isNotBlank() }?.removeSuffix(" ago")
 }
 
 // region Previews
