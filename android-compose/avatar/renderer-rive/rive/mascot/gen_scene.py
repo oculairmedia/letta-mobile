@@ -665,7 +665,10 @@ def wander_animations():
     peek = animation("WanderPeek", WANDER_PEEK, frames(1400), {JOYSTICK: {
         JY: [(0, 0, BACK_IN_OUT), (frames(400), 0.7, None), (frames(900), 0.7, ELASTIC_SOFT), (frames(1400), 0)],
         JX: [(0, 0, BACK_IN_OUT), (frames(400), 0.3, None), (frames(900), 0.3, ELASTIC_SOFT), (frames(1400), 0)]}})
-    spin = animation("WanderSpin", WANDER_SPIN, frames(700), spin_keys(0, frames(700)))
+    spin_k = spin_keys(0, frames(700))
+    d7 = frames(700)
+    spin_k.update(squash(INFLATE_NODE, [(0, 1, BACK_IN), (round(d7 * 0.25), 1.05, STANDARD), (round(d7 * 0.62), 1.05, ELASTIC_SOFT), (d7, 1)]))
+    spin = animation("WanderSpin", WANDER_SPIN, d7, spin_k)
     # Asleep: one slow, small shift every ~30 s, nothing else.
     sleep_shift = animation("WanderSleepShift", WANDER_SLEEP_SHIFT, frames(3000), {JOYSTICK: {
         JX: [(0, 0.4, SINE), (frames(1500), 0.22, SINE), (frames(3000), 0.4)],
@@ -822,12 +825,21 @@ def enter_animations():
             keys[FACE] = {Y: [(0, 28, SOFT_OUT), (n, 0)], ROT: [(0, rad(5), SOFT_OUT), (n, 0)]}
             keys[BODY_NODE] = {Y: [(0, 24, SOFT_OUT), (n, 0)]}
             keys[TINT] = {COLOR: [(0, "14000000"), (frames(100), "00000000")]}
+        if turn is BACK_OUT and n >= 10:
+            keys.update(squash(INFLATE_NODE, [(0, 1, EMPH_ACCEL), (3, 1.04, SOFT_OUT), (min(n - 2, 9), 0.98, SOFT_OUT), (n, 1)]))
         out.append(animation(f"Enter_{frm}_{to}", aid, n, keys, callbacks=(PLATE_BLINK,)))
     return out
 
 
 def shape_animations():
     return [animation("Shape" + s[0].upper() + s[1:], shape_anim[s], 1, shape_keys(s)) for s in SHAPES]
+
+
+def squash(node, keys):
+    """Volume-preserving squash and stretch: keys of (frame, scaleX[, bezier]); scaleY = 1/scaleX."""
+    sx = [(k[0], k[1]) + tuple(k[2:]) for k in keys]
+    sy = [(k[0], round(1 / k[1], 4)) + tuple(k[2:]) for k in keys]
+    return {node: {SX: sx, SY: sy}}
 
 
 def momentary_animations():
@@ -840,6 +852,11 @@ def momentary_animations():
         BODY_NODE: {Y: hop},
         FACE: {Y: hop, ROT: [(0, 0, EMPH_ACCEL), (f(10), rad(-2), STD_DECEL), (f(37.5), rad(2), EMPH_ACCEL), (f(70), rad(-1), EMPH_DECEL), (f(87.5), 0, M3_STANDARD), (S, 0)]},
         PLATE_EXPR: {NESTED_VALUE: EXPR["success"]}}
+    # Squash and stretch, volume preserved: crouch before the jump, stretch on the way up,
+    # neutral at the apex, stretch falling, squash on landing, elastic settle. The plate joins in.
+    success_keys.update(squash(INFLATE_NODE, [(0, 1, EMPH_ACCEL), (f(10), 1.06, STD_DECEL), (f(22), 0.93, SOFT_OUT), (f(37.5), 1, EMPH_ACCEL),
+                                              (f(60), 0.96, ACCEL), (f(70), 1.10, ELASTIC_SOFT), (S, 1)]))
+    success_keys[FACE].update(squash(FACE, [(0, 1, EMPH_ACCEL), (f(22), 0.97, SOFT_OUT), (f(37.5), 1, EMPH_ACCEL), (f(70), 1.05, ELASTIC_SOFT), (S, 1)])[FACE])
     success_keys.update(spin_keys(f(10), f(70) - f(10)))
     success = animation("SuccessFlash", SUCCESS_ANIM, S, success_keys)
     E = frames(600)
@@ -848,9 +865,10 @@ def momentary_animations():
     ex = [(0, 0, STANDARD), (g(16.6667), -24, STANDARD), (g(33.3333), 24, STANDARD), (g(50), -12, STANDARD), (g(66.6667), 0, None), (E, 0)]
     ey = [(0, 0, STANDARD), (g(16.6667), 24, STANDARD), (g(33.3333), 24, STANDARD), (g(50), 24, STANDARD), (g(66.6667), 24, None), (E, 24)]
     er = [(0, 0, STANDARD), (g(16.6667), rad(-7), STANDARD), (g(33.3333), rad(7), STANDARD), (g(50), rad(-3), STANDARD), (g(66.6667), rad(5), None), (E, rad(5))]
-    error = animation("ErrorFlash", ERROR_ANIM, E, {BODY_NODE: {X: ex, Y: ey}, FACE: {X: ex, Y: ey, ROT: er},
-                                                   PLATE_EXPR: {NESTED_VALUE: EXPR["error"]}})
-    drag = animation("Dragged", DRAG_ANIM, 1, {PLATE_EXPR: {NESTED_VALUE: EXPR["dragged"]}})
+    error_keys = {BODY_NODE: {X: ex, Y: ey}, FACE: {X: ex, Y: ey, ROT: er}, PLATE_EXPR: {NESTED_VALUE: EXPR["error"]}}
+    error_keys.update(squash(INFLATE_NODE, [(0, 1, STANDARD), (g(16.6667), 1.07, STANDARD), (g(33.3333), 0.97, STANDARD), (g(50), 1.04, STANDARD), (g(66.6667), 1, None), (E, 1)]))
+    error = animation("ErrorFlash", ERROR_ANIM, E, error_keys)
+    drag = animation("Dragged", DRAG_ANIM, 1, {PLATE_EXPR: {NESTED_VALUE: EXPR["dragged"]}, INFLATE_NODE: {SX: 1.08, SY: 0.92}})
     return [animation("FlashRest", FLASH_REST_ANIM, 1, {}), success, error, animation("DragRest", DRAG_REST_ANIM, 1, {}), drag]
 
 
