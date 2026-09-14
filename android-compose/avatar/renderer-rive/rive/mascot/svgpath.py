@@ -11,19 +11,52 @@ Two emitters:
 import math
 import re
 
-_NUM = r"[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?"
+_NUM = r"[-+]?(?:\d+\.\d+|\d+|\.\d+)(?:[eE][-+]?\d+)?"
+_SUPPORTED = set("MLCZ")
 
 
 def _tokens(d):
-    for m in re.finditer(rf"([MLCZmlcz])|({_NUM})", d):
-        yield m.group(1) or float(m.group(2))
+    for m in re.finditer(rf"([A-Za-z])|({_NUM})", d):
+        letter, num = m.group(1), m.group(2)
+        if letter:
+            if letter not in _SUPPORTED:
+                raise ValueError(f"unsupported path command {letter}")
+            yield letter
+        else:
+            yield float(num)
+
+
+def _close_sub(cur):
+    cur["closed"] = True
+    v0, vN = cur["verts"][0], cur["verts"][-1]
+    if len(cur["verts"]) > 1 and abs(v0[0] - vN[0]) < 1e-6 and abs(v0[1] - vN[1]) < 1e-6:
+        cur["verts"][0] = (v0[0], v0[1], vN[2], v0[3])
+        cur["verts"].pop()
+    return (v0[0], v0[1])
+
+
+def _move_to(toks, i):
+    return {"closed": False, "verts": [(toks[i], toks[i + 1], None, None)]}, (toks[i], toks[i + 1]), i + 2
+
+
+def _line_to(cur, toks, i):
+    cur["verts"].append((toks[i], toks[i + 1], None, None))
+    return (toks[i], toks[i + 1]), i + 2
+
+
+def _cubic_to(cur, toks, i):
+    c1, c2, p = (toks[i], toks[i + 1]), (toks[i + 2], toks[i + 3]), (toks[i + 4], toks[i + 5])
+    px, py, cin, _ = cur["verts"][-1]
+    cur["verts"][-1] = (px, py, cin, c1)
+    cur["verts"].append((p[0], p[1], c2, None))
+    return p, i + 6
 
 
 def parse_path(d):
     """-> list of subpaths; each {'closed': bool, 'verts': [(x, y, c_in, c_out)]} where c_in/c_out
     are absolute control points of the incoming / outgoing cubic, or None for straight segments."""
     subpaths, cur, pos = [], None, (0.0, 0.0)
-    cmd, nums = None, []
+    cmd = None
     toks = list(_tokens(d))
     i = 0
 
@@ -36,32 +69,21 @@ def parse_path(d):
     while i < len(toks):
         t = toks[i]
         if isinstance(t, str):
-            cmd = t.upper()
+            cmd = t
             if cmd == "Z":
                 if cur:
-                    cur["closed"] = True
-                    # A closing segment back to the first vertex is implied; drop a duplicate end vertex.
-                    v0, vN = cur["verts"][0], cur["verts"][-1]
-                    if len(cur["verts"]) > 1 and abs(v0[0] - vN[0]) < 1e-6 and abs(v0[1] - vN[1]) < 1e-6:
-                        cur["verts"][0] = (v0[0], v0[1], vN[2], v0[3])
-                        cur["verts"].pop()
-                    pos = (v0[0], v0[1])
+                    pos = _close_sub(cur)
                 flush_sub()
             i += 1
             continue
         if cmd == "M":
             flush_sub()
-            cur = {"closed": False, "verts": [(toks[i], toks[i + 1], None, None)]}
-            pos = (toks[i], toks[i + 1]); i += 2; cmd = "L"
+            cur, pos, i = _move_to(toks, i)
+            cmd = "L"
         elif cmd == "L":
-            cur["verts"].append((toks[i], toks[i + 1], None, None))
-            pos = (toks[i], toks[i + 1]); i += 2
+            pos, i = _line_to(cur, toks, i)
         elif cmd == "C":
-            c1, c2, p = (toks[i], toks[i + 1]), (toks[i + 2], toks[i + 3]), (toks[i + 4], toks[i + 5])
-            px, py, cin, _ = cur["verts"][-1]
-            cur["verts"][-1] = (px, py, cin, c1)
-            cur["verts"].append((p[0], p[1], c2, None))
-            pos = p; i += 6
+            pos, i = _cubic_to(cur, toks, i)
         else:
             raise ValueError(f"unsupported path command {cmd}")
     flush_sub()
@@ -92,8 +114,14 @@ def read_svg(path):
     return attrs
 
 
-def path_rml(svg_file, name, sid, color="FF111111", opacity=None, x=0, y=0, extra_attrs=""):
+def path_rml(*parts, **opts):
     """A <Shape> holding every subpath of the SVG and its paint. Ink is normalised to `color`."""
+    svg_file, name, sid = parts[0], parts[1], parts[2]
+    color = parts[3] if len(parts) > 3 else opts.get("color", "FF111111")
+    opacity = opts.get("opacity")
+    x = opts.get("x", 0)
+    y = opts.get("y", 0)
+    extra_attrs = opts.get("extra_attrs", "")
     a = read_svg(svg_file)
     subs = parse_path(a["d"])
     paths = []

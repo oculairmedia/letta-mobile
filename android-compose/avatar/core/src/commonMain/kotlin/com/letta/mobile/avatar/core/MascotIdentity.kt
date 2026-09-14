@@ -57,6 +57,7 @@ data class MascotIdentity(
             val shapeName = value.substringBefore(':')
             val hex = value.substringAfter(':', "")
             val shape = MascotShape.entries.firstOrNull { it.name.equals(shapeName, ignoreCase = true) } ?: return null
+            if (hex.length != 8) return null
             val argb = hex.toUIntOrNull(16)?.toInt() ?: return null
             return MascotIdentity(shape, argb)
         }
