@@ -225,41 +225,52 @@ class Layer:
     # --- validation ------------------------------------------------------------------------
     def validate(self, seams=None):
         """Raise ValueError on a layer Rive would accept and then animate wrongly."""
+        known = self._check_state_nodes()
+        for t in self.any_transitions:
+            self._check_any_transition(t, known)
+        for s in self.states:
+            self._check_state_exits(s, known)
+        index = _ANIMATION_INDEX if seams is None else seams
+        self._check_blends(index)
+
+    def _check_state_nodes(self):
+        """Every state node is used once; returns the node ids a transition may target."""
         nodes = []
         for s in self.states:
             if s.node in nodes:
                 raise ValueError(f'layer "{self.name}": duplicate state node id {s.node} '
                                  f'(second use by animation {s.anim})')
             nodes.append(s.node)
-        known = set(nodes) | {self.entry}
+        return set(nodes) | {self.entry}
 
-        for t in self.any_transitions:
-            self._check_target("AnyState", t, known)
-            if t.weight is not None:
-                raise ValueError(f'layer "{self.name}": AnyState -> {t.to} carries '
-                                 f'randomWeight={t.weight}; only a random="true" state randomises')
+    def _check_any_transition(self, t, known):
+        self._check_target("AnyState", t, known)
+        if t.weight is not None:
+            raise ValueError(f'layer "{self.name}": AnyState -> {t.to} carries '
+                             f'randomWeight={t.weight}; only a random="true" state randomises')
 
-        for s in self.states:
-            weighted_exits = 0
-            for t in s.transitions:
-                self._check_target(s.node, t, known)
-                if t.weight is not None:
-                    if not s.random:
-                        raise ValueError(f'layer "{self.name}": state {s.node} -> {t.to} carries '
-                                         f'randomWeight={t.weight} but {s.node} is not random="true"')
-                    weighted_exits += 1
-                if (isinstance(t, Exit) and self.anim_loops
-                        and self.anim_loops.get(s.anim) == "loop"):
-                    raise ValueError(f'layer "{self.name}": state {s.node} -> {t.to} is an '
-                                     f'exit-time transition, but animation {s.anim} loops and '
-                                     f'never reaches its exit time')
-            if s.random and weighted_exits < 2:
-                raise ValueError(f'layer "{self.name}": state {s.node} is random="true" but has '
-                                 f'{weighted_exits} weighted transition(s); a random pick needs '
-                                 f'at least two')
+    def _check_state_exits(self, s, known):
+        for t in s.transitions:
+            self._check_target(s.node, t, known)
+            self._check_weight(s, t)
+            self._check_exit_time(s, t)
+        weighted_exits = sum(1 for t in s.transitions if t.weight is not None)
+        if s.random and weighted_exits < 2:
+            raise ValueError(f'layer "{self.name}": state {s.node} is random="true" but has '
+                             f'{weighted_exits} weighted transition(s); a random pick needs '
+                             f'at least two')
 
-        index = _ANIMATION_INDEX if seams is None else seams
-        self._check_blends(index)
+    def _check_weight(self, s, t):
+        if t.weight is not None and not s.random:
+            raise ValueError(f'layer "{self.name}": state {s.node} -> {t.to} carries '
+                             f'randomWeight={t.weight} but {s.node} is not random="true"')
+
+    def _check_exit_time(self, s, t):
+        loops = (self.anim_loops or {}).get(s.anim) == "loop"
+        if loops and isinstance(t, Exit):
+            raise ValueError(f'layer "{self.name}": state {s.node} -> {t.to} is an '
+                             f'exit-time transition, but animation {s.anim} loops and '
+                             f'never reaches its exit time')
 
     # --- the blend policy --------------------------------------------------------------------
     def _signed(self):
@@ -268,20 +279,23 @@ class Layer:
         ledger can read the marks from a plain build."""
         pairs = [(None, t) for t in self.any_transitions]
         pairs += [(s, t) for s in self.states for t in s.transitions]
-        out = []
-        for src, t in pairs:
-            cut = bool(t.cut or (src is not None and src.cut))
-            hold = bool(getattr(t, "hold", False))
-            reason = t.reason or (src.reason if src is not None else None)
-            if (cut or hold) and not reason:
-                raise ValueError(f'layer "{self.name}": {src.node if src else "AnyState"} -> '
-                                 f'{t.to} is marked cut/hold with no reason; say why')
-            if cut:
-                CUT_MARKS[(self.name, src.node if src else None, t.to)] = reason
-            if hold:
-                HOLD_MARKS[(self.name, src.node if src else None, t.to)] = reason
-            out.append((src, t, cut, reason))
-        return out
+        return [self._sign(src, t) for src, t in pairs]
+
+    def _sign(self, src, t):
+        """(src, t, cut, reason) for one way out, recording its cut / hold signature."""
+        source = getattr(src, "node", None)
+        cut = bool(t.cut or getattr(src, "cut", False))
+        hold = bool(getattr(t, "hold", False))
+        reason = t.reason or getattr(src, "reason", None)
+        marked = cut or hold
+        if marked and not reason:
+            raise ValueError(f'layer "{self.name}": {source or "AnyState"} -> '
+                             f'{t.to} is marked cut/hold with no reason; say why')
+        if cut:
+            CUT_MARKS[(self.name, source, t.to)] = reason
+        if hold:
+            HOLD_MARKS[(self.name, source, t.to)] = reason
+        return src, t, cut, reason
 
     def _check_blends(self, index):
         """Refuse a 0 ms transition that tears a property both animations key, unless it is
@@ -291,23 +305,31 @@ class Layer:
         that ends holding a property its target does not key, so the layers below take it back
         at the cut - is a layering question rather than a transition one, and belongs to the
         ledger (`python -m rig.seams`), not to this gate."""
+        signed = self._signed()       # always: building the layer records its signatures
+        if not index:
+            return
         anim_of = {s.node: s.anim for s in self.states}
-        for src, t, cut, reason in self._signed():
-            if not index or t.ms or cut:
+        for src, t, cut, _reason in signed:
+            if t.ms or cut:
                 continue
-            for s in ([src] if src is not None else self.states):
-                if s.node == t.to:
-                    continue
-                for c in crossings(index, s.anim, anim_of.get(t.to)):
-                    if c.hand_back:
-                        continue
-                    raise ValueError(
-                        f'layer "{self.name}": {s.node} -> {t.to} is a 0 ms cut, but '
-                        f'{_name(index, s.anim)} leaves object {c.obj} '
-                        f'{_prop(c.key)} at {c.from_value} and {_name(index, anim_of.get(t.to))} '
-                        f'starts it at {c.to_value} (delta {c.delta:g}, '
-                        f'{c.normalised:.1f}x the {c.eps:g} tolerance). Blend it, or mark the '
-                        f'transition cut=True with a reason.')
+            for s in self._sources(src, t):
+                self._check_seam(index, s, t, anim_of.get(t.to))
+
+    def _sources(self, src, t):
+        """The states a transition can leave from: its own state, or every other state for AnyState."""
+        return [s for s in ([src] if src is not None else self.states) if s.node != t.to]
+
+    def _check_seam(self, index, s, t, target_anim):
+        c = next((c for c in crossings(index, s.anim, target_anim) if not c.hand_back), None)
+        if c is None:
+            return
+        raise ValueError(
+            f'layer "{self.name}": {s.node} -> {t.to} is a 0 ms cut, but '
+            f'{_name(index, s.anim)} leaves object {c.obj} '
+            f'{_prop(c.key)} at {c.from_value} and {_name(index, target_anim)} '
+            f'starts it at {c.to_value} (delta {c.delta:g}, '
+            f'{c.normalised:.1f}x the {c.eps:g} tolerance). Blend it, or mark the '
+            f'transition cut=True with a reason.')
 
     def _check_target(self, frm, t, known):
         if t.to not in known:
