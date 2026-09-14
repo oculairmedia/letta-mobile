@@ -90,6 +90,7 @@ internal class ChatConversationCoordinator(
         (activeConversationId ?: currentClientModeConversationId()).takeIf { uiState.value.messages.isNotEmpty() }
     private var clientModeBootstrapState: ClientModeBootstrapState =
         if (isFreshRoute) ClientModeBootstrapState.NewConversationPending else ClientModeBootstrapState.Idle
+    private var timelineSelectionGeneration = 0L
     private val rosterNameResolver = RosterNameResolver(
         fetch = { id -> agentRepository.getAgent(AgentId(id)).first() },
         source = "ChatConversationCoordinator",
@@ -336,19 +337,19 @@ internal class ChatConversationCoordinator(
     private suspend fun hydrateAndLoadTimelineConversation(conversationId: String): Boolean {
         val cachedAgent = agentRepository.getCachedAgent(AgentId(agentId))
         reportNameFallbackIfUnresolved(cachedAgent?.name)
-        val agent = cachedAgent ?: resolveMissingAgentName()
-        val summary = ChatConversationSummary(
-            id = conversationId,
-            title = agent?.name ?: uiState.value.agentName,
-            agentName = agent?.name ?: uiState.value.agentName,
-            updatedAtLabel = "",
-            lastMessagePreview = "",
-        )
+        val agentName = CoordinatorAgentName(cachedAgent?.name ?: uiState.value.agentName)
+        val summary = conversationSummary(CoordinatorConversationId(conversationId), agentName)
         updateSessionState { current ->
             hydrateOrShowLoading(current, summary, hydrationAvailability(summary))
         }
-        agent?.name?.let { uiState.value = uiState.value.copy(agentName = it) }
-        return loadMessagesInternal()
+        if (cachedAgent != null) uiState.value = uiState.value.copy(agentName = agentName.value)
+
+        val selectionGeneration = ++timelineSelectionGeneration
+        val loaded = loadMessagesInternal()
+        if (cachedAgent == null && loaded) {
+            refreshMissingAgentName(conversationId, selectionGeneration)
+        }
+        return loaded
     }
 
     private fun handleEmptyTimelineConversationState() {
@@ -394,6 +395,18 @@ internal class ChatConversationCoordinator(
     }
 
     private suspend fun resolveMissingAgentName() = rosterNameResolver.resolve(agentId)
+
+    private fun refreshMissingAgentName(conversationId: String, selectionGeneration: Long) {
+        scope.launch {
+            val agent = resolveMissingAgentName() ?: return@launch
+            if (
+                timelineSelectionGeneration == selectionGeneration &&
+                isCurrentConversation(CoordinatorConversationId(conversationId))
+            ) {
+                uiState.value = uiState.value.copy(agentName = agent.name)
+            }
+        }
+    }
 
     internal val rosterNameResolverForTest get() = rosterNameResolver
 
@@ -547,25 +560,18 @@ internal class ChatConversationCoordinator(
         }
     }
 
-    private suspend fun loadRemoteConversation(conversationId: CoordinatorConversationId, loadTimer: Telemetry.Timer): Boolean =
-        try {
-            val agent = agentRepository.getAgent(AgentId(agentId)).first()
-            if (!isCurrentConversation(conversationId)) {
-                loadTimer.stop("result" to "staleConversation")
-                false
-            } else {
-                completeRemoteConversationLoad(
-                    conversationId,
-                    CoordinatorAgentName(agent.name),
-                    loadTimer,
-                )
-                true
-            }
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (error: Exception) {
-            failRemoteConversationLoad(conversationId, error, loadTimer)
+    private fun loadRemoteConversation(conversationId: CoordinatorConversationId, loadTimer: Telemetry.Timer): Boolean {
+        if (!isCurrentConversation(conversationId)) {
+            loadTimer.stop("result" to "staleConversation")
+            return false
         }
+        completeRemoteConversationLoad(
+            conversationId,
+            CoordinatorAgentName(agentRepository.getCachedAgent(AgentId(agentId))?.name ?: uiState.value.agentName),
+            loadTimer,
+        )
+        return true
+    }
 
     private fun completeRemoteConversationLoad(
         conversationId: CoordinatorConversationId,
@@ -586,24 +592,6 @@ internal class ChatConversationCoordinator(
         startTimelineObserver(conversationId.value)
         recentMessagesReconcileLauncher.launch(ConversationOpenReconcileRequest(conversationId.value))
         loadTimer.stop("conversationId" to conversationId.value, "mode" to "timeline")
-    }
-
-    private fun failRemoteConversationLoad(
-        conversationId: CoordinatorConversationId,
-        error: Exception,
-        loadTimer: Telemetry.Timer,
-    ): Boolean {
-        loadTimer.stopError(error, "conversationId" to conversationId.value)
-        if (!isCurrentConversation(conversationId)) return false
-        updateSessionState { current ->
-            ChatSessionReducer.streamDisconnected(
-                state = current,
-                generation = current.selectionGeneration,
-                errorMessage = error.message ?: "Failed to load messages",
-            )
-        }
-        uiState.value = uiState.value.copy(isLoadingOlderMessages = false)
-        return false
     }
 
     private fun isCurrentConversation(conversationId: CoordinatorConversationId): Boolean =

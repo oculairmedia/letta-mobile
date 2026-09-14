@@ -48,7 +48,15 @@ fun CanonicalTimelineSession.paging(
     }
 }
 
-/** Network history is requested only when Paging reaches the end of the local ledger. */
+/**
+ * Both ends of the list reach the network. Older history walks the durable continuation backwards;
+ * the newest end reconciles a bounded recent page, which is how a message authored on another client
+ * enters this ledger at all.
+ *
+ * Without the prepend, new content could only arrive through live ingest - the stream this client
+ * happens to be watching, plus its own sends - so a conversation went permanently stale the moment
+ * it was written to from somewhere else, and no amount of scrolling could recover it.
+ */
 @OptIn(ExperimentalPagingApi::class)
 internal class TimelineHistoryMediator(
     private val session: CanonicalTimelineSession,
@@ -60,7 +68,7 @@ internal class TimelineHistoryMediator(
         loadType: LoadType,
         state: PagingState<TimelinePageKey, TimelineSettledRecord>,
     ): MediatorResult {
-        if (loadType == LoadType.PREPEND) return MediatorResult.Success(true)
+        if (loadType == LoadType.PREPEND) return refreshNewest()
         return try {
             if (!session.engine.hasOlderHistory(selection)) return MediatorResult.Success(true)
             when (session.loadOlder(selection)) {
@@ -73,5 +81,27 @@ internal class TimelineHistoryMediator(
         } catch (failure: Exception) {
             MediatorResult.Error(failure)
         }
+    }
+
+    /**
+     * The recent-tail read, which deliberately does not consume the older-history cursor: the two
+     * ends of this list are independent walks and must not spend each other's state.
+     *
+     * End of pagination is reported when the page added nothing, which is also what stops this from
+     * spinning. Applying rows bumps the durable revision, the source is invalidated, and the newest
+     * end is asked again - until a page appends nothing and the walk settles.
+     */
+    private suspend fun refreshNewest(): MediatorResult = try {
+        val result = session.reconcileRecentDetailed(selection)
+        when (result.outcome) {
+            TimelineEnginePageOutcome.Applied -> MediatorResult.Success(result.appended == 0)
+            // Refused mid-stream: the turn in flight owns those rows and will settle them itself.
+            TimelineEnginePageOutcome.NoProgress -> MediatorResult.Success(true)
+            TimelineEnginePageOutcome.Stale -> MediatorResult.Error(IllegalStateException("Stale recent request"))
+        }
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (failure: Exception) {
+        MediatorResult.Error(failure)
     }
 }

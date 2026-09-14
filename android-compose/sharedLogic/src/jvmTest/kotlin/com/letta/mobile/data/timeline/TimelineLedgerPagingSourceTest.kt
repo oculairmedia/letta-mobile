@@ -82,11 +82,6 @@ class TimelineLedgerPagingSourceTest {
             config = androidx.paging.PagingConfig(pageSize = 64),
             leadingPlaceholderCount = 0,
         )
-        val prepend = mediator.load(androidx.paging.LoadType.PREPEND, emptyState)
-        val prependSuccess = assertIs<androidx.paging.RemoteMediator.MediatorResult.Success>(prepend)
-        kotlin.test.assertTrue(prependSuccess.endOfPaginationReached)
-        assertEquals(0, calls)
-
         if (noProgress) {
             assertIs<androidx.paging.RemoteMediator.MediatorResult.Error>(
                 mediator.load(androidx.paging.LoadType.APPEND, emptyState),
@@ -105,6 +100,44 @@ class TimelineLedgerPagingSourceTest {
         kotlin.test.assertTrue(exhaustedSuccess.endOfPaginationReached)
     }
 
+    /**
+     * The newest end is what a message authored on another client arrives through. Before this, a
+     * prepend answered "end of pagination" without asking anyone, so such a message could only ever
+     * reach the ledger through live ingest and a conversation went permanently stale otherwise.
+     */
+    @OptIn(androidx.paging.ExperimentalPagingApi::class)
+    @Test fun prependReadsTheRecentTailRatherThanDeclaringTheNewestEndFinished() = runTest {
+        val store = Store()
+        val recent = RecordingTransport(records = listOf(message("m-2"), message("m-1")))
+        val session = CanonicalTimelineSession(store, recent, TimelineScope("b", "c"), enabled = true)
+        val selection = assertIs<TimelineEngineOpen.Opened>(session.open()).selection
+        val mediator = TimelineHistoryMediator(session, selection)
+
+        val prepend = mediator.load(androidx.paging.LoadType.PREPEND, pagingState())
+
+        assertEquals(1, recent.calls, "the newest end never asked the transport")
+        // A recent read must not spend the older-history cursor: the two ends are separate walks.
+        assertEquals(TimelineContinuation.Initial, recent.lastContinuation)
+        assertEquals(TimelineRemoteOrder.NewestFirst, recent.lastOrder)
+        val success = assertIs<androidx.paging.RemoteMediator.MediatorResult.Success>(prepend)
+        // Rows arrived, so the newest end is not finished - ask again once they are applied.
+        kotlin.test.assertFalse(success.endOfPaginationReached)
+    }
+
+    @OptIn(androidx.paging.ExperimentalPagingApi::class)
+    @Test fun prependThatAddsNothingSettlesInsteadOfSpinning() = runTest {
+        val store = Store()
+        val recent = RecordingTransport(records = emptyList())
+        val session = CanonicalTimelineSession(store, recent, TimelineScope("b", "c"), enabled = true)
+        val selection = assertIs<TimelineEngineOpen.Opened>(session.open()).selection
+        val mediator = TimelineHistoryMediator(session, selection)
+
+        val prepend = mediator.load(androidx.paging.LoadType.PREPEND, pagingState())
+
+        val success = assertIs<androidx.paging.RemoteMediator.MediatorResult.Success>(prepend)
+        kotlin.test.assertTrue(success.endOfPaginationReached)
+    }
+
     @Test fun cancellationEscapesPagingLoad() = runTest {
         val store = Store()
         val engine = CanonicalTimelineEngine(store, TimelineCanonicalWriter { _, _ -> false }, enabled = true)
@@ -113,6 +146,48 @@ class TimelineLedgerPagingSourceTest {
         assertFailsWith<CancellationException> {
             TimelineLedgerPagingSource(engine, selection).load(PagingSource.LoadParams.Refresh(null, 64, false))
         }
+    }
+
+    private fun pagingState() = androidx.paging.PagingState<TimelinePageKey, TimelineSettledRecord>(
+        pages = emptyList(),
+        anchorPosition = null,
+        config = androidx.paging.PagingConfig(pageSize = 64),
+        leadingPlaceholderCount = 0,
+    )
+
+    private fun message(id: String) = com.letta.mobile.data.model.AssistantMessage(
+        id = id,
+        contentRaw = kotlinx.serialization.json.JsonPrimitive("reply"),
+        date = "2026-01-01T00:00:00Z",
+    )
+
+    /** Answers one recent page and records how it was asked. */
+    private class RecordingTransport(private val records: List<LettaMessage>) : TimelineTransport {
+        var calls = 0
+        var lastContinuation: TimelineContinuation? = null
+        var lastOrder: TimelineRemoteOrder? = null
+
+        override suspend fun listConversationMessagePage(
+            request: TimelineRemotePageRequest,
+            progress: TimelinePageProgress?,
+        ): TimelineRemotePageResult {
+            calls++
+            lastContinuation = request.continuation
+            lastOrder = request.order
+            return TimelineRemotePageResult.Page(
+                request.requestId,
+                request.selectionGeneration,
+                records.map { TimelineRemoteRecord(TimelineMessageId(it.id.orEmpty()), it, 0) },
+                null,
+                false,
+                0,
+            )
+        }
+
+        override suspend fun sendConversationMessage(conversationId: String, request: MessageCreateRequest): Flow<LettaMessage> = emptyFlow()
+        override suspend fun streamConversation(conversationId: String): Flow<TimelineStreamFrame> = emptyFlow()
+        override suspend fun listConversationMessages(conversationId: String, limit: Int?, after: String?, order: String?): List<LettaMessage> = emptyList()
+        override suspend fun listAgentMessages(agentId: String, limit: Int?, order: String?, conversationId: String?): List<LettaMessage> = emptyList()
     }
 
     private class Store : TimelineBoundedStore, TimelineStoreReader, TimelineStoreTransaction {
