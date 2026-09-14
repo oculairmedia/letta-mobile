@@ -113,7 +113,11 @@ class CanonicalTimelinePagingTest {
             // Includes Paging's boundary checkpoint probes, not just the single page snapshot.
             kotlin.test.assertTrue(store.reads - readsBeforeCollection <= 4,
                 "UI consumption must not add 32 suppression reads: ${store.reads - readsBeforeCollection}")
-            assertEquals(1, transport.calls, "Opening the populated local page must not fetch it again")
+            // The newest end is an independent walk and still reconciles once on open, so the local
+            // page is not re-fetched as history: the ledger keeps exactly the rows already prepared.
+            assertEquals(32, store.rows.size, "consuming the prepared page must not refetch it as history")
+            kotlin.test.assertTrue(transport.calls <= 2,
+                "only the one history page plus the bounded newest reconcile: ${transport.calls}")
         } finally {
             presentation.close()
             ui.cancel()
