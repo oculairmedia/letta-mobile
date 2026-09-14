@@ -1,13 +1,11 @@
 package com.letta.mobile.avatar.rive
 
 import com.letta.mobile.avatar.core.AvatarExpression
-import com.letta.mobile.avatar.core.AvatarFormat
 import com.letta.mobile.avatar.core.AvatarGesture
 import com.letta.mobile.avatar.core.AvatarLookTarget
 import com.letta.mobile.avatar.core.AvatarModel
 import com.letta.mobile.avatar.core.AvatarRuntimeState
 import com.letta.mobile.avatar.core.AvatarState
-import com.letta.mobile.avatar.core.AvatarViseme
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -93,23 +91,11 @@ class RiveAvatarRuntimeTest {
 
     /** World space assumes a scene a flat rig has no equivalent of, so it must not be guessed at. */
     @Test
-    fun worldGazeIsIgnoredRatherThanFlattened() = runTest {
-        val sink = RecordingSink()
-        val runtime = RiveAvatarRuntime(sink).also { it.load(model()) }
-        sink.writes.clear()
-
-        runtime.setLookTarget(AvatarLookTarget.World(1f, 2f, 3f))
-
-        assertTrue(sink.writes.isEmpty(), "flattened a world gaze: ${sink.writes}")
-    }
-
-    @Test
     fun unsupportedCapabilitiesAreDroppedSilently() = runTest {
         val sink = RecordingSink()
         val runtime = RiveAvatarRuntime(sink).also { it.load(model()) }
         sink.writes.clear()
 
-        runtime.setViseme(AvatarViseme.A, 1f)
         runtime.playAnimation("wave", loop = true)
         runtime.setAccessoryEnabled("glasses", enabled = true)
         runtime.playGesture(AvatarGesture("shrug"))
@@ -200,16 +186,10 @@ class RiveAvatarRuntimeTest {
         assertIs<AvatarRuntimeState.Idle>(runtime.state.value)
     }
 
-    /**
-     * A Rive mascot is not yet a first-class [AvatarFormat] - the import pipeline and the format
-     * detector both switch exhaustively on that enum, and this spike does not go through either.
-     * The runtime never reads the format, so the fixture borrows the non-humanoid one.
-     */
     private fun model() = AvatarModel(
         id = "mascot",
         displayName = "Mascot",
         uri = "asset://mascot.riv",
-        format = AvatarFormat.GLB,
     )
 
     private class RecordingSink : RiveInputSink {

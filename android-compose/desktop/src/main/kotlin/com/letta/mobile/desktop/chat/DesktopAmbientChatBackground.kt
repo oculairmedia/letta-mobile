@@ -200,7 +200,8 @@ internal fun DesktopAmbientChatBackground(
                     val breath = 0.5f + 0.5f * sin(TwoPi * 0.0146f * phase)
                     val wobble = sin(TwoPi * 0.0394f * phase) * 0.03f * agitation
                     val radius = size.maxDimension * (0.52f + 0.12f * breath + wobble)
-                    val center = Offset(size.width * 0.5f, size.height * 0.92f)
+                    // Anchored at the bottom edge, like the shader's band.
+                    val center = Offset(size.width * 0.5f, size.height * 1.02f)
                     drawRect(
                         brush = Brush.radialGradient(
                             colorStops = arrayOf(

@@ -190,8 +190,12 @@ internal fun DesktopAgentRail(
     // "Agent <short-id>" placeholder share nothing, and stacking them hides
     // every member but one behind an orb that cannot select them. Only a real,
     // shared name means "same fleet".
-    val groups = remember(state.agents) {
+    // The selected agent is already on screen as the composer companion; listing it here too
+    // draws the same mascot twice. It leaves the rail while selected and returns on switch.
+    val selectedAgentId = state.focus.selectedAgentId
+    val groups = remember(state.agents, selectedAgentId) {
         state.agents
+            .filter { (id, _) -> id != selectedAgentId }
             .groupBy { (id, name) -> if (DisplayNames.isAgentFallback(name)) id else name }
             .map { (_, members) ->
                 AgentRailGroup(name = members.first().second, agentIds = members.map { it.first })

@@ -10,7 +10,6 @@ import com.letta.mobile.avatar.core.AvatarModel
 import com.letta.mobile.avatar.core.AvatarRuntime
 import com.letta.mobile.avatar.core.AvatarRuntimeState
 import com.letta.mobile.avatar.core.AvatarState
-import com.letta.mobile.avatar.core.AvatarViseme
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,8 +22,8 @@ import kotlinx.coroutines.flow.asStateFlow
  * which is what lets every mapping decision here be tested without a device, and what lets the
  * desktop JCEF surface reuse this class unchanged rather than growing a parallel copy.
  *
- * A flat mascot is honest about what it is not. It has no skeleton, no spring bones and no embedded
- * glTF clips, so those capabilities are reported false and the matching commands are dropped - which
+ * A flat mascot is honest about what it is not. It has no embedded clips and no accessories, so
+ * those capabilities are reported false and the matching commands are dropped - which
  * the [AvatarRuntime] contract already defines as the behavior for an unsupported capability, so the
  * app keeps one code path for every asset.
  */
@@ -69,8 +68,7 @@ class RiveAvatarRuntime(
      */
     override fun setExpression(expression: AvatarExpression, weight: Float) = Unit
 
-    /** No viseme rig. Lip sync arrives as [setMouthOpen], which a flat mouth can honour. */
-    override fun setViseme(viseme: AvatarViseme, weight: Float) = Unit
+    /** Lip sync arrives as [setMouthOpen], which a flat mouth can honour. */
 
     override fun setMouthOpen(value: Float) {
         if (!ready()) return
@@ -86,7 +84,6 @@ class RiveAvatarRuntime(
         val (x, y) = when (target) {
             null -> 0f to 0f
             is AvatarLookTarget.Screen -> (target.x * 2f - 1f) to (target.y * 2f - 1f)
-            is AvatarLookTarget.World -> return
         }
         sink.setNumber(RiveAvatarContract.INPUT_LOOK_X, x.coerceIn(-1f, 1f))
         sink.setNumber(RiveAvatarContract.INPUT_LOOK_Y, y.coerceIn(-1f, 1f))
@@ -166,15 +163,12 @@ class RiveAvatarRuntime(
         const val BLINK_GESTURE: String = "blink"
 
         /**
-         * What a flat mascot can actually do. Not humanoid, no viseme rig, no spring bones and no
-         * embedded clips; expressions and gaze are state-machine inputs, so those hold.
+         * What a flat mascot can actually do: expressions and gaze are state-machine inputs, so
+         * those hold; there are no embedded clips and no accessories.
          */
         val MASCOT_CAPABILITIES: AvatarCapabilities = AvatarCapabilities(
-            supportsHumanoid = false,
             supportsExpressions = true,
-            supportsVisemes = false,
             supportsLookAt = true,
-            supportsSpringBones = false,
             supportsEmbeddedAnimations = false,
             supportsAccessories = false,
         )

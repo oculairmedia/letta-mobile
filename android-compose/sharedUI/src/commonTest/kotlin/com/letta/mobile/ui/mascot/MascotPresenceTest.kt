@@ -87,8 +87,8 @@ class MascotPresenceTest {
         val pose = entry.lastGaze
         assertTrue(pose.lookTarget.x in 0f..1f && pose.lookTarget.y in 0f..1f)
         assertTrue(
-            pose.target == GazeTarget.OWN || pose.target == GazeTarget.USER,
-            "without a pointer the plan still runs: ${pose.target}",
+            pose.target in setOf(GazeTarget.OWN, GazeTarget.AWAY, GazeTarget.USER),
+            "without a pointer the plan still runs on the pointer-free targets: ${pose.target}",
         )
     }
 }

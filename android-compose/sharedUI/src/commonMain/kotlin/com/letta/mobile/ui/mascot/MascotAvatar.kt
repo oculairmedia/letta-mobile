@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
@@ -128,8 +129,14 @@ fun MascotLive(
     val cursor = registry.cursor.value
     val inputBounds = registry.inputBounds.value
     val timelineBounds = registry.timelineBounds.value
+    // This surface's slot in the registry, so the other agents' mascots can look at it.
+    val slotKey = remember(agentId) { "$agentId#${slotCounter++}" }
+    DisposableEffect(registry, slotKey) { onDispose { registry.mascotBounds.remove(slotKey) } }
+    val peersPx = registry.mascotBounds.values
+        .filter { it.agentId != agentId && !it.bounds.isEmpty }
+        .map { GazePoint(it.bounds.centerX, it.bounds.centerY) }
     val minReachPx = with(LocalDensity.current) { GAZE_MIN_REACH.toPx() }
-    LaunchedEffect(entry, cursor, bounds, minReachPx, inputBounds, timelineBounds) {
+    LaunchedEffect(entry, cursor, bounds, minReachPx, inputBounds, timelineBounds, peersPx) {
         entry.setGazeWorld(
             GazeWorld.fromWindow(
                 GazeWindow(
@@ -137,13 +144,22 @@ fun MascotLive(
                     reach = GazeReach(minReachPx),
                     pointerPx = cursor?.let { GazePoint(it.x, it.y) },
                     rects = GazeTargetRects(input = inputBounds, timeline = timelineBounds),
+                    peersPx = peersPx,
                 ),
             ),
         )
     }
     // requiredSize: an overscaled mascot must exceed its tile so the tile's clip crops it;
     // plain size() is coerced down to the parent's constraints and never overscales.
-    host.Surface(entry, modifier.requiredSize(size).onGloballyPositioned { bounds = it.boundsInWindow() })
+    host.Surface(
+        entry,
+        modifier.requiredSize(size).onGloballyPositioned {
+            val r = it.boundsInWindow()
+            bounds = r
+            val slot = MascotSlot(agentId, GazeRect(r.left, r.top, r.right, r.bottom))
+            if (registry.mascotBounds[slotKey] != slot) registry.mascotBounds[slotKey] = slot
+        },
+    )
 }
 
 /**
@@ -164,4 +180,7 @@ fun pointerLook(x: Float, y: Float, bounds: Rect, minReachPx: Float): AvatarLook
 
 /** The body spans ~60 % of the artboard; this fills a tile edge to edge. */
 const val MASCOT_TILE_OVERSCALE = 1.6f
+
+/** Distinguishes several surfaces of one agent in [MascotIdentityRegistry.mascotBounds]; composition-thread only. */
+private var slotCounter = 0
 private val GAZE_MIN_REACH = 360.dp

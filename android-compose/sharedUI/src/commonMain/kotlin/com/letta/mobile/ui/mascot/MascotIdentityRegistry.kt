@@ -40,6 +40,12 @@ class MascotIdentityRegistry {
         identities.putAll(all)
     }
 
+    /**
+     * Every live mascot surface's window bounds, keyed by surface (one agent can be drawn in
+     * several places), so mascots can look at each other. [MascotLive] publishes and retracts.
+     */
+    val mascotBounds = mutableStateMapOf<String, MascotSlot>()
+
     fun updatePresence(all: Map<String, AgentPresence>) {
         presence.keys.retainAll(all.keys)
         presence.putAll(all)
@@ -77,3 +83,6 @@ fun Modifier.mascotGazeTarget(surface: MascotGazeSurface): Modifier {
 
 /** The shell's [MascotIdentityRegistry]; the default is an empty one (no identities, so every avatar draws its fallback). */
 val LocalMascotRegistry = compositionLocalOf { MascotIdentityRegistry() }
+
+/** One drawn mascot: which agent, and where it is in the window. */
+data class MascotSlot(val agentId: String, val bounds: GazeRect)

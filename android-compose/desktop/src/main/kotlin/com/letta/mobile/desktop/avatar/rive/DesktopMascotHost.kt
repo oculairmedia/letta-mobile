@@ -49,6 +49,10 @@ object DesktopMascotHost : MascotHost {
                 it.load(bytes)
                 // Host rule: identity before the first advance, or the first frame is a black body.
                 RiveAvatarContract.applyIdentity(it.inputSink, identity)
+                // Desynchronise: every scene starts at the same instant, so without this the
+                // mascots on one screen blink, wander and fidget in lockstep. A random head start
+                // (0-20 s in small steps, so the state machines take their transitions) breaks it.
+                repeat(kotlin.random.Random.nextInt(0, 60)) { _ -> it.advance(kotlin.random.Random.nextFloat() * 0.3f + 0.05f) }
             }
         }.getOrNull() ?: return null
         return DesktopMascotEntry(scene, RiveAvatarRuntime(scene.inputSink), identity)

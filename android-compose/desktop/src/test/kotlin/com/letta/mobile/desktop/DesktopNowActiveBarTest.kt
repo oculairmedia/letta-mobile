@@ -48,13 +48,11 @@ class DesktopNowActiveBarTest {
         isStreamingReplySelected: Boolean = false,
         avatarStyleByAgentId: Map<String, Int> = emptyMap(),
         fallbackOrbIndex: Int = 0,
-        avatarCompanionActive: Boolean = false,
     ) = NowActiveBarHostState(
         thinkingConversationId = thinkingConversationId,
         isStreamingReplySelected = isStreamingReplySelected,
         avatarStyleByAgentId = avatarStyleByAgentId,
         fallbackOrbIndex = fallbackOrbIndex,
-        avatarCompanionActive = avatarCompanionActive,
     )
 
     @Test
@@ -196,18 +194,5 @@ class DesktopNowActiveBarTest {
             host = host(avatarStyleByAgentId = emptyMap(), fallbackOrbIndex = 9),
         )
         assertEquals(9, pin?.state?.orbIndex)
-    }
-
-    @Test
-    fun avatarCompanionActiveFlowsThroughUnchanged() {
-        val convo = conversation("c1")
-        val pin = deriveNowActiveBarPin(
-            lastPromptedId = "c1",
-            streamingId = null,
-            cancellingId = null,
-            chatState = surfaceState(conversations = listOf(convo), selectedConversationId = "c1"),
-            host = host(avatarCompanionActive = true),
-        )
-        assertEquals(true, pin?.state?.avatarCompanionActive)
     }
 }

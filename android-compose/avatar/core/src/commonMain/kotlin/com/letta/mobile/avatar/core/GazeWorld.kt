@@ -21,6 +21,8 @@ data class GazeWorld(
     val pointer: GazePoint? = null,
     val input: GazePoint? = null,
     val timeline: GazePoint? = null,
+    /** Other live mascots on screen, in this mascot's gaze units; empty makes PEER unavailable. */
+    val peers: List<GazePoint> = emptyList(),
     val mode: GazeDriveMode = GazeDriveMode.JUSTIFIED,
     /**
      * Bench: `now - lastCursorMove < 500ms`. When null, inferred from pointer
@@ -38,6 +40,7 @@ data class GazeWorld(
             pointer = GazeMath.pointerPxToGaze(window.pointerPx, window.mascot, window.reach.minPx),
             input = GazeMath.rectCenterToGaze(window.rects.input, window.mascot, window.reach.minPx),
             timeline = GazeMath.rectCenterToGaze(window.rects.timeline, window.mascot, window.reach.minPx),
+            peers = window.peersPx.mapNotNull { GazeMath.pointerPxToGaze(it, window.mascot, window.reach.minPx) },
             mode = mode,
             pointerMovedRecently = pointerMovedRecently,
         )
@@ -59,6 +62,8 @@ data class GazeWindow(
     val reach: GazeReach,
     val pointerPx: GazePoint? = null,
     val rects: GazeTargetRects = GazeTargetRects(),
+    /** Centres of the other live mascots, in pixels (same space as [mascot]). */
+    val peersPx: List<GazePoint> = emptyList(),
 )
 
 /** Eyes, head, and a one-tick blink pulse. Look is also packaged as a screen target. */

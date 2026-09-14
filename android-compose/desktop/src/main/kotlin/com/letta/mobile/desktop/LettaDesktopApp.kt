@@ -246,8 +246,6 @@ internal fun LettaDesktopApp(
         ),
     )
 
-    val avatar = rememberAvatarCompanion(chatScope, secureSettingsStore)
-
     DesktopControllerLifecycles(
         DesktopControllerLifecycleParams(
             chatController = chatController,
@@ -646,13 +644,6 @@ internal fun LettaDesktopApp(
         )
     }
 
-    AvatarPresenceEffects(
-        avatar = avatar,
-        isStreamingReplySelected = isStreamingReplySelected,
-        thinkingConversationId = thinkingConversationId,
-        errorMessage = chatState.errorMessage,
-    )
-
     // Load the skills registry + the focused agent's installed skills when the
     // Skills page is open (or the focused agent changes).
     LaunchedEffect(selectedDestination, skillsPanel, selectedAgentId) {
@@ -1003,7 +994,6 @@ internal fun LettaDesktopApp(
                 isStreamingReplySelected = isStreamingReplySelected,
                 avatarStyleByAgentId = avatarStyleByAgentId,
                 fallbackOrbIndex = selectedAgentOrbIndex,
-                avatarCompanionActive = avatar.isActive,
             ),
             actions = NowActiveBarHostActions(
                 onOpenConversation = { conversationId ->
@@ -1011,7 +1001,6 @@ internal fun LettaDesktopApp(
                     chatController.selectConversation(conversationId)
                     selectedDestination = DesktopDestination.Conversations
                 },
-                onAvatarCompanion = avatar.toggle,
                 onStopRun = chatController::stopActiveRun,
             ),
         )

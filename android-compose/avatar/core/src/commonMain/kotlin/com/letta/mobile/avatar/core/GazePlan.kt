@@ -14,6 +14,8 @@ enum class GazeTarget(val label: String, val reason: String) {
     CURSOR("the cursor", "your hand moved"),
     INPUT("the input", "watching you type"),
     TIMELINE("the timeline", "reading the code / its own reply"),
+    AWAY("off to the side", "lost in thought: gaze parked off-axis, the way people think"),
+    PEER("another agent", "the mascot next door"),
 }
 
 /** One justified look: the target, how likely, how long it holds, and the pause before the next. */
@@ -30,29 +32,40 @@ data class GazeLook(
  */
 object GazePlan {
     val byState: Map<AvatarState, List<GazeLook>> = mapOf(
+        // Straight ahead is the exception, not the rest pose: people park their gaze off-axis
+        // while they think, glance at whoever is next to them, and only meet your eyes to
+        // address you. AWAY and PEER carry most of the idle time; OWN itself drifts aside.
         AvatarState.IDLE to listOf(
-            GazeLook(GazeTarget.OWN, 50, 3f..7f),
-            GazeLook(GazeTarget.USER, 25, 1.5f..3.5f),
-            GazeLook(GazeTarget.CURSOR, 25, 1.5f..3f),
+            GazeLook(GazeTarget.AWAY, 35, 3f..8f),
+            GazeLook(GazeTarget.OWN, 25, 3f..7f),
+            GazeLook(GazeTarget.PEER, 15, 2f..5f),
+            GazeLook(GazeTarget.USER, 15, 1.5f..3.5f),
+            GazeLook(GazeTarget.CURSOR, 10, 1.5f..3f),
         ),
         AvatarState.LISTENING to listOf(
-            GazeLook(GazeTarget.INPUT, 70, 3f..8f, 0.3f..1.2f),
-            GazeLook(GazeTarget.USER, 20, 1f..2.5f),
+            GazeLook(GazeTarget.INPUT, 60, 3f..8f, 0.3f..1.2f),
+            GazeLook(GazeTarget.USER, 15, 1f..2.5f),
+            GazeLook(GazeTarget.AWAY, 10, 1.5f..3f),
             GazeLook(GazeTarget.CURSOR, 10, 1f..2f),
+            GazeLook(GazeTarget.PEER, 5, 1f..2.5f),
         ),
         AvatarState.THINKING to listOf(
-            GazeLook(GazeTarget.OWN, 60, 3f..8f),
-            GazeLook(GazeTarget.TIMELINE, 30, 2f..5f),
-            GazeLook(GazeTarget.INPUT, 10, 1f..2.5f),
+            GazeLook(GazeTarget.AWAY, 40, 3f..8f),
+            GazeLook(GazeTarget.OWN, 25, 3f..8f),
+            GazeLook(GazeTarget.TIMELINE, 25, 2f..5f),
+            GazeLook(GazeTarget.PEER, 10, 1.5f..3f),
         ),
         AvatarState.SPEAKING to listOf(
-            GazeLook(GazeTarget.USER, 55, 2.5f..6f, 0.3f..1.5f),
-            GazeLook(GazeTarget.TIMELINE, 35, 1.5f..4f),
+            GazeLook(GazeTarget.USER, 45, 2.5f..6f, 0.3f..1.5f),
+            GazeLook(GazeTarget.TIMELINE, 25, 1.5f..4f),
+            GazeLook(GazeTarget.AWAY, 15, 1.5f..3.5f),
             GazeLook(GazeTarget.CURSOR, 10, 1f..2f),
+            GazeLook(GazeTarget.PEER, 5, 1f..2.5f),
         ),
         AvatarState.WAITING_INPUT to listOf(
-            GazeLook(GazeTarget.USER, 80, 4f..9f, 0.3f..1f),
+            GazeLook(GazeTarget.USER, 70, 4f..9f, 0.3f..1f),
             GazeLook(GazeTarget.CURSOR, 20, 1.5f..3f),
+            GazeLook(GazeTarget.AWAY, 10, 1.5f..3f),
         ),
         AvatarState.DRAGGED to listOf(
             GazeLook(GazeTarget.CURSOR, 100, 10f..10f, 0f..0f),
@@ -61,7 +74,8 @@ object GazePlan {
             GazeLook(GazeTarget.USER, 100, 3f..3f, 0f..0f),
         ),
         AvatarState.ERROR to listOf(
-            GazeLook(GazeTarget.OWN, 70, 3f..7f),
+            GazeLook(GazeTarget.AWAY, 40, 3f..7f),
+            GazeLook(GazeTarget.OWN, 30, 3f..7f),
             GazeLook(GazeTarget.USER, 30, 1.5f..3f),
         ),
         AvatarState.SLEEPING to listOf(
