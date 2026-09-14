@@ -134,17 +134,40 @@ class ConversationsViewModel @Inject constructor(
         if (initialAgents.isNotEmpty()) {
             agentNameCache = initialAgents.associate { it.id to it.name }.toMutableMap()
         }
-        // A recreated screen cannot know whether a cached conversation timestamp
-        // predates the chat activity that navigated here. Publishing those rows and
-        // then refreshing exposes a visible stale-order -> authoritative-order swap.
-        // Keep the cached roster for names, but let the initial refresh publish the
-        // first populated conversation snapshot atomically.
         if (initialAgents.isNotEmpty()) {
             _uiState.value = _uiState.value.copy(
                 agents = initialAgents.toImmutableList(),
             )
         }
+        // letta-mobile-pus2w: the page renders from whatever the repository already holds - the
+        // on-disk cache at cold start, the last fetch afterwards - and the refresh updates it in
+        // place. Holding the first snapshot until the refresh returned avoided a visible
+        // stale-order -> authoritative-order swap, at the price of a shimmer on every open; a row
+        // moving (animated by the list) is the cheaper of the two. Empty emissions are skipped:
+        // they are "no cache yet" or a refresh clearing before it applies its page, and the
+        // load result decides both.
+        viewModelScope.launch {
+            allConversationsRepository.conversations.collect { held ->
+                if (held.isNotEmpty()) publishSnapshot(held)
+            }
+        }
         loadConversations()
+    }
+
+    /** Publishes [conversations] as the list now, named from the roster the app currently holds. */
+    private fun publishSnapshot(conversations: List<Conversation>) {
+        val activeConfigIsLocalRuntime = AgentRuntimeBinding.isLocalRuntime(settingsRepository.activeConfig.value)
+        val agents = displayAgents(agentRepository.agents.value, activeConfigIsLocalRuntime)
+        if (agents.isNotEmpty()) {
+            agentNameCache = agents.associate { it.id to it.name }.toMutableMap()
+        }
+        val display = displayConversations(conversations, agents, activeConfigIsLocalRuntime)
+        _uiState.value = _uiState.value.copy(
+            conversations = applyPinnedState(display.map { it.toDisplay() }).toImmutableList(),
+            agents = agents.toImmutableList(),
+            isLoading = false,
+            error = null,
+        )
     }
 
     fun loadConversations() {
