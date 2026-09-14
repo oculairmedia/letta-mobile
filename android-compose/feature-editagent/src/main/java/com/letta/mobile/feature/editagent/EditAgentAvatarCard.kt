@@ -32,7 +32,6 @@ import com.letta.mobile.ui.mascot.MascotShapeGlyph
  * and a sheet with the shared [MascotPicker]. A pick is written to the registry at once so every
  * tile of this agent re-skins while the sheet is still open; persistence is the view model's.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun EditAgentAvatarCard(
     agentId: String,
@@ -40,7 +39,6 @@ internal fun EditAgentAvatarCard(
     onChange: (MascotIdentity) -> Unit,
 ) {
     var showPicker by remember { mutableStateOf(false) }
-    val registry = LocalMascotRegistry.current
     CardGroup(title = { Text(stringResource(R.string.screen_agent_edit_avatar_section)) }) {
         item(
             headlineContent = {
@@ -81,27 +79,44 @@ internal fun EditAgentAvatarCard(
         )
     }
     if (showPicker) {
-        ModalBottomSheet(onDismissRequest = { showPicker = false }) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
-                    .navigationBarsPadding(),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+        EditAgentAvatarPickerSheet(
+            agentId = agentId,
+            identity = identity,
+            onChange = onChange,
+            onDismiss = { showPicker = false },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EditAgentAvatarPickerSheet(
+    agentId: String,
+    identity: MascotIdentity?,
+    onChange: (MascotIdentity) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val registry = LocalMascotRegistry.current
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .navigationBarsPadding(),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            MascotPicker(
+                identity = identity ?: MascotIdentity.DEFAULT,
+                onChange = { picked ->
+                    registry.identities[agentId] = picked
+                    onChange(picked)
+                },
+            )
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.align(Alignment.End).padding(bottom = 8.dp),
             ) {
-                MascotPicker(
-                    identity = identity ?: MascotIdentity.DEFAULT,
-                    onChange = { picked ->
-                        registry.identities[agentId] = picked
-                        onChange(picked)
-                    },
-                )
-                TextButton(
-                    onClick = { showPicker = false },
-                    modifier = Modifier.align(Alignment.End).padding(bottom = 8.dp),
-                ) {
-                    Text(stringResource(R.string.screen_agent_edit_avatar_done))
-                }
+                Text(stringResource(R.string.screen_agent_edit_avatar_done))
             }
         }
     }

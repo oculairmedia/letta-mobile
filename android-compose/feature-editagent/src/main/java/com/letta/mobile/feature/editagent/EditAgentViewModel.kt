@@ -98,6 +98,8 @@ internal class EditAgentViewModel @Inject constructor(
             try {
                 modelRepository.refreshLlmModels()
                 modelRepository.refreshEmbeddingModels()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 android.util.Log.w("EditAgentVM", "Failed to load models", e)
             }
@@ -109,6 +111,8 @@ internal class EditAgentViewModel @Inject constructor(
             state.setLoading()
             try {
                 applyLoadSnapshot(agentLoader.load(llmModels.value))
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 state.setError(e.message ?: "Failed to load agent")
             }

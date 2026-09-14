@@ -84,13 +84,12 @@ class AndroidMascotHost(
      * and ownership passes on when the driver leaves composition. Compose state so the waiting
      * surface upgrades itself the moment the driver is gone.
      */
-    private val liveDrivers = mutableStateMapOf<AndroidMascotEntry, Any>()
+    private val liveDrivers = mutableStateMapOf<AndroidMascotEntry, LiveSurfaceToken>()
 
     @Composable
     override fun Surface(entry: MascotEntry, modifier: Modifier, playing: Boolean) {
         val live = entry as AndroidMascotEntry
-        val scene = live.scene
-        val token = remember { Any() }
+        val token = remember { LiveSurfaceToken() }
         val driver = liveDrivers[live]
         val drives = playing && (driver == null || driver === token)
         DisposableEffect(live, playing) {
@@ -98,9 +97,14 @@ class AndroidMascotHost(
             onDispose { if (liveDrivers[live] === token) liveDrivers.remove(live) }
         }
         if (drives) {
-            RiveMascotSurface(scene, modifier, playing = true)
-            return
+            RiveMascotSurface(live.scene, modifier, playing = true)
+        } else {
+            MascotStill(live, modifier)
         }
+    }
+
+    @Composable
+    private fun MascotStill(entry: AndroidMascotEntry, modifier: Modifier) {
         BoxWithConstraints(modifier) {
             val key = entry.identity to constraints.maxWidth
             val still = stills[key]
@@ -108,7 +112,7 @@ class AndroidMascotHost(
                 Image(still, contentDescription = null, modifier = Modifier.matchParentSize(), contentScale = ContentScale.Fit)
             } else {
                 RiveMascotSurface(
-                    scene,
+                    entry.scene,
                     modifier = Modifier.matchParentSize(),
                     playing = false,
                     onFirstFrame = { getBitmap -> runCatching { stills[key] = getBitmap().asImageBitmap() } },
@@ -135,6 +139,9 @@ class AndroidMascotHost(
         const val TAG = "AndroidMascotHost"
     }
 }
+
+/** Identity of one composed surface; compared by instance so two tiles of one agent don't share a clock. */
+private class LiveSurfaceToken
 
 /**
  * The activity's [MascotHost]: brings up the Rive runtime and a worker bound to this composition's

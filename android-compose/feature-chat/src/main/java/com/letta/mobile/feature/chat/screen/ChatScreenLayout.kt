@@ -430,7 +430,6 @@ private fun ChatScreenComposerColumn(params: ChatScreenComposerColumnParams) {
             composerState = params.composerState,
             viewModel = params.viewModel,
             navigation = params.navigation,
-            reducedMotion = params.reducedMotion,
         )
     }
 }
@@ -480,8 +479,8 @@ private fun ChatScreenComposerInputSection(
     composerState: ChatComposerState,
     viewModel: AdminChatViewModel,
     navigation: ChatScreenNavigationCallbacks,
-    reducedMotion: Boolean,
 ) {
+    val reducedMotion = rememberReducedMotionEnabled()
     val launchPicker = rememberImageAttachmentPicker(
         onPicked = { viewModel.addAttachment(it) },
         onError = { viewModel.reportComposerError(it) },
