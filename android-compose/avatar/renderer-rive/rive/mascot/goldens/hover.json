@@ -94,12 +94,12 @@
       "spacing": "ease-out"
     },
     "Face.rotation": {
-      "max_delta": 0.0139,
-      "overshoot_pct": 53.87,
-      "peak": -0.0537,
-      "peak_frame": 10,
-      "range": 0.0537,
-      "settle_frame": 29,
+      "max_delta": 0.0092,
+      "overshoot_pct": 50.86,
+      "peak": -0.0527,
+      "peak_frame": 16,
+      "range": 0.0527,
+      "settle_frame": 31,
       "spacing": "ease-in"
     },
     "Face.x": {
@@ -112,12 +112,12 @@
       "spacing": "hold"
     },
     "Face.y": {
-      "max_delta": 2.392,
-      "overshoot_pct": 80.35,
-      "peak": -9.233,
-      "peak_frame": 10,
-      "range": 9.233,
-      "settle_frame": 34,
+      "max_delta": 1.9751,
+      "overshoot_pct": 80.3,
+      "peak": -9.2303,
+      "peak_frame": 13,
+      "range": 9.2303,
+      "settle_frame": 35,
       "spacing": "ease-in"
     },
     "Joystick.x": {
@@ -157,21 +157,21 @@
       "spacing": "ease-out"
     },
     "Placement.scaleX": {
-      "max_delta": 0.0225,
-      "overshoot_pct": 163.1,
-      "peak": 0.9179,
-      "peak_frame": 10,
-      "range": 0.0821,
-      "settle_frame": 35,
+      "max_delta": 0.0247,
+      "overshoot_pct": 163.02,
+      "peak": 0.918,
+      "peak_frame": 13,
+      "range": 0.082,
+      "settle_frame": 36,
       "spacing": "ease-in"
     },
     "Placement.scaleY": {
-      "max_delta": 0.0253,
-      "overshoot_pct": 177.22,
-      "peak": 1.0893,
-      "peak_frame": 10,
-      "range": 0.0893,
-      "settle_frame": 35,
+      "max_delta": 0.0277,
+      "overshoot_pct": 177.14,
+      "peak": 1.0892,
+      "peak_frame": 13,
+      "range": 0.0892,
+      "settle_frame": 36,
       "spacing": "ease-in"
     },
     "Trail1.opacity": {

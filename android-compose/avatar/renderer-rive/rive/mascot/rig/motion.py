@@ -21,13 +21,15 @@ Rive rules that bite here:
 """
 from typing import NamedTuple
 
-from rml import (ACCEL, BACK_IN, BACK_IN_OUT, BACK_OUT, COLOR, EASE_OUT, ELASTIC_SOFT, EMPH_ACCEL,
-                 EMPH_DECEL, GRADIENT_OPACITY, M3_STANDARD, NESTED_VALUE, OPACITY, REMAP_TIME, ROT,
-                 SINE, SOFT_OUT, SPRING, STANDARD, STD_DECEL, SX, SY, X, Y, animation)
+from rml import (ACCEL, BACK_IN, BACK_IN_OUT, BACK_SOFT, COLOR, EASE_OUT, ELASTIC_HEAVY,
+                 ELASTIC_SOFT, EMPH_ACCEL, EMPH_DECEL, GRADIENT_OPACITY, LINEAR, M3_STANDARD,
+                 NESTED_VALUE, OPACITY, REMAP_TIME, ROT, SINE, SOFT_OUT, SPRING, STANDARD,
+                 STD_DECEL, SX, SY, X, Y, animation)
 from rig.body import (
     BREATHING, BREATH_MS, HALO_FAILED, HALO_OPACITY, HALO_SLEEP, INFLATE_NODE, LUMEN, LUMEN_PEAK,
     LUMEN_REST, bone_pose, breath2, breath_scale, lumen_keys, shape_keys, sine, squash,
 )
+from rig.chart import Chart
 from rig.constants import (BLINK_FLIP, DESIGNED_PAIRS, EXPR, IDLE_WAITS, JX, JY, WANDER_WAITS, beat,
                            frames, rad)
 from rig.face import spin_keys
@@ -60,13 +62,46 @@ def merge(into, more):
     return into
 
 
+def travel(f0, v0, f1, v1, spacing="s", ticks=5):
+    """A joystick move authored as spacing rather than as a bezier: real in-betweens, linear between.
+
+    The head is the heaviest thing the rig turns, and a bezier states its weight only at the ends -
+    the middle is the interpolator's opinion, and BACK_IN_OUT's opinion is that a third of the
+    travel happens in a seventh of the time. A chart states the whole of it (`rig/chart.py`:
+    spacing IS the weight), so an "s" lays the move down eased out of one extreme and into the
+    next with no frame carrying more than about a fifth of it. Linear between the ticks for the
+    reason `spin_keys` gives: the in-betweens ARE the spacing, and a bezier on each one would
+    re-ease every segment and put the snap back.
+    """
+    return Chart(extremes=[(f0, v0), (f1, v1)], spacing=spacing, smooth=LINEAR, ticks=ticks).keys()
+
+
 def wander_animations():
-    """The Wander layer's animations: four unequal waits, the glance, peek, spin and the sleep shift."""
-    glance = animation("WanderGlance", WANDER_GLANCE, beat(1600), {JOYSTICK: {
-        JX: [(0, 0, BACK_IN_OUT), (beat(450), -0.8, None), (beat(900), -0.8, BACK_IN_OUT), (beat(1250), 0.4, ELASTIC_SOFT), (beat(1600), 0)]}})
-    peek = animation("WanderPeek", WANDER_PEEK, beat(1400), {JOYSTICK: {
-        JY: [(0, 0, BACK_IN_OUT), (beat(400), 0.7, None), (beat(900), 0.7, ELASTIC_SOFT), (beat(1400), 0)],
-        JX: [(0, 0, BACK_IN_OUT), (beat(400), 0.3, None), (beat(900), 0.3, ELASTIC_SOFT), (beat(1400), 0)]}})
+    """The Wander layer's animations: four unequal waits, the glance, peek, spin and the sleep shift.
+
+    The glance and the peek are chart-authored (letta-mobile-q55am): a head with mass leaves rest
+    slowly, carries its travel through the middle and eases into the extreme, and the only spring
+    in the beat is the short, damped settle at the very end. The old shape - BACK_IN_OUT out to the
+    extreme and an ELASTIC_SOFT release straight off a dead hold - put the whole return into its
+    first three frames (`Joystick.x max|delta|` 0.176 of a 1.2-unit swing) and read as a twang.
+    """
+    d = beat(1600)
+    # Look away, hold, swing back through centre, settle. The counter-swing is small and the
+    # elastic only governs it, so the release is a settle rather than the whole return.
+    gx = (travel(0, 0, beat(560), -0.8)[:-1] + [(beat(560), -0.8, None)]
+          + travel(beat(900), -0.8, beat(1300), 0.2)[:-1]
+          + [(beat(1300), 0.2, ELASTIC_HEAVY), (d, 0)])
+    glance = animation("WanderGlance", WANDER_GLANCE, d, {JOYSTICK: {JX: gx}})
+    d = beat(1400)
+    def peek_axis(top):
+        # The counter-swing is 6 % of the travel on purpose. A settle is scored against 2 % of the
+        # move's span, so a counter much bigger than that reads to the probe as "still moving" for
+        # every frame the spring takes to shed it - a heavier beat that measures as a slower one.
+        counter = round(-0.06 * top, 4)
+        return (travel(0, 0, beat(450), top)[:-1] + [(beat(450), top, None)]
+                + travel(beat(850), top, beat(1150), counter)[:-1]
+                + [(beat(1150), counter, ELASTIC_HEAVY), (d, 0)])
+    peek = animation("WanderPeek", WANDER_PEEK, d, {JOYSTICK: {JY: peek_axis(0.7), JX: peek_axis(0.3)}})
     spin_k = spin_keys(0, beat(700))
     d7 = beat(700)
     merge(spin_k, squash(INFLATE_NODE, [(0, 1, BACK_IN), (round(d7 * 0.25), 1.05, STANDARD), (round(d7 * 0.62), 1.05, ELASTIC_SOFT), (d7, 1)]))
@@ -190,13 +225,33 @@ class EnterTiming(NamedTuple):
     bezier: str
 
 
+TURNING = 0.2        # facing delta above which an entry is a real turn, not a settle
+TURN_STRETCH = 1.35  # ...and gets that much more travel time, because a head has mass
+
+
+def turning(frm, to, facing=None):
+    """How far the facing moves across this entry, in joystick units (x and y summed)."""
+    F = facing or sustained_facing()
+    (fx0, fy0), (fx1, fy1) = F[frm], F[to]
+    return abs(fx1 - fx0) + abs(fy1 - fy0)
+
+
 def enter_duration(frm, to):
     """The EnterTiming of the entry from `frm` to `to`: SPEC section 3 for the designed pairs,
-    otherwise the target's default (sleeping settles slowly, waitingInput springs)."""
+    otherwise the target's default (sleeping settles slowly, waitingInput springs).
+
+    A generic entry that actually turns the head - more than TURNING units of facing - gets
+    TURN_STRETCH more time to do it (letta-mobile-q55am). 160 ms was the duration of a glyph swap
+    under a blink, and swinging the whole head 0.65 units of facing through it read as weightless.
+    The five designed pairs keep their SPEC section 3 durations exactly; their extra weight comes
+    from the curve alone."""
     if (frm, to) in DESIGNED_PAIRS:
         return EnterTiming(DESIGNED_PAIRS[(frm, to)], SOFT_OUT)
-    return {"sleeping": EnterTiming(600, STANDARD),
-            "waitingInput": EnterTiming(160, SPRING)}.get(to, EnterTiming(160, EASE_OUT))
+    timing = {"sleeping": EnterTiming(600, STANDARD),
+              "waitingInput": EnterTiming(160, SPRING)}.get(to, EnterTiming(160, EASE_OUT))
+    if turning(frm, to) > TURNING:
+        return EnterTiming(round(timing.ms * TURN_STRETCH), timing.bezier)
+    return timing
 
 
 def enter_animations():
@@ -219,7 +274,9 @@ def enter_animations():
         timing = enter_duration(frm, to)
         bez = timing.bezier
         n = frames(timing.ms)
-        turn = BACK_OUT if abs(fx1 - fx0) + abs(fy1 - fy0) > 0.2 else bez   # a real turn lands with overshoot
+        # A real turn lands with overshoot - but a small one, off a heavy departure. BACK_OUT left
+        # the old pose at 3.7x the average speed and BACK_SOFT leaves at 3.1x with no less arrival.
+        turn = BACK_SOFT if turning(frm, to, F) > TURNING else bez
         r0, r1 = sustained_rest(frm), sustained_rest(to)
         keys = {PLATE_EXPR: {NESTED_VALUE: [(0, EXPR[frm], None), (BLINK_FLIP, EXPR[to])]},
                 JOYSTICK: {JX: [(0, fx0, turn), (n, fx1)], JY: [(0, fy0, turn), (n, fy1)]}}
@@ -236,7 +293,7 @@ def enter_animations():
                           ROT: [(0, 0, EMPH_ACCEL), (frames(50), rad(1), EMPH_DECEL), (frames(200), rad(-3), M3_STANDARD), (n, rad(-2))]}
         elif (frm, to) == ("listening", "thinking"):
             # hold the gaze 60 ms, then turn away and tilt.
-            keys[JOYSTICK] = {JX: [(0, fx0, None), (frames(60), fx0, BACK_IN_OUT), (n, fx1)], JY: [(0, fy0, None), (frames(60), fy0, BACK_IN_OUT), (n, fy1)]}
+            keys[JOYSTICK] = {JX: [(0, fx0, None), (frames(60), fx0, BACK_SOFT), (n, fx1)], JY: [(0, fy0, None), (frames(60), fy0, BACK_SOFT), (n, fy1)]}
             keys[FACE] = {Y: [(0, -14, STANDARD), (n, 0)], ROT: [(0, rad(-2), STANDARD), (n, rad(-6))]}
         elif (frm, to) == ("thinking", "speaking"):
             keys[FACE] = {ROT: [(0, rad(-6), SOFT_OUT), (frames(140), 0, None), (n, 0)]}
@@ -252,7 +309,7 @@ def enter_animations():
         # The inflate travels from the source state's breath low point to the target's (sleeping
         # rests at 0.985, everything else at 1), with the turn's own squash riding on top of it.
         base = lambda f: r0.inflate + (r1.inflate - r0.inflate) * (f / n)
-        if turn is BACK_OUT and n >= 10:
+        if turn is BACK_SOFT and n >= 10:
             sq = squash(INFLATE_NODE, [(0, 1, EMPH_ACCEL), (3, 1.04, SOFT_OUT), (min(n - 2, 9), 0.98, SOFT_OUT), (n, 1)])
             merge(keys, {INFLATE_NODE: {k: [(f, round(v * base(f), 4)) + tuple(rest) for (f, v, *rest) in ks]
                                         for k, ks in sq[INFLATE_NODE].items()}})
@@ -309,9 +366,13 @@ def momentary_animations():
 
 def idle_variety_animations():
     """The IdleVariety layer's animations: four unequal waits and the nine idle beats."""
-    m, h, r = beat(250), beat(650), beat(300)
+    # The glance gives 200 ms of its hold to its return, for the reason the tilt does: an elastic
+    # release is front-loaded, so frames are the only damping it has. Total length is unchanged.
+    m, h, r = beat(250), beat(450), beat(500)
+    # Rotation leaves and settles heavier than the offset it rides on: BACK_SOFT out, ELASTIC_HEAVY
+    # home. The 2 px of travel is a translation and keeps the tokens it had (letta-mobile-q55am).
     glance = animation("IdleGlance", IDLE_GLANCE_ANIM, m + h + r, {
-        FACE: {ROT: [(0, 0, BACK_IN_OUT), (m, rad(2), None), (m + h, rad(2), ELASTIC_SOFT), (m + h + r, 0)],
+        FACE: {ROT: [(0, 0, BACK_SOFT), (m, rad(2), None), (m + h, rad(2), ELASTIC_HEAVY), (m + h + r, 0)],
                X: [(0, 0, BACK_IN_OUT), (m, 2, None), (m + h, 2, ELASTIC_SOFT), (m + h + r, 0)]}})
     # Stretch: a slow tall stretch (volume kept), face rides up, then a soft elastic settle.
     d = beat(1400)
@@ -319,11 +380,15 @@ def idle_variety_animations():
         squash(INFLATE_NODE, [(0, 1, BACK_IN_OUT), (beat(500), 0.93, None), (beat(900), 0.93, ELASTIC_SOFT), (d, 1)]),
         **{FACE: {Y: [(0, 0, BACK_IN_OUT), (beat(500), -7, None), (beat(900), -7, ELASTIC_SOFT), (d, 0)]}}))
     # Tilt: the whole body cocks 6 degrees like a dog hearing something, holds, comes back.
+    # The hold gives up 250 ms so the unwind has 63 frames instead of 42: an elastic release is
+    # front-loaded whatever its period (about a fifth of the travel lands in the first frame), so
+    # the only way to take the whip out of it is to hand it more frames. The beat's own length,
+    # and the frame it is back at rest by, are unchanged (letta-mobile-q55am).
     d = beat(1600)
     tilt = animation("IdleTilt", IDLE_BEATS["tilt"].anim, d, {
-        BODY_NODE: {ROT: [(0, 0, BACK_IN_OUT), (beat(400), rad(6), None), (beat(1100), rad(6), ELASTIC_SOFT), (d, 0)]},
-        FACE: {ROT: [(0, 0, BACK_IN_OUT), (beat(400), rad(4), None), (beat(1100), rad(4), ELASTIC_SOFT), (d, 0)],
-               X: [(0, 0, BACK_IN_OUT), (beat(400), 4, None), (beat(1100), 4, ELASTIC_SOFT), (d, 0)]}})
+        BODY_NODE: {ROT: [(0, 0, BACK_SOFT), (beat(400), rad(6), None), (beat(850), rad(6), ELASTIC_HEAVY), (d, 0)]},
+        FACE: {ROT: [(0, 0, BACK_SOFT), (beat(400), rad(4), None), (beat(850), rad(4), ELASTIC_HEAVY), (d, 0)],
+               X: [(0, 0, BACK_IN_OUT), (beat(400), 4, None), (beat(850), 4, ELASTIC_SOFT), (d, 0)]}})
     # Bounce: anticipation squash, a small hop, landing squash, settle.
     d = beat(700)
     hop = [(0, 0, EMPH_ACCEL), (beat(120), 3, STD_DECEL), (beat(320), -14, EMPH_ACCEL), (beat(520), 2, EMPH_DECEL), (d, 0)]
@@ -340,19 +405,33 @@ def idle_variety_animations():
     sigh = animation("IdleSigh", IDLE_BEATS["sigh"].anim, d, dict(
         squash(INFLATE_NODE, [(0, 1, SINE), (beat(700), 1.05, None), (beat(1100), 1.05, SOFT_OUT), (d, 1)]),
         **{FACE: {Y: [(0, 0, SINE), (beat(700), 5, None), (beat(1100), 5, SOFT_OUT), (d, 0)]}}))
-    # Wobble: a decaying rock about the base, like it was nudged.
+    # Wobble: a decaying rock about the base, like it was nudged. The envelope is geometric, not
+    # linear: a nudge loses most of its energy in the first swing back, and the old `1 - k/7` ramp
+    # still had a quarter of the amplitude left on the fifth swing, which is what read as lively.
+    # `tuple(k)`, not `tuple(k[2:])`: k is already the rest of the tuple, so slicing it threw the
+    # SINE away and let the animation default (SOFT_OUT, the most front-loaded curve in rml.py)
+    # drive the face. That alone was `Face.rotation max|delta|` 0.0185 against the body's 0.0069 -
+    # the face snapped where the body eased, on keys that were supposed to be the same curve.
     d = beat(1300)
-    rock = [(0, 0, SINE)] + [(beat(180 * k), rad(4 * (1 if k % 2 else -1) * (1 - k / 7)), SINE) for k in range(1, 6)] + [(d, 0)]
-    wobble = animation("IdleWobble", IDLE_BEATS["wobble"].anim, d, {BODY_NODE: {ROT: rock}, FACE: {ROT: [(f, v * 0.6) + tuple(k[2:]) for (f, v, *k) in rock]}})
+    rock = [(0, 0, SINE)] + [(beat(180 * k), rad(4 * (1 if k % 2 else -1) * 0.6 ** k), SINE) for k in range(1, 6)] + [(d, 0)]
+    wobble = animation("IdleWobble", IDLE_BEATS["wobble"].anim, d, {BODY_NODE: {ROT: rock}, FACE: {ROT: [(f, v * 0.6) + tuple(k) for (f, v, *k) in rock]}})
     # Shift: settles its weight to one side for a while, then back.
     d = beat(2600)
     shift = animation("IdleShift", IDLE_BEATS["shift"].anim, d, {
         BODY_NODE: {X: [(0, 0, BACK_IN_OUT), (beat(500), 7, None), (beat(2000), 7, SOFT_OUT), (d, 0)],
-                    ROT: [(0, 0, BACK_IN_OUT), (beat(500), rad(-2), None), (beat(2000), rad(-2), SOFT_OUT), (d, 0)]},
+                    # The roll leaves heavy; it keeps SOFT_OUT home because an elastic release over
+                    # this 50-frame leg measures LIVELIER than the bezier, not heavier - the spring
+                    # front-loads a fifth of the travel into one frame where SOFT_OUT spreads it.
+                    ROT: [(0, 0, BACK_SOFT), (beat(500), rad(-2), None), (beat(2000), rad(-2), SOFT_OUT), (d, 0)]},
         FACE: {X: [(0, 0, BACK_IN_OUT), (beat(500), 9, None), (beat(2000), 9, SOFT_OUT), (d, 0)]}})
     # Look-around: the whole face turns to one side, pauses, sweeps to the other, comes home.
     d = beat(2400)
+    # The sweep across is the longest single joystick move in the rig; it is charted for the same
+    # reason the wander beats are, and only the last leg home springs.
     lookaround = animation("IdleLookAround", IDLE_BEATS["lookaround"].anim, d, {JOYSTICK: {
-        JX: [(0, 0, BACK_IN_OUT), (beat(500), -0.6, None), (beat(1000), -0.6, BACK_IN_OUT), (beat(1600), 0.55, None), (beat(2000), 0.55, ELASTIC_SOFT), (d, 0)]}})
+        JX: (travel(0, 0, beat(500), -0.6)[:-1] + [(beat(500), -0.6, None)]
+             + travel(beat(1000), -0.6, beat(1600), 0.55)[:-1] + [(beat(1600), 0.55, None)]
+             + travel(beat(1900), 0.55, beat(2250), -0.06)[:-1]
+             + [(beat(2250), -0.06, ELASTIC_HEAVY), (d, 0)])}})
     return ([animation("IdleWait" + str(k), w.anim, frames(w.ms), {}) for k, w in enumerate(IDLE_WAITS)]
             + [glance, stretch, tilt, bounce, shiver, sigh, wobble, shift, lookaround])

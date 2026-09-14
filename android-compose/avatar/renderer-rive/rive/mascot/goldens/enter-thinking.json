@@ -66,21 +66,21 @@
   "scenario": "enter-thinking",
   "signature": {
     "Arc.y": {
-      "max_delta": 1.1583,
-      "overshoot_pct": 2.88,
-      "peak": -2.2869,
-      "peak_frame": 8,
-      "range": 4.3376,
-      "settle_frame": 8,
+      "max_delta": 1.0531,
+      "overshoot_pct": 0.7,
+      "peak": -2.3787,
+      "peak_frame": 13,
+      "range": 4.2458,
+      "settle_frame": 10,
       "spacing": "ease-in"
     },
     "Body.x": {
       "max_delta": 0.0661,
-      "overshoot_pct": 0.11,
-      "peak": 2.0,
-      "peak_frame": 59,
-      "range": 2.0,
-      "settle_frame": 54,
+      "overshoot_pct": 0.0,
+      "peak": 1.9916,
+      "peak_frame": 60,
+      "range": 1.9916,
+      "settle_frame": 57,
       "spacing": "ease-out"
     },
     "Body.y": {
@@ -93,21 +93,21 @@
       "spacing": "hold"
     },
     "Face.rotation": {
-      "max_delta": 0.0168,
+      "max_delta": 0.0131,
       "overshoot_pct": 0.0,
       "peak": -0.1047,
-      "peak_frame": 12,
+      "peak_frame": 15,
       "range": 0.1047,
-      "settle_frame": 9,
+      "settle_frame": 12,
       "spacing": "ease-in"
     },
     "Face.x": {
       "max_delta": 0.0661,
-      "overshoot_pct": 0.11,
-      "peak": 2.0,
-      "peak_frame": 59,
-      "range": 2.0,
-      "settle_frame": 54,
+      "overshoot_pct": 0.0,
+      "peak": 1.9916,
+      "peak_frame": 60,
+      "range": 1.9916,
+      "settle_frame": 57,
       "spacing": "ease-out"
     },
     "Face.y": {
@@ -120,30 +120,30 @@
       "spacing": "hold"
     },
     "Joystick.x": {
-      "max_delta": 0.1514,
-      "overshoot_pct": 2.58,
-      "peak": -0.6116,
-      "peak_frame": 8,
-      "range": 0.4616,
-      "settle_frame": 8,
+      "max_delta": 0.1019,
+      "overshoot_pct": 0.62,
+      "peak": -0.6028,
+      "peak_frame": 13,
+      "range": 0.4528,
+      "settle_frame": 10,
       "spacing": "ease-in"
     },
     "Joystick.y": {
-      "max_delta": 0.0673,
-      "overshoot_pct": 2.58,
-      "peak": -0.2052,
-      "peak_frame": 8,
-      "range": 0.2052,
-      "settle_frame": 8,
+      "max_delta": 0.0453,
+      "overshoot_pct": 0.62,
+      "peak": -0.2012,
+      "peak_frame": 13,
+      "range": 0.2012,
+      "settle_frame": 10,
       "spacing": "ease-in"
     },
     "Lean.rotation": {
-      "max_delta": 0.0132,
-      "overshoot_pct": 2.58,
-      "peak": -0.0534,
-      "peak_frame": 8,
-      "range": 0.0403,
-      "settle_frame": 8,
+      "max_delta": 0.0089,
+      "overshoot_pct": 0.62,
+      "peak": -0.0526,
+      "peak_frame": 13,
+      "range": 0.0395,
+      "settle_frame": 10,
       "spacing": "ease-in"
     },
     "Lumen.opacity": {
@@ -156,21 +156,21 @@
       "spacing": "hold"
     },
     "Placement.scaleX": {
-      "max_delta": 0.0404,
+      "max_delta": 0.0359,
       "overshoot_pct": 0.0,
       "peak": 1.04,
       "peak_frame": 4,
       "range": 0.06,
-      "settle_frame": 9,
+      "settle_frame": 11,
       "spacing": "ease-in"
     },
     "Placement.scaleY": {
-      "max_delta": 0.0397,
+      "max_delta": 0.0352,
       "overshoot_pct": 0.0,
       "peak": 0.9615,
       "peak_frame": 4,
       "range": 0.0589,
-      "settle_frame": 9,
+      "settle_frame": 11,
       "spacing": "ease-in"
     },
     "Trail1.opacity": {
@@ -183,39 +183,39 @@
       "spacing": "hold"
     },
     "Turn.rotation": {
-      "max_delta": 0.037,
-      "overshoot_pct": 2.58,
-      "peak": -0.1494,
-      "peak_frame": 8,
-      "range": 0.1128,
-      "settle_frame": 8,
+      "max_delta": 0.0249,
+      "overshoot_pct": 0.62,
+      "peak": -0.1473,
+      "peak_frame": 13,
+      "range": 0.1106,
+      "settle_frame": 10,
       "spacing": "ease-in"
     },
     "Turn.scaleX": {
-      "max_delta": 0.0624,
-      "overshoot_pct": 2.58,
-      "peak": 0.748,
-      "peak_frame": 8,
-      "range": 0.1902,
-      "settle_frame": 8,
+      "max_delta": 0.042,
+      "overshoot_pct": 0.62,
+      "peak": 0.7516,
+      "peak_frame": 13,
+      "range": 0.1866,
+      "settle_frame": 10,
       "spacing": "ease-in"
     },
     "Turn.x": {
-      "max_delta": 10.5957,
-      "overshoot_pct": 2.58,
-      "peak": -42.8113,
-      "peak_frame": 8,
-      "range": 32.3113,
-      "settle_frame": 8,
+      "max_delta": 7.1343,
+      "overshoot_pct": 0.62,
+      "peak": -42.1966,
+      "peak_frame": 13,
+      "range": 31.6966,
+      "settle_frame": 10,
       "spacing": "ease-in"
     },
     "Turn.y": {
-      "max_delta": 1.6146,
-      "overshoot_pct": 2.58,
-      "peak": -4.9236,
-      "peak_frame": 8,
-      "range": 4.9236,
-      "settle_frame": 8,
+      "max_delta": 1.0871,
+      "overshoot_pct": 0.62,
+      "peak": -4.83,
+      "peak_frame": 13,
+      "range": 4.83,
+      "settle_frame": 10,
       "spacing": "ease-in"
     }
   }

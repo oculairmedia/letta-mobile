@@ -36,7 +36,7 @@ import os
 import re
 from textwrap import indent
 
-from rml import (BACK_OUT, ELASTIC_SOFT, GRADIENT_OPACITY, ROT, SINE, SX, SY, VM, VM_BLINK, VM_COLOR,
+from rml import (BACK_OUT, BACK_SOFT, ELASTIC_HEAVY, ELASTIC_SOFT, GRADIENT_OPACITY, ROT, SINE, SX, SY, VM, VM_BLINK, VM_COLOR,
                  VM_DRAGGED, VM_ERROR, VM_HOVER, VM_LOOKX, VM_LOOKY, VM_MOUTH, VM_SHAPE, VM_STATE,
                  VM_SUCCESS, Y, anim_state, animation, bind, layer_frame)
 from rig.body import INFLATE_NODE, body, sine, squash
@@ -83,12 +83,16 @@ def root_artboard(solo=None):
     blink_rest = animation("BlinkRest", BLINK_REST_ANIM, 1, {})
     blink = animation("BlinkFire", BLINK_ANIM, 2, {}, callbacks=(PLATE_BLINK,))
     hover_rest = animation("HoverRest", HOVER_REST_ANIM, 1, {})
+    # The perk takes 200 ms to arrive instead of 160 and its two rolls leave on BACK_SOFT and settle
+    # on ELASTIC_HEAVY: BACK_OUT put a fifth of the whole roll into the second frame, which is what
+    # the product owner was reading as too lively (letta-mobile-q55am). The lift and the inflate are
+    # a translation and a scale and keep their own tokens; they are re-timed only to stay in step.
     d = beat(520)
     hover = animation("HoverPerk", HOVER_ANIM, d, dict(
-        squash(INFLATE_NODE, [(0, 1, BACK_OUT), (beat(160), 0.92, None), (beat(300), 0.92, ELASTIC_SOFT), (d, 0.97)]),
-        **{FACE: {Y: [(0, 0, BACK_OUT), (beat(160), -9, None), (beat(300), -9, ELASTIC_SOFT), (d, -5)],
-                  ROT: [(0, 0, BACK_OUT), (beat(160), rad(-3), None), (beat(300), rad(-3), ELASTIC_SOFT), (d, rad(-2))]},
-           BODY_NODE: {ROT: [(0, 0, BACK_OUT), (beat(160), rad(-4), None), (beat(300), rad(-4), ELASTIC_SOFT), (d, rad(-2))]}}))
+        squash(INFLATE_NODE, [(0, 1, BACK_OUT), (beat(200), 0.92, None), (beat(320), 0.92, ELASTIC_SOFT), (d, 0.97)]),
+        **{FACE: {Y: [(0, 0, BACK_OUT), (beat(200), -9, None), (beat(320), -9, ELASTIC_SOFT), (d, -5)],
+                  ROT: [(0, 0, BACK_SOFT), (beat(200), rad(-3), None), (beat(320), rad(-3), ELASTIC_HEAVY), (d, rad(-2))]},
+           BODY_NODE: {ROT: [(0, 0, BACK_SOFT), (beat(200), rad(-4), None), (beat(320), rad(-4), ELASTIC_HEAVY), (d, rad(-2))]}}))
     # Held while hovered: the perk's end pose, breathing a little faster in the face lift.
     hover_held = animation("HoverHeld", HOVER_HELD_ANIM, beat(2400), dict(
         squash(INFLATE_NODE, [(0, 0.97, SINE), (beat(1200), 0.95, SINE), (beat(2400), 0.97)]),

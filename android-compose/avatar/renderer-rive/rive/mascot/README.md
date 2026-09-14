@@ -251,6 +251,22 @@ objects, `3:*` root animations/nodes (60-77 shapes, 100-140 states, 160-244 misc
   is **ms**. `rig/constants.py` has `rad()` and `frames()`.
 - Keyframes default to `hold`. Motion needs `interpolationType="cubic"` plus a nested
   `CubicEaseInterpolator`; the bezier on a key shapes the segment *leaving* it.
+- **An `ElasticInterpolator` is damped by its period, not by its amplitude.** Rive clamps any
+  amplitude at or below 1 to 1, so `ELASTIC_OUT` (0.75), `ELASTIC_SOFT` (0.9) and `ELASTIC_HEAVY`
+  (1.0) differ only in period: about 7 %, 4 % and 3 % of overshoot on the single bounce. Reach for
+  `ELASTIC_HEAVY` when a **rotation** settles - a head has more mass than the offset it rides on.
+- **An elastic release is front-loaded whatever its period**, so a token swap barely moves
+  `max|delta|`: about a fifth of the travel lands in the segment's first frame either way. The
+  only real damping an elastic settle has is *frames*. When a beat rings too hard, give the return
+  leg more of the beat by shortening the hold (the tilt and the glance both do this) - the beat's
+  own length and the frame it is back at rest by need not change. Better still, chart the return
+  and let the spring govern only a short tail (the wander beats do this): `max|delta|` on
+  `WanderGlance`'s facing fell 62 % that way, against 15 % for the token alone.
+- **A bezier's control point is not its overshoot.** `BACK_IN_OUT`'s `y2 = 1.35` overshoots the
+  value by 4.7 %, not 35 %, and dips 6 % under the start. What actually reads as snap is the
+  steepest frame: 4.27x the average for `BACK_IN_OUT`, 4.47x for `SOFT_OUT` (the most front-loaded
+  token in `rml.py`, and the animation default - so a *dropped* bezier lands there), 3.70x for
+  `BACK_OUT`, 3.08x for `BACK_SOFT`, 1.59x for `SINE`. `timeline.Ease.at()` samples any of them.
 - First child of a node draws on top; the later paint in a shape draws on top.
 - `Feather` on a Fill renders nothing through the CLI; feather strokes only. (The editor can
   feather fills - that is on the artist list.)
@@ -271,6 +287,15 @@ objects, `3:*` root animations/nodes (60-77 shapes, 100-140 states, 160-244 misc
   `applyIdentity` on load. A scene that never writes `color` draws a black body.
 - Placement and keyed motion must live on different nodes (a keyed `x=0` overwrites placement) -
   hence `FacePlacement > Turn > Face`.
+- **A `beat:` probe's first frame is the joystick's authored default, not the animation.** The
+  `Facing` joystick declares `x="-0.15"`, so frame 0 of any `--solo` run reads -0.15 and frame 1
+  reads whatever the beat keys - a phantom 0.150 step that becomes the reported `Joystick.x
+  max|delta|` as soon as the real motion falls below it. Judge a facing beat on the deltas from
+  frame 1 on; `Lean.rotation` carries the same phantom, scaled by `TURN_LEAN_DEG` (0.0131 rad).
+- **`(f, v, *rest)` already strips the frame and the value**, so `tuple(rest[2:])` throws the
+  bezier away and the key silently falls back to the animation default. That is how `IdleWobble`'s
+  face rocked on `SOFT_OUT` while its body rocked on `SINE` - the same authored curve, 2.7x the
+  snap on the half that was meant to lag. Copy the pattern in `spin_keys`, not the typo.
 - The CLI compiles every `*.rml` in the directory; scratch fragments go elsewhere.
 - PowerShell `>` writes UTF-16; redirect from bash.
 
