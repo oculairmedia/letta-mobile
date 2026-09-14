@@ -26,7 +26,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.MaterialTheme
 import com.letta.mobile.ui.mascot.MascotAvatar
-import com.letta.mobile.ui.mascot.mascotPlaysLiveByDefault
 import com.letta.mobile.ui.theme.customColors
 
 /**
@@ -61,24 +60,14 @@ fun AgentOrb(
     modifier: Modifier = Modifier,
     cornerRadius: Dp = 7.dp,
     onClick: (() -> Unit)? = null,
-    /** The agent this orb stands for; with a known mascot identity the orb is the mascot. */
+    /** The agent this orb stands for; with a known mascot identity the orb is the live mascot. */
     agentId: String? = null,
-    /** Override still/live; default follows [mascotPlaysLiveByDefault] (still below 56.dp). */
-    live: Boolean = mascotPlaysLiveByDefault(size),
     content: @Composable (() -> Unit)? = null,
 ) {
     val shape = RoundedCornerShape(cornerRadius)
     // With an identity in MascotIdentityRegistry and a renderer in LocalMascotHost, the orb IS
-    // the mascot (still when small; live at/above 56.dp unless [live] is overridden). The
-    // gradient stands in when there is no identity or no renderer.
-    MascotAvatar(
-        agentId = agentId,
-        size = size,
-        modifier = modifier,
-        cornerRadius = cornerRadius,
-        onClick = onClick,
-        live = live,
-    ) {
+    // the live mascot (one shared scene per agent); the gradient stands in otherwise.
+    MascotAvatar(agentId = agentId, size = size, modifier = modifier, cornerRadius = cornerRadius, onClick = onClick) {
         Box(
             // clip BEFORE clickable so the hover/press indication follows the orb's
             // rounded shape instead of a rectangle. onClick is applied here (not by

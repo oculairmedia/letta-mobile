@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -32,6 +31,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.letta.mobile.ui.mascot.AgentAvatar
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
@@ -180,7 +180,7 @@ private fun NewChatAgentRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            AgentInitialAvatar(agent.name)
+            AgentAvatar(agentId = agent.id.value, name = agent.name, size = 48.dp)
             NewChatAgentDetails(
                 agent = agent,
                 modifier = Modifier.weight(1f),
@@ -225,21 +225,6 @@ private fun newChatAgentSubtitle(agent: Agent): String {
     return agent.description?.takeIf(String::isNotBlank)
         ?: agent.model?.takeIf(String::isNotBlank)
         ?: agent.id.value
-}
-
-@Composable
-private fun AgentInitialAvatar(name: String) {
-    val initial = name.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "?"
-    Surface(
-        modifier = Modifier.size(48.dp),
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Text(initial, style = MaterialTheme.typography.titleLarge)
-        }
-    }
 }
 
 // region Previews

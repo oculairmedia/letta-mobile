@@ -1,18 +1,16 @@
 package com.letta.mobile.ui.screens.conversations
 
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.assertIsDisplayed
-import com.letta.mobile.data.model.ConversationId
-import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.testutil.TestData
+import com.letta.mobile.ui.test.setLettaTestContent
+import java.time.Instant
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-import com.letta.mobile.ui.test.setLettaTestContent
-import java.time.Instant
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], manifest = Config.NONE)
@@ -21,9 +19,7 @@ class ConversationCardTest {
     val composeTestRule = createComposeRule()
 
     @Test
-    fun `ConversationCard displays title and condensed metadata correctly`() {
-        // Use a time very close to now so formatRelativeTime returns "just now" or similar,
-        // but just checking prefix is safer.
+    fun `ConversationCard displays title, pinned status, and agent name`() {
         val conversation = TestData.conversation(
             id = "conv-1",
             agentId = "agent-1",
@@ -51,15 +47,14 @@ class ConversationCardTest {
                 )
         }
 
-        // Check if the title exists
         composeTestRule.onNodeWithText("My Conversation").assertIsDisplayed()
-
-        // Check if the condensed metadata string contains the Pinned text and Agent Name
-        composeTestRule.onNodeWithText("Pinned • Test Agent", substring = true).assertIsDisplayed()
+        // Status, bullet, and agent name are separate Text nodes in ConversationCardStatusRow.
+        composeTestRule.onNodeWithText("Pinned").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Test Agent").assertIsDisplayed()
     }
 
     @Test
-    fun `ConversationCard displays condensed metadata without pinned`() {
+    fun `ConversationCard displays agent name without pinned status`() {
         val conversation = TestData.conversation(
             id = "conv-1",
             agentId = "agent-1",
@@ -87,7 +82,8 @@ class ConversationCardTest {
                 )
         }
 
-        // The prefix should just be "Test Agent" with no "Pinned • "
-        composeTestRule.onNodeWithText("Test Agent • ", substring = true).assertIsDisplayed()
+        composeTestRule.onNodeWithText("My Conversation").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Test Agent").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Pinned").assertDoesNotExist()
     }
 }

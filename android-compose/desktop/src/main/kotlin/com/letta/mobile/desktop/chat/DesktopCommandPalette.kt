@@ -164,20 +164,7 @@ private fun PaletteRow(item: PaletteItem, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        when (item.kind) {
-            PaletteItemKind.Destination -> Icon(
-                imageVector = Icons.Outlined.ArrowForward,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(18.dp),
-            )
-            else -> AgentOrb(
-                index = item.orbIndex ?: 0,
-                size = 22.dp,
-                cornerRadius = 6.dp,
-                agentId = item.mascotAgentId(),
-            )
-        }
+        PaletteItemLeading(item)
         Text(
             text = item.label,
             style = MaterialTheme.typography.bodyMedium,
@@ -195,5 +182,20 @@ private fun PaletteRow(item: PaletteItem, onClick: () -> Unit) {
                 maxLines = 1,
             )
         }
+    }
+}
+
+/** A palette row's leading glyph: an arrow for destinations, the owning agent's orb otherwise. */
+@Composable
+internal fun PaletteItemLeading(item: PaletteItem) {
+    if (item.kind == PaletteItemKind.Destination) {
+        Icon(
+            imageVector = Icons.Outlined.ArrowForward,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp),
+        )
+    } else {
+        AgentOrb(index = item.orbIndex ?: 0, size = 22.dp, cornerRadius = 6.dp, agentId = item.mascotAgentId())
     }
 }
