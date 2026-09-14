@@ -51,6 +51,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.stateIn
@@ -132,9 +133,11 @@ internal fun resolveLocalRuntimeRouting(
 internal fun chatFontScaleState(
     scales: Flow<Float>,
     scope: CoroutineScope,
-): StateFlow<Float?> = scales
-    .map<Float, Float?> { it }
-    .stateIn(scope, SharingStarted.WhileSubscribed(5000), null)
+): MutableStateFlow<Float?> = MutableStateFlow<Float?>(null).also { current ->
+    // Storage seeds the current zoom once; later disk emissions cannot roll back a gesture.
+    // Unknown remains null until loaded, and an early local choice wins over a late read.
+    scope.launch { current.compareAndSet(null, scales.first()) }
+}
 
 @HiltViewModel
 internal class AdminChatViewModel @Inject constructor(
@@ -513,10 +516,11 @@ internal class AdminChatViewModel @Inject constructor(
         .map { ChatBackground.fromKey(it) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ChatBackground.Default)
 
-    val chatFontScale: StateFlow<Float?> = chatFontScaleState(
+    private val currentChatFontScale = chatFontScaleState(
         settingsRepository.getChatFontScale(),
         viewModelScope,
     )
+    val chatFontScale: StateFlow<Float?> = currentChatFontScale
 
     // Master switch for the expressive Jindong activity haptics (streaming +
     // tool-call pattern cues). Default-on; gates the new ChatScreen effects.
@@ -579,8 +583,12 @@ internal class AdminChatViewModel @Inject constructor(
     fun clearChatSearch() = chatSearchCoordinator.clear()
 
     fun setChatFontScale(scale: Float) {
+        if (!scale.isFinite()) return
+        val clamped = scale.coerceIn(0.7f, 1.6f)
+        if (currentChatFontScale.value == clamped) return
+        currentChatFontScale.value = clamped
         viewModelScope.launch {
-            settingsRepository.setChatFontScale(scale)
+            settingsRepository.setChatFontScale(clamped)
         }
     }
 

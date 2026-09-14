@@ -19,6 +19,33 @@ import org.junit.jupiter.api.Tag
 @Tag("unit")
 class ChatFontScaleBootstrapTest {
     @Test
+    fun `current zoom wins over a late initial read`() = runTest {
+        val storage = PausedFirstEmissionFlow(0.82f)
+        val scale = chatFontScaleState(storage, backgroundScope)
+        scale.value = 1.24f
+        storage.releaseFirstEmission()
+        runCurrent()
+        assertEquals(1.24f, scale.value)
+    }
+
+    @Test
+    fun `disk echoes cannot overwrite the current zoom`() = runTest {
+        val storage = kotlinx.coroutines.flow.MutableStateFlow(0.82f)
+        val scale = chatFontScaleState(storage, backgroundScope)
+        runCurrent()
+        assertEquals(0.82f, scale.value)
+        scale.value = 1.24f
+        assertEquals(1.24f, scale.value)
+        storage.value = 1f
+        runCurrent()
+        assertEquals(1.24f, scale.value)
+        scale.value = 1.4f
+        storage.value = 1.24f
+        runCurrent()
+        assertEquals(1.4f, scale.value)
+    }
+
+    @Test
     fun `stored scale is unresolved until first storage emission then publishes 082 first`() = runTest {
         val storage = PausedFirstEmissionFlow(0.82f)
         val scale = chatFontScaleState(storage, backgroundScope)
