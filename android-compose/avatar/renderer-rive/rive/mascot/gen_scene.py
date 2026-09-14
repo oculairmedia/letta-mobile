@@ -89,7 +89,9 @@ PLATE_SCALE_NODE, GLYPH_SCALE_NODE, MOUTH_NODE, SACCADE_NODE = "7:25", "7:26", "
 # Solo, visible only for idle/listening/speaking. Keyed four-target fallback for the wave.
 PUPIL_OVERLAY, PUPIL_ROOT, IRIS, WAVE, CORE, CATCH = "7:29", "7:96", "7:95", "7:97", "7:98", "7:99"
 wave_vertex_ids = [f"7:{200 + i}" for i in range(5)]
-PUPIL = {"idle": (2500, 0.0), "listening": (1250, 3.0), "speaking": (500, 2.0)}   # period ms, amplitude px (idle: core only)
+# Astra Max pupil overlay (SPEC 10.2): built, reviewed, and dropped - the pure glyph stays. The
+# assembly remains in the file at opacity 0 so the art pass can revisit it; PUPIL is empty.
+PUPIL = {}   # state: (period ms, amplitude px); empty = never shown
 WAVE_STROKE = 5   # spec says 8; that reads as a bar at hero size
 PUPIL_PARALLAX = (1.5, 1.0)
 # Saccade layer: random waits, then a 60 ms hop to one of a few small fixations, a hold, a hop back.
@@ -512,7 +514,7 @@ def pupil_overlay():
     """iris field (neutral, stationary) with the clipped pupil root: wave behind core, catchlight above."""
     wave_verts = "\n".join(
         f'<CubicDetachedVertex x="{x}" y="{y}" inRotation="{ir}" inDistance="{idist}" outRotation="{orot}" outDistance="{odist}" name="W{i}" id="{vid}"/>'
-        for i, ((x, y, ir, idist, orot, odist), vid) in enumerate(zip(wave_samples(PUPIL["idle"][1])[0], wave_vertex_ids)))
+        for i, ((x, y, ir, idist, orot, odist), vid) in enumerate(zip(wave_samples(1.0)[0], wave_vertex_ids)))
     wave = f'''<Shape x="0" y="0" name="Wave" id="{WAVE}">
     <PointsPath isClosed="false" name="Path">
 {indent(wave_verts, "        ")}
