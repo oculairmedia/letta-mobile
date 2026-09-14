@@ -26,6 +26,7 @@ import argparse
 import os
 import sys
 import textwrap
+from typing import NamedTuple
 
 import timeline
 from rig.chart import Chart
@@ -69,47 +70,76 @@ class Level:
         return "[K]" if before * after <= 0 else "(B)"
 
 
+class Keyed(NamedTuple):
+    """One KeyedProperty of one animation, parsed: who keys it, what, and the keys."""
+    anim: str
+    object_id: str
+    label: str
+    prop_key: int
+    keys: list
+
+
+def is_level(keys):
+    """A level is a numeric curve with at least two keys."""
+    return len(keys) >= 2 and all(k.kind == "double" for k in keys)
+
+
+class Collector:
+    """Accumulates levels, the driver column and the span over the named animations."""
+
+    def __init__(self, scene):
+        self.scene = scene
+        self.levels, self.drivers, self.span, self.by_key = [], {}, 0, {}
+
+    def drive(self, keys, text):
+        for k in keys:
+            self.drivers.setdefault(k.frame, []).append(text(k))
+
+    def add(self, kp):
+        self.span = max(self.span, kp.keys[-1].frame)
+        if kp.prop_key == NESTED_FIRE:
+            self.drive(kp.keys, lambda k: f"{kp.label} fire")
+        elif kp.prop_key == NESTED_VALUE:
+            self.drive(kp.keys, lambda k: f"{kp.label}={timeline.num(k.value)}")
+        elif not is_level(kp.keys):
+            # Not a level: a one-key static pose, a glyph swap, a colour. It still happened on a
+            # frame, so it belongs in the driver column.
+            prop = timeline.prop_name(kp.prop_key)
+            self.drive(kp.keys, lambda k: f"{kp.label} {prop}={timeline.value_text(k, self.scene)}")
+        else:
+            self.add_level(kp)
+
+    def add_level(self, kp):
+        ident = (kp.object_id, kp.prop_key)
+        if ident in self.by_key:
+            self.by_key[ident].also.append(kp.anim)
+            return
+        level = Level(kp.label, kp.prop_key, kp.keys, kp.anim)
+        self.by_key[ident] = level
+        self.levels.append(level)
+
+
+def keyed_properties(scene, name, anim):
+    """Every KeyedProperty of `anim` with a numeric key and at least one keyframe, in document order."""
+    out = []
+    for ko in anim.findall("KeyedObject"):
+        label = scene.label(ko.get("objectId"))
+        for kp in ko.findall("KeyedProperty"):
+            prop_key = timeline.property_key(kp.get("propertyKey"))
+            keys = timeline.read_keys(kp) if prop_key >= 0 else []
+            if keys:
+                out.append(Keyed(name, ko.get("objectId"), label, prop_key, keys))
+    return out
+
+
 def collect(scene, anims):
     """(levels, drivers, span) for the named animations. Drivers are frame -> [text]."""
-    levels, drivers, span = [], {}, 0
-    by_key = {}
+    sheet = Collector(scene)
     for name, anim in anims:
-        span = max(span, int(float(anim.get("duration", 0))))
-        for ko in anim.findall("KeyedObject"):
-            label = scene.label(ko.get("objectId"))
-            for kp in ko.findall("KeyedProperty"):
-                try:
-                    prop_key = int(kp.get("propertyKey"))
-                except (TypeError, ValueError):
-                    continue
-                keys = timeline.read_keys(kp)
-                if not keys:
-                    continue
-                span = max(span, keys[-1].frame)
-                if prop_key == NESTED_FIRE:
-                    for k in keys:
-                        drivers.setdefault(k.frame, []).append(f"{label} fire")
-                    continue
-                if prop_key == NESTED_VALUE:
-                    for k in keys:
-                        drivers.setdefault(k.frame, []).append(f"{label}={timeline.num(k.value)}")
-                    continue
-                if not all(k.kind == "double" for k in keys) or len(keys) < 2:
-                    # Not a level: a one-key static pose, a glyph swap, a colour. It still
-                    # happened on a frame, so it belongs in the driver column.
-                    prop = timeline.prop_name(prop_key)
-                    for k in keys:
-                        drivers.setdefault(k.frame, []).append(
-                            f"{label} {prop}={timeline.value_text(k, scene)}")
-                    continue
-                ident = (ko.get("objectId"), prop_key)
-                if ident in by_key:
-                    by_key[ident].also.append(name)
-                    continue
-                level = Level(label, prop_key, keys, name)
-                by_key[ident] = level
-                levels.append(level)
-    return levels, drivers, span
+        sheet.span = max(sheet.span, int(float(anim.get("duration", 0))))
+        for kp in keyed_properties(scene, name, anim):
+            sheet.add(kp)
+    return sheet.levels, sheet.drivers, sheet.span
 
 
 # --- rendering -----------------------------------------------------------------------------------
@@ -155,77 +185,115 @@ def group_levels(levels, widths, driver_w, wide):
     return groups if wide else groups[:1], groups
 
 
-def print_sheet(scene, anims, wide=False, chart_width=40, window=None):
-    names = [n for n, _a in anims]
+class Layout(NamedTuple):
+    """How the sheet is laid out: every group or the first, the chart width, a frame window."""
+    wide: bool = False
+    chart_width: int = 40
+    window: tuple = None
+
+
+class Sheet:
+    """The collected levels with everything the table needs: cells, column widths, driver texts."""
+
+    def __init__(self, levels, drivers, span, layout):
+        self.levels, self.span, self.layout = levels, span, layout
+        window = layout.window
+        self.first, self.last = (0, span) if window is None else (max(0, window[0]), min(span, window[1]))
+        self.rows = {level: cells(level, span) for level in levels}
+        self.widths = {level: column_width(level, self.rows[level]) for level in levels}
+        self.driver_texts = {f: ", ".join(v) for f, v in drivers.items()}
+        self.driver_w = min(26, max([len(t) for t in self.driver_texts.values()] + [len("driver")]))
+
+    def header(self, names, board):
+        shown = f"; showing {self.first}..{self.last}" if (self.first, self.last) != (0, self.span) else ""
+        print(f"x-sheet  {', '.join(names)}   [{board}]")
+        print(f"  {self.span + 1} frames (0..{self.span}, {timeline.num(self.span / FPS * 1000.0, 1)} ms at "
+              f"{int(FPS)} fps), {len(self.levels)} levels, authored values" + shown)
+
+    def cell(self, level, frame):
+        w, wv, wd = self.widths[level]
+        mark, val, dl = self.rows[level][frame]
+        cell = f"{mark or '-':<3} {val:>{wv}} {dl:>{wd}}"
+        return f"  {cell:<{w}}"
+
+    def print_table(self, group):
+        head = f"  {'frame':>5}  {'driver':<{self.driver_w}}" + "".join(
+            f"  {level.label:<{self.widths[level][0]}}" for level in group)
+        print(head.rstrip())
+        for f in range(self.first, self.last + 1):
+            line = f"  {f:>5}  {self.driver_texts.get(f, '')[:self.driver_w]:<{self.driver_w}}"
+            print((line + "".join(self.cell(level, f) for level in group)).rstrip())
+
+    def print_spacing(self, group):
+        print()
+        print(f"  {'spacing':>5}")
+        wl = max(len(l.label) for l in group)
+        for level in group:
+            print(f"  {level.label:<{wl}}  {level.chart.text(self.layout.chart_width)}")
+
+    def print_groups(self):
+        shown, allgroups = group_levels(self.levels, self.widths, self.driver_w, self.layout.wide)
+        for gi, group in enumerate(shown):
+            print()
+            if len(allgroups) > 1:
+                print(f"  levels {gi + 1}/{len(allgroups)}")
+            self.print_table(group)
+            self.print_spacing(group)
+        print_hidden(allgroups[len(shown):])
+
+    def print_footer(self):
+        print()
+        print("  footer: spacing class per level")
+        wl = max(len(l.label) for l in self.levels)
+        for level in self.levels:
+            extra = f"   also keyed by {', '.join(level.also)}" if level.also else ""
+            print(f"    {level.label:<{wl}}  {level.chart.spacing:<8} {len(level.keys)} keys  "
+                  f"[{level.anim}]{extra}")
+
+
+def print_hidden(groups):
+    """The levels a narrow sheet left out, named so the reader knows to ask for --wide."""
+    rest = [level.label for g in groups for level in g]
+    if not rest:
+        return
+    print()
+    print(f"  {len(rest)} more levels - rerun with --wide:")
+    for line in textwrap.wrap(", ".join(rest), TERM - 6):
+        print(f"    {line}")
+
+
+def print_sheet(scene, anims, layout=Layout()):
     levels, drivers, span = collect(scene, anims)
-    first, last = (0, span) if window is None else (max(0, window[0]), min(span, window[1]))
-    print(f"x-sheet  {', '.join(names)}   [{scene.animations[0][0] if scene.animations else '?'}]")
-    print(f"  {span + 1} frames (0..{span}, {timeline.num(span / FPS * 1000.0, 1)} ms at {int(FPS)} fps), "
-          f"{len(levels)} levels, authored values"
-          + (f"; showing {first}..{last}" if (first, last) != (0, span) else ""))
+    sheet = Sheet(levels, drivers, span, layout)
+    sheet.header([n for n, _a in anims], scene.animations[0][0] if scene.animations else "?")
     if not levels:
         print("  (no numeric levels - a rest/placeholder timeline)")
         return
-    rows = {level: cells(level, span) for level in levels}
-    widths = {level: column_width(level, rows[level]) for level in levels}
-    driver_texts = {f: ", ".join(v) for f, v in drivers.items()}
-    driver_w = min(26, max([len(t) for t in driver_texts.values()] + [len("driver")]))
-    shown, allgroups = group_levels(levels, widths, driver_w, wide)
-
-    for gi, group in enumerate(shown):
-        print()
-        if len(allgroups) > 1:
-            print(f"  levels {gi + 1}/{len(allgroups)}")
-        head = f"  {'frame':>5}  {'driver':<{driver_w}}"
-        for level in group:
-            head += f"  {level.label:<{widths[level][0]}}"
-        print(head.rstrip())
-        for f in range(first, last + 1):
-            line = f"  {f:>5}  {driver_texts.get(f, '')[:driver_w]:<{driver_w}}"
-            for level in group:
-                w, wv, wd = widths[level]
-                mark, val, dl = rows[level][f]
-                cell = f"{mark or '-':<3} {val:>{wv}} {dl:>{wd}}"
-                line += f"  {cell:<{w}}"
-            print(line.rstrip())
-        print()
-        print(f"  {'spacing':>5}")
-        for level in group:
-            print(f"  {level.label:<{max(len(l.label) for l in group)}}  {level.chart.text(chart_width)}")
-
-    if len(allgroups) > len(shown):
-        rest = [level.label for g in allgroups[len(shown):] for level in g]
-        print()
-        print(f"  {len(rest)} more levels - rerun with --wide:")
-        for line in textwrap.wrap(", ".join(rest), TERM - 6):
-            print(f"    {line}")
-
-    print()
-    print("  footer: spacing class per level")
-    wl = max(len(l.label) for l in levels)
-    for level in levels:
-        extra = f"   also keyed by {', '.join(level.also)}" if level.also else ""
-        print(f"    {level.label:<{wl}}  {level.chart.spacing:<8} {len(level.keys)} keys  "
-              f"[{level.anim}]{extra}")
+    sheet.print_groups()
+    sheet.print_footer()
 
 
 # --- main ----------------------------------------------------------------------------------------
 
+def find_one(scene, want):
+    """The animation named exactly `want`, else the first whose name contains it, else None."""
+    exact = [(a.get("name"), a) for _b, a in scene.animations if a.get("name") == want]
+    loose = [(a.get("name"), a) for _b, a in scene.animations if want.lower() in (a.get("name") or "").lower()]
+    return (exact or loose or [None])[0]
+
+
 def find(scene, names):
     hits = []
     for want in names:
-        match = [(a.get("name"), a) for _b, a in scene.animations if a.get("name") == want]
-        if not match:
-            match = [(a.get("name"), a) for _b, a in scene.animations
-                     if want.lower() in (a.get("name") or "").lower()]
-        if not match:
+        hit = find_one(scene, want)
+        if hit is None:
             print(f"no animation matching {want!r}; try `python timeline.py --list`")
             return None
-        hits.extend(match[:1])
+        hits.append(hit)
     return hits
 
 
-def main(argv=None):
+def parser():
     here = os.path.dirname(os.path.abspath(__file__))
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--rml", default=os.path.join(here, "scene.rml"), help="the document to read")
@@ -235,33 +303,42 @@ def main(argv=None):
     p.add_argument("--wide", action="store_true", help="every level, wrapped into groups")
     p.add_argument("--chart-width", type=int, default=40, help="width of the timing charts")
     p.add_argument("--range", help="only these frames, FIRST:LAST (the whole span by default)")
-    args = p.parse_args(argv)
+    return p
 
+
+def requested_names(args):
+    names = [args.animation] if args.animation else []
+    return names + [n.strip() for n in (args.animations or "").split(",") if n.strip()]
+
+
+def parse_window(text):
+    """'FIRST:LAST' -> (first, last); None for no --range; raises ValueError when unreadable."""
+    if not text:
+        return None
+    a, b = text.split(":")
+    return int(a), int(b)
+
+
+def main(argv=None):
+    p = parser()
+    args = p.parse_args(argv)
     if args.scenario:
         print("telemetry not wired yet")
         return 0
-    names = []
-    if args.animation:
-        names.append(args.animation)
-    if args.animations:
-        names.extend(n.strip() for n in args.animations.split(",") if n.strip())
+    names = requested_names(args)
     if not names:
         p.print_help()
         return 2
-
     scene = timeline.Scene(args.rml)
     anims = find(scene, names)
     if anims is None:
         return 1
-    window = None
-    if args.range:
-        try:
-            a, b = args.range.split(":")
-            window = (int(a), int(b))
-        except ValueError:
-            print("--range wants FIRST:LAST, e.g. --range 0:60")
-            return 2
-    print_sheet(scene, anims, wide=args.wide, chart_width=args.chart_width, window=window)
+    try:
+        window = parse_window(args.range)
+    except ValueError:
+        print("--range wants FIRST:LAST, e.g. --range 0:60")
+        return 2
+    print_sheet(scene, anims, Layout(args.wide, args.chart_width, window))
     return 0
 
 

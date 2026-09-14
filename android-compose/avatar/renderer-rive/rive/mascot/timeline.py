@@ -13,6 +13,7 @@ import os
 import re
 import sys
 import xml.etree.ElementTree as ET
+from typing import NamedTuple
 
 FPS = 60.0
 
@@ -31,6 +32,10 @@ OPS = {
     "equal": "==", "notEqual": "!=", "lessThan": "<", "lessThanOrEqual": "<=",
     "greaterThan": ">", "greaterThanOrEqual": ">=",
 }
+
+CURVE_HEIGHT = 9
+INDENT = "      "
+INPUT_TAGS = ("StateMachineNumber", "StateMachineBool", "StateMachineBoolean", "StateMachineTrigger")
 
 
 def prop_name(key):
@@ -60,22 +65,16 @@ class Scene:
     def __init__(self, path):
         self.path = path
         self.root = ET.parse(path).getroot()
+        self.parent = {child: el for el in self.root.iter() for child in el}
         self.by_id = {}
-        self.parent = {}
         for el in self.root.iter():
-            for child in el:
-                self.parent[child] = el
-            i = el.get("id")
-            if i is not None and i not in self.by_id:
-                self.by_id[i] = el
-        self.animations = []  # (artboard name, element)
-        self.machines = []    # (artboard name, element)
-        for board in self.root.iter("Artboard"):
-            name = board.get("name", "?")
-            for anim in board.iter("LinearAnimation"):
-                self.animations.append((name, anim))
-            for sm in board.iter("StateMachine"):
-                self.machines.append((name, sm))
+            if el.get("id") is not None:
+                self.by_id.setdefault(el.get("id"), el)
+        self.animations = self._per_board("LinearAnimation")  # (artboard name, element)
+        self.machines = self._per_board("StateMachine")       # (artboard name, element)
+
+    def _per_board(self, tag):
+        return [(board.get("name", "?"), el) for board in self.root.iter("Artboard") for el in board.iter(tag)]
 
     def describe(self, oid):
         """'Node BodyPlacement (0:233)' - the object an objectId points at."""
@@ -101,15 +100,21 @@ class Scene:
         el = self.by_id.get(value_id)
         return el.get("key") or el.get("name") or value_id if el is not None else value_id
 
+    def animation_name(self, animation_id):
+        """The name of the animation an AnimationState plays, or its id when it does not resolve."""
+        anim = self.by_id.get(animation_id)
+        return anim.get("name") if anim is not None else animation_id
+
 
 # --- easing --------------------------------------------------------------------------------------
 
-class Ease:
+class Ease(NamedTuple):
     """How the segment leaving a keyframe is shaped."""
-
-    def __init__(self, kind, bezier=None, amplitude=None, period=None, easing=None):
-        self.kind, self.bezier = kind, bezier
-        self.amplitude, self.period, self.easing = amplitude, period, easing
+    kind: str
+    bezier: tuple = None
+    amplitude: float = None
+    period: float = None
+    easing: str = None
 
     def __str__(self):
         if self.kind == "cubic":
@@ -157,44 +162,58 @@ def _bezier_y(b, u):
     return 3 * mt * mt * t * y1 + 3 * mt * t * t * y2 + t ** 3
 
 
+def _cubic_ease(kf):
+    c = kf.find("CubicEaseInterpolator")
+    if c is None:
+        return HOLD
+    b = tuple(float(c.get(a, 0)) for a in ("x1", "y1", "x2", "y2"))
+    return Ease("linear" if b == (0.0, 0.0, 1.0, 1.0) else "cubic", bezier=b)
+
+
+def _elastic_ease(kf):
+    e = kf.find("ElasticInterpolator")
+    if e is None:
+        return HOLD
+    return Ease("elastic", amplitude=float(e.get("amplitude", 1)),
+                period=float(e.get("period", 0.4)), easing=e.get("easingValue"))
+
+
+_EASE_READERS = {"cubic": _cubic_ease, "elastic": _elastic_ease}
+
+
 def read_ease(kf):
-    kind = kf.get("interpolationType")
-    if kind == "cubic":
-        c = kf.find("CubicEaseInterpolator")
-        if c is None:
-            return HOLD
-        b = tuple(float(c.get(a, 0)) for a in ("x1", "y1", "x2", "y2"))
-        return Ease("linear" if b == (0.0, 0.0, 1.0, 1.0) else "cubic", bezier=b)
-    if kind == "elastic":
-        e = kf.find("ElasticInterpolator")
-        if e is None:
-            return HOLD
-        return Ease("elastic", amplitude=float(e.get("amplitude", 1)),
-                    period=float(e.get("period", 0.4)), easing=e.get("easingValue"))
-    return HOLD
+    reader = _EASE_READERS.get(kf.get("interpolationType"))
+    return reader(kf) if reader else HOLD
 
 
 # --- keyframes -----------------------------------------------------------------------------------
 
-class Key:
-    def __init__(self, frame, value, ease, kind, raw=None):
-        self.frame, self.value, self.ease, self.kind, self.raw = frame, value, ease, kind, raw
+class Key(NamedTuple):
+    frame: int
+    value: object
+    ease: Ease
+    kind: str
+    raw: str = None
+
+
+def _key(kf):
+    """One keyframe element as a Key, or None when the element is not a keyframe."""
+    frame = int(float(kf.get("frame", 0)))
+    if kf.tag == "KeyFrameDouble":
+        return Key(frame, float(kf.get("value", 0)), read_ease(kf), "double")
+    if kf.tag == "KeyFrameColor":
+        return Key(frame, kf.get("value", ""), HOLD, "color")
+    if kf.tag == "KeyFrameId":
+        return Key(frame, kf.get("value", ""), HOLD, "id")
+    if kf.tag == "KeyFrameCallback":
+        return Key(frame, None, HOLD, "callback")
+    if kf.tag.startswith("KeyFrame"):
+        return Key(frame, kf.get("value", ""), read_ease(kf), "other", raw=kf.tag)
+    return None
 
 
 def read_keys(keyed_property):
-    keys = []
-    for kf in keyed_property:
-        frame = int(float(kf.get("frame", 0)))
-        if kf.tag == "KeyFrameDouble":
-            keys.append(Key(frame, float(kf.get("value", 0)), read_ease(kf), "double"))
-        elif kf.tag == "KeyFrameColor":
-            keys.append(Key(frame, kf.get("value", ""), HOLD, "color"))
-        elif kf.tag == "KeyFrameId":
-            keys.append(Key(frame, kf.get("value", ""), HOLD, "id"))
-        elif kf.tag == "KeyFrameCallback":
-            keys.append(Key(frame, None, HOLD, "callback"))
-        elif kf.tag.startswith("KeyFrame"):
-            keys.append(Key(frame, kf.get("value", ""), read_ease(kf), "other", raw=kf.tag))
+    keys = [k for k in (_key(kf) for kf in keyed_property) if k is not None]
     keys.sort(key=lambda k: k.frame)
     return keys
 
@@ -207,57 +226,62 @@ def sample(keys, frame):
         return keys[0].value, False
     if frame >= keys[-1].frame:
         return keys[-1].value, False
-    for a, b in zip(keys, keys[1:]):
-        if a.frame <= frame <= b.frame:
-            span = b.frame - a.frame
-            if span <= 0:
-                return b.value, False
-            u = (frame - a.frame) / span
-            return a.value + (b.value - a.value) * a.ease.at(u), a.ease.kind == "elastic"
-    return keys[-1].value, False
+    a, b = next((a, b) for a, b in zip(keys, keys[1:]) if a.frame <= frame <= b.frame)
+    span = b.frame - a.frame
+    if span <= 0:
+        return b.value, False
+    u = (frame - a.frame) / span
+    return a.value + (b.value - a.value) * a.ease.at(u), a.ease.kind == "elastic"
 
 
 # --- rendering -----------------------------------------------------------------------------------
 
-def curve(keys, duration, width, height=9, indent="      "):
+def _key_columns(keys, last, width):
+    """The plot columns a keyframe lands on, for a span 0..last drawn `width` columns wide."""
+    return {min(width - 1, max(0, int(round(k.frame / float(last) * (width - 1))))) for k in keys}
+
+
+def _plot(values, elastic, key_cols):
+    """The value grid, top row first: '~' on an elastic segment, 'o' on a key column, '*' otherwise."""
+    lo, hi = min(values), max(values)
+    width = len(values)
+    grid = [[" "] * width for _ in range(CURVE_HEIGHT)]
+    for col, v in enumerate(values):
+        row = min(CURVE_HEIGHT - 1, max(0, int(round((v - lo) / (hi - lo) * (CURVE_HEIGHT - 1)))))
+        grid[CURVE_HEIGHT - 1 - row][col] = "~" if elastic[col] else ("o" if col in key_cols else "*")
+    return grid
+
+
+def _framed(grid, lo, hi, last):
+    """The grid with its value gutter, axis and frame labels."""
+    width = len(grid[0])
+    gutter = max(len(num(hi)), len(num(lo))) + 1
+    tags = [num(hi)] + [""] * (CURVE_HEIGHT - 2) + [num(lo)]
+    out = [f"{INDENT}{tag:>{gutter}} |{''.join(row)}" for tag, row in zip(tags, grid)]
+    axis_left, axis_right = "0", str(last)
+    pad = max(0, width - len(axis_left) - len(axis_right))
+    out.append(f"{INDENT}{'':>{gutter}} +{'-' * width}")
+    out.append(f"{INDENT}{'':>{gutter}}  {axis_left}{' ' * pad}{axis_right}  (frames)")
+    return out
+
+
+def curve(keys, duration, width):
     """An ASCII plot of the value over the animation's frames. 'o' marks a keyframe column."""
     if duration <= 0 or len(keys) < 2:
         return []
     width = max(12, width)
     # Always the animation's whole span, so two properties of the same timeline line up and a
     # property whose last key lands early visibly holds to the end.
-    first, last = 0, max(duration, keys[-1].frame)
-    if last <= first:
-        return []
-    frames = [first + (last - first) * i / (width - 1) for i in range(width)]
-    values, elastic = [], []
-    for f in frames:
-        v, e = sample(keys, f)
-        values.append(v)
-        elastic.append(e)
+    last = max(duration, keys[-1].frame)
+    samples = [sample(keys, last * i / (width - 1)) for i in range(width)]
+    values, elastic = [v for v, _e in samples], [e for _v, e in samples]
     lo, hi = min(values), max(values)
     if hi - lo < 1e-9:
-        return [f"{indent}flat at {num(lo)}"]
-    key_cols = set()
-    for k in keys:
-        pos = (k.frame - first) / float(last - first)
-        key_cols.add(min(width - 1, max(0, int(round(pos * (width - 1))))))
-    grid = [[" "] * width for _ in range(height)]
-    for col, v in enumerate(values):
-        row = int(round((v - lo) / (hi - lo) * (height - 1)))
-        row = min(height - 1, max(0, row))
-        grid[height - 1 - row][col] = "~" if elastic[col] else ("o" if col in key_cols else "*")
-    gutter = max(len(num(hi)), len(num(lo))) + 1
-    out = []
-    for r, row in enumerate(grid):
-        tag = num(hi) if r == 0 else (num(lo) if r == height - 1 else "")
-        out.append(f"{indent}{tag:>{gutter}} |{''.join(row)}")
-    axis_left, axis_right = str(first), str(last)
-    pad = max(0, width - len(axis_left) - len(axis_right))
-    out.append(f"{indent}{'':>{gutter}} +{'-' * width}")
-    out.append(f"{indent}{'':>{gutter}}  {axis_left}{' ' * pad}{axis_right}  (frames)")
+        return [f"{INDENT}flat at {num(lo)}"]
+    out = _framed(_plot(values, elastic, _key_columns(keys, last, width)), lo, hi, last)
     if any(elastic):
-        out.append(f"{indent}{'':>{gutter}}  ~ elastic segment, drawn at its target value")
+        gutter = max(len(num(hi)), len(num(lo))) + 1
+        out.append(f"{INDENT}{'':>{gutter}}  ~ elastic segment, drawn at its target value")
     return out
 
 
@@ -278,7 +302,7 @@ def degrees_text(key):
     return f"{num(key.value * 180.0 / 3.141592653589793, 2)} deg"
 
 
-def chart_line(keys, indent="      "):
+def chart_line(keys, indent=INDENT):
     """The timing chart for a curve, as rig/chart.py draws it. Imported late: rig.chart reads
     this module, so importing it at the top would be a cycle."""
     from rig.chart import Chart
@@ -288,7 +312,49 @@ def chart_line(keys, indent="      "):
         return []
 
 
-def print_animation(scene, anim, board, width, chart=False):
+class View(NamedTuple):
+    """How print_animation draws each property: the curve's width and whether to add its chart."""
+    width: int
+    chart: bool = False
+
+
+def property_key(raw_key):
+    try:
+        return int(raw_key)
+    except (TypeError, ValueError):
+        return -1
+
+
+def print_key_table(scene, keys, rotation):
+    """The frame / value [/ degrees] / easing table of one keyed property."""
+    wf = max([len(str(k.frame)) for k in keys] + [5])
+    wv = max([len(value_text(k, scene)) for k in keys] + [5])
+    wd = max([len(degrees_text(k)) for k in keys] + [len("degrees")]) if rotation else 0
+    degrees = (lambda text: f"  {text:>{wd}}") if rotation else (lambda _text: "")
+    print(f"      {'frame':>{wf}}  {'value':<{wv}}" + degrees("degrees") + "  easing")
+    for k in keys:
+        print(f"      {k.frame:>{wf}}  {value_text(k, scene):<{wv}}" + degrees(degrees_text(k)) + f"  {k.ease}")
+
+
+def print_property(scene, kp, duration, view):
+    """One keyed property: its table, then (for a numeric curve) the plot and the chart."""
+    raw_key = kp.get("propertyKey")
+    keys = read_keys(kp)
+    print(f"    {prop_name(raw_key)}")
+    print_key_table(scene, keys, property_key(raw_key) in ROTATION_KEYS)
+    if not all(k.kind == "double" for k in keys):
+        return
+    print_lines(curve(keys, duration, view.width))
+    if view.chart:
+        print_lines(chart_line(keys))
+
+
+def print_lines(lines):
+    for line in lines:
+        print(line)
+
+
+def print_animation(scene, anim, board, view):
     duration = int(float(anim.get("duration", 0)))
     ms = duration / FPS * 1000.0
     print(f"{anim.get('name')}   [{board}]  id {anim.get('id')}")
@@ -302,30 +368,7 @@ def print_animation(scene, anim, board, width, chart=False):
         print()
         print(f"  {scene.describe(ko.get('objectId'))}")
         for kp in ko.findall("KeyedProperty"):
-            raw_key = kp.get("propertyKey")
-            try:
-                key_num = int(raw_key)
-            except (TypeError, ValueError):
-                key_num = -1
-            keys = read_keys(kp)
-            print(f"    {prop_name(raw_key)}")
-            rot = key_num in ROTATION_KEYS
-            wf = max([len(str(k.frame)) for k in keys] + [5])
-            wv = max([len(value_text(k, scene)) for k in keys] + [5])
-            wd = max([len(degrees_text(k)) for k in keys] + [len("degrees")]) if rot else 0
-            head = f"      {'frame':>{wf}}  {'value':<{wv}}"
-            print(head + (f"  {'degrees':>{wd}}" if rot else "") + "  easing")
-            for k in keys:
-                line = f"      {k.frame:>{wf}}  {value_text(k, scene):<{wv}}"
-                if rot:
-                    line += f"  {degrees_text(k):>{wd}}"
-                print(f"{line}  {k.ease}")
-            if all(k.kind == "double" for k in keys):
-                for line in curve(keys, duration, width):
-                    print(line)
-                if chart:
-                    for line in chart_line(keys):
-                        print(line)
+            print_property(scene, kp, duration, view)
     print()
 
 
@@ -356,48 +399,65 @@ def print_list(scene):
 
 # --- --layers ------------------------------------------------------------------------------------
 
+_COMPARATOR_LITERALS = {
+    "TransitionValueEnumComparator": lambda scene, b: scene.enum_key(b.get("value", "")),
+    "TransitionValueBooleanComparator": lambda scene, b: b.get("value", ""),
+    "TransitionValueNumberComparator": lambda scene, b: num(b.get("value", "")),
+    "TransitionValueTriggerComparator": lambda scene, b: None,
+}
+
+
+def _bound_property(scene, el, prop):
+    """The view-model property a BindableProperty element reads, else `prop` unchanged."""
+    ctx = el.find("DataBindContext") if el.tag.startswith("BindableProperty") else None
+    return scene.vm_property(ctx.get("sourcePathIds")) if ctx is not None else prop
+
+
+def vm_condition_text(scene, c):
+    """'state == listening' / 'success fired' for one TransitionViewModelCondition."""
+    op = OPS.get(c.get("opValue", "equal"), c.get("opValue", "?"))
+    prop, literal = "?", ""
+    for b in c.iter():
+        prop = _bound_property(scene, b, prop)
+        reader = _COMPARATOR_LITERALS.get(b.tag)
+        if reader:
+            literal = reader(scene, b)
+    return f"{prop} fired" if literal is None else f"{prop} {op} {literal}"
+
+
+def input_condition_texts(scene, transition):
+    """The legacy state-machine-input conditions of a transition, as text."""
+    bits = []
+    for c in transition.findall("TransitionNumberCondition"):
+        op = OPS.get(c.get("opValue", "equal"), c.get("opValue", "?"))
+        bits.append(f"{scene.label(c.get('inputId'))} {op} {num(c.get('value', 0))}")
+    bits += [f"{scene.label(c.get('inputId'))} == {c.get('value', '')}" for c in transition.findall("TransitionBoolCondition")]
+    bits += [f"{scene.label(c.get('inputId'))} fired" for c in transition.findall("TransitionTriggerCondition")]
+    return bits
+
+
 def condition_text(scene, transition):
     bits = []
     if transition.get("enableExitTime") == "true":
         bits.append(f"on exit {transition.get('exitTime', '100')}%")
-    for c in transition.findall("TransitionViewModelCondition"):
-        op = OPS.get(c.get("opValue", "equal"), c.get("opValue", "?"))
-        prop, literal = "?", ""
-        for b in c.iter():
-            if b.tag.startswith("BindableProperty"):
-                ctx = b.find("DataBindContext")
-                if ctx is not None:
-                    prop = scene.vm_property(ctx.get("sourcePathIds"))
-            elif b.tag == "TransitionValueEnumComparator":
-                literal = scene.enum_key(b.get("value", ""))
-            elif b.tag == "TransitionValueBooleanComparator":
-                literal = b.get("value", "")
-            elif b.tag == "TransitionValueNumberComparator":
-                literal = num(b.get("value", ""))
-            elif b.tag == "TransitionValueTriggerComparator":
-                literal = None
-        bits.append(f"{prop} fired" if literal is None else f"{prop} {op} {literal}")
-    for c in transition.findall("TransitionNumberCondition"):
-        op = OPS.get(c.get("opValue", "equal"), c.get("opValue", "?"))
-        bits.append(f"{scene.label(c.get('inputId'))} {op} {num(c.get('value', 0))}")
-    for c in transition.findall("TransitionBoolCondition"):
-        bits.append(f"{scene.label(c.get('inputId'))} == {c.get('value', '')}")
-    for c in transition.findall("TransitionTriggerCondition"):
-        bits.append(f"{scene.label(c.get('inputId'))} fired")
+    bits += [vm_condition_text(scene, c) for c in transition.findall("TransitionViewModelCondition")]
+    bits += input_condition_texts(scene, transition)
     return " and ".join(bits) if bits else "always"
 
 
+def state_flags(state, sep):
+    """'[reset, random]' for an AnimationState's set flags, prefixed by `sep`; '' when none are set."""
+    flags = [f for f in ("reset", "random") if state.get(f) == "true"]
+    return f"{sep}[{', '.join(flags)}]" if flags else ""
+
+
 def state_label(scene, layer, state_id):
-    for el in layer.iter():
-        if el.get("id") != state_id:
-            continue
-        if el.tag == "AnimationState":
-            anim = scene.by_id.get(el.get("animationId"))
-            name = anim.get("name") if anim is not None else el.get("animationId")
-            flags = [f for f in ("reset", "random") if el.get(f) == "true"]
-            return f"{name}" + (f" [{', '.join(flags)}]" if flags else "")
+    el = next((el for el in layer.iter() if el.get("id") == state_id), None)
+    if el is None:
+        return f"<{state_id}>"
+    if el.tag != "AnimationState":
         return el.tag
-    return f"<{state_id}>"
+    return f"{scene.animation_name(el.get('animationId'))}" + state_flags(el, " ")
 
 
 def print_transitions(scene, layer, holder, indent):
@@ -411,43 +471,45 @@ def print_transitions(scene, layer, holder, indent):
         print("  ".join(bits))
 
 
+def machine_inputs(scene, sm):
+    """(inputs, listeners) of a state machine, as text."""
+    inputs = [f"{e.get('name')} ({e.tag.replace('StateMachine', '').lower()})" for e in sm if e.tag in INPUT_TAGS]
+    listeners = [f"{e.get('name')} on {scene.label(e.get('targetId'))} ({e.get('listenerTypeValue', '?')})"
+                 for e in sm if e.tag.startswith("StateMachineListener")]
+    return inputs, listeners
+
+
+def print_layer(scene, layer):
+    states = layer.findall("AnimationState")
+    print(f"  layer {layer.get('name')}  ({len(states)} states)")
+    entry = layer.find("EntryState")
+    if entry is not None:
+        print_transitions(scene, layer, entry, "      entry ")
+    any_state = layer.find("AnyState")
+    if any_state is not None and list(any_state.findall("StateTransition")):
+        print("    AnyState")
+        print_transitions(scene, layer, any_state, "      ")
+    for st in states:
+        print(f"    {scene.animation_name(st.get('animationId'))}  ({st.get('id')}){state_flags(st, '  ')}")
+        print_transitions(scene, layer, st, "      ")
+
+
 def print_layers(scene):
     for board, sm in scene.machines:
-        inputs, listeners = [], []
-        for e in sm:
-            if e.tag in ("StateMachineNumber", "StateMachineBool", "StateMachineBoolean", "StateMachineTrigger"):
-                inputs.append(f"{e.get('name')} ({e.tag.replace('StateMachine', '').lower()})")
-            elif e.tag.startswith("StateMachineListener"):
-                listeners.append(f"{e.get('name')} on {scene.label(e.get('targetId'))} "
-                                 f"({e.get('listenerTypeValue', '?')})")
+        inputs, listeners = machine_inputs(scene, sm)
         print(f"StateMachine {sm.get('name')}  [{board}]  id {sm.get('id')}")
         if inputs:
             print(f"  inputs: {', '.join(inputs)}")
         if listeners:
             print(f"  listeners: {', '.join(listeners)}")
         for layer in sm.findall("StateMachineLayer"):
-            states = layer.findall("AnimationState")
-            print(f"  layer {layer.get('name')}  ({len(states)} states)")
-            entry = layer.find("EntryState")
-            if entry is not None:
-                print_transitions(scene, layer, entry, "      entry ")
-            any_state = layer.find("AnyState")
-            if any_state is not None and list(any_state.findall("StateTransition")):
-                print("    AnyState")
-                print_transitions(scene, layer, any_state, "      ")
-            for st in states:
-                anim = scene.by_id.get(st.get("animationId"))
-                name = anim.get("name") if anim is not None else st.get("animationId")
-                flags = [f for f in ("reset", "random") if st.get(f) == "true"]
-                suffix = f"  [{', '.join(flags)}]" if flags else ""
-                print(f"    {name}  ({st.get('id')}){suffix}")
-                print_transitions(scene, layer, st, "      ")
+            print_layer(scene, layer)
         print()
 
 
 # --- main ----------------------------------------------------------------------------------------
 
-def main(argv=None):
+def parser():
     here = os.path.dirname(os.path.abspath(__file__))
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("pattern", nargs="?", help="animation name or substring")
@@ -457,8 +519,26 @@ def main(argv=None):
     p.add_argument("--layers", action="store_true", help="the state machine layers as a tree")
     p.add_argument("--chart", action="store_true",
                    help="a timing chart under each property (rig/chart.py)")
-    args = p.parse_args(argv)
+    return p
 
+
+def print_matches(scene, pattern, view):
+    """Every animation whose name contains `pattern`; 1 when there is none."""
+    needle = pattern.lower()
+    hits = [(b, a) for b, a in scene.animations if needle in (a.get("name") or "").lower()]
+    if not hits:
+        print(f"no animation matching {pattern!r}; try --list")
+        return 1
+    for board, anim in hits:
+        print_animation(scene, anim, board, view)
+    if len(hits) > 1:
+        print(f"{len(hits)} animations matched {pattern!r}")
+    return 0
+
+
+def main(argv=None):
+    p = parser()
+    args = p.parse_args(argv)
     scene = Scene(args.rml)
     if args.list:
         print_list(scene)
@@ -469,17 +549,7 @@ def main(argv=None):
     if not args.pattern:
         p.print_help()
         return 2
-
-    needle = args.pattern.lower()
-    hits = [(b, a) for b, a in scene.animations if needle in (a.get("name") or "").lower()]
-    if not hits:
-        print(f"no animation matching {args.pattern!r}; try --list")
-        return 1
-    for board, anim in hits:
-        print_animation(scene, anim, board, args.width, chart=args.chart)
-    if len(hits) > 1:
-        print(f"{len(hits)} animations matched {args.pattern!r}")
-    return 0
+    return print_matches(scene, args.pattern, View(args.width, args.chart))
 
 
 if __name__ == "__main__":
