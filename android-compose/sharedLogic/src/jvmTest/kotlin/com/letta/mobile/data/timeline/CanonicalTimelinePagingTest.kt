@@ -18,6 +18,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonPrimitive
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -78,6 +79,42 @@ class CanonicalTimelinePagingTest {
         }
     }
 
+    @Test fun settledPresentationDecodesAndProjectsEachRenderedRecordOnce() = runBlocking {
+        val store = InMemoryTimelineStore()
+        val transport = PageTransport(records = 1)
+        val coordinator = CanonicalTimelineCoordinator(store, transport)
+        val owner = coordinator.acquire(scope)
+        val ui = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val decodes = AtomicInteger()
+        val projections = AtomicInteger()
+        val adapter = TimelineSettledProjectionAdapter(
+            decode = { record ->
+                decodes.incrementAndGet()
+                DefaultTimelineSettledProjectionAdapter.decode(record).also {
+                    // A second raw decode outside this adapter must fail too, not evade the counter.
+                    record.body.fill(0)
+                }
+            },
+            project = { record, event, ownAgentId ->
+                projections.incrementAndGet()
+                DefaultTimelineSettledProjectionAdapter.project(record, event, ownAgentId)
+            },
+        )
+        val presentation = CanonicalTimelinePresentation.open(coordinator, owner, ui, settledProjectionAdapter = adapter)
+        val presenter = RecordingPresenter<CanonicalTimelinePresentation.Row>()
+        try {
+            ui.launch { presentation.settled.collectLatest { presenter.collectFrom(it) } }
+            presenter.awaitRows(1) { "calls=${transport.calls} ledgerRows=${store.rows.size}" }
+
+            assertEquals(1, decodes.get(), "the settled production path decodes the complete body once")
+            assertEquals(1, projections.get(), "the settled production path projects the decoded event once")
+            assertEquals("otid-m-0", presenter.snapshot().items.single().otid)
+            presentation.close()
+        } finally {
+            ui.cancel()
+        }
+    }
+
     private class RecordingPresenter<T : Any> : PagingDataPresenter<T>(Dispatchers.Default, null) {
         override suspend fun presentPagingDataEvent(event: PagingDataEvent<T>) = Unit
 
@@ -115,7 +152,7 @@ class CanonicalTimelinePagingTest {
                     TimelineMessageId("m-$index"),
                     AssistantMessage(
                         id = "m-$index", contentRaw = JsonPrimitive("reply $index"),
-                        date = "2026-01-01T00:00:0${index}Z",
+                        date = "2026-01-01T00:00:0${index}Z", otid = "otid-m-$index",
                     ),
                     0,
                 )
