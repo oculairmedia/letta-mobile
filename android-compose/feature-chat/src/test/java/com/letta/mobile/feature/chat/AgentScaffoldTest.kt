@@ -268,7 +268,7 @@ class AgentScaffoldTest {
             )
         }
 
-        composeRule.onNodeWithContentDescription("Refresh").performClick()
+        composeRule.onNodeWithTag(AgentScaffoldTestTags.DRAWER_CONTEXT_CARD).performClick()
         assertTrue("Context window refresh callback should fire", fired)
     }
 
@@ -298,7 +298,8 @@ class AgentScaffoldTest {
             )
         }
 
-        composeRule.onNodeWithText("Context utilization").assertIsDisplayed()
+        composeRule.onNodeWithTag(AgentScaffoldTestTags.DRAWER_CONTEXT_CARD).assertIsDisplayed()
+        composeRule.onNodeWithText("30%", substring = true).assertIsDisplayed()
     }
 
     @Test
@@ -324,6 +325,6 @@ class AgentScaffoldTest {
             )
         }
 
-        composeRule.onNodeWithText("Context usage is not available yet.").assertIsDisplayed()
+        composeRule.onNodeWithText("Not available yet").assertIsDisplayed()
     }
 }
