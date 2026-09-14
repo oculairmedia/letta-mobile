@@ -199,56 +199,10 @@ private fun ChatDetailBody(
                 onChangeDirectory = actions.onChangeWorkingDirectory,
             )
         }
-        val companionAgentId = surface.selectedConversation?.agentId
-        val companionIdentity = companionAgentId?.let { state.agentIdentitiesById[it] }
-        val companion = companionIdentity != null && com.letta.mobile.ui.mascot.mascotAvailable(companionAgentId)
-        if (state.canonicalPresentation != null) {
-            DesktopCanonicalMessageList(state.canonicalPresentation, Modifier.weight(1f))
-        } else if (state.canonicalStatus != null) {
-            Text(state.canonicalStatus, modifier = Modifier.weight(1f))
-        } else if (surface.shouldShowStatePanel) {
-            ChatStatePanel(
-                state = surface,
-                onRetryConnection = actions.onRetryConnection,
-                modifier = Modifier.weight(1f),
-            )
-        } else if (surface.renderItems.isEmpty() && !state.isThinking) {
-            NewConversationWelcome(
-                agentName = surface.selectedConversation?.agentName,
-                agentId = surface.selectedConversation?.agentId,
-                identity = surface.selectedConversation?.agentId?.let { state.agentIdentitiesById[it] },
-                onStarterPrompt = actions.onComposerTextChanged,
-                onOnboardingTask = actions.onOnboardingTask,
-                modifier = Modifier.weight(1f),
-            )
-        } else {
-            MessageList(
-                params = MessageListParams(
-                    conversationId = surface.selectedConversationId,
-                    renderItems = surface.renderItems,
-                    isSending = state.isThinking,
-                    isStreamingReply = state.isStreamingReply,
-                    showThinkingRow = !companion,
-                ),
-                modifier = Modifier.weight(1f),
-            )
-        }
-        // The agent keeps the user company at the prompt: its live mascot beside the text box,
-        // persistent across the whole conversation, thinking/listening/speaking where the user types.
-        val composerCompanion: (@Composable () -> Unit)? =
-            if (companion && companionAgentId != null && companionIdentity != null) {
-                {
-                    com.letta.mobile.ui.mascot.MascotLive(
-                        agentId = companionAgentId,
-                        identity = companionIdentity,
-                        size = ComposerCompanionSize,
-                    )
-                }
-            } else {
-                null
-            }
+        val companion = rememberComposerCompanion(surface, state)
+        ChatDetailContent(surface, state, actions, showThinkingRow = companion == null, modifier = Modifier.weight(1f))
         ComposerBar(
-            companion = composerCompanion,
+            companion = companion,
             state = ComposerBarState(
                 text = surface.composerText,
                 pendingImageAttachments = surface.pendingImageAttachments,
@@ -270,6 +224,63 @@ private fun ChatDetailBody(
             ),
         )
     }
+}
+
+/** The thread area above the composer: whichever of the canonical list, status, state panel, welcome or message list applies. */
+@Composable
+private fun ChatDetailContent(
+    surface: DesktopChatSurfaceState,
+    state: ChatDetailPaneState,
+    actions: ChatDetailPaneActions,
+    showThinkingRow: Boolean,
+    modifier: Modifier,
+) {
+    when {
+        state.canonicalPresentation != null -> DesktopCanonicalMessageList(state.canonicalPresentation, modifier)
+        state.canonicalStatus != null -> Text(state.canonicalStatus, modifier = modifier)
+        surface.shouldShowStatePanel -> ChatStatePanel(
+            state = surface,
+            onRetryConnection = actions.onRetryConnection,
+            modifier = modifier,
+        )
+        surface.isFreshConversation(state) -> NewConversationWelcome(
+            agentName = surface.selectedConversation?.agentName,
+            agentId = surface.selectedConversation?.agentId,
+            identity = surface.selectedConversation?.agentId?.let { state.agentIdentitiesById[it] },
+            onStarterPrompt = actions.onComposerTextChanged,
+            onOnboardingTask = actions.onOnboardingTask,
+            modifier = modifier,
+        )
+        else -> MessageList(
+            params = MessageListParams(
+                conversationId = surface.selectedConversationId,
+                renderItems = surface.renderItems,
+                isSending = state.isThinking,
+                isStreamingReply = state.isStreamingReply,
+                showThinkingRow = showThinkingRow,
+            ),
+            modifier = modifier,
+        )
+    }
+}
+
+private fun DesktopChatSurfaceState.isFreshConversation(state: ChatDetailPaneState): Boolean =
+    renderItems.isEmpty() && !state.isThinking
+
+/**
+ * The agent keeps the user company at the prompt: its live mascot beside the text box, persistent
+ * across the whole conversation, thinking/listening/speaking where the user types. Null when the
+ * selected agent has no identity or the host has no renderer (the composer then stands alone).
+ */
+@Composable
+private fun rememberComposerCompanion(
+    surface: DesktopChatSurfaceState,
+    state: ChatDetailPaneState,
+): (@Composable () -> Unit)? {
+    val agentId = surface.selectedConversation?.agentId ?: return null
+    val identity = state.agentIdentitiesById[agentId] ?: return null
+    if (!com.letta.mobile.ui.mascot.mascotAvailable(agentId)) return null
+    return { com.letta.mobile.ui.mascot.MascotLive(agentId = agentId, identity = identity, size = ComposerCompanionSize) }
 }
 
 /** The composer companion's live size; the body spans ~60 % of it. */

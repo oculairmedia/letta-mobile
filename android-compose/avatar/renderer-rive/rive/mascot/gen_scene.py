@@ -37,6 +37,7 @@ import os
 from textwrap import indent
 
 import svgpath
+from rml import *  # noqa: F401,F403 - property keys, ids, easings, XML builders
 
 ART = os.path.join(os.path.dirname(os.path.abspath(__file__)), "art")
 
@@ -73,19 +74,6 @@ SHAPE_SVG = {"circle": "body-circle.svg", "blob": "body-blob.svg", "roundedSquar
              "cloud": "body-cloud.svg", "drop": "body-drop.svg"}
 DEFAULT_SHAPE = "blob"
 
-# --- property keys (rive schema) --------------------------------------------------------------
-X, Y, ROT, SX, SY, OPACITY = 13, 14, 15, 16, 17, 18
-COLOR, GRADIENT_OPACITY = 37, 46
-VX, VY, VROT, VDIST = 24, 25, 82, 83                      # mirrored vertex
-VIN_ROT, VIN_DIST, VOUT_ROT, VOUT_DIST = 84, 85, 86, 87   # detached vertex
-NESTED_VALUE, NESTED_FIRE, REMAP_TIME = 239, 401, 202
-ACTIVE_CHILD = 296  # Solo.activeComponentId
-BIND_ENUM, BIND_TRIGGER, BIND_BOOL = 637, 686, 634
-
-# --- ids ----------------------------------------------------------------------------------------
-VM, VM_STATE, VM_MOUTH, VM_LOOKX, VM_LOOKY, VM_BLINK, VM_SHAPE, VM_COLOR, VM_HOVER = (
-    "1:50", "1:1", "1:2", "1:3", "1:4", "1:5", "1:6", "1:7", "1:8")
-VM_SUCCESS, VM_ERROR, VM_DRAGGED = "1:9", "1:10", "1:11"
 # Art-direction tunables (bench only, not in the app contract): 0..1 scrubbing a pose range, 0.5 = shipped.
 TUNABLES = {  # name: (vm id, timeline id, node id, property keys, (value at 0, value at 1))
     "tunePlate": ("1:12", "7:66", "7:25", ("SX", "SY"), (0.6, 1.4)),
@@ -191,173 +179,10 @@ BLINK_FLIP = 6                     # entries flip the glyph here: the plate sees
 
 INK = "FF111111"
 PLATE_WHITE = "FFF7F7F7"
-# SPEC / MOTION-REFERENCES beziers
-EASE_OUT = "0 0 0.58 1"
-SOFT_OUT = "0.22 1 0.36 1"
-STANDARD = "0.4 0 0.2 1"
-SPRING = "0.16 1 0.3 1"
-ACCEL = "0.4 0 1 1"
-SINE = "0.37 0 0.63 1"
-LINEAR = "0 0 1 1"
-# SPEC section 9 (Material 3 motion tokens)
-EMPH_ACCEL = "0.3 0 0.8 0.15"
-# Mass. A cubic with y outside 0..1 pulls back before it goes (BACK_IN) or overshoots and
-# settles (BACK_OUT); Elastic is a real damped spring on the landing.
-BACK_IN = "0.36 0 0.66 -0.56"
-BACK_OUT = "0.34 1.28 0.64 1"
-BACK_IN_OUT = "0.68 -0.4 0.32 1.35"
-
-
-class Elastic(str):
-    """Marker: `Elastic(amplitude, period)` as a key's outgoing interpolation (spring on arrival)."""
-    def __new__(cls, amplitude=1.0, period=0.4, easing="easeOut"):
-        o = str.__new__(cls, f"elastic {amplitude} {period} {easing}")
-        o.amplitude, o.period, o.easing = amplitude, period, easing
-        return o
-
-
-ELASTIC_OUT = Elastic(0.7, 0.75)     # a whip settles with one slow, heavy bounce
-ELASTIC_SOFT = Elastic(0.35, 0.9)    # a glance settles with barely one
-EMPH_DECEL = "0.05 0.7 0.1 1"
-M3_STANDARD = "0.2 0 0 1"
-STD_DECEL = "0 0 0 1"
-
-
-# --- small builders ----------------------------------------------------------------------------
-def bind(source, key, converter=None):
-    conv = f' converterId="{converter}"' if converter else ""
-    return f'<DataBindContext sourcePathIds="{VM}-{source}" propertyKey="{key}"{conv}/>'
-
-
-def interp(bezier):
-    x1, y1, x2, y2 = bezier.split()
-    return f'<CubicEaseInterpolator x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}"/>'
-
-
-class Id(str):
-    """A keyed object reference (Solo.activeComponentId): KeyFrameId, always hold."""
-
-
-def kf(value, frame, bezier=None):
-    if isinstance(value, Id):
-        return f'<KeyFrameId value="{value}" frame="{frame}"/>'
-    if isinstance(value, str):  # colour
-        return f'<KeyFrameColor value="{value}" frame="{frame}"/>'
-    if isinstance(bezier, Elastic):
-        return (f'<KeyFrameDouble value="{value}" frame="{frame}" interpolationType="elastic">'
-                f'<ElasticInterpolator easingValue="{bezier.easing}" amplitude="{bezier.amplitude}" period="{bezier.period}"/></KeyFrameDouble>')
-    if bezier:
-        return f'<KeyFrameDouble value="{value}" frame="{frame}" interpolationType="cubic">{interp(bezier)}</KeyFrameDouble>'
-    return f'<KeyFrameDouble value="{value}" frame="{frame}"/>'
-
-
-def keyed(objects, default_bezier=SOFT_OUT):
-    """objects: {objectId: {propertyKey: value | [(frame, value) | (frame, value, bezier)]}}.
-    The bezier on a keyframe shapes the segment that LEAVES it (Rive semantics)."""
-    out = []
-    for obj, props in objects.items():
-        kp = []
-        for key, fr in props.items():
-            if not isinstance(fr, list):
-                fr = [(0, fr)]
-            lines = []
-            for item in fr:
-                f, v = item[0], item[1]
-                bez = item[2] if len(item) > 2 else (default_bezier if len(fr) > 1 else None)
-                lines.append("        " + kf(v, f, bez))
-            kp.append(f'    <KeyedProperty propertyKey="{key}">\n' + "\n".join(lines) + '\n    </KeyedProperty>')
-        out.append(f'<KeyedObject objectId="{obj}">\n' + "\n".join(kp) + '\n</KeyedObject>')
-    return "\n".join(out)
-
-
-def callback_keyed(objects, frame=0):
-    return "\n".join(
-        f'<KeyedObject objectId="{o}">\n    <KeyedProperty propertyKey="{NESTED_FIRE}">\n'
-        f'        <KeyFrameCallback frame="{frame}"/>\n    </KeyedProperty>\n</KeyedObject>' for o in objects)
-
-
-def animation(name, aid, duration, objects, loop="oneShot", callbacks=(), bezier=SOFT_OUT):
-    body = keyed(objects, bezier) + ("\n" + callback_keyed(callbacks) if callbacks else "")
-    return (f'<LinearAnimation fps="60" duration="{max(1, duration)}" loopValue="{loop}" name="{name}" id="{aid}">\n'
-            + indent(body, "    ") + '\n</LinearAnimation>')
-
-
-def anim_state(aid, nid, i, extra="", children=""):
-    if children:
-        return f'<AnimationState x="200" y="{40 + 60 * i}" animationId="{aid}"{extra} id="{nid}">\n{indent(children, "    ")}\n</AnimationState>'
-    return f'<AnimationState x="200" y="{40 + 60 * i}" animationId="{aid}"{extra} id="{nid}"/>'
-
-
-def layer_frame(name, lid, entry_to, any_transitions, states):
-    return f'''<StateMachineLayer name="{name}" id="{lid}">
-    <EntryState>
-        <StateTransition stateToId="{entry_to}"/>
-    </EntryState>
-    <AnyState x="220" y="-140">
-{indent(any_transitions, "        ")}
-    </AnyState>
-    <ExitState x="430" y="-140"/>
-{indent(states, "    ")}
-</StateMachineLayer>'''
-
-
-def vm_condition(kind, prop, literal, op="equal"):
-    key = {"Enum": BIND_ENUM, "Trigger": BIND_TRIGGER, "Boolean": BIND_BOOL}[kind]
-    return f'''<TransitionViewModelCondition opValue="{op}">
-    <TransitionPropertyViewModelComparator>
-        <BindableProperty{kind}>
-            {bind(prop, key)}
-        </BindableProperty{kind}>
-    </TransitionPropertyViewModelComparator>
-    {literal}
-</TransitionViewModelCondition>'''
-
-
-def transition(to_id, duration_ms, bezier, condition=None, exit_time=False):
-    attrs = f'stateToId="{to_id}" duration="{duration_ms}"'
-    if exit_time:
-        attrs += ' enableExitTime="true" exitTimeIsPercetange="true" exitTime="100"'
-    eased = bool(bezier) and duration_ms > 0
-    if eased:
-        attrs += ' interpolationType="cubic"'
-    inner = (interp(bezier) + "\n" if eased else "") + (condition or "")
-    if inner.strip():
-        return f'<StateTransition {attrs}>\n{indent(inner.rstrip(), "    ")}\n</StateTransition>'
-    return f'<StateTransition {attrs}/>'
-
-
-def enum_transition(to_id, enum_value_id, duration_ms=160, bezier=EASE_OUT, prop=VM_STATE, op="equal"):
-    return transition(to_id, duration_ms, bezier, vm_condition("Enum", prop, f'<TransitionValueEnumComparator value="{enum_value_id}"/>', op))
-
-
-def trigger_transition(to_id, prop):
-    return transition(to_id, 0, None, vm_condition("Trigger", prop, '<TransitionValueTriggerComparator/>'))
-
-
-def bool_transition(to_id, prop, value, duration_ms, bezier):
-    return transition(to_id, duration_ms, bezier, vm_condition("Boolean", prop, f'<TransitionValueBooleanComparator value="{value}"/>'))
-
-
-def input_transition(to_id, input_id, value, duration=160):
-    # Banded, not exact: the root keys this number and a root cross-blend interpolates it, so an
-    # exact match would only fire when the blend ends. The band switches at the blend midpoint.
-    return (f'<StateTransition stateToId="{to_id}" duration="{duration}">\n'
-            f'    <TransitionNumberCondition inputId="{input_id}" opValue="greaterThanOrEqual" value="{value - 0.5}"/>\n'
-            f'    <TransitionNumberCondition inputId="{input_id}" opValue="lessThan" value="{value + 0.5}"/>\n'
-            f'</StateTransition>')
-
-
-def exit_transition(to_id, duration=0, bezier=None):
-    return transition(to_id, duration, bezier, exit_time=True)
-
-
-def weighted(t, weight):
-    return t.replace("<StateTransition ", f'<StateTransition randomWeight="{weight}" ', 1)
-
-
-def expression_layer(name, lid, input_id, anim_ids, node_ids):
+def expression_layer(*parts):
     # Explicit matrix, instant cuts: the root hides every swap inside a blink shutter, and an
     # AnyState fan-out would keep re-entering the current state (a self-blend that fades the glyph).
+    name, lid, input_id, anim_ids, node_ids = parts
     states = []
     for i, s in enumerate(STATES):
         own = "\n".join(input_transition(node_ids[t], input_id, EXPR[t], 0) for t in STATES if t != s)
@@ -612,7 +437,7 @@ def plate_component():
     to_fix = "\n".join(weighted(exit_transition(n), w) for n, (_, _, w) in zip(SACCADE_FIX_NODES, SACCADE_FIX))
     to_wait = "\n".join(weighted(exit_transition(n), 10) for n in SACCADE_WAIT_NODES)
     sac_states = [anim_state(aid, nid, i, ' random="true"', asleep_s + "\n" + to_fix) for i, ((aid, _), nid) in enumerate(zip(SACCADE_WAITS, SACCADE_WAIT_NODES))]
-    sac_states += [anim_state(aid, nid, 3 + i, ' reset="true" random="true"', to_wait) for i, ((aid, _, _), nid) in enumerate(zip(SACCADE_FIX, SACCADE_FIX_NODES))]
+    sac_states += [anim_state(aid, nid, 3 + i, ' reset="true" random="true"', asleep_s + "\n" + to_wait) for i, ((aid, _, _), nid) in enumerate(zip(SACCADE_FIX, SACCADE_FIX_NODES))]
     sac_states.append(anim_state(SACCADE_WAITS[0][0], SACCADE_SLEEP_NODE, 12, "", awake_s))
     saccade_layer = layer_frame("Saccade", "7:13", SACCADE_WAIT_NODES[0], "", "\n".join(sac_states))
     trigger_layer = layer_frame(
@@ -1076,7 +901,8 @@ def idle_variety_animations():
         **{BODY_NODE: {Y: hop}, FACE: {Y: hop}}))
     # Shiver: a quick side-to-side shake of the body, the face lagging a frame or two.
     d = beat(420)
-    shake = lambda amp, lag: [(0, 0, STANDARD)] + [(beat(60 * i) + lag, amp * (1 if i % 2 else -1) * (1 - i / 7), STANDARD) for i in range(1, 6)] + [(d, 0)]
+    def shake(amp, lag):
+        return [(0, 0, STANDARD)] + [(beat(60 * i) + lag, amp * (1 if i % 2 else -1) * (1 - i / 7), STANDARD) for i in range(1, 6)] + [(d, 0)]
     shiver = animation("IdleShiver", IDLE_BEATS["shiver"][0], d, {BODY_NODE: {X: shake(4, 0)}, FACE: {X: shake(3, 2)}})
     # Sigh: a slow deflate (wide squash), the face sinks, then it fills back up.
     d = beat(1800)
@@ -1101,11 +927,15 @@ def idle_variety_animations():
             + [glance, stretch, tilt, bounce, shiver, sigh, wobble, shift, lookaround])
 
 
-def root_machine():
+def _shape_layer():
     shape_trans = "\n".join(enum_transition(shape_node[s], shape_enum_ids[s], 240, SOFT_OUT, VM_SHAPE) for s in SHAPES)
     shape_states = "\n".join(anim_state(shape_anim[s], shape_node[s], i) for i, s in enumerate(SHAPES))
     shape_layer = layer_frame("Shape", "3:9", shape_node[DEFAULT_SHAPE], shape_trans, shape_states)
 
+    return shape_layer
+
+
+def _expression_layer():
     # No AnyState fan-out: Rive evaluates AnyState before a state's own transitions, which would
     # swallow the entries. Every sustained state cuts (0 ms) into the entry for the requested
     # state; the entry hands off to the sustained loop at its end. Designed entries land on the
@@ -1122,6 +952,11 @@ def root_machine():
         states.append(anim_state(enter_anim[(frm, to)], nid, len(SUSTAINED) + j, ' reset="true"', "\n".join(own)))
     expression = layer_frame("Expression", "3:1", root_state_node["idle"], "", "\n".join(states))
 
+    return expression
+
+
+def _static_layers():
+    """Breath, Blink, Hover, Flash, Drag: one animation each, driven by the view model."""
     breath = layer_frame("Breath", "3:2", BREATH_NODE, "", anim_state(BREATH_ANIM, BREATH_NODE, 0))
     blink = layer_frame("Blink", "3:3", BLINK_REST_NODE, trigger_transition(BLINK_NODE, VM_BLINK),
                         f'<AnimationState x="200" y="40" animationId="{BLINK_REST_ANIM}" id="{BLINK_REST_NODE}"/>\n'
@@ -1141,11 +976,19 @@ def root_machine():
         bool_transition(DRAG_NODE, VM_DRAGGED, "true", 80, SPRING) + "\n" + bool_transition(DRAG_REST_NODE, VM_DRAGGED, "false", 350, SOFT_OUT),
         f'<AnimationState x="200" y="40" animationId="{DRAG_REST_ANIM}" id="{DRAG_REST_NODE}"/>\n'
         f'<AnimationState x="200" y="100" animationId="{DRAG_ANIM}" id="{DRAG_NODE}"/>')
+    return breath, blink, hover, flash, drag
+
+
+def _park():
     # Asleep, the character holds still: the waits divert to a parked state until it is awake
     # again. Transitions are ordered, so the park check comes first.
     sleeping = state_enum_ids["sleeping"]
     to_park = lambda node, dur=0: enum_transition(node, sleeping, dur, None)
     from_park = lambda node: enum_transition(node, sleeping, 0, None, op="notEqual")
+    return to_park, from_park
+
+
+def _idle_layer(to_park, from_park):
     # Each wait ends by picking one beat at random (weights: the glance is still the most common,
     # the bounce the rarest); every beat returns to a random wait.
     # A beat blends in over 160 ms and out over 320 ms: its keys sit on top of Breath / the
@@ -1159,15 +1002,19 @@ def root_machine():
         anim_state(aid, n, k, ' random="true"', to_park(IDLE_SLEEP_NODE) + "\n" + pick_beat)
         for k, (aid, n, _) in enumerate(IDLE_WAITS))
     beat_states = "\n".join(
-        anim_state(aid, n, 5 + i, ' reset="true" random="true"', back_to_wait)
+        anim_state(aid, n, 5 + i, ' reset="true" random="true"', to_park(IDLE_SLEEP_NODE) + "\n" + back_to_wait)
         for i, (aid, n) in enumerate(IDLE_BEATS.values()))
     idle = layer_frame(
         "IdleVariety", "3:8", IDLE_A_NODE, "",
         wait_states + "\n"
-        + anim_state(IDLE_GLANCE_ANIM, IDLE_GLANCE_NODE, 4, ' reset="true" random="true"', back_to_wait) + "\n"
+        + anim_state(IDLE_GLANCE_ANIM, IDLE_GLANCE_NODE, 4, ' reset="true" random="true"', to_park(IDLE_SLEEP_NODE) + "\n" + back_to_wait) + "\n"
         + anim_state(IDLE_WAIT_A, IDLE_SLEEP_NODE, 14, "", from_park(IDLE_A_NODE)) + "\n"
         + beat_states)
 
+    return idle
+
+
+def _wander_layer(to_park, from_park):
     # Wander beats key the joystick the host also turns: blend in (200 ms) and out (320 ms).
     pick_wander = (weighted(exit_transition(WANDER_GLANCE_NODE, 200, SOFT_OUT), 55) + "\n"
                    + weighted(exit_transition(WANDER_PEEK_NODE, 200, SOFT_OUT), 35) + "\n"
@@ -1183,12 +1030,17 @@ def root_machine():
                      to_park(WANDER_SLEEP_WAIT_NODE, 400) + "\n" + wander_home) + "\n"
         + anim_state(WANDER_PEEK, WANDER_PEEK_NODE, 5, ' reset="true" random="true"',
                      to_park(WANDER_SLEEP_WAIT_NODE, 400) + "\n" + wander_home) + "\n"
-        + anim_state(WANDER_SPIN, WANDER_SPIN_NODE, 6, ' reset="true" random="true"', wander_home) + "\n"
+        + anim_state(WANDER_SPIN, WANDER_SPIN_NODE, 6, ' reset="true" random="true"',
+                     to_park(WANDER_SLEEP_WAIT_NODE, 400) + "\n" + wander_home) + "\n"
         + anim_state(WANDER_SLEEP_WAIT, WANDER_SLEEP_WAIT_NODE, 7, "",
                      from_park(WANDER_A_NODE) + "\n" + exit_transition(WANDER_SLEEP_SHIFT_NODE)) + "\n"
         + anim_state(WANDER_SLEEP_SHIFT, WANDER_SLEEP_SHIFT_NODE, 6, ' reset="true"',
                      from_park(WANDER_A_NODE) + "\n" + exit_transition(WANDER_SLEEP_WAIT_NODE, 200, SOFT_OUT)))
 
+    return wander
+
+
+def _listeners():
     def bool_listener(name, kind, prop, value):
         b = bind(prop, BIND_BOOL).replace("/>", ' direction="true"/>')
         return (f'<StateMachineListenerSingle targetId="{HITBOX}" listenerTypeValue="{kind}" name="{name}">\n'
@@ -1198,18 +1050,15 @@ def root_machine():
         bool_listener("HoverIn", "enter", VM_HOVER, "true"), bool_listener("HoverOut", "exit", VM_HOVER, "false"),
         bool_listener("DragStart", "dragStart", VM_DRAGGED, "true"), bool_listener("DragEnd", "dragEnd", VM_DRAGGED, "false"),
     ])
-    return f'''<StateMachine name="Avatar" id="{SM}">
-{indent(shape_layer, "    ")}
-{indent(expression, "    ")}
-{indent(breath, "    ")}
-{indent(blink, "    ")}
-{indent(hover, "    ")}
-{indent(flash, "    ")}
-{indent(drag, "    ")}
-{indent(idle, "    ")}
-{indent(wander, "    ")}
-{indent(listeners, "    ")}
-</StateMachine>'''
+    return listeners
+
+
+def root_machine():
+    to_park, from_park = _park()
+    breath, blink, hover, flash, drag = _static_layers()
+    layers = [_shape_layer(), _expression_layer(), breath, blink, hover, flash, drag,
+              _idle_layer(to_park, from_park), _wander_layer(to_park, from_park), _listeners()]
+    return f'<StateMachine name="Avatar" id="{SM}">\n' + "\n".join(indent(layer, "    ") for layer in layers) + '\n</StateMachine>'
 
 
 def root_artboard():
@@ -1319,7 +1168,8 @@ def data():
 </ViewModel>'''
 
 
-doc = f'''<Rive version="1" kind="fragment">
+def scene_document():
+    return f'''<Rive version="1" kind="fragment">
     <!--
         The Letta agent mascot, v4: SPEC.md + art/*.svg through gen_scene.py. Regenerate rather
         than hand-edit the exhaustive parts; the art is the illustrator's.
@@ -1344,6 +1194,7 @@ doc = f'''<Rive version="1" kind="fragment">
 '''
 
 if __name__ == "__main__":
+    doc = scene_document()
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scene.rml")
     with open(out, "w", encoding="utf-8", newline="\n") as f:
         f.write(doc)

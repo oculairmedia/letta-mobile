@@ -15,12 +15,11 @@ class HeadlessAvatarRuntimeTest {
     private val model = AvatarModel(
         id = "avatar-1",
         displayName = "Test Avatar",
-        uri = "file:///avatars/test.vrm",
-        format = AvatarFormat.VRM_1,
+        uri = "res://raw/mascot.riv",
     )
 
     @Test
-    fun loadTransitionsIdleToReadyWithHumanoidCapabilities() = runTest {
+    fun loadTransitionsIdleToReadyWithTheRuntimesCapabilities() = runTest {
         val runtime = HeadlessAvatarRuntime()
         assertEquals(AvatarRuntimeState.Idle, runtime.state.value)
 
@@ -28,16 +27,8 @@ class HeadlessAvatarRuntimeTest {
 
         val ready = assertIs<AvatarRuntimeState.Ready>(runtime.state.value)
         assertEquals(model, ready.model)
-        assertTrue(ready.capabilities.supportsHumanoid)
-    }
-
-    @Test
-    fun nonHumanoidFormatReportsNoHumanoidSupport() = runTest {
-        val runtime = HeadlessAvatarRuntime()
-        runtime.load(model.copy(format = AvatarFormat.GLB))
-
-        val ready = assertIs<AvatarRuntimeState.Ready>(runtime.state.value)
-        assertEquals(false, ready.capabilities.supportsHumanoid)
+        assertTrue(ready.capabilities.supportsExpressions)
+        assertTrue(ready.capabilities.supportsLookAt)
     }
 
     @Test
@@ -46,13 +37,11 @@ class HeadlessAvatarRuntimeTest {
         runtime.load(model)
 
         runtime.setExpression(AvatarExpression.Happy, 1.7f)
-        runtime.setViseme(AvatarViseme.A, -0.3f)
         runtime.setMouthOpen(0.5f)
         runtime.setLookTarget(AvatarLookTarget.Screen(0.5f, 0.25f))
         runtime.setAccessoryEnabled("glasses", enabled = false)
 
         assertEquals(1f, runtime.expressionWeights["happy"])
-        assertEquals(0f, runtime.visemeWeights["aa"])
         assertEquals(0.5f, runtime.mouthOpen)
         assertEquals(AvatarLookTarget.Screen(0.5f, 0.25f), runtime.lookTarget)
         assertEquals(setOf("glasses"), runtime.disabledAccessoryIds)
@@ -74,7 +63,7 @@ class HeadlessAvatarRuntimeTest {
         val runtime = HeadlessAvatarRuntime()
         runtime.load(model)
         runtime.setExpression(AvatarExpression.Happy)
-        runtime.setLookTarget(AvatarLookTarget.World(0f, 1f, 2f))
+        runtime.setLookTarget(AvatarLookTarget.Screen(0.2f, 0.8f))
 
         runtime.unload()
 
@@ -175,15 +164,14 @@ class HeadlessAvatarRuntimeTest {
         runtime.load(model)
 
         runtime.setExpression(AvatarExpression.Happy)
-        runtime.setViseme(AvatarViseme.A, 1f)
         runtime.setMouthOpen(1f)
-        runtime.setLookTarget(AvatarLookTarget.World(0f, 0f, 0f))
+        runtime.setLookTarget(AvatarLookTarget.Screen(0f, 0f))
         runtime.playAnimation("Idle")
         runtime.setAccessoryEnabled("glasses", enabled = false)
 
         assertTrue(runtime.expressionWeights.isEmpty())
-        assertTrue(runtime.visemeWeights.isEmpty())
-        assertEquals(0f, runtime.mouthOpen)
+        // mouthOpen is a plain level with no capability behind it: it is recorded regardless.
+        assertEquals(1f, runtime.mouthOpen)
         assertNull(runtime.lookTarget)
         assertEquals(0, runtime.animationPlays)
         assertTrue(runtime.disabledAccessoryIds.isEmpty())
@@ -223,12 +211,10 @@ class HeadlessAvatarRuntimeTest {
         runtime.load(model)
 
         runtime.setExpression(AvatarExpression.Happy, Float.NaN)
-        runtime.setViseme(AvatarViseme.A, Float.NaN)
         runtime.setMouthOpen(Float.NaN)
         runtime.setMouthOpen(Float.POSITIVE_INFINITY)
 
         assertEquals(0f, runtime.expressionWeights["happy"])
-        assertEquals(0f, runtime.visemeWeights["aa"])
         assertEquals(1f, runtime.mouthOpen) // +Inf clamps to 1, NaN drops to 0
     }
 
@@ -259,7 +245,7 @@ class HeadlessAvatarRuntimeTest {
             override suspend fun loadCapabilities(model: AvatarModel): AvatarCapabilities {
                 loadCount += 1
                 if (loadCount == 1) firstGate.await()
-                return AvatarCapabilities(supportsHumanoid = true)
+                return AvatarCapabilities(supportsExpressions = true)
             }
         }
 

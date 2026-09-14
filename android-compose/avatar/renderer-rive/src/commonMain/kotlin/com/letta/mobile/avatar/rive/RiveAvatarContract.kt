@@ -124,14 +124,9 @@ interface RiveInputSink {
     fun fire(input: String)
 }
 
-/**
- * The mascot this module ships. Packaged as a raw resource rather than imported through the avatar
- * pipeline: a Rive file is not an [com.letta.mobile.avatar.core.AvatarFormat] yet, and the pipeline
- * switches exhaustively on that enum.
- */
+/** The mascot this module ships: a raw resource on Android, a classpath resource on desktop. */
 val MASCOT_MODEL: com.letta.mobile.avatar.core.AvatarModel = com.letta.mobile.avatar.core.AvatarModel(
     id = "letta-mascot",
     displayName = "Letta Mascot",
     uri = "res://raw/mascot.riv",
-    format = com.letta.mobile.avatar.core.AvatarFormat.GLB,
 )

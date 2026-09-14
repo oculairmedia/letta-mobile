@@ -130,7 +130,7 @@ fun MascotLive(
     val inputBounds = registry.inputBounds.value
     val timelineBounds = registry.timelineBounds.value
     // This surface's slot in the registry, so the other agents' mascots can look at it.
-    val slotKey = remember { "$agentId#${slotCounter++}" }
+    val slotKey = remember(agentId) { "$agentId#${slotCounter++}" }
     DisposableEffect(registry, slotKey) { onDispose { registry.mascotBounds.remove(slotKey) } }
     val peersPx = registry.mascotBounds.values
         .filter { it.agentId != agentId && !it.bounds.isEmpty }

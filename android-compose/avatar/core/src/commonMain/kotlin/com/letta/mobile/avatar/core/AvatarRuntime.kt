@@ -34,7 +34,7 @@ sealed interface AvatarRuntimeState {
  * Command semantics:
  * - Commands issued while not [AvatarRuntimeState.Ready] are best-effort and
  *   may be dropped; callers gate persistent intent on [state].
- * - Weight-style setters ([setExpression], [setViseme], [setMouthOpen]) are
+ * - Weight-style setters ([setExpression], [setMouthOpen]) are
  *   level controls, not events: the value holds until changed. Weights are
  *   clamped to 0..1 by implementations.
  * - Commands targeting capabilities the model lacks (see
@@ -51,8 +51,6 @@ interface AvatarRuntime {
     suspend fun unload()
 
     fun setExpression(expression: AvatarExpression, weight: Float = 1f)
-
-    fun setViseme(viseme: AvatarViseme, weight: Float)
 
     /** Direct jaw/mouth-open level (0..1), e.g. from audio amplitude. */
     fun setMouthOpen(value: Float)

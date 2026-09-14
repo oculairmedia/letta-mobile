@@ -23,9 +23,6 @@ open class HeadlessAvatarRuntime : AvatarRuntime, AvatarHeadTurn {
     /** Current expression weights by normalized key (clamped 0..1). */
     val expressionWeights: Map<String, Float> get() = expressions.toMap()
 
-    /** Current viseme weights by normalized key (clamped 0..1). */
-    val visemeWeights: Map<String, Float> get() = visemes.toMap()
-
     var mouthOpen: Float = 0f
         private set
 
@@ -49,7 +46,6 @@ open class HeadlessAvatarRuntime : AvatarRuntime, AvatarHeadTurn {
         private set
 
     private val expressions = mutableMapOf<String, Float>()
-    private val visemes = mutableMapOf<String, Float>()
     private val disabledAccessories = mutableSetOf<String>()
 
     /**
@@ -66,11 +62,8 @@ open class HeadlessAvatarRuntime : AvatarRuntime, AvatarHeadTurn {
      */
     protected open suspend fun loadCapabilities(model: AvatarModel): AvatarCapabilities =
         AvatarCapabilities(
-            supportsHumanoid = model.format.isHumanoidProfile,
             supportsExpressions = true,
-            supportsVisemes = true,
             supportsLookAt = true,
-            supportsSpringBones = false,
             supportsEmbeddedAnimations = true,
             supportsAccessories = true,
         )
@@ -134,15 +127,8 @@ open class HeadlessAvatarRuntime : AvatarRuntime, AvatarHeadTurn {
         onExpressionChanged(expression, clamped)
     }
 
-    override fun setViseme(viseme: AvatarViseme, weight: Float) {
-        if (readyCapabilities()?.supportsVisemes != true) return
-        val clamped = sanitizeWeight(weight)
-        visemes[viseme.key] = clamped
-        onVisemeChanged(viseme, clamped)
-    }
-
     override fun setMouthOpen(value: Float) {
-        if (readyCapabilities()?.supportsVisemes != true) return
+        if (readyCapabilities() == null) return
         mouthOpen = sanitizeWeight(value)
         onMouthOpenChanged(mouthOpen)
     }
@@ -217,9 +203,6 @@ open class HeadlessAvatarRuntime : AvatarRuntime, AvatarHeadTurn {
     /** Hook for subclasses: an expression weight changed (already clamped). */
     protected open fun onExpressionChanged(expression: AvatarExpression, weight: Float) {}
 
-    /** Hook for subclasses: a viseme weight changed (already clamped). */
-    protected open fun onVisemeChanged(viseme: AvatarViseme, weight: Float) {}
-
     /** Hook for subclasses: the mouth-open level changed (already clamped). */
     protected open fun onMouthOpenChanged(value: Float) {}
 
@@ -240,7 +223,6 @@ open class HeadlessAvatarRuntime : AvatarRuntime, AvatarHeadTurn {
 
     private fun resetCommandState() {
         expressions.clear()
-        visemes.clear()
         disabledAccessories.clear()
         mouthOpen = 0f
         lookTarget = null

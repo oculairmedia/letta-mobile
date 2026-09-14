@@ -350,8 +350,8 @@ private fun MascotBench(file: File, modifier: Modifier) {
                 }
                 if (showTargets && gazeMode == GazeMode.JUSTIFIED) {
                     val ink = if (isDark(page.base)) Color(0x55FFFFFF) else Color(0x55000000)
-                    Hotspot("input (you typing)", inputSpot, 260f, 44f, ink, target == GazeTarget.INPUT)
-                    Hotspot("timeline / code", timelineSpot, 220f, 160f, ink, target == GazeTarget.TIMELINE)
+                    Hotspot(HotspotMark("input (you typing)", inputSpot, ink).also { it.width = 260f; it.height = 44f }, target == GazeTarget.INPUT)
+                    Hotspot(HotspotMark("timeline / code", timelineSpot, ink).also { it.width = 220f; it.height = 160f }, target == GazeTarget.TIMELINE)
                 }
                 Text(
                     if (editGradients) "drag the rings to place lights; tap a ground to pick its base colour"
@@ -500,15 +500,24 @@ private fun MascotBench(file: File, modifier: Modifier) {
     }
 }
 
+private class HotspotMark(
+    val label: String,
+    val centre: androidx.compose.ui.geometry.Offset,
+    val ink: Color,
+) {
+    var width: Float = 0f
+    var height: Float = 0f
+}
+
 /** A labelled rectangle on the stage standing in for a piece of UI the character can look at. */
 @Composable
-private fun Hotspot(label: String, centre: androidx.compose.ui.geometry.Offset, w: Float, h: Float, ink: Color, hot: Boolean) {
+private fun Hotspot(mark: HotspotMark, hot: Boolean) {
     Box(
-        Modifier.offset { IntOffset((centre.x - w / 2).toInt(), (centre.y - h / 2).toInt()) }
-            .size(w.dp / LocalDensity.current.density, h.dp / LocalDensity.current.density)
-            .border(if (hot) 2.dp else 1.dp, if (hot) ink.copy(alpha = 0.9f) else ink, RoundedCornerShape(8.dp))
+        Modifier.offset { IntOffset((mark.centre.x - mark.width / 2).toInt(), (mark.centre.y - mark.height / 2).toInt()) }
+            .size(mark.width.dp / LocalDensity.current.density, mark.height.dp / LocalDensity.current.density)
+            .border(if (hot) 2.dp else 1.dp, if (hot) mark.ink.copy(alpha = 0.9f) else mark.ink, RoundedCornerShape(8.dp))
             .padding(6.dp),
-    ) { Text(label, color = ink, style = MaterialTheme.typography.labelSmall) }
+    ) { Text(mark.label, color = mark.ink, style = MaterialTheme.typography.labelSmall) }
 }
 
 /** One rig tunable: a 0..1 view-model number the file maps onto a pose range; `shown` renders the real value. */

@@ -72,8 +72,10 @@ internal fun ComposerBar(
         )
         // The box keeps its centred max width; the companion hangs off its left edge, so the
         // pair is centred together and the mascot stays beside the text at any pane width.
+        // Without a companion the row is the column's width, so the box stays centred.
+        val rowMaxWidth = if (companion != null) ChatColumnMaxWidth + ComposerCompanionSlot else ChatColumnMaxWidth
         Row(
-            modifier = Modifier.widthIn(max = ChatColumnMaxWidth + ComposerCompanionSlot).fillMaxWidth(),
+            modifier = Modifier.widthIn(max = rowMaxWidth).fillMaxWidth(),
             verticalAlignment = Alignment.Bottom,
         ) {
             if (companion != null) {

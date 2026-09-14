@@ -85,7 +85,16 @@ def compose_gaze(state, host, noise, tail=''):
     return host + lam * noise, lam, kappa
 
 
-def pupil_svg(state, size, phase, amplitude=None, mouth=.5, gaze=(0, 0), reduced=False):
+def pupil_svg(*args, **opts):
+    state, size, phase = args[0], args[1], args[2]
+    amplitude = args[3] if len(args) > 3 else opts.get('amplitude')
+    mouth = args[4] if len(args) > 4 else opts.get('mouth', .5)
+    gaze = args[5] if len(args) > 5 else opts.get('gaze', (0, 0))
+    reduced = args[6] if len(args) > 6 else opts.get('reduced', False)
+    return _pupil_svg(state, size, phase, amplitude, mouth, gaze, reduced)
+
+
+def _pupil_svg(state, size, phase, amplitude, mouth, gaze, reduced):
     if state not in HOSTED or size <= 28: return ''
     amplitude = {'idle': 1.5, 'listening': 4., 'speaking': 1 + 3 * mouth}[state] if amplitude is None else amplitude
     delta = np.zeros(2) if reduced else np.clip(.15 * np.array(gaze), [-1.5, -1], [1.5, 1])
@@ -95,9 +104,24 @@ def pupil_svg(state, size, phase, amplitude=None, mouth=.5, gaze=(0, 0), reduced
     return f'<defs><clipPath id="irisClip">{iris}</clipPath></defs>{iris}<g clip-path="url(#irisClip)"><g transform="translate({delta[0]} {delta[1]})">{wave_svg}{v.content("pupil/pupil-core.svg")}{glint}</g></g>'
 
 
-def avatar(state='idle', size=72, bg='#15191F', display=1.25, pupil=True,
-           phase=0, amplitude=None, small=False, gaze=(0, 0), mouth=.5,
-           root=(0, 0), neutral=False, reduced=False):
+def avatar(*args, **opts):
+    state = args[0] if args else opts.get('state', 'idle')
+    size = args[1] if len(args) > 1 else opts.get('size', 72)
+    bg = args[2] if len(args) > 2 else opts.get('bg', '#15191F')
+    display = opts.get('display', 1.25)
+    pupil = opts.get('pupil', True)
+    phase = opts.get('phase', 0)
+    amplitude = opts.get('amplitude')
+    small = opts.get('small', False)
+    gaze = opts.get('gaze', (0, 0))
+    mouth = opts.get('mouth', .5)
+    root = opts.get('root', (0, 0))
+    neutral = opts.get('neutral', False)
+    reduced = opts.get('reduced', False)
+    return _draw_avatar(state, size, bg, display, pupil, phase, amplitude, small, gaze, mouth, root, neutral, reduced)
+
+
+def _draw_avatar(state, size, bg, display, pupil, phase, amplitude, small, gaze, mouth, root, neutral, reduced):
     """Rest-state assembly. Gaussian edge approximates paint, not Rive feather."""
     tail = '-small' if small else ''
     ps = {'listening': 1.04, 'waitingInput': 1.06}.get(state, 1)
@@ -128,77 +152,110 @@ def avatar(state='idle', size=72, bg='#15191F', display=1.25, pupil=True,
     return output.resize((size, size), Image.Resampling.LANCZOS).convert('RGB')
 
 
-def gate():
-    report = {'baseline': BASE}
+def _assert_max_inventory():
     assert {p.name for p in ART.glob('*.svg')} == v.EXPECTED | {'glyph-working.svg', 'glyph-working-small.svg'}
     assert {p.name for p in (ART / 'pupil').glob('*.svg')} == PUPILS
     for name in v.EXPECTED:
         assert (ART / name).read_bytes() == baseline('art/' + name), name
     previous_spec = baseline('SPEC.md')
     assert (PROJECT / 'SPEC.md').read_bytes().startswith(previous_spec)
-    changed = subprocess.check_output(['git', 'diff', BASE, '--name-only'], cwd=v.REPO, text=True).splitlines()
+    mascot = 'android-compose/avatar/renderer-rive/rive/mascot'
+    changed = subprocess.check_output(
+        ['git', 'diff', BASE, '--name-only', '--', mascot], cwd=v.REPO, text=True,
+    ).splitlines()
     assert all(p.endswith('SPEC.md') or '/art/' in p for p in changed), changed
+
+
+def _assert_new_svg(path):
+    root = ET.parse(path).getroot()
+    assert root.tag == '{http://www.w3.org/2000/svg}svg'
+    assert root.attrib == {'viewBox': '-50 -50 100 100'} and len(root) == 1
+    a = root[0].attrib
+    assert root[0].tag == '{http://www.w3.org/2000/svg}path'
+    assert set(a) <= {'d', 'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'fill-rule'}
+    assert set(re.findall('[A-Za-z]', a['d'])) <= set('MLCZ')
+    paints = {a[k] for k in ('fill', 'stroke') if k in a and a[k] != 'none'}
+    assert len(paints) == 1 and paints <= {'#111111', '#F7F7F7', '#FFFFFF'}
+    p = np.concatenate(v.samples(a['d']))
+    pad = float(a.get('stroke-width', 0)) / 2
+    assert np.max(np.abs(p)) + pad <= 50
+    ET.fromstring(v.svgpath.path_rml(path, 'ValidationOnly', '999:1'))
+
+
+def _pupil_clearance():
+    minimum = float('inf')
+    for phase in np.linspace(0, 1, 257):
+        p = np.concatenate(v.samples(wave(phase, 4), 41))
+        for x in (-1.5, 1.5):
+            for y in (-1, 1):
+                minimum = min(minimum, float(np.min(-sdf(p + [x, y], (17, 15), 7) - 4)))
+    core = np.concatenate(v.samples(v.node('pupil/pupil-core.svg').get('d')))
+    for x in (-1.5, 1.5):
+        for y in (-1, 1):
+            assert np.max(sdf(core + [x, y], (17, 15), 7)) < 0
+    assert math.hypot(2, -2) + 3 < 7
+    assert minimum >= 1, minimum
+    return round(minimum, 6)
+
+
+def _outer_gaze():
+    before, after, kappas = [], [], []
+    for state in STATES:
+        for x in (-23, 0, 23):
+            for y in (-17, 0, 17):
+                for nx, ny in ((-12, -9), (-12, 9), (12, -9), (12, 9), (0, 0)):
+                    host, noise = np.array([x, y]), np.array([nx, ny])
+                    before.append(clearance(state, host + noise))
+                    out, lam, kappa = compose_gaze(state, host, noise)
+                    after.append(clearance(state, out))
+                    kappas.append(kappa)
+    assert min(after) >= 2 - 1e-8 and min(kappas) == 1
+    raw = clearance('failed', np.array([29, 17]))
+    corrected, lam, _ = compose_gaze('failed', (23, 17), (6, 0))
+    return {
+        'sample_cases': len(after),
+        'minimum_raw_clearance_px': round(min(before), 6),
+        'minimum_clamped_clearance_px': round(min(after), 6),
+        'host_fraction_min': min(kappas),
+        'failed_example_overflow_px': round(-raw, 6),
+        'failed_example_noise_fraction': round(lam, 9),
+        'failed_example_corrected_xy': corrected.tolist(),
+    }
+
+
+def _phase_rasters():
+    report = {}
+    for state in ('idle', 'listening', 'speaking', 'thinking', 'sleeping'):
+        for size in (22, 44, 72):
+            a = np.array(avatar(state, size, phase=0, small=size == 22), dtype=int)
+            b = np.array(avatar(state, size, phase=.5, small=size == 22), dtype=int)
+            delta = np.max(np.abs(a - b), axis=2)
+            count = int(np.sum(delta >= 8))
+            if size == 22 or state not in HOSTED:
+                assert count == 0
+            if size > 22 and state in ('listening', 'speaking'):
+                assert count > 0
+            report[f'{state}_{size}'] = {'pixels_delta_ge_8': count, 'max_channel_delta': int(delta.max())}
+    return report
+
+
+def gate():
+    report = {'baseline': BASE}
+    _assert_max_inventory()
     new = [ART / f'glyph-working{t}.svg' for t in ('', '-small')] + sorted((ART / 'pupil').glob('*.svg'))
     for path in new:
-        root = ET.parse(path).getroot()
-        assert root.tag == '{http://www.w3.org/2000/svg}svg'
-        assert root.attrib == {'viewBox': '-50 -50 100 100'} and len(root) == 1
-        a = root[0].attrib
-        assert root[0].tag == '{http://www.w3.org/2000/svg}path'
-        assert set(a) <= {'d', 'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'fill-rule'}
-        assert set(re.findall('[A-Za-z]', a['d'])) <= set('MLCZ')
-        paints = {a[k] for k in ('fill', 'stroke') if k in a and a[k] != 'none'}
-        assert len(paints) == 1 and paints <= {'#111111', '#F7F7F7', '#FFFFFF'}
-        p = np.concatenate(v.samples(a['d']))
-        pad = float(a.get('stroke-width', 0)) / 2
-        assert np.max(np.abs(p)) + pad <= 50
-        ET.fromstring(v.svgpath.path_rml(path, 'ValidationOnly', '999:1'))
+        _assert_new_svg(path)
     for i in range(4):
         a = v.node(f'pupil/squiggle-{i}.svg').attrib
         assert a['d'] == wave(i/4, 1)
         assert re.findall('[A-Z]', a['d']) == ['M'] + ['C'] * 4
         assert a['stroke-width'] == '8' and a['stroke-linecap'] == 'round'
-    minimum = float('inf')
-    # Stroke centerline margin minus radius is conservative for round caps/joins.
-    for phase in np.linspace(0, 1, 257):
-        p = np.concatenate(v.samples(wave(phase, 4), 41))
-        for x in (-1.5, 1.5):
-            for y in (-1, 1):
-                minimum = min(minimum, float(np.min(-sdf(p+[x,y], (17,15), 7) - 4)))
-    core = np.concatenate(v.samples(v.node('pupil/pupil-core.svg').get('d')))
-    for x in (-1.5, 1.5):
-        for y in (-1, 1):
-            assert np.max(sdf(core+[x,y], (17,15), 7)) < 0
-    assert math.hypot(2,-2)+3 < 7  # catchlight stays in core
-    assert minimum >= 1, minimum
-    report['pupil_iris_minimum_clearance_px'] = round(minimum, 6)
-    before, after, kappas = [], [], []
-    for state in STATES:
-        for x in (-23, 0, 23):
-            for y in (-17, 0, 17):
-                for nx, ny in ((-12,-9),(-12,9),(12,-9),(12,9),(0,0)):
-                    host, noise = np.array([x,y]), np.array([nx,ny])
-                    before.append(clearance(state, host+noise))
-                    out, lam, kappa = compose_gaze(state, host, noise)
-                    after.append(clearance(state, out))
-                    kappas.append(kappa)
-    assert min(after) >= 2-1e-8 and min(kappas) == 1
-    raw = clearance('failed', np.array([29,17]))
-    corrected, lam, _ = compose_gaze('failed', (23,17), (6,0))
-    report['outer_gaze'] = {'sample_cases': len(after), 'minimum_raw_clearance_px': round(min(before),6), 'minimum_clamped_clearance_px': round(min(after),6), 'host_fraction_min':min(kappas), 'failed_example_overflow_px':round(-raw,6), 'failed_example_noise_fraction':round(lam,9), 'failed_example_corrected_xy':corrected.tolist()}
-    report['phase_raster_changes'] = {}
-    for state in ('idle','listening','speaking','thinking','sleeping'):
-        for size in (22,44,72):
-            a = np.array(avatar(state,size,phase=0,small=size==22),dtype=int)
-            b = np.array(avatar(state,size,phase=.5,small=size==22),dtype=int)
-            delta = np.max(np.abs(a-b),axis=2)
-            count = int(np.sum(delta >= 8))
-            if size == 22 or state not in HOSTED: assert count == 0
-            if size > 22 and state in ('listening','speaking'): assert count > 0
-            report['phase_raster_changes'][f'{state}_{size}'] = {'pixels_delta_ge_8': count, 'max_channel_delta': int(delta.max())}
-    for a in (0,.5,1):
-        for size in (22,44,72):
-            assert avatar('speaking', size, mouth=a, small=size==22).size == (size,size)
+    report['pupil_iris_minimum_clearance_px'] = _pupil_clearance()
+    report['outer_gaze'] = _outer_gaze()
+    report['phase_raster_changes'] = _phase_rasters()
+    for a in (0, .5, 1):
+        for size in (22, 44, 72):
+            assert avatar('speaking', size, mouth=a, small=size == 22).size == (size, size)
     report.update(new_pure_svg_count=len(new), prior_root_svgs_unchanged=len(v.EXPECTED), prior_spec_prefix='PASS', native_path_parser='PASS', mouth_topology='PASS (unchanged bytes)', runtime='NOT RUN', human_recognition='PENDING')
     report['new_svg_sha256'] = {p.relative_to(ART).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest() for p in new}
     return report

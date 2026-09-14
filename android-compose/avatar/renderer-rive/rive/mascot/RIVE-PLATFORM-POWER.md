@@ -202,7 +202,7 @@ Worth it when:
   allows (feathering needs Rive Renderer).
 
 Avoid: putting AvatarDirector policy (who wins between speaking vs dragged) only in scripts —
-that belongs in shared Kotlin so the 3D VRM twin stays in sync.
+that belongs in shared Kotlin so both platforms stay in sync.
 
 ### J. Audio
 

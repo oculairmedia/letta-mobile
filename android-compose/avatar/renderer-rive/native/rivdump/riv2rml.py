@@ -12,6 +12,14 @@ radians. Ids are "<client>:<index>" so a fragment can be pasted into another fil
 """
 import json
 import sys
+from pathlib import Path
+from xml.sax.saxutils import escape
+
+
+def _cli_path(arg: str) -> Path:
+    if "\x00" in arg or ".." in Path(arg).parts:
+        raise SystemExit(f"invalid path: {arg}")
+    return Path(arg).expanduser().resolve()
 
 DRAWABLE = {
     "Node", "Shape", "PointsPath", "Ellipse", "Rectangle", "Polygon", "Star", "Triangle",
@@ -42,64 +50,115 @@ def fmt(v):
     return str(v)
 
 
-def lift(dump, artboard_name, client=9, subtree=None):
-    ab = next(a for a in dump["artboards"] if a["name"] == artboard_name)
-    objs = {o["index"]: o for o in ab["objects"] if o.get("type")}
+def xml_attr(v):
+    return escape(fmt(v), {'"': "&quot;"})
+
+
+def _remap(k, v, new_id):
+    if k in ID_ATTRS:
+        return f'{k}="{new_id(v)}"'
+    if k in ENUMS and isinstance(v, int) and v < len(ENUMS[k]):
+        v = ENUMS[k][v]
+    if k in DEFAULTS and v == DEFAULTS[k]:
+        return None
+    return f'{k}="{xml_attr(v)}"'
+
+
+def _attrs_for(o, new_id):
+    attrs = []
+    for k, v in o.items():
+        if k in ("index", "typeKey", "type") or k in SKIP_ATTRS:
+            continue
+        mapped = _remap(k, v, new_id)
+        if mapped:
+            attrs.append(mapped)
+    t = o["type"]
+    if t in ("Node", "Shape", "PointsPath", "Ellipse", "Rectangle", "Polygon", "Star", "Solo"):
+        attrs.append(f'name="{t}{o["index"]}" id="{new_id(o["index"])}"')
+    else:
+        attrs.append(f'name="{t}"')
+    return attrs
+
+
+def _emit(o, depth, kids, new_id):
+    t = o["type"]
+    if t not in DRAWABLE:
+        return []
+    children = [line for c in kids.get(o["index"], []) for line in _emit(c, depth + 1, kids, new_id)]
+    pad = "    " * depth
+    head = f'{pad}<{t} {" ".join(_attrs_for(o, new_id))}'
+    if not children:
+        return [head + "/>"]
+    return [head + ">"] + children + [f"{pad}</{t}>"]
+
+
+def _kid_map(objs):
     kids = {}
     for o in objs.values():
         if o["index"] != 0 and "parentId" in o:
             kids.setdefault(o["parentId"], []).append(o)
+    return kids
+
+
+def lift(dump, artboard_name, client=9, subtree=None):
+    ab = next(a for a in dump["artboards"] if a["name"] == artboard_name)
+    objs = {o["index"]: o for o in ab["objects"] if o.get("type")}
+    kids = _kid_map(objs)
     new_id = lambda i: f"{client}:{i + 1}"  # object 0 is reserved in RML ids
-
-    def emit(o, depth):
-        t = o["type"]
-        if t not in DRAWABLE:
-            return []
-        attrs = []
-        for k, v in o.items():
-            if k in ("index", "typeKey", "type") or k in SKIP_ATTRS:
-                continue
-            if k in ID_ATTRS:
-                attrs.append(f'{k}="{new_id(v)}"')
-                continue
-            if k in ENUMS and isinstance(v, int) and v < len(ENUMS[k]):
-                v = ENUMS[k][v]
-            if k in DEFAULTS and v == DEFAULTS[k]:
-                continue
-            attrs.append(f'{k}="{fmt(v)}"')
-        if t in ("Node", "Shape", "PointsPath", "Ellipse", "Rectangle", "Polygon", "Star", "Solo"):
-            attrs.append(f'name="{t}{o["index"]}" id="{new_id(o["index"])}"')
-        else:
-            attrs.append(f'name="{t}"')
-        children = [line for c in kids.get(o["index"], []) for line in emit(c, depth + 1)]
-        pad = "    " * depth
-        head = f'{pad}<{t} {" ".join(attrs)}'
-        if not children:
-            return [head + "/>"]
-        return [head + ">"] + children + [f"{pad}</{t}>"]
-
+    roots = kids.get(subtree, []) if subtree is not None else kids.get(0, [])
     lines = []
-    for c in kids.get(subtree, []) if subtree is not None else kids.get(0, []):
-        lines += emit(c, 1)
+    for c in roots:
+        lines += _emit(c, 1, kids, new_id)
     if subtree is not None and subtree in objs:
-        lines = emit(objs[subtree], 1)
-    root = objs[0]
-    return root, lines
+        lines = _emit(objs[subtree], 1, kids, new_id)
+    return objs[0], lines
+
+
+def _flag_value(argv, flag, default=None, cast=int):
+    if flag not in argv:
+        return default
+    return cast(argv[argv.index(flag) + 1])
+
+
+def _artboard_size(root):
+    return root.get("width", 500), root.get("height", 500)
+
+
+def _standalone_doc(root, name, client, body):
+    w, h = _artboard_size(root)
+    return (f'<Rive version="1" kind="fragment">\n<Artboard clip="false" width="{xml_attr(w)}" height="{xml_attr(h)}" '
+            f'name="{xml_attr(name)}" id="{client}:1">\n{body}\n</Artboard>\n</Rive>\n')
+
+
+def _write_standalone(out, artboard, lines):
+    root, name, client = artboard
+    w, h = _artboard_size(root)
+    out.write_text(_standalone_doc(root, name, client, "\n".join(lines)), encoding="utf-8", newline="\n")
+    print(f"wrote {out}: {len(lines)} lines, artboard {w}x{h}", file=sys.stderr)
+
+
+def _standalone_out(argv):
+    if "--standalone" not in argv:
+        return None
+    return _cli_path(argv[argv.index("--standalone") + 1])
+
+
+def _parse_cli(argv):
+    if len(argv) < 3:
+        raise SystemExit("usage: python riv2rml.py <dump.json> <artboard name> [--id-client N] [--standalone out.rml]")
+    dump = json.loads(_cli_path(argv[1]).read_text(encoding="utf-8"))
+    return dump, argv[2], _flag_value(argv, "--id-client", 9), _flag_value(argv, "--subtree"), _standalone_out(argv)
+
+
+def main(argv=None):
+    argv = sys.argv if argv is None else argv
+    dump, name, client, subtree, standalone = _parse_cli(argv)
+    root, lines = lift(dump, name, client, subtree)
+    if standalone:
+        _write_standalone(standalone, (root, name, client), lines)
+    else:
+        print("\n".join(lines))
 
 
 if __name__ == "__main__":
-    dump = json.load(open(sys.argv[1], encoding="utf-8"))
-    name = sys.argv[2]
-    client = int(sys.argv[sys.argv.index("--id-client") + 1]) if "--id-client" in sys.argv else 9
-    subtree = int(sys.argv[sys.argv.index("--subtree") + 1]) if "--subtree" in sys.argv else None
-    root, lines = lift(dump, name, client, subtree)
-    body = "\n".join(lines)
-    if "--standalone" in sys.argv:
-        out = sys.argv[sys.argv.index("--standalone") + 1]
-        w, h = root.get("width", 500), root.get("height", 500)
-        doc = (f'<Rive version="1" kind="fragment">\n<Artboard clip="false" width="{fmt(w)}" height="{fmt(h)}" '
-               f'name="{name}" id="{client}:1">\n{body}\n</Artboard>\n</Rive>\n')
-        open(out, "w", encoding="utf-8", newline="\n").write(doc)
-        print(f"wrote {out}: {len(lines)} lines, artboard {w}x{h}", file=sys.stderr)
-    else:
-        print(body)
+    main()

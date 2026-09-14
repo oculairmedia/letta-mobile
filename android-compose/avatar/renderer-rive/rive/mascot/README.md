@@ -13,6 +13,7 @@ Beads: `letta-mobile-kh094` (this asset), `letta-mobile-1zti3` (identity picker 
 | Path | What | Edit? |
 |---|---|---|
 | `gen_scene.py` | The generator. Structure, ids, timings, state machine. **Source of truth.** | yes |
+| `rml.py` | RML primitives: Rive property keys, view-model ids, easing tokens, XML builders (keyframes, animations, states, transitions). No mascot knowledge | rarely |
 | `svgpath.py` | SVG path -> RML vertices (M/L/C/Z, evenodd, strokes; 8-cubic mirrored bodies, 4-vertex mouths) | rarely |
 | `art/*.svg` | The locked art: `body-*.svg` (8 identities), one glyph per state, three mouths | via SPEC owner |
 | `scene.rml` | Generated. Committed so diffs are reviewable. Never hand-edit. | no |
