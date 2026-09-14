@@ -32,6 +32,7 @@ import com.letta.mobile.avatar.core.GazeTargetRects
 import com.letta.mobile.avatar.core.GazeWindow
 import com.letta.mobile.avatar.core.GazeWorld
 import com.letta.mobile.avatar.core.MascotIdentity
+import com.letta.mobile.data.presence.AgentActivityKind
 import com.letta.mobile.data.presence.AgentPresence
 
 /**
@@ -62,6 +63,19 @@ object NoMascotHost : MascotHost {
 
 val LocalMascotHost = compositionLocalOf<MascotHost> { NoMascotHost }
 
+/**
+ * The product rule for whether an agent's tile moves: it is live while the agent is at work
+ * (thinking or speaking, as the shell's presence says) and a still otherwise. One rule for every
+ * list, chip and header on every platform; a site passes `live` explicitly only when it must
+ * stay still beside a live companion of the same agent.
+ */
+@Composable
+fun mascotAtWork(agentId: String?): Boolean {
+    if (agentId == null) return false
+    val activity = LocalMascotRegistry.current.presence[agentId]?.activity ?: return false
+    return activity != AgentActivityKind.IDLE
+}
+
 /** True when [agentId] has an identity and the host can draw it live. */
 @Composable
 fun mascotAvailable(agentId: String?): Boolean {
@@ -73,9 +87,9 @@ fun mascotAvailable(agentId: String?): Boolean {
 /**
  * The agent's avatar: a tile of [size] the live mascot fills edge to edge, overscaled by
  * [overscale] and cropped by the tile's clip - an avatar photo, not a figure in a frame. Draws
- * [fallback] when the agent has no identity or the host has no renderer. [live] false draws a
- * still of the character instead of animating it - for a chip that sits next to a live mascot of
- * the same agent, where two of them moving is one too many.
+ * [fallback] when the agent has no identity or the host has no renderer. [live] defaults to the
+ * product rule ([mascotAtWork]: moving while the agent works, a still otherwise); pass false for a
+ * chip that sits next to a live mascot of the same agent, where two of them moving is one too many.
  */
 @Composable
 fun MascotAvatar(
@@ -85,7 +99,7 @@ fun MascotAvatar(
     cornerRadius: Dp = 7.dp,
     onClick: (() -> Unit)? = null,
     overscale: Float = MASCOT_TILE_OVERSCALE,
-    live: Boolean = true,
+    live: Boolean = mascotAtWork(agentId),
     fallback: @Composable () -> Unit,
 ) {
     val identity = agentId?.let { LocalMascotRegistry.current.identities[it] }

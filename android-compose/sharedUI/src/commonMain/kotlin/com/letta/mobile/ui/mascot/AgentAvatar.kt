@@ -15,9 +15,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
- * The one way an agent is pictured anywhere in the app: its mascot when it has one (a still by
- * default; [live] for the single animated site), otherwise the same initial-letter tile every
- * screen used to draw for itself. Call this from a list row, a header, a chip or a picker and
+ * The one way an agent is pictured anywhere in the app: its mascot when it has one (moving while
+ * the agent works, a still otherwise - [mascotAtWork]; [live] false forces a still), otherwise
+ * the same initial-letter tile every screen used to draw for itself. Call this from a list row, a header, a chip or a picker and
  * they all agree - the shape, the fallback and the size rule live here, not at each site.
  */
 @Composable
@@ -27,7 +27,7 @@ fun AgentAvatar(
     size: Dp,
     modifier: Modifier = Modifier,
     cornerRadius: Dp = size / 2,
-    live: Boolean = false,
+    live: Boolean = mascotAtWork(agentId),
     onClick: (() -> Unit)? = null,
 ) {
     MascotAvatar(

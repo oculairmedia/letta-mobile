@@ -133,6 +133,15 @@ fun ConversationsScreen(
         viewModel.clearCreateConversationError()
     }
 
+    // Rows with a run in flight animate (letta-mobile-pus2w): publish those agents as thinking, and
+    // re-read the run store while the list is on screen so a run starting or ending shows without a refresh.
+    ConversationsMascotPresenceSync(uiState.conversations)
+    LaunchedEffect(viewModel) {
+        while (true) {
+            kotlinx.coroutines.delay(WORKING_STATE_POLL_MS)
+            viewModel.refreshWorkingState()
+        }
+    }
     val filteredConversations = remember(uiState.conversations, uiState.searchQuery, uiState.filter) {
         viewModel.getFilteredConversations()
     }
@@ -451,6 +460,8 @@ internal fun ConversationsScreenBody(
         }
     }
 }
+
+private const val WORKING_STATE_POLL_MS = 3_000L
 
 // region Previews
 
