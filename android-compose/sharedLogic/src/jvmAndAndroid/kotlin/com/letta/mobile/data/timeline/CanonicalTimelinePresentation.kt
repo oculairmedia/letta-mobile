@@ -87,17 +87,9 @@ class CanonicalTimelinePresentation private constructor(
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     val settled: Flow<PagingData<Row>> = anchor.flatMapLatest { key ->
-        owner.session.paging(owner.selection, key).map { page ->
-            page.map { record -> record to record.presentationWithAdapter(owner.selection.scope.agentId, settledProjectionAdapter) }
-                .filter { (record, presentation) ->
-                    when (presentation) {
-                        is TimelineSettledPresentation.Drop -> false
-                        is TimelineSettledPresentation.Defer -> true
-                        is TimelineSettledPresentation.Render -> !owner.session.engine.isSuppressed(
-                            owner.selection, record.key.identity, record.revision, presentation.event,
-                        )
-                    }
-                }.map { (record, presentation) -> project(record, presentation) }
+        owner.session.paging(owner.selection, key, settledProjectionAdapter).map { page ->
+            page.filter { it.preparedPresentation !is TimelineSettledPresentation.Drop }
+                .map { record -> project(record, requireNotNull(record.preparedPresentation)) }
         }
     }.cachedIn(scope)
 

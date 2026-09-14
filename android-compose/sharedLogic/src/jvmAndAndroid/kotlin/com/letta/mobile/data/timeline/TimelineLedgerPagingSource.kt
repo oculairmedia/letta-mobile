@@ -8,6 +8,8 @@ import kotlinx.coroutines.CancellationException
 class TimelineLedgerPagingSource(
     private val engine: CanonicalTimelineEngine,
     private val selection: TimelineEngineSelection,
+    private val ownAgentId: String? = selection.scope.agentId,
+    private val settledProjectionAdapter: TimelineSettledProjectionAdapter = DefaultTimelineSettledProjectionAdapter,
 ) : PagingSource<TimelinePageKey, TimelineSettledRecord>() {
     private val revision = engine.publication.value.durableRevision
     override fun getRefreshKey(state: PagingState<TimelinePageKey, TimelineSettledRecord>): TimelinePageKey? =
@@ -28,12 +30,10 @@ class TimelineLedgerPagingSource(
                 is LoadParams.Append -> TimelineReadPosition.Before(params.key)
                 is LoadParams.Prepend -> TimelineReadPosition.After(params.key)
             }
-            val page = engine.load(selection, position, params.loadSize)
+            val page = engine.preparePage(selection, position, params.loadSize, ownAgentId, settledProjectionAdapter)
             if (isObsolete()) return LoadResult.Invalid()
             LoadResult.Page(
-                data = page.metadata.rows.zip(page.bodies) { metadata, body ->
-                    TimelineSettledRecord(metadata.key, metadata.contentType, body, page.metadata.revision, metadata.body)
-                }.reversed(),
+                data = page.records.reversed(),
                 prevKey = page.metadata.newer,
                 nextKey = page.metadata.older,
             )
