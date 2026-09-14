@@ -633,7 +633,7 @@ private fun AgentRailOrbContent(
     }
 }
 
-/** A rail slot: [AgentOrb] with the agent id, so it is the live mascot when the agent has an identity. */
+/** A rail slot: [AgentOrb] with the agent id, so it is the mascot when the agent has an identity. */
 @Composable
 private fun RailAgentTile(
     target: AgentRailOrbTarget,
