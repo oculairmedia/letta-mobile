@@ -407,3 +407,185 @@ Rows specify the easing **from the previous row**. All percentages are of the au
 Duration 600 ms, easing, error glyph, frown and return-to-error behavior are unchanged; only root translation changes. `error→idle` releases +24→0 once over the existing 300 ms. At 22 dp the pending small profile still prunes ambient breath/glance; it does not suppress requested error/success feedback.
 
 Fable: ingest SPEC numbers → swap SVGs → regenerate; retune existing State/Enter/Flash keys and LookX/LookY endpoints. Preserve §8's Solo, shutter, facing, trails and smoothing. Current expr=2 shares Thinking: the delivered thinking/dragged paths share six-vertex topology so expr 2/3 can key the corresponding path coordinates in that existing Solo child; no new slot, ID or external key is required. Keep the geometry swap inside the existing shutter. Standard-only 22 dp rendering, feather/trail clipping and the runtime contract remain post-ingest checks; see `art/validation/VALIDATION.md`.
+
+## 10. Astra Max — living pupil and localized vector deformation
+
+**Design proposal against `2e11692c21ddcc971e2acb1609c33794ed892118`.** Sections 1–9 are preserved as historical design and implementation records. This appendix supplies the proposed deltas against the current rig, without editing its RML, scene generator, exported Rive file or runtime contract. Existing mechanisms remain Fable's responsibility. Static SVG proofs are not recordings of the proposed behavior running in either host.
+
+| Companion | Mechanical content |
+| --- | --- |
+| [PUPIL-SPEC.md](art/pupil/PUPIL-SPEC.md) | Exact phase geometry, composition, clipping, amplitude and runtime fallback |
+| [DEFORMATION-SPEC.md](art/mesh/DEFORMATION-SPEC.md) | Three-bone coefficients, all identity/vertex weights, exact area normalization, keyframes and measured limits |
+| [RESEARCH-NOTES.md](art/pupil/RESEARCH-NOTES.md) | Primary sources; distinguishes measured findings from authored numbers |
+| [RIVE-LEFTOVERS.md](art/pupil/RIVE-LEFTOVERS.md) | Feature choices and actual Android/desktop adoption conditions |
+| [VALIDATION.md](art/validation/max/VALIDATION.md) | Static geometry/size proofs and unresolved human/runtime gates |
+
+### 10.1 Baseline, framing and numeric deltas
+
+The current `tuneScale` mapping makes its VM default `0.5` render at scale `1.0`. This differs from the `1.25` framing assumed by the earlier design sheets. Restore that framing through the existing default, without changing the 500×500 artboard or applying a second scale. Product-size distances below are derived as `artboard_px × product_dp / 500 × display_scale`; at 44 dp the factor changes from `0.088` to `0.11`.
+
+| Field | Current rig | Proposed | Reason / provenance |
+| --- | --- | --- | --- |
+| `tuneScale` VM default | 0.5 | 0.75 | Existing mapping yields display scale 1.0→1.25; restore brief framing |
+| Artboard | 500×500 px | unchanged | Preserve coordinates and origins |
+| Display scale | 1.0 | 1.25 | One global scale; validation distinguishes both framings |
+| Output factors at 22 / 44 / 72 dp | 0.044 / 0.088 / 0.144 | 0.055 / 0.11 / 0.18 | Arithmetic, not perceptual thresholds |
+| Normal breath period | 6500 ms | 4600 ms | Latest explicit product brief; not a paper-derived comfort preference |
+| Normal inhale / exhale | 3575 / 2925 ms | 2530 / 2070 ms | Preserve 55/45 proportion; each leg cubic-bezier `0.37 0 0.63 1` |
+| Sleeping breath period | 9000 ms | 6800 ms | Latest explicit product brief |
+| Sleeping inhale / exhale | 4950 / 4050 ms | 3740 / 3060 ms | Preserve 55/45; cubic-bezier `0.37 0 0.63 1` |
+| Normal radial inflate | 1→1.06→1 | 1→1.03→1 | One inflate writer; area peak 1.1236→1.0609 times rest |
+| Sleeping radial inflate | 0.985→1.045→0.985 | 0.985→1.015→0.985 | Area peak relative to neutral 1.092025→1.030225 |
+| Blink close / hold / open | 4 / 1 / 10 frames at 60 fps | unchanged: 250 ms total | Canonical frames; exact milliseconds 66⅔ / 16⅔ / 166⅔. Do not create a 251 ms timeline from rounded labels |
+| Host facing spring / lag | ω=8.5, ζ=0.72; 350 ms | unchanged | Current implementation wins over the brief's stale 11/0.5 proposal |
+| Plate bowl | no bowl | 0 at 22 / 44 / 72 dp | Rigid card and eye protect the geometric glyph language |
+| Paint | Current body/halo bindings and neutral plate | unchanged | Independent identity `shape` and `color`; no new paint recipe |
+
+No local translation amplitude is increased in the following table. Restoring display scale recovers the agreed product-size floors. Values are peak travel from rest unless marked ±.
+
+| Signal | Artboard px, current→proposed | Current @44 dp, ×0.088 | Proposed @44 dp, ×0.11 |
+| --- | --- | --- | --- |
+| Breath root Y, 0→−11→0 | 11→11 | 0.968 | 1.21 |
+| `lookX` at ±1 | ±23→±23 | ±2.024 | ±2.53 |
+| `lookY` at ±1 | ±17→±17 | ±1.496 | ±1.87 |
+| Success hop | −48→−48 | −4.224 | −5.28 |
+| Waiting bounce | ±19→±19 | ±1.672 | ±2.09 |
+| Error shake X | ±24→±24 | ±2.112 | ±2.64 |
+| Error settle Y | +24→+24 | +2.112 | +2.64 |
+| Listening face lean Y | −14→−14 | −1.232 | −1.54 |
+
+The proposed 22 dp optical profile keeps ambient breath/glance translation pruned. Its existing `-small` glyphs and larger plate still need host size selection; the current rig's standard-only rendering is not silently relabeled as that profile. Facing, turn arc, intentional head motion, success trails and existing state transitions are not retuned here. All current timing/transform overrides remain subject to the bounds checks after Fable integrates this proposal.
+
+### 10.2 One pupil, still one geometric eye
+
+Preserve the existing glyphs and Solo selection. Add one `PupilOverlay` alongside Solo under the existing saccade/gaze assembly, visible only with resolved expr `0/1/5` (`idle/listening/speaking`) at 44/72 dp. Its field sits inside the existing solid glyph; the dark pupil core and wave overlap into one eye detail. There is one instance of the overlay, not one pupil per state. These are proposed layer labels, not invented component IDs or new VM keys.
+
+Back-to-front within that overlay: `iris-field.svg` → one active/interpolated squiggle path → `pupil-core.svg` → optional `catchlight.svg`. The field remains neutral; it does not inherit identity color. Clip the core, wave and catchlight to that field; all inherit the same existing look and blink ownership. The parent card and every face layer stay rigid while the body deforms.
+
+| Geometry / behavior | Earlier brief value | Proposed exact value | Derived @44 / @72 dp |
+| --- | --- | --- | --- |
+| Field, `art/pupil/iris-field.svg` | Ratio-based field, unspecified contrast | 34×30 px rounded rectangle, radius 7; fill `FFF7F7F7` | 3.74×3.30 / 6.12×5.40 dp |
+| Core, `art/pupil/pupil-core.svg` | Diameter 10–14 px | Diameter 14 px; fill `FF111111` | 1.54 / 2.52 dp |
+| Wave length | Approximately 0.6 pupil diameter | Endpoint span 20 px, x=−10…+10 | 2.20 / 3.60 dp before round caps |
+| Wave stroke | 2.5–3.5 px | 8 px, round caps/joins, `FF111111` | 0.88 / 1.44 dp; a 3 px stroke would be only 0.33 dp at 44 |
+| Maximum wave amplitude | Up to 3 px during speech | 4 px, applied to path y coordinates and handles | 0.44 / 0.72 dp from centre |
+| Inner parallax | 1.15× whole glyph look | `clamp(0.15*H.x,−1.5,+1.5)`, `clamp(0.15*H.y,−1,+1)` | Maximum ±0.165/±0.11 dp at 44; ±0.27/±0.18 at 72 |
+| Catchlight, `art/pupil/catchlight.svg` | 0.18 pupil diameter | Diameter 6 px, centre `(2,−2)` already baked into path; `FFFFFFFF` at 0.9 opacity | 1.08 dp at 72 only; do not apply the baked offset twice |
+| Additional high-frequency tremor | 0.3–0.6 px at 8–12 Hz | 0; dropped at every size | Existing microsaccade layer remains the sole noise owner |
+| Rest lid scaleY | Brief proposed thinking 0.92 | Keep current 1 outside blink; no per-state lid compression | Sleeping retains its existing lower crescent |
+| 22 dp overlay | Static core or hidden | Entire overlay hidden; original `glyph-*-small` geometry unchanged | No squiggle, core, field or catchlight |
+
+The four assets `art/pupil/squiggle-0.svg`, `squiggle-1.svg`, `squiggle-2.svg`, `squiggle-3.svg` encode phases `0, π/2, π, 3π/2` at normalized amplitude 1. Each has one `M` followed by four matching cubic segments, five anchors and corresponding handles. Render one interpolated path, never the four targets together. Multiply each y coordinate and tangent-handle y coordinate by amplitude A; preserve x coordinates and the 8 px stroke width. Do not animate node scaleY to implement amplitude, because that would also scale stroke thickness. Close the cycle back to phase 0.
+
+### 10.3 Per-state pupil motion and visibility
+
+`e` is the existing effective, host-smoothed `mouthOpen` in [0,1]. The following frequencies and amplitudes are authored values; no cited paper establishes them as physiological or perceptually optimal. `working` is an asset proposal only, as defined in §10.6.
+
+| Resolved key / role | Overlay at 44/72 | Frequency f, Hz | Amplitude A, artboard px | Core | Catchlight at 72 | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| `idle` | on | 0.4 | 1.5 | on | on, opacity 0.9 | 2500 ms phase cycle |
+| `listening` | on | 0.8 | 4 | on | on, opacity 0.9 | 1250 ms cycle; stronger wave remains inside field |
+| `thinking` | off | 0 | 0 | off | off | Preserve bent dash; gaze/aversion carries attention |
+| `waitingInput` | off | 0 | 0 | off | off | Preserve ring and existing fixed o mouth |
+| `speaking` | on | `1.5+e` | `1+3e` | on | on, opacity 0.9 | 1.5–2.5 Hz; mouth remains primary speech signal |
+| `error`, sustained | off | 0 | 0 | off | off | Diamond and frown retained |
+| `sleeping` | off | 0 | 0 | off | off | Lower crescent; no pupil life |
+| `loading` | off | 0 | 0 | off | off | Existing lifecycle dot |
+| `failed` | off | 0 | 0 | off | off | Existing X; apply outer containment below |
+| `degraded` | off | 0 | 0 | off | off | Existing bent diagonal |
+| `success`, flash | off | 0 | 0 | off | off | Upper crescent; hop remains dominant |
+| `error`, flash | off | 0 | 0 | off | off | Same winner/visibility as sustained error |
+| `dragged`, held | off | 0 | 0 | off | off | Squint and host-driven mouthOpen; no stress-wave addition |
+| `working`, proposed only | off | 0 | 0 | off | off | Connected notched glyph; no new priority |
+
+Catchlight is off at both 22 and 44 dp, and throughout blink closure. At 72 dp it appears only in the three enabled states. No catchlight is a second pupil. Every asset keeps viewBox `-50 -50 100 100`; each path uses one fill/stroke color without gradients, filters, masks, text or nested transforms. Runtime clipping is a documented rig operation, not an SVG mask embedded in the ingest files.
+
+| Phase implementation | Numeric rule | Adoption condition |
+| --- | --- | --- |
+| Preferred local clock | `phase = (phase + f*dt_seconds) mod 1`; phase is continuous when e changes | Path Effect support and nested invalidation must pass on the actual Android and desktop binaries; no per-frame host phase key |
+| Four-target fallback | Idle: 2500 ms; listening: 1250 ms; speaking: fixed 500 ms (2 Hz), fixed A=2.5 | Same single path interpolates targets at phase 0/.25/.5/.75/1, linear phase progress; mouth animation remains envelope-driven |
+| Inactive / hidden | No visible wave; stop phase work while overlay inactive | Existing resolved expression and visibility own the gate |
+| Reduced motion | f=0, A=0; enabled eye keeps static core in its field; inner parallax 0; catchlight off | Apply through the agreed `reduceMotion` contract follow-up; no claim that this pack changes or completes that host contract |
+
+A formula converter does not supply its own clock. A local Path Effect or timeline must provide phase. The fixed fallback explicitly drops speech-to-wave coupling while preserving the same character geometry. It is an implementation fallback for this one design, not a visual variant. Do not add in-file smoothing to mouthOpen: the host retains τ_attack=45 ms and τ_release=90 ms, with unchanged mouth paths, anchors and allowed states.
+
+### 10.4 Combined gaze containment and staging
+
+The current unattenuated combination can place the failed X approximately **2.540659 artboard px outside** the rounded card at an extreme host look plus rightward saccade. That is a baseline geometry finding, not a runtime screenshot. New inner pupil motion must not amplify this existing overflow.
+
+| Layer / signal | Owner | Numeric rule |
+| --- | --- | --- |
+| Host glyph look H | Existing `lookX` / `lookY` scrub | `H=(23*lookX,17*lookY)` at standard size; preserve intentional H first |
+| Existing decorative offset N | Existing automatic bias plus microsaccade, no new timer | `N=autoBias+saccade`; choose greatest λ∈[0,1] such that every glyph ink point at `H+λN` has inward rounded-card clearance ≥2 px |
+| Outer eye translation | Existing gaze/saccade assembly | `H+λN`; attenuate decorative noise before changing host intent; test current glyph including stroke |
+| Inner pupil translation | New overlay local control | Clamp `0.15H` to ±1.5 x / ±1 y; shares the outer assembly; no second full ±23/±17 offset |
+| Blink | Existing clip/shutter | One shutter applies to glyph and overlay; catchlight disappears with closure |
+| Force / flash | Existing resolved winner | Mute pupil wave, parallax, breath inflate, Wander and idle variety while the winning force/flash beat owns expression |
+| Mouth | Existing speech envelope | Unchanged geometry and host smoothing; pupil wave is secondary to mouth |
+
+For the standard 120 px/r27 card, the signed distance of point p to its outline is `length(max(abs(p)−(33,33),0)) + min(max(abs(p.x)−33,abs(p.y)−33),0) − 27`. Require this to be ≤−2 for all outer glyph ink samples. For a transformed card, evaluate points in its corresponding local space. If H alone fails, suppress N and choose the greatest radial κ∈[0,1] for which κH fits; report the attenuated host pose rather than calling it an unchanged-gaze pass. If even the centred glyph fails, the tuning combination fails validation and translation cannot repair it. Clipping remains a guard; it does not replace the clearance gate. The supplied proofs distinguish sampled static bounds from combined runtime facing, lean, deformation and painted-edge bounds.
+
+Decorative muting follows the already resolved winner. Preserve `dragged > error > waitingInput > speaking > success > thinking > listening > idle`; `sleeping` keeps its existing `dragged`/`error` exceptions. Lifecycle `loading`/`failed`/`degraded` remains surface chrome. This proposal does not introduce the brief's conflicting Flash-before-Drag priority, new listeners, new Solo IDs or a new state machine. Keep current shutter timing and expression swaps; historical §8 frame labels are not a request to overwrite the evolved implementation.
+
+### 10.5 Localized body deformation, one force stage
+
+Use vector bones bound to the existing path anchors/handles, or the equivalent keyed eight-vertex paths defined in [DEFORMATION-SPEC.md](art/mesh/DEFORMATION-SPEC.md). The 6×6 `art/mesh/body-lattice-overlay.svg` is a sampled weight-field diagram; it is not a Rive image mesh or a replacement 36-vertex body. All eight identity SVGs remain unchanged, with their existing start order, eight cubic segments and mirrored handles. No state chooses another body family.
+
+| Internal parameter | Current | Proposed bound / values | Layer responsibility |
+| --- | --- | --- | --- |
+| S, primary X scale | Existing success/error force scale | Success: 1/1.06/.93/1/.96/1.10/1.02/1 by keys below; error retains 1.07/.97/1.04/1 | One force stage; raw Y coefficient 1/S |
+| L, crown/base X delta | 0 | Success −.008…+.012; drag −.008; error 0 | Crown coefficient S−L; middle S; base S+L |
+| H, shear-like offset | 0 | Drag [−.015,+.015], all other named poses 0 | Opposing crown/base translations; optional existing velocity signal, otherwise 0 |
+| I, deliberate radial inflate | Normal 1…1.06; sleeping .985…1.045 | Normal 1…1.03; sleeping .985…1.015; force poses 1 | Independent sustained breath writer; pause during force ownership |
+| q, area correction | Not needed for reciprocal uniform S | `A_rest/A_raw`, recomputed per identity and pose | Apply once on deformed Y before I |
+| Plate bowl | None | 0 | Card, eye, pupil and mouth remain rigid |
+| Anchor displacement gate | No local-deformer gate | ≤18 px, 12% of nominal radius 150 | Displacement bound; not a claim about local differential strain |
+
+At rest anchor y: `wc=clamp(−y/150,0,1)`, `wb=clamp(y/150,0,1)`, `wm=1−wc−wb`. Freeze those weights for the anchor and both handles. For each of its three points p, compute `a=wc*(S−L)+wm*S+wb*(S+L)`, `tx=150*H*(wb−wc)`, `raw(p)=(a*p.x+tx,p.y/S)`, then `final(p)=I*(raw.x,q*raw.y)`. Compute path areas analytically from the cubic boundary integral, as in the companion validator. The force stage preserves **2D area**, not 3D volume; deliberate inflate changes area by I². Sampling new weights independently at the tangent handles would break the mirrored-handle contract.
+
+| Success key | t_ms / % of 800 ms | S | L | H / I | Easing to next deformation key |
+| --- | --- | --- | --- | --- | --- |
+| Rest | 0 / 0 | 1 | 0 | 0 / 1 | `0.3 0 0.8 0.15` |
+| Crouch | 80 / 10 | 1.06 | +.008 | 0 / 1 | `0 0 0 1` |
+| Ascent | 176 / 22 | .93 | −.008 | 0 / 1 | `0.22 1 0.36 1` |
+| Apex | 300 / 37.5 | 1 | 0 | 0 / 1 | `0.3 0 0.8 0.15` |
+| Fall | 480 / 60 | .96 | −.006 | 0 / 1 | `0.4 0 1 1` |
+| Land | 560 / 70 | 1.10 | +.012 | 0 / 1 | `0.22 1 0.36 1` |
+| Settle | 700 / 87.5 | 1.02 | +.003 | 0 / 1 | `0.2 0 0 1` |
+| Rest / return | 800 / 100 | 1 | 0 | 0 / 1 | Return 120 ms, `0.22 1 0.36 1` |
+
+All tuples in the easing column are `cubic-bezier x1 y1 x2 y2`. These are bounded deformation curves; replace the old landing elastic overshoot with the explicit settle key. Retain the current root hop, facing spin and trails as separately owned channels. Quantize absolute design times once using `round(ms*60/1000)` for the existing 60 fps timeline; do not independently round intervals.
+
+| Other deformation beat | duration_ms | S / L / H / I | cubic-bezier x1 y1 x2 y2 |
+| --- | --- | --- | --- |
+| Drag enter | 80 | `1/.92 / −.008 / 0 / 1` | `0.16 1 0.3 1` |
+| Held pointer response | 100 | Same S/L; `H=.015*clamp(existing_normalized_horizontal_velocity,−1,1)`; I=1 | `0.2 0 0 1` |
+| Drag release | 350 | Return to `1 / 0 / 0 / 1` | `0.22 1 0.36 1` |
+| Ordinary breath | 2530 inhale / 2070 exhale | `1 / 0 / 0 / I`; I=1→1.03→1 | `0.37 0 0.63 1` |
+| Sleeping breath | 3740 inhale / 3060 exhale | `1 / 0 / 0 / I`; I=.985→1.015→.985 | `0.37 0 0.63 1` |
+
+Drag is vertical compression plus horizontal spread; its primary S becomes `1/.92=1.086956521739` instead of old X1.08/Y.92. If the existing host supplies no velocity, H=0; no new external input is required. The local coefficients and all animation timing choices are authored, with provenance in [RESEARCH-NOTES.md](art/pupil/RESEARCH-NOTES.md).
+
+This stage **replaces** the existing force deformation result; set that inherited force scale to 1 while this stage owns geometry. Never multiply another landing squash or breath inflate on top. BodyShape, BodyShade, Gloss, tint and SoftEdge must share the same resulting path; Glow follows that boundary then its existing 1.02 scale. At 22 dp omit local L/H and decorative inflate/travel; retain meaningful primary force feedback. Native binding, area during runtime interpolation and composed painted bounds remain Fable's verification gates.
+
+### 10.6 Working glyph proposal and delivery gates
+
+| Asset | Standard / small geometry | Contract status |
+| --- | --- | --- |
+| `art/glyph-working.svg` | 44×56 px ink; connected vertical silhouette with right-open notch | Asset proposal only; distinct from horizontal `glyph-thinking.svg` |
+| `art/glyph-working-small.svg` | 52×64 px ink; wider notch for the optical-size profile | Same single-eye vocabulary; no pupil or mouth |
+| `art/validation/max/working-comparison.png` | Exact 22/44/72 px comparisons and enlarged crops | Static illustration; independent confusion test pending |
+
+A future semantic proposal would map `AvatarState.WORKING` to `working`. This delivery does not add that enum, expression number, VM key, Solo ID or arbitration priority. Fable and the host director must agree the contract before routing these assets. Existing external keys are unchanged.
+
+| Acceptance gate | Evidence / limit |
+| --- | --- |
+| Pure SVG and topology | Exact viewBoxes, one ink per path, stable four-cubic pupil phase targets, unchanged mouth topology and eight identity body files; see companion checks |
+| Pupil at 44/72 | Static phase strips and actual-size composites; compare visible shape change at 100%, not only enlarged crops |
+| Deformation | Same identity across land/drag/inflate; analytic planar area correction and sampled containment/displacement proofs; no native skinning claim |
+| V1 human recognition | **PENDING** independent identification of idle/thinking/success/error/sleeping at 44 dp |
+| V4 working vs thinking | **PENDING** five-person glance test with confusion below 10%; designer review does not satisfy it |
+| Runtime | **NOT RUN** Path Effect or fallback playback, nested invalidation, combined facing/lean/shutter, clipping, feather/trails, host size selection and reduced motion |
+| Handoff status | Draft until the remaining human/runtime gates are resolved; [VALIDATION.md](art/validation/max/VALIDATION.md) records measured results and exact proof paths |
+
+Fable: ingest §10 numbers → import pupil/working SVG paths and the vector deformation recipe → regenerate in the implementation workflow → verify the exported contract and actual host playback. Astra supplies geometry, tables and static proofs only. No Rive scene edit or push is included in this pass.

@@ -1,0 +1,96 @@
+{
+  "baseline": "2e11692c21ddcc971e2acb1609c33794ed892118",
+  "pupil_iris_minimum_clearance_px": 1.5,
+  "outer_gaze": {
+    "sample_cases": 630,
+    "minimum_raw_clearance_px": -12.064449,
+    "minimum_clamped_clearance_px": 2.0,
+    "host_fraction_min": 1.0,
+    "failed_example_overflow_px": 2.540659,
+    "failed_example_noise_fraction": 0.166666667,
+    "failed_example_corrected_xy": [
+      23.999999999068677,
+      17.0
+    ]
+  },
+  "phase_raster_changes": {
+    "idle_22": {
+      "pixels_delta_ge_8": 0,
+      "max_channel_delta": 0
+    },
+    "idle_44": {
+      "pixels_delta_ge_8": 4,
+      "max_channel_delta": 21
+    },
+    "idle_72": {
+      "pixels_delta_ge_8": 8,
+      "max_channel_delta": 46
+    },
+    "listening_22": {
+      "pixels_delta_ge_8": 0,
+      "max_channel_delta": 0
+    },
+    "listening_44": {
+      "pixels_delta_ge_8": 13,
+      "max_channel_delta": 60
+    },
+    "listening_72": {
+      "pixels_delta_ge_8": 9,
+      "max_channel_delta": 123
+    },
+    "speaking_22": {
+      "pixels_delta_ge_8": 0,
+      "max_channel_delta": 0
+    },
+    "speaking_44": {
+      "pixels_delta_ge_8": 8,
+      "max_channel_delta": 37
+    },
+    "speaking_72": {
+      "pixels_delta_ge_8": 12,
+      "max_channel_delta": 70
+    },
+    "thinking_22": {
+      "pixels_delta_ge_8": 0,
+      "max_channel_delta": 0
+    },
+    "thinking_44": {
+      "pixels_delta_ge_8": 0,
+      "max_channel_delta": 0
+    },
+    "thinking_72": {
+      "pixels_delta_ge_8": 0,
+      "max_channel_delta": 0
+    },
+    "sleeping_22": {
+      "pixels_delta_ge_8": 0,
+      "max_channel_delta": 0
+    },
+    "sleeping_44": {
+      "pixels_delta_ge_8": 0,
+      "max_channel_delta": 0
+    },
+    "sleeping_72": {
+      "pixels_delta_ge_8": 0,
+      "max_channel_delta": 0
+    }
+  },
+  "new_pure_svg_count": 9,
+  "prior_root_svgs_unchanged": 44,
+  "prior_spec_prefix": "PASS",
+  "native_path_parser": "PASS",
+  "mouth_topology": "PASS (unchanged bytes)",
+  "runtime": "NOT RUN",
+  "human_recognition": "PENDING",
+  "new_svg_sha256": {
+    "glyph-working.svg": "e2b2b71a8d84db7b07b411b60929373ee7d3a646c8669206a60ee2cc9481e9cb",
+    "glyph-working-small.svg": "8f2bc123b331a7087dfa6511f38dc17e987e1981bd954ce802ed793462893f45",
+    "pupil/catchlight.svg": "8b95ff64751d8baea72f83383fae95fdfb431e01212055917ae4d1ecdd27f996",
+    "pupil/iris-field.svg": "0074bc9498c8a02e3e3ce8cb632f802e9aac4378aa971a4f51de4b1fa9c34813",
+    "pupil/pupil-core.svg": "83e656083ac35733b4853e38ef20c1cf33676fd38660d96d27a160252511d18b",
+    "pupil/squiggle-0.svg": "86a3efca393d986eaf3044c13801c30b6d2fbb2b3a62522800a16ee07383aaaf",
+    "pupil/squiggle-1.svg": "486477e5bfb921a12fb392ddf822d05b8940d803e822048b28867cd8bdd56ce6",
+    "pupil/squiggle-2.svg": "31e4f1dbfd787eb8d6acca80bcd8636962a78256b8aa0aa85076ae049862f79c",
+    "pupil/squiggle-3.svg": "e93ac8db512c084fccba07f6bdfae8e7937ac8f6c520c63f9cedd90fb0f0e3a7"
+  }
+}
