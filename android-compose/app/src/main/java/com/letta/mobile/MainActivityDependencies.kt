@@ -20,4 +20,5 @@ class MainActivityDependencies @Inject constructor(
     /** The roster and the per-agent settings the mascot identity registry is derived from. */
     val agentRepository: IAgentRepository,
     val secureSettingsStore: SecureSettingsStore,
+    val conversationRunRegistry: com.letta.mobile.data.presence.ConversationRunRegistry,
 )
