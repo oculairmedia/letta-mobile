@@ -168,12 +168,12 @@ class RiveAvatarRuntimeTest {
         val runtime = RiveAvatarRuntime(sink).also { it.load(model()) }
 
         runtime.setHeadTurn(1f, -1f)
-        assertEquals(1f, sink.lastNumber(RiveAvatarContract.INPUT_TURN_X))
-        assertEquals(-1f, sink.lastNumber(RiveAvatarContract.INPUT_TURN_Y))
+        assertEquals(1f, sink.lastTurnX())
+        assertEquals(-1f, sink.lastTurnY())
 
         runtime.setHeadTurn(4f, -4f)
-        assertEquals(1f, sink.lastNumber(RiveAvatarContract.INPUT_TURN_X))
-        assertEquals(-1f, sink.lastNumber(RiveAvatarContract.INPUT_TURN_Y))
+        assertEquals(1f, sink.lastTurnX())
+        assertEquals(-1f, sink.lastTurnY())
     }
 
     @Test
@@ -239,6 +239,8 @@ class RiveAvatarRuntimeTest {
 
         fun lastLookX(): Float? = lastNumber(RiveAvatarContract.INPUT_LOOK_X)
         fun lastLookY(): Float? = lastNumber(RiveAvatarContract.INPUT_LOOK_Y)
+        fun lastTurnX(): Float? = lastNumber(RiveAvatarContract.INPUT_TURN_X)
+        fun lastTurnY(): Float? = lastNumber(RiveAvatarContract.INPUT_TURN_Y)
         fun lastMouth(): Float? = lastNumber(RiveAvatarContract.INPUT_MOUTH_OPEN)
         fun lastState(): String? = lastEnum(RiveAvatarContract.INPUT_STATE)
         fun stateEnums(): List<String> = enums(RiveAvatarContract.INPUT_STATE)
