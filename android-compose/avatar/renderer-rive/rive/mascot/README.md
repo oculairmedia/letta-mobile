@@ -83,20 +83,25 @@ are stable across pushes and are what the artist's edits attach to.
 the editor*. From then on the editor file is the source of truth and a CLI push would overwrite
 it. Ask before pushing if you do not know whether that has happened.
 
-**Pulling editor changes back.** The CLI (1.0.2) cannot download the cloud file's current
-revision, so the loop is: in the editor, File > Export > Download `.rev`; then
+**Pulling editor changes back - and the paywall.** The CLI (1.0.2) cannot download the cloud
+file's current revision, and on the free plan the editor exports nothing either: `.rev` download
+and `.riv` download are both behind a paid plan. So on this plan the editor is read-only for us:
+push into it to look, never author in it, because an edit made there cannot come back and the
+next `rive push` overwrites it. Author in `gen_scene.py`; review with `--screenshot` and
+`sheet.py`; describe a change you want in editor terms (which animation, which keys, what
+timing) and port it here.
+
+If a paid plan ever lands, the loop is: File > Export > Download `.rev`, then
 
 ```bash
 python pull_editor.py path/to/mascot.rev --write-report build/pull-report.md
 ```
 
-converts it with `rive create --from-rev`, strips push-assigned ids, and lists every
-animation, state-machine layer and named node that differs from the committed `scene.rml`:
-which animations changed and on which (object, property) the keyframes moved. Port those into
-`gen_scene.py` (the function that owns that animation), regenerate, verify, screenshot, and
-push - the ids the editor edited are the generator's named ones, so the next push updates them
-in place. A `.riv` download works too, through `rivdump` + `riv2rml.py` to an RML directory,
-then `pull_editor.py <dir>`.
+which converts it with `rive create --from-rev`, strips push-assigned ids, and lists every
+animation (with the keyed object/property whose keyframes moved), state-machine layer and named
+node that differs from the committed `scene.rml` - the map for porting the edit into
+`gen_scene.py`. Regenerate, verify, screenshot, push: the edited ids are the generator's named
+ones, so the push updates them in place.
 
 ## How the rig is put together
 
