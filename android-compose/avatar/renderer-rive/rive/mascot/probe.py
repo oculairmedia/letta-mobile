@@ -26,7 +26,6 @@ whose `push:` section is stripped, so a stray push cannot happen from there.
 import argparse
 import json
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -40,6 +39,7 @@ for _stream in (sys.stdout, sys.stderr):
         pass
 
 import scenarios
+from rivecli import rive_bin, temp_project
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 BUILD = os.path.join(HERE, "build", "probe")
@@ -50,42 +50,15 @@ SETTLE_TOL = 0.02          # "settled" = within 2 % of the span of the move
 FLAT = 1e-6
 
 
-def rive_bin():
-    env = os.environ.get("RIVE_BIN")
-    if env:
-        return env
-    exe = os.path.expanduser("~/.rive/bin/rive.exe")
-    return exe if os.path.exists(exe) else "rive"
-
-
 # --- the probed project --------------------------------------------------------------------------
 def probe_project(into, solo=None):
     """Write a complete probed Rive project into `into`; return (dir, solo duration in frames)."""
-    rml = os.path.join(into, "scene.rml")
-    run = [sys.executable, os.path.join(HERE, "gen_scene.py"), rml, "--probe"]
-    if solo:
-        run += ["--solo", solo]
-    p = subprocess.run(run, cwd=HERE, capture_output=True, text=True)
-    if p.returncode:
-        raise SystemExit((p.stderr or p.stdout).strip() or "gen_scene.py --probe failed")
-    duration = 0
-    if solo:
-        with open(rml, encoding="utf-8") as f:
-            doc = f.read()
-        m = re.search(r'<LinearAnimation[^>]*\bduration="(\d+)"[^>]*\bname="%s" id=' % re.escape(solo), doc)
-        duration = int(m.group(1)) if m else 0
-    # rive.yaml without the push: block - the temp project must not be pushable.
-    out, skipping = [], False
-    with open(os.path.join(HERE, "rive.yaml"), encoding="utf-8") as f:
-        for line in f:
-            if skipping and (line[:1].isspace() or not line.strip()):
-                continue
-            skipping = line.startswith("push:")
-            if not skipping:
-                out.append(line)
-    with open(os.path.join(into, "rive.yaml"), "w", encoding="utf-8", newline="\n") as f:
-        f.writelines(out)
-    return into, duration
+    return temp_project(into, ["--probe"], solo=solo)
+
+
+def json_lines(text):
+    """The JSON objects in the CLI's output, one per line that starts with '{'."""
+    return [json.loads(raw) for raw in (line.strip() for line in text.splitlines()) if raw.startswith("{")]
 
 
 def run_scenario(scenario, every=1, quiet=False):
@@ -101,11 +74,7 @@ def run_scenario(scenario, every=1, quiet=False):
         p = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
         if p.returncode:
             raise SystemExit("rive failed:\n  " + " ".join(cmd) + "\n" + (p.stderr or p.stdout))
-        lines = []
-        for raw in p.stdout.splitlines():
-            raw = raw.strip()
-            if raw.startswith("{"):
-                lines.append(json.loads(raw))
+        lines = json_lines(p.stdout)
         if not lines:
             raise SystemExit("no telemetry: the CLI printed no JSON lines\n" + (p.stderr or p.stdout))
         return lines, duration
@@ -114,34 +83,27 @@ def run_scenario(scenario, every=1, quiet=False):
 
 
 # --- the dense table -----------------------------------------------------------------------------
-def dense(lines, probes, every=1):
-    """JSON Lines -> {frames: [...], values: {name: [...]}, missing: [...]}.
+def named_values(line, vm_to_name):
+    """(probe name, float value) for every probed, valued item on one dump line."""
+    named = ((vm_to_name.get(item.get("path")), item.get("value")) for item in line.get("values", ()))
+    return [(name, float(value)) for name, value in named if name is not None and value is not None]
 
-    The dump prints a header, a frame-0 "full" line, then only what CHANGED at each sample, and a
-    final full line - and it prints NO line at all for a sample where nothing changed. So the
-    table has to be rebuilt on a uniform grid: every `every` frames from the first sample to the
-    last, with unchanged values carried forward. That carry is the whole reason this function
-    exists, and getting it wrong silently shortens every signature by the held frames.
-    """
-    vm_to_name = {p.vm_name: p.name for p in probes}
-    seen, sparse = set(), {}
-    current = {}
+
+def sparse_samples(lines, vm_to_name):
+    """({frame: every value known by then}, the probe names that ever had a value)."""
+    seen, sparse, current = set(), {}, {}
     for line in lines:
         if line.get("kind") == "header" or "frame" not in line:
             continue
-        for item in line.get("values", ()):
-            name = vm_to_name.get(item.get("path"))
-            if name is None:
-                continue
-            value = item.get("value")
-            if value is None:
-                continue
+        for name, value in named_values(line, vm_to_name):
             seen.add(name)
-            current[name] = float(value)
+            current[name] = value
         sparse[int(line["frame"])] = dict(current)     # a trailing full line restates its sample
-    if not sparse:
-        raise SystemExit("no telemetry frames in the dump")
+    return sparse, seen
 
+
+def uniform_grid(sparse, every):
+    """(frames, rows) every `every` frames from the first sample to the last, values carried forward."""
     step = max(1, int(every))
     first, last = min(sparse), max(sparse)
     frames, rows, held = [], [], {}
@@ -153,7 +115,22 @@ def dense(lines, probes, every=1):
         held.update(sparse[last])
         frames.append(last)
         rows.append(dict(held))
+    return frames, rows
 
+
+def dense(lines, probes, every=1):
+    """JSON Lines -> {frames: [...], values: {name: [...]}, missing: [...]}.
+
+    The dump prints a header, a frame-0 "full" line, then only what CHANGED at each sample, and a
+    final full line - and it prints NO line at all for a sample where nothing changed. So the
+    table has to be rebuilt on a uniform grid: every `every` frames from the first sample to the
+    last, with unchanged values carried forward. That carry is the whole reason this function
+    exists, and getting it wrong silently shortens every signature by the held frames.
+    """
+    sparse, seen = sparse_samples(lines, {p.vm_name: p.name for p in probes})
+    if not sparse:
+        raise SystemExit("no telemetry frames in the dump")
+    frames, rows = uniform_grid(sparse, every)
     names = [p.name for p in probes if p.name in seen]
     missing = [p.name for p in probes if p.name not in seen]
     values = {n: [row.get(n, 0.0) for row in rows] for n in names}
@@ -187,33 +164,40 @@ def signature(table):
     """
     frames = table["frames"]
     every = max(1, (frames[1] - frames[0]) if len(frames) > 1 else 1)
-    out = {}
-    for name, series in table["values"].items():
-        rest, final = series[0], series[-1]
-        lo, hi = min(series), max(series)
-        span = hi - lo
-        i = max(range(len(series)), key=lambda k: abs(series[k] - rest))
-        peak, peak_frame = series[i], frames[i]
-        # Overshoot only means something when the move IS a step to a new resting value. A
-        # self-returning beat (the success hop) ends where it started, and a loop that drifts
-        # (the breath) ends a hair away from it: neither is a step, and reading the hop's -48
-        # against the breath's -1.9 would print a meaningless 2400 %.
-        step = final - rest
-        if abs(step) > FLAT and abs(step) >= 0.2 * span:
-            overshoot = max(0.0, ((peak - rest) / step - 1.0) * 100.0)
-        else:
-            overshoot = 0.0
-        tol = max(span * SETTLE_TOL, FLAT)
-        settle = frames[0]
-        for f, v in zip(frames, series):
-            if abs(v - final) > tol:
-                settle = f
-        deltas = [abs(b - a) / every for a, b in zip(series, series[1:])]
-        out[name] = {"peak": round(peak, 4), "peak_frame": peak_frame,
-                     "overshoot_pct": round(overshoot, 2), "settle_frame": settle,
-                     "max_delta": round(max(deltas) if deltas else 0.0, 4),
-                     "spacing": spacing(series, frames[0]), "range": round(span, 4)}
-    return out
+    return {name: series_signature(frames, series, every) for name, series in table["values"].items()}
+
+
+def overshoot_pct(series, peak, span):
+    """How far past the resting-to-final step the peak went, in percent; 0 when there is no step.
+
+    Overshoot only means something when the move IS a step to a new resting value. A
+    self-returning beat (the success hop) ends where it started, and a loop that drifts (the
+    breath) ends a hair away from it: neither is a step, and reading the hop's -48 against the
+    breath's -1.9 would print a meaningless 2400 %."""
+    rest, step = series[0], series[-1] - series[0]
+    if abs(step) <= FLAT or abs(step) < 0.2 * span:
+        return 0.0
+    return max(0.0, ((peak - rest) / step - 1.0) * 100.0)
+
+
+def settle_frame(frames, series, span):
+    """The last frame the value is still outside 2 % of the span of the whole move."""
+    tol = max(span * SETTLE_TOL, FLAT)
+    outside = [f for f, v in zip(frames, series) if abs(v - series[-1]) > tol]
+    return outside[-1] if outside else frames[0]
+
+
+def series_signature(frames, series, every):
+    """One property's signature - see `signature`."""
+    span = max(series) - min(series)
+    i = max(range(len(series)), key=lambda k: abs(series[k] - series[0]))
+    peak = series[i]
+    deltas = [abs(b - a) / every for a, b in zip(series, series[1:])]
+    return {"peak": round(peak, 4), "peak_frame": frames[i],
+            "overshoot_pct": round(overshoot_pct(series, peak, span), 2),
+            "settle_frame": settle_frame(frames, series, span),
+            "max_delta": round(max(deltas) if deltas else 0.0, 4),
+            "spacing": spacing(series, frames[0]), "range": round(span, 4)}
 
 
 # --- printing ------------------------------------------------------------------------------------

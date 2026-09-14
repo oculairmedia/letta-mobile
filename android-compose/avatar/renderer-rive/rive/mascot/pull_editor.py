@@ -26,21 +26,23 @@ import sys
 import tempfile
 import xml.etree.ElementTree as ET
 
+from rivecli import rive_bin
+
 HERE = os.path.dirname(os.path.abspath(__file__))
-RIVE = os.path.expanduser("~/.rive/bin/rive.exe")
 ID_ATTR = re.compile(r'\s+id="\d+:\d+"')
+UNNAMED_CONTAINERS = ("LinearAnimation", "StateMachine", "StateMachineLayer", "KeyedObject", "KeyedProperty")
 
 
 def convert_rev(rev_path):
     out = tempfile.mkdtemp(prefix="mascot-pull-")
     shutil.rmtree(out)
-    subprocess.run([RIVE, "create", out, f"--from-rev={rev_path}"], check=True)
+    subprocess.run([rive_bin(), "create", out, f"--from-rev={rev_path}"], check=True)
     return out
 
 
 def load(path):
-    text = open(path, encoding="utf-8").read()
-    return ET.fromstring(ID_ATTR.sub("", text))
+    with open(path, encoding="utf-8") as f:
+        return ET.fromstring(ID_ATTR.sub("", f.read()))
 
 
 def norm(el):
@@ -61,73 +63,68 @@ def layers(root):
 def named_nodes(root):
     out = {}
     for el in root.iter():
-        if el.tag in ("LinearAnimation", "StateMachine", "StateMachineLayer", "KeyedObject", "KeyedProperty"):
-            continue
         name = el.get("name")
-        if name:
+        if name and el.tag not in UNNAMED_CONTAINERS:
             out.setdefault(f"{el.tag}:{name}", el)
     return out
 
 
+def keyed_table(anim):
+    """{(objectId, propertyKey): canonical keyframes} for one animation."""
+    return {(ko.get("objectId"), kp.get("propertyKey")): norm(kp)
+            for ko in anim.iter("KeyedObject") for kp in ko.iter("KeyedProperty")}
+
+
+def presence(key, ours, theirs):
+    """'added' | 'removed' | 'changed' for a key present on at least one side."""
+    if key not in ours:
+        return "added"
+    return "removed" if key not in theirs else "changed"
+
+
 def keyed_diff(ours, theirs):
     """Which (objectId, propertyKey) keyframe lists differ inside two animations."""
-    def table(anim):
-        t = {}
-        for ko in anim.iter("KeyedObject"):
-            for kp in ko.iter("KeyedProperty"):
-                t[(ko.get("objectId"), kp.get("propertyKey"))] = norm(kp)
-        return t
-    a, b = table(ours), table(theirs)
-    lines = []
-    for key in sorted(set(a) | set(b)):
-        if a.get(key) != b.get(key):
-            state = "added" if key not in a else "removed" if key not in b else "changed"
-            lines.append(f"    object {key[0]} property {key[1]}: {state}")
-    head = []
-    for attr in ("duration", "loopValue", "fps"):
-        if ours.get(attr) != theirs.get(attr):
-            head.append(f"    {attr}: {ours.get(attr)} -> {theirs.get(attr)}")
+    a, b = keyed_table(ours), keyed_table(theirs)
+    head = [f"    {attr}: {ours.get(attr)} -> {theirs.get(attr)}"
+            for attr in ("duration", "loopValue", "fps") if ours.get(attr) != theirs.get(attr)]
+    lines = [f"    object {key[0]} property {key[1]}: {presence(key, a, b)}"
+             for key in sorted(set(a) | set(b)) if a.get(key) != b.get(key)]
     return head + lines
+
+
+def attribute_changes(ours, theirs):
+    """' (k: a -> b, ...)' for the attributes that differ, or ' (children)' when only children do."""
+    attrs = [f"{k}: {ours.get(k)} -> {theirs.get(k)}"
+             for k in sorted(set(ours.attrib) | set(theirs.attrib)) if ours.get(k) != theirs.get(k)]
+    return " (" + ", ".join(attrs) + ")" if attrs else " (children)"
+
+
+def section(title, ours, theirs, detail):
+    """One report section: every name on either side that was added, removed or changed.
+    `detail(ours_el, theirs_el)` returns (suffix on the CHANGED line, extra lines under it)."""
+    out = [title]
+    for name in sorted(set(ours) | set(theirs)):
+        if name not in ours:
+            out.append(f"- ADDED   {name}")
+        elif name not in theirs:
+            out.append(f"- REMOVED {name}")
+        elif norm(ours[name]) != norm(theirs[name]):
+            suffix, extra = detail(ours[name], theirs[name])
+            out.append(f"- CHANGED {name}{suffix}")
+            out.extend(extra)
+    return out
 
 
 def report(ours_path, theirs_path):
     ours, theirs = load(ours_path), load(theirs_path)
     out = ["# Editor pull report", "", f"ours:   {ours_path}", f"theirs: {theirs_path}", ""]
-
-    oa, ta = animations(ours), animations(theirs)
-    out.append("## Animations")
-    for name in sorted(set(oa) | set(ta)):
-        if name not in oa:
-            out.append(f"- ADDED   {name}")
-        elif name not in ta:
-            out.append(f"- REMOVED {name}")
-        elif norm(oa[name]) != norm(ta[name]):
-            out.append(f"- CHANGED {name}")
-            out.extend(keyed_diff(oa[name], ta[name]))
+    out += section("## Animations", animations(ours), animations(theirs),
+                   lambda o, t: ("", keyed_diff(o, t)))
     out.append("")
-
-    ol, tl = layers(ours), layers(theirs)
-    out.append("## State machine layers")
-    for name in sorted(set(ol) | set(tl)):
-        if name not in ol:
-            out.append(f"- ADDED   {name}")
-        elif name not in tl:
-            out.append(f"- REMOVED {name}")
-        elif norm(ol[name]) != norm(tl[name]):
-            out.append(f"- CHANGED {name}")
+    out += section("## State machine layers", layers(ours), layers(theirs), lambda o, t: ("", []))
     out.append("")
-
-    on, tn = named_nodes(ours), named_nodes(theirs)
-    out.append("## Named nodes (attributes / children)")
-    for key in sorted(set(on) | set(tn)):
-        if key not in on:
-            out.append(f"- ADDED   {key}")
-        elif key not in tn:
-            out.append(f"- REMOVED {key}")
-        elif norm(on[key]) != norm(tn[key]):
-            o, t = on[key], tn[key]
-            attrs = [f"{k}: {o.get(k)} -> {t.get(k)}" for k in sorted(set(o.attrib) | set(t.attrib)) if o.get(k) != t.get(k)]
-            out.append(f"- CHANGED {key}" + (" (" + ", ".join(attrs) + ")" if attrs else " (children)"))
+    out += section("## Named nodes (attributes / children)", named_nodes(ours), named_nodes(theirs),
+                   lambda o, t: (attribute_changes(o, t), []))
     return "\n".join(out) + "\n"
 
 

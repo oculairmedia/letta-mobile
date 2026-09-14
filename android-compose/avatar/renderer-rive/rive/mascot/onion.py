@@ -40,13 +40,15 @@ Needs Pillow and the Rive CLI (~/.rive/bin/rive.exe). Never writes scene.rml.
 import argparse
 import hashlib
 import os
-import re
 import shutil
 import subprocess
 import sys
 import tempfile
+from typing import NamedTuple
 
 from PIL import Image, ImageChops, ImageDraw, ImageFilter
+
+from rivecli import rive_bin, temp_project
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 BUILD = os.path.join(HERE, "build", "onion")
@@ -54,14 +56,22 @@ CROP = (50, 30, 450, 430)          # the character's corner of the 500x500 artbo
 GROUND = (12, 12, 12)
 COOL, WARM = (90, 150, 255), (255, 150, 60)   # oldest -> newest paper tint
 FPS = 60.0
+SPIKE_RATIO = 2.5                  # a pair moving this many times its busiest neighbour...
+SPIKE_FLOOR = 1.0                  # ...and more than this % of pixels is an isolated spike
 
 
-def rive_bin():
-    env = os.environ.get("RIVE_BIN")
-    if env:
-        return env
-    exe = os.path.expanduser("~/.rive/bin/rive.exe")
-    return exe if os.path.exists(exe) else "rive"
+class Shot(NamedTuple):
+    """What one capture renders: the project, the CLI arguments before --advance, the cache dir."""
+    project: str
+    args: list
+    cache: str
+
+
+class Look(NamedTuple):
+    """How the onion composite draws its older frames."""
+    min_alpha: float
+    tint: bool
+    edges: bool
 
 
 # --- units ---------------------------------------------------------------------------------------
@@ -87,71 +97,50 @@ def spaced(total, count):
 # --- the solo document ---------------------------------------------------------------------------
 def solo_project(name, into):
     """Write a complete one-animation Rive project into `into`; return (dir, duration in frames)."""
-    rml = os.path.join(into, "scene.rml")
-    run = [sys.executable, os.path.join(HERE, "gen_scene.py"), rml, "--solo", name]
-    p = subprocess.run(run, cwd=HERE, capture_output=True, text=True)
-    if p.returncode:
-        raise SystemExit((p.stderr or p.stdout).strip() or f"gen_scene.py --solo {name} failed")
-    with open(rml, encoding="utf-8") as f:
-        doc = f.read()
-    m = re.search(r'<LinearAnimation[^>]*\bduration="(\d+)"[^>]*\bname="%s" id=' % re.escape(name), doc)
-    duration = int(m.group(1)) if m else 0
-    # rive.yaml without the push: block - the temp project must not be pushable.
-    out, skipping = [], False
-    with open(os.path.join(HERE, "rive.yaml"), encoding="utf-8") as f:
-        for line in f:
-            if skipping and (line[:1].isspace() or not line.strip()):
-                continue
-            skipping = line.startswith("push:")
-            if not skipping:
-                out.append(line)
-    with open(os.path.join(into, "rive.yaml"), "w", encoding="utf-8", newline="\n") as f:
-        f.writelines(out)
-    return into, duration
+    return temp_project(into, [], solo=name)
 
 
 # --- what to capture -----------------------------------------------------------------------------
+def identity_data(a):
+    """The identity and extra view-model writes, in the order the CLI receives them."""
+    data = [f"--data=shape={a.shape}"] if a.shape else []
+    data += [f"--data=color={a.color}"] if a.color else []
+    return data + [f"--data={kv}" for kv in a.data or []]
+
+
+def motion_bits(a):
+    """[(label, data args, gesture args)] for each motion the arguments ask for, in label order."""
+    wanted = [
+        (a.animation, a.animation, [], []),
+        (a.state, a.state, [f"--data=state={a.state}"], []),
+        (a.trigger, a.trigger, [], [f"--data={a.trigger}=true"]),
+        (a.hover, "hover", [], ["--pointer=move@250,250"]),
+        (a.drag, "drag", [], ["--pointer=down@250,250", "--pointer=move@300,300"]),
+    ]
+    return [(label, data, gestures) for asked, label, data, gestures in wanted if asked]
+
+
 def build_spec(a):
     """-> (label, gesture args before the final --advance, needs_solo)."""
-    data, gestures = [], []
-    if a.shape:
-        data.append(f"--data=shape={a.shape}")
-    if a.color:
-        data.append(f"--data=color={a.color}")
-    for kv in a.data or []:
-        data.append(f"--data={kv}")
-
-    label_bits = []
-    if a.animation:
-        label_bits.append(a.animation)
-    if a.state:
-        data.append(f"--data=state={a.state}")
-        label_bits.append(a.state)
-    if a.trigger:
-        gestures.append(f"--data={a.trigger}=true")
-        label_bits.append(a.trigger)
-    if a.hover:
-        gestures.append("--pointer=move@250,250")
-        label_bits.append("hover")
-    if a.drag:
-        gestures += ["--pointer=down@250,250", "--pointer=move@300,300"]
-        label_bits.append("drag")
-    if not label_bits:
+    bits = motion_bits(a)
+    if not bits:
         raise SystemExit("pick a motion: --state, --animation, --trigger, --hover or --drag")
-    return "+".join(label_bits), data + gestures, bool(a.animation)
+    data = identity_data(a) + [arg for _l, d, _g in bits for arg in d]
+    gestures = [arg for _l, _d, g in bits for arg in g]
+    return "+".join(label for label, _d, _g in bits), data + gestures, bool(a.animation)
 
 
-def capture(project, args, frames, cache, refresh):
+def capture(shot, frames, refresh):
     """One CLI run per frame; cached PNGs come back untouched."""
-    os.makedirs(cache, exist_ok=True)
+    os.makedirs(shot.cache, exist_ok=True)
     paths = []
     for i, n in enumerate(frames):
-        png = os.path.join(cache, f"frame-{n}.png")
+        png = os.path.join(shot.cache, f"frame-{n}.png")
         paths.append(png)
         if not refresh and os.path.exists(png):
             print(f"  frame {n:>4}  cached")
             continue
-        cmd = [rive_bin(), project, f"--screenshot={png}", "--quiet"] + args + [f"--advance={n}"]
+        cmd = [rive_bin(), shot.project, f"--screenshot={png}", "--quiet"] + shot.args + [f"--advance={n}"]
         print(f"  frame {n:>4}  ({i + 1}/{len(frames)}) ...", end="", flush=True)
         p = subprocess.run(cmd, capture_output=True, text=True)
         if p.returncode or not os.path.exists(png):
@@ -219,22 +208,25 @@ def outline(im, colour):
     return layer
 
 
-def onion(paths, frames, label, min_alpha, tint, edges):
+def skin(im, i, n, look):
+    """Frame i of n as the composite draws it: an outline, a tinted frame, or the frame itself."""
+    age = 0 if n < 2 else i / (n - 1)
+    colour = mix(COOL, WARM, age)
+    if look.edges and i != n - 1:
+        return outline(im, colour if look.tint else (200, 210, 225))
+    if look.tint:
+        # The newest frame is nearly untinted: it has to read as the real pose.
+        return tinted(im, colour, 0.6 - 0.5 * age)
+    return im
+
+
+def onion(paths, frames, label, look):
     ims = [load(p) for p in paths]
     n = len(ims)
     w, h = ims[0].size
     base = Image.new("RGBA", (w, h), GROUND + (255,))
     for i, im in enumerate(ims):
-        newest = i == n - 1
-        colour = mix(COOL, WARM, 0 if n < 2 else i / (n - 1))
-        if edges and not newest:
-            layer = outline(im, colour if tint else (200, 210, 225))
-        elif tint:
-            # The newest frame is nearly untinted: it has to read as the real pose.
-            layer = tinted(im, colour, 0.6 - 0.5 * (0 if n < 2 else i / (n - 1)))
-        else:
-            layer = im
-        base.alpha_composite(scale_alpha(layer, ramp(i, n, min_alpha)))
+        base.alpha_composite(scale_alpha(skin(im, i, n, look), ramp(i, n, look.min_alpha)))
     return label_image(base.convert("RGB"), label, frames)
 
 
@@ -296,20 +288,28 @@ def diff(paths, frames, cell=200, threshold=12):
     return out, rows
 
 
+def is_spike(pcts, i):
+    """Whether pair i moves far more than the pairs either side of it."""
+    near = [pcts[j] for j in (i - 1, i + 1) if 0 <= j < len(pcts)]
+    if not near:
+        return False
+    return pcts[i] > max(SPIKE_RATIO * max(near), SPIKE_FLOOR)
+
+
+def spikes_of(pcts):
+    # A snap is an ISOLATED spike: one pair moving far more than the pairs either side of it.
+    # A front-loaded ease is a smooth ramp and must not be flagged, so compare to neighbours,
+    # not to the mean.
+    return [i for i in range(len(pcts)) if is_spike(pcts, i)]
+
+
 def print_diff(rows):
     if not rows:
         print("  (need at least two frames for a diff)")
         return
     pcts = [r[2] for r in rows]
     peak, mean = max(pcts), sum(pcts) / len(pcts)
-    # A snap is an ISOLATED spike: one pair moving far more than the pairs either side of it.
-    # A front-loaded ease is a smooth ramp and must not be flagged, so compare to neighbours,
-    # not to the mean.
-    spikes = []
-    for i, pct in enumerate(pcts):
-        near = [pcts[j] for j in (i - 1, i + 1) if 0 <= j < len(pcts)]
-        if near and pct > 2.5 * max(near) and pct > 1.0:
-            spikes.append(i)
+    spikes = spikes_of(pcts)
     print("\n  frame pair        % pixels changed   energy")
     for i, (a, b, pct, energy) in enumerate(rows):
         bar = "#" * round(28 * (pct / peak if peak else 0))
@@ -322,7 +322,7 @@ def print_diff(rows):
 
 
 # --- main ----------------------------------------------------------------------------------------
-def main(argv=None):
+def parse_args(argv):
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0],
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--state", help="sustained state to switch into (plays Enter_<from>_<state>)")
@@ -343,35 +343,37 @@ def main(argv=None):
     p.add_argument("--diff", action="store_true", help="also write the motion-energy heatmap and table")
     p.add_argument("--refresh", action="store_true", help="recapture instead of reusing the cache")
     p.add_argument("--out", help="output png (default build/onion/<key>.png)")
-    a = p.parse_args(argv)
+    return p.parse_args(argv)
 
-    label, args, needs_solo = build_spec(a)
-    key = label.replace("/", "-") + "-" + hashlib.sha1(" ".join([label] + args).encode()).hexdigest()[:8]
-    cache = os.path.join(BUILD, key)
 
-    tmp = None
+def frames_for(a, duration):
+    """(span, frames): --at verbatim, else --frames spread over --span (or the solo duration, or 900 ms)."""
+    span = parse_time(a.span, "--span") if a.span else (duration or parse_time("900ms"))
+    if a.at:
+        return span, [int(x) for x in a.at.replace(" ", "").split(",") if x != ""]
+    return span, spaced(span, a.frames)
+
+
+def capture_motion(a, label, args, cache):
+    """Pick the project (a temp solo one for --animation), lay out the frames and capture them."""
+    tmp = tempfile.mkdtemp(prefix="onion-solo-") if a.animation else None
     try:
-        if needs_solo:
-            tmp = tempfile.mkdtemp(prefix="onion-solo-")
+        if tmp:
             project, duration = solo_project(a.animation, tmp)
             print(f"solo project for {a.animation} ({duration} frames) in {project}")
         else:
             project, duration = HERE, 0
-
-        span = parse_time(a.span, "--span") if a.span else (duration or parse_time("900ms"))
-        frames = ([int(x) for x in a.at.replace(" ", "").split(",") if x != ""] if a.at
-                  else spaced(span, a.frames))
+        span, frames = frames_for(a, duration)
         print(f"{label}: {len(frames)} frames over {span} frames "
               f"({span / FPS * 1000:.0f} ms) -> {cache}")
-        paths = capture(project, args, frames, cache, a.refresh)
+        return capture(Shot(project, args, cache), frames, a.refresh), frames
     finally:
         if tmp:
             shutil.rmtree(tmp, ignore_errors=True)
 
-    os.makedirs(BUILD, exist_ok=True)
-    out = a.out or os.path.join(BUILD, f"{key}.png")
-    onion(paths, frames, label, a.min_alpha, a.tint, a.edges).save(out)
-    print("wrote", out)
+
+def write_extras(a, out, paths, frames):
+    """--strip and --diff, next to the composite."""
     if a.strip:
         sp = os.path.splitext(out)[0] + "-strip.png"
         strip(paths, frames).save(sp)
@@ -382,6 +384,19 @@ def main(argv=None):
         image.save(dp)
         print("wrote", dp)
         print_diff(rows)
+
+
+def main(argv=None):
+    a = parse_args(argv)
+    label, args, _needs_solo = build_spec(a)
+    key = label.replace("/", "-") + "-" + hashlib.sha1(" ".join([label] + args).encode()).hexdigest()[:8]
+    paths, frames = capture_motion(a, label, args, os.path.join(BUILD, key))
+
+    os.makedirs(BUILD, exist_ok=True)
+    out = a.out or os.path.join(BUILD, f"{key}.png")
+    onion(paths, frames, label, Look(a.min_alpha, a.tint, a.edges)).save(out)
+    print("wrote", out)
+    write_extras(a, out, paths, frames)
     return 0
 
 
