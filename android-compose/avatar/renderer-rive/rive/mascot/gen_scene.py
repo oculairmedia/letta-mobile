@@ -33,6 +33,7 @@ DEVIATIONS from SPEC.md, all intentional and small:
   - speaking mouth opacity is smoothstep-free: visible while expr is speaking/dragged
 """
 import os
+import re
 from textwrap import indent
 
 from rml import *  # noqa: F401,F403
@@ -45,7 +46,26 @@ from rig.motion import (enter_animations, idle_variety_animations, momentary_ani
 from rig.machine import root_machine
 
 
-def root_artboard():
+# Solo mode (onion.py --animation): a throwaway extra state machine that plays one named
+# LinearAnimation outright, so an animation that normally sits behind a random wait can be
+# screenshotted. `Avatar` stays in the file untouched; only defaultStateMachineId changes, and
+# only when solo is asked for - the default output must stay byte-identical.
+SOLO_SM, SOLO_LAYER, SOLO_STATE = "3:900", "3:901", "3:902"
+
+
+def _animation_id(document, name):
+    m = re.search(r'<LinearAnimation[^>]*\bname="%s" id="([^"]+)"' % re.escape(name), document)
+    if not m:
+        raise SystemExit(f"no animation named {name!r} in the generated document")
+    return m.group(1)
+
+
+def _solo_machine(anim_id):
+    layer = layer_frame("Solo", SOLO_LAYER, SOLO_STATE, "", anim_state(anim_id, SOLO_STATE, 0))
+    return f'<StateMachine name="Solo" id="{SOLO_SM}">\n{indent(layer, "    ")}\n</StateMachine>'
+
+
+def root_artboard(solo=None):
     breath = animation("Breath", BREATH_ANIM, frames(4600), {GLOSS: {GRADIENT_OPACITY: sine(0.05, 4600, 1.0)}}, "loop")
     blink_rest = animation("BlinkRest", BLINK_REST_ANIM, 1, {})
     blink = animation("BlinkFire", BLINK_ANIM, 2, {}, callbacks=(PLATE_BLINK,))
@@ -63,7 +83,7 @@ def root_artboard():
            BODY_NODE: {ROT: [(0, rad(-2))]}}), "loop")
     anims = (shape_animations() + sustained_animations() + enter_animations() + momentary_animations() + idle_variety_animations()
              + turn_animations() + wander_animations() + [breath, blink_rest, blink, hover_rest, hover, hover_held])
-    return f'''<Artboard defaultStateMachineId="{SM}" viewModelId="{VM}" viewModelInstanceId="{VM_INSTANCE}"
+    board = f'''<Artboard defaultStateMachineId="{SM}" viewModelId="{VM}" viewModelInstanceId="{VM_INSTANCE}"
           x="0" y="0" styleId="0:3" clip="false" width="500" height="500" name="Mascot" id="{ROOT}">
     <LayoutComponentStyle name="Style" id="0:3"/>
     <!-- Facing: one 2-D value scrubbing TurnX/TurnY; keyed by state entries, Wander and flashes. -->
@@ -84,6 +104,11 @@ def root_artboard():
 
 {indent(root_machine(), "    ")}
 </Artboard>'''
+    if not solo:
+        return board
+    machine = indent(_solo_machine(_animation_id(board, solo)), "    ")
+    return board.replace(f'defaultStateMachineId="{SM}"', f'defaultStateMachineId="{SOLO_SM}"', 1) \
+                .replace("\n</Artboard>", f"\n\n{machine}\n</Artboard>")
 
 
 def data():
@@ -152,7 +177,7 @@ def data():
 </ViewModel>'''
 
 
-def scene_document():
+def scene_document(solo=None):
     return f'''<Rive version="1" kind="fragment">
     <!--
         The Letta agent mascot, v4: SPEC.md + art/*.svg through gen_scene.py. Regenerate rather
@@ -169,7 +194,7 @@ def scene_document():
           color     - identity; body, soft edge and halo are bound to it
           shape     - identity; picks one of eight bodies on the Shape layer
     -->
-{indent(root_artboard(), "    ")}
+{indent(root_artboard(solo), "    ")}
 
 {indent(plate_component(), "    ")}
 
@@ -179,9 +204,15 @@ def scene_document():
 
 if __name__ == "__main__":
     import sys
-    doc = scene_document()
-    # `python gen_scene.py [out.rml]` - an explicit path lets a check regenerate without touching scene.rml.
-    out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(os.path.abspath(__file__)), "scene.rml")
+    # `python gen_scene.py [out.rml] [--solo <AnimationName>]` - an explicit path lets a check
+    # regenerate without touching scene.rml; --solo is onion.py's single-animation document.
+    argv, solo = sys.argv[1:], None
+    if "--solo" in argv:
+        i = argv.index("--solo")
+        solo = argv[i + 1]
+        del argv[i:i + 2]
+    doc = scene_document(solo)
+    out = argv[0] if argv else os.path.join(os.path.dirname(os.path.abspath(__file__)), "scene.rml")
     with open(out, "w", encoding="utf-8", newline="\n") as f:
         f.write(doc)
     print(f"wrote {out} ({doc.count(chr(10))} lines)")

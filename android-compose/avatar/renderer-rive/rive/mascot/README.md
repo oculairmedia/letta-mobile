@@ -21,6 +21,7 @@ Beads: `letta-mobile-kh094` (this asset), `letta-mobile-1zti3` (identity picker 
 | `rive.yaml` | Push mapping: project 1882737 "oculair / Shared Project", file 2578084 "mascot" | no |
 | `pull_editor.py` | Editor round trip: diff a `.rev` export (or converted dir) against `scene.rml` by animation / layer / node | when the artist edits |
 | `sheet.py` | Contact sheets from screenshots (the review tool) | - |
+| `onion.py` | Onion skins: several frames of one motion overlaid, older ones fainter (`--tint`, `--edges`), so arcs, spacing and overshoot read at a glance; `--diff` prints the per-pair % changed as a pop detector. Drives the CLI itself and caches frames | rarely |
 | `timeline.py` | Read a curve without building: keyframes, easing and an ASCII plot per animation (`--list`, `--layers`) - the review tool when the editor is not available | rarely |
 | `test_rig.py` | `python -m unittest test_rig`: regenerate parity, unique ids, resolvable state/animation references, the contract check, a `timeline.py` smoke | rarely |
 | `SPEC.md`, `MOTION-REFERENCES.md` | Numbers and references from the design agent; §8 is the implementation map, §9 the human-touch patch (amplitudes, alphas, glyphs) the rig now follows | with them |
@@ -65,7 +66,10 @@ at 60 fps, so `--advance=N` is "frame N of whatever the data triggered from idle
 `--data=state=<key>` for sustained states, `--data=success=true` / `--data=error=true` to fire the flashes, `--data=dragged=true`,
 `--data=lookX=-1 --data=lookY=1 --data=mouthOpen=0.8` for the numbers, `--data=shape=drop`
 for identity. Render a state past its entry (advance 40+) to see its loop, and frames
-1/3/5/8/12/20 to see an entry.
+1/3/5/8/12/20 to see an entry. For a motion rather than a pose, `python onion.py --state
+listening --frames 10` captures and overlays the frames itself (`--animation IdleBounce` plays a
+beat that normally hides behind a random wait; `--diff` prints the % changed per pair, where an
+isolated spike is a snap).
 
 The desktop demo renders the built file through the same native runtime the product uses:
 
