@@ -25,7 +25,7 @@ import dev.snipme.highlights.model.ColorHighlight
 import dev.snipme.highlights.model.SyntaxLanguage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
 
 /**
  * One syntax-highlight span, renderer-neutral so it can be cached and carried between
@@ -62,13 +62,19 @@ internal fun rememberHighlightedCode(
             return@LaunchedEffect
         }
         spans = holder.carry(code)
-        // Coalesce: a streaming fence changes every token; the highlight is worth computing
-        // once the text has sat still for a beat, not per keystroke of the model.
-        delay(HIGHLIGHT_COALESCE_MS)
-        val computed = withContext(Dispatchers.Default) { computeCodeSpans(code, language, highlightsBuilder) }
-        HighlightedCodeCache.put(cacheKey, computed)
-        holder.commit(code, computed)
-        spans = computed
+        // The whole wait-and-compute runs on Default and writes the snapshot state from there
+        // (a snapshot write is thread-safe), the way the library's produceState did. Resuming on
+        // the composition's dispatcher after a background hop tripped Robolectric's
+        // wrong-thread check in the recomposition-gate test.
+        launch(Dispatchers.Default) {
+            // Coalesce: a streaming fence changes every token; the highlight is worth computing
+            // once the text has sat still for a beat, not per keystroke of the model.
+            delay(HIGHLIGHT_COALESCE_MS)
+            val computed = computeCodeSpans(code, language, highlightsBuilder)
+            HighlightedCodeCache.put(cacheKey, computed)
+            holder.commit(code, computed)
+            spans = computed
+        }
     }
     return remember(code, spans) { annotate(code, spans) }
 }
