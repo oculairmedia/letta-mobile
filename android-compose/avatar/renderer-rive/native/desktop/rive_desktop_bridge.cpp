@@ -20,6 +20,7 @@
 #include "rive/renderer/rive_renderer.hpp"
 #include "rive/animation/state_machine_input_instance.hpp"
 #include "rive/viewmodel/viewmodel_instance.hpp"
+#include "rive/viewmodel/viewmodel_instance_boolean.hpp"
 #include "rive/viewmodel/viewmodel_instance_color.hpp"
 #include "rive/viewmodel/viewmodel_instance_enum.hpp"
 #include "rive/viewmodel/viewmodel_instance_number.hpp"
@@ -158,10 +159,10 @@ __declspec(dllexport) void rive_bridge_advance(RiveBridge* bridge, float seconds
         bridge->stateMachine->advanceAndApply(seconds);
 }
 
-static void ensure_target(RiveBridge* bridge, uint32_t width, uint32_t height)
+static bool ensure_target(RiveBridge* bridge, uint32_t width, uint32_t height)
 {
-    if (bridge->width == width && bridge->height == height && bridge->drawTexture)
-        return;
+    if (bridge->width == width && bridge->height == height && bridge->drawTexture && bridge->readbackTexture)
+        return true;
     D3D11_TEXTURE2D_DESC desc{};
     desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
     desc.MipLevels = 1;
@@ -171,17 +172,20 @@ static void ensure_target(RiveBridge* bridge, uint32_t width, uint32_t height)
     desc.SampleDesc.Count = 1;
     desc.Usage = D3D11_USAGE_DEFAULT;
     desc.BindFlags = D3D11_BIND_RENDER_TARGET;
-    bridge->gpu->CreateTexture2D(&desc, nullptr, bridge->drawTexture.ReleaseAndGetAddressOf());
+    HRESULT drawOk = bridge->gpu->CreateTexture2D(&desc, nullptr, bridge->drawTexture.ReleaseAndGetAddressOf());
 
     desc.Usage = D3D11_USAGE_STAGING;
     desc.BindFlags = 0;
     desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
-    bridge->gpu->CreateTexture2D(&desc, nullptr, bridge->readbackTexture.ReleaseAndGetAddressOf());
+    HRESULT readOk = bridge->gpu->CreateTexture2D(&desc, nullptr, bridge->readbackTexture.ReleaseAndGetAddressOf());
+    if (FAILED(drawOk) || FAILED(readOk) || !bridge->drawTexture || !bridge->readbackTexture)
+        return false;
 
     bridge->renderTarget =
         bridge->renderContext->static_impl_cast<RenderContextD3DImpl>()->makeRenderTarget(width, height);
     bridge->width = width;
     bridge->height = height;
+    return true;
 }
 
 // Draws the current scene and copies it into `rgbaOut` (width * height * 4 bytes, premultiplied
@@ -191,7 +195,8 @@ __declspec(dllexport) int rive_bridge_render(RiveBridge* bridge, int width, int 
 {
     if (!bridge->artboard || width <= 0 || height <= 0)
         return 1;
-    ensure_target(bridge, (uint32_t)width, (uint32_t)height);
+    if (!ensure_target(bridge, (uint32_t)width, (uint32_t)height))
+        return 3;
 
     bridge->renderContext->beginFrame({
         .renderTargetWidth = (uint32_t)width,
@@ -306,6 +311,15 @@ __declspec(dllexport) int rive_bridge_vm_fire(RiveBridge* bridge, const char* na
     if (!property || !property->is<ViewModelInstanceTrigger>())
         return 1;
     property->as<ViewModelInstanceTrigger>()->trigger();
+    return 0;
+}
+
+__declspec(dllexport) int rive_bridge_vm_set_boolean(RiveBridge* bridge, const char* name, int value)
+{
+    auto* property = bridge->viewModel ? bridge->viewModel->propertyValue(std::string(name)) : nullptr;
+    if (!property || !property->is<ViewModelInstanceBoolean>())
+        return 1;
+    property->as<ViewModelInstanceBoolean>()->propertyValue(value != 0);
     return 0;
 }
 

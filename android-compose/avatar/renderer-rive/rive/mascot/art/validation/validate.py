@@ -87,141 +87,198 @@ def signature(name):
             target = row[4].split('→')[-1].split('/')
             keys.append((int(row[1]),number(target[0]),number(target[1]),
                          tuple(float(x) for x in row[5].split())))
-            assert abs(float(row[2]) - int(row[1])/(300 if name=='listening' else 800)*100)<.0001
+            span = 300 if name == 'listening' else 800
+            assert abs(float(row[2]) - int(row[1]) / span * 100) < .0001
     assert len(keys)==(4 if name=='listening' else 6)
     return keys
 
 
-def gate():
+CONTRACT_STATE_KEYS = {
+    'IDLE': 'idle',
+    'LISTENING': 'listening',
+    'THINKING': 'thinking',
+    'WAITING_INPUT': 'waitingInput',
+    'SPEAKING': 'speaking',
+    'ERROR': 'error',
+    'SLEEPING': 'sleeping',
+    'LOADING': 'loading',
+    'FAILED': 'failed',
+    'DEGRADED': 'degraded',
+}
+
+
+def _assert_state_contract():
+    states = [r for r in ROWS if len(r) == 8 and r[0] in STATES and r[1].startswith('glyph-')]
+    expected_rows = [(s, f'glyph-{s}.svg', 'body-blob.svg') for s in STATES]
+    assert [(r[0], r[1], r[2]) for r in states] == expected_rows
+    assert len({r[0] for r in states}) == len(states)
+    contract = (PROJECT.parents[1] / 'src/commonMain/kotlin/com/letta/mobile/avatar/rive/RiveAvatarContract.kt').read_text()
+    pairs = re.findall(r'AvatarState\.(\w+) -> "(\w+)"', contract)
+    assert len(pairs) == len(set(pairs))
+    assert dict(pairs) == CONTRACT_STATE_KEYS
+
+
+def _assert_inventory():
     # Two Max assets are proposals, not additions to the active state set.
     proposals = {'glyph-working.svg', 'glyph-working-small.svg'}
     supplied = {p.name for p in ART.glob('*.svg')}
     assert supplied == EXPECTED or supplied == EXPECTED | proposals
+    return supplied
+
+
+def _assert_one_svg(file):
+    root = ET.parse(file).getroot()
+    body = file.name.startswith('body-')
+    assert root.tag=='{http://www.w3.org/2000/svg}svg'
+    assert root.attrib=={'viewBox':'-180 -180 360 360' if body else '-50 -50 100 100'}
+    assert len(root)==1 and root[0].tag=='{http://www.w3.org/2000/svg}path'
+    a = root[0].attrib
+    assert set(a) <= {'d','fill','stroke','stroke-width','stroke-linecap','stroke-linejoin','fill-rule'}
+    assert {c for c in re.findall('[A-Za-z]',a['d'])} <= set('MLCZ')
+    assert len({a[k] for k in ('fill','stroke') if k in a and a[k]!='none'})==1
+    assert all(a[k] in ('#111111','#000000','none') for k in ('fill','stroke') if k in a)
+    points = np.concatenate(samples(a['d']))
+    pad = float(a.get('stroke-width',0))/2
+    assert np.min(points-pad)>=(-180 if body else -50)
+    assert np.max(points+pad)<=(180 if body else 50)
+    if body:
+        assert re.findall('[A-Z]',a['d'])==['M']+['C']*8+['Z']
+        assert len(svgpath.body_vertices(file))==8
+        assert file.read_bytes()==old_file('art/'+file.name)
+    else:
+        ET.fromstring(svgpath.path_rml(file,'ValidationOnly','999:1'))
+    raster = Image.open(BytesIO(cairosvg.svg2png(url=str(file),output_width=100,output_height=100)))
+    assert (raster.getchannel('A').getbbox() is None)==('mouth-closed' in file.name)
+
+
+def _assert_svgs():
+    for file in sorted(ART.glob('*.svg')):
+        _assert_one_svg(file)
+
+
+def _assert_faces(tail):
+    assert node(f'glyph-thinking{tail}.svg').get('d') != node(f'glyph-dragged{tail}.svg').get('d')
+    for key in ('thinking', 'dragged'):
+        d = node(f'glyph-{key}{tail}.svg').get('d')
+        assert re.findall('[A-Z]', d) == ['M'] + ['C'] * 6 + ['Z']
+        assert len(svgpath.parse_path(d)[0]['verts']) == 6
+    assert node(f'glyph-idle{tail}.svg').get('d') != node(f'glyph-speaking{tail}.svg').get('d')
+    for key in MOUTHS:
+        p = ART / f'glyph-mouth-{key}{tail}.svg'
+        assert p.read_bytes() == old_file('art/' + p.name)
+    poses = []
+    for key in ('closed', 'half', 'open'):
+        p = ART / f'glyph-mouth-{key}{tail}.svg'
+        assert re.findall('[A-Z]', node(p.name).get('d')) == ['M'] + ['C'] * 4 + ['Z']
+        assert len(svgpath.mouth_vertices(p)) == 4
+        verts = svgpath.parse_path(node(p.name).get('d'))[0]['verts']
+        points = np.array([v[:2] for v in verts])
+        assert points[0, 0] > 0 and points[2, 0] < 0
+        assert points[1, 1] >= 0 and points[3, 1] <= 0
+        poses.append(points)
+    for a in np.linspace(0, 1, 41):
+        i = 0 if a <= .5 else 1
+        q = 2 * a - i
+        verts = (1 - q) * poses[i] + q * poses[i + 1]
+        assert verts[0, 0] > 0 and verts[2, 0] < 0
+        assert verts[1, 1] >= 0 and verts[3, 1] <= 0
+
+
+def _assert_section8(report):
+    section8 = SPEC.split('## 8.', 1)[1].split('## 9.', 1)[0].rstrip() + '\n'
+    section8_base = '2e11692c21ddcc971e2acb1609c33794ed892118' if '## 10. Astra Max' in SPEC else BASE
+    old8 = subprocess.check_output(['git', 'show', f'{section8_base}:{REL}/SPEC.md'], cwd=REPO).decode().split('## 8.', 1)[1].split('## 9.', 1)[0].rstrip() + '\n'
+    assert section8 == old8
+    report['section8_baseline'] = section8_base
+    report['section8_sha256'] = hashlib.sha256(section8.encode()).hexdigest()
+
+
+def _assert_amplitudes(report):
+    targets = {'Breath root y': (1.2, 1.5), 'Gaze lookX max': (2.2, 2.8),
+       'Gaze lookY max': (1.6, 2.2), 'Success hop peak': (5, 7), 'Waiting bounce': (2, 2.5),
+       'Error shake': (2.5, 3.5), 'Error settle': (2.5, 3.5), 'Listening lean': (1.5, float('inf'))}
+    assert AMP.keys() == targets.keys()
+    report['amplitudes_44dp'] = {}
+    for key, (old, new) in AMP.items():
+        lo, hi = targets[key]
+        assert old * .11 < lo and lo <= new * .11 <= hi
+        row = next(r for r in ROWS if len(r) == 7 and r[0] == key)
+        assert abs(number(row[4]) - new * .11) < 1e-8
+        report['amplitudes_44dp'][key] = round(new * .11, 2)
+    for key in ('listening', 'success'):
+        signature(key)
+    assert '| gaze max x/y | 0.22 / 0.165 dp | 2.53 / 1.87 dp | 4.14 / 3.06 dp |' in SPEC
+    assert '| root breath peak from rest | 0 dp (pruned) | 1.21 dp | 1.98 dp |' in SPEC
+
+
+def _size_values(key, column):
+    row = next(r for r in ROWS if len(r) == 4 and r[0] == key)
+    return [float(x) for x in re.findall(r'\d+(?:\.\d+)?', row[column])]
+
+
+def _assert_glyph_sizes():
+    for col, mult, tail in ((1, .055, '-small'), (2, .11, ''), (3, .18, '')):
+        pieces = samples(node(f'glyph-waitingInput{tail}.svg').get('d'))
+        diameters = [float(np.ptp(p[:, 0])) * mult for p in pieces]
+        assert np.allclose(_size_values('waitingInput ring outer / hole diameter', col), diameters, atol=.005)
+        points = np.concatenate(samples(node(f'glyph-speaking{tail}.svg').get('d')))
+        assert np.allclose(_size_values('speaking eye width×height', col), np.ptp(points, axis=0) * mult, atol=.005)
+        stroke = float(node(f'glyph-failed{tail}.svg').get('stroke-width'))
+        assert abs(_size_values('failed X stroke', col)[0] - stroke * mult) < .005
+        outer, inner = (36, 16) if tail else (29, 14)
+        conservative = math.floor((outer - inner - math.sqrt(2)) * mult * 100) / 100
+        assert abs(_size_values('waitingInput eye minimum radial ink width (off-centre hole; conservative bound)', col)[0] - conservative) < 1e-8
+
+
+def _gaze_clearance():
+    minimum = float('inf')
+    for state in STATES:
+        a = node(f'glyph-{state}.svg').attrib
+        points = np.concatenate(samples(a['d']))
+        scale = {'listening': 1.04, 'waitingInput': 1.06}.get(state, 1)
+        h, r = 60 * scale, 27 * scale
+        pad = float(a.get('stroke-width', 0)) / 2
+        for x in (-AMP['Gaze lookX max'][1], 0, AMP['Gaze lookX max'][1]):
+            for y in (-AMP['Gaze lookY max'][1], 0, AMP['Gaze lookY max'][1]):
+                q = np.abs(points + [x, y]) - (h - r)
+                distance = np.linalg.norm(np.maximum(q, 0), axis=1) + np.minimum(np.maximum(q[:, 0], q[:, 1]), 0) - r
+                minimum = min(minimum, float(np.min(-distance - pad)))
+    assert minimum >= 2, minimum
+    return round(minimum, 3)
+
+
+def _body_clearance():
+    minimum = 500
+    for shape in SHAPES:
+        pts = np.concatenate(samples(node(f'body-{shape}.svg').get('d'), 301))
+        for angle in np.linspace(-11, 11, 221):
+            c, s = math.cos(math.radians(angle)), math.sin(math.radians(angle))
+            p = pts @ np.array([[c, s], [-s, c]])
+            for x in (-24, 24):
+                for y in (-48, 24):
+                    out = np.array([250, 270]) + 1.25 * (p + [x, y])
+                    minimum = min(minimum, float(out.min()), float((500 - out).min()))
+    assert minimum >= 2, minimum
+    return round(minimum, 3)
+
+
+def gate():
+    supplied = _assert_inventory()
     baseline_names = set(subprocess.check_output(
         ['git','ls-tree','--name-only',BASE,f'{REL}/art/'],cwd=REPO,text=True).splitlines())
     assert {f'{REL}/art/{n}' for n in EXPECTED} <= baseline_names
     report = {'baseline':BASE, 'svg_count':len(supplied),
               'proposal_only_svg_count':len(supplied - EXPECTED),
               'max_appendix_gate':'art/validation/max/validate_max.py'}
-    for file in sorted(ART.glob('*.svg')):
-        root = ET.parse(file).getroot()
-        body = file.name.startswith('body-')
-        assert root.tag=='{http://www.w3.org/2000/svg}svg'
-        assert root.attrib=={'viewBox':'-180 -180 360 360' if body else '-50 -50 100 100'}
-        assert len(root)==1 and root[0].tag=='{http://www.w3.org/2000/svg}path'
-        a = root[0].attrib
-        assert set(a) <= {'d','fill','stroke','stroke-width','stroke-linecap','stroke-linejoin','fill-rule'}
-        assert {c for c in re.findall('[A-Za-z]',a['d'])} <= set('MLCZ')
-        assert len({a[k] for k in ('fill','stroke') if k in a and a[k]!='none'})==1
-        assert all(a[k] in ('#111111','#000000','none') for k in ('fill','stroke') if k in a)
-        points = np.concatenate(samples(a['d']))
-        pad = float(a.get('stroke-width',0))/2
-        assert np.min(points-pad)>=(-180 if body else -50)
-        assert np.max(points+pad)<=(180 if body else 50)
-        if body:
-            assert re.findall('[A-Z]',a['d'])==['M']+['C']*8+['Z']
-            assert len(svgpath.body_vertices(file))==8
-            assert file.read_bytes()==old_file('art/'+file.name)
-        else:
-            # Fable's actual path converter must accept every supplied file.
-            # Parse its returned XML in memory; do not serialize an .rml artifact.
-            ET.fromstring(svgpath.path_rml(file,'ValidationOnly','999:1'))
-        raster = Image.open(BytesIO(cairosvg.svg2png(url=str(file),output_width=100,output_height=100)))
-        assert (raster.getchannel('A').getbbox() is None)==('mouth-closed' in file.name)
-    for tail in ('','-small'):
-        assert node(f'glyph-thinking{tail}.svg').get('d') != node(f'glyph-dragged{tail}.svg').get('d')
-        for key in ('thinking','dragged'):
-            d=node(f'glyph-{key}{tail}.svg').get('d')
-            assert re.findall('[A-Z]',d)==['M']+['C']*6+['Z']
-            assert len(svgpath.parse_path(d)[0]['verts'])==6
-        assert node(f'glyph-idle{tail}.svg').get('d') != node(f'glyph-speaking{tail}.svg').get('d')
-        for key in MOUTHS:
-            p = ART / f'glyph-mouth-{key}{tail}.svg'
-            assert p.read_bytes()==old_file('art/'+p.name)
-        poses=[]
-        for key in ('closed','half','open'):
-            p = ART / f'glyph-mouth-{key}{tail}.svg'
-            assert re.findall('[A-Z]',node(p.name).get('d'))==['M']+['C']*4+['Z']
-            assert len(svgpath.mouth_vertices(p))==4
-            verts=svgpath.parse_path(node(p.name).get('d'))[0]['verts']
-            points=np.array([v[:2] for v in verts])
-            assert points[0,0]>0 and points[2,0]<0
-            assert points[1,1]>=0 and points[3,1]<=0
-            poses.append(points)
-        for a in np.linspace(0,1,41):
-            i=0 if a<=.5 else 1
-            q=2*a-i
-            verts=(1-q)*poses[i]+q*poses[i+1]
-            assert verts[0,0]>0 and verts[2,0]<0
-            assert verts[1,1]>=0 and verts[3,1]<=0
-    section8=SPEC.split('## 8.',1)[1].split('## 9.',1)[0].rstrip()+'\n'
-    # Fable added the evolved blink row after the original art baseline.
-    # Max preserves that implementation record as well as the rest of §§1–9.
-    section8_base = '2e11692c21ddcc971e2acb1609c33794ed892118' if '## 10. Astra Max' in SPEC else BASE
-    old8 = subprocess.check_output(['git','show',f'{section8_base}:{REL}/SPEC.md'],cwd=REPO).decode().split('## 8.',1)[1].split('## 9.',1)[0].rstrip()+'\n'
-    assert section8==old8
-    report['section8_baseline']=section8_base
-    report['section8_sha256']=hashlib.sha256(section8.encode()).hexdigest()
-    targets={'Breath root y':(1.2,1.5),'Gaze lookX max':(2.2,2.8),
-       'Gaze lookY max':(1.6,2.2),'Success hop peak':(5,7),'Waiting bounce':(2,2.5),
-       'Error shake':(2.5,3.5),'Error settle':(2.5,3.5),'Listening lean':(1.5,float('inf'))}
-    assert AMP.keys()==targets.keys()
-    report['amplitudes_44dp']={}
-    for key,(old,new) in AMP.items():
-        lo,hi=targets[key]
-        assert old*.11<lo and lo<=new*.11<=hi
-        row=next(r for r in ROWS if len(r)==7 and r[0]==key)
-        assert abs(number(row[4])-new*.11)<1e-8
-        report['amplitudes_44dp'][key]=round(new*.11,2)
-    for key in ('listening','success'): signature(key)
-    assert '| gaze max x/y | 0.22 / 0.165 dp | 2.53 / 1.87 dp | 4.14 / 3.06 dp |' in SPEC
-    assert '| root breath peak from rest | 0 dp (pruned) | 1.21 dp | 1.98 dp |' in SPEC
-    def size_values(key, column):
-        row=next(r for r in ROWS if len(r)==4 and r[0]==key)
-        return [float(x) for x in re.findall(r'\d+(?:\.\d+)?',row[column])]
-    for col,mult,tail in ((1,.055,'-small'),(2,.11,''),(3,.18,'')):
-        pieces=samples(node(f'glyph-waitingInput{tail}.svg').get('d'))
-        diameters=[float(np.ptp(p[:,0]))*mult for p in pieces]
-        assert np.allclose(size_values('waitingInput ring outer / hole diameter',col),diameters,atol=.005)
-        points=np.concatenate(samples(node(f'glyph-speaking{tail}.svg').get('d')))
-        assert np.allclose(size_values('speaking eye width×height',col),np.ptp(points,axis=0)*mult,atol=.005)
-        stroke=float(node(f'glyph-failed{tail}.svg').get('stroke-width'))
-        assert abs(size_values('failed X stroke',col)[0]-stroke*mult)<.005
-        outer,inner=(36,16) if tail else (29,14)
-        conservative=math.floor((outer-inner-math.sqrt(2)) * mult * 100)/100
-        assert abs(size_values('waitingInput eye minimum radial ink width (off-centre hole; conservative bound)',col)[0]-conservative)<1e-8
-    # State selection, all unchanged identity names, and exact external state keys.
-    states=[r for r in ROWS if len(r)==8 and r[0] in STATES and r[1].startswith('glyph-')]
-    assert len(states)==13 and all(r[2]=='body-blob.svg' for r in states)
-    contract=(PROJECT.parents[1]/'src/commonMain/kotlin/com/letta/mobile/avatar/rive/RiveAvatarContract.kt').read_text()
-    assert set(re.findall(r'AvatarState\.\w+ -> "(\w+)"',contract))==set(STATES[:10])
-    # Rounded Card signed-distance test. Expand stroked centerlines by half-width.
-    minimum=float('inf')
-    for state in STATES:
-        a=node(f'glyph-{state}.svg').attrib
-        points=np.concatenate(samples(a['d']))
-        scale={'listening':1.04,'waitingInput':1.06}.get(state,1)
-        h,r=60*scale,27*scale
-        pad=float(a.get('stroke-width',0))/2
-        for x in (-AMP['Gaze lookX max'][1],0,AMP['Gaze lookX max'][1]):
-            for y in (-AMP['Gaze lookY max'][1],0,AMP['Gaze lookY max'][1]):
-                q=np.abs(points+[x,y])-(h-r)
-                distance=np.linalg.norm(np.maximum(q,0),axis=1)+np.minimum(np.maximum(q[:,0],q[:,1]),0)-r
-                minimum=min(minimum,float(np.min(-distance-pad)))
-    assert minimum>=2, minimum
-    report['minimum_gaze_ink_clearance_px']=round(minimum,3)
-    minimum=500
-    for shape in SHAPES:
-        pts=np.concatenate(samples(node(f'body-{shape}.svg').get('d'),301))
-        for angle in np.linspace(-11,11,221):
-            c,s=math.cos(math.radians(angle)),math.sin(math.radians(angle))
-            p=pts@np.array([[c,s],[-s,c]])
-            for x in (-24,24):
-                for y in (-48,24):
-                    out=np.array([250,270])+1.25*(p+[x,y])
-                    minimum=min(minimum,float(out.min()),float((500-out).min()))
-    assert minimum>=2,minimum
-    report['minimum_swept_body_fill_clearance_px']=round(minimum,3)
+    _assert_svgs()
+    for tail in ('', '-small'):
+        _assert_faces(tail)
+    _assert_section8(report)
+    _assert_amplitudes(report)
+    _assert_glyph_sizes()
+    _assert_state_contract()
+    report['minimum_gaze_ink_clearance_px'] = _gaze_clearance()
+    report['minimum_swept_body_fill_clearance_px'] = _body_clearance()
     report.update(purity='PASS',native_svg_converter='PASS',mouth_topology='PASS',
         body_identity='PASS',spec_numeric_floors='PASS',runtime='NOT RUN',
         blind_human_recognition='NOT RUN')
@@ -233,9 +290,23 @@ def svg_raster(body, size):
     return Image.open(BytesIO(cairosvg.svg2png(bytestring=svg.encode(),output_width=size,output_height=size))).convert('RGBA')
 
 
-def avatar(state='idle', size=72, bg='#15191F', color='#79B7DF', old=False,
-           small=False, root=(0,0), face_y=None, gaze=(0,0), mouth=.5, angle=None,
-           old_paint=None):
+def avatar(*args, **opts):
+    state = args[0] if args else opts.get('state', 'idle')
+    size = args[1] if len(args) > 1 else opts.get('size', 72)
+    bg = args[2] if len(args) > 2 else opts.get('bg', '#15191F')
+    color = opts.get('color', '#79B7DF')
+    old = opts.get('old', False)
+    small = opts.get('small', False)
+    root = opts.get('root', (0, 0))
+    face_y = opts.get('face_y')
+    gaze = opts.get('gaze', (0, 0))
+    mouth = opts.get('mouth', .5)
+    angle = opts.get('angle')
+    old_paint = opts.get('old_paint')
+    return _draw_avatar(state, size, bg, color, old, small, root, face_y, gaze, mouth, angle, old_paint)
+
+
+def _draw_avatar(state, size, bg, color, old, small, root, face_y, gaze, mouth, angle, old_paint):
     tail='-small' if small else ''
     pscale={'listening':1.04,'waitingInput':1.06}.get(state,1)
     ps=(152 if small else 120)*pscale
@@ -278,7 +349,10 @@ def font(size=14):
     except OSError: return ImageFont.load_default()
 
 
-def label(im, xy, text, fill='#CBD1D8', size=14):
+def label(*args, **opts):
+    im, xy, text = args[0], args[1], args[2]
+    fill = args[3] if len(args) > 3 else opts.get('fill', '#CBD1D8')
+    size = args[4] if len(args) > 4 else opts.get('size', 14)
     ImageDraw.Draw(im).text(xy,text,fill=fill,font=font(size))
 
 
@@ -317,7 +391,9 @@ def sheet_sizes():
     im.save(HERE/'sizes-small-proposal.png')
 
 
-def arrow(draw,a,b,color,width=3):
+def arrow(*args, **opts):
+    draw, a, b, color = args[0], args[1], args[2], args[3]
+    width = args[4] if len(args) > 4 else opts.get('width', 3)
     draw.line((a,b),fill=color,width=width)
     dx,dy=b[0]-a[0],b[1]-a[1];length=math.hypot(dx,dy)
     if length<1:return

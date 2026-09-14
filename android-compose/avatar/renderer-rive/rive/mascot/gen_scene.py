@@ -234,23 +234,29 @@ def kf(value, frame, bezier=None):
     return f'<KeyFrameDouble value="{value}" frame="{frame}"/>'
 
 
+def _frames(fr, default_bezier):
+    if not isinstance(fr, list):
+        fr = [(0, fr)]
+    lines = []
+    for item in fr:
+        f, v = item[0], item[1]
+        bez = item[2] if len(item) > 2 else (default_bezier if len(fr) > 1 else None)
+        lines.append("        " + kf(v, f, bez))
+    return lines
+
+
+def _keyed_object(obj, props, default_bezier):
+    kp = []
+    for key, fr in props.items():
+        lines = _frames(fr, default_bezier)
+        kp.append(f'    <KeyedProperty propertyKey="{key}">\n' + "\n".join(lines) + '\n    </KeyedProperty>')
+    return f'<KeyedObject objectId="{obj}">\n' + "\n".join(kp) + '\n</KeyedObject>'
+
+
 def keyed(objects, default_bezier=SOFT_OUT):
     """objects: {objectId: {propertyKey: value | [(frame, value) | (frame, value, bezier)]}}.
     The bezier on a keyframe shapes the segment that LEAVES it (Rive semantics)."""
-    out = []
-    for obj, props in objects.items():
-        kp = []
-        for key, fr in props.items():
-            if not isinstance(fr, list):
-                fr = [(0, fr)]
-            lines = []
-            for item in fr:
-                f, v = item[0], item[1]
-                bez = item[2] if len(item) > 2 else (default_bezier if len(fr) > 1 else None)
-                lines.append("        " + kf(v, f, bez))
-            kp.append(f'    <KeyedProperty propertyKey="{key}">\n' + "\n".join(lines) + '\n    </KeyedProperty>')
-        out.append(f'<KeyedObject objectId="{obj}">\n' + "\n".join(kp) + '\n</KeyedObject>')
-    return "\n".join(out)
+    return "\n".join(_keyed_object(obj, props, default_bezier) for obj, props in objects.items())
 
 
 def callback_keyed(objects, frame=0):
@@ -259,19 +265,27 @@ def callback_keyed(objects, frame=0):
         f'        <KeyFrameCallback frame="{frame}"/>\n    </KeyedProperty>\n</KeyedObject>' for o in objects)
 
 
-def animation(name, aid, duration, objects, loop="oneShot", callbacks=(), bezier=SOFT_OUT):
+def animation(*parts, **opts):
+    name, aid, duration, objects = parts[0], parts[1], parts[2], parts[3]
+    loop = parts[4] if len(parts) > 4 else opts.get("loop", "oneShot")
+    callbacks = opts.get("callbacks", ())
+    bezier = opts.get("bezier", SOFT_OUT)
     body = keyed(objects, bezier) + ("\n" + callback_keyed(callbacks) if callbacks else "")
     return (f'<LinearAnimation fps="60" duration="{max(1, duration)}" loopValue="{loop}" name="{name}" id="{aid}">\n'
             + indent(body, "    ") + '\n</LinearAnimation>')
 
 
-def anim_state(aid, nid, i, extra="", children=""):
+def anim_state(*parts, **opts):
+    aid, nid, i = parts[0], parts[1], parts[2]
+    extra = parts[3] if len(parts) > 3 else opts.get("extra", "")
+    children = parts[4] if len(parts) > 4 else opts.get("children", "")
     if children:
         return f'<AnimationState x="200" y="{40 + 60 * i}" animationId="{aid}"{extra} id="{nid}">\n{indent(children, "    ")}\n</AnimationState>'
     return f'<AnimationState x="200" y="{40 + 60 * i}" animationId="{aid}"{extra} id="{nid}"/>'
 
 
-def layer_frame(name, lid, entry_to, any_transitions, states):
+def layer_frame(*parts):
+    name, lid, entry_to, any_transitions, states = parts
     return f'''<StateMachineLayer name="{name}" id="{lid}">
     <EntryState>
         <StateTransition stateToId="{entry_to}"/>
@@ -296,7 +310,10 @@ def vm_condition(kind, prop, literal, op="equal"):
 </TransitionViewModelCondition>'''
 
 
-def transition(to_id, duration_ms, bezier, condition=None, exit_time=False):
+def transition(*parts, **opts):
+    to_id, duration_ms, bezier = parts[0], parts[1], parts[2]
+    condition = parts[3] if len(parts) > 3 else opts.get("condition")
+    exit_time = opts.get("exit_time", False)
     attrs = f'stateToId="{to_id}" duration="{duration_ms}"'
     if exit_time:
         attrs += ' enableExitTime="true" exitTimeIsPercetange="true" exitTime="100"'
@@ -309,7 +326,12 @@ def transition(to_id, duration_ms, bezier, condition=None, exit_time=False):
     return f'<StateTransition {attrs}/>'
 
 
-def enum_transition(to_id, enum_value_id, duration_ms=160, bezier=EASE_OUT, prop=VM_STATE, op="equal"):
+def enum_transition(*parts, **opts):
+    to_id, enum_value_id = parts[0], parts[1]
+    duration_ms = parts[2] if len(parts) > 2 else opts.get("duration_ms", 160)
+    bezier = parts[3] if len(parts) > 3 else opts.get("bezier", EASE_OUT)
+    prop = parts[4] if len(parts) > 4 else opts.get("prop", VM_STATE)
+    op = opts.get("op", "equal")
     return transition(to_id, duration_ms, bezier, vm_condition("Enum", prop, f'<TransitionValueEnumComparator value="{enum_value_id}"/>', op))
 
 
@@ -317,7 +339,8 @@ def trigger_transition(to_id, prop):
     return transition(to_id, 0, None, vm_condition("Trigger", prop, '<TransitionValueTriggerComparator/>'))
 
 
-def bool_transition(to_id, prop, value, duration_ms, bezier):
+def bool_transition(*parts):
+    to_id, prop, value, duration_ms, bezier = parts
     return transition(to_id, duration_ms, bezier, vm_condition("Boolean", prop, f'<TransitionValueBooleanComparator value="{value}"/>'))
 
 
@@ -338,9 +361,10 @@ def weighted(t, weight):
     return t.replace("<StateTransition ", f'<StateTransition randomWeight="{weight}" ', 1)
 
 
-def expression_layer(name, lid, input_id, anim_ids, node_ids):
+def expression_layer(*parts):
     # Explicit matrix, instant cuts: the root hides every swap inside a blink shutter, and an
     # AnyState fan-out would keep re-entering the current state (a self-blend that fades the glyph).
+    name, lid, input_id, anim_ids, node_ids = parts
     states = []
     for i, s in enumerate(STATES):
         own = "\n".join(input_transition(node_ids[t], input_id, EXPR[t], 0) for t in STATES if t != s)
@@ -595,7 +619,7 @@ def plate_component():
     to_fix = "\n".join(weighted(exit_transition(n), w) for n, (_, _, w) in zip(SACCADE_FIX_NODES, SACCADE_FIX))
     to_wait = "\n".join(weighted(exit_transition(n), 10) for n in SACCADE_WAIT_NODES)
     sac_states = [anim_state(aid, nid, i, ' random="true"', asleep_s + "\n" + to_fix) for i, ((aid, _), nid) in enumerate(zip(SACCADE_WAITS, SACCADE_WAIT_NODES))]
-    sac_states += [anim_state(aid, nid, 3 + i, ' reset="true" random="true"', to_wait) for i, ((aid, _, _), nid) in enumerate(zip(SACCADE_FIX, SACCADE_FIX_NODES))]
+    sac_states += [anim_state(aid, nid, 3 + i, ' reset="true" random="true"', asleep_s + "\n" + to_wait) for i, ((aid, _, _), nid) in enumerate(zip(SACCADE_FIX, SACCADE_FIX_NODES))]
     sac_states.append(anim_state(SACCADE_WAITS[0][0], SACCADE_SLEEP_NODE, 12, "", awake_s))
     saccade_layer = layer_frame("Saccade", "7:13", SACCADE_WAIT_NODES[0], "", "\n".join(sac_states))
     trigger_layer = layer_frame(
@@ -1093,7 +1117,7 @@ def root_machine():
         anim_state(IDLE_WAIT_A, IDLE_A_NODE, 0, "", to_park(IDLE_SLEEP_NODE) + "\n" + exit_transition(IDLE_GLANCE_NODE)) + "\n"
         + anim_state(IDLE_WAIT_B, IDLE_B_NODE, 1, "", to_park(IDLE_SLEEP_NODE) + "\n" + exit_transition(IDLE_GLANCE_NODE)) + "\n"
         + anim_state(IDLE_GLANCE_ANIM, IDLE_GLANCE_NODE, 2, ' reset="true" random="true"',
-                     weighted(exit_transition(IDLE_A_NODE), 50) + "\n" + weighted(exit_transition(IDLE_B_NODE), 50)) + "\n"
+                     to_park(IDLE_SLEEP_NODE) + "\n" + weighted(exit_transition(IDLE_A_NODE), 50) + "\n" + weighted(exit_transition(IDLE_B_NODE), 50)) + "\n"
         + anim_state(IDLE_WAIT_A, IDLE_SLEEP_NODE, 3, "", from_park(IDLE_A_NODE)))
 
     wander = layer_frame(
@@ -1107,7 +1131,7 @@ def root_machine():
         + anim_state(WANDER_PEEK, WANDER_PEEK_NODE, 3, ' reset="true" random="true"',
                      to_park(WANDER_SLEEP_WAIT_NODE, 400) + "\n" + weighted(exit_transition(WANDER_A_NODE, 200, SOFT_OUT), 50) + "\n" + weighted(exit_transition(WANDER_B_NODE, 200, SOFT_OUT), 50)) + "\n"
         + anim_state(WANDER_SPIN, WANDER_SPIN_NODE, 4, ' reset="true" random="true"',
-                     weighted(exit_transition(WANDER_A_NODE, 200, SOFT_OUT), 50) + "\n" + weighted(exit_transition(WANDER_B_NODE, 200, SOFT_OUT), 50)) + "\n"
+                     to_park(WANDER_SLEEP_WAIT_NODE, 400) + "\n" + weighted(exit_transition(WANDER_A_NODE, 200, SOFT_OUT), 50) + "\n" + weighted(exit_transition(WANDER_B_NODE, 200, SOFT_OUT), 50)) + "\n"
         + anim_state(WANDER_SLEEP_WAIT, WANDER_SLEEP_WAIT_NODE, 5, "",
                      from_park(WANDER_A_NODE) + "\n" + exit_transition(WANDER_SLEEP_SHIFT_NODE)) + "\n"
         + anim_state(WANDER_SLEEP_SHIFT, WANDER_SLEEP_SHIFT_NODE, 6, ' reset="true"',
@@ -1233,7 +1257,8 @@ def data():
 </ViewModel>'''
 
 
-doc = f'''<Rive version="1" kind="fragment">
+def scene_document():
+    return f'''<Rive version="1" kind="fragment">
     <!--
         The Letta agent mascot, v4: SPEC.md + art/*.svg through gen_scene.py. Regenerate rather
         than hand-edit the exhaustive parts; the art is the illustrator's.
@@ -1258,6 +1283,7 @@ doc = f'''<Rive version="1" kind="fragment">
 '''
 
 if __name__ == "__main__":
+    doc = scene_document()
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scene.rml")
     with open(out, "w", encoding="utf-8", newline="\n") as f:
         f.write(doc)

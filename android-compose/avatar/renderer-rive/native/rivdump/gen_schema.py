@@ -11,8 +11,12 @@ import os
 import re
 import sys
 
+if len(sys.argv) < 2:
+    raise SystemExit("usage: python gen_schema.py <rive-runtime dir>")
 root = sys.argv[1]
 headers = glob.glob(os.path.join(root, "include", "rive", "generated", "**", "*_base.hpp"), recursive=True)
+if not headers:
+    raise SystemExit(f"no generated Rive headers found under {root!r}")
 type_re = re.compile(r"class (\w+)Base\b.*?static const uint16_t typeKey = (\d+);", re.S)
 key_re = re.compile(r"static const uint16_t (\w+)PropertyKey = (\d+);")
 # Tolerates the editor-only #ifdef around some names and CoreIdType's runtimeDeserialize.
@@ -38,6 +42,8 @@ for path in headers:
             continue
         rows.append((type_key, int(key), kind, name, prop))
 
+if not rows:
+    raise SystemExit("generated headers produced no supported view-model or core types")
 rows.sort()
 for r in rows:
     print("\t".join(map(str, r)))

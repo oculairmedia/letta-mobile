@@ -25,5 +25,7 @@ class MascotIdentityTest {
         assertNull(MascotIdentity.decode(""))
         assertNull(MascotIdentity.decode("octagon:ff000000"))
         assertNull(MascotIdentity.decode("circle:notahex"))
+        assertNull(MascotIdentity.decode("circle:1"))
+        assertNull(MascotIdentity.decode("circle:ff0000"))
     }
 }

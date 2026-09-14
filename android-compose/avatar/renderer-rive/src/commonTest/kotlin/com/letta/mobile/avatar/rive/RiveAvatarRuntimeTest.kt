@@ -34,15 +34,15 @@ class RiveAvatarRuntimeTest {
 
         runtime.applyState(AvatarState.SUCCESS)
         assertEquals(listOf(RiveAvatarContract.TRIGGER_SUCCESS), sink.fired)
-        assertEquals(emptyList(), sink.enums(RiveAvatarContract.INPUT_STATE), "success must not become the sustained state")
+        assertEquals(emptyList(), sink.stateEnums(), "success must not become the sustained state")
 
         runtime.applyState(AvatarState.DRAGGED)
         runtime.applyState(AvatarState.IDLE)
-        assertEquals(listOf(true, false), sink.booleans(RiveAvatarContract.INPUT_DRAGGED))
+        assertEquals(listOf(true, false), sink.draggedBooleans())
 
         runtime.applyState(AvatarState.ERROR)
         assertEquals(RiveAvatarContract.TRIGGER_ERROR, sink.fired.last())
-        assertEquals("error", sink.lastEnum(RiveAvatarContract.INPUT_STATE))
+        assertEquals("error", sink.lastState())
     }
 
     @Test
@@ -54,7 +54,7 @@ class RiveAvatarRuntimeTest {
 
         assertEquals(
             listOf(AvatarState.LOADING, AvatarState.IDLE).map(RiveAvatarContract::stateKey),
-            sink.enums(RiveAvatarContract.INPUT_STATE),
+            sink.stateEnums(),
         )
         assertIs<AvatarRuntimeState.Ready>(runtime.state.value)
     }
@@ -78,17 +78,17 @@ class RiveAvatarRuntimeTest {
         val runtime = RiveAvatarRuntime(sink).also { it.load(model()) }
 
         runtime.setLookTarget(AvatarLookTarget.Screen(0.5f, 0.5f))
-        assertEquals(0f, sink.lastNumber(RiveAvatarContract.INPUT_LOOK_X))
-        assertEquals(0f, sink.lastNumber(RiveAvatarContract.INPUT_LOOK_Y))
+        assertEquals(0f, sink.lastLookX())
+        assertEquals(0f, sink.lastLookY())
 
         runtime.setLookTarget(AvatarLookTarget.Screen(0f, 1f))
-        assertEquals(-1f, sink.lastNumber(RiveAvatarContract.INPUT_LOOK_X))
-        assertEquals(1f, sink.lastNumber(RiveAvatarContract.INPUT_LOOK_Y))
+        assertEquals(-1f, sink.lastLookX())
+        assertEquals(1f, sink.lastLookY())
 
         // Null is the idle gaze, not "leave the eyes wherever they were pointed".
         runtime.setLookTarget(null)
-        assertEquals(0f, sink.lastNumber(RiveAvatarContract.INPUT_LOOK_X))
-        assertEquals(0f, sink.lastNumber(RiveAvatarContract.INPUT_LOOK_Y))
+        assertEquals(0f, sink.lastLookX())
+        assertEquals(0f, sink.lastLookY())
     }
 
     /** World space assumes a scene a flat rig has no equivalent of, so it must not be guessed at. */
@@ -123,10 +123,10 @@ class RiveAvatarRuntimeTest {
         val runtime = RiveAvatarRuntime(sink).also { it.load(model()) }
 
         runtime.setMouthOpen(4f)
-        assertEquals(1f, sink.lastNumber(RiveAvatarContract.INPUT_MOUTH_OPEN))
+        assertEquals(1f, sink.lastMouth())
 
         runtime.setMouthOpen(-4f)
-        assertEquals(0f, sink.lastNumber(RiveAvatarContract.INPUT_MOUTH_OPEN))
+        assertEquals(0f, sink.lastMouth())
     }
 
     @Test
@@ -136,23 +136,23 @@ class RiveAvatarRuntimeTest {
         // flash, LISTENING's Neutral reset to idle). Expressions live inside the file's states.
         val sink = RecordingSink()
         val runtime = RiveAvatarRuntime(sink).also { it.load(model()) }
-        val before = sink.lastEnum(RiveAvatarContract.INPUT_STATE)
+        val before = sink.lastState()
 
         runtime.setExpression(AvatarExpression.Happy)
 
         assertEquals(emptyList(), sink.fired)
-        assertEquals(before, sink.lastEnum(RiveAvatarContract.INPUT_STATE))
+        assertEquals(before, sink.lastState())
     }
 
     @Test
     fun aZeroWeightExpressionLeavesTheStateAlone() = runTest {
         val sink = RecordingSink()
         val runtime = RiveAvatarRuntime(sink).also { it.load(model()) }
-        val before = sink.lastEnum(RiveAvatarContract.INPUT_STATE)
+        val before = sink.lastState()
 
         runtime.setExpression(AvatarExpression.Happy, weight = 0f)
 
-        assertEquals(before, sink.lastEnum(RiveAvatarContract.INPUT_STATE))
+        assertEquals(before, sink.lastState())
     }
 
     @Test
@@ -237,17 +237,24 @@ class RiveAvatarRuntimeTest {
             fired += input
         }
 
-        fun numbers(input: String): List<Float> =
+        fun lastLookX(): Float? = lastNumber(RiveAvatarContract.INPUT_LOOK_X)
+        fun lastLookY(): Float? = lastNumber(RiveAvatarContract.INPUT_LOOK_Y)
+        fun lastMouth(): Float? = lastNumber(RiveAvatarContract.INPUT_MOUTH_OPEN)
+        fun lastState(): String? = lastEnum(RiveAvatarContract.INPUT_STATE)
+        fun stateEnums(): List<String> = enums(RiveAvatarContract.INPUT_STATE)
+        fun draggedBooleans(): List<Boolean> = booleans(RiveAvatarContract.INPUT_DRAGGED)
+
+        private fun numbers(input: String): List<Float> =
             writes.filter { it.first == input }.map { it.second as Float }
 
-        fun lastNumber(input: String): Float? = numbers(input).lastOrNull()
+        private fun lastNumber(input: String): Float? = numbers(input).lastOrNull()
 
-        fun enums(input: String): List<String> =
+        private fun enums(input: String): List<String> =
             writes.filter { it.first == input }.map { it.second as String }
 
-        fun lastEnum(input: String): String? = enums(input).lastOrNull()
+        private fun lastEnum(input: String): String? = enums(input).lastOrNull()
 
-        fun booleans(input: String): List<Boolean> =
+        private fun booleans(input: String): List<Boolean> =
             writes.filter { it.first == input }.map { it.second as Boolean }
     }
 }
