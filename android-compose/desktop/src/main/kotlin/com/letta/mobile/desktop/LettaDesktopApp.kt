@@ -700,6 +700,7 @@ internal fun LettaDesktopApp(
                             selectedAgentId = selectedAgentId,
                             thinkingAgentId = thinkingAgentId,
                             avatarStyleByAgentId = avatarStyleByAgentId,
+                            identityByAgentId = identityByAgentId,
                         ),
                         expanded = railExpanded,
                     ),

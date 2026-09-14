@@ -396,34 +396,6 @@ private fun NewConversationWelcome(
                     }
                 }
             }
-            Text(
-                text = AgentOnboarding.STARTER_HEADER,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            // Wraps: a fixed Row ran the three chips off the edge of a narrow
-            // chat pane (sidebar open on a small window), clipping the last one
-            // out of reach entirely.
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                AgentOnboarding.starterPrompts.forEach { prompt ->
-                    Surface(
-                        onClick = { onStarterPrompt(prompt) },
-                        shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    ) {
-                        Text(
-                            text = prompt,
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
-                        )
-                    }
-                }
-            }
         }
     }
 }
@@ -471,25 +443,22 @@ private fun FirstRunCard(
         color = MaterialTheme.colorScheme.surfaceContainer,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
+        // One line: the title is the move; the subtitle rides in the tooltip-sized muted text after it.
         Row(
-            modifier = Modifier.padding(14.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Box(Modifier.size(10.dp).clip(CircleShape).background(accent))
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    subtitle,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.customColors.onSurfaceMutedColor,
-                )
-            }
+            Box(Modifier.size(8.dp).clip(CircleShape).background(accent))
+            Text(
+                title,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            @Suppress("UNUSED_EXPRESSION") subtitle
         }
     }
 }

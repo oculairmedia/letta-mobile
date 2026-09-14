@@ -153,6 +153,8 @@ internal data class DesktopAgentRailFocus(
     val selectedAgentId: String?,
     val thinkingAgentId: String?,
     val avatarStyleByAgentId: Map<String, Int>,
+    /** Agents with a mascot identity draw their silhouette in their colour instead of the gradient orb. */
+    val identityByAgentId: Map<String, com.letta.mobile.avatar.core.MascotIdentity> = emptyMap(),
 )
 
 @Immutable
@@ -445,14 +447,7 @@ private fun ExpandedAgentRow(params: AgentRailOrbParams) {
             if (flags.thinking) {
                 ThinkingRing(diameter = 32.dp)
             }
-            AgentOrb(index = target.orbStyle, size = 28.dp, cornerRadius = 8.dp) {
-                Text(
-                    text = params.group.name.firstOrNull()?.uppercase() ?: "?",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.White,
-                )
-            }
+            RailAgentTile(target = target, initial = params.group.name.firstOrNull()?.uppercase() ?: "?", size = 28.dp, cornerRadius = 8.dp)
         }
         Text(
             text = params.group.name,
@@ -560,6 +555,7 @@ private data class AgentRailOrbTarget(
     val agentId: String,
     val orbStyle: Int,
     val tooltip: String,
+    val identity: com.letta.mobile.avatar.core.MascotIdentity? = null,
 )
 
 private fun AgentRailOrbParams.toFlags(): AgentRailOrbFlags {
@@ -584,7 +580,8 @@ private fun AgentRailOrbParams.toTarget(flags: AgentRailOrbFlags): AgentRailOrbT
         if (flags.count > 1) append(" · ${flags.count} agents")
         if (flags.thinking) append(" · thinking…")
     }
-    return AgentRailOrbTarget(agentId = targetAgentId, orbStyle = orbStyle, tooltip = tooltip)
+    val identity = group.agentIds.firstNotNullOfOrNull { focus.identityByAgentId[it] }
+    return AgentRailOrbTarget(agentId = targetAgentId, orbStyle = orbStyle, tooltip = tooltip, identity = identity)
 }
 
 @Composable
@@ -618,21 +615,47 @@ private fun AgentRailOrbContent(
             // slot so it doesn't crowd neighbouring orbs.
             ThinkingRing(diameter = 34.dp)
         }
-        AgentOrb(
-            index = target.orbStyle,
+        RailAgentTile(
+            target = target,
+            initial = params.group.name.firstOrNull()?.uppercase() ?: "?",
             size = 30.dp,
             onClick = { params.onAgentSelected(target.agentId) },
-        ) {
-            Text(
-                text = params.group.name.firstOrNull()?.uppercase() ?: "?",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = Color.White,
-            )
-        }
+        )
         // No member-count chip on stacked orbs: PM groups aggregate hundreds
         // of spawns, so every orb wore a meaningless "99+". The tooltip still
         // reports the exact count for anyone who cares.
+    }
+}
+
+/**
+ * A rail slot: the agent's mascot silhouette in its colour when it has an identity (the flat
+ * tier - no live scene for a list), otherwise the gradient orb with the name's initial.
+ */
+@Composable
+private fun RailAgentTile(
+    target: AgentRailOrbTarget,
+    initial: String,
+    size: androidx.compose.ui.unit.Dp,
+    cornerRadius: androidx.compose.ui.unit.Dp = 7.dp,
+    onClick: (() -> Unit)? = null,
+) {
+    val identity = target.identity
+    if (identity == null) {
+        AgentOrb(index = target.orbStyle, size = size, cornerRadius = cornerRadius, onClick = onClick) {
+            Text(text = initial, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = Color.White)
+        }
+        return
+    }
+    val shape = RoundedCornerShape(cornerRadius)
+    Box(
+        modifier = Modifier
+            .size(size)
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+        contentAlignment = Alignment.Center,
+    ) {
+        com.letta.mobile.ui.mascot.MascotShapeGlyph(identity.shape, identity.argb, size * 0.78f)
     }
 }
 
