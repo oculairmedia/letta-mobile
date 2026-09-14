@@ -84,7 +84,8 @@ static void print_object(const rive::Core* object, const std::string& extra = ""
         return;
     }
     int typeKey = object->coreType();
-    printf("{\"typeKey\":%d,\"type\":\"%s\"", typeKey, typeKey < 4096 ? g_typeNameOf[typeKey].c_str() : "");
+    printf("{\"typeKey\":%d,\"type\":\"%s\"", typeKey,
+           (typeKey >= 0 && typeKey < 4096) ? g_typeNameOf[typeKey].c_str() : "");
     for (const auto& p : g_props)
     {
         if (!object->isTypeOf((uint16_t)p.typeKey))
@@ -241,8 +242,9 @@ static bool load_schema(const char* path)
             continue;
         p.typeKey = std::stoi(tk);
         p.key = std::stoi(k);
-        if (p.typeKey < 4096)
-            g_typeNameOf[p.typeKey] = p.typeName;
+        if (p.typeKey < 0 || p.typeKey >= 4096)
+            continue;
+        g_typeNameOf[p.typeKey] = p.typeName;
         if (p.key >= 0)
             g_props.push_back(p);
     }

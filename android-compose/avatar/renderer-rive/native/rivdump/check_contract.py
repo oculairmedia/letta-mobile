@@ -14,8 +14,17 @@ from pathlib import Path
 
 RIVE = str(Path.home() / ".rive" / "bin" / "rive.exe")
 
-project, contract = sys.argv[1], sys.argv[2]
-kt = open(contract, encoding="utf-8").read()
+
+def _cli_path(arg: str) -> Path:
+    if "\x00" in arg or ".." in Path(arg).parts:
+        raise SystemExit(f"invalid path: {arg}")
+    return Path(arg).expanduser().resolve()
+
+
+if len(sys.argv) < 3:
+    raise SystemExit("usage: python check_contract.py <rive project dir> <RiveAvatarContract.kt>")
+project, contract = _cli_path(sys.argv[1]), _cli_path(sys.argv[2])
+kt = contract.read_text(encoding="utf-8")
 # Every INPUT_* / TRIGGER_* string const is required on the .riv, including
 # INPUT_TURN_X/Y ("turnX"/"turnY") written by RiveAvatarRuntime.setHeadTurn.
 want_props = set(re.findall(r'const val (?:INPUT|TRIGGER)_\w+: String = "(\w+)"', kt))

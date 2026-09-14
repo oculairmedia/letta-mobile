@@ -11,7 +11,7 @@ Two emitters:
 import math
 import re
 
-_NUM = r"[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?"
+_NUM = r"[-+]?(?:\d+\.\d+|\d+|\.\d+)(?:[eE][-+]?\d+)?"
 _SUPPORTED = set("MLCZ")
 
 

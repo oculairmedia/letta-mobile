@@ -12,7 +12,14 @@ radians. Ids are "<client>:<index>" so a fragment can be pasted into another fil
 """
 import json
 import sys
+from pathlib import Path
 from xml.sax.saxutils import escape
+
+
+def _cli_path(arg: str) -> Path:
+    if "\x00" in arg or ".." in Path(arg).parts:
+        raise SystemExit(f"invalid path: {arg}")
+    return Path(arg).expanduser().resolve()
 
 DRAWABLE = {
     "Node", "Shape", "PointsPath", "Ellipse", "Rectangle", "Polygon", "Star", "Triangle",
@@ -108,18 +115,20 @@ def lift(dump, artboard_name, client=9, subtree=None):
 
 
 if __name__ == "__main__":
-    dump = json.load(open(sys.argv[1], encoding="utf-8"))
+    if len(sys.argv) < 3:
+        raise SystemExit("usage: python riv2rml.py <dump.json> <artboard name> [--id-client N] [--standalone out.rml]")
+    dump = json.loads(_cli_path(sys.argv[1]).read_text(encoding="utf-8"))
     name = sys.argv[2]
     client = int(sys.argv[sys.argv.index("--id-client") + 1]) if "--id-client" in sys.argv else 9
     subtree = int(sys.argv[sys.argv.index("--subtree") + 1]) if "--subtree" in sys.argv else None
     root, lines = lift(dump, name, client, subtree)
     body = "\n".join(lines)
     if "--standalone" in sys.argv:
-        out = sys.argv[sys.argv.index("--standalone") + 1]
+        out = _cli_path(sys.argv[sys.argv.index("--standalone") + 1])
         w, h = root.get("width", 500), root.get("height", 500)
         doc = (f'<Rive version="1" kind="fragment">\n<Artboard clip="false" width="{xml_attr(w)}" height="{xml_attr(h)}" '
                f'name="{xml_attr(name)}" id="{client}:1">\n{body}\n</Artboard>\n</Rive>\n')
-        open(out, "w", encoding="utf-8", newline="\n").write(doc)
+        out.write_text(doc, encoding="utf-8", newline="\n")
         print(f"wrote {out}: {len(lines)} lines, artboard {w}x{h}", file=sys.stderr)
     else:
         print(body)

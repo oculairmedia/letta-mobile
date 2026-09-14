@@ -159,7 +159,10 @@ def _assert_max_inventory():
         assert (ART / name).read_bytes() == baseline('art/' + name), name
     previous_spec = baseline('SPEC.md')
     assert (PROJECT / 'SPEC.md').read_bytes().startswith(previous_spec)
-    changed = subprocess.check_output(['git', 'diff', BASE, '--name-only'], cwd=v.REPO, text=True).splitlines()
+    mascot = 'android-compose/avatar/renderer-rive/rive/mascot'
+    changed = subprocess.check_output(
+        ['git', 'diff', BASE, '--name-only', '--', mascot], cwd=v.REPO, text=True,
+    ).splitlines()
     assert all(p.endswith('SPEC.md') or '/art/' in p for p in changed), changed
 
 

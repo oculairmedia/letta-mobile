@@ -10,14 +10,22 @@ import glob
 import os
 import re
 import sys
+from pathlib import Path
+
+
+def _cli_path(arg: str) -> Path:
+    if "\x00" in arg or ".." in Path(arg).parts:
+        raise SystemExit(f"invalid path: {arg}")
+    return Path(arg).expanduser().resolve()
+
 
 if len(sys.argv) < 2:
     raise SystemExit("usage: python gen_schema.py <rive-runtime dir>")
-root = sys.argv[1]
+root = str(_cli_path(sys.argv[1]))
 headers = glob.glob(os.path.join(root, "include", "rive", "generated", "**", "*_base.hpp"), recursive=True)
 if not headers:
     raise SystemExit(f"no generated Rive headers found under {root!r}")
-type_re = re.compile(r"class (\w+)Base\b.*?static const uint16_t typeKey = (\d+);", re.S)
+type_re = re.compile(r"class (\w+)Base\b.{0,4000}?static const uint16_t typeKey = (\d+);", re.S)
 key_re = re.compile(r"static const uint16_t (\w+)PropertyKey = (\d+);")
 # Tolerates the editor-only #ifdef around some names and CoreIdType's runtimeDeserialize.
 deser_re = re.compile(
