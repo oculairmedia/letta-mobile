@@ -19,6 +19,7 @@ Beads: `letta-mobile-kh094` (this asset), `letta-mobile-1zti3` (identity picker 
 | `scene.rml` | Generated. Committed so diffs are reviewable. Never hand-edit. | no |
 | `build/mascot.riv` | Built by the CLI; copied to `src/androidMain/res/raw/mascot.riv` (what the app loads) | no |
 | `rive.yaml` | Push mapping: project 1882737 "oculair / Shared Project", file 2578084 "mascot" | no |
+| `pull_editor.py` | Editor round trip: diff a `.rev` export (or converted dir) against `scene.rml` by animation / layer / node | when the artist edits |
 | `sheet.py` | Contact sheets from screenshots (the review tool) | - |
 | `SPEC.md`, `MOTION-REFERENCES.md` | Numbers and references from the design agent; §8 is the implementation map, §9 the human-touch patch (amplitudes, alphas, glyphs) the rig now follows | with them |
 | `art/validation/` | The design agent's static proofs and `validate.py` (needs numpy, Pillow, CairoSVG); not part of the build | - |
@@ -81,6 +82,21 @@ are stable across pushes and are what the artist's edits attach to.
 **Push rule.** The CLI regenerates and pushes freely *until the artist makes their first edit in
 the editor*. From then on the editor file is the source of truth and a CLI push would overwrite
 it. Ask before pushing if you do not know whether that has happened.
+
+**Pulling editor changes back.** The CLI (1.0.2) cannot download the cloud file's current
+revision, so the loop is: in the editor, File > Export > Download `.rev`; then
+
+```bash
+python pull_editor.py path/to/mascot.rev --write-report build/pull-report.md
+```
+
+converts it with `rive create --from-rev`, strips push-assigned ids, and lists every
+animation, state-machine layer and named node that differs from the committed `scene.rml`:
+which animations changed and on which (object, property) the keyframes moved. Port those into
+`gen_scene.py` (the function that owns that animation), regenerate, verify, screenshot, and
+push - the ids the editor edited are the generator's named ones, so the next push updates them
+in place. A `.riv` download works too, through `rivdump` + `riv2rml.py` to an RML directory,
+then `pull_editor.py <dir>`.
 
 ## How the rig is put together
 
