@@ -18210,7 +18210,7 @@
             </KeyedObject>
             <KeyedObject objectId="7:23" id="0:13040">
                 <KeyedProperty propertyKey="18" id="0:13041">
-                    <KeyFrameDouble value="1" frame="0" id="0:13042"/>
+                    <KeyFrameDouble value="0" frame="0" id="0:13042"/>
                 </KeyedProperty>
             </KeyedObject>
             <KeyedObject objectId="7:43" id="0:13043">

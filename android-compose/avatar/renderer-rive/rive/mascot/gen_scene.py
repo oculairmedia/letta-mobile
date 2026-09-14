@@ -467,7 +467,8 @@ MOUTH_SAMPLES = [svgpath.mouth_vertices(art(f"glyph-mouth-{n}.svg")) for n in ("
 STATE_GLYPH = {"idle": "idle", "listening": "listening", "dragged": "dragged", "thinking": "thinking",
                "waitingInput": "waitingInput", "speaking": "speaking", "success": "success", "error": "error",
                "sleeping": "sleeping", "loading": "loading", "failed": "failed", "degraded": "degraded"}
-STATE_MOUTH = {"dragged": MOUTH_MORPH, "waitingInput": MOUTH_O, "speaking": MOUTH_MORPH, "error": FROWN}
+# No mouth while speaking (the user: a moving mouth looks stupid); the glyph and the head carry speech.
+STATE_MOUTH = {"dragged": MOUTH_MORPH, "waitingInput": MOUTH_O, "error": FROWN}
 STATE_PLATE_SCALE = {"listening": 1.04, "waitingInput": 1.06}
 
 
