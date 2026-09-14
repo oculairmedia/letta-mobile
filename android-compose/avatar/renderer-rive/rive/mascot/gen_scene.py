@@ -178,8 +178,10 @@ def scene_document():
 '''
 
 if __name__ == "__main__":
+    import sys
     doc = scene_document()
-    out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scene.rml")
+    # `python gen_scene.py [out.rml]` - an explicit path lets a check regenerate without touching scene.rml.
+    out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(os.path.abspath(__file__)), "scene.rml")
     with open(out, "w", encoding="utf-8", newline="\n") as f:
         f.write(doc)
     print(f"wrote {out} ({doc.count(chr(10))} lines)")
