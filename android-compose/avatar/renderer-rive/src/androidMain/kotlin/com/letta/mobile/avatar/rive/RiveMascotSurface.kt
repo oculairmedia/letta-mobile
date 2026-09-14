@@ -2,16 +2,16 @@ package com.letta.mobile.avatar.rive
 
 import android.graphics.Bitmap
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.remember
+import app.rive.StateMachine
 import androidx.compose.ui.Modifier
 import app.rive.Artboard
-import app.rive.Result
 import app.rive.Rive
 import app.rive.RiveFile
 import app.rive.RivePointerInputMode
 import app.rive.ViewModelInstance
 import app.rive.ViewModelSource
-import app.rive.rememberArtboardResult
-import app.rive.rememberStateMachineResult
 import com.letta.mobile.avatar.core.MascotIdentity
 
 /**
@@ -57,6 +57,37 @@ class AndroidMascotScene private constructor(
 }
 
 /**
+ * The artboard and state machine one surface binds to a scene's shared view-model instance.
+ * Owned here, not by the library's `remember*Result` helpers: those throw from their dispose hook
+ * when the lifecycle-bound worker is already gone (activity teardown disposes the worker before
+ * the surfaces), which crashed the app with RiveResourceClosedException. Closing is best effort -
+ * a resource whose worker is gone is gone.
+ */
+class AndroidMascotSurfaceScene private constructor(
+    val artboard: Artboard,
+    val stateMachine: StateMachine,
+) {
+    fun close() {
+        runCatching { stateMachine.close() }
+        runCatching { artboard.close() }
+    }
+
+    companion object {
+        /** Null when the worker or file is already closed; the surface then draws nothing. */
+        fun bind(scene: AndroidMascotScene): AndroidMascotSurfaceScene? = runCatching {
+            val artboard = Artboard.fromFile(scene.file)
+            val stateMachine = try {
+                StateMachine.fromArtboard(artboard, RiveAvatarContract.STATE_MACHINE)
+            } catch (t: Throwable) {
+                runCatching { artboard.close() }
+                throw t
+            }
+            AndroidMascotSurfaceScene(artboard, stateMachine)
+        }.getOrNull()
+    }
+}
+
+/**
  * Paints [scene] into [modifier]'s bounds. Owns an artboard and a state machine for this node only,
  * bound to the scene's shared view-model instance; both are released when the node leaves
  * composition, and the Rive composable stops advancing while the lifecycle is not RESUMED or the
@@ -75,15 +106,14 @@ fun RiveMascotSurface(
     /** Called once the first frame is on the surface; the getter is valid only while the surface lives. */
     onFirstFrame: ((getBitmap: () -> Bitmap) -> Unit)? = null,
 ) {
-    val artboard = rememberArtboardResult(scene.file)
-    if (artboard !is Result.Success) return
-    val stateMachine = rememberStateMachineResult(artboard.value, RiveAvatarContract.STATE_MACHINE)
-    if (stateMachine !is Result.Success) return
+    val bound = remember(scene) { AndroidMascotSurfaceScene.bind(scene) }
+    DisposableEffect(bound) { onDispose { bound?.close() } }
+    if (bound == null) return
     Rive(
         file = scene.file,
         modifier = modifier,
-        artboard = artboard.value,
-        stateMachine = stateMachine.value,
+        artboard = bound.artboard,
+        stateMachine = bound.stateMachine,
         viewModelInstance = scene.viewModelInstance,
         playing = playing,
         pointerInputMode = RivePointerInputMode.PassThrough,
