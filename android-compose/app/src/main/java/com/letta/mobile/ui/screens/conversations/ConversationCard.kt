@@ -179,67 +179,82 @@ private fun ConversationCardSurface(params: ConversationCardSurfaceParams) {
         colors = LettaCardDefaults.listCardColors(),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // The agent's mascot as the row's tile (letta-mobile-8jtf3); no tile when it has none.
-            MascotAvatar(
-                agentId = params.display.conversation.agentId.value,
-                size = ConversationCardMascotSize,
-                cornerRadius = ConversationCardMascotSize / 2,
-                live = false,
-                fallback = {},
-            )
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = params.title,
-                        style = MaterialTheme.typography.listItemHeadline,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
-                    )
-                    conversationActivityText(params.display.conversation)?.let { time ->
-                        Text(
-                            text = time,
-                            style = MaterialTheme.typography.listItemMetadata,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            modifier = Modifier.padding(start = 8.dp),
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.height(2.dp))
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    conversationStatus(params.display)?.let { status ->
-                        Icon(
-                            imageVector = status.icon,
-                            contentDescription = null,
-                            tint = status.tint,
-                            modifier = Modifier.size(LettaIconSizing.Inline),
-                        )
-                        Text(text = status.label, style = MaterialTheme.typography.listItemSupporting, color = status.tint)
-                        Text(
-                            text = "\u2022",
-                            style = MaterialTheme.typography.listItemSupporting,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Text(
-                        text = params.display.agentName,
-                        style = MaterialTheme.typography.listItemSupporting,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
+        ConversationCardRow(params)
+    }
+}
+
+@Composable
+private fun ConversationCardRow(params: ConversationCardSurfaceParams) {
+    Row(
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // The agent's mascot as the row's tile (letta-mobile-8jtf3); no tile when it has none.
+        MascotAvatar(
+            agentId = params.display.conversation.agentId.value,
+            size = ConversationCardMascotSize,
+            cornerRadius = ConversationCardMascotSize / 2,
+            live = false,
+            fallback = {},
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            ConversationCardTitleRow(params)
+            Spacer(modifier = Modifier.height(2.dp))
+            ConversationCardStatusRow(params)
         }
+    }
+}
+
+@Composable
+private fun ConversationCardTitleRow(params: ConversationCardSurfaceParams) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = params.title,
+            style = MaterialTheme.typography.listItemHeadline,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        conversationActivityText(params.display.conversation)?.let { time ->
+            Text(
+                text = time,
+                style = MaterialTheme.typography.listItemMetadata,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                modifier = Modifier.padding(start = 8.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ConversationCardStatusRow(params: ConversationCardSurfaceParams) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        conversationStatus(params.display)?.let { status ->
+            Icon(
+                imageVector = status.icon,
+                contentDescription = null,
+                tint = status.tint,
+                modifier = Modifier.size(LettaIconSizing.Inline),
+            )
+            Text(text = status.label, style = MaterialTheme.typography.listItemSupporting, color = status.tint)
+            Text(
+                text = "\u2022",
+                style = MaterialTheme.typography.listItemSupporting,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Text(
+            text = params.display.agentName,
+            style = MaterialTheme.typography.listItemSupporting,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
