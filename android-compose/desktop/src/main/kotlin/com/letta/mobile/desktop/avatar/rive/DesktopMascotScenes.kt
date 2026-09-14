@@ -34,7 +34,9 @@ object DesktopMascotScenes {
         /** Feeds the director; a run that ends without an error is a completed task. */
         fun apply(presence: AgentPresence) {
             val was = lastPresence
+            if (presence == was) return
             lastPresence = presence
+            println("mascot presence ${identity.encode()}: $presence")
             director.setActivity(
                 when (presence.activity) {
                     AgentActivityKind.THINKING -> AvatarActivity.THINKING

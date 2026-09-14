@@ -461,10 +461,11 @@ internal fun LettaDesktopApp(
     // Presence -> the mascots' directors. Busy is the whole run (send -> terminal), speaking while
     // tokens stream, listening while the user composes, error when the attempt failed.
     val runningConversationId by chatController.streamingConversationId.collectAsState()
-    val mascotPresence = remember(chatState.conversations, runningConversationId, replyPresence.isStreaming, chatState.selectedConversationId, chatState.composerText, chatState.errorMessage) {
+    val mascotPresence = remember(chatState.conversations, runningConversationId, thinkingConversationId, replyPresence.isStreaming, chatState.selectedConversationId, chatState.composerText, chatState.errorMessage) {
         com.letta.mobile.data.presence.AgentPresenceResolver.resolve(
             conversations = chatState.conversations,
-            runningConversationId = runningConversationId,
+            // Either run signal: the controller's streaming id (send -> terminal) or its thinking id.
+            runningConversationId = runningConversationId ?: thinkingConversationId,
             streamingTokens = replyPresence.isStreaming,
             selectedConversationId = chatState.selectedConversationId,
             composerText = chatState.composerText,

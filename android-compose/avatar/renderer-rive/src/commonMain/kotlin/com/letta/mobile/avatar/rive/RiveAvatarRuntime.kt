@@ -59,10 +59,14 @@ class RiveAvatarRuntime(
      * one drawing per mood, and blending two of them is exactly what a flat rig cannot do. Weight is
      * therefore a switch - anything at or below zero leaves the current state alone.
      */
-    override fun setExpression(expression: AvatarExpression, weight: Float) {
-        if (!ready() || weight <= 0f) return
-        stateForExpression(expression)?.let(::applyState)
-    }
+    /**
+     * A no-op on purpose. The director installs an expression on every state it enters
+     * (Neutral for LISTENING, Happy 0.2 for SPEAKING...), and mapping those back onto the
+     * sustained enum fought the real state: LISTENING became IDLE, SPEAKING fired the success
+     * flash. The mascot has one channel for state - [applyState], driven from the director's
+     * state transitions by the host - and its expressions live inside the file's states.
+     */
+    override fun setExpression(expression: AvatarExpression, weight: Float) = Unit
 
     /** No viseme rig. Lip sync arrives as [setMouthOpen], which a flat mouth can honour. */
     override fun setViseme(viseme: AvatarViseme, weight: Float) = Unit

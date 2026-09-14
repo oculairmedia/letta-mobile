@@ -176,7 +176,7 @@ private fun SidebarAgentIdentity(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         // The agent itself, alive, where it lives; the gradient orb until it has an identity.
-        AgentOrb(index = agentOrbIndex, size = if (agentIdentity != null) 56.dp else 30.dp, cornerRadius = 6.dp, agentId = agentId)
+        AgentOrb(index = agentOrbIndex, size = if (agentIdentity != null) 64.dp else 30.dp, cornerRadius = 6.dp, agentId = agentId)
         Text(
             text = agentName,
             style = MaterialTheme.typography.titleMedium,

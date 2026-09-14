@@ -130,13 +130,18 @@ class RiveAvatarRuntimeTest {
     }
 
     @Test
-    fun aHappyExpressionFiresTheSuccessFlash() = runTest {
+    fun anExpressionWritesNothingTheStateIsTheOnlyChannel() = runTest {
+        // The director installs an expression on every state it enters; mapping those onto the
+        // sustained enum fought the state it had just set (SPEAKING's Happy fired the success
+        // flash, LISTENING's Neutral reset to idle). Expressions live inside the file's states.
         val sink = RecordingSink()
         val runtime = RiveAvatarRuntime(sink).also { it.load(model()) }
+        val before = sink.lastEnum(RiveAvatarContract.INPUT_STATE)
 
         runtime.setExpression(AvatarExpression.Happy)
 
-        assertEquals(listOf(RiveAvatarContract.TRIGGER_SUCCESS), sink.fired)
+        assertEquals(emptyList(), sink.fired)
+        assertEquals(before, sink.lastEnum(RiveAvatarContract.INPUT_STATE))
     }
 
     @Test

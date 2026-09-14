@@ -74,8 +74,9 @@ fun AgentOrb(
                 .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
             contentAlignment = Alignment.Center,
         ) {
-            // The body spans ~60 % of the artboard; overscale so the character fills the slot.
-            com.letta.mobile.desktop.avatar.rive.DesktopMascotHero(agentId = agentId, identity = identity, size = size * 1.6f)
+            // The body spans ~60 % of the artboard; overscale so the character fills the tile edge
+            // to edge and the tile's clip crops the rest - an avatar photo, not a figure in a frame.
+            com.letta.mobile.desktop.avatar.rive.DesktopMascotHero(agentId = agentId, identity = identity, size = size * 2.2f)
         }
         return
     }

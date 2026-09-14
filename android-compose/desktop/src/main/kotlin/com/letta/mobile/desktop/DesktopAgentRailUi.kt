@@ -448,7 +448,7 @@ private fun ExpandedAgentRow(params: AgentRailOrbParams) {
             if (flags.thinking && target.identity == null) {
                 ThinkingRing(diameter = 32.dp)
             }
-            RailAgentTile(target = target, initial = params.group.name.firstOrNull()?.uppercase() ?: "?", size = 28.dp, cornerRadius = 8.dp)
+            RailAgentTile(target = target, initial = params.group.name.firstOrNull()?.uppercase() ?: "?", size = 44.dp, cornerRadius = 10.dp)
         }
         Text(
             text = params.group.name,
@@ -619,7 +619,7 @@ private fun AgentRailOrbContent(
         RailAgentTile(
             target = target,
             initial = params.group.name.firstOrNull()?.uppercase() ?: "?",
-            size = 30.dp,
+            size = 44.dp,
             onClick = { params.onAgentSelected(target.agentId) },
         )
         // No member-count chip on stacked orbs: PM groups aggregate hundreds
