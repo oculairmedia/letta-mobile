@@ -89,7 +89,8 @@ PLATE_SCALE_NODE, GLYPH_SCALE_NODE, MOUTH_NODE, SACCADE_NODE = "7:25", "7:26", "
 # Solo, visible only for idle/listening/speaking. Keyed four-target fallback for the wave.
 PUPIL_OVERLAY, PUPIL_ROOT, IRIS, WAVE, CORE, CATCH = "7:29", "7:96", "7:95", "7:97", "7:98", "7:99"
 wave_vertex_ids = [f"7:{200 + i}" for i in range(5)]
-PUPIL = {"idle": (2500, 1.5), "listening": (1250, 4.0), "speaking": (500, 2.5)}   # period ms, amplitude px
+PUPIL = {"idle": (2500, 0.0), "listening": (1250, 3.0), "speaking": (500, 2.0)}   # period ms, amplitude px (idle: core only)
+WAVE_STROKE = 5   # spec says 8; that reads as a bar at hero size
 PUPIL_PARALLAX = (1.5, 1.0)
 # Saccade layer: random waits, then a 60 ms hop to one of a few small fixations, a hold, a hop back.
 SACCADE_WAITS = [("7:170", 1800), ("7:171", 3600), ("7:172", 5200)]          # (anim id, ms)
@@ -516,7 +517,7 @@ def pupil_overlay():
     <PointsPath isClosed="false" name="Path">
 {indent(wave_verts, "        ")}
     </PointsPath>
-    <Stroke thickness="8" cap="round" join="round" name="Stroke"><SolidColor colorValue="{INK}" name="Color"/></Stroke>
+    <Stroke thickness="{WAVE_STROKE}" cap="round" join="round" name="Stroke"><SolidColor colorValue="{INK}" name="Color"/></Stroke>
 </Shape>'''
     core = svgpath.path_rml(art("pupil/pupil-core.svg"), "Core", CORE, INK)
     catch = svgpath.path_rml(art("pupil/catchlight.svg"), "Catchlight", CATCH, "FFFFFFFF", opacity=0.9)
@@ -547,7 +548,12 @@ def plate_component():
         if st in PUPIL:
             n, wk = wave_keys(*PUPIL[st])
             objs[PUPIL_OVERLAY] = {OPACITY: 1}
+            # The stroke wave read as a bar at every size; the core bobs on the same sine instead.
+            objs[WAVE] = {OPACITY: 0}
             objs.update(wk)
+            A = PUPIL[st][1]
+            q = [0, round(n / 4), round(n / 2), round(3 * n / 4), n]
+            objs[CORE] = {Y: [(q[0], 0, SINE), (q[1], A, SINE), (q[2], 0, SINE), (q[3], -A, SINE), (q[4], 0)]}
             expr_anims.append(animation("Expr" + st[0].upper() + st[1:], plate_expr_anim[st], n, objs, "loop"))
         else:
             objs[PUPIL_OVERLAY] = {OPACITY: 0}
