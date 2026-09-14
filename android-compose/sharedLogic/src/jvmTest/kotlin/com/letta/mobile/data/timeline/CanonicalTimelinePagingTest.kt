@@ -43,9 +43,14 @@ class CanonicalTimelinePagingTest {
             collectors.launch { session.paging(selection).collectLatest { presenter.collectFrom(it) } }
             presenter.awaitRows(3) { "calls=${transport.calls} ledgerRows=${store.rows.size} revision=${session.publication.value.durableRevision}" }
 
-            assertEquals(1, transport.calls)
+            presenter.awaitIdle()
+            // Initial newest read, older-cursor walk, then the revision-triggered newest check.
+            assertEquals(3, transport.calls)
             assertEquals(3, store.rows.size, "history page was written to the ledger")
-            assertEquals(1L, session.publication.value.durableRevision)
+            // Recent reconciliation stores rows; the independent older walk then persists exhaustion.
+            assertEquals(2L, session.publication.value.durableRevision)
+            assertEquals(false, store.current.hasMore)
+            assertEquals(null, store.current.continuation)
             assertIs<LoadState.NotLoading>(presenter.loadStateFlow.value?.refresh)
             assertEquals(listOf("m-2", "m-1", "m-0"), presenter.snapshot().items.map { it.key.identity.value })
         } finally {
@@ -75,6 +80,16 @@ class CanonicalTimelinePagingTest {
 
     private class RecordingPresenter<T : Any> : PagingDataPresenter<T>(Dispatchers.Default, null) {
         override suspend fun presentPagingDataEvent(event: PagingDataEvent<T>) = Unit
+
+        suspend fun awaitIdle() {
+            val idle = withTimeoutOrNull(5_000) {
+                loadStateFlow.first { states ->
+                    states != null && states.refresh is LoadState.NotLoading &&
+                        states.prepend is LoadState.NotLoading && states.append is LoadState.NotLoading
+                }
+            }
+            if (idle == null) fail("Paging did not settle: ${loadStateFlow.value}")
+        }
 
         /** Waits for the row count, and names what the pipeline had done when it did not arrive. */
         suspend fun awaitRows(expected: Int, detail: () -> String) {
