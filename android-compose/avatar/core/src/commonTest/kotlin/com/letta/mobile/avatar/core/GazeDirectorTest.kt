@@ -179,7 +179,7 @@ class GazeDirectorTest {
     @Test
     fun fromWindowMapsHostRectsAndLeavesMissingOnesUnavailable() {
         val mascot = GazeRect(0f, 0f, 80f, 80f)
-        val empty = GazeWorld.fromWindow(GazeWindow(mascot = mascot, minReachPx = 360f))
+        val empty = GazeWorld.fromWindow(GazeWindow(mascot = mascot, reach = GazeReach(360f)))
         assertEquals(null, empty.pointer)
         assertEquals(null, empty.input)
         assertEquals(null, empty.timeline)
@@ -189,7 +189,7 @@ class GazeDirectorTest {
         val with = GazeWorld.fromWindow(
             GazeWindow(
                 mascot = mascot,
-                minReachPx = 360f,
+                reach = GazeReach(360f),
                 pointerPx = GazePoint(200f, 40f),
                 rects = GazeTargetRects(
                     input = GazeRect(0f, 400f, 200f, 440f),
@@ -210,7 +210,7 @@ class GazeDirectorTest {
             GazeWorld.fromWindow(
                 GazeWindow(
                     mascot = mascot,
-                    minReachPx = 360f,
+                    reach = GazeReach(360f),
                     rects = GazeTargetRects(input = GazeRect(0f, 400f, 200f, 440f)),
                 ),
             ),

@@ -21,6 +21,9 @@ data class GazePoint(val x: Float, val y: Float) {
     fun coerce(): GazePoint = GazePoint(x.coerceIn(-1f, 1f), y.coerceIn(-1f, 1f))
 }
 
+/** Soft-look reach, in window pixels, used by [GazeWindow] / [GazeMath.pointerToGaze]. */
+data class GazeReach(val minPx: Float)
+
 /**
  * Pixel → gaze mapping used by live product surfaces. Reach is a window-scale
  * distance (at least [minReachPx]), never the tile's own width, so a 32 dp

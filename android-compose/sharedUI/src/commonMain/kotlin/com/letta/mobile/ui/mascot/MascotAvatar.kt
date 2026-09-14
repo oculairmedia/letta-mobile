@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.avatar.core.AvatarLookTarget
 import com.letta.mobile.avatar.core.GazeMath
 import com.letta.mobile.avatar.core.GazePoint
+import com.letta.mobile.avatar.core.GazeReach
 import com.letta.mobile.avatar.core.GazeRect
 import com.letta.mobile.avatar.core.GazeTargetRects
 import com.letta.mobile.avatar.core.GazeWindow
@@ -133,7 +134,7 @@ fun MascotLive(
             GazeWorld.fromWindow(
                 GazeWindow(
                     mascot = GazeRect(bounds.left, bounds.top, bounds.right, bounds.bottom),
-                    minReachPx = minReachPx,
+                    reach = GazeReach(minReachPx),
                     pointerPx = cursor?.let { GazePoint(it.x, it.y) },
                     rects = GazeTargetRects(input = inputBounds, timeline = timelineBounds),
                 ),

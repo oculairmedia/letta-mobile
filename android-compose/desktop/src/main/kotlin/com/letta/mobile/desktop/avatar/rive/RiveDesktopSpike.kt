@@ -252,10 +252,8 @@ private fun MascotBench(file: File, modifier: Modifier) {
             withFrameNanos { now ->
                 val dt = ((now - last) / 1e9f).coerceIn(0f, 0.1f)
                 last = now
-                gaze.config = gaze.config.copy(
-                    headLeadSeconds = headLead / 1000f,
-                    cursorNearRadius = 1f / trackReach,
-                )
+                gaze.config.headLeadSeconds = headLead / 1000f
+                gaze.config.cursorNearRadius = 1f / trackReach
                 val input = lookAt(inputSpot.x, inputSpot.y)
                 val timeline = lookAt(timelineSpot.x, timelineSpot.y)
                 val pose = gaze.tick(

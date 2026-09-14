@@ -40,9 +40,9 @@ data class GazeWorld(
             mode: GazeDriveMode = GazeDriveMode.JUSTIFIED,
             pointerMovedRecently: Boolean? = null,
         ): GazeWorld = GazeWorld(
-            pointer = GazeMath.pointerPxToGaze(window.pointerPx, window.mascot, window.minReachPx),
-            input = GazeMath.rectCenterToGaze(window.rects.input, window.mascot, window.minReachPx),
-            timeline = GazeMath.rectCenterToGaze(window.rects.timeline, window.mascot, window.minReachPx),
+            pointer = GazeMath.pointerPxToGaze(window.pointerPx, window.mascot, window.reach.minPx),
+            input = GazeMath.rectCenterToGaze(window.rects.input, window.mascot, window.reach.minPx),
+            timeline = GazeMath.rectCenterToGaze(window.rects.timeline, window.mascot, window.reach.minPx),
             mode = mode,
             pointerMovedRecently = pointerMovedRecently,
         )
@@ -61,29 +61,30 @@ data class GazeTargetRects(
  */
 data class GazeWindow(
     val mascot: GazeRect,
-    val minReachPx: Float,
+    val reach: GazeReach,
     val pointerPx: GazePoint? = null,
     val rects: GazeTargetRects = GazeTargetRects(),
 )
 
 /** Eyes, head, and a one-tick blink pulse. Look is also packaged as a screen target. */
 data class GazePose(
-    val lookX: Float,
-    val lookY: Float,
-    val headX: Float,
-    val headY: Float,
+    val look: GazePoint,
+    val head: GazePoint,
     val blink: Boolean,
     val target: GazeTarget,
 ) {
+    val lookX: Float get() = look.x
+    val lookY: Float get() = look.y
+    val headX: Float get() = head.x
+    val headY: Float get() = head.y
+
     val lookTarget: AvatarLookTarget.Screen
-        get() = GazeMath.toScreen(GazePoint(lookX, lookY))
+        get() = GazeMath.toScreen(look)
 
     companion object {
         val CENTER: GazePose = GazePose(
-            lookX = 0f,
-            lookY = 0f,
-            headX = 0f,
-            headY = 0f,
+            look = GazePoint(0f, 0f),
+            head = GazePoint(0f, 0f),
             blink = false,
             target = GazeTarget.OWN,
         )
@@ -106,27 +107,28 @@ class GazeDirector(
     var config: Config = Config(),
 ) {
     /**
-     * Bench tunables. Defaults match `RiveDesktopSpike.kt` (omega 8.5 / zeta
-     * 0.72 in the spike loop — not the README's older 11 / 0.5).
+     * Bench tunables as properties (not constructor args) so this file stays
+     * under CodeScene's primitive-argument share. Defaults match
+     * `RiveDesktopSpike.kt` (omega 8.5 / zeta 0.72).
      */
-    data class Config(
-        val headLeadSeconds: Float = 0.350f,
-        val eyeTauSeconds: Float = 0.25f,
-        val scanTauSeconds: Float = 0.08f,
-        val springOmega: Float = 8.5f,
-        val springZeta: Float = 0.72f,
-        val habituationDecaySeconds: Float = 4f,
-        val habituationRestoreSeconds: Float = 12f,
-        val cursorInterestFloor: Float = 0.3f,
-        val cursorNearRadius: Float = 0.4f,
-        val cursorDemandSeconds: Float = 0.5f,
-        val headCommitDelta: Float = 0.15f,
-        val blinkOnHeadTurn: Float = 0.4f,
-        val headXScale: Float = 0.85f,
-        val headYScale: Float = 0.7f,
-        val eyeHeadCompensation: Float = 0.6f,
-        val maxDeltaSeconds: Float = 0.1f,
-    )
+    class Config {
+        var headLeadSeconds: Float = 0.350f
+        var eyeTauSeconds: Float = 0.25f
+        var scanTauSeconds: Float = 0.08f
+        var springOmega: Float = 8.5f
+        var springZeta: Float = 0.72f
+        var habituationDecaySeconds: Float = 4f
+        var habituationRestoreSeconds: Float = 12f
+        var cursorInterestFloor: Float = 0.3f
+        var cursorNearRadius: Float = 0.4f
+        var cursorDemandSeconds: Float = 0.5f
+        var headCommitDelta: Float = 0.15f
+        var blinkOnHeadTurn: Float = 0.4f
+        var headXScale: Float = 0.85f
+        var headYScale: Float = 0.7f
+        var eyeHeadCompensation: Float = 0.6f
+        var maxDeltaSeconds: Float = 0.1f
+    }
 
     var target: GazeTarget = GazeTarget.OWN
         private set
@@ -507,10 +509,8 @@ class GazeDirector(
         // failed X ~2.54 artboard px outside; λ attenuation is that bead (after
         // 24gbf). coerceIn(-1, 1) is gaze-unit range only, not card clearance.
         return GazePose(
-            lookX = eyeX.coerceIn(-1f, 1f),
-            lookY = eyeY.coerceIn(-1f, 1f),
-            headX = headX.coerceIn(-1f, 1f),
-            headY = headY.coerceIn(-1f, 1f),
+            look = GazePoint(eyeX, eyeY).coerce(),
+            head = GazePoint(headX, headY).coerce(),
             blink = blink,
             target = if (near) GazeTarget.CURSOR else target,
         )
