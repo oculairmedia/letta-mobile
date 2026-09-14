@@ -44,6 +44,7 @@ Standard library only. Read-only: nothing here writes a file.
 # Re-authoring a beat with a chart is an output-changing change and belongs in its own PR.
 """
 import sys
+from typing import NamedTuple
 
 import timeline
 from rml import SINE, Elastic
@@ -118,6 +119,16 @@ def profile(values):
     return total, share, [cum[k] - (k + 1) / m for k in range(m)]
 
 
+def is_pop(share):
+    """One step carrying most of the travel and dwarfing the next largest: a pop, not a spacing."""
+    ordered = sorted(share, reverse=True)
+    biggest = ordered[0]
+    if biggest <= POP_SHARE:
+        return False
+    runner_up = ordered[1] if len(ordered) > 1 else 0.0
+    return runner_up <= 1e-9 or biggest / runner_up > POP_DOMINANCE
+
+
 def classify(values):
     """'ease-in' | 'ease-out' | 's' | 'linear' | 'hold' | 'pop' for a per-frame value series."""
     if len(values) < 2:
@@ -125,9 +136,7 @@ def classify(values):
     total, share, dev = profile(values)
     if not share:
         return "hold"
-    ordered = sorted(share, reverse=True)
-    biggest, runner_up = ordered[0], (ordered[1] if len(ordered) > 1 else 0.0)
-    if biggest > POP_SHARE and (runner_up <= 1e-9 or biggest / runner_up > POP_DOMINANCE):
+    if is_pop(share):
         return "pop"
     interior = dev[:-1] or dev
     mean_dev = sum(interior) / len(interior)
@@ -147,27 +156,40 @@ def _round(v, digits=4):
     return int(r) if r == int(r) else r
 
 
+def _pose(pair):
+    """(frame, value) with the frame rounded to a whole frame."""
+    return int(round(pair[0])), float(pair[1])
+
+
+class Pen(NamedTuple):
+    """How a chart lays its keys down: the bezier rounding each corner, and how many in-betweens
+    a named pattern gets."""
+    smooth: object = SINE
+    ticks: int = TICKS
+
+
+def spacing_fractions(spacing, ticks):
+    """(spacing class, tick fractions) for a pattern name or an explicit list of fractions."""
+    if isinstance(spacing, str):
+        return spacing, (Chart.pattern(spacing, ticks) if spacing in PATTERNS else [])
+    fr = sorted(float(x) for x in spacing)
+    if any(not 0.0 < x < 1.0 for x in fr):
+        raise ValueError("tick fractions must lie strictly inside (0, 1)")
+    return classify([0.0] + fr + [1.0]), fr
+
+
 class Chart:
     """Two extremes, an optional breakdown, and a spacing pattern. See the module docstring."""
 
-    def __init__(self, extremes, breakdown=None, spacing="ease-in", smooth=SINE, ticks=TICKS):
+    def __init__(self, extremes, breakdown=None, spacing="ease-in", pen=Pen()):
         pair = list(extremes)
         if len(pair) != 2:
             raise ValueError("a chart has exactly two extremes")
-        self.extremes = [(int(round(f)), float(v)) for f, v in pair]
-        self.breakdown = None if breakdown is None else (int(round(breakdown[0])), float(breakdown[1]))
-        self.smooth = smooth
-        self.ticks = ticks
+        self.extremes = [_pose(p) for p in pair]
+        self.breakdown = None if breakdown is None else _pose(breakdown)
+        self.smooth, self.ticks = pen.smooth, pen.ticks
         self.fps = FPS
-        if isinstance(spacing, str):
-            self.spacing = spacing
-            self.fractions = self.pattern(spacing, ticks) if spacing in PATTERNS else []
-        else:
-            fr = sorted(float(x) for x in spacing)
-            if any(not 0.0 < x < 1.0 for x in fr):
-                raise ValueError("tick fractions must lie strictly inside (0, 1)")
-            self.fractions = fr
-            self.spacing = classify([0.0] + fr + [1.0])
+        self.spacing, self.fractions = spacing_fractions(spacing, pen.ticks)
         self._samples = None     # (first frame, values) when read off a curve or telemetry
         self._marks = None       # [(frame, token)] when read off a curve
 
@@ -210,6 +232,13 @@ class Chart:
         a, b = self.extremes
         return [a, self.breakdown, b] if self.breakdown else [a, b]
 
+    def _segment(self, a, b):
+        """Anchor `a` and the in-betweens laid down toward `b` (strictly between the two), in order."""
+        (fa, va), (fb, vb) = a, b
+        n = len(self.fractions) + 1.0
+        ticks = [(int(round(fa + (fb - fa) * (i + 1) / n)), va + (vb - va) * p) for i, p in enumerate(self.fractions)]
+        return [a] + [(f, v) for f, v in ticks if fa < f < fb]
+
     def keys(self):
         """The keyframe list rml.animation() consumes: extremes, breakdown, and one real key per
         tick. The in-betweens are keys, not a bezier's guess; `smooth` only rounds the corners
@@ -217,22 +246,13 @@ class Chart:
         last key carries none."""
         if not self.fractions and len(self.anchors) < 3:
             raise ValueError(f"spacing {self.spacing!r} has no ticks to lay down")
-        out, seen = [], set()
         anchors = self.anchors
-        for (fa, va), (fb, vb) in zip(anchors, anchors[1:]):
-            if fa not in seen:
-                out.append((fa, _round(va)))
-                seen.add(fa)
-            span = fb - fa
-            for i, p in enumerate(self.fractions):
-                frame = int(round(fa + span * (i + 1) / (len(self.fractions) + 1.0)))
-                if frame <= fa or frame >= fb or frame in seen:
-                    continue
-                out.append((frame, _round(va + (vb - va) * p)))
+        poses = [pose for a, b in zip(anchors, anchors[1:]) for pose in self._segment(a, b)] + [anchors[-1]]
+        out, seen = [], set()
+        for frame, value in poses:
+            if frame not in seen:
+                out.append((frame, _round(value)))
                 seen.add(frame)
-        last = anchors[-1]
-        if last[0] not in seen:
-            out.append((last[0], _round(last[1])))
         out.sort(key=lambda k: k[0])
         return [(f, v, self.smooth) for f, v in out[:-1]] + [out[-1]]
 
@@ -321,17 +341,14 @@ def _lay_out(items, width):
         return ""
     lo = len(items[0][1]) // 2
     hi = max(lo + 1, width - len(items[-1][1]) + len(items[-1][1]) // 2)
-    line, cursor = [" "] * (hi + len(items[-1][1]) + 2), -1
+    # Grown token by token rather than into a buffer sized from the width: when many marks crowd
+    # one end, each is pushed right of the last and the line runs past `width` (ErrorFlash's y).
+    line = ""
     for pos, token in items:
         centre = int(round(lo + max(0.0, min(1.0, pos)) * (hi - lo)))
-        start = max(centre - len(token) // 2, cursor + 1, 0)
-        for i, ch in enumerate(token):
-            line[start + i] = ch
-        cursor = start + len(token) - 1
-    for i in range(cursor + 1):
-        if line[i] == " ":
-            line[i] = "-"
-    return "".join(line[:cursor + 1])
+        start = max(centre - len(token) // 2, len(line))
+        line += "-" * (start - len(line)) + token.replace(" ", "-")
+    return line
 
 
 # --- a quick look --------------------------------------------------------------------------------

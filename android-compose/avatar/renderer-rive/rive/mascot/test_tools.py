@@ -224,6 +224,14 @@ class TimelineChart(unittest.TestCase):
         self.assertIn("[59]", out)
         self.assertIn("ease-in", out)
 
+    def test_marks_crowding_one_end_still_draw(self):
+        # ErrorFlash's y holds for most of its span, so every interior mark crowds the far end and
+        # the laid-out line runs past the requested width; that used to raise an IndexError.
+        code, out = run(timeline.main, ["ErrorFlash", "--chart"])
+        self.assertEqual(code, 0)
+        self.assertIn("[36]  ease-in", out)
+        self.assertTrue(Chart(extremes=[(0, 0), (40, 1)], spacing=[0.97, 0.98, 0.99]).text(width=12))
+
     def test_the_default_output_is_unchanged(self):
         _code, plain = run(timeline.main, ["IdleBounce"])
         _code, charted = run(timeline.main, ["IdleBounce", "--chart"])

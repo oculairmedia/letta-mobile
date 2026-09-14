@@ -29,7 +29,7 @@ from rig.body import (
     BREATHING, BREATH_MS, HALO_FAILED, HALO_OPACITY, HALO_SLEEP, INFLATE_NODE, LUMEN, LUMEN_PEAK,
     LUMEN_REST, bone_pose, breath2, breath_scale, lumen_keys, shape_keys, sine, squash,
 )
-from rig.chart import Chart
+from rig.chart import Chart, Pen
 from rig.constants import (BLINK_FLIP, DESIGNED_PAIRS, EXPR, IDLE_WAITS, JX, JY, WANDER_WAITS, beat,
                            frames, rad)
 from rig.face import spin_keys
@@ -62,7 +62,7 @@ def merge(into, more):
     return into
 
 
-def travel(f0, v0, f1, v1, spacing="s", ticks=5):
+def travel(start, end, spacing="s", ticks=5):
     """A joystick move authored as spacing rather than as a bezier: real in-betweens, linear between.
 
     The head is the heaviest thing the rig turns, and a bezier states its weight only at the ends -
@@ -73,7 +73,7 @@ def travel(f0, v0, f1, v1, spacing="s", ticks=5):
     reason `spin_keys` gives: the in-betweens ARE the spacing, and a bezier on each one would
     re-ease every segment and put the snap back.
     """
-    return Chart(extremes=[(f0, v0), (f1, v1)], spacing=spacing, smooth=LINEAR, ticks=ticks).keys()
+    return Chart(extremes=[start, end], spacing=spacing, pen=Pen(smooth=LINEAR, ticks=ticks)).keys()
 
 
 def wander_animations():
@@ -88,8 +88,8 @@ def wander_animations():
     d = beat(1600)
     # Look away, hold, swing back through centre, settle. The counter-swing is small and the
     # elastic only governs it, so the release is a settle rather than the whole return.
-    gx = (travel(0, 0, beat(560), -0.8)[:-1] + [(beat(560), -0.8, None)]
-          + travel(beat(900), -0.8, beat(1300), 0.2)[:-1]
+    gx = (travel((0, 0), (beat(560), -0.8))[:-1] + [(beat(560), -0.8, None)]
+          + travel((beat(900), -0.8), (beat(1300), 0.2))[:-1]
           + [(beat(1300), 0.2, ELASTIC_HEAVY), (d, 0)])
     glance = animation("WanderGlance", WANDER_GLANCE, d, {JOYSTICK: {JX: gx}})
     d = beat(1400)
@@ -98,8 +98,8 @@ def wander_animations():
         # move's span, so a counter much bigger than that reads to the probe as "still moving" for
         # every frame the spring takes to shed it - a heavier beat that measures as a slower one.
         counter = round(-0.06 * top, 4)
-        return (travel(0, 0, beat(450), top)[:-1] + [(beat(450), top, None)]
-                + travel(beat(850), top, beat(1150), counter)[:-1]
+        return (travel((0, 0), (beat(450), top))[:-1] + [(beat(450), top, None)]
+                + travel((beat(850), top), (beat(1150), counter))[:-1]
                 + [(beat(1150), counter, ELASTIC_HEAVY), (d, 0)])
     peek = animation("WanderPeek", WANDER_PEEK, d, {JOYSTICK: {JY: peek_axis(0.7), JX: peek_axis(0.3)}})
     spin_k = spin_keys(0, beat(700))
@@ -429,9 +429,9 @@ def idle_variety_animations():
     # The sweep across is the longest single joystick move in the rig; it is charted for the same
     # reason the wander beats are, and only the last leg home springs.
     lookaround = animation("IdleLookAround", IDLE_BEATS["lookaround"].anim, d, {JOYSTICK: {
-        JX: (travel(0, 0, beat(500), -0.6)[:-1] + [(beat(500), -0.6, None)]
-             + travel(beat(1000), -0.6, beat(1600), 0.55)[:-1] + [(beat(1600), 0.55, None)]
-             + travel(beat(1900), 0.55, beat(2250), -0.06)[:-1]
+        JX: (travel((0, 0), (beat(500), -0.6))[:-1] + [(beat(500), -0.6, None)]
+             + travel((beat(1000), -0.6), (beat(1600), 0.55))[:-1] + [(beat(1600), 0.55, None)]
+             + travel((beat(1900), 0.55), (beat(2250), -0.06))[:-1]
              + [(beat(2250), -0.06, ELASTIC_HEAVY), (d, 0)])}})
     return ([animation("IdleWait" + str(k), w.anim, frames(w.ms), {}) for k, w in enumerate(IDLE_WAITS)]
             + [glance, stretch, tilt, bounce, shiver, sigh, wobble, shift, lookaround])

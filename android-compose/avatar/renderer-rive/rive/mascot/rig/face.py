@@ -16,7 +16,7 @@ from textwrap import indent
 from rml import (LINEAR, OPACITY, REMAP_TIME, ROT, SINE, SX, SY, VM_LOOKX, VM_LOOKY, VM_MOUTH, X, Y,
                  animation, bind)
 from rig.body import fill, rrect
-from rig.chart import Chart
+from rig.chart import Chart, Pen
 from rig.constants import JX, LEAN_BASE, PLATE_WHITE, TUNABLES, TURN_ARC, TURN_LEAN_DEG, rad
 from rig.ids import (
     ARC_NODE, AUTO_X, AUTO_Y, BODY_NODE, CONV_LOOK, CONV_MOUTH, CONV_TURN_ROT, CONV_TURN_X,
@@ -141,7 +141,7 @@ def spin_keys(start, dur, trails=True):
     """
     a, b, c, d = start, start + round(dur * 0.26), start + round(dur * 0.68), start + dur
     swing = lambda f0, v0, f1, v1: Chart(extremes=[(f0, v0), (f1, v1)], spacing=list(SPIN_SPACING),
-                                         smooth=LINEAR).keys()
+                                         pen=Pen(smooth=LINEAR)).keys()
     x = swing(a, 0, b, 1)[:-1] + swing(b, 1, c, -1)[:-1] + swing(c, -1, d, 0)
     roll = [(f, rad(TURN_ROT * v)) + tuple(rest) for (f, v, *rest) in x]
     keys = {JOYSTICK: {JX: x}, BODY_NODE: {ROT: roll}}
