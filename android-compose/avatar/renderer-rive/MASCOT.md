@@ -1,7 +1,8 @@
 # The mascot: art spec and how it fits the codebase
 
-Beads: letta-mobile-kh094 (asset), letta-mobile-1zti3 (identity slice), letta-mobile-bn0y6
-(orbs everywhere). Proven by the native desktop spike, letta-mobile-0s5bi (`native/desktop/`).
+Beads: epic letta-mobile-wbin4 (rollout); letta-mobile-kh094 (asset), letta-mobile-1zti3 (identity),
+letta-mobile-24gbf (director wiring), letta-mobile-bn0y6 (everywhere), letta-mobile-jwntc (Android
+parity). Proven by the native desktop spike, letta-mobile-0s5bi (`native/desktop/`).
 
 The model is the Grokbot one: a user picks a **shape** and a **colour** for each agent, and the
 character's **face** is driven by the app. Shape and colour are identity and never change on their
@@ -16,8 +17,8 @@ and `art/*.svg`; `rive/mascot/README.md` is the operating manual (edit-verify-re
 ids, Rive gotchas, state machine layout) and `rive/mascot/ARTIST.md` the handoff for the human
 art pass. The character turns (a facing joystick moves the plate across the body and rotates the
 body), wanders on its own, spins with trails on `success`, and hides every glyph swap inside a
-blink. Sections 1-4 below are the original brief and the codebase plan; where they disagree with
-the README, the README wins.
+blink. Section 1 is the original brief (superseded where the README differs); section 2 is the rollout
+plan: topology, phases, timing.
 
 Check any state headless, no app needed:
 `rive . --screenshot=out.png --data=state=success --data=lookX=-1 --advance=30`.
@@ -95,55 +96,93 @@ runtime's generated headers rather than guessed: opacity 18, colorValue 37, x/y 
 scaleX/Y 16/17, rotation 15, Rectangle corner radii 31/161/162/163 (link 164), Polygon points
 125 / cornerRadius 126, view-model colour value 555.
 
-## 2. Contract
+## 2. Rollout: the mascot as the agent avatar everywhere (epic letta-mobile-wbin4; P2 = letta-mobile-24gbf, P4 = letta-mobile-jwntc)
 
-`RiveAvatarContract` gains `INPUT_SHAPE = "shape"`, `INPUT_COLOR = "color"` and
-`shapeKey(MascotShape)`. `RiveInputSink` gains `setColor(input, argb)`: Android maps it to
-`ViewModelInstance.setColor(String, Int)`, desktop to `rive_bridge_vm_set_color`.
+What exists today (feat/kh094-mascot-identity-art):
 
-`RiveAvatarRuntime` is unchanged. Identity is written **by the surface, once, on load**, not by
-the runtime: the runtime is about behaviour, and shape/colour are not behaviour.
+- The rig: v4 plate design with the human-touch art, entries with a blink shutter, facing +
+  lean + arc + recede on turns, mass curves, breath with inflate and light, saccade layer,
+  gaze/blink numbers from the Disney and Eyes Alive papers. Contract stable
+  (`RiveAvatarContract`), verified by `check_contract.py`.
+- The desktop bench (`RiveDesktopSpike.kt`): the reference implementation of the **director's
+  attention rules** - justified targets, habituation, eye-lead + spring head turn, mutual-gaze
+  saccades, reading/typing scans - written against the runtime's `setLookTarget` and two new
+  view-model numbers `turnX`/`turnY`.
+- `RiveAvatarRuntime` (common) drives both `RiveAvatarSurface` (Android, rive-android 11.12) and
+  `RiveDesktopScene` (Windows, native bridge). `AvatarDirector` (common) arbitrates
+  `AvatarState`; only the desktop web companion and the Android debug activity feed it.
 
-That write is not optional. The instance's authored default colour is in the file, but the
-data bind only delivers a value once the property is set at runtime — a scene that never calls
-`applyIdentity` draws a black body. Observed on the desktop bridge; verify on Android.
+### 2.1 Topology
 
-## 3. Where each piece lives (KMP)
+```
+sharedLogic (commonMain)
+  data/… turn engine, RuntimeEventFanout        ──► NEW AgentPresenceSource
+                                                     per agent: activity (idle/thinking/speaking/
+                                                     waitingInput/error/success), userTyping,
+                                                     derived from turn/tool/approval events
 
-The cardinal rule applies: logic in shared modules, platforms bind.
+avatar/core (commonMain, pure Kotlin, tested)
+  AvatarState, AvatarDirector, MascotIdentity/Shape/Palette, PresenceSemantics
+  NEW GazeDirector: targets (own/user/cursor/input/timeline), per-state plan, habituation,
+      eye-lead + damped-spring head, mutual-gaze saccades, reading/typing scans.
+      Inputs: state, cursor (optional), target rects (optional). Outputs: look(x,y), head(x,y),
+      blink. Lifted from the bench, one implementation for both platforms.
 
-| Piece | Module | Notes |
-|---|---|---|
-| `MascotShape` enum, `MascotIdentity(shape, color)`, palette, legacy-index mapping | `avatar/core` (commonMain) | Already the shared home of `AvatarState`. |
-| Contract + runtime | `avatar/renderer-rive` (commonMain) | As today. |
-| `MascotPicker` composable (shape grid + colour dots, Grokbot layout) | `sharedUI` (commonMain) | Pure Compose, no renderer. Previews the identity with a static render. |
-| `MascotAvatar(identity, state, size)` — the public composable | `sharedUI` (commonMain) via `expect`/`actual` | The one thing surfaces call. Chooses live vs cached rendering by size. |
-| Android live surface | `renderer-rive` androidMain (`RiveAvatarSurface`) | Exists; gains identity writes. |
-| Desktop live surface | `desktop` (`RiveDesktopSurface`) | From the spike. |
-| Native bridge | `renderer-rive/native/desktop` | From the spike; +`vm_set_color`. |
-| Per-agent persistence | today: desktop `secureSettingsStore` key `agent.<id>.avatar_style` (an int 0–5) | Becomes a serialised `MascotIdentity`; an old int reads as `circle` + palette[index]. Android gets the same key in its settings store. |
+avatar/renderer-rive (commonMain)
+  RiveAvatarContract (+ INPUT_TURN_X/Y), RiveAvatarRuntime (+ setHeadTurn), RiveInputSink
+  androidMain: RiveAvatarSurface + ViewModelInstanceInputSink  (rive-android; Rive Renderer)
+  (desktop scene stays in desktop/ until a second OS bridge exists)
 
-### Rendering budget
+sharedUI (commonMain, android + jvm)
+  NEW MascotAvatar(identity, state, size, gaze) - THE composable every surface calls.
+      size >= 56 dp: live scene.  size < 56 dp: cached bitmap keyed (shape, colour, state, px),
+      rendered by one shared scene per process, refreshed on state change - 20 agents in a list
+      cost 20 cache hits per frame, not 20 renders.
+      Renderer unavailable (no bridge on this OS, load failure): the existing gradient orb.
+  NEW MascotPicker(identity, onChange) - shape grid 4x2 + colour dots 5x2 + grey (Grokbot layout).
 
-Live scenes (advance + render + readback every frame, ~5 ms each on desktop) are for **hero**
-avatars only: chat header (72 dp), edit-agent preview (64 dp), the active agent in the Now-active
-bar. Everything smaller — rail 28 dp, sidebar 30 dp, list rows 22–44 dp, ~15 call sites — draws
-a **cached bitmap** keyed by `(shape, color, state, sizePx)`, rendered by one shared scene when
-first needed and again when that agent's state changes. A list of 20 agents costs 20 cache hits
-per frame, not 20 native renders. `MascotAvatar` makes this choice from `size`; callers do not.
+desktop/                               app/ (Android)
+  bind presence -> director            bind presence -> director
+  RiveDesktopScene/Surface (Windows)   RiveAvatarSurface
+  edit-agent picker, chat header hero, edit-agent picker, chat header hero,
+  12 AgentOrb/AgentSphere sites        agent list / rail sites
+  persistence: agent.<id>.avatar_style persistence: same key in the settings store
+  (MascotIdentity.encode(); legacy int -> circle + palette)
+```
 
-### Fallback
+The cardinal rule holds: every decision (what state, where to look, when to blink, what size
+gets a live scene) is in common code; the platforms only render and persist.
 
-When the native bridge cannot load (not Windows yet, DLL missing, no D3D11), `MascotAvatar` draws
-the existing gradient `AgentOrb`/`AgentSphere`. Identity still resolves and persists, so the day
-macOS/Linux land, every agent already has a shape and colour.
+### 2.2 Timing (working days, one engineer, sequential; P1 and P2 can overlap)
 
-## 4. Slices
+| Phase | Bead | Scope | Est. | Exit check |
+|---|---|---|---|---|
+| P0 done | kh094 | rig, bench, contract, native bridge | - | this branch, PR #1540 |
+| P1 identity | 1zti3 | `MascotIdentity` persistence (desktop + Android), `MascotPicker` in sharedUI, edit-agent uses it on both, chat-header hero live on both (desktop bridge / Android surface), contract gains `turnX`/`turnY` | 2-3 d | pick a shape+colour on one platform, see it on the hero; legacy int agents keep a look |
+| P2 director wiring | 24gbf | `AgentPresenceSource` from the turn engine; both hosts feed `AvatarDirector`; `GazeDirector` lifted from the bench into avatar/core with unit tests; hosts supply input/timeline rects; runtime `setHeadTurn` | 3-4 d | a real turn: listening while typing, thinking, speaking with mouth, waitingInput on approval, error flash - on both platforms, no debug buttons |
+| P3 everywhere | bn0y6 | `MascotAvatar` with the size tiers and bitmap cache; replace the 12 desktop orb sites and the Android list/header sites; gradient fallback | 3-4 d | a list of 20 agents at 60 fps; every avatar in the app is the mascot |
+| P4 Android parity + perf | jwntc | Pixel run via `MascotDebugActivity`: feathering, 60 fps hero, pause offscreen, memory; `reduceMotion` (qg77k) gates in rig + host; 22 dp profile decision | 2-3 d | Pixel 9 Pro + Pixel 2XL harness green; no dropped frames on the chat screen |
+| Later | z4b83, 0s5bi follow-ups | WORKING state + glyph; macOS/Linux bridge (Metal / Vulkan) or rive-cmp; the artist pass in the editor (then the editor is source of truth) | - | - |
 
-1. **Asset** (kh094): this spec in RML, compiled and inspected by the Linux agent; the spike
-   window (`:desktop:runRiveSpike -PriveSelfTest=true`) is the visual check, since it cycles
-   every state.
-2. **Identity** (1zti3): contract, sink, bridge, `MascotIdentity`, picker in `sharedUI`, desktop
-   edit-agent wired to it, chat-header hero becomes live. Small orbs unchanged.
-3. **Orbs** (bn0y6): `MascotAvatar` + cache, all call sites, Android parity.
-4. **Presence tint** (unfiled): host-drawn ring/glow for amber/green/red if wanted after 1–3.
+Total to "mascot everywhere on both platforms": ~11-14 working days after P0.
+
+### 2.3 Decisions already made (do not relitigate)
+
+- One `.riv`, one artboard, one state machine, view-model driven. Identity = shape + colour,
+  written once on load; state never persists.
+- Interaction logic (hover, drag, blink, wander, entries, saccades) lives in the file; the host
+  writes contract properties only. Attention/gaze policy lives in `avatar/core`, not the file.
+- Write identity and state before the first frame (no startup flash); `contain` fit.
+- Desktop rendering is the native bridge (feathering needs the Rive Renderer); Android is
+  rive-android (same renderer). No webview.
+- Bench tunables (`tune*`) are not contract; the numbers they find go into SPEC, then the
+  tunables can be removed.
+- Rive push before commit; once the artist edits in the editor, the editor is source of truth.
+
+### 2.4 Risks
+
+- macOS/Linux have no bridge yet: they get the gradient orb until P5. Acceptable for v1.
+- rive-android feathering/perf on low-end devices: P4 measures; the cached-bitmap tier is the
+  lever if the hero costs too much.
+- The 22 dp profile needs a host size signal (SPEC section 7); until then small orbs use the
+  standard glyphs through the bitmap cache.
