@@ -39,8 +39,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mikepenz.markdown.coil3.Coil3ImageTransformerImpl
 import com.mikepenz.markdown.compose.components.markdownComponents
+import com.mikepenz.markdown.compose.elements.MarkdownCodeFence
 import com.mikepenz.markdown.compose.elements.MarkdownHighlightedCodeBlock
-import com.mikepenz.markdown.compose.elements.MarkdownHighlightedCodeFence
 import com.mikepenz.markdown.compose.extendedspans.ExtendedSpans
 import com.mikepenz.markdown.compose.extendedspans.RoundedCornerSpanPainter
 import com.mikepenz.markdown.compose.Markdown as CoreMarkdown
@@ -644,9 +644,12 @@ private fun CodeFenceWithHeader(
     val (language, codeText) = remember(content, node) {
         extractCodeFenceInfo(content, node)
     }
-    val capA2uiFallback = language.equals("a2ui-json", ignoreCase = true) &&
-        (codeText.length > A2UI_JSON_FALLBACK_COLLAPSE_CHAR_LIMIT ||
-            codeText.lineSequence().count() > A2UI_JSON_FALLBACK_COLLAPSE_LINE_LIMIT)
+    val capA2uiFallback = remember(language, codeText) {
+        language.equals("a2ui-json", ignoreCase = true) &&
+            (codeText.length > A2UI_JSON_FALLBACK_COLLAPSE_CHAR_LIMIT ||
+                codeText.lineSequence().count() > A2UI_JSON_FALLBACK_COLLAPSE_LINE_LIMIT)
+    }
+    val isDarkTheme = isSystemInDarkTheme()
     var expanded by remember(content) { mutableStateOf(false) }
     val scrollState = rememberScrollState()
 
@@ -693,8 +696,8 @@ private fun CodeFenceWithHeader(
                 }
             }
 
-            // NOTE: do NOT wrap MarkdownHighlightedCodeFence in a horizontalScroll
-            // here — the library already applies its own horizontalScroll internally.
+            // NOTE: do NOT wrap the fence body in a second horizontalScroll here —
+            // HighlightedCodeText applies its own horizontalScroll internally.
             // Nesting two horizontal scrollers produces infinite-width constraints
             // during Compose's lookahead measure pass, which crashes the app with
             // "Horizontally scrollable component was measured with an infinity
@@ -718,11 +721,18 @@ private fun CodeFenceWithHeader(
                     .padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
                 contentAlignment = Alignment.TopCenter,
             ) {
-                MarkdownHighlightedCodeFence(
-                    content = content,
-                    node = node,
-                    highlightsBuilder = highlights,
-                )
+                // Our own highlighter, not the library's: it never flips to plain text while a
+                // recompute runs, coalesces streaming updates, and caches finished results, so a
+                // code box no longer relays out twice per token or on every scroll back into view.
+                MarkdownCodeFence(content = content, node = node, style = style) { code, fenceLanguage, codeStyle ->
+                    HighlightedCodeText(
+                        code = code,
+                        language = fenceLanguage,
+                        style = codeStyle,
+                        highlightsBuilder = highlights,
+                        darkTheme = isDarkTheme,
+                    )
+                }
             }
         }
     }
