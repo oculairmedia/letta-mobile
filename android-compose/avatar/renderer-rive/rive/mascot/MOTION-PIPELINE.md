@@ -22,6 +22,46 @@ Everything below is built on (1). The loop's floor is the CLI (verify 1.9 s, a s
 the plan spends that floor once per scenario, not once per frame, and spends it on numbers before
 pixels.
 
+### Findings (step C, 2026-09-14): what the first full probe pass turned up
+
+Seventeen node properties now read back per frame (`rig/probe.py`), driven by named scenarios
+(`scenarios.py`) through `probe.py`, with signatures committed as `goldens/*.json` and checked by
+`test_probe.py`. The probed document renders **pixel-identical** to the shipped one (diffed at
+`state=speaking`, frame 40), so the instrument does not disturb what it measures.
+
+1. **The success hop still only lifts the face.** Confirmed at every frame, not just one:
+   `Face.y` peaks -48.0 at frame 19, `Body.y` reaches -0.21 - the breath, nothing else. The bead
+   (`letta-mobile-uesod`) stands.
+2. **The plate never foreshortens on a horizontal turn.** `Turn.scaleX` reads exactly 1.000 for
+   the whole of `success`, `beat:WanderSpin` and every entry - while `Turn.x` swings the full
+   +-70 px and `Turn.rotation` the full +-14 deg. `TurnX` keys Turn.scaleX to 0.59 at the edges
+   (the squash) and `TurnY` keys the same property to 0.84/1.0 (the recede); the joystick applies
+   both axes and TurnY's value, always 1.0 while facing Y is 0, lands last and wins. It does move
+   under `beat:WanderPeek`, which drives Y - so the property is fine and the authoring is not.
+   A turn that slides and rolls but does not foreshorten is the flat slide `rig/face.py` warns
+   about. Two animations keying one property is the same class of bug as (1), one layer down.
+3. **The success spin cuts, hard.** `Turn.x` runs -70.0 -> -23.1 between frames 24 and 25, with
+   `Arc.y` jumping -0.0 -> -5.3 on the same pair: 47 px in one frame as the spin hands the facing
+   back. That is the largest single-frame delta anywhere in the probe set, and it is a seam the
+   authored keys do not show, because the two ends belong to different layers.
+4. **`--data` does not sequence, so scenario batching does not work.** Section 2 item 6 assumed
+   `--data=... --advance=40 --data=... --advance=40` walks a conversation in one run. It does not:
+   every `--data` is applied before the scene runs, whatever its position in argv, and repeated
+   writes to one property collapse to the last. Measured - that argv prints telemetry
+   byte-identical to a single `--data=state=listening --advance=80`. `--pointer` and `--advance`
+   do sequence. So `conversation` probes only the idle loop, and a real sequence of entries needs
+   one run per leg (or a Luau driver in the file). `Scenario.collapsed()` names the offending
+   properties and `probe.py` prints the warning.
+5. **A synthesised pointer drag does not reach the file's drag listener.** `--pointer=down@250,250
+   --pointer=move@300,300` renders pixel-identical to a plain hover and nothing like
+   `--data=dragged=true`. The `drag` scenario writes the contract boolean instead.
+6. **A nested state machine's input cannot be read back.** A two-way bind on the plate's `expr`
+   (`NestedNumber` 0:211, propertyKey 239) verifies, builds and is inert: it reports the authored
+   `nestedValue="0"` for every frame of every scenario, including `--data=state=speaking`. Which
+   glyph a state selects still has to come from the authored keys or from a pixel. Everything else
+   on the risk list in section 5 - node x/y/rotation/scale, gradient opacity, and **both joystick
+   axes** (keys 299/300) - reads live.
+
 ## 1. Where each Disney tool lands in the package
 
 ```
@@ -121,10 +161,13 @@ one pass, and most of them are text.
    heatmap. The numbers are baked as text in the image so one `Read` gives everything a human or
    an agent needs to judge the beat. Cards are cached by the animation's content hash; a regenerate
    only rebuilds cards whose animation changed.
-6. **Scenario batching.** One CLI run walks a whole conversation, `idle -> listening -> thinking ->
-   speaking -> idle`, with `--data` and `--advance` chained and `--data-dump-every=1`; the sheet and
-   signatures for five entries come out of one second, and every hand-off seam in the sequence is
-   measured for real, mixing included.
+6. **Scenario batching - limited.** Measured (step C): the CLI applies every `--data` before the
+   run whatever its position and collapses repeats to the last, so one run cannot walk
+   `idle -> listening -> thinking`; only `--pointer` and `--advance` sequence. A conversation is
+   therefore one run per state change (each about a second, still numbers not pixels), and the
+   cross-state hand-off seams come from the ledger plus one probe per pair. The Harness artboard's
+   Luau script (section 6) can change the view model on a frame schedule and is the way to get a
+   true multi-state run; `probe.py` warns when a scenario tries to sequence `--data`.
 7. **Authored versus actual, side by side.** The generator knows what it asked for; telemetry
    knows what happened. Every tool prints both when they disagree; that difference is the bug
    class we could not see before (the success hop).
