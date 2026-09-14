@@ -15,6 +15,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import app.rive.RiveFile
@@ -145,13 +146,20 @@ private class LiveSurfaceToken
 
 /**
  * The activity's [MascotHost]: brings up the Rive runtime and a worker bound to this composition's
- * lifecycle, loads the mascot from the first frame on, and releases everything when the root
- * leaves composition. [NoMascotHost] when the native runtime or the worker is unavailable, so a
- * device that cannot draw the mascot draws the orbs it always drew.
+ * lifecycle, loads the mascot after the first frame, and releases everything when the root
+ * leaves composition. [NoMascotHost] until that frame (and when the native runtime or the worker
+ * is unavailable), so TTFD is not the Rive JNI init and a device that cannot draw the mascot
+ * draws the orbs it always drew.
  */
 @Composable
 fun rememberAndroidMascotHost(): MascotHost {
     val context = LocalContext.current
+    var afterFirstFrame by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        withFrameNanos { }
+        afterFirstFrame = true
+    }
+    if (!afterFirstFrame) return NoMascotHost
     // The worker calls into JNI as soon as it exists; the runtime must be initialised first.
     val runtimeReady = remember {
         runCatching { app.rive.runtime.kotlin.core.Rive.init(context.applicationContext) }
