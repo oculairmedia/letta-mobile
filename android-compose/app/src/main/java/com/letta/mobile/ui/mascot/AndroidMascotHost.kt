@@ -5,7 +5,12 @@ import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import app.rive.core.ComposeFrameTicker
+import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -60,12 +65,37 @@ class AndroidMascotHost(
         applyIdentity = { entry, identity -> RiveAvatarContract.applyIdentity(entry.scene.sink, identity) },
     )
 
+    /**
+     * Whether the worker's message poll must run. The runtime's default polls on every vsync for
+     * the life of the activity, which keeps Compose's frame clock busy on every screen whether a
+     * mascot is drawn or not; here it runs only while a Rive surface is composed (a live companion,
+     * a still being captured) or the file is loading (the load completes through a polled message).
+     */
+    val pollNeeded: Boolean get() = loading || activeSurfaces > 0
+    private var loading by mutableStateOf(false)
+    private var activeSurfaces by mutableIntStateOf(0)
+
     /** Loads the shipped mascot once; a failure leaves every avatar on its fallback rather than crashing. */
     suspend fun load() {
         if (file != null) return
-        file = runCatching { RiveFile.load(RiveFileSource.RawRes(R.raw.mascot, resources), worker) }
-            .onFailure { Log.w(TAG, "mascot file failed to load; avatars fall back", it) }
-            .getOrNull()
+        loading = true
+        try {
+            file = runCatching { RiveFile.load(RiveFileSource.RawRes(R.raw.mascot, resources), worker) }
+                .onFailure { Log.w(TAG, "mascot file failed to load; avatars fall back", it) }
+                .getOrNull()
+        } finally {
+            loading = false
+        }
+    }
+
+    /** A Rive surface for the duration of [content]'s composition, counted so the poll runs only then. */
+    @Composable
+    private fun CountedSurface(content: @Composable () -> Unit) {
+        DisposableEffect(Unit) {
+            activeSurfaces++
+            onDispose { activeSurfaces-- }
+        }
+        content()
     }
 
     override fun entry(agentId: String, identity: MascotIdentity): MascotEntry? =
@@ -98,7 +128,7 @@ class AndroidMascotHost(
             onDispose { if (liveDrivers[live] === token) liveDrivers.remove(live) }
         }
         if (drives) {
-            RiveMascotSurface(live.scene, modifier, playing = true)
+            CountedSurface { RiveMascotSurface(live.scene, modifier, playing = true) }
         } else {
             MascotStill(live, modifier)
         }
@@ -112,12 +142,14 @@ class AndroidMascotHost(
             if (still != null) {
                 Image(still, contentDescription = null, modifier = Modifier.matchParentSize(), contentScale = ContentScale.Fit)
             } else {
-                RiveMascotSurface(
-                    entry.scene,
-                    modifier = Modifier.matchParentSize(),
-                    playing = false,
-                    onFirstFrame = { getBitmap -> runCatching { stills[key] = getBitmap().asImageBitmap() } },
-                )
+                CountedSurface {
+                    RiveMascotSurface(
+                        entry.scene,
+                        modifier = Modifier.matchParentSize(),
+                        playing = false,
+                        onFirstFrame = { getBitmap -> runCatching { stills[key] = getBitmap().asImageBitmap() } },
+                    )
+                }
             }
         }
     }
@@ -168,8 +200,15 @@ fun rememberAndroidMascotHost(): MascotHost {
     }
     if (!runtimeReady) return NoMascotHost
     val workerError = remember { mutableStateOf<Throwable?>(null) }
-    val worker = rememberRiveWorkerOrNull(workerError) ?: return NoMascotHost
+    // autoPoll off: the host decides when the per-frame poll runs (see [AndroidMascotHost.pollNeeded]).
+    val worker = rememberRiveWorkerOrNull(workerError, autoPoll = false) ?: return NoMascotHost
     val host = remember(worker) { AndroidMascotHost(worker, context.resources) }
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(host) {
+        snapshotFlow { host.pollNeeded }.collectLatest { needed ->
+            if (needed) runCatching { worker.beginPolling(lifecycle, ComposeFrameTicker) }
+        }
+    }
     LaunchedEffect(host) { host.load() }
     DisposableEffect(host) { onDispose { host.close() } }
     return host
