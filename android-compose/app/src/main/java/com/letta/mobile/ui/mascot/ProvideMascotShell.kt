@@ -20,7 +20,10 @@ fun ProvideMascotShell(
 ) {
     val host = rememberAndroidMascotHost()
     val registry = remember { MascotIdentityRegistry() }
-    MascotIdentitySync(agents, settings, registry)
+    // Roster collect stays off the first-display frame; tiles use empty identity until then.
+    if (host !== NoMascotHost) {
+        MascotIdentitySync(agents, settings, registry)
+    }
     CompositionLocalProvider(
         LocalMascotHost provides host,
         LocalMascotRegistry provides registry,

@@ -178,16 +178,22 @@ private class LiveSurfaceToken
 
 /**
  * The activity's [MascotHost]: brings up the Rive runtime and a worker bound to this composition's
- * lifecycle, loads the mascot after the first frame, and releases everything when the root
- * leaves composition. [NoMascotHost] until that frame (and when the native runtime or the worker
- * is unavailable), so TTFD is not the Rive JNI init and a device that cannot draw the mascot
- * draws the orbs it always drew.
+ * lifecycle, loads the mascot after initial display, and releases everything when the root
+ * leaves composition. [NoMascotHost] until two vsyncs have passed (and when the native runtime
+ * or the worker is unavailable), so TTFD is not the Rive JNI init / worker poll and a device
+ * that cannot draw the mascot draws the orbs it always drew.
+ *
+ * One `withFrameNanos` is not enough: that continuation can run in the same Choreographer
+ * callback that reports timeToInitialDisplay. Warm startup then sits on the perf-gate
+ * ceiling (487ms). Two frames plus a third before [AndroidMascotHost.load] keeps JNI and
+ * [RiveWorker.beginPolling] off that path.
  */
 @Composable
 fun rememberAndroidMascotHost(): MascotHost {
     val context = LocalContext.current
     var afterFirstFrame by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
+        withFrameNanos { }
         withFrameNanos { }
         afterFirstFrame = true
     }
@@ -209,7 +215,10 @@ fun rememberAndroidMascotHost(): MascotHost {
             if (needed) runCatching { worker.beginPolling(lifecycle, ComposeFrameTicker) }
         }
     }
-    LaunchedEffect(host) { host.load() }
+    LaunchedEffect(host) {
+        withFrameNanos { }
+        host.load()
+    }
     DisposableEffect(host) { onDispose { host.close() } }
     return host
 }
