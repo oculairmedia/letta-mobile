@@ -17,8 +17,11 @@ class GazeDirectorConfig {
     var headLeadSeconds: Float = 0.45f
     var eyeTauSeconds: Float = 0.32f
     var scanTauSeconds: Float = 0.08f
-    var springOmega: Float = 6.5f
-    var springZeta: Float = 0.72f
+    // The head spring also drives the lean (the host's turnX is bound to the lean rotation), so
+    // its weight IS the body's weight: heavier and near-critically damped, one slow settle, no
+    // wobble. The bench read the old 6.5 / 0.72 as abrupt lean and a face that kept ringing.
+    var springOmega: Float = 4.8f
+    var springZeta: Float = 0.92f
     var habituationDecaySeconds: Float = 4f
     var habituationRestoreSeconds: Float = 12f
     var cursorInterestFloor: Float = 0.3f
