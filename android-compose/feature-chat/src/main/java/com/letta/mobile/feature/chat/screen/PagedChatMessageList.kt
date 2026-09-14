@@ -81,6 +81,23 @@ private fun PagedChatMessageListContent(
     val routeTarget = if (presentation.hasBoundRoute) presentation.routeTarget else appearance.scrollToMessageId
     val pages = presentation.settled.collectAsLazyPagingItems()
     val live by presentation.live.collectAsStateWithLifecycle()
+    var initialHistoryReady by remember(presentation) { mutableStateOf(false) }
+    val refresh = pages.loadState.source.refresh
+    val initialPageAvailable = pages.itemSnapshotList.items.isNotEmpty() ||
+        (refresh is LoadState.NotLoading && pages.loadState.source.prepend.endOfPaginationReached &&
+            pages.loadState.source.append.endOfPaginationReached)
+    if (initialPageAvailable) SideEffect { initialHistoryReady = true }
+    // Do not paint an optimistic-only conversation before its first history page.
+    // Once visible, keep the viewport mounted through all later refreshes.
+    if (!initialHistoryReady && !initialPageAvailable) {
+        androidx.compose.foundation.layout.Column(modifier) {
+            androidx.compose.material3.Text(if (refresh is LoadState.Error) "Could not load conversation" else "Loading conversation...")
+            if (refresh is LoadState.Error) androidx.compose.material3.TextButton(onClick = { pages.retry() }) {
+                androidx.compose.material3.Text("Retry")
+            }
+        }
+        return
+    }
     LaunchedEffect(presentation, pages) {
         snapshotFlow { pages.itemSnapshotList.items }.collect { resident ->
             presentation.onResidentRows(resident)
@@ -188,15 +205,16 @@ private fun PagedChatMessageListContent(
     val pinch = remember { PinchScalePreviewController(minScale = 0.7f, maxScale = 1.6f, step = 0.02f) }
     SideEffect { pinch.syncCommittedScale(appearance.activeFontScale) }
     val currentCallbacks by rememberUpdatedState(callbacks)
+    val currentActiveScale by rememberUpdatedState(appearance.activeFontScale)
     val liveScale = if (pinch.isPinching) pinch.effectiveScale else appearance.activeFontScale
-    BoxWithConstraints(modifier.fillMaxSize().pointerInput(pinch, appearance.activeFontScale) {
+    BoxWithConstraints(modifier.fillMaxSize().pointerInput(pinch) {
         try {
             awaitEachGesture {
                 awaitFirstDown(requireUnconsumed = false)
                 do {
                     val event = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
                     if (event.changes.count { it.pressed } >= 2) {
-                        if (!pinch.isPinching) pinch.begin(appearance.activeFontScale)
+                        if (!pinch.isPinching) pinch.begin(currentActiveScale)
                         pinch.applyZoom(event.calculateZoom())
                         event.changes.forEach { it.consume() }
                     }

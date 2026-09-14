@@ -144,13 +144,12 @@ internal fun ChatMessageListRenderItem(params: ChatMessageListRenderItemParams) 
     // tracks the gesture whether it reads chatTypography or scales a Material style itself.
     TimelineZoomScope(perItemFontScale) {
         CompositionLocalProvider(LocalToolCardBodyParentVisible provides itemSeesLiveScale) {
-            // Reasoning, tool cards and run blocks animate their own size; a cached
-            // minimum can pin an intermediate expanded height while they collapse.
+            // Markdown also reflows after measurement. Let content own its height;
+            // a cached outer minimum can keep blank space after the text shrinks.
             MeasuredChatRenderItem(
                 signature = geometrySignature,
                 geometryState = context.itemGeometryState,
-                applyCachedMinHeight = !renderItem.includesReasoningRow() &&
-                    renderItem is ChatRenderItem.Single && renderItem.message.toolCalls.isNullOrEmpty(),
+                applyCachedMinHeight = false,
                 // The signature carries the committed scale, so while the live scale differs the
                 // cached height describes a size this row is no longer drawn at.
                 scaleIsTransient = perItemFontScale != context.activeFontScale,

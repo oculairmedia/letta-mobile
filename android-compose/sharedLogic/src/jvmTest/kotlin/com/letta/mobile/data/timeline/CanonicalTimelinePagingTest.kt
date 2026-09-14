@@ -110,6 +110,7 @@ class CanonicalTimelinePagingTest {
         try {
             ui.launch { presentation.settled.collectLatest { presenter.collectFrom(it) } }
             presenter.awaitRows(32) { "reads=${store.reads - readsBeforeCollection}" }
+            presenter.awaitIdle()
             // Includes Paging's boundary checkpoint probes, not just the single page snapshot.
             kotlin.test.assertTrue(store.reads - readsBeforeCollection <= 4,
                 "UI consumption must not add 32 suppression reads: ${store.reads - readsBeforeCollection}")
