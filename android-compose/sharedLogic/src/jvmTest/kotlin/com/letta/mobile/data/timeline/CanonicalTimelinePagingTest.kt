@@ -18,6 +18,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonPrimitive
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -78,6 +79,87 @@ class CanonicalTimelinePagingTest {
         }
     }
 
+    @Test fun pagingSourcePreparesThirtyTwoRowsInOneStoreSnapshot() = runBlocking {
+        val store = InMemoryTimelineStore()
+        val session = CanonicalTimelineSession(store, PageTransport(records = 32), scope, enabled = true)
+        val selection = assertIs<TimelineEngineOpen.Opened>(session.open()).selection
+        assertEquals(TimelineEnginePageOutcome.Applied, session.loadOlder(selection))
+        val readsBeforeLoad = store.reads
+
+        val page = assertIs<androidx.paging.PagingSource.LoadResult.Page<TimelinePageKey, TimelineSettledRecord>>(
+            TimelineLedgerPagingSource(session.engine, selection).load(
+                androidx.paging.PagingSource.LoadParams.Refresh(null, 32, false),
+            ),
+        )
+
+        assertEquals(32, page.data.size)
+        page.data.forEach { assertIs<TimelineSettledPresentation.Render>(it.preparedPresentation) }
+        assertEquals(1, store.reads - readsBeforeLoad, "page preparation must not re-enter the store per row")
+    }
+
+    @Test fun consumingPreparedPageDoesNotReadSuppressionPerRow() = runBlocking {
+        val store = InMemoryTimelineStore()
+        val transport = PageTransport(records = 32)
+        val coordinator = CanonicalTimelineCoordinator(store, transport)
+        val owner = coordinator.acquire(scope)
+        assertEquals(TimelineEnginePageOutcome.Applied, owner.session.loadOlder(owner.selection))
+        val ui = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val presentation = CanonicalTimelinePresentation.open(coordinator, owner, ui)
+        val presenter = RecordingPresenter<CanonicalTimelinePresentation.Row>()
+        val readsBeforeCollection = store.reads
+        try {
+            ui.launch { presentation.settled.collectLatest { presenter.collectFrom(it) } }
+            presenter.awaitRows(32) { "reads=${store.reads - readsBeforeCollection}" }
+            // Includes Paging's boundary checkpoint probes, not just the single page snapshot.
+            kotlin.test.assertTrue(store.reads - readsBeforeCollection <= 4,
+                "UI consumption must not add 32 suppression reads: ${store.reads - readsBeforeCollection}")
+            // The newest end is an independent walk and still reconciles once on open, so the local
+            // page is not re-fetched as history: the ledger keeps exactly the rows already prepared.
+            assertEquals(32, store.rows.size, "consuming the prepared page must not refetch it as history")
+            kotlin.test.assertTrue(transport.calls <= 2,
+                "only the one history page plus the bounded newest reconcile: ${transport.calls}")
+        } finally {
+            presentation.close()
+            ui.cancel()
+        }
+    }
+
+    @Test fun settledPresentationDecodesAndProjectsEachRenderedRecordOnce() = runBlocking {
+        val store = InMemoryTimelineStore()
+        val transport = PageTransport(records = 1)
+        val coordinator = CanonicalTimelineCoordinator(store, transport)
+        val owner = coordinator.acquire(scope)
+        val ui = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val decodes = AtomicInteger()
+        val projections = AtomicInteger()
+        val adapter = TimelineSettledProjectionAdapter(
+            decode = { record ->
+                decodes.incrementAndGet()
+                DefaultTimelineSettledProjectionAdapter.decode(record).also {
+                    // A second raw decode outside this adapter must fail too, not evade the counter.
+                    record.body.fill(0)
+                }
+            },
+            project = { record, event, ownAgentId ->
+                projections.incrementAndGet()
+                DefaultTimelineSettledProjectionAdapter.project(record, event, ownAgentId)
+            },
+        )
+        val presentation = CanonicalTimelinePresentation.open(coordinator, owner, ui, settledProjectionAdapter = adapter)
+        val presenter = RecordingPresenter<CanonicalTimelinePresentation.Row>()
+        try {
+            ui.launch { presentation.settled.collectLatest { presenter.collectFrom(it) } }
+            presenter.awaitRows(1) { "calls=${transport.calls} ledgerRows=${store.rows.size}" }
+
+            assertEquals(1, decodes.get(), "the settled production path decodes the complete body once")
+            assertEquals(1, projections.get(), "the settled production path projects the decoded event once")
+            assertEquals("otid-m-0", presenter.snapshot().items.single().otid)
+            presentation.close()
+        } finally {
+            ui.cancel()
+        }
+    }
+
     private class RecordingPresenter<T : Any> : PagingDataPresenter<T>(Dispatchers.Default, null) {
         override suspend fun presentPagingDataEvent(event: PagingDataEvent<T>) = Unit
 
@@ -115,7 +197,7 @@ class CanonicalTimelinePagingTest {
                     TimelineMessageId("m-$index"),
                     AssistantMessage(
                         id = "m-$index", contentRaw = JsonPrimitive("reply $index"),
-                        date = "2026-01-01T00:00:0${index}Z",
+                        date = "2026-01-01T00:00:0${index}Z", otid = "otid-m-$index",
                     ),
                     0,
                 )

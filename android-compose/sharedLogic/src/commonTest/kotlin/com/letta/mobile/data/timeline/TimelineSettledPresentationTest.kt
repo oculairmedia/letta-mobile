@@ -4,6 +4,7 @@ import com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent
 import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 
 /**
@@ -31,6 +32,53 @@ class TimelineSettledPresentationTest {
     @Test fun anAssistantMessageRenders() {
         val rendered = assertIs<TimelineSettledPresentation.Render>(record(event("assistant_message", "hello")).presentation())
         assertEquals("hello", rendered.event.content)
+    }
+
+    @Test fun completeRenderableRecordDecodesAndProjectsOnce() {
+        var decodes = 0
+        var projections = 0
+        val adapter = TimelineSettledProjectionAdapter(
+            decode = { timeline ->
+                decodes++
+                DefaultTimelineSettledProjectionAdapter.decode(timeline)
+            },
+            project = { timeline, decoded, ownAgentId ->
+                projections++
+                DefaultTimelineSettledProjectionAdapter.project(timeline, decoded, ownAgentId)
+            },
+        )
+
+        val rendered = assertIs<TimelineSettledPresentation.Render>(
+            record(event("assistant_message", "hello")).presentationWithAdapter(null, adapter),
+        )
+        assertEquals("otid-1", rendered.event.otid)
+        assertEquals(1, decodes)
+        assertEquals(1, projections)
+    }
+
+    @Test fun droppedAndDeferredRecordsDoNotDecodeOrProject() {
+        val adapter = TimelineSettledProjectionAdapter(
+            decode = { error("must not decode") },
+            project = { _, _, _ -> error("must not project") },
+        )
+        val opaque = record(event("assistant_message", "hello"), "application/vnd.letta.message+json;version=1")
+        val deferred = record(event("assistant_message", "hello")).copy(pointer = TimelineBodyPointer("body-1", 4_096))
+
+        assertEquals(TimelineSettledPresentation.Drop, opaque.presentationWithAdapter(null, adapter))
+        assertEquals(TimelineSettledPresentation.Defer, deferred.presentationWithAdapter(null, adapter))
+    }
+
+    @Test fun malformedCompleteRecordStillFailsBeforeProjection() {
+        var projections = 0
+        val adapter = TimelineSettledProjectionAdapter(
+            decode = { DefaultTimelineSettledProjectionAdapter.decode(it) },
+            project = { _, _, _ -> projections++; error("must not project") },
+        )
+
+        assertFailsWith<Exception> {
+            record("not-json".encodeToByteArray()).presentationWithAdapter(null, adapter)
+        }
+        assertEquals(0, projections)
     }
 
     @Test fun aBodyHeldBackFromInlineDecodingIsDeferred() {

@@ -4,12 +4,10 @@ import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import androidx.paging.map
 import androidx.paging.filter
-import com.letta.mobile.data.timeline.snapshot.toConfirmedTimelineEvent
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.projection.timelineEventToUiMessage
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.common.GroupPosition
-import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -34,6 +32,7 @@ class CanonicalTimelinePresentation private constructor(
     private val lease: CanonicalTimelineCoordinator.Presentation,
     parentScope: CoroutineScope,
     val missingTarget: String?,
+    private val settledProjectionAdapter: TimelineSettledProjectionAdapter,
 ) {
     private val job = SupervisorJob(parentScope.coroutineContext[Job])
     private val scope = parentScope + job
@@ -88,16 +87,9 @@ class CanonicalTimelinePresentation private constructor(
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     val settled: Flow<PagingData<Row>> = anchor.flatMapLatest { key ->
-        owner.session.paging(owner.selection, key).map { page ->
-            page.filter { record ->
-                when (val presentation = record.presentation(owner.selection.scope.agentId)) {
-                    is TimelineSettledPresentation.Drop -> false
-                    is TimelineSettledPresentation.Defer -> true
-                    is TimelineSettledPresentation.Render -> !owner.session.engine.isSuppressed(
-                        owner.selection, record.key.identity, record.revision, presentation.event,
-                    )
-                }
-            }.map { record -> project(record) }
+        owner.session.paging(owner.selection, key, settledProjectionAdapter).map { page ->
+            page.filter { it.preparedPresentation !is TimelineSettledPresentation.Drop }
+                .map { record -> project(record, requireNotNull(record.preparedPresentation)) }
         }
     }.cachedIn(scope)
 
@@ -194,31 +186,29 @@ class CanonicalTimelinePresentation private constructor(
         return copy(toolCalls = calls.map { if (it.settled) it else it.copy(settled = true) })
     }
 
-    private fun project(record: TimelineSettledRecord): Row {
-        val projection = record.projectBounded(owner.selection.scope, owner.selection.scope.agentId)
-        val deferred = (projection as? TimelineSettledProjection.Deferred)?.reference
-        // A deferred row carries no text of its own: the card above it reads the stored body a
-        // page at a time. NotRenderable cannot reach here - `settled` drops those records before
-        // projection - so it is recorded rather than described to the user.
-        if (projection is TimelineSettledProjection.NotRenderable) {
-            Telemetry.event(
-                "CanonicalTimelinePresentation", "settled_row_not_renderable",
-                "identity" to record.key.identity.value, "contentType" to record.contentType,
-            )
-        }
-        val item = (projection as? TimelineSettledProjection.Rendered)?.item?.settledToolCalls() ?: ChatRenderItem.Single(
-            UiMessage(record.key.identity.value, "assistant", "", timestamp = ""),
-            GroupPosition.None, keyOverride = "segment-${record.key.identity.value}",
+    private fun project(record: TimelineSettledRecord, presentation: TimelineSettledPresentation): Row = when (presentation) {
+        is TimelineSettledPresentation.Render -> Row(
+            record.key.identity,
+            record.revision,
+            presentation.item.settledToolCalls(),
+            otid = presentation.event.otid,
         )
-        // A deferred body is not decoded here, so its otid stays blank and simply never matches.
-        val otid = if (deferred != null || record.isPreview ||
-            record.contentType != TIMELINE_EVENT_CONTENT_TYPE
-        ) "" else runCatching {
-            com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec.json.decodeFromString(
-                com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent.serializer(), record.body.decodeToString(),
-            ).toConfirmedTimelineEvent().otid
-        }.getOrDefault("")
-        return Row(record.key.identity, record.revision, item, deferred, otid)
+        is TimelineSettledPresentation.Defer -> Row(
+            record.key.identity,
+            record.revision,
+            ChatRenderItem.Single(
+                UiMessage(record.key.identity.value, "assistant", "", timestamp = ""),
+                GroupPosition.None, keyOverride = "segment-${record.key.identity.value}",
+            ),
+            TimelineBodyReference(
+                owner.selection.scope,
+                record.key,
+                requireNotNull(record.pointer) { "Deferred body requires a pointer" },
+                record.contentType,
+                record.revision,
+            ),
+        )
+        TimelineSettledPresentation.Drop -> error("Dropped records must not reach projection")
     }
 
     companion object {
@@ -228,11 +218,14 @@ class CanonicalTimelinePresentation private constructor(
             owner: CanonicalTimelineCoordinator.Owner,
             parentScope: CoroutineScope,
             target: TimelineMessageId? = null,
+            settledProjectionAdapter: TimelineSettledProjectionAdapter = DefaultTimelineSettledProjectionAdapter,
         ): CanonicalTimelinePresentation {
             val requested = coordinator.attach(owner, target)
             val lease = requested ?: checkNotNull(coordinator.attach(owner))
             return try {
-                CanonicalTimelinePresentation(coordinator, lease, parentScope, if (requested == null) target?.value else null)
+                CanonicalTimelinePresentation(
+                    coordinator, lease, parentScope, if (requested == null) target?.value else null, settledProjectionAdapter,
+                )
             } catch (failure: Throwable) {
                 withContext(NonCancellable) { coordinator.detach(lease) }
                 throw failure
