@@ -11,10 +11,10 @@ import kotlin.io.path.exists
  * letta-mobile-ah1ng source contract.
  *
  * Every projection publication inside [ChatTimelineObserver] must route
- * through terminal reconciliation
+ * through run-presentation reconciliation
  * ([ChatRunExpansionState.reconcileCollapsedRunsOnProjection]). The original
  * defect shipped as a raw `uiState.value = prev.copy(...)` publication that
- * silently bypassed collapse reconciliation, so this contract fails closed:
+ * silently bypassed run-state reconciliation, so this contract fails closed:
  * any new unwrapped publication inside the timeline collector (or an
  * unwrapped presence-clear in the sync-event collector) breaks the build.
  */
