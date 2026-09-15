@@ -10,7 +10,10 @@ interface PendingLocalDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(row: PendingLocalEntity)
 
-    @Query("SELECT * FROM pending_local_messages WHERE conversationId = :conversationId ORDER BY sentAtEpochMs ASC")
+    @Query(
+        "SELECT otid, conversationId, content, attachmentsJson, sentAtEpochMs, deliveryState " +
+            "FROM pending_local_messages WHERE conversationId = :conversationId ORDER BY sentAtEpochMs ASC",
+    )
     suspend fun listForConversation(conversationId: String): List<PendingLocalEntity>
 
     @Query("DELETE FROM pending_local_messages WHERE otid = :otid")
