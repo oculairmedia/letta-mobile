@@ -9,6 +9,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -24,6 +25,9 @@ class IrohAgentRepositoryPushTest {
         val calls = mutableListOf<String>()
         var agents = mutableMapOf("agent-1" to "Old", "agent-2" to "Two")
 
+        /** When set, agent.list answers with the roster as it was when the call started, after this opens. */
+        var listGate: kotlinx.coroutines.CompletableDeferred<Unit>? = null
+
         override val events = pushes
         override val state = connection
 
@@ -32,6 +36,7 @@ class IrohAgentRepositoryPushTest {
             val result = when (method) {
                 "agent.get" -> path.substringAfterLast('/').let { id -> agents[id]?.let { """{"id":"$id","name":"$it"}""" } }
                 "agent.list" -> agents.entries.joinToString(",", "[", "]") { """{"id":"${it.key}","name":"${it.value}"}""" }
+                    .also { listGate?.await() }
                 else -> null
             }
             return AppServerInboundFrame.AdminRpcResponse(
@@ -84,6 +89,24 @@ class IrohAgentRepositoryPushTest {
         transport.connection.value = ChannelTransportState.Connected("server", "session", "device")
 
         assertEquals("Created while offline", repository.getCachedAgent(AgentId("agent-3"))?.name)
+    }
+
+    @Test
+    fun aPushDuringAFullRefreshIsNotOverwrittenByTheOlderRoster() = runTest(UnconfinedTestDispatcher()) {
+        val transport = PushingTransport()
+        val repository = IrohAgentRepository(directoryProvider = { IrohAdminRpcAgentDirectory(transport) }, transport = transport, scope = backgroundScope)
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        transport.listGate = gate
+        // The full refresh reads the roster ("Old") and is held in flight...
+        val refresh = backgroundScope.async { repository.refreshAgents() }
+        // ...while the agent is renamed elsewhere and the push arrives.
+        transport.agents["agent-1"] = "Renamed"
+        transport.pushes.emit(push("agent-1", "updated"))
+        transport.listGate = null
+        gate.complete(Unit)
+        refresh.await()
+
+        assertEquals("Renamed", repository.getCachedAgent(AgentId("agent-1"))?.name)
     }
 
     @Test

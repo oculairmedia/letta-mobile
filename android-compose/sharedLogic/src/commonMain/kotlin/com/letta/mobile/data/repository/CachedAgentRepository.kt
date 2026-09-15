@@ -352,8 +352,11 @@ open class CachedAgentRepository(
         }
 
     private suspend fun refreshAgent(agentId: AgentId): Result<Agent> = runCatchingCancellable {
-        val fresh = fetchAgentRemote(agentId)
-        updateAgentInCache(fresh)
+        // Under refreshMutex like refreshAgents: otherwise a full refresh already in flight can
+        // overwrite this newer agent with its older roster when it lands.
+        val fresh = refreshMutex.withLock {
+            fetchAgentRemote(agentId).also(::updateAgentInCache)
+        }
         // Persist the transport-driven refresh to the Room cache so a pushed
         // agent_updated change survives an app restart (CodeRabbit #517).
         runCatchingCancellable { localCache?.invoke()?.upsert(fresh) }

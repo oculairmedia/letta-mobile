@@ -1,5 +1,8 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -119,7 +122,10 @@ class ConnectionRegistry {
      */
     suspend fun broadcast(frame: String, isRecipient: (ViewerHandle) -> Boolean): BroadcastResult {
         val recipients = connections().filter(isRecipient)
-        return BroadcastResult(recipients = recipients.size, delivered = recipients.count { it.writeFrame(frame) })
+        // Concurrently: each write waits on that connection's own stream lock, so a slow peer must
+        // not hold up delivery to the others.
+        val delivered = coroutineScope { recipients.map { async { it.writeFrame(frame) } }.awaitAll() }
+        return BroadcastResult(recipients = recipients.size, delivered = delivered.count { it })
     }
 
     data class BroadcastResult(val recipients: Int, val delivered: Int)

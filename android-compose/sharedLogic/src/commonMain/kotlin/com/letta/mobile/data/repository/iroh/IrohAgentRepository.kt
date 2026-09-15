@@ -17,6 +17,8 @@ import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.runCatchingCancellable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -38,6 +40,7 @@ class IrohAgentRepository(
     private val refreshingFlow = MutableStateFlow(false)
     private val refreshErrorFlow = MutableStateFlow<Throwable?>(null)
     private var lastRefreshMs = 0L
+    private val refreshMutex = Mutex()
 
     init {
         if (transport != null && scope != null) {
@@ -54,9 +57,13 @@ class IrohAgentRepository(
         }
     }
 
-    /** One agent, fresh from Meridian; a failed fetch keeps the cached copy (the next refresh reconciles). */
-    private suspend fun refetch(agentId: AgentId) {
-        val directory = directoryProvider() ?: return
+    /**
+     * One agent, fresh from Meridian; a failed fetch keeps the cached copy (the next refresh
+     * reconciles). Serialized with [refreshAgents] so a full refresh already in flight cannot
+     * overwrite this newer agent with its older roster.
+     */
+    private suspend fun refetch(agentId: AgentId) = refreshMutex.withLock {
+        val directory = directoryProvider() ?: return@withLock
         runCatchingCancellable { directory.getAgent(agentId) }
             .onSuccess { agent -> agent?.let(::updateAgentInCache) }
             .onFailure { e ->
@@ -70,7 +77,9 @@ class IrohAgentRepository(
 
     override suspend fun countAgents(): Int = directory().countAgents()
 
-    override suspend fun refreshAgents() {
+    override suspend fun refreshAgents() = refreshMutex.withLock { refreshAgentsLocked() }
+
+    private suspend fun refreshAgentsLocked() {
         refreshingFlow.value = true
         try {
             val newAgents = directory().listAgents()

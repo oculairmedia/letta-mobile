@@ -46,6 +46,27 @@ class ConnectionRegistryTest {
     }
 
     @Test
+    fun aSlowConnectionDoesNotHoldUpBroadcastToTheOthers() = runTest {
+        val registry = ConnectionRegistry()
+        val slowWrite = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val slow = object : ViewerHandle {
+            override val connectionId = "endpoint-slow"
+            override suspend fun writeFrame(frame: String): Boolean = slowWrite.await().let { true }
+            override fun receivesBroadcast(requiredCapability: String) = true
+        }
+        val fast = BroadcastViewer("endpoint-fast", setOf(IrohPeerCapabilities.CHAT_READ))
+        registry.claim(slow)
+        registry.claim(fast)
+
+        val result = async { registry.broadcast("frame") { it.receivesBroadcast(IrohPeerCapabilities.CHAT_READ) } }
+        testScheduler.runCurrent()
+
+        assertEquals(listOf("frame"), fast.frames, "the fast connection is written while the slow one is still blocked")
+        slowWrite.complete(Unit)
+        assertEquals(ConnectionRegistry.BroadcastResult(recipients = 2, delivered = 2), result.await())
+    }
+
+    @Test
     fun theDefaultViewerHandleReceivesNoBroadcasts() {
         assertFalse(FakeViewer("endpoint-a").receivesBroadcast(IrohPeerCapabilities.CHAT_READ))
     }
