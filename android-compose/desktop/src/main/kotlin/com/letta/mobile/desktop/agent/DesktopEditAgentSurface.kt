@@ -164,8 +164,9 @@ internal fun DesktopEditAgentSurface(
             b?.value?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }?.let { interests.addAll(it) }
         }
         // The agent's own identity (its metadata - the same field mobile writes) first, then this
-        // machine's cached / legacy setting; decode reads both the `shape:AARRGGBB` form and the legacy orb index.
-        loadedIdentity = resolveMascotIdentity(agent, settings.getString(agentAvatarStyleKey(agentId)))
+        // machine's cached / legacy setting, else the one generated from the agent id - the mascot the
+        // agent already shows everywhere. Loading it is not a change, so opening the editor saves nothing.
+        loadedIdentity = resolveMascotIdentity(agentId, agent, settings.getString(agentAvatarStyleKey(agentId)))
         loadedMetadata = agent.metadata
         identity = loadedIdentity ?: MascotIdentity.DEFAULT
         voice = settings.getString(agentVoiceKey(agentId))?.takeIf { it in VoiceOptions } ?: VoiceOptions.first()
