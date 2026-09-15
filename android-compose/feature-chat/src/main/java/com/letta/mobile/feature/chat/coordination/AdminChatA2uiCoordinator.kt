@@ -304,8 +304,10 @@ internal class AdminChatA2uiCoordinator(
         val decision = action.context["decision"]?.jsonPrimitive?.contentOrNull
         val message = when (normalized) {
             "matched_approval" -> when (decision) {
+                "approve", "approved" -> "Approved"
                 "deny", "rejected", "timeout" -> "Denied"
-                else -> "Approved"
+                // letta-mobile-soa3i.4: fail closed - an unknown or missing decision is not an approval.
+                else -> "Resolved"
             }
             "injected_as_input" -> "Sent"
             "recorded_only" -> "Saved"
