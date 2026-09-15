@@ -14,11 +14,13 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -37,10 +39,14 @@ import com.letta.mobile.avatar.core.MascotShape
 import kotlin.math.cos
 import kotlin.math.sin
 
+/** The rotation slider's resolution: 24 positions, 0 to 345 degrees. */
+const val MASCOT_ROTATION_STEP: Int = 15
+
 /**
- * The Grokbot-style identity picker: a grid of the eight bodies, drawn in the chosen colour, and
- * the palette's colour dots. Pure Compose, no renderer - the preview is the body silhouette, which
- * is exactly what the identity is. Shared by every platform's edit-agent surface.
+ * The Grokbot-style identity picker: a grid of the eight bodies, drawn in the chosen colour and at
+ * the chosen turn, the palette's colour dots, and the turn itself. Pure Compose, no renderer - the
+ * preview is the body silhouette, which is exactly what the identity is. Shared by every platform's
+ * edit-agent surface.
  */
 @Composable
 fun MascotPicker(
@@ -58,7 +64,34 @@ fun MascotPicker(
         MascotChoiceRows(MascotPalette.ALL, columns = 5) { argb ->
             MascotColorChoice(argb, identity, accent) { onChange(identity.copy(argb = argb)) }
         }
+        MascotRotationChoice(identity, onChange)
     }
+}
+
+@Composable
+private fun MascotRotationChoice(identity: MascotIdentity, onChange: (MascotIdentity) -> Unit) {
+    Text(
+        "Rotation ${identity.rotationDegrees}°",
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    val positions = MascotIdentity.FULL_TURN / MASCOT_ROTATION_STEP
+    Slider(
+        value = snapRotation(identity.rotationDegrees).toFloat(),
+        onValueChange = { degrees ->
+            val snapped = snapRotation(degrees.toInt())
+            if (snapped != identity.rotationDegrees) onChange(identity.copy(rotationDegrees = snapped))
+        },
+        valueRange = 0f..(MascotIdentity.FULL_TURN - MASCOT_ROTATION_STEP).toFloat(),
+        steps = positions - 2,
+        modifier = Modifier.semantics { contentDescription = "rotation" },
+    )
+}
+
+/** [degrees] to the nearest slider position, folded into one turn. */
+fun snapRotation(degrees: Int): Int {
+    val step = MASCOT_ROTATION_STEP
+    return MascotIdentity.normalizeRotation(((degrees + step / 2).floorDiv(step)) * step)
 }
 
 @Composable
@@ -97,7 +130,7 @@ private fun MascotShapeChoice(
             )
             .semantics { contentDescription = shape.name.lowercase() },
         contentAlignment = Alignment.Center,
-    ) { MascotShapeGlyph(shape, identity.argb, 36.dp) }
+    ) { MascotShapeGlyph(shape, identity.argb, 36.dp, Modifier.rotate(identity.rotationDegrees.toFloat())) }
 }
 
 @Composable
@@ -137,11 +170,12 @@ fun DrawScope.drawMascotShape(shape: MascotShape, color: Color) {
     val r = minOf(w, h) / 2f
     when (shape) {
         MascotShape.CIRCLE -> drawCircle(color, r, c)
-        MascotShape.ROUNDED_SQUARE -> drawRoundRect(color, Offset(c.x - r, c.y - r), Size(2 * r, 2 * r), androidx.compose.ui.geometry.CornerRadius(r * 0.45f))
+        MascotShape.ROUNDED_SQUARE -> drawRoundRect(color, Offset(c.x - r * 0.92f, c.y - r * 0.92f), Size(1.84f * r, 1.84f * r), androidx.compose.ui.geometry.CornerRadius(r * 0.16f))
         MascotShape.PILL -> drawRoundRect(color, Offset(c.x - r, c.y - r * 0.68f), Size(2 * r, 2 * r * 0.68f), androidx.compose.ui.geometry.CornerRadius(r * 0.68f))
         MascotShape.BLOB -> drawPath(blob(c, r), color)
-        MascotShape.TRIANGLE -> drawSoftPolygon(color, SoftPolygon(c, r * 1.08f, r * 0.42f).also { it.sides = 3; it.startDeg = -90f })
-        MascotShape.HEXAGON -> drawSoftPolygon(color, SoftPolygon(c, r * 1.02f, r * 0.22f).also { it.sides = 6 })
+        // Centred on the face like art/body-triangle.svg, so a turned glyph turns about the same point.
+        MascotShape.TRIANGLE -> drawSoftPolygon(color, SoftPolygon(c, r * 1.0f, r * 0.16f).also { it.sides = 3; it.startDeg = -90f })
+        MascotShape.HEXAGON -> drawSoftPolygon(color, SoftPolygon(c, r * 1.0f, r * 0.12f).also { it.sides = 6 })
         MascotShape.CLOUD -> drawCloud(color, c, r)
         MascotShape.DROP -> drawPath(drop(c, r), color)
     }

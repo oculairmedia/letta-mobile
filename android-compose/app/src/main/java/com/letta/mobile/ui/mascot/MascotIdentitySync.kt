@@ -9,11 +9,11 @@ import com.letta.mobile.data.storage.SecureSettingsStore
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * Keeps the shell's [MascotIdentityRegistry] current with every known agent's chosen identity:
- * the one on the agent itself (its metadata, the same field desktop writes), else the device's
- * cached / legacy setting. Re-derived whenever the roster changes; the edit-agent picker also writes
- * the registry directly so a fresh choice shows before the roster next refreshes. Agents without a
- * choice have no identity and draw their fallback.
+ * Keeps the shell's [MascotIdentityRegistry] current with every known agent's identity: the one on
+ * the agent itself (its metadata, the same field desktop writes), else the device's cached / legacy
+ * setting, else the identity generated from the agent id. Re-derived whenever the roster changes; the
+ * edit-agent picker also writes the registry directly so a fresh choice shows before the roster next
+ * refreshes.
  */
 @Composable
 fun MascotIdentitySync(
@@ -24,10 +24,10 @@ fun MascotIdentitySync(
     val roster by agents.collectAsStateWithLifecycle()
     LaunchedEffect(roster) {
         registry.update(
-            roster.mapNotNull { agent ->
+            roster.associate { agent ->
                 val id = agent.id.value
-                resolveMascotIdentity(agent, settings.getString(mascotIdentitySettingsKey(id)))?.let { id to it }
-            }.toMap(),
+                id to resolveMascotIdentity(id, agent, settings.getString(mascotIdentitySettingsKey(id)))
+            },
         )
     }
 }
