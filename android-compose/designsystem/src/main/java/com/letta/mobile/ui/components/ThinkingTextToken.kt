@@ -106,7 +106,7 @@ fun ThinkingTextToken(
                 initialValue = 0f,
                 targetValue = 1f,
                 animationSpec = infiniteRepeatable(
-                    animation = tween(durationMillis = 1200, easing = LinearEasing),
+                    animation = tween(durationMillis = 2_400, easing = LinearEasing),
                     repeatMode = RepeatMode.Restart,
                 ),
                 label = "thinking-text-token-phase",

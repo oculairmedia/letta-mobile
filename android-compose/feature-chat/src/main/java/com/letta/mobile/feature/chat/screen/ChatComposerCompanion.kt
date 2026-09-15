@@ -77,7 +77,7 @@ internal fun ChatComposerCompanion(agentId: String?, status: (@Composable () -> 
     }
 }
 
-/** The companion's surface; the body spans ~60 % of it, so this reads as a ~34 dp character. */
-private val ChatComposerCompanionSize = 56.dp
+/** The companion's surface; the body spans ~60 % of it, so this reads as a ~39 dp character. */
+private val ChatComposerCompanionSize = 64.dp
 private val ChatComposerCompanionGap = 2.dp
 private val ChatComposerCompanionBodyDrop = 7.dp

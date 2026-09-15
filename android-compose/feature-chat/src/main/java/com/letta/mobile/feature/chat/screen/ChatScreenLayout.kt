@@ -488,7 +488,7 @@ private fun ChatScreenThinkingTokenSection(
     }
     val activityText = if (thinkingTokenActive) {
         val phase = activeToolName?.let { "Running $it" } ?: "Thinking…"
-        "$phase - ${formatElapsedSeconds(elapsedSeconds)}"
+        "${formatElapsedSeconds(elapsedSeconds)}  $phase"
     } else null
     ThinkingTextToken(
         visible = thinkingTokenActive,
