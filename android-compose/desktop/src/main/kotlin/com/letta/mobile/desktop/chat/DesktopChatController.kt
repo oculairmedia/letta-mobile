@@ -25,7 +25,9 @@ import com.letta.mobile.data.model.ModelCatalog
 import com.letta.mobile.data.model.withCatalogModelRouting
 import com.letta.mobile.data.timeline.Timeline
 import com.letta.mobile.desktop.DesktopBootstrapState
-import com.letta.mobile.ui.chat.render.ChatTimelineProjector
+import com.letta.mobile.ui.chat.render.ChatPresenceSignals
+import com.letta.mobile.ui.chat.render.ChatTimelinePresenter
+import com.letta.mobile.ui.chat.render.TimelineProjection
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.util.Telemetry
 import kotlinx.collections.immutable.persistentListOf
@@ -180,26 +182,25 @@ class DesktopChatController(
     val cancellingConversationId: StateFlow<String?> = interruptCoordinator.cancellingConversationId
 
     /**
-     * Shared Timeline→message projection (the same one Android uses). Gives the
-     * desktop list the incremental tail cache, optimistic-twin dedup, A2UI
-     * history stripping, and no-change suppression instead of a plain re-map of
-     * every event on every emit. Stateful per bound conversation — reset on
-     * rebind in [selectRemoteConversation].
+     * The shared chat timeline presenter - the same one Android's ChatTimelineObserver uses
+     * (letta-mobile-2dsi5.1). Projection gives the desktop list the incremental tail cache,
+     * optimistic-twin dedup, A2UI history stripping, and no-change suppression; presentation
+     * derives streaming/typing with the same inputs Android passes, including the in-flight turn
+     * and the projection's own "a run is still active" fact. Stateful per bound conversation -
+     * reset on rebind in [selectRemoteConversation].
      */
-    private val timelineProjector = ChatTimelineProjector()
+    private val timelinePresenter = ChatTimelinePresenter()
 
     /**
-     * The bound conversation's latest projection facts that the shared streaming-
-     * presence policy needs. Updated on every projected timeline emit (and reset
-     * on rebind) so [replyPresence] can re-derive without re-projecting.
+     * The bound conversation's latest projection, kept so [replyPresence] can re-derive when the
+     * stream signal or selection changes without re-projecting. Reset on rebind.
      */
-    private data class BoundPresenceFacts(
+    private data class BoundProjection(
         val conversationId: String? = null,
-        val tailIsAssistant: Boolean = false,
-        val anyServerLocalPending: Boolean = false,
+        val projection: TimelineProjection? = null,
     )
 
-    private val _boundPresenceFacts = MutableStateFlow(BoundPresenceFacts())
+    private val _boundProjection = MutableStateFlow(BoundProjection())
 
     /**
      * The selected conversation's "agent is working" presence, derived by the
@@ -212,25 +213,67 @@ class DesktopChatController(
     val replyPresence: StateFlow<ChatStreamingPresence> = _replyPresence.asStateFlow()
 
     private val presenceJob: Job = scope.launch {
+        var presenceConversationId: String? = null
         combine(
-            _boundPresenceFacts,
+            _boundProjection,
             _streamingConversationId,
             state.map { it.selectedConversationId },
-        ) { facts, streamingConversationId, selectedConversationId ->
-            val factsForSelected = facts.conversationId != null && facts.conversationId == selectedConversationId
-            ChatStreamingPresencePolicy.derive(
+        ) { bound, streamingConversationId, selectedConversationId ->
+            // Presence carries over only within one conversation; a selection change starts fresh.
+            val previous = _replyPresence.value.takeIf { presenceConversationId == selectedConversationId }
+            presenceConversationId = selectedConversationId
+            derivePresence(
+                projection = bound.projection?.takeIf { bound.conversationId != null && bound.conversationId == selectedConversationId },
+                // The send job spans send -> terminal across every tool round: it is desktop's
+                // in-flight turn, the same fact Android reads from the transport.
+                turnInFlight = streamingConversationId != null && streamingConversationId == selectedConversationId,
+                previous = previous,
+            )
+        }.collect { _replyPresence.value = it }
+    }
+
+    /**
+     * Streaming/typing for the selected conversation through the shared presenter, so desktop and
+     * Android agree on "Thinking…" and the cancel chrome, including across tool rounds.
+     */
+    private fun derivePresence(
+        projection: TimelineProjection?,
+        turnInFlight: Boolean,
+        previous: ChatStreamingPresence?,
+    ): ChatStreamingPresence {
+        val previousIsStreaming = previous?.isStreaming ?: false
+        val previousIsAgentTyping = previous?.isAgentTyping ?: false
+        if (projection == null) {
+            // Nothing projected for this conversation yet: only the in-flight turn can say it works.
+            return ChatStreamingPresencePolicy.derive(
                 inputs = ChatStreamInputs(
-                    previousIsStreaming = false,
-                    previousIsAgentTyping = false,
-                    anyServerLocalPending = factsForSelected && facts.anyServerLocalPending,
-                    tailIsAssistant = factsForSelected && facts.tailIsAssistant,
-                    replyStreaming = streamingConversationId != null && streamingConversationId == selectedConversationId,
+                    previousIsStreaming = previousIsStreaming,
+                    previousIsAgentTyping = previousIsAgentTyping,
+                    anyServerLocalPending = false,
+                    tailIsAssistant = false,
+                    replyStreaming = turnInFlight,
                     clientModeStreamInFlight = false,
                     a2uiThinkingActive = false,
                     duplicateInitialMessageInFlight = false,
+                    turnInFlight = turnInFlight,
                 ),
             )
-        }.collect { _replyPresence.value = it }
+        }
+        // Desktop is server-mode only, so the client-mode / A2UI-thinking / duplicate-initial
+        // signals are inert here.
+        val presentation = timelinePresenter.present(
+            projection = projection,
+            signals = ChatPresenceSignals(
+                replyStreaming = turnInFlight,
+                clientModeStreamInFlight = false,
+                a2uiThinkingActive = false,
+                duplicateInitialMessageInFlight = false,
+                turnInFlight = turnInFlight,
+            ),
+            previousIsStreaming = previousIsStreaming,
+            previousIsAgentTyping = previousIsAgentTyping,
+        )
+        return ChatStreamingPresence(isStreaming = presentation.isStreaming, isAgentTyping = presentation.isAgentTyping)
     }
 
     private var gateway: DesktopChatGateway? = null
@@ -1071,8 +1114,8 @@ class DesktopChatController(
 
         timelineJob?.cancel()
         closeActiveLoopAsync()
-        timelineProjector.reset()
-        _boundPresenceFacts.value = BoundPresenceFacts()
+        timelinePresenter.reset()
+        _boundProjection.value = BoundProjection()
 
         _state.update {
             it.withRuntimeState(ChatSessionReducer.beginSelectedConversationHydrate(it.runtimeState, generation))
@@ -1175,18 +1218,14 @@ class DesktopChatController(
 
     private fun updateTimelineMessages(conversationId: String, generation: Long, timeline: Timeline) {
         if (closed) return
-        val projection = timelineProjector.project(
+        val projection = timelinePresenter.project(
             timeline = timeline,
-            prefix = timelineProjector.olderPrefixFor(conversationId),
+            prefix = timelinePresenter.olderPrefixFor(conversationId),
             previousState = ChatUiState(),
             isActiveRunStreaming = _streamingConversationId.value == conversationId,
             ownAgentId = _state.value.conversations.firstOrNull { it.id == conversationId }?.agentId,
         )
-        _boundPresenceFacts.value = BoundPresenceFacts(
-            conversationId = conversationId,
-            tailIsAssistant = projection.tailIsAssistant,
-            anyServerLocalPending = projection.anyLettaServerLocalPending,
-        )
+        _boundProjection.value = BoundProjection(conversationId = conversationId, projection = projection)
         if (projection.noChange) return
         val messages = projection.ui
         approvalCoordinator.reconcileSubmittedApprovals(conversationId, messages)
