@@ -166,11 +166,8 @@ internal fun ApprovalResponseCard(message: UiMessage) {
     // bypassPermissions sessions), but if any other code path constructs a
     // UiApprovalResponse with all-null decisions we still must not paint it
     // as "Rejected" — that's how the long-standing mis-labeling bug surfaced.
-    val explicitDecisions = listOfNotNull(approval.approved) +
-        approval.approvals.mapNotNull { it.approved }
-    if (explicitDecisions.isEmpty()) return
-
-    val approved = explicitDecisions.any { it }
+    // letta-mobile-soa3i.4: any explicit rejection wins, so a mixed response reads Rejected.
+    val approved = approval.verdict ?: return
     val title = if (approved) {
         stringResource(R.string.screen_chat_approval_approved_title)
     } else {
