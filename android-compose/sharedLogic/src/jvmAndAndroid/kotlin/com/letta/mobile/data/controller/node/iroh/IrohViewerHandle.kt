@@ -54,7 +54,10 @@ internal class IrohViewerHandle(
     private val streamWriteMutex: Mutex,
     private val frameParts: () -> Boolean,
     private val maxFrameBytes: Int,
+    private val broadcastGate: (requiredCapability: String) -> Boolean = { false },
 ) : ViewerHandle {
+
+    override fun receivesBroadcast(requiredCapability: String): Boolean = broadcastGate(requiredCapability)
 
     /**
      * Re-wrap an already-cumulated + cm-stream-tagged assistant/tool/terminal

@@ -338,6 +338,27 @@ class NativeAdminHandlersTest {
         assertTrue("agent_update" in client.calls)
     }
 
+    @Test
+    fun agentWritesNotifyConnectedClientsAndFailedWritesDoNot() = runTest {
+        val frames = mutableListOf<String>()
+        val notifier = AgentChangeNotifier(backgroundScope, windowMs = 10).also { it.attach { frame -> frames += frame } }
+        val client = FakeNativeClient()
+        val r = AdminRpcRouter().also {
+            AgentAdminHandlers.register(it, controller = null, tiers = NativeReadTiers(nativeClient = client, agentChanges = notifier))
+        }
+
+        resultOf(dispatchJson(r, "agent.create", buildJsonObject { put("name", "N") }))
+        resultOf(dispatchJson(r, "agent.update", buildJsonObject { put("agent_id", "agent-1"); put("name", "N2") }))
+        resultOf(dispatchJson(r, "agent.delete", buildJsonObject { put("agent_id", "agent-2") }))
+        client.failNative = true
+        dispatchJson(r, "agent.update", buildJsonObject { put("agent_id", "agent-3"); put("name", "N3") })
+        testScheduler.advanceTimeBy(20)
+        testScheduler.runCurrent()
+
+        val reasons = frames.map { Json.parseToJsonElement(it).jsonObject }.associate { it.getValue("agent_id").jsonPrimitive.content to it.getValue("reason").jsonPrimitive.content }
+        assertEquals(mapOf("agent-new" to "created", "agent-1" to "updated", "agent-2" to "deleted"), reasons)
+    }
+
     private suspend fun dispatchJson(r: AdminRpcRouter, method: String, params: kotlinx.serialization.json.JsonObject): String =
         r.dispatch(
             AdminRpcInvocation(

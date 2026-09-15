@@ -20,6 +20,13 @@ interface ViewerHandle {
      * registry/fanout can de-register a dead viewer.
      */
     suspend fun writeFrame(frame: String): Boolean
+
+    /**
+     * Whether this connection may receive a device-wide broadcast gated on [requiredCapability]
+     * (e.g. `agent_updated` needs the agent-read capability). Evaluated at send time, so a peer
+     * whose grants change stops receiving. Default: no broadcasts.
+     */
+    fun receivesBroadcast(requiredCapability: String): Boolean = false
 }
 
 /** Opaque ownership token for one canonical endpoint connection generation. */
@@ -100,6 +107,23 @@ class ConnectionRegistry {
     suspend fun viewersFor(conversationId: String): Set<ViewerHandle> = mutex.withLock {
         viewersByConversation[conversationId]?.values?.mapTo(linkedSetOf()) { it.viewer } ?: emptySet()
     }
+
+    /** Snapshot of every live connection's current handle, for device-wide broadcasts. */
+    suspend fun connections(): List<ViewerHandle> = mutex.withLock {
+        activeByEndpoint.values.map { it.viewer }
+    }
+
+    /**
+     * Writes [frame] to every live connection that [ViewerHandle.receivesBroadcast]
+     * [requiredCapability], outside the lock (a slow connection must not stall the others).
+     * Returns how many connections accepted the write.
+     */
+    suspend fun broadcast(frame: String, requiredCapability: String): BroadcastResult {
+        val recipients = connections().filter { it.receivesBroadcast(requiredCapability) }
+        return BroadcastResult(recipients = recipients.size, delivered = recipients.count { it.writeFrame(frame) })
+    }
+
+    data class BroadcastResult(val recipients: Int, val delivered: Int)
 
     /** Test/telemetry: total distinct conversations currently viewed. */
     suspend fun conversationCount(): Int = mutex.withLock { viewersByConversation.size }

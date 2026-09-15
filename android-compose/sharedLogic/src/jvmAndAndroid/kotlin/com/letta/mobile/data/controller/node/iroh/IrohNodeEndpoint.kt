@@ -74,6 +74,15 @@ class IrohNodeEndpoint(
     private val connectionRegistry = ConnectionRegistry()
 
     /**
+     * Delivers device-wide `agent_updated` frames to every live connection allowed to read agents
+     * ([IrohPeerCapabilities.CHAT_READ], the `agent.list` capability), on its stream channel.
+     */
+    fun agentChangeTarget(): AgentChangeTarget = AgentChangeTarget { frame ->
+        val result = connectionRegistry.broadcast(frame, IrohPeerCapabilities.CHAT_READ)
+        Telemetry.event("IrohNode", "agent_updated.broadcast", "recipients" to result.recipients, "delivered" to result.delivered)
+    }
+
+    /**
      * The admin RPC router for this endpoint. Created lazily so handlers can
      * register before [start] is called. Passed to every incoming connection.
      */
@@ -252,6 +261,9 @@ class IrohNodeEndpoint(
                     }
                 } catch (_: TimeoutCancellationException) {
                     continue
+                } catch (e: CancellationException) {
+                    // After the timeout case (a subclass): shutdown and any other cancellation end the loop.
+                    throw e
                 } catch (e: Exception) {
                     if (!isActive) break
                     Telemetry.event("IrohNode", "incoming.accept.failed", "error" to (e.message ?: e.toString()), "class" to e::class.simpleName)

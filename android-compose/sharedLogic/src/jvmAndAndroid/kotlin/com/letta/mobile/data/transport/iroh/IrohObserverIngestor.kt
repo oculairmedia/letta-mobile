@@ -128,9 +128,29 @@ internal class IrohObserverIngestor(
         resubscribeJob = scope.launch { resubscribe(subscription) }
     }
 
+    /**
+     * Meridian's device-wide `agent_updated` push (not an App Server message, so it decodes as
+     * [AppServerInboundFrame.Unknown]) is republished as [ServerFrame.AgentUpdated], the frame the
+     * agent repositories already react to. Returns true when [received] was that frame.
+     */
+    private suspend fun republishAgentUpdated(received: AppServerReceivedFrame): Boolean {
+        val unknown = received.frame as? AppServerInboundFrame.Unknown ?: return false
+        if (unknown.type != AGENT_UPDATED_TYPE) return false
+        val frame = runCatching {
+            AGENT_UPDATED_JSON.decodeFromJsonElement(com.letta.mobile.data.transport.ServerFrameSerializer, received.raw)
+        }.getOrNull() as? ServerFrame.AgentUpdated
+        if (frame == null) {
+            Telemetry.event("IrohObserver", "agent_updated.undecodable", level = Telemetry.Level.WARN)
+            return true
+        }
+        emitBoth(frame)
+        return true
+    }
+
     suspend fun ingestObserverFrame(request: ObserverFrameRequest) {
         if (request.expectedGeneration != null && connectionGeneration() != request.expectedGeneration) return
         val received = request.received
+        if (republishAgentUpdated(received)) return
         val streamDelta = received.frame as? AppServerInboundFrame.StreamDelta ?: return
         if (!streamDelta.subagentId.isNullOrBlank()) {
             observeChildActivity(streamDelta)
@@ -418,6 +438,10 @@ internal class IrohObserverIngestor(
     )
 
     companion object {
+        /** Meridian's device-wide agent change push; see AgentChangeNotifier on the host. */
+        private const val AGENT_UPDATED_TYPE = "agent_updated"
+        private val AGENT_UPDATED_JSON = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+
         internal const val SUBAGENT_REASON_STARTED = "started"
         internal const val SUBAGENT_REASON_DISPATCHED = "dispatched"
 
