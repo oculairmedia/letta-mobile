@@ -239,7 +239,7 @@ private fun BoxScope.ChatMessageListScrollFab(params: ChatMessageListBodyParams)
             .align(Alignment.BottomEnd)
             .padding(
                 end = LettaSpacing.INNER_PADDING,
-                bottom = LettaSpacing.INNER_PADDING + params.appearance.bottomPadding,
+                bottom = LettaSpacing.INNER_PADDING,
             ),
     )
 }

@@ -122,13 +122,23 @@ private fun backfillUnambiguousAssistantRun(
     start: Int,
     end: Int,
 ) {
-    val runId = uniqueAssistantRunId(messages.subList(start, end)) ?: return
+    val segment = messages.subList(start, end)
+    val runId = uniqueAssistantRunId(segment)
+        ?: syntheticHydratedToolRunId(segment)
+        ?: return
     for (index in start until end) {
         val message = messages[index]
         if (message.role == "assistant" && message.runId.isNullOrBlank()) {
             messages[index] = message.copy(runId = runId)
         }
     }
+}
+
+private fun syntheticHydratedToolRunId(segment: List<UiMessage>): String? {
+    val assistantMessages = segment.filter { it.role == "assistant" }
+    if (assistantMessages.size < 2 || assistantMessages.none { !it.toolCalls.isNullOrEmpty() }) return null
+    if (assistantMessages.any { !it.runId.isNullOrBlank() }) return null
+    return "hydrated-${assistantMessages.first().id}"
 }
 
 private fun uniqueAssistantRunId(segment: List<UiMessage>): String? {
