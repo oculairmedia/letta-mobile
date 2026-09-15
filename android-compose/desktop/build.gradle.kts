@@ -611,6 +611,62 @@ tasks.matching { it.name == "prepareAppResources" }.configureEach {
     dependsOn(prepareDesktopLettaCodeRuntime)
 }
 
+/*
+ * The native Rive mascot renderer (avatar/renderer-rive/native/desktop). It is built outside Gradle -
+ * VS 2022 plus a rive-runtime checkout, scripted by build-bridge.sh - and handed in by path:
+ *   -PriveBridge=C:\path\to\rive_desktop_bridge.dll   or   LETTA_RIVE_BRIDGE_DLL
+ * It is staged into the app resources, so `:desktop:run` and the installed app both find it through
+ * compose.application.resources.dir (RiveBridgeNative.PATH). Without it every agent draws the
+ * gradient orb, so packaging refuses to run without one unless -PallowMissingRiveBridge=true.
+ */
+val riveBridgeSource: String? = providers.gradleProperty("riveBridge")
+    .orElse(providers.environmentVariable("LETTA_RIVE_BRIDGE_DLL"))
+    .orNull
+    ?.takeIf { it.isNotBlank() }
+val allowMissingRiveBridge = providers.gradleProperty("allowMissingRiveBridge").orNull.toBoolean()
+val stagedRiveBridge = desktopAppResourcesDir.map { it.file("windows/rive_desktop_bridge.dll") }
+val stageDesktopRiveBridge = tasks.register("stageDesktopRiveBridge") {
+    val source = riveBridgeSource?.let(::File)
+    val target = stagedRiveBridge.get().asFile
+    enabled = isWindowsHost
+    inputs.property("source", riveBridgeSource.orEmpty())
+    source?.takeIf { it.isFile }?.let { inputs.file(it) }
+    outputs.file(target)
+    doLast {
+        if (source == null) {
+            // Nothing handed in: make sure a DLL staged by an earlier build does not linger silently.
+            target.delete()
+            logger.lifecycle("stageDesktopRiveBridge: no -PriveBridge / LETTA_RIVE_BRIDGE_DLL; mascots fall back to orbs.")
+            return@doLast
+        }
+        require(source.isFile) { "Rive bridge DLL not found at $source (-PriveBridge / LETTA_RIVE_BRIDGE_DLL)" }
+        target.parentFile.mkdirs()
+        source.copyTo(target, overwrite = true)
+        logger.lifecycle("stageDesktopRiveBridge: staged $source")
+    }
+}
+
+tasks.matching { it.name == "prepareAppResources" }.configureEach {
+    dependsOn(stageDesktopRiveBridge)
+}
+
+tasks.matching {
+    it.name.startsWith("createDistributable") ||
+    it.name.startsWith("createReleaseDistributable") ||
+    it.name.startsWith("packageDistributionForCurrentOS") ||
+    it.name.startsWith("packageReleaseDistributionForCurrentOS")
+}.configureEach {
+    val staged = stagedRiveBridge
+    doFirst {
+        if (!isWindowsHost || allowMissingRiveBridge) return@doFirst
+        check(staged.get().asFile.isFile) {
+            "No rive_desktop_bridge.dll staged: this installer would ship without the mascot renderer. " +
+                "Build it with avatar/renderer-rive/native/desktop/build-bridge.sh and pass " +
+                "-PriveBridge=<dll> (or LETTA_RIVE_BRIDGE_DLL), or -PallowMissingRiveBridge=true to package orbs only."
+        }
+    }
+}
+
 tasks.matching { it.name == "checkRuntime" || it.name == "checkReleaseRuntime" }.configureEach {
     dependsOn(extractDesktopJbr)
 }
