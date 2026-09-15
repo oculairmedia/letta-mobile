@@ -49,6 +49,7 @@ class LettaDatabaseCharacterizationTest {
             content = "message with local image",
             attachmentsJson = """[{"base64":"abc123","mediaType":"image/png"}]""",
             sentAtEpochMs = 123_456L,
+            deliveryState = "SENT",
         )
 
         db.pendingLocalDao().upsert(row)
