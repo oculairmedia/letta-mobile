@@ -45,7 +45,12 @@ suspend fun <T> retryTimelineOwnership(block: suspend () -> T): T {
     error("Unreachable ownership retry")
 }
 
-class TimelineOwnershipAuthority(private val directory: Path) {
+class TimelineOwnershipAuthority internal constructor(
+    private val directory: Path,
+    private val syncDirectory: (Path) -> Unit,
+) {
+    constructor(directory: Path) : this(directory, ::forceDirectory)
+
     enum class Phase { Legacy, Migrating, Prepared, Canonical }
     enum class Route { Legacy, Migration, Canonical }
     data class Receipt(val sourceToken: String, val targetGeneration: String, val targetRevision: Long, val certificateId: String = "")
@@ -233,9 +238,10 @@ class TimelineOwnershipAuthority(private val directory: Path) {
 
     private suspend fun <T> locked(backendId: String, block: suspend () -> T): T = withContext(Dispatchers.IO) {
         val backend = backendDirectory(backendId)
+        // Idempotent and cheap. Durability of the new entry is publish()'s job: a read-only
+        // acquisition (every guarded read on chat open) must not pay a directory fsync, and a
+        // lock or state read survives a crash that loses an empty, never-published directory.
         Files.createDirectories(backend)
-        // Persist newly created directory entries before any state publication.
-        syncDirectory(directory)
         FileChannel.open(backend.resolve("ownership.lock"), StandardOpenOption.CREATE, StandardOpenOption.WRITE).use { channel ->
             val lock = try { channel.tryLock() } catch (_: java.nio.channels.OverlappingFileLockException) { null }
             (lock ?: throw TimelineOwnershipBusyException()).use {
@@ -310,6 +316,8 @@ class TimelineOwnershipAuthority(private val directory: Path) {
         // the result must reread state; it must never infer rollback from cancellation/IO failure.
         withContext(NonCancellable) {
             val backend = backendDirectory(state.scope.backendId)
+            // Persist the backend directory's own entry before anything inside it is published.
+            syncDirectory(directory)
             FileChannel.open(backend.resolve("managed"), StandardOpenOption.CREATE, StandardOpenOption.WRITE).use { it.force(true) }
             syncDirectory(backend)
             val temporary = backend.resolve("next-state")
@@ -323,11 +331,14 @@ class TimelineOwnershipAuthority(private val directory: Path) {
         }
     }
 
-    private fun syncDirectory(path: Path) { FileChannel.open(path, StandardOpenOption.READ).use { it.force(true) } }
     private fun encode(block: DataOutputStream.() -> Unit): ByteArray = ByteArrayOutputStream().also { output ->
         DataOutputStream(output).use { it.block() }
     }.toByteArray()
     private fun digest(bytes: ByteArray) = MessageDigest.getInstance("SHA-256").digest(bytes)
     private fun hash(bytes: ByteArray) = digest(bytes).joinToString("") { "%02x".format(it.toInt() and 255) }
     private companion object { const val MAX_STATE = 64 * 1024 }
+}
+
+private fun forceDirectory(path: Path) {
+    FileChannel.open(path, StandardOpenOption.READ).use { it.force(true) }
 }
