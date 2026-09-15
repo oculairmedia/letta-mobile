@@ -220,7 +220,22 @@ data class UiApprovalResponse(
     val approved: Boolean? = null,
     val reason: String? = null,
     val approvals: List<UiApprovalDecision> = emptyList(),
-)
+) {
+    /**
+     * letta-mobile-soa3i.4: the one verdict every client renders. It fails closed: any explicit
+     * rejection, top-level or per call, makes the whole response Rejected (false), so a mixed
+     * response never reads as Approved. Null when no explicit decision exists at all.
+     */
+    val verdict: Boolean?
+        get() {
+            val explicit = listOfNotNull(approved) + approvals.mapNotNull { it.approved }
+            return when {
+                explicit.isEmpty() -> null
+                explicit.any { !it } -> false
+                else -> true
+            }
+        }
+}
 
 @Immutable
 data class UiApprovalDecision(

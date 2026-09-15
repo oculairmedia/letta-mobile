@@ -186,12 +186,18 @@ class TimelineOwnedStorageHandoffTest {
             var audit: TimelineOwnedStorageFactory.ValidationProgress
             var validateRows = 0
             var validateBytes = 0
+            var validateSteps = 0
             do {
                 audit = factory.validationStep(lease)
                 assertTrue(audit.metadataRows <= 128 && audit.bodyBytes <= 65536)
                 validateRows += audit.metadataRows
                 validateBytes += audit.bodyBytes
+                validateSteps++
             } while (!audit.complete)
+            // letta-mobile-qfrer: an empty source used to take six steps, one per phase boundary. Now the
+            // empty phases hand on inside a step, leaving only real work: the conversion's evidence entry
+            // (staged in step 1, its body read in step 2) and the final phase ends (step 3).
+            assertEquals(3, validateSteps)
             assertEquals(0, copyRows)
             assertEquals(0, copyBytes)
             assertTrue(validateRows >= 0 && validateBytes >= 0)

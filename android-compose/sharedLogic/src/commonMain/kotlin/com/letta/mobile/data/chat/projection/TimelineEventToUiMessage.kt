@@ -134,10 +134,11 @@ fun timelineEventToUiMessage(ev: TimelineEvent, ownAgentId: String? = null): UiM
             // the UI doesn't spin (the gateway is the delivery authority).
             val uiToolCalls: List<UiToolCall>? =
                 if (ev.toolCalls.isNotEmpty()) {
-                    val chip: UiToolApprovalDecision? =
-                        if (ev.approvalDecided && ev.approvalRequestId != null) {
-                            UiToolApprovalDecision.Approved
-                        } else null
+                    val chip: UiToolApprovalDecision? = implicitApprovalChip(
+                        decided = ev.approvalDecided,
+                        approvalRequestId = ev.approvalRequestId,
+                        anyToolReturnError = ev.toolReturnIsError || ev.toolReturnIsErrorByCallId.values.any { it },
+                    )
                     ev.toolCalls.mapIndexed { index, tc ->
                         val callId = tc.effectiveId.takeIf { it.isNotBlank() }
                         val result = callId?.let { ev.toolReturnContentByCallId[it] }
@@ -472,14 +473,31 @@ private fun com.letta.mobile.data.model.ToolCall.generatedImageAttachments(
  * letta-mobile-c49of: approval chip for a TOOL_CALL event. An explicit
  * decision (ApprovalDecision) always wins; REJECTED projects to Rejected so
  * a rejected call no longer renders as Approved. A decided event with no
- * explicit outcome (tool-return completion or the approve=null auto-approval
- * echo) keeps the pre-c49of rendering: Approved.
+ * explicit outcome falls to [implicitApprovalChip].
  */
-private fun TimelineEvent.Confirmed.approvalChip(): UiToolApprovalDecision? = when {
-    approvalDecision == com.letta.mobile.data.timeline.ApprovalDecision.REJECTED ->
-        UiToolApprovalDecision.Rejected
-    approvalDecision == com.letta.mobile.data.timeline.ApprovalDecision.APPROVED ->
-        UiToolApprovalDecision.Approved
-    approvalDecided && approvalRequestId != null -> UiToolApprovalDecision.Approved
-    else -> null
+private fun TimelineEvent.Confirmed.approvalChip(): UiToolApprovalDecision? = when (approvalDecision) {
+    com.letta.mobile.data.timeline.ApprovalDecision.REJECTED -> UiToolApprovalDecision.Rejected
+    com.letta.mobile.data.timeline.ApprovalDecision.APPROVED -> UiToolApprovalDecision.Approved
+    null -> implicitApprovalChip(
+        decided = approvalDecided,
+        approvalRequestId = approvalRequestId,
+        anyToolReturnError = toolReturnIsError || toolReturnIsErrorByCallId.values.any { it },
+    )
+}
+
+/**
+ * letta-mobile-soa3i.4: the chip for a request resolved without an explicit decision - the
+ * approve=null auto-approval echo, or a tool return that completed it. It fails closed: a rejected
+ * call comes back as an error tool return, so a request whose missing explicit decision is paired
+ * with an error return gets no chip at all rather than reading as Approved. Only a clean resolution
+ * keeps the Approved label.
+ */
+internal fun implicitApprovalChip(
+    decided: Boolean,
+    approvalRequestId: String?,
+    anyToolReturnError: Boolean,
+): UiToolApprovalDecision? = when {
+    !decided || approvalRequestId == null -> null
+    anyToolReturnError -> null
+    else -> UiToolApprovalDecision.Approved
 }
