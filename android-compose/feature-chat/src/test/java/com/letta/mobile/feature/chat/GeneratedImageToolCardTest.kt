@@ -219,8 +219,9 @@ class GeneratedImageToolCardTest {
             }
         }
 
-        // The projected timeline renders the generated-image special card
-        // immediately (no click-to-expand needed for special cards).
+        // Tool calls stay collapsed in the timeline, including image generation.
+        composeRule.onNodeWithText("Ran 2 commands").performClick()
+        composeRule.waitForIdle()
         composeRule.onNodeWithContentDescription("Open image").performClick()
 
         composeRule.onNodeWithText("1 / 1").assertIsDisplayed()
