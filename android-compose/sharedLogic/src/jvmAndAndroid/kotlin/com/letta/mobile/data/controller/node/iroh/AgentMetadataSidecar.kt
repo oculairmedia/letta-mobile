@@ -72,13 +72,18 @@ class AgentMetadataSidecar(private val dir: File) {
         if (loaded) return
         lock.withLock {
             if (loaded) return
-            dir.listFiles { file -> file.isFile && file.name.endsWith(SUFFIX) }?.forEach { file ->
-                val agentId = runCatching { String(DECODER.decode(file.name.removeSuffix(SUFFIX))) }.getOrNull() ?: return@forEach
-                val metadata = runCatching { Json.parseToJsonElement(file.readText()).jsonObject }.getOrNull() ?: return@forEach
-                cache[agentId] = metadata
-            }
+            dir.listFiles { file -> file.isFile && file.name.endsWith(SUFFIX) }
+                ?.mapNotNull(::readEntry)
+                ?.forEach { (agentId, metadata) -> cache[agentId] = metadata }
             loaded = true
         }
+    }
+
+    /** One stored agent's metadata, or null for a file that is not a readable entry (skipped). */
+    private fun readEntry(file: File): Pair<String, JsonObject>? {
+        val agentId = runCatching { String(DECODER.decode(file.name.removeSuffix(SUFFIX))) }.getOrNull() ?: return null
+        val metadata = runCatching { Json.parseToJsonElement(file.readText()).jsonObject }.getOrNull() ?: return null
+        return agentId to metadata
     }
 
     private fun fileFor(agentId: String) = File(dir, ENCODER.encodeToString(agentId.toByteArray()) + SUFFIX)
