@@ -70,25 +70,21 @@ object AgentAdminHandlers {
     private fun pageOf(all: JsonArray, offset: Long, pageSize: Long): JsonArray =
         if (offset == 0L && all.size <= pageSize) all else JsonArray(all.drop(offset.toInt()).take(pageSize.toInt()))
 
-    /** An admin RPC method addressed by `agent_id`, served by one native [op]. */
-    private class AgentByIdMethod(val name: String, val op: NativeAdminOp)
-
-    /** The native call behind an [AgentByIdMethod]; null means it failed. */
-    private fun interface AgentByIdCall {
-        suspend fun invoke(client: AppServerClient, agentId: String): JsonElement?
+    /** Serves an admin RPC method addressed by `agent_id`; [AgentByIdHandler.handle] makes the native call. */
+    private fun interface AgentByIdHandler {
+        suspend fun handle(agentId: String): JsonElement
     }
 
-    private fun AdminRpcRouter.registerById(method: AgentByIdMethod, tiers: NativeReadTiers, call: AgentByIdCall) {
-        register(method.name) { params ->
-            val id = params.requireParam(AdminParamKey("agent_id"))
-            NativeAdmin.require(tiers.nativeClient, method.op) { c -> call.invoke(c, id) }
-        }
+    private fun AdminRpcRouter.registerById(method: String, handler: AgentByIdHandler) {
+        register(method) { params -> handler.handle(params.requireParam(AdminParamKey("agent_id"))) }
     }
 
     private fun registerAgentGet(router: AdminRpcRouter, tiers: NativeReadTiers) =
-        router.registerById(AgentByIdMethod("agent.get", NativeAdminOp.AgentGet), tiers) { c, id ->
-            val response = c.agentRetrieve(AppServerCommand.AgentRetrieve(requestId = NativeAdmin.requestId(), agentId = id))
-            if (response.success) tiers.agentMetadata.overlaid(response.agent) else null
+        router.registerById("agent.get") { id ->
+            NativeAdmin.require(tiers.nativeClient, NativeAdminOp.AgentGet) { c ->
+                val response = c.agentRetrieve(AppServerCommand.AgentRetrieve(requestId = NativeAdmin.requestId(), agentId = id))
+                if (response.success) tiers.agentMetadata.overlaid(response.agent) else null
+            }
         }
 
     private fun registerAgentCreate(router: AdminRpcRouter, tiers: NativeReadTiers) {
@@ -160,13 +156,15 @@ object AgentAdminHandlers {
     }
 
     private fun registerAgentDelete(router: AdminRpcRouter, tiers: NativeReadTiers) =
-        router.registerById(AgentByIdMethod("agent.delete", NativeAdminOp.AgentDelete), tiers) { c, id ->
-            val response = c.agentDelete(AppServerCommand.AgentDelete(requestId = NativeAdmin.requestId(), agentId = id))
-            if (response.success) {
-                tiers.agentMetadata?.delete(id)
-                buildJsonObject { put("deleted", true) }
-            } else {
-                null
+        router.registerById("agent.delete") { id ->
+            NativeAdmin.require(tiers.nativeClient, NativeAdminOp.AgentDelete) { c ->
+                val response = c.agentDelete(AppServerCommand.AgentDelete(requestId = NativeAdmin.requestId(), agentId = id))
+                if (response.success) {
+                    tiers.agentMetadata?.delete(id)
+                    buildJsonObject { put("deleted", true) }
+                } else {
+                    null
+                }
             }
         }
 
