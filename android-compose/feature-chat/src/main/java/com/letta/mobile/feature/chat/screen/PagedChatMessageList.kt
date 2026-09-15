@@ -248,8 +248,13 @@ private fun PagedChatMessageListContent(
             pinchFontScaleController = pinch,
             scaleWindowIndexRange = IntRange.EMPTY,
             callbacks = ChatMessageRenderCallbacks(
-                callbacks.onSendMessage, callbacks.onRerunMessage, callbacks.onSubmitApproval,
-                callbacks.onToggleRunCollapsed, callbacks.onToggleReasoningExpanded, callbacks.onAttachmentImageTap,
+                onSendMessage = callbacks.onSendMessage,
+                onRerunMessage = callbacks.onRerunMessage,
+                onSubmitApproval = callbacks.onSubmitApproval,
+                onToggleRunCollapsed = callbacks.onToggleRunCollapsed,
+                onToggleReasoningExpanded = callbacks.onToggleReasoningExpanded,
+                onOpenToolRunDetails = callbacks.onOpenToolRunDetails,
+                onAttachmentImageTap = callbacks.onAttachmentImageTap,
             ),
         )
         val reducedMotion = com.letta.mobile.ui.components.rememberReducedMotionEnabled()

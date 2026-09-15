@@ -52,6 +52,7 @@ internal fun ChatMessageListBody(
             onSubmitApproval = params.callbacks.onSubmitApproval,
             onToggleRunCollapsed = params.callbacks.onToggleRunCollapsed,
             onToggleReasoningExpanded = params.callbacks.onToggleReasoningExpanded,
+            onOpenToolRunDetails = params.callbacks.onOpenToolRunDetails,
             onAttachmentImageTap = params.callbacks.onAttachmentImageTap,
         )
     }

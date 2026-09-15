@@ -10,6 +10,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.UiImageAttachment
+import com.letta.mobile.data.chat.projection.ToolTimelineGroup
 import com.letta.mobile.feature.chat.subagent.SubagentTodoSheetTarget
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
@@ -27,6 +28,8 @@ internal data class ChatScreenLayoutLocalState(
     val bottomPaddingDp: Dp,
     val onComposerHeightChange: (Dp) -> Unit,
     val contentCallbacks: ChatContentCallbacks,
+    val toolRunDetails: List<ToolTimelineGroup>?,
+    val onToolRunDetailsChange: (List<ToolTimelineGroup>?) -> Unit,
 )
 
 @Composable
@@ -37,6 +40,7 @@ internal fun rememberChatScreenLayoutLocalState(params: ChatScreenLayoutParams):
     var imageViewerState by remember {
         mutableStateOf<Pair<ImmutableList<UiImageAttachment>, Int>?>(null)
     }
+    var toolRunDetails by remember { mutableStateOf<List<ToolTimelineGroup>?>(null) }
     var composerHeightDp by remember { mutableStateOf(0.dp) }
     val bottomPaddingDp = composerHeightDp + params.bottomInsetDp
 
@@ -57,6 +61,7 @@ internal fun rememberChatScreenLayoutLocalState(params: ChatScreenLayoutParams):
             },
             onToggleRunCollapsed = params.viewModel::toggleRunCollapsed,
             onToggleReasoningExpanded = params.viewModel::toggleReasoningExpanded,
+            onOpenToolRunDetails = { toolRunDetails = it },
             onA2uiAction = params.viewModel::submitA2uiAction,
             onDismissA2uiSurface = params.viewModel::dismissA2uiSurface,
             onAttachmentImageTap = openImageViewer,
@@ -99,5 +104,7 @@ internal fun rememberChatScreenLayoutLocalState(params: ChatScreenLayoutParams):
         bottomPaddingDp = bottomPaddingDp,
         onComposerHeightChange = { composerHeightDp = it },
         contentCallbacks = contentCallbacks,
+        toolRunDetails = toolRunDetails,
+        onToolRunDetailsChange = { toolRunDetails = it },
     )
 }

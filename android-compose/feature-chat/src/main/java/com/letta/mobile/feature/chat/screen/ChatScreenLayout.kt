@@ -132,6 +132,13 @@ internal fun ChatScreenLayout(
                 onTargetUpdate = localState.onTappedSubagentTargetChange,
             ),
         )
+        localState.toolRunDetails?.let { groups ->
+            ToolRunDetailsSheet(
+                groups = groups,
+                onDismiss = { localState.onToolRunDetailsChange(null) },
+                onAttachmentImageTap = localState.contentCallbacks.onAttachmentImageTap,
+            )
+        }
         ChatScreenFloatingOverlays(
             params = ChatScreenFloatingOverlaysParams(
                 floatingBannerMessage = params.floatingBannerMessage,
