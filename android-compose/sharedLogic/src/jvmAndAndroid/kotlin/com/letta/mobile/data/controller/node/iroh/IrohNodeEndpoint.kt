@@ -79,7 +79,7 @@ class IrohNodeEndpoint(
      * ([IrohPeerCapabilities.CHAT_READ], the `agent.list` capability), on its stream channel.
      */
     fun agentChangeTarget(): AgentChangeTarget = AgentChangeTarget { frame ->
-        val result = connectionRegistry.broadcast(frame) { it.receivesBroadcast(IrohPeerCapabilities.CHAT_READ) }
+        val result = connectionRegistry.broadcast(frame) { it.receivesAgentEvents() }
         Telemetry.event("IrohNode", "agent_updated.broadcast", "recipients" to result.recipients, "delivered" to result.delivered)
     }
 

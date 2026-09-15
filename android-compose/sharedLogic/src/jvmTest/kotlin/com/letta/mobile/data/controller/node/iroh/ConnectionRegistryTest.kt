@@ -24,7 +24,7 @@ class ConnectionRegistryTest {
     ) : ViewerHandle {
         val frames = mutableListOf<String>()
         override suspend fun writeFrame(frame: String): Boolean = writable.also { if (it) frames += frame }
-        override fun receivesBroadcast(requiredCapability: String): Boolean = requiredCapability in capabilities
+        override fun receivesAgentEvents(): Boolean = IrohPeerCapabilities.CHAT_READ in capabilities
     }
 
     @Test
@@ -37,7 +37,7 @@ class ConnectionRegistryTest {
         listOf(reader, unauthorised, dead).forEach { registry.claim(it) }
         registry.release(registry.claim(released))
 
-        val result = registry.broadcast("""{"type":"agent_updated"}""") { it.receivesBroadcast(IrohPeerCapabilities.CHAT_READ) }
+        val result = registry.broadcast("""{"type":"agent_updated"}""") { it.receivesAgentEvents() }
 
         assertEquals(ConnectionRegistry.BroadcastResult(recipients = 2, delivered = 1), result)
         assertEquals(1, reader.frames.size)
@@ -52,13 +52,13 @@ class ConnectionRegistryTest {
         val slow = object : ViewerHandle {
             override val connectionId = "endpoint-slow"
             override suspend fun writeFrame(frame: String): Boolean = slowWrite.await().let { true }
-            override fun receivesBroadcast(requiredCapability: String) = true
+            override fun receivesAgentEvents() = true
         }
         val fast = BroadcastViewer("endpoint-fast", setOf(IrohPeerCapabilities.CHAT_READ))
         registry.claim(slow)
         registry.claim(fast)
 
-        val result = async { registry.broadcast("frame") { it.receivesBroadcast(IrohPeerCapabilities.CHAT_READ) } }
+        val result = async { registry.broadcast("frame") { it.receivesAgentEvents() } }
         testScheduler.runCurrent()
 
         assertEquals(listOf("frame"), fast.frames, "the fast connection is written while the slow one is still blocked")
@@ -68,7 +68,7 @@ class ConnectionRegistryTest {
 
     @Test
     fun theDefaultViewerHandleReceivesNoBroadcasts() {
-        assertFalse(FakeViewer("endpoint-a").receivesBroadcast(IrohPeerCapabilities.CHAT_READ))
+        assertFalse(FakeViewer("endpoint-a").receivesAgentEvents())
     }
 
     @Test

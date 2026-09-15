@@ -25,11 +25,11 @@ interface ViewerHandle {
     suspend fun writeFrame(frame: String): Boolean
 
     /**
-     * Whether this connection may receive a device-wide broadcast gated on [requiredCapability]
-     * (e.g. `agent_updated` needs the agent-read capability). Evaluated at send time, so a peer
-     * whose grants change stops receiving. Default: no broadcasts.
+     * Whether this connection may receive device-wide `agent_updated` pushes, which name agents: the
+     * peer must be allowed to read them. Evaluated at send time, so a peer whose grants change stops
+     * receiving. Default: no.
      */
-    fun receivesBroadcast(requiredCapability: String): Boolean = false
+    fun receivesAgentEvents(): Boolean = false
 }
 
 /** Opaque ownership token for one canonical endpoint connection generation. */

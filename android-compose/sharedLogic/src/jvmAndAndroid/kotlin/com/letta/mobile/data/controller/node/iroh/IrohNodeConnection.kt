@@ -185,10 +185,10 @@ class IrohNodeConnection(
             streamWriteMutex = streamWriteMutex,
             frameParts = { peerSupportsFrameParts() },
             maxFrameBytes = MAX_FRAME_BYTES,
-            // Broadcasts reach only authenticated peers holding the capability, the same gate
-            // admin_rpc applies per method.
-            broadcastGate = { required ->
-                authenticated.get() && IrohPeerCapabilities.isAllowed(effectiveCapabilities(), required)
+            // Agent pushes reach only authenticated peers allowed to read agents (chat.read, the
+            // agent.list capability), the same gate admin_rpc applies per method.
+            agentEventsGate = {
+                authenticated.get() && IrohPeerCapabilities.isAllowed(effectiveCapabilities(), IrohPeerCapabilities.CHAT_READ)
             },
         )
         selfViewer = handle
