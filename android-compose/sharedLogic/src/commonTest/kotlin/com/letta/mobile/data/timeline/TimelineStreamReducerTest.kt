@@ -686,6 +686,27 @@ class TimelineStreamReducerTest {
     }
 
     @Test
+    fun `live stream drops user shaped skill content before canonical ingest`() {
+        val skillContent = """
+            <skill_content name="asus-router">
+            ---
+            name: asus-router
+            description: Query router status.
+            ---
+            ${"Internal skill instructions. ".repeat(20)}
+            </skill_content>
+        """.trimIndent()
+
+        val output = reduce(
+            frame = UserMessage(id = "skill-content-live", contentRaw = JsonPrimitive(skillContent)),
+        )
+
+        output.next.events shouldBe emptyList()
+        output.emittedEvents shouldBe emptyList()
+        output.notification shouldBe null
+    }
+
+    @Test
     fun `semantic match dedupes hydrate then ws assistant with different server id`() {
         val hydrated = TimelineHydrationReducer.reduce(
             conversationId = "conv-test",
