@@ -71,6 +71,9 @@ class TimelineSyncLoopImageRestoreTest {
         val rows = mutableMapOf<String, PendingLocalRecord>()
         override suspend fun save(record: PendingLocalRecord) { rows[record.otid] = record }
         override suspend fun delete(otid: String) { rows.remove(otid) }
+        override suspend fun markFailed(otid: String) {
+            rows[otid]?.let { rows[otid] = it.copy(deliveryState = DeliveryState.FAILED) }
+        }
         override suspend fun load(conversationId: String): List<PendingLocalRecord> =
             rows.values.filter { it.conversationId == conversationId }.sortedBy { it.sentAt }
     }
