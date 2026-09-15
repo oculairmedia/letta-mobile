@@ -929,6 +929,9 @@ class ChatSendCoordinator(
         val eventAgentId: String? = when (event) {
             is WsTimelineEvent.TurnStarted -> event.agentId
             is WsTimelineEvent.AgentUpdated -> event.agentId
+            // Message frames name their run's agent too; a foreign agent's delta must not
+            // reach turn resolution at all (cross-agent timeline bleed, 2026-09-14).
+            is WsTimelineEvent.MessageDelta -> event.agentId
             else -> null
         }
         if (eventAgentId != null && eventAgentId != agentId) {
@@ -1048,15 +1051,48 @@ class ChatSendCoordinator(
         boundState: ConversationTurnState?,
     ): String? {
         val rawConv = event.conversationId
-        val aliasedConv = rawConv?.let { resolveConversationId(it) }
-        val state = boundState
-            ?: event.turnId?.let { liveStateForTurn(it) }
-            ?: (aliasedConv ?: rawConv)?.let { peekState(it) }
+        val frameConv = rawConv?.let { resolveConversationId(it) } ?: rawConv
+        if (frameConv != null) {
+            // The frame names its (agent, conversation). That is where it belongs, whatever this
+            // screen shows: resolve only to a state that genuinely owns this conversation's turn,
+            // never to one fabricated for the open conversation. Before, an unknown turn fell
+            // through to fallbackState(), which minted a state for the OPEN conversation and
+            // ingested another conversation's run into it - across agents, and across two
+            // conversations of the same agent.
+            val state = boundState
+                ?: ownedStateForTurn(event.turnId, frameConv)
+                ?: peekState(frameConv)
+            return state?.let { it.localConversationId ?: it.conversationId } ?: frameConv
+        }
+        // No conversation on the frame (legacy id-less frames): only a send of ours in flight can
+        // own it. With nothing in flight the caller drops it instead of guessing the open chat.
+        if (!hasInFlightSend()) return null
+        val state = boundState ?: event.turnId?.let { liveStateForTurn(it) }
         return state?.let { it.localConversationId ?: it.conversationId }
-            ?: aliasedConv
-            ?: rawConv
             ?: lastActiveConversationId
             ?: activeConversationId()
+    }
+
+    /**
+     * The state that owns [turnId] for a frame that names [frameConversationId]: an exact live turn,
+     * a turn this conversation already fenced, or this conversation's own send still awaiting its
+     * `TurnStarted`. Unlike [resolveStateByTurnId] it never falls back to a state for whatever
+     * conversation is active, and a state for another conversation never claims the frame.
+     */
+    private fun ownedStateForTurn(turnId: String?, frameConversationId: String): ConversationTurnState? {
+        val key = turnId?.takeIf { it.isNotBlank() } ?: return null
+        val states = snapshotStates()
+        fun ownsConversation(state: ConversationTurnState) =
+            state.conversationId == frameConversationId || state.localConversationId == frameConversationId
+        states.firstOrNull { it.turnId == key }?.let { return it.takeUnless { state -> isRetiredTurn(state, key) } }
+        states.firstOrNull { it.identity.isFenced(key) }?.let { return it }
+        return states.singleOrNull { it.turnId == null && it.identity.active != null && ownsConversation(it) }
+    }
+
+    /** True while a send of this coordinator is queued, dispatched, or streaming. */
+    private fun hasInFlightSend(): Boolean {
+        if (synchronized(pendingSendLock) { pendingSends.isNotEmpty() }) return true
+        return snapshotStates().any { it.identity.active != null || it.turnId != null }
     }
 
     private suspend fun handleMessageDelta(event: WsTimelineEvent.MessageDelta) {
@@ -1080,6 +1116,16 @@ class ChatSendCoordinator(
             "isReplay" to event.isReplay,
         )
         if (conversationId == null) {
+            if (!hasInFlightSend()) {
+                // Nothing of ours is in flight, so an id-less delta cannot be ours: queuing it would
+                // hand another run's output to this chat's first conversation.
+                Telemetry.event(
+                    "AdminChatVM", "ws.messageDelta.unownedDropped",
+                    "messageId" to event.message.id,
+                    "turnId" to (event.turnId ?: ""),
+                )
+                return
+            }
             preConversationMessageDeltas.addLast(event)
             return
         }

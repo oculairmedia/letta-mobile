@@ -146,6 +146,30 @@ class IrohCrossAgentTimelineBleedTest {
         assertNoWritesUnderAgent(timeline, AGENT_B, stack)
     }
 
+    @Test
+    fun runInOneConversationDoesNotBleedIntoAnotherConversationOfTheSameAgent() = runBlocking {
+        // Letta agents have many conversations: ownership is (agentId, conversationId), not agent.
+        val stack = stack()
+        val timeline = RecordingTimelineWriter()
+        val chatFirst = stack.chat(AGENT_A, conversation = CONV_A, timeline)
+
+        stack.startRun(AGENT_A, CONV_A, timeline)
+        stack.streamAssistant(AGENT_A, CONV_A, "cm-a-early", "before switching", seq = 10)
+        awaitControl(timeline, AGENT_A, CONV_A)
+        // Switching to another conversation of the same agent replaces the chat's view model.
+        chatFirst.close()
+        stack.chatAlongside(AGENT_A, conversation = CONV_A2, timeline)
+
+        stack.streamFullTurn(AGENT_A, CONV_A, seqStart = 20)
+        delay(SETTLE)
+
+        assertNothingIngestedInto(timeline, CONV_A2, stack)
+        assertTrue(
+            timeline.writes.filter { it.agentId == AGENT_A }.all { it.conversationId == CONV_A },
+            "every write of the run must stay in its own conversation ($CONV_A): ${timeline.writes}",
+        )
+    }
+
     // ------------------------------------------------------------------ harness
 
     private suspend fun stack(): Stack {
@@ -188,6 +212,10 @@ class IrohCrossAgentTimelineBleedTest {
 
         fun chat(agentId: String, conversation: String?, timeline: RecordingTimelineWriter): Chat =
             Chat(agentId, conversation, bridge, timeline).also { chats[agentId] = it }
+
+        /** A second chat for an agent already registered (another conversation), without replacing it. */
+        fun chatAlongside(agentId: String, conversation: String?, timeline: RecordingTimelineWriter): Chat =
+            Chat(agentId, conversation, bridge, timeline)
 
         /** Sends from [agentId]'s chat and waits until the engine-owned turn is streaming. */
         suspend fun startRun(agentId: String, conversationId: String, timeline: RecordingTimelineWriter) {
@@ -380,6 +408,7 @@ class IrohCrossAgentTimelineBleedTest {
         const val AGENT_B = "agent-b"
         const val CONV_A = "local-conv-a"
         const val CONV_B = "local-conv-b"
+        const val CONV_A2 = "local-conv-a2"
         val SETTLE = 400.milliseconds
     }
 }
