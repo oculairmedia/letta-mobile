@@ -187,6 +187,32 @@ class TimelineOwnershipAuthorityTest {
         rejected { owner.registerLegacyPair(scope, target.copy(conversationId = "lost")) { fail("mapped source readmitted") } }
     }
 
+    /**
+     * letta-mobile-gdfrn: every guarded timeline read on chat open acquires the authority, and each
+     * acquisition used to fsync the authority directory. Reads must not sync anything; a publication
+     * still syncs the authority directory (the backend entry) before the backend's own files.
+     */
+    @Test fun readOnlyAcquisitionNeverSyncsButPublicationSyncsParentFirst() = runBlocking {
+        val synced = mutableListOf<java.nio.file.Path>()
+        val root = temporary.root.toPath()
+        val counting = TimelineOwnershipAuthority(root) { synced.add(it) }
+
+        val legacy = counting.acquire(scope, TimelineOwnershipAuthority.Route.Legacy)
+        val migration = counting.beginMigration(legacy)
+        val published = synced.toList()
+        assertEquals("publication syncs the authority directory first", root, published.first())
+        assertTrue("and then the backend directory", published.drop(1).isNotEmpty() && published.drop(1).all { it.parent == root })
+
+        synced.clear()
+        repeat(3) {
+            counting.state(scope)
+            counting.ownerAgent(scope)
+            counting.capturedMapping(migration)
+            counting.withLease(migration) { }
+        }
+        assertEquals("read-only acquisitions must not fsync", emptyList<java.nio.file.Path>(), synced)
+    }
+
     @Test fun corruptOrOversizedStateNeverDefaultsToLegacy() = runBlocking {
         authority().beginMigration(authority().acquire(scope, TimelineOwnershipAuthority.Route.Legacy))
         val backend = Files.list(temporary.root.toPath()).use { it.findFirst().get() }

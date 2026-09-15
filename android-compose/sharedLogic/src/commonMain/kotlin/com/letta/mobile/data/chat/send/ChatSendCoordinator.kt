@@ -929,6 +929,9 @@ class ChatSendCoordinator(
         val eventAgentId: String? = when (event) {
             is WsTimelineEvent.TurnStarted -> event.agentId
             is WsTimelineEvent.AgentUpdated -> event.agentId
+            // Message frames name their run's agent too; a foreign agent's delta must not
+            // reach turn resolution at all (cross-agent timeline bleed, 2026-09-14).
+            is WsTimelineEvent.MessageDelta -> event.agentId
             else -> null
         }
         if (eventAgentId != null && eventAgentId != agentId) {
@@ -1048,16 +1051,45 @@ class ChatSendCoordinator(
         boundState: ConversationTurnState?,
     ): String? {
         val rawConv = event.conversationId
-        val aliasedConv = rawConv?.let { resolveConversationId(it) }
-        val state = boundState
-            ?: event.turnId?.let { liveStateForTurn(it) }
-            ?: (aliasedConv ?: rawConv)?.let { peekState(it) }
+        val frameConv = rawConv?.let { resolveConversationId(it) } ?: rawConv
+        if (frameConv != null) {
+            // The frame names its (agent, conversation). That is where it belongs, whatever this
+            // screen shows: resolve only to a state that genuinely owns this conversation's turn,
+            // never to one fabricated for the open conversation. Before, an unknown turn fell
+            // through to fallbackState(), which minted a state for the OPEN conversation and
+            // ingested another conversation's run into it - across agents, and across two
+            // conversations of the same agent.
+            val state = boundState
+                ?: ownedStateForTurn(event.turnId, frameConv)
+                ?: peekState(frameConv)
+            return state?.let { it.localConversationId ?: it.conversationId } ?: frameConv
+        }
+        // No conversation on the frame: legacy WS frames only (Iroh always stamps agent, conversation
+        // and turn). The WS contract attributes these to this chat's own send or open conversation,
+        // pinned by WsChatSendCoordinatorTest (replay, live stream, pre-conversation buffering).
+        val state = boundState ?: event.turnId?.let { liveStateForTurn(it) }
         return state?.let { it.localConversationId ?: it.conversationId }
-            ?: aliasedConv
-            ?: rawConv
             ?: lastActiveConversationId
             ?: activeConversationId()
     }
+
+    /**
+     * The state that owns [turnId] for a frame that names [frameConversationId]: an exact live turn,
+     * a turn this conversation already fenced, or this conversation's own send still awaiting its
+     * `TurnStarted`. Unlike [resolveStateByTurnId] it never falls back to a state for whatever
+     * conversation is active, and a state for another conversation never claims the frame.
+     */
+    private fun ownedStateForTurn(turnId: String?, frameConversationId: String): ConversationTurnState? {
+        val key = turnId?.takeIf { it.isNotBlank() } ?: return null
+        val states = snapshotStates()
+        fun ownsConversation(state: ConversationTurnState) =
+            state.conversationId == frameConversationId || state.localConversationId == frameConversationId
+        states.firstOrNull { it.turnId == key }?.let { return it.takeUnless { state -> isRetiredTurn(state, key) } }
+        states.firstOrNull { it.identity.isFenced(key) }?.let { return it }
+        return states.singleOrNull { it.turnId == null && it.identity.active != null && ownsConversation(it) }
+    }
+
+
 
     private suspend fun handleMessageDelta(event: WsTimelineEvent.MessageDelta) {
         val otid = event.message.otid

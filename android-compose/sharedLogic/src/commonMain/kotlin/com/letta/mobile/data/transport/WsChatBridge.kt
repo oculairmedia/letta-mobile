@@ -234,6 +234,11 @@ sealed interface WsTimelineEvent {
          * server emits an unseen server-assigned conversation id.
          */
         val turnId: String? = null,
+        /**
+         * The wire frame's own `agent_id`, when it carried a non-blank one. With [conversationId]
+         * it names the run's owner: a coordinator bound to another agent drops the delta.
+         */
+        val agentId: String? = null,
     ) : WsTimelineEvent
 
     data class StopReason(
@@ -487,6 +492,7 @@ private fun ServerFrame.messageDeltaEvent(isReplay: Boolean): WsTimelineEvent.Me
             isReplay = isReplay,
             conversationId = messageFrameConversationId(),
             turnId = messageFrameTurnId(),
+            agentId = messageFrameAgentId(),
         )
     }
 }
@@ -503,6 +509,16 @@ private fun ServerFrame.messageFrameConversationId(): String? = when (this) {
     is ServerFrame.ReasoningMessage -> conversationId
     is ServerFrame.ToolCallMessage -> conversationId
     is ServerFrame.ToolReturnMessage -> conversationId
+    else -> null
+}?.takeIf { it.isNotBlank() }
+
+/** The `agent_id` the message frame itself carries, normalized to null when absent or blank. */
+private fun ServerFrame.messageFrameAgentId(): String? = when (this) {
+    is ServerFrame.UserMessage -> agentId
+    is ServerFrame.AssistantMessage -> agentId
+    is ServerFrame.ReasoningMessage -> agentId
+    is ServerFrame.ToolCallMessage -> agentId
+    is ServerFrame.ToolReturnMessage -> agentId
     else -> null
 }?.takeIf { it.isNotBlank() }
 
