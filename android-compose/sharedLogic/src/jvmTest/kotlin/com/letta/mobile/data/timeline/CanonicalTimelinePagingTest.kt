@@ -45,6 +45,11 @@ class CanonicalTimelinePagingTest {
             collectors.launch { session.paging(selection).collectLatest { presenter.collectFrom(it) } }
             presenter.awaitRows(3) { "calls=${transport.calls} ledgerRows=${store.rows.size} revision=${session.publication.value.durableRevision}" }
 
+            // The revision-triggered newest check starts after the presenter first goes idle, so
+            // wait for the pipeline to finish it instead of snapshotting a still-running walk.
+            awaitCondition({ "calls=${transport.calls} revision=${session.publication.value.durableRevision}" }) {
+                transport.calls >= 3 && session.publication.value.durableRevision >= 2L
+            }
             presenter.awaitIdle()
             // Initial newest read, older-cursor walk, then the revision-triggered newest check.
             assertEquals(3, transport.calls)
@@ -205,12 +210,14 @@ class CanonicalTimelinePagingTest {
 
     /** One page of assistant replies, newest first, with no older history behind it. */
     private class PageTransport(private val records: Int) : TimelineTransport {
-        @Volatile var calls = 0
+        // The newest and older walks fetch independently; a plain ++ can lose a concurrent call.
+        private val callCount = AtomicInteger()
+        val calls: Int get() = callCount.get()
         override suspend fun listConversationMessagePage(
             request: TimelineRemotePageRequest,
             progress: TimelinePageProgress?,
         ): TimelineRemotePageResult {
-            calls++
+            callCount.incrementAndGet()
             val page = (records - 1 downTo 0).map { index ->
                 TimelineRemoteRecord(
                     TimelineMessageId("m-$index"),
@@ -232,5 +239,14 @@ class CanonicalTimelinePagingTest {
 
     companion object {
         private val scope = TimelineScope("backend", "conversation", "agent")
+
+        /** Real-time wait for async pipeline work that has no flow to observe. */
+        private suspend fun awaitCondition(detail: () -> String, condition: () -> Boolean) {
+            val met = withTimeoutOrNull(10_000) {
+                while (!condition()) delay(10)
+                true
+            }
+            if (met == null) fail("condition never held: ${detail()}")
+        }
     }
 }
