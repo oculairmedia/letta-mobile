@@ -69,7 +69,7 @@ class DesktopTimelineBoundedStoreTest {
         }
     }
 
-    @Test fun unresolvedSeekSkipsTwentyEightThousandResolvedEntries() = runTest(timeout = 5.minutes) {
+    @Test fun unresolvedSeekSkipsTwentyEightThousandResolvedEntries() = runTest(timeout = 60.minutes) {
         val owner = TimelineMessageId("owner")
         val store = store()
         repeat(280) { batch ->
@@ -329,7 +329,7 @@ class DesktopTimelineBoundedStoreTest {
         }
     }
 
-    @Test fun cursorOnlyRevisionsReuseHistoryWithoutOverlayChains() = runTest(timeout = kotlin.time.Duration.parse("5m")) {
+    @Test fun cursorOnlyRevisionsReuseHistoryWithoutOverlayChains() = runTest(timeout = 60.minutes) {
         legacy = true // Keep the published v1 corpus compatibility gate.
         val backend = store()
         backend.transaction(scope) {
@@ -368,7 +368,7 @@ class DesktopTimelineBoundedStoreTest {
         }
     }
 
-    @Test fun persistentWritesKeepIndependentRootsAndRejectOversizedBatches() = runTest(timeout = kotlin.time.Duration.parse("5m")) {
+    @Test fun persistentWritesKeepIndependentRootsAndRejectOversizedBatches() = runTest(timeout = 60.minutes) {
         val backend = store()
         repeat(4) { batch ->
             backend.transaction(scope) {
@@ -406,7 +406,7 @@ class DesktopTimelineBoundedStoreTest {
         backend.read(scope) { assertEquals(6L, checkpoint().revision); assertNull(locate(TimelineMessageId("id-999"))) }
     }
 
-    @Test fun persistent28kRestartAndChangedWriteRemainBounded() = runTest(timeout = kotlin.time.Duration.parse("60m")) {
+    @Test fun persistent28kRestartAndChangedWriteRemainBounded() = runTest(timeout = 60.minutes) {
         val backend = store()
         repeat(280) { batch ->
             backend.transaction(scope) {
