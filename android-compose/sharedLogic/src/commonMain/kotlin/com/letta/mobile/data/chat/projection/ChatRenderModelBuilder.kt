@@ -422,7 +422,7 @@ fun filterMessagesForMode(
     // display mode so they never appear as user bubbles. The canonical skill
     // tool call (assistant TOOL_CALL) renders through the normal tool card.
     val afterFilter = messages.filterNot { msg ->
-        msg.role == "user" && SyntheticSkillEnvelopeDetector.isSyntheticSkillEnvelope(msg.role, msg.content)
+        SyntheticSkillEnvelopeDetector.isSyntheticSkillEnvelope(role = msg.role, content = msg.content)
     }
     return when (mode) {
         // letta-mobile-tz1sp (2026-08-05 product decision): Simple mode matches
