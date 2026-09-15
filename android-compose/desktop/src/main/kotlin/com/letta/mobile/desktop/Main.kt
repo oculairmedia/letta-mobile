@@ -182,6 +182,10 @@ private fun runDesktopApplication(
                     if (System.getenv("LETTA_SHADER_LOOKDEV") == "1") {
                         com.letta.mobile.desktop.lookdev.ShaderLookdevWindow()
                     }
+                    // Canvas Workspace (debug window) — P0 verification host
+                    if (System.getenv("MERIDIAN_CANVAS_DEBUG") == "1") {
+                        com.letta.mobile.desktop.canvas.CanvasDebugWindow()
+                    }
                 }
             }
         }
