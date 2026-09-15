@@ -114,12 +114,11 @@ class ConnectionRegistry {
     }
 
     /**
-     * Writes [frame] to every live connection that [ViewerHandle.receivesBroadcast]
-     * [requiredCapability], outside the lock (a slow connection must not stall the others).
-     * Returns how many connections accepted the write.
+     * Writes [frame] to every live connection [isRecipient] accepts, outside the lock (a slow
+     * connection must not stall the others). Returns how many connections accepted the write.
      */
-    suspend fun broadcast(frame: String, requiredCapability: String): BroadcastResult {
-        val recipients = connections().filter { it.receivesBroadcast(requiredCapability) }
+    suspend fun broadcast(frame: String, isRecipient: (ViewerHandle) -> Boolean): BroadcastResult {
+        val recipients = connections().filter(isRecipient)
         return BroadcastResult(recipients = recipients.size, delivered = recipients.count { it.writeFrame(frame) })
     }
 

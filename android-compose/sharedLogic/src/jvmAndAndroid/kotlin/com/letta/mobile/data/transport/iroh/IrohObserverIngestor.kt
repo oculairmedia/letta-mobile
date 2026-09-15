@@ -152,6 +152,10 @@ internal class IrohObserverIngestor(
         val received = request.received
         if (republishAgentUpdated(received)) return
         val streamDelta = received.frame as? AppServerInboundFrame.StreamDelta ?: return
+        ingestStreamDelta(streamDelta, received)
+    }
+
+    private suspend fun ingestStreamDelta(streamDelta: AppServerInboundFrame.StreamDelta, received: AppServerReceivedFrame) {
         if (!streamDelta.subagentId.isNullOrBlank()) {
             observeChildActivity(streamDelta)
             return

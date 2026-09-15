@@ -37,7 +37,7 @@ class ConnectionRegistryTest {
         listOf(reader, unauthorised, dead).forEach { registry.claim(it) }
         registry.release(registry.claim(released))
 
-        val result = registry.broadcast("""{"type":"agent_updated"}""", IrohPeerCapabilities.CHAT_READ)
+        val result = registry.broadcast("""{"type":"agent_updated"}""") { it.receivesBroadcast(IrohPeerCapabilities.CHAT_READ) }
 
         assertEquals(ConnectionRegistry.BroadcastResult(recipients = 2, delivered = 1), result)
         assertEquals(1, reader.frames.size)

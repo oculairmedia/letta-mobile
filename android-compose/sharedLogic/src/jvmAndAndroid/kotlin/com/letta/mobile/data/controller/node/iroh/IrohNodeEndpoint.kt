@@ -4,6 +4,7 @@ import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.controller.node.IrohRelayConfig
 import com.letta.mobile.data.transport.iroh.IrohDiagnostics
 import computer.iroh.Endpoint
+import computer.iroh.Incoming
 import computer.iroh.EndpointAddr
 import computer.iroh.EndpointOptions
 import computer.iroh.EndpointTicket
@@ -78,7 +79,7 @@ class IrohNodeEndpoint(
      * ([IrohPeerCapabilities.CHAT_READ], the `agent.list` capability), on its stream channel.
      */
     fun agentChangeTarget(): AgentChangeTarget = AgentChangeTarget { frame ->
-        val result = connectionRegistry.broadcast(frame, IrohPeerCapabilities.CHAT_READ)
+        val result = connectionRegistry.broadcast(frame) { it.receivesBroadcast(IrohPeerCapabilities.CHAT_READ) }
         Telemetry.event("IrohNode", "agent_updated.broadcast", "recipients" to result.recipients, "delivered" to result.delivered)
     }
 
@@ -227,38 +228,7 @@ class IrohNodeEndpoint(
                     // client handshake (peer died mid-connect) can never block
                     // the accept loop for other clients — the exact wedge that
                     // made every subsequent dial time out.
-                    launch {
-                        try {
-                            val accepting = incoming.accept()
-                            val connection = withTimeout(HANDSHAKE_TIMEOUT_MS.milliseconds) { accepting.connect() }
-                            val remoteId = IrohDiagnostics.endpointIdHex(connection.remoteId())
-                            Telemetry.event("IrohNode", "incoming.connected", "remoteEndpointId" to remoteId)
-                            if (authPolicy.allowedPeerIds.isNotEmpty() && remoteId !in authPolicy.allowedPeerIds) {
-                                Telemetry.event("IrohNode", "auth.failed", "remoteEndpointId" to remoteId, "reason" to "peer_not_allowed")
-                                runCatching { connection.close(4403L, "peer_not_allowed".encodeToByteArray()) }
-                            } else {
-                                IrohNodeConnection(
-                                    connection = connection,
-                                    controller = controller,
-                                    adminRpcRouter = adminRpcRouter,
-                                    authPolicy = authPolicy,
-                                    authVerifier = authVerifier,
-                                    pairingService = pairingService,
-                                    remoteEndpointId = remoteId,
-                                    connectionRegistry = connectionRegistry,
-                                ).serve()
-                            }
-                        } catch (e: CancellationException) {
-                            throw e
-                        } catch (e: Exception) {
-                            Telemetry.event(
-                                "IrohNode", "incoming.handshake.failed",
-                                "error" to (e.message ?: e.toString()),
-                                "class" to e::class.simpleName,
-                                level = Telemetry.Level.WARN,
-                            )
-                        }
-                    }
+                    launch { serveIncoming(incoming, controller) }
                 } catch (_: TimeoutCancellationException) {
                     continue
                 } catch (e: CancellationException) {
@@ -272,6 +242,43 @@ class IrohNodeEndpoint(
             }
         }
     }
+
+    /** Handshake and serve one accepted connection; failures are logged, never thrown into the accept loop. */
+    private suspend fun serveIncoming(incoming: Incoming, controller: AppServerController) {
+        try {
+            val accepting = incoming.accept()
+            val connection = withTimeout(HANDSHAKE_TIMEOUT_MS.milliseconds) { accepting.connect() }
+            val remoteId = IrohDiagnostics.endpointIdHex(connection.remoteId())
+            Telemetry.event("IrohNode", "incoming.connected", "remoteEndpointId" to remoteId)
+            if (!isPeerAllowed(remoteId)) {
+                Telemetry.event("IrohNode", "auth.failed", "remoteEndpointId" to remoteId, "reason" to "peer_not_allowed")
+                runCatching { connection.close(4403L, "peer_not_allowed".encodeToByteArray()) }
+                return
+            }
+            IrohNodeConnection(
+                connection = connection,
+                controller = controller,
+                adminRpcRouter = adminRpcRouter,
+                authPolicy = authPolicy,
+                authVerifier = authVerifier,
+                pairingService = pairingService,
+                remoteEndpointId = remoteId,
+                connectionRegistry = connectionRegistry,
+            ).serve()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Telemetry.event(
+                "IrohNode", "incoming.handshake.failed",
+                "error" to (e.message ?: e.toString()),
+                "class" to e::class.simpleName,
+                level = Telemetry.Level.WARN,
+            )
+        }
+    }
+
+    private fun isPeerAllowed(remoteId: String): Boolean =
+        authPolicy.allowedPeerIds.isEmpty() || remoteId in authPolicy.allowedPeerIds
 
     suspend fun shutdown() {
         acceptJob?.cancel()
