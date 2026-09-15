@@ -12,6 +12,7 @@ on:
       - ".github/workflows/desktop.yml"
       - "android-compose/desktop/**"
       - "android-compose/native/**"
+      - "android-compose/avatar/**"
       - "android-compose/sharedLogic/**"
       - "android-compose/gradle/**"
       - "android-compose/settings.gradle.kts"
@@ -23,6 +24,7 @@ on:
       - ".github/workflows/desktop.yml"
       - "android-compose/desktop/**"
       - "android-compose/native/**"
+      - "android-compose/avatar/**"
       - "android-compose/sharedLogic/**"
       - "android-compose/gradle/**"
       - "android-compose/settings.gradle.kts"
@@ -83,6 +85,23 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-jbr-
 
+      - name: Cache rive-runtime build (desktop mascot renderer)
+        # build-bridge.sh keeps rive-runtime's headers and release libraries (~1.7 GB, mostly
+        # rive.lib) as D:\rb\work\sdk and reuses them at the pinned commit, so a hit skips the
+        # clone and the ~3 min library build; the bridge itself always recompiles.
+        uses: actions/cache@v4
+        with:
+          path: D:\rb\work\sdk
+          key: ${{ runner.os }}-rive-runtime-sdk-${{ hashFiles('android-compose/avatar/renderer-rive/native/desktop/rive-runtime.version', 'android-compose/avatar/renderer-rive/native/desktop/tools/**', 'android-compose/avatar/renderer-rive/native/desktop/build-bridge.sh') }}
+
+      - name: Build Rive desktop bridge (rive_desktop_bridge.dll)
+        # The mascot renderer. Packaging refuses to run without it (desktop/build.gradle.kts,
+        # stageDesktopRiveBridge), so an installer can never silently ship orbs only.
+        shell: bash
+        run: |
+          bash avatar/renderer-rive/native/desktop/build-bridge.sh /d/rb/work /d/rb/out
+          echo 'LETTA_RIVE_BRIDGE_DLL=D:\rb\out\rive_desktop_bridge.dll' >> "$GITHUB_ENV"
+
       - name: Build Windows EXE + MSI installers
         env:
           # WiX still resolves source files through MAX_PATH-limited Win32 APIs.
@@ -102,6 +121,13 @@ jobs:
         # this entry point is not, so keep the cache off here only.
         run: ./gradlew --no-configuration-cache :desktop:packageDistributionForCurrentOS
 
+      - name: Verify the mascot renderer is in the app image
+        shell: pwsh
+        run: |
+          $dll = Get-ChildItem 'D:\l\compose\binaries\main\app\*\app\resources\rive_desktop_bridge.dll' -ErrorAction SilentlyContinue
+          if (-not $dll) { throw "rive_desktop_bridge.dll is missing from the packaged app resources" }
+          Write-Host "Packaged $($dll.FullName) ($($dll.Length) bytes)"
+
       - name: Upload Windows installers
         uses: actions/upload-artifact@v4
         with:
@@ -109,6 +135,13 @@ jobs:
           path: |
             D:\l\compose\binaries\main\exe\*.exe
             D:\l\compose\binaries\main\msi\*.msi
+          if-no-files-found: error
+
+      - name: Upload Rive desktop bridge
+        uses: actions/upload-artifact@v4
+        with:
+          name: rive-desktop-bridge-${{ github.run_number }}
+          path: D:\rb\out\rive_desktop_bridge.dll
           if-no-files-found: error
 
   # Stable status check for branch protection.
