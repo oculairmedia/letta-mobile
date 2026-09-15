@@ -60,6 +60,9 @@ sealed interface AppServerCommandRetryClass {
             // Aborting / approval / tool-result are effectful and non-idempotent.
             is AppServerCommand.AbortMessage -> AmbiguousMutation(dedupKey = null)
             is AppServerCommand.ExternalToolCallResponse -> AmbiguousMutation(dedupKey = null)
+            // Absolute values, but device state is shared by every client on the runtime: a
+            // replay could overwrite a change another client made after this one.
+            is AppServerCommand.ChangeDeviceState -> AmbiguousMutation(dedupKey = null)
 
             // Native admin operations (lgns8.7): reads replay safely; entity
             // mutations may have committed before an ambiguous disconnect.

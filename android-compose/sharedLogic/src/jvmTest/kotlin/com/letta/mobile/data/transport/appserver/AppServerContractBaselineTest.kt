@@ -40,8 +40,8 @@ class AppServerContractBaselineTest {
         val classifiedCommands = capabilities.flatMap { it.stringSet("commands") }
         val classifiedMessages = capabilities.flatMap { it.stringSet("messages") }
 
-        assertEquals(91, commands.size, "Update the pinned count after reviewing an upstream union change")
-        assertEquals(100, messages.size, "Update the pinned count after reviewing an upstream union change")
+        assertEquals(100, commands.size, "Update the pinned count after reviewing an upstream union change")
+        assertEquals(111, messages.size, "Update the pinned count after reviewing an upstream union change")
         assertEquals(commands, classifiedCommands.toSet())
         assertEquals(messages, classifiedMessages.toSet())
         assertEquals(classifiedCommands.size, classifiedCommands.toSet().size, "A command has multiple capability owners")
@@ -121,14 +121,14 @@ class AppServerContractBaselineTest {
         val probes = matrix["cli_probes"]!!.jsonArray.map { it.jsonObject }
             .associateBy { it.requiredString("classification") }
 
-        assertEquals("0.29.12", baseline.requiredString("version"))
+        assertEquals("0.32.10", baseline.requiredString("version"))
         assertEquals("v24.18.0", baseline.requiredString("node"))
         assertEquals("v24.18.0\n", fixtureText(probes.getValue("installed_node_version").requiredString("fixture")))
-        assertEquals("0.29.12 (Letta Code)\n", fixtureText(probes.getValue("installed_version").requiredString("fixture")))
+        assertEquals("0.32.10 (Letta Code)\n", fixtureText(probes.getValue("installed_version").requiredString("fixture")))
 
         val serverListener = probes.getValue("server_listener")
         val appServer = probes.getValue("app_server_v2")
-        // 0.29.x unified CLI: both probes emit `letta server --listen` help.
+        // 0.29.x-0.32.x unified CLI: both probes emit `letta server --listen` help.
         assertProbe(serverListener, expectedUsage = "Usage:\n  letta server", forbiddenUsage = "Usage: letta app-server")
         assertProbe(appServer, expectedUsage = "Usage:\n  letta server", forbiddenUsage = "Usage: letta app-server")
         assertTrue("app_server_v2" in appServer.stringSet("capabilities"))
@@ -166,23 +166,33 @@ class AppServerContractBaselineTest {
             "cli-version.txt",
             "cli-server-help.txt",
             "cli-app-server-help.txt",
+            "golden/letta-code-0.32.3-live.jsonl",
         )
         val forbidden = listOf(
-            "authorization: bearer", "sk-", "api_key", "refresh_token", "private_key",
+            "authorization: bearer", "api_key", "refresh_token", "private_key",
             "[letta-code-patch]", "patch-loader", "/root/", "/tmp/letta-code-shell-shim",
         )
+        // Key-shaped, not a bare substring: 0.32 ships `task-control-protocol.d.ts`, whose name
+        // contains "sk-" and is a legitimate protocol corpus file.
+        val secretKeyShape = Regex("(?<![a-z0-9])sk-[a-z0-9_-]{16,}", RegexOption.IGNORE_CASE)
 
         fixtureNames.forEach { name ->
             val content = fixtureText(name)
             forbidden.forEach { marker ->
                 assertFalse(content.lowercase().contains(marker.lowercase()), "$name contains forbidden marker $marker")
             }
+            assertFalse(secretKeyShape.containsMatchIn(content), "$name contains a secret-key-shaped value")
         }
+        assertTrue(secretKeyShape.containsMatchIn("key sk-proj-AbCdEf0123456789xyz"), "the key-shape check must still catch a real key")
+        assertFalse(secretKeyShape.containsMatchIn("dist/types/types/task-control-protocol.d.ts"))
         fixtureNames.filter { it.endsWith(".json") }.forEach { name ->
             assertCredentialsRedacted(fixtureJson(name), name)
         }
         protocolFixtures().forEach { frame ->
             assertCredentialsRedacted(frame, "protocol-frames.jsonl:${typeOf(frame)}")
+        }
+        fixtureText("golden/letta-code-0.32.3-live.jsonl").lineSequence().filter { it.isNotBlank() }.forEachIndexed { index, line ->
+            assertCredentialsRedacted(AppServerProtocol.json.parseToJsonElement(line), "golden live capture row $index")
         }
         val nestedCredentialExample = AppServerProtocol.json.parseToJsonElement(
             """{"outer":{"items":[{"access_token":"<redacted>"},{"password":"<redacted>"}]}}""",

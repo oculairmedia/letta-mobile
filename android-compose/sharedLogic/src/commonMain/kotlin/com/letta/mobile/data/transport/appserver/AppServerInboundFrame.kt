@@ -106,6 +106,52 @@ sealed interface AppServerInboundFrame {
         override val requestId: String? = null
     }
 
+    /**
+     * Acknowledges an `input` that carried a `request_id` (upstream 0.32+). It correlates acceptance
+     * only — `disposition` says whether the input started a turn or was queued — never turn
+     * completion; that is [TurnFinished] or a terminal `stop_reason` delta.
+     */
+    @Serializable
+    @SerialName("input_accepted")
+    data class InputAccepted(
+        @SerialName("request_id") override val requestId: String,
+        override val runtime: AppServerRuntimeScope,
+        val accepted: Boolean,
+        val disposition: String? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient
+        override val type: String = "input_accepted"
+
+        val queued: Boolean get() = disposition == "queued"
+    }
+
+    /**
+     * Authoritative end of a turn (upstream 0.32+), independent of stream delivery order. Older
+     * servers never send it, so a terminal `stop_reason` stream delta stays a valid boundary.
+     * `stop_reason` is kept as a string: the upstream enum is open and `requires_approval` is not
+     * terminal (see [AppServerStopReason]).
+     */
+    @Serializable
+    @SerialName("turn_finished")
+    data class TurnFinished(
+        override val runtime: AppServerRuntimeScope,
+        @SerialName("event_seq") val eventSeq: Long,
+        @SerialName("emitted_at") val emittedAt: String,
+        @SerialName("idempotency_key") val idempotencyKey: String,
+        @SerialName("turn_id") val turnId: String,
+        @SerialName("stop_reason") val stopReason: String,
+        @SerialName("run_id") val runId: String? = null,
+        val error: String? = null,
+        val usage: JsonObject? = null,
+    ) : AppServerInboundFrame {
+        @Transient
+        override val type: String = "turn_finished"
+
+        @Transient
+        override val requestId: String? = null
+    }
+
     @Serializable
     @SerialName("update_loop_status")
     data class UpdateLoopStatus(

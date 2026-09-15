@@ -1,1 +1,1 @@
-0.29.12 (Letta Code)
+0.32.10 (Letta Code)
