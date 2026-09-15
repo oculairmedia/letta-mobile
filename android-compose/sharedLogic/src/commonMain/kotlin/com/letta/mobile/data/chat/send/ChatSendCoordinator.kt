@@ -1064,9 +1064,9 @@ class ChatSendCoordinator(
                 ?: peekState(frameConv)
             return state?.let { it.localConversationId ?: it.conversationId } ?: frameConv
         }
-        // No conversation on the frame (legacy id-less frames): only a send of ours in flight can
-        // own it. With nothing in flight the caller drops it instead of guessing the open chat.
-        if (!hasInFlightSend()) return null
+        // No conversation on the frame: legacy WS frames only (Iroh always stamps agent, conversation
+        // and turn). The WS contract attributes these to this chat's own send or open conversation,
+        // pinned by WsChatSendCoordinatorTest (replay, live stream, pre-conversation buffering).
         val state = boundState ?: event.turnId?.let { liveStateForTurn(it) }
         return state?.let { it.localConversationId ?: it.conversationId }
             ?: lastActiveConversationId
@@ -1089,11 +1089,7 @@ class ChatSendCoordinator(
         return states.singleOrNull { it.turnId == null && it.identity.active != null && ownsConversation(it) }
     }
 
-    /** True while a send of this coordinator is queued, dispatched, or streaming. */
-    private fun hasInFlightSend(): Boolean {
-        if (synchronized(pendingSendLock) { pendingSends.isNotEmpty() }) return true
-        return snapshotStates().any { it.identity.active != null || it.turnId != null }
-    }
+
 
     private suspend fun handleMessageDelta(event: WsTimelineEvent.MessageDelta) {
         val otid = event.message.otid
@@ -1116,16 +1112,6 @@ class ChatSendCoordinator(
             "isReplay" to event.isReplay,
         )
         if (conversationId == null) {
-            if (!hasInFlightSend()) {
-                // Nothing of ours is in flight, so an id-less delta cannot be ours: queuing it would
-                // hand another run's output to this chat's first conversation.
-                Telemetry.event(
-                    "AdminChatVM", "ws.messageDelta.unownedDropped",
-                    "messageId" to event.message.id,
-                    "turnId" to (event.turnId ?: ""),
-                )
-                return
-            }
             preConversationMessageDeltas.addLast(event)
             return
         }
