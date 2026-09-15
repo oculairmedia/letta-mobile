@@ -19,8 +19,9 @@ import svgpath
 from rml import COLOR, GRADIENT_OPACITY, ROT, SINE, SX, SY, VDIST, VM_COLOR, VROT, VX, VY, X, bind
 from rig.constants import BONE_REACH, DEFAULT_SHAPE, LEAN_BASE, SHAPE_SVG, art, frames
 from rig.ids import (
-    BODY_NODE, BONE_BASE, BONE_CROWN, BONE_MID, CONV_BODY_ROT, CONV_BODY_X, GLOSS, HALO, HITBOX,
-    SHAPES, SOFT, TINT, VM_TURN_X, body_vertex_ids, halo_vertex_ids, soft_vertex_ids,
+    BODY_NODE, BONE_BASE, BONE_CROWN, BONE_MID, CONV_BODY_ROT, CONV_BODY_X, CONV_DEGREES, GLOSS, HALO,
+    HITBOX, SHAPES, SOFT, TINT, VM_SHAPE_ROTATION, VM_TURN_X, alloc, body_vertex_ids, halo_vertex_ids,
+    soft_vertex_ids,
 )
 
 
@@ -39,6 +40,7 @@ def rrect(w, h, r, name="Path"):
 # Body: identity path (SPEC section 1, body import mechanics) + paint recipe (section 6).
 # ================================================================================================
 BODY = {s: svgpath.body_vertices(art(SHAPE_SVG[s])) for s in SHAPES}
+ORIENTATION_NODE = alloc(0, "OrientationNode")
 
 
 def bone_weight(y):
@@ -88,9 +90,15 @@ def body():
     {bind(VM_TURN_X, ROT, CONV_BODY_ROT)}
     {bind(VM_TURN_X, X, CONV_BODY_X)}
 <Node x="0" y="0" name="Body" id="{BODY_NODE}">
-    <RootBone x="0" y="{-BONE_REACH}" length="1" rotation="0" name="Crown" id="{BONE_CROWN}"/>
-    <RootBone x="0" y="0" length="1" rotation="0" name="Middle" id="{BONE_MID}"/>
-    <RootBone x="0" y="{BONE_REACH}" length="1" rotation="0" name="Base" id="{BONE_BASE}"/>
+    <!-- Orientation: the identity's turn (shapeRotation, degrees). It holds only the bones, so the
+         skinned outlines turn with them while the Shapes - and the Shade / Gloss / Lumen gradients
+         laid out in their space - stay upright: the light keeps coming from the top left. -->
+    <Node x="0" y="0" name="Orientation" id="{ORIENTATION_NODE}">
+        {bind(VM_SHAPE_ROTATION, ROT, CONV_DEGREES)}
+        <RootBone x="0" y="{-BONE_REACH}" length="1" rotation="0" name="Crown" id="{BONE_CROWN}"/>
+        <RootBone x="0" y="0" length="1" rotation="0" name="Middle" id="{BONE_MID}"/>
+        <RootBone x="0" y="{BONE_REACH}" length="1" rotation="0" name="Base" id="{BONE_BASE}"/>
+    </Node>
     <!-- Paints on one shape; the LATER paint draws on top. -->
     <Shape name="BodyShape" id="{HITBOX}">
 {indent(body_path(body_vertex_ids, "Path"), "        ")}

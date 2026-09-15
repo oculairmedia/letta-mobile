@@ -24,9 +24,17 @@ fun mascotIdentitySettingsKey(agentId: String): String = "agent.$agentId.avatar_
 fun Agent.mascotIdentity(): MascotIdentity? =
     MascotIdentity.decode(metadata[MASCOT_IDENTITY_METADATA_KEY]?.let { runCatching { it.jsonPrimitive.contentOrNull }.getOrNull() })
 
-/** The agent's identity: the agent's own first, then the device's cached / legacy [localValue]. */
-fun resolveMascotIdentity(agent: Agent?, localValue: String?): MascotIdentity? =
+/** A chosen identity: the agent's own first, then the device's cached / legacy [localValue]; null when none was ever chosen. */
+fun chosenMascotIdentity(agent: Agent?, localValue: String?): MascotIdentity? =
     agent?.mascotIdentity() ?: MascotIdentity.decode(localValue)
+
+/**
+ * The identity [agentId] draws with: a chosen one when there is one (see [chosenMascotIdentity]),
+ * else the identity generated from the id itself, so every agent has a mascot and every client
+ * draws the same one.
+ */
+fun resolveMascotIdentity(agentId: String, agent: Agent?, localValue: String?): MascotIdentity =
+    chosenMascotIdentity(agent, localValue) ?: MascotIdentity.seeded(agentId)
 
 /** [existing] metadata with this identity written in - the whole map, since an agent PATCH replaces it. */
 fun MascotIdentity.withinAgentMetadata(existing: Map<String, JsonElement>?): Map<String, JsonElement> =

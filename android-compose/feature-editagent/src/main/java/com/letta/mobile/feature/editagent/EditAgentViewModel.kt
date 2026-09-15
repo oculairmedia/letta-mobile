@@ -15,9 +15,6 @@ import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.avatar.core.MascotIdentity
 import com.letta.mobile.ui.mascot.mascotIdentitySettingsKey
 import com.letta.mobile.ui.mascot.resolveMascotIdentity
-import com.letta.mobile.ui.mascot.withinAgentMetadata
-import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.ui.common.UiState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.toImmutableList
@@ -63,6 +60,14 @@ internal class EditAgentViewModel @Inject constructor(
             scope = viewModelScope,
             reload = { loadAgentSnapshot() },
         ),
+    )
+    private val identityWriter = EditAgentMascotIdentityWriter(
+        agentId = agentId,
+        agentRepository = agentRepository,
+        settings = secureSettingsStore,
+        scope = viewModelScope,
+        loadedMetadata = { state.successData()?.agent?.metadata },
+        onFailed = { e -> android.util.Log.w("EditAgentVM", "Failed to store mascot identity on the agent; kept locally", e) },
     )
     private val environmentEditor = EditAgentEnvironmentEditor(state)
     private val toolAttachment = EditAgentToolAttachment(
@@ -141,28 +146,17 @@ internal class EditAgentViewModel @Inject constructor(
         state.setSuccess(snapshot.uiState.copy(avatarIdentity = loadAvatarIdentity(snapshot.uiState)))
     }
 
-    private fun loadAvatarIdentity(loaded: EditAgentUiState): MascotIdentity? =
-        resolveMascotIdentity(loaded.agent, secureSettingsStore.getString(mascotIdentitySettingsKey(agentId)))
+    private fun loadAvatarIdentity(loaded: EditAgentUiState): MascotIdentity =
+        resolveMascotIdentity(agentId, loaded.agent, secureSettingsStore.getString(mascotIdentitySettingsKey(agentId)))
 
     /**
-     * Persists the chosen mascot identity at once: on the agent (its metadata, so every client shows
-     * it) and in the device cache (so this client shows it offline and before the roster refreshes).
-     * The write is its own round-trip, independent of the form's Save - a picked character should
-     * not wait on, or be lost to, a model validation error elsewhere on the form.
+     * Persists the chosen mascot identity at once (see [EditAgentMascotIdentityWriter]). The write is
+     * its own round-trip, independent of the form's Save - a picked character should not wait on, or
+     * be lost to, a model validation error elsewhere on the form.
      */
     fun updateAvatarIdentity(identity: MascotIdentity) {
-        secureSettingsStore.putString(mascotIdentitySettingsKey(agentId), identity.encode())
         state.updateField { copy(avatarIdentity = identity) }
-        val existing = state.successData()?.agent?.metadata
-        viewModelScope.launch {
-            try {
-                agentRepository.updateAgent(AgentId(agentId), AgentUpdateParams(metadata = identity.withinAgentMetadata(existing)))
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                android.util.Log.w("EditAgentVM", "Failed to store mascot identity on the agent; kept locally", e)
-            }
-        }
+        identityWriter.write(identity)
     }
 
     fun updateName(value: String) = state.updateField { copy(name = value) }

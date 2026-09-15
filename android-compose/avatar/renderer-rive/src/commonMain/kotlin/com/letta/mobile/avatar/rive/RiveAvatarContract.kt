@@ -64,6 +64,13 @@ object RiveAvatarContract {
     /** Colour. Identity; every body fill in the asset is bound to it. */
     const val INPUT_COLOR: String = "color"
 
+    /**
+     * Number, degrees 0..359. Identity: turns the body clockwise about its centre. The asset rotates
+     * the body's bones, so the skinned outline turns while the face, the plate and the lighting
+     * gradients stay upright.
+     */
+    const val INPUT_SHAPE_ROTATION: String = "shapeRotation"
+
     /** The enum key for [shape], matching a `DataEnumValue key` in the asset. A key, not an index, for the same reason as [stateKey]. */
     fun shapeKey(shape: MascotShape): String = when (shape) {
         MascotShape.CIRCLE -> "circle"
@@ -80,6 +87,7 @@ object RiveAvatarContract {
     fun applyIdentity(sink: RiveInputSink, identity: MascotIdentity) {
         sink.setEnum(INPUT_SHAPE, shapeKey(identity.shape))
         sink.setColor(INPUT_COLOR, identity.argb)
+        sink.setNumber(INPUT_SHAPE_ROTATION, identity.rotationDegrees.toFloat())
     }
 
     /**
