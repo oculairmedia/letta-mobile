@@ -48,8 +48,14 @@ def unit(v):
     return v[0] / n, v[1] / n
 
 
-def corner_arc(prev, corner, nxt, radius, samples=24):
-    """The arc of `radius` that rounds `corner`, from the side toward `prev` to the side toward `nxt`."""
+ARC_SAMPLES = 24
+
+
+def corner_arc(neighbourhood, radius):
+    """The arc of `radius` rounding the middle point of (prev, corner, next), from the side toward
+    prev to the side toward next."""
+    prev, corner, nxt = neighbourhood
+    samples = ARC_SAMPLES
     a = unit((prev[0] - corner[0], prev[1] - corner[1]))
     b = unit((nxt[0] - corner[0], nxt[1] - corner[1]))
     theta = math.acos(max(-1.0, min(1.0, a[0] * b[0] + a[1] * b[1])))
@@ -67,7 +73,7 @@ def corner_arc(prev, corner, nxt, radius, samples=24):
 def rounded_outline(corners, radius):
     """The closed polyline of the rounded polygon: consecutive corner arcs, joined by the straight sides."""
     n = len(corners)
-    return [p for i in range(n) for p in corner_arc(corners[i - 1], corners[i], corners[(i + 1) % n], radius)]
+    return [p for i in range(n) for p in corner_arc((corners[i - 1], corners[i], corners[(i + 1) % n]), radius)]
 
 
 def edges(polyline):
@@ -95,7 +101,9 @@ def ray_hit(outline, angle):
 
 
 # --- fitting the cubics ---------------------------------------------------------------------------
-def cubic_point(p0, c0, c1, p1, t):
+def cubic_point(cubic, t):
+    """The point at `t` on a cubic given as (start, control, control, end)."""
+    p0, c0, c1, p1 = cubic
     mt = 1 - t
     return tuple(mt ** 3 * p0[i] + 3 * mt * mt * t * c0[i] + 3 * mt * t * t * c1[i] + t ** 3 * p1[i] for i in range(2))
 
@@ -130,7 +138,7 @@ class Fit:
                 for i in range(n)]
 
     def error(self):
-        return max(min(distance_to_segment(cubic_point(*c, k / 12), a, b) for a, b in self.segments)
+        return max(min(distance_to_segment(cubic_point(c, k / 12), a, b) for a, b in self.segments)
                    for c in self.cubics() for k in range(1, 12))
 
     def search_ratios(self):
@@ -173,13 +181,13 @@ def svg_document(path):
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--radius", type=float, default=DEFAULT_RADIUS, help="corner radius in px (default 25)")
-    p.add_argument("--out", default=os.path.join(HERE, "art"), help="where the SVGs are written")
     args = p.parse_args(argv)
     for body in BODIES:
         fit = Fit(body, args.radius)
         fit.search_ratios()
         fit.refine()
-        with open(os.path.join(args.out, body.svg), "w", encoding="utf-8", newline="\n") as f:
+        # Always this rig's own art/ - the file names are fixed above, never taken from the command line.
+        with open(os.path.join(HERE, "art", body.svg), "w", encoding="utf-8", newline="\n") as f:
             f.write(svg_document(fit.path()))
         print(f"{body.svg}: corner radius {args.radius:g}px, max deviation {fit.error():.2f}px")
     return 0
