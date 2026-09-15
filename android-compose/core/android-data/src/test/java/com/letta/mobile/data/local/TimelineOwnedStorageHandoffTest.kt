@@ -194,8 +194,10 @@ class TimelineOwnedStorageHandoffTest {
                 validateBytes += audit.bodyBytes
                 validateSteps++
             } while (!audit.complete)
-            // letta-mobile-qfrer: nothing to audit is one step, not one per phase.
-            assertEquals(1, validateSteps)
+            // letta-mobile-qfrer: an empty source used to take six steps, one per phase boundary. Now the
+            // empty phases hand on inside a step, leaving only real work: the conversion's evidence entry
+            // (staged in step 1, its body read in step 2) and the final phase ends (step 3).
+            assertEquals(3, validateSteps)
             assertEquals(0, copyRows)
             assertEquals(0, copyBytes)
             assertTrue(validateRows >= 0 && validateBytes >= 0)
