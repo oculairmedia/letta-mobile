@@ -72,6 +72,7 @@ kotlin {
                 // DrawBox canvas editor (P0)
                 implementation(libs.drawbox)
                 implementation(libs.drawbox.ui)
+                // DrawBoxController inherits from androidx.lifecycle.ViewModel; exposed as api so consumers resolve ViewModel hierarchy.
                 api(libs.androidx.lifecycle.viewmodel)
             }
         }
