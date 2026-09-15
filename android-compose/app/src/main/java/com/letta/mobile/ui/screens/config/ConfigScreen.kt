@@ -61,6 +61,7 @@ fun ConfigScreen(
     onNavigateToConfigList: () -> Unit,
     onNavigateToSystemAccess: () -> Unit = {},
     onNavigateToVibesyncDebug: () -> Unit = {},
+    onNavigateToCanvasDebug: () -> Unit = {},
     viewModel: ConfigViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -182,6 +183,7 @@ fun ConfigScreen(
                 },
                 onNavigateToSystemAccess = onNavigateToSystemAccess,
                 onNavigateToVibesyncDebug = onNavigateToVibesyncDebug,
+                onNavigateToCanvasDebug = onNavigateToCanvasDebug,
                 onRefresh = viewModel::loadConfig,
                 onSave = {
                     viewModel.saveConfig(
@@ -248,6 +250,7 @@ private fun ConfigContent(
     onRequestBatteryOptimizationExemption: () -> Unit,
     onNavigateToSystemAccess: () -> Unit,
     onNavigateToVibesyncDebug: () -> Unit,
+    onNavigateToCanvasDebug: () -> Unit = {},
     onRefresh: () -> Unit,
     onSave: () -> Unit,
     modifier: Modifier = Modifier
@@ -493,6 +496,12 @@ private fun ConfigContent(
                     headlineContent = { Text(stringResource(R.string.screen_vibesync_debug_title)) },
                     supportingContent = { Text(stringResource(R.string.screen_vibesync_debug_entry_description)) },
                     leadingContent = { Icon(LettaIcons.Database, contentDescription = null) },
+                )
+                item(
+                    onClick = onNavigateToCanvasDebug,
+                    headlineContent = { Text("Canvas Workspace (Debug)") },
+                    supportingContent = { Text("Interactive DrawBox canvas with sample import/export") },
+                    leadingContent = { Icon(LettaIcons.Edit, contentDescription = null) },
                 )
             }
         }
