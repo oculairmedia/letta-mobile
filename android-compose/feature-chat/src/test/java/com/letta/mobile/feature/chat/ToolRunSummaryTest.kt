@@ -24,7 +24,7 @@ class ToolRunSummaryTest {
         val live = summarizeToolRun(listOf(group(call("a", ToolTimelineState.Running), call("b"))))
         val hydrated = summarizeToolRun(listOf(group(call("a"), call("b"))))
 
-        assertEquals("Running 2 commands - 0:18", live.label(elapsedSeconds = 18))
+        assertEquals("Running Bash - 2 commands - 0:18", live.label(elapsedSeconds = 18))
         assertEquals("Ran 2 commands", hydrated.label())
     }
 

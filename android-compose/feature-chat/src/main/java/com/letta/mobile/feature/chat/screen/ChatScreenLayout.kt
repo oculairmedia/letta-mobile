@@ -470,9 +470,30 @@ private fun ChatScreenThinkingTokenSection(
     val thinkingTokenActive = state.isStreaming ||
         state.isAgentTyping ||
         !state.a2uiThinkingDelayMessage.isNullOrBlank()
+    val activeRunMessages = state.messages.takeLastWhile { it.runId != null && it.runId == state.messages.lastOrNull()?.runId }
+    val activeToolName = activeRunMessages
+        .flatMap { it.toolCalls.orEmpty() }
+        .lastOrNull { it.status.isNullOrBlank() || it.status.equals("running", ignoreCase = true) }
+        ?.name
+    val runStartedAt = activeRunMessages.firstNotNullOfOrNull {
+        com.letta.mobile.data.chat.projection.parseTimestampEpochMillis(it.timestamp)
+    }
+    val elapsedSeconds by androidx.compose.runtime.produceState(0L, thinkingTokenActive, runStartedAt) {
+        value = runStartedAt?.let { ((System.currentTimeMillis() - it).coerceAtLeast(0L)) / 1_000L } ?: 0L
+        while (thinkingTokenActive) {
+            kotlinx.coroutines.delay(1_000L)
+            value = runStartedAt?.let { ((System.currentTimeMillis() - it).coerceAtLeast(0L)) / 1_000L }
+                ?: value + 1L
+        }
+    }
+    val activityText = if (thinkingTokenActive) {
+        val phase = activeToolName?.let { "Running $it" } ?: "Thinking…"
+        "$phase - ${formatElapsedSeconds(elapsedSeconds)}"
+    } else null
     ThinkingTextToken(
         visible = thinkingTokenActive,
         delayMessage = state.a2uiThinkingDelayMessage,
+        textOverride = activityText,
         reducedMotion = reducedMotion,
         reserveSpace = thinkingTokenActive,
         // Beside the mascot companion: no leading inset, the row already places it.

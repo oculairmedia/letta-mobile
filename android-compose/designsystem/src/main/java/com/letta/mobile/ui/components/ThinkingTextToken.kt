@@ -61,6 +61,7 @@ const val THINKING_TEXT_TOKEN_TEST_TAG = "thinking-text-token"
 fun ThinkingTextToken(
     visible: Boolean,
     delayMessage: String? = null,
+    textOverride: String? = null,
     reducedMotion: Boolean = false,
     reserveSpace: Boolean = visible || !delayMessage.isNullOrBlank(),
     modifier: Modifier = Modifier,
@@ -93,7 +94,9 @@ fun ThinkingTextToken(
             label = "thinking-text-token-alpha",
         )
         val scheme = MaterialTheme.colorScheme
-        val text = delayMessage?.takeIf { it.isNotBlank() } ?: "Thinking…"
+        val text = textOverride?.takeIf { it.isNotBlank() }
+            ?: delayMessage?.takeIf { it.isNotBlank() }
+            ?: "Thinking…"
 
         val phase = if (reducedMotion) {
             0f

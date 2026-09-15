@@ -24,6 +24,7 @@ import com.letta.mobile.data.chat.projection.ToolTimelineGroup
 import com.letta.mobile.data.chat.projection.ToolTimelineProjector
 import com.letta.mobile.data.chat.projection.ToolTimelineState
 import com.letta.mobile.data.chat.projection.projectToolTimelineGroupFromCalls
+import com.letta.mobile.data.chat.projection.parseTimestampEpochMillis
 import com.letta.mobile.data.chat.projection.toWireStatus
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiImageAttachment
@@ -97,6 +98,7 @@ internal fun ProjectedToolTimelineGroupStepRow(
         autoExpandDelayMs = autoExpandDelayMs,
         stagedCollapseDelayMs = stagedCollapseDelayMs,
         onOpenDetails = onOpenDetails,
+        startedAtEpochMs = step.messages.firstNotNullOfOrNull { parseTimestampEpochMillis(it.timestamp) },
     )
 }
 
@@ -176,6 +178,7 @@ internal fun ProjectedToolTimelineGroupCard(
     autoExpandDelayMs: Long = DEFAULT_AUTO_EXPAND_DELAY_MS,
     stagedCollapseDelayMs: Long = DEFAULT_STAGED_COLLAPSE_DELAY_MS,
     onOpenDetails: (List<ToolTimelineGroup>) -> Unit = {},
+    startedAtEpochMs: Long? = null,
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -189,7 +192,11 @@ internal fun ProjectedToolTimelineGroupCard(
             )
         }
 
-        ToolRunSummaryRow(groups = groups, onClick = { onOpenDetails(groups) })
+        ToolRunSummaryRow(
+            groups = groups,
+            startedAtEpochMs = startedAtEpochMs,
+            onClick = { onOpenDetails(groups) },
+        )
 
         // Ordinary calls can retain an auto-allowed request row while running. Surface
         // controls only for canonical runtime tools that are actually awaiting user input.
@@ -213,6 +220,7 @@ internal data class ToolRunSummary(
     val failureCount: Int,
     val awaitingApprovalCount: Int,
     val running: Boolean,
+    val activeToolName: String?,
 )
 
 internal fun summarizeToolRun(groups: List<ToolTimelineGroup>): ToolRunSummary {
@@ -222,12 +230,13 @@ internal fun summarizeToolRun(groups: List<ToolTimelineGroup>): ToolRunSummary {
         failureCount = calls.count { it.state == ToolTimelineState.Failed || it.state == ToolTimelineState.Rejected },
         awaitingApprovalCount = calls.count { it.state == ToolTimelineState.AwaitingApproval },
         running = calls.any { it.state == ToolTimelineState.Running },
+        activeToolName = calls.lastOrNull { it.state == ToolTimelineState.Running }?.name,
     )
 }
 
 internal fun ToolRunSummary.label(elapsedSeconds: Long = 0L): String = when {
     awaitingApprovalCount > 0 -> "Approval needed - $toolCount ${toolNoun(toolCount)}"
-    running -> "Running $toolCount ${toolNoun(toolCount)} - ${formatElapsedSeconds(elapsedSeconds)}"
+    running -> "Running ${activeToolName.orEmpty().ifBlank { "tool" }} - $toolCount ${toolNoun(toolCount)} - ${formatElapsedSeconds(elapsedSeconds)}"
     failureCount > 0 -> "$toolCount ran - $failureCount failed"
     else -> "Ran $toolCount ${toolNoun(toolCount)}"
 }
@@ -240,14 +249,16 @@ internal fun formatElapsedSeconds(totalSeconds: Long): String =
 @Composable
 private fun ToolRunSummaryRow(
     groups: List<ToolTimelineGroup>,
+    startedAtEpochMs: Long? = null,
     onClick: () -> Unit,
 ) {
     val summary = remember(groups) { summarizeToolRun(groups) }
-    val elapsed by produceState(0L, summary.running, groups.firstOrNull()?.key) {
-        value = 0L
+    val elapsed by produceState(0L, summary.running, startedAtEpochMs) {
+        value = startedAtEpochMs?.let { ((System.currentTimeMillis() - it).coerceAtLeast(0L)) / 1_000L } ?: 0L
         while (summary.running) {
             delay(1.seconds)
-            value += 1L
+            value = startedAtEpochMs?.let { ((System.currentTimeMillis() - it).coerceAtLeast(0L)) / 1_000L }
+                ?: value + 1L
         }
     }
     val color = when {
