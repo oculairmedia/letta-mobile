@@ -51,6 +51,11 @@ import kotlin.test.assertTrue
  * the shared flow does, and asserts on where agent B's coordinator writes. The
  * invariant: a coordinator bound to agent B never writes agent A's message into
  * any timeline scoped to agent B.
+ *
+ * These are the two id-less paths. The path the device hit - deltas that DO carry A's
+ * conversation and turn id - is reproduced through the real Iroh stack in
+ * `IrohCrossAgentTimelineBleedTest` (jvmTest); calling `handleEvent` directly here does
+ * not reproduce production's event sequence for that case, so it is not duplicated.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatSendCoordinatorCrossAgentBleedTest {
@@ -68,36 +73,6 @@ class ChatSendCoordinatorCrossAgentBleedTest {
     }
 
     @Test
-    fun foreignAgentDeltaSharingDefaultConversationIdDoesNotLandInOpenChat() = runTest {
-        // Letta Code agents each have a conversation with the bare id "default".
-        val timeline = RecordingTimelineWriter()
-        val chatA = chat(AGENT_A, activeConversation = "default", timeline)
-        val chatB = chat(AGENT_B, activeConversation = "default", timeline)
-        val both = listOf(chatA, chatB)
-
-        broadcast(both, turnStarted(AGENT_A, "default", "turn-a", "run-a"))
-        broadcast(both, delta("message-a", conversationId = "default", turnId = "turn-a", runId = "run-a"))
-        broadcast(both, WsTimelineEvent.TurnDone("turn-a", "run-a", BridgeTurnStatus.Completed))
-        advanceUntilIdle()
-
-        assertNoForeignWrite(timeline, owner = AGENT_B, foreignMessageId = "message-a")
-    }
-
-    @Test
-    fun foreignAgentDeltaWithoutConversationIdDoesNotLandInOpenChat() = runTest {
-        val timeline = RecordingTimelineWriter()
-        val chatA = chat(AGENT_A, activeConversation = "conv-a", timeline)
-        val chatB = chat(AGENT_B, activeConversation = "conv-b", timeline)
-        val both = listOf(chatA, chatB)
-
-        broadcast(both, turnStarted(AGENT_A, "conv-a", "turn-a", "run-a"))
-        broadcast(both, delta("message-a", conversationId = null, turnId = "turn-a", runId = "run-a"))
-        advanceUntilIdle()
-
-        assertNoForeignWrite(timeline, owner = AGENT_B, foreignMessageId = "message-a")
-    }
-
-    @Test
     fun foreignAgentDeltaWithNoIdentifiersDoesNotLandInOpenChat() = runTest {
         val timeline = RecordingTimelineWriter()
         val chatA = chat(AGENT_A, activeConversation = "conv-a", timeline)
@@ -106,20 +81,6 @@ class ChatSendCoordinatorCrossAgentBleedTest {
 
         broadcast(both, turnStarted(AGENT_A, "conv-a", "turn-a", "run-a"))
         broadcast(both, delta("message-a", conversationId = null, turnId = null, runId = "run-a"))
-        advanceUntilIdle()
-
-        assertNoForeignWrite(timeline, owner = AGENT_B, foreignMessageId = "message-a")
-    }
-
-    @Test
-    fun afterNavigatingAwayForeignDeltasDoNotWriteUnderNewChatsAgent() = runTest {
-        // Navigating A -> B clears A's view model, so only B's coordinator is left
-        // on the shared flow while A's run keeps streaming.
-        val timeline = RecordingTimelineWriter()
-        val chatB = chat(AGENT_B, activeConversation = "conv-b", timeline)
-
-        broadcast(listOf(chatB), delta("message-a", conversationId = "conv-a", turnId = "turn-a", runId = "run-a"))
-        broadcast(listOf(chatB), WsTimelineEvent.TurnDone("turn-a", "run-a", BridgeTurnStatus.Completed))
         advanceUntilIdle()
 
         assertNoForeignWrite(timeline, owner = AGENT_B, foreignMessageId = "message-a")
