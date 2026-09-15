@@ -655,7 +655,9 @@ private fun buildAskUserQuestionAnswers(
 internal fun ApprovalResponseCard(approvalResponse: UiApprovalResponse) {
     // One decision on the verdict, yielding both the word and the glyph, rather
     // than a `when` for the label and a separate `if` for the icon.
-    val (label, glyph) = when (approvalResponse.approved) {
+    // letta-mobile-soa3i.4: the shared verdict counts per-call decisions too, so a per-call
+    // rejection under a top-level approve reads Rejected here as on Android.
+    val (label, glyph) = when (approvalResponse.verdict) {
         true -> "Approved" to Icons.Outlined.CheckCircle
         false -> "Rejected" to Icons.Outlined.ErrorOutline
         null -> "Approval response" to Icons.Outlined.CheckCircle
