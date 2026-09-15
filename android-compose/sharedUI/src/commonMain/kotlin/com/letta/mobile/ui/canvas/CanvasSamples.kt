@@ -1,4 +1,4 @@
-﻿package com.letta.mobile.ui.canvas
+package com.letta.mobile.ui.canvas
 
 /**
  * Embedded official DrawBox sample diagrams for P0 import and export verification.

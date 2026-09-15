@@ -499,8 +499,8 @@ private fun ConfigContent(
                 )
                 item(
                     onClick = onNavigateToCanvasDebug,
-                    headlineContent = { Text("Canvas Workspace (Debug)") },
-                    supportingContent = { Text("Interactive DrawBox canvas with sample import/export") },
+                    headlineContent = { Text(stringResource(R.string.screen_canvas_debug_title)) },
+                    supportingContent = { Text(stringResource(R.string.screen_canvas_debug_entry_description)) },
                     leadingContent = { Icon(LettaIcons.Edit, contentDescription = null) },
                 )
             }

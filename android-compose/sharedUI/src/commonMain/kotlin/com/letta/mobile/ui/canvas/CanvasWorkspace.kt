@@ -29,7 +29,9 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.unit.dp
 import io.ak1.drawbox.DrawBox
 import io.ak1.drawbox.domain.model.Event
-import io.ak1.drawbox.presentation.viewmodel.rememberDrawBoxController
+import io.ak1.drawbox.domain.usecase.UseCase
+import io.ak1.drawbox.presentation.reducer.Reducer
+import io.ak1.drawbox.presentation.viewmodel.DrawBoxController
 import io.ak1.drawbox.ui.controls.ControlsBar
 import io.ak1.drawbox.ui.controls.defaultControlsBarItems
 
@@ -41,19 +43,17 @@ import io.ak1.drawbox.ui.controls.defaultControlsBarItems
 @Composable
 fun CanvasWorkspace(
     modifier: Modifier = Modifier,
+    controller: DrawBoxController = remember { DrawBoxController(Reducer(UseCase())) },
     initialJson: String? = null,
     onNavigateBack: (() -> Unit)? = null,
     onExportJson: ((String) -> Unit)? = null,
     onExportSvg: ((String) -> Unit)? = null,
 ) {
-    val controller = rememberDrawBoxController()
     val state by controller.state.collectAsState()
     val canUndo by controller.canUndo.collectAsState()
     val canRedo by controller.canRedo.collectAsState()
 
     var statusMessage by remember { mutableStateOf("Ready") }
-    var lastExportedJson by remember { mutableStateOf<String?>(null) }
-    var lastExportedSvg by remember { mutableStateOf<String?>(null) }
 
     // Load initial JSON diagram if provided
     LaunchedEffect(initialJson) {
@@ -68,7 +68,6 @@ fun CanvasWorkspace(
         controller.events.collect { event ->
             when (event) {
                 is Event.JsonExported -> {
-                    lastExportedJson = event.json
                     val hasElements = event.json.contains("\"elements\"")
                     statusMessage = if (hasElements) {
                         "Exported JSON (${event.json.length} chars, verified)"
@@ -78,7 +77,6 @@ fun CanvasWorkspace(
                     onExportJson?.invoke(event.json)
                 }
                 is Event.SvgExported -> {
-                    lastExportedSvg = event.svg
                     val hasSvgTag = event.svg.contains("<svg", ignoreCase = true)
                     statusMessage = if (hasSvgTag) {
                         "Exported SVG (${event.svg.length} chars, verified)"
@@ -88,7 +86,8 @@ fun CanvasWorkspace(
                     onExportSvg?.invoke(event.svg)
                 }
                 is Event.Error -> {
-                    statusMessage = "Error: ${event.throwable?.message ?: "Unknown"}"
+                    val err = event.message.ifBlank { event.throwable?.message ?: "Unknown" }
+                    statusMessage = "Error: $err"
                 }
                 else -> Unit
             }
