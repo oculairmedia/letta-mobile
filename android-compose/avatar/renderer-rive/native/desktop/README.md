@@ -21,6 +21,20 @@ input sink implements the same `RiveInputSink` Android uses, so `RiveAvatarRunti
 
 Nothing beyond VS 2022 C++ tools, the Windows SDK, Git for Windows and Python 3 is needed.
 
+**One command** (what CI runs; the steps below are what it does):
+
+```bash
+bash avatar/renderer-rive/native/desktop/build-bridge.sh D:/rb/work D:/rb/out
+cd android-compose && ./gradlew :desktop:run -PriveBridge=D:/rb/out/rive_desktop_bridge.dll
+```
+
+The rive-runtime commit is pinned in `rive-runtime.version`; a work dir already holding a built
+checkout at that commit is reused. `-PriveBridge` (or `LETTA_RIVE_BRIDGE_DLL`) stages the DLL into
+the app resources, so `:desktop:run` and the installer both carry it. Packaging a Windows
+distribution without one fails unless `-PallowMissingRiveBridge=true` - an installer without the
+bridge draws every agent as a gradient orb. The desktop workflow builds the bridge, packages it,
+checks it is in the app image and uploads it as the `rive-desktop-bridge-<run>` artifact.
+
 1. Clone and build rive-runtime. Verified at `02bea09bc68eb923498a3fe77da257a96e48d2e9`.
    Three workarounds apply to a plain VS 2022 install, all in `tools/`:
    - `--with_rive_canvas` (on by default) pulls in the Ore D3D12 backend, which older MSVC
@@ -95,6 +109,6 @@ Nothing beyond VS 2022 C++ tools, the Windows SDK, Git for Windows and Python 3 
 ## Open questions for productionising
 
 - macOS (Metal) and Linux (Vulkan/GL) offscreen backends; the bridge is D3D11-only.
-- CI builds per OS and packaging the DLL into the installer, like `letta_mermaid_renderer`.
+- CI builds for macOS and Linux (Windows is built and packaged by the desktop workflow).
 - Readback cost at large sizes; a shared GPU texture into Skiko would remove it.
 - Pinning rive-runtime to the version rive-android ships, so both platforms read the same files.
