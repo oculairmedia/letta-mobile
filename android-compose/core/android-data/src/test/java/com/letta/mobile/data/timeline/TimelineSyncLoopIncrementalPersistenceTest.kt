@@ -563,8 +563,12 @@ class TimelineSyncLoopIncrementalPersistenceTest {
      */
     @Test
     fun aDurableFallbackResetsStaleHistoryAndKeepsTheWriterAttached() = runTest {
-        val db = inMemoryDatabase()
-        val store = OutcomeOverridingStore(RoomConfirmedTimelineStore(db))
+        // In-memory, like theSafetyDeadlineReArmsAcrossSuccessiveWindows: Room commits on its own
+        // real Dispatchers.IO, which advanceUntilIdle() cannot drive, so the final durable read
+        // raced the "after" write and failed intermittently in CI. What is under test -- a
+        // fallback resets the stale run and the writer stays attached -- is the loop's logic;
+        // Room durability is covered by RoomNormalizedIncrementalCommitTest.
+        val store = OutcomeOverridingStore(InMemoryConfirmedTimelineStore())
         val scope = TimelineScope(backendId = "backend", conversationId = "conv-reset", agentId = "agent")
         val dispatcher = StandardTestDispatcher(testScheduler)
         val loop = newLoop(scope, store, dispatcher)
@@ -1409,7 +1413,7 @@ class TimelineSyncLoopIncrementalPersistenceTest {
     }
 
     private class OutcomeOverridingStore(
-        private val delegate: RoomConfirmedTimelineStore,
+        private val delegate: com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore,
     ) : com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore by delegate {
         private var staleOnce = false
         private var invalidOnce = false
