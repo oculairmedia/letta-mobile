@@ -70,17 +70,25 @@ object AgentAdminHandlers {
     private fun pageOf(all: JsonArray, offset: Long, pageSize: Long): JsonArray =
         if (offset == 0L && all.size <= pageSize) all else JsonArray(all.drop(offset.toInt()).take(pageSize.toInt()))
 
-    private fun registerAgentGet(router: AdminRpcRouter, tiers: NativeReadTiers) {
-        router.register("agent.get") { params ->
+    /** An `agent_id`-addressed method served by one native call; [call] returns null when it failed. */
+    private fun registerById(
+        router: AdminRpcRouter,
+        method: String,
+        op: NativeAdminOp,
+        tiers: NativeReadTiers,
+        call: suspend (client: AppServerClient, agentId: String) -> JsonElement?,
+    ) {
+        router.register(method) { params ->
             val id = params.requireParam(AdminParamKey("agent_id"))
-            NativeAdmin.require(tiers.nativeClient, NativeAdminOp.AgentGet) { c ->
-                val response = c.agentRetrieve(
-                    AppServerCommand.AgentRetrieve(requestId = NativeAdmin.requestId(), agentId = id),
-                )
-                if (response.success) tiers.agentMetadata.overlaid(response.agent) else null
-            }
+            NativeAdmin.require(tiers.nativeClient, op) { c -> call(c, id) }
         }
     }
+
+    private fun registerAgentGet(router: AdminRpcRouter, tiers: NativeReadTiers) =
+        registerById(router, "agent.get", NativeAdminOp.AgentGet, tiers) { c, id ->
+            val response = c.agentRetrieve(AppServerCommand.AgentRetrieve(requestId = NativeAdmin.requestId(), agentId = id))
+            if (response.success) tiers.agentMetadata.overlaid(response.agent) else null
+        }
 
     private fun registerAgentCreate(router: AdminRpcRouter, tiers: NativeReadTiers) {
         router.register("agent.create") { params ->
@@ -150,19 +158,16 @@ object AgentAdminHandlers {
         return sidecar.overlaid(response.agent)
     }
 
-    private fun registerAgentDelete(router: AdminRpcRouter, tiers: NativeReadTiers) {
-        router.register("agent.delete") { params ->
-            val id = params.requireParam(AdminParamKey("agent_id"))
-            NativeAdmin.require(tiers.nativeClient, NativeAdminOp.AgentDelete) { c ->
-                val response = c.agentDelete(
-                    AppServerCommand.AgentDelete(requestId = NativeAdmin.requestId(), agentId = id),
-                )
-                if (!response.success) return@require null
+    private fun registerAgentDelete(router: AdminRpcRouter, tiers: NativeReadTiers) =
+        registerById(router, "agent.delete", NativeAdminOp.AgentDelete, tiers) { c, id ->
+            val response = c.agentDelete(AppServerCommand.AgentDelete(requestId = NativeAdmin.requestId(), agentId = id))
+            if (response.success) {
                 tiers.agentMetadata?.delete(id)
-                buildJsonObject { put("deleted", true) } as JsonObject
+                buildJsonObject { put("deleted", true) }
+            } else {
+                null
             }
         }
-    }
 
     private fun metadataOf(body: JsonObject): JsonObject? = body[AgentMetadataSidecar.METADATA_KEY] as? JsonObject
 
@@ -174,9 +179,11 @@ object AgentAdminHandlers {
 
     private fun agentIdOf(agent: JsonElement?): String? = ((agent as? JsonObject)?.get("id") as? JsonPrimitive)?.content
 
+    /** Keeps [metadata] for [agentId] when there is a sidecar, an id and metadata to keep. */
     private fun storeMetadata(sidecar: AgentMetadataSidecar?, agentId: String?, metadata: JsonObject?) {
-        if (sidecar == null || agentId == null || metadata == null) return
-        sidecar.write(agentId, metadata)
+        val target = sidecar ?: return
+        val id = agentId ?: return
+        target.write(id, metadata ?: return)
     }
 
     private fun registerAgentCount(router: AdminRpcRouter, store: LocalBackendAdminStore?) {
