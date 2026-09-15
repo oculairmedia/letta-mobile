@@ -17,6 +17,8 @@ import com.letta.mobile.data.controller.AppServerController
 data class NativeReadTiers(
     val nativeClient: com.letta.mobile.data.transport.appserver.AppServerClient? = null,
     val localBackendStore: LocalBackendAdminStore? = null,
+    /** Agent metadata the App Server drops; see [AgentMetadataSidecar]. Null keeps pass-through. */
+    val agentMetadata: AgentMetadataSidecar? = null,
 )
 
 object AdminRpcRegistry {
@@ -110,7 +112,11 @@ object AdminRpcRegistry {
         val localBackendStore = localBackendDir
             ?.takeIf { it.isNotBlank() }
             ?.let { runCatching { LocalBackendAdminStore(java.io.File(it)) }.getOrNull() }
-        val tiers = NativeReadTiers(nativeClient, localBackendStore)
+        // Beside the store it annotates, but written only by Meridian (the store stays read-only).
+        val agentMetadata = localBackendDir
+            ?.takeIf { it.isNotBlank() }
+            ?.let { AgentMetadataSidecar.inLocalBackend(java.io.File(it)) }
+        val tiers = NativeReadTiers(nativeClient, localBackendStore, agentMetadata)
 
         HealthAdminHandlers.register(router, controller)
         AgentAdminHandlers.register(router, controller, tiers)

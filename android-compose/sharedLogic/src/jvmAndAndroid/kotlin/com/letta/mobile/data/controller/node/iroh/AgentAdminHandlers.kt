@@ -22,6 +22,8 @@ object AgentAdminHandlers {
         tiers: NativeReadTiers = NativeReadTiers(),
     ) {
         val nativeClient = tiers.nativeClient
+        // The App Server drops agent `metadata`; Meridian keeps it (see AgentMetadataSidecar).
+        val sidecar = tiers.agentMetadata
         router.register("agent.list") { params ->
             val limit = param(params, AdminParamKey("limit"))?.toLongOrNull()?.coerceAtLeast(1L)
             val offset = param(params, AdminParamKey("offset"))?.toLongOrNull()?.coerceAtLeast(0L) ?: 0L
@@ -46,11 +48,12 @@ object AgentAdminHandlers {
                     !response.success -> null
                     else -> {
                         val all = response.agents ?: JsonArray(emptyList())
-                        if (offset == 0L && all.size <= pageSize) {
+                        val page = if (offset == 0L && all.size <= pageSize) {
                             all
                         } else {
                             JsonArray(all.drop(offset.toInt()).take(pageSize.toInt()))
                         }
+                        sidecar?.overlayAll(page) ?: page
                     }
                 }
             }
@@ -61,7 +64,7 @@ object AgentAdminHandlers {
                 val response = c.agentRetrieve(
                     AppServerCommand.AgentRetrieve(requestId = NativeAdmin.requestId(), agentId = id),
                 )
-                if (response.success) response.agent else null
+                if (response.success) sidecar.overlaid(response.agent) else null
             }
         }
         router.register("agent.create") { params ->
@@ -73,7 +76,11 @@ object AgentAdminHandlers {
                         body = body,
                     ),
                 )
-                if (response.success) response.agent else null
+                if (!response.success) return@require null
+                val created = (response.agent as? JsonObject)?.get("id")?.let { (it as? JsonPrimitive)?.content }
+                val metadata = body[AgentMetadataSidecar.METADATA_KEY] as? JsonObject
+                if (sidecar != null && created != null && metadata != null) sidecar.write(created, metadata)
+                sidecar.overlaid(response.agent)
             }
         }
         router.register("agent.update") { params ->
@@ -82,7 +89,20 @@ object AgentAdminHandlers {
             // patches (Desktop / AdminChatModelCoordinator) must keep the agent's
             // existing limit. Defaults apply on create only.
             val body = params
+            val metadata = body?.get(AgentMetadataSidecar.METADATA_KEY) as? JsonObject
+            // A metadata-only patch never reaches the App Server: it would drop the metadata and
+            // still rewrite the agent's stored record. The retrieve proves the agent exists.
+            val metadataOnly = sidecar != null && metadata != null &&
+                body.keys.all { it == "agent_id" || it == AgentMetadataSidecar.METADATA_KEY }
             val result = NativeAdmin.require(nativeClient, NativeAdminOp.AgentUpdate) { c ->
+                if (metadataOnly && sidecar != null && metadata != null) {
+                    val existing = c.agentRetrieve(
+                        AppServerCommand.AgentRetrieve(requestId = NativeAdmin.requestId(), agentId = id),
+                    )
+                    if (!existing.success || existing.agent == null) return@require null
+                    sidecar.write(id, metadata)
+                    return@require sidecar.overlaid(existing.agent)
+                }
                 val response = c.agentUpdate(
                     AppServerCommand.AgentUpdate(
                         requestId = NativeAdmin.requestId(),
@@ -90,7 +110,9 @@ object AgentAdminHandlers {
                         body = body ?: buildJsonObject { },
                     ),
                 )
-                if (response.success) response.agent else null
+                if (!response.success) return@require null
+                if (sidecar != null && metadata != null) sidecar.write(id, metadata)
+                sidecar.overlaid(response.agent)
             }
             if (RuntimeInvalidationPolicy.agentUpdateRequiresRestart(params)) {
                 controller?.stopRuntime(AgentId(id))
@@ -103,7 +125,9 @@ object AgentAdminHandlers {
                 val response = c.agentDelete(
                     AppServerCommand.AgentDelete(requestId = NativeAdmin.requestId(), agentId = id),
                 )
-                if (response.success) buildJsonObject { put("deleted", true) } as JsonObject else null
+                if (!response.success) return@require null
+                sidecar?.delete(id)
+                buildJsonObject { put("deleted", true) } as JsonObject
             }
         }
         // letta-mobile-ulz2b.1: authoritative scalar roster size from the on-disk
@@ -155,6 +179,8 @@ object AgentAdminHandlers {
 
 
     /** Mirrors the lc-local-backend default page size for agent.list. */
+    private fun AgentMetadataSidecar?.overlaid(agent: kotlinx.serialization.json.JsonElement?) = this?.overlay(agent) ?: agent
+
     private const val DEFAULT_AGENT_LIST_LIMIT = 20L
 
     /**
