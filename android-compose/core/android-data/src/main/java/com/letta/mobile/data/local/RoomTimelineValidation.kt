@@ -61,77 +61,84 @@ internal class RoomTimelineValidation(
                     check(digest.finish() == state.checksum) { "Audit body checksum mismatch" }
                     state.copy(pointer = null, size = 0, offset = 0, checksum = "", digest = "")
                 } else state.copy(offset = offset, digest = digest.checkpoint())
-            } else when (state.phase) {
-                0 -> {
-                    val row = metadata(state.order, 1).singleOrNull()
-                    if (row == null) {
-                        check(state.count == head.rowCount)
-                        if (normalized == null) {
-                            check(head.rowCount == 0L) { "Empty source claimed rows" }
+            } else do {
+                // A phase that finds nothing left hands straight on to the next one inside this step:
+                // its end probe is one point read, so an empty phase need not cost a whole step - a
+                // fresh lease, legacy snapshot and target transaction (letta-mobile-qfrer: an empty
+                // source used to pay that five times). A step still audits at most one item.
+                val phaseBefore = state.phase
+                when (state.phase) {
+                    0 -> {
+                        val row = metadata(state.order, 1).singleOrNull()
+                        if (row == null) {
+                            check(state.count == head.rowCount)
+                            if (normalized == null) {
+                                check(head.rowCount == 0L) { "Empty source claimed rows" }
+                            } else {
+                                val actual = if (normalized.rowDigest.startsWith(CHAIN_ROW_DIGEST_PREFIX))
+                                    state.chain.ifEmpty { normalizedRowDigest(emptyList()) }
+                                else ResumableLedgerSha256.restore(state.digest).finish()
+                                check(actual == normalized.rowDigest.removePrefix(CHAIN_ROW_DIGEST_PREFIX).lowercase()) { "Source root mismatch" }
+                            }
+                            state = state.copy(phase = 1, order = Long.MIN_VALUE, count = 0, digest = "", chain = "")
                         } else {
-                            val actual = if (normalized.rowDigest.startsWith(CHAIN_ROW_DIGEST_PREFIX))
-                                state.chain.ifEmpty { normalizedRowDigest(emptyList()) }
-                            else ResumableLedgerSha256.restore(state.digest).finish()
-                            check(actual == normalized.rowDigest.removePrefix(CHAIN_ROW_DIGEST_PREFIX).lowercase()) { "Source root mismatch" }
+                            checkNotNull(normalized) { "Empty source produced rows" }
+                            rows++
+                            check(row.order == state.count && row.order <= Int.MAX_VALUE)
+                            val fields = object : NormalizedTimelineRowDigestFields {
+                                override val identityPrimary = row.primary
+                                override val identitySecondary = row.secondary
+                                override val eventOrder = row.order.toInt()
+                                override val checksum = row.checksum
+                            }
+                            if (normalized.rowDigest.startsWith(CHAIN_ROW_DIGEST_PREFIX)) {
+                                val chain = incrementalNormalizedRowDigest(state.chain.ifEmpty { normalizedRowDigest(emptyList()) }, listOf(fields)).removePrefix(CHAIN_ROW_DIGEST_PREFIX)
+                                state = state.copy(order = row.order, count = state.count + 1, chain = chain)
+                            } else {
+                                val digest = ResumableLedgerSha256.restore(state.digest)
+                                val encoded = listOf(row.primary.toString(), row.secondary.toString(), row.order.toString(), row.checksum)
+                                    .joinToString("") { "${it.length}:$it;" }.toByteArray(Charsets.UTF_8)
+                                digest.update(encoded)
+                                state = state.copy(order = row.order, count = state.count + 1, digest = digest.checkpoint())
+                            }
                         }
-                        state = state.copy(phase = 1, order = Long.MIN_VALUE, count = 0, digest = "", chain = "")
-                    } else {
-                        checkNotNull(normalized) { "Empty source produced rows" }
-                        rows++
-                        check(row.order == state.count && row.order <= Int.MAX_VALUE)
-                        val fields = object : NormalizedTimelineRowDigestFields {
-                            override val identityPrimary = row.primary
-                            override val identitySecondary = row.secondary
-                            override val eventOrder = row.order.toInt()
-                            override val checksum = row.checksum
+                    }
+                    1 -> {
+                        val row = if (state.after == null) dao.tail(scope, 1).singleOrNull()
+                            else dao.before(scope, state.order, ledgerKey(state.after!!), 1).singleOrNull()
+                        if (row == null) state = state.copy(phase = 2, after = null)
+                        else {
+                            rows++
+                            check(row.revision in 1..revision)
+                            state = stage(state.copy(after = ledgerString(row.identity), order = row.position), row.pointer, row.bytes, scope)
                         }
-                        if (normalized.rowDigest.startsWith(CHAIN_ROW_DIGEST_PREFIX)) {
-                            val chain = incrementalNormalizedRowDigest(state.chain.ifEmpty { normalizedRowDigest(emptyList()) }, listOf(fields)).removePrefix(CHAIN_ROW_DIGEST_PREFIX)
-                            state = state.copy(order = row.order, count = state.count + 1, chain = chain)
+                    }
+                    2 -> {
+                        val entry = if (state.after == null) dao.auditEvidenceFirst(scope, ledgerKey(KEY))
+                            else dao.auditEvidence(scope, ledgerKey(KEY), ledgerKey(state.after!!))
+                        if (entry == null) state = state.copy(phase = 3, after = null)
+                        else {
+                            rows++
+                            state = stage(state.copy(after = ledgerString(entry.identity)), entry.pointer, entry.bytes, scope)
+                        }
+                    }
+                    3 -> {
+                        val entry = if (state.after == null) dao.auditToolFirst(scope)
+                            else dao.auditTool(scope, ledgerKey(state.after!!))
+                        if (entry == null) {
+                            check((dao.toolSweepGeneration(scope) ?: 0) >= 0)
+                            state = state.copy(phase = 4)
                         } else {
-                            val digest = ResumableLedgerSha256.restore(state.digest)
-                            val encoded = listOf(row.primary.toString(), row.secondary.toString(), row.order.toString(), row.checksum)
-                                .joinToString("") { "${it.length}:$it;" }.toByteArray(Charsets.UTF_8)
-                            digest.update(encoded)
-                            state = state.copy(order = row.order, count = state.count + 1, digest = digest.checkpoint())
+                            rows++
+                            ledgerString(entry.callId)
+                            check(entry.unresolved == (entry.owner != null && !entry.returned))
+                            entry.owner?.let { checkNotNull(dao.locate(scope, it)) { "Tool owner missing" } }
+                            state = state.copy(after = ledgerString(entry.callId))
                         }
                     }
+                    else -> error("Invalid audit phase")
                 }
-                1 -> {
-                    val row = if (state.after == null) dao.tail(scope, 1).singleOrNull()
-                        else dao.before(scope, state.order, ledgerKey(state.after!!), 1).singleOrNull()
-                    if (row == null) state = state.copy(phase = 2, after = null)
-                    else {
-                        rows++
-                        check(row.revision in 1..revision)
-                        state = stage(state.copy(after = ledgerString(row.identity), order = row.position), row.pointer, row.bytes, scope)
-                    }
-                }
-                2 -> {
-                    val entry = if (state.after == null) dao.auditEvidenceFirst(scope, ledgerKey(KEY))
-                        else dao.auditEvidence(scope, ledgerKey(KEY), ledgerKey(state.after!!))
-                    if (entry == null) state = state.copy(phase = 3, after = null)
-                    else {
-                        rows++
-                        state = stage(state.copy(after = ledgerString(entry.identity)), entry.pointer, entry.bytes, scope)
-                    }
-                }
-                3 -> {
-                    val entry = if (state.after == null) dao.auditToolFirst(scope)
-                        else dao.auditTool(scope, ledgerKey(state.after!!))
-                    if (entry == null) {
-                        check((dao.toolSweepGeneration(scope) ?: 0) >= 0)
-                        state = state.copy(phase = 4)
-                    } else {
-                        rows++
-                        ledgerString(entry.callId)
-                        check(entry.unresolved == (entry.owner != null && !entry.returned))
-                        entry.owner?.let { checkNotNull(dao.locate(scope, it)) { "Tool owner missing" } }
-                        state = state.copy(after = ledgerString(entry.callId))
-                    }
-                }
-                else -> error("Invalid audit phase")
-            }
+            } while (state.phase != phaseBefore && state.phase < 4)
             currentCoroutineContext().ensureActive()
             save(scope, state)
             // Conservative aggregate bounds include point reads and progress/conversion evidence.

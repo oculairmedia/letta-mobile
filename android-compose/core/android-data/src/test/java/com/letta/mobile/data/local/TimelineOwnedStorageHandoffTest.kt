@@ -186,12 +186,16 @@ class TimelineOwnedStorageHandoffTest {
             var audit: TimelineOwnedStorageFactory.ValidationProgress
             var validateRows = 0
             var validateBytes = 0
+            var validateSteps = 0
             do {
                 audit = factory.validationStep(lease)
                 assertTrue(audit.metadataRows <= 128 && audit.bodyBytes <= 65536)
                 validateRows += audit.metadataRows
                 validateBytes += audit.bodyBytes
+                validateSteps++
             } while (!audit.complete)
+            // letta-mobile-qfrer: nothing to audit is one step, not one per phase.
+            assertEquals(1, validateSteps)
             assertEquals(0, copyRows)
             assertEquals(0, copyBytes)
             assertTrue(validateRows >= 0 && validateBytes >= 0)
