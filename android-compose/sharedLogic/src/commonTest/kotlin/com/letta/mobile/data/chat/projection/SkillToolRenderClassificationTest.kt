@@ -48,6 +48,23 @@ class SkillToolRenderClassificationTest {
     }
 
     @Test
+    fun `assistant skill content is rejected by direct render grouping`() {
+        val skillContent = """
+            <skill_content name="asus-router">
+            ---
+            name: asus-router
+            description: Query router status.
+            ---
+            ${"Internal skill instructions. ".repeat(20)}
+            </skill_content>
+        """.trimIndent()
+        val message = assistant("skill-content-direct", content = skillContent)
+        val grouped = listOf(message to com.letta.mobile.ui.common.GroupPosition.None)
+
+        assertTrue(groupMessagesForRender(grouped.asReversed()).isEmpty())
+    }
+
+    @Test
     fun `synthetic skill envelope is filtered from render items`() {
         val skillEnvelopeContent = """
             <asus-router>
