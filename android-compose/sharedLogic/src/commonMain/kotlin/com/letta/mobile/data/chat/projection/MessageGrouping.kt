@@ -219,7 +219,7 @@ fun groupMessagesForRender(
         // presentation so they never render as bubbles or special chips.
         // The canonical skill tool call (assistant TOOL_CALL event) remains
         // and renders through the normal UiToolCall card path.
-        if (msg.role == "user" && SyntheticSkillEnvelopeDetector.isSyntheticSkillEnvelope("user", msg.content)) {
+        if (SyntheticSkillEnvelopeDetector.isSyntheticSkillEnvelope(msg.role, msg.content)) {
             i++
             continue
         }
