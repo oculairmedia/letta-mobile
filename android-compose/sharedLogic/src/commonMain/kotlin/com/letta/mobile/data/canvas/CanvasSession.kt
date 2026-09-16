@@ -111,27 +111,46 @@ class CanvasSession(
         commitScene(newScene)
     }
 
+    private fun updateLamport(op: CanvasOp) {
+        if (op.lamport > lamportClock) {
+            lamportClock = op.lamport
+        }
+    }
+
+    private suspend fun recordSingleOp(op: CanvasOp) {
+        opLog.append(canvasId, op)
+        updateLamport(op)
+    }
+
+    private suspend fun filterAndRecordOps(ops: List<CanvasOp>, isRemote: Boolean): List<CanvasOp> {
+        val opsToApply = mutableListOf<CanvasOp>()
+        for (op in ops) {
+            if (isRemote && opLog.has(canvasId, op.opId)) continue
+            recordSingleOp(op)
+            opsToApply.add(op)
+        }
+        return opsToApply
+    }
+
+    private suspend fun broadcastOps(ops: List<CanvasOp>) {
+        val transport = syncTransport ?: return
+        for (op in ops) {
+            transport.publish(canvasId, op)
+        }
+    }
+
     /**
      * Applies a sequence of operations as a single revision bump.
      */
     suspend fun applyOps(ops: List<CanvasOp>, isRemote: Boolean = false): CanvasDocument = mutex.withLock {
         val current = currentDoc()
-        val opsToApply = mutableListOf<CanvasOp>()
-        for (op in ops) {
-            if (isRemote && opLog.has(canvasId, op.opId)) continue
-            opLog.append(canvasId, op)
-            if (op.lamport > lamportClock) lamportClock = op.lamport
-            opsToApply.add(op)
-        }
-
+        val opsToApply = filterAndRecordOps(ops, isRemote)
         if (opsToApply.isEmpty()) return current
 
         val newScene = CanvasOpProjector.project(current.sceneJson, opsToApply)
         val updated = commitScene(newScene)
-        if (!isRemote && syncTransport != null) {
-            for (op in opsToApply) {
-                syncTransport.publish(canvasId, op)
-            }
+        if (!isRemote) {
+            broadcastOps(opsToApply)
         }
         updated
     }

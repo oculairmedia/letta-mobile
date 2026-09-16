@@ -85,9 +85,17 @@ object CanvasOpProjector {
     private fun zIndexOf(element: kotlinx.serialization.json.JsonElement): Long =
         runCatching { element.jsonObject["zIndex"]?.jsonPrimitive?.long }.getOrNull() ?: 0L
 
-    /** A write with [lamport]/[actor] beats one already recorded at [atLamport]/[atActor]. */
-    private fun wins(lamport: Long, actor: String, atLamport: Long?, atActor: String): Boolean =
-        atLamport == null || lamport > atLamport || (lamport == atLamport && actor >= atActor)
+    private data class WriterProvenance(val lamport: Long, val actorId: String)
+
+    private fun isBgProperty(key: String): Boolean =
+        key == "bgColor" || key == BG_LAMPORT || key == BG_ACTOR
+
+    private fun isMetadataProperty(key: String): Boolean =
+        key == "id" || key == LAMPORT || key == ACTOR
+
+    /** A write with [write] beats one already recorded at [against]. */
+    private fun wins(write: WriterProvenance, against: WriterProvenance?): Boolean =
+        against == null || write.lamport > against.lamport || (write.lamport == against.lamport && write.actorId >= against.actorId)
 
     /**
      * Projects [ops] onto [baseSceneJson]. A blank base starts from an empty scene.
@@ -103,8 +111,8 @@ object CanvasOpProjector {
     private fun projectSingle(sceneJson: String, op: CanvasOp): String = when (op) {
         is CanvasOp.ReplaceSceneOp -> replaceScene(op)
         is CanvasOp.SetBackgroundOp -> setBackground(sceneJson, op)
-        is CanvasOp.AddElementOp -> upsertElementWithLww(sceneJson, op, op.elementId, op.elementJson)
-        is CanvasOp.UpdateElementOp -> upsertElementWithLww(sceneJson, op, op.elementId, op.elementJson)
+        is CanvasOp.AddElementOp -> upsertElementWithLww(sceneJson, op)
+        is CanvasOp.UpdateElementOp -> upsertElementWithLww(sceneJson, op)
         is CanvasOp.RemoveElementOp -> removeElementWithLww(sceneJson, op)
         is CanvasOp.BatchOp -> project(sceneJson, op.ops)
     }
@@ -116,10 +124,11 @@ object CanvasOpProjector {
      */
     private fun replaceScene(op: CanvasOp.ReplaceSceneOp): String {
         val incoming = if (op.sceneJson.isNotBlank()) parseScene(op.sceneJson) else parseEmptyScene()
+        val provenance = WriterProvenance(op.lamport, op.actorId)
         val stamped = incoming["elements"]?.jsonArray?.map { element ->
             val obj = runCatching { element.jsonObject }.getOrNull() ?: return@map element
             val id = runCatching { obj["id"]?.jsonPrimitive?.content }.getOrNull().orEmpty()
-            parseElementWithMetadata(id, json.encodeToString(JsonObject.serializer(), obj), op.lamport, op.actorId)
+            parseElementWithMetadata(id, json.encodeToString(JsonObject.serializer(), obj), provenance)
         } ?: emptyList()
         return canonicalScene(
             buildMap {
@@ -135,13 +144,15 @@ object CanvasOpProjector {
         val parsed = parseScene(sceneJson)
         val atLamport = runCatching { parsed[BG_LAMPORT]?.jsonPrimitive?.long }.getOrNull()
         val atActor = runCatching { parsed[BG_ACTOR]?.jsonPrimitive?.content }.getOrNull().orEmpty()
+        val currentProvenance = atLamport?.let { WriterProvenance(it, atActor) }
+        val opProvenance = WriterProvenance(op.lamport, op.actorId)
         // The background is scene-level state with its own history; comparing it against arrival
         // order alone let two peers settle on different colours (review B2).
-        if (!wins(op.lamport, op.actorId, atLamport, atActor)) return sceneJson
+        if (!wins(opProvenance, currentProvenance)) return sceneJson
         return canonicalScene(
             buildMap {
                 parsed.forEach { (key, value) ->
-                    if (key != "bgColor" && key != BG_LAMPORT && key != BG_ACTOR) put(key, value)
+                    if (!isBgProperty(key)) put(key, value)
                 }
                 put("bgColor", JsonPrimitive(op.colorHex))
                 put(BG_LAMPORT, JsonPrimitive(op.lamport))
@@ -150,17 +161,18 @@ object CanvasOpProjector {
         )
     }
 
-    private fun upsertElementWithLww(
-        sceneJson: String,
-        op: CanvasOp,
-        elementId: String,
-        elementJson: String,
-    ): String {
+    private fun upsertElementWithLww(sceneJson: String, op: CanvasOp): String {
+        val (elementId, elementJson) = when (op) {
+            is CanvasOp.AddElementOp -> op.elementId to op.elementJson
+            is CanvasOp.UpdateElementOp -> op.elementId to op.elementJson
+            else -> return sceneJson
+        }
+        val opProvenance = WriterProvenance(op.lamport, op.actorId)
         val parsed = parseScene(sceneJson)
         val tombstones = tombstonesOf(parsed)
         // A removal the element never came back from still counts, even though the element is gone.
         tombstones[elementId]?.let { grave ->
-            if (!wins(op.lamport, op.actorId, grave.lamport, grave.actorId)) return sceneJson
+            if (!wins(opProvenance, grave)) return sceneJson
         }
 
         val elements = parsed["elements"]?.jsonArray?.toMutableList() ?: mutableListOf()
@@ -169,10 +181,11 @@ object CanvasOpProjector {
             val existing = elements[existingIndex].jsonObject
             val atLamport = runCatching { existing[LAMPORT]?.jsonPrimitive?.long }.getOrNull()
             val atActor = runCatching { existing[ACTOR]?.jsonPrimitive?.content }.getOrNull().orEmpty()
-            if (!wins(op.lamport, op.actorId, atLamport, atActor)) return sceneJson
+            val existingProvenance = atLamport?.let { WriterProvenance(it, atActor) }
+            if (!wins(opProvenance, existingProvenance)) return sceneJson
         }
 
-        val newElement = parseElementWithMetadata(elementId, elementJson, op.lamport, op.actorId)
+        val newElement = parseElementWithMetadata(elementId, elementJson, opProvenance)
         if (existingIndex >= 0) elements[existingIndex] = newElement else elements.add(newElement)
         // The write won, so any tombstone for this id is now history.
         return writeScene(parsed, elements, tombstones - elementId)
@@ -181,8 +194,9 @@ object CanvasOpProjector {
     private fun removeElementWithLww(sceneJson: String, op: CanvasOp.RemoveElementOp): String {
         val parsed = parseScene(sceneJson)
         val tombstones = tombstonesOf(parsed)
+        val opProvenance = WriterProvenance(op.lamport, op.actorId)
         tombstones[op.elementId]?.let { grave ->
-            if (!wins(op.lamport, op.actorId, grave.lamport, grave.actorId)) return sceneJson
+            if (!wins(opProvenance, grave)) return sceneJson
         }
 
         val elements = parsed["elements"]?.jsonArray?.toMutableList() ?: mutableListOf()
@@ -191,35 +205,34 @@ object CanvasOpProjector {
             val existing = elements[existingIndex].jsonObject
             val atLamport = runCatching { existing[LAMPORT]?.jsonPrimitive?.long }.getOrNull()
             val atActor = runCatching { existing[ACTOR]?.jsonPrimitive?.content }.getOrNull().orEmpty()
-            if (!wins(op.lamport, op.actorId, atLamport, atActor)) return sceneJson
+            val existingProvenance = atLamport?.let { WriterProvenance(it, atActor) }
+            if (!wins(opProvenance, existingProvenance)) return sceneJson
             elements.removeAt(existingIndex)
         }
         // Recorded even when the element was not here: the peer that has not seen the add yet must
         // still refuse it when it arrives, or the two peers disagree about whether it exists.
-        return writeScene(parsed, elements, tombstones + (op.elementId to Grave(op.lamport, op.actorId)))
+        return writeScene(parsed, elements, tombstones + (op.elementId to opProvenance))
     }
 
-    private data class Grave(val lamport: Long, val actorId: String)
-
-    private fun tombstonesOf(scene: JsonObject): Map<String, Grave> {
+    private fun tombstonesOf(scene: JsonObject): Map<String, WriterProvenance> {
         val raw = runCatching { scene[TOMBSTONES]?.jsonObject }.getOrNull() ?: return emptyMap()
         return raw.mapNotNull { (id, value) ->
             val obj = runCatching { value.jsonObject }.getOrNull() ?: return@mapNotNull null
             val lamport = runCatching { obj[LAMPORT]?.jsonPrimitive?.long }.getOrNull() ?: return@mapNotNull null
             val actor = runCatching { obj[ACTOR]?.jsonPrimitive?.content }.getOrNull().orEmpty()
-            id to Grave(lamport, actor)
+            id to WriterProvenance(lamport, actor)
         }.toMap()
     }
 
     private fun writeScene(
         parsed: JsonObject,
         elements: List<kotlinx.serialization.json.JsonElement>,
-        tombstones: Map<String, Grave>,
+        tombstones: Map<String, WriterProvenance>,
     ): String {
         // Newest kept; see MAX_TOMBSTONES. Ordered by actor as well so every peer evicts the same
         // ones and the scenes stay byte-identical.
         val kept = tombstones.entries
-            .sortedWith(compareByDescending<Map.Entry<String, Grave>> { it.value.lamport }.thenBy { it.key })
+            .sortedWith(compareByDescending<Map.Entry<String, WriterProvenance>> { it.value.lamport }.thenBy { it.key })
             .take(MAX_TOMBSTONES)
             .sortedBy { it.key }
         return canonicalScene(
@@ -268,8 +281,7 @@ object CanvasOpProjector {
     private fun parseElementWithMetadata(
         elementId: String,
         elementJson: String,
-        lamport: Long,
-        actorId: String,
+        provenance: WriterProvenance,
     ): JsonObject {
         val parsed = try {
             json.parseToJsonElement(elementJson).jsonObject
@@ -279,11 +291,23 @@ object CanvasOpProjector {
         return buildJsonObject {
             put("id", JsonPrimitive(elementId))
             parsed.forEach { (key, value) ->
-                if (key != "id" && key != LAMPORT && key != ACTOR) put(key, value)
+                if (!isMetadataProperty(key)) put(key, value)
             }
-            put(LAMPORT, JsonPrimitive(lamport))
-            put(ACTOR, JsonPrimitive(actorId))
+            put(LAMPORT, JsonPrimitive(provenance.lamport))
+            put(ACTOR, JsonPrimitive(provenance.actorId))
         }
+    }
+
+    private fun cleanElementsArray(elements: JsonArray): List<JsonObject> = elements.mapNotNull { elem ->
+        val elemObj = runCatching { elem.jsonObject }.getOrNull() ?: return@mapNotNull null
+        buildJsonObject {
+            elemObj.forEach { (k, v) -> if (!k.startsWith("_")) put(k, v) }
+        }
+    }
+
+    private fun cleanSceneRoot(parsed: JsonObject, cleanedElements: List<JsonObject>): JsonObject = buildJsonObject {
+        parsed.forEach { (k, v) -> if (k != "elements" && !k.startsWith("_")) put(k, v) }
+        put("elements", JsonArray(cleanedElements))
     }
 
     /**
@@ -294,16 +318,9 @@ object CanvasOpProjector {
         if (sceneJson.isBlank()) return emptySceneJson()
         return try {
             val parsed = json.parseToJsonElement(sceneJson).jsonObject
-            val elements = parsed["elements"]?.jsonArray?.map { elem ->
-                val elemObj = elem.jsonObject
-                buildJsonObject {
-                    elemObj.forEach { (k, v) -> if (!k.startsWith("_")) put(k, v) }
-                }
-            } ?: emptyList()
-            val cleaned = buildJsonObject {
-                parsed.forEach { (k, v) -> if (k != "elements" && !k.startsWith("_")) put(k, v) }
-                put("elements", JsonArray(elements))
-            }
+            val elements = parsed["elements"]?.jsonArray
+            val cleanedElements = if (elements != null) cleanElementsArray(elements) else emptyList()
+            val cleaned = cleanSceneRoot(parsed, cleanedElements)
             json.encodeToString(JsonObject.serializer(), cleaned)
         } catch (_: Exception) {
             sceneJson

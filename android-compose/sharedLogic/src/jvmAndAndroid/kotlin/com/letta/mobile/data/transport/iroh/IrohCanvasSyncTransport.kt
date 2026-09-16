@@ -73,34 +73,42 @@ class IrohCanvasSyncTransport(
             }
 
             try {
-                while (true) {
-                    val frameBytes = readFrame(recvStream) ?: break
-                    val packet = runCatching {
-                        json.decodeFromString<CanvasOpWirePacket>(frameBytes.decodeToString())
-                    }.getOrNull()
-
-                    if (packet != null) {
-                        val canvasId = CanvasId(packet.canvasId)
-                        val flow = getOrCreateFlow(canvasId)
-                        flow.emit(packet.op)
-                        fallback.publish(canvasId, packet.op)
-                    }
-                }
+                consumePackets(recvStream)
             } finally {
-                // NonCancellable: this runs on the cancellation path too, and a suspending
-                // withLock there would resume with CancellationException and leave the stream
-                // registered forever (AGENTS.md, concurrent-collection defaults).
-                withContext(NonCancellable) {
-                    mutex.withLock {
-                        activeSendStreams.remove(sendStream)
-                    }
-                    runCatching { sendStream.finish() }
-                }
+                removeActiveSendStream(sendStream)
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (t: Throwable) {
-            Telemetry.event("CanvasSync", "connection.error", "error" to (t.message ?: t.toString()))
+            val errorMsg = t.message ?: t.toString()
+            Telemetry.event("CanvasSync", "connection.error", "error" to errorMsg)
+        }
+    }
+
+    private suspend fun consumePackets(recvStream: RecvStream) {
+        while (true) {
+            val frameBytes = readFrame(recvStream) ?: break
+            dispatchIncomingPacket(frameBytes)
+        }
+    }
+
+    private suspend fun dispatchIncomingPacket(frameBytes: ByteArray) {
+        val packet = runCatching {
+            json.decodeFromString<CanvasOpWirePacket>(frameBytes.decodeToString())
+        }.getOrNull() ?: return
+
+        val canvasId = CanvasId(packet.canvasId)
+        val flow = getOrCreateFlow(canvasId)
+        flow.emit(packet.op)
+        fallback.publish(canvasId, packet.op)
+    }
+
+    private suspend fun removeActiveSendStream(sendStream: SendStream) {
+        withContext(NonCancellable) {
+            mutex.withLock {
+                activeSendStreams.remove(sendStream)
+            }
+            runCatching { sendStream.finish() }
         }
     }
 
@@ -157,18 +165,20 @@ class IrohCanvasSyncTransport(
         var offset = 0
         while (offset < PREFIX_BYTES) {
             val chunk = stream.read((PREFIX_BYTES - offset).toUInt())
-            if (chunk.isEmpty()) {
-                if (offset == 0) return null
-                return null
-            }
+            if (chunk.isEmpty()) return null
             chunk.copyInto(prefix, destinationOffset = offset)
             offset += chunk.size
         }
-        val length = ((prefix[0].toInt() and 0xff) shl 24) or
-            ((prefix[1].toInt() and 0xff) shl 16) or
-            ((prefix[2].toInt() and 0xff) shl 8) or
-            (prefix[3].toInt() and 0xff)
+        val length = decodePrefixLength(prefix)
         if (length !in 0..MAX_PAYLOAD_BYTES) return null
         return stream.readExact(length.toUInt())
     }
+
+    private fun decodePrefixLength(prefix: ByteArray): Int {
+        return ((prefix[0].toInt() and 0xff) shl 24) or
+            ((prefix[1].toInt() and 0xff) shl 16) or
+            ((prefix[2].toInt() and 0xff) shl 8) or
+            (prefix[3].toInt() and 0xff)
+    }
 }
+
