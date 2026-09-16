@@ -1,0 +1,155 @@
+package com.letta.mobile.data.canvas
+
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+
+/**
+ * Domain operations for Canvas mutations.
+ *
+ * Each operation carries a unique [opId], the originating [actorId] (agent ID or user ID),
+ * and a logical [lamport] timestamp for ordering in multiplayer and sync phases.
+ */
+@Serializable
+sealed interface CanvasOp {
+    val opId: String
+    val actorId: String
+    val lamport: Long
+
+    @Serializable
+    @SerialName("replace_scene")
+    data class ReplaceSceneOp(
+        override val opId: String,
+        override val actorId: String,
+        override val lamport: Long,
+        val sceneJson: String,
+    ) : CanvasOp
+
+    @Serializable
+    @SerialName("add_element")
+    data class AddElementOp(
+        override val opId: String,
+        override val actorId: String,
+        override val lamport: Long,
+        val elementId: String,
+        val elementJson: String,
+    ) : CanvasOp
+
+    @Serializable
+    @SerialName("update_element")
+    data class UpdateElementOp(
+        override val opId: String,
+        override val actorId: String,
+        override val lamport: Long,
+        val elementId: String,
+        val elementJson: String,
+    ) : CanvasOp
+
+    @Serializable
+    @SerialName("remove_element")
+    data class RemoveElementOp(
+        override val opId: String,
+        override val actorId: String,
+        override val lamport: Long,
+        val elementId: String,
+    ) : CanvasOp
+
+    @Serializable
+    @SerialName("set_background")
+    data class SetBackgroundOp(
+        override val opId: String,
+        override val actorId: String,
+        override val lamport: Long,
+        val colorHex: String,
+    ) : CanvasOp
+
+    @Serializable
+    @SerialName("batch")
+    data class BatchOp(
+        override val opId: String,
+        override val actorId: String,
+        override val lamport: Long,
+        val ops: List<CanvasOp>,
+    ) : CanvasOp
+}
+
+/**
+ * Tool payload DTOs for App Server external tools (canvas.*).
+ */
+@Serializable
+data class CanvasCreateArgs(
+    val title: String? = null,
+    @SerialName("conversation_id")
+    val conversationId: String? = null,
+    @SerialName("agent_id")
+    val agentId: String? = null,
+)
+
+@Serializable
+data class CanvasCreateResult(
+    @SerialName("canvas_id")
+    val canvasId: String,
+)
+
+@Serializable
+data class CanvasGetSceneArgs(
+    @SerialName("canvas_id")
+    val canvasId: String,
+)
+
+@Serializable
+data class CanvasGetSceneResult(
+    @SerialName("scene_json")
+    val sceneJson: String,
+    val revision: Long,
+)
+
+@Serializable
+data class CanvasReplaceSceneArgs(
+    @SerialName("canvas_id")
+    val canvasId: String,
+    @SerialName("scene_json")
+    val sceneJson: String,
+)
+
+@Serializable
+data class CanvasReplaceSceneResult(
+    val ok: Boolean,
+    val revision: Long,
+)
+
+@Serializable
+data class CanvasApplyOpsArgs(
+    @SerialName("canvas_id")
+    val canvasId: String,
+    val ops: List<CanvasOp>,
+)
+
+@Serializable
+data class CanvasApplyOpsResult(
+    val ok: Boolean,
+    val revision: Long,
+)
+
+@Serializable
+data class CanvasExportSvgArgs(
+    @SerialName("canvas_id")
+    val canvasId: String,
+)
+
+@Serializable
+data class CanvasExportSvgResult(
+    val svg: String,
+)
+
+@Serializable
+data class CanvasListArgs(
+    @SerialName("conversation_id")
+    val conversationId: String? = null,
+    @SerialName("agent_id")
+    val agentId: String? = null,
+)
+
+@Serializable
+data class CanvasListResult(
+    val ids: List<String>,
+)
