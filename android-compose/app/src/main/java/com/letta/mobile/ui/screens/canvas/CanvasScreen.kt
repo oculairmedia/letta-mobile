@@ -46,9 +46,11 @@ class CanvasViewModel @Inject constructor(
                 CanvasSession.getOrCreateForConversation(
                     store = store,
                     conversationId = conversationId,
-                    title = "Conversation Canvas",
-                    opLog = opLog,
-                    syncTransport = syncTransport,
+                    options = com.letta.mobile.data.canvas.CanvasConversationOptions(
+                        title = "Conversation Canvas",
+                        opLog = opLog,
+                        syncTransport = syncTransport,
+                    ),
                 )
             } else {
                 val effectiveId = if (canvasId.isNotBlank()) CanvasId(canvasId) else CanvasId("canvas-${System.currentTimeMillis()}")

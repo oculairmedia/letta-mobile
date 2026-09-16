@@ -176,15 +176,19 @@ class CanvasSession(
     ): List<CanvasOp> {
         val opsToApply = mutableListOf<CanvasOp>()
         for (op in ops) {
-            if (acl != null && !acl.canWrite(op.actorId)) {
-                if (isRemote) continue
-                throw UnauthorizedCanvasMutationException(op.actorId, canvasId)
-            }
-            if (isRemote && opLog.has(canvasId, op.opId)) continue
+            if (shouldSkipOrReject(op, isRemote, acl)) continue
             recordSingleOp(op)
             opsToApply.add(op)
         }
         return opsToApply
+    }
+
+    private suspend fun shouldSkipOrReject(op: CanvasOp, isRemote: Boolean, acl: CanvasAcl?): Boolean {
+        if (acl != null && !acl.canWrite(op.actorId)) {
+            if (isRemote) return true
+            throw UnauthorizedCanvasMutationException(op.actorId, canvasId)
+        }
+        return isRemote && opLog.has(canvasId, op.opId)
     }
 
     private suspend fun broadcastOps(ops: List<CanvasOp>) {
@@ -345,34 +349,41 @@ class CanvasSession(
         suspend fun getOrCreateForConversation(
             store: CanvasDocumentStore,
             conversationId: String,
-            agentId: String? = null,
-            title: String = "Conversation Canvas",
-            opLog: CanvasOpLog = InMemoryCanvasOpLog(),
-            syncTransport: CanvasSyncTransport? = null,
-            clock: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
+            options: CanvasConversationOptions = CanvasConversationOptions(),
         ): CanvasSession {
             val existing = store.getForConversation(conversationId)
             return if (existing != null) {
                 val session = CanvasSession(
                     canvasId = existing.id,
                     store = store,
-                    opLog = opLog,
-                    syncTransport = syncTransport,
-                    clock = clock,
+                    opLog = options.opLog,
+                    syncTransport = options.syncTransport,
+                    clock = options.clock,
                 )
                 session._document.value = existing
                 session
             } else {
                 create(
                     store = store,
-                    title = title,
+                    title = options.title,
                     conversationId = conversationId,
-                    agentId = agentId,
-                    opLog = opLog,
-                    syncTransport = syncTransport,
-                    clock = clock,
+                    agentId = options.agentId,
+                    opLog = options.opLog,
+                    syncTransport = options.syncTransport,
+                    clock = options.clock,
                 )
             }
         }
     }
 }
+
+/**
+ * Options for resolving or creating a conversation-linked [CanvasSession].
+ */
+data class CanvasConversationOptions(
+    val agentId: String? = null,
+    val title: String = "Conversation Canvas",
+    val opLog: CanvasOpLog = InMemoryCanvasOpLog(),
+    val syncTransport: CanvasSyncTransport? = null,
+    val clock: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
+)

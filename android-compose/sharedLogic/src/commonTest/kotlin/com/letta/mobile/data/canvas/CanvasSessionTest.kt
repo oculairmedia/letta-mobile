@@ -85,8 +85,10 @@ class CanvasSessionTest {
         val sessionA = CanvasSession.getOrCreateForConversation(
             store = store,
             conversationId = convId,
-            agentId = "agent-x",
-            title = "Conv Canvas",
+            options = CanvasConversationOptions(
+                agentId = "agent-x",
+                title = "Conv Canvas",
+            ),
         )
         val initialId = sessionA.canvasId
         sessionA.saveScene("""{"elements":[{"id":"note"}]}""")

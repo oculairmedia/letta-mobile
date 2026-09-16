@@ -25,7 +25,7 @@ class CanvasExternalToolsTest {
     private lateinit var sessions: CanvasSessionRegistry
 
     @BeforeTest
-    fun setUp() = runTest {
+    fun setUp() {
         store = InMemoryCanvasDocumentStore()
         sessions = CanvasSessionRegistry()
     }

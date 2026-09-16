@@ -16,10 +16,9 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 class CanvasAttachmentTooLargeException(message: String) : IllegalArgumentException(message)
 
 /**
- * Utilities for sharing canvas exports to chat conversations as attachment bubbles.
+ * Lifecycle-owned staging queue for shared canvas attachments.
  */
-object CanvasShare {
-
+class CanvasShareStaging {
     private val stagingMutex = Mutex()
     private val pendingAttachmentsByConversation = mutableMapOf<String, MutableList<MessageContentPart.Image>>()
     private val _stagedAttachmentEvents = MutableSharedFlow<Pair<String, MessageContentPart.Image>>(
@@ -59,6 +58,40 @@ object CanvasShare {
         stagingMutex.withLock {
             pendingAttachmentsByConversation.clear()
         }
+    }
+}
+
+/**
+ * Utilities for sharing canvas exports to chat conversations as attachment bubbles.
+ */
+object CanvasShare {
+
+    private val staging = CanvasShareStaging()
+
+    /**
+     * Flow of staged canvas attachments emitted for conversations: `(conversationId, image)`.
+     */
+    val stagedAttachmentEvents: Flow<Pair<String, MessageContentPart.Image>>
+        get() = staging.stagedAttachmentEvents
+
+    /**
+     * Stages a packaged canvas attachment for the specified [conversationId].
+     */
+    suspend fun stageForConversation(conversationId: String?, image: MessageContentPart.Image) {
+        staging.stageForConversation(conversationId, image)
+    }
+
+    /**
+     * Consumes and clears any staged attachments for [conversationId].
+     */
+    suspend fun consumeStagedAttachments(conversationId: String?): List<MessageContentPart.Image> =
+        staging.consumeStagedAttachments(conversationId)
+
+    /**
+     * Clears all pending staged attachments across all conversations.
+     */
+    suspend fun clearStagedAttachments() {
+        staging.clearStagedAttachments()
     }
 
     /**

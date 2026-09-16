@@ -110,6 +110,7 @@ private fun androidx.navigation.NavGraphBuilder.appCanvasGraph(navController: Na
     }
 }
 
+@Suppress("NoAnyType")
 private fun resolveStartDestination(
     hasConfig: Boolean,
     initialNotificationTarget: AppLaunchTarget?,
@@ -174,7 +175,7 @@ fun AppNavGraph(
     val openBackendSwitcher: () -> Unit = remember { { showBackendSwitcher = true } }
 
     val initialNotificationTarget = remember { notificationTarget }
-    val startDestination: Any = resolveStartDestination(
+    val startDestination = resolveStartDestination(
         hasConfig = hasConfig,
         initialNotificationTarget = initialNotificationTarget,
         restoredChatSelection = lastChatSelection,

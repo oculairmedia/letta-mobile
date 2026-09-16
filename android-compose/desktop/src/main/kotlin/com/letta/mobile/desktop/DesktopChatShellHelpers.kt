@@ -335,10 +335,12 @@ internal fun openDesktopCanvasSession(params: OpenDesktopCanvasParams) {
         val session = com.letta.mobile.data.canvas.CanvasSession.getOrCreateForConversation(
             store = params.store,
             conversationId = convId,
-            agentId = params.agentId,
-            title = "Canvas ($displayName)",
-            opLog = com.letta.mobile.desktop.canvas.DesktopCanvasHostSync.opLog,
-            syncTransport = com.letta.mobile.desktop.canvas.DesktopCanvasHostSync.syncTransport,
+            options = com.letta.mobile.data.canvas.CanvasConversationOptions(
+                agentId = params.agentId,
+                title = "Canvas ($displayName)",
+                opLog = com.letta.mobile.desktop.canvas.DesktopCanvasHostSync.opLog,
+                syncTransport = com.letta.mobile.desktop.canvas.DesktopCanvasHostSync.syncTransport,
+            ),
         )
         params.onSessionReady(session)
     }

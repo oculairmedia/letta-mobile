@@ -4,12 +4,13 @@ import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.canvas.CanvasOp
 import com.letta.mobile.data.canvas.CanvasOpLog
 import java.io.IOException
+import java.util.concurrent.ConcurrentHashMap
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.nio.file.StandardOpenOption
 import java.security.MessageDigest
-import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -76,6 +77,8 @@ class DesktopCanvasOpLog(
                         if (op.lamport > sinceLamport) {
                             ops.add(op)
                         }
+                    } catch (e: CancellationException) {
+                        throw e
                     } catch (_: Exception) {
                         // Skip corrupted line
                     }
@@ -96,7 +99,7 @@ class DesktopCanvasOpLog(
 
     override fun observe(canvasId: CanvasId): Flow<CanvasOp> {
         val flow = flowsByCanvas.computeIfAbsent(canvasId) {
-            MutableSharedFlow(replay = 16, extraBufferCapacity = 64)
+            MutableSharedFlow<CanvasOp>(replay = 16, extraBufferCapacity = 64)
         }
         return flow.asSharedFlow()
     }

@@ -864,15 +864,10 @@ internal fun LettaDesktopApp(
                         },
                         onCloseCanvas = { activeCanvasSession = null },
                         onShareCanvasToChat = { bytes, mimeType ->
-                            com.letta.mobile.data.canvas.CanvasShare.packageForChat(bytes, mimeType)
-                                .onSuccess { image ->
-                                    chatController.attachImage(image)
-                                    selectedDestination = DesktopDestination.Conversations
-                                    activeCanvasSession = null
-                                }
-                                .onFailure { error ->
-                                    chatController.showComposerError(error.message ?: "Could not share canvas to chat")
-                                }
+                            handleDesktopShareCanvasToChat(bytes, mimeType, chatController) {
+                                selectedDestination = DesktopDestination.Conversations
+                                activeCanvasSession = null
+                            }
                         },
                         chatDetailActions = createDesktopChatDetailPaneActions(
                             CreateDesktopChatDetailPaneActionsParams(
@@ -1110,6 +1105,22 @@ private fun workingAgentName(params: WorkingAgentNameParams): String {
 private fun desktopActiveTitle(destination: DesktopDestination, conversationTitle: String?): String {
     if (destination != DesktopDestination.Conversations) return destination.label
     return conversationTitle ?: "Letta Desktop"
+}
+
+private fun handleDesktopShareCanvasToChat(
+    bytes: ByteArray,
+    mimeType: String,
+    chatController: DesktopChatController,
+    onSuccessNav: () -> Unit,
+) {
+    com.letta.mobile.data.canvas.CanvasShare.packageForChat(bytes, mimeType)
+        .onSuccess { image ->
+            chatController.attachImage(image)
+            onSuccessNav()
+        }
+        .onFailure { error ->
+            chatController.showComposerError(error.message ?: "Could not share canvas to chat")
+        }
 }
 
 

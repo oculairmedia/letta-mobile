@@ -21,23 +21,31 @@ private val canvasJson = Json {
 }
 
 
+private data class CanvasToolContext(
+    val store: CanvasDocumentStore,
+    val sessions: CanvasSessionRegistry,
+    val agentId: String? = null,
+) {
+    fun resolveCallerId(input: JsonObject): String? =
+        agentId ?: input["agent_id"]?.jsonPrimitive?.contentOrNull
+}
+
 private sealed interface CanvasLookupResult {
     data class Found(val doc: CanvasDocument) : CanvasLookupResult
     data class Error(val result: ExternalToolResult.Error) : CanvasLookupResult
 }
 
 private suspend fun findCanvasDocument(
+    context: CanvasToolContext,
     input: JsonObject,
-    store: CanvasDocumentStore,
-    sessions: CanvasSessionRegistry,
-    callerId: String? = null,
 ): CanvasLookupResult {
     val canvasIdStr = input["canvas_id"]?.jsonPrimitive?.contentOrNull
         ?: return CanvasLookupResult.Error(ExternalToolResult.Error("Missing required parameter: canvas_id"))
     val canvasId = CanvasId(canvasIdStr)
-    val activeSession = sessions.get(canvasId)
-    val doc = activeSession?.document?.value ?: store.get(canvasId)
+    val activeSession = context.sessions.get(canvasId)
+    val doc = activeSession?.document?.value ?: context.store.get(canvasId)
         ?: return CanvasLookupResult.Error(ExternalToolResult.Error("Canvas not found: $canvasIdStr"))
+    val callerId = context.resolveCallerId(input)
     if (doc.acl != null && !doc.acl.canRead(callerId)) {
         return CanvasLookupResult.Error(ExternalToolResult.Error("Unauthorized: actor '$callerId' cannot read canvas '$canvasIdStr'"))
     }
@@ -45,13 +53,12 @@ private suspend fun findCanvasDocument(
 }
 
 private suspend fun executeCreateCanvas(
-    store: CanvasDocumentStore,
+    context: CanvasToolContext,
     input: JsonObject,
-    agentId: String?,
 ): CanvasId {
     val title = input["title"]?.jsonPrimitive?.contentOrNull ?: "Untitled Canvas"
     val conversationId = input["conversation_id"]?.jsonPrimitive?.contentOrNull
-    val callerAgentId = input["agent_id"]?.jsonPrimitive?.contentOrNull ?: agentId
+    val callerAgentId = context.resolveCallerId(input)
 
     val defaultAcl = CanvasAcl(
         ownerUserId = "local_user",
@@ -59,12 +66,12 @@ private suspend fun executeCreateCanvas(
     )
 
     if (conversationId != null) {
-        val existing = store.getForConversation(conversationId)
+        val existing = context.store.getForConversation(conversationId)
         if (existing != null) return existing.id
     }
     val now = kotlin.time.Clock.System.now().toEpochMilliseconds()
     val newId = CanvasId("canvas-$now-${(1000..9999).random()}")
-    store.upsert(
+    context.store.upsert(
         CanvasDocument(
             id = newId,
             agentId = callerAgentId,
@@ -79,94 +86,108 @@ private suspend fun executeCreateCanvas(
     return newId
 }
 
-private suspend fun executeReplaceScene(
+private suspend fun commitSceneUpdate(
     store: CanvasDocumentStore,
-    sessions: CanvasSessionRegistry,
+    activeSession: CanvasSession?,
+    doc: CanvasDocument,
+    sceneJson: String,
+    callerId: String?,
+): Long = if (activeSession != null) {
+    activeSession.applyAgentReplace(sceneJson, actorId = callerId).revision
+} else {
+    val updated = doc.copy(
+        revision = doc.revision + 1L,
+        sceneJson = sceneJson,
+        updatedAtEpochMs = kotlin.time.Clock.System.now().toEpochMilliseconds(),
+    )
+    store.upsert(updated)
+    updated.revision
+}
+
+private suspend fun executeReplaceScene(
+    context: CanvasToolContext,
     input: JsonObject,
-    agentId: String?,
 ): ExternalToolResult {
-    val canvasIdStr = input["canvas_id"]?.jsonPrimitive?.contentOrNull
-        ?: return ExternalToolResult.Error("Missing required parameter: canvas_id")
     val sceneJson = input["scene_json"]?.jsonPrimitive?.contentOrNull
         ?: return ExternalToolResult.Error("Missing required parameter: scene_json")
-    val canvasId = CanvasId(canvasIdStr)
-    val callerId = agentId ?: input["agent_id"]?.jsonPrimitive?.contentOrNull
-    val activeSession = sessions.get(canvasId)
-    val doc = activeSession?.document?.value ?: store.get(canvasId)
-        ?: return ExternalToolResult.Error("Canvas not found: $canvasIdStr")
-
+    val callerId = context.resolveCallerId(input)
+    val doc = when (val lookup = findCanvasDocument(context, input)) {
+        is CanvasLookupResult.Error -> return lookup.result
+        is CanvasLookupResult.Found -> lookup.doc
+    }
     if (doc.acl != null && !doc.acl.canWrite(callerId)) {
-        return ExternalToolResult.Error("Unauthorized: actor '$callerId' cannot write to canvas '$canvasIdStr'")
+        return ExternalToolResult.Error("Unauthorized: actor '$callerId' cannot write to canvas '${doc.id.value}'")
     }
 
-    val revision = if (activeSession != null) {
-        activeSession.applyAgentReplace(sceneJson, actorId = callerId).revision
-    } else {
-        val updated = doc.copy(
-            revision = doc.revision + 1L,
-            sceneJson = sceneJson,
-            updatedAtEpochMs = kotlin.time.Clock.System.now().toEpochMilliseconds(),
-        )
-        store.upsert(updated)
-        updated.revision
-    }
+    val activeSession = context.sessions.get(doc.id)
+    val revision = commitSceneUpdate(context.store, activeSession, doc, sceneJson, callerId)
     return ExternalToolResult.Success(
         canvasJson.encodeToString(CanvasReplaceSceneResult(ok = true, revision = revision))
     )
 }
 
-private suspend fun executeApplyOps(
-    store: CanvasDocumentStore,
-    sessions: CanvasSessionRegistry,
-    input: JsonObject,
-    agentId: String?,
-): ExternalToolResult {
-    val canvasIdStr = input["canvas_id"]?.jsonPrimitive?.contentOrNull
-        ?: return ExternalToolResult.Error("Missing required parameter: canvas_id")
-    val opsJson = input["ops"] ?: return ExternalToolResult.Error("Missing required parameter: ops")
-    val ops = canvasJson.decodeFromJsonElement<List<CanvasOp>>(opsJson)
-    val canvasId = CanvasId(canvasIdStr)
-    val callerId = agentId ?: input["agent_id"]?.jsonPrimitive?.contentOrNull
-    val activeSession = sessions.get(canvasId)
-    val doc = activeSession?.document?.value ?: store.get(canvasId)
-        ?: return ExternalToolResult.Error("Canvas not found: $canvasIdStr")
-
-    if (doc.acl != null && !doc.acl.canWrite(callerId)) {
-        return ExternalToolResult.Error("Unauthorized: actor '$callerId' cannot write to canvas '$canvasIdStr'")
-    }
+private fun validateOpAcls(doc: CanvasDocument, ops: List<CanvasOp>): ExternalToolResult.Error? {
+    if (doc.acl == null) return null
     for (op in ops) {
-        if (doc.acl != null && !doc.acl.canWrite(op.actorId)) {
-            return ExternalToolResult.Error("Unauthorized: op actor '${op.actorId}' cannot write to canvas '$canvasIdStr'")
+        if (!doc.acl.canWrite(op.actorId)) {
+            return ExternalToolResult.Error("Unauthorized: op actor '${op.actorId}' cannot write to canvas '${doc.id.value}'")
         }
     }
+    return null
+}
 
-    val revision = if (activeSession != null) {
-        activeSession.applyOps(ops).revision
-    } else {
-        val projected = CanvasOpProjector.project(doc.sceneJson, ops)
-        val updated = doc.copy(
-            revision = doc.revision + 1L,
-            sceneJson = projected,
-            updatedAtEpochMs = kotlin.time.Clock.System.now().toEpochMilliseconds(),
-        )
-        store.upsert(updated)
-        updated.revision
+private suspend fun commitOpsUpdate(
+    store: CanvasDocumentStore,
+    activeSession: CanvasSession?,
+    doc: CanvasDocument,
+    ops: List<CanvasOp>,
+): Long = if (activeSession != null) {
+    activeSession.applyOps(ops).revision
+} else {
+    val projected = CanvasOpProjector.project(doc.sceneJson, ops)
+    val updated = doc.copy(
+        revision = doc.revision + 1L,
+        sceneJson = projected,
+        updatedAtEpochMs = kotlin.time.Clock.System.now().toEpochMilliseconds(),
+    )
+    store.upsert(updated)
+    updated.revision
+}
+
+private suspend fun executeApplyOps(
+    context: CanvasToolContext,
+    input: JsonObject,
+): ExternalToolResult {
+    val opsJson = input["ops"] ?: return ExternalToolResult.Error("Missing required parameter: ops")
+    val ops = canvasJson.decodeFromJsonElement<List<CanvasOp>>(opsJson)
+    val callerId = context.resolveCallerId(input)
+    val doc = when (val lookup = findCanvasDocument(context, input)) {
+        is CanvasLookupResult.Error -> return lookup.result
+        is CanvasLookupResult.Found -> lookup.doc
     }
+
+    if (doc.acl != null && !doc.acl.canWrite(callerId)) {
+        return ExternalToolResult.Error("Unauthorized: actor '$callerId' cannot write to canvas '${doc.id.value}'")
+    }
+    val aclError = validateOpAcls(doc, ops)
+    if (aclError != null) return aclError
+
+    val activeSession = context.sessions.get(doc.id)
+    val revision = commitOpsUpdate(context.store, activeSession, doc, ops)
     return ExternalToolResult.Success(
         canvasJson.encodeToString(CanvasApplyOpsResult(ok = true, revision = revision))
     )
 }
 
 private suspend fun executeListCanvases(
-    store: CanvasDocumentStore,
+    context: CanvasToolContext,
     input: JsonObject,
-    agentId: String?,
 ): List<String> {
     val conversationId = input["conversation_id"]?.jsonPrimitive?.contentOrNull
-    val targetAgentId = input["agent_id"]?.jsonPrimitive?.contentOrNull ?: agentId
+    val targetAgentId = context.resolveCallerId(input)
     return when {
-        conversationId != null -> store.getForConversation(conversationId)?.let { listOf(it.id.value) }.orEmpty()
-        targetAgentId != null -> store.listForAgent(targetAgentId).map { it.id.value }
+        conversationId != null -> context.store.getForConversation(conversationId)?.let { listOf(it.id.value) }.orEmpty()
+        targetAgentId != null -> context.store.listForAgent(targetAgentId).map { it.id.value }
         else -> emptyList()
     }
 }
@@ -194,7 +215,8 @@ class CanvasCreateTool(
     override val capability: Capability = Capability.ImageHydration
 
     override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult = runCatching {
-        val canvasId = executeCreateCanvas(store, input, agentId)
+        val context = CanvasToolContext(store, sessions, agentId)
+        val canvasId = executeCreateCanvas(context, input)
         ExternalToolResult.Success(canvasJson.encodeToString(CanvasCreateResult(canvasId = canvasId.value)))
     }.getOrElse { ExternalToolResult.Error("Failed to create canvas: ${it.message}") }
 
@@ -225,8 +247,8 @@ class CanvasGetSceneTool(
     override val capability: Capability = Capability.ImageHydration
 
     override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult = runCatching {
-        val callerId = agentId ?: input["agent_id"]?.jsonPrimitive?.contentOrNull
-        when (val lookup = findCanvasDocument(input, store, sessions, callerId)) {
+        val context = CanvasToolContext(store, sessions, agentId)
+        when (val lookup = findCanvasDocument(context, input)) {
             is CanvasLookupResult.Error -> lookup.result
             is CanvasLookupResult.Found -> ExternalToolResult.Success(
                 canvasJson.encodeToString(
@@ -270,7 +292,8 @@ class CanvasReplaceSceneTool(
     override val capability: Capability = Capability.ImageHydration
 
     override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult = runCatching {
-        executeReplaceScene(store, sessions, input, agentId)
+        val context = CanvasToolContext(store, sessions, agentId)
+        executeReplaceScene(context, input)
     }.getOrElse { ExternalToolResult.Error("Failed to replace scene: ${it.message}") }
 
     companion object {
@@ -304,7 +327,8 @@ class CanvasApplyOpsTool(
     override val capability: Capability = Capability.ImageHydration
 
     override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult = runCatching {
-        executeApplyOps(store, sessions, input, agentId)
+        val context = CanvasToolContext(store, sessions, agentId)
+        executeApplyOps(context, input)
     }.getOrElse { ExternalToolResult.Error("Failed to apply ops: ${it.message}") }
 
     companion object {
@@ -334,8 +358,8 @@ class CanvasExportSvgTool(
     override val capability: Capability = Capability.ImageHydration
 
     override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult = runCatching {
-        val callerId = agentId ?: input["agent_id"]?.jsonPrimitive?.contentOrNull
-        when (val lookup = findCanvasDocument(input, store, sessions, callerId)) {
+        val context = CanvasToolContext(store, sessions, agentId)
+        when (val lookup = findCanvasDocument(context, input)) {
             is CanvasLookupResult.Error -> lookup.result
             is CanvasLookupResult.Found -> {
                 val svgContent = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 800 600\"></svg>"
@@ -373,7 +397,8 @@ class CanvasListTool(
     override val capability: Capability = Capability.ImageHydration
 
     override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult = runCatching {
-        val ids = executeListCanvases(store, input, agentId)
+        val context = CanvasToolContext(store, sessions, agentId)
+        val ids = executeListCanvases(context, input)
         ExternalToolResult.Success(canvasJson.encodeToString(CanvasListResult(ids = ids)))
     }.getOrElse { ExternalToolResult.Error("Failed to list canvases: ${it.message}") }
 

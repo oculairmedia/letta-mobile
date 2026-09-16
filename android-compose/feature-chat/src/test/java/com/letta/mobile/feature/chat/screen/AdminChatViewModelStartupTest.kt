@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import com.letta.mobile.data.health.ShimBackendDetector
+import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.BackendKind
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.repository.api.IAgentRepository
@@ -95,36 +96,6 @@ class AdminChatViewModelStartupTest {
         var viewModel: AdminChatViewModel? = null
         try {
             val agent = TestData.agent("agent-canvas", "CanvasAgent")
-            val agents = mockk<IAgentRepository>(relaxed = true) {
-                every { this@mockk.agents } returns MutableStateFlow(listOf(agent))
-                every { getCachedAgent(agent.id) } returns agent
-                every { getAgent(agent.id) } returns flowOf(agent)
-            }
-            val settings = mockk<ISettingsRepository>(relaxed = true) {
-                every { activeConfig } returns MutableStateFlow(null)
-                every { activeConfigChanges } returns emptyFlow()
-                every { favoriteAgentId } returns MutableStateFlow(null)
-                every { getChatBackgroundKey() } returns flowOf("default")
-                every { getChatFontScale() } returns flowOf(1f)
-                every { getHapticsEnabled() } returns flowOf(false)
-                every { getPinnedAgentIds() } returns flowOf(emptySet())
-            }
-            val detector = mockk<ShimBackendDetector>(relaxed = true) {
-                every { activeUsesChannelTransport } returns MutableStateFlow(false)
-                every { activeBackendKind } returns MutableStateFlow(BackendKind.REST)
-            }
-            val bridge = mockk<WsChatBridge>(relaxed = true) {
-                every { connection } returns emptyFlow()
-                every { state } returns MutableStateFlow(mockk(relaxed = true))
-                every { events } returns emptyFlow()
-                every { a2uiEvents } returns emptyFlow()
-            }
-            val session = mockk<SessionManager>(relaxed = true) {
-                every { current.localRuntimeBackend } returns null
-                every { current.backendDescriptor.backendId } returns BackendId("startup")
-                every { current.backendDescriptor.runtimeId } returns RuntimeId("startup")
-            }
-
             val convId = "conversation-canvas-share"
             val sampleImage = com.letta.mobile.data.canvas.CanvasShare.createChatImageAttachment(
                 bytes = "canvas-test-image-content".encodeToByteArray(),
@@ -132,46 +103,7 @@ class AdminChatViewModelStartupTest {
             )
             com.letta.mobile.data.canvas.CanvasShare.stageForConversation(convId, sampleImage)
 
-            val presentation = ChatPagingPresentation(
-                settled = flowOf(PagingData.empty()),
-                live = MutableStateFlow(emptyList()),
-                close = { },
-            )
-            val host = ChatPagingHost().apply {
-                openCanonical = { _, _, _, _ -> presentation }
-            }
-
-            val vm = AdminChatViewModel(
-                routeArgs = ChatRouteArgs(SavedStateHandle(mapOf(
-                    "agentId" to agent.id.value,
-                    "conversationId" to convId,
-                ))),
-                messageRepository = mockk(relaxed = true),
-                timelineRepository = mockk(relaxed = true),
-                externalTimelineWriter = mockk(relaxed = true),
-                agentRepository = agents,
-                blockRepository = mockk(relaxed = true),
-                bugReportRepository = mockk(relaxed = true),
-                conversationRepository = mockk(relaxed = true),
-                settingsRepository = settings,
-                sessionManager = session,
-                runtimeEventOutbox = mockk(relaxed = true),
-                currentConversationTracker = mockk(relaxed = true),
-                shimBackendDetector = detector,
-                wsChatBridge = bridge,
-                subagentRepository = mockk(relaxed = true),
-                slashCommandRepository = mockk(relaxed = true) {
-                    coEvery { listForAgent(any()) } returns Result.success(emptyList())
-                    coEvery { listGlobal() } returns Result.success(emptyList())
-                    coEvery { getGoalStatus(any()) } returns Result.failure(IllegalStateException("Unsupported"))
-                },
-                clientVersionProvider = mockk(relaxed = true),
-                selfTodoRepository = mockk(relaxed = true),
-                modelRepository = mockk(relaxed = true) {
-                    every { llmModels } returns MutableStateFlow(emptyList())
-                },
-                pagingHost = host,
-            )
+            val vm = createTestViewModel(agent, convId)
             viewModel = vm
 
             assertEquals(1, vm.composerState.value.pendingAttachments.size)
@@ -188,5 +120,77 @@ class AdminChatViewModelStartupTest {
             com.letta.mobile.data.canvas.CanvasShare.clearStagedAttachments()
             Dispatchers.resetMain()
         }
+    }
+
+    private fun createTestViewModel(agent: Agent, convId: String): AdminChatViewModel {
+        val agents = mockk<IAgentRepository>(relaxed = true) {
+            every { this@mockk.agents } returns MutableStateFlow(listOf(agent))
+            every { getCachedAgent(agent.id) } returns agent
+            every { getAgent(agent.id) } returns flowOf(agent)
+        }
+        val settings = mockk<ISettingsRepository>(relaxed = true) {
+            every { activeConfig } returns MutableStateFlow(null)
+            every { activeConfigChanges } returns emptyFlow()
+            every { favoriteAgentId } returns MutableStateFlow(null)
+            every { getChatBackgroundKey() } returns flowOf("default")
+            every { getChatFontScale() } returns flowOf(1f)
+            every { getHapticsEnabled() } returns flowOf(false)
+            every { getPinnedAgentIds() } returns flowOf(emptySet())
+        }
+        val detector = mockk<ShimBackendDetector>(relaxed = true) {
+            every { activeUsesChannelTransport } returns MutableStateFlow(false)
+            every { activeBackendKind } returns MutableStateFlow(BackendKind.REST)
+        }
+        val bridge = mockk<WsChatBridge>(relaxed = true) {
+            every { connection } returns emptyFlow()
+            every { state } returns MutableStateFlow(mockk(relaxed = true))
+            every { events } returns emptyFlow()
+            every { a2uiEvents } returns emptyFlow()
+        }
+        val session = mockk<SessionManager>(relaxed = true) {
+            every { current.localRuntimeBackend } returns null
+            every { current.backendDescriptor.backendId } returns BackendId("startup")
+            every { current.backendDescriptor.runtimeId } returns RuntimeId("startup")
+        }
+        val presentation = ChatPagingPresentation(
+            settled = flowOf(PagingData.empty()),
+            live = MutableStateFlow(emptyList()),
+            close = { },
+        )
+        val host = ChatPagingHost().apply {
+            openCanonical = { _, _, _, _ -> presentation }
+        }
+
+        return AdminChatViewModel(
+            routeArgs = ChatRouteArgs(SavedStateHandle(mapOf(
+                "agentId" to agent.id.value,
+                "conversationId" to convId,
+            ))),
+            messageRepository = mockk(relaxed = true),
+            timelineRepository = mockk(relaxed = true),
+            externalTimelineWriter = mockk(relaxed = true),
+            agentRepository = agents,
+            blockRepository = mockk(relaxed = true),
+            bugReportRepository = mockk(relaxed = true),
+            conversationRepository = mockk(relaxed = true),
+            settingsRepository = settings,
+            sessionManager = session,
+            runtimeEventOutbox = mockk(relaxed = true),
+            currentConversationTracker = mockk(relaxed = true),
+            shimBackendDetector = detector,
+            wsChatBridge = bridge,
+            subagentRepository = mockk(relaxed = true),
+            slashCommandRepository = mockk(relaxed = true) {
+                coEvery { listForAgent(any()) } returns Result.success(emptyList())
+                coEvery { listGlobal() } returns Result.success(emptyList())
+                coEvery { getGoalStatus(any()) } returns Result.failure(IllegalStateException("Unsupported"))
+            },
+            clientVersionProvider = mockk(relaxed = true),
+            selfTodoRepository = mockk(relaxed = true),
+            modelRepository = mockk(relaxed = true) {
+                every { llmModels } returns MutableStateFlow(emptyList())
+            },
+            pagingHost = host,
+        )
     }
 }
