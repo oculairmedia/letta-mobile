@@ -68,6 +68,12 @@ kotlin {
                 // Shared Android/Desktop Markdown paint layer.
                 api("com.mikepenz:multiplatform-markdown-renderer-m3:0.41.0")
                 api("com.mikepenz:multiplatform-markdown-renderer-code:0.41.0")
+
+                // DrawBox canvas editor (P0)
+                implementation(libs.drawbox)
+                implementation(libs.drawbox.ui)
+                // DrawBoxController inherits from androidx.lifecycle.ViewModel; exposed as api so consumers resolve ViewModel hierarchy.
+                api(libs.androidx.lifecycle.viewmodel)
             }
         }
 
@@ -80,6 +86,7 @@ kotlin {
         jvmTest {
             dependencies {
                 implementation(libs.junit4)
+                implementation(libs.kotlinx.coroutines.test)
                 implementation(compose.desktop.currentOs)
                 implementation(kotlin("test"))
             }

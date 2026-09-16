@@ -43,6 +43,7 @@ import kotlinx.serialization.Serializable
 @Serializable data object PairingScanRoute
 @Serializable data object PairingInviteRoute
 @Serializable data object VibesyncDebugRoute
+@Serializable data object CanvasDebugRoute
 @Serializable
 data class ProjectIssuesRoute(
     val projectId: String,

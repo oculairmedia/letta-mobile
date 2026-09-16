@@ -30,11 +30,21 @@ fun NavGraphBuilder.configGraph(
             onNavigateToVibesyncDebug = {
                 navController.navigate(VibesyncDebugRoute)
             },
+            onNavigateToCanvasDebug = {
+                navController.navigate(CanvasDebugRoute)
+            },
         )
     }
 
     composable<VibesyncDebugRoute> {
         VibesyncDebugScreen(onNavigateBack = { navController.popBackStack() })
+    }
+
+    composable<CanvasDebugRoute> {
+        com.letta.mobile.ui.canvas.CanvasWorkspace(
+            initialJson = com.letta.mobile.ui.canvas.CanvasSamples.buildCycleJson,
+            onNavigateBack = { navController.popBackStack() },
+        )
     }
 
     composable<ConfigListRoute> {

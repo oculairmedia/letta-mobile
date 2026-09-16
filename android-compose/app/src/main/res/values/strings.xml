@@ -107,6 +107,8 @@
     <string name="screen_projects_beads_provision_confirm">Provision a Beads remote for %1$s? This creates the remote backing store and cannot be undone from Android.</string>
     <string name="screen_vibesync_debug_title">Vibesync debug</string>
     <string name="screen_vibesync_debug_entry_description">Inspect backend health, stats, and AGENTS.md refresh tools.</string>
+    <string name="screen_canvas_debug_title">Canvas Workspace (Debug)</string>
+    <string name="screen_canvas_debug_entry_description">Interactive DrawBox canvas with sample import/export</string>
     <string name="screen_vibesync_debug_status_section">Backend status</string>
     <string name="screen_vibesync_debug_agents_md_section">AGENTS.md refresh</string>
     <string name="screen_vibesync_debug_agents_md_refresh">Refresh generated AGENTS.md files</string>
