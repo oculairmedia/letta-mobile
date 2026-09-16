@@ -99,7 +99,16 @@ class DesktopHybridAppServerChatGateway internal constructor(
     DesktopApprovalSubmitter,
     DesktopTurnAborter,
     DesktopWorkingDirectoryController,
+    DesktopRuntimeEventSource,
     AutoCloseable {
+
+    /**
+     * The turns' own runtime events, republished for presence. The timeline takes the same drafts
+     * as messages; the run-phase reducer takes them as phases, so neither has to guess from the
+     * other's projection.
+     */
+    private val runtimeEventRelay = DesktopRuntimeEventRelay()
+    override val runtimeEvents = runtimeEventRelay.runtimeEvents
 
     override suspend fun currentWorkingDirectory(agentId: String, conversationId: String): String? =
         currentWorkingDirectory(AgentId(agentId), ConversationId(conversationId))?.value
@@ -197,6 +206,7 @@ class DesktopHybridAppServerChatGateway internal constructor(
             var mainReplyCompleted = false
             try {
                 turnEngine.runTurn(command).collect { draft ->
+                    runtimeEventRelay.emit(conversationId.value, agentId.value, draft.payload)
                     draft.runId?.value?.takeIf { it.isNotBlank() }?.let {
                         activeRunIdByConversation[conversationId] = DesktopRunId(it)
                     }
@@ -391,8 +401,13 @@ internal class DesktopRuntimeOwnedChatGateway(
     DesktopApprovalSubmitter,
     DesktopTurnAborter,
     DesktopWorkingDirectoryController,
+    DesktopRuntimeEventSource,
     ChatGatewayExtras,
     AutoCloseable {
+    /** Pass the wrapped gateway's runtime events through; a delegate that has none reports none. */
+    override val runtimeEvents = (delegate as? DesktopRuntimeEventSource)?.runtimeEvents
+        ?: DesktopRuntimeEventRelay().runtimeEvents
+
     override suspend fun submitApproval(submission: DesktopApprovalSubmission) {
         (delegate as? DesktopApprovalSubmitter)?.submitApproval(submission)
             ?: error("The local App Server gateway cannot submit approvals")

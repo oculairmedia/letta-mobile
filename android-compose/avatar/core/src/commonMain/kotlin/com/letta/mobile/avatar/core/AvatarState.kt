@@ -37,8 +37,16 @@ enum class AvatarState {
     /** The pet is being dragged by the user — spring-bones swing free. */
     DRAGGED,
 
-    /** The agent is reasoning or running tools — relaxed, inward, amber. */
+    /** The agent is reasoning — relaxed, inward, amber. */
     THINKING,
+
+    /**
+     * The agent is executing a tool (or delegating to subagents) — amber, faster pulse.
+     *
+     * Held for at least [AvatarDirector.Config.workingMinDwellSeconds] and released only after a
+     * quiet gap, so the reasoning/tool alternation inside one turn does not strobe the mascot.
+     */
+    WORKING,
 
     /** A tool approval is pending — surprised, steady amber, waiting on YOU. */
     WAITING_INPUT,

@@ -36,6 +36,20 @@ class MascotPresenceTest {
     }
 
     @Test
+    fun runningAToolIsItsOwnStateAndDelegatingReadsTheSame() {
+        val (director, entered) = director().let { it.director to it.entered }
+        val thinking = AgentPresence(activity = AgentActivityKind.THINKING)
+        val working = AgentPresence(activity = AgentActivityKind.WORKING, toolName = "grep")
+        val delegating = AgentPresence(activity = AgentActivityKind.DELEGATING, toolName = "Task")
+        director.applyPresence(AgentPresence.IDLE, thinking)
+        director.applyPresence(thinking, working)
+        assertEquals(AvatarState.WORKING, director.state)
+        director.applyPresence(working, delegating)
+        assertEquals(AvatarState.WORKING, director.state)
+        assertEquals(listOf(AvatarState.THINKING, AvatarState.WORKING), entered.take(2))
+    }
+
+    @Test
     fun errorRisingEdgeIsTheCueAndNoSuccessFollows() {
         val (director, entered) = director().let { it.director to it.entered }
         val thinking = AgentPresence(activity = AgentActivityKind.THINKING)
