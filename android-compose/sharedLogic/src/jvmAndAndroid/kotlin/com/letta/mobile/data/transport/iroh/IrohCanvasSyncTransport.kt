@@ -74,36 +74,12 @@ class IrohCanvasSyncTransport(
 
     fun startAcceptLoop(): Job {
         acceptJob?.cancel()
-        val ep = endpoint ?: return completedJob()
+        val ep = endpoint ?: return Job().apply { complete() }
         val job = scope.launch {
-            runAcceptLoop(ep)
+            runCanvasAcceptLoop(ep, "CanvasSync") { handleIncomingConnection(it) }
         }
         acceptJob = job
         return job
-    }
-
-    private fun completedJob(): Job = Job().apply { complete() }
-
-    private suspend fun CoroutineScope.runAcceptLoop(ep: Endpoint) {
-        while (isActive) {
-            acceptNextSafely(ep)
-        }
-    }
-
-    private suspend fun CoroutineScope.acceptNextSafely(ep: Endpoint) {
-        try {
-            val incoming = ep.acceptNext() ?: return
-            launch { handleIncomingConnection(incoming) }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (t: Throwable) {
-            logAcceptError(t)
-        }
-    }
-
-    private fun logAcceptError(t: Throwable) {
-        val errorMsg = t.message ?: t.toString()
-        Telemetry.event("CanvasSync", "accept.error", "error" to errorMsg)
     }
 
     private suspend fun handleIncomingConnection(incoming: Incoming) {

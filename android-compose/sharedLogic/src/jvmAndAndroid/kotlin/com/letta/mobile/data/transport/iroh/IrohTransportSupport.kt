@@ -10,6 +10,13 @@ import com.letta.mobile.runtime.TurnInput
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
+import com.letta.mobile.util.Telemetry
+import computer.iroh.Endpoint
+import computer.iroh.Incoming
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import java.time.Instant
 import java.util.UUID
 
@@ -62,4 +69,22 @@ internal object IrohTransportSupport {
     fun otherActiveConversationsLabel(registry: IrohTurnRegistry, conversationId: String): String =
         registry.concurrentTurns(excludingConversationId = IrohConversationId(conversationId))
             .joinToString(",") { it.conversationId }
+}
+
+internal suspend fun CoroutineScope.runCanvasAcceptLoop(
+    endpoint: Endpoint,
+    telemetryTag: String,
+    handle: suspend (Incoming) -> Unit,
+) {
+    while (isActive) {
+        try {
+            val incoming = endpoint.acceptNext() ?: return
+            launch { handle(incoming) }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (t: Throwable) {
+            val errorMsg = t.message ?: t.toString()
+            Telemetry.event(telemetryTag, "accept.error", "error" to errorMsg)
+        }
+    }
 }
