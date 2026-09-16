@@ -24,6 +24,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -181,7 +182,8 @@ fun MascotSeat(
     val transport = LocalMascotTransport.current
     val registry = LocalMascotRegistry.current
     val shown = identity ?: agentId?.let { transport.previewOf(it) ?: registry.identities[it] }
-    val available = agentId != null && shown != null && LocalMascotHost.current.available
+    val host = LocalMascotHost.current
+    val available = agentId != null && shown != null && host.available && host.entry(agentId, shown) != null
     val key = agentId?.let { MascotTransport.SeatKey(it, stage) }
     val handlers = remember { SeatHandlers() }
     handlers.onClick = onClick
@@ -226,12 +228,15 @@ fun MascotTransportLayer(
     }
     Box(modifier.onGloballyPositioned { origin = it.boundsInWindow().topLeft }) {
         content()
-        for (agentId in transport.agentsSeated()) {
-            val stage = transport.activeStage(agentId) ?: continue
-            val seat = transport.seat(agentId, stage) ?: continue
-            val identity = seat.identity ?: transport.previewOf(agentId) ?: registry.identities[agentId] ?: continue
-            key(agentId) {
-                TransportedMascot(agentId, identity, stage, seat, origin, reducedMotion)
+        // Keyed by slot, not by agent: the focused character is one scene that is re-skinned when
+        // the focused agent changes, so agent A morphs into agent B where it stands instead of a
+        // fresh scene loading in with a flash.
+        transport.agentsSeated().forEachIndexed { slot, agentId ->
+            val stage = transport.activeStage(agentId) ?: return@forEachIndexed
+            val seat = transport.seat(agentId, stage) ?: return@forEachIndexed
+            val identity = seat.identity ?: transport.previewOf(agentId) ?: registry.identities[agentId] ?: return@forEachIndexed
+            key(slot) {
+                TransportedMascot(agentId, identity, stage, seat, origin, reducedMotion, sceneKey = "mascot-focus-$slot")
             }
         }
     }
@@ -245,17 +250,20 @@ private fun TransportedMascot(
     seat: MascotSeatInfo,
     origin: Offset,
     reducedMotion: Boolean,
+    sceneKey: String,
 ) {
     val transport = LocalMascotTransport.current
-    val flight = transport.flight(agentId)
+    val flight = transport.flight(sceneKey)
     // Every hop is the same function: progress runs the one 360 ms curve while the character
     // fades and shrinks as it leaves and fades and grows back as it arrives. The endpoint is the
     // destination seat *as it is each frame* - a pane that is still opening moves its seat, and
     // the character follows it in without the curve restarting - so every pair of seats gets the
     // identical motion and no hop waits. Hops run one after another off a conflated stream of
     // stage changes, so a flicker mid-flight cannot restart one halfway.
-    LaunchedEffect(agentId, reducedMotion) {
-        snapshotFlow { transport.activeStage(agentId) }
+    // The slot outlives the agent it shows: the driver reads whichever agent stands here now.
+    val currentAgent by rememberUpdatedState(agentId)
+    LaunchedEffect(sceneKey, reducedMotion) {
+        snapshotFlow { transport.activeStage(currentAgent) }
             .distinctUntilChanged()
             .conflate()
             .collect { next ->
@@ -303,7 +311,7 @@ private fun TransportedMascot(
             .hoverable(hover),
         contentAlignment = Alignment.Center,
     ) {
-        MascotLive(agentId, identity, size = boxSize * seat.overscale, onClick = seat.onClick)
+        MascotLive(agentId, identity, size = boxSize * seat.overscale, onClick = seat.onClick, sceneKey = sceneKey)
         // The pencil, in front of the character (the layer draws above every seat), on hover only:
         // one way to edit the agent from any mascot, so no seat needs to travel to the editor.
         seat.onEdit?.let { onEdit ->
