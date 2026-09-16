@@ -32,8 +32,6 @@ import io.ak1.drawbox.domain.model.Event
 import io.ak1.drawbox.domain.usecase.UseCase
 import io.ak1.drawbox.presentation.reducer.Reducer
 import io.ak1.drawbox.presentation.viewmodel.DrawBoxController
-import io.ak1.drawbox.ui.controls.ControlsBar
-import io.ak1.drawbox.ui.controls.defaultControlsBarItems
 
 /**
  * Shared Canvas Workspace composable for Meridian.
@@ -99,17 +97,6 @@ fun CanvasWorkspace(
         state = state,
         canUndo = canUndo,
         canRedo = canRedo,
-    )
-
-    val controlsItems = defaultControlsBarItems(
-        state = controlsBarState,
-        dispatch = { intent ->
-            CanvasControlsBridge.dispatchIntent(
-                controller = controller,
-                intent = intent,
-                hasSelection = hasSelection,
-            )
-        },
     )
 
     Surface(
@@ -218,8 +205,17 @@ fun CanvasWorkspace(
             }
 
             // Lifted Bottom ControlsBar
-            ControlsBar(
-                items = controlsItems,
+            // Our own bar: the drawbox-ui one loads drawables its Android artifact never ships
+            // (letta-mobile-r5f3r). See CanvasControlsBar.
+            CanvasControlsBar(
+                state = controlsBarState,
+                dispatch = { intent ->
+                    CanvasControlsBridge.dispatchIntent(
+                        controller = controller,
+                        intent = intent,
+                        hasSelection = hasSelection,
+                    )
+                },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 24.dp),
