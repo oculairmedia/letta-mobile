@@ -14,7 +14,7 @@ DrawBox acts exclusively as a local view/editor in `:sharedUI`. In-memory state,
                                     +-----+-----+
                                     |           |
                                     v           v
-                            [ CanvasSession ]  [ CanvasSyncTransport (Iroh QUIC) ]
+                            [ CanvasSession ]  [ CanvasSyncTransport (Loopback live / Iroh sketch P3.1+) ]
                                     |
                             [ CanvasDocumentStore ]
 ```
@@ -52,3 +52,6 @@ All scene mutations are expressed as typed `CanvasOp` instances carrying:
    - `CanvasOpLog` is currently in-memory (`InMemoryCanvasOpLog`).
    - Cold process restarts recover the latest projected scene JSON snapshot from `CanvasDocumentStore` (Room on Android, file on Desktop).
    - Durable op logging (persisting individual `canvas_ops` rows across restarts for historic delta replay) is deferred to P3.1/P4.
+
+6. **Background Color Semantics (N3)**:
+   - `SetBackgroundOp` follows last-apply order in the P3 spike; element-level LWW is enforced on discrete elements. Concurrent background LWW is deferred to P3.1/P4.

@@ -43,6 +43,7 @@ object CanvasOpProjector {
                 if (op.sceneJson.isNotBlank()) op.sceneJson else emptySceneJson()
             }
             is CanvasOp.SetBackgroundOp -> {
+                // Background color follows last-apply order in P3 spike; concurrent background LWW deferred to P3.1/P4 (N3)
                 val parsed = parseScene(sceneJson)
                 val updated = buildJsonObject {
                     parsed.forEach { (key, value) ->

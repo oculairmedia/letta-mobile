@@ -151,14 +151,7 @@ class CanvasSession(
         )
 
         if (generatedOps.isEmpty()) {
-            val replaceOp = CanvasOp.ReplaceSceneOp(
-                opId = CanvasOpDiffer.generateOpId("replace"),
-                actorId = actorId,
-                lamport = ++lamportClock,
-                sceneJson = newJson,
-            )
-            applyLocal(replaceOp)
-            return listOf(replaceOp)
+            return emptyList()
         }
 
         applyOps(generatedOps, isRemote = false)

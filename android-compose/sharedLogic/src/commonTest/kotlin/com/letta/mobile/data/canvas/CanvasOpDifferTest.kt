@@ -113,4 +113,59 @@ class CanvasOpDifferTest {
 
         assertTrue(ops.isEmpty(), "Formatting-only differences must produce zero ops, got: $ops")
     }
+
+    @Test
+    fun diff_metadataOnlyDifferencesProduceZeroOps() {
+        val sessionSceneWithLww = """
+        {
+            "bgColor": "#ffffffff",
+            "elements": [
+                {
+                    "id": "node-1",
+                    "type": "Text",
+                    "text": "Hello",
+                    "_lamport": 42,
+                    "_actorId": "peer-alice"
+                },
+                {
+                    "id": "node-2",
+                    "type": "Shape",
+                    "shapeType": "RECTANGLE",
+                    "_lamport": 43,
+                    "_actorId": "peer-bob"
+                }
+            ]
+        }
+        """.trimIndent()
+
+        val cleanDrawBoxExport = """
+        {
+            "bgColor": "#ffffffff",
+            "elements": [
+                {
+                    "id": "node-1",
+                    "type": "Text",
+                    "text": "Hello"
+                },
+                {
+                    "id": "node-2",
+                    "type": "Shape",
+                    "shapeType": "RECTANGLE"
+                }
+            ]
+        }
+        """.trimIndent()
+
+        val ops = CanvasOpDiffer.diff(
+            oldSceneJson = sessionSceneWithLww,
+            newSceneJson = cleanDrawBoxExport,
+            actorId = "local_user",
+            lamportSupplier = { 100L },
+        )
+
+        assertTrue(
+            ops.isEmpty(),
+            "Autosave comparing metadata-tagged session against clean DrawBox export must produce zero phantom ops (N1), got: $ops"
+        )
+    }
 }
