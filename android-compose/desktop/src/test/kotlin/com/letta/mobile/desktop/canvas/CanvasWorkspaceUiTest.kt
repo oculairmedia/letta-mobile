@@ -38,4 +38,30 @@ class CanvasWorkspaceUiTest {
         onNodeWithText("Import Daily Loop").performClick()
         onNodeWithText("Imported Daily Loop sample", substring = true).assertExists()
     }
+
+    @Test
+    fun canvasWorkspace_withSession_loadsInitialSceneAndSavesExport() = runComposeUiTest {
+        val store = com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore()
+        val session = kotlinx.coroutines.runBlocking {
+            com.letta.mobile.data.canvas.CanvasSession.create(
+                store = store,
+                title = "Session Diagram",
+                initialSceneJson = CanvasSamples.buildCycleJson,
+            )
+        }
+
+        setContent {
+            CanvasWorkspace(
+                session = session,
+            )
+        }
+
+        // Verify session diagram loaded
+        onNodeWithText("Session Diagram", substring = true).assertExists()
+        onNodeWithText("Elements: 15", substring = true).assertExists()
+
+        // Click Export JSON
+        onNodeWithText("Export JSON").performClick()
+        onNodeWithText("Exported JSON", substring = true).assertExists()
+    }
 }

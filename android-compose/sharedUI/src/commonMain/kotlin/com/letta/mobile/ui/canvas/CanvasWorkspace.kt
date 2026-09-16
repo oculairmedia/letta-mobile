@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.data.canvas.CanvasSession
 import io.ak1.drawbox.DrawBox
 import io.ak1.drawbox.domain.model.Event
 import io.ak1.drawbox.domain.usecase.UseCase
@@ -36,12 +37,13 @@ import io.ak1.drawbox.presentation.viewmodel.DrawBoxController
 /**
  * Shared Canvas Workspace composable for Meridian.
  * Hosts DrawBox editor with lifted demo UI ControlsBar, sample diagram import,
- * and JSON/SVG export capabilities.
+ * JSON/SVG export capabilities, and optional persistent [CanvasSession] integration.
  */
 @Composable
 fun CanvasWorkspace(
     modifier: Modifier = Modifier,
     controller: DrawBoxController = remember { DrawBoxController(Reducer(UseCase())) },
+    session: CanvasSession? = null,
     initialJson: String? = null,
     onNavigateBack: (() -> Unit)? = null,
     onExportJson: ((String) -> Unit)? = null,
@@ -50,19 +52,27 @@ fun CanvasWorkspace(
     val state by controller.state.collectAsState()
     val canUndo by controller.canUndo.collectAsState()
     val canRedo by controller.canRedo.collectAsState()
+    val sessionDoc by (session?.document?.collectAsState() ?: remember { mutableStateOf(null) })
 
     var statusMessage by remember { mutableStateOf("Ready") }
 
-    // Load initial JSON diagram if provided
-    LaunchedEffect(initialJson) {
-        if (!initialJson.isNullOrBlank()) {
+    // Load initial JSON diagram or session document
+    LaunchedEffect(session, initialJson) {
+        if (session != null) {
+            session.load()
+            val sessionJson = session.sceneJsonOrEmpty()
+            if (sessionJson.isNotBlank()) {
+                controller.importPath(sessionJson)
+                statusMessage = "Loaded from session (rev ${session.document.value?.revision ?: 1})"
+            }
+        } else if (!initialJson.isNullOrBlank()) {
             controller.importPath(initialJson)
             statusMessage = "Loaded diagram (${state.elements.size} elements)"
         }
     }
 
     // Collect export/error events from DrawBoxController
-    LaunchedEffect(controller) {
+    LaunchedEffect(controller, session) {
         controller.events.collect { event ->
             when (event) {
                 is Event.JsonExported -> {
@@ -72,6 +82,7 @@ fun CanvasWorkspace(
                     } else {
                         "Warning: Exported JSON missing 'elements' key"
                     }
+                    session?.saveScene(event.json)
                     onExportJson?.invoke(event.json)
                 }
                 is Event.SvgExported -> {
@@ -195,8 +206,9 @@ fun CanvasWorkspace(
                     shadowElevation = 1.dp,
                     modifier = Modifier.padding(horizontal = 8.dp),
                 ) {
+                    val sessionSuffix = sessionDoc?.let { " | ${it.title} (rev ${it.revision})" }.orEmpty()
                     Text(
-                        text = "Elements: ${state.elements.size} | $statusMessage",
+                        text = "Elements: ${state.elements.size}$sessionSuffix | $statusMessage",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
