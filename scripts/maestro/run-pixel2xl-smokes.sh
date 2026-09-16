@@ -4,7 +4,7 @@ set -uo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 DEVICE_SERIAL="${DEVICE_SERIAL:-711KPAE0914240}"
-PKG_UNDER_TEST="${PKG_UNDER_TEST:-com.letta.mobile.dev}"
+PKG_UNDER_TEST="${PKG_UNDER_TEST:-ca.oculair.meridian.dev}"
 FLOWS_DIR="${FLOWS_DIR:-$ROOT_DIR/scripts/maestro/flows}"
 REPORT_ROOT="${REPORT_ROOT:-$ROOT_DIR/scripts/maestro/reports}"
 MAESTRO_BIN="${MAESTRO_BIN:-$HOME/.maestro/bin/maestro}"

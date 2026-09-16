@@ -1376,13 +1376,6 @@ tasks.named("check") {
     dependsOn(testEmbeddedLettaCodeToolGroupPatch)
 }
 
-androidComponents {
-    onVariants(selector().withBuildType("debug").withFlavor("distribution" to "root")) { variant ->
-        // Keep the existing root development install/data separate from the Play identity.
-        variant.applicationId.set("com.letta.mobile.dev")
-    }
-}
-
 android {
     // Play identity freeze (letta-mobile-h0b1h.1): store package is Meridian.
     // Kotlin source packages remain com.letta.mobile; R/BuildConfig follow this namespace.

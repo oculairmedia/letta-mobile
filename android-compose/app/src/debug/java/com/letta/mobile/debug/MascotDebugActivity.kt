@@ -37,7 +37,7 @@ import kotlinx.coroutines.isActive
  * from a shipped build. Launch it with:
  *
  * ```
- * adb shell am start -n com.letta.mobile.dev/com.letta.mobile.debug.MascotDebugActivity
+ * adb shell am start -n ca.oculair.meridian.dev/com.letta.mobile.debug.MascotDebugActivity
  * ```
  *
  * What it proves is the whole chain, not just the renderer: the buttons drive [AvatarDirector],
