@@ -46,6 +46,12 @@ internal class AdminChatSendPipeline(
     private val setActiveConversationId: (String?) -> Unit,
     private val startTimelineObserver: (conversationId: String) -> Unit,
     private val selectedOwner: SelectedChatSendOwner? = null,
+    /**
+     * Every runtime event this screen's transport produces, as it is recorded. The view model
+     * folds these through the shared run-phase reducer so the registry carries honest phases;
+     * the pipeline itself stays a wire and owns no presence logic.
+     */
+    private val runtimeEventObserver: (List<com.letta.mobile.runtime.RuntimeEventDraft>) -> Unit = {},
 ) {
     suspend fun retireSelectedOwner() { selectedOwner?.retire() }
     val timelineSendCoordinator: TimelineSendCoordinator by lazy {
@@ -90,6 +96,7 @@ internal class AdminChatSendPipeline(
                 selectedOwner?.let { it.requireCurrent(); it.descriptor } ?: sessionManager.current.backendDescriptor
             },
             runtimeEventSink = { drafts ->
+                runtimeEventObserver(drafts)
                 runtimeEventOutbox.appendAll(drafts)
             },
         )

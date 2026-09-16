@@ -32,6 +32,7 @@ import com.letta.mobile.data.desktopshell.ShellLayoutEvent
 import com.letta.mobile.data.desktopshell.ShellLayoutReducer
 import com.letta.mobile.data.lens.WorkPlayLens
 import com.letta.mobile.data.lens.WorkPlayMode
+import com.letta.mobile.data.presence.presenceByAgent
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.onboarding.OnboardingTaskKind
 import com.letta.mobile.data.model.SubagentStatus
@@ -458,22 +459,14 @@ internal fun LettaDesktopApp(
     // bespoke desktop check, so the "is the agent working" semantics stay in one
     // place across platforms.
     val replyPresence by chatController.replyPresence.collectAsState()
-    // Presence -> the mascots' directors. Busy is the whole run (send -> terminal), speaking while
-    // tokens stream, listening while the user composes, error when the attempt failed.
+    // Presence -> the mascots' directors, read from the window's run registry exactly as Android's
+    // ProvideMascotShell reads the app-wide one. The controller folds the runtime's events through
+    // the shared RunPhaseReducer, so what arrives here is the phase the turn is actually in -
+    // running a tool, parked on an approval, responding - attributed to the conversation it
+    // happened in rather than to whichever one is selected (letta-mobile-8a3bz, -s4krx).
     val runningConversationId by chatController.streamingConversationId.collectAsState()
-    val mascotPresence = remember(chatState.conversations, runningConversationId, thinkingConversationId, replyPresence, chatState.selectedConversationId, chatState.composerText, chatState.errorMessage) {
-        com.letta.mobile.data.presence.AgentPresenceResolver.resolve(
-            conversations = chatState.conversations,
-            // Either run signal: the controller's streaming id (send -> terminal) or its thinking id.
-            runningConversationId = runningConversationId ?: thinkingConversationId,
-            // Tokens are arriving when the run is streaming and the "agent typing" dots are off;
-            // the dots (before the first token, between tool phases) are thinking.
-            streamingTokens = replyPresence.isStreaming && !replyPresence.isAgentTyping,
-            selectedConversationId = chatState.selectedConversationId,
-            composerText = chatState.composerText,
-            errorConversationId = chatState.selectedConversationId.takeIf { chatState.errorMessage != null },
-        )
-    }
+    val runs by chatController.runs.collectAsState()
+    val mascotPresence = remember(runs) { runs.presenceByAgent() }
     androidx.compose.runtime.SideEffect { mascotRegistry.updatePresence(mascotPresence) }
     val isStreamingReplySelected = replyPresence.isStreaming
 
