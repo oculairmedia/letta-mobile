@@ -1,6 +1,7 @@
 package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.attachment.AttachmentLimits
+import kotlinx.coroutines.test.runTest
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.Test
@@ -29,9 +30,68 @@ class CanvasShareTest {
         val limits = AttachmentLimits(maxRawBytesPerImage = 100)
         val oversized = ByteArray(101) { 1 }
 
-        val error = assertFailsWith<IllegalArgumentException> {
+        val error = assertFailsWith<CanvasAttachmentTooLargeException> {
             CanvasShare.createChatImageAttachment(oversized, "image/png", limits)
         }
         assertTrue(error.message!!.contains("exceeds maxRawBytesPerImage limit"))
+    }
+
+    @Test
+    fun prepareAttachment_returnsAttachmentUsingSniffedMime() {
+        val pngBytes = byteArrayOf(0x89.toByte(), 0x50.toByte(), 0x4E.toByte(), 0x47.toByte(), 0x0D, 0x0A, 0x1A, 0x0A)
+        val attachment = CanvasShare.prepareAttachment(pngBytes)
+        assertEquals("image/png", attachment.mediaType)
+        assertEquals(8L, attachment.storedByteSize)
+    }
+
+    @Test
+    fun detectMimeType_recognizesHeaders() {
+        val png = byteArrayOf(0x89.toByte(), 0x50.toByte(), 0x4E.toByte(), 0x47.toByte(), 0, 0, 0, 0)
+        val jpeg = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0)
+        val svg = "<svg viewBox='0 0 10 10'></svg>".encodeToByteArray()
+        val xmlSvg = "<?xml version='1.0'?><svg></svg>".encodeToByteArray()
+
+        assertEquals("image/png", CanvasShare.detectMimeType(png))
+        assertEquals("image/jpeg", CanvasShare.detectMimeType(jpeg))
+        assertEquals("image/svg+xml", CanvasShare.detectMimeType(svg))
+        assertEquals("image/svg+xml", CanvasShare.detectMimeType(xmlSvg))
+    }
+
+    @Test
+    fun stageAndConsume_scopedToConversationId() = runTest {
+        CanvasShare.clearStagedAttachments()
+
+        val imgA = CanvasShare.createChatImageAttachment("sample-A".encodeToByteArray(), "image/png")
+        val imgB = CanvasShare.createChatImageAttachment("sample-B".encodeToByteArray(), "image/png")
+
+        CanvasShare.stageForConversation("conv-123", imgA)
+        CanvasShare.stageForConversation("conv-456", imgB)
+
+        val consumed123 = CanvasShare.consumeStagedAttachments("conv-123")
+        assertEquals(1, consumed123.size)
+        assertEquals(imgA, consumed123.first())
+
+        // Ensure 123 is cleared but 456 remains
+        assertTrue(CanvasShare.consumeStagedAttachments("conv-123").isEmpty())
+        val consumed456 = CanvasShare.consumeStagedAttachments("conv-456")
+        assertEquals(1, consumed456.size)
+        assertEquals(imgB, consumed456.first())
+    }
+
+    @Test
+    fun packageForChat_withinLimits_succeeds() {
+        val bytes = "valid-payload".encodeToByteArray()
+        val result = CanvasShare.packageForChat(bytes)
+        assertTrue(result.isSuccess)
+        assertEquals(bytes.size.toLong(), result.getOrThrow().storedByteSize)
+    }
+
+    @Test
+    fun packageForChat_exceedingLimit_fails() {
+        val limits = AttachmentLimits(maxRawBytesPerImage = 5)
+        val bytes = "too-large-payload".encodeToByteArray()
+        val result = CanvasShare.packageForChat(bytes, limits = limits)
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull() is CanvasAttachmentTooLargeException)
     }
 }

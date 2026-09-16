@@ -304,12 +304,19 @@ class CanvasSession(
             title: String = "Untitled Canvas",
             conversationId: String? = null,
             agentId: String? = null,
+            acl: CanvasAcl? = null,
             canvasId: CanvasId = CanvasId("canvas-${kotlin.time.Clock.System.now().toEpochMilliseconds()}-${(1000..9999).random()}"),
             initialSceneJson: String = "",
             opLog: CanvasOpLog = InMemoryCanvasOpLog(),
             syncTransport: CanvasSyncTransport? = null,
             clock: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
         ): CanvasSession {
+            val effectiveAcl = acl ?: if (agentId != null) {
+                CanvasAcl(
+                    ownerUserId = "local_user",
+                    writerAgentIds = setOf(agentId),
+                )
+            } else null
             val doc = CanvasDocument(
                 id = canvasId,
                 agentId = agentId,
@@ -317,6 +324,7 @@ class CanvasSession(
                 title = title,
                 revision = 1L,
                 sceneJson = initialSceneJson,
+                acl = effectiveAcl,
                 updatedAtEpochMs = clock(),
             )
             store.upsert(doc)

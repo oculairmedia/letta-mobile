@@ -30,11 +30,12 @@ data class CanvasAcl(
 
     /**
      * Checks if [actorId] is authorized to view the canvas.
+     * When [readerUserIds] and [readerAgentIds] are empty, the canvas defaults to public-read.
      */
     fun canRead(actorId: String?): Boolean {
+        if (readerUserIds.isEmpty() && readerAgentIds.isEmpty()) return true
         if (actorId.isNullOrBlank()) return false
         if (canWrite(actorId)) return true
-        if (readerUserIds.isEmpty() && readerAgentIds.isEmpty()) return true
         val normalized = normalize(actorId)
         if (actorId in readerUserIds || normalized in readerUserIds) return true
         if (actorId in readerAgentIds || normalized in readerAgentIds) return true

@@ -53,6 +53,11 @@ private suspend fun executeCreateCanvas(
     val conversationId = input["conversation_id"]?.jsonPrimitive?.contentOrNull
     val callerAgentId = input["agent_id"]?.jsonPrimitive?.contentOrNull ?: agentId
 
+    val defaultAcl = CanvasAcl(
+        ownerUserId = "local_user",
+        writerAgentIds = if (callerAgentId != null) setOf(callerAgentId) else emptySet(),
+    )
+
     if (conversationId != null) {
         val existing = store.getForConversation(conversationId)
         if (existing != null) return existing.id
@@ -67,6 +72,7 @@ private suspend fun executeCreateCanvas(
             title = title,
             revision = 1L,
             sceneJson = "",
+            acl = defaultAcl,
             updatedAtEpochMs = now,
         )
     )

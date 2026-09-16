@@ -67,6 +67,7 @@ class CanvasAclTest {
         assertTrue(acl.canRead("alice"))
         assertTrue(acl.canRead("bob"))
         assertTrue(acl.canRead("charlie"))
+        assertTrue(acl.canRead(null))
     }
 
     @Test

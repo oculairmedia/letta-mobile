@@ -61,3 +61,22 @@ All scene mutations are expressed as typed `CanvasOp` instances carrying:
 
 6. **Background Color Semantics (N3)**:
    - `SetBackgroundOp` follows last-apply order in current releases; element-level LWW is strictly enforced on discrete scene elements.
+
+7. **Access Control & Authorization (P4.2)**:
+   - `CanvasAcl` defines owners (`ownerUserId`), authorized writers (`writerUserIds`, `writerAgentIds`), and authorized readers (`readerUserIds`, `readerAgentIds`).
+   - Identities support raw identifiers as well as `user:` and `agent:` prefixed strings (e.g. `agent:agent-123` and `agent-123` normalize identically).
+   - `canWrite`: strictly requires the caller to be the document owner or an explicitly listed writer.
+   - **Default Read Behavior**: When both `readerUserIds` and `readerAgentIds` are empty, read access defaults to public (anyone with the canvas ID can read), while write access remains strictly gated by `canWrite`. Once any explicit readers are added, read access is restricted to owners, writers, and explicitly listed readers.
+   - Canvas creation paths (`CanvasSession.create`, `CanvasCreateTool`) automatically configure sensible defaults granting write permissions to the creating agent and user.
+
+8. **In-Session Checkpoint History & Restore (P4.3)**:
+   - `CanvasSession` records snapshots (`CanvasCheckpoint`) in a bounded in-memory ring (`MAX_CHECKPOINTS = 30`).
+   - `restoreCheckpoint(checkpointId, actorId)` verifies `canWrite` ACL, creates an authoritative `CanvasOp.ReplaceSceneOp`, records a restore checkpoint, advances document revision, and broadcasts the op over `syncTransport`.
+   - **Lifecycle Note**: Checkpoints currently live in-session per process lifecycle. Durable multi-session snapshot persistence across process death is deferred to post-P4.
+
+9. **Share-to-Chat Integration (P4.1)**:
+   - Canvas exports are packaged via `CanvasShare.createChatImageAttachment` / `CanvasShare.packageForChat` enforcing `AttachmentLimits.maxRawBytesPerImage` (2 MiB limit).
+   - If payload exceeds limits, `CanvasAttachmentTooLargeException` is thrown.
+   - Sniffs MIME type (prefers raster `image/png` and `image/jpeg` for chat LLM vision capabilities; supports `image/svg+xml`).
+   - On Android and Desktop, staged attachments are delivered directly into the owning conversation's `ChatComposerController` pending attachments bar.
+

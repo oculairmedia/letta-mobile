@@ -13,6 +13,7 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -91,11 +92,18 @@ private fun androidx.navigation.NavGraphBuilder.appChatGraph(navController: NavH
 private fun androidx.navigation.NavGraphBuilder.appCanvasGraph(navController: NavHostController) {
     composable<CanvasRoute> { backStackEntry ->
         val route = backStackEntry.toRoute<CanvasRoute>()
+        val coroutineScope = rememberCoroutineScope()
         com.letta.mobile.ui.screens.canvas.CanvasScreen(
             canvasId = route.canvasId,
             conversationId = route.conversationId,
             onNavigateBack = { navController.popBackStack() },
-            onShareToChat = { _, _ ->
+            onShareToChat = { bytes, mimeType ->
+                val result = com.letta.mobile.data.canvas.CanvasShare.packageForChat(bytes, mimeType)
+                result.onSuccess { image ->
+                    coroutineScope.launch {
+                        com.letta.mobile.data.canvas.CanvasShare.stageForConversation(route.conversationId, image)
+                    }
+                }
                 navController.popBackStack()
             },
         )
