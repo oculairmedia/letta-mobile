@@ -49,26 +49,11 @@ internal fun rememberChatScreenLayoutLocalState(params: ChatScreenLayoutParams):
             imageViewerState = attachments.toImmutableList() to index
         }
     }
-    val activeFontScaleChange = rememberUpdatedState(params.onActiveFontScaleChange)
-    val contentCallbacks = remember(params.viewModel, openImageViewer) {
-        ChatContentCallbacks(
-            onSendMessage = { params.viewModel.sendMessage(it) },
-            onRerunMessage = { params.viewModel.rerunMessage(it) },
-            onLoadOlderMessages = { params.viewModel.loadOlderMessages() },
-            onReleaseOlderMessages = { params.viewModel.releaseOlderMessages() },
-            onSubmitApproval = { requestId, toolCallIds, approve, reason ->
-                params.viewModel.submitApproval(requestId, toolCallIds, approve, reason)
-            },
-            onToggleRunCollapsed = params.viewModel::toggleRunCollapsed,
-            onToggleReasoningExpanded = params.viewModel::toggleReasoningExpanded,
-            onOpenToolRunDetails = { toolRunDetails = it },
-            onA2uiAction = params.viewModel::submitA2uiAction,
-            onDismissA2uiSurface = params.viewModel::dismissA2uiSurface,
-            onAttachmentImageTap = openImageViewer,
-            onActiveFontScaleChange = { activeFontScaleChange.value(it) },
-            onFontScaleChange = { params.viewModel.setChatFontScale(it) },
-        )
-    }
+    val contentCallbacks = rememberChatContentCallbacks(
+        params = params,
+        openImageViewer = openImageViewer,
+        openToolRunDetails = { toolRunDetails = it },
+    )
     val openSubagentTarget: (SubagentTodoSheetTarget) -> Unit = remember(
         params.resolvedSubagentSource,
         subagentNavigationScope,
@@ -107,4 +92,33 @@ internal fun rememberChatScreenLayoutLocalState(params: ChatScreenLayoutParams):
         toolRunDetails = toolRunDetails,
         onToolRunDetailsChange = { toolRunDetails = it },
     )
+}
+
+@Composable
+private fun rememberChatContentCallbacks(
+    params: ChatScreenLayoutParams,
+    openImageViewer: (List<UiImageAttachment>, Int) -> Unit,
+    openToolRunDetails: (List<ToolTimelineGroup>?) -> Unit,
+): ChatContentCallbacks {
+    val activeFontScaleChange = rememberUpdatedState(params.onActiveFontScaleChange)
+    val currentOpenToolRunDetails = rememberUpdatedState(openToolRunDetails)
+    return remember(params.viewModel, openImageViewer) {
+        ChatContentCallbacks(
+            onSendMessage = { params.viewModel.sendMessage(it) },
+            onRerunMessage = { params.viewModel.rerunMessage(it) },
+            onLoadOlderMessages = { params.viewModel.loadOlderMessages() },
+            onReleaseOlderMessages = { params.viewModel.releaseOlderMessages() },
+            onSubmitApproval = { requestId, toolCallIds, approve, reason ->
+                params.viewModel.submitApproval(requestId, toolCallIds, approve, reason)
+            },
+            onToggleRunCollapsed = params.viewModel::toggleRunCollapsed,
+            onToggleReasoningExpanded = params.viewModel::toggleReasoningExpanded,
+            onOpenToolRunDetails = { currentOpenToolRunDetails.value(it) },
+            onA2uiAction = params.viewModel::submitA2uiAction,
+            onDismissA2uiSurface = params.viewModel::dismissA2uiSurface,
+            onAttachmentImageTap = openImageViewer,
+            onActiveFontScaleChange = { activeFontScaleChange.value(it) },
+            onFontScaleChange = { params.viewModel.setChatFontScale(it) },
+        )
+    }
 }

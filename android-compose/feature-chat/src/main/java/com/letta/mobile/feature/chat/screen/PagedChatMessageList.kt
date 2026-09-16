@@ -239,6 +239,7 @@ private fun PagedChatMessageListContent(
             pinch.cancel()
         }
     }) {
+        val newestMessage = (live.firstOrNull() ?: pages.itemSnapshotList.items.firstOrNull())?.newestMessage()
         val context = ChatMessageListLazyContext(
             itemState = state.toChatRenderItemState(),
             conversationId = (state.conversationState as? com.letta.mobile.ui.chat.render.ConversationState.Ready)?.conversationId,
@@ -248,24 +249,12 @@ private fun PagedChatMessageListContent(
             layoutDirection = direction,
             activeFontScale = appearance.activeFontScale,
             liveFontScale = liveScale,
-            newestMessageId = when (val newest = live.firstOrNull() ?: pages.itemSnapshotList.items.firstOrNull()) {
-                is ChatRenderItem.Single -> newest.message.id
-                is ChatRenderItem.RunBlock -> newest.messages.lastOrNull()?.first?.id
-                else -> null
-            },
+            newestMessageId = newestMessage?.id,
             highlightedMessageId = highlightedTarget,
             itemGeometryState = geometry,
             pinchFontScaleController = pinch,
             scaleWindowIndexRange = IntRange.EMPTY,
-            callbacks = ChatMessageRenderCallbacks(
-                onSendMessage = callbacks.onSendMessage,
-                onRerunMessage = callbacks.onRerunMessage,
-                onSubmitApproval = callbacks.onSubmitApproval,
-                onToggleRunCollapsed = callbacks.onToggleRunCollapsed,
-                onToggleReasoningExpanded = callbacks.onToggleReasoningExpanded,
-                onOpenToolRunDetails = callbacks.onOpenToolRunDetails,
-                onAttachmentImageTap = callbacks.onAttachmentImageTap,
-            ),
+            callbacks = callbacks.toRenderCallbacks(),
         )
         val reducedMotion = com.letta.mobile.ui.components.rememberReducedMotionEnabled()
         val kineticOverscroll = rememberTimelineKineticOverscroll(
@@ -291,11 +280,7 @@ private fun PagedChatMessageListContent(
         )
         val topFadeLength = appearance.topPadding + ChatFadeEdgeLength
         val bottomFadeLength = chatMessageListBottomFadeLength(appearance.bottomPadding)
-        val newestRole = when (val newest = live.firstOrNull() ?: pages.itemSnapshotList.items.firstOrNull()) {
-            is ChatRenderItem.Single -> newest.message.role
-            is ChatRenderItem.RunBlock -> newest.messages.lastOrNull()?.first?.role
-            else -> null
-        }
+        val newestRole = newestMessage?.role
         // Paging can briefly report a backward scroll range while the live tail settles.
         // Keep a streaming user prompt at the newest edge fully visible during that window.
         val suppressBottomFade = following && newestRole == "user" && state.isStreaming
@@ -384,3 +369,20 @@ internal fun pagedBoundaryDate(newer: ChatRenderItem, older: ChatRenderItem?): L
 private fun PagedDateBoundary(newer: ChatRenderItem, older: ChatRenderItem?) {
     pagedBoundaryDate(newer, older)?.let { DateSeparator(date = it) }
 }
+
+/** The newest message a render row carries, or null for rows that carry none. */
+private fun ChatRenderItem.newestMessage(): com.letta.mobile.data.model.UiMessage? = when (this) {
+    is ChatRenderItem.Single -> message
+    is ChatRenderItem.RunBlock -> messages.lastOrNull()?.first
+    else -> null
+}
+
+private fun ChatContentCallbacks.toRenderCallbacks() = ChatMessageRenderCallbacks(
+    onSendMessage = onSendMessage,
+    onRerunMessage = onRerunMessage,
+    onSubmitApproval = onSubmitApproval,
+    onToggleRunCollapsed = onToggleRunCollapsed,
+    onToggleReasoningExpanded = onToggleReasoningExpanded,
+    onOpenToolRunDetails = onOpenToolRunDetails,
+    onAttachmentImageTap = onAttachmentImageTap,
+)

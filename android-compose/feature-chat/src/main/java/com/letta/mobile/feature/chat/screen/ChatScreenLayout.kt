@@ -470,34 +470,41 @@ private fun ChatScreenThinkingTokenSection(
     val thinkingTokenActive = state.isStreaming ||
         state.isAgentTyping ||
         !state.a2uiThinkingDelayMessage.isNullOrBlank()
-    val activeRunMessages = state.messages.takeLastWhile { it.runId != null && it.runId == state.messages.lastOrNull()?.runId }
-    val activeToolName = activeRunMessages
-        .flatMap { it.toolCalls.orEmpty() }
-        .lastOrNull { it.status.isNullOrBlank() || it.status.equals("running", ignoreCase = true) }
-        ?.name
-    val runStartedAt = activeRunMessages.firstNotNullOfOrNull {
-        com.letta.mobile.data.chat.projection.parseTimestampEpochMillis(it.timestamp)
-    }
-    val elapsedSeconds by androidx.compose.runtime.produceState(0L, thinkingTokenActive, runStartedAt) {
-        value = runStartedAt?.let { ((System.currentTimeMillis() - it).coerceAtLeast(0L)) / 1_000L } ?: 0L
-        while (thinkingTokenActive) {
-            kotlinx.coroutines.delay(1_000L)
-            value = runStartedAt?.let { ((System.currentTimeMillis() - it).coerceAtLeast(0L)) / 1_000L }
-                ?: value + 1L
-        }
-    }
-    val activityText = if (thinkingTokenActive) {
-        val phase = activeToolName?.let { "Running $it" } ?: "Thinking…"
-        "${formatElapsedSeconds(elapsedSeconds)}  $phase"
-    } else null
+    val activity = remember(state.messages) { activeRunActivity(state.messages) }
+    val elapsedSeconds by rememberRunElapsedSeconds(thinkingTokenActive, activity.startedAtEpochMs)
     ThinkingTextToken(
         visible = thinkingTokenActive,
         delayMessage = state.a2uiThinkingDelayMessage,
-        textOverride = activityText,
+        textOverride = if (thinkingTokenActive) activity.label(elapsedSeconds) else null,
         reducedMotion = reducedMotion,
         reserveSpace = thinkingTokenActive,
         // Beside the mascot companion: no leading inset, the row already places it.
         contentPadding = androidx.compose.foundation.layout.PaddingValues(end = 16.dp, top = 4.dp, bottom = 4.dp),
+    )
+}
+
+/** What the newest run is doing right now, for the composer's thinking token. */
+internal data class ActiveRunActivity(
+    val runningToolName: String?,
+    val startedAtEpochMs: Long?,
+) {
+    fun label(elapsedSeconds: Long): String {
+        val phase = runningToolName?.let { "Running $it" } ?: "Thinking…"
+        return "${formatElapsedSeconds(elapsedSeconds)}  $phase"
+    }
+}
+
+internal fun activeRunActivity(messages: List<com.letta.mobile.data.model.UiMessage>): ActiveRunActivity {
+    val newestRunId = messages.lastOrNull()?.runId
+    val activeRunMessages = messages.takeLastWhile { it.runId != null && it.runId == newestRunId }
+    return ActiveRunActivity(
+        runningToolName = activeRunMessages
+            .flatMap { it.toolCalls.orEmpty() }
+            .lastOrNull { it.status.isNullOrBlank() || it.status.equals("running", ignoreCase = true) }
+            ?.name,
+        startedAtEpochMs = activeRunMessages.firstNotNullOfOrNull {
+            com.letta.mobile.data.chat.projection.parseTimestampEpochMillis(it.timestamp)
+        },
     )
 }
 

@@ -253,14 +253,7 @@ private fun ToolRunSummaryRow(
     onClick: () -> Unit,
 ) {
     val summary = remember(groups) { summarizeToolRun(groups) }
-    val elapsed by produceState(0L, summary.running, startedAtEpochMs) {
-        value = startedAtEpochMs?.let { ((System.currentTimeMillis() - it).coerceAtLeast(0L)) / 1_000L } ?: 0L
-        while (summary.running) {
-            delay(1.seconds)
-            value = startedAtEpochMs?.let { ((System.currentTimeMillis() - it).coerceAtLeast(0L)) / 1_000L }
-                ?: value + 1L
-        }
-    }
+    val elapsed by rememberRunElapsedSeconds(summary.running, startedAtEpochMs)
     val color = when {
         summary.failureCount > 0 -> MaterialTheme.colorScheme.error
         summary.awaitingApprovalCount > 0 -> MaterialTheme.colorScheme.secondary
