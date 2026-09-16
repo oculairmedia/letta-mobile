@@ -43,6 +43,8 @@ class AndroidMascotEntry(val scene: AndroidMascotScene, runtime: RiveAvatarRunti
 
     override suspend fun load() = rive.load(MASCOT_MODEL)
 
+    override fun writeIdentity(identity: MascotIdentity) = RiveAvatarContract.applyIdentity(scene.sink, identity)
+
     override fun dispose() = scene.close()
 }
 
@@ -60,10 +62,7 @@ class AndroidMascotHost(
 ) : MascotHost {
     /** Compose state so every tile drawing its fallback recomposes into the live mascot once the file lands. */
     private var file by mutableStateOf<RiveFile?>(null)
-    private val entries = MascotEntries<AndroidMascotEntry>(
-        create = ::create,
-        applyIdentity = { entry, identity -> RiveAvatarContract.applyIdentity(entry.scene.sink, identity) },
-    )
+    private val entries = MascotEntries<AndroidMascotEntry>(create = ::create)
 
     /**
      * Whether the worker's message poll must run. The runtime's default polls on every vsync for

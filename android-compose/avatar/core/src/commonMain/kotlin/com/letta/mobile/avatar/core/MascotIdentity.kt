@@ -85,6 +85,30 @@ data class MascotIdentity(
         fun normalizeRotation(degrees: Int): Int = degrees.mod(FULL_TURN)
 
         /**
+         * The identity [fraction] of the way from [from] to [to] - what a mascot mid-morph draws.
+         * The shape is [to]'s from the first step, because the asset morphs the outline itself when
+         * the shape input changes; only the colour (mixed per channel) and the turn (the shorter
+         * arc, so 350 to 10 passes through 0, not 180) are the host's to ease.
+         */
+        fun lerp(from: MascotIdentity, to: MascotIdentity, fraction: Float): MascotIdentity {
+            val t = fraction.coerceIn(0f, 1f)
+            if (t >= 1f) return to
+            var delta = (to.rotationDegrees - from.rotationDegrees).mod(FULL_TURN)
+            if (delta > FULL_TURN / 2) delta -= FULL_TURN
+            val rotation = normalizeRotation(from.rotationDegrees + (delta * t).toInt())
+            return MascotIdentity(to.shape, lerpArgb(from.argb, to.argb, t), rotation)
+        }
+
+        private fun lerpArgb(from: Int, to: Int, t: Float): Int {
+            fun channel(shift: Int): Int {
+                val a = (from ushr shift) and 0xff
+                val b = (to ushr shift) and 0xff
+                return (a + (b - a) * t + 0.5f).toInt().coerceIn(0, 0xff)
+            }
+            return (channel(24) shl 24) or (channel(16) shl 16) or (channel(8) shl 8) or channel(0)
+        }
+
+        /**
          * Reads a persisted identity. Accepts the legacy per-agent avatar style (a bare int
          * indexing the old six gradient orbs) so existing agents keep a stable look: they become a
          * circle in the palette colour at that index.

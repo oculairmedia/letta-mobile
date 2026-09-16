@@ -158,6 +158,8 @@ internal fun ChatComposer(
     agentId: String? = null,
     /** Status beside the mascot companion (the thinking indicator); drawn in the same row, after the character. */
     companionStatus: (@Composable () -> Unit)? = null,
+    /** The companion mascot was tapped: open the agent's pane. */
+    onCompanionClick: (() -> Unit)? = null,
 ) {
     val model = ChatComposerUiModel(
         agentId = agentId,
@@ -183,6 +185,7 @@ internal fun ChatComposer(
         callbacks = callbacks,
         modifier = modifier,
         companionStatus = companionStatus,
+        onCompanionClick = onCompanionClick,
     )
 }
 
@@ -192,6 +195,7 @@ private fun ChatComposerContent(
     callbacks: ChatComposerCallbacks,
     modifier: Modifier,
     companionStatus: (@Composable () -> Unit)? = null,
+    onCompanionClick: (() -> Unit)? = null,
 ) {
     var previewAttachment by remember { mutableStateOf<MessageContentPart.Image?>(null) }
     var showComposerActions by remember { mutableStateOf(false) }
@@ -227,7 +231,7 @@ private fun ChatComposerContent(
     Column(modifier = modifier.fillMaxWidth()) {
         // letta-mobile-8jtf3: the agent's mascot above the box, on the attach button's edge,
         // watching the field (and the pointer, when there is one) through the shared gaze director.
-        ChatComposerCompanion(agentId = model.agentId, status = companionStatus)
+        ChatComposerCompanion(agentId = model.agentId, status = companionStatus, onClick = onCompanionClick)
 
         // letta-mobile-ihuz: tool-affordance chips above the input when the
         // composer is empty AND the active agent has tools. Hides as soon as
