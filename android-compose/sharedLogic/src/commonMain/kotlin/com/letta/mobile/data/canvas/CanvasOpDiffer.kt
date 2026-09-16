@@ -3,6 +3,7 @@ package com.letta.mobile.data.canvas
 import kotlin.random.Random
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -24,12 +25,50 @@ object CanvasOpDiffer {
     }
 
     fun canonicalize(sceneJson: String): String {
-        val parsed = parseScene(sceneJson)
+        val parsed = cleanScene(parseScene(sceneJson))
         return json.encodeToString(JsonObject.serializer(), parsed)
     }
 
     /**
+     * Strips internal synchronization metadata (e.g. _lamport, _actorId) from a scene,
+     * returning a clean semantic JsonObject suitable for content equality comparisons.
+     */
+    fun cleanScene(scene: JsonObject): JsonObject {
+        val elementsArray = runCatching { scene["elements"]?.jsonArray }.getOrNull()
+        val cleanedElements = elementsArray?.map { elem ->
+            val obj = runCatching { elem.jsonObject }.getOrNull()
+            if (obj != null) cleanElement(obj) else elem
+        }
+        return buildJsonObject {
+            scene.forEach { (key, value) ->
+                if (!key.startsWith("_") && key != "elements") {
+                    put(key, value)
+                }
+            }
+            if (cleanedElements != null) {
+                put("elements", kotlinx.serialization.json.JsonArray(cleanedElements))
+            }
+        }
+    }
+
+    /**
+     * Strips internal synchronization metadata (e.g. _lamport, _actorId) from an element.
+     */
+    fun cleanElement(elem: JsonObject): JsonObject {
+        val hasMetadata = elem.keys.any { it.startsWith("_") }
+        if (!hasMetadata) return elem
+        return buildJsonObject {
+            elem.forEach { (k, v) ->
+                if (!k.startsWith("_")) put(k, v)
+            }
+        }
+    }
+
+    /**
      * Diffs [oldSceneJson] against [newSceneJson] and returns a list of discrete operations.
+     *
+     * Ignores synchronization metadata (_lamport, _actorId) so that clean DrawBox exports
+     * compared against metadata-tagged session scenes produce zero phantom operations (N1).
      *
      * @param oldSceneJson Previous snapshot of the canvas scene
      * @param newSceneJson Newly exported canvas scene
@@ -46,8 +85,8 @@ object CanvasOpDiffer {
     ): List<CanvasOp> {
         if (oldSceneJson == newSceneJson) return emptyList()
 
-        val oldParsed = parseScene(oldSceneJson)
-        val newParsed = parseScene(newSceneJson)
+        val oldParsed = cleanScene(parseScene(oldSceneJson))
+        val newParsed = cleanScene(parseScene(newSceneJson))
         if (oldParsed == newParsed) return emptyList()
 
         val ops = mutableListOf<CanvasOp>()
@@ -131,7 +170,7 @@ object CanvasOpDiffer {
         elementsArray.forEachIndexed { index, elem ->
             val obj = runCatching { elem.jsonObject }.getOrNull() ?: return@forEachIndexed
             val id = runCatching { obj["id"]?.jsonPrimitive?.content }.getOrNull() ?: "elem-$index"
-            map[id] = obj
+            map[id] = cleanElement(obj)
         }
         return map
     }
