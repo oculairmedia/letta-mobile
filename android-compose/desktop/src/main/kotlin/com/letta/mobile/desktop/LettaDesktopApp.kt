@@ -410,19 +410,10 @@ internal fun LettaDesktopApp(
     // Every AgentOrb in the app reads identities from the registry; keep it current.
     val mascotRegistry = com.letta.mobile.ui.mascot.LocalMascotRegistry.current
     androidx.compose.runtime.SideEffect { mascotRegistry.update(identityByAgentId) }
-    // The transport verb, driven from the shell's own state so every surface agrees: editing an
-    // agent sends its mascot to the editor's seat and closing the editor lets it settle; picking
-    // another conversation lets the previous agent's mascot rest (the composer seat).
+    // The transport verb is driven from the shell's own state (below, once the sidebar's
+    // visibility is known) so every control that opens a pane moves the mascot the same way.
     val mascotTransport = LocalMascotTransport.current
-    var mascotInEditor by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(editAgentId) {
-        mascotInEditor?.takeIf { it != editAgentId }?.let(mascotTransport::rest)
-        editAgentId?.let { mascotTransport.transportTo(it, MascotStage.EDIT_AGENT_HERO) }
-        mascotInEditor = editAgentId
-    }
-    LaunchedEffect(chatState.selectedConversationId) {
-        selectedAgentId?.let(mascotTransport::rest)
-    }
+    var placedMascotAgent by remember { mutableStateOf<String?>(null) }
     val selectedAgentOrbIndex = avatarStyleByAgentId[selectedAgentId]
         ?: railAgents.indexOfFirst { it.first == selectedAgentId }.coerceAtLeast(0)
     val selectedAgentName = railAgents.firstOrNull { it.first == selectedAgentId }?.second
@@ -717,6 +708,21 @@ internal fun LettaDesktopApp(
             val measuredWidthDp = maxWidth.value
             val isSidebarVisible = shellLayoutState.isSidebarVisible &&
                 !ShellLayoutReducer.defaultCollapsedForWidth(measuredWidthDp)
+            // One rule for where the mascot stands (wbin4.4): the editor's seat while an agent is
+            // being edited, the agent pane's hero seat while the sidebar shows (however it was
+            // opened), else rest at the composer. The previous agent is let go when focus moves.
+            val mascotStageAgent = editAgentId ?: selectedAgentId
+            val mascotStage = when {
+                editAgentId != null -> MascotStage.EDIT_AGENT_HERO
+                isSidebarVisible -> MascotStage.AGENT_PANE_HERO
+                else -> null
+            }
+            LaunchedEffect(mascotStageAgent, mascotStage) {
+                placedMascotAgent?.takeIf { it != mascotStageAgent }?.let(mascotTransport::rest)
+                placedMascotAgent = mascotStageAgent
+                val agent = mascotStageAgent ?: return@LaunchedEffect
+                if (mascotStage != null) mascotTransport.transportTo(agent, mascotStage) else mascotTransport.rest(agent)
+            }
             LaunchedEffect(measuredWidthDp) {
                 shellLayoutController.dispatch(ShellLayoutEvent.WindowWidthChanged(measuredWidthDp))
             }
@@ -894,6 +900,13 @@ internal fun LettaDesktopApp(
                                     onNavigateToChannels = { selectedDestination = DesktopDestination.Channels },
                                     onNavigateToAgents = { selectedDestination = DesktopDestination.Agents },
                                     onOpenAgent = ::openAgent,
+                                    // The companion mascot is the way into its agent: bring the agent
+                                    // pane (the sidebar) back if it was collapsed and leave any editor.
+                                    onOpenAgentPane = {
+                                        editAgentId = null
+                                        selectedDestination = DesktopDestination.Conversations
+                                        shellLayoutController.dispatch(ShellLayoutEvent.SetSidebarCollapsed(false))
+                                    },
                                 ),
                             ),
                             destinationActions = DestinationContentActions(

@@ -1,10 +1,17 @@
 package com.letta.mobile.ui.mascot
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -180,22 +187,47 @@ fun MascotLive(
     }
     // requiredSize: an overscaled mascot must exceed its tile so the tile's clip crops it;
     // plain size() is coerced down to the parent's constraints and never overscales.
-    val clickable = if (onClick != null) {
-        Modifier.pointerHoverIcon(PointerIcon.Hand).clickable(onClick = onClick)
-    } else {
-        Modifier
-    }
-    host.Surface(
-        entry,
-        modifier.then(clickable).requiredSize(size).onGloballyPositioned {
+    Box(
+        modifier = modifier.requiredSize(size).onGloballyPositioned {
             val r = it.boundsInWindow()
             bounds = r
             val slot = MascotSlot(agentId, GazeRect(r.left, r.top, r.right, r.bottom))
             if (registry.mascotBounds[slotKey] != slot) registry.mascotBounds[slotKey] = slot
         },
-        playing = true,
+        contentAlignment = Alignment.Center,
+    ) {
+        host.Surface(entry, Modifier.matchParentSize(), playing = true)
+        if (onClick != null) MascotHitRing(size, onClick)
+    }
+}
+
+/**
+ * The control over a clickable mascot: a hit area the size of the body (the rig draws it across
+ * ~60 % of the tile, a little below centre), outlined on hover so the affordance is the character
+ * itself, not a large invisible box around it.
+ */
+@Composable
+private fun MascotHitRing(size: Dp, onClick: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    val ring = MaterialTheme.colorScheme.primary.copy(alpha = if (hovered) HIT_RING_ALPHA else 0f)
+    Box(
+        Modifier
+            .offset(y = size * BODY_DROP_FRACTION)
+            .size(size * BODY_FRACTION)
+            .clip(CircleShape)
+            .border(HIT_RING_WIDTH, ring, CircleShape)
+            .hoverable(interaction)
+            .pointerHoverIcon(PointerIcon.Hand)
+            .clickable(interactionSource = interaction, indication = null, onClick = onClick),
     )
 }
+
+/** The body's share of a tile and how far below the tile's centre it sits (see the 8yee3 framing note). */
+private const val BODY_FRACTION = 0.62f
+private const val BODY_DROP_FRACTION = 0.06f
+private const val HIT_RING_ALPHA = 0.7f
+private val HIT_RING_WIDTH = 1.5.dp
 
 /**
  * The real mascot for an identity that belongs to no agent - a picker option, a preview - drawn
