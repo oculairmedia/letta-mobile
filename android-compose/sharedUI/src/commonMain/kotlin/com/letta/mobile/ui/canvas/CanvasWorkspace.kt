@@ -61,6 +61,7 @@ fun CanvasWorkspace(
     onNavigateBack: (() -> Unit)? = null,
     onExportJson: ((String) -> Unit)? = null,
     onExportSvg: ((String) -> Unit)? = null,
+    onShareToChat: ((bytes: ByteArray, mimeType: String) -> Unit)? = null,
 ) {
     val state by controller.state.collectAsState()
     val canUndo by controller.canUndo.collectAsState()
@@ -75,6 +76,7 @@ fun CanvasWorkspace(
     var statusMessage by remember { mutableStateOf("Ready") }
     var initialLoadDone by remember { mutableStateOf(false) }
     var lastExportedJson by remember { mutableStateOf<String?>(null) }
+    var isSharingToChat by remember { mutableStateOf(false) }
 
     // Load initial JSON diagram or session document & observe external session updates (Card I2.3 & I3.3)
     LaunchedEffect(session, initialJson) {
@@ -164,6 +166,16 @@ fun CanvasWorkspace(
                         "Warning: Exported SVG missing '<svg' tag"
                     }
                     onExportSvg?.invoke(event.svg)
+                    if (isSharingToChat && onShareToChat != null) {
+                        isSharingToChat = false
+                        val bytes = event.svg.encodeToByteArray()
+                        if (bytes.size <= com.letta.mobile.data.attachment.AttachmentLimits.Default.maxRawBytesPerImage) {
+                            onShareToChat.invoke(bytes, "image/svg+xml")
+                            statusMessage = "Shared canvas SVG (${bytes.size} bytes) to chat"
+                        } else {
+                            statusMessage = "Error: Exported SVG exceeds attachment limit (${bytes.size} bytes)"
+                        }
+                    }
                 }
                 is Event.Error -> {
                     val err = event.message.ifBlank { event.throwable?.message ?: "Unknown" }
@@ -279,6 +291,20 @@ fun CanvasWorkspace(
                             ),
                         ) {
                             Text("Export SVG")
+                        }
+
+                        if (onShareToChat != null) {
+                            Button(
+                                onClick = {
+                                    isSharingToChat = true
+                                    controller.exportSvg()
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                ),
+                            ) {
+                                Text("Share to Chat")
+                            }
                         }
                     }
                 }

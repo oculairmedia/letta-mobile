@@ -69,6 +69,7 @@ fun CanvasScreen(
     canvasId: String,
     conversationId: String? = null,
     onNavigateBack: () -> Unit,
+    onShareToChat: ((ByteArray, String) -> Unit)? = null,
     viewModel: CanvasViewModel = hiltViewModel(),
 ) {
     LaunchedEffect(canvasId, conversationId) {
@@ -82,6 +83,7 @@ fun CanvasScreen(
             session = activeSession,
             presenceTransport = viewModel.presenceTransport,
             onNavigateBack = onNavigateBack,
+            onShareToChat = onShareToChat,
         )
     } else {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

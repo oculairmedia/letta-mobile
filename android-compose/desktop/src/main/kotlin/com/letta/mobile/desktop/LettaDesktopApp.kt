@@ -863,6 +863,17 @@ internal fun LettaDesktopApp(
                             if (nameChanged) chatController.retryConnection()
                         },
                         onCloseCanvas = { activeCanvasSession = null },
+                        onShareCanvasToChat = { bytes, mimeType ->
+                            com.letta.mobile.data.canvas.CanvasShare.packageForChat(bytes, mimeType)
+                                .onSuccess { image ->
+                                    chatController.attachImage(image)
+                                    selectedDestination = DesktopDestination.Conversations
+                                    activeCanvasSession = null
+                                }
+                                .onFailure { error ->
+                                    chatController.showComposerError(error.message ?: "Could not share canvas to chat")
+                                }
+                        },
                         chatDetailActions = createDesktopChatDetailPaneActions(
                             CreateDesktopChatDetailPaneActionsParams(
                                 chatController = chatController,

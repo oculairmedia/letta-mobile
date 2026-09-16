@@ -95,6 +95,9 @@ private fun androidx.navigation.NavGraphBuilder.appCanvasGraph(navController: Na
             canvasId = route.canvasId,
             conversationId = route.conversationId,
             onNavigateBack = { navController.popBackStack() },
+            onShareToChat = { _, _ ->
+                navController.popBackStack()
+            },
         )
     }
 }
