@@ -76,6 +76,7 @@ internal fun LazyListScope.chatMessageListItems(params: ChatMessageListItemsPara
                     chatDimens = params.chatDimens,
                     chatShapes = params.chatShapes,
                 ),
+                modifier = Modifier.animateItem(),
             )
         }
 
@@ -108,7 +109,10 @@ internal fun LazyListScope.chatMessageListItems(params: ChatMessageListItemsPara
 }
 
 @Composable
-internal fun ChatMessageListRenderItem(params: ChatMessageListRenderItemParams) {
+internal fun ChatMessageListRenderItem(
+    params: ChatMessageListRenderItemParams,
+    modifier: Modifier = Modifier,
+) {
     val renderItem = params.renderItem
     val context = params.context
     if (com.letta.mobile.ui.chat.render.RenderDiagnostics.enabled()) {
@@ -153,6 +157,7 @@ internal fun ChatMessageListRenderItem(params: ChatMessageListRenderItemParams) 
                 // The signature carries the committed scale, so while the live scale differs the
                 // cached height describes a size this row is no longer drawn at.
                 scaleIsTransient = perItemFontScale != context.activeFontScale,
+                modifier = modifier,
             ) {
                 ChatMessageListRenderItemBody(
                     params = ChatMessageListRenderItemBodyParams(

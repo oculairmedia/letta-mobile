@@ -141,8 +141,8 @@ internal class EditAgentViewModel @Inject constructor(
         state.setSuccess(snapshot.uiState.copy(avatarIdentity = loadAvatarIdentity(snapshot.uiState)))
     }
 
-    private fun loadAvatarIdentity(loaded: EditAgentUiState): MascotIdentity? =
-        resolveMascotIdentity(loaded.agent, secureSettingsStore.getString(mascotIdentitySettingsKey(agentId)))
+    private fun loadAvatarIdentity(loaded: EditAgentUiState): MascotIdentity =
+        resolveMascotIdentity(agentId, loaded.agent, secureSettingsStore.getString(mascotIdentitySettingsKey(agentId)))
 
     /**
      * Persists the chosen mascot identity at once: on the agent (its metadata, so every client shows

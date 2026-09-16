@@ -12,6 +12,8 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.ui.draw.alpha
@@ -29,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 
@@ -64,12 +67,23 @@ fun ThinkingTextToken(
     /** Around the text; the default is the standalone strip's inset. Beside a mascot the caller drops the start. */
     contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
 ) {
+    val restingOrigin = TransformOrigin(pivotFractionX = 0f, pivotFractionY = 1f)
     AnimatedVisibility(
         visible = reserveSpace,
-        enter = fadeIn(animationSpec = tween(durationMillis = 180)) +
-            expandVertically(animationSpec = tween(durationMillis = 180)),
-        exit = fadeOut(animationSpec = tween(durationMillis = if (reducedMotion) 0 else 160)) +
-            shrinkVertically(animationSpec = tween(durationMillis = if (reducedMotion) 0 else 220)),
+        enter = fadeIn(animationSpec = tween(durationMillis = if (reducedMotion) 0 else 180)) +
+            expandVertically(animationSpec = tween(durationMillis = if (reducedMotion) 0 else 240)) +
+            scaleIn(
+                initialScale = 0.82f,
+                transformOrigin = restingOrigin,
+                animationSpec = tween(durationMillis = if (reducedMotion) 0 else 240),
+            ),
+        exit = fadeOut(animationSpec = tween(durationMillis = if (reducedMotion) 0 else 220)) +
+            shrinkVertically(animationSpec = tween(durationMillis = if (reducedMotion) 0 else 320)) +
+            scaleOut(
+                targetScale = 0.72f,
+                transformOrigin = restingOrigin,
+                animationSpec = tween(durationMillis = if (reducedMotion) 0 else 300),
+            ),
         modifier = modifier,
     ) {
         val contentVisible = visible || !delayMessage.isNullOrBlank()

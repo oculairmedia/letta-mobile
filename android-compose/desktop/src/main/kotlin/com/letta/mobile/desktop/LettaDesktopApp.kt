@@ -388,16 +388,15 @@ internal fun LettaDesktopApp(
             ?: chatController.createConversation()
     }
 
-    // Per-agent avatar-style override chosen in the editor (stored in agent
-    // metadata). Re-derived whenever the roster changes — which includes the
-    // post-save reload — so a freshly-saved icon is reflected on the orbs.
-    // Agents without an override fall back to their position-derived colour.
+    // Every known agent's identity - the rail's and the whole roster's, so the palette and quick
+    // query draw roster-only agents too: the one chosen in the editor (agent metadata, then this
+    // machine's cache), else the one generated from the agent id. Re-derived whenever the roster
+    // changes - which includes the post-save reload - so a freshly-saved icon shows on the orbs.
     val cachedIdentities = remember(railAgents, rosterAgents) {
-        railAgents.mapNotNull { (id, _) ->
-            val agent = rosterAgents.firstOrNull { it.id.value == id }
-            com.letta.mobile.ui.mascot.resolveMascotIdentity(agent, secureSettingsStore.getString(agentAvatarStyleKey(id)))
-                ?.let { id to it }
-        }.toMap()
+        val rosterById = rosterAgents.associateBy { it.id.value }
+        (railAgents.map { it.first } + rosterById.keys).distinct().associateWith { id ->
+            com.letta.mobile.ui.mascot.resolveMascotIdentity(id, rosterById[id], secureSettingsStore.getString(agentAvatarStyleKey(id)))
+        }
     }
     // Session overrides win over the cached/backend value so a just-saved icon
     // shows instantly.

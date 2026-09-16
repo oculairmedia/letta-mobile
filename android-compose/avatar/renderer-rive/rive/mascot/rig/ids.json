@@ -11,6 +11,7 @@
   "IdleWaitCNode": "3:462",
   "IdleWaitD": "3:461",
   "IdleWaitDNode": "3:463",
+  "OrientationNode": "0:400",
   "WanderWaitC": "3:464",
   "WanderWaitCNode": "3:466",
   "WanderWaitD": "3:465",

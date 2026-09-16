@@ -193,6 +193,10 @@ VM_TUNE_SCALE = "1:16"
 VM_TURN_X, VM_TURN_Y = "1:17", "1:18"
 
 
+# shapeRotation: the identity's turn in degrees; the Orientation node rotates the body bones by it.
+VM_SHAPE_ROTATION = "1:19"
+
+
 VM_INSTANCE, ENUM_STATE, ENUM_SHAPE = "1:20", "1:100", "1:200"
 
 
@@ -210,6 +214,9 @@ CONV_TURN_X, CONV_TURN_Y, CONV_TURN_ROT, CONV_BODY_ROT = "2:4", "2:5", "2:6", "2
 
 
 CONV_BODY_X, CONV_LEAN = "2:8", "2:9"
+
+
+CONV_DEGREES = "2:10"
 
 
 # --- 3: root animations and state-machine states -----------------------------------------------
