@@ -369,20 +369,3 @@ internal fun pagedBoundaryDate(newer: ChatRenderItem, older: ChatRenderItem?): L
 private fun PagedDateBoundary(newer: ChatRenderItem, older: ChatRenderItem?) {
     pagedBoundaryDate(newer, older)?.let { DateSeparator(date = it) }
 }
-
-/** The newest message a render row carries, or null for rows that carry none. */
-private fun ChatRenderItem.newestMessage(): com.letta.mobile.data.model.UiMessage? = when (this) {
-    is ChatRenderItem.Single -> message
-    is ChatRenderItem.RunBlock -> messages.lastOrNull()?.first
-    else -> null
-}
-
-private fun ChatContentCallbacks.toRenderCallbacks() = ChatMessageRenderCallbacks(
-    onSendMessage = onSendMessage,
-    onRerunMessage = onRerunMessage,
-    onSubmitApproval = onSubmitApproval,
-    onToggleRunCollapsed = onToggleRunCollapsed,
-    onToggleReasoningExpanded = onToggleReasoningExpanded,
-    onOpenToolRunDetails = onOpenToolRunDetails,
-    onAttachmentImageTap = onAttachmentImageTap,
-)

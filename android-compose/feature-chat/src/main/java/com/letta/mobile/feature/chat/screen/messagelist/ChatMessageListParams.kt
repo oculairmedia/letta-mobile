@@ -2,7 +2,9 @@ package com.letta.mobile.feature.chat.screen.messagelist
 
 import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.projection.ToolTimelineGroup
+import com.letta.mobile.feature.chat.screen.ChatContentCallbacks
 import com.letta.mobile.ui.theme.ChatBackground
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.unit.Dp
@@ -138,4 +140,21 @@ internal data class ChatMessageListPinchIndicatorEffectParams(
     val isPinching: Boolean,
     val onShowFontIndicator: (Boolean) -> Unit,
     val onSuppressPinchLayoutAnimations: (Boolean) -> Unit,
+)
+
+/** The newest message a render row carries, or null for rows that carry none. */
+internal fun ChatRenderItem.newestMessage(): UiMessage? = when (this) {
+    is ChatRenderItem.Single -> message
+    is ChatRenderItem.RunBlock -> messages.lastOrNull()?.first
+    else -> null
+}
+
+internal fun ChatContentCallbacks.toRenderCallbacks() = ChatMessageRenderCallbacks(
+    onSendMessage = onSendMessage,
+    onRerunMessage = onRerunMessage,
+    onSubmitApproval = onSubmitApproval,
+    onToggleRunCollapsed = onToggleRunCollapsed,
+    onToggleReasoningExpanded = onToggleReasoningExpanded,
+    onOpenToolRunDetails = onOpenToolRunDetails,
+    onAttachmentImageTap = onAttachmentImageTap,
 )
