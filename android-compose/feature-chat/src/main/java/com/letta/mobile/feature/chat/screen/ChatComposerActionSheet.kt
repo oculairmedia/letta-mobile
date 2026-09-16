@@ -24,6 +24,7 @@ internal data class ChatComposerActionSheetCallbacks(
     val onDismiss: () -> Unit,
     val onAttachImage: () -> Unit,
     val onToolSelected: (Tool) -> Unit,
+    val onOpenCanvas: (() -> Unit)? = null,
 )
 
 @Composable
@@ -51,6 +52,13 @@ internal fun ChatComposerActionSheet(
                 icon = LettaIcons.Add,
                 onClick = callbacks.onAttachImage,
             )
+            if (callbacks.onOpenCanvas != null) {
+                ActionSheetItem(
+                    text = stringResource(R.string.action_open_canvas),
+                    icon = LettaIcons.Edit,
+                    onClick = callbacks.onOpenCanvas,
+                )
+            }
             state.availableTools.forEach { tool ->
                 ActionSheetItem(
                     text = tool.name,

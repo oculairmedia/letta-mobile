@@ -45,6 +45,11 @@ import kotlinx.serialization.Serializable
 @Serializable data object VibesyncDebugRoute
 @Serializable data object CanvasDebugRoute
 @Serializable
+data class CanvasRoute(
+    val canvasId: String = "",
+    val conversationId: String? = null,
+)
+@Serializable
 data class ProjectIssuesRoute(
     val projectId: String,
     val projectName: String? = null,

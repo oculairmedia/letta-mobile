@@ -21,7 +21,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.toRoute
 import com.letta.mobile.AppLaunchTarget
 import com.letta.mobile.channel.ChatPushAlarmScheduler
 import com.letta.mobile.data.model.LettaConfig
@@ -79,6 +81,9 @@ private fun androidx.navigation.NavGraphBuilder.appChatGraph(navController: NavH
             navController.navigate(route) {
                 popUpTo<AgentChatRoute> { inclusive = true }
             }
+        },
+        onNavigateToCanvas = { conversationId ->
+            navController.navigate(CanvasRoute(canvasId = "", conversationId = conversationId))
         },
     )
 }
@@ -189,6 +194,15 @@ fun AppNavGraph(
         )
 
         appChatGraph(navController)
+
+        composable<CanvasRoute> { backStackEntry ->
+            val route = backStackEntry.toRoute<CanvasRoute>()
+            com.letta.mobile.ui.screens.canvas.CanvasScreen(
+                canvasId = route.canvasId,
+                conversationId = route.conversationId,
+                onNavigateBack = { navController.popBackStack() },
+            )
+        }
     }
 
     // letta-mobile-cdlk: render the backend-switcher sheet at the top level

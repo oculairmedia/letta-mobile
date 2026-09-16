@@ -274,6 +274,7 @@ internal data class BuildComposerCommandsParams(
     val onCreateAgent: () -> Unit,
     val onEditAgent: () -> Unit,
     val onNavigate: (DesktopDestination) -> Unit,
+    val onOpenCanvas: (() -> Unit)? = null,
 )
 
 internal fun buildComposerCommands(params: BuildComposerCommandsParams): List<ComposerCommand> = buildList {
@@ -282,6 +283,7 @@ internal fun buildComposerCommands(params: BuildComposerCommandsParams): List<Co
     add(ComposerCommand("new", "Start a new chat") { chatController.createConversation() })
     add(ComposerCommand("agent", "Create a new agent") { params.onCreateAgent() })
     add(ComposerCommand("edit", "Edit this agent") { params.onEditAgent() })
+    add(ComposerCommand("canvas", "Open canvas workspace") { params.onOpenCanvas?.invoke() })
     add(ComposerCommand("memory", "Open memory") { onNavigate(DesktopDestination.Memory) })
     add(ComposerCommand("schedules", "Open schedules") { onNavigate(DesktopDestination.Schedules) })
     add(ComposerCommand("skills", "Open skills & tools") { onNavigate(DesktopDestination.Agents) })

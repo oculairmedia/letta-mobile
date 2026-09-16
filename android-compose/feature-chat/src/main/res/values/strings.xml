@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
   <string name="action_attach_image">Attach image</string>
+  <string name="action_open_canvas">Open canvas</string>
   <string name="action_back">Back</string>
   <string name="action_cancel">Cancel</string>
   <string name="action_close">Close</string>

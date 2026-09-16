@@ -768,9 +768,12 @@ internal fun LettaDesktopApp(
                 )
                 RailDivider()
                 }
+                val canvasStore = remember { com.letta.mobile.desktop.canvas.DesktopCanvasDocumentStore() }
+                var activeCanvasSession by remember { mutableStateOf<com.letta.mobile.data.canvas.CanvasSession?>(null) }
                 val composerCommands = remember(
-                    chatController,
+                    chatState.selectedConversationId,
                     agentSlashCommands,
+                    selectedDestination,
                     selectedAgentId,
                 ) {
                     buildComposerCommands(
@@ -780,6 +783,18 @@ internal fun LettaDesktopApp(
                             onCreateAgent = { overlays.newAgent = true },
                             onEditAgent = { editAgentId = selectedAgentId },
                             onNavigate = { selectedDestination = it },
+                            onOpenCanvas = {
+                                val convId = chatState.selectedConversationId ?: "desktop-default-conversation"
+                                val agentId = selectedAgentId
+                                chatScope.launch {
+                                    activeCanvasSession = com.letta.mobile.data.canvas.CanvasSession.getOrCreateForConversation(
+                                        store = canvasStore,
+                                        conversationId = convId,
+                                        agentId = agentId,
+                                        title = "Canvas (${selectedAgentName.ifBlank { "Conversation" }})",
+                                    )
+                                }
+                            },
                         ),
                     )
                 }
@@ -849,6 +864,7 @@ internal fun LettaDesktopApp(
                         showBackgroundTasks = showBackgroundTasks,
                         subagentRepository = subagentRepository,
                         activeSubagents = activeSubagents,
+                        activeCanvasSession = activeCanvasSession,
                     ),
                     actions = DesktopMainContentActions(
                         onEditAgentClose = { editAgentId = null },
@@ -857,6 +873,7 @@ internal fun LettaDesktopApp(
                             editAgentId = null
                             if (nameChanged) chatController.retryConnection()
                         },
+                        onCloseCanvas = { activeCanvasSession = null },
                         chatDetailActions = ChatDetailPaneActions(
                             onComposerTextChanged = chatController::updateComposerText,
                             onSend = chatController::send,
