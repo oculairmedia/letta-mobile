@@ -64,6 +64,11 @@ object CanvasOpDiffer {
         }
     }
 
+    private data class DiffTarget(
+        val actorId: String,
+        val lamportSupplier: () -> Long,
+    )
+
     /**
      * Diffs [oldSceneJson] against [newSceneJson] and returns a list of discrete operations.
      *
@@ -74,14 +79,12 @@ object CanvasOpDiffer {
      * @param newSceneJson Newly exported canvas scene
      * @param actorId Author identifier for the generated operations
      * @param lamportSupplier Function providing incrementing Lamport timestamps
-     * @param opIdGenerator Function providing unique operation IDs
      */
     fun diff(
         oldSceneJson: String,
         newSceneJson: String,
         actorId: String,
         lamportSupplier: () -> Long,
-        opIdGenerator: () -> String = { generateOpId() }
     ): List<CanvasOp> {
         if (oldSceneJson == newSceneJson) return emptyList()
 
@@ -90,69 +93,90 @@ object CanvasOpDiffer {
         if (oldParsed == newParsed) return emptyList()
 
         val ops = mutableListOf<CanvasOp>()
+        val target = DiffTarget(actorId, lamportSupplier)
+        diffBackground(oldParsed, newParsed, target)?.let { ops.add(it) }
+        diffElements(oldParsed, newParsed, target, ops)
+        return ops
+    }
 
-        // 1. Background color diff
+    private fun diffBackground(
+        oldParsed: JsonObject,
+        newParsed: JsonObject,
+        target: DiffTarget,
+    ): CanvasOp.SetBackgroundOp? {
         val oldBg = runCatching { oldParsed["bgColor"]?.jsonPrimitive?.content }.getOrNull()
         val newBg = runCatching { newParsed["bgColor"]?.jsonPrimitive?.content }.getOrNull()
-        if (newBg != null && newBg != oldBg) {
-            ops.add(
-                CanvasOp.SetBackgroundOp(
-                    opId = opIdGenerator(),
-                    actorId = actorId,
-                    lamport = lamportSupplier(),
-                    colorHex = newBg,
-                )
-            )
-        }
+        if (newBg == null || newBg == oldBg) return null
+        return CanvasOp.SetBackgroundOp(
+            opId = generateOpId(),
+            actorId = target.actorId,
+            lamport = target.lamportSupplier(),
+            colorHex = newBg,
+        )
+    }
 
-        // 2. Elements diff
+    private fun diffElements(
+        oldParsed: JsonObject,
+        newParsed: JsonObject,
+        target: DiffTarget,
+        destination: MutableList<CanvasOp>,
+    ) {
         val oldElements = extractElementsMap(oldParsed)
         val newElements = extractElementsMap(newParsed)
+        findRemovedElements(oldElements, newElements, target, destination)
+        findAddedOrUpdatedElements(oldElements, newElements, target, destination)
+    }
 
-        // Removed elements (in old but not in new)
+    private fun findRemovedElements(
+        oldElements: Map<String, JsonObject>,
+        newElements: Map<String, JsonObject>,
+        target: DiffTarget,
+        destination: MutableList<CanvasOp>,
+    ) {
         for ((oldId, _) in oldElements) {
             if (!newElements.containsKey(oldId)) {
-                ops.add(
+                destination.add(
                     CanvasOp.RemoveElementOp(
-                        opId = opIdGenerator(),
-                        actorId = actorId,
-                        lamport = lamportSupplier(),
+                        opId = generateOpId(),
+                        actorId = target.actorId,
+                        lamport = target.lamportSupplier(),
                         elementId = oldId,
                     )
                 )
             }
         }
+    }
 
-        // Added elements (in new but not in old)
+    private fun findAddedOrUpdatedElements(
+        oldElements: Map<String, JsonObject>,
+        newElements: Map<String, JsonObject>,
+        target: DiffTarget,
+        destination: MutableList<CanvasOp>,
+    ) {
         for ((newId, newElemObj) in newElements) {
-            if (!oldElements.containsKey(newId)) {
-                ops.add(
+            val oldElemObj = oldElements[newId]
+            if (oldElemObj == null) {
+                destination.add(
                     CanvasOp.AddElementOp(
-                        opId = opIdGenerator(),
-                        actorId = actorId,
-                        lamport = lamportSupplier(),
+                        opId = generateOpId(),
+                        actorId = target.actorId,
+                        lamport = target.lamportSupplier(),
                         elementId = newId,
                         elementJson = json.encodeToString(JsonObject.serializer(), newElemObj),
                     )
                 )
-            } else {
-                // Updated elements (in both but content differs)
-                val oldElemObj = oldElements[newId]!!
-                if (oldElemObj != newElemObj) {
-                    ops.add(
-                        CanvasOp.UpdateElementOp(
-                            opId = opIdGenerator(),
-                            actorId = actorId,
-                            lamport = lamportSupplier(),
-                            elementId = newId,
-                            elementJson = json.encodeToString(JsonObject.serializer(), newElemObj),
-                        )
+            } else if (oldElemObj != newElemObj) {
+                destination.add(
+                    CanvasOp.UpdateElementOp(
+                        opId = generateOpId(),
+                        actorId = target.actorId,
+                        lamport = target.lamportSupplier(),
+                        elementId = newId,
+                        elementJson = json.encodeToString(JsonObject.serializer(), newElemObj),
                     )
-                }
+                )
             }
         }
-
-        return ops
     }
 
     private fun parseScene(sceneJson: String): JsonObject {
