@@ -98,7 +98,11 @@ object AgentAdminHandlers {
                     ),
                 )
                 if (!response.success) return@require null
-                storeMetadata(tiers.agentMetadata, agentIdOf(response.agent), metadataOf(body))
+                val created = agentIdOf(response.agent)
+                storeMetadata(tiers.agentMetadata, created, metadataOf(body))
+                // Every agent write from an Iroh client lands in these handlers, so this is where
+                // connected clients learn of it (AgentChangeNotifier).
+                created?.let { tiers.agentChanges?.notify(it, AgentChangeKind.Created) }
                 tiers.agentMetadata.overlaid(response.agent)
             }
         }
@@ -114,11 +118,13 @@ object AgentAdminHandlers {
             val sidecar = tiers.agentMetadata
             val result = NativeAdmin.require(tiers.nativeClient, NativeAdminOp.AgentUpdate) { c ->
                 val metadataOnly = metadataOnlyPatch(body)
-                if (sidecar != null && metadataOnly != null) {
+                val updated = if (sidecar != null && metadataOnly != null) {
                     updateMetadataOnly(c, sidecar, id, metadataOnly)
                 } else {
                     updateThroughAppServer(c, sidecar, id, body)
                 }
+                // Inside the success path: a failed update tells no client to refetch.
+                updated?.also { tiers.agentChanges?.notify(id, AgentChangeKind.Updated) }
             }
             if (RuntimeInvalidationPolicy.agentUpdateRequiresRestart(params)) {
                 controller?.stopRuntime(AgentId(id))
@@ -161,6 +167,7 @@ object AgentAdminHandlers {
                 val response = c.agentDelete(AppServerCommand.AgentDelete(requestId = NativeAdmin.requestId(), agentId = id))
                 if (response.success) {
                     tiers.agentMetadata?.delete(id)
+                    tiers.agentChanges?.notify(id, AgentChangeKind.Deleted)
                     buildJsonObject { put("deleted", true) }
                 } else {
                     null

@@ -10,6 +10,15 @@ import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.AgentImportParams
 import com.letta.mobile.data.model.ImportedAgentsResponse
 import com.letta.mobile.data.repository.api.IAgentRepository
+import com.letta.mobile.data.repository.observeAgentUpdates
+import com.letta.mobile.data.repository.observeReconnectRefresh
+import com.letta.mobile.data.transport.api.IChannelTransport
+import com.letta.mobile.util.Telemetry
+import com.letta.mobile.util.runCatchingCancellable
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,11 +29,47 @@ import kotlin.time.Clock
 
 class IrohAgentRepository(
     private val directoryProvider: () -> IrohAdminRpcAgentDirectory?,
+    /**
+     * When given with [scope], the roster follows Meridian's `agent_updated` pushes and refreshes
+     * after a reconnect, as Android's CachedAgentRepository does, instead of only on demand.
+     */
+    transport: IChannelTransport? = null,
+    scope: CoroutineScope? = null,
 ) : IAgentRepository {
     private val agentsFlow = MutableStateFlow<List<Agent>>(emptyList())
     private val refreshingFlow = MutableStateFlow(false)
     private val refreshErrorFlow = MutableStateFlow<Throwable?>(null)
     private var lastRefreshMs = 0L
+    private val refreshMutex = Mutex()
+
+    init {
+        if (transport != null && scope != null) {
+            scope.launch {
+                observeAgentUpdates(
+                    transport = transport,
+                    onDeleted = { agentId -> agentsFlow.update { current -> current.filterNot { it.id == agentId } } },
+                    onChanged = { agentId -> refetch(agentId) },
+                )
+            }
+            scope.launch {
+                observeReconnectRefresh(transport) { runCatchingCancellable { refreshAgents() } }
+            }
+        }
+    }
+
+    /**
+     * One agent, fresh from Meridian; a failed fetch keeps the cached copy (the next refresh
+     * reconciles). Serialized with [refreshAgents] so a full refresh already in flight cannot
+     * overwrite this newer agent with its older roster.
+     */
+    private suspend fun refetch(agentId: AgentId) = refreshMutex.withLock {
+        val directory = directoryProvider() ?: return@withLock
+        runCatchingCancellable { directory.getAgent(agentId) }
+            .onSuccess { agent -> agent?.let(::updateAgentInCache) }
+            .onFailure { e ->
+                Telemetry.event("IrohAgentRepository", "agent_updated.refetch_failed", "agentId" to agentId.value, "error" to (e.message ?: e::class.simpleName), level = Telemetry.Level.WARN)
+            }
+    }
 
     override val agents: StateFlow<List<Agent>> = agentsFlow
     override val isRefreshing: StateFlow<Boolean> = refreshingFlow
@@ -32,7 +77,9 @@ class IrohAgentRepository(
 
     override suspend fun countAgents(): Int = directory().countAgents()
 
-    override suspend fun refreshAgents() {
+    override suspend fun refreshAgents() = refreshMutex.withLock { refreshAgentsLocked() }
+
+    private suspend fun refreshAgentsLocked() {
         refreshingFlow.value = true
         try {
             val newAgents = directory().listAgents()
