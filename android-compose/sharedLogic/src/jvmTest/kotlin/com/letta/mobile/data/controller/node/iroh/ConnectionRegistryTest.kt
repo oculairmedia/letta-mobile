@@ -39,7 +39,7 @@ class ConnectionRegistryTest {
 
         val result = registry.broadcast("""{"type":"agent_updated"}""") { it.receivesAgentEvents() }
 
-        assertEquals(ConnectionRegistry.BroadcastResult(recipients = 2, delivered = 1), result)
+        assertEquals(BroadcastResult(recipients = 2, delivered = 1), result)
         assertEquals(1, reader.frames.size)
         assertTrue(unauthorised.frames.isEmpty(), "a peer without agent-read must not learn agent ids")
         assertTrue(released.frames.isEmpty(), "a closed connection is not a recipient")
@@ -63,7 +63,7 @@ class ConnectionRegistryTest {
 
         assertEquals(listOf("frame"), fast.frames, "the fast connection is written while the slow one is still blocked")
         slowWrite.complete(Unit)
-        assertEquals(ConnectionRegistry.BroadcastResult(recipients = 2, delivered = 2), result.await())
+        assertEquals(BroadcastResult(recipients = 2, delivered = 2), result.await())
     }
 
     @Test
