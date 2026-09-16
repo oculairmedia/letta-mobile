@@ -2,7 +2,6 @@ package com.letta.mobile.data.repository
 
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.model.isLettaCodeEphemeralWorker
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentRuntimeBinding
 import com.letta.mobile.data.model.AgentSummary
@@ -21,8 +20,6 @@ import kotlin.uuid.Uuid
 import com.letta.mobile.data.repository.api.LocalRuntimeAgentSource
 import com.letta.mobile.data.session.BackendScopedCache
 import com.letta.mobile.data.repository.api.IAgentRepository
-import com.letta.mobile.data.transport.ChannelTransportState
-import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.runCatchingCancellable
@@ -355,8 +352,11 @@ open class CachedAgentRepository(
         }
 
     private suspend fun refreshAgent(agentId: AgentId): Result<Agent> = runCatchingCancellable {
-        val fresh = fetchAgentRemote(agentId)
-        updateAgentInCache(fresh)
+        // Under refreshMutex like refreshAgents: otherwise a full refresh already in flight can
+        // overwrite this newer agent with its older roster when it lands.
+        val fresh = refreshMutex.withLock {
+            fetchAgentRemote(agentId).also(::updateAgentInCache)
+        }
         // Persist the transport-driven refresh to the Room cache so a pushed
         // agent_updated change survives an app restart (CodeRabbit #517).
         runCatchingCancellable { localCache?.invoke()?.upsert(fresh) }
@@ -365,42 +365,30 @@ open class CachedAgentRepository(
     }
 
     private suspend fun observeAgentUpdated(channelTransport: IChannelTransport) {
-        channelTransport.events.collect { frame ->
-            if (frame !is ServerFrame.AgentUpdated) return@collect
-            val agentId = AgentId(frame.agentId)
-            if (frame.reason == "deleted") {
+        observeAgentUpdates(
+            transport = channelTransport,
+            onDeleted = { agentId ->
                 _agents.update { current -> current.filterNot { it.id == agentId } }
                 // Targeted single-agent delete — not a broad deleteExcept that
                 // could race with a stale in-memory list (CodeRabbit #517).
                 runCatchingCancellable { localCache?.invoke()?.deleteById(agentId.value) }
-                    .onFailure { e -> Telemetry.event("CachedAgentRepository", "agent_updated delete cache update failed for ${frame.agentId}", "error" to (e.message ?: e.toString()), level = Telemetry.Level.WARN) }
-                return@collect
-            }
-            // Ephemeral letta-code subagents (`agent-local-*`, transient
-            // "Letta Code" workers) churn in bursts while a run fans out;
-            // don't issue a per-agent GET for each one — they are not part of
-            // the human agent list and the next bulk refresh reconciles them
-            // (letta-mobile-vcmin).
-            if (agentId.isLettaCodeEphemeralWorker()) return@collect
-            refreshAgent(agentId)
-                .onFailure { e -> Telemetry.event("CachedAgentRepository", "agent_updated refresh failed for ${frame.agentId}", "detail" to e.message, level = Telemetry.Level.WARN) }
-        }
+                    .onFailure { e -> Telemetry.event("CachedAgentRepository", "agent_updated delete cache update failed for ${agentId.value}", "error" to (e.message ?: e.toString()), level = Telemetry.Level.WARN) }
+            },
+            onChanged = { agentId ->
+                refreshAgent(agentId)
+                    .onFailure { e -> Telemetry.event("CachedAgentRepository", "agent_updated refresh failed for ${agentId.value}", "detail" to e.message, level = Telemetry.Level.WARN) }
+            },
+        )
     }
 
     private suspend fun observeReconnects(channelTransport: IChannelTransport) {
-        var wasConnected: Boolean? = null
-        channelTransport.state.collect { state ->
-            val nowConnected = state is ChannelTransportState.Connected
-            if (wasConnected == false && nowConnected) {
-                // One paged list call instead of a GET /v1/agents/{id} per
-                // cached agent: with ~100 cached agents (mostly ephemeral
-                // `agent-local-*` subagents) the per-agent loop serialized
-                // ~5s of sequential requests on every reconnect
-                // (letta-mobile-vcmin).
-                runCatchingCancellable { refreshAgents() }
-                    .onFailure { e -> Telemetry.event("CachedAgentRepository", "reconnect agent refresh failed", "detail" to e.message, level = Telemetry.Level.WARN) }
-            }
-            wasConnected = nowConnected
+        // One paged list call instead of a GET /v1/agents/{id} per cached agent:
+        // with ~100 cached agents (mostly ephemeral `agent-local-*` subagents) the
+        // per-agent loop serialized ~5s of sequential requests on every reconnect
+        // (letta-mobile-vcmin).
+        observeReconnectRefresh(channelTransport) {
+            runCatchingCancellable { refreshAgents() }
+                .onFailure { e -> Telemetry.event("CachedAgentRepository", "reconnect agent refresh failed", "detail" to e.message, level = Telemetry.Level.WARN) }
         }
     }
 
