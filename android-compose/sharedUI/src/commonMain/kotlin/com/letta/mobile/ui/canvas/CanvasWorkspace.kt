@@ -33,6 +33,7 @@ import io.ak1.drawbox.domain.model.Event
 import io.ak1.drawbox.domain.usecase.UseCase
 import io.ak1.drawbox.presentation.reducer.Reducer
 import io.ak1.drawbox.presentation.viewmodel.DrawBoxController
+import kotlinx.coroutines.delay
 
 /**
  * Shared Canvas Workspace composable for Meridian.
@@ -55,6 +56,7 @@ fun CanvasWorkspace(
     val sessionDoc by (session?.document?.collectAsState() ?: remember { mutableStateOf(null) })
 
     var statusMessage by remember { mutableStateOf("Ready") }
+    var initialLoadDone by remember { mutableStateOf(false) }
 
     // Load initial JSON diagram or session document
     LaunchedEffect(session, initialJson) {
@@ -69,6 +71,19 @@ fun CanvasWorkspace(
             controller.importPath(initialJson)
             statusMessage = "Loaded diagram (${state.elements.size} elements)"
         }
+        delay(100)
+        initialLoadDone = true
+    }
+
+    // Card I1.6: Autosave debounce
+    // Debounce ~500ms on dirty signal (elements change) -> exportJson()
+    // The resulting Event.JsonExported persists the updated scene off the main thread.
+    // Document: Full JSON replace is acceptable for single-player session in P1;
+    // multi-writer op-log projection will be introduced in P3.
+    LaunchedEffect(state.elements, initialLoadDone, session) {
+        if (!initialLoadDone || session == null) return@LaunchedEffect
+        delay(500)
+        controller.exportJson()
     }
 
     // Collect export/error events from DrawBoxController
@@ -82,7 +97,11 @@ fun CanvasWorkspace(
                     } else {
                         "Warning: Exported JSON missing 'elements' key"
                     }
-                    session?.saveScene(event.json)
+                    if (session != null && session.sceneJsonOrEmpty() != event.json) {
+                        withContext(Dispatchers.Default) {
+                            session.saveScene(event.json)
+                        }
+                    }
                     onExportJson?.invoke(event.json)
                 }
                 is Event.SvgExported -> {
@@ -147,7 +166,14 @@ fun CanvasWorkspace(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         if (onNavigateBack != null) {
-                            OutlinedButton(onClick = onNavigateBack) {
+                            OutlinedButton(
+                                onClick = {
+                                    if (session != null) {
+                                        controller.exportJson()
+                                    }
+                                    onNavigateBack()
+                                },
+                            ) {
                                 Text("Back")
                             }
                         }
