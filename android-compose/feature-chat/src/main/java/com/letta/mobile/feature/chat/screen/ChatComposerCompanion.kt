@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -43,6 +44,10 @@ internal fun ChatComposerCompanion(agentId: String?, status: (@Composable () -> 
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            // Keep the companion lane stable after work completes. Removing
+            // this height makes the entire timeline jump toward the composer
+            // when the mascot and thinking token leave composition.
+            .height(ChatComposerCompanionSize)
             .padding(start = ChatComposerInputHorizontalPadding, bottom = ChatComposerCompanionGap),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(ChatComposerCompanionGap),
