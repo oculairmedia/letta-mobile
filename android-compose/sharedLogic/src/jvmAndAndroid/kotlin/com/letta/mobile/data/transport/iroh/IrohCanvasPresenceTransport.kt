@@ -278,3 +278,21 @@ class IrohCanvasPresenceTransport(
             (prefix[3].toInt() and 0xff)
     }
 }
+
+internal suspend fun CoroutineScope.runCanvasAcceptLoop(
+    endpoint: Endpoint,
+    telemetryTag: String,
+    handle: suspend (Incoming) -> Unit,
+) {
+    while (isActive) {
+        try {
+            val incoming = endpoint.acceptNext() ?: return
+            launch { handle(incoming) }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (t: Throwable) {
+            val errorMsg = t.message ?: t.toString()
+            Telemetry.event(telemetryTag, "accept.error", "error" to errorMsg)
+        }
+    }
+}
