@@ -61,8 +61,11 @@ import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
 import io.github.vinceglb.filekit.dialogs.FileKitMode
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.letta.mobile.desktop.chat.DesktopChatController
+import com.letta.mobile.desktop.chat.ComposerCommand
 import kotlinx.coroutines.flow.StateFlow
 import kotlin.time.Duration.Companion.seconds
 import java.awt.Window
@@ -770,34 +773,22 @@ internal fun LettaDesktopApp(
                 }
                 val canvasStore = remember { com.letta.mobile.desktop.canvas.DesktopCanvasDocumentStore() }
                 var activeCanvasSession by remember { mutableStateOf<com.letta.mobile.data.canvas.CanvasSession?>(null) }
-                val composerCommands = remember(
-                    chatState.selectedConversationId,
-                    agentSlashCommands,
-                    selectedDestination,
-                    selectedAgentId,
-                ) {
-                    buildComposerCommands(
-                        BuildComposerCommandsParams(
-                            chatController = chatController,
-                            agentSlashCommands = agentSlashCommands,
-                            onCreateAgent = { overlays.newAgent = true },
-                            onEditAgent = { editAgentId = selectedAgentId },
-                            onNavigate = { selectedDestination = it },
-                            onOpenCanvas = {
-                                val convId = chatState.selectedConversationId ?: "desktop-default-conversation"
-                                val agentId = selectedAgentId
-                                chatScope.launch {
-                                    activeCanvasSession = com.letta.mobile.data.canvas.CanvasSession.getOrCreateForConversation(
-                                        store = canvasStore,
-                                        conversationId = convId,
-                                        agentId = agentId,
-                                        title = "Canvas (${selectedAgentName.ifBlank { "Conversation" }})",
-                                    )
-                                }
-                            },
-                        ),
-                    )
-                }
+                val composerCommands = rememberDesktopComposerCommands(
+                    DesktopComposerCommandsParams(
+                        chatController = chatController,
+                        agentSlashCommands = agentSlashCommands,
+                        selectedConversationId = chatState.selectedConversationId,
+                        selectedAgentId = selectedAgentId,
+                        selectedAgentName = selectedAgentName,
+                        selectedDestination = selectedDestination,
+                        canvasStore = canvasStore,
+                        chatScope = chatScope,
+                        onNavigate = { selectedDestination = it },
+                        onCreateAgent = { overlays.newAgent = true },
+                        onEditAgent = { editAgentId = it },
+                        onCanvasSessionChange = { activeCanvasSession = it },
+                    ),
+                )
                 val contextUsage = rememberFocusedContextUsage(
                     agentId = selectedAgentId,
                     conversationId = chatState.selectedConversationId,
@@ -1119,6 +1110,76 @@ private fun workingAgentName(params: WorkingAgentNameParams): String {
 private fun desktopActiveTitle(destination: DesktopDestination, conversationTitle: String?): String {
     if (destination != DesktopDestination.Conversations) return destination.label
     return conversationTitle ?: "Letta Desktop"
+}
+
+private data class OpenDesktopCanvasParams(
+    val scope: CoroutineScope,
+    val store: com.letta.mobile.desktop.canvas.DesktopCanvasDocumentStore,
+    val conversationId: String?,
+    val agentId: String?,
+    val agentName: String,
+    val onSessionReady: (com.letta.mobile.data.canvas.CanvasSession) -> Unit,
+)
+
+private fun openDesktopCanvasSession(params: OpenDesktopCanvasParams) {
+    val convId = params.conversationId ?: "desktop-default-conversation"
+    val displayName = if (params.agentName.isBlank()) "Conversation" else params.agentName
+    params.scope.launch {
+        val session = com.letta.mobile.data.canvas.CanvasSession.getOrCreateForConversation(
+            store = params.store,
+            conversationId = convId,
+            agentId = params.agentId,
+            title = "Canvas ($displayName)",
+        )
+        params.onSessionReady(session)
+    }
+}
+
+private data class DesktopComposerCommandsParams(
+    val chatController: DesktopChatController,
+    val agentSlashCommands: List<AgentSlashCommand>,
+    val selectedConversationId: String?,
+    val selectedAgentId: String?,
+    val selectedAgentName: String,
+    val selectedDestination: DesktopDestination,
+    val canvasStore: com.letta.mobile.desktop.canvas.DesktopCanvasDocumentStore,
+    val chatScope: CoroutineScope,
+    val onNavigate: (DesktopDestination) -> Unit,
+    val onCreateAgent: () -> Unit,
+    val onEditAgent: (String?) -> Unit,
+    val onCanvasSessionChange: (com.letta.mobile.data.canvas.CanvasSession?) -> Unit,
+)
+
+@Composable
+private fun rememberDesktopComposerCommands(params: DesktopComposerCommandsParams): List<ComposerCommand> {
+    return remember(
+        params.selectedConversationId,
+        params.agentSlashCommands,
+        params.selectedDestination,
+        params.selectedAgentId,
+    ) {
+        buildComposerCommands(
+            BuildComposerCommandsParams(
+                chatController = params.chatController,
+                agentSlashCommands = params.agentSlashCommands,
+                onCreateAgent = params.onCreateAgent,
+                onEditAgent = { params.onEditAgent(params.selectedAgentId) },
+                onNavigate = params.onNavigate,
+                onOpenCanvas = {
+                    openDesktopCanvasSession(
+                        OpenDesktopCanvasParams(
+                            scope = params.chatScope,
+                            store = params.canvasStore,
+                            conversationId = params.selectedConversationId,
+                            agentId = params.selectedAgentId,
+                            agentName = params.selectedAgentName,
+                            onSessionReady = params.onCanvasSessionChange,
+                        ),
+                    )
+                },
+            ),
+        )
+    }
 }
 
 /**

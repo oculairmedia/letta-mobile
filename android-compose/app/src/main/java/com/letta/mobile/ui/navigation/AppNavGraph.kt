@@ -88,6 +88,36 @@ private fun androidx.navigation.NavGraphBuilder.appChatGraph(navController: NavH
     )
 }
 
+private fun androidx.navigation.NavGraphBuilder.appCanvasGraph(navController: NavHostController) {
+    composable<CanvasRoute> { backStackEntry ->
+        val route = backStackEntry.toRoute<CanvasRoute>()
+        com.letta.mobile.ui.screens.canvas.CanvasScreen(
+            canvasId = route.canvasId,
+            conversationId = route.conversationId,
+            onNavigateBack = { navController.popBackStack() },
+        )
+    }
+}
+
+private fun resolveStartDestination(
+    hasConfig: Boolean,
+    initialNotificationTarget: AppLaunchTarget?,
+    restoredChatSelection: LastChatSelection?,
+    fallbackAgentId: String?,
+): Any = when {
+    hasConfig && initialNotificationTarget != null -> initialNotificationTarget.toRoute()
+    hasConfig && restoredChatSelection != null -> restoredChatSelection.let { selection ->
+        AgentChatRoute(
+            agentId = selection.agentId,
+            agentName = selection.agentName,
+            conversationId = selection.conversationId,
+        )
+    }
+    hasConfig && fallbackAgentId != null -> AgentChatRoute(agentId = fallbackAgentId)
+    hasConfig -> ConversationsRoute
+    else -> ConfigRoute()
+}
+
 val LocalAnimatedVisibilityScope = compositionLocalOf<AnimatedVisibilityScope?> { null }
 
 @HiltViewModel
@@ -133,24 +163,12 @@ fun AppNavGraph(
     val openBackendSwitcher: () -> Unit = remember { { showBackendSwitcher = true } }
 
     val initialNotificationTarget = remember { notificationTarget }
-    val restoredChatSelection = lastChatSelection
-    val fallbackAgentId = favoriteAgentId ?: adminAgentId
-    val startDestination: Any = when {
-        hasConfig && initialNotificationTarget != null -> initialNotificationTarget.toRoute()
-        hasConfig && restoredChatSelection != null -> restoredChatSelection.let { selection ->
-            AgentChatRoute(
-                agentId = selection.agentId,
-                agentName = selection.agentName,
-                conversationId = selection.conversationId,
-            )
-        }
-        hasConfig && fallbackAgentId != null -> AgentChatRoute(agentId = fallbackAgentId)
-        // Default landing surface is Conversations, not the Projects home —
-        // opening the app should drop the user into their chats (2026-08-01,
-        // user-requested; Projects stays one tap away on the nav rail).
-        hasConfig -> ConversationsRoute
-        else -> ConfigRoute()
-    }
+    val startDestination: Any = resolveStartDestination(
+        hasConfig = hasConfig,
+        initialNotificationTarget = initialNotificationTarget,
+        restoredChatSelection = lastChatSelection,
+        fallbackAgentId = favoriteAgentId ?: adminAgentId,
+    )
 
     LaunchedEffect(notificationTarget) {
         val target = notificationTarget ?: return@LaunchedEffect
@@ -195,14 +213,7 @@ fun AppNavGraph(
 
         appChatGraph(navController)
 
-        composable<CanvasRoute> { backStackEntry ->
-            val route = backStackEntry.toRoute<CanvasRoute>()
-            com.letta.mobile.ui.screens.canvas.CanvasScreen(
-                canvasId = route.canvasId,
-                conversationId = route.conversationId,
-                onNavigateBack = { navController.popBackStack() },
-            )
-        }
+        appCanvasGraph(navController)
     }
 
     // letta-mobile-cdlk: render the backend-switcher sheet at the top level

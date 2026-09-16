@@ -118,11 +118,10 @@ class CanvasSession(
             conversationId: String,
             agentId: String? = null,
             title: String = "Conversation Canvas",
-            clock: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
         ): CanvasSession {
             val existing = store.getForConversation(conversationId)
             return if (existing != null) {
-                val session = CanvasSession(canvasId = existing.id, store = store, clock = clock)
+                val session = CanvasSession(canvasId = existing.id, store = store)
                 session._document.value = existing
                 session
             } else {
@@ -131,7 +130,6 @@ class CanvasSession(
                     title = title,
                     conversationId = conversationId,
                     agentId = agentId,
-                    clock = clock,
                 )
             }
         }
