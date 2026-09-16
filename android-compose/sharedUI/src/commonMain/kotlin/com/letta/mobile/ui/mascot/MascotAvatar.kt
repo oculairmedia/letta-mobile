@@ -121,7 +121,8 @@ fun MascotAvatar(
     fallback: @Composable () -> Unit,
 ) {
     val identity = agentId?.let { LocalMascotRegistry.current.identities[it] }
-    if (agentId == null || identity == null || !LocalMascotHost.current.available) {
+    val host = LocalMascotHost.current
+    if (agentId == null || identity == null || !host.available || host.entry(agentId, identity) == null) {
         fallback()
         return
     }
@@ -156,10 +157,17 @@ fun MascotLive(
     modifier: Modifier = Modifier,
     /** The mascot is a control (it opens its agent): pointer becomes a hand and the tile is clickable. */
     onClick: (() -> Unit)? = null,
+    /**
+     * Which scene draws: the agent's own by default. A surface that shows one agent after another
+     * in the same place (the transport layer's focused character) passes a key of its own, so the
+     * scene it already has is re-skinned - one character morphing into the next - rather than
+     * a new scene brought up for each agent.
+     */
+    sceneKey: String = agentId,
 ) {
     val host = LocalMascotHost.current
     val registry = LocalMascotRegistry.current
-    val entry = remember(host, agentId, identity) { host.entry(agentId, identity) } ?: return
+    val entry = remember(host, sceneKey, identity) { host.entry(sceneKey, identity) } ?: return
     val presence = registry.presence[agentId] ?: AgentPresence.IDLE
     LaunchedEffect(entry, presence) { entry.ensureLoaded(); entry.apply(presence) }
     // The director's timers (listening release, success hold, blink schedule) need a clock;

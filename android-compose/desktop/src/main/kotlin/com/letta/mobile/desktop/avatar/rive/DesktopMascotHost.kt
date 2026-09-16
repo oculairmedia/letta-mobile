@@ -39,6 +39,10 @@ class DesktopMascotEntry private constructor(
     var scene: RiveDesktopScene? by mutableStateOf(null)
         private set
 
+    /** The scene could not be created: the host stops offering this entry and surfaces draw their fallback. */
+    var failed: Boolean by mutableStateOf(false)
+        private set
+
     init {
         // Queued in the deferred sink: the first write the scene will see once it exists.
         RiveAvatarContract.applyIdentity(sink, identity)
@@ -57,8 +61,12 @@ class DesktopMascotEntry private constructor(
                     // (0-20 s in small steps, so the state machines take their transitions) breaks it.
                     repeat(kotlin.random.Random.nextInt(0, 60)) { _ -> scene.advance(kotlin.random.Random.nextFloat() * 0.3f + 0.05f) }
                 }
-            }.getOrNull()
-        } ?: return
+            }.onFailure { System.err.println("[mascot] scene failed to load: ${'$'}it") }.getOrNull()
+        }
+        if (created == null) {
+            failed = true
+            return
+        }
         rive.load(MASCOT_MODEL)
         scene = created
     }
@@ -118,7 +126,7 @@ object DesktopMascotHost : MascotHost {
     override val available: Boolean get() = RiveBridgeNative.AVAILABLE && mascotBytes != null
 
     override fun entry(agentId: String, identity: MascotIdentity): MascotEntry? =
-        if (available) entries.get(agentId, identity) else null
+        if (available) entries.get(agentId, identity)?.takeUnless { it.failed } else null
 
     @Composable
     override fun Surface(entry: MascotEntry, modifier: Modifier, playing: Boolean) {
