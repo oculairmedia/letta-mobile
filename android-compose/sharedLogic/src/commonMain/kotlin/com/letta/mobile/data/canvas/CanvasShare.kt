@@ -66,22 +66,24 @@ object CanvasShare {
      * Prefers raster formats (image/png, image/jpeg) when present; falls back to SVG or PNG.
      */
     fun detectMimeType(bytes: ByteArray): String {
-        if (bytes.size >= 8 &&
+        if (isPng(bytes)) return "image/png"
+        if (isJpeg(bytes)) return "image/jpeg"
+        if (isSvg(bytes)) return "image/svg+xml"
+        return "image/png"
+    }
+
+    private fun isPng(bytes: ByteArray): Boolean =
+        bytes.size >= 8 &&
             bytes[0] == 0x89.toByte() && bytes[1] == 0x50.toByte() &&
             bytes[2] == 0x4E.toByte() && bytes[3] == 0x47.toByte()
-        ) {
-            return "image/png"
-        }
-        if (bytes.size >= 3 &&
+
+    private fun isJpeg(bytes: ByteArray): Boolean =
+        bytes.size >= 3 &&
             bytes[0] == 0xFF.toByte() && bytes[1] == 0xD8.toByte() && bytes[2] == 0xFF.toByte()
-        ) {
-            return "image/jpeg"
-        }
+
+    private fun isSvg(bytes: ByteArray): Boolean {
         val prefix = bytes.take(128).toByteArray().decodeToString()
-        if (prefix.contains("<svg", ignoreCase = true) || prefix.contains("<?xml", ignoreCase = true)) {
-            return "image/svg+xml"
-        }
-        return "image/png"
+        return prefix.contains("<svg", ignoreCase = true) || prefix.contains("<?xml", ignoreCase = true)
     }
 
     /**

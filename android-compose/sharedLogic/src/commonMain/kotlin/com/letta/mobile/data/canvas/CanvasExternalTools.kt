@@ -177,7 +177,7 @@ private suspend fun executeListCanvases(
  */
 class CanvasCreateTool(
     private val store: CanvasDocumentStore,
-    private val sessions: CanvasSessionRegistry,
+    private val sessions: CanvasSessionRegistry = CanvasSessionRegistry(),
 ) : HostExternalTool {
     override val name: String = NAME
     override val description: String =
@@ -209,7 +209,7 @@ class CanvasCreateTool(
  */
 class CanvasGetSceneTool(
     private val store: CanvasDocumentStore,
-    private val sessions: CanvasSessionRegistry,
+    private val sessions: CanvasSessionRegistry = CanvasSessionRegistry(),
 ) : HostExternalTool {
     override val name: String = NAME
     override val description: String =
@@ -250,7 +250,7 @@ class CanvasGetSceneTool(
  */
 class CanvasReplaceSceneTool(
     private val store: CanvasDocumentStore,
-    private val sessions: CanvasSessionRegistry,
+    private val sessions: CanvasSessionRegistry = CanvasSessionRegistry(),
 ) : HostExternalTool {
     override val name: String = NAME
     override val description: String =
@@ -284,7 +284,7 @@ class CanvasReplaceSceneTool(
  */
 class CanvasApplyOpsTool(
     private val store: CanvasDocumentStore,
-    private val sessions: CanvasSessionRegistry,
+    private val sessions: CanvasSessionRegistry = CanvasSessionRegistry(),
 ) : HostExternalTool {
     override val name: String = NAME
     override val description: String =
@@ -318,7 +318,7 @@ class CanvasApplyOpsTool(
  */
 class CanvasExportSvgTool(
     private val store: CanvasDocumentStore,
-    private val sessions: CanvasSessionRegistry,
+    private val sessions: CanvasSessionRegistry = CanvasSessionRegistry(),
 ) : HostExternalTool {
     override val name: String = NAME
     override val description: String =
@@ -357,7 +357,7 @@ class CanvasExportSvgTool(
  */
 class CanvasListTool(
     private val store: CanvasDocumentStore,
-    private val sessions: CanvasSessionRegistry,
+    private val sessions: CanvasSessionRegistry = CanvasSessionRegistry(),
 ) : HostExternalTool {
     override val name: String = NAME
     override val description: String =

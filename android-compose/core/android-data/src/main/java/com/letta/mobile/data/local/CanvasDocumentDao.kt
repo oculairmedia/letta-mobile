@@ -10,7 +10,7 @@ import androidx.room.Query
  * instead of a shape change the reader discovers at runtime (`NoSelectStarInRoomDao`).
  */
 private const val CANVAS_COLUMNS =
-    "id, agentId, conversationId, title, revision, sceneJson, updatedAtEpochMs"
+    "id, agentId, conversationId, title, revision, sceneJson, updatedAtEpochMs, aclJson"
 
 @Dao
 interface CanvasDocumentDao {

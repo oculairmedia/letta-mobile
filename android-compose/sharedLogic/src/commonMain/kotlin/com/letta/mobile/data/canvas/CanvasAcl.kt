@@ -22,25 +22,34 @@ data class CanvasAcl(
     fun canWrite(actorId: String?): Boolean {
         if (actorId.isNullOrBlank()) return false
         val normalized = normalize(actorId)
-        if (actorId == ownerUserId || normalized == normalize(ownerUserId)) return true
-        if (actorId in writerUserIds || normalized in writerUserIds) return true
-        if (actorId in writerAgentIds || normalized in writerAgentIds) return true
-        return false
+        return isOwner(actorId, normalized) || isWriter(actorId, normalized)
     }
+
+    private fun isOwner(actorId: String, normalized: String): Boolean =
+        actorId == ownerUserId || normalized == normalize(ownerUserId)
+
+    private fun isWriter(actorId: String, normalized: String): Boolean =
+        actorId in writerUserIds || normalized in writerUserIds ||
+            actorId in writerAgentIds || normalized in writerAgentIds
 
     /**
      * Checks if [actorId] is authorized to view the canvas.
      * When [readerUserIds] and [readerAgentIds] are empty, the canvas defaults to public-read.
      */
     fun canRead(actorId: String?): Boolean {
-        if (readerUserIds.isEmpty() && readerAgentIds.isEmpty()) return true
+        if (isPublicRead()) return true
         if (actorId.isNullOrBlank()) return false
         if (canWrite(actorId)) return true
         val normalized = normalize(actorId)
-        if (actorId in readerUserIds || normalized in readerUserIds) return true
-        if (actorId in readerAgentIds || normalized in readerAgentIds) return true
-        return false
+        return isReader(actorId, normalized)
     }
+
+    private fun isPublicRead(): Boolean =
+        readerUserIds.isEmpty() && readerAgentIds.isEmpty()
+
+    private fun isReader(actorId: String, normalized: String): Boolean =
+        actorId in readerUserIds || normalized in readerUserIds ||
+            actorId in readerAgentIds || normalized in readerAgentIds
 
     companion object {
         private fun normalize(id: String): String =
