@@ -6,7 +6,9 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.CancellationException
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Test
 import org.junit.jupiter.api.Tag
 import com.letta.mobile.feature.chat.coordination.ChatApprovalCoordinator
@@ -85,5 +87,23 @@ class ChatApprovalCoordinatorTest {
         )
 
         assertEquals(ChatApprovalResult.Failed("boom"), result)
+    }
+
+    @Test
+    fun `submitApproval propagates cancellation instead of reporting a failure`() = runTest {
+        coEvery { messageRepository.submitApproval(any<AgentId>(), any(), any(), any(), any(), any()) } throws CancellationException("left the screen")
+
+        assertThrows(CancellationException::class.java) {
+            kotlinx.coroutines.runBlocking {
+                coordinator.submitApproval(
+                    agentId = "agent-1",
+                    activeConversationId = "conv-1",
+                    requestId = "approval-1",
+                    toolCallIds = listOf("tool-1"),
+                    approve = true,
+                    reason = null,
+                )
+            }
+        }
     }
 }

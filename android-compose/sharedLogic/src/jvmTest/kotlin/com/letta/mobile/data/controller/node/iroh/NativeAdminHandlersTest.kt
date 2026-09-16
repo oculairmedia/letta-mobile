@@ -274,6 +274,80 @@ class NativeAdminHandlersTest {
         assertFalse("agent_list" in client.calls, "must not dial native when store is absent")
     }
 
+    // The App Server's agent_update drops `metadata` (the fake mirrors it: its agents carry none),
+    // so Meridian keeps it beside the local backend store.
+    private fun sidecarRouter(client: AppServerClient, sidecar: AgentMetadataSidecar?): AdminRpcRouter =
+        AdminRpcRouter().also {
+            AgentAdminHandlers.register(it, controller = null, tiers = NativeReadTiers(nativeClient = client, agentMetadata = sidecar))
+        }
+
+    private val mascot = buildJsonObject { put("letta_mobile.avatar_style", "hexagon:ff14a08a:30"); put("team", "core") }
+
+    private fun resultOf(response: String) = Json.parseToJsonElement(response).jsonObject.also {
+        assertEquals(true, it.getValue("success").jsonPrimitive.boolean, "expected success: $response")
+    }.getValue("result")
+
+    @Test
+    fun metadataOnlyUpdateIsKeptByMeridianAndServedOnEveryReadAfterRestart() = runTest {
+        val dir = kotlin.io.path.createTempDirectory("agent-metadata-sidecar").toFile()
+        val client = FakeNativeClient(agentRosterSize = 2)
+        val r = sidecarRouter(client, AgentMetadataSidecar(dir))
+
+        val updated = resultOf(dispatchJson(r, "agent.update", buildJsonObject { put("agent_id", "agent-2"); put("metadata", mascot) }))
+        assertEquals(mascot, updated.jsonObject["metadata"])
+        assertFalse("agent_update" in client.calls, "a metadata-only patch must not rewrite the App Server record: ${client.calls}")
+
+        // A new sidecar over the same directory is a Meridian restart.
+        val restarted = sidecarRouter(client, AgentMetadataSidecar(dir))
+        assertEquals(mascot, resultOf(dispatchJson(restarted, "agent.get", buildJsonObject { put("agent_id", "agent-2") })).jsonObject["metadata"])
+        val listed = resultOf(dispatchJson(restarted, "agent.list", buildJsonObject { })).jsonArray.map { it.jsonObject }
+        assertEquals(mascot, listed.single { it["id"]?.jsonPrimitive?.content == "agent-2" }["metadata"])
+        assertEquals(null, listed.single { it["id"]?.jsonPrimitive?.content == "agent-1" }["metadata"], "other agents are untouched")
+    }
+
+    @Test
+    fun mixedUpdateStillReachesTheAppServerAndKeepsTheMetadata() = runTest {
+        val client = FakeNativeClient()
+        val r = sidecarRouter(client, AgentMetadataSidecar(kotlin.io.path.createTempDirectory("agent-metadata-mixed").toFile()))
+
+        val updated = resultOf(dispatchJson(r, "agent.update", buildJsonObject { put("agent_id", "agent-1"); put("name", "N2"); put("metadata", mascot) }))
+
+        assertTrue("agent_update" in client.calls, "fields the App Server keeps still go to it: ${client.calls}")
+        assertEquals(mascot, updated.jsonObject["metadata"])
+    }
+
+    @Test
+    fun deletingAnAgentForgetsItsMetadata() = runTest {
+        val dir = kotlin.io.path.createTempDirectory("agent-metadata-delete").toFile()
+        val client = FakeNativeClient()
+        val r = sidecarRouter(client, AgentMetadataSidecar(dir))
+        resultOf(dispatchJson(r, "agent.update", buildJsonObject { put("agent_id", "agent-1"); put("metadata", mascot) }))
+
+        resultOf(dispatchJson(r, "agent.delete", buildJsonObject { put("agent_id", "agent-1") }))
+
+        assertEquals(null, AgentMetadataSidecar(dir).read("agent-1"))
+    }
+
+    @Test
+    fun withoutASidecarMetadataPassesThroughToTheAppServerAsBefore() = runTest {
+        val client = FakeNativeClient()
+        val r = sidecarRouter(client, sidecar = null)
+
+        resultOf(dispatchJson(r, "agent.update", buildJsonObject { put("agent_id", "agent-1"); put("metadata", mascot) }))
+
+        assertTrue("agent_update" in client.calls)
+    }
+
+    private suspend fun dispatchJson(r: AdminRpcRouter, method: String, params: kotlinx.serialization.json.JsonObject): String =
+        r.dispatch(
+            AdminRpcInvocation(
+                requestId = "t-json",
+                method = method,
+                params = params,
+                context = AdminRpcRequestContext.Authenticated,
+            ),
+        )
+
     private suspend fun dispatch(r: AdminRpcRouter, method: String, params: Map<String, String>): String =
         r.dispatch(
             AdminRpcInvocation(
