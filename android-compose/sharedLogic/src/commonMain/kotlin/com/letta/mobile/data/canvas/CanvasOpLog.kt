@@ -2,6 +2,7 @@ package com.letta.mobile.data.canvas
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -23,19 +24,26 @@ class InMemoryCanvasOpLog : CanvasOpLog {
     private val mutex = Mutex()
     private val opsByCanvas = mutableMapOf<CanvasId, MutableList<CanvasOp>>()
     private val opIdsByCanvas = mutableMapOf<CanvasId, MutableSet<String>>()
-    private val flowsByCanvas = mutableMapOf<CanvasId, MutableSharedFlow<CanvasOp>>()
+    // Reached from the non-suspending observe path as well, so it cannot live behind the mutex.
+    // See [getOrCreate].
+    private val flowsByCanvas = MutableStateFlow<Map<CanvasId, MutableSharedFlow<CanvasOp>>>(emptyMap())
 
-    override suspend fun append(canvasId: CanvasId, op: CanvasOp) = mutex.withLock {
-        val opIds = opIdsByCanvas.getOrPut(canvasId) { mutableSetOf() }
-        if (!opIds.add(op.opId)) {
-            // Already present, idempotent ignore
-            return@withLock
+    private fun flowFor(canvasId: CanvasId): MutableSharedFlow<CanvasOp> =
+        flowsByCanvas.getOrCreate(canvasId) { MutableSharedFlow(replay = 16, extraBufferCapacity = 64) }
+
+    override suspend fun append(canvasId: CanvasId, op: CanvasOp) {
+        val appended = mutex.withLock {
+            val opIds = opIdsByCanvas.getOrPut(canvasId) { mutableSetOf() }
+            if (!opIds.add(op.opId)) {
+                false // Already present, idempotent ignore
+            } else {
+                opsByCanvas.getOrPut(canvasId) { mutableListOf() }.add(op)
+                true
+            }
         }
-        val list = opsByCanvas.getOrPut(canvasId) { mutableListOf() }
-        list.add(op)
-        val flow = flowsByCanvas[canvasId]
-        flow?.emit(op)
-        Unit
+        // Outside the lock: emit suspends once the buffer fills, and a collector that needs this
+        // same log would then be waiting on a lock its publisher is still holding.
+        if (appended) flowFor(canvasId).emit(op)
     }
 
     override suspend fun getOps(canvasId: CanvasId, sinceLamport: Long): List<CanvasOp> = mutex.withLock {
@@ -47,10 +55,5 @@ class InMemoryCanvasOpLog : CanvasOpLog {
         opIdsByCanvas[canvasId]?.contains(opId) == true
     }
 
-    override fun observe(canvasId: CanvasId): Flow<CanvasOp> {
-        val flow = flowsByCanvas.getOrPut(canvasId) {
-            MutableSharedFlow(replay = 16, extraBufferCapacity = 64)
-        }
-        return flow.asSharedFlow()
-    }
+    override fun observe(canvasId: CanvasId): Flow<CanvasOp> = flowFor(canvasId).asSharedFlow()
 }

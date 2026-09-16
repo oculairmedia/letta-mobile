@@ -39,7 +39,12 @@ class InMemoryCanvasPresenceTransport(
 ) : CanvasPresenceTransport {
     private val mutex = Mutex()
     private val presencesByCanvas = mutableMapOf<CanvasId, MutableMap<String, CanvasPresence>>()
-    private val flowsByCanvas = mutableMapOf<CanvasId, MutableStateFlow<List<CanvasPresence>>>()
+    // Reached from the non-suspending observe path as well as the suspending writer, so it cannot
+    // live behind the mutex. See [getOrCreate].
+    private val flowsByCanvas = MutableStateFlow<Map<CanvasId, MutableStateFlow<List<CanvasPresence>>>>(emptyMap())
+
+    private fun flowFor(canvasId: CanvasId): MutableStateFlow<List<CanvasPresence>> =
+        flowsByCanvas.getOrCreate(canvasId) { MutableStateFlow(emptyList()) }
 
     override suspend fun updatePresence(canvasId: CanvasId, presence: CanvasPresence) = mutex.withLock {
         val map = presencesByCanvas.getOrPut(canvasId) { mutableMapOf() }
@@ -59,15 +64,9 @@ class InMemoryCanvasPresenceTransport(
             }
         }
 
-        val list = map.values.toList()
-        val flow = flowsByCanvas.getOrPut(canvasId) { MutableStateFlow(emptyList()) }
-        flow.value = list
+        flowFor(canvasId).value = map.values.toList()
     }
 
-    override fun observePresence(canvasId: CanvasId): Flow<List<CanvasPresence>> {
-        val flow = synchronized(flowsByCanvas) {
-            flowsByCanvas.getOrPut(canvasId) { MutableStateFlow(emptyList()) }
-        }
-        return flow.asStateFlow()
-    }
+    override fun observePresence(canvasId: CanvasId): Flow<List<CanvasPresence>> =
+        flowFor(canvasId).asStateFlow()
 }

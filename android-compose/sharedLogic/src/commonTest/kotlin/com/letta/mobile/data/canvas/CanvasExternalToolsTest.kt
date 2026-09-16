@@ -9,7 +9,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -20,6 +19,10 @@ import kotlin.test.assertTrue
 class CanvasExternalToolsTest {
     private val json = Json { ignoreUnknownKeys = true }
     private lateinit var store: InMemoryCanvasDocumentStore
+    private lateinit var sessions: CanvasSessionRegistry
+
+    // A fresh registry per test is the isolation now; it used to be a process-global object that
+    // every test had to remember to clear by hand, before and after.
     private lateinit var sessions: CanvasSessionRegistry
 
     @BeforeTest

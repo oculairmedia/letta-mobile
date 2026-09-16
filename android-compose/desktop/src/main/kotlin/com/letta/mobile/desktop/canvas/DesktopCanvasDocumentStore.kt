@@ -42,8 +42,10 @@ class DesktopCanvasDocumentStore(
             try {
                 val content = Files.readString(file)
                 json.decodeFromString(CanvasDocument.serializer(), content)
-            } catch (e: Exception) {
-                if (e is CancellationException) throw e
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (unreadable: Exception) {
+                // An unreadable or malformed document reads as absent, not as a crash.
                 null
             }
         }

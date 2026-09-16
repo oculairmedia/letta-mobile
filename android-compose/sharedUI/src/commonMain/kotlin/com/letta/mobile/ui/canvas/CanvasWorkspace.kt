@@ -51,7 +51,11 @@ fun CanvasWorkspace(
     modifier: Modifier = Modifier,
     controller: DrawBoxController = remember { DrawBoxController(Reducer(UseCase())) },
     session: CanvasSession? = null,
-    sessions: CanvasSessionRegistry = CanvasSessionRegistry(),
+    /**
+     * The registry external tools look the open session up in. Null means agent commands only
+     * reach the store, not this session, so a host that wires canvas tools must pass its own.
+     */
+    sessionRegistry: CanvasSessionRegistry? = null,
     initialJson: String? = null,
     presenceTransport: CanvasPresenceTransport? = null,
     currentPeerId: String? = null,
@@ -73,13 +77,13 @@ fun CanvasWorkspace(
     var initialLoadDone by remember { mutableStateOf(false) }
     var lastExportedJson by remember { mutableStateOf<String?>(null) }
 
-    DisposableEffect(session, sessions) {
+    DisposableEffect(session, sessionRegistry) {
         if (session != null) {
-            sessions.register(session)
+            sessionRegistry?.register(session)
         }
         onDispose {
             if (session != null) {
-                sessions.unregister(session.canvasId)
+                sessionRegistry?.unregister(session.canvasId)
             }
         }
     }

@@ -112,12 +112,14 @@ class CanvasWorkspaceUiTest {
                 initialSceneJson = "",
             )
         }
+        // The workspace and the tool must share one registry, or the tool only ever sees the
+        // store and the open session never hears about the agent's replace.
+        val sessions = com.letta.mobile.data.canvas.CanvasSessionRegistry()
 
-        val registry = com.letta.mobile.data.canvas.CanvasSessionRegistry()
         setContent {
             CanvasWorkspace(
                 session = session,
-                sessions = registry,
+                sessionRegistry = sessions,
             )
         }
 
@@ -125,7 +127,7 @@ class CanvasWorkspaceUiTest {
         onNodeWithText("Elements: 0", substring = true).assertExists()
 
         // Agent tool simulates replace_scene with Build Cycle fixture
-        val replaceTool = com.letta.mobile.data.canvas.CanvasReplaceSceneTool(store, registry)
+        val replaceTool = com.letta.mobile.data.canvas.CanvasReplaceSceneTool(store, sessions)
         kotlinx.coroutines.runBlocking {
             replaceTool.invoke(
                 kotlinx.serialization.json.buildJsonObject {
