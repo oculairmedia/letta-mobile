@@ -98,7 +98,7 @@ object TimelineHydrationReducer {
             .filter { it.identityKeys().none(initialKeys::contains) }
             .filter { it.identityKeys().none(convertedKeys::contains) }
         val knownOtids = (converted + pendingLocals + olderConfirmed + newerConfirmed).mapTo(HashSet()) { it.otid }
-        val diskLocals = diskRecords.filter { it.otid !in knownOtids }.map { it.toSentEvent() }
+        val diskLocals = diskRecords.filter { it.otid !in knownOtids }.map { it.toLocalEvent() }
         return PreservedEvents(olderConfirmed, newerConfirmed + (pendingLocals + concurrentConfirmed).sortedBy { it.position } + diskLocals)
     }
 
@@ -127,13 +127,13 @@ object TimelineHydrationReducer {
         }
     }
 
-    private fun PendingLocalRecord.toSentEvent(): TimelineEvent.Local = TimelineEvent.Local(
+    private fun PendingLocalRecord.toLocalEvent(): TimelineEvent.Local = TimelineEvent.Local(
         position = 0.0,
         otid = otid,
         content = content,
         role = Role.USER,
         sentAt = sentAt,
-        deliveryState = DeliveryState.SENT,
+        deliveryState = deliveryState,
         attachments = attachments.toTimelinePersistentList(),
     )
 

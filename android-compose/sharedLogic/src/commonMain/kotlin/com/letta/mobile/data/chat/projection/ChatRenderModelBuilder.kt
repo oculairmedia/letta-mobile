@@ -122,13 +122,23 @@ private fun backfillUnambiguousAssistantRun(
     start: Int,
     end: Int,
 ) {
-    val runId = uniqueAssistantRunId(messages.subList(start, end)) ?: return
+    val segment = messages.subList(start, end)
+    val runId = uniqueAssistantRunId(segment)
+        ?: syntheticHydratedToolRunId(segment)
+        ?: return
     for (index in start until end) {
         val message = messages[index]
         if (message.role == "assistant" && message.runId.isNullOrBlank()) {
             messages[index] = message.copy(runId = runId)
         }
     }
+}
+
+private fun syntheticHydratedToolRunId(segment: List<UiMessage>): String? {
+    val assistantMessages = segment.filter { it.role == "assistant" }
+    if (assistantMessages.size < 2 || assistantMessages.none { !it.toolCalls.isNullOrEmpty() }) return null
+    if (assistantMessages.any { !it.runId.isNullOrBlank() }) return null
+    return "hydrated-${assistantMessages.first().id}"
 }
 
 private fun uniqueAssistantRunId(segment: List<UiMessage>): String? {
@@ -412,7 +422,7 @@ fun filterMessagesForMode(
     // display mode so they never appear as user bubbles. The canonical skill
     // tool call (assistant TOOL_CALL) renders through the normal tool card.
     val afterFilter = messages.filterNot { msg ->
-        msg.role == "user" && SyntheticSkillEnvelopeDetector.isSyntheticSkillEnvelope(msg.role, msg.content)
+        SyntheticSkillEnvelopeDetector.isSyntheticSkillEnvelope(role = msg.role, content = msg.content)
     }
     return when (mode) {
         // letta-mobile-tz1sp (2026-08-05 product decision): Simple mode matches

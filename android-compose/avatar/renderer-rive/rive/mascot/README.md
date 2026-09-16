@@ -32,6 +32,7 @@ there are no star imports, so the definition of anything is one jump away.
 | `rig/probe.py` | The probe list: which node properties telemetry exposes (name, object, property key, unit) and `inject()`, which adds the view-model numbers and the two-way binds to a built document. Probe ids (`1:900+`) are deliberately outside `ids.py` - they must never be pushed | add probes |
 | `rml.py` | RML primitives: Rive property keys, view-model ids, easing tokens, XML builders (keyframes, animations, states, transitions). No mascot knowledge | rarely |
 | `svgpath.py` | SVG path -> RML vertices (M/L/C/Z, evenodd, strokes; 8-cubic mirrored bodies, 4-vertex mouths) | rarely |
+| `body_shapes.py` | Draws the polygon bodies (roundedSquare, triangle, hexagon) as rounded polygons with a chosen corner radius (`--radius`, 25 px), fitted to the 8-vertex mirrored contract; writes `art/body-{squircle,triangle,hexagon}.svg` | when a polygon body changes |
 | `art/*.svg` | The locked art: `body-*.svg` (8 identities), one glyph per state, three mouths | via SPEC owner |
 | `scene.rml` | Generated. Committed so diffs are reviewable. Never hand-edit. | no |
 | `build/mascot.riv` | Built by the CLI; copied to `src/androidMain/res/raw/mascot.riv` (what the app loads) | no |

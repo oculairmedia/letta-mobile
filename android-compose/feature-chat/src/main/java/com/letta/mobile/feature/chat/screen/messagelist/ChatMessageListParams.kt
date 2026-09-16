@@ -2,6 +2,7 @@ package com.letta.mobile.feature.chat.screen.messagelist
 
 import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.chat.projection.ToolTimelineGroup
 import com.letta.mobile.ui.theme.ChatBackground
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.unit.Dp
@@ -17,6 +18,7 @@ internal data class ChatMessageListCallbacks(
     val onSubmitApproval: (String, List<String>, Boolean, String?) -> Unit,
     val onToggleRunCollapsed: (String) -> Unit,
     val onToggleReasoningExpanded: (String) -> Unit,
+    val onOpenToolRunDetails: (List<ToolTimelineGroup>) -> Unit = {},
     val onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)?,
 ) {
     /** User-facing name for the historical rerun callback. */
@@ -40,6 +42,7 @@ internal data class ChatMessageRenderCallbacks(
     val onSubmitApproval: (String, List<String>, Boolean, String?) -> Unit,
     val onToggleRunCollapsed: (String) -> Unit,
     val onToggleReasoningExpanded: (String) -> Unit,
+    val onOpenToolRunDetails: (List<ToolTimelineGroup>) -> Unit = {},
     val onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)?,
 ) {
     /** User-facing name for the historical rerun callback. */

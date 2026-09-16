@@ -44,11 +44,11 @@ from rig.constants import (DEFAULT_SHAPE, HOST_BODY_DEG, HOST_BODY_PX, HOST_LEAN
                            HOST_TURN_PX, HOST_TURN_PY, LEAN_BASE, TUNABLES, beat, frames, rad)
 from rig.face import face, turn_animations
 from rig.ids import (
-    BLINK_ANIM, BLINK_REST_ANIM, BODY_NODE, BREATH_ANIM, CONV_BODY_ROT, CONV_BODY_X, CONV_LEAN,
+    BLINK_ANIM, BLINK_REST_ANIM, BODY_NODE, BREATH_ANIM, CONV_BODY_ROT, CONV_BODY_X, CONV_DEGREES, CONV_LEAN,
     CONV_LOOK, CONV_MOUTH, CONV_SCALE, CONV_TURN_ROT, CONV_TURN_X, CONV_TURN_Y, ENTITY, ENUM_SHAPE,
     ENUM_STATE, FACE, GLOSS, HOVER_ANIM, HOVER_HELD_ANIM, HOVER_REST_ANIM, JOYSTICK, LEAN_NODE,
     PLATE_BLINK, ROOT, SHAPES, SM, SUSTAINED, TURN_X_ANIM, TURN_Y_ANIM, VM_INSTANCE, VM_TUNE_SCALE,
-    VM_TURN_X, VM_TURN_Y, shape_enum_ids, state_enum_ids,
+    VM_SHAPE_ROTATION, VM_TURN_X, VM_TURN_Y, shape_enum_ids, state_enum_ids,
 )
 from rig.layers import set_animation_index
 from rig.machine import root_machine
@@ -162,6 +162,8 @@ def data():
                           clampLower="true" clampUpper="true" name="TurnToBodyX" id="{CONV_BODY_X}"/>
 <DataConverterRangeMapper minInput="-1" maxInput="1" minOutput="{rad(-HOST_LEAN_DEG)}" maxOutput="{rad(HOST_LEAN_DEG)}"
                           clampLower="true" clampUpper="true" name="TurnToLean" id="{CONV_LEAN}"/>
+<DataConverterRangeMapper minInput="0" maxInput="360" minOutput="0" maxOutput="{rad(360)}"
+                          clampLower="false" clampUpper="false" name="DegreesToRadians" id="{CONV_DEGREES}"/>
 
 <ViewModel defaultInstanceId="{VM_INSTANCE}" name="Avatar" id="{VM}">
     <ViewModelPropertyEnumCustom enumId="{ENUM_STATE}" name="state" id="{VM_STATE}"/>
@@ -179,12 +181,14 @@ def data():
     <ViewModelPropertyNumber name="tuneScale" id="{VM_TUNE_SCALE}"/>
     <ViewModelPropertyNumber name="turnX" id="{VM_TURN_X}"/>
     <ViewModelPropertyNumber name="turnY" id="{VM_TURN_Y}"/>
+    <ViewModelPropertyNumber name="shapeRotation" id="{VM_SHAPE_ROTATION}"/>
 
     <ViewModelInstance exports="true" name="Default" id="{VM_INSTANCE}">
 {indent(chr(10).join(f'<ViewModelInstanceNumber propertyValue="0.5" viewModelPropertyId="{t.vm_id}"/>' for t in TUNABLES.values()), "        ")}
         <ViewModelInstanceNumber propertyValue="0.5" viewModelPropertyId="{VM_TUNE_SCALE}"/>
         <ViewModelInstanceNumber propertyValue="0" viewModelPropertyId="{VM_TURN_X}"/>
         <ViewModelInstanceNumber propertyValue="0" viewModelPropertyId="{VM_TURN_Y}"/>
+        <ViewModelInstanceNumber propertyValue="0" viewModelPropertyId="{VM_SHAPE_ROTATION}"/>
         <ViewModelInstanceEnum propertyValue="{state_enum_ids['idle']}" viewModelPropertyId="{VM_STATE}"/>
         <ViewModelInstanceNumber propertyValue="0" viewModelPropertyId="{VM_MOUTH}"/>
         <ViewModelInstanceNumber propertyValue="0" viewModelPropertyId="{VM_LOOKX}"/>

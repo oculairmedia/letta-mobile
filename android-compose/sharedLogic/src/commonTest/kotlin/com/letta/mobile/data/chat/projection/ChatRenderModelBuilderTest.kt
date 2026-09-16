@@ -15,6 +15,27 @@ import kotlin.time.TimeSource
 class ChatRenderModelBuilderTest {
 
     @Test
+    fun `hydrated assistant segment without run ids keeps one tool aggregate`() {
+        val normalized = backfillMissingAssistantRunIds(
+            listOf(
+                user("prompt"),
+                reasoning("thought"),
+                assistantToolCall("tool-1"),
+                assistantToolCall("tool-2"),
+                assistant("answer"),
+            ),
+        )
+
+        val assistantRunIds = normalized.filter { it.role == "assistant" }.map { it.runId }.distinct()
+        assertEquals(1, assistantRunIds.size)
+        assertNotNull(assistantRunIds.single())
+        val run = buildChatRenderModel(normalized, ChatDisplayMode.Interactive).renderItems
+            .filterIsInstance<ChatRenderItem.RunBlock>()
+            .single()
+        assertEquals(listOf("thought", "tool-1", "tool-2", "answer"), run.messages.map { it.first.id })
+    }
+
+    @Test
     fun `reasoning followed by assistant with same content skips assistant echo`() {
         val messages = listOf(
             reasoning("r1", content = "thinking"),
