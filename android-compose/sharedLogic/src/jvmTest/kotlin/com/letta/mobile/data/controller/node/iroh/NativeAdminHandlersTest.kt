@@ -64,6 +64,7 @@ class NativeAdminHandlersTest {
         // numeric `limit` in the command query exactly like lc-local-backend
         // (and, like it, has no offset concept).
         val agentRosterSize: Int = 1,
+        var updateSucceeds: Boolean = true,
     ) : AppServerClient {
         var lastAgentListQuery: kotlinx.serialization.json.JsonObject? = null
         override val events: Flow<AppServerReceivedFrame> = MutableSharedFlow()
@@ -136,8 +137,8 @@ class NativeAdminHandlersTest {
             "agent_update",
             AppServerInboundFrame.AgentUpdateResponse(
                 requestId = command.requestId,
-                success = true,
-                agent = buildJsonObject { put("id", command.agentId) },
+                success = updateSucceeds,
+                agent = buildJsonObject { put("id", command.agentId) }.takeIf { updateSucceeds },
             ),
         )
 
@@ -336,6 +337,44 @@ class NativeAdminHandlersTest {
         resultOf(dispatchJson(r, "agent.update", buildJsonObject { put("agent_id", "agent-1"); put("metadata", mascot) }))
 
         assertTrue("agent_update" in client.calls)
+    }
+
+    @Test
+    fun agentWritesNotifyConnectedClientsAndFailedWritesDoNot() = runTest {
+        val frames = mutableListOf<String>()
+        val notifier = AgentChangeNotifier(backgroundScope, windowMs = 10).also { it.attach { frame -> frames += frame } }
+        val client = FakeNativeClient()
+        val r = AdminRpcRouter().also {
+            AgentAdminHandlers.register(it, controller = null, tiers = NativeReadTiers(nativeClient = client, agentChanges = notifier))
+        }
+
+        resultOf(dispatchJson(r, "agent.create", buildJsonObject { put("name", "N") }))
+        resultOf(dispatchJson(r, "agent.update", buildJsonObject { put("agent_id", "agent-1"); put("name", "N2") }))
+        resultOf(dispatchJson(r, "agent.delete", buildJsonObject { put("agent_id", "agent-2") }))
+        client.failNative = true
+        dispatchJson(r, "agent.update", buildJsonObject { put("agent_id", "agent-3"); put("name", "N3") })
+        testScheduler.advanceTimeBy(20)
+        testScheduler.runCurrent()
+
+        val reasons = frames.map { Json.parseToJsonElement(it).jsonObject }.associate { it.getValue("agent_id").jsonPrimitive.content to it.getValue("reason").jsonPrimitive.content }
+        assertEquals(mapOf("agent-new" to "created", "agent-1" to "updated", "agent-2" to "deleted"), reasons)
+    }
+
+    @Test
+    fun anUnsuccessfulUpdateResponseTellsNoClientToRefetch() = runTest {
+        val frames = mutableListOf<String>()
+        val notifier = AgentChangeNotifier(backgroundScope, windowMs = 10).also { it.attach { frame -> frames += frame } }
+        val client = FakeNativeClient(updateSucceeds = false)
+        val r = AdminRpcRouter().also {
+            AgentAdminHandlers.register(it, controller = null, tiers = NativeReadTiers(nativeClient = client, agentChanges = notifier))
+        }
+
+        val response = Json.parseToJsonElement(dispatchJson(r, "agent.update", buildJsonObject { put("agent_id", "agent-1"); put("name", "N2") })).jsonObject
+        testScheduler.advanceTimeBy(20)
+        testScheduler.runCurrent()
+
+        assertEquals(false, response.getValue("success").jsonPrimitive.boolean, "the update must report failure: $response")
+        assertEquals(emptyList(), frames)
     }
 
     private suspend fun dispatchJson(r: AdminRpcRouter, method: String, params: kotlinx.serialization.json.JsonObject): String =
