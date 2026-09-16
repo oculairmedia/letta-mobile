@@ -37,6 +37,13 @@ sealed interface AppServerCommand {
         @SerialName("recover_approvals") val recoverApprovals: Boolean? = null,
         @SerialName("force_device_status") val forceDeviceStatus: Boolean? = null,
         @SerialName("external_tools") val externalTools: List<AppServerExternalToolsGroup>? = null,
+        /** Which skill roots the runtime loads: any of `bundled`, `global`, `agent`, `project`. */
+        @SerialName("skill_sources") val skillSources: List<String>? = null,
+        /** Hold the response until the automatic state replay has been sent (0.32+). */
+        @SerialName("wait_for_replay") val waitForReplay: Boolean? = null,
+        @SerialName("conversation_source_tags") val conversationSourceTags: List<String>? = null,
+        /** Opaque upstream settings object (0.32+); passed through untouched. */
+        @SerialName("execution_settings") val executionSettings: JsonObject? = null,
     ) : AppServerCommand
 
     @Serializable
@@ -44,6 +51,23 @@ sealed interface AppServerCommand {
     data class Input(
         val runtime: AppServerRuntimeScope,
         val payload: AppServerInputPayload,
+        /**
+         * Optional (0.32+): the server answers with `input_accepted` carrying it. It correlates
+         * acceptance only, not turn completion. Leave null unless the caller awaits the ack.
+         */
+        @SerialName("request_id") val requestId: String? = null,
+    ) : AppServerCommand
+
+    /**
+     * Changes the device's permission mode, working directory or bound runtime. It replaces the
+     * legacy `change_mode` / `change_cwd` commands, which must never be sent. No direct response:
+     * the effect arrives as `update_device_status`.
+     */
+    @Serializable
+    @SerialName("change_device_state")
+    data class ChangeDeviceState(
+        val runtime: AppServerRuntimeScope,
+        val payload: AppServerDeviceStatePayload,
     ) : AppServerCommand
 
     @Serializable

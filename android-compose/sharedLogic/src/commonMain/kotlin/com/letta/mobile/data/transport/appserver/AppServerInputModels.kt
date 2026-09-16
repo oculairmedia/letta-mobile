@@ -18,6 +18,10 @@ sealed interface AppServerInputPayload {
         val messages: List<AppServerInputMessage>,
         @SerialName("client_tool_allowlist") val clientToolAllowlist: List<String>? = null,
         @SerialName("external_tool_scope_ids") val externalToolScopeIds: List<String>? = null,
+        /** `strict` (default upstream) fails the input on an unreadable image; `drop` skips it. */
+        @SerialName("image_failure_mode") val imageFailureMode: String? = null,
+        /** Keep interactive tools (questions, plan mode) out of this turn, e.g. for headless input. */
+        @SerialName("exclude_interactive_tools") val excludeInteractiveTools: Boolean? = null,
     ) : AppServerInputPayload
 
     @Serializable
@@ -63,6 +67,15 @@ sealed interface AppServerApprovalResponseDecision {
         val message: String,
     ) : AppServerApprovalResponseDecision
 }
+
+/** `change_device_state` payload; every field is optional and only sent fields change. */
+@Serializable
+data class AppServerDeviceStatePayload(
+    val mode: AppServerPermissionMode? = null,
+    val cwd: String? = null,
+    @SerialName("agent_id") val agentId: String? = null,
+    @SerialName("conversation_id") val conversationId: String? = null,
+)
 
 @Serializable
 data class AppServerExternalToolResult(

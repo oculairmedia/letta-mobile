@@ -3,6 +3,8 @@ package com.letta.mobile.data.runtime
 import com.letta.mobile.data.transport.appserver.AppServerChannel
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
+import com.letta.mobile.data.transport.appserver.AppServerStopReason
+import com.letta.mobile.data.transport.appserver.AppServerTurnBoundary
 import com.letta.mobile.runtime.RunId
 import com.letta.mobile.runtime.RuntimeEventDraft
 import com.letta.mobile.runtime.RuntimeEventPayload
@@ -70,7 +72,11 @@ open class AppServerRuntimeEventMapper {
             // Capability discovery (lgns8.24): correlated by the request registry,
             // not a runtime turn event.
             is AppServerInboundFrame.AppServerInfoResponse,
+            // Acknowledges an input that carried request_id; correlated by the registry.
+            is AppServerInboundFrame.InputAccepted,
             -> emptyList()
+            // Decoded as Unknown before 0.32 typing; kept on the same observable path.
+            is AppServerInboundFrame.TurnFinished -> listOf(received.toExternalTransportDraft(command))
             is AppServerInboundFrame.AbortMessageResponse -> frame.toAbortDraft(command)
             is AppServerInboundFrame.StreamDelta -> frame.toStreamDeltaDraft(command, received.raw)
             is AppServerInboundFrame.UpdateLoopStatus -> frame.toLoopStatusDraft(command)
@@ -155,21 +161,18 @@ open class AppServerRuntimeEventMapper {
                         body = raw.toString(),
                     ),
                 )
-                if (deltaObject.isTerminalStopReason()) {
-                    val stopReason = deltaObject.string("stop_reason") ?: deltaObject.string("reason")
-                    val lifecycleDraft = when (stopReason) {
-                        "cancelled" -> command.lifecycle(RuntimeRunStatus.Cancelled, runId = runId)
-                        "error" -> command.lifecycle(
-                            RuntimeRunStatus.Failed,
-                            runId = runId,
-                            reason = deltaObject.errorMessage("App Server turn stopped with error"),
-                        )
-                        else -> command.lifecycle(RuntimeRunStatus.Completed, runId = runId)
-                    }
-                    listOf(stopDraft, lifecycleDraft)
-                } else {
-                    listOf(stopDraft)
+                val stopReason = deltaObject.string("stop_reason") ?: deltaObject.string("reason")
+                val lifecycleDraft = when (AppServerStopReason.boundaryOf(stopReason)) {
+                    AppServerTurnBoundary.AwaitingApproval, AppServerTurnBoundary.Continuing -> null
+                    AppServerTurnBoundary.Cancelled -> command.lifecycle(RuntimeRunStatus.Cancelled, runId = runId)
+                    AppServerTurnBoundary.Failed -> command.lifecycle(
+                        RuntimeRunStatus.Failed,
+                        runId = runId,
+                        reason = deltaObject.errorMessage("App Server turn stopped with ${stopReason ?: "error"}"),
+                    )
+                    AppServerTurnBoundary.Completed -> command.lifecycle(RuntimeRunStatus.Completed, runId = runId)
                 }
+                listOfNotNull(stopDraft, lifecycleDraft)
             }
             "loop_error",
             "error_message",
@@ -312,16 +315,6 @@ open class AppServerRuntimeEventMapper {
         (this[key] as? JsonPrimitive)?.contentOrNull
 
     private fun JsonObject.objectOrNull(key: String): JsonObject? = this[key] as? JsonObject
-
-    private fun JsonObject.isTerminalStopReason(): Boolean {
-        val reason = string("stop_reason") ?: string("reason") ?: return true
-        // `length` is the OpenAI-compat finish_reason for output/context caps;
-        // providers on the lmstudio path (e.g. MiniMax-M3) emit it instead of
-        // `max_tokens`. Treat it as terminal Completed the same way — otherwise
-        // the turn stays open until a later error_message paints a false Failed.
-        return reason == "end_turn" || reason == "stop_sequence" || reason == "max_tokens" ||
-            reason == "length" || reason == "cancelled" || reason == "error"
-    }
 
     private fun JsonObject.errorMessage(fallback: String = "App Server turn failed"): String =
         string("message")

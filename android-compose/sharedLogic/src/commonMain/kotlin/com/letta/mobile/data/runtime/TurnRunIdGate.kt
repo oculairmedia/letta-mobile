@@ -2,6 +2,8 @@ package com.letta.mobile.data.runtime
 
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
+import com.letta.mobile.data.transport.appserver.AppServerStopReason
+import com.letta.mobile.data.transport.appserver.AppServerTurnBoundary
 import kotlinx.atomicfu.AtomicRef
 import kotlinx.atomicfu.update
 import kotlinx.serialization.json.contentOrNull
@@ -86,10 +88,12 @@ internal fun AppServerReceivedFrame.lifecycleStatusFromTerminal(): com.letta.mob
     if (!carriesLifecycleTerminal()) return null
     return when (terminalMessageTypeOrNull()) {
         "error_message", "loop_error" -> com.letta.mobile.runtime.RuntimeRunStatus.Failed
-        "stop_reason" -> when (stopReasonOrNull()) {
-            "cancelled" -> com.letta.mobile.runtime.RuntimeRunStatus.Cancelled
-            "error" -> com.letta.mobile.runtime.RuntimeRunStatus.Failed
-            else -> com.letta.mobile.runtime.RuntimeRunStatus.Completed
+        // Same reading as the mapper: `requires_approval` pauses the run, it never settles it.
+        "stop_reason" -> when (AppServerStopReason.boundaryOf(stopReasonOrNull())) {
+            AppServerTurnBoundary.AwaitingApproval, AppServerTurnBoundary.Continuing -> null
+            AppServerTurnBoundary.Cancelled -> com.letta.mobile.runtime.RuntimeRunStatus.Cancelled
+            AppServerTurnBoundary.Failed -> com.letta.mobile.runtime.RuntimeRunStatus.Failed
+            AppServerTurnBoundary.Completed -> com.letta.mobile.runtime.RuntimeRunStatus.Completed
         }
         else -> null
     }

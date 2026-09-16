@@ -39,7 +39,7 @@ internal class DesktopChatApprovalCoordinator(
     }
 
     private data class SubmissionTarget(
-        val gateway: Any,
+        val gateway: DesktopChatGateway,
         val agentId: String,
         val conversationId: String,
     )
@@ -73,7 +73,7 @@ internal class DesktopChatApprovalCoordinator(
     }
 
     private suspend fun dispatchToGateway(
-        gw: Any,
+        gw: DesktopChatGateway,
         agentId: String,
         conversationId: String,
         request: ApprovalSubmissionRequest,

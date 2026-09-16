@@ -39,6 +39,7 @@ class CanonicalTimelinePresentation private constructor(
     private val owner = lease.owner
     private val resident = MutableStateFlow<Map<TimelineMessageId, Long>>(emptyMap())
     private val residentOtids = MutableStateFlow<Set<String>>(emptySet())
+    private val residentServerIds = MutableStateFlow<Set<String>>(emptySet())
 
     private val detached = kotlinx.coroutines.CompletableDeferred<Unit>()
     init {
@@ -65,6 +66,8 @@ class CanonicalTimelinePresentation private constructor(
         val deferred: TimelineBodyReference? = null,
         // Identities differ between the streamed and stored copy of a send; the otid does not.
         val otid: String = "",
+        // Storage identity may be remapped; server identity still matches the live event.
+        val serverId: String = "",
     )
 
     private val anchor = MutableStateFlow(lease.anchor)
@@ -107,13 +110,15 @@ class CanonicalTimelinePresentation private constructor(
 
     // Durability alone is not presentation: retain live until the settled ledger is at the turn's revision.
     private val liveProjection: Flow<List<ChatRenderItem>> = combine(
-        owner.session.live, owner.session.pending, resident, residentOtids,
-    ) { publication, pending, presented, settledOtids ->
-        // A send is on screen once. The overlay and the optimistic bubble both stand down as soon
-        // as the settled page carries that otid, which is the only identifier the streamed copy and
-        // the stored copy share: their server ids and render keys never match.
+        owner.session.live, owner.session.pending, resident, residentOtids, residentServerIds,
+    ) { publication, pending, presented, settledOtids, settledServerIds ->
+        // One logical event stays on screen once. Sends converge by otid; server-originated
+        // reasoning and assistant frames converge by server id even when storage remaps the row key.
         val events = publication?.overlayEvents(presented).orEmpty()
-            .filterNot { it.otid.isNotBlank() && it.otid in settledOtids }
+            .filterNot { event ->
+                (event.otid.isNotBlank() && event.otid in settledOtids) ||
+                    event.serverId in settledServerIds
+            }
         // Only the sync path's durable echo clears pending storage, and the publication is dropped
         // the moment settlement is acknowledged. Remember the otids this turn echoed so the local
         // bubble cannot reappear in the gap between the overlay draining and that write landing.
@@ -139,6 +144,7 @@ class CanonicalTimelinePresentation private constructor(
         val presented = rows.take(128).associate { it.identity to it.revision }
         resident.value = presented
         residentOtids.value = rows.take(128).mapNotNullTo(mutableSetOf()) { it.otid.takeIf(String::isNotBlank) }
+        residentServerIds.value = rows.take(128).mapNotNullTo(mutableSetOf()) { it.serverId.takeIf(String::isNotBlank) }
         val fence = owner.session.live.value?.fence ?: return
         scope.launch { coordinator.acknowledgeSettlement(owner, fence, presented) }
     }
@@ -192,6 +198,7 @@ class CanonicalTimelinePresentation private constructor(
             record.revision,
             presentation.item.settledToolCalls(),
             otid = presentation.event.otid,
+            serverId = presentation.event.serverId,
         )
         is TimelineSettledPresentation.Defer -> Row(
             record.key.identity,

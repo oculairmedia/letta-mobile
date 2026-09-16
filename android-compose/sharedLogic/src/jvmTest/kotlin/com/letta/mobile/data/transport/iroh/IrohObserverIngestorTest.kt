@@ -172,6 +172,46 @@ class IrohObserverIngestorTest {
     }
 
     @Test
+    fun meridianAgentUpdatedPushIsRepublishedForTheAgentRepositories() = testScope.runTest {
+        val emittedFrames = CopyOnWriteArrayList<ServerFrame>()
+        val ingestor = IrohObserverIngestor(
+            scope = testScope,
+            turnRegistry = IrohTurnRegistry(),
+            connectionGeneration = { 1L },
+            emitBoth = { emittedFrames.add(it) },
+            adminRpc = { _, _, _ -> error("unexpected") },
+            recordFrameOwnership = { _, _ -> error("an agent push is not a conversation frame") },
+        )
+        // Exactly what AgentChangeNotifier writes, as the Iroh transport decodes it off the stream.
+        val wire = """{"v":1,"type":"agent_updated","id":"agent-updated-1","ts":"2026-09-15T21:00:00Z","agent_id":"agent-7","reason":"deleted","at":"2026-09-15T21:00:00Z"}"""
+        val received = AppServerProtocol.decodeFrame(wire, AppServerChannel.Stream)
+        assertIs<AppServerInboundFrame.Unknown>(received.frame)
+
+        ingestor.ingestObserverFrame(ObserverFrameRequest(received, 1L))
+
+        val pushed = assertIs<ServerFrame.AgentUpdated>(emittedFrames.single())
+        assertEquals("agent-7", pushed.agentId)
+        assertEquals("deleted", pushed.reason)
+    }
+
+    @Test
+    fun otherUnknownStreamFramesStayIgnored() = testScope.runTest {
+        val emittedFrames = CopyOnWriteArrayList<ServerFrame>()
+        val ingestor = IrohObserverIngestor(
+            scope = testScope,
+            turnRegistry = IrohTurnRegistry(),
+            connectionGeneration = { 1L },
+            emitBoth = { emittedFrames.add(it) },
+            adminRpc = { _, _, _ -> error("unexpected") },
+            recordFrameOwnership = { _, _ -> },
+        )
+
+        ingestor.ingestObserverFrame(ObserverFrameRequest(AppServerProtocol.decodeFrame("""{"type":"future_frame","x":1}""", AppServerChannel.Stream), 1L))
+
+        assertTrue(emittedFrames.isEmpty())
+    }
+
+    @Test
     fun childAttributedFramesNeverProjectIntoParentTimeline() = testScope.runTest {
         val emitted = CopyOnWriteArrayList<ServerFrame>()
         val ingestor = IrohObserverIngestor(

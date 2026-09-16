@@ -102,6 +102,8 @@ fun buildProductionAdminRouter(
      */
     skillsDir: String? = null,
     eventScope: CoroutineScope? = null,
+    /** Pushes `agent_updated` to connected clients after agent writes. */
+    agentChanges: com.letta.mobile.data.controller.node.iroh.AgentChangeNotifier? = null,
 ): AdminRpcRouter {
     val skillsCatalog = NativeSkillsCatalog()
     // Cold-start discovery: hydrate BEFORE the router is built, so the very first
@@ -147,6 +149,7 @@ fun buildProductionAdminRouter(
         vibesyncBaseUrl = vibesyncBaseUrl,
         localBackendDir = localBackendDir,
         skillsListing = skillsCatalog.asListingSource(),
+        agentChanges = agentChanges,
     )
 }
 
@@ -411,6 +414,8 @@ class AppServerServeIrohCommand : CliktCommand(
             // read conversations/messages/agents WITHOUT any direct HTTP route
             // to this host (Iroh purity: letta-mobile-qfa81). Phase 4: no
             // LettaShim admin base / HTTP subagent discovery.
+            // One notifier for the whole host: agent handlers feed it, the endpoint delivers it.
+            val agentChanges = com.letta.mobile.data.controller.node.iroh.AgentChangeNotifier(scope)
             val adminRpcRouter = buildProductionAdminRouter(
                 controller = controller,
                 pairingService = pairingService,
@@ -420,8 +425,10 @@ class AppServerServeIrohCommand : CliktCommand(
                 skillsDir = skillsDir,
                 localBackendDir = localBackendDir ?: System.getenv("LETTA_LOCAL_BACKEND_DIR"),
                 eventScope = scope,
+                agentChanges = agentChanges,
             )
             endpoint.adminRpcRouter.copyHandlersFrom(adminRpcRouter)
+            agentChanges.attach(endpoint.agentChangeTarget())
             println(
                 "[iroh-app-server] admin_rpc handlers registered " +
                     "(methods: ${adminRpcRouter.methodCount}, " +
