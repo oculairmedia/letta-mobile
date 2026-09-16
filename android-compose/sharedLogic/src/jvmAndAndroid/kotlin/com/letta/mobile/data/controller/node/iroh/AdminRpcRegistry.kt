@@ -19,6 +19,8 @@ data class NativeReadTiers(
     val localBackendStore: LocalBackendAdminStore? = null,
     /** Agent metadata the App Server drops; see [AgentMetadataSidecar]. Null keeps pass-through. */
     val agentMetadata: AgentMetadataSidecar? = null,
+    /** Pushes `agent_updated` to connected clients after agent writes; null sends nothing. */
+    val agentChanges: AgentChangeNotifier? = null,
 )
 
 object AdminRpcRegistry {
@@ -104,6 +106,8 @@ object AdminRpcRegistry {
          * When null, skill.list returns an empty skills array until a catalog is wired.
          */
         skillsListing: SkillsListingSource? = null,
+        /** See [NativeReadTiers.agentChanges]. */
+        agentChanges: AgentChangeNotifier? = null,
     ): AdminRpcRouter {
         val router = AdminRpcRouter()
 
@@ -116,7 +120,7 @@ object AdminRpcRegistry {
         val agentMetadata = localBackendDir
             ?.takeIf { it.isNotBlank() }
             ?.let { AgentMetadataSidecar.inLocalBackend(java.io.File(it)) }
-        val tiers = NativeReadTiers(nativeClient, localBackendStore, agentMetadata)
+        val tiers = NativeReadTiers(nativeClient, localBackendStore, agentMetadata, agentChanges)
 
         HealthAdminHandlers.register(router, controller)
         AgentAdminHandlers.register(router, controller, tiers)

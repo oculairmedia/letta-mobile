@@ -1,5 +1,8 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -20,6 +23,13 @@ interface ViewerHandle {
      * registry/fanout can de-register a dead viewer.
      */
     suspend fun writeFrame(frame: String): Boolean
+
+    /**
+     * Whether this connection may receive device-wide `agent_updated` pushes, which name agents: the
+     * peer must be allowed to read them. Evaluated at send time, so a peer whose grants change stops
+     * receiving. Default: no.
+     */
+    fun receivesAgentEvents(): Boolean = false
 }
 
 /** Opaque ownership token for one canonical endpoint connection generation. */
@@ -100,6 +110,25 @@ class ConnectionRegistry {
     suspend fun viewersFor(conversationId: String): Set<ViewerHandle> = mutex.withLock {
         viewersByConversation[conversationId]?.values?.mapTo(linkedSetOf()) { it.viewer } ?: emptySet()
     }
+
+    /** Snapshot of every live connection's current handle, for device-wide broadcasts. */
+    suspend fun connections(): List<ViewerHandle> = mutex.withLock {
+        activeByEndpoint.values.map { it.viewer }
+    }
+
+    /**
+     * Writes [frame] to every live connection [isRecipient] accepts, outside the lock (a slow
+     * connection must not stall the others). Returns how many connections accepted the write.
+     */
+    suspend fun broadcast(frame: String, isRecipient: (ViewerHandle) -> Boolean): BroadcastResult {
+        val recipients = connections().filter(isRecipient)
+        // Concurrently: each write waits on that connection's own stream lock, so a slow peer must
+        // not hold up delivery to the others.
+        val delivered = coroutineScope { recipients.map { async { it.writeFrame(frame) } }.awaitAll() }
+        return BroadcastResult(recipients = recipients.size, delivered = delivered.count { it })
+    }
+
+    data class BroadcastResult(val recipients: Int, val delivered: Int)
 
     /** Test/telemetry: total distinct conversations currently viewed. */
     suspend fun conversationCount(): Int = mutex.withLock { viewersByConversation.size }

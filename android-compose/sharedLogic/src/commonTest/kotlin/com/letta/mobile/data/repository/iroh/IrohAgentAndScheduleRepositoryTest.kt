@@ -241,7 +241,7 @@ class IrohAgentAndScheduleRepositoryTest {
             assertEquals("/v1/agents/agent-1", call.path)
             ok("""{"id":"agent-1","name":"Fresh"}""")
         }
-        val repository = IrohAgentRepository { IrohAdminRpcAgentDirectory(transport) }
+        val repository = IrohAgentRepository(directoryProvider = { IrohAdminRpcAgentDirectory(transport) })
 
         assertNull(repository.getCachedAgent(AgentId("agent-1")))
 
@@ -264,7 +264,7 @@ class IrohAgentAndScheduleRepositoryTest {
                 else -> error("unexpected rpc ${call.method}")
             }
         }
-        val repository = IrohAgentRepository { IrohAdminRpcAgentDirectory(transport) }
+        val repository = IrohAgentRepository(directoryProvider = { IrohAdminRpcAgentDirectory(transport) })
         repository.refreshAgents()
         assertEquals(1, repository.agents.value.size)
         // Cache has 1 agent; authoritative count is 131 — must not return .size.
@@ -282,7 +282,7 @@ class IrohAgentAndScheduleRepositoryTest {
                 else -> error("unexpected rpc ${call.method}")
             }
         }
-        val repository = IrohAgentRepository { IrohAdminRpcAgentDirectory(transport) }
+        val repository = IrohAgentRepository(directoryProvider = { IrohAdminRpcAgentDirectory(transport) })
         repository.refreshAgents()
 
         kotlin.test.assertFailsWith<CancellationException> {
@@ -300,7 +300,7 @@ class IrohAgentAndScheduleRepositoryTest {
                 else -> error("unexpected rpc ${call.method}")
             }
         }
-        val repository = IrohAgentRepository { IrohAdminRpcAgentDirectory(transport) }
+        val repository = IrohAgentRepository(directoryProvider = { IrohAdminRpcAgentDirectory(transport) })
         repository.refreshAgents()
         assertEquals("Original", repository.getCachedAgent(AgentId("agent-1"))?.name)
 
