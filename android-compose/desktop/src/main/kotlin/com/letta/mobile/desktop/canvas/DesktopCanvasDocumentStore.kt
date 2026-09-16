@@ -9,6 +9,7 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -42,6 +43,7 @@ class DesktopCanvasDocumentStore(
                 val content = Files.readString(file)
                 json.decodeFromString(CanvasDocument.serializer(), content)
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 null
             }
         }
