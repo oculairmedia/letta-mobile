@@ -42,6 +42,30 @@ class MessageApiTimelineTransport(
         )
     }
 
+    override suspend fun listConversationMessagePage(
+        request: TimelineRemotePageRequest,
+        progress: TimelinePageProgress?,
+    ): TimelineRemotePageResult {
+        val page = TimelineRemotePageAdapter.load(request) { limit, before, after, order ->
+            translateTimelineTransportErrors {
+                when {
+                    before != null -> messageApi.fetchRecentMessages(
+                        conversationId = ConversationId(request.scope.conversationId),
+                        messageLimit = limit,
+                        beforeMessageId = before,
+                    )
+                    else -> messageApi.listConversationMessages(
+                        conversationId = ConversationId(request.scope.conversationId),
+                        limit = limit,
+                        after = after,
+                        order = order,
+                    )
+                }
+            }
+        }
+        return progress?.let { TimelineRemotePageProgressClassifier.classify(request, page, it) } ?: page
+    }
+
     override suspend fun listAgentMessages(
         agentId: String,
         limit: Int?,

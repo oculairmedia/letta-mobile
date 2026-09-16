@@ -147,18 +147,28 @@ private fun SidebarHeaderTitleSlot(
             )
         } else {
             SidebarAgentIdentity(
-                agentOrbIndex = state.agentOrbIndex,
-                agentName = state.agentName,
+                identity = SidebarIdentity(
+                    agentOrbIndex = state.agentOrbIndex,
+                    agentId = state.agentId,
+                    agentIdentity = state.agentIdentity,
+                    agentName = state.agentName,
+                ),
                 onEditAgent = onEditAgent,
             )
         }
     }
 }
 
+private data class SidebarIdentity(
+    val agentOrbIndex: Int,
+    val agentId: String?,
+    val agentIdentity: com.letta.mobile.avatar.core.MascotIdentity?,
+    val agentName: String,
+)
+
 @Composable
 private fun SidebarAgentIdentity(
-    agentOrbIndex: Int,
-    agentName: String,
+    identity: SidebarIdentity,
     onEditAgent: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -171,9 +181,10 @@ private fun SidebarAgentIdentity(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        AgentOrb(index = agentOrbIndex, size = 30.dp, cornerRadius = 6.dp)
+        // The agent itself, alive, where it lives; the gradient orb until it has an identity.
+        AgentOrb(index = identity.agentOrbIndex, size = if (identity.agentIdentity != null) 64.dp else 30.dp, cornerRadius = 6.dp, agentId = identity.agentId)
         Text(
-            text = agentName,
+            text = identity.agentName,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface,

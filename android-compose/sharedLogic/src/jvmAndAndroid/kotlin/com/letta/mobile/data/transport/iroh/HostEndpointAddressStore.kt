@@ -101,8 +101,7 @@ class HostEndpointAddressStore(
     private fun readHostRecord(): HostRecord? {
         if (!file.exists()) return null
         return file.readLines()
-            .mapNotNull(::parseHostLine)
-            .firstOrNull()
+            .firstNotNullOfOrNull(::parseHostLine)
     }
 
     private fun parseHostLine(line: String): HostRecord? {

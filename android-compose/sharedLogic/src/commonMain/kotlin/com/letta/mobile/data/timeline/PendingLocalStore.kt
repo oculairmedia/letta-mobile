@@ -19,6 +19,9 @@ interface PendingLocalStore {
     /** Drop a pending local once the server confirms it (or the user cancels). */
     suspend fun delete(otid: String)
 
+    /** Mark the exact persisted optimistic row failed and retain only the newest failure. */
+    suspend fun markFailed(otid: String)
+
     /** Load every pending local for a conversation, oldest first. */
     suspend fun load(conversationId: String): List<PendingLocalRecord>
 }
@@ -29,11 +32,13 @@ data class PendingLocalRecord(
     val content: String,
     val attachments: List<MessageContentPart.Image>,
     val sentAt: TimelineInstant,
+    val deliveryState: DeliveryState = DeliveryState.SENT,
 )
 
 /** No-op store used in tests / situations where persistence is undesired. */
 object NoOpPendingLocalStore : PendingLocalStore {
     override suspend fun save(record: PendingLocalRecord) = Unit
     override suspend fun delete(otid: String) = Unit
+    override suspend fun markFailed(otid: String) = Unit
     override suspend fun load(conversationId: String): List<PendingLocalRecord> = emptyList()
 }

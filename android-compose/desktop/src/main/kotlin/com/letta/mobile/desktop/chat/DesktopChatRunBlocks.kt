@@ -28,51 +28,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.projection.projectRunContent
 import com.letta.mobile.data.model.UiToolCall
-
-@Composable
-internal fun DesktopSkillEnvelopeChip(item: ChatRenderItem.SkillEnvelopeChip) {
-    // Desktop parity for the mobile skill-envelope chip: collapsed one-liner,
-    // click to expand the raw envelope (monospace). Mirrors PR #852 mobile UI.
-    var expanded by remember(item.messageId) { mutableStateOf(false) }
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { expanded = !expanded }
-            .padding(vertical = 4.dp),
-    ) {
-        Text(
-            text = skillEnvelopeLabel(item),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
-        )
-        if (expanded) {
-            Text(
-                text = item.rawContent,
-                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                modifier = Modifier.padding(top = 4.dp),
-            )
-        }
-    }
-}
-
-@JvmInline
-internal value class SkillSlug(val value: String)
-
-@JvmInline
-internal value class SkillArgs(val value: String)
-
-private fun skillEnvelopeLabel(item: ChatRenderItem.SkillEnvelopeChip): String {
-    val slug = SkillSlug(item.slug)
-    val args = SkillArgs(item.args)
-    val suffix = args.value.takeIf { it.isNotBlank() }?.let { " — $it" }.orEmpty()
-    return "\uD83E\uDDE9 Skill: ${slug.value}$suffix"
-}
 
 @JvmInline
 internal value class StreamingMessageId(val value: String)
@@ -125,7 +88,9 @@ internal fun ReasoningRow(text: String) {
     var open by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(
-            modifier = Modifier.clickable { open = !open },
+            modifier = Modifier
+                .clickable(role = Role.Button) { open = !open }
+                .semantics { stateDescription = if (open) "Expanded" else "Collapsed" },
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
@@ -295,6 +260,14 @@ internal fun StepStatusCircle(state: StepState) {
 }
 
 internal val ChatColumnMaxWidth = 760.dp
+
+/**
+ * Readable measure for centred prose in the pane's full-width states (the
+ * welcome copy, the status hero's body). Narrower than [ChatColumnMaxWidth] on
+ * purpose — a 760dp line of centred text is hard to track — but shared, so the
+ * pane has exactly two widths rather than a different magic number per state.
+ */
+internal val ChatProseMaxWidth = 520.dp
 
 /** A composer slash-command (shown when the message starts with "/"). */
 data class ComposerCommand(

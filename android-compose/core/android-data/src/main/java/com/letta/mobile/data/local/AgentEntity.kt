@@ -28,7 +28,7 @@ data class AgentEntity(
     val toolCount: Int = 0,
     val blockCount: Int = 0,
 ) {
-    fun toAgent() = Agent(
+    fun toAgent(): Agent = Agent(
         id = AgentId(id),
         name = name,
         description = description,

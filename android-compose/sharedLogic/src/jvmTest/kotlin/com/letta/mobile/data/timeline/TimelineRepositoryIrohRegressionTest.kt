@@ -7,7 +7,9 @@ import com.letta.mobile.data.model.ToolCall
 import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.model.ToolReturnMessage
 import com.letta.mobile.util.Telemetry
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.emptyFlow
@@ -33,7 +35,12 @@ class TimelineRepositoryIrohRegressionTest {
 
     @Test
     fun `observe null conversation and scoped ingest share one StateFlow after split loops existed`() = runTest {
-        val repository = TimelineRepository(NoopTimelineTransport(), NoOpPendingLocalStore, NoOpConversationCursorStore)
+        val repository = TimelineRepository(
+            NoopTimelineTransport(),
+            NoOpPendingLocalStore,
+            NoOpConversationCursorStore,
+            repositoryScope = backgroundScope,
+        )
         val unscoped = repository.observe(agentId = null, conversationId = "conv-alias")
         val scopedLoopBeforeAlias = repository.getOrCreate(agentId = "agent-1", conversationId = "conv-alias")
         advanceUntilIdle()
@@ -56,6 +63,45 @@ class TimelineRepositoryIrohRegressionTest {
         assertEquals(1, unscoped.value.events.size)
         assertEquals("visible now", unscoped.value.events.single().content)
         assertEquals(1, repository.cachedLoopCount())
+    }
+
+    @Test
+    fun `peek cache is exact scoped and tracks removal without aliasing`() = runTest {
+        val repository = TimelineRepository(
+            NoopTimelineTransport(),
+            NoOpPendingLocalStore,
+            NoOpConversationCursorStore,
+            repositoryScope = backgroundScope,
+        )
+        val agentALoop = repository.getOrCreate("agent-a", "shared")
+        val agentBLoop = repository.getOrCreate("agent-b", "shared")
+
+        assertSame(agentALoop.state.value, repository.peekCached("agent-a", "shared"))
+        assertSame(agentBLoop.state.value, repository.peekCached("agent-b", "shared"))
+        assertEquals(null, repository.peekCached(null, "shared"))
+
+        repository.clear("agent-a", "shared")
+
+        assertEquals(null, repository.peekCached("agent-a", "shared"))
+        assertSame(agentBLoop.state.value, repository.peekCached("agent-b", "shared"))
+    }
+
+    @Test
+    fun `peek cache follows unscoped alias promotion exactly`() = runTest {
+        val repository = TimelineRepository(
+            NoopTimelineTransport(),
+            NoOpPendingLocalStore,
+            NoOpConversationCursorStore,
+            repositoryScope = backgroundScope,
+        )
+        val unscoped = repository.getOrCreate(null, "promoted")
+        assertSame(unscoped.state.value, repository.peekCached(null, "promoted"))
+
+        repository.getOrCreate("agent-a", "promoted")
+
+        assertEquals(null, repository.peekCached(null, "promoted"))
+        assertSame(unscoped.state.value, repository.peekCached("agent-a", "promoted"))
+        assertEquals(null, repository.peekCached("agent-b", "promoted"))
     }
 
     @Test
@@ -128,7 +174,7 @@ class TimelineRepositoryIrohRegressionTest {
     }
 
     private class NoopTimelineTransport : TimelineTransport {
-        private val stream = MutableSharedFlow<TimelineStreamFrame>()
+        val stream = MutableSharedFlow<TimelineStreamFrame>()
 
         override suspend fun sendConversationMessage(
             conversationId: String,

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -59,6 +60,8 @@ import com.letta.mobile.ui.components.audio.HoldToDictateButton
 import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.image.decodeImageBitmap
+import com.letta.mobile.ui.mascot.MascotGazeSurface
+import com.letta.mobile.ui.mascot.mascotGazeTarget
 import com.letta.mobile.feature.chat.voice.VoiceInputUiState
 import com.letta.mobile.feature.chat.voice.VoiceInputViewModel
 import kotlinx.collections.immutable.ImmutableList
@@ -72,7 +75,7 @@ import com.letta.mobile.ui.preview.LettaPreviewFrame
 internal val ChatComposerAttachButtonSize = LettaSpacing.COMPOSER_ATTACH_BUTTON_SIZE
 private val ChatComposerActionTargetSize = 48.dp
 private val ChatComposerAttachIconSize = LettaSpacing.COMPOSER_ATTACH_ICON_SIZE
-private val ChatComposerInputHorizontalPadding = LettaSpacing.SM
+internal val ChatComposerInputHorizontalPadding = LettaSpacing.SM
 // letta-mobile-6237v.2: padded up to 24.dp from LettaSpacing.XS (6.dp) so
 // the composer bar feels substantial enough to anchor chat input at rest.
 // When the keyboard slides up (IME open), the bar animates back down to
@@ -93,6 +96,8 @@ internal object ChatComposerTestTags {
 }
 
 private data class ChatComposerUiModel(
+    /** The agent this composer talks to; its mascot keeps the user company above the box. */
+    val agentId: String?,
     val inputText: String,
     val pendingAttachments: ImmutableList<MessageContentPart.Image>,
     val isStreaming: Boolean,
@@ -150,8 +155,12 @@ internal fun ChatComposer(
     onSlashCommandUninstall: (SlashCommand) -> Unit = {},
     availableTools: List<Tool> = emptyList(),
     isCancelling: Boolean = false,
+    agentId: String? = null,
+    /** Status beside the mascot companion (the thinking indicator); drawn in the same row, after the character. */
+    companionStatus: (@Composable () -> Unit)? = null,
 ) {
     val model = ChatComposerUiModel(
+        agentId = agentId,
         inputText = inputText,
         pendingAttachments = pendingAttachments,
         isStreaming = isStreaming,
@@ -173,6 +182,7 @@ internal fun ChatComposer(
         model = model,
         callbacks = callbacks,
         modifier = modifier,
+        companionStatus = companionStatus,
     )
 }
 
@@ -181,6 +191,7 @@ private fun ChatComposerContent(
     model: ChatComposerUiModel,
     callbacks: ChatComposerCallbacks,
     modifier: Modifier,
+    companionStatus: (@Composable () -> Unit)? = null,
 ) {
     var previewAttachment by remember { mutableStateOf<MessageContentPart.Image?>(null) }
     var showComposerActions by remember { mutableStateOf(false) }
@@ -214,6 +225,10 @@ private fun ChatComposerContent(
     val voice = rememberChatComposerVoice(model)
 
     Column(modifier = modifier.fillMaxWidth()) {
+        // letta-mobile-8jtf3: the agent's mascot above the box, on the attach button's edge,
+        // watching the field (and the pointer, when there is one) through the shared gaze director.
+        ChatComposerCompanion(agentId = model.agentId, status = companionStatus)
+
         // letta-mobile-ihuz: tool-affordance chips above the input when the
         // composer is empty AND the active agent has tools. Hides as soon as
         // the user starts typing — gated by composable visibility (no flicker).
@@ -224,15 +239,17 @@ private fun ChatComposerContent(
             onPreviewAttachment = { previewAttachment = it },
         )
 
-        ChatComposerInput(
-            state = ChatComposerInputState(
-                model = model,
-                voice = voice,
-                showAction = showAction,
-            ),
-            callbacks = callbacks,
-            onOpenActions = { showComposerActions = true },
-        )
+        Box(Modifier.fillMaxWidth().mascotGazeTarget(MascotGazeSurface.INPUT)) {
+            ChatComposerInput(
+                state = ChatComposerInputState(
+                    model = model,
+                    voice = voice,
+                    showAction = showAction,
+                ),
+                callbacks = callbacks,
+                onOpenActions = { showComposerActions = true },
+            )
+        }
     }
 
     ChatComposerActionSheet(
@@ -328,6 +345,7 @@ private fun matchingSlashCommands(
     }
 }
 
+
 @Composable
 private fun ChatComposerInput(
     state: ChatComposerInputState,
@@ -341,8 +359,6 @@ private fun ChatComposerInput(
     // to its compact previous state when the IME slides up — typing surface
     // reclaims the padding. Driven off ime visibility rather than focus so it
     // tracks the keyboard even when the field loses focus while the IME is
-    // still up (e.g. user taps the attach menu).
-    val keyboardOpen = WindowInsets.ime.getBottom(LocalDensity.current) > 0
     // Drive the height transition from the same continuously changing IME
     // inset that moves the parent. A fixed tween starts after the keyboard
     // transition and produces a visible pop on close.

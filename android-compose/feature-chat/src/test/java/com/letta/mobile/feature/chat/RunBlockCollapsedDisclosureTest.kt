@@ -2,6 +2,7 @@ package com.letta.mobile.feature.chat
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.Text
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertHasClickAction
@@ -39,6 +40,7 @@ class RunBlockCollapsedDisclosureTest {
 
     @Test
     fun collapsedCompletedRunHidesToolRowsButKeepsDisclosureTappable() {
+        val collapsedState = mutableStateOf(true)
         composeRule.setContent {
             LettaTheme(
                 appTheme = AppTheme.LIGHT,
@@ -52,8 +54,8 @@ class RunBlockCollapsedDisclosureTest {
                             toolMessage(id = "tool-1", command = "collapse-check"),
                             message(id = "final-1", content = "All done."),
                         ),
-                        collapsed = true,
-                        onToggleCollapsed = {},
+                        collapsed = collapsedState.value,
+                        onToggleCollapsed = { collapsedState.value = !collapsedState.value },
                         showCompletedDisclosure = true,
                     ) { message, _, rowModifier ->
                         Box(
@@ -115,6 +117,40 @@ class RunBlockCollapsedDisclosureTest {
         composeRule.onNodeWithTag("run-row-reasoning-1").assertIsDisplayed()
         composeRule.onNodeWithTag("run-row-pending-1").assertIsDisplayed()
         composeRule.runOnIdle { org.junit.Assert.assertEquals(0, toggles) }
+    }
+
+    @Test
+    fun completedRunCollapseDoesNotDependOnDisclosureVisibility() {
+        val showDisclosure = mutableStateOf(true)
+        composeRule.setContent {
+            LettaTheme(AppTheme.LIGHT, ThemePreset.DEFAULT, false) {
+                LettaChatTheme {
+                    RunBlock(
+                        messages = listOf(
+                            message(id = "reasoning-1", content = "Inspecting", isReasoning = true),
+                            toolMessage(id = "tool-1", command = "visibility-check"),
+                            message(id = "final-1", content = "All done."),
+                        ),
+                        collapsed = true,
+                        onToggleCollapsed = {},
+                        showCompletedDisclosure = showDisclosure.value,
+                    ) { message, _, rowModifier ->
+                        Box(modifier = rowModifier.testTag("run-row-${message.id}")) {
+                            Text(text = message.content.ifBlank { message.id })
+                        }
+                    }
+                }
+            }
+        }
+
+        composeRule.onNodeWithText("Bash(visibility-check)").assertDoesNotExist()
+        composeRule.runOnIdle { showDisclosure.value = false }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag(RunActivityDisclosureTestTags.Header).assertDoesNotExist()
+        composeRule.onNodeWithText("Bash(visibility-check)").assertDoesNotExist()
+        composeRule.onNodeWithTag("run-row-reasoning-1").assertDoesNotExist()
+        composeRule.onNodeWithTag("run-row-final-1").assertIsDisplayed()
     }
 
     private fun message(

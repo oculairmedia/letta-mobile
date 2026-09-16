@@ -1,10 +1,18 @@
 package com.letta.mobile.feature.chat
 
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.data.model.UiMessage
@@ -26,6 +34,30 @@ class ChatReasoningTest {
 
     @get:Rule
     val composeRule = createComposeRule()
+
+    /**
+     * The reasoning body enters behind an AnimatedVisibility, so the node exists before it is
+     * displayed. Settle that motion on the test clock rather than asserting on the frame that
+     * happens to follow setContent, which passes or fails with machine load.
+     */
+    private fun settleReasoningEnter() {
+        composeRule.mainClock.advanceTimeBy(1_000)
+        composeRule.waitForIdle()
+    }
+
+    /**
+     * Waits for the reasoning body to finish entering or leaving instead of advancing the clock by
+     * a fixed amount and asserting on whatever frame follows: the enter/exit runs behind an
+     * AnimatedVisibility, so on a loaded machine one 1s advance plus waitForIdle could land while
+     * the node was still absent (collapseStateSurvivesContentUpdatesAndStreamingCompletion failed
+     * that way in CI). waitUntil drives the same test clock, so this stays deterministic.
+     */
+    private fun awaitReasoningContent(present: Boolean) {
+        composeRule.waitUntil(REASONING_MOTION_TIMEOUT_MS) {
+            composeRule.onAllNodesWithTag(ChatReasoningTestTags.Content).fetchSemanticsNodes().isNotEmpty() == present
+        }
+        composeRule.waitForIdle()
+    }
 
     @Test
     fun activeReasoningWithBlankContentShowsLiveStatusIndicator() {
@@ -55,7 +87,8 @@ class ChatReasoningTest {
             }
         }
 
-        composeRule.onNodeWithTag(ChatReasoningTestTags.LiveStatus).assertIsDisplayed()
+        composeRule.onAllNodesWithText("Thinking…").assertCountEquals(2)
+        composeRule.onAllNodesWithTag(ChatReasoningTestTags.LiveStatus).assertCountEquals(1)
     }
 
     @Test
@@ -87,6 +120,7 @@ class ChatReasoningTest {
             }
         }
 
+        settleReasoningEnter()
         composeRule.onNodeWithText("Thought for 1.5s").assertIsDisplayed()
         composeRule.onNodeWithTag(ChatReasoningTestTags.Content).assertIsDisplayed()
     }
@@ -201,6 +235,7 @@ class ChatReasoningTest {
         }
 
         composeRule.waitForIdle()
+        settleReasoningEnter()
         composeRule.onNodeWithTag(ChatReasoningTestTags.Content).assertIsDisplayed()
 
         // Non-prefix replacement
@@ -211,6 +246,7 @@ class ChatReasoningTest {
         }
 
         composeRule.waitForIdle()
+        settleReasoningEnter()
         composeRule.onNodeWithTag(ChatReasoningTestTags.Content).assertIsDisplayed()
     }
 
@@ -243,6 +279,87 @@ class ChatReasoningTest {
             }
         }
 
+        settleReasoningEnter()
         composeRule.onNodeWithTag(ChatReasoningTestTags.Content).assertIsDisplayed()
+    }
+
+    @Test
+    fun collapseStateSurvivesContentUpdatesAndStreamingCompletion() {
+        val messageState = mutableStateOf(
+            UiMessage(
+                id = "reasoning-lifecycle",
+                role = "assistant",
+                content = "Initial reasoning",
+                timestamp = "2026-07-26T12:00:00Z",
+                isReasoning = true,
+            ),
+        )
+        val streamingState = mutableStateOf(false)
+        val collapsedState = mutableStateOf(true)
+
+        composeRule.setContent {
+            LettaTheme(AppTheme.LIGHT, ThemePreset.DEFAULT, false) {
+                LettaChatTheme {
+                    MessageReasoning(
+                        message = messageState.value,
+                        isStreaming = streamingState.value,
+                        collapsed = collapsedState.value,
+                        onToggleCollapsed = { collapsedState.value = !collapsedState.value },
+                    )
+                }
+            }
+        }
+
+        val header = composeRule.onNodeWithTag(ChatReasoningTestTags.Header)
+        val content = composeRule.onNodeWithTag(ChatReasoningTestTags.Content)
+        header.assert(reasoningState("Reasoning collapsed", actionLabel = "Expand reasoning"))
+        content.assertDoesNotExist()
+
+        header.performClick()
+        awaitReasoningContent(present = true)
+        header.assert(reasoningState("Reasoning expanded", actionLabel = "Collapse reasoning"))
+        content.assertIsDisplayed()
+
+        composeRule.runOnIdle {
+            messageState.value = messageState.value.copy(content = "Initial reasoning with more tokens")
+        }
+        content.assertIsDisplayed()
+
+        header.performClick()
+        awaitReasoningContent(present = false)
+        content.assertDoesNotExist()
+
+        composeRule.runOnIdle {
+            streamingState.value = true
+            messageState.value = messageState.value.copy(content = "Streaming reasoning")
+        }
+        awaitReasoningContent(present = true)
+        header.assert(reasoningState("Reasoning in progress", actionLabel = null))
+        content.assertIsDisplayed()
+
+        composeRule.runOnIdle {
+            messageState.value = messageState.value.copy(content = "Streaming reasoning completed", isError = true)
+            streamingState.value = false
+        }
+        awaitReasoningContent(present = false)
+        header.assert(reasoningState("Reasoning collapsed", actionLabel = "Expand reasoning"))
+        content.assertDoesNotExist()
+    }
+
+    private fun reasoningState(state: String, actionLabel: String?): SemanticsMatcher {
+        val stateMatcher = SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, state)
+        val actionMatcher = if (actionLabel == null) {
+            SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick)
+        } else {
+            SemanticsMatcher("onClick label=$actionLabel") { node ->
+                runCatching { node.config[SemanticsActions.OnClick] }.getOrNull()?.label == actionLabel
+            }
+        }
+        return stateMatcher.and(actionMatcher)
+    }
+
+    private companion object {
+        /** Generous: it bounds a hang, it is not the expected duration (the clock is virtual). */
+        const val REASONING_MOTION_TIMEOUT_MS = 10_000L
     }
 }

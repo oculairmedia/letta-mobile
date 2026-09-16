@@ -8,9 +8,11 @@ import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeRunStatus
 import com.letta.mobile.runtime.ToolExecutionStatus
 import com.letta.mobile.util.Telemetry
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.supervisorScope
+import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -21,6 +23,42 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 
 import kotlin.time.Duration.Companion.milliseconds
+
+/** Serializes asynchronous writes per observer while allowing different observers to progress independently. */
+internal class ObserverWriteQueue(
+    private val scope: CoroutineScope,
+) {
+    // Key by the handle generation, not endpoint identity. During reconnect the
+    // old and new streams share an endpoint but must never inherit each other's
+    // stalled tail.
+    private val tails = ConcurrentHashMap<ViewerHandle, Job>()
+
+    /** Enqueues [write] after earlier writes for the same viewer without blocking the caller. */
+    fun enqueue(viewer: ViewerHandle, write: suspend () -> Unit) {
+        val next = requireNotNull(
+            tails.compute(viewer) { _, previous ->
+                scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                    previous?.join()
+                    write()
+                }
+            },
+        )
+        next.invokeOnCompletion {
+            tails.remove(viewer, next)
+        }
+    }
+
+    /**
+     * Await this viewer's currently-queued writes. Frames enqueued after this
+     * call are NOT waited for — the point is to flush what is already pending,
+     * which is what the terminal-frame guarantee needs (see
+     * [ConversationTurnFanout.broadcastDeltaBodyNoPark]).
+     */
+    suspend fun drain(viewer: ViewerHandle) {
+        tails[viewer]?.join()
+    }
+}
+
 /**
  * eaczz.4 — the fanout core. Owns a single turn's per-connection frame-shaping
  * state (cumulative assistant text + open-tool_call tracking + terminal-dedup)
@@ -68,7 +106,6 @@ import kotlin.time.Duration.Companion.milliseconds
 internal class ConversationTurnFanout(
     private val conversationId: String,
     private val runtime: AppServerRuntimeScope,
-    private val remoteEndpointId: String,
     /** Snapshot source of every viewer of [conversationId] (incl. the initiator). */
     private val viewersFor: suspend (conversationId: String) -> Set<ViewerHandle>,
     /**
@@ -99,6 +136,7 @@ internal class ConversationTurnFanout(
      * to this timeout (it must receive every frame). Injectable for tests.
      */
     private val observerWriteTimeoutMs: Long = OBSERVER_WRITE_TIMEOUT_MS,
+    private val observerWrites: ObserverWriteQueue? = null,
 ) {
     private val openToolCalls = OpenToolCallTracker()
     private val cumulativeText = CumulativeStreamText()
@@ -251,7 +289,6 @@ internal class ConversationTurnFanout(
         if (openIds.isEmpty()) return
         Telemetry.event(
             "IrohNode", "stream.dangling_tool_calls_synthesized",
-            "remoteEndpointId" to remoteEndpointId,
             "count" to openIds.size,
         )
         openIds.forEach { toolCallId ->
@@ -365,40 +402,35 @@ internal class ConversationTurnFanout(
      * deterministically from the (redial-resent) input rather than from live
      * turn frames — so it must not consume a parking slot.
      *
-     * eaczz.6 — NON-BLOCKING FANOUT + FAULT ISOLATION. Every viewer is written
-     * CONCURRENTLY inside a [supervisorScope]: a per-viewer failure (thrown
-     * exception, false-return, or observer timeout) can NEVER cancel a sibling
-     * write or propagate to the caller's collect loop / controller.runTurn — the
-     * initiator turn always completes.
+     * eaczz.6 — NON-BLOCKING FANOUT + FAULT ISOLATION. EVERY viewer's writes,
+     * initiator included (letta-mobile-aggeh), enter the connection-owned
+     * [ObserverWriteQueue], so a normal delta does not wait on any network write
+     * at all. Each viewer has one ordered job chain, preserving frame order and
+     * event-sequence monotonicity while a stalled observer is timed out and
+     * removed. Failures are absorbed by [writeToViewerIsolated] and cannot cancel
+     * sibling viewers or the initiator turn.
      *
-     * Concurrency (not per-viewer serial) is the chosen non-blocking strategy:
-     * a wedged QUIC observer stream cannot serially-block the others because
-     * writes proceed in parallel. It is ALSO bounded by [observerWriteTimeoutMs]
-     * for OBSERVERS only — a dead peer that never completes a write is timed out,
-     * de-registered on the FIRST stall, and skipped on every subsequent delta, so
-     * the total delay it can add to the turn is at most one timeout window (a
-     * bound), not one-per-delta. Tradeoff vs. a pure fire-and-forget scheme: we
-     * join each delta before the next so per-viewer frame ORDERING + event_seq
-     * monotonicity are preserved (a viewer's mutex still serializes its writes),
-     * at the cost of that single bounded wait; ordering correctness is worth it.
+     * A TERMINAL delta additionally drains the initiator's chain before
+     * returning, so a turn never completes with its terminal frame still queued.
+     * That is one join per turn, not per frame.
      *
      * The INITIATOR viewer is written with NO timeout and its failure is NOT
      * de-registered here — it must receive EVERY frame, and its stream death is
      * handled by the existing parking path in [IrohNodeConnection]. Timeout +
      * drop is observer-only.
+     *
+     * When there is no queue (legacy/test construction) every write stays
+     * synchronous, preserving the pre-queue behaviour exactly.
      */
     private suspend fun broadcastDeltaBodyNoPark(delta: JsonObject) {
         val viewers = snapshotViewers()
-        // eaczz observability: the fanout write path emits no stream.write
-        // telemetry, so multi-client delivery was invisible in the wrapper log.
-        // Log the viewer count + ids per broadcast so a turn reaching every
-        // viewer is greppable (fanout.broadcast).
+        // Endpoint identities are stable public keys and therefore correlatable.
+        // Emit only aggregate delivery state; never copy endpoint values into fanout telemetry.
         Telemetry.event(
             "IrohNode", "fanout.broadcast",
             "conversationId" to conversationId,
             "viewerCount" to viewers.size,
-            "viewerIds" to viewers.joinToString(",") { it.connectionId.take(12) },
-            "initiatorId" to (initiatorViewer?.connectionId?.take(12) ?: "none"),
+            "hasInitiator" to (initiatorViewer != null),
         )
         if (viewers.isEmpty()) return
         // tg7b8: split the join. The initiator MUST receive every frame for
@@ -407,20 +439,46 @@ internal class ConversationTurnFanout(
         // the slowest observer block the next delta — the user-perceptible
         // hitch on send. Fire-and-forget observer writes so the call site
         // returns as soon as the initiator's write commits.
-        val (initiatorWrite, observerWrites) = partitionViewersByInitiator(viewers)
-        supervisorScope {
-            // Observers: launch in parallel, do NOT await. Their failures are
-            // already absorbed by writeToViewerIsolated (which de-registers on
-            // persistent failure); the launch is enough.
-            observerWrites.forEach { viewer ->
-                async { writeToViewerIsolated(viewer, delta, isInitiator = false) }
+        val (initiatorWrite, observerViewers) = partitionViewersByInitiator(viewers)
+        observerViewers.forEach { viewer ->
+            val queue = observerWrites
+            if (queue == null) {
+                writeToViewerIsolated(viewer, delta, isInitiator = false)
+            } else {
+                queue.enqueue(viewer) {
+                    writeToViewerIsolated(viewer, delta, isInitiator = false)
+                }
             }
-            // Initiator (0 or 1 writes): await. This is the join the
-            // dispatcher thread blocks on; we want it back as fast as the
-            // initiator's write can commit.
-            initiatorWrite.map { viewer ->
-                async { writeToViewerIsolated(viewer, delta, isInitiator = true) }
-            }.awaitAll()
+        }
+        // letta-mobile-aggeh: the initiator goes through the SAME per-viewer
+        // ordered chain as observers. Awaiting its QUIC write per frame was the
+        // last synchronous network hop in the App Server drain path: every hop
+        // from the socket to here is a suspending send over a bounded buffer, so
+        // a slow initiator link propagated backpressure all the way to
+        // KtorAppServerWebSocketTransport's 1024-frame stream queue and tore the
+        // whole shared generation down on overflow (41 times in one production
+        // boot, taking every surface with it).
+        //
+        // Nothing is lost by not awaiting: writeToViewerIsolated DISCARDS the
+        // initiator's write result (`if (isInitiator) return`), and parking is
+        // recorded by trackInitiatorFrame BEFORE the write regardless of its
+        // outcome. Ordering and event_seq monotonicity are preserved because the
+        // chain serializes the whole write lambda -- seq is assigned inside it.
+        //
+        // The one guarantee awaiting DID provide is that a terminal frame
+        // reaches the wire before the turn completes; that is now explicit, and
+        // costs one join per TURN instead of one per frame (a median turn is
+        // ~5,500 frames).
+        val queue = observerWrites
+        initiatorWrite.forEach { viewer ->
+            if (queue == null) {
+                writeToViewerIsolated(viewer, delta, isInitiator = true)
+            } else {
+                queue.enqueue(viewer) {
+                    writeToViewerIsolated(viewer, delta, isInitiator = true)
+                }
+                if (deltaIsTerminal(delta)) queue.drain(viewer)
+            }
         }
     }
 
@@ -474,8 +532,6 @@ internal class ConversationTurnFanout(
         if (ok != true) {
             Telemetry.event(
                 "IrohNode", "fanout.observer_dropped",
-                "remoteEndpointId" to remoteEndpointId,
-                "connectionId" to viewer.connectionId,
                 "conversationId" to conversationId,
                 "reason" to if (ok == null) "write_timeout" else "write_failed",
                 level = Telemetry.Level.WARN,

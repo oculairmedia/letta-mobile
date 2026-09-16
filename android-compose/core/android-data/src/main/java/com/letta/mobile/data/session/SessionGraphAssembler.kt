@@ -58,7 +58,6 @@ import com.letta.mobile.data.repository.StepRepository
 import com.letta.mobile.data.repository.SubagentRepository
 import com.letta.mobile.data.repository.ToolRepository
 import com.letta.mobile.data.repository.VibesyncEventStreamRepository
-import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.api.LocalRuntimeAgentSource
 import com.letta.mobile.data.repository.api.LocalRuntimeConversationSource
 import com.letta.mobile.data.repository.api.LocalRuntimeModelSource
@@ -71,7 +70,6 @@ import com.letta.mobile.runtime.BackendDescriptor
 import dagger.Lazy
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.CoroutineScope
 
 /**
  * Hilt-owned assembler that wires session-scoped repositories onto a
@@ -124,8 +122,9 @@ class SessionGraphAssembler @Inject constructor(
         val useIroh = binding.bindsIroh()
         return SessionGraph(
             id = request.graphId,
-            backendDescriptor = request.localRuntimeBackend?.descriptor
-                ?: remoteLettaDescriptor(request.activeConfig),
+            capturedConfig = request.activeConfig,
+            backendDescriptor = request.backendDescriptor,
+            conversationCursorStore = request.capturedCursorStore,
             localRuntimeBackend = request.localRuntimeBackend,
             scope = request.scope,
             agentRepository = agentRepository,
@@ -211,7 +210,7 @@ class SessionGraphAssembler @Inject constructor(
 
     private fun createAdminRepositories(request: SessionGraphAssembleRequest): AdminRepositories {
         val ops = createOpsAdminRepositories(request)
-        val catalog = createCatalogAdminRepositories(request, ops.provider)
+        val catalog = createCatalogAdminRepositories(request)
         return AdminRepositories(
             archive = catalog.archive,
             folder = catalog.folder,
@@ -230,7 +229,6 @@ class SessionGraphAssembler @Inject constructor(
 
     private fun createCatalogAdminRepositories(
         request: SessionGraphAssembleRequest,
-        providerRepository: ProviderRepository,
     ): CatalogAdminRepositories {
         val transport = request.channelTransport
         val settings = request.settingsRepository
@@ -271,15 +269,6 @@ class SessionGraphAssembler @Inject constructor(
                 settingsRepository = settings,
                 irohModelSource = settings?.let {
                     IrohAdminRpcModelSource(channelTransport = transport, settingsRepository = it)
-                },
-                credentialedProviderTypes = {
-                    if (providerRepository.providers.value.isEmpty()) {
-                        providerRepository.refreshProviders()
-                    }
-                    providerRepository.providers.value
-                        .map { it.providerType }
-                        .filter { it.isNotBlank() }
-                        .toSet()
                 },
             ),
             project = ProjectRepository(

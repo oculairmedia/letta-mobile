@@ -1,0 +1,738 @@
+package com.letta.mobile.data.timeline
+
+import com.letta.mobile.data.timeline.snapshot.TimelineScope
+import com.letta.mobile.util.Telemetry
+import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
+import com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent
+import com.letta.mobile.data.timeline.snapshot.toStoredTimelineEvent
+import com.letta.mobile.data.timeline.snapshot.toConfirmedTimelineEvent
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+
+/** A shared semantic writer, never implemented by the platform persistence backend. */
+fun interface TimelineCanonicalWriter {
+    /** Resolve exact evidence and write ledger/evidence atomically; return whether either changed. */
+    suspend fun merge(transaction: TimelineStoreTransaction, record: TimelineRemoteRecord): Boolean
+}
+
+data class TimelineEngineSelection(
+    val scope: TimelineScope,
+    val generation: TimelineSelectionGeneration,
+    val anchor: TimelinePageKey?,
+)
+
+data class TimelineEngineRequest(val selection: TimelineEngineSelection, val remote: TimelineRemotePageRequest)
+
+data class TimelineEnginePublication(
+    val selection: TimelineEngineSelection? = null,
+    val durableRevision: Long = 0,
+)
+
+sealed interface TimelineEngineOpen {
+    data class Opened(val selection: TimelineEngineSelection) : TimelineEngineOpen
+    data object Disabled : TimelineEngineOpen
+    data object MissingTarget : TimelineEngineOpen
+}
+
+enum class TimelineEnginePageOutcome { Applied, Stale, NoProgress }
+
+data class TimelineEngineReconcileResult(val outcome: TimelineEnginePageOutcome, val appended: Int = 0, val committedSequence: Long? = null)
+
+/**
+ * Serialized shadow coordinator. The mutex covers suspending storage transactions, not just dispatch.
+ * No host may enable this until an exact shared semantic writer and transport binding are supplied.
+ */
+class CanonicalTimelineEngine(
+    private val store: TimelineBoundedStore,
+    private val writer: TimelineCanonicalWriter,
+    val budget: TimelinePageBudget = TimelinePageBudget(64, 2L * 1024 * 1024),
+    private val enabled: Boolean = false,
+) {
+    private val mutex = Mutex()
+    private var generation = 0L
+    private var sequence = 0L
+    private var pending: TimelineEngineRequest? = null
+    private var pendingReconcile: TimelineEngineRequest? = null
+    private val mutablePublication = MutableStateFlow(TimelineEnginePublication())
+    val publication = mutablePublication.asStateFlow()
+    private var liveFence: TimelineLiveFence? = null
+    private var liveReduction: TimelineReducerState? = null
+    private var liveReturns = emptySet<String>()
+    private val mutableLive = MutableStateFlow<TimelineLivePublication?>(null)
+    val live = mutableLive.asStateFlow()
+
+    suspend fun beginLive(selection: TimelineEngineSelection): TimelineLiveFence = mutex.withLock {
+        check(selection === mutablePublication.value.selection) { "Stale selection" }
+        // A committed settlement already belongs to the durable ledger. Starting another turn
+        // drops only its resident overlay; Paging observes durableRevision and canonical identities.
+        // Old acknowledgments remain fenced by the publication's fence, not a growing body queue.
+        check(sequence < Long.MAX_VALUE)
+        TimelineLiveFence(selection, TimelineRequestId((++sequence).toString())).also {
+            // A response fetched before this run cannot repair the post-run timeline.
+            pendingReconcile = null
+            liveFence = it
+            liveReduction = TimelineReducerState(Timeline(conversationId = selection.scope.conversationId))
+            liveReturns = emptySet()
+            mutableLive.value = null
+        }
+    }
+
+    suspend fun ingest(fence: TimelineLiveFence, frame: TimelineStreamFrame): Boolean = mutex.withLock {
+        if (liveFence !== fence || fence.selection !== mutablePublication.value.selection ||
+            mutableLive.value?.settlementRevision != null
+        ) return@withLock false
+        val previous = checkNotNull(liveReduction)
+        val next = when (frame) {
+            is TimelineStreamFrame.Message -> {
+                val output = reduceStreamFrame(TimelineReducerInput(previous.timeline, frame.message,
+                    previous.pendingToolReturnsByCallId, agentId = fence.selection.scope.agentId))
+                previous.copy(timeline = output.next, pendingToolReturnsByCallId = output.updatedPendingToolReturnsByCallId)
+            }
+            TimelineStreamFrame.Heartbeat -> return@withLock true
+            TimelineStreamFrame.Done -> previous
+            is TimelineStreamFrame.RawEvent -> error("Raw events must be decoded by the transport before ingest")
+        }
+        val events = next.timeline.events.filterIsInstance<TimelineEvent.Confirmed>()
+        val returnedId = ((frame as? TimelineStreamFrame.Message)?.message as? com.letta.mobile.data.model.ToolReturnMessage)
+            ?.toolReturn?.toolCallId?.takeIf { it.isNotBlank() }
+        val nextReturns = if (returnedId == null) liveReturns else liveReturns + returnedId
+        // The overlay is a bounded resident view of a turn, not its record: a turn long enough to
+        // exceed the budget is legal, and the durable rows still arrive through reconcile. Outgrowing
+        // the budget therefore stops the overlay growing - it must never fail the turn, and it used
+        // to kill the process mid-stream. A terminal frame adds no rows, so it can never be dropped.
+        val overflow = overflowReason(events, nextReturns)
+        if (overflow != null) {
+            Telemetry.event(
+                "CanonicalTimeline", "live.overlayFrameDropped",
+                "reason" to overflow, "rows" to events.size,
+            )
+            return@withLock true
+        }
+        val terminal = frame == TimelineStreamFrame.Done
+        // Sync/reconcile is the single durable writer; a stream-only identity would double the row.
+        // Terminal frames only name the first revision that can carry this turn, so the overlay
+        // knows when the settled ledger has caught up. Nothing here commits.
+        val revision = if (terminal) store.read(fence.selection.scope) { checkpoint().revision + 1 } else null
+        liveReduction = next
+        liveReturns = nextReturns
+        mutableLive.value = TimelineLivePublication(fence, TimelineLiveBlock(emptyList(), terminal, events), revision)
+        true
+    }
+
+    /** Names the budget a frame would outgrow, or null when the overlay can still carry it. */
+    private fun overflowReason(events: List<TimelineEvent.Confirmed>, returns: Set<String>): String? {
+        if (events.size > budget.maxMetadataRows) return "row budget"
+        if (returns.size > budget.maxMetadataRows) return "return index budget"
+        var liveBytes = 0L
+        for (event in events) {
+            liveBytes += TimelineSnapshotCodec.json.encodeToString(
+                StoredTimelineEvent.serializer(), event.toStoredTimelineEvent(),
+            ).encodeToByteArray().size
+            if (liveBytes > budget.maxDecodedBodyBytes) return "byte budget"
+        }
+        return null
+    }
+
+    suspend fun publishLive(fence: TimelineLiveFence, block: TimelineLiveBlock): Boolean = mutex.withLock {
+        if (liveFence !== fence || fence.selection !== mutablePublication.value.selection) return@withLock false
+        if (mutableLive.value?.block?.terminal == true) return@withLock false
+        validate(TimelineRemotePageResult.Page(
+            fence.requestId, fence.selection.generation, block.records, null, false,
+            block.records.sumOf { it.encodedBodyBytes },
+        ))
+        val revision = if (block.terminal) store.transaction(fence.selection.scope) {
+            val before = checkpoint()
+            var changed = false
+            for (record in block.records) {
+                currentCoroutineContext().ensureActive()
+                changed = writer.merge(this, record) || changed
+            }
+            currentCoroutineContext().ensureActive()
+            if (changed) nextRevision() else before.revision
+        } else null
+        mutableLive.value = TimelineLivePublication(fence, block, revision)
+        if (revision != null) mutablePublication.value = TimelineEnginePublication(fence.selection, revision)
+        true
+    }
+
+    /** Runtime-only release when no viewport is attached; never discard a still-streaming block. */
+    internal suspend fun releaseUnobservedSettlement(fence: TimelineLiveFence): Boolean = mutex.withLock {
+        if (liveFence !== fence) return@withLock false
+        if (fence.selection !== mutablePublication.value.selection) return@withLock false
+        val current = mutableLive.value ?: return@withLock false
+        if (current.settlementRevision == null) return@withLock false
+        mutableLive.value = null
+        liveFence = null
+        liveReduction = null
+        true
+    }
+
+    /** Host acknowledges only once the settled ledger it renders carries this turn's identity. */
+    suspend fun acknowledgeSettlement(
+        fence: TimelineLiveFence,
+        presented: Map<TimelineMessageId, Long>,
+    ): Boolean = mutex.withLock {
+        val current = mutableLive.value ?: return@withLock false
+        if (current.fence !== fence) return@withLock false
+        val nextAliases = resolveAliases(fence.selection.scope, current, presented)
+        val active = if (nextAliases.isEmpty()) current
+        else current.copy(aliases = current.aliases + nextAliases).also { mutableLive.value = it }
+        if (!active.isSettled(presented)) return@withLock false
+        mutableLive.value = null
+        liveFence = null
+        liveReduction = null
+        true
+    }
+
+    /**
+     * The one moment both names for a streamed reply are in hand.
+     *
+     * A streamed assistant message and its durable counterpart share no identifier: the stream
+     * names it `cm-stream-*` with an otid derived from that same id, while the server names it and
+     * derives its otid from its own. Neither side can find the other on its own, so the overlay
+     * would sit on screen beside the settled row forever, showing the reply twice.
+     *
+     * This page is where the two meet. The live block holds the streamed events, the page holds the
+     * records being committed for the very same turn, and pairing them here lets the overlay drain
+     * against a row it could never have identified. Matching is by exact content within a single
+     * settling turn, which is the narrowest join available - never across turns, and never on a
+     * turn that is still streaming.
+     */
+    /**
+     * A row this page committed, and whether the page is what put it there. Position may pair only
+     * against rows the page appended: a reconcile page is a window of recent history, not a turn,
+     * so a row that was already resident would shift the count and pair the wrong two together.
+     */
+    private data class CommittedRow(
+        val event: TimelineEvent.Confirmed,
+        val identity: TimelineMessageId,
+        val isNew: Boolean,
+    )
+
+    private fun adoptCommittedIdentities(committed: List<CommittedRow>) {
+        val live = mutableLive.value ?: return
+        if (live.settlementRevision == null) return
+        val adopted = live.adoptionsFrom(committed)
+        if (adopted.isEmpty()) return
+        mutableLive.value = live.copy(aliases = live.aliases + adopted)
+    }
+
+    private fun TimelineLivePublication.adoptionsFrom(
+        committed: List<CommittedRow>,
+    ): Map<String, TimelineMessageId> {
+        val unclaimed = committed.filterTo(mutableListOf()) { it.event.adoptionKey() != null }
+        if (unclaimed.isEmpty()) return emptyMap()
+        val adopted = linkedMapOf<String, TimelineMessageId>()
+        val unpaired = mutableListOf<TimelineEvent.Confirmed>()
+        for (event in block.events) {
+            when (val claim = event.claimAdoption(unclaimed, aliases)) {
+                is Adoption.Alias -> adopted[claim.streamedId] = claim.identity
+                Adoption.AlreadyNamed -> Unit
+                null -> if (event.messageType == TimelineMessageType.ASSISTANT) unpaired += event
+            }
+        }
+        return adopted + positionalAdoptions(unpaired, unclaimed, adopted)
+    }
+
+    /**
+     * The last honest join: what is left, in the order it happened.
+     *
+     * Both sides describe the same turn in the same order — the k-th streamed reply is the k-th
+     * reply that turn committed — so when the two share no id and their text does not match,
+     * position still pairs them. That is the case content cannot survive: a dropped tail delta
+     * leaves the streamed row short of the stored one, the texts stop matching, and both render.
+     * Measured on device 2026-09-11 at 368 characters against a stored 369.
+     *
+     * Deliberately narrow. Assistant rows only, rows this page appended only, inside one settling
+     * turn, and only after every id and text match has been taken. Pairing stops at the shorter of
+     * the two lists, so an unequal count leaves the remainder unadopted instead of guessing.
+     */
+    private fun positionalAdoptions(
+        unpaired: List<TimelineEvent.Confirmed>,
+        unclaimed: List<CommittedRow>,
+        alreadyAdopted: Map<String, TimelineMessageId>,
+    ): Map<String, TimelineMessageId> {
+        if (unpaired.isEmpty()) return emptyMap()
+        val taken = alreadyAdopted.values.toSet()
+        val candidates = unclaimed.filter {
+            it.isNew && it.event.messageType == TimelineMessageType.ASSISTANT && it.identity !in taken
+        }
+        if (candidates.isEmpty()) return emptyMap()
+        return unpaired.zip(candidates)
+            .filter { (event, row) -> row.identity.value != event.serverId }
+            .associate { (event, row) -> event.serverId to row.identity }
+    }
+
+    /**
+     * What names the same message on both sides of the boundary. A tool call and its return are
+     * named by the call, which the stream and the ledger agree on exactly. An assistant reply has
+     * no shared id at all - the stream and the server each derive an otid from their own name - so
+     * its content is the only thing left to match on.
+     */
+    private fun TimelineEvent.Confirmed.adoptionKey(): String? = when (messageType) {
+        TimelineMessageType.TOOL_CALL -> toolCalls.firstNotNullOfOrNull { it.effectiveId.takeIf(String::isNotBlank) }
+        TimelineMessageType.TOOL_RETURN -> toolReturnContentByCallId.keys.firstOrNull { it.isNotBlank() }
+        TimelineMessageType.ASSISTANT -> content.takeIf { it.isNotBlank() }
+        else -> null
+    }
+
+    /**
+     * The types must agree, or a tool call could claim the assistant row it belongs to.
+     *
+     * A content match is consumed, because two replies that happen to read the same are still two
+     * replies and must not collapse onto one row. An id match is not: one call can reach the
+     * overlay under several names - a stream emits a synthetic return before the real one - and
+     * every one of them is the same message as the single committed row, so all of them adopt it.
+     */
+    /** Paired under a new name, paired under the name it already has, or not paired at all. */
+    private sealed interface Adoption {
+        data class Alias(val streamedId: String, val identity: TimelineMessageId) : Adoption
+        data object AlreadyNamed : Adoption
+    }
+
+    private fun TimelineEvent.Confirmed.claimAdoption(
+        unclaimed: MutableList<CommittedRow>,
+        aliases: Map<String, TimelineMessageId>,
+    ): Adoption? {
+        if (serverId in aliases) return Adoption.AlreadyNamed
+        val key = adoptionKey() ?: return null
+        val match = unclaimed.firstOrNull {
+            it.event.messageType == messageType && it.event.adoptionKey() == key
+        } ?: return null
+        if (messageType == TimelineMessageType.ASSISTANT) unclaimed.remove(match)
+        return if (match.identity.value == serverId) Adoption.AlreadyNamed
+        else Adoption.Alias(serverId, match.identity)
+    }
+
+    /**
+     * The sync writer's commit is the first moment alias evidence exists for this turn, so this
+     * runs there rather than at the terminal frame: at Done the durable row has not been written
+     * and there is nothing yet to resolve against.
+     */
+    private suspend fun attachResolvedAliases(scope: TimelineScope) {
+        val live = mutableLive.value ?: return
+        if (live.settlementRevision == null) return
+        val aliases = resolveAliases(scope, live, emptyMap())
+        if (aliases.isEmpty()) return
+        mutableLive.value = live.copy(aliases = live.aliases + aliases)
+    }
+
+    private suspend fun resolveAliases(
+        scope: TimelineScope,
+        publication: TimelineLivePublication,
+        presented: Map<TimelineMessageId, Long>,
+    ): Map<String, TimelineMessageId> {
+        // Alias evidence requires the exact canonical writer. Fallback writers without exact
+        // canonical indexing rely on matching event identities directly or the strand guard.
+        val exact = writer as? TimelineExactCanonicalWriter ?: return emptyMap()
+        // An alias never changes once recorded, so a known one is never re-read. Events already
+        // resident under their own id need no alias at all.
+        val missing = publication.block.events.filter { event ->
+            event.serverId !in publication.aliases && TimelineMessageId(event.serverId) !in presented
+        }
+        if (missing.isEmpty()) return emptyMap()
+        val aliases = mutableMapOf<String, TimelineMessageId>()
+        store.read(scope) {
+            for (event in missing) {
+                val canonical = exact.canonicalIdentity(this, event.serverId, event.otid)
+                if (canonical.value != event.serverId) {
+                    aliases[event.serverId] = canonical
+                }
+            }
+        }
+        return aliases
+    }
+
+    suspend fun open(scope: TimelineScope, target: TimelineMessageId? = null): TimelineEngineOpen = mutex.withLock {
+        if (!enabled) return@withLock TimelineEngineOpen.Disabled
+        val (checkpoint, anchor) = store.read(scope) { checkpoint() to target?.let { locate(it) } }
+        if (target != null && anchor == null) return@withLock TimelineEngineOpen.MissingTarget
+        check(generation < Long.MAX_VALUE)
+        val selection = TimelineEngineSelection(scope, TimelineSelectionGeneration(++generation), anchor)
+        pending = null
+        liveFence = null
+        liveReduction = null
+        mutableLive.value = null
+        mutablePublication.value = TimelineEnginePublication(selection, checkpoint.revision)
+        TimelineEngineOpen.Opened(selection)
+    }
+
+    suspend fun hasOlderHistory(selection: TimelineEngineSelection): Boolean = mutex.withLock {
+        check(selection === mutablePublication.value.selection) { "Stale selection" }
+        store.read(selection.scope) { checkpoint().hasMore }
+    }
+
+    suspend fun beginPage(selection: TimelineEngineSelection): TimelineEngineRequest = mutex.withLock {
+        check(selection === mutablePublication.value.selection) { "Stale selection" }
+        val checkpoint = store.read(selection.scope) { checkpoint() }
+        check(checkpoint.hasMore) { "History exhausted" }
+        check(sequence < Long.MAX_VALUE)
+        val remote = TimelineRemotePageRequest(
+            selection.scope, TimelineRequestId((++sequence).toString()), selection.generation,
+            TimelineRemoteOrder.NewestFirst, checkpoint.continuation ?: TimelineContinuation.Initial, budget,
+        )
+        TimelineEngineRequest(selection, remote).also { pending = it }
+    }
+
+    suspend fun applyPage(request: TimelineEngineRequest, page: TimelineRemotePageResult.Page): TimelineEnginePageOutcome =
+        mutex.withLock {
+            if (pending !== request || request.selection !== mutablePublication.value.selection ||
+                page.requestId != request.remote.requestId || page.selectionGeneration != request.selection.generation
+            ) return@withLock TimelineEnginePageOutcome.Stale
+            validate(page)
+            // Refuse an unadvanced cursor even for empty pages; never persist false exhaustion.
+            if (page.hasMore && page.nextContinuation == request.remote.continuation) {
+                pending = null
+                return@withLock TimelineEnginePageOutcome.NoProgress
+            }
+            val revision = store.transaction(request.selection.scope) {
+                val before = checkpoint()
+                check((before.continuation ?: TimelineContinuation.Initial) == request.remote.continuation) {
+                    "Durable cursor changed during request"
+                }
+                var changed = false
+                for (record in page.records) {
+                    currentCoroutineContext().ensureActive()
+                    changed = writer.merge(this, record) || changed
+                }
+                val cursorChanged = before.continuation != page.nextContinuation || before.hasMore != page.hasMore
+                if (cursorChanged) cursor(page.nextContinuation, page.hasMore)
+                currentCoroutineContext().ensureActive()
+                if (changed || cursorChanged) nextRevision() else before.revision
+            }
+            // No suspension after commit: cancellation cannot strand the in-memory watermark.
+            mutablePublication.value = TimelineEnginePublication(request.selection, revision)
+            pending = null
+            TimelineEnginePageOutcome.Applied
+        }
+
+    suspend fun beginReconcile(selection: TimelineEngineSelection): TimelineEngineRequest = mutex.withLock {
+        check(selection === mutablePublication.value.selection) { "Stale selection" }
+        check(sequence < Long.MAX_VALUE)
+        val remote = TimelineRemotePageRequest(selection.scope, TimelineRequestId((++sequence).toString()),
+            selection.generation, TimelineRemoteOrder.NewestFirst, TimelineContinuation.Initial, budget)
+        TimelineEngineRequest(selection, remote).also { pendingReconcile = it }
+    }
+
+    /** Recent-tail repair must not advance or exhaust the independent older-history cursor. */
+    suspend fun reconcilePage(
+        request: TimelineEngineRequest,
+        page: TimelineRemotePageResult.Page,
+    ): TimelineEnginePageOutcome = reconcilePageDetailed(request, page).outcome
+
+    suspend fun reconcilePageDetailed(
+        request: TimelineEngineRequest,
+        page: TimelineRemotePageResult.Page,
+    ): TimelineEngineReconcileResult = mutex.withLock {
+        if (pendingReconcile !== request || request.selection !== mutablePublication.value.selection ||
+            page.requestId != request.remote.requestId || page.selectionGeneration != request.selection.generation
+        ) return@withLock TimelineEngineReconcileResult(TimelineEnginePageOutcome.Stale)
+        // A settled turn now depends on this path for its durable rows, so only refuse mid-stream.
+        if (liveFence != null && mutableLive.value?.settlementRevision == null) {
+            return@withLock TimelineEngineReconcileResult(TimelineEnginePageOutcome.NoProgress)
+        }
+        validate(page)
+        val committed = mutableListOf<CommittedRow>()
+        val (revision, appended) = store.transaction(request.selection.scope) {
+            var changed = false
+            var appended = 0
+            for (record in page.records) {
+                currentCoroutineContext().ensureActive()
+                val event = record.message.toTimelineEvent(0.0)
+                val identity = if (writer is TimelineExactCanonicalWriter && event != null)
+                    writer.canonicalIdentity(this, event.serverId, event.otid) else record.identity
+                val existed = locate(identity) != null
+                val merged = writer.merge(this, record)
+                if (merged && !existed) appended++
+                changed = merged || changed
+                // After the merge: a tool call's stored key is its group owner, which the tool
+                // index only knows once this record has been written.
+                if (writer is TimelineExactCanonicalWriter && event != null) {
+                    committed += CommittedRow(event, writer.canonicalEventIdentity(this, event), isNew = !existed)
+                }
+            }
+            currentCoroutineContext().ensureActive()
+            (if (changed) nextRevision() else checkpoint().revision) to appended
+        }
+        mutablePublication.value = TimelineEnginePublication(request.selection, revision)
+        adoptCommittedIdentities(committed)
+        attachResolvedAliases(request.selection.scope)
+        pendingReconcile = null
+        TimelineEngineReconcileResult(TimelineEnginePageOutcome.Applied, appended,
+            page.records.mapNotNull { it.message.seqId?.toLong() }.maxOrNull())
+    }
+
+    /**
+     * Presentation checks explicit suppression without erasing an in-flight page merely
+     * because pending-send metadata advanced the checkpoint. Paging owns generation replacement.
+     */
+    suspend fun isSuppressed(
+        selection: TimelineEngineSelection,
+        identity: TimelineMessageId,
+        revision: Long,
+        event: TimelineEvent.Confirmed,
+    ): Boolean = mutex.withLock {
+        if (selection !== mutablePublication.value.selection) return@withLock true
+        store.read(selection.scope) { isSuppressed(identity, revision, event) }
+    }
+
+    /**
+     * Builds one bounded settled page while holding both the engine generation fence and one storage
+     * snapshot. Presentation and its suppression evidence cannot be split by a concurrent writer.
+     */
+    suspend fun preparePage(
+        selection: TimelineEngineSelection,
+        position: TimelineReadPosition,
+        maxRows: Int,
+        ownAgentId: String?,
+        adapter: TimelineSettledProjectionAdapter,
+    ): TimelinePreparedPage = mutex.withLock {
+        check(selection === mutablePublication.value.selection) { "Stale selection" }
+        require(maxRows > 0)
+        store.read(selection.scope) {
+            val page = TimelineBoundedReader(store).run {
+                preview(position, budget.copy(maxMetadataRows = minOf(maxRows, budget.maxMetadataRows)))
+            }
+            val records = page.metadata.rows.zip(page.bodies) { metadata, body ->
+                TimelineSettledRecord(metadata.key, metadata.contentType, body, page.metadata.revision, metadata.body)
+            }.map { record ->
+                val presentation = record.presentationWithAdapter(ownAgentId, adapter)
+                val prepared = if (presentation is TimelineSettledPresentation.Render &&
+                    isSuppressed(record.key.identity, record.revision, presentation.event)
+                ) TimelineSettledPresentation.Drop else presentation
+                record.copy(preparedPresentation = prepared)
+            }
+            TimelinePreparedPage(page.metadata, records)
+        }
+    }
+
+    private suspend fun TimelineStoreReader.isSuppressed(
+        identity: TimelineMessageId,
+        revision: Long,
+        event: TimelineEvent.Confirmed,
+    ): Boolean {
+        require(revision <= checkpoint().revision) { "Future presentation revision" }
+        val exact = writer as? TimelineExactCanonicalWriter ?: error("Exact writer required")
+        val canonical = exact.canonicalIdentity(this, event.serverId, event.otid)
+        require(identity == canonical) { "Suppression identity mismatch" }
+        val bytes = evidence("suppression/server/${identity.value}", 64 * 1024)
+        return event.messageType == TimelineMessageType.ASSISTANT && bytes != null &&
+            TimelineSnapshotCodec.json.decodeFromString(AbandonedAssistantFragmentSuppression.serializer(), bytes.decodeToString()) ==
+            event.toAbandonedAssistantFragmentSuppression()
+    }
+
+    /** Suppress exact abandoned tail fragments without deleting their raw durable bodies. */
+    suspend fun suppressAbandonedTail(
+        selection: TimelineEngineSelection,
+        runId: String?,
+        turnId: String?,
+        reason: String,
+        candidateRunIds: Set<String>,
+    ): Int = mutex.withLock {
+        check(selection === mutablePublication.value.selection) { "Stale selection" }
+        check(liveFence == null || mutableLive.value?.settlementRevision != null) { "Turn still active" }
+        val (revision, count) = store.transaction(selection.scope) {
+            val metadata = metadata(TimelineReadPosition.Tail, budget.maxMetadataRows)
+            var remaining = budget.maxDecodedBodyBytes
+            val events = mutableListOf<TimelineEvent.Confirmed>()
+            for (row in metadata.rows.asReversed()) {
+                if (row.contentType != TIMELINE_EVENT_CONTENT_TYPE) break
+                require(row.body.encodedBytes <= remaining && row.body.encodedBytes <= Int.MAX_VALUE) { "Cleanup body budget exceeded" }
+                val bytes = ByteArray(row.body.encodedBytes.toInt())
+                var offset = 0
+                while (offset < bytes.size) {
+                    val requested = minOf(64 * 1024, bytes.size - offset)
+                    val chunk = body(row.body, offset.toLong(), requested)
+                    check(chunk.isNotEmpty() && chunk.size <= requested)
+                    chunk.copyInto(bytes, offset)
+                    offset += chunk.size
+                }
+                remaining -= bytes.size
+                val event = TimelineSnapshotCodec.json.decodeFromString(StoredTimelineEvent.serializer(), bytes.decodeToString())
+                val confirmed = event.toConfirmedTimelineEvent()
+                if (confirmed.messageType != TimelineMessageType.ASSISTANT) break
+                events.add(confirmed)
+            }
+            // A truncated assistant-only tail could hide the longest prefix owner. Fail closed.
+            check(events.size < budget.maxMetadataRows || metadata.older == null) { "Cleanup tail exceeds bounded window" }
+            val timeline = Timeline(conversationId = selection.scope.conversationId, events = events.asReversed().toTimelinePersistentList())
+            val result = timeline.cleanupAbandonedAssistantFragments(runId, turnId, reason, candidateRunIds)
+            var changed = 0
+            for (decision in result.suppressions) {
+                val id = decision.serverId ?: continue
+                val key = "suppression/server/$id"
+                val bytes = TimelineSnapshotCodec.json.encodeToString(AbandonedAssistantFragmentSuppression.serializer(), decision).encodeToByteArray()
+                if (evidence(key, 64 * 1024)?.contentEquals(bytes) != true) {
+                    putEvidence(key, bytes)
+                    changed++
+                }
+            }
+            (if (changed > 0) nextRevision() else checkpoint().revision) to changed
+        }
+        mutablePublication.value = TimelineEnginePublication(selection, revision)
+        count
+    }
+
+    suspend fun advanceToolSweep(selection: TimelineEngineSelection): Long = mutex.withLock {
+        check(selection === mutablePublication.value.selection)
+        val (sweepGeneration, revision) = store.transaction(selection.scope) {
+            CanonicalToolIndex.advanceGeneration(this) to nextRevision()
+        }
+        mutablePublication.value = TimelineEnginePublication(selection, revision)
+        sweepGeneration
+    }
+
+    suspend fun settleToolSweep(selection: TimelineEngineSelection, generation: Long): Int = mutex.withLock {
+        check(selection === mutablePublication.value.selection)
+        val (revision, count) = store.transaction(selection.scope) {
+            if (toolSweepGeneration() != generation) return@transaction checkpoint().revision to 0
+            val entries = unresolvedTools(null, budget.maxMetadataRows)
+            var remaining = budget.maxDecodedBodyBytes
+            var count = 0
+            for (entry in entries) {
+                val identity = checkNotNull(entry.owner)
+                if (!CanonicalToolIndex.stillUnresolved(this, generation, entry.callId, identity)) continue
+                val key = checkNotNull(locate(identity)) { "Missing unresolved tool owner" }
+                val row = metadata(TimelineReadPosition.Around(key), 1).rows.single { it.key == key }
+                require(row.body.encodedBytes <= remaining && row.body.encodedBytes <= Int.MAX_VALUE) { "Tool settlement budget exceeded" }
+                val bytes = ByteArray(row.body.encodedBytes.toInt())
+                var offset = 0
+                while (offset < bytes.size) {
+                    val limit = minOf(64 * 1024, bytes.size - offset)
+                    val chunk = body(row.body, offset.toLong(), limit)
+                    check(chunk.isNotEmpty() && chunk.size <= limit)
+                    chunk.copyInto(bytes, offset)
+                    offset += chunk.size
+                }
+                remaining -= bytes.size
+                val event = TimelineSnapshotCodec.json.decodeFromString(StoredTimelineEvent.serializer(), bytes.decodeToString()).toConfirmedTimelineEvent()
+                check(event.toolCalls.any { it.effectiveId == entry.callId }) { "Tool index owner mismatch" }
+                val repaired = event.copy(
+                    toolReturnContent = event.toolReturnContent ?: DanglingToolCallResolver.NO_RESULT_MESSAGE,
+                    toolReturnIsError = if (event.toolReturnContent == null) true else event.toolReturnIsError,
+                    toolReturnContentByCallId = (event.toolReturnContentByCallId + (entry.callId to DanglingToolCallResolver.NO_RESULT_MESSAGE)).toTimelinePersistentMap(),
+                    toolReturnIsErrorByCallId = (event.toolReturnIsErrorByCallId + (entry.callId to true)).toTimelinePersistentMap(),
+                )
+                (writer as TimelineExactCanonicalWriter).mergeEvent(this, repaired)
+                count++
+            }
+            (if (count > 0) nextRevision() else checkpoint().revision) to count
+        }
+        mutablePublication.value = TimelineEnginePublication(selection, revision)
+        count
+    }
+
+    suspend fun cancelPage(request: TimelineEngineRequest) = mutex.withLock {
+        if (pending === request) pending = null
+    }
+
+    suspend fun cancelReconcile(request: TimelineEngineRequest) = mutex.withLock {
+        if (pendingReconcile === request) pendingReconcile = null
+    }
+
+    suspend fun rejectReconcileNoProgress(
+        request: TimelineEngineRequest,
+        response: TimelineRemotePageResult.NoProgress,
+    ): TimelineEnginePageOutcome = mutex.withLock {
+        if (pendingReconcile !== request || request.selection !== mutablePublication.value.selection ||
+            response.requestId != request.remote.requestId || response.selectionGeneration != request.selection.generation
+        ) return@withLock TimelineEnginePageOutcome.Stale
+        require(response.continuation == request.remote.continuation)
+        pendingReconcile = null
+        TimelineEnginePageOutcome.NoProgress
+    }
+
+    suspend fun rejectNoProgress(
+        request: TimelineEngineRequest,
+        response: TimelineRemotePageResult.NoProgress,
+    ): TimelineEnginePageOutcome = mutex.withLock {
+        if (pending !== request || mutablePublication.value.selection !== request.selection ||
+            response.requestId != request.remote.requestId || response.selectionGeneration != request.selection.generation
+        ) return@withLock TimelineEnginePageOutcome.Stale
+        require(response.continuation == request.remote.continuation)
+        pending = null
+        TimelineEnginePageOutcome.NoProgress
+    }
+
+    suspend fun load(selection: TimelineEngineSelection, position: TimelineReadPosition, maxRows: Int): TimelineBodyPage =
+        mutex.withLock {
+            check(selection === mutablePublication.value.selection) { "Stale selection" }
+            require(maxRows > 0)
+            TimelineBoundedReader(store).preview(selection.scope, position, budget.copy(maxMetadataRows = minOf(maxRows, budget.maxMetadataRows)))
+        }
+
+    /** Chunk access shares the selection fence; a reference cannot cross conversation ownership. */
+    suspend fun resolveBodyChunk(
+        selection: TimelineEngineSelection,
+        reference: TimelineBodyReference,
+        offset: Long,
+        maxBytes: Int,
+    ): TimelineBodyChunk = mutex.withLock {
+        check(selection === mutablePublication.value.selection) { "Stale selection" }
+        require(reference.scope == selection.scope) { "Body scope mismatch" }
+        TimelineBoundedReader(store).readChunk(reference, offset, maxBytes)
+    }
+
+    /** Resolve only the selected row, in one storage snapshot, without following a stale pointer. */
+    suspend fun resolveBody(selection: TimelineEngineSelection, record: TimelineSettledRecord): TimelineSettledRecord =
+        mutex.withLock {
+            check(selection === mutablePublication.value.selection) { "Stale selection" }
+            val pointer = record.pointer ?: return@withLock record
+            if (!record.isPreview) return@withLock record
+            require(pointer.encodedBytes <= budget.maxDecodedBodyBytes && pointer.encodedBytes <= Int.MAX_VALUE) {
+                "Body requires chunked presentation"
+            }
+            store.read(selection.scope) {
+                val page = metadata(TimelineReadPosition.Around(record.key), 1)
+                check(page.revision == record.revision) { "Stale body revision" }
+                val row = page.rows.singleOrNull { it.key == record.key }
+                check(row?.body == pointer) { "Stale body pointer" }
+                val bytes = ByteArray(pointer.encodedBytes.toInt())
+                var offset = 0
+                while (offset < bytes.size) {
+                    val requested = minOf(64 * 1024, bytes.size - offset)
+                    val chunk = body(pointer, offset.toLong(), requested)
+                    check(chunk.isNotEmpty() && chunk.size <= requested) { "Incomplete body" }
+                    chunk.copyInto(bytes, offset)
+                    offset += chunk.size
+                }
+                record.copy(body = bytes)
+            }
+        }
+
+    suspend fun readBody(selection: TimelineEngineSelection, pointer: TimelineBodyPointer, offset: Long, maxBytes: Int): ByteArray =
+        mutex.withLock {
+            check(selection === mutablePublication.value.selection)
+            require(offset >= 0 && maxBytes > 0 && maxBytes.toLong() <= budget.maxDecodedBodyBytes)
+            store.read(selection.scope) { body(pointer, offset, maxBytes) }.also { require(it.size <= maxBytes) }
+        }
+
+    /** Releases resident ownership only. Durable ledger and evidence survive reopen and page dropping. */
+    suspend fun release(selection: TimelineEngineSelection) = mutex.withLock {
+        if (selection === mutablePublication.value.selection) {
+            pending = null
+            pendingReconcile = null
+            liveFence = null
+            liveReduction = null
+            mutableLive.value = null
+            mutablePublication.value = TimelineEnginePublication()
+        }
+    }
+
+    private fun validate(page: TimelineRemotePageResult.Page) {
+        require(page.records.size <= budget.maxMetadataRows)
+        require(page.hasMore == (page.nextContinuation != null))
+        require(page.records.map { it.identity }.toSet().size == page.records.size)
+        var remaining = budget.maxDecodedBodyBytes
+        for (record in page.records) {
+            require(record.identity.value == record.message.id)
+            require(record.encodedBodyBytes <= remaining)
+            remaining -= record.encodedBodyBytes
+        }
+        require(page.decodedBodyBytes == budget.maxDecodedBodyBytes - remaining)
+    }
+}

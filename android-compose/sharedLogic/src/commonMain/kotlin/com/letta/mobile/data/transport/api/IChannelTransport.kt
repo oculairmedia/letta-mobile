@@ -121,6 +121,27 @@ interface RedialAwareChannelTransport {
     val redialWhileTurnActive: SharedFlow<RedialWhileTurnActive>
 }
 
+/** Optional provenance emitted when a bounded frame projection is detached. */
+interface FrameCollectorOverflowAwareChannelTransport {
+    val collectorOverflows: SharedFlow<FrameCollectorOverflowIncident>
+    val frameCollectorConnectionGeneration: Long
+
+    /** True only when [cancellation] was produced by this projection's overflow detach. */
+    fun isFrameCollectorOverflowCancellation(
+        subscriptionIdentity: String,
+        cancellation: kotlinx.coroutines.CancellationException,
+    ): Boolean
+}
+
+data class FrameCollectorOverflowIncident(
+    val subscriptionId: Long,
+    val subscriptionIdentity: String,
+    val capacity: Int,
+    val frameType: String,
+    val conversationId: String,
+    val connectionGeneration: Long = 0L,
+)
+
 /**
  * letta-mobile-wxy4s: transports that run an application-level liveness probe and
  * can be asked to run one RIGHT NOW.

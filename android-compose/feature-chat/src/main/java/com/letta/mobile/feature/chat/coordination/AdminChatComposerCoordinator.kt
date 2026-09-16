@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.time.Duration.Companion.milliseconds
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.GoalStatusUi
 import com.letta.mobile.ui.chat.render.ConversationState
@@ -298,7 +299,7 @@ internal class AdminChatComposerCoordinator(
      * A real new turn bumps [sendEpoch] and stands this watcher down.
      */
     private suspend fun suppressLateFramesAfterTerminal(epoch: Int) {
-        withTimeoutOrNull(LATE_FRAME_SUPPRESSION_WINDOW_MS) {
+        withTimeoutOrNull(LATE_FRAME_SUPPRESSION_WINDOW_MS.milliseconds) {
             uiState.takeWhile { epoch == sendEpoch }.collect { state ->
                 if (!state.isStreaming) return@collect
                 Telemetry.event(

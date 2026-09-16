@@ -111,13 +111,67 @@ internal fun calculateLazyIndexForRenderItem(
     return lazyIndex
 }
 
+/**
+ * Snapshot of a chat [LazyListState] projected into the per-message domain that
+ * [ChatViewportFollowPolicy] reasons about.
+ *
+ * `totalItems` is the number of *render* items (chat messages, not date
+ * headers). The mapping from "visible lazy index" to "visible render index"
+ * is computed here so that policy decisions are made on a consistent axis.
+ *
+ * `lastVisibleIndex` is the render-item index of the newest visible message.
+ * `dateHeaderOffset` counts how many of the lazy items between the head and
+ * the first visible render item are date headers, so that the
+ * `lastVisibleIndex >= totalItems - 1 - threshold` comparison in
+ * [ChatViewportFollowPolicy.isNearLatest] is not tripped by a one-message
+ * scroll that only happens to cross a date boundary.
+ */
 internal fun LazyListState.toChatViewportSnapshot(
     isUserScrolling: Boolean,
-    itemCount: Int,
+    renderItems: List<ChatRenderItem>,
 ): ChatViewportSnapshot {
-    return ChatViewportSnapshot(
-        totalItems = itemCount,
-        lastVisibleIndex = (itemCount - 1 - firstVisibleItemIndex).takeIf { itemCount > 0 },
-        isUserScrolling = isUserScrolling,
+    val renderItemCount = renderItems.size
+    val lazyItemCount = layoutInfo.totalItemsCount
+    val visibleDateHeadersBeforeFirstRender = countDateHeadersBeforeFirstRender(
+        renderItems = renderItems,
     )
+    // Lazy index 1 is always render item 0 (calculateLazyIndexForRenderItem
+    // returns 1 for target=0). The H date headers above `firstVisibleItemIndex`
+    // occupy H of the indices between 1 and the first visible index, so the
+    // first visible *render* index is firstVisibleItemIndex - 1 - H.
+    val firstVisibleRenderIndex = (firstVisibleItemIndex - 1 - visibleDateHeadersBeforeFirstRender)
+        .coerceAtLeast(0)
+    return ChatViewportSnapshot(
+        totalItems = renderItemCount,
+        lastVisibleIndex = (renderItemCount - 1 - firstVisibleRenderIndex)
+            .takeIf { renderItemCount > 0 && lazyItemCount > 0 },
+        isUserScrolling = isUserScrolling,
+        dateHeaderOffset = visibleDateHeadersBeforeFirstRender,
+    )
+}
+
+/**
+ * Counts how many of the lazy items at indices `[0, firstVisibleItemIndex)`
+ * are date headers rather than chat messages, given the same render-items
+ * ordering used to build the lazy list. Mirrors the offset logic in
+ * [calculateLazyIndexForRenderItem].
+ */
+private fun LazyListState.countDateHeadersBeforeFirstRender(
+    renderItems: List<ChatRenderItem>,
+): Int {
+    if (renderItems.isEmpty() || firstVisibleItemIndex <= 0) return 0
+    var lazyIndex = 1 // matches calculateLazyIndexForRenderItem's starting offset
+    var dateHeaders = 0
+    for (i in renderItems.indices) {
+        val prevDate = renderItems.getOrNull(i + 1)?.boundaryTimestamp?.take(10)
+        val curDate = renderItems[i].boundaryTimestamp.take(10)
+        if (prevDate != null && prevDate != curDate) {
+            if (lazyIndex >= firstVisibleItemIndex) return dateHeaders
+            dateHeaders++
+            lazyIndex++
+        }
+        if (lazyIndex >= firstVisibleItemIndex) return dateHeaders
+        lazyIndex++
+    }
+    return dateHeaders
 }

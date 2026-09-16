@@ -14,7 +14,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -68,10 +67,17 @@ internal fun UiMessage.displayRoleLabel(defaultLabel: String): String {
                 "Tool activity"
             }
         } else {
-            defaultLabel
+            // letta-mobile-jt4wq: a message that could not be handed to the
+            // transport keeps its own identity ("You · Not sent") instead of
+            // being restyled as a server "Error" bubble quoting the user's own
+            // words back at them.
+            defaultLabel.withSendFailedSuffix(isSendFailed)
         }
     return toolCall.name
 }
+
+private fun String.withSendFailedSuffix(isSendFailed: Boolean): String =
+    if (isSendFailed) "$this · Not sent" else this
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -225,7 +231,6 @@ internal fun MessageAvatar(
     role: String,
     modifier: Modifier = Modifier,
 ) {
-    val isUser = role == "user"
     val icon = when (role) {
         "tool" -> LettaIcons.Tool
         "assistant" -> LettaIcons.Agent
@@ -238,7 +243,7 @@ internal fun MessageAvatar(
     // the user / tool roles (preserves the current visual weight for those).
     val avatarSize = LettaSpacing.AVATAR_SIZE
 
-    if (isUser || icon == null) {
+    if (icon == null) {
         // Filled pill for user (and any unknown roles): preserves the current
         // "Y" badge / role-letter look.
         val containerColor = MaterialTheme.chatColors.userBubble

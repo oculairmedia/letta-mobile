@@ -53,6 +53,32 @@ class ToolTimelineProjectionTest {
     }
 
     @Test
+    fun aCallReadBackFromTheLedgerIsNotRunningEvenWithoutItsResult() {
+        // The ledger keeps a call and its return in separate rows, so a rehydrated call never
+        // carries a result. Reading that absence as Running is what made old tool cards announce
+        // "Executing ..." and auto-expand their arguments long after the turn ended.
+        val rehydrated = UiToolCall(
+            name = "Bash",
+            arguments = """{"command":"echo hi"}""",
+            result = null,
+            status = null,
+            toolCallId = "call-settled-1",
+            settled = true,
+        )
+        assertEquals(ToolTimelineState.Succeeded, classifyToolCallState(rehydrated))
+        assertEquals(ToolTimelineState.Succeeded, projectToolTimelineCall(rehydrated).state)
+        // isActive is what auto-expands the card, so pin it at the group the UI actually renders.
+        val settledGroup = projectToolTimelineGroupFromCalls(listOf(rehydrated), groupKey = "g-settled")
+        assertEquals(false, settledGroup?.isActive)
+
+        // A live call with the same shape is still running: only the ledger closes this question.
+        val live = rehydrated.copy(settled = false, toolCallId = "call-live-1")
+        assertEquals(ToolTimelineState.Running, classifyToolCallState(live))
+        val liveGroup = projectToolTimelineGroupFromCalls(listOf(live), groupKey = "g-live")
+        assertEquals(true, liveGroup?.isActive)
+    }
+
+    @Test
     fun liveAndHydratedProjectionsMatch() {
         var liveTimeline = Timeline(conversationId = ToolTimelineFixtures.TEST_CONVERSATION_ID)
         var pendingReturns = persistentMapOf<String, com.letta.mobile.data.model.ToolReturnMessage>()
@@ -287,7 +313,7 @@ class ToolTimelineProjectionTest {
     }
 
     @Test
-    fun approvalPendingApprovedRunningSuccessLifecycle() {
+    fun userInputApprovalPendingApprovedRunningSuccessLifecycle() {
         val reqMsg = UiMessage(
             id = "msg-appr-1",
             role = "assistant",
@@ -296,11 +322,11 @@ class ToolTimelineProjectionTest {
             approvalRequest = UiApprovalRequest(
                 requestId = "appr-req-1",
                 toolCalls = listOf(
-                    UiApprovalToolCall(toolCallId = "call-appr-1", name = "delete_file", arguments = """{"path":"old.txt"}""")
+                    UiApprovalToolCall(toolCallId = "call-appr-1", name = "AskUserQuestion", arguments = """{"questions":[{"question":"Continue?","options":[{"label":"Yes"}]}]}""")
                 )
             ),
             toolCalls = listOf(
-                UiToolCall(name = "delete_file", arguments = """{"path":"old.txt"}""", result = null, status = null, toolCallId = "call-appr-1")
+                UiToolCall(name = "AskUserQuestion", arguments = """{"questions":[{"question":"Continue?","options":[{"label":"Yes"}]}]}""", result = null, status = null, toolCallId = "call-appr-1")
             )
         )
 
@@ -312,7 +338,7 @@ class ToolTimelineProjectionTest {
         val approvedMsg = reqMsg.copy(
             approvalRequest = null,
             toolCalls = listOf(
-                UiToolCall(name = "delete_file", arguments = """{"path":"old.txt"}""", result = null, status = null, toolCallId = "call-appr-1", approvalDecision = UiToolApprovalDecision.Approved)
+                UiToolCall(name = "AskUserQuestion", arguments = """{"questions":[{"question":"Continue?","options":[{"label":"Yes"}]}]}""", result = null, status = null, toolCallId = "call-appr-1", approvalDecision = UiToolApprovalDecision.Approved)
             )
         )
 
@@ -323,7 +349,7 @@ class ToolTimelineProjectionTest {
 
         val successMsg = approvedMsg.copy(
             toolCalls = listOf(
-                UiToolCall(name = "delete_file", arguments = """{"path":"old.txt"}""", result = "deleted", status = "success", toolCallId = "call-appr-1", approvalDecision = UiToolApprovalDecision.Approved)
+                UiToolCall(name = "AskUserQuestion", arguments = """{"questions":[{"question":"Continue?","options":[{"label":"Yes"}]}]}""", result = "answered", status = "success", toolCallId = "call-appr-1", approvalDecision = UiToolApprovalDecision.Approved)
             )
         )
 
@@ -331,6 +357,33 @@ class ToolTimelineProjectionTest {
         assertNotNull(g3)
         assertEquals(ToolTimelineState.Succeeded, g3.state)
         assertEquals(ToolTimelineState.Succeeded, g3.calls.single().state)
+    }
+
+    @Test
+    fun autoAllowedOrdinaryRequestRunsAndSettlesWithoutAwaitingApproval() {
+        val request = UiApprovalRequest(
+            requestId = "auto-allowed-request",
+            toolCalls = listOf(
+                UiApprovalToolCall(toolCallId = "ordinary-call", name = "Bash", arguments = """{"command":"pwd"}"""),
+            ),
+        )
+        val inFlight = UiToolCall(
+            name = "Bash",
+            arguments = """{"command":"pwd"}""",
+            result = null,
+            status = null,
+            toolCallId = "ordinary-call",
+        )
+
+        assertEquals(ToolTimelineState.Running, classifyToolCallState(inFlight, request))
+        assertEquals(
+            ToolTimelineState.Succeeded,
+            classifyToolCallState(inFlight.copy(result = "/workspace", status = "success"), request),
+        )
+        assertEquals(
+            ToolTimelineState.Failed,
+            classifyToolCallState(inFlight.copy(result = "denied", status = "error"), request),
+        )
     }
 
     @Test
@@ -361,5 +414,22 @@ class ToolTimelineProjectionTest {
 
         val s3 = deriveToolCallSummary("blank_args", "")
         assertEquals("blank_args", s3)
+    }
+
+    @Test
+    fun skillDisplayTargetUsesNormalToolTimelineSummaryWithoutDiscardingArguments() {
+        val call = projectToolTimelineCall(
+            UiToolCall(
+                name = "Skill",
+                arguments = """{"query":"weather"}""",
+                result = null,
+                displayTarget = "searxng",
+                toolCallId = "call-skill-1",
+            ),
+        )
+
+        assertEquals("Skill · searxng", call.summary)
+        assertEquals("""{"query":"weather"}""", call.arguments)
+        assertEquals("call:call-skill-1", call.key)
     }
 }

@@ -5,11 +5,8 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.decodeFromJsonElement
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 object AppServerProtocol {
     val json: Json = Json {
@@ -40,6 +37,9 @@ object AppServerProtocol {
     private val KNOWN_INBOUND_MESSAGE_TYPES: Set<String> = STREAM_CHANNEL_MESSAGE_TYPES + setOf(
         "auth_response",
         "runtime_start_response",
+        // 0.32+: acknowledgement of an input carrying request_id, and the authoritative turn end.
+        "input_accepted",
+        "turn_finished",
         "sync_response",
         "abort_message_response",
         "external_tool_call_request",
@@ -110,10 +110,7 @@ object AppServerProtocol {
      */
     fun decodeFrame(rawJson: String, channel: AppServerChannel? = null): AppServerReceivedFrame {
         val element = runCatching { json.parseToJsonElement(rawJson) }.getOrNull()
-        val raw = element as? JsonObject
-        if (raw == null) {
-            return malformedFrame(element, channel)
-        }
+        val raw = element as? JsonObject ?: return malformedFrame(element, channel)
         val parsed = ParsedInboundFrame(type = raw["type"] as? JsonPrimitive, raw = raw)
         val resolvedChannel = channel ?: if (parsed.typeName in STREAM_CHANNEL_MESSAGE_TYPES) {
             AppServerChannel.Stream

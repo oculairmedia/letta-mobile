@@ -69,7 +69,7 @@ class AgentScaffoldHiltTest {
         com.letta.mobile.ui.theme.ChatBackground.Default
     )
     private val composerFlow = MutableStateFlow(ChatComposerState())
-    private val fontScaleFlow = MutableStateFlow(1.0f)
+    private val fontScaleFlow = MutableStateFlow<Float?>(1.0f)
     private val availableAgentsFlow = MutableStateFlow(emptyList<com.letta.mobile.data.model.Agent>())
 
     private lateinit var viewModel: AdminChatViewModel
@@ -100,6 +100,7 @@ class AgentScaffoldHiltTest {
         projectBindings = mockk(relaxed = true)
         conversationRepository = mockk(relaxed = true)
         every { viewModel.uiState } returns uiFlow
+        every { viewModel.pagingPresentation } returns MutableStateFlow(null)
         every { viewModel.chatBackground } returns bgFlow
         every { viewModel.composerState } returns composerFlow
         every { viewModel.chatFontScale } returns fontScaleFlow
@@ -130,7 +131,7 @@ class AgentScaffoldHiltTest {
         }
 
         composeRule.onNodeWithTag(AgentScaffoldTestTags.MENU_BUTTON).performClick()
-        composeRule.onNodeWithText("Context utilization").assertIsDisplayed()
+        composeRule.onNodeWithTag(AgentScaffoldTestTags.DRAWER_MODEL_CARD).assertIsDisplayed()
     }
 
     @Test

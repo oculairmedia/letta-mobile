@@ -7,13 +7,11 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.feature.chat.subagent.ActiveSubagentSource
@@ -22,7 +20,6 @@ import com.letta.mobile.ui.ambient.reduceVisibleAssistantStreamPulse
 import com.letta.mobile.ui.components.AmbientShaderAgentBackground
 import com.letta.mobile.ui.theme.ChatBackground
 import com.letta.mobile.ui.theme.LettaChatTheme
-import kotlin.math.max
 
 @Composable
 internal fun ChatScreen(
@@ -39,12 +36,10 @@ internal fun ChatScreen(
     val resolvedSubagentSource = activeSubagentSource ?: viewModel.activeSubagentSource
     val resolvedSelfTodoSource = selfTodoSource ?: viewModel.selfTodoSource
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val pagingPresentation by viewModel.pagingPresentation.collectAsStateWithLifecycle()
     val composerState by viewModel.composerState.collectAsStateWithLifecycle()
-    val fontScale by viewModel.chatFontScale.collectAsStateWithLifecycle()
+    val activeFontScale by viewModel.chatFontScale.collectAsStateWithLifecycle()
     val hapticsEnabled by viewModel.hapticsEnabled.collectAsStateWithLifecycle()
-
-    var activeFontScale by remember { mutableFloatStateOf(fontScale) }
-    LaunchedEffect(fontScale) { activeFontScale = fontScale }
 
     val backgroundModifier = when (chatBackground) {
         is ChatBackground.Default -> Modifier
@@ -59,9 +54,9 @@ internal fun ChatScreen(
         )
     }
 
-    LettaChatTheme(fontScale = activeFontScale) {
+    val committedFontScale = activeFontScale
+    LettaChatTheme(fontScale = committedFontScale ?: 1f) {
         var floatingBannerMessage by remember { mutableStateOf("") }
-        val density = LocalDensity.current
         val currentConversationId = viewModel.conversationId?.value
         val subagentBarState = rememberChatScreenSubagentBarState(
             resolvedSubagentSource = resolvedSubagentSource,
@@ -104,25 +99,31 @@ internal fun ChatScreen(
                 .imePadding()
                 .then(backgroundModifier),
         ) {
-            ChatScreenLayout(
-                params = ChatScreenLayoutParams(
-                    state = state,
-                    composerState = composerState,
-                    viewModel = viewModel,
-                    contentPadding = contentPadding,
-                    chatBackground = chatBackground,
-                    chatMode = chatMode,
-                    navigation = navigation,
-                    resolvedSubagentSource = resolvedSubagentSource,
-                    subagentBarState = subagentBarState,
-                    activeFontScale = activeFontScale,
-                    onActiveFontScaleChange = { activeFontScale = it },
-                    bottomInsetDp = bottomInsetDp,
-                    floatingBannerMessage = floatingBannerMessage,
-                    onFloatingBannerMessageChange = { floatingBannerMessage = it },
-                    streamingRevealPulse = streamingRevealPulse,
-                ),
-            )
+            if (committedFontScale != null) {
+                androidx.compose.runtime.CompositionLocalProvider(
+                    LocalChatPagingPresentation provides pagingPresentation,
+                ) {
+                    ChatScreenLayout(
+                    params = ChatScreenLayoutParams(
+                        state = state,
+                        composerState = composerState,
+                        viewModel = viewModel,
+                        contentPadding = contentPadding,
+                        chatBackground = chatBackground,
+                        chatMode = chatMode,
+                        navigation = navigation,
+                        resolvedSubagentSource = resolvedSubagentSource,
+                        subagentBarState = subagentBarState,
+                        activeFontScale = committedFontScale,
+                        onActiveFontScaleChange = viewModel::setChatFontScale,
+                        bottomInsetDp = bottomInsetDp,
+                        floatingBannerMessage = floatingBannerMessage,
+                        onFloatingBannerMessageChange = { floatingBannerMessage = it },
+                        streamingRevealPulse = streamingRevealPulse,
+                    ),
+                )
+                }
+            }
         }
     }
 }

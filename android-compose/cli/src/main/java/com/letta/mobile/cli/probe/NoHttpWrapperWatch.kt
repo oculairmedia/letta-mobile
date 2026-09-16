@@ -28,7 +28,7 @@ internal class NoHttpWrapperWatch(
     private val nowMs: () -> Long = { System.currentTimeMillis() },
     private val mode: WrapperScanMode = WrapperScanMode.DEPLOYMENT,
     /** Hermetic-only: the harness declared it spawns no wrapper process at all. */
-    private val notApplicableReason: String? = null,
+    notApplicableReason: String? = null,
 ) {
     private val samples: MutableList<Int> = Collections.synchronizedList(mutableListOf())
     private val scanUnsupported = AtomicBoolean(false)

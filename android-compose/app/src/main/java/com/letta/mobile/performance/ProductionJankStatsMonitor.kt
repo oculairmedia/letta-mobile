@@ -87,7 +87,7 @@ object ProductionJankStatsMonitor {
             }
 
             val attached = withActiveTransaction { transaction ->
-                recorder.record(transaction.spanContext.traceId, durationMs) { key, value ->
+                recorder.record(MeasurementSpanId(transaction.spanContext.traceId.toString()), durationMs) { key, value ->
                     transaction.setMeasurement(key, value)
                 }
             }
@@ -150,11 +150,15 @@ object JankSessionSampler {
     }
 }
 
+/** Identity of the transaction a run of jank frames is attributed to. */
+@JvmInline
+value class MeasurementSpanId(val value: String)
+
 class JankMeasurementRecorder(
     private val frameBudgetMs: Long,
     private val maxDetailedFrameMeasurements: Int,
 ) {
-    private var activeSpanKey: Any? = null
+    private var activeSpanKey: MeasurementSpanId? = null
     private var jankFrameCount: Long = 0
     private var maxFrameDurationMs: Long = 0
     private var totalFrameDurationMs: Long = 0
@@ -162,11 +166,11 @@ class JankMeasurementRecorder(
     private var detailedFramesRecorded: Int = 0
 
     fun record(
-        spanKey: Any,
+        spanKey: MeasurementSpanId,
         durationMs: Long,
         measurementSink: (String, Double) -> Unit,
     ) {
-        if (activeSpanKey !== spanKey) {
+        if (activeSpanKey != spanKey) {
             reset(spanKey)
         }
 
@@ -187,7 +191,7 @@ class JankMeasurementRecorder(
         }
     }
 
-    private fun reset(spanKey: Any) {
+    private fun reset(spanKey: MeasurementSpanId) {
         activeSpanKey = spanKey
         jankFrameCount = 0
         maxFrameDurationMs = 0

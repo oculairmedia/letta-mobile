@@ -491,8 +491,7 @@ private fun DiffOutputSurface(block: ToolOutputBlock.Diff) {
             limited.files.forEach { file ->
                 Text(
                     text = file.newPath ?: file.oldPath ?: ChatRenderStrings.diffFile(),
-                    style = MaterialTheme.typography.labelSmall.copy(fontFamily = LettaCodeFont)
-                        .scaledBy(LocalChatFontScale.current),
+                    style = MaterialTheme.typography.labelSmall.copy(fontFamily = LettaCodeFont),
                     color = MaterialTheme.colorScheme.primary.copy(alpha = 0.86f),
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -616,13 +615,12 @@ private fun MonospaceText(
 private fun toolOutputTextStyle(): TextStyle =
     MaterialTheme.typography.listItemSupporting
         .copy(fontFamily = MaterialTheme.chatTypography.codeBlock.fontFamily ?: LettaCodeFont)
-        .scaledBy(LocalChatFontScale.current)
 
 @Composable
 private fun ToolOutputLimitNotice(text: String) {
     Text(
         text = text,
-        style = MaterialTheme.typography.labelSmall.scaledBy(LocalChatFontScale.current),
+        style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.58f),
     )
 }

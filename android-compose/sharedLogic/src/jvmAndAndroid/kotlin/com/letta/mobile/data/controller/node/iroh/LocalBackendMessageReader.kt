@@ -74,7 +74,7 @@ internal class LocalBackendMessageReader(
         val data = loadMessageData(dir, resolvedAgentId, internalConvId)
         buildJsonArray {
             paginate(data.messages, page).forEach { m ->
-                projection.localMessageToConversationMessages(m, data.sidecars).forEach { add(it) }
+                projection.localMessageToConversationMessages(hydrateSmallImages(dir, m), data.sidecars).forEach { add(it) }
             }
         }
     }.getOrNull()
@@ -111,6 +111,58 @@ internal class LocalBackendMessageReader(
             },
         )
     }.getOrNull()
+
+    /** Inline only a snapshot-safe budget; references are resolved inside this conversation. */
+    private fun hydrateSmallImages(dir: File, message: JsonObject): JsonObject {
+        var remaining = 12 * 1024
+        val parts = message["parts"] as? JsonArray ?: return message
+        val hydrated = parts.map { element ->
+            val part = element as? JsonObject ?: return@map element
+            val ref = part["image_ref"]?.stringOrNull() ?: return@map element
+            if (!ref.matches(Regex("sha256:[a-f0-9]{64}"))) return@map element
+            val hash = ref.removePrefix("sha256:")
+            val mime = part["mediaType"]?.stringOrNull() ?: "image/jpeg"
+            val extensions = when (mime) {
+                "image/png" -> listOf("png")
+                "image/jpeg" -> listOf("jpg", "jpeg")
+                "image/gif" -> listOf("gif")
+                "image/webp" -> listOf("webp")
+                else -> return@map element
+            }
+            val bytes = runCatching {
+                val root = File(support.baseDir, "conversations").canonicalFile
+                require(dir.canonicalFile.parentFile == root)
+                val blobs = File(dir, "blobs")
+                require(blobs.canonicalFile.parentFile == dir.canonicalFile)
+                val file = extensions.map { File(blobs, "$hash.$it") }.firstOrNull { it.isFile }
+                    ?: return@runCatching null
+                require(file.canonicalFile.parentFile == blobs.canonicalFile)
+                require(file.length() in 1..remaining.toLong())
+                val output = java.io.ByteArrayOutputStream()
+                file.inputStream().use { input ->
+                    val buffer = ByteArray(4096)
+                    while (true) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        require(output.size() + count <= remaining)
+                        output.write(buffer, 0, count)
+                    }
+                }
+                output.toByteArray().also {
+                    val actual = java.security.MessageDigest.getInstance("SHA-256").digest(it)
+                        .joinToString("") { byte -> "%02x".format(byte) }
+                    require(actual == hash)
+                }
+            }.getOrNull() ?: return@map element
+            remaining -= bytes.size
+            JsonObject(mapOf(
+                "type" to kotlinx.serialization.json.JsonPrimitive("image"),
+                "mimeType" to kotlinx.serialization.json.JsonPrimitive(mime),
+                "data" to kotlinx.serialization.json.JsonPrimitive(java.util.Base64.getEncoder().encodeToString(bytes)),
+            ))
+        }
+        return JsonObject(message + ("parts" to JsonArray(hydrated)))
+    }
 
     /** Apply `before` cursor, newest-`limit` window, then `order` — the shim's message.list paging. */
     private fun paginate(messages: List<JsonObject>, page: MessagePage): List<JsonObject> {

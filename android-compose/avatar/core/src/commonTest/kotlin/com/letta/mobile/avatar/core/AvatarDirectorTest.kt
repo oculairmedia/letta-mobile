@@ -11,8 +11,7 @@ class AvatarDirectorTest {
     private val model = AvatarModel(
         id = "avatar-1",
         displayName = "Buddy",
-        uri = "file:///buddy.vrm",
-        format = AvatarFormat.VRM_1,
+        uri = "res://raw/mascot.riv",
     )
 
     private suspend fun readyRuntime(): HeadlessAvatarRuntime =
@@ -108,11 +107,13 @@ class AvatarDirectorTest {
         director.tick(0.4f)
         val relaxed = runtime.expressionWeights["relaxed"]
         assertNotNull(relaxed)
-        assertTrue(relaxed > 0f)
+        // THINKING relaxed 0.6wt, attack 0.4s (section 6): one 0.4 s tick lands the full weight.
+        assertEquals(0.6f, relaxed, 0.05f)
 
         director.setActivity(AvatarActivity.SPEAKING)
         assertEquals(0f, runtime.expressionWeights["relaxed"])
-        assertTrue((runtime.expressionWeights["happy"] ?: 0f) > 0f)
+        // SPEAKING installs happy at 0.2wt with no attack: it is there on the same tick.
+        assertEquals(0.2f, runtime.expressionWeights["happy"] ?: 0f, 0.05f)
 
         director.setActivity(AvatarActivity.IDLE)
         assertEquals(0f, runtime.expressionWeights["happy"])

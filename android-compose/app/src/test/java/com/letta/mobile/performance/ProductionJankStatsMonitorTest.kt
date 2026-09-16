@@ -25,7 +25,7 @@ class ProductionJankStatsMonitorTest {
         val recorder = JankMeasurementRecorder(frameBudgetMs = 16L, maxDetailedFrameMeasurements = 2)
         val sink = linkedMapOf<String, Double>()
 
-        recorder.record(spanKey = "span-a", durationMs = 24L) { key, value -> sink[key] = value }
+        recorder.record(spanKey = MeasurementSpanId("span-a"), durationMs = 24L) { key, value -> sink[key] = value }
 
         assertEquals(1.0, sink["jank_frame_count"] ?: error("missing frame count"), 0.0)
         assertEquals(24.0, sink["jank_frame_max_ms"] ?: error("missing max"), 0.0)
@@ -34,7 +34,7 @@ class ProductionJankStatsMonitorTest {
         assertEquals(24.0, sink["jank_frame_1_ms"] ?: error("missing first frame"), 0.0)
 
         sink.clear()
-        recorder.record(spanKey = "span-a", durationMs = 40L) { key, value -> sink[key] = value }
+        recorder.record(spanKey = MeasurementSpanId("span-a"), durationMs = 40L) { key, value -> sink[key] = value }
 
         assertEquals(2.0, sink["jank_frame_count"] ?: error("missing frame count"), 0.0)
         assertEquals(40.0, sink["jank_frame_max_ms"] ?: error("missing max"), 0.0)
@@ -43,7 +43,7 @@ class ProductionJankStatsMonitorTest {
         assertEquals(40.0, sink["jank_frame_2_ms"] ?: error("missing second frame"), 0.0)
 
         sink.clear()
-        recorder.record(spanKey = "span-a", durationMs = 50L) { key, value -> sink[key] = value }
+        recorder.record(spanKey = MeasurementSpanId("span-a"), durationMs = 50L) { key, value -> sink[key] = value }
 
         assertEquals(3.0, sink["jank_frame_count"] ?: error("missing frame count"), 0.0)
         assertFalse(sink.containsKey("jank_frame_3_ms"))
@@ -55,8 +55,8 @@ class ProductionJankStatsMonitorTest {
         val firstSink = linkedMapOf<String, Double>()
         val secondSink = linkedMapOf<String, Double>()
 
-        recorder.record(spanKey = "span-a", durationMs = 30L) { key, value -> firstSink[key] = value }
-        recorder.record(spanKey = "span-b", durationMs = 20L) { key, value -> secondSink[key] = value }
+        recorder.record(spanKey = MeasurementSpanId("span-a"), durationMs = 30L) { key, value -> firstSink[key] = value }
+        recorder.record(spanKey = MeasurementSpanId("span-b"), durationMs = 20L) { key, value -> secondSink[key] = value }
 
         assertEquals(1.0, secondSink["jank_frame_count"] ?: error("missing frame count"), 0.0)
         assertEquals(20.0, secondSink["jank_frame_total_ms"] ?: error("missing total"), 0.0)

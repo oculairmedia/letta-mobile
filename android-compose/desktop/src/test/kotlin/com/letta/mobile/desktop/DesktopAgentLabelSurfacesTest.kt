@@ -4,6 +4,7 @@ import com.letta.mobile.data.lens.WorkPlayMode
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.DisplayNames
+import com.letta.mobile.data.search.mascotAgentId
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -80,5 +81,30 @@ class DesktopAgentLabelSurfacesTest {
         val items = buildPaletteItems(conversations, railAgents = emptyList(), workPlayMode = WorkPlayMode.Work)
 
         assertEquals("Agent deadbeef", items.first { it.id == "c1" }.sublabel)
+    }
+
+    @Test
+    fun paletteRowsCarryTheOwningAgentForMascotOrbs() {
+        val conversations = listOf(conversation("c1", agentId = "agent-owner", agentName = "Owner"))
+        val railAgents = listOf("agent-owner" to "Owner", "agent-other" to "Other")
+
+        val items = buildPaletteItems(conversations, railAgents, workPlayMode = WorkPlayMode.Work)
+
+        val conversationRow = items.first { it.id == "c1" }
+        assertEquals("agent-owner", conversationRow.agentId)
+        assertEquals("agent-owner", conversationRow.mascotAgentId())
+
+        val agentRow = items.first { it.id == "agent-other" }
+        assertEquals("agent-other", agentRow.agentId)
+        assertEquals("agent-other", agentRow.mascotAgentId())
+    }
+
+    @Test
+    fun paletteConversationWithoutOwningAgentKeepsGradientFallback() {
+        val conversations = listOf(conversation("c1", agentId = null, agentName = "Unknown"))
+        val items = buildPaletteItems(conversations, railAgents = emptyList(), workPlayMode = WorkPlayMode.Work)
+        val row = items.first { it.id == "c1" }
+        assertEquals(null, row.agentId)
+        assertEquals(null, row.mascotAgentId())
     }
 }

@@ -84,5 +84,6 @@ class EmbeddedLettaCodeAssetExtractor @Inject constructor(
     }
 }
 
+@Suppress("UnusedReceiverParameter")
 private fun File.readTextOrNull(): String? =
     runCatching { if (isFile) readText() else null }.getOrNull()

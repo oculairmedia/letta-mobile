@@ -1,6 +1,11 @@
 package com.letta.mobile.data.transport.iroh
 
 import com.letta.mobile.data.transport.ServerFrame
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -142,27 +147,72 @@ class IrohProbeAssertionsTest {
 
     @Test
     fun `admin rpc unknown method is reported as method missing`() {
-        val violation = IrohProbeAssertions.classifyAdminRpc(
-            method = "message.list",
-            success = false,
-            resultIsArray = false,
-            error = "Unknown method: message.list",
-        )
+        val violation = classifyAdminRpc(success = false, error = "Unknown method: message.list")
 
         assertEquals("admin_rpc_method_missing:message.list", violation)
     }
 
     @Test
-    fun `admin rpc non array result is reported as method missing`() {
-        val violation = IrohProbeAssertions.classifyAdminRpc(
-            method = "conversation.list",
-            success = true,
-            resultIsArray = false,
-            error = null,
+    fun `ordinary admin rpc failure is distinct and bounded`() {
+        val violation = classifyAdminRpc(
+            success = false,
+            error = "Backend timed out: token=secret value with spaces " + "x".repeat(100),
         )
 
-        assertEquals("admin_rpc_method_missing:conversation.list", violation)
+        assertTrue(violation!!.startsWith("admin_rpc_failed:message.list:backend-timed-out-token-secret-value-with-spaces-"))
+        assertTrue(violation.length <= "admin_rpc_failed:message.list:".length + 80)
     }
+
+    @Test
+    fun `message list accepts bare array`() {
+        assertEquals(null, classifyAdminRpc(result = JsonArray(emptyList())))
+    }
+
+    @Test
+    fun `message list accepts wrapped page object`() {
+        val page = buildJsonObject {
+            put("messages", JsonArray(emptyList()))
+            put("next_cursor", JsonPrimitive("cursor"))
+        }
+
+        assertEquals(null, classifyAdminRpc(result = page))
+    }
+
+    @Test
+    fun `successful wrong shape is not conflated with missing method`() {
+        val violation = classifyAdminRpc(result = JsonPrimitive("ok"))
+
+        assertEquals("admin_rpc_shape_invalid:message.list:primitive", violation)
+    }
+
+    @Test
+    fun `message list wrapped object requires array messages`() {
+        val violation = classifyAdminRpc(result = buildJsonObject { put("messages", JsonPrimitive("not-array")) })
+
+        assertEquals("admin_rpc_shape_invalid:message.list:object", violation)
+    }
+
+    @Test
+    fun `message list null and missing result are invalid shapes`() {
+        assertEquals("admin_rpc_shape_invalid:message.list:primitive", classifyAdminRpc(result = JsonNull))
+        assertEquals("admin_rpc_shape_invalid:message.list:null", classifyAdminRpc(result = null))
+    }
+
+    @Test
+    fun `conversation list preserves bare array contract`() {
+        assertEquals(null, classifyAdminRpc(method = "conversation.list", result = JsonArray(emptyList())))
+        assertEquals(
+            "admin_rpc_shape_invalid:conversation.list:object",
+            classifyAdminRpc(method = "conversation.list", result = buildJsonObject { put("messages", JsonArray(emptyList())) }),
+        )
+    }
+
+    private fun classifyAdminRpc(
+        method: String = "message.list",
+        success: Boolean = true,
+        result: kotlinx.serialization.json.JsonElement? = JsonArray(emptyList()),
+        error: String? = null,
+    ): String? = IrohProbeAssertions.classifyAdminRpc(method, success, result, error)
 
     @Test
     fun `fresh conversation missing error is reported as bootstrap failure`() {

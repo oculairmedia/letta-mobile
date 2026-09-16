@@ -134,10 +134,11 @@ fun timelineEventToUiMessage(ev: TimelineEvent, ownAgentId: String? = null): UiM
             // the UI doesn't spin (the gateway is the delivery authority).
             val uiToolCalls: List<UiToolCall>? =
                 if (ev.toolCalls.isNotEmpty()) {
-                    val chip: UiToolApprovalDecision? =
-                        if (ev.approvalDecided && ev.approvalRequestId != null) {
-                            UiToolApprovalDecision.Approved
-                        } else null
+                    val chip: UiToolApprovalDecision? = implicitApprovalChip(
+                        decided = ev.approvalDecided,
+                        approvalRequestId = ev.approvalRequestId,
+                        anyToolReturnError = ev.toolReturnIsError || ev.toolReturnIsErrorByCallId.values.any { it },
+                    )
                     ev.toolCalls.mapIndexed { index, tc ->
                         val callId = tc.effectiveId.takeIf { it.isNotBlank() }
                         val result = callId?.let { ev.toolReturnContentByCallId[it] }
@@ -151,28 +152,14 @@ fun timelineEventToUiMessage(ev: TimelineEvent, ownAgentId: String? = null): UiM
                                     timelineInstantDurationMillis(startedAt, completedAt).coerceAtLeast(0L)
                                 }
                         } else null
-                        UiToolCall(
-                            name = tc.name ?: "tool",
-                            arguments = tc.arguments ?: "",
-                            result = result,
-                            status = if (result == null) null else if (isError) "error" else "success",
-                            generatedImageAttachments = if (tc.name == "generate_image") {
-                                ev.attachments.map {
-                                    UiImageAttachment(base64 = it.base64, mediaType = it.mediaType)
-                                }
-                            } else {
-                                emptyList()
-                            },
-                            executionTimeMs = executionTimeMs,
-                            toolCallId = callId,
-                            approvalDecision = chip,
-                            subagentDispatch = tc.toSubagentDispatch(result),
-                            agentMessageProvenance = AgentMessageProvenanceProjection.projectOutbound(
-                                toolName = tc.name,
-                                argumentsJson = tc.arguments,
-                                resultJson = result,
+                        tc.toUiToolCall(
+                            ToolCallRenderData(
+                                result = result,
                                 isError = isError,
-                                fromAgentId = ownAgentId,
+                                generatedImageAttachments = tc.generatedImageAttachments(ev.attachments),
+                                executionTimeMs = executionTimeMs,
+                                approvalDecision = chip,
+                                sourceAgentId = ownAgentId,
                             ),
                         )
                     }
@@ -216,8 +203,14 @@ fun timelineEventToUiMessage(ev: TimelineEvent, ownAgentId: String? = null): UiM
                 clientMessageId = ev.otid,
                 isPending = ev.deliveryState == DeliveryState.SENDING,
                 isReasoning = ev.messageType == TimelineMessageType.REASONING,
-                isError = ev.messageType == TimelineMessageType.ERROR ||
-                    ev.deliveryState == DeliveryState.FAILED,
+                // letta-mobile-jt4wq: a FAILED delivery is not a server error
+                // frame. Folding it into isError made the user's own prompt
+                // render as a destructive "Error" bubble quoting their own
+                // words back at them — see UiMessage.isSendFailed. The
+                // confirmed-event branch below has always drawn this line
+                // correctly; only the optimistic/local branch conflated them.
+                isError = ev.messageType == TimelineMessageType.ERROR,
+                isSendFailed = ev.deliveryState == DeliveryState.FAILED,
                 toolCalls = uiToolCalls,
                 approvalRequest = uiApproval,
                 approvalResponse = null,
@@ -225,7 +218,7 @@ fun timelineEventToUiMessage(ev: TimelineEvent, ownAgentId: String? = null): UiM
                     emptyList()
                 } else {
                     ev.attachments.map {
-                        UiImageAttachment(base64 = it.base64, mediaType = it.mediaType)
+                        UiImageAttachment(base64 = it.base64, mediaType = it.mediaType, storedByteSize = it.storedByteSize)
                     }
                 },
                 // letta-mobile-slqfp: Local events have no owning agentId yet,
@@ -295,30 +288,16 @@ fun timelineEventToUiMessage(ev: TimelineEvent, ownAgentId: String? = null): UiM
                         // letta-mobile-fe51r: surface the pointer-diet marker
                         // so the card can lazily fetch the full body on expand.
                         val truncation = callId?.let { ev.toolReturnTruncationByCallId[it] }
-                        UiToolCall(
-                            name = tc.name ?: "tool",
-                            arguments = tc.arguments ?: "",
-                            result = result,
-                            status = if (result == null) null else if (isError) "error" else "success",
-                            generatedImageAttachments = if (tc.name == "generate_image") {
-                                ev.attachments.map {
-                                    UiImageAttachment(base64 = it.base64, mediaType = it.mediaType)
-                                }
-                            } else {
-                                emptyList()
-                            },
-                            toolCallId = callId,
-                            approvalDecision = chip,
-                            subagentDispatch = tc.toSubagentDispatch(result),
-                            resultTruncation = truncation?.let {
-                                UiToolResultTruncation(messageId = it.messageId, byteLen = it.byteLen)
-                            },
-                            agentMessageProvenance = AgentMessageProvenanceProjection.projectOutbound(
-                                toolName = tc.name,
-                                argumentsJson = tc.arguments,
-                                resultJson = result,
+                        tc.toUiToolCall(
+                            ToolCallRenderData(
+                                result = result,
                                 isError = isError,
-                                fromAgentId = ev.agentId,
+                                generatedImageAttachments = tc.generatedImageAttachments(ev.attachments),
+                                approvalDecision = chip,
+                                resultTruncation = truncation?.let {
+                                    UiToolResultTruncation(messageId = it.messageId, byteLen = it.byteLen)
+                                },
+                                sourceAgentId = ev.agentId,
                             ),
                         )
                     }
@@ -392,7 +371,7 @@ fun timelineEventToUiMessage(ev: TimelineEvent, ownAgentId: String? = null): UiM
                     emptyList()
                 } else {
                     ev.attachments.map {
-                        UiImageAttachment(base64 = it.base64, mediaType = it.mediaType)
+                        UiImageAttachment(base64 = it.base64, mediaType = it.mediaType, storedByteSize = it.storedByteSize)
                     }
                 },
                 agentMessageProvenance = if (role == "user") {
@@ -420,17 +399,105 @@ private fun com.letta.mobile.data.model.ToolCall.toSubagentDispatch(result: Stri
     }
 
 /**
+ * letta-mobile-45e2k: normalize a skill-invocation tool call for display.
+ *
+ * When a tool call's arguments contain a `skill` field (possibly wrapped in
+ * up to two JSON-string layers), replace the tool name with "Skill" and the
+ * remaining arguments as normalized JSON. Unknown or malformed payloads fall
+ * back to the original name/arguments so the tool call stays visible.
+ */
+private data class NormalizedToolCall(
+    val name: String,
+    val arguments: String,
+    val displayTarget: String? = null,
+)
+
+private fun normalizeSkillToolCall(name: String, arguments: String): NormalizedToolCall {
+    val normalized = com.letta.mobile.data.model.SkillArgumentNormalizer.normalize(arguments)
+    return if (normalized != null) {
+        // Keep invocation details on the ordinary tool-card path rather than
+        // projecting the injected skill document as a second timeline item.
+        NormalizedToolCall(
+            name = "Skill",
+            arguments = normalized.normalizedArguments,
+            displayTarget = normalized.skillName,
+        )
+    } else {
+        NormalizedToolCall(name = name, arguments = arguments)
+    }
+}
+
+private data class ToolCallRenderData(
+    val result: String?,
+    val isError: Boolean,
+    val generatedImageAttachments: List<UiImageAttachment>,
+    val executionTimeMs: Long? = null,
+    val approvalDecision: UiToolApprovalDecision? = null,
+    val resultTruncation: UiToolResultTruncation? = null,
+    val sourceAgentId: String? = null,
+)
+
+private fun com.letta.mobile.data.model.ToolCall.toUiToolCall(data: ToolCallRenderData): UiToolCall {
+    val normalized = normalizeSkillToolCall(name ?: "tool", arguments ?: "")
+    return UiToolCall(
+        name = normalized.name,
+        arguments = normalized.arguments,
+        result = data.result,
+        displayTarget = normalized.displayTarget,
+        status = data.result?.let { if (data.isError) "error" else "success" },
+        generatedImageAttachments = data.generatedImageAttachments,
+        executionTimeMs = data.executionTimeMs,
+        toolCallId = effectiveId.takeIf { it.isNotBlank() },
+        approvalDecision = data.approvalDecision,
+        subagentDispatch = toSubagentDispatch(data.result),
+        resultTruncation = data.resultTruncation,
+        agentMessageProvenance = AgentMessageProvenanceProjection.projectOutbound(
+            toolName = name,
+            argumentsJson = arguments,
+            resultJson = data.result,
+            isError = data.isError,
+            fromAgentId = data.sourceAgentId,
+        ),
+    )
+}
+
+private fun com.letta.mobile.data.model.ToolCall.generatedImageAttachments(
+    attachments: List<com.letta.mobile.data.model.MessageContentPart.Image>,
+): List<UiImageAttachment> = if (name == "generate_image") {
+    attachments.map { UiImageAttachment(base64 = it.base64, mediaType = it.mediaType, storedByteSize = it.storedByteSize) }
+} else {
+    emptyList()
+}
+
+/**
  * letta-mobile-c49of: approval chip for a TOOL_CALL event. An explicit
  * decision (ApprovalDecision) always wins; REJECTED projects to Rejected so
  * a rejected call no longer renders as Approved. A decided event with no
- * explicit outcome (tool-return completion or the approve=null auto-approval
- * echo) keeps the pre-c49of rendering: Approved.
+ * explicit outcome falls to [implicitApprovalChip].
  */
-private fun TimelineEvent.Confirmed.approvalChip(): UiToolApprovalDecision? = when {
-    approvalDecision == com.letta.mobile.data.timeline.ApprovalDecision.REJECTED ->
-        UiToolApprovalDecision.Rejected
-    approvalDecision == com.letta.mobile.data.timeline.ApprovalDecision.APPROVED ->
-        UiToolApprovalDecision.Approved
-    approvalDecided && approvalRequestId != null -> UiToolApprovalDecision.Approved
-    else -> null
+private fun TimelineEvent.Confirmed.approvalChip(): UiToolApprovalDecision? = when (approvalDecision) {
+    com.letta.mobile.data.timeline.ApprovalDecision.REJECTED -> UiToolApprovalDecision.Rejected
+    com.letta.mobile.data.timeline.ApprovalDecision.APPROVED -> UiToolApprovalDecision.Approved
+    null -> implicitApprovalChip(
+        decided = approvalDecided,
+        approvalRequestId = approvalRequestId,
+        anyToolReturnError = toolReturnIsError || toolReturnIsErrorByCallId.values.any { it },
+    )
+}
+
+/**
+ * letta-mobile-soa3i.4: the chip for a request resolved without an explicit decision - the
+ * approve=null auto-approval echo, or a tool return that completed it. It fails closed: a rejected
+ * call comes back as an error tool return, so a request whose missing explicit decision is paired
+ * with an error return gets no chip at all rather than reading as Approved. Only a clean resolution
+ * keeps the Approved label.
+ */
+internal fun implicitApprovalChip(
+    decided: Boolean,
+    approvalRequestId: String?,
+    anyToolReturnError: Boolean,
+): UiToolApprovalDecision? = when {
+    !decided || approvalRequestId == null -> null
+    anyToolReturnError -> null
+    else -> UiToolApprovalDecision.Approved
 }

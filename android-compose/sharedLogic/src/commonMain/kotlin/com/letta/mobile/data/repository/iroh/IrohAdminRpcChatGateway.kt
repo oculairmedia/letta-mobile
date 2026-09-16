@@ -31,6 +31,7 @@ import com.letta.mobile.data.transport.BridgeTurnStatus
 import com.letta.mobile.data.transport.WsTimelineEvent
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.util.Telemetry
+import io.ktor.http.encodeURLParameter
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.delay
@@ -212,10 +213,28 @@ class IrohAdminRpcChatGateway(
         limit: Int?,
         after: String?,
         order: String?,
+    ): List<LettaMessage> = listConversationMessagesRpc(conversationId, limit, after, before = null, order = order)
+
+    // The wrapper's message.list handler forwards `before` to the App Server, so older history
+    // pages take the same route as the tail read instead of failing the continuation.
+    override suspend fun listConversationMessagesBefore(
+        conversationId: String,
+        limit: Int,
+        before: String,
+        order: String,
+    ): List<LettaMessage> = listConversationMessagesRpc(conversationId, limit, after = null, before = before, order = order)
+
+    private suspend fun listConversationMessagesRpc(
+        conversationId: String,
+        limit: Int?,
+        after: String?,
+        before: String?,
+        order: String?,
     ): List<LettaMessage> {
         val query = listOfNotNull(
             limit?.let { "limit=$it" },
             after?.let { "after=$it" },
+            before?.let { "before=${it.encodeURLParameter()}" },
             order?.let { "order=$it" },
         ).joinToString("&")
         val path = "/v1/conversations/$conversationId/messages" +

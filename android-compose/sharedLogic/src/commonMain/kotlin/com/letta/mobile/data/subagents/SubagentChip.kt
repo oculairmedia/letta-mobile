@@ -1,6 +1,7 @@
 package com.letta.mobile.data.subagents
 
 import com.letta.mobile.data.model.SubagentEntry
+import com.letta.mobile.data.model.SubagentActivitySnapshot
 import com.letta.mobile.data.model.SubagentStatus
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -87,15 +88,20 @@ enum class SubagentChipState {
          * vocabulary is conservatively treated as [OBSERVED] (pending) rather
          * than as a terminal — never invent a completion (5hihw).
          */
-        fun fromWireStatus(status: String?): SubagentChipState = when (status?.lowercase()) {
+        fun fromWireStatus(status: String?): SubagentChipState = when (val raw = status?.trim()?.lowercase()) {
             null, "" -> OBSERVED
-            "pending", "queued", "dispatched", "observed", "starting" -> OBSERVED
-            SubagentStatus.RUNNING, "in_progress", "active" -> RUNNING
-            SubagentStatus.COMPLETED, "complete", "success", "succeeded", "done" -> COMPLETED
-            SubagentStatus.FAILED, "error", "errored" -> FAILED
-            SubagentStatus.CANCELLED, "canceled", "killed", "stopped", "evicted" -> CANCELLED
+            // Kept ahead of the shared vocabulary: this state machine draws a
+            // distinction the wire vocabulary does not, between "dispatched but
+            // not yet started" (OBSERVED) and RUNNING.
+            in SubagentStatus.PENDING_ALIASES -> OBSERVED
             "orphaned", "unknown" -> ORPHANED
-            else -> OBSERVED
+            else -> when (SubagentStatus.normalize(raw)) {
+                SubagentStatus.RUNNING -> RUNNING
+                SubagentStatus.COMPLETED -> COMPLETED
+                SubagentStatus.FAILED -> FAILED
+                SubagentStatus.CANCELLED -> CANCELLED
+                else -> OBSERVED
+            }
         }
     }
 }
@@ -149,6 +155,7 @@ data class SubagentChipRecord(
     @SerialName("subagent_conversation_id") val subagentConversationId: String? = null,
     @SerialName("parent_run_id") val parentRunId: String? = null,
     @SerialName("started_at") val startedAt: String? = null,
+    val activity: SubagentActivitySnapshot? = null,
     /**
      * Controller connection generation that last touched this chip. Data, not
      * identity: reconciliation uses it to tell "seen on the current connection"
@@ -173,6 +180,7 @@ data class SubagentChipRecord(
         parentAgentId = agentId,
         parentConversationId = conversationId,
         startedAt = startedAt,
+        activity = activity,
         terminalAtEpochMs = terminalAtEpochMs,
     )
 }
@@ -213,6 +221,7 @@ data class SubagentChipObservation(
     val subagentConversationId: String? = null,
     val parentRunId: String? = null,
     val startedAt: String? = null,
+    val activity: SubagentActivitySnapshot? = null,
     val generation: Long = 0,
 ) {
     val key: SubagentChipKey get() = SubagentChipKey(conversationId, agentId, toolCallId)
@@ -238,6 +247,7 @@ data class SubagentChipObservation(
             subagentConversationId = entry.subagentConversationId,
             parentRunId = entry.parentRunId,
             startedAt = entry.startedAt,
+            activity = entry.activity,
             generation = generation,
         )
     }

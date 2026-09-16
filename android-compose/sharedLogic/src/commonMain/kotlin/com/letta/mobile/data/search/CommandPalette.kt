@@ -15,7 +15,23 @@ data class PaletteItem(
     val kind: PaletteItemKind,
     /** Optional avatar gradient index for agent/conversation rows. */
     val orbIndex: Int? = null,
+    /**
+     * Owning agent for a [PaletteItemKind.Conversation] row. Agent rows may omit this:
+     * [mascotAgentId] falls back to [id]. Null on a conversation means the orb stays the
+     * gradient fallback (no mascot identity to look up).
+     */
+    val agentId: String? = null,
 )
+
+/**
+ * Agent whose mascot the row should draw. Destinations have none. Conversation rows without
+ * [PaletteItem.agentId] return null so the platform can keep the gradient orb.
+ */
+fun PaletteItem.mascotAgentId(): String? = when (kind) {
+    PaletteItemKind.Agent -> agentId ?: id
+    PaletteItemKind.Conversation -> agentId
+    PaletteItemKind.Destination -> null
+}
 
 /**
  * Shared filtering + grouping for the Cmd+K command palette (Penpot "Search

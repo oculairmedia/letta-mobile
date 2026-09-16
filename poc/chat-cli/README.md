@@ -4,6 +4,10 @@ Proof of concept for Matrix-style message sync architecture.
 
 **Purpose:** Validate the otid-based timeline design in isolation before touching mobile code.
 
+## Prerequisites
+
+- Java 21+ (`JAVA_HOME` or default JDK on `PATH`)
+
 ## Quick start
 
 ```bash

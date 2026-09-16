@@ -18,6 +18,8 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 
+// The singleton repository owns this scope and cancels it explicitly in close().
+@Suppress("NoDetachedCoroutineLifecycle")
 internal fun defaultSessionScopedProviderRepositoryScope(): CoroutineScope =
     CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -45,7 +47,7 @@ class SessionScopedProviderRepository internal constructor(
             .launchIn(proxyScope)
     }
 
-    override suspend fun refreshProviders(name: String?, providerType: String?) =
+    override suspend fun refreshProviders(name: String?, providerType: String?): Unit =
         sessionManager.withCurrentSession { it.providerRepository.refreshProviders(name, providerType) }
 
     override suspend fun getProvider(providerId: ProviderId): Provider = sessionManager.withCurrentSession { it.providerRepository.getProvider(providerId) }
@@ -55,11 +57,11 @@ class SessionScopedProviderRepository internal constructor(
     override suspend fun updateProvider(providerId: ProviderId, params: ProviderUpdateParams): Provider =
         sessionManager.withCurrentSession { it.providerRepository.updateProvider(providerId, params) }
 
-    override suspend fun checkProvider(params: ProviderCheckParams) = sessionManager.withCurrentSession { it.providerRepository.checkProvider(params) }
+    override suspend fun checkProvider(params: ProviderCheckParams): Unit = sessionManager.withCurrentSession { it.providerRepository.checkProvider(params) }
 
-    override suspend fun checkExistingProvider(providerId: ProviderId) = sessionManager.withCurrentSession { it.providerRepository.checkExistingProvider(providerId) }
+    override suspend fun checkExistingProvider(providerId: ProviderId): Unit = sessionManager.withCurrentSession { it.providerRepository.checkExistingProvider(providerId) }
 
-    override suspend fun deleteProvider(providerId: ProviderId) = sessionManager.withCurrentSession { it.providerRepository.deleteProvider(providerId) }
+    override suspend fun deleteProvider(providerId: ProviderId): Unit = sessionManager.withCurrentSession { it.providerRepository.deleteProvider(providerId) }
 
     fun close() { proxyScope.cancel() }
 }

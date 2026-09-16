@@ -21,123 +21,14 @@ import com.letta.mobile.data.chat.runtime.groupSubagentConversations
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.repository.api.IAgentRepository
 import kotlinx.coroutines.CoroutineScope
-import com.letta.mobile.avatar.core.AvatarActivity
-import com.letta.mobile.desktop.avatar.DesktopAvatarCompanion
-import com.letta.mobile.desktop.avatar.DesktopAvatarLibraryWindow
-import com.letta.mobile.desktop.avatar.defaultAvatarCatalogDir
 import com.letta.mobile.desktop.chat.ConversationArchiveFilter
 import com.letta.mobile.data.search.PaletteItem
 import com.letta.mobile.data.search.PaletteItemKind
 import com.letta.mobile.desktop.chat.ComposerCommand
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
-import com.letta.mobile.desktop.data.DesktopFileSecureSettingsStore
 import com.letta.mobile.desktop.memory.DesktopMemorySurfaceState
 import com.letta.mobile.data.commands.AgentSlashCommand
-
-internal class DesktopAvatarCompanionHandle(
-    val companion: DesktopAvatarCompanion,
-    val state: DesktopAvatarCompanion.State,
-    val toggle: () -> Unit,
-) {
-    val isActive: Boolean
-        get() = state is DesktopAvatarCompanion.State.Running ||
-            state is DesktopAvatarCompanion.State.Starting
-}
-
-/**
- * Avatar companion (pet mode v1): loopback-hosted three-vrm renderer in
- * the default browser, driven by the agent's presence via AvatarDirector.
- * Owns the avatar library window — library-first: pick from imported avatars
- * (with their license on display) instead of a blind file dialog; imports run
- * the full pipeline from inside the library window.
- */
-@Composable
-internal fun rememberAvatarCompanion(
-    chatScope: CoroutineScope,
-    secureSettingsStore: com.letta.mobile.data.storage.SecureSettingsStore,
-): DesktopAvatarCompanionHandle {
-    val avatarCompanion = remember(chatScope) { DesktopAvatarCompanion(chatScope) }
-    val avatarCompanionState by avatarCompanion.state.collectAsState()
-    DisposableEffect(avatarCompanion) {
-        onDispose { avatarCompanion.stop() }
-    }
-    var showAvatarLibrary by remember { mutableStateOf(false) }
-    var activeAvatarModelId by remember { mutableStateOf<String?>(null) }
-    if (showAvatarLibrary) {
-        DesktopAvatarLibraryWindow(
-            catalogDir = remember { defaultAvatarCatalogDir() },
-            activeModelId = activeAvatarModelId,
-            onUseAvatar = { model, assetPath ->
-                showAvatarLibrary = false
-                secureSettingsStore.putString(AVATAR_COMPANION_VRM_PATH_KEY, assetPath.toString())
-                activeAvatarModelId = model.id
-                avatarCompanion.stop()
-                avatarCompanion.start(assetPath)
-            },
-            onClose = { showAvatarLibrary = false },
-        )
-    }
-    return DesktopAvatarCompanionHandle(
-        companion = avatarCompanion,
-        state = avatarCompanionState,
-        toggle = {
-            when (avatarCompanionState) {
-                is DesktopAvatarCompanion.State.Starting,
-                is DesktopAvatarCompanion.State.Running,
-                -> {
-                    avatarCompanion.stop()
-                    activeAvatarModelId = null
-                }
-                else -> showAvatarLibrary = true
-            }
-        },
-    )
-}
-
-internal data class AvatarPresenceParams(
-    val avatar: DesktopAvatarCompanionHandle,
-    val isStreamingReplySelected: Boolean,
-    val thinkingConversationId: String?,
-    val errorMessage: String?,
-)
-
-/** Agent presence -> avatar companion behavior. */
-@Composable
-internal fun AvatarPresenceEffects(
-    avatar: DesktopAvatarCompanionHandle,
-    isStreamingReplySelected: Boolean,
-    thinkingConversationId: String?,
-    errorMessage: String?,
-) {
-    AvatarPresenceEffects(
-        AvatarPresenceParams(
-            avatar = avatar,
-            isStreamingReplySelected = isStreamingReplySelected,
-            thinkingConversationId = thinkingConversationId,
-            errorMessage = errorMessage,
-        ),
-    )
-}
-
-@Composable
-internal fun AvatarPresenceEffects(params: AvatarPresenceParams) {
-    val avatar = params.avatar
-    LaunchedEffect(params.isStreamingReplySelected, params.thinkingConversationId, avatar.state) {
-        if (avatar.isActive) {
-            avatar.companion.setActivity(
-                when {
-                    params.isStreamingReplySelected -> AvatarActivity.SPEAKING
-                    params.thinkingConversationId != null -> AvatarActivity.THINKING
-                    else -> AvatarActivity.IDLE
-                },
-            )
-        }
-    }
-    LaunchedEffect(params.errorMessage) {
-        if (params.errorMessage != null) avatar.companion.flashError()
-    }
-}
 
 /** Model picker options: display label to route-stable selection token. */
 internal fun buildModelOptions(availableModels: List<LlmModel>): List<Pair<String, String>> =
@@ -339,11 +230,21 @@ internal fun buildPaletteItems(
                 sublabel = agentLabel,
                 kind = PaletteItemKind.Conversation,
                 orbIndex = railIndex.coerceAtLeast(0),
+                agentId = conversation.agentId,
             ),
         )
     }
     railAgents.forEachIndexed { index, (id, name) ->
-        add(PaletteItem(id = id, label = name, sublabel = "agent", kind = PaletteItemKind.Agent, orbIndex = index))
+        add(
+            PaletteItem(
+                id = id,
+                label = name,
+                sublabel = "agent",
+                kind = PaletteItemKind.Agent,
+                orbIndex = index,
+                agentId = id,
+            ),
+        )
     }
     WorkPlayLens.navDestinations(workPlayMode).forEach { lensDestination ->
         val target = lensNavTarget(workPlayMode, lensDestination)
@@ -413,4 +314,3 @@ internal fun conversationRecency(label: String): java.time.Instant =
     runCatching { java.time.Instant.parse(label) }.getOrNull()
         ?: if (label == "Queued") java.time.Instant.MAX else java.time.Instant.MIN
 
-private const val AVATAR_COMPANION_VRM_PATH_KEY = "avatar.companion.vrm_path"

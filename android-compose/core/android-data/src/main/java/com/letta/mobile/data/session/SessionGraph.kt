@@ -1,5 +1,6 @@
 package com.letta.mobile.data.session
 
+import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.AllConversationsRepository
 import com.letta.mobile.data.repository.ArchiveRepository
@@ -28,6 +29,9 @@ import com.letta.mobile.runtime.BackendDescriptor
 import com.letta.mobile.runtime.LocalLettaBackend
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.CoroutineStart
 
 class SessionGraph internal constructor(
     override val id: Long,
@@ -58,8 +62,18 @@ class SessionGraph internal constructor(
     override val toolRepository: ToolRepository,
     override val vibesyncEventStreamRepository: VibesyncEventStreamRepository,
     override val blockRepository: BlockRepository? = null,
+    val conversationCursorStore: com.letta.mobile.data.local.CapturedBackendConversationCursorStore? = null,
+    /** Configuration captured at creation, never resolved from mutable settings. */
+    val capturedConfig: LettaConfig? = null,
 ) : SessionRepositoryGraph {
+    init {
+        scope.launch(start = CoroutineStart.UNDISPATCHED) {
+            try { awaitCancellation() } finally { conversationCursorStore?.close() }
+        }
+    }
+
     override fun close() {
+        conversationCursorStore?.retire()
         scope.cancel()
     }
 }

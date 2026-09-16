@@ -508,6 +508,7 @@ private fun JsonElement?.toDisplayString(): String {
     }
 }
 
+@Suppress("UnusedReceiverParameter")
 private fun Job.isTerminalStatus(): Boolean {
     return status in setOf("completed", "failed", "cancelled", "expired")
 }

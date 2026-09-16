@@ -48,7 +48,17 @@ sealed class MessageContentPart {
      * @param base64 the base64-encoded image bytes (no `data:` prefix)
      * @param mediaType MIME type, e.g. "image/jpeg" or "image/png"
      */
-    data class Image(val base64: String, val mediaType: String) : MessageContentPart() {
+    data class Image(
+        val base64: String,
+        val mediaType: String,
+        /**
+         * Round-tripped from a snapshot pointer whose inline thumbnail exceeded
+         * the 16 KB budget. Non-null + empty base64 means the attachment exists
+         * but the bytes were not rehydrated; renderers show a stored-pointer
+         * placeholder labelled with [storedByteSize].
+         */
+        val storedByteSize: Long? = null,
+    ) : MessageContentPart() {
         /**
          * Build an `data:<mediaType>;base64,<base64>` URL. NOT used on the
          * outbound wire (see class docs); kept for in-app rendering callers

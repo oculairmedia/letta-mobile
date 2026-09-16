@@ -8,7 +8,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
@@ -28,7 +27,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -72,6 +70,7 @@ import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.desktop.DesktopTooltip
 import com.letta.mobile.ui.chat.provenance.AgentMessageProvenanceLabel
+import com.letta.mobile.ui.theme.customColors
 import com.letta.mobile.ui.chat.render.rememberSmoothedStreamingText
 import kotlinx.coroutines.delay
 
@@ -239,7 +238,7 @@ private fun CopyButtonVisual(
         Icon(
             imageVector = if (state.copied) Icons.Outlined.Check else Icons.Outlined.ContentCopy,
             contentDescription = null,
-            tint = if (state.copied) Color(0xFF34C759) else style.tint,
+            tint = if (state.copied) MaterialTheme.customColors.successColor else style.tint,
             modifier = Modifier.size(14.dp),
         )
     }
@@ -427,9 +426,8 @@ private fun PromptExpandButton(expanded: Boolean, onToggle: () -> Unit) {
  */
 @Composable
 internal fun ThinkingMessageRow() {
-    // Quiet, current treatment: a small breathing glow-dot plus a shimmering
-    // "Thinking…" label. The previous 40dp glossy sphere + three grey dots
-    // read as a toy marble in an otherwise flat, dark surface.
+    // Agents with a live mascot think beside the composer instead (DesktopChatSurface); this
+    // row is the indicator for agents without one.
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -510,15 +508,87 @@ internal value class IsoTimestamp(val value: String)
 internal fun messageClockLabel(iso: String): String? =
     messageClockLabel(IsoTimestamp(iso))
 
-internal fun messageClockLabel(iso: IsoTimestamp): String? {
+/**
+ * Built once. `ofPattern` compiles the pattern string on every call, which is
+ * most of this label's cost — and it is asked for once per visible message on
+ * every recomposition, so during a stream that was thousands of pattern
+ * compilations a second. DateTimeFormatter is immutable and thread-safe.
+ */
+private val ClockLabelFormatter: java.time.format.DateTimeFormatter =
+    java.time.format.DateTimeFormatter.ofPattern("h:mm a")
+
+internal fun messageClockLabel(iso: IsoTimestamp): String? =
+    parseMessageTimestamp(iso, java.time.ZoneId.systemDefault())?.format(ClockLabelFormatter)
+
+/**
+ * Resolves a message's ISO timestamp into [zone]. Accepts the three shapes the
+ * backends actually emit — instant (`…Z`), offset date-time, and a bare local
+ * date-time — and returns null for blank or unparseable input rather than
+ * throwing, so a malformed timestamp costs one label, not the row.
+ */
+internal fun parseMessageTimestamp(
+    iso: IsoTimestamp,
+    zone: java.time.ZoneId,
+): java.time.ZonedDateTime? {
     if (iso.value.isBlank()) return null
-    val zone = java.time.ZoneId.systemDefault()
-    val zoned = runCatching { java.time.Instant.parse(iso.value).atZone(zone) }
-        .recoverCatching { java.time.OffsetDateTime.parse(iso.value).atZoneSameInstant(zone) }
-        .recoverCatching { java.time.LocalDateTime.parse(iso.value).atZone(zone) }
-        .getOrNull() ?: return null
-    return zoned.format(java.time.format.DateTimeFormatter.ofPattern("h:mm a"))
+    val key = iso.value
+    synchronized(TimestampCache) {
+        // Entries are only valid for the zone they were resolved in. The zone is
+        // effectively fixed for a session, so tracking it and dropping the cache
+        // on a change beats paying for a composite key on every lookup.
+        if (CachedZoneId != zone.id) {
+            TimestampCache.clear()
+            CachedZoneId = zone.id
+        } else if (TimestampCache.containsKey(key)) {
+            return TimestampCache[key]
+        }
+    }
+    val parsed = parseIsoTimestamp(iso.value, zone)
+    synchronized(TimestampCache) {
+        if (CachedZoneId == zone.id) TimestampCache[key] = parsed
+        timestampParseCount++
+    }
+    return parsed
 }
+
+/**
+ * Cache misses since start — the number of strings actually handed to the date
+ * parser. Exists so a test can assert that repeated lookups stay free, which is
+ * a regression guard the wall clock cannot give reliably in CI.
+ */
+@Volatile
+internal var timestampParseCount: Int = 0
+    private set
+
+/** The zone [TimestampCache]'s entries were resolved in; guarded by the cache's monitor. */
+private var CachedZoneId: String? = null
+
+private fun parseIsoTimestamp(value: String, zone: java.time.ZoneId): java.time.ZonedDateTime? =
+    runCatching { java.time.Instant.parse(value).atZone(zone) }
+        .recoverCatching { java.time.OffsetDateTime.parse(value).atZoneSameInstant(zone) }
+        .recoverCatching { java.time.LocalDateTime.parse(value).atZone(zone) }
+        .getOrNull()
+
+/**
+ * Parsing an ISO timestamp costs ~2µs, and the chat asks for the same handful of
+ * strings relentlessly: once per visible message per recomposition for the clock
+ * labels, and once per row for every day-divider rebuild — which runs on each
+ * streamed token. The strings are immutable and repeat exactly, so the answer is
+ * cached rather than recomputed.
+ *
+ * Access-ordered and bounded, so a long-lived window converges on the messages
+ * actually being looked at instead of retaining every timestamp ever seen.
+ * Unparseable input is cached as null too — a malformed timestamp should cost
+ * one failed parse, not one per frame.
+ */
+private const val TimestampCacheMax = 4096
+
+private val TimestampCache =
+    object : LinkedHashMap<String, java.time.ZonedDateTime?>(512, 0.75f, true) {
+        override fun removeEldestEntry(
+            eldest: MutableMap.MutableEntry<String, java.time.ZonedDateTime?>,
+        ): Boolean = size > TimestampCacheMax
+    }
 
 /**
  * The id of the assistant message inside this render item that should be
@@ -528,7 +598,6 @@ internal fun messageClockLabel(iso: IsoTimestamp): String? {
  * last matching one. Returns null for user prompts or items with no narration.
  */
 internal fun ChatRenderItem.streamingCandidateMessageId(): String? = when (this) {
-    is ChatRenderItem.SkillEnvelopeChip -> null
     is ChatRenderItem.Single -> message
         .takeIf {
             !MessageRoleToken(it.role).isUser() &&

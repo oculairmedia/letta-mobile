@@ -42,6 +42,7 @@ class LettaCodeTurnEngine(
         )
     }
 
+    @Suppress("UnusedReceiverParameter")
     private fun TurnCommand.runStatus(
         status: RuntimeRunStatus,
         reason: String? = null,

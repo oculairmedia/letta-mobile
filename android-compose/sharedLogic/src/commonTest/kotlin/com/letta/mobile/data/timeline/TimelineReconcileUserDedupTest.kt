@@ -3,9 +3,6 @@ package com.letta.mobile.data.timeline
 import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.util.Telemetry
 import kotlinx.collections.immutable.persistentListOf
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.test.runTest
 import kotlin.test.AfterTest
 import kotlin.test.Test
@@ -55,18 +52,12 @@ class TimelineReconcileUserDedupTest {
             ),
         )
 
-        val result = applyReconcileAfterSendSnapshot(
-            otid = otid,
-            conversationId = conversationId,
-            serverMessages = serverMessages,
-            writeMutex = Mutex(),
-            state = MutableStateFlow(timeline),
-        )
+        val reconciled = reconcileAfterSendSnapshot(timeline, otid, serverMessages)
 
-        assertEquals(true, result.confirmedLocal, "Optimistic local should be confirmed")
-        assertEquals(0, result.appendedMissing, "No duplicate rows should be appended")
-        
-        val finalTimeline = MutableStateFlow(timeline).value
+        assertEquals(true, reconciled.result.confirmedLocal, "Optimistic local should be confirmed")
+        assertEquals(0, reconciled.result.appendedMissing, "No duplicate rows should be appended")
+
+        val finalTimeline = reconciled.timeline
         assertEquals(1, finalTimeline.events.size, "Should have exactly one event after dedup")
     }
 
@@ -79,6 +70,7 @@ class TimelineReconcileUserDedupTest {
         val otid = "cm-android-test-456"
         val conversationId = "conv-1"
         val content = "that's my bad we're on the wrong network"
+        val sentAt = parseTimelineInstant("2026-07-08T16:15:30Z")
 
         val timeline = Timeline(
             conversationId = conversationId,
@@ -88,7 +80,7 @@ class TimelineReconcileUserDedupTest {
                     otid = otid,
                     content = content,
                     role = Role.USER,
-                    sentAt = timelineNow(),
+                    sentAt = sentAt,
                     deliveryState = DeliveryState.SENT,
                 ),
             ),
@@ -103,19 +95,10 @@ class TimelineReconcileUserDedupTest {
             ),
         )
 
-        val writeMutex = Mutex()
-        val state = MutableStateFlow(timeline)
-
-        val result = applyReconcileAfterSendSnapshot(
-            otid = otid,
-            conversationId = conversationId,
-            serverMessages = serverMessages,
-            writeMutex = writeMutex,
-            state = state,
-        )
+        val reconciled = reconcileAfterSendSnapshot(timeline, otid, serverMessages)
 
         // Even without otid match, content dedup should prevent duplication
-        val finalTimeline = state.value
+        val finalTimeline = reconciled.timeline
         assertEquals(1, finalTimeline.events.size, "Content-based dedup should prevent duplicate user rows")
         
         val event = finalTimeline.events.single() as? TimelineEvent.Confirmed
@@ -155,9 +138,6 @@ class TimelineReconcileUserDedupTest {
                 otid = null,
             ),
         )
-
-        val writeMutex = Mutex()
-        val state = MutableStateFlow(timeline)
 
         val merged = timeline.mergeServerMessages(serverMessages)
         val finalTimeline = merged.first

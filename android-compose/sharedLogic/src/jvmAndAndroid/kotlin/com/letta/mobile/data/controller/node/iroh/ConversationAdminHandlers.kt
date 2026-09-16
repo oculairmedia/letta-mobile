@@ -7,9 +7,9 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
+import kotlin.time.Duration.Companion.milliseconds
 
 object ConversationAdminHandlers {
     /**
@@ -62,7 +62,7 @@ object ConversationAdminHandlers {
         val nativeClient = tiers.nativeClient
         registerConversationReadRoutes(router, nativeClient, tiers)
         registerConversationWriteRoutes(router, nativeClient, controller)
-        registerMessageRoutes(router, nativeClient)
+        registerMessageRoutes(router, nativeClient, tiers.localBackendStore)
     }
 
     private fun registerConversationReadRoutes(
@@ -225,6 +225,7 @@ object ConversationAdminHandlers {
     private fun registerMessageRoutes(
         router: AdminRpcRouter,
         nativeClient: AppServerClient?,
+        localStore: LocalBackendAdminStore?,
     ) {
         router.registerScoped("message.list") { params, context ->
             val convId = params.requireParam(AdminParamKey("conversation_id"))
@@ -245,8 +246,34 @@ object ConversationAdminHandlers {
                 )
                 if (native.success) native.messages else null
             }
+            val projected = MessageListWireProjection.projectMessageList(response, convId).let { wire ->
+                // Keep App Server membership, ordering and text authoritative. Enrich only
+                // exact user IDs already returned by this authorized page.
+                val rows = wire as? JsonArray ?: return@let wire
+                val local = localStore?.listMessagesProjected(convId, null, MessagePage(64, null, null, "desc"))
+                    ?.filterIsInstance<JsonObject>()?.associateBy { it["id"] } ?: return@let wire
+                JsonArray(rows.map { element ->
+                    val row = element as? JsonObject ?: return@map element
+                    if (row["message_type"]?.jsonPrimitive?.content != "user_message") return@map row
+                    val content = row["content"]
+                    if (content is JsonArray && content.any { (it as? JsonObject)?.get("type")?.jsonPrimitive?.content == "image" }) return@map row
+                    var imageBudget = 16_384
+                    val images = (local[row["id"]]?.get("content") as? JsonArray)?.filter {
+                        val image = it as? JsonObject
+                        val source = image?.get("source") as? JsonObject
+                        val size = source?.get("data")?.jsonPrimitive?.content?.length ?: 0
+                        val accepted = image?.get("type")?.jsonPrimitive?.content == "image" && size in 1..imageBudget
+                        if (accepted) imageBudget -= size
+                        accepted
+                    }.orEmpty()
+                    if (images.isEmpty()) row else {
+                        val textParts = if (content is JsonArray) content.toList() else listOf(JsonObject(mapOf("type" to JsonPrimitive("text"), "text" to (content ?: JsonPrimitive("")))))
+                        JsonObject(row + ("content" to JsonArray(textParts + images)))
+                    }
+                })
+            }
             MessageListPageGuard.bound(
-                MessageListWireProjection.projectMessageList(response, convId),
+                projected,
                 newestLast = param(params, AdminParamKey("order"))?.lowercase() != "desc",
             )
         }
@@ -279,7 +306,7 @@ object ConversationAdminHandlers {
         op: NativeAdminOp,
     ): JsonElement {
         val message = try {
-            kotlinx.coroutines.withTimeout(messageGetBudgetMs()) {
+            kotlinx.coroutines.withTimeout(messageGetBudgetMs().milliseconds) {
                 walkMessagePages(nativeClient, conversationId, messageId, op)
             }
         } catch (e: kotlinx.coroutines.TimeoutCancellationException) {

@@ -3,6 +3,14 @@ package com.letta.mobile.data.chat.runtime
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
+import com.letta.mobile.data.timeline.TimelineCandidateListFreshness
+import com.letta.mobile.data.timeline.TimelineCandidateListSource
+import com.letta.mobile.data.timeline.TimelineConversationAttribution
+import com.letta.mobile.data.timeline.TimelineConversationAttributionCapture
+import com.letta.mobile.data.timeline.TimelineConversationSelectionMode
+import com.letta.mobile.data.timeline.TimelineProvenanceRedaction
+import com.letta.mobile.data.timeline.ConversationAttributionQuery
+import com.letta.mobile.data.timeline.classifyConversationAttribution
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -45,30 +53,163 @@ class SharedChatSessionResolver(
     suspend fun resolveMostRecentConversation(
         agentId: String,
         maxAgeMs: Long,
-    ): String? {
-        mostRecentCachedConversationId(agentId)?.let { cachedConversationId ->
-            if (!conversationRepository.hasFreshConversations(AgentId(agentId), maxAgeMs)) {
+    ): String? = resolveMostRecentConversationWithProvenance(agentId, maxAgeMs).conversationId
+
+    /**
+     * letta-mobile-grrhq: the SAME selection as [resolveMostRecentConversation],
+     * additionally returning a bounded, redacted attribution capture of the
+     * candidates considered.
+     *
+     * Behaviour-neutral by construction: [resolveMostRecentConversation]
+     * delegates here, so exactly one selection implementation exists and the
+     * capture cannot drift from the choice it describes. Nothing in the capture
+     * is read to make the selection.
+     *
+     * [parentAgentId] is optional. When it is null the attribution class is
+     * reported as UNKNOWN rather than guessed — see
+     * [classifyConversationAttribution] for why "requested-only" must not be
+     * asserted without a known other claimant.
+     */
+    suspend fun resolveMostRecentConversationWithProvenance(
+        agentId: String,
+        maxAgeMs: Long,
+        parentAgentId: String? = null,
+    ): ConversationSelection {
+        // Call ordering below mirrors the pre-instrumentation implementation
+        // EXACTLY — same number of getCachedConversations reads, and
+        // hasFreshConversations still consulted only when a cached conversation
+        // exists. The candidate list is captured from the SAME read the
+        // selection was made from, so the capture cannot describe a different
+        // list than the one that produced the choice.
+        var wasFresh = false
+        var refreshed = false
+        var candidates = conversationRepository.getCachedConversations(AgentId(agentId))
+        var selected = mostRecentConversationIdIn(candidates)
+        if (selected != null) {
+            wasFresh = conversationRepository.hasFreshConversations(AgentId(agentId), maxAgeMs)
+            if (!wasFresh) {
                 if (backgroundRefreshScope != null) {
                     backgroundRefreshScope.launch {
                         runCatching { conversationRepository.refreshConversationsIfStale(AgentId(agentId), maxAgeMs) }
                     }
                 } else {
                     conversationRepository.refreshConversationsIfStale(AgentId(agentId), maxAgeMs)
+                    refreshed = true
                 }
             }
-            return cachedConversationId
+        } else {
+            conversationRepository.refreshConversationsIfStale(AgentId(agentId), maxAgeMs)
+            refreshed = true
+            candidates = conversationRepository.getCachedConversations(AgentId(agentId))
+            selected = mostRecentConversationIdIn(candidates)
         }
-        conversationRepository.refreshConversationsIfStale(AgentId(agentId), maxAgeMs)
-        return mostRecentCachedConversationId(agentId)
+        return ConversationSelection(
+            conversationId = selected,
+            capture = buildCapture(
+                request = AttributionRequest(
+                    requestedAgentId = agentId,
+                    selectedConversationId = selected,
+                    parentAgentId = parentAgentId,
+                    selectionMode = TimelineConversationSelectionMode.MOST_RECENT_FALLBACK,
+                    freshness = when {
+                        refreshed -> TimelineCandidateListFreshness.REFRESHED
+                        wasFresh -> TimelineCandidateListFreshness.FRESH
+                        else -> TimelineCandidateListFreshness.STALE
+                    },
+                ),
+                candidates = candidates,
+            ),
+        )
     }
 
-    private fun mostRecentCachedConversationId(agentId: String): String? {
-        return conversationRepository.getCachedConversations(AgentId(agentId))
-            .filterNot { it.id.value.startsWith(DEFAULT_SHIM_CONVERSATION_PREFIX) }
-            .maxByOrNull { it.lastMessageAt ?: it.createdAt ?: "" }
-            ?.id
-            ?.value
+    /** Request parameters for capturing attribution outside the default resolver loop. */
+    data class AttributionRequest(
+        val requestedAgentId: String,
+        val selectedConversationId: String?,
+        val selectionMode: TimelineConversationSelectionMode,
+        val parentAgentId: String? = null,
+        val freshness: TimelineCandidateListFreshness = TimelineCandidateListFreshness.UNKNOWN,
+    )
+
+    /**
+     * Build the bounded attribution capture for a selection. Public so callers
+     * that chose a conversation by a NON-resolver route (explicit id, route
+     * state) can emit the same shape and stay comparable in the log.
+     */
+    fun captureAttribution(request: AttributionRequest): TimelineConversationAttributionCapture = buildCapture(
+        request = request,
+        candidates = conversationRepository.getCachedConversations(AgentId(request.requestedAgentId)),
+    )
+
+    fun captureAttribution(
+        requestedAgentId: String,
+        selectedConversationId: String?,
+        selectionMode: TimelineConversationSelectionMode,
+        parentAgentId: String? = null,
+    ): TimelineConversationAttributionCapture = captureAttribution(
+        AttributionRequest(
+            requestedAgentId = requestedAgentId,
+            selectedConversationId = selectedConversationId,
+            selectionMode = selectionMode,
+            parentAgentId = parentAgentId,
+        ),
+    )
+
+    private fun buildCapture(
+        request: AttributionRequest,
+        candidates: List<com.letta.mobile.data.model.Conversation>,
+    ): TimelineConversationAttributionCapture {
+        val candidateIds = candidates.map { it.id.value }
+        val parentCandidateIds = request.parentAgentId
+            ?.let { parent -> conversationRepository.getCachedConversations(AgentId(parent)).map { it.id.value } }
+            .orEmpty()
+        val selectedRecordAgentId = candidates.firstOrNull { it.id.value == request.selectedConversationId }?.agentId?.value
+        val attribution = classifyConversationAttribution(
+            ConversationAttributionQuery(
+                requestedAgentId = request.requestedAgentId,
+                selectedConversationId = request.selectedConversationId,
+                selectedRecordAgentId = selectedRecordAgentId,
+                requestedAgentCandidateIds = candidateIds.toSet(),
+                parentAgentId = request.parentAgentId,
+                parentAgentCandidateIds = parentCandidateIds.toSet(),
+            ),
+        )
+        return TimelineConversationAttributionCapture(
+            requestedAgentId = request.requestedAgentId,
+            selectedConversationId = request.selectedConversationId,
+            selectedRecordAgentId = selectedRecordAgentId,
+            candidateCount = candidateIds.size,
+            parentAgentId = request.parentAgentId,
+            selectedAlsoAttributedToParent = attribution == TimelineConversationAttribution.BOTH ||
+                attribution == TimelineConversationAttribution.PARENT_AGENT_ONLY,
+            attribution = attribution,
+            selectionMode = request.selectionMode,
+            candidateListSource = TimelineCandidateListSource.AGENT_SCOPED_CACHE,
+            candidateListFreshness = request.freshness,
+            candidateIdSample = TimelineProvenanceRedaction.boundedSample(candidateIds),
+            candidateIdDigest = TimelineProvenanceRedaction.setDigest(candidateIds),
+        )
     }
+
+    /** Result of a provenance-carrying conversation selection. */
+    data class ConversationSelection(
+        val conversationId: String?,
+        val capture: TimelineConversationAttributionCapture,
+    )
+
+    /**
+     * The selection rule, factored out over an already-fetched candidate list so
+     * the attribution capture can describe exactly the list the choice was made
+     * from. Behaviour is byte-for-byte the pre-instrumentation rule: skip the
+     * default-shim placeholder, then take the newest by lastMessageAt/createdAt.
+     */
+    private fun mostRecentConversationIdIn(
+        candidates: List<com.letta.mobile.data.model.Conversation>,
+    ): String? = candidates
+        .filterNot { it.id.value.startsWith(DEFAULT_SHIM_CONVERSATION_PREFIX) }
+        .maxByOrNull { it.lastMessageAt ?: it.createdAt ?: "" }
+        ?.id
+        ?.value
 
     companion object {
         const val DEFAULT_SHIM_CONVERSATION_PREFIX = "conv-default-"

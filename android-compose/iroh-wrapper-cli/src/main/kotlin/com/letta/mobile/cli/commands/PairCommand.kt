@@ -18,7 +18,6 @@ import com.letta.mobile.qr.QrRenderer
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
@@ -184,8 +183,7 @@ class PairCommand : CliktCommand(name = "pair") {
         }
         // Step 3: render. The renderer is the ONLY difference between CLI,
         // Desktop, and Mobile per protocol §10.
-        val mode = parseQrFormat(qrFormat)
-        when (mode) {
+        when (val mode = parseQrFormat(qrFormat)) {
             is QrFormatSpec.Text -> {
                 val matrix = QrCode.encode(qrInvite)
                 val text = QrRenderer.renderText(matrix)
@@ -215,7 +213,7 @@ class PairCommand : CliktCommand(name = "pair") {
      * through to a random ephemeral key — the QR remains valid, but the
      * `node_id` is non-deterministic.
      */
-    private suspend fun resolveSecretKeyStore(path: String?): com.letta.mobile.data.controller.node.iroh.IrohSecretKeyStore {
+    private fun resolveSecretKeyStore(path: String?): com.letta.mobile.data.controller.node.iroh.IrohSecretKeyStore {
         if (path.isNullOrBlank()) {
             // Ephemeral: 32 random bytes, NEVER persisted. The CLI run's
             // QR is single-use by design (the invite TTL bounds it) so we

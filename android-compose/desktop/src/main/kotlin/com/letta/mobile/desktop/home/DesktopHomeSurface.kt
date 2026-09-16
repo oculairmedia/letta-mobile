@@ -157,6 +157,7 @@ fun DesktopHomeSurface(
         items(items = recent, key = { it.conversationId }) { conversation ->
             RecentConversationRow(
                 conversation = conversation,
+                agentId = conversation.agentId,
                 orbIndex = conversation.agentId?.let { state.orbIndexByAgentId[it] } ?: 0,
                 onClick = { actions.onOpenConversation(conversation.conversationId) },
             )
@@ -325,6 +326,7 @@ private fun HomeComposerSendButton(canSend: Boolean, onSend: () -> Unit) {
 @Composable
 private fun RecentConversationRow(
     conversation: FleetRecentConversation,
+    agentId: String?,
     orbIndex: Int,
     onClick: () -> Unit,
 ) {
@@ -337,7 +339,7 @@ private fun RecentConversationRow(
         verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(11.dp),
     ) {
-        AgentOrb(index = orbIndex, size = 26.dp, cornerRadius = 7.dp)
+        AgentOrb(agentId = agentId, index = orbIndex, size = 26.dp, cornerRadius = 7.dp)
         Column(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(2.dp),

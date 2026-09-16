@@ -19,6 +19,9 @@ class A2uiDataModel(
     val root: JsonElement
         get() = rootState.value
 
+    /** Immutable boundary value: neither this model nor a caller-owned JSON collection escapes. */
+    fun checkpoint(): String = root.toString()
+
     fun resolve(path: String): JsonElement? = A2uiJsonPointer.resolve(root, path)
 
     fun observe(path: String): State<JsonElement?> {

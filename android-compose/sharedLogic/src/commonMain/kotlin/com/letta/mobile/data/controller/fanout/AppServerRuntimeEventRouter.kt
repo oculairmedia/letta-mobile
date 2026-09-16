@@ -63,7 +63,7 @@ class AppServerRuntimeEventRouter(
 
     fun isAttached(): Boolean = collectorJob.value?.isActive == true
 
-    suspend fun subscribe(
+    fun subscribe(
         agentId: AgentId,
         conversationId: ConversationId,
         subscriberId: String? = null,
@@ -74,9 +74,9 @@ class AppServerRuntimeEventRouter(
             fanout.subscribe(agentId, conversationId, subscriberId)
         }
 
-    suspend fun unsubscribe(subscriberId: String): Boolean = fanout.unsubscribe(subscriberId)
+    fun unsubscribe(subscriberId: String): Boolean = fanout.unsubscribe(subscriberId)
 
-    suspend fun subscriberCount(): Int = fanout.subscriberCount()
+    fun subscriberCount(): Int = fanout.subscriberCount()
 
-    suspend fun turnLockCount(): Int = fanout.turnLockCount()
+    fun turnLockCount(): Int = fanout.turnLockCount()
 }

@@ -12,6 +12,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.letta.mobile.ui.mascot.ProvideMascotShell
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
@@ -98,9 +99,8 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            // Surface any uncaught crash from the previous session exactly once.
-            // Snackbar with a "Copy id" action lets the user file a ticket tied
-            // to the Sentry event. Dismissing clears the on-disk record.
+            // Surface the previous crash briefly without blocking the composer.
+            // Copy/dismiss leaves the diagnostic record available on disk.
             val lastCrashState = crashReporter.lastCrash.collectAsStateWithLifecycle()
             LaunchedEffect(lastCrashState.value) {
                 val crash = lastCrashState.value ?: return@LaunchedEffect
@@ -110,6 +110,8 @@ class MainActivity : ComponentActivity() {
                 val result = snackbarHostState.showSnackbar(
                     message = summary,
                     actionLabel = label,
+                    withDismissAction = true,
+                    duration = androidx.compose.material3.SnackbarDuration.Long,
                 )
                 if (result == SnackbarResult.ActionPerformed) {
                     val payload = crash.sentryEventId
@@ -143,16 +145,22 @@ class MainActivity : ComponentActivity() {
                     LocalSnackbarDispatcher provides snackbarDispatcher,
                     LocalWindowSizeClass provides windowSizeClass,
                 ) {
-                    Scaffold(
-                        snackbarHost = { SnackbarHost(snackbarHostState) },
-                    ) { _ ->
-                        val navController = rememberNavController()
-                        AdaptiveScaffold(navController = navController) {
-                            AppNavGraph(
-                                navController = navController,
-                                 notificationTarget = launchTarget.value,
-                                 onNotificationTargetConsumed = { launchTarget.value = null },
-                            )
+                    ProvideMascotShell(
+                        agents = deps.agentRepository.agents,
+                        settings = deps.secureSettingsStore,
+                        runs = deps.conversationRunRegistry,
+                    ) {
+                        Scaffold(
+                            snackbarHost = { SnackbarHost(snackbarHostState) },
+                        ) { _ ->
+                            val navController = rememberNavController()
+                            AdaptiveScaffold(navController = navController) {
+                                AppNavGraph(
+                                    navController = navController,
+                                    notificationTarget = launchTarget.value,
+                                    onNotificationTargetConsumed = { launchTarget.value = null },
+                                )
+                            }
                         }
                     }
                 }

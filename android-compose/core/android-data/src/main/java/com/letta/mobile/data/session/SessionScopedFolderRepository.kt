@@ -9,7 +9,6 @@ import com.letta.mobile.data.model.FolderUpdateParams
 import com.letta.mobile.data.model.OrganizationSourcesStats
 import com.letta.mobile.data.model.Passage
 import com.letta.mobile.data.repository.api.IFolderRepository
-import io.ktor.http.ContentType
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
@@ -22,6 +21,8 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 
+// The singleton repository owns this scope and cancels it explicitly in close().
+@Suppress("NoDetachedCoroutineLifecycle")
 internal fun defaultSessionScopedFolderRepositoryScope(): CoroutineScope =
     CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -49,7 +50,7 @@ class SessionScopedFolderRepository internal constructor(
             .launchIn(proxyScope)
     }
 
-    override suspend fun refreshFolders(name: String?) = sessionManager.withCurrentSession { it.folderRepository.refreshFolders(name) }
+    override suspend fun refreshFolders(name: String?): Unit = sessionManager.withCurrentSession { it.folderRepository.refreshFolders(name) }
 
     override suspend fun countFolders(): Int = sessionManager.withCurrentSession { it.folderRepository.countFolders() }
 
@@ -63,7 +64,7 @@ class SessionScopedFolderRepository internal constructor(
     override suspend fun updateFolder(folderId: FolderId, params: FolderUpdateParams): Folder =
         sessionManager.withCurrentSession { it.folderRepository.updateFolder(folderId, params) }
 
-    override suspend fun deleteFolder(folderId: FolderId) = sessionManager.withCurrentSession { it.folderRepository.deleteFolder(folderId) }
+    override suspend fun deleteFolder(folderId: FolderId): Unit = sessionManager.withCurrentSession { it.folderRepository.deleteFolder(folderId) }
 
     override suspend fun uploadFileToFolder(params: FolderFileUploadParams): FileMetadata =
         sessionManager.withCurrentSession { it.folderRepository.uploadFileToFolder(params) }
@@ -77,7 +78,7 @@ class SessionScopedFolderRepository internal constructor(
     override suspend fun listFolderFiles(folderId: FolderId, includeContent: Boolean): List<FileMetadata> =
         sessionManager.withCurrentSession { it.folderRepository.listFolderFiles(folderId, includeContent) }
 
-    override suspend fun deleteFileFromFolder(folderId: FolderId, fileId: String) =
+    override suspend fun deleteFileFromFolder(folderId: FolderId, fileId: String): Unit =
         sessionManager.withCurrentSession { it.folderRepository.deleteFileFromFolder(folderId, fileId) }
 
     fun close() { proxyScope.cancel() }

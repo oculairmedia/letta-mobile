@@ -10,7 +10,7 @@ import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
-import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
@@ -20,7 +20,6 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.onSubscription
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import java.util.concurrent.CopyOnWriteArrayList
@@ -108,14 +107,9 @@ class IrohChannelTransportConcurrentConversationsTest {
         transport: IrohChannelTransport,
         frames: MutableList<ServerFrame>,
     ): Deferred<Unit> {
-        val subscribed = CompletableDeferred<Unit>()
-        val job = clientScope.async {
-            transport.events
-                .onSubscription { subscribed.complete(Unit) }
-                .collect { frames.add(it) }
+        return clientScope.async(start = CoroutineStart.UNDISPATCHED) {
+            transport.events.collect { frames.add(it) }
         }
-        withTimeout(10.seconds) { subscribed.await() }
-        return job
     }
 
     /** Starts conversation A's turn and waits until it is genuinely streaming. */
@@ -302,7 +296,7 @@ class IrohChannelTransportConcurrentConversationsTest {
 
             // The user cancels conversation B. B has no live turn of its own —
             // this must NOT reach into A's turn.
-            assertTrue(transport.cancel(CONV_B))
+            assertFalse(transport.cancel(CONV_B), "cancel(B) reports that B has no active turn")
             // Longer than serverTerminalWaitMs, so a mis-keyed cancel would have
             // already aborted + synthesized a cancelled terminal for A by now.
             delay(600.milliseconds)
@@ -316,12 +310,8 @@ class IrohChannelTransportConcurrentConversationsTest {
                 "A's turn must still be live after cancelling a DIFFERENT conversation",
             )
             assertTrue(
-                frames.any { it is ServerFrame.TurnDone && it.status == "cancelled" },
-                "cancel always yields a terminal so the cancelled surface can never hang",
-            )
-            assertTrue(
-                frames.none { it is ServerFrame.TurnDone && it.turnId == turnIdA },
-                "A's turn must not have been terminated by B's cancel",
+                frames.none { it is ServerFrame.TurnDone },
+                "cancel(B) must not fabricate a terminal or terminate A's turn",
             )
 
             // A is untouched and still settles on its own server terminal — the

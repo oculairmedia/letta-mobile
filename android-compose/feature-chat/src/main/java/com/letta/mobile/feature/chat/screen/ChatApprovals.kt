@@ -21,6 +21,7 @@ import com.letta.mobile.feature.chat.R
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
+import com.letta.mobile.runtime.RuntimeUserInputTools
 import com.letta.mobile.ui.components.TextInputDialog
 import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.theme.chatTypography
@@ -31,6 +32,7 @@ internal fun ApprovalRequestCard(
     isSubmitting: Boolean,
     onDecision: ((String, List<String>, Boolean, String?) -> Unit)?,
 ) {
+    if (!approval.requiresUserInput()) return
     // letta-mobile-vilsn: runtime user-input tools (AskUserQuestion) render a
     // structured question/answer card instead of the generic approve/reject card.
     if (AskUserQuestionCard(approval = approval, isSubmitting = isSubmitting, onDecision = onDecision)) return
@@ -74,6 +76,7 @@ internal fun ApprovalRequestControls(
     // after a matching approval response or tool return, and the controls must clear
     // with it when a resolved conversation is reopened (letta-mobile-jbui1).
     if (approval == null) return
+    if (!approval.requiresUserInput()) return
 
     Column(
         modifier = Modifier.padding(top = 4.dp),
@@ -96,6 +99,9 @@ internal fun ApprovalRequestControls(
         }
     }
 }
+
+internal fun UiApprovalRequest.requiresUserInput(): Boolean =
+    toolCalls.any { RuntimeUserInputTools.requiresUserInput(it.name) }
 
 @Composable
 internal fun ApprovalActionRow(
@@ -160,11 +166,8 @@ internal fun ApprovalResponseCard(message: UiMessage) {
     // bypassPermissions sessions), but if any other code path constructs a
     // UiApprovalResponse with all-null decisions we still must not paint it
     // as "Rejected" — that's how the long-standing mis-labeling bug surfaced.
-    val explicitDecisions = listOfNotNull(approval.approved) +
-        approval.approvals.mapNotNull { it.approved }
-    if (explicitDecisions.isEmpty()) return
-
-    val approved = explicitDecisions.any { it }
+    // letta-mobile-soa3i.4: any explicit rejection wins, so a mixed response reads Rejected.
+    val approved = approval.verdict ?: return
     val title = if (approved) {
         stringResource(R.string.screen_chat_approval_approved_title)
     } else {

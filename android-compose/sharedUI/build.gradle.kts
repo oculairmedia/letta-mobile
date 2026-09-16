@@ -53,6 +53,9 @@ kotlin {
                 // Domain/transport contracts and projection models stay in
                 // :sharedLogic; this module renders them.
                 api(project(":sharedLogic"))
+                // The mascot's identity model (shape + colour) and presence vocabulary; the picker
+                // and the size-tiered avatar composable render them.
+                api(project(":avatar:core"))
                 api("org.jetbrains.compose.runtime:runtime:1.10.0")
                 api("org.jetbrains.compose.foundation:foundation:1.10.0")
                 api("org.jetbrains.compose.material3:material3:1.9.0")
@@ -76,7 +79,7 @@ kotlin {
 
         jvmTest {
             dependencies {
-                implementation("junit:junit:4.13.2")
+                implementation(libs.junit4)
                 implementation(compose.desktop.currentOs)
                 implementation(kotlin("test"))
             }

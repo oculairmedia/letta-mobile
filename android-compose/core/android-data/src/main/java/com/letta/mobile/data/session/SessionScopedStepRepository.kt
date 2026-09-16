@@ -19,6 +19,8 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 
+// The singleton repository owns this scope and cancels it explicitly in close().
+@Suppress("NoDetachedCoroutineLifecycle")
 internal fun defaultSessionScopedStepRepositoryScope(): CoroutineScope =
     CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -49,7 +51,7 @@ class SessionScopedStepRepository internal constructor(
     private val current: IStepRepository
         get() = sessionManager.current.stepRepository
 
-    override suspend fun refreshSteps(params: StepListParams) = sessionManager.withCurrentSession { it.stepRepository.refreshSteps(params) }
+    override suspend fun refreshSteps(params: StepListParams): Unit = sessionManager.withCurrentSession { it.stepRepository.refreshSteps(params) }
 
     override suspend fun listSteps(params: StepListParams): List<Step> = sessionManager.withCurrentSession { it.stepRepository.listSteps(params) }
 
@@ -64,7 +66,7 @@ class SessionScopedStepRepository internal constructor(
     override suspend fun updateStepFeedback(stepId: String, params: StepFeedbackUpdateParams): Step =
         sessionManager.withCurrentSession { it.stepRepository.updateStepFeedback(stepId, params) }
 
-    override fun upsertStep(step: Step) = current.upsertStep(step)
+    override fun upsertStep(step: Step): Unit = current.upsertStep(step)
 
     fun close() { proxyScope.cancel() }
 }

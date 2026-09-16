@@ -55,6 +55,18 @@ interface TimelineExternalTransportWriter {
 
     suspend fun repairExpiredConversationCursorScoped(agentId: String?, conversationId: String, fallbackSeq: Long?)
 
+    /**
+     * Cursor-expiry recovery with the server's retained hello [expectedWatermark] (`after_seq`).
+     * Default ignores the watermark and delegates to the legacy three-arg path.
+     * Production captured runtimes must override and CAS-replace after a generation-fenced commit.
+     */
+    suspend fun repairExpiredConversationCursorScoped(
+        agentId: String?,
+        conversationId: String,
+        fallbackSeq: Long?,
+        expectedWatermark: Long?,
+    ) = repairExpiredConversationCursorScoped(agentId, conversationId, fallbackSeq)
+
     suspend fun clearExternalTransportActive(conversationId: String)
 
     suspend fun clearExternalTransportActive(agentId: String?, conversationId: String)
@@ -76,7 +88,7 @@ interface TimelineExternalTransportWriter {
      * turn's sweep left pending. Default no-op so existing fakes compile
      * unchanged.
      */
-    suspend fun turnStarted(agentId: String?, conversationId: String) {}
+    suspend fun turnStarted(agentId: String?, conversationId: String, runId: String? = null, turnId: String? = null) {}
 
     /**
      * letta-mobile-dangling-tool: signals that a turn ended on

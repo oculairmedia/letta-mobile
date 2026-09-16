@@ -350,7 +350,7 @@ class LocalConversationHealer(
             var lineIndex = -1
             var sawNonWhitespace = false
             var writingCurrentLine = false
-            var pendingWhitespace = java.io.ByteArrayOutputStream()
+            val pendingWhitespace = java.io.ByteArrayOutputStream()
 
             fun writeSyntheticRowsFor(index: Int) {
                 insertAfterIndex[index]?.forEach { synthetic ->

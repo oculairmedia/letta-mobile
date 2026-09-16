@@ -218,6 +218,38 @@ class ConversationPagingSourceTest {
         assert(result is PagingSource.LoadResult.Error)
     }
 
+    @Test
+    fun `load propagates CancellationException when cancelled`() {
+        val throwingLoader: ConversationPageLoader = { _, _, _, _, _, _, _ ->
+            throw kotlinx.coroutines.CancellationException("paging cancelled")
+        }
+        val source = ConversationPagingSource(
+            conversationApi = armedConversationApi(),
+            pageLoader = throwingLoader,
+        )
+        val ex = org.junit.Assert.assertThrows(kotlinx.coroutines.CancellationException::class.java) {
+            runTest {
+                source.load(refresh(loadSize = 50))
+            }
+        }
+        assertEquals("paging cancelled", ex.message)
+    }
+
+    @Test
+    fun `installing loader never evaluates api fallback`() = runTest {
+        val emptyLoader: ConversationPageLoader = { _, _, _, _, _, _, _ ->
+            emptyList()
+        }
+        val armedApi = armedConversationApi()
+        val source = ConversationPagingSource(
+            conversationApi = armedApi,
+            pageLoader = emptyLoader,
+        )
+        val result = source.load(refresh(loadSize = 50))
+        result as PagingSource.LoadResult.Page
+        assertTrue(result.data.isEmpty())
+    }
+
     private fun irohPageLoader(transport: FakeChannelTransport): ConversationPageLoader {
         val source = IrohAdminRpcConversationListSource(
             transport,

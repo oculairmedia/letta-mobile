@@ -101,9 +101,11 @@ class LocalKoogRuntimeProvider @Inject constructor() : LocalRuntimeProvider {
     }
 }
 
+@Suppress("UnusedReceiverParameter")
 private fun LettaConfig.localRuntimeScheme(): String =
     serverUrl.trim().let { trimmed ->
         trimmed.substringBefore("://", missingDelimiterValue = trimmed).lowercase()
     }
 
+@Suppress("UnusedReceiverParameter")
 private fun LettaConfig.backendKey(): String = id.takeIf { it.isNotBlank() } ?: "device"

@@ -19,6 +19,8 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 
+// The singleton repository owns this scope and cancels it explicitly in close().
+@Suppress("NoDetachedCoroutineLifecycle")
 internal fun defaultSessionScopedProjectRepositoryScope(): CoroutineScope =
     CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -65,7 +67,7 @@ class SessionScopedProjectRepository internal constructor(
         sessionManager.withCurrentSession { it.projectRepository.updateProject(identifier, filesystemPath, gitUrl) }
 
     override suspend fun archiveProject(identifier: String): ProjectSummary = sessionManager.withCurrentSession { it.projectRepository.archiveProject(identifier) }
-    override suspend fun deleteProject(identifier: String) = sessionManager.withCurrentSession { it.projectRepository.deleteProject(identifier) }
+    override suspend fun deleteProject(identifier: String): Unit = sessionManager.withCurrentSession { it.projectRepository.deleteProject(identifier) }
     override fun hasFreshProjects(maxAgeMs: Long): Boolean = current.hasFreshProjects(maxAgeMs)
     override suspend fun refreshProjectsIfStale(maxAgeMs: Long): Boolean = sessionManager.withCurrentSession { it.projectRepository.refreshProjectsIfStale(maxAgeMs) }
 

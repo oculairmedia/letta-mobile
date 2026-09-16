@@ -45,7 +45,7 @@ internal data class ProjectionFrame(
     val messages: List<UiMessage> = timelineEvents.mapNotNull(::timelineEventToUiMessage)
 }
 
-internal enum class RenderItemKind { Single, RunBlock, SkillEnvelope }
+internal enum class RenderItemKind { Single, RunBlock }
 
 internal enum class MessageFeature {
     Pending,
@@ -97,12 +97,6 @@ internal fun List<ChatRenderItem>.toFixtureExpectation(): List<RenderItemExpecta
             messages = item.messages.map { (message, position) ->
                 message.toFixtureExpectation(position)
             },
-        )
-        is ChatRenderItem.SkillEnvelopeChip -> RenderItemExpectation(
-            kind = RenderItemKind.SkillEnvelope,
-            key = item.key,
-            runId = null,
-            messages = listOf(MessageExpectation(item.messageId)),
         )
     }
 }

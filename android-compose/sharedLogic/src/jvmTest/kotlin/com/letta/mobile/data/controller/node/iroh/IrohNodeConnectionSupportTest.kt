@@ -136,6 +136,33 @@ class IrohNodeConnectionSupportTest {
     }
 
     @Test
+    fun tagStreamDelta_prefersMessageIdAndKeepsDistinctMessagesInOneRunDistinct() {
+        fun delta(id: String, messageId: String) = kotlinx.serialization.json.buildJsonObject {
+            put("id", kotlinx.serialization.json.JsonPrimitive(id))
+            put("message_id", kotlinx.serialization.json.JsonPrimitive(messageId))
+            put("message_type", kotlinx.serialization.json.JsonPrimitive("assistant_message"))
+            put("run_id", kotlinx.serialization.json.JsonPrimitive("one-run"))
+            put("turn_id", kotlinx.serialization.json.JsonPrimitive("one-turn"))
+        }
+        assertEquals("cm-stream-logical-a", tagStreamDeltaForOptimisticDedup(delta("delivery-a", "logical-a"))["id"]?.jsonPrimitive?.contentOrNull)
+        assertEquals("cm-stream-logical-b", tagStreamDeltaForOptimisticDedup(delta("delivery-b", "logical-b"))["id"]?.jsonPrimitive?.contentOrNull)
+    }
+
+    @Test
+    fun tagStreamDelta_skipsBlankAliasesAndUsesNextStableValue() {
+        val delta = kotlinx.serialization.json.buildJsonObject {
+            put("id", kotlinx.serialization.json.JsonPrimitive("delivery"))
+            put("message_id", kotlinx.serialization.json.JsonPrimitive(" "))
+            put("otid", kotlinx.serialization.json.JsonPrimitive("stable-otid"))
+            put("message_type", kotlinx.serialization.json.JsonPrimitive("assistant_message"))
+        }
+        assertEquals(
+            "cm-stream-stable-otid",
+            tagStreamDeltaForOptimisticDedup(delta)["id"]?.jsonPrimitive?.contentOrNull,
+        )
+    }
+
+    @Test
     fun tagStreamDelta_reasoning_getsCmReasonId() {
         val delta = kotlinx.serialization.json.buildJsonObject {
             put("id", kotlinx.serialization.json.JsonPrimitive("letta-msg-9"))

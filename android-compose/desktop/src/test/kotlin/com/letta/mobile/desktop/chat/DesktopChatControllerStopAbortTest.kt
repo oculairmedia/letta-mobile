@@ -159,6 +159,7 @@ class DesktopChatControllerStopAbortTest {
         bootstrapState = defaultDesktopBootstrapState(),
         scope = this,
         gatewayFactory = { gateway },
+        timelinePersistence = noOpDesktopTimelinePersistence,
         loopFactory = { _, _, _ -> loop },
     )
 }

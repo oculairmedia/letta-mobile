@@ -10,6 +10,9 @@ import com.letta.mobile.data.model.ErrorMessage
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
+import com.letta.mobile.data.model.ReasoningMessage
+import com.letta.mobile.data.model.ToolCall
+import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.runtime.TurnFailureNotices
 import com.letta.mobile.data.timeline.RecentMessagesReconcileOutcome
@@ -271,23 +274,23 @@ class ChatSendCoordinatorCleanupTest {
     }
 
     @Test
-    fun failedTurnDoneWithSyntheticRunUsesObservedAssistantRunCandidates() = runTest(UnconfinedTestDispatcher()) {
+    fun failedSyntheticTerminalUsesObservedAssistantRunCandidatesExactlyOnce() = runTest(UnconfinedTestDispatcher()) {
         val timeline = RecordingTimelineWriter()
         val coordinator = coordinator(timeline = timeline, ui = RecordingUiSink(), transport = FakeChannelTransport(mutableListOf(true)), activeConversationId = { "conv-1" })
 
         coordinator.send("hello").join()
-        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "synthetic-turn-run"))
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", SYNTHETIC_RUN_ID))
         coordinator.handleEvent(WsTimelineEvent.MessageDelta(AssistantMessage(id = "m1", contentRaw = JsonPrimitive("a"), runId = "run-real")))
-        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "synthetic-turn-run", BridgeTurnStatus.Cancelled))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", SYNTHETIC_RUN_ID, BridgeTurnStatus.Failed))
         advanceUntilIdle()
 
         assertEquals(
             RecordingTimelineWriter.CleanupTail(
                 agentId = AGENT_ID,
                 conversationId = "conv-1",
-                activeRunId = "synthetic-turn-run",
+                activeRunId = SYNTHETIC_RUN_ID,
                 activeTurnId = "turn-1",
-                candidateRunIds = setOf("synthetic-turn-run", "run-real"),
+                candidateRunIds = setOf(SYNTHETIC_RUN_ID, "run-real"),
             ),
             timeline.cleanupTails.single(),
         )
@@ -567,6 +570,84 @@ class ChatSendCoordinatorCleanupTest {
         assertNull(ui.currentError())
     }
 
+    @Test
+    fun failedAgentTurnWithDeliveredShortReplyAndNoStopReasonIsNotDead() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val ui = RecordingUiSink()
+        val coordinator = coordinator(timeline, ui, FakeChannelTransport(mutableListOf(true)))
+
+        coordinator.send("hey").join()
+        val otid = timeline.externalLocals.last().otid
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
+        // Exercise the live coordinator path through reasoning and Agent tool
+        // evidence before the short main reply, as emitted by a real Agent turn.
+        coordinator.handleEvent(
+            WsTimelineEvent.MessageDelta(
+                ReasoningMessage(id = "reasoning-1", reasoning = "Checking the request", runId = "run-1"),
+                conversationId = "conv-1",
+            ),
+        )
+        coordinator.handleEvent(
+            WsTimelineEvent.MessageDelta(
+                ToolCallMessage(
+                    id = "agent-tool-1",
+                    toolCall = ToolCall(id = "agent-call-1", name = "Agent", arguments = "{}"),
+                    runId = "run-1",
+                ),
+                conversationId = "conv-1",
+            ),
+        )
+        coordinator.handleEvent(
+            WsTimelineEvent.MessageDelta(
+                AssistantMessage(id = "reply-1", contentRaw = JsonPrimitive("Hey. I'm here."), runId = "run-1"),
+                conversationId = "conv-1",
+            ),
+        )
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", BridgeTurnStatus.Failed))
+        advanceUntilIdle()
+
+        assertTrue(timeline.ingestedMessages.filterIsInstance<ReasoningMessage>().any { it.id == "reasoning-1" })
+        assertTrue(timeline.ingestedMessages.filterIsInstance<ToolCallMessage>().any { it.id == "agent-tool-1" })
+        assertTrue(timeline.ingestedMessages.filterIsInstance<AssistantMessage>().any { it.content == "Hey. I'm here." })
+        assertTrue(timeline.ingestedMessages.filterIsInstance<ErrorMessage>().isEmpty())
+        assertTrue(timeline.sentLocals.contains(RecordingTimelineWriter.LocalMarker("conv-1", otid)))
+        assertNull(ui.currentError())
+        assertTrue(timeline.cleanupTails.isEmpty())
+    }
+
+    @Test
+    fun failedTurnWithUnknownBufferedErrorAfterPartialContentRemainsDead() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val ui = RecordingUiSink()
+        val coordinator = coordinator(timeline, ui, FakeChannelTransport(mutableListOf(true)))
+
+        coordinator.send("hello").join()
+        val otid = timeline.externalLocals.last().otid
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
+        coordinator.handleEvent(
+            WsTimelineEvent.MessageDelta(
+                AssistantMessage(id = "partial-1", contentRaw = JsonPrimitive("partial"), runId = "run-1"),
+                conversationId = "conv-1",
+            ),
+        )
+        coordinator.handleEvent(
+            WsTimelineEvent.Error(
+                code = "unrecognized_provider_failure",
+                message = "unrecognized provider failure",
+                conversationId = "conv-1",
+                turnId = "turn-1",
+                runId = "run-1",
+            ),
+        )
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", BridgeTurnStatus.Failed))
+        advanceUntilIdle()
+
+        assertEquals(1, timeline.ingestedMessages.filterIsInstance<ErrorMessage>().size)
+        assertEquals(listOf(RecordingTimelineWriter.LocalMarker("conv-1", otid)), timeline.failedLocals)
+        assertEquals("unrecognized provider failure", ui.currentError())
+        assertEquals(1, timeline.cleanupTails.size)
+    }
+
     // letta-mobile-br5g0 (codex review): the mapper ships the sanitized family
     // in Error.code with fixed copy in Error.message. Reclassifying the copy
     // downgraded content_filter to provider_error — the wire code must win.
@@ -680,6 +761,34 @@ class ChatSendCoordinatorCleanupTest {
         assertEquals("turn-failed-turn-1-local-run-1", errorRow.id)
     }
 
+    /**
+     * A timeline fence rejecting one frame used to escape the frame dispatcher and kill the app -
+     * three of the five crashes in one day's device log. The turn must absorb it and keep running.
+     */
+    @Test
+    fun `a timeline failure on one frame does not stop the turn`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val timeline = RecordingTimelineWriter(ingestFailure = IllegalStateException("fence"))
+            val ui = RecordingUiSink()
+            val transport = FakeChannelTransport(mutableListOf(true), activeChatTurn = true)
+            val coordinator = coordinator(timeline, ui, transport)
+
+            coordinator.send("hello").join()
+            coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "local-run-1"))
+            coordinator.handleEvent(WsTimelineEvent.MessageDelta(
+                message = AssistantMessage(id = "m-1", contentRaw = JsonPrimitive("hello"), runId = "local-run-1"),
+                conversationId = "conv-1",
+                turnId = "turn-1",
+            ))
+            coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "local-run-1", BridgeTurnStatus.Completed))
+            advanceUntilIdle()
+
+            // The frame is lost, but the turn still reached its terminal and stood the UI down.
+            assertEquals(emptyList(), timeline.ingestedMessages.filterIsInstance<AssistantMessage>())
+            assertEquals(listOf("conv-1"), timeline.clearedActiveConversations)
+            assertFalse(ui.isStreaming())
+        }
+
     private fun coordinator(
         timeline: RecordingTimelineWriter,
         ui: RecordingUiSink,
@@ -729,7 +838,10 @@ class ChatSendCoordinatorCleanupTest {
         override fun onDisconnectFailure(error: String) { this.error = error; isStreaming = false; isAgentTyping = false }
     }
 
-    private class RecordingTimelineWriter(private val cleanupFailure: Throwable? = null) : TimelineExternalTransportWriter {
+    private class RecordingTimelineWriter(
+        private val cleanupFailure: Throwable? = null,
+        private val ingestFailure: Throwable? = null,
+    ) : TimelineExternalTransportWriter {
         var reconcileOutcome: RecentMessagesReconcileOutcome = RecentMessagesReconcileOutcome.Applied(0)
         val externalLocals = mutableListOf<ExternalLocal>()
         val ingestedMessages = mutableListOf<LettaMessage>()
@@ -740,8 +852,8 @@ class ChatSendCoordinatorCleanupTest {
         val reconciles = mutableListOf<Reconcile>()
         override suspend fun appendExternalTransportLocal(conversationId: String, content: String, otid: String, attachments: List<MessageContentPart.Image>): String { externalLocals += ExternalLocal(conversationId, content, otid); return otid }
         override suspend fun appendExternalTransportLocal(agentId: String?, conversationId: String, content: String, otid: String, attachments: List<MessageContentPart.Image>): String = appendExternalTransportLocal(conversationId, content, otid, attachments)
-        override suspend fun ingestExternalTransportMessage(conversationId: String, message: LettaMessage, source: String) { ingestedMessages += message }
-        override suspend fun ingestExternalTransportMessage(agentId: String?, conversationId: String, message: LettaMessage, source: String) { ingestedMessages += message }
+        override suspend fun ingestExternalTransportMessage(conversationId: String, message: LettaMessage, source: String) { ingestFailure?.let { throw it }; ingestedMessages += message }
+        override suspend fun ingestExternalTransportMessage(agentId: String?, conversationId: String, message: LettaMessage, source: String) = ingestExternalTransportMessage(conversationId, message, source)
         override suspend fun markExternalTransportLocalSent(conversationId: String, otid: String) { sentLocals += LocalMarker(conversationId, otid) }
         override suspend fun markExternalTransportLocalSent(agentId: String?, conversationId: String, otid: String) { sentLocals += LocalMarker(conversationId, otid) }
         override suspend fun markExternalTransportLocalFailed(conversationId: String, otid: String) { failedLocals += LocalMarker(conversationId, otid) }
@@ -826,6 +938,7 @@ class ChatSendCoordinatorCleanupTest {
 
     private companion object {
         const val AGENT_ID = "agent-1"
+        const val SYNTHETIC_RUN_ID = "iroh-run-synthetic"
         var otid = 0
     }
 }

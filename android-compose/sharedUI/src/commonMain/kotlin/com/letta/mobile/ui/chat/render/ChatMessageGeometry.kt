@@ -31,7 +31,7 @@ data class ChatRenderItemGeometrySignature(
 )
 
 class ChatMessageGeometryState(
-    maxEntries: Int = 240,
+    private val maxEntries: Int = 240,
 ) {
     init {
         // letta-mobile-1260 (CodeRabbit review): reject negative capacity so
@@ -43,7 +43,6 @@ class ChatMessageGeometryState(
             "maxEntries must be >= 0 (got $maxEntries)"
         }
     }
-    private val maxEntries: Int = maxEntries
     // Insertion-order linked map (commonMain-safe). Lookups must not reorder
     // entries — access-order promotion defeated per-frame dedup on recycled
     // slots. Evict oldest-by-insertion when full.
@@ -228,13 +227,6 @@ private fun ChatRenderItem.geometryContentFingerprint(
                 include(position.hashCode())
             }
         }
-        is ChatRenderItem.SkillEnvelopeChip -> {
-            include(messageId.hashCode())
-            include(slug.hashCode())
-            include(name.hashCode())
-            include(args.hashCode())
-            // TODO: include expanded state when chip expansion is implemented
-        }
     }
     return ChatRenderItemContentFingerprint(length = length, hash = hash)
 }
@@ -261,10 +253,6 @@ private fun ChatRenderItem.geometryExpansionHash(state: ChatRenderItemState): In
                 include(position.hashCode())
                 include((message.id !in state.expandedReasoningMessageIds).hashCode())
             }
-        }
-        is ChatRenderItem.SkillEnvelopeChip -> {
-            include(messageId.hashCode())
-            // TODO: include expanded state when chip expansion is implemented
         }
     }
     return hash

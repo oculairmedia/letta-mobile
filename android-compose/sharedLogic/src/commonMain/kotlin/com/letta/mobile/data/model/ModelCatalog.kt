@@ -51,9 +51,9 @@ object ModelCatalog {
      */
     fun selectedModel(models: List<LlmModel>, selectedValue: String?): LlmModel? {
         val selected = selectedValue?.takeIf { it.isNotBlank() } ?: return null
-        models.filter { selectionValue(models, it) == selected }.singleOrNull()?.let { return it }
-        models.filter { valueOf(it) == selected }.singleOrNull()?.let { return it }
-        return models.filter { selected in it.selectionAliases }.singleOrNull()
+        models.singleOrNull { selectionValue(models, it) == selected }?.let { return it }
+        models.singleOrNull { valueOf(it) == selected }?.let { return it }
+        return models.singleOrNull { selected in it.selectionAliases }
     }
 
     /**
@@ -68,9 +68,9 @@ object ModelCatalog {
         selectedModel(models, selectedValue)?.let { return it }
         val selected = selectedValue?.takeIf { it.isNotBlank() } ?: return null
         val route = routeIdentity?.takeIf { it.isSpecified } ?: return null
-        return models.filter { valueOf(it) == selected || selected in it.selectionAliases }
-            .filter(route::matches)
-            .singleOrNull()
+        return models.singleOrNull {
+            (valueOf(it) == selected || selected in it.selectionAliases) && route.matches(it)
+        }
     }
 
     /**
@@ -94,9 +94,9 @@ object ModelCatalog {
         val normalized = ModelCatalogNormalizer.normalize(models).toMutableList()
         val selected = selectedValue?.takeIf { it.isNotBlank() }
         if (selected != null && normalized.none { selectionValue(normalized, it) == selected }) {
-            models.filter {
+            models.singleOrNull {
                 selectionValue(models, it) == selected || valueOf(it) == selected
-            }.singleOrNull()?.let { normalized.add(it) }
+            }?.let { normalized.add(it) }
         }
         val ordered = LinkedHashMap<String, MutableList<ModelOption>>()
         normalized.forEach { model ->

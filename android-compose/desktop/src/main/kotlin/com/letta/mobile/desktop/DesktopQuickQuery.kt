@@ -18,7 +18,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Icon
@@ -58,7 +57,9 @@ import androidx.compose.ui.window.rememberWindowState
 import com.letta.mobile.data.search.CommandPalette
 import com.letta.mobile.data.search.PaletteItem
 import com.letta.mobile.data.search.PaletteItemKind
+import com.letta.mobile.data.search.mascotAgentId
 import com.letta.mobile.desktop.chat.AgentOrb
+import com.letta.mobile.desktop.chat.PaletteItemLeading
 import dev.nucleusframework.core.runtime.Platform
 import java.awt.event.WindowEvent
 import java.awt.event.WindowFocusListener
@@ -377,17 +378,19 @@ private fun handleQuickQueryKey(
     keys: QuickQueryKeyActions,
 ): Boolean {
     if (event.type != KeyEventType.KeyDown) return false
-    return when {
-        event.key == Key.Escape -> {
+    return when (event.key) {
+        Key.Escape -> {
             keys.onClose()
             true
         }
-        event.key == Key.Enter && event.isCtrlPressed -> {
-            keys.onSubmit()
-            true
-        }
-        event.key == Key.Enter -> {
-            if (hasResults) keys.onOpenTop() else keys.onSubmit()
+        Key.Enter -> {
+            if (event.isCtrlPressed) {
+                keys.onSubmit()
+            } else if (hasResults) {
+                keys.onOpenTop()
+            } else {
+                keys.onSubmit()
+            }
             true
         }
         else -> false
@@ -456,7 +459,12 @@ private fun RecentAgentsStrip(
                         .width(64.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    AgentOrb(index = item.orbIndex ?: 0, size = 44.dp, cornerRadius = 12.dp)
+                    AgentOrb(
+                        index = item.orbIndex ?: 0,
+                        size = 44.dp,
+                        cornerRadius = 12.dp,
+                        agentId = item.mascotAgentId(),
+                    )
                     Text(
                         text = item.label,
                         style = MaterialTheme.typography.labelMedium,
@@ -531,15 +539,7 @@ private fun QuickQueryRow(item: PaletteItem, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        when (item.kind) {
-            PaletteItemKind.Destination -> Icon(
-                imageVector = Icons.Outlined.ArrowForward,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(18.dp),
-            )
-            else -> AgentOrb(index = item.orbIndex ?: 0, size = 22.dp, cornerRadius = 6.dp)
-        }
+        PaletteItemLeading(item)
         Text(
             text = item.label,
             style = MaterialTheme.typography.bodyMedium,

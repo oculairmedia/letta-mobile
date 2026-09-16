@@ -2,11 +2,13 @@ package com.letta.mobile.data.controller.extras
 
 import com.letta.mobile.data.controller.capability.Capability
 import com.letta.mobile.data.controller.capability.RemoteCapabilities
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -113,6 +115,29 @@ class ExternalToolRegistryTest {
         val result = registry.invoke("nonexistent_tool", input)
 
         assertIs<ExternalToolResult.Error>(result, "Should return error for nonexistent tool")
+    }
+
+    @Test
+    fun invokePropagatesCancellation() = runTest {
+        val tool = object : ExternalTool {
+            override val name = "cancelled"
+            override val description = "Throws cancellation for propagation coverage"
+            override val inputSchema: kotlinx.serialization.json.JsonObject? = null
+            override val capability = Capability.ImageHydration
+
+            override suspend fun invoke(
+                input: kotlinx.serialization.json.JsonObject,
+                agentId: String?,
+            ): ExternalToolResult = throw CancellationException("cancelled")
+        }
+        val registry = ExternalToolRegistry(
+            tools = listOf(tool),
+            capabilities = RemoteCapabilities(imageHydration = true),
+        )
+
+        assertFailsWith<CancellationException> {
+            registry.invoke("cancelled", buildJsonObject {})
+        }
     }
 
     @Test

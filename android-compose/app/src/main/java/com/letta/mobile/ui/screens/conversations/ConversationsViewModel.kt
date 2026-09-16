@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentRuntimeBinding
+import com.letta.mobile.data.model.isLettaCodeEphemeralWorker
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.repository.ConversationInspectorMessage
 import com.letta.mobile.data.repository.RosterNameTelemetry
@@ -15,6 +16,7 @@ import com.letta.mobile.data.repository.api.IAllConversationsRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.repository.api.IMessageRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.data.presence.ConversationRunRegistry
 import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatusProvider
 import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelRepository
 import com.letta.mobile.ui.screens.agentlist.LocalLettaCodeCreateReadiness
@@ -25,6 +27,7 @@ import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.async
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -41,6 +44,8 @@ data class ConversationDisplay(
     val conversation: Conversation,
     val agentName: String,
     val isPinned: Boolean = false,
+    /** A run is in flight in this conversation (a non-terminal cursor in the run store). */
+    val isWorking: Boolean = false,
 )
 
 @androidx.compose.runtime.Immutable
@@ -50,7 +55,7 @@ data class ConversationsUiState(
     val isLoading: Boolean = true,
     val isRefreshing: Boolean = false,
     val searchQuery: String = "",
-    val showArchived: Boolean = false,
+    val filter: ConversationFilter = ConversationFilter.ALL,
     val selectedConversation: ConversationDisplay? = null,
     val inspectorMessages: ImmutableList<ConversationInspectorMessage> = persistentListOf(),
     val isInspectorLoading: Boolean = false,
@@ -65,6 +70,12 @@ private data class ConversationListLoadResult(
     val agents: Result<List<Agent>>,
     val conversations: Result<List<Conversation>>,
 )
+
+/**
+ * What the list shows. Working and Completed split the live rows by whether a run is in flight
+ * (from the run cursor store); Archived is the archive; All is every live row.
+ */
+enum class ConversationFilter { ALL, WORKING, COMPLETED, ARCHIVED }
 
 fun ConversationsUiState.shouldShowFirstRunOnboarding(): Boolean =
     !isLoading &&
@@ -82,6 +93,7 @@ class ConversationsViewModel @Inject constructor(
     private val settingsRepository: ISettingsRepository,
     private val embeddedRuntimeStatusProvider: EmbeddedLettaCodeRuntimeStatusProvider,
     private val embeddedModelRepository: EmbeddedModelRepository,
+    private val runRegistry: ConversationRunRegistry = ConversationRunRegistry(),
 ) : ViewModel() {
     companion object {
         private const val LIST_CACHE_TTL_MS = 30_000L
@@ -132,17 +144,42 @@ class ConversationsViewModel @Inject constructor(
         if (initialAgents.isNotEmpty()) {
             agentNameCache = initialAgents.associate { it.id to it.name }.toMutableMap()
         }
-        // A recreated screen cannot know whether a cached conversation timestamp
-        // predates the chat activity that navigated here. Publishing those rows and
-        // then refreshing exposes a visible stale-order -> authoritative-order swap.
-        // Keep the cached roster for names, but let the initial refresh publish the
-        // first populated conversation snapshot atomically.
         if (initialAgents.isNotEmpty()) {
             _uiState.value = _uiState.value.copy(
                 agents = initialAgents.toImmutableList(),
             )
         }
+        // letta-mobile-pus2w: the page renders from whatever the repository already holds - the
+        // on-disk cache at cold start, the last fetch afterwards - and the refresh updates it in
+        // place. Holding the first snapshot until the refresh returned avoided a visible
+        // stale-order -> authoritative-order swap, at the price of a shimmer on every open; a row
+        // moving (animated by the list) is the cheaper of the two. Empty emissions are skipped:
+        // they are "no cache yet" or a refresh clearing before it applies its page, and the
+        // load result decides both.
+        viewModelScope.launch {
+            allConversationsRepository.conversations.collect { held ->
+                if (held.isNotEmpty()) publishSnapshot(held)
+            }
+        }
+        // A run starting or ending anywhere in the app re-marks the rows; no polling, no refresh.
+        viewModelScope.launch { runRegistry.runs.collect { refreshWorkingState() } }
         loadConversations()
+    }
+
+    /** Publishes [conversations] as the list now, named from the roster the app currently holds. */
+    private fun publishSnapshot(conversations: List<Conversation>) {
+        val activeConfigIsLocalRuntime = AgentRuntimeBinding.isLocalRuntime(settingsRepository.activeConfig.value)
+        val agents = displayAgents(agentRepository.agents.value, activeConfigIsLocalRuntime)
+        if (agents.isNotEmpty()) {
+            agentNameCache = agents.associate { it.id to it.name }.toMutableMap()
+        }
+        val display = displayConversations(conversations, agents, activeConfigIsLocalRuntime)
+        _uiState.value = _uiState.value.copy(
+            conversations = applyPinnedState(display.map { it.toDisplay() }).toImmutableList(),
+            agents = agents.toImmutableList(),
+            isLoading = false,
+            error = null,
+        )
     }
 
     fun loadConversations() {
@@ -224,6 +261,8 @@ class ConversationsViewModel @Inject constructor(
                     agents = displayAgents.toImmutableList(),
                     isRefreshing = false,
                 )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(isRefreshing = false)
             }
@@ -240,6 +279,8 @@ class ConversationsViewModel @Inject constructor(
                     selectedConversation = if (_uiState.value.selectedConversation?.conversation?.id == conversationId) null else _uiState.value.selectedConversation,
                 )
                 conversationRepository.deleteConversation(conversationId, display.conversation.agentId)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 Log.w("ConversationsVM", "Delete failed", e)
                 loadConversations()
@@ -253,10 +294,14 @@ class ConversationsViewModel @Inject constructor(
 
     fun getFilteredConversations(): List<ConversationDisplay> {
         val state = _uiState.value
-        val conversations = if (state.showArchived) {
-            state.conversations.filter { it.conversation.archived == true }
-        } else {
-            state.conversations.filter { it.conversation.archived != true }
+        val conversations = state.conversations.filter { display ->
+            val archived = display.conversation.archived == true
+            when (state.filter) {
+                ConversationFilter.ALL -> !archived
+                ConversationFilter.WORKING -> !archived && display.isWorking
+                ConversationFilter.COMPLETED -> !archived && !display.isWorking
+                ConversationFilter.ARCHIVED -> archived
+            }
         }
         if (state.searchQuery.isBlank()) return conversations
         val q = state.searchQuery.trim().lowercase()
@@ -267,8 +312,13 @@ class ConversationsViewModel @Inject constructor(
         }
     }
 
+    fun setFilter(filter: ConversationFilter) {
+        _uiState.value = _uiState.value.copy(filter = filter)
+    }
+
     fun toggleShowArchived() {
-        _uiState.value = _uiState.value.copy(showArchived = !_uiState.value.showArchived)
+        val next = if (_uiState.value.filter == ConversationFilter.ARCHIVED) ConversationFilter.ALL else ConversationFilter.ARCHIVED
+        setFilter(next)
     }
 
     fun renameConversation(conversationId: ConversationId, agentId: AgentId, newName: String) {
@@ -286,6 +336,8 @@ class ConversationsViewModel @Inject constructor(
                         ?.copy(conversation = selectedConversation.conversation.copy(summary = newName))
                         ?: selectedConversation,
                 )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 Log.w("ConversationsVM", "Rename failed", e)
             }
@@ -298,6 +350,8 @@ class ConversationsViewModel @Inject constructor(
                 val forked = conversationRepository.forkConversation(conversationId, agentId)
                 onSuccess(forked.id)
                 loadConversations()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 Log.w("ConversationsVM", "Fork failed", e)
             }
@@ -324,6 +378,8 @@ class ConversationsViewModel @Inject constructor(
                     inspectorError = inspectorResult.exceptionOrNull()?.message,
                     isInspectorLoading = false,
                 )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 Log.w("ConversationsVM", "Admin detail load failed", e)
                 _uiState.value = _uiState.value.copy(
@@ -347,32 +403,42 @@ class ConversationsViewModel @Inject constructor(
     }
 
     fun setConversationArchived(display: ConversationDisplay, archived: Boolean) {
+        // letta-mobile-pus2w: the row leaves (or returns) in the same frame as the gesture; the
+        // network write follows and only a failure moves it back. Waiting on the write left the
+        // dismissed row in the list for a round-trip, then removed it in a second, visible step.
+        applyArchived(display.conversation.id, archived)
         viewModelScope.launch {
             try {
                 conversationRepository.setConversationArchived(display.conversation.id, display.conversation.agentId, archived)
-                val updatedConversations = _uiState.value.conversations.map {
-                    if (it.conversation.id == display.conversation.id) {
-                        it.copy(conversation = it.conversation.copy(archived = archived))
-                    } else it
-                }
-                _uiState.value = _uiState.value.copy(
-                    conversations = updatedConversations.toImmutableList(),
-                    selectedConversation = _uiState.value.selectedConversation?.let { selected ->
-                        if (selected.conversation.id == display.conversation.id) {
-                            selected.copy(conversation = display.conversation.copy(archived = archived))
-                        } else selected
-                    },
-                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 Log.w("ConversationsVM", "Archive toggle failed", e)
+                applyArchived(display.conversation.id, !archived)
             }
         }
+    }
+
+    private fun applyArchived(id: ConversationId, archived: Boolean) {
+        val current = _uiState.value
+        _uiState.value = current.copy(
+            conversations = current.conversations.map {
+                if (it.conversation.id == id) it.copy(conversation = it.conversation.copy(archived = archived)) else it
+            }.toImmutableList(),
+            selectedConversation = current.selectedConversation?.let { selected ->
+                if (selected.conversation.id == id) {
+                    selected.copy(conversation = selected.conversation.copy(archived = archived))
+                } else selected
+            },
+        )
     }
 
     fun cancelConversationRuns(display: ConversationDisplay) {
         viewModelScope.launch {
             try {
                 conversationRepository.cancelConversation(display.conversation.id, display.conversation.agentId)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 Log.w("ConversationsVM", "Cancel failed", e)
             }
@@ -384,6 +450,8 @@ class ConversationsViewModel @Inject constructor(
             try {
                 val result = conversationRepository.recompileConversation(display.conversation.id, false, display.conversation.agentId)
                 _uiState.value = _uiState.value.copy(recompilePreview = result)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 Log.w("ConversationsVM", "Recompile failed", e)
             }
@@ -400,6 +468,8 @@ class ConversationsViewModel @Inject constructor(
                     conversations = applyPinnedState(_uiState.value.conversations + conversation.toDisplay()).toImmutableList(),
                     createConversationError = null,
                 )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 Log.e("ConversationsVM", "Create conversation failed for agent ${agentId.value}", e)
                 _uiState.value = _uiState.value.copy(
@@ -450,8 +520,22 @@ class ConversationsViewModel @Inject constructor(
             conversation = this,
             agentName = resolved ?: agentId.value.take(8),
             isPinned = id in pinnedConversationIds,
+            isWorking = id.value in workingConversationIds(),
         )
     }
+
+    /** Re-marks which rows have a run in flight; publishes only when that changed. No network. */
+    private fun refreshWorkingState() {
+        val working = workingConversationIds()
+        val current = _uiState.value.conversations
+        if (current.all { (it.conversation.id.value in working) == it.isWorking }) return
+        _uiState.value = _uiState.value.copy(
+            conversations = current.map { it.copy(isWorking = it.conversation.id.value in working) }.toImmutableList(),
+        )
+    }
+
+    /** Conversations with a run in flight, from the app-wide run registry (any transport). */
+    private fun workingConversationIds(): Set<String> = runRegistry.runningConversationIds()
 
     private fun displayAgents(
         agents: List<Agent>,
@@ -467,9 +551,10 @@ class ConversationsViewModel @Inject constructor(
         agents: List<Agent>,
         activeConfigIsLocalRuntime: Boolean = AgentRuntimeBinding.isLocalRuntime(settingsRepository.activeConfig.value),
     ): List<Conversation> {
-        if (!activeConfigIsLocalRuntime) return conversations
+        val nonEphemeralConversations = conversations.filterNot { it.agentId.isLettaCodeEphemeralWorker() }
+        if (!activeConfigIsLocalRuntime) return nonEphemeralConversations
         val localAgentIds = agents.map { it.id }.toSet()
-        return conversations.filter { conversation ->
+        return nonEphemeralConversations.filter { conversation ->
             conversation.id.value.startsWith("local-conv-") || conversation.agentId in localAgentIds
         }
     }
@@ -482,6 +567,8 @@ class ConversationsViewModel @Inject constructor(
         .sortedWith(
             compareByDescending<ConversationDisplay> { it.isPinned }
                 .thenByDescending { conversationSortInstant(it.conversation) }
+                // A total order: rows with equal timestamps never swap between two publishes.
+                .thenBy { it.conversation.id.value }
         )
 
     private fun conversationSortInstant(conversation: Conversation): Instant = runCatching {

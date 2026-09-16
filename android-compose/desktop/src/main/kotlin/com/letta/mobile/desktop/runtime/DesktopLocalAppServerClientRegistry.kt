@@ -5,6 +5,7 @@ import java.util.UUID
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeout
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Shares the single child-owned App Server session with LOCAL repository adapters.
@@ -34,14 +35,14 @@ class DesktopLocalAppServerClientRegistry {
     @Synchronized
     fun generation(): Long = entry.value.generation
 
-    suspend fun currentClient(timeoutMs: Long = 10_000L): AppServerClient = withTimeout(timeoutMs) {
+    suspend fun currentClient(timeoutMs: Long = 10_000L): AppServerClient = withTimeout(timeoutMs.milliseconds) {
         entry.first { it.client != null }.client!!
     }
 
     suspend fun awaitClientAfter(
         generation: Long,
         timeoutMs: Long = 10_000L,
-    ): AppServerClient = withTimeout(timeoutMs) {
+    ): AppServerClient = withTimeout(timeoutMs.milliseconds) {
         entry.first { it.generation > generation && it.client != null }.client!!
     }
 

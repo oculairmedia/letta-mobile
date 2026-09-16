@@ -7,6 +7,7 @@ import com.letta.mobile.data.local.ConversationDao
 import com.letta.mobile.data.local.ConversationEntity
 import com.letta.mobile.data.local.ConversationRefreshEntity
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.timeline.RecentMessagesReconcileOutcome
 import com.letta.mobile.testutil.FakeAgentApi
 import com.letta.mobile.testutil.FakeArchiveApi
 import com.letta.mobile.testutil.FakeConversationApi
@@ -57,6 +58,9 @@ class SessionScopedChannelTransportTest {
         val proxy = SessionScopedChannelTransport(
             sessionManager = sessionManager,
             proxyScope = CoroutineScope(SupervisorJob() + dispatcher),
+            overflowReconciler = FrameCollectorOverflowReconciler { _, _ ->
+                RecentMessagesReconcileOutcome.Applied(0)
+            },
         )
         advanceUntilIdle()
 

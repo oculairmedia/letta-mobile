@@ -328,14 +328,14 @@ internal fun parseConversationInstant(label: String): Instant? =
 private fun dayBucketIndex(at: Instant, today: LocalDate, zone: ZoneId, days: Int): Int? {
     val date = LocalDate.ofInstant(at, zone)
     val ago = ChronoUnit.DAYS.between(date, today)
-    if (ago < 0 || ago >= days) return null
+    if (ago !in 0 until days) return null
     return (days - 1 - ago).toInt()
 }
 
 /** Index into an oldest-first window of [hours] ending now, or null if outside it. */
 private fun hourBucketIndex(at: Instant, now: Instant, hours: Int): Int? {
     val ago = ChronoUnit.HOURS.between(at, now)
-    if (ago < 0 || ago >= hours) return null
+    if (ago !in 0 until hours) return null
     return (hours - 1 - ago).toInt()
 }
 

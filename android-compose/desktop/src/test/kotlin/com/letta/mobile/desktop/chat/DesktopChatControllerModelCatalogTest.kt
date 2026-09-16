@@ -55,6 +55,7 @@ class DesktopChatControllerModelCatalogTest {
             bootstrapState = defaultDesktopBootstrapState(),
             scope = backgroundScope,
             gatewayFactory = { gateway },
+            timelinePersistence = noOpDesktopTimelinePersistence,
         )
 }
 

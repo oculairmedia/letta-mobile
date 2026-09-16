@@ -10,11 +10,8 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
@@ -122,6 +119,9 @@ class DefaultIrohCliRunner(
             process.outputStream.bufferedWriter(Charsets.UTF_8).use { writer ->
                 writer.write(body)
             }
+        } catch (e: CancellationException) {
+            process.destroyForcibly()
+            throw e
         } catch (e: Exception) {
             process.destroyForcibly()
             return@withContext IrohCliSendResult.Failed(
@@ -154,7 +154,7 @@ class DefaultIrohCliRunner(
                 // 50ms poll granularity — coarse enough to avoid pegging
                 // a CPU, fine enough that destroyForcibly lands within one
                 // poll of the deadline.
-                delay(50)
+                delay(50.milliseconds)
             }
             process.exitValue()
         }

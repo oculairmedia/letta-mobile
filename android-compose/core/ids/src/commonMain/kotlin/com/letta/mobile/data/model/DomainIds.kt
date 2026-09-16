@@ -19,6 +19,12 @@ value class AgentId(val value: String) {
     override fun toString(): String = value
 }
 
+/** Classifies transient workers created by Letta Code during a run. */
+fun AgentId.isLettaCodeEphemeralWorker(): Boolean =
+    value.startsWith(LETTA_CODE_EPHEMERAL_WORKER_ID_PREFIX)
+
+private const val LETTA_CODE_EPHEMERAL_WORKER_ID_PREFIX = "agent-local-worker-"
+
 @JvmInline
 @Serializable
 value class ProjectId(val value: String) {
@@ -70,5 +76,47 @@ value class McpServerId(val value: String) {
 @JvmInline
 @Serializable
 value class GroupId(val value: String) {
+    override fun toString(): String = value
+}
+
+@JvmInline
+@Serializable
+value class HostId(val value: String) {
+    override fun toString(): String = value
+}
+
+@JvmInline
+@Serializable
+value class ProviderDefinitionId(val value: String) {
+    override fun toString(): String = value
+}
+
+@JvmInline
+@Serializable
+value class ProviderInstanceId(val value: String) {
+    override fun toString(): String = value
+}
+
+@JvmInline
+@Serializable
+value class ProviderFieldId(val value: String) {
+    override fun toString(): String = value
+}
+
+@JvmInline
+@Serializable
+value class ModelRouteId(val value: String) {
+    override fun toString(): String = value
+}
+
+@JvmInline
+@Serializable
+value class CatalogRevision(val value: String) {
+    override fun toString(): String = value
+}
+
+@JvmInline
+@Serializable
+value class ProviderRevision(val value: String) {
     override fun toString(): String = value
 }

@@ -80,5 +80,5 @@ private fun ModelSettings.hasCatalogSettings(): Boolean =
 
 private fun String.removeRoutingProviderPrefix(): String {
     val slash = indexOf('/')
-    return if (slash > 0 && slash < lastIndex) substring(slash + 1) else this
+    return if (slash in 1 until lastIndex) substring(slash + 1) else this
 }

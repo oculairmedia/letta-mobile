@@ -51,6 +51,18 @@ class SettingsRepositoryTest {
     }
 
     @Test
+    fun `chat font scale emits stored value first`() = runTest {
+        repository.setChatFontScale(0.82f)
+
+        assertEquals(0.82f, repository.getChatFontScale().first())
+    }
+
+    @Test
+    fun `chat font scale defaults to one when absent`() = runTest {
+        assertEquals(1f, repository.getChatFontScale().first())
+    }
+
+    @Test
     fun `saveConfig adds new config and sets as active`() = runTest {
         val config = LettaConfig(
             id = "c1",

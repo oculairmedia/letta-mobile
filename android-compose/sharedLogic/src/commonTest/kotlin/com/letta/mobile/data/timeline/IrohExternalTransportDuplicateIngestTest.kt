@@ -30,6 +30,7 @@ class IrohExternalTransportDuplicateIngestTest {
             EmptyTimelineTransport,
             NoOpPendingLocalStore,
             NoOpConversationCursorStore,
+            repositoryScope = backgroundScope,
         )
         val reasoning = ReasoningMessage(
             id = "reasoning-shared",
@@ -69,6 +70,7 @@ class IrohExternalTransportDuplicateIngestTest {
             EmptyTimelineTransport,
             NoOpPendingLocalStore,
             NoOpConversationCursorStore,
+            repositoryScope = backgroundScope,
         )
 
         repository.ingestExternalTransportMessage(

@@ -100,7 +100,7 @@ class ConversationApi @Inject constructor(
         }
     }
 
-    suspend fun deleteConversation(conversationId: String) = deleteConversation(ConversationId(conversationId))
+    suspend fun deleteConversation(conversationId: String): Unit = deleteConversation(ConversationId(conversationId))
 
     suspend fun forkConversation(conversationId: ConversationId, agentId: AgentId? = null): Conversation {
         val (client, baseUrl) = apiClient.session()
@@ -130,7 +130,7 @@ class ConversationApi @Inject constructor(
         }
     }
 
-    suspend fun cancelConversation(conversationId: String, agentId: String? = null) =
+    suspend fun cancelConversation(conversationId: String, agentId: String? = null): Unit =
         cancelConversation(ConversationId(conversationId), agentId?.let(::AgentId))
 
     suspend fun recompileConversation(

@@ -17,6 +17,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlin.time.Duration.Companion.milliseconds
 
 @Singleton
 class AndroidScreenCaptureProvider @Inject constructor(
@@ -89,7 +90,7 @@ class AndroidScreenCaptureProvider @Inject constructor(
             // main-thread hops stay on the coroutine dispatcher (l2ew9.5).
             return runCatching {
                 runBlocking {
-                    withTimeout(MAIN_THREAD_WAIT_MS) {
+                    withTimeout(MAIN_THREAD_WAIT_MS.milliseconds) {
                         withContext(Dispatchers.Main.immediate) { current.get() }
                     }
                 }

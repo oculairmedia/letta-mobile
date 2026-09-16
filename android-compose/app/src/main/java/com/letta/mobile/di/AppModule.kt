@@ -1,5 +1,7 @@
 package com.letta.mobile.di
 
+import androidx.lifecycle.ProcessLifecycleOwner
+import androidx.lifecycle.lifecycleScope
 import com.letta.mobile.channel.NotificationDeliveryCoordinator
 import com.letta.mobile.channel.ChannelNotificationPublisher
 import com.letta.mobile.channel.ChannelSyncStateStore
@@ -7,6 +9,7 @@ import com.letta.mobile.channel.IChannelNotificationPublisher
 import com.letta.mobile.channel.IChannelSyncStateStore
 import com.letta.mobile.chat.BuildConfigChatClientVersionProvider
 import com.letta.mobile.data.channel.NotificationDelivery
+import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.health.IServerHealthRepository
 import com.letta.mobile.data.health.ServerHealthRepository
 import com.letta.mobile.data.session.BackendScopedCache
@@ -91,6 +94,8 @@ import com.letta.mobile.platform.systemaccess.AndroidSystemAccessEnvironment
 import com.letta.mobile.platform.systemaccess.DefaultSystemAccessCapabilityRegistry
 import com.letta.mobile.platform.systemaccess.SystemAccessCapabilityRegistry
 import com.letta.mobile.platform.systemaccess.SystemAccessEnvironment
+import com.letta.mobile.runtime.actions.DeviceActionCommandRunner
+import com.letta.mobile.runtime.actions.DeviceActionExternalTool
 import com.letta.mobile.startup.AppStartupActions
 import com.letta.mobile.startup.DefaultAppStartupActions
 import dagger.Binds
@@ -108,6 +113,14 @@ abstract class AppModule {
         @Provides
         @Singleton
         fun provideWsChatBridge(transport: IChannelTransport): WsChatBridge = WsChatBridge(transport)
+
+        @Provides
+        @Singleton
+        fun provideAndroidExternalToolRegistry(
+            runner: DeviceActionCommandRunner,
+        ): ExternalToolRegistry = ExternalToolRegistry.hostTools(
+            listOf(DeviceActionExternalTool(runner)),
+        )
 
         // letta-mobile-qfa81 (P4 row 13): approval submission routed over
         // admin_rpc when the active backend is iroh://. Injected into
@@ -167,35 +180,61 @@ abstract class AppModule {
 
         @Provides
         @Singleton
-        fun provideTimelineRepository(
+        fun provideTimelineExternalTransportWriter(impl: TimelineRepository): TimelineExternalTransportWriter =
+            impl.admittedExternalWriter
+
+        @Provides
+        @Singleton
+        fun provideAndroidCanonicalRuntimeFactory(
+            legacy: TimelineRepository,
+            authority: com.letta.mobile.data.local.TimelineOwnershipAuthority,
+            storage: com.letta.mobile.data.local.TimelineOwnedStorageFactory,
+        ) = AndroidCanonicalTimelineRuntimeFactory(legacy, authority, storage)
+
+        @Provides
+        @Singleton
+        fun provideCanonicalTimelineTransport(
             messageApi: MessageApi,
-            pendingLocalStore: PendingLocalStore,
-            conversationCursorStore: ConversationCursorStore,
-            localTimelineTransport: com.letta.mobile.runtime.local.LettaCodeLocalTimelineTransport,
-            channelTransport: IChannelTransport,
+            local: com.letta.mobile.runtime.local.LettaCodeLocalTimelineTransport,
+            remote: IrohAdminRpcTimelineTransport,
             settingsRepository: ISettingsRepository,
-        ): TimelineRepository {
-            val httpTimelineTransport = MessageApiTimelineTransport(messageApi)
-            val remoteTimelineTransport = IrohRoutingTimelineTransport(
-                settingsRepository = settingsRepository,
-                http = httpTimelineTransport,
-                iroh = IrohAdminRpcTimelineTransport(
-                    channelTransport = channelTransport,
+        ): com.letta.mobile.data.timeline.TimelineTransport =
+            com.letta.mobile.runtime.local.LocalRoutingTimelineTransport(
+                local = local,
+                remote = IrohRoutingTimelineTransport(
                     settingsRepository = settingsRepository,
+                    http = MessageApiTimelineTransport(messageApi),
+                    iroh = remote,
                 ),
             )
+
+        @Provides
+        @Singleton
+        fun provideTimelineRepository(
+            timelineTransport: com.letta.mobile.data.timeline.TimelineTransport,
+            pendingLocalStore: PendingLocalStore,
+            conversationCursorStore: ConversationCursorStore,
+            confirmedTimelineStore: com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore,
+            settingsRepository: ISettingsRepository,
+        ): TimelineRepository {
             return TimelineRepository(
                 // local-conv-* hydrates from the on-device letta.js transcript
                 // (letta-mobile-czomn); everything else uses the active remote route.
-                timelineTransport = com.letta.mobile.runtime.local.LocalRoutingTimelineTransport(
-                    local = localTimelineTransport,
-                    remote = remoteTimelineTransport,
-                ),
+                timelineTransport = timelineTransport,
                 pendingLocalStore = pendingLocalStore,
                 conversationCursorStore = conversationCursorStore,
+                confirmedTimelineStore = confirmedTimelineStore,
+                backendIdProvider = { settingsRepository.activeConfig.value?.id ?: "default" },
+                repositoryScope = ProcessLifecycleOwner.get().lifecycleScope,
             )
         }
     }
+
+    @Binds
+    @Singleton
+    abstract fun bindSelectedChatRuntimeProvider(
+        impl: ProductionSelectedChatRuntimeProvider,
+    ): com.letta.mobile.feature.chat.coordination.SelectedChatRuntimeProvider
 
     @Binds
     @Singleton
@@ -360,10 +399,6 @@ abstract class AppModule {
     abstract fun bindChannelNotificationPublisher(
         impl: ChannelNotificationPublisher,
     ): IChannelNotificationPublisher
-
-    @Binds
-    @Singleton
-    abstract fun bindTimelineExternalTransportWriter(impl: TimelineRepository): TimelineExternalTransportWriter
 
     @Binds
     @IntoSet

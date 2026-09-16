@@ -1,5 +1,11 @@
 package com.letta.mobile.desktop
 
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -99,9 +105,14 @@ private fun runDesktopApplication(
             // which is a composition sibling — not a descendant — of
             // LettaDesktopApp. See letta-mobile-3arhe.1.
             var headerChrome by remember { mutableStateOf(DesktopHeaderChromeState.Empty) }
+            val mascots = remember { com.letta.mobile.ui.mascot.MascotIdentityRegistry() }
             CompositionLocalProvider(
                 LocalWindowExceptionHandlerFactory provides CrashReportingExceptionHandlerFactory,
                 LocalMermaidDiagramRenderer provides DesktopMermaidDiagramRenderer,
+                // The native Rive bridge draws every live mascot; the shared MascotAvatar reads it here,
+                // with the window-owned registry of identities, presence and the pointer.
+                com.letta.mobile.ui.mascot.LocalMascotHost provides com.letta.mobile.desktop.avatar.rive.DesktopMascotHost,
+                com.letta.mobile.ui.mascot.LocalMascotRegistry provides mascots,
             ) {
                 // Windows touchscreens: every text field that starts an input
                 // session while the last pointer input came from a finger gets
@@ -127,16 +138,41 @@ private fun runDesktopApplication(
                             DesktopWindowsTouchInput.attach(window)
                         }
 
-                        LettaDesktopApp(
-                            shell = DesktopAppShellBindings(
-                                nucleusApplicationScope = nucleusScope,
-                                window = window,
-                                deepLinks = deepLinks,
-                                quickQuery = quickQuery,
-                            ),
-                            onActiveTitleChange = { windowTitle = it },
-                            onHeaderChromeChange = { headerChrome = it },
-                        )
+                        // Ctrl+scroll scales app type, persisted across
+                        // launches. Wraps the shell only, so the custom title
+                        // bar (a composition sibling) keeps its fixed chrome
+                        // metrics the way browser zoom leaves the browser's own
+                        // chrome alone.
+                        DesktopChatFontScaleHost {
+                            // Every mascot in the app looks toward the cursor; capture it once, at the root.
+                            Box(
+                                Modifier.fillMaxSize().pointerInput(Unit) {
+                                    awaitPointerEventScope {
+                                        while (true) {
+                                            val e = awaitPointerEvent(PointerEventPass.Initial)
+                                            when (e.type) {
+                                                PointerEventType.Move ->
+                                                    mascots.cursor.value = e.changes.firstOrNull()?.position
+                                                PointerEventType.Exit ->
+                                                    mascots.cursor.value = null
+                                                else -> Unit
+                                            }
+                                        }
+                                    }
+                                },
+                            ) {
+                            LettaDesktopApp(
+                                shell = DesktopAppShellBindings(
+                                    nucleusApplicationScope = nucleusScope,
+                                    window = window,
+                                    deepLinks = deepLinks,
+                                    quickQuery = quickQuery,
+                                ),
+                                onActiveTitleChange = { windowTitle = it },
+                                onHeaderChromeChange = { headerChrome = it },
+                            )
+                            }
+                        }
                     }
                     // Spotlight-style floating query bar, summoned by the global
                     // hotkey without raising the main window.

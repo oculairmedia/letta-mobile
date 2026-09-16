@@ -1,0 +1,12 @@
+# Smoke: clear app state and assert the first-run Settings / Server Configuration
+# surface. Destructive — wipes local config on the target device.
+appId: com.letta.mobile.dev
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "Settings"
+    timeout: 20000
+- assertVisible: "Server Configuration"
+- assertVisible: "API Token"
+- takeScreenshot: smoke-first-run-ok

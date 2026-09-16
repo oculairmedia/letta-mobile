@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.chat.approval.ApprovalSubmissionTracker
 import com.letta.mobile.data.chat.runtime.ApprovalSubmittingGateway
 import com.letta.mobile.data.model.UiMessage
 import kotlinx.coroutines.CancellationException
@@ -26,28 +27,26 @@ internal class DesktopChatApprovalCoordinator(
     private val scope: CoroutineScope,
     private val onError: (String) -> Unit,
 ) {
-    private val _submittingApprovals = MutableStateFlow<Set<String>>(emptySet())
-    val submittingApprovals: StateFlow<Set<String>> = _submittingApprovals.asStateFlow()
+    /** The shared in-flight tracker (letta-mobile-2dsi5.4): the same one Android's approval controller uses. */
+    private val tracker = ApprovalSubmissionTracker()
+    val submittingApprovals: StateFlow<Set<String>> = tracker.submitting
 
     private val _canSubmitApprovals = MutableStateFlow(false)
     val canSubmitApprovals: StateFlow<Boolean> = _canSubmitApprovals.asStateFlow()
-
-    private val submittedApprovalConversations = mutableMapOf<String, String>()
 
     fun bindGateway(gateway: DesktopChatGateway?) {
         _canSubmitApprovals.value = gateway is ApprovalSubmittingGateway || gateway is DesktopApprovalSubmitter
     }
 
     private data class SubmissionTarget(
-        val gateway: Any,
+        val gateway: DesktopChatGateway,
         val agentId: String,
         val conversationId: String,
     )
 
     fun submitApproval(request: ApprovalSubmissionRequest) {
         val target = validateSubmissionTarget(request) ?: return
-        submittedApprovalConversations[request.requestId] = target.conversationId
-        _submittingApprovals.update { it + request.requestId }
+        tracker.begin(request.requestId, target.conversationId)
         launchSubmission(target, request)
     }
 
@@ -74,7 +73,7 @@ internal class DesktopChatApprovalCoordinator(
     }
 
     private suspend fun dispatchToGateway(
-        gw: Any,
+        gw: DesktopChatGateway,
         agentId: String,
         conversationId: String,
         request: ApprovalSubmissionRequest,
@@ -102,20 +101,10 @@ internal class DesktopChatApprovalCoordinator(
         }
     }
 
-    fun clearSubmittedApproval(requestId: String) {
-        submittedApprovalConversations.remove(requestId)
-        _submittingApprovals.update { it - requestId }
-    }
+    fun clearSubmittedApproval(requestId: String) = tracker.clear(requestId)
 
     fun reconcileSubmittedApprovals(conversationId: String, messages: List<UiMessage>) {
-        if (submittedApprovalConversations.isEmpty()) return
-        val present = messages.mapNotNull { it.approvalRequest?.requestId }.toSet()
-        val reconciled = submittedApprovalConversations
-            .filterValues { it == conversationId }
-            .keys
-            .filter { it !in present }
-        if (reconciled.isEmpty()) return
-        reconciled.forEach { submittedApprovalConversations.remove(it) }
-        _submittingApprovals.update { it - reconciled.toSet() }
+        if (tracker.submitting.value.isEmpty()) return
+        tracker.reconcile(conversationId, messages.mapNotNull { it.approvalRequest?.requestId }.toSet())
     }
 }

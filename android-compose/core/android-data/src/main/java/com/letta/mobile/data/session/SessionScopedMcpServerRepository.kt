@@ -26,6 +26,8 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 
+// The singleton repository owns this scope and cancels it explicitly in close().
+@Suppress("NoDetachedCoroutineLifecycle")
 internal fun defaultSessionScopedMcpServerRepositoryScope(): CoroutineScope =
     CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -83,8 +85,8 @@ class SessionScopedMcpServerRepository internal constructor(
         flow.asStateFlow()
     }
 
-    override suspend fun refreshServers() = sessionManager.withCurrentSession { it.mcpServerRepository.refreshServers() }
-    override suspend fun refreshServerTools(serverId: McpServerId) = sessionManager.withCurrentSession { it.mcpServerRepository.refreshServerTools(serverId) }
+    override suspend fun refreshServers(): Unit = sessionManager.withCurrentSession { it.mcpServerRepository.refreshServers() }
+    override suspend fun refreshServerTools(serverId: McpServerId): Unit = sessionManager.withCurrentSession { it.mcpServerRepository.refreshServerTools(serverId) }
     override suspend fun resyncServerTools(serverId: McpServerId): McpServerResyncResult =
         sessionManager.withCurrentSession { it.mcpServerRepository.resyncServerTools(serverId) }
 
@@ -97,7 +99,7 @@ class SessionScopedMcpServerRepository internal constructor(
     override suspend fun fetchAllMcpTools(): List<Tool> = sessionManager.withCurrentSession { it.mcpServerRepository.fetchAllMcpTools() }
     override suspend fun createServer(params: McpServerCreateParams): McpServer = sessionManager.withCurrentSession { it.mcpServerRepository.createServer(params) }
     override suspend fun updateServer(id: McpServerId, params: McpServerUpdateParams): McpServer = sessionManager.withCurrentSession { it.mcpServerRepository.updateServer(id, params) }
-    override suspend fun deleteServer(id: McpServerId) = sessionManager.withCurrentSession { it.mcpServerRepository.deleteServer(id) }
+    override suspend fun deleteServer(id: McpServerId): Unit = sessionManager.withCurrentSession { it.mcpServerRepository.deleteServer(id) }
 
     fun close() { proxyScope.cancel() }
 }

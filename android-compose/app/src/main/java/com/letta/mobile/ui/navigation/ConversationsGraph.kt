@@ -147,7 +147,7 @@ private fun CompactConversationsPane(
 ) = with(drawerCallbacks) {
     ConversationsScreen(
         onNavigateToChat = { agentId, conversationId, agentName ->
-            navController.navigate(
+            navController.openResidentChatOrNavigate(
                 AgentChatRoute(
                     agentId = agentId,
                     agentName = agentName,

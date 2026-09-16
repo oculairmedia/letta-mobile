@@ -36,6 +36,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.ui.theme.customColors
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentStatus
 import com.letta.mobile.data.model.SubagentTodo
@@ -255,9 +256,10 @@ private fun TodoLog(todos: List<SubagentTodo>?, entry: SubagentEntry) {
 
 @Composable
 private fun TodoLine(todo: SubagentTodo) {
+    val cc = MaterialTheme.customColors
     val (glyph, color) = when (todo.status) {
-        "completed" -> "✓" to Color(0xFF34C759)
-        "in_progress" -> "›" to Color(0xFFE0A33E)
+        "completed" -> "✓" to cc.successColor
+        "in_progress" -> "›" to cc.runningColor
         else -> "›" to MaterialTheme.colorScheme.onSurfaceVariant
     }
     val text = todo.activeForm.takeIf { it.isNotBlank() && todo.status == "in_progress" } ?: todo.content
@@ -285,7 +287,7 @@ private fun LogLine(glyph: String, text: String, color: Color) {
 @Composable
 private fun FinishedTaskRow(entry: SubagentEntry) {
     val isFailure = entry.status == SubagentStatus.FAILED || entry.status == SubagentStatus.CANCELLED
-    val accent = if (isFailure) MaterialTheme.colorScheme.error else Color(0xFF34C759)
+    val accent = if (isFailure) MaterialTheme.colorScheme.error else MaterialTheme.customColors.successColor
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),

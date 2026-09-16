@@ -73,19 +73,24 @@ internal fun MessageReasoning(
 
     val previewText = remember(message.content) { message.content.reasoningPreview() }
     val isCollapsed = collapsed && !isActive
-    val clickLabel = if (isCollapsed) "Expand reasoning" else "Collapse reasoning"
-    val stateDesc = if (isCollapsed) {
-        stringResource(R.string.work_disclosure_state_collapsed)
-    } else {
-        stringResource(R.string.work_disclosure_state_expanded)
+    val canToggle = onToggleCollapsed != null && !isActive
+    val clickLabel = when {
+        !canToggle -> null
+        isCollapsed -> stringResource(R.string.reasoning_disclosure_expand)
+        else -> stringResource(R.string.reasoning_disclosure_collapse)
     }
+    val stateDesc = stringResource(
+        when {
+            isActive -> R.string.reasoning_disclosure_state_working
+            isCollapsed -> R.string.reasoning_disclosure_state_collapsed
+            else -> R.string.reasoning_disclosure_state_expanded
+        },
+    )
 
-    // letta-mobile-d2z6: gate animateContentSize on !isActive. While
-    // assistant tokens are arriving the reasoning bubble grows on every
-    // frame; the default 150ms FastOutSlowIn animation produces visible
-    // wobble that compounds with the RunBlock layout. The animation is
-    // still useful for the user-initiated collapse/expand toggle, so we
-    // keep it gated rather than removing it outright.
+    // While assistant tokens arrive, update height directly. Interpolating
+    // every token-driven size change compounds with the smoothed text reveal
+    // and the enclosing run layout, producing visible vertical wobble. Keep
+    // size motion only for terminal user-initiated collapse/expand.
     //
     // letta-mobile-5e0f.r2: also suppress during pinch-to-zoom so we
     // don't get height-interpolation cascades across many bubbles per
@@ -94,7 +99,7 @@ internal fun MessageReasoning(
     val sizeAnimation = when {
         isPinching -> Modifier
         motionPolicy.isReducedMotionEnabled -> Modifier
-        isActive -> Modifier.animateContentSize(animationSpec = ChatMotion.streamingSizeSpec)
+        isActive -> Modifier
         else -> Modifier.animateContentSize(animationSpec = ChatMotion.contentSizeSpec)
     }
 
@@ -128,10 +133,16 @@ internal fun MessageReasoning(
                 .semantics(mergeDescendants = true) {
                     stateDescription = stateDesc
                 }
-                .clickable(
-                    enabled = onToggleCollapsed != null,
-                    onClickLabel = clickLabel,
-                ) { onToggleCollapsed?.invoke() }
+                .then(
+                    if (canToggle) {
+                        Modifier.clickable(
+                            onClickLabel = clickLabel,
+                            onClick = { onToggleCollapsed.invoke() },
+                        )
+                    } else {
+                        Modifier
+                    },
+                )
                 .padding(vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -148,28 +159,16 @@ internal fun MessageReasoning(
                 )
             }
 
-            if (isActive && message.content.isBlank()) {
-                LiveStatusText(
-                    text = "Thinking…",
-                    active = true,
-                    style = MaterialTheme.typography.sectionTitle,
-                    baseColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.92f),
-                    highlightColor = MaterialTheme.colorScheme.primary,
-                    motionPolicy = motionPolicy,
-                    modifier = Modifier.testTag(ChatReasoningTestTags.LiveStatus),
-                )
-            } else {
-                Text(
-                    text = titleText,
-                    style = MaterialTheme.typography.sectionTitle,
-                    color = if (isActive) {
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.92f)
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                    modifier = Modifier.testTag(ChatReasoningTestTags.Title),
-                )
-            }
+            Text(
+                text = titleText,
+                style = MaterialTheme.typography.sectionTitle,
+                color = if (isActive) {
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.92f)
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                modifier = Modifier.testTag(ChatReasoningTestTags.Title),
+            )
 
             Text(
                 text = if (isCollapsed) previewText else "Shown",
@@ -184,9 +183,9 @@ internal fun MessageReasoning(
 
             Icon(
                 imageVector = LettaIcons.ExpandMore,
-                contentDescription = clickLabel,
+                contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(
-                    alpha = if (onToggleCollapsed != null) 0.8f else 0.4f,
+                    alpha = if (canToggle) 0.8f else 0.4f,
                 ),
                 modifier = Modifier
                     .size(LettaIconSizing.Inline)

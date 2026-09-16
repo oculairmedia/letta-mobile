@@ -5,6 +5,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlin.random.Random
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Drives automatic reconnect/replay of the App Server controller on connection
@@ -53,7 +54,7 @@ class AppServerReconnectSupervisor(
     private val stableConnectedResetMs: Long = DEFAULT_STABLE_RESET_MS,
     private val maxAttempts: Int? = null,
     private val random: Random = Random.Default,
-    private val delayProvider: suspend (Long) -> Unit = { delay(it) },
+    private val delayProvider: suspend (Long) -> Unit = { delay(it.milliseconds) },
     private val isTerminal: (AppServerControllerState) -> Boolean = { false },
     private val onEvent: (SupervisorEvent) -> Unit = {},
 ) {
@@ -85,7 +86,7 @@ class AppServerReconnectSupervisor(
                 -> {
                     if (isTerminal(state)) {
                         onEvent(SupervisorEvent.TerminalStop(state))
-                        throw StopSupervision
+                        throw StopSupervision()
                     }
 
                     // A stable prior connection resets the sequence.
@@ -102,7 +103,7 @@ class AppServerReconnectSupervisor(
                     while (isRetryableDrop(connectionState.value)) {
                         if (maxAttempts != null && attempt >= maxAttempts) {
                             onEvent(SupervisorEvent.GaveUp(attempt))
-                            throw StopSupervision
+                            throw StopSupervision()
                         }
                         val waitMs = backoff.delayMs(attempt, random)
                         onEvent(SupervisorEvent.Scheduled(attempt, waitMs))
@@ -129,7 +130,7 @@ class AppServerReconnectSupervisor(
     }
 
     /** Private sentinel to break the infinite StateFlow collect on stop. */
-    private object StopSupervision : CancellationException("reconnect supervision stopped")
+    private class StopSupervision : CancellationException("reconnect supervision stopped")
 
     private fun isRetryableDrop(state: AppServerControllerState): Boolean =
         (state is AppServerControllerState.Disconnected ||

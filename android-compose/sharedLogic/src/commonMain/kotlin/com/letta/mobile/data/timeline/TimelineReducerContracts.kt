@@ -1,0 +1,614 @@
+package com.letta.mobile.data.timeline
+
+import com.letta.mobile.data.model.LettaMessage
+import com.letta.mobile.data.model.MessageContentPart
+import com.letta.mobile.data.model.ToolReturnMessage
+import kotlinx.collections.immutable.PersistentList
+import kotlinx.collections.immutable.PersistentMap
+import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.persistentMapOf
+
+/** Platform-neutral immutable state owned by [TimelineProcessor]. */
+data class TimelineReducerState(
+    val timeline: Timeline,
+    val pendingToolReturnsByCallId: PersistentMap<String, ToolReturnMessage> = persistentMapOf(),
+    val lifecycleEpoch: Long = 0L,
+    val lastAppliedMutationSequence: Long = 0L,
+    val hydrateGeneration: Long = 0L,
+    val highestRequestedReconcileGeneration: Long = 0L,
+    val highestAppliedReconcileGeneration: Long = 0L,
+    val freshnessSequence: Long = 0L,
+    val danglingSweepGeneration: Long = 0L,
+)
+
+/**
+ * Storage-neutral description of one committed timeline mutation.
+ *
+ * Persistence may use an exact delta to avoid rebuilding the whole confirmed timeline.
+ * Broad reconciliation and hydration deliberately request a full rescan instead of guessing.
+ */
+sealed interface TimelineMutationDelta {
+    data object None : TimelineMutationDelta
+
+    data class Exact(
+        val changedConfirmedServerIds: Set<String> = emptySet(),
+        val deletedConfirmedServerIds: Set<String> = emptySet(),
+        val metadataChanged: Boolean = false,
+    ) : TimelineMutationDelta
+
+    data class RequiresFullRescan(val reason: SnapshotPlanningFallback) : TimelineMutationDelta
+}
+
+/** Payload-only mutation families. Ordering is assigned internally by [TimelineProcessor]. */
+sealed interface TimelineMutation {
+    data class LocalAppend(
+        val pending: PendingSend,
+        val sentAt: TimelineInstant,
+        val mode: TimelineLocalAppendMode = TimelineLocalAppendMode.SEND,
+    ) : TimelineMutation
+
+    data class RetryLocal(val otid: String) : TimelineMutation
+    data class MarkLocalSent(val otid: String) : TimelineMutation
+    data class MarkLocalFailed(val otid: String) : TimelineMutation
+    data class StreamFrame(
+        val message: LettaMessage,
+        val agentId: String? = null,
+    ) : TimelineMutation
+    data class SnapshotEnrichment(val messages: List<LettaMessage>) : TimelineMutation
+    data class HydrateSnapshot(
+        val generation: Long,
+        val messages: List<LettaMessage>,
+        val timelineBeforeFetch: Timeline,
+        val diskRecords: List<PendingLocalRecord>,
+        val cursorSequence: Long? = null,
+    ) : TimelineMutation
+    data class ReconcileSnapshot(val generation: Long, val messages: List<LettaMessage>) : TimelineMutation
+    data class RecentMessagesSnapshot(
+        val generation: Long,
+        val freshnessSequence: Long,
+        val messages: List<LettaMessage>,
+    ) : TimelineMutation
+    data class ReconcileAfterSendSnapshot(
+        val otid: String,
+        val messages: List<LettaMessage>,
+    ) : TimelineMutation
+    data class CleanupAbandonedFragments(
+        val runId: String?,
+        val turnId: String?,
+        val reason: String,
+        val candidateRunIds: Set<String> = emptySet(),
+    ) : TimelineMutation
+    data class RepairFullToolReturn(val message: ToolReturnMessage) : TimelineMutation
+    data class AdvanceDanglingSweep(val generation: Long) : TimelineMutation
+    data class SettleDanglingToolCalls(
+        val generation: Long,
+        val lifecycleEpoch: Long,
+        val callIds: Set<String>,
+    ) : TimelineMutation
+    data class LifecycleReset(val epoch: Long) : TimelineMutation
+}
+
+/** Local append variants currently migrated to the processor. */
+enum class TimelineLocalAppendMode {
+    /** Append, enqueue the transport send, then emit LocalAppended. */
+    SEND,
+
+    /** The caller queues transport separately; append only for same-frame UI visibility. */
+    OPTIMISTIC,
+
+    /** Append a local observed from the external transport and emit LocalAppended. */
+    EXTERNAL_TRANSPORT,
+}
+
+sealed interface TimelineReductionEffect {
+    data class EmitSyncEvent(val event: TimelineSyncEvent) : TimelineReductionEffect
+    data class Notify(val notification: PendingIngestNotification) : TimelineReductionEffect
+    data class Send(val pending: PendingSend) : TimelineReductionEffect
+    data class PersistPendingLocal(val pending: PendingSend, val sentAt: TimelineInstant) : TimelineReductionEffect
+    data class DeletePendingLocal(val otid: String) : TimelineReductionEffect
+    /** Persist the SSE resume sequence; this is distinct from Timeline.liveCursor. */
+    data class RecordStreamSequence(val sequence: Long) : TimelineReductionEffect
+    /** Repair the SSE resume sequence from an accepted hydration snapshot. */
+    data class RepairHydrationCursor(val sequence: Long) : TimelineReductionEffect
+    data class AdvanceCursor(val cursor: String) : TimelineReductionEffect
+}
+
+sealed interface TimelineReductionResult {
+    val changed: Boolean
+
+    data object NoChange : TimelineReductionResult { override val changed: Boolean = false }
+    data class Changed(val kind: TimelineChangeKind) : TimelineReductionResult { override val changed: Boolean = true }
+    data class Hydrated(
+        val visibleEventCount: Int,
+        override val changed: Boolean,
+    ) : TimelineReductionResult
+    data class RecentMessagesApplied(
+        val appended: Int,
+        override val changed: Boolean,
+    ) : TimelineReductionResult
+    data class ReconcileAfterSendApplied(
+        val result: ReconcileAfterSendResult,
+        override val changed: Boolean,
+    ) : TimelineReductionResult
+    data class CleanupApplied(
+        val removed: Int,
+        override val changed: Boolean,
+    ) : TimelineReductionResult
+    data class FullToolReturnRepaired(
+        val messageId: String,
+        override val changed: Boolean,
+    ) : TimelineReductionResult
+    data class DanglingToolCallsSettled(
+        val callIds: Set<String>,
+        override val changed: Boolean,
+    ) : TimelineReductionResult
+}
+
+enum class TimelineChangeKind { LOCAL_APPENDED, LOCAL_RETRIED, LOCAL_SENT, LOCAL_FAILED, SNAPSHOT_ENRICHED, CLEANED, RECONCILED }
+
+data class TimelineReduction(
+    val next: TimelineReducerState,
+    val effects: PersistentList<TimelineReductionEffect> = persistentListOf(),
+    val result: TimelineReductionResult,
+    val persistenceDelta: TimelineMutationDelta = TimelineMutationDelta.None,
+)
+
+data class LocalAppendPayload(
+    val otid: String,
+    val content: String,
+    val attachments: PersistentList<MessageContentPart.Image> = persistentListOf(),
+    val sentAt: TimelineInstant,
+)
+
+fun reduceLocalAppend(state: TimelineReducerState, payload: LocalAppendPayload): TimelineReduction {
+    if (state.timeline.findByOtid(payload.otid) != null) return unchanged(state)
+    val local = TimelineEvent.Local(
+        position = state.timeline.nextLocalPosition(),
+        otid = payload.otid,
+        content = payload.content,
+        role = Role.USER,
+        sentAt = payload.sentAt,
+        deliveryState = DeliveryState.SENDING,
+        attachments = payload.attachments,
+    )
+    val pending = PendingSend(payload.otid, payload.content, payload.attachments)
+    return changed(
+        state.copy(timeline = state.timeline.append(local)),
+        TimelineChangeKind.LOCAL_APPENDED,
+        TimelineReductionEffect.Send(pending),
+        TimelineReductionEffect.EmitSyncEvent(TimelineSyncEvent.LocalAppended(payload.otid)),
+    )
+}
+
+fun reduceLocalAppend(
+    state: TimelineReducerState,
+    payload: LocalAppendPayload,
+    mode: TimelineLocalAppendMode,
+): TimelineReduction {
+    val reduction = reduceLocalAppend(state, payload)
+    if (!reduction.result.changed || mode == TimelineLocalAppendMode.SEND) return reduction
+    val effects = when (mode) {
+        TimelineLocalAppendMode.SEND -> reduction.effects
+        TimelineLocalAppendMode.OPTIMISTIC -> persistentListOf()
+        TimelineLocalAppendMode.EXTERNAL_TRANSPORT -> persistentListOf(
+            TimelineReductionEffect.EmitSyncEvent(TimelineSyncEvent.LocalAppended(payload.otid)),
+        )
+    }
+    return reduction.copy(effects = effects)
+}
+
+fun reduceRetryLocal(state: TimelineReducerState, otid: String): TimelineReduction {
+    val existing = state.timeline.findByOtid(otid) as? TimelineEvent.Local ?: return unchanged(state)
+    if (existing.deliveryState != DeliveryState.FAILED) return unchanged(state)
+    val persisted = state.timeline.events.map {
+        if (it.otid == otid && it is TimelineEvent.Local) it.copy(deliveryState = DeliveryState.SENDING) else it
+    }.toTimelinePersistentList()
+    val nextTimeline = state.timeline.copy(events = persisted, stablePrefixVersion = persisted.stablePrefixFingerprint())
+    return changed(
+        state.copy(timeline = nextTimeline),
+        TimelineChangeKind.LOCAL_RETRIED,
+        TimelineReductionEffect.Send(PendingSend(otid, existing.content, existing.attachments)),
+    )
+}
+
+fun reduceMarkLocalSent(state: TimelineReducerState, otid: String): TimelineReduction =
+    deliveryReduction(state, state.timeline.markSent(otid), TimelineChangeKind.LOCAL_SENT)
+
+fun reduceMarkLocalFailed(state: TimelineReducerState, otid: String): TimelineReduction =
+    deliveryReduction(state, state.timeline.markFailed(otid), TimelineChangeKind.LOCAL_FAILED)
+
+fun reduceSnapshotEnrichment(state: TimelineReducerState, snapshot: List<LettaMessage>): TimelineReduction {
+    val nextTimeline = enrichTimelineFromSnapshot(state.timeline, snapshot)
+    return if (nextTimeline == state.timeline) unchanged(state)
+    else changed(state.copy(timeline = nextTimeline), TimelineChangeKind.SNAPSHOT_ENRICHED)
+}
+
+fun enrichTimelineFromSnapshot(timeline: Timeline, snapshot: List<LettaMessage>): Timeline {
+    val evidence = approvalTimelineEvidence(snapshot)
+    if (evidence.responsesByRequestId.isEmpty() && evidence.returnsByCallId.isEmpty()) return timeline
+    val newEvents = timeline.events.map { ev ->
+        if (ev !is TimelineEvent.Confirmed || ev.messageType != TimelineMessageType.TOOL_CALL) return@map ev
+        val matchingReturns = ev.matchingToolReturns(evidence)
+        val matchingReturn = matchingReturns.firstOrNull()?.second
+        val byResponse = ev.hasAnyApprovalResponse(evidence)
+        val byReturn = if (ev.approvalRequestId == null) matchingReturns.isNotEmpty() else ev.allApprovalCallsReturned(matchingReturns)
+        if (matchingReturn == null && !byResponse && !byReturn) return@map ev
+        val fold = foldToolReturnBodies(ev.toolReturnContentByCallId, ev.toolReturnTruncationByCallId, matchingReturns)
+        val errors = ev.toolReturnIsErrorByCallId + matchingReturns.associate { (id, value) -> id to (value.isErr == true || value.status == "error") }
+        ev.copy(
+            approvalDecided = byResponse || byReturn || ev.approvalDecided,
+            approvalDecision = ev.approvalOutcomeFromEvidence(evidence) ?: ev.approvalDecision,
+            toolReturnContent = matchingReturns.firstOrNull()?.first?.let { fold.contentByCallId[it] } ?: ev.toolReturnContent,
+            toolReturnIsError = matchingReturn?.let { it.isErr == true || it.status == "error" } ?: ev.toolReturnIsError,
+            toolReturnContentByCallId = fold.contentByCallId.toTimelinePersistentMap(),
+            toolReturnIsErrorByCallId = errors.toTimelinePersistentMap(),
+            toolReturnTruncationByCallId = fold.truncationByCallId.toTimelinePersistentMap(),
+        )
+    }
+    if (newEvents == timeline.events) return timeline
+    val persisted = newEvents.toTimelinePersistentList()
+    return timeline.copy(events = persisted, stablePrefixVersion = persisted.stablePrefixFingerprint())
+}
+
+fun reduceCleanup(
+    state: TimelineReducerState,
+    runId: String?,
+    turnId: String?,
+    reason: String,
+    candidateRunIds: Set<String> = emptySet(),
+): TimelineReduction {
+    val cleanup = state.timeline.cleanupAbandonedAssistantFragments(runId, turnId, reason, candidateRunIds)
+    return TimelineReduction(
+        next = state.copy(timeline = cleanup.timeline),
+        result = TimelineReductionResult.CleanupApplied(
+            removed = cleanup.suppressions.size,
+            changed = cleanup.timeline != state.timeline,
+        ),
+        persistenceDelta = exactConfirmedDelta(state.timeline, cleanup.timeline),
+    )
+}
+
+fun reducePostSendReconcile(
+    state: TimelineReducerState,
+    otid: String,
+    serverMessages: List<LettaMessage>,
+): TimelineReduction {
+    val reconciled = reconcileAfterSendSnapshot(state.timeline, otid, serverMessages)
+    // Enrich tool calls before publishing the snapshot so every after-send
+    // observer sees one complete, atomically reconciled timeline.
+    val enrichedTimeline = enrichTimelineFromSnapshot(reconciled.timeline, serverMessages)
+    val next = state.copy(timeline = enrichedTimeline)
+    val effects = buildList {
+        reconciled.result.confirmedServerId?.let {
+            add(TimelineReductionEffect.EmitSyncEvent(TimelineSyncEvent.LocalConfirmed(otid, it)))
+        }
+        if (reconciled.result.shouldDeletePendingLocal) add(TimelineReductionEffect.DeletePendingLocal(otid))
+        serverMessages.lastOrNull()?.id?.let { add(TimelineReductionEffect.AdvanceCursor(it)) }
+    }.toTimelinePersistentList()
+    return TimelineReduction(
+        next = next,
+        effects = effects,
+        result = TimelineReductionResult.ReconcileAfterSendApplied(
+            result = reconciled.result,
+            changed = next != state,
+        ),
+    )
+}
+
+private fun deliveryReduction(state: TimelineReducerState, timeline: Timeline, kind: TimelineChangeKind): TimelineReduction =
+    if (timeline == state.timeline) unchanged(state) else changed(state.copy(timeline = timeline), kind)
+
+private fun unchanged(state: TimelineReducerState) = TimelineReduction(state, result = TimelineReductionResult.NoChange)
+
+private fun changed(
+    state: TimelineReducerState,
+    kind: TimelineChangeKind,
+    vararg effects: TimelineReductionEffect,
+) = TimelineReduction(state, effects.toList().toTimelinePersistentList(), TimelineReductionResult.Changed(kind))
+
+/** Production reducer used by both [TimelineProcessor] and the parity harness. */
+fun reduceProductionMutation(state: TimelineReducerState, mutation: TimelineMutation): TimelineReduction = when (mutation) {
+    is TimelineMutation.LocalAppend -> reduceLocalAppend(
+        state,
+        LocalAppendPayload(
+            mutation.pending.otid,
+            mutation.pending.content,
+            mutation.pending.attachments,
+            mutation.sentAt,
+        ),
+        mutation.mode,
+    )
+    is TimelineMutation.RetryLocal -> reduceRetryLocal(state, mutation.otid)
+    is TimelineMutation.MarkLocalSent -> reduceMarkLocalSent(state, mutation.otid)
+    is TimelineMutation.MarkLocalFailed -> reduceMarkLocalFailed(state, mutation.otid)
+    is TimelineMutation.StreamFrame -> reduceStreamMutation(state, mutation)
+    is TimelineMutation.SnapshotEnrichment -> reduceSnapshotEnrichment(state, mutation.messages)
+    is TimelineMutation.HydrateSnapshot -> reduceHydrateMutation(state, mutation)
+    is TimelineMutation.ReconcileSnapshot -> reduceReconcileMutation(state, mutation)
+    is TimelineMutation.RecentMessagesSnapshot -> reduceRecentMessagesMutation(state, mutation)
+    is TimelineMutation.ReconcileAfterSendSnapshot -> reducePostSendReconcile(state, mutation.otid, mutation.messages)
+    is TimelineMutation.CleanupAbandonedFragments -> reduceCleanup(
+        state,
+        mutation.runId,
+        mutation.turnId,
+        mutation.reason,
+        mutation.candidateRunIds,
+    )
+    is TimelineMutation.RepairFullToolReturn -> reduceFullToolReturnRepair(state, mutation.message)
+    is TimelineMutation.AdvanceDanglingSweep -> changedIfNeeded(
+        state,
+        state.copy(danglingSweepGeneration = maxOf(state.danglingSweepGeneration, mutation.generation)),
+    )
+    is TimelineMutation.SettleDanglingToolCalls -> reduceDanglingToolSettlement(state, mutation)
+    is TimelineMutation.LifecycleReset -> changedIfNeeded(state, state.copy(lifecycleEpoch = mutation.epoch))
+}
+
+private fun reduceFullToolReturnRepair(
+    state: TimelineReducerState,
+    message: ToolReturnMessage,
+): TimelineReduction {
+    val callId = message.toolCallId
+    if (message.toolReturnTruncated == true || callId.isNullOrBlank()) return fullToolReturnRepairNoOp(state, message.id)
+
+    val eligibleServerIds = state.timeline.events.mapNotNullTo(mutableSetOf()) { event ->
+        val confirmed = event as? TimelineEvent.Confirmed ?: return@mapNotNullTo null
+        confirmed.serverId.takeIf {
+            confirmed.toolReturnTruncationByCallId[callId]?.messageId == message.id
+        }
+    }
+    if (eligibleServerIds.isEmpty()) return fullToolReturnRepairNoOp(state, message.id)
+
+    val enriched = enrichTimelineFromSnapshot(state.timeline, listOf(message))
+    val events = state.timeline.events.zip(enriched.events) { current, repaired ->
+        val serverId = (current as? TimelineEvent.Confirmed)?.serverId
+        if (serverId in eligibleServerIds) repaired else current
+    }.toTimelinePersistentList()
+    val nextTimeline = if (events == state.timeline.events) state.timeline else state.timeline.copy(
+        events = events,
+        stablePrefixVersion = events.stablePrefixFingerprint(),
+    )
+    return TimelineReduction(
+        next = state.copy(timeline = nextTimeline),
+        result = TimelineReductionResult.FullToolReturnRepaired(message.id, nextTimeline != state.timeline),
+    )
+}
+
+private fun fullToolReturnRepairNoOp(state: TimelineReducerState, messageId: String) = TimelineReduction(
+    state,
+    result = TimelineReductionResult.FullToolReturnRepaired(messageId, false),
+)
+
+private fun reduceDanglingToolSettlement(
+    state: TimelineReducerState,
+    mutation: TimelineMutation.SettleDanglingToolCalls,
+): TimelineReduction {
+    if (mutation.callIds.isEmpty()) return danglingSettlementNoOp(state)
+    if (!mutation.matchesDanglingFence(state)) return danglingSettlementNoOp(state)
+    val settlements = state.timeline.events.map { event ->
+        settleDanglingEvent(event, mutation.callIds)
+    }
+    val settled = buildSet {
+        settlements.forEach { addAll(it.callIds) }
+    }
+    val nextTimeline = if (settled.isEmpty()) state.timeline else {
+        val events = settlements.map { it.event }.toTimelinePersistentList()
+        state.timeline.copy(
+            events = events,
+            stablePrefixVersion = events.stablePrefixFingerprint(),
+        )
+    }
+    return TimelineReduction(
+        next = state.copy(timeline = nextTimeline),
+        result = TimelineReductionResult.DanglingToolCallsSettled(settled, settled.isNotEmpty()),
+    )
+}
+
+private data class DanglingEventSettlement(
+    val event: TimelineEvent,
+    val callIds: Set<String> = emptySet(),
+)
+
+private fun settleDanglingEvent(event: TimelineEvent, requestedCallIds: Set<String>): DanglingEventSettlement {
+    val confirmed = event as? TimelineEvent.Confirmed ?: return DanglingEventSettlement(event)
+    if (confirmed.messageType != TimelineMessageType.TOOL_CALL) return DanglingEventSettlement(event)
+    val targets = confirmed.unreturnedCallIds(requestedCallIds)
+    if (targets.isEmpty()) return DanglingEventSettlement(event)
+
+    val content = confirmed.toolReturnContentByCallId.toMutableMap()
+    val errors = confirmed.toolReturnIsErrorByCallId.toMutableMap()
+    targets.forEach { callId ->
+        content[callId] = DanglingToolCallResolver.NO_RESULT_MESSAGE
+        errors[callId] = true
+    }
+    val repaired = confirmed.copy(
+        toolReturnContent = confirmed.toolReturnContent ?: content[targets.first()],
+        toolReturnIsError = if (confirmed.toolReturnContent == null) true else confirmed.toolReturnIsError,
+        toolReturnContentByCallId = content.toTimelinePersistentMap(),
+        toolReturnIsErrorByCallId = errors.toTimelinePersistentMap(),
+    )
+    return DanglingEventSettlement(repaired, targets.toSet())
+}
+
+private fun TimelineEvent.Confirmed.unreturnedCallIds(requestedCallIds: Set<String>): List<String> = buildList {
+    toolCalls.forEach { call ->
+        val callId = call.effectiveId
+        if (callId.isBlank()) return@forEach
+        if (callId !in requestedCallIds) return@forEach
+        if (callId in toolReturnContentByCallId) return@forEach
+        add(callId)
+    }
+}
+
+private fun TimelineMutation.SettleDanglingToolCalls.matchesDanglingFence(state: TimelineReducerState): Boolean {
+    if (generation != state.danglingSweepGeneration) return false
+    if (lifecycleEpoch != state.lifecycleEpoch) return false
+    return true
+}
+
+private fun danglingSettlementNoOp(state: TimelineReducerState) = TimelineReduction(
+    state,
+    result = TimelineReductionResult.DanglingToolCallsSettled(emptySet(), false),
+)
+
+private fun reduceStreamMutation(
+    state: TimelineReducerState,
+    mutation: TimelineMutation.StreamFrame,
+): TimelineReduction {
+    val output = reduceStreamFrame(
+        TimelineReducerInput(
+            prev = state.timeline,
+            frame = mutation.message,
+            pendingToolReturnsByCallId = state.pendingToolReturnsByCallId,
+            source = "timeline-processor",
+            agentId = mutation.agentId,
+        ),
+    )
+    val effects = buildList {
+        output.emittedEvents.forEach { add(TimelineReductionEffect.EmitSyncEvent(it)) }
+        output.notification?.let { add(TimelineReductionEffect.Notify(it)) }
+        mutation.message.seqId?.takeIf { it >= 0 }?.let { seq ->
+            add(TimelineReductionEffect.RecordStreamSequence(seq.toLong()))
+        }
+    }.toTimelinePersistentList()
+    val didChange = output.next != state.timeline ||
+        output.updatedPendingToolReturnsByCallId != state.pendingToolReturnsByCallId
+    val persistenceDelta = if (output.next == state.timeline) {
+        TimelineMutationDelta.None
+    } else {
+        exactConfirmedDelta(state.timeline, output.next)
+    }
+    return TimelineReduction(
+        state.copy(
+            timeline = output.next,
+            pendingToolReturnsByCallId = output.updatedPendingToolReturnsByCallId,
+        ),
+        effects,
+        if (didChange) TimelineReductionResult.Changed(TimelineChangeKind.RECONCILED)
+        else TimelineReductionResult.NoChange,
+        persistenceDelta,
+    )
+}
+
+/**
+ * Stream frames normally append or replace a bounded number of confirmed rows. Derive that
+ * exact set from persistent-list reference reuse and stable server ids. If ordering or identity
+ * changes outside that bounded shape, fail closed to the full planner.
+ */
+internal fun exactConfirmedDelta(previous: Timeline, current: Timeline): TimelineMutationDelta {
+    // letta-mobile-94bt8.1: a cursor advance used to force a FULL RESCAN, and five of the nine
+    // writes in the clean-main capture advanced the cursor. It never needed to: the incremental
+    // plan already carries liveCursor, backfillCursor and releasedOlderCount in its commit
+    // METADATA, so metadata moves without implying anything about row identity or order. Carry
+    // it as a metadata flag and keep the bounded row path.
+    val metadataChanged = previous.liveCursor != current.liveCursor ||
+        previous.backfillCursor != current.backfillCursor ||
+        previous.releasedOlderCount != current.releasedOlderCount
+
+    val changed = linkedSetOf<String>()
+    val deleted = linkedSetOf<String>()
+    val previousByServerId = previous.events.mapNotNull { event ->
+        (event as? TimelineEvent.Confirmed)?.let { it.serverId to it }
+    }.toMap()
+    val currentByServerId = current.events.mapNotNull { event ->
+        (event as? TimelineEvent.Confirmed)?.let { it.serverId to it }
+    }.toMap()
+    if (previousByServerId.size != previous.events.count { it is TimelineEvent.Confirmed } ||
+        currentByServerId.size != current.events.count { it is TimelineEvent.Confirmed }
+    ) {
+        return TimelineMutationDelta.RequiresFullRescan(SnapshotPlanningFallback.AMBIGUOUS_SERVER_IDENTITY)
+    }
+    currentByServerId.forEach { (serverId, event) ->
+        val old = previousByServerId[serverId]
+        if (old == null || old !== event) changed += serverId
+    }
+    previousByServerId.keys.forEach { serverId ->
+        if (serverId !in currentByServerId) deleted += serverId
+    }
+    if (changed.size + deleted.size > MAX_EXACT_STREAM_DELTA_ROWS) {
+        return TimelineMutationDelta.RequiresFullRescan(SnapshotPlanningFallback.STREAM_DELTA_TOO_WIDE)
+    }
+    return TimelineMutationDelta.Exact(
+        changedConfirmedServerIds = changed,
+        deletedConfirmedServerIds = deleted,
+        metadataChanged = metadataChanged,
+    )
+}
+
+private const val MAX_EXACT_STREAM_DELTA_ROWS = 64
+
+private fun reduceHydrateMutation(
+    state: TimelineReducerState,
+    mutation: TimelineMutation.HydrateSnapshot,
+): TimelineReduction {
+    val hydrated = TimelineHydrationReducer.reduce(
+        state.timeline.conversationId,
+        normalizeHydratedMessageOrder(mutation.messages),
+        mutation.timelineBeforeFetch,
+        state.timeline,
+        mutation.diskRecords,
+    )
+    val next = state.copy(timeline = hydrated.timeline, hydrateGeneration = mutation.generation)
+    val effects = buildList {
+        mutation.cursorSequence?.let { add(TimelineReductionEffect.RepairHydrationCursor(it)) }
+    }.toTimelinePersistentList()
+    return TimelineReduction(
+        next = next,
+        effects = effects,
+        result = TimelineReductionResult.Hydrated(
+            visibleEventCount = hydrated.visibleEventCount,
+            changed = next != state,
+        ),
+        persistenceDelta = if (next != state) TimelineMutationDelta.RequiresFullRescan(SnapshotPlanningFallback.HYDRATE)
+        else TimelineMutationDelta.None,
+    )
+}
+
+private fun reduceRecentMessagesMutation(
+    state: TimelineReducerState,
+    mutation: TimelineMutation.RecentMessagesSnapshot,
+): TimelineReduction {
+    val enriched = reduceSnapshotEnrichment(state, mutation.messages)
+    val merge = enriched.next.timeline.mergeServerMessages(mutation.messages)
+    val next = enriched.next.copy(
+        timeline = merge.first,
+        highestAppliedReconcileGeneration = maxOf(state.highestAppliedReconcileGeneration, mutation.generation),
+        freshnessSequence = maxOf(state.freshnessSequence, mutation.freshnessSequence),
+    )
+    return TimelineReduction(
+        next = next,
+        result = TimelineReductionResult.RecentMessagesApplied(
+            appended = merge.second,
+            changed = next.timeline != state.timeline,
+        ),
+        persistenceDelta = if (next.timeline != state.timeline) TimelineMutationDelta.RequiresFullRescan(SnapshotPlanningFallback.RECENT_MESSAGES)
+        else TimelineMutationDelta.None,
+    )
+}
+
+private fun reduceReconcileMutation(
+    state: TimelineReducerState,
+    mutation: TimelineMutation.ReconcileSnapshot,
+): TimelineReduction {
+    val enriched = reduceSnapshotEnrichment(state, mutation.messages)
+    val merged = enriched.next.timeline.mergeServerMessages(mutation.messages).first
+    val next = enriched.next.copy(
+        timeline = merged,
+        highestRequestedReconcileGeneration = maxOf(
+            state.highestRequestedReconcileGeneration,
+            mutation.generation,
+        ),
+        highestAppliedReconcileGeneration = mutation.generation,
+    )
+    return changedIfNeeded(state, next)
+}
+
+private fun changedIfNeeded(
+    state: TimelineReducerState,
+    next: TimelineReducerState,
+): TimelineReduction = TimelineReduction(
+    next,
+    result = if (next == state) TimelineReductionResult.NoChange
+    else TimelineReductionResult.Changed(TimelineChangeKind.RECONCILED),
+    persistenceDelta = if (next.timeline != state.timeline) TimelineMutationDelta.RequiresFullRescan(SnapshotPlanningFallback.RECONCILE)
+    else TimelineMutationDelta.None,
+)

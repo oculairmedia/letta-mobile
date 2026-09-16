@@ -18,6 +18,23 @@ class TimelineSyncStreamSubscriberPolicyTest {
         assertFalse(source.contains("postApprovalReconcile"))
     }
 
+    @Test
+    fun `production timeline has no shadow state bridge or holder fanout`() {
+        val loopSource = timelineSource("TimelineSyncLoop.kt")
+        val processorSource = timelineSource("TimelineProcessor.kt")
+        val dispatcherSource = timelineSource("TimelineStreamDispatcher.kt")
+
+        listOf(loopSource, processorSource, dispatcherSource).forEach { source ->
+            assertFalse(source.contains("holderFramesIn"))
+            assertFalse(source.contains("foldedViaHolder"))
+            assertFalse(source.contains("ConversationStateHolder"))
+            assertFalse(source.contains("TimelineProcessorStateBridge"))
+            assertFalse(source.contains("stateBridge"))
+        }
+        assertFalse(loopSource.contains("stateIn("))
+        assertFalse(loopSource.contains("MutableStateFlow<Timeline>"))
+    }
+
     private fun timelineSource(fileName: String): String = repositoryRoot()
         .resolve("sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/timeline")
         .resolve(fileName)

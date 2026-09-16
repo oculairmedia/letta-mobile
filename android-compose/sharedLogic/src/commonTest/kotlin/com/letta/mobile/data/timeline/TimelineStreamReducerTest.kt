@@ -4,6 +4,7 @@ import com.letta.mobile.data.model.ApprovalRequestMessage
 import com.letta.mobile.data.model.ApprovalResponseMessage
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.MessageContentPart
+import com.letta.mobile.data.model.ReasoningMessage
 import com.letta.mobile.data.model.ToolCall
 import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.model.ToolReturnMessage
@@ -21,6 +22,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class TimelineStreamReducerTest {
     @AfterTest
@@ -875,7 +877,7 @@ class TimelineStreamReducerTest {
     }
 
     @Test
-    fun `reconcile copy with backend-minted id does not duplicate identical live row`() {
+    fun `ui-msg final without exact alias preserves identical live row`() {
         val live = reduce(
             frame = AssistantMessage(
                 id = "letta-msg-166",
@@ -896,9 +898,9 @@ class TimelineStreamReducerTest {
             )
         )
 
-        changed shouldBe 0
-        mergedTimeline.events shouldHaveSize 1
-        (mergedTimeline.events.single() as TimelineEvent.Confirmed).serverId shouldBe "letta-msg-166"
+        changed shouldBe 1
+        mergedTimeline.events shouldHaveSize 2
+        (mergedTimeline.events.first() as TimelineEvent.Confirmed).serverId shouldBe "letta-msg-166"
     }
 
     @Test
@@ -1664,37 +1666,6 @@ class TimelineStreamReducerTest {
     }
 
     @Test
-    fun `blank existing run id must NOT absorb a later stream w0ctr`() {
-        // The other half of the orphan cause is deliberately NOT fixed by relaxing this
-        // gate. A blank run id is indistinguishable from an older RECONCILED reply, so
-        // merging into it would overwrite an unrelated earlier message whose text happens
-        // to be a prefix (the #827 regression). This pins that decision: the blank case
-        // stays a separate row here, and must be addressed at settle time instead.
-        var tl = reduce(
-            frame = AssistantMessage(
-                id = "letta-msg-2100",
-                contentRaw = JsonPrimitive("Su"),
-                runId = null,
-                otid = null,
-                seqId = 0,
-            ),
-        ).next
-
-        tl = reduce(
-            prev = tl,
-            frame = AssistantMessage(
-                id = "letta-msg-2101",
-                contentRaw = JsonPrimitive("Sure, here it is."),
-                runId = "run-real-77",
-                otid = null,
-                seqId = 1,
-            ),
-        ).next
-
-        tl.events shouldHaveSize 2
-    }
-
-    @Test
     fun `post-tool continuation still starts its own row after the run-id gate change w0ctr`() {
         // Guards the relaxation: a post-tool continuation arrives SHORTER than the prior
         // assistant row, so it is not forward growth and must remain a separate message.
@@ -1753,12 +1724,22 @@ class TimelineStreamReducerTest {
     }
 
     @Test
-    fun `REAL reconcile dup ui-msg final with null run collapses into streamed row h30cy`() {
-        // Ground truth (admin message.list): the reconciled FINAL has id==otid==ui-msg-*,
-        // run_id=NULL, and content that is a SUPERSET (or near-equal, first-word-lag
-        // means not byte-identical) of the streamed row. Different otid + null run +
-        // non-exact content defeated every match, so it inserted as a 2nd row.
-        // The streamed row is a live assistant row (synthetic otid, real run).
+    fun `ui-msg final without exact alias preserves identical content rows and emits telemetry`() {
+        Telemetry.clear()
+        var tl = reduce(frame = AssistantMessage(
+            id = "cm-stream-logical-live", contentRaw = JsonPrimitive("same"), runId = "run-1", otid = "logical-live", seqId = 1,
+        )).next
+        tl = tl.mergeServerMessages(listOf(
+            AssistantMessage(id = "ui-msg-final", contentRaw = JsonPrimitive("same"), runId = null, otid = "ui-msg-final", seqId = null),
+        )).first
+        assertEquals(2, tl.events.filterIsInstance<TimelineEvent.Confirmed>().count { it.messageType == TimelineMessageType.ASSISTANT })
+        assertTrue(Telemetry.snapshot().any { it.name == "recentReconcile.unresolvedCrossBoundaryIdentity" })
+    }
+
+    @Test
+    fun `REAL reconcile ui-msg final without exact identity remains distinct h30cy`() {
+        // A ui-msg final has no exact link to this streamed row. Similar content
+        // and a missing run id are insufficient identity evidence.
         val streamedRow = reduce(
             frame = AssistantMessage(
                 id = "letta-msg-1799",
@@ -1781,17 +1762,14 @@ class TimelineStreamReducerTest {
         val (afterReconcile, _) = streamedRow.mergeServerMessages(reconciled)
         val assistantRows = afterReconcile.events.filterIsInstance<TimelineEvent.Confirmed>()
             .filter { it.messageType == TimelineMessageType.ASSISTANT }
-        assertEquals(1, assistantRows.size)
-        assertEquals("I'm Lester, a dedicated test agent", assistantRows.single().content)
+        assertEquals(2, assistantRows.size)
+        assertEquals("m Lester, a dedicated test agent", assistantRows[0].content)
+        assertEquals("I'm Lester, a dedicated test agent", assistantRows[1].content)
     }
 
     @Test
-    fun `reconcile ui-msg final collapses even when liveCursor moved off the streamed row h30cy`() {
-        // h30cy RESURFACE: the earlier fix required the match to be the liveCursor
-        // row, but at reconcile time liveCursor has often moved off the streamed
-        // reply (e.g. a later turn started, or it was cleared), so the duplicate
-        // slipped through. The null-run signature is the correct discriminator;
-        // liveCursor must NOT be required.
+    fun `reconcile ui-msg final without exact identity stays distinct when cursor moved h30cy`() {
+        // Cursor position does not strengthen an otherwise unresolved identity.
         var tl = reduce(
             frame = AssistantMessage(
                 id = "letta-msg-1799", contentRaw = JsonPrimitive("I'm Lester, a dedicated test agent"),
@@ -1810,15 +1788,14 @@ class TimelineStreamReducerTest {
         val (after, _) = tl.mergeServerMessages(reconciled)
         val rows = after.events.filterIsInstance<TimelineEvent.Confirmed>()
             .filter { it.messageType == TimelineMessageType.ASSISTANT }
-        assertEquals(1, rows.size)
-        assertEquals("I'm Lester, a dedicated test agent for validating mobile", rows.single().content)
+        assertEquals(2, rows.size)
+        assertEquals("I'm Lester, a dedicated test agent", rows[0].content)
+        assertEquals("I'm Lester, a dedicated test agent for validating mobile", rows[1].content)
     }
 
     @Test
-    fun `server double-stores reply as two ui-msg finals both dedupe to one row h30cy`() {
-        // GROUND TRUTH (admin message.list): the App Server persists the reply
-        // TWICE — two ui-msg finals, DIFFERENT ids, SAME content "Hey.", null run.
-        // The streamed row already holds "Hey."; both reconcile copies must dedupe.
+    fun `distinct ui-msg finals without aliases are never content deduped h30cy`() {
+        // Distinct persisted IDs remain distinct even when their content matches.
         var tl = reduce(
             frame = AssistantMessage(
                 id = "letta-msg-3255", contentRaw = JsonPrimitive("Hey"),
@@ -1836,16 +1813,13 @@ class TimelineStreamReducerTest {
         )
         val (after, _) = tl.mergeServerMessages(reconciled)
         val rows = after.events.filterIsInstance<TimelineEvent.Confirmed>().filter { it.messageType == TimelineMessageType.ASSISTANT }
-        assertEquals(1, rows.size, "rows: " + rows.joinToString("|"){ it.content })
-        assertEquals("Hey.", rows.single().content)
+        assertEquals(3, rows.size, "rows: " + rows.joinToString("|"){ it.content })
+        assertEquals(listOf("Hey.", "Hey.", "Hey."), rows.map { it.content })
     }
 
     @Test
-    fun `second identical ui-msg final in a LATER reconcile poll still dedupes h30cy`() {
-        // GROUND TRUTH: the server persists the reply twice, 8s apart, so the two
-        // identical "Hey." finals arrive in SEPARATE reconcile polls (not one
-        // batch). streamed row -> poll1 "Hey." dedupes -> poll2 "Hey." (NEW ui-msg
-        // id) must ALSO dedupe, not insert a 2nd row.
+    fun `identical ui-msg finals in later polls remain distinct without aliases h30cy`() {
+        // Poll timing and identical content do not establish identity.
         var tl = reduce(frame = AssistantMessage(id = "letta-msg-1", contentRaw = JsonPrimitive("Hey"), runId = "local-run-1", otid = "provider-assistant-1-x", seqId = 1)).next
         tl = reduce(prev = tl, frame = AssistantMessage(id = "letta-msg-2", contentRaw = JsonPrimitive("."), runId = "local-run-1", otid = "provider-assistant-1-x", seqId = 2)).next
         // poll 1
@@ -1853,14 +1827,13 @@ class TimelineStreamReducerTest {
         // poll 2 (8s later): a NEW server-persisted identical copy
         tl = tl.mergeServerMessages(listOf(AssistantMessage(id = "ui-msg-598", contentRaw = JsonPrimitive("Hey."), runId = null, otid = "ui-msg-598", seqId = null))).first
         val rows = tl.events.filterIsInstance<TimelineEvent.Confirmed>().filter { it.messageType == TimelineMessageType.ASSISTANT }
-        assertEquals(1, rows.size, "rows: " + rows.joinToString("|"){ it.content })
+        assertEquals(3, rows.size, "rows: " + rows.joinToString("|"){ it.content })
     }
 
     @Test
     fun `reconcile final does not overwrite an unrelated older reply that is a substring h30cy`() {
-        // #827 review (Major): an OLDER distinct reply whose text is a substring of
-        // the null-run final must NOT be overwritten. Only the STREAMED row (real
-        // run id) being finalized is a valid target.
+        // Neither the older reply nor the streamed row has an exact alias for the
+        // final, so neither may be overwritten based on substring similarity.
         // older distinct reply — seed it as a reconciled null-run row via merge.
         var tl = Timeline(conversationId = "c").mergeServerMessages(listOf(
             AssistantMessage(id = "ui-msg-old", contentRaw = JsonPrimitive("Hey"), runId = null, otid = "ui-msg-old", seqId = null)
@@ -1876,10 +1849,11 @@ class TimelineStreamReducerTest {
             AssistantMessage(id = "ui-msg-final", contentRaw = JsonPrimitive("Hey there, how are you?"), runId = null, otid = "ui-msg-final", seqId = null)
         ))
         val rows = after.events.filterIsInstance<TimelineEvent.Confirmed>().filter { it.messageType == TimelineMessageType.ASSISTANT }
-        // old "Hey" preserved, streamed row replaced by the full final = 2 rows.
-        assertEquals(2, rows.size, "rows: " + rows.joinToString("|"){ it.content })
+        // Both prior rows are preserved and the unresolved final is appended.
+        assertEquals(3, rows.size, "rows: " + rows.joinToString("|"){ it.content })
         assertEquals("Hey", rows[0].content)
-        assertEquals("Hey there, how are you?", rows[1].content)
+        assertEquals("Hey there, how are", rows[1].content)
+        assertEquals("Hey there, how are you?", rows[2].content)
     }
 
     @Test
@@ -1911,9 +1885,10 @@ class TimelineStreamReducerTest {
 
         val rows = after.events.filterIsInstance<TimelineEvent.Confirmed>()
             .filter { it.messageType == TimelineMessageType.ASSISTANT }
-        assertEquals(2, rows.size, "rows: " + rows.joinToString("|") { it.content })
-        assertEquals("Ah, got it — so the original theory still holds. Clean on restart dupes only in streaming path. The persistence layer is fine.", rows[0].content)
+        assertEquals(3, rows.size, "rows: " + rows.joinToString("|") { it.content })
+        assertEquals(", got it — so the original theory still holds. Clean on restart dupes only in streaming path The persistence layer is fine", rows[0].content)
         assertEquals("Newer turn has already started", rows[1].content)
+        assertEquals("Ah, got it — so the original theory still holds. Clean on restart dupes only in streaming path. The persistence layer is fine.", rows[2].content)
     }
 
     @Test
@@ -1925,6 +1900,263 @@ class TimelineStreamReducerTest {
         val confirmed = out.next.events.filterIsInstance<TimelineEvent.Confirmed>()
             .single { it.serverId == "assistant-agent-scoped" }
         confirmed.agentId shouldBe "agent-A"
+    }
+
+    @Test
+    fun `run-id-less cumulative fragments grow one row instead of stranding the opening bubble lf4hh`() {
+        // On-device symptom (desktop, 2026-09-03): one reply rendered as TWO bubbles,
+        // "Hey" above "Hey there! Still connected." The frames carried no otid and NO
+        // run id, so the otid merge, the same-run prefix skip and the forward-growth
+        // merge all missed and the second cumulative fragment appended a new row.
+        var tl = reduce(frame = AssistantMessage(id = "letta-msg-1", contentRaw = JsonPrimitive("Hey"))).next
+        tl = reduce(
+            prev = tl,
+            frame = AssistantMessage(id = "letta-msg-2", contentRaw = JsonPrimitive("Hey there! Still connected.")),
+        ).next
+
+        val rows = tl.events.filterIsInstance<TimelineEvent.Confirmed>()
+            .filter { it.messageType == TimelineMessageType.ASSISTANT }
+        assertEquals(1, rows.size, "rows: " + rows.joinToString("|") { it.content })
+        rows.single().content shouldBe "Hey there! Still connected."
+    }
+
+    @Test
+    fun `blank-run growth does not fire when the incoming fragment carries a real run id lf4hh`() {
+        // #827 shape: a settled reconciled row (runId = null) must not be grown by a
+        // streamed fragment that carries its own real run id, however similar the text.
+        var tl = timeline().mergeServerMessages(
+            listOf(
+                AssistantMessage(id = "ui-msg-old", contentRaw = JsonPrimitive("Hey"), runId = null, otid = "ui-msg-old")
+            )
+        ).first
+        tl = reduce(
+            prev = tl,
+            frame = AssistantMessage(
+                id = "letta-msg-9",
+                contentRaw = JsonPrimitive("Hey there, how are"),
+                runId = "local-run-9",
+                otid = "provider-assistant-1-z",
+                seqId = 9,
+            ),
+        ).next
+
+        val rows = tl.events.filterIsInstance<TimelineEvent.Confirmed>()
+            .filter { it.messageType == TimelineMessageType.ASSISTANT }
+        assertEquals(2, rows.size, "rows: " + rows.joinToString("|") { it.content })
+    }
+
+    @Test
+    fun `blank-run growth never absorbs a settled older reply with the same prefix lf4hh`() {
+        // The date window, not the run id, is what keeps an older run-id-less reply
+        // safe when a NEW turn opens with text that happens to extend it.
+        var tl = timeline().mergeServerMessages(
+            listOf(
+                AssistantMessage(
+                    id = "ui-msg-old",
+                    contentRaw = JsonPrimitive("Hey"),
+                    date = "2020-01-01T00:00:00Z",
+                    runId = null,
+                    otid = "ui-msg-old",
+                )
+            )
+        ).first
+        tl = reduce(
+            prev = tl,
+            frame = AssistantMessage(id = "letta-msg-9", contentRaw = JsonPrimitive("Hey there, a brand new turn.")),
+        ).next
+
+        val rows = tl.events.filterIsInstance<TimelineEvent.Confirmed>()
+            .filter { it.messageType == TimelineMessageType.ASSISTANT }
+        assertEquals(2, rows.size, "rows: " + rows.joinToString("|") { it.content })
+        rows[0].content shouldBe "Hey"
+        rows[1].content shouldBe "Hey there, a brand new turn."
+    }
+
+    @Test
+    fun `cursor re-emit preserves settled tool call when new list rotates the call id x13xi-broken-card`() {
+        // letta-mobile-x13xi.13.1.2: cursor re-emits bring the same tool-call frame
+        // with a rotated effectiveId (rare, observed in production). The old list
+        // anchored the call-id -> toolReturnContentByCallId bond; the arg-score
+        // branch (newScore >= oldScore) used to swap the list, severing the bond
+        // and re-spinning the tool card. The fix preserves any settled call whose
+        // effectiveId is not present in the new list.
+        val seeded = reduce(
+            frame = ToolCallMessage(
+                id = "tool-batch",
+                toolCalls = listOf(
+                    ToolCall(toolCallId = "call-A", name = "read", arguments = "{}"),
+                ),
+            ),
+        ).next
+        // First tool_return settles call-A.
+        val withReturn = reduce(
+            prev = seeded,
+            frame = ToolReturnMessage(
+                id = "return-A",
+                toolCallId = "call-A",
+                status = "success",
+                toolReturnRaw = JsonPrimitive("done"),
+            ),
+        ).next
+        withReturn.events.filterIsInstance<TimelineEvent.Confirmed>()
+            .single { it.serverId == "tool-batch" }
+            .toolReturnContentByCallId["call-A"] shouldBe "done"
+
+        // Cursor re-emit lands the same frame with a rotated effectiveId and
+        // populated arguments. The mergedCalls branch used to swap the list,
+        // dropping call-A and leaving the projection reading null for result.
+        val afterReemit = reduce(
+            prev = withReturn,
+            frame = ToolCallMessage(
+                id = "tool-batch",
+                toolCalls = listOf(
+                    ToolCall(toolCallId = "call-A-rotated", name = "read", arguments = "{ \"path\": \"/tmp\" }"),
+                ),
+            ),
+        ).next
+
+        val event = afterReemit.events.filterIsInstance<TimelineEvent.Confirmed>()
+            .single { it.serverId == "tool-batch" }
+        val effectiveIds = event.toolCalls.map { it.effectiveId }.toSet()
+        effectiveIds shouldBe setOf("call-A", "call-A-rotated")
+        event.toolReturnContentByCallId["call-A"] shouldBe "done"
+    }
+
+    @Test
+    fun `cursor re-emit does not duplicate a call id that is present in both lists x13xi-broken-card`() {
+        // Same effectiveId in both oldCalls and newCalls must collapse to one
+        // entry (no double-projection). The preserveSettledToolCalls helper must
+        // skip entries whose id is already in newCalls, otherwise a re-emit would
+        // double the call row and the tool card would render twice.
+        val seeded = reduce(
+            frame = ToolCallMessage(
+                id = "tool-batch",
+                toolCalls = listOf(
+                    ToolCall(toolCallId = "call-A", name = "read", arguments = "{}"),
+                ),
+            ),
+        ).next
+        val withReturn = reduce(
+            prev = seeded,
+            frame = ToolReturnMessage(
+                id = "return-A",
+                toolCallId = "call-A",
+                status = "success",
+                toolReturnRaw = JsonPrimitive("done"),
+            ),
+        ).next
+        val afterReemit = reduce(
+            prev = withReturn,
+            frame = ToolCallMessage(
+                id = "tool-batch",
+                toolCalls = listOf(
+                    ToolCall(toolCallId = "call-A", name = "read", arguments = "{ \"path\": \"/tmp\" }"),
+                ),
+            ),
+        ).next
+
+        val event = afterReemit.events.filterIsInstance<TimelineEvent.Confirmed>()
+            .single { it.serverId == "tool-batch" }
+        event.toolCalls.size shouldBe 1
+        event.toolCalls.single().effectiveId shouldBe "call-A"
+        event.toolCalls.single().arguments shouldBe "{ \"path\": \"/tmp\" }"
+        event.toolReturnContentByCallId["call-A"] shouldBe "done"
+    }
+
+    @Test
+    fun `first frame with empty arguments still accepts subsequent tool return without losing it x13xi-broken-card`() {
+        // The "args blank" branch of the mergedCalls fence (oldCalls.isEmpty()
+        // || newCalls.isEmpty()) must keep the oldCalls list when newCalls is
+        // empty, NOT swap it for newCalls (which would be empty and lose the
+        // call entirely). Regression: a refactor that simplified the fence to
+        // "always prefer newCalls on newScore >= oldScore" would break this.
+        val seeded = reduce(
+            frame = ToolCallMessage(
+                id = "tool-batch",
+                toolCalls = listOf(
+                    ToolCall(toolCallId = "call-A", name = "read", arguments = ""),
+                ),
+            ),
+        ).next
+        val withReturn = reduce(
+            prev = seeded,
+            frame = ToolReturnMessage(
+                id = "return-A",
+                toolCallId = "call-A",
+                status = "success",
+                toolReturnRaw = JsonPrimitive("done"),
+            ),
+        ).next
+        // Re-emit with empty toolCalls (a degenerate frame).
+        val afterEmptyReemit = reduce(
+            prev = withReturn,
+            frame = ToolCallMessage(
+                id = "tool-batch",
+                toolCalls = listOf(
+                    ToolCall(toolCallId = "call-A", name = "read", arguments = ""),
+                ),
+            ),
+        ).next
+
+        val event = afterEmptyReemit.events.filterIsInstance<TimelineEvent.Confirmed>()
+            .single { it.serverId == "tool-batch" }
+        event.toolCalls.single().effectiveId shouldBe "call-A"
+        event.toolReturnContentByCallId["call-A"] shouldBe "done"
+    }
+
+    @Test
+    fun `older non-settled tool call stays untouched by re-emit preservation x13xi-broken-card`() {
+        // A tool call with no tool_return yet must NOT be carried into the new
+        // list (the projection side has no settled bond to protect). Only calls
+        // with a settled toolReturnContentByCallId entry are preserved. Otherwise
+        // the projection would double-count unsent calls.
+        //
+        // Setup: old list has call-A and call-B, both populated; only call-A is
+        // settled. Re-emit brings a new list that out-scores the old (so the
+        // arg-score branch would otherwise swap). call-B has no settled bond
+        // and must be dropped.
+        val seeded = reduce(
+            frame = ToolCallMessage(
+                id = "tool-batch",
+                toolCalls = listOf(
+                    ToolCall(toolCallId = "call-A", name = "read", arguments = "{}"),
+                    ToolCall(toolCallId = "call-B", name = "write", arguments = "{}"),
+                ),
+            ),
+        ).next
+        // Settle only call-A.
+        val withReturn = reduce(
+            prev = seeded,
+            frame = ToolReturnMessage(
+                id = "return-A",
+                toolCallId = "call-A",
+                status = "success",
+                toolReturnRaw = JsonPrimitive("done"),
+            ),
+        ).next
+        // Re-emit: 3 calls, all with populated arguments. newScore=3 > oldScore=2,
+        // so the arg-score branch fires and oldCalls is at risk of being dropped.
+        val afterReemit = reduce(
+            prev = withReturn,
+            frame = ToolCallMessage(
+                id = "tool-batch",
+                toolCalls = listOf(
+                    ToolCall(toolCallId = "call-C", name = "delete", arguments = "{ \"path\": \"/tmp/c\" }"),
+                    ToolCall(toolCallId = "call-D", name = "edit", arguments = "{ \"x\": 1 }"),
+                    ToolCall(toolCallId = "call-E", name = "list", arguments = "{ \"dir\": \"/\" }"),
+                ),
+            ),
+        ).next
+
+        val event = afterReemit.events.filterIsInstance<TimelineEvent.Confirmed>()
+            .single { it.serverId == "tool-batch" }
+        val effectiveIds = event.toolCalls.map { it.effectiveId }
+        // call-C/D/E come from the new list (arg-score branch). call-A is
+        // preserved (settled, call-id -> result bond). call-B is dropped
+        // (no settled bond, nothing to preserve).
+        effectiveIds shouldBe listOf("call-C", "call-D", "call-E", "call-A")
+        event.toolReturnContentByCallId["call-A"] shouldBe "done"
+        event.toolCalls.none { it.effectiveId == "call-B" } shouldBe true
     }
 
     private fun reduce(

@@ -43,18 +43,18 @@ dependencies {
     // exposing the same subcommand by consuming it from there.
     implementation(project(":iroh-wrapper-cli"))
 
-    implementation("com.github.ajalt.clikt:clikt:5.1.0")
+    implementation(libs.clikt)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.android)
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
-    implementation("com.squareup.okhttp3:okhttp:5.3.2")
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.okhttp)
     implementation(libs.ktor.client.core)
     implementation(libs.ktor.client.okhttp)
     implementation(libs.ktor.client.websockets)
     implementation(libs.ktor.client.content.negotiation)
     implementation(libs.ktor.serialization.kotlinx.json)
-    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.20.2")
-    implementation("computer.iroh:iroh:1.1.0")
+    implementation(libs.jackson.dataformat.yaml)
+    implementation(libs.iroh)
 
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.kotlinx.coroutines.test)

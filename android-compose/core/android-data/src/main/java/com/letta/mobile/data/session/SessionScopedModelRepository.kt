@@ -15,6 +15,8 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 
+// The singleton repository owns this scope and cancels it explicitly in close().
+@Suppress("NoDetachedCoroutineLifecycle")
 internal fun defaultSessionScopedModelRepositoryScope(): CoroutineScope =
     CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -49,9 +51,9 @@ class SessionScopedModelRepository internal constructor(
             .launchIn(proxyScope)
     }
 
-    override suspend fun refreshLlmModels() = sessionManager.withCurrentSession { it.modelRepository.refreshLlmModels() }
+    override suspend fun refreshLlmModels(): Unit = sessionManager.withCurrentSession { it.modelRepository.refreshLlmModels() }
 
-    override suspend fun refreshEmbeddingModels() = sessionManager.withCurrentSession { it.modelRepository.refreshEmbeddingModels() }
+    override suspend fun refreshEmbeddingModels(): Unit = sessionManager.withCurrentSession { it.modelRepository.refreshEmbeddingModels() }
 
     fun close() { proxyScope.cancel() }
 }

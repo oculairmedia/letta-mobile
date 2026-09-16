@@ -48,6 +48,13 @@ data class SubagentTodoProgressWire(
 )
 
 @Serializable
+data class SubagentActivitySnapshot(
+    val lines: List<String> = emptyList(),
+    @SerialName("updated_at") val updatedAt: String? = null,
+    val truncated: Boolean = false,
+)
+
+@Serializable
 data class SubagentEntry(
     @SerialName("toolCallId") val toolCallId: String,
     val description: String = "",
@@ -62,6 +69,7 @@ data class SubagentEntry(
     @SerialName("parentAgentId") val parentAgentId: String? = null,
     @SerialName("parentConversationId") val parentConversationId: String? = null,
     @SerialName("startedAt") val startedAt: String? = null,
+    val activity: SubagentActivitySnapshot? = null,
     @SerialName("todo_progress") val todoProgress: SubagentTodoProgressWire? = null,
     /** Client-owned lifecycle timestamp; never encoded onto the wire. */
     @Transient val terminalAtEpochMs: Long? = null,
@@ -90,6 +98,36 @@ object SubagentStatus {
      * lingers then dismisses (29h9u).
      */
     const val CANCELLED = "cancelled"
+
+    /**
+     * letta-mobile-al6q5: the ONE wire-status vocabulary.
+     *
+     * The App Server's terminal value for a successful subagent is `success`
+     * (confirmed live in the m6oa1.6 capture), not `completed`. That value used
+     * to be understood by exactly one of the three mappers that read it, so a
+     * SUCCESSFUL subagent decoded as an unrecognized status and fell through
+     * the "unknown means still running" fallback — the chip stayed RUNNING
+     * forever. These alias sets are the single source every mapper reads, so a
+     * vocabulary gap can no longer be fixed in one place and missed in another.
+     */
+    val PENDING_ALIASES = setOf("pending", "queued", "dispatched", "observed", "starting")
+    val RUNNING_ALIASES = setOf("running", "in_progress", "active")
+    val COMPLETED_ALIASES = setOf("completed", "complete", "success", "succeeded", "done")
+    val FAILED_ALIASES = setOf("failed", "error", "errored")
+    val CANCELLED_ALIASES = setOf("cancelled", "canceled", "killed", "stopped", "evicted")
+
+    /**
+     * Canonicalize a raw wire status, or null when the vocabulary does not
+     * cover it. Callers decide what an unknown value means — this deliberately
+     * does NOT guess, so forward-compatibility policy stays at the call site.
+     */
+    fun normalize(raw: String?): String? = when (raw?.trim()?.lowercase()) {
+        in PENDING_ALIASES, in RUNNING_ALIASES -> RUNNING
+        in COMPLETED_ALIASES -> COMPLETED
+        in FAILED_ALIASES -> FAILED
+        in CANCELLED_ALIASES -> CANCELLED
+        else -> null
+    }
 }
 
 /**

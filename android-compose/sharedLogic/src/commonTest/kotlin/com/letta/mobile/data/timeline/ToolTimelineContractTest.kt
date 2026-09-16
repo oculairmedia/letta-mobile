@@ -5,6 +5,9 @@ import com.letta.mobile.data.chat.projection.deduplicateRenderKeys
 import com.letta.mobile.data.chat.projection.groupMessagesForRender
 import com.letta.mobile.data.chat.projection.timelineEventToUiMessage
 import com.letta.mobile.data.model.ApprovalResponseMessage
+import com.letta.mobile.data.model.ApprovalRequestMessage
+import com.letta.mobile.data.model.ToolCall
+import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.model.UiToolApprovalDecision
 import com.letta.mobile.ui.common.GroupPosition
 import kotlinx.collections.immutable.persistentMapOf
@@ -22,6 +25,43 @@ import kotlin.test.assertTrue
  * All test function names in commonTest use camelCase identifiers (Rule 4).
  */
 class ToolTimelineContractTest {
+
+    @Test
+    fun hydrationCollapsesToolCallAndApprovalCopiesByCanonicalCallId() {
+        val call = ToolCall(
+            id = "call-skill-hydrated-1",
+            name = "Skill",
+            arguments = """{"skill":"beads-dolt-migration-safety"}""",
+        )
+        val messages = listOf(
+            ToolCallMessage(
+                id = "msg-tool-copy",
+                toolCalls = listOf(call),
+                runId = "run-skill-hydrated-1",
+                otid = "otid-tool-copy",
+            ),
+            ApprovalRequestMessage(
+                id = "msg-approval-copy",
+                toolCalls = listOf(call),
+                runId = "run-skill-hydrated-1",
+                otid = "otid-approval-copy",
+            ),
+        )
+
+        val hydrated = TimelineHydrationReducer.reduce(
+            conversationId = "conv-skill-hydrated-1",
+            serverMessagesChronological = messages,
+            timelineBeforeFetch = Timeline("conv-skill-hydrated-1"),
+            currentTimeline = Timeline("conv-skill-hydrated-1"),
+            diskRecords = emptyList(),
+        )
+
+        val event = hydrated.timeline.events.single() as TimelineEvent.Confirmed
+        val ui = timelineEventToUiMessage(event)!!
+        assertEquals("call-skill-hydrated-1", ui.toolCalls!!.single().toolCallId)
+        assertEquals("Skill", ui.toolCalls!!.single().name)
+        assertEquals("beads-dolt-migration-safety", ui.toolCalls!!.single().displayTarget)
+    }
 
     @Test
     fun oneCallReceivingArgumentDeltasKeepsKeyStable() {

@@ -42,5 +42,5 @@ internal fun encodeWebImage(
         "jpg", "jpeg" -> "image/jpeg"
         else -> "image/$extension"
     }
-    return MessageContentPart.Image(base64 = Base64.Default.encode(bytes), mediaType = mediaType)
+    return MessageContentPart.Image(base64 = Base64.encode(bytes), mediaType = mediaType)
 }

@@ -37,6 +37,8 @@ kotzilla.json
 android-compose/shared-ui/
 
 # Kotlin compiler error logs
+.kotlin/
+**/.kotlin/
 android-compose/.kotlin/
 android-compose/native/mermaid_renderer/target/
 

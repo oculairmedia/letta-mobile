@@ -11,8 +11,11 @@ import com.letta.mobile.data.local.PendingLocalDao
 import com.letta.mobile.data.local.RoomConversationCursorStore
 import com.letta.mobile.data.local.RoomPendingLocalStore
 import com.letta.mobile.data.local.RuntimeEventDao
+import com.letta.mobile.data.local.ConfirmedTimelineSnapshotDao
+import com.letta.mobile.data.local.RoomConfirmedTimelineStore
 import com.letta.mobile.data.timeline.ConversationCursorStore
 import com.letta.mobile.data.timeline.PendingLocalStore
+import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -31,6 +34,22 @@ abstract class PendingLocalStoreModule {
     @Binds
     @Singleton
     abstract fun bindConversationCursorStore(impl: RoomConversationCursorStore): ConversationCursorStore
+
+    @Binds
+    @Singleton
+    abstract fun bindConfirmedTimelineStore(impl: RoomConfirmedTimelineStore): ConfirmedTimelineStore
+}
+
+@Module
+@InstallIn(SingletonComponent::class)
+object CanonicalTimelineModule {
+    @Provides
+    @Singleton
+    fun provideCoordinator(
+        store: com.letta.mobile.data.timeline.TimelineBoundedStore,
+        transport: com.letta.mobile.data.timeline.TimelineTransport,
+    ): com.letta.mobile.data.timeline.CanonicalTimelineCoordinator =
+        com.letta.mobile.data.timeline.CanonicalTimelineCoordinator(store, transport)
 }
 
 @Module
@@ -41,6 +60,43 @@ object DatabaseModule {
     fun provideDatabase(@ApplicationContext context: Context): LettaDatabase {
         return LettaDatabase.getDatabase(context)
     }
+
+    @Provides
+    @Singleton
+    fun provideRoomConfirmedTimelineStore(database: LettaDatabase, authority: com.letta.mobile.data.local.TimelineOwnershipAuthority): RoomConfirmedTimelineStore {
+        return RoomConfirmedTimelineStore(database, ownership = authority)
+    }
+
+    @Provides
+    @Singleton
+    fun provideTimelineLedgerDatabase(@ApplicationContext context: Context): com.letta.mobile.data.local.TimelineLedgerDatabase =
+        androidx.room.Room.databaseBuilder(
+            context,
+            com.letta.mobile.data.local.TimelineLedgerDatabase::class.java,
+            "timeline-ledger.db",
+        ).addMigrations(
+            com.letta.mobile.data.local.TimelineLedgerDatabase.MIGRATION_1_2,
+            com.letta.mobile.data.local.TimelineLedgerDatabase.MIGRATION_2_3,
+        ).build()
+
+    @Provides
+    @Singleton
+    fun provideTimelineBoundedStore(): com.letta.mobile.data.timeline.TimelineBoundedStore =
+        com.letta.mobile.data.local.DormantCanonicalTimelineStore
+
+    @Provides
+    @Singleton
+    fun provideTimelineOwnership(@ApplicationContext context: Context): com.letta.mobile.data.local.TimelineOwnershipAuthority =
+        com.letta.mobile.data.local.TimelineOwnershipAuthority(context.noBackupFilesDir.toPath().resolve("timeline-ownership"))
+
+    @Provides
+    @Singleton
+    fun provideOwnedTimelineStorage(
+        legacy: LettaDatabase,
+        ledger: com.letta.mobile.data.local.TimelineLedgerDatabase,
+        authority: com.letta.mobile.data.local.TimelineOwnershipAuthority,
+    ): com.letta.mobile.data.local.TimelineOwnedStorageFactory =
+        com.letta.mobile.data.local.TimelineOwnedStorageFactory(legacy, ledger, authority)
 
     // letta-mobile-g2ff0: DAOs returned directly here, but the LettaDatabase
     // singleton is the only thing that triggers Room.databaseBuilder.build().
@@ -82,5 +138,10 @@ object DatabaseModule {
     @Provides
     fun provideMemFsDao(database: LettaDatabase): MemFsDao {
         return database.memFsDao()
+    }
+
+    @Provides
+    fun provideConfirmedTimelineSnapshotDao(database: LettaDatabase): ConfirmedTimelineSnapshotDao {
+        return database.confirmedTimelineSnapshotDao()
     }
 }

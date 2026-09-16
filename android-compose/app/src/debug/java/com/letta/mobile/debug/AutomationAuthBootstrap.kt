@@ -5,6 +5,7 @@ import android.util.Base64
 import android.util.Log
 import androidx.core.content.edit
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.chat.runtime.BackendConfigPolicy
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.ui.screens.config.ConfigViewModel
 import kotlinx.coroutines.runBlocking
@@ -79,7 +80,7 @@ object AutomationAuthBootstrap {
                 serverUrl.trim()
                     .ifBlank { throw IllegalArgumentException("serverUrl is required") }
                     .let { url ->
-                        if (url.startsWith("http://") || url.startsWith("https://")) url else "https://$url"
+                        if (BackendConfigPolicy.REMOTE_URL_PREFIXES.any { url.startsWith(it) }) url else "https://$url"
                     }
                     .removeSuffix("/")
             }

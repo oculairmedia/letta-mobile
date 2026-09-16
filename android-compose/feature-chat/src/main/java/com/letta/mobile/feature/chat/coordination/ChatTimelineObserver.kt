@@ -5,12 +5,16 @@ import com.letta.mobile.data.a2ui.A2uiSurfaceState
 import com.letta.mobile.data.channel.CurrentConversationTracker
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.timeline.TimelineRepository
+import com.letta.mobile.data.timeline.TimelineSyncLoop
 import com.letta.mobile.data.timeline.TimelineSyncEvent
+import com.letta.mobile.data.timeline.Timeline
 import kotlinx.collections.immutable.toPersistentMap
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,6 +28,7 @@ import com.letta.mobile.feature.chat.screen.AdminChatViewModel
 import com.letta.mobile.util.Telemetry
 
 import kotlin.time.Duration.Companion.milliseconds
+import com.letta.mobile.data.timeline.TimelineAcquisitionProvenance
 /**
  * Owns the long-lived timeline subscriptions and projection of timeline events
  * into [ChatUiState]. [AdminChatViewModel] still decides when to bind a
@@ -82,21 +87,50 @@ internal class ChatTimelineObserver(
     /** Agent/conversation id pair the current observer job is bound to. */
     private var observerBinding: TimelineObserverBinding? = null
     private var hydrationGeneration: ChatHydrationTrace.Generation? = null
+    private var warmBootstrap: WarmBootstrap? = null
 
     fun stop() {
         observerJob?.cancel()
         observerJob = null
         hydrateSignalJob?.cancel()
         hydrateSignalJob = null
+        clearObserverBinding()
+    }
+
+    suspend fun stopAndJoin() {
+        val observer = observerJob
+        val hydrate = hydrateSignalJob
+        observerJob = null
+        hydrateSignalJob = null
+        observer?.cancelAndJoin()
+        hydrate?.cancelAndJoin()
+        clearObserverBinding()
+    }
+
+    private fun clearObserverBinding() {
         observerBinding = null
         hydrationGeneration = null
+        warmBootstrap = null
         awaitingProjectionAfterHydrate = false
         presenter.reset()
     }
 
     fun start(conversationId: String) = start(agentId = null, conversationId = conversationId)
 
-    fun start(agentId: String?, conversationId: String) {
+    /**
+     * letta-mobile-grrhq: provenance for the acquisition this bind performs.
+     * Deliberately a SEPARATE field rather than a [TimelineObserverBinding]
+     * member — binding equality drives rebind/keep-projection decisions, so
+     * putting diagnostic data in it would change behavior.
+     */
+    private var pendingProvenance: TimelineAcquisitionProvenance = TimelineAcquisitionProvenance.UNSPECIFIED
+
+    fun start(
+        agentId: String?,
+        conversationId: String,
+        provenance: TimelineAcquisitionProvenance = TimelineAcquisitionProvenance.UNSPECIFIED,
+    ) {
+        pendingProvenance = provenance
         val binding = TimelineObserverBinding(agentId = agentId, conversationId = conversationId)
         val bindingSame = observerBinding == binding
         val jobActive = observerJob?.isActive == true
@@ -104,258 +138,332 @@ internal class ChatTimelineObserver(
 
         observerJob?.cancel()
         hydrateSignalJob?.cancel()
+        observerBinding = binding
+        warmBootstrap = null
         if (!bindingSame) {
-            // Binding change (conversation and/or agent): drop projection cache
-            // and clear stale rows so we never flash the previous agent's
-            // messages when both share conversation id "default", then hold the
-            // skeleton until hydrate/projection completes.
             presenter.reset()
-            uiState.value = uiState.value.copy(
-                messages = kotlinx.collections.immutable.persistentListOf(),
-                messageListChange = com.letta.mobile.data.chat.projection.ChatMessageListChange.Full,
-                isLoadingMessages = true,
-            )
+            val cachedTimeline = timelineRepository.peekCached(agentId, conversationId)
+            if (cachedTimeline != null) {
+                // Project the target loop synchronously so its identity and rows
+                // become visible in one publication. Empty is a ready cache hit.
+                val previous = uiState.value
+                val projection = presenter.project(
+                    timeline = cachedTimeline,
+                    prefix = presenter.olderPrefixFor(conversationId),
+                    previousState = previous,
+                    isActiveRunStreaming = hasActiveChatTurn(),
+                    ownAgentId = agentId,
+                )
+                publishProjection(binding, projection, generation = null).let {
+                    uiState.value = reconcileCollapsedRunsOnProjection(
+                        it.previous,
+                        it.next.copy(isLoadingMessages = false),
+                    )
+                }
+                warmBootstrap = WarmBootstrap(binding, cachedTimeline)
+            } else {
+                uiState.value = uiState.value.copy(
+                    messages = kotlinx.collections.immutable.persistentListOf(),
+                    messageListChange = com.letta.mobile.data.chat.projection.ChatMessageListChange.Full,
+                    isLoadingMessages = true,
+                )
+            }
         } else {
             // Same binding rebind (job died / restart): keep projection
             // cache + visible messages so Compose retains item identity.
             uiState.value = uiState.value.copy(isLoadingMessages = true)
         }
-        observerBinding = binding
         hydrationGeneration = ChatHydrationTrace.begin(hydrationIdentity(agentId, conversationId), reuseIfActive = true)
-        val generation = hydrationGeneration
-        observerJob = scope.launch {
-            val flow = try {
-                timelineRepository.observe(agentId, conversationId)
-            } catch (e: Exception) {
-                android.util.Log.e("AdminChatViewModel", "Timeline observe failed", e)
+        observerJob = launchObserver(binding, hydrationGeneration)
+    }
+
+    private suspend fun observeTimeline(
+        agentId: String?,
+        conversationId: String,
+        provenance: TimelineAcquisitionProvenance,
+    ): StateFlow<Timeline> = if (provenance == TimelineAcquisitionProvenance.UNSPECIFIED) {
+        timelineRepository.observe(agentId, conversationId)
+    } else {
+        timelineRepository.observe(agentId, conversationId, provenance)
+    }
+
+    private suspend fun getOrCreateTimelineLoop(
+        agentId: String?,
+        conversationId: String,
+        provenance: TimelineAcquisitionProvenance,
+    ): TimelineSyncLoop = if (provenance == TimelineAcquisitionProvenance.UNSPECIFIED) {
+        timelineRepository.getOrCreate(agentId, conversationId)
+    } else {
+        timelineRepository.getOrCreate(agentId, conversationId, provenance)
+    }
+
+    private fun launchObserver(
+        binding: TimelineObserverBinding,
+        generation: ChatHydrationTrace.Generation?,
+    ): Job = scope.launch {
+        val flow = try {
+            observeTimeline(binding.agentId, binding.conversationId, pendingProvenance)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            android.util.Log.e("AdminChatViewModel", "Timeline observe failed", failure)
+            if (observerBinding == binding) {
                 uiState.value = uiState.value.copy(
-                    error = "Timeline init failed: ${e.message}",
+                    error = "Couldn't sync conversation — pull to refresh",
                     isLoadingMessages = false,
                 )
-                return@launch
             }
+            return@launch
+        }
 
-            val loop = timelineRepository.getOrCreate(agentId, conversationId)
-            currentConversationTracker.setCurrent(conversationId)
-            hydrateSignalJob = scope.launch {
-                loop.events.collect { ev ->
-                    when (ev) {
-                        is TimelineSyncEvent.Hydrated -> {
-                            generation?.let { ChatHydrationTrace.sourceReady(it, source = "timeline", count = ev.messageCount) }
-                            android.util.Log.i(
-                                "AdminChatViewModel",
-                                "Timeline ready conv=$conversationId count=${ev.messageCount}",
-                            )
-                            val prev = uiState.value
-                            // Keep the skeleton until projection has actually
-                            // produced rows when hydrate reports a nonempty page.
-                            // If projection later yields zero UI rows (system-only
-                            // history), the first collect still clears loading.
-                            awaitingProjectionAfterHydrate =
-                                ev.messageCount > 0 && prev.messages.isEmpty()
-                            uiState.value = prev.copy(
-                                isLoadingMessages = awaitingProjectionAfterHydrate,
-                            )
-                        }
-                        is TimelineSyncEvent.HydrateFailed -> {
-                            generation?.let { ChatHydrationTrace.sourceUnavailable(it, source = "timeline") }
-                            awaitingProjectionAfterHydrate = false
-                            uiState.value = uiState.value.copy(isLoadingMessages = false)
-                        }
-                        is TimelineSyncEvent.ReconcileError -> {
-                            // The assistant reply may already be visible from
-                            // stream Confirmed events; surface sync failure and
-                            // clear stuck typing indicators.
-                            val prevState = uiState.value
-                            uiState.value = reconcileCollapsedRunsOnProjection(
-                                prevState,
-                                prevState.copy(
-                                    error = "Couldn't sync agent reply — pull to refresh",
-                                    isStreaming = false,
-                                    isAgentTyping = false,
-                                ),
-                            )
-                        }
-                        else -> Unit
+        if (observerBinding != binding) return@launch
+        val loop = getOrCreateTimelineLoop(binding.agentId, binding.conversationId, pendingProvenance)
+        if (observerBinding != binding) return@launch
+        currentConversationTracker.setCurrent(binding.conversationId)
+        hydrateSignalJob = launchHydrationCollector(loop, binding, generation)
+
+        try {
+            // letta-mobile-yflpp COALESCE: during streaming the
+            // authoritative Timeline StateFlow can produce ~20 updates/sec
+            // (one per token delta + shadow-holder parity churn). `flow` is
+            // a StateFlow, which is already conflated — a collector that
+            // suspends (e.g. on the projection dispatcher or the frame-pace
+            // delay below) only ever sees the LATEST value when it resumes,
+            // never a backlog. Together with that pacing delay the
+            // projection runs at most ~once per frame instead of once per
+            // delta, so Compose hit-testing / gesture handling get a clean
+            // pass and tool-card taps land mid-stream.
+            flow.collect { timeline ->
+                if (observerBinding != binding) return@collect
+                val conversationId = binding.conversationId
+                if (Telemetry.isTimelineSyncGateDebugEnabled()) {
+                    Telemetry.event(
+                        "TimelineSyncIngest", "gate6.timelineCollected",
+                        "conversationId" to conversationId,
+                        "count" to timeline.events.size,
+                        level = Telemetry.Level.DEBUG,
+                    )
+                }
+                val prefix = presenter.olderPrefixFor(conversationId)
+                val previousState = uiState.value
+                val projection = withContext(projectionDispatcher) {
+                    presenter.project(
+                        timeline = timeline,
+                        prefix = prefix,
+                        previousState = previousState,
+                        // letta-mobile-dir4k.1: thread the transport's
+                        // "turn in flight" latch into the projector so
+                        // [TimelineProjection.anyRunActive] stays true
+                        // across inter-tool-call gaps where no
+                        // `isPending=true` message is currently in `live`.
+                        // Without this the Thinking chip drops mid-turn
+                        // between tools (regression introduced by PR
+                        // #1119 — see bead letta-mobile-dir4k.1).
+                        isActiveRunStreaming = hasActiveChatTurn(),
+                        ownAgentId = binding.agentId,
+                    )
+                }
+
+                if (observerBinding != binding) return@collect
+
+                if (suppressWarmBootstrapReplay(binding, timeline, projection, generation)) {
+                    return@collect
+                }
+
+                // letta-mobile-yflpp DEDUPE: a no-op streaming tick (the
+                // tail event was re-emitted unchanged) projects to a UI
+                // byte-identical to the screen. Skip the uiState write so we
+                // don't allocate a new ChatUiState and force a recomposition
+                // storm over every tool card. Telemetry was already emitted
+                // as uiProjection.suppressed by the presenter.
+                if (projection.noChange) {
+                    publishPresenceOnly(binding, projection, generation)?.let {
+                        uiState.value = reconcileCollapsedRunsOnProjection(it.previous, it.next)
                     }
+                    return@collect
+                }
+                publishProjection(binding, projection, generation).let {
+                    uiState.value = reconcileCollapsedRunsOnProjection(it.previous, it.next)
+                }
+
+                // letta-mobile-yflpp COALESCE: pace real updates to at most
+                // ~one per frame. conflate() already drops backlog while we
+                // were projecting; this delay guarantees a minimum gap
+                // between writes so a burst of genuine token deltas can't
+                // peg the UI thread with >60 recompositions/sec. The latest
+                // value is always re-read after the delay, so no update is
+                // lost — they just collapse to frame cadence. A zero
+                // interval (tests) disables pacing so virtual-clock tests
+                // that drive emissions with runCurrent() stay synchronous.
+                if (projectionFrameIntervalMs > 0L) {
+                    delay(projectionFrameIntervalMs.milliseconds)
                 }
             }
+        } finally {
+            hydrateSignalJob?.cancel()
+        }
+    }
 
-            try {
-                // letta-mobile-yflpp COALESCE: during streaming the
-                // authoritative Timeline StateFlow can produce ~20 updates/sec
-                // (one per token delta + shadow-holder parity churn). `flow` is
-                // a StateFlow, which is already conflated â€” a collector that
-                // suspends (e.g. on the projection dispatcher or the frame-pace
-                // delay below) only ever sees the LATEST value when it resumes,
-                // never a backlog. Together with that pacing delay the
-                // projection runs at most ~once per frame instead of once per
-                // delta, so Compose hit-testing / gesture handling get a clean
-                // pass and tool-card taps land mid-stream.
-                flow.collect { timeline ->
-                    if (Telemetry.isTimelineSyncGateDebugEnabled()) {
-                        Telemetry.event(
-                            "TimelineSyncIngest", "gate6.timelineCollected",
-                            "conversationId" to conversationId,
-                            "count" to timeline.events.size,
-                            level = Telemetry.Level.DEBUG,
-                        )
-                    }
-                    val prefix = presenter.olderPrefixFor(conversationId)
-                    val previousState = uiState.value
-                    val projection = withContext(projectionDispatcher) {
-                        presenter.project(
-                            timeline = timeline,
-                            prefix = prefix,
-                            previousState = previousState,
-                            // letta-mobile-dir4k.1: thread the transport's
-                            // "turn in flight" latch into the projector so
-                            // [TimelineProjection.anyRunActive] stays true
-                            // across inter-tool-call gaps where no
-                            // `isPending=true` message is currently in `live`.
-                            // Without this the Thinking chip drops mid-turn
-                            // between tools (regression introduced by PR
-                            // #1119 — see bead letta-mobile-dir4k.1).
-                            isActiveRunStreaming = hasActiveChatTurn(),
-                            ownAgentId = observerBinding?.agentId,
-                        )
-                    }
-
-                    // letta-mobile-yflpp DEDUPE: a no-op streaming tick (the
-                    // tail event was re-emitted unchanged) projects to a UI
-                    // byte-identical to the screen. Skip the uiState write so we
-                    // don't allocate a new ChatUiState and force a recomposition
-                    // storm over every tool card. Telemetry was already emitted
-                    // as uiProjection.suppressed by the presenter.
-                    if (projection.noChange) {
-                        val prev = uiState.value
-                        if (isFollowingDuplicateInitialMessageInFlight() && projection.tailIsAssistant) {
-                            clearFollowingDuplicateInitialMessageInFlight()
-                        }
-                        val a2uiStartMessageCount = a2uiThinkingStartMessageCount()
-                        val a2uiResponseArrived = a2uiStartMessageCount != null && projection.ui
-                            .drop(a2uiStartMessageCount)
-                            .any { it.role == "assistant" && !it.isReasoning }
-                        if (a2uiResponseArrived) {
-                            clearA2uiThinkingOnResponse()
-                        }
-                        val presentation = presenter.present(
-                            projection = projection,
-                            signals = ChatPresenceSignals(
-                                replyStreaming = activeReplyStreams.value.contains(conversationId) ||
-                                    projection.hasGrowingPassiveModelTail(prev),
-                                clientModeStreamInFlight = isClientModeStreamInFlight(),
-                                a2uiThinkingActive = a2uiStartMessageCount != null && !a2uiResponseArrived,
-                                duplicateInitialMessageInFlight = isFollowingDuplicateInitialMessageInFlight(),
-                                turnInFlight = hasActiveChatTurn(),
-                            ),
-                            previousIsStreaming = prev.isStreaming,
-                            previousIsAgentTyping = prev.isAgentTyping,
-                        )
-                        if (presentation.isStreaming != prev.isStreaming || presentation.isAgentTyping != prev.isAgentTyping) {
-                            generation?.let {
-                                ChatHydrationTrace.activityChanged(
-                                    it,
-                                    active = presentation.isStreaming || presentation.isAgentTyping,
-                                    reason = "presence_only",
-                                )
-                            }
-                            uiState.value = reconcileCollapsedRunsOnProjection(
-                                prev,
-                                prev.copy(
-                                    isStreaming = presentation.isStreaming,
-                                    isAgentTyping = presentation.isAgentTyping,
-                                ),
-                            )
-                        }
-                        return@collect
-                    }
-                    val ui = projection.ui
-                    val a2uiSurfaces = syncA2uiHistorySnapshot(conversationId, projection.a2uiMessages)
-                    val tailIsAssistant = projection.tailIsAssistant
-                    val clearLoading = ui.isNotEmpty() || awaitingProjectionAfterHydrate
-                    if (clearLoading) awaitingProjectionAfterHydrate = false
-                    val newHasMoreOlder = if (projection.anyConfirmed) true else uiState.value.hasMoreOlderMessages
-
-                    if (isFollowingDuplicateInitialMessageInFlight() && tailIsAssistant) {
-                        clearFollowingDuplicateInitialMessageInFlight()
-                    }
-                    // Platform stream signals — computed on the collect coroutine
-                    // (NOT the projection dispatcher) because they read/clear
-                    // ViewModel flags and inspect the projected list. The shared
-                    // presenter then derives the streaming/typing presence.
-                    // prev is captured before the a2ui side effect, matching the
-                    // pre-refactor ordering.
-                    val prev = uiState.value
-                    val a2uiStartMessageCount = a2uiThinkingStartMessageCount()
-                    val a2uiResponseArrived = a2uiStartMessageCount != null && ui
-                        .drop(a2uiStartMessageCount)
-                        .any { it.role == "assistant" && !it.isReasoning }
-                    if (a2uiResponseArrived) {
-                        clearA2uiThinkingOnResponse()
-                    }
-                    val presentation = presenter.present(
-                        projection = projection,
-                        signals = ChatPresenceSignals(
-                            replyStreaming = activeReplyStreams.value.contains(conversationId) ||
-                                projection.hasGrowingPassiveModelTail(prev),
-                            clientModeStreamInFlight = isClientModeStreamInFlight(),
-                            a2uiThinkingActive = a2uiStartMessageCount != null && !a2uiResponseArrived,
-                            duplicateInitialMessageInFlight = isFollowingDuplicateInitialMessageInFlight(),
-                            turnInFlight = hasActiveChatTurn(),
-                        ),
-                        previousIsStreaming = prev.isStreaming,
-                        previousIsAgentTyping = prev.isAgentTyping,
-                    )
-                    val nextIsStreaming = presentation.isStreaming
-                    val nextIsAgentTyping = presentation.isAgentTyping
-
-                    generation?.let {
-                        ChatHydrationTrace.presentationPublished(
-                            it,
-                            commitReason = projection.messageListChange::class.simpleName ?: "unknown",
-                            messageCount = ui.size,
-                            missingOptionalSources = if (projection.a2uiMessages.isEmpty()) "a2ui" else "none",
-                        )
-                        if (nextIsStreaming != prev.isStreaming || nextIsAgentTyping != prev.isAgentTyping) {
-                            ChatHydrationTrace.activityChanged(
-                                it,
-                                active = nextIsStreaming || nextIsAgentTyping,
-                                reason = "projection_presence",
-                            )
-                        }
-                    }
+    private fun launchHydrationCollector(
+        loop: TimelineSyncLoop,
+        binding: TimelineObserverBinding,
+        generation: ChatHydrationTrace.Generation?,
+    ): Job = scope.launch {
+        loop.events.collect { ev ->
+            if (observerBinding != binding) return@collect
+            when (ev) {
+                is TimelineSyncEvent.ReconcileError -> {
+                    val previous = uiState.value
                     uiState.value = reconcileCollapsedRunsOnProjection(
-                        prev,
-                        prev.copy(
-                            messages = ui,
-                            messageListChange = projection.messageListChange,
-                            a2uiSurfaces = a2uiSurfaces.toPersistentMap(),
-                            isLoadingMessages = if (clearLoading) false else prev.isLoadingMessages,
-                            isStreaming = nextIsStreaming,
-                            isAgentTyping = nextIsAgentTyping,
-                            hasMoreOlderMessages = newHasMoreOlder,
+                        previous,
+                        previous.copy(
+                            error = "Couldn't sync agent reply — pull to refresh",
+                            isStreaming = false,
+                            isAgentTyping = false,
                         ),
                     )
-
-                    // letta-mobile-yflpp COALESCE: pace real updates to at most
-                    // ~one per frame. conflate() already drops backlog while we
-                    // were projecting; this delay guarantees a minimum gap
-                    // between writes so a burst of genuine token deltas can't
-                    // peg the UI thread with >60 recompositions/sec. The latest
-                    // value is always re-read after the delay, so no update is
-                    // lost â€” they just collapse to frame cadence. A zero
-                    // interval (tests) disables pacing so virtual-clock tests
-                    // that drive emissions with runCurrent() stay synchronous.
-                    if (projectionFrameIntervalMs > 0L) {
-                        delay(projectionFrameIntervalMs.milliseconds)
-                    }
                 }
-            } finally {
-                hydrateSignalJob?.cancel()
+                else -> handleHydrationEvent(ev, binding, generation)
             }
         }
     }
+
+    private fun handleHydrationEvent(
+        event: TimelineSyncEvent,
+        binding: TimelineObserverBinding,
+        generation: ChatHydrationTrace.Generation?,
+    ) {
+        when (event) {
+            is TimelineSyncEvent.Hydrated -> {
+                generation?.let { ChatHydrationTrace.sourceReady(it, source = "timeline", count = event.messageCount) }
+                android.util.Log.i(
+                    "AdminChatViewModel",
+                    "Timeline ready conv=${binding.conversationId} count=${event.messageCount}",
+                )
+                val previous = uiState.value
+                awaitingProjectionAfterHydrate = event.messageCount > 0 && previous.messages.isEmpty()
+                uiState.value = previous.copy(isLoadingMessages = awaitingProjectionAfterHydrate)
+            }
+            is TimelineSyncEvent.HydrateFailed -> {
+                generation?.let { ChatHydrationTrace.sourceUnavailable(it, source = "timeline") }
+                awaitingProjectionAfterHydrate = false
+                uiState.value = uiState.value.copy(isLoadingMessages = false)
+            }
+            else -> Unit
+        }
+    }
+
+    private fun publishProjection(
+        binding: TimelineObserverBinding,
+        projection: TimelineProjection,
+        generation: ChatHydrationTrace.Generation?,
+    ): UiStatePublication {
+        val ui = projection.ui
+        val surfaces = syncA2uiHistorySnapshot(binding.conversationId, projection.a2uiMessages)
+        val clearLoading = ui.isNotEmpty() || awaitingProjectionAfterHydrate
+        if (clearLoading) awaitingProjectionAfterHydrate = false
+        if (isFollowingDuplicateInitialMessageInFlight() && projection.tailIsAssistant) {
+            clearFollowingDuplicateInitialMessageInFlight()
+        }
+        val previous = uiState.value
+        val thinkingStart = a2uiThinkingStartMessageCount()
+        val responseArrived = thinkingStart != null && ui
+            .drop(thinkingStart)
+            .any { it.role == "assistant" && !it.isReasoning }
+        if (responseArrived) clearA2uiThinkingOnResponse()
+        val presentation = presenter.present(
+            projection = projection,
+            signals = presenceSignals(
+                PresenceRequest(binding, projection, previous, thinkingStart, responseArrived),
+            ),
+            previousIsStreaming = previous.isStreaming,
+            previousIsAgentTyping = previous.isAgentTyping,
+        )
+        recordPresentation(
+            PresentationRecord(generation, projection, previous, presentation.isStreaming, presentation.isAgentTyping),
+        )
+        return UiStatePublication(
+            previous = previous,
+            next = previous.copy(
+                messages = ui,
+                messageListChange = projection.messageListChange,
+                a2uiSurfaces = surfaces.toPersistentMap(),
+                isLoadingMessages = if (clearLoading) false else previous.isLoadingMessages,
+                isStreaming = presentation.isStreaming,
+                isAgentTyping = presentation.isAgentTyping,
+                hasMoreOlderMessages = projection.anyConfirmed || previous.hasMoreOlderMessages,
+            ),
+        )
+    }
+
+    private fun recordPresentation(record: PresentationRecord) {
+        val generation = record.generation ?: return
+        ChatHydrationTrace.presentationPublished(
+            generation,
+            commitReason = record.projection.messageListChange::class.simpleName ?: "unknown",
+            messageCount = record.projection.ui.size,
+            missingOptionalSources = if (record.projection.a2uiMessages.isEmpty()) "a2ui" else "none",
+        )
+        if (record.isStreaming != record.previous.isStreaming ||
+            record.isAgentTyping != record.previous.isAgentTyping
+        ) {
+            ChatHydrationTrace.activityChanged(
+                generation,
+                active = record.isStreaming || record.isAgentTyping,
+                reason = "projection_presence",
+            )
+        }
+    }
+
+    private fun publishPresenceOnly(
+        binding: TimelineObserverBinding,
+        projection: TimelineProjection,
+        generation: ChatHydrationTrace.Generation?,
+    ): UiStatePublication? {
+        val previous = uiState.value
+        if (isFollowingDuplicateInitialMessageInFlight() && projection.tailIsAssistant) {
+            clearFollowingDuplicateInitialMessageInFlight()
+        }
+        val thinkingStart = a2uiThinkingStartMessageCount()
+        val responseArrived = thinkingStart != null && projection.ui
+            .drop(thinkingStart)
+            .any { it.role == "assistant" && !it.isReasoning }
+        if (responseArrived) clearA2uiThinkingOnResponse()
+        val presentation = presenter.present(
+            projection = projection,
+            signals = presenceSignals(
+                PresenceRequest(binding, projection, previous, thinkingStart, responseArrived),
+            ),
+            previousIsStreaming = previous.isStreaming,
+            previousIsAgentTyping = previous.isAgentTyping,
+        )
+        if (presentation.isStreaming == previous.isStreaming &&
+            presentation.isAgentTyping == previous.isAgentTyping
+        ) return null
+        generation?.let {
+            ChatHydrationTrace.activityChanged(
+                it,
+                active = presentation.isStreaming || presentation.isAgentTyping,
+                reason = "presence_only",
+            )
+        }
+        return UiStatePublication(
+            previous = previous,
+            next = previous.copy(
+                isStreaming = presentation.isStreaming,
+                isAgentTyping = presentation.isAgentTyping,
+            ),
+        )
+    }
+
+    private fun presenceSignals(request: PresenceRequest) = ChatPresenceSignals(
+        replyStreaming = activeReplyStreams.value.contains(request.binding.conversationId) ||
+            request.projection.hasGrowingPassiveModelTail(request.previous),
+        clientModeStreamInFlight = isClientModeStreamInFlight(),
+        a2uiThinkingActive = request.thinkingStart != null && !request.responseArrived,
+        duplicateInitialMessageInFlight = isFollowingDuplicateInitialMessageInFlight(),
+        turnInFlight = hasActiveChatTurn(),
+    )
 
     fun mergeOlderPage(
         conversationId: String,
@@ -397,10 +505,58 @@ internal class ChatTimelineObserver(
     private fun UiMessage.isModelOutputRow(tailIsAssistant: Boolean): Boolean =
         role == "assistant" && (isReasoning || tailIsAssistant)
 
+    private data class UiStatePublication(
+        val previous: ChatUiState,
+        val next: ChatUiState,
+    )
+
+    private data class PresentationRecord(
+        val generation: ChatHydrationTrace.Generation?,
+        val projection: TimelineProjection,
+        val previous: ChatUiState,
+        val isStreaming: Boolean,
+        val isAgentTyping: Boolean,
+    )
+
+    private data class PresenceRequest(
+        val binding: TimelineObserverBinding,
+        val projection: TimelineProjection,
+        val previous: ChatUiState,
+        val thinkingStart: Int?,
+        val responseArrived: Boolean,
+    )
+
     private data class TimelineObserverBinding(
         val agentId: String?,
         val conversationId: String,
     )
+
+    private data class WarmBootstrap(
+        val binding: TimelineObserverBinding,
+        val timeline: Timeline,
+    )
+
+    private fun suppressWarmBootstrapReplay(
+        binding: TimelineObserverBinding,
+        timeline: Timeline,
+        projection: TimelineProjection,
+        generation: ChatHydrationTrace.Generation?,
+    ): Boolean {
+        val bootstrap = warmBootstrap?.takeIf { it.binding == binding } ?: return false
+        warmBootstrap = null
+        if (timeline !== bootstrap.timeline || !projection.noChange) return false
+
+        publishPresenceOnly(binding, projection, generation)?.let { publication ->
+            val reconciled = reconcileCollapsedRunsOnProjection(publication.previous, publication.next)
+            if (reconciled != publication.previous) uiState.value = reconciled
+        }
+        Telemetry.event(
+            "TimelineSync", "warmBootstrap.suppressed",
+            "conversationId" to binding.conversationId,
+            "eventCount" to timeline.events.size,
+        )
+        return true
+    }
 
     private companion object {
         // letta-mobile-yflpp COALESCE: minimum gap between projection writes.

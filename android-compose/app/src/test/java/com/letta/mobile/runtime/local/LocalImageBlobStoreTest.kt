@@ -14,6 +14,38 @@ class LocalImageBlobStoreTest {
     val tempFolder = TemporaryFolder()
 
     @Test
+    fun `reads reject traversal and do not create directories`() {
+        val directory = tempFolder.root.resolve("absent")
+        val store = LocalImageBlobStore(directory)
+        assertNull(store.getBytes("sha256:../../secret"))
+        assertFalse(store.has("sha256:../../secret"))
+        assertNull(store.getBytes("sha256:" + "a".repeat(64)))
+        assertFalse(directory.exists())
+    }
+
+    @Test
+    fun `corrupt blob fails hash verification and is repaired atomically`() {
+        val store = LocalImageBlobStore(tempFolder.root)
+        val bytes = "original".toByteArray()
+        val ref = store.putBytes("image/png", bytes)
+        tempFolder.root.resolve("blobs/${ref.removePrefix("sha256:")}.png").writeText("corrupt")
+        assertNull(store.getBytes(ref))
+        assertEquals(ref, store.putBytes("image/png", bytes))
+        assertArrayEquals(bytes, store.getBytes(ref))
+    }
+
+    @Test
+    fun `oversized blob rejected before storage`() {
+        val store = LocalImageBlobStore(tempFolder.root)
+        try {
+            store.putBytes("image/png", ByteArray(LocalImageBlobStore.MAX_BLOB_BYTES + 1))
+            org.junit.Assert.fail("Expected size rejection")
+        } catch (_: IllegalArgumentException) {
+            assertFalse(tempFolder.root.resolve("blobs").exists())
+        }
+    }
+
+    @Test
     fun `putBytes returns sha256 ref and stores blob`() {
         val store = LocalImageBlobStore(tempFolder.root)
         val bytes = "Hello, World!".toByteArray()

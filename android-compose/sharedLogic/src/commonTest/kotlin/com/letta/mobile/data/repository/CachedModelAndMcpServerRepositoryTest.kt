@@ -231,6 +231,26 @@ class CachedModelRepositoryTest {
     }
 
     @Test
+    fun refreshLlmModelsReplacesPriorSnapshotAndDoesNotAccumulateDuplicates() = runTest {
+        val duplicate = model("openai/gpt-4o")
+        val remote = FakeModelRemoteSource(
+            llmModels = listOf(duplicate, duplicate, model("anthropic/claude")),
+        )
+        val repository = CachedModelRepository(remote)
+
+        repository.refreshLlmModels()
+        assertEquals(
+            listOf("openai/gpt-4o", "anthropic/claude"),
+            repository.llmModels.value.map { it.handle },
+        )
+
+        remote.llmModels = listOf(model("google/gemini"))
+        repository.refreshLlmModels()
+
+        assertEquals(listOf("google/gemini"), repository.llmModels.value.map { it.handle })
+    }
+
+    @Test
     fun refreshEmbeddingModelsUsesRemoteWhenNotLocalOrIroh() = runTest {
         val remote = FakeModelRemoteSource(
             embeddingModels = listOf(EmbeddingModel(id = "embed-1", name = "Embed", handle = "openai/embed")),
@@ -254,7 +274,7 @@ class CachedModelRepositoryTest {
     }
 
     private class FakeModelRemoteSource(
-        private val llmModels: List<LlmModel> = emptyList(),
+        var llmModels: List<LlmModel> = emptyList(),
         private val embeddingModels: List<EmbeddingModel> = emptyList(),
     ) : ModelRemoteSource {
         var llmCalls = 0

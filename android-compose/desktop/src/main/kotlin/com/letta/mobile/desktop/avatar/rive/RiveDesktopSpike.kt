@@ -1,0 +1,708 @@
+package com.letta.mobile.desktop.avatar.rive
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInParent
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.application
+import androidx.compose.ui.window.rememberWindowState
+import com.letta.mobile.avatar.core.AvatarGesture
+import com.letta.mobile.avatar.core.AvatarLookTarget
+import com.letta.mobile.avatar.core.AvatarState
+import com.letta.mobile.avatar.core.GazeDirector
+import com.letta.mobile.avatar.core.GazeDriveMode
+import com.letta.mobile.avatar.core.GazePoint
+import com.letta.mobile.avatar.core.GazeTarget
+import com.letta.mobile.avatar.core.GazeWorld
+import com.letta.mobile.avatar.core.MascotIdentity
+import com.letta.mobile.avatar.core.MascotPalette
+import com.letta.mobile.avatar.core.MascotShape
+import com.letta.mobile.avatar.rive.MASCOT_MODEL
+import com.letta.mobile.avatar.rive.RiveAvatarContract
+import com.letta.mobile.avatar.rive.RiveAvatarRuntime
+import java.io.File
+import kotlinx.coroutines.delay
+
+/** `-Drive.spike.selfTest=true` starts with the auto-cycle on (states, identities, triggers). */
+private val SELF_TEST = System.getProperty("rive.spike.selfTest").toBoolean()
+
+/**
+ * letta-mobile-0s5bi spike window. Two native Rive scenes side by side, both plain Compose nodes:
+ *
+ *  - Left (optional): any `.riv` (`-PriveFile`), clickable, with its state machine's trigger inputs
+ *    exposed as buttons. This is the feathering check - the glow and blur must survive.
+ *  - Right: the shipped mascot driven through the SAME [RiveAvatarRuntime] Android uses, over the
+ *    desktop [RiveDesktopScene.inputSink], inside a review bench: auto-cycle toggle, every state,
+ *    identity (shape x colour), gaze from the cursor or sliders, mouth, and the surround - page
+ *    and frame as art-directable grounds (base colour plus draggable radial lights), the frame in
+ *    several shapes at any size, the mascot scaled inside it so it can be clipped.
+ *
+ * Args: `<file.riv> [stateMachine] [trigger,trigger,...] [mascot.riv]`.
+ */
+fun main(args: Array<String>) = application {
+    // Gradle passes every arg, blank when the property is unset; a blank path is "not given".
+    val file = args.getOrNull(0)?.takeIf { it.isNotBlank() }?.let(::File)
+    val stateMachine = args.getOrNull(1)?.takeIf { it.isNotBlank() }
+    val triggers = args.getOrNull(2)?.split(',')?.filter { it.isNotBlank() }.orEmpty()
+    val mascot = args.getOrNull(3)?.takeIf { it.isNotBlank() }?.let(::File)
+
+    Window(
+        onCloseRequest = ::exitApplication,
+        title = "Rive native spike (D3D11)",
+        state = rememberWindowState(width = 1320.dp, height = 900.dp),
+    ) {
+        MaterialTheme(colorScheme = darkColorScheme()) {
+            // A bare `-PriveFile` (no state machine, no triggers) is a build of the mascot itself -
+            // a `--solo` or a `--probe` variant - so the bench reviews THAT instead of the shipped
+            // file: the scenarios, the onion skin and the telemetry panel all want the same scene.
+            // `-PriveFile` with a state machine or triggers is still the second column.
+            val benchFile = benchFileOf(file, stateMachine, triggers) ?: mascot
+            val secondColumn = file?.takeIf { it != benchFile }
+            Row(Modifier.fillMaxSize().background(Color(0xFF1A1A1A)), horizontalArrangement = Arrangement.spacedBy(0.dp)) {
+                if (secondColumn != null) {
+                    SceneColumn(secondColumn, stateMachine, triggers, Modifier.weight(1f).padding(16.dp))
+                }
+                if (benchFile != null) {
+                    MascotBench(benchFile, Modifier.weight(if (secondColumn != null) 1.4f else 1f))
+                }
+            }
+        }
+    }
+}
+
+/** `file` when it is a bare build of the mascot (no state machine, no triggers), else null. */
+private fun benchFileOf(file: File?, stateMachine: String?, triggers: List<String>): File? {
+    val bare = stateMachine == null && triggers.isEmpty()
+    return file?.takeIf { bare }
+}
+
+@Composable
+private fun rememberScene(bytes: ByteArray, stateMachine: String?): RiveDesktopScene {
+    val scene = remember(bytes) { RiveDesktopScene.create().also { it.load(bytes, RiveSceneTarget(stateMachine)) } }
+    DisposableEffect(scene) { onDispose { scene.close() } }
+    return scene
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SceneColumn(file: File, stateMachine: String?, triggers: List<String>, modifier: Modifier) {
+    val scene = rememberScene(remember(file) { file.readBytes() }, stateMachine)
+    var nativeMs by remember { mutableStateOf(0.0) }
+    LaunchedEffect(scene) {
+        if (!SELF_TEST || triggers.isEmpty()) return@LaunchedEffect
+        while (true) {
+            for (name in triggers) {
+                println("rive-spike self-test: trigger $name fired=${scene.fireTrigger(name)}")
+                delay(2000)
+            }
+        }
+    }
+    Column(modifier.fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("${file.name}  |  ${scene.adapterName}  |  render+readback %.2f ms".format(nativeMs), color = Color.LightGray)
+        RiveDesktopSurface(scene, Modifier.weight(1f).fillMaxSize(), onFrameStats = { nativeMs = it })
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            triggers.forEach { name -> OutlinedButton(onClick = { scene.fireTrigger(name) }) { Text(name) } }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Review bench
+// ---------------------------------------------------------------------------------------------
+
+/** Surrounds worth judging the mascot against: the app's darks and lights plus the palette itself. */
+private val SURROUND_COLORS: List<Int> = listOf(
+    0xFF000000.toInt(), 0xFF101010.toInt(), 0xFF1A1A1A.toInt(), 0xFF242424.toInt(), 0xFF2E2E33.toInt(), 0xFF3A3A40.toInt(),
+    0xFF5A5A60.toInt(), 0xFF8A8A90.toInt(), 0xFFBFBFC4.toInt(), 0xFFE6E6EA.toInt(), 0xFFF5F5F7.toInt(), 0xFFFFFFFF.toInt(),
+    0xFF0F1B2D.toInt(), 0xFF1B2A1F.toInt(), 0xFF2B1B2E.toInt(), 0xFF2E2416.toInt(),
+) + MascotPalette.ALL
+
+private enum class FrameShape(val label: String, val shape: Shape) {
+    NONE("none", RectangleShape),
+    CIRCLE("circle", CircleShape),
+    SQUIRCLE("squircle", RoundedCornerShape(30)),
+    ROUNDED("rounded", RoundedCornerShape(16.dp)),
+    SQUARE("square", RectangleShape),
+}
+
+private enum class Ground(val label: String) { PAGE("page"), FRAME("frame") }
+
+/** How the host drives the gaze. JUSTIFIED is the product behaviour; CURSOR is for checking range. */
+private enum class GazeMode(val label: String) { JUSTIFIED("justified"), CURSOR("cursor"), OFF("sliders") }
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun MascotBench(file: File, modifier: Modifier) {
+    val scene = rememberScene(remember(file) { file.readBytes() }, null)
+    val runtime = remember(scene) { RiveAvatarRuntime(scene.inputSink) }
+
+    var autoCycle by remember { mutableStateOf(SELF_TEST) }
+    var current by remember { mutableStateOf(AvatarState.IDLE) }
+    var identity by remember { mutableStateOf(MascotIdentity.DEFAULT) }
+    var mouth by remember { mutableFloatStateOf(0f) }
+    var lookX by remember { mutableFloatStateOf(0f) }
+    var lookY by remember { mutableFloatStateOf(0f) }
+    var gazeMode by remember { mutableStateOf(GazeMode.JUSTIFIED) }
+    var trackReach by remember { mutableFloatStateOf(2.5f) }   // how far (in mascot widths) the gaze saturates
+    var cursorLook by remember { mutableStateOf(0f to 0f) }    // where the cursor is, in gaze units
+    var lastCursorMove by remember { mutableStateOf(0L) }
+    var target by remember { mutableStateOf(GazeTarget.OWN) }  // what it is looking at right now
+    var showTargets by remember { mutableStateOf(true) }
+    var stageSize by remember { mutableStateOf(IntSize.Zero) }
+    var mascotBounds by remember { mutableStateOf(Rect.Zero) }
+    var headLead by remember { mutableFloatStateOf(350f) }      // ms the eyes lead the head by
+    val gaze = remember { GazeDirector() }
+
+    var page by remember { mutableStateOf(Surround(0xFF1A1A1A.toInt())) }
+    var frame by remember { mutableStateOf(Surround(0xFF2E2E33.toInt())) }
+    var frameShape by remember { mutableStateOf(FrameShape.NONE) }
+    var frameSize by remember { mutableFloatStateOf(360f) }
+    var mascotScale by remember { mutableFloatStateOf(1f) }     // mascot box = frame x scale; > 1 clips
+    var editGradients by remember { mutableStateOf(false) }
+    var ground by remember { mutableStateOf(Ground.PAGE) }
+    var selPage by remember { mutableIntStateOf(-1) }
+    var selFrame by remember { mutableIntStateOf(-1) }
+    var loaded by remember { mutableStateOf(false) }
+    val tune = remember { mutableStateMapOf("tuneScale" to 0.5f, "tunePlate" to 0.5f, "tuneGlyph" to 0.5f, "tuneMouth" to 0.5f, "tuneMouthY" to 0.5f) }
+
+    val bench = remember { BenchInstruments() }   // onion skin, telemetry, signatures (MOTION-PIPELINE section 6)
+    val onion = bench.onion
+
+    fun setState(state: AvatarState) {
+        current = state
+        runtime.applyState(state)
+    }
+
+    fun setIdentity(value: MascotIdentity) {
+        identity = value
+        RiveAvatarContract.applyIdentity(scene.inputSink, value)
+    }
+
+    fun setLook(x: Float, y: Float) {
+        lookX = x.coerceIn(-1f, 1f); lookY = y.coerceIn(-1f, 1f)
+        // Screen space is 0..1; the runtime maps it to the contract's -1..1.
+        runtime.setLookTarget(AvatarLookTarget.Screen((lookX + 1f) / 2f, (lookY + 1f) / 2f))
+    }
+
+    // Identity before the first frame (see rive/mascot/README.md, host rules), then the runtime.
+    LaunchedEffect(runtime) {
+        RiveAvatarContract.applyIdentity(scene.inputSink, identity)
+        runtime.load(MASCOT_MODEL)
+        loaded = true
+    }
+
+    // Where the UI's things are, in gaze units from the mascot's centre. The bench fakes an input
+    // field below and a timeline to the left; the product supplies the real rectangles.
+    fun lookAt(px: Float, py: Float): Pair<Float, Float> {
+        if (mascotBounds.isEmpty) return 0f to 0f
+        val reach = mascotBounds.width * trackReach / 2f
+        return ((px - mascotBounds.center.x) / reach).coerceIn(-1f, 1f) to ((py - mascotBounds.center.y) / reach).coerceIn(-1f, 1f)
+    }
+    val inputSpot = androidx.compose.ui.geometry.Offset(stageSize.width / 2f, stageSize.height - 60f)
+    val timelineSpot = androidx.compose.ui.geometry.Offset(150f, stageSize.height / 2f - 80f)
+
+    // Same GazeDirector the product ticks from MascotEntry — one implementation.
+    LaunchedEffect(gazeMode) {
+        if (gazeMode == GazeMode.OFF) {
+            setLook(0f, 0f)
+            runtime.setHeadTurn(0f, 0f)
+            return@LaunchedEffect
+        }
+        var last = System.nanoTime()
+        while (true) {
+            withFrameNanos { now ->
+                val dt = ((now - last) / 1e9f).coerceIn(0f, 0.1f)
+                last = now
+                gaze.config.headLeadSeconds = headLead / 1000f
+                gaze.config.cursorNearRadius = 1f / trackReach
+                val input = lookAt(inputSpot.x, inputSpot.y)
+                val timeline = lookAt(timelineSpot.x, timelineSpot.y)
+                val pose = gaze.tick(
+                    dt,
+                    current,
+                    GazeWorld(
+                        pointer = GazePoint(cursorLook.first, cursorLook.second),
+                        input = GazePoint(input.first, input.second),
+                        timeline = GazePoint(timeline.first, timeline.second),
+                        mode = when (gazeMode) {
+                            GazeMode.JUSTIFIED -> GazeDriveMode.JUSTIFIED
+                            GazeMode.CURSOR -> GazeDriveMode.CURSOR
+                            GazeMode.OFF -> GazeDriveMode.OFF
+                        },
+                        pointerMovedRecently = now - lastCursorMove < 500_000_000L,
+                    ),
+                )
+                target = pose.target
+                if (kotlin.math.abs(pose.lookX - lookX) > 0.002f || kotlin.math.abs(pose.lookY - lookY) > 0.002f) {
+                    setLook(pose.lookX, pose.lookY)
+                }
+                runtime.setHeadTurn(pose.headX, pose.headY)
+                if (pose.blink) runtime.playGesture(AvatarGesture(RiveAvatarRuntime.BLINK_GESTURE))
+            }
+        }
+    }
+
+    BenchInstrumentEffects(scene, loaded, bench) { autoCycle = false; it.play(::setState, runtime) }
+
+    // Tunables are plain view-model numbers; write each on change (the map is snapshot state).
+    LaunchedEffect(loaded) {
+        if (!loaded) return@LaunchedEffect
+        snapshotFlow { tune.toMap() }.collect { m -> m.forEach { (k, v) -> scene.inputSink.setNumber(k, v) } }
+    }
+
+    // Hands-free contract check: every state through the shared runtime, identity rotating
+    // independently, mouth pulsed while speaking. Off, the bench keeps whatever is set.
+    LaunchedEffect(autoCycle, loaded) {
+        if (!autoCycle || !loaded) return@LaunchedEffect
+        var tick = 0
+        while (true) {
+            for (state in AvatarState.entries) {
+                setIdentity(MascotIdentity(MascotShape.entries[tick % MascotShape.entries.size], MascotPalette.ALL[tick % MascotPalette.ALL.size]))
+                println("rive-spike self-test: identity=${identity.encode()}")
+                tick++
+                setState(state)
+                mouth = if (state == AvatarState.SPEAKING) 0.9f else 0f
+                runtime.setMouthOpen(mouth)
+                println("rive-spike self-test: mascot state=${state.name}")
+                delay(1500)
+            }
+        }
+    }
+
+    Row(modifier.fillMaxHeight()) {
+        // ---- stage: page ground, frame ground, the mascot scaled inside the frame ----
+        var pagePalette by remember { mutableStateOf(false) }
+        var framePalette by remember { mutableStateOf(false) }
+        SurroundLayer(
+            spec = page, editing = editGradients, selected = selPage,
+            onSelect = { selPage = it; ground = Ground.PAGE }, onChange = { page = it }, onTap = { pagePalette = true },
+            modifier = Modifier.weight(1f).fillMaxHeight().onSizeChanged { stageSize = it }
+                // Gaze from the cursor anywhere on the stage, relative to the mascot's centre.
+                .pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val e = awaitPointerEvent()
+                            if (e.type != PointerEventType.Move || mascotBounds.isEmpty) continue
+                            val p = e.changes.firstOrNull()?.position ?: continue
+                            val reach = mascotBounds.width * trackReach / 2f
+                            cursorLook = ((p.x - mascotBounds.center.x) / reach).coerceIn(-1f, 1f) to ((p.y - mascotBounds.center.y) / reach).coerceIn(-1f, 1f)
+                            lastCursorMove = System.nanoTime()
+                        }
+                    }
+                },
+        ) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                PalettePopup(pagePalette, { pagePalette = false }, page.base) { page = page.copy(base = it) }
+                val clipShape = if (frameShape == FrameShape.NONE) RectangleShape else frameShape.shape
+                val framed = frameShape != FrameShape.NONE
+                Box(Modifier.size(frameSize.dp).clip(clipShape), contentAlignment = Alignment.Center) {
+                    if (framed) {
+                        SurroundLayer(
+                            spec = frame, editing = editGradients, selected = selFrame,
+                            onSelect = { selFrame = it; ground = Ground.FRAME }, onChange = { frame = it }, onTap = { framePalette = true },
+                            modifier = Modifier.fillMaxSize(),
+                        ) {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                PalettePopup(framePalette, { framePalette = false }, frame.base) { frame = frame.copy(base = it) }
+                                MascotBox(scene, frameSize * mascotScale, onion) { mascotBounds = it }
+                            }
+                        }
+                    } else {
+                        MascotBox(scene, frameSize * mascotScale, onion) { mascotBounds = it }
+                    }
+                }
+                if (showTargets && gazeMode == GazeMode.JUSTIFIED) {
+                    val ink = if (isDark(page.base)) Color(0x55FFFFFF) else Color(0x55000000)
+                    Hotspot(HotspotMark("input (you typing)", inputSpot, ink).also { it.width = 260f; it.height = 44f }, target == GazeTarget.INPUT)
+                    Hotspot(HotspotMark("timeline / code", timelineSpot, ink).also { it.width = 220f; it.height = 160f }, target == GazeTarget.TIMELINE)
+                }
+                Text(
+                    if (editGradients) "drag the rings to place lights; tap a ground to pick its base colour"
+                    else "looking at ${target.label}: ${target.reason}",
+                    color = if (isDark(page.base)) Color(0x66FFFFFF) else Color(0x66000000),
+                    modifier = Modifier.align(Alignment.BottomStart).padding(12.dp),
+                )
+            }
+        }
+
+        // ---- the instrument panel, beside the character: sparkline, value, delta, spacing ----
+        TelemetryColumn(bench)
+
+        // ---- controls ----
+        Column(
+            Modifier.width(400.dp).fillMaxHeight().background(Color(0xFF141414)).verticalScroll(rememberScrollState()).padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Switch(autoCycle, onCheckedChange = { autoCycle = it })
+                Text(if (autoCycle) "auto-cycle: on (states + identities every 1.5 s)" else "auto-cycle: off", color = Color.LightGray)
+            }
+
+            Section("state: ${current.name.lowercase()}")
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                AvatarState.entries.forEach { state ->
+                    val onClick = { autoCycle = false; setState(state) }
+                    if (state == current) Button(onClick) { Text(state.name.lowercase()) }
+                    else OutlinedButton(onClick) { Text(state.name.lowercase()) }
+                }
+            }
+
+            Section("shape")
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                MascotShape.entries.forEach { shape ->
+                    val onClick = { autoCycle = false; setIdentity(identity.copy(shape = shape)) }
+                    if (shape == identity.shape) Button(onClick) { Text(shape.name.lowercase()) }
+                    else OutlinedButton(onClick) { Text(shape.name.lowercase()) }
+                }
+            }
+
+            Section("colour  ${hex(identity.argb)}")
+            SwatchRow(MascotPalette.ALL, identity.argb) { autoCycle = false; setIdentity(identity.copy(argb = it)) }
+            HexField(identity.argb) { autoCycle = false; setIdentity(identity.copy(argb = it)) }
+
+            Section("mouthOpen %.2f  (visible in speaking / dragged only)".format(mouth))
+            Slider(mouth, onValueChange = { autoCycle = false; mouth = it; runtime.setMouthOpen(it) })
+
+            Section("gaze: looking at ${target.label}")
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                GazeMode.entries.forEach { m ->
+                    if (m == gazeMode) Button({ gazeMode = m }) { Text(m.label) } else OutlinedButton({ gazeMode = m }) { Text(m.label) }
+                }
+            }
+            if (gazeMode != GazeMode.OFF) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Switch(showTargets, onCheckedChange = { showTargets = it })
+                    Text("show what it can look at", color = Color.LightGray)
+                }
+                Section("reach %.1f mascot widths to full gaze".format(trackReach))
+                Slider(trackReach, valueRange = 0.6f..6f, onValueChange = { trackReach = it })
+                Section("eyes lead the head by %.0f ms".format(headLead))
+                Slider(headLead, valueRange = 0f..1200f, onValueChange = { headLead = it })
+            } else {
+                Section("lookX %.2f".format(lookX))
+                Slider(lookX, valueRange = -1f..1f, onValueChange = { setLook(it, lookY) })
+                Section("lookY %.2f".format(lookY))
+                Slider(lookY, valueRange = -1f..1f, onValueChange = { setLook(lookX, it) })
+            }
+
+            FrameShapeControls(frameShape) { frameShape = it }
+            FrameSizeControls(frameSize) { frameSize = it }
+            OnionControls(bench)
+            SignatureControls(bench)
+
+            MascotScaleControls(mascotScale) { mascotScale = it }
+
+            RigTunableControls(tune, scene)
+
+            // ---- grounds: base colour plus radial lights, dragged on the canvas ----
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Switch(editGradients, onCheckedChange = { editGradients = it })
+                Text("edit lights on the canvas", color = Color.LightGray)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Ground.entries.forEach { g ->
+                    if (g == ground) Button({ ground = g }) { Text(g.label) } else OutlinedButton({ ground = g }) { Text(g.label) }
+                }
+            }
+            val spec = if (ground == Ground.PAGE) page else frame
+            val sel = if (ground == Ground.PAGE) selPage else selFrame
+            fun update(s: Surround) { if (ground == Ground.PAGE) page = s else frame = s }
+            fun select(i: Int) { if (ground == Ground.PAGE) selPage = i else selFrame = i }
+
+            Section("${ground.label} base  ${hex(spec.base)}")
+            SwatchRow(SURROUND_COLORS, spec.base) { update(spec.copy(base = it)) }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                OutlinedButton({
+                    // A new light starts as a soft highlight (or shadow on a light ground) at the centre.
+                    val light = if (isDark(spec.base)) 0x66FFFFFF.toInt() else 0x66000000.toInt()
+                    update(spec.copy(nodes = spec.nodes + GradNode(argb = light))); select(spec.nodes.size); editGradients = true
+                }) { Text("+ light") }
+                if (sel in spec.nodes.indices) {
+                    OutlinedButton({ update(spec.copy(nodes = spec.nodes.filterIndexed { i, _ -> i != sel })); select(-1) }) { Text("remove") }
+                }
+                if (spec.nodes.isNotEmpty()) OutlinedButton({ update(spec.copy(nodes = emptyList())); select(-1) }) { Text("clear") }
+            }
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                spec.nodes.forEachIndexed { i, n ->
+                    val label = "light ${i + 1}"
+                    if (i == sel) Button({ select(i) }) { Text(label) } else OutlinedButton({ select(i) }) { Text(label) }
+                }
+            }
+            if (sel in spec.nodes.indices) {
+                val n = spec.nodes[sel]
+                fun set(v: GradNode) = update(spec.copy(nodes = spec.nodes.toMutableList().also { it[sel] = v }))
+                Section("light ${sel + 1}  colour ${hex(n.argb)}")
+                SwatchRow(SURROUND_COLORS, n.argb or 0xFF000000.toInt()) { set(n.copy(argb = (it and 0x00FFFFFF) or (n.argb and 0xFF000000.toInt()))) }
+                HexField(n.argb) { set(n.copy(argb = it)) }
+                Section("strength %.2f".format(((n.argb ushr 24) and 0xFF) / 255f))
+                Slider(((n.argb ushr 24) and 0xFF) / 255f, onValueChange = { set(n.copy(argb = (n.argb and 0x00FFFFFF) or ((it * 255).toInt() shl 24))) })
+                Section("radius %.2f".format(n.radius))
+                Slider(n.radius, valueRange = 0.05f..1.5f, onValueChange = { set(n.copy(radius = it)) })
+                Section("stretch x%.2f".format(n.aspect))
+                Slider(n.aspect, valueRange = 0.2f..4f, onValueChange = { set(n.copy(aspect = it)) })
+                Section("rotation %.0f deg".format(n.rotation))
+                Slider(n.rotation, valueRange = -180f..180f, onValueChange = { set(n.copy(rotation = it)) })
+                Section("position %.2f, %.2f  (drag the ring on the canvas)".format(n.x, n.y))
+            }
+        }
+    }
+}
+
+private class HotspotMark(
+    val label: String,
+    val centre: androidx.compose.ui.geometry.Offset,
+    val ink: Color,
+) {
+    var width: Float = 0f
+    var height: Float = 0f
+}
+
+/** A labelled rectangle on the stage standing in for a piece of UI the character can look at. */
+@Composable
+private fun Hotspot(mark: HotspotMark, hot: Boolean) {
+    Box(
+        Modifier.offset { IntOffset((mark.centre.x - mark.width / 2).toInt(), (mark.centre.y - mark.height / 2).toInt()) }
+            .size(mark.width.dp / LocalDensity.current.density, mark.height.dp / LocalDensity.current.density)
+            .border(if (hot) 2.dp else 1.dp, if (hot) mark.ink.copy(alpha = 0.9f) else mark.ink, RoundedCornerShape(8.dp))
+            .padding(6.dp),
+    ) { Text(mark.label, color = mark.ink, style = MaterialTheme.typography.labelSmall) }
+}
+
+/** One rig tunable: a 0..1 view-model number the file maps onto a pose range; `shown` renders the real value. */
+@Composable
+private fun TuneSlider(label: String, tune: MutableMap<String, Float>, key: String, shown: (Float) -> String) {
+    val v = tune[key] ?: 0.5f
+    Section("$label  ${shown(v)}")
+    Slider(v, onValueChange = { tune[key] = it })
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun FrameShapeControls(frameShape: FrameShape, onShape: (FrameShape) -> Unit) {
+    Section("frame")
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        FrameShape.entries.forEach { f ->
+            if (f == frameShape) Button({ onShape(f) }) { Text(f.label) }
+            else OutlinedButton({ onShape(f) }) { Text(f.label) }
+        }
+    }
+}
+
+@Composable
+private fun FrameSizeControls(frameSize: Float, onSize: (Float) -> Unit) {
+    Section("frame size ${frameSize.toInt()} dp")
+    Slider(frameSize, valueRange = 22f..520f, onValueChange = onSize)
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        listOf(22f, 44f, 72f, 120f, 240f, 360f).forEach { s -> OutlinedButton({ onSize(s) }) { Text("${s.toInt()}") } }
+    }
+}
+
+/** The mascot box as a multiple of the frame; above 1 the frame clips it. */
+@Composable
+private fun MascotScaleControls(mascotScale: Float, onScale: (Float) -> Unit) {
+    Section("mascot in frame x%.2f  (%s)".format(mascotScale, if (mascotScale > 1f) "clipped" else "padded"))
+    Slider(mascotScale, valueRange = 0.4f..2.2f, onValueChange = onScale)
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        listOf(0.8f, 1f, 1.2f, 1.5f).forEach { s -> OutlinedButton({ onScale(s) }) { Text("x$s") } }
+    }
+}
+
+/** Rig tunables: art-direct the plate, glyph and mouth; read the numbers back into SPEC. */
+@Composable
+private fun RigTunableControls(tune: MutableMap<String, Float>, scene: RiveDesktopScene) {
+    Section("rig tunables (0.5 = as shipped; numbers are what to put in SPEC)")
+    TuneSlider("entity scale", tune, "tuneScale") { t -> "x%.2f".format(0.5f + t) }
+    TuneSlider("plate scale", tune, "tunePlate") { t -> "x%.2f".format(0.6f + 0.8f * t) }
+    TuneSlider("glyph scale", tune, "tuneGlyph") { t -> "x%.2f".format(0.4f + 1.2f * t) }
+    TuneSlider("mouth scale", tune, "tuneMouth") { t -> "x%.2f".format(0.5f + t) }
+    TuneSlider("mouth distance below plate", tune, "tuneMouthY") { t -> "%.0f px".format(42f + 80f * t) }
+    OutlinedButton({ tune.keys.toList().forEach { tune[it] = 0.5f; scene.inputSink.setNumber(it, 0.5f) } }) { Text("reset tunables") }
+}
+
+/** Play a bench scenario: a state entry through [setState], a gesture straight on the runtime. */
+private fun BenchScenario.play(setState: (AvatarState) -> Unit, runtime: RiveAvatarRuntime) {
+    when (this) {
+        is BenchScenario.Enter -> setState(state)
+        is BenchScenario.Gesture -> runtime.playGesture(AvatarGesture(gesture))
+    }
+}
+
+@Composable
+private fun TelemetryColumn(bench: BenchInstruments) {
+    if (bench.tracks.isEmpty()) return
+    Column(
+        Modifier.width(260.dp).fillMaxHeight().background(Color(0xFF101010))
+            .verticalScroll(rememberScrollState()).padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        TelemetryPanel(bench.tracks, TELEMETRY_WINDOW_SECONDS)
+        if (bench.lastSignature.isNotEmpty()) {
+            Section("last signature (also on stdout)")
+            Text(bench.lastSignature, color = Color(0xFF9FD0A0), style = MaterialTheme.typography.labelSmall)
+        }
+    }
+}
+
+/** Onion skin: the last N rendered frames under the live one, onion.py's ramp. */
+@Composable
+private fun OnionControls(bench: BenchInstruments) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Switch(bench.onionOn, onCheckedChange = { bench.onionOn = it })
+        Text(if (bench.onionOn) "onion: on" else "onion: off", color = Color.LightGray)
+        Switch(bench.onionTint, onCheckedChange = { bench.onionTint = it }, enabled = bench.onionOn)
+        Text("tint", color = Color.LightGray)
+    }
+    if (!bench.onionOn) return
+    Section("onion frames ${bench.onionFrames}")
+    Slider(bench.onionFrames.toFloat(), valueRange = 2f..24f, onValueChange = { bench.onionFrames = it.toInt() })
+    Section("onion stride every ${bench.onionStride} frame(s)")
+    Slider(bench.onionStride.toFloat(), valueRange = 1f..12f, onValueChange = { bench.onionStride = it.toInt() })
+}
+
+/** Signatures: play a scenario and print probe.py's JSON per probed property. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SignatureControls(bench: BenchInstruments) {
+    val tracks = bench.tracks
+    Section(
+        if (tracks.isEmpty()) "record signature (no telemetry probes in this file)"
+        else "record signature - ${tracks.size} probes, %.1f s".format(RECORD_MILLIS / 1000f),
+    )
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        BENCH_SCENARIOS.forEach { candidate -> ScenarioButton(bench, candidate) }
+    }
+    Button({ bench.requestRecording() }, enabled = tracks.isNotEmpty() && !bench.recording) {
+        Text(if (bench.recording) "recording ${bench.scenario.label}..." else "record ${bench.scenario.label}")
+    }
+}
+
+@Composable
+private fun ScenarioButton(bench: BenchInstruments, candidate: BenchScenario) {
+    val onClick = { bench.scenario = candidate }
+    if (candidate == bench.scenario) Button(onClick) { Text(candidate.label) }
+    else OutlinedButton(onClick) { Text(candidate.label) }
+}
+
+/** The mascot at a given size, reporting its bounds in the stage so the cursor gaze can aim at it. */
+@Composable
+private fun MascotBox(scene: RiveDesktopScene, sizeDp: Float, onion: RiveOnionSkin?, onBounds: (Rect) -> Unit) {
+    Box(Modifier.size(sizeDp.dp).onGloballyPositioned { onBounds(it.boundsInParent()) }) {
+        RiveDesktopSurface(scene, Modifier.fillMaxSize(), onion = onion)
+    }
+}
+
+@Composable
+private fun Section(title: String) = Text(title, color = Color(0xFFBBBBBB), style = MaterialTheme.typography.labelLarge)
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SwatchRow(colors: List<Int>, selected: Int, onPick: (Int) -> Unit) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        colors.forEach { c -> Swatch(c, c == selected) { onPick(c) } }
+    }
+}
+
+@Composable
+private fun Swatch(argb: Int, selected: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier.size(26.dp).clip(CircleShape).background(Color(argb))
+            .border(if (selected) 2.dp else 1.dp, if (selected) Color.White else Color(0x55FFFFFF), CircleShape)
+            .clickable(onClick = onClick),
+    )
+}
+
+/** A palette anchored to whatever it sits in: swatches plus a hex field for anything else. */
+@Composable
+private fun PalettePopup(open: Boolean, onDismiss: () -> Unit, selected: Int, onPick: (Int) -> Unit) {
+    DropdownMenu(expanded = open, onDismissRequest = onDismiss) {
+        Column(Modifier.padding(10.dp).width(300.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            SwatchRow(SURROUND_COLORS, selected) { onPick(it); onDismiss() }
+            HexField(selected) { onPick(it) }
+        }
+    }
+}
+
+@Composable
+private fun HexField(argb: Int, onPick: (Int) -> Unit) {
+    var text by remember(argb) { mutableStateOf(hex(argb)) }
+    OutlinedTextField(
+        text,
+        onValueChange = { v ->
+            text = v
+            parseHex(v)?.let(onPick)
+        },
+        singleLine = true,
+        label = { Text("hex (RRGGBB or AARRGGBB)") },
+        modifier = Modifier.fillMaxWidth(),
+    )
+}
+
+private fun hex(argb: Int) = "#" + argb.toUInt().toString(16).padStart(8, '0').uppercase()
+
+private fun parseHex(s: String): Int? {
+    val h = s.trim().removePrefix("#")
+    return when (h.length) {
+        6 -> h.toUIntOrNull(16)?.let { (0xFF000000u or it).toInt() }
+        8 -> h.toUIntOrNull(16)?.toInt()
+        else -> null
+    }
+}
+
+private fun isDark(argb: Int): Boolean {
+    val r = (argb shr 16) and 0xFF; val g = (argb shr 8) and 0xFF; val b = argb and 0xFF
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b < 128
+}

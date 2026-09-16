@@ -2,6 +2,10 @@ package com.letta.mobile.desktop.chat
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
@@ -40,12 +44,15 @@ internal data class ComposerBarActions(
 internal fun ComposerBar(
     state: ComposerBarState,
     actions: ComposerBarActions,
+    modifier: Modifier = Modifier,
+    /** The agent's live mascot, drawn at the input box's left edge so it sits with the text, not the pane. */
+    companion: (@Composable () -> Unit)? = null,
 ) {
     val canSend = state.enabled &&
         (state.text.isNotBlank() || state.pendingImageAttachments.isNotEmpty())
     val autocomplete = composerAutocompleteUi(state)
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(start = 28.dp, top = 4.dp, end = 28.dp, bottom = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -63,15 +70,37 @@ internal fun ComposerBar(
             composerText = state.text,
             onTextChanged = actions.onTextChanged,
         )
-        ComposerInputSurface(
-            ComposerInputSurfaceParams(
-                state = state,
-                actions = actions,
-                canSend = canSend,
-                matchedCommands = autocomplete.matchedCommands,
+        // The box keeps its centred max width; the companion hangs off its left edge, so the
+        // pair is centred together and the mascot stays beside the text at any pane width.
+        // Without a companion the row is the column's width, so the box stays centred.
+        val rowMaxWidth = if (companion != null) ChatColumnMaxWidth + ComposerCompanionSlot else ChatColumnMaxWidth
+        Row(
+            modifier = Modifier.widthIn(max = rowMaxWidth).fillMaxWidth(),
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            if (companion != null) {
+                Box(
+                    Modifier.width(ComposerCompanionSlot).padding(end = ComposerCompanionGap),
+                    contentAlignment = Alignment.BottomCenter,
+                ) { companion() }
+            }
+            Box(Modifier.weight(1f)) {
+                ComposerInputSurface(
+                    ComposerInputSurfaceParams(
+                        state = state,
+                        actions = actions,
+                        canSend = canSend,
+                        matchedCommands = autocomplete.matchedCommands,
+                    ),
+                )
+            }
+        }
+        ComposerHintRow(
+            visible = composerHintVisible(
+                text = state.text,
+                hasAttachments = state.pendingImageAttachments.isNotEmpty(),
             ),
         )
-        ComposerHintRow()
     }
 }
 
@@ -96,3 +125,9 @@ private fun ComposerMentionSuggestions(
         },
     )
 }
+
+/** Width reserved for the composer companion (the mascot) at the box's left edge. */
+internal val ComposerCompanionSlot = 108.dp
+
+/** Breathing room between the mascot and the box's edge. */
+private val ComposerCompanionGap = 16.dp

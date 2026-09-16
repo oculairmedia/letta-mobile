@@ -19,17 +19,21 @@ import com.letta.mobile.data.model.BlockCreateParams
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.ModelCatalog
 import com.letta.mobile.data.model.withCatalogModelRouting
 import com.letta.mobile.data.timeline.Timeline
 import com.letta.mobile.desktop.DesktopBootstrapState
-import com.letta.mobile.ui.chat.render.ChatTimelineProjector
+import com.letta.mobile.ui.chat.render.ChatPresenceSignals
+import com.letta.mobile.ui.chat.render.ChatTimelinePresenter
+import com.letta.mobile.ui.chat.render.TimelineProjection
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.util.Telemetry
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -55,16 +59,13 @@ class DesktopChatController(
     // PATCHes the server so this lights up automatically once the backend lands.
     loadArchivedConversationIds: () -> Set<String> = { emptySet() },
     private val persistArchivedConversationIds: (Set<String>) -> Unit = {},
-    private val loopFactory: (
+    private val timelinePersistence: DesktopTimelinePersistence = DesktopTimelinePersistence(),
+    private val loopFactory: suspend (
         gateway: DesktopChatGateway,
         conversation: DesktopConversationSummary,
         scope: CoroutineScope,
     ) -> DesktopTimelineLoop = { gateway, conversation, loopScope ->
-        RealDesktopTimelineLoop(
-            gateway = gateway,
-            conversation = conversation,
-            scope = loopScope,
-        )
+        RealDesktopTimelineLoop.create(gateway, conversation, loopScope, timelinePersistence)
     },
 ) {
     private val initialState = initialLiveDesktopChatSurfaceState(bootstrapState)
@@ -91,12 +92,14 @@ class DesktopChatController(
 
     private val approvalCoordinator = DesktopChatApprovalCoordinator(
         scope = scope,
-        onError = { message ->
-            if (!closed) {
-                _state.update { it.copy(errorMessage = message) }
-            }
-        },
+        onError = ::showApprovalError,
     )
+
+    /** A closed controller no longer owns the surface, so it must not write to it. */
+    private fun showApprovalError(message: String) {
+        if (closed) return
+        _state.update { it.copy(errorMessage = message) }
+    }
 
     /**
      * Approval request ids whose decision (answer / dismiss) is in flight, so the
@@ -179,26 +182,25 @@ class DesktopChatController(
     val cancellingConversationId: StateFlow<String?> = interruptCoordinator.cancellingConversationId
 
     /**
-     * Shared Timeline→message projection (the same one Android uses). Gives the
-     * desktop list the incremental tail cache, optimistic-twin dedup, A2UI
-     * history stripping, and no-change suppression instead of a plain re-map of
-     * every event on every emit. Stateful per bound conversation — reset on
-     * rebind in [selectRemoteConversation].
+     * The shared chat timeline presenter - the same one Android's ChatTimelineObserver uses
+     * (letta-mobile-2dsi5.1). Projection gives the desktop list the incremental tail cache,
+     * optimistic-twin dedup, A2UI history stripping, and no-change suppression; presentation
+     * derives streaming/typing with the same inputs Android passes, including the in-flight turn
+     * and the projection's own "a run is still active" fact. Stateful per bound conversation -
+     * reset on rebind in [selectRemoteConversation].
      */
-    private val timelineProjector = ChatTimelineProjector()
+    private val timelinePresenter = ChatTimelinePresenter()
 
     /**
-     * The bound conversation's latest projection facts that the shared streaming-
-     * presence policy needs. Updated on every projected timeline emit (and reset
-     * on rebind) so [replyPresence] can re-derive without re-projecting.
+     * The bound conversation's latest projection, kept so [replyPresence] can re-derive when the
+     * stream signal or selection changes without re-projecting. Reset on rebind.
      */
-    private data class BoundPresenceFacts(
+    private data class BoundProjection(
         val conversationId: String? = null,
-        val tailIsAssistant: Boolean = false,
-        val anyServerLocalPending: Boolean = false,
+        val projection: TimelineProjection? = null,
     )
 
-    private val _boundPresenceFacts = MutableStateFlow(BoundPresenceFacts())
+    private val _boundProjection = MutableStateFlow(BoundProjection())
 
     /**
      * The selected conversation's "agent is working" presence, derived by the
@@ -211,25 +213,67 @@ class DesktopChatController(
     val replyPresence: StateFlow<ChatStreamingPresence> = _replyPresence.asStateFlow()
 
     private val presenceJob: Job = scope.launch {
+        var presenceConversationId: String? = null
         combine(
-            _boundPresenceFacts,
+            _boundProjection,
             _streamingConversationId,
             state.map { it.selectedConversationId },
-        ) { facts, streamingConversationId, selectedConversationId ->
-            val factsForSelected = facts.conversationId != null && facts.conversationId == selectedConversationId
-            ChatStreamingPresencePolicy.derive(
+        ) { bound, streamingConversationId, selectedConversationId ->
+            // Presence carries over only within one conversation; a selection change starts fresh.
+            val previous = _replyPresence.value.takeIf { presenceConversationId == selectedConversationId }
+            presenceConversationId = selectedConversationId
+            derivePresence(
+                projection = bound.projection?.takeIf { bound.conversationId != null && bound.conversationId == selectedConversationId },
+                // The send job spans send -> terminal across every tool round: it is desktop's
+                // in-flight turn, the same fact Android reads from the transport.
+                turnInFlight = streamingConversationId != null && streamingConversationId == selectedConversationId,
+                previous = previous,
+            )
+        }.collect { _replyPresence.value = it }
+    }
+
+    /**
+     * Streaming/typing for the selected conversation through the shared presenter, so desktop and
+     * Android agree on "Thinking…" and the cancel chrome, including across tool rounds.
+     */
+    private fun derivePresence(
+        projection: TimelineProjection?,
+        turnInFlight: Boolean,
+        previous: ChatStreamingPresence?,
+    ): ChatStreamingPresence {
+        val previousIsStreaming = previous?.isStreaming ?: false
+        val previousIsAgentTyping = previous?.isAgentTyping ?: false
+        if (projection == null) {
+            // Nothing projected for this conversation yet: only the in-flight turn can say it works.
+            return ChatStreamingPresencePolicy.derive(
                 inputs = ChatStreamInputs(
-                    previousIsStreaming = false,
-                    previousIsAgentTyping = false,
-                    anyServerLocalPending = factsForSelected && facts.anyServerLocalPending,
-                    tailIsAssistant = factsForSelected && facts.tailIsAssistant,
-                    replyStreaming = streamingConversationId != null && streamingConversationId == selectedConversationId,
+                    previousIsStreaming = previousIsStreaming,
+                    previousIsAgentTyping = previousIsAgentTyping,
+                    anyServerLocalPending = false,
+                    tailIsAssistant = false,
+                    replyStreaming = turnInFlight,
                     clientModeStreamInFlight = false,
                     a2uiThinkingActive = false,
                     duplicateInitialMessageInFlight = false,
+                    turnInFlight = turnInFlight,
                 ),
             )
-        }.collect { _replyPresence.value = it }
+        }
+        // Desktop is server-mode only, so the client-mode / A2UI-thinking / duplicate-initial
+        // signals are inert here.
+        val presentation = timelinePresenter.present(
+            projection = projection,
+            signals = ChatPresenceSignals(
+                replyStreaming = turnInFlight,
+                clientModeStreamInFlight = false,
+                a2uiThinkingActive = false,
+                duplicateInitialMessageInFlight = false,
+                turnInFlight = turnInFlight,
+            ),
+            previousIsStreaming = previousIsStreaming,
+            previousIsAgentTyping = previousIsAgentTyping,
+        )
+        return ChatStreamingPresence(isStreaming = presentation.isStreaming, isAgentTyping = presentation.isAgentTyping)
     }
 
     private var gateway: DesktopChatGateway? = null
@@ -237,86 +281,109 @@ class DesktopChatController(
     private val modelCatalogHelper = DesktopChatModelCatalogHelper(
         scope = scope,
         agentByIdProvider = agentByIdProvider,
-        onModelsLoaded = { models ->
-            if (!closed) _availableModels.value = models
-        },
-        getSelectedConversationAgentId = { _state.value.selectedConversation?.agentId },
+        onModelsLoaded = ::publishAvailableModels,
+        getSelectedConversationAgentId = ::selectedConversationAgentId,
     )
+
+    private fun publishAvailableModels(models: List<LlmModel>) {
+        if (closed) return
+        _availableModels.value = models
+    }
+
+    private fun selectedConversationAgentId(): String? = _state.value.selectedConversation?.agentId
 
     private val connectionWatcher = DesktopChatConnectionWatcher(
         scope = scope,
-        onConnected = {
-            runCatching {
-                reloadConversationsAndSelect(
-                    preferConversationId = _state.value.runtimeState.selectedConversationId,
-                )
-            }
-        },
-        onDisconnected = { transportState ->
-            if (transportState.isAuthFailure) {
-                _state.update { current ->
-                    current.withRuntimeState(
-                        ChatSessionReducer.conversationLoadFailed(
-                            state = current.runtimeState,
-                            errorMessage = transportState.reason.ifBlank { "Authentication failed" },
-                        ),
-                    )
-                }
-            } else {
-                _state.update { current ->
-                    current.withRuntimeState(
-                        ChatSessionReducer.streamDisconnected(
-                            state = current.runtimeState,
-                            generation = current.runtimeState.selectionGeneration,
-                            errorMessage = transportState.reason.ifBlank { "Connection lost" },
-                            statusMessage = if (transportState.willReconnect) "Reconnecting…" else "Stream disconnected",
-                        ),
-                    )
-                }
-            }
-        },
-        onEscalateRetryConnection = { retryConnection() },
+        onConnected = ::onTransportConnected,
+        onDisconnected = ::onTransportDisconnected,
+        onEscalateRetryConnection = ::retryConnection,
     )
 
+    /** Reconnecting re-reads the roster, preferring whatever the user was already looking at. */
+    private suspend fun onTransportConnected() {
+        runCatching {
+            reloadConversationsAndSelect(
+                preferConversationId = _state.value.runtimeState.selectedConversationId,
+            )
+        }
+    }
+
+    /**
+     * An auth failure is terminal for the roster, so it reports as a load failure. Anything else is
+     * the stream dropping, which may still reconnect - and the status has to say which, or a blip
+     * and a dead connection read identically.
+     */
+    private fun onTransportDisconnected(transportState: ChannelTransportState.Disconnected) {
+        if (transportState.isAuthFailure) {
+            _state.update { current ->
+                current.withRuntimeState(
+                    ChatSessionReducer.conversationLoadFailed(
+                        state = current.runtimeState,
+                        errorMessage = transportState.reason.ifBlank { "Authentication failed" },
+                    ),
+                )
+            }
+        } else {
+            _state.update { current ->
+                current.withRuntimeState(
+                    ChatSessionReducer.streamDisconnected(
+                        state = current.runtimeState,
+                        generation = current.runtimeState.selectionGeneration,
+                        errorMessage = transportState.reason.ifBlank { "Connection lost" },
+                        statusMessage = if (transportState.willReconnect) "Reconnecting…" else "Stream disconnected",
+                    ),
+                )
+            }
+        }
+    }
+
     private val remoteSender = DesktopChatRemoteSender(
-        onSendSuccess = {
-            _state.update {
-                it.withRuntimeState(ChatSessionReducer.sendSucceeded(it.runtimeState))
-            }
-        },
-        onSendFailed = { attempt, errorMessage ->
-            if (!closed) {
-                if (_thinkingConversationId.value == attempt.conversationId) {
-                    _thinkingConversationId.value = null
-                }
-                _state.update {
-                    it.withRuntimeState(
-                        ChatSessionReducer.sendFailed(
-                            state = it.runtimeState,
-                            text = attempt.text,
-                            attachments = attempt.attachments,
-                            errorMessage = errorMessage,
-                        ),
-                    )
-                }
-            }
-        },
+        onSendSuccess = ::onRemoteSendSucceeded,
+        onSendFailed = ::onRemoteSendFailed,
         persistConversationTitle = ::persistConversationTitle,
-        onAttemptCompleted = { attempt ->
-            if (attempt.streamGen == streamingGeneration &&
-                _streamingConversationId.value == attempt.conversationId
-            ) {
-                _streamingConversationId.value = null
-            }
-            if (cancellingConversationId.value == attempt.conversationId) {
-                interruptCoordinator.clearCancelling()
-                if (_thinkingConversationId.value == attempt.conversationId) {
-                    _thinkingConversationId.value = null
-                }
-                attempt.conversationId?.let(interruptCoordinator::recordTerminalAfterCancel)
-            }
-        },
+        onAttemptCompleted = ::onRemoteSendAttemptCompleted,
     )
+
+    private fun onRemoteSendSucceeded(attempt: RemoteSendAttempt) {
+        _state.update { it.withRuntimeState(ChatSessionReducer.sendSucceeded(it.runtimeState)) }
+    }
+
+    /** The draft comes back with the failure, so a failed send never costs the user what they typed. */
+    private fun onRemoteSendFailed(attempt: RemoteSendAttempt, errorMessage: String) {
+        if (closed) return
+        clearThinkingFor(attempt.conversationId)
+        _state.update {
+            it.withRuntimeState(
+                ChatSessionReducer.sendFailed(
+                    state = it.runtimeState,
+                    text = attempt.text,
+                    attachments = attempt.attachments,
+                    errorMessage = errorMessage,
+                ),
+            )
+        }
+    }
+
+    /**
+     * The end of an attempt, however it ended. The generation check stops a superseded attempt from
+     * clearing the indicator of the one that replaced it, and a cancel is only finished once the
+     * turn's own terminal frame arrives, never optimistically when stop was pressed.
+     */
+    private fun onRemoteSendAttemptCompleted(attempt: RemoteSendAttempt) {
+        if (attempt.streamGen == streamingGeneration &&
+            _streamingConversationId.value == attempt.conversationId
+        ) {
+            _streamingConversationId.value = null
+        }
+        if (cancellingConversationId.value != attempt.conversationId) return
+        interruptCoordinator.clearCancelling()
+        clearThinkingFor(attempt.conversationId)
+        attempt.conversationId?.let(interruptCoordinator::recordTerminalAfterCancel)
+    }
+
+    private fun clearThinkingFor(conversationId: String?) {
+        if (_thinkingConversationId.value == conversationId) _thinkingConversationId.value = null
+    }
 
     private fun bindGateway(next: DesktopChatGateway?) {
         if (gateway !== next) {
@@ -344,6 +411,12 @@ class DesktopChatController(
     private var started = false
     private var closed = false
 
+    private fun closeActiveLoopAsync() {
+        val loop = activeLoop ?: return
+        activeLoop = null
+        scope.launch(start = CoroutineStart.UNDISPATCHED) { loop.closeAndAwait() }
+    }
+
     fun start() {
         if (started || closed) return
         started = true
@@ -356,8 +429,7 @@ class DesktopChatController(
         selectJob?.cancel()
         sendJob?.cancel()
         timelineJob?.cancel()
-        activeLoop?.close()
-        activeLoop = null
+        closeActiveLoopAsync()
         (gateway as? AutoCloseable)?.close()
         bindGateway(null)
         started = false
@@ -382,8 +454,7 @@ class DesktopChatController(
         sendJob?.cancel()
         createConversationJob?.cancel()
         timelineJob?.cancel()
-        activeLoop?.close()
-        activeLoop = null
+        closeActiveLoopAsync()
         (gateway as? AutoCloseable)?.close()
         bindGateway(null)
     }
@@ -439,8 +510,7 @@ class DesktopChatController(
                         _thinkingConversationId.value = null
                     }
                     timelineJob?.cancel()
-                    activeLoop?.close()
-                    activeLoop = null
+                    closeActiveLoopAsync()
                     val runtime = _state.value.runtimeState
                     val nextSelected = runtime.selectedConversationId
                     if (nextSelected != null) {
@@ -685,7 +755,7 @@ class DesktopChatController(
         if (trimmed.isEmpty()) return
         scope.launch {
             val selection = selectConversation(conversationId)
-            withTimeoutOrNull(NOTIFICATION_REPLY_SETTLE_TIMEOUT_MS) { selection?.join() }
+            withTimeoutOrNull(NOTIFICATION_REPLY_SETTLE_TIMEOUT_MS.milliseconds) { selection?.join() }
             updateComposerText(trimmed)
             send()
         }
@@ -782,6 +852,12 @@ class DesktopChatController(
         }
         val draft = ChatComposerPolicy.beginSend(_state.value.composer) ?: return
         _state.value.selectedConversationId?.let { _lastPromptedConversationId.value = it }
+        // The canonical route owns its own send. It deliberately runs no legacy loop, so falling
+        // through to the loop check below would drop the message on the floor.
+        if (_canonicalPresentation.value != null) {
+            launchCanonicalSend(draft)
+            return
+        }
         val loop = activeLoop
         if (loop == null || !_state.value.isRemoteBacked) {
             _state.update {
@@ -794,6 +870,37 @@ class DesktopChatController(
             return
         }
         launchRemoteSend(loop, draft)
+    }
+
+    /**
+     * Sends through the shared [com.letta.mobile.data.chat.send.ChatSendCoordinator], the same
+     * orchestration Android uses. The optimistic bubble, otid reconciliation and turn lifecycle all
+     * land in the canonical ledger the paginated list is already reading, so there is no second
+     * durable copy of the conversation and no second send path to keep in agreement with this one.
+     */
+    private fun launchCanonicalSend(draft: ChatComposerSendDraft) {
+        val conversationId = _state.value.selectedConversationId
+        val conversation = _state.value.conversations.firstOrNull { it.id == conversationId }
+        val activeGateway = gateway
+        // Resolved by the same routing the presentation used, so the send and the history it lands
+        // beside are indexed against one transport.
+        val coordinator = conversation?.agentId?.let { agentId ->
+            activeGateway?.let { gw ->
+                canonicalSendFor?.invoke(agentId, desktopTimelineTransportFor(gw, conversation))
+            }
+        }
+        if (coordinator == null) {
+            showComposerError("This conversation cannot send on the canonical timeline route.")
+            return
+        }
+        titleCandidateForSend(conversationId, draft.text)?.let { title ->
+            conversationId?.let { persistConversationTitle(it, title) }
+        }
+        clearUnsentIfMatching(conversationId)
+        _state.update { it.withRuntimeState(ChatSessionReducer.beginSend(it.runtimeState, draft)) }
+        // The coordinator drives the indicators through the UI sink from here, including the
+        // failure paths, so nothing else may set them on this route.
+        sendJob = coordinator.send(draft.text, draft.attachments)
     }
 
     private fun launchRemoteSend(loop: DesktopTimelineLoop, draft: ChatComposerSendDraft) {
@@ -926,7 +1033,17 @@ class DesktopChatController(
         val nextGateway = gateway ?: return
         val conversations = nextGateway.listConversations(archiveStatus = ConversationArchiveFilter.All.apiValue)
         val agentIds = conversations.map { it.agentId.value }.filter { it.isNotBlank() }.toSet()
-        val agentNamesById = runCatching { agentNamesByIdProvider(agentIds) }.getOrDefault(emptyMap())
+        // An empty map here silently degrades every conversation label to its
+        // raw `agent-<uuid>`, so the failure must not be invisible.
+        val agentNamesById = runCatching { agentNamesByIdProvider(agentIds) }
+            .onFailure { t ->
+                if (t is CancellationException) throw t
+                Telemetry.error(
+                    "DesktopChat", "agentNames.resolveFailed", t,
+                    "agentIds" to agentIds.size,
+                )
+            }
+            .getOrDefault(emptyMap())
         val summaries = conversations.toChatConversationSummaries(agentNamesById)
             .distinctBy { it.id }
             .map { if (it.id in locallyArchivedIds) it.copy(archived = true) else it }
@@ -941,6 +1058,53 @@ class DesktopChatController(
         selectedId?.let { selectRemoteConversation(it, loadedRuntime.selectionGeneration) }
     }
 
+    /**
+     * Installed by the dev-gated writer host only; null keeps the existing desktop route.
+     *
+     * The request carries the transport because per-conversation routing lives here, not in the
+     * host: a default-shim conversation is served by a different transport than the gateway, and a
+     * canonical ledger opened against the wrong one would index another conversation's history.
+     */
+    var canonicalOpen: (suspend (DesktopCanonicalOpenRequest) -> com.letta.mobile.data.timeline.CanonicalTimelinePresentation)? = null
+    var canonicalEligible: (String) -> Boolean = { false }
+
+    /**
+     * Resolves the shared send coordinator for an agent. Installed alongside [canonicalOpen]: a
+     * canonical route without it can render history but cannot send, which is a state the host must
+     * not be able to produce by accident.
+     */
+    var canonicalSendFor: (
+        (agentId: String, transport: com.letta.mobile.data.timeline.TimelineTransport) ->
+        com.letta.mobile.data.chat.send.ChatSendCoordinator
+    )? = null
+
+    /** The turn-indicator and error state the shared send coordinator is allowed to move. */
+    internal val sendSurface: DesktopChatSendSurface = ControllerSendSurface()
+
+    /**
+     * Named rather than an anonymous object in a property initializer: this is the whole contract
+     * the shared coordinator drives the desktop UI through, and it belongs in a declaration that can
+     * be read on its own.
+     */
+    private inner class ControllerSendSurface : DesktopChatSendSurface {
+        override fun currentError(): String? = _state.value.errorMessage
+        override fun setError(message: String?) {
+            _state.update { it.copy(errorMessage = message) }
+        }
+        override fun streamingConversationId(): String? = _streamingConversationId.value
+        override fun thinkingConversationId(): String? = _thinkingConversationId.value
+        override fun setStreaming(conversationId: String?) { _streamingConversationId.value = conversationId }
+        override fun setThinking(conversationId: String?) { _thinkingConversationId.value = conversationId }
+        override fun selectedConversationId(): String? = _state.value.selectedConversationId
+        override fun settleSend(failed: Boolean) {
+            _state.update { it.withRuntimeState(ChatSessionReducer.sendSettled(it.runtimeState, failed)) }
+        }
+    }
+    private val _canonicalPresentation = MutableStateFlow<com.letta.mobile.data.timeline.CanonicalTimelinePresentation?>(null)
+    val canonicalPresentation = _canonicalPresentation.asStateFlow()
+    private val _canonicalStatus = MutableStateFlow<String?>(null)
+    val canonicalStatus = _canonicalStatus.asStateFlow()
+
     private suspend fun selectRemoteConversation(conversationId: String, generation: Long) {
         if (!isActiveSelection(generation)) return
         val nextGateway = gateway ?: return
@@ -949,28 +1113,85 @@ class DesktopChatController(
         applyComposerModelLabel(conversationId, conversation.agentId)
 
         timelineJob?.cancel()
-        activeLoop?.close()
-        timelineProjector.reset()
-        _boundPresenceFacts.value = BoundPresenceFacts()
+        closeActiveLoopAsync()
+        timelinePresenter.reset()
+        _boundProjection.value = BoundProjection()
 
         _state.update {
             it.withRuntimeState(ChatSessionReducer.beginSelectedConversationHydrate(it.runtimeState, generation))
         }
 
+        _canonicalPresentation.value = null
+        val canonical = canonicalOpen
+        _canonicalStatus.value = null
+        if (canonical != null && canonicalEligible(conversationId)) {
+            _canonicalStatus.value = "Opening conversation..."
+            timelineJob = scope.launch {
+                try {
+                    val presentation = canonical(
+                        DesktopCanonicalOpenRequest(
+                            agentId = requireNotNull(conversation.agentId) { "Canonical route requires an agent" },
+                            conversationId = conversationId,
+                            transport = desktopTimelineTransportFor(nextGateway, conversation),
+                            scope = this,
+                        ),
+                    )
+                    try {
+                        if (!isActiveSelection(generation)) return@launch
+                        _canonicalPresentation.value = presentation
+                        _state.update { it.withRuntimeState(ChatSessionReducer.hydrateCompleted(it.runtimeState, generation)) }
+                        kotlinx.coroutines.awaitCancellation()
+                    } finally {
+                        if (_canonicalPresentation.value === presentation) _canonicalPresentation.value = null
+                        presentation.close()
+                    }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (failure: Exception) {
+                    if (isActiveSelection(generation)) {
+                        _canonicalStatus.value = failure.message ?: "Canonical timeline failed to open"
+                        _state.update {
+                            it.withRuntimeState(ChatSessionReducer.hydrateFailed(it.runtimeState, generation,
+                                failure.message ?: "Canonical timeline failed to open"))
+                        }
+                    }
+                }
+            }
+            return
+        }
+
+        val selectionStart = System.currentTimeMillis()
         val loop = loopFactory(nextGateway, conversation, scope)
         activeLoop = loop
+        val snapshotEventCount = loop.state.value.events.size
+        val selectionToSnapshotMs = System.currentTimeMillis() - selectionStart
+        Telemetry.event(
+            "ChatPerformance", "selection_to_snapshot",
+            "conversationId" to conversationId,
+            "durationMs" to selectionToSnapshotMs,
+            "eventCount" to snapshotEventCount,
+            "hasSnapshot" to (snapshotEventCount > 0),
+        )
+
         timelineJob = scope.launch {
             loop.state.collect { timeline ->
                 updateTimelineMessages(conversationId, generation, timeline)
             }
         }
 
+        val refreshStart = System.currentTimeMillis()
         try {
             loop.hydrate(
                 DesktopTimelineHydrateRequest(
                     limit = TimelinePageLimit(50),
                     recordConversationCursor = true,
                 ),
+            )
+            val refreshDurationMs = System.currentTimeMillis() - refreshStart
+            Telemetry.event(
+                "ChatPerformance", "remote_refresh",
+                "conversationId" to conversationId,
+                "durationMs" to refreshDurationMs,
             )
             if (!isActiveSelection(generation)) return
             _state.update {
@@ -982,7 +1203,7 @@ class DesktopChatController(
             if (!isActiveSelection(generation)) return
             _state.update {
                 it.withRuntimeState(
-                    ChatSessionReducer.streamDisconnected(
+                    ChatSessionReducer.hydrateFailed(
                         state = it.runtimeState,
                         generation = generation,
                         errorMessage = t.message ?: t::class.simpleName ?: "Message load failed",
@@ -997,18 +1218,14 @@ class DesktopChatController(
 
     private fun updateTimelineMessages(conversationId: String, generation: Long, timeline: Timeline) {
         if (closed) return
-        val projection = timelineProjector.project(
+        val projection = timelinePresenter.project(
             timeline = timeline,
-            prefix = timelineProjector.olderPrefixFor(conversationId),
+            prefix = timelinePresenter.olderPrefixFor(conversationId),
             previousState = ChatUiState(),
             isActiveRunStreaming = _streamingConversationId.value == conversationId,
             ownAgentId = _state.value.conversations.firstOrNull { it.id == conversationId }?.agentId,
         )
-        _boundPresenceFacts.value = BoundPresenceFacts(
-            conversationId = conversationId,
-            tailIsAssistant = projection.tailIsAssistant,
-            anyServerLocalPending = projection.anyLettaServerLocalPending,
-        )
+        _boundProjection.value = BoundProjection(conversationId = conversationId, projection = projection)
         if (projection.noChange) return
         val messages = projection.ui
         approvalCoordinator.reconcileSubmittedApprovals(conversationId, messages)

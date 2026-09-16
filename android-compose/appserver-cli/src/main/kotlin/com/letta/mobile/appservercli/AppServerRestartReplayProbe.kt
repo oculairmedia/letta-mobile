@@ -20,7 +20,6 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.UUID
 import kotlin.io.path.exists
-import kotlin.io.path.name
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -161,6 +160,8 @@ class AppServerRestartReplayProbe(private val config: Config) {
     )
 
     // A tiny helper that provides a connected client bound to a fresh scope, closing it after.
+    // The independent transport scope is always cancelled in this function's finally block.
+    @Suppress("NoDetachedCoroutineLifecycle")
     private suspend fun <T> withClient(block: suspend (DefaultAppServerClient) -> T): T = coroutineScope {
         // Independent scope for the transport I/O jobs so cancelling it never
         // propagates to the caller's job hierarchy.
@@ -242,7 +243,7 @@ class AppServerRestartReplayProbe(private val config: Config) {
             }
         }
         // Let the shared-flow collector subscribe before the (multi-second) turn starts.
-        delay(SUBSCRIBE_GRACE_MS)
+        delay(SUBSCRIBE_GRACE_MS.milliseconds)
         client.input(
             AppServerCommand.Input(
                 runtime = runtime,

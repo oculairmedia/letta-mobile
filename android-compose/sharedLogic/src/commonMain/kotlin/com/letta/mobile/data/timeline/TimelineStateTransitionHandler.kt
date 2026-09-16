@@ -3,80 +3,40 @@ package com.letta.mobile.data.timeline
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.util.Telemetry
 import kotlinx.collections.immutable.PersistentList
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 
 /**
  * Handles timeline local event additions, retry transitions, and delivery state transitions (sent/failed).
  */
 class TimelineStateTransitionHandler(
     private val conversationId: String,
-    private val state: MutableStateFlow<Timeline>,
-    private val events: MutableSharedFlow<TimelineSyncEvent>,
-    private val sendQueue: Channel<PendingSend>,
-    private val writeMutex: Mutex,
+    private val processor: TimelineProcessor,
 ) {
     suspend fun applyLocalSendAppend(event: TimelineGatewayEvent.LocalSendAppend) {
-        writeMutex.withLock {
-            val local = TimelineEvent.Local(
-                position = state.value.nextLocalPosition(),
-                otid = event.pending.otid,
-                content = event.pending.content,
-                role = Role.USER,
-                sentAt = event.sentAt,
-                deliveryState = DeliveryState.SENDING,
-                attachments = event.pending.attachments,
-            )
-            state.value = state.value.append(local)
-            sendQueue.send(event.pending)
-        }
-        events.emit(TimelineSyncEvent.LocalAppended(event.pending.otid))
+        val result = processor.submitWithBackpressure(
+            TimelineMutation.LocalAppend(event.pending, event.sentAt, TimelineLocalAppendMode.SEND),
+        ).appliedResultOrThrow()
         Telemetry.event(
             "TimelineSync", "send.localAppended",
             "otid" to event.pending.otid,
             "conversationId" to conversationId,
             "contentLength" to event.pending.content.length,
+            "changed" to result.changed,
         )
         event.ack.complete(Unit)
     }
 
     suspend fun applyRetrySend(event: TimelineGatewayEvent.RetrySend) {
-        writeMutex.withLock {
-            val existing = state.value.findByOtid(event.otid)
-            if (existing is TimelineEvent.Local && existing.deliveryState == DeliveryState.FAILED) {
-                // Recompute the fingerprint: the retried message may be a NON-tail
-                // event, and data class copy() reuses stablePrefixVersion, so the
-                // projector's fast path would otherwise suppress the FAILED→SENDING
-                // repaint (Codex review).
-                val persisted = state.value.events.map {
-                    if (it.otid == event.otid && it is TimelineEvent.Local) {
-                        it.copy(deliveryState = DeliveryState.SENDING)
-                    } else it
-                }.toTimelinePersistentList()
-                state.value = state.value.copy(
-                    events = persisted,
-                    stablePrefixVersion = persisted.stablePrefixFingerprint(),
-                )
-                sendQueue.send(PendingSend(event.otid, existing.content, existing.attachments))
-            }
-        }
+        processor.submitWithBackpressure(TimelineMutation.RetryLocal(event.otid)).appliedResultOrThrow()
         event.ack.complete(Unit)
     }
 
     suspend fun applyMarkSent(event: TimelineGatewayEvent.MarkSent) {
-        writeMutex.withLock {
-            state.value = state.value.markSent(event.otid)
-        }
+        processor.submitWithBackpressure(TimelineMutation.MarkLocalSent(event.otid)).appliedResultOrThrow()
         event.ack.complete(Unit)
     }
 
     suspend fun applyMarkFailed(event: TimelineGatewayEvent.MarkFailed) {
-        writeMutex.withLock {
-            state.value = state.value.markFailed(event.otid)
-        }
+        processor.submitWithBackpressure(TimelineMutation.MarkLocalFailed(event.otid)).appliedResultOrThrow()
         event.ack.complete(Unit)
     }
 
@@ -103,22 +63,15 @@ class TimelineStateTransitionHandler(
         attachments: PersistentList<MessageContentPart.Image>,
         sentAt: TimelineInstant,
     ): Boolean {
-        var appended = false
-        writeMutex.withLock {
-            if (state.value.findByOtid(otid) == null) {
-                val local = TimelineEvent.Local(
-                    position = state.value.nextLocalPosition(),
-                    otid = otid,
-                    content = content,
-                    role = Role.USER,
-                    sentAt = sentAt,
-                    deliveryState = DeliveryState.SENDING,
-                    attachments = attachments,
-                )
-                state.value = state.value.append(local)
-                appended = true
-            }
-        }
+        val ack = processor.submitWithBackpressure(
+            TimelineMutation.LocalAppend(
+                pending = PendingSend(otid, content, attachments),
+                sentAt = sentAt,
+                mode = TimelineLocalAppendMode.OPTIMISTIC,
+            ),
+        )
+        if (ack.isClosedRejection()) return false
+        val appended = ack.appliedResultOrThrow().changed
         if (appended) {
             Telemetry.event(
                 "TimelineSync", "send.optimisticLocalAppended",
@@ -131,19 +84,15 @@ class TimelineStateTransitionHandler(
     }
 
     /**
-     * letta-mobile-mxwtn: synchronous FAILED transition. Mirrors
-     * [applyMarkFailed] but takes the write mutex directly so the caller's
-     * failure handler can flip the bubble's deliveryState in the same frame
-     * the HTTP error is surfaced, without round-tripping through the event
-     * queue. A no-op when no Local event with that otid exists.
+     * letta-mobile-mxwtn: synchronous FAILED transition. Submits to the
+     * processor so the caller's failure handler can observe the serialized
+     * delivery-state update without round-tripping through the event queue.
+     * A no-op when the processor is closed or no Local event exists.
      */
     suspend fun markOptimisticLocalFailedSync(otid: String) {
-        writeMutex.withLock {
-            val existing = state.value.findByOtid(otid)
-            if (existing is TimelineEvent.Local) {
-                state.value = state.value.markFailed(otid)
-            }
-        }
+        val ack = processor.submitWithBackpressure(TimelineMutation.MarkLocalFailed(otid))
+        if (ack.isClosedRejection()) return
+        ack.appliedResultOrThrow()
         Telemetry.event(
             "TimelineSync", "send.optimisticLocalFailed",
             "otid" to otid,
@@ -153,14 +102,15 @@ class TimelineStateTransitionHandler(
 
     /**
      * letta-mobile-mxwtn: synchronous SENT transition (delivery acknowledged
-     * by the transport but no Confirmed echo yet). Mirrors [applyMarkSent].
+     * by the transport but no Confirmed echo yet). Submits to the processor
+     * for serialized processing and no-ops after normal processor closure.
      */
     suspend fun markOptimisticLocalSentSync(otid: String) {
-        writeMutex.withLock {
-            val existing = state.value.findByOtid(otid)
-            if (existing is TimelineEvent.Local) {
-                state.value = state.value.markSent(otid)
-            }
-        }
+        val ack = processor.submitWithBackpressure(TimelineMutation.MarkLocalSent(otid))
+        if (ack.isClosedRejection()) return
+        ack.appliedResultOrThrow()
     }
 }
+
+private fun TimelineProcessorAck.isClosedRejection(): Boolean =
+    this is TimelineProcessorAck.Rejected && reason == TimelineProcessorRejectionReason.Closed

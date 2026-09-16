@@ -101,13 +101,13 @@ internal object AndroidPermissionNames {
     const val READ_MEDIA_IMAGES = "android.permission.READ_MEDIA_IMAGES"
     const val READ_MEDIA_VIDEO = "android.permission.READ_MEDIA_VIDEO"
     const val READ_MEDIA_AUDIO = "android.permission.READ_MEDIA_AUDIO"
-    const val READ_EXTERNAL_STORAGE = Manifest.permission.READ_EXTERNAL_STORAGE
+    const val READ_EXTERNAL_STORAGE: String = Manifest.permission.READ_EXTERNAL_STORAGE
     const val MANAGE_EXTERNAL_STORAGE = "android.permission.MANAGE_EXTERNAL_STORAGE"
-    const val READ_CONTACTS = Manifest.permission.READ_CONTACTS
-    const val WRITE_CONTACTS = Manifest.permission.WRITE_CONTACTS
-    const val SYSTEM_ALERT_WINDOW = Manifest.permission.SYSTEM_ALERT_WINDOW
+    const val READ_CONTACTS: String = Manifest.permission.READ_CONTACTS
+    const val WRITE_CONTACTS: String = Manifest.permission.WRITE_CONTACTS
+    const val SYSTEM_ALERT_WINDOW: String = Manifest.permission.SYSTEM_ALERT_WINDOW
     const val POST_NOTIFICATIONS = "android.permission.POST_NOTIFICATIONS"
-    const val BIND_ACCESSIBILITY_SERVICE = Manifest.permission.BIND_ACCESSIBILITY_SERVICE
+    const val BIND_ACCESSIBILITY_SERVICE: String = Manifest.permission.BIND_ACCESSIBILITY_SERVICE
 
     const val SHIZUKU_API_V23 = "moe.shizuku.manager.permission.API_V23"
 }
@@ -115,8 +115,8 @@ internal object AndroidPermissionNames {
 internal object AndroidSettingsActions {
     const val ACTION_OPEN_DOCUMENT = "android.intent.action.OPEN_DOCUMENT"
     const val ACTION_OPEN_DOCUMENT_TREE = "android.intent.action.OPEN_DOCUMENT_TREE"
-    const val ACTION_MANAGE_OVERLAY_PERMISSION = Settings.ACTION_MANAGE_OVERLAY_PERMISSION
-    const val ACTION_NOTIFICATION_LISTENER_SETTINGS = Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS
-    const val ACTION_ACCESSIBILITY_SETTINGS = Settings.ACTION_ACCESSIBILITY_SETTINGS
+    const val ACTION_MANAGE_OVERLAY_PERMISSION: String = Settings.ACTION_MANAGE_OVERLAY_PERMISSION
+    const val ACTION_NOTIFICATION_LISTENER_SETTINGS: String = Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS
+    const val ACTION_ACCESSIBILITY_SETTINGS: String = Settings.ACTION_ACCESSIBILITY_SETTINGS
     const val ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION = "android.settings.MANAGE_APP_ALL_FILES_ACCESS_PERMISSION"
 }

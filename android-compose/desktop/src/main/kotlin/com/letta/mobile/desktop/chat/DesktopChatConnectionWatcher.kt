@@ -8,6 +8,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Monitors the active [DesktopChatGateway] connection state, tracks outages,
@@ -63,7 +64,7 @@ internal class DesktopChatConnectionWatcher(
 
     private suspend fun watchForSustainedOutage(outage: OutageTracker) {
         while (true) {
-            delay(CONNECTION_ESCALATION_POLL_MS)
+            delay(CONNECTION_ESCALATION_POLL_MS.milliseconds)
             if (!outage.isDown.get()) {
                 outage.downTicks.set(0)
                 continue

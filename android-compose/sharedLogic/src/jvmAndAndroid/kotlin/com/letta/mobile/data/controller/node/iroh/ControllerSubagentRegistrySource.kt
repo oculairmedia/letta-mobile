@@ -2,6 +2,8 @@ package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.model.AppServerSubagentSnapshotAdapter
 import com.letta.mobile.data.model.SubagentEntry
+import com.letta.mobile.data.model.SubagentParentIdentity
+import com.letta.mobile.data.model.SubagentStatus
 import com.letta.mobile.data.subagents.DurableSubagentRegistry
 import com.letta.mobile.data.subagents.SubagentChipObservation
 import com.letta.mobile.data.subagents.SubagentChipSource
@@ -40,7 +42,24 @@ class ControllerSubagentRegistrySource(
     override suspend fun todos(conversationId: String, toolCallId: String): SubagentTodosSnapshot? {
         // Todo snapshots are not yet projected from App Server events (m6oa1).
         val record = registry.findByToolCall(conversationId, toolCallId) ?: return null
-        return SubagentTodosSnapshot(subagent = record.toEntry(), todos = emptyList(), todosFound = false)
+        val entry = record.toEntry()
+        val activity = entry.activity
+        val activityLines = activity?.lines.orEmpty()
+        val activityTodos = activityLines.mapIndexed { index, line ->
+            com.letta.mobile.data.model.SubagentTodo(
+                content = line,
+                status = activityTodoStatus(
+                    entry,
+                    ActivityTodoPosition(index, activityLines.lastIndex, activity?.truncated == true),
+                ),
+                activeForm = line,
+            )
+        }
+        return SubagentTodosSnapshot(
+            subagent = entry,
+            todos = activityTodos,
+            todosFound = activityTodos.isNotEmpty(),
+        )
     }
 
     /**
@@ -117,13 +136,24 @@ class ControllerSubagentRegistrySource(
         )
     }
 
+    private data class ActivityTodoPosition(
+        val index: Int,
+        val lastIndex: Int,
+        val truncated: Boolean,
+    )
+
+    private fun activityTodoStatus(entry: SubagentEntry, position: ActivityTodoPosition): String {
+        if (entry.status != SubagentStatus.RUNNING) return "completed"
+        if (position.truncated) return "completed"
+        return if (position.index == position.lastIndex) "in_progress" else "completed"
+    }
+
     private data class ParentIds(val conversationId: String, val agentId: String?)
 
     private fun decodeEntry(raw: JsonObject, parents: ParentIds): SubagentEntry? =
         AppServerSubagentSnapshotAdapter.toEntry(
-            raw = raw,
-            parentConversationId = parents.conversationId,
-            parentAgentId = parents.agentId,
+            raw,
+            SubagentParentIdentity(parents.conversationId, parents.agentId),
         )
 
     companion object {

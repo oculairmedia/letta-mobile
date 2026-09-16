@@ -6,7 +6,6 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -68,9 +67,9 @@ internal class LocalBackendMessageProjection(private val support: LocalBackendSt
             projectedRunId = (id?.let { sidecars.runIds[it] })?.let { JsonPrimitive(it) } ?: JsonNull,
             attachmentRefs = id?.let { sidecars.attachments[it] },
         )
-        return when {
-            role == "user" || role == "system" -> projectUserOrSystem(ctx, role, parts)
-            role == "toolResult" -> projectToolResultRow(ctx, localMsg, parts)
+        return when (role) {
+            "user", "system" -> projectUserOrSystem(ctx, role, parts)
+            "toolResult" -> projectToolResultRow(ctx, localMsg, parts)
             else -> projectAssistantParts(ctx, parts)
         }
     }
@@ -153,18 +152,20 @@ internal class LocalBackendMessageProjection(private val support: LocalBackendSt
             .replace(Regex("\\n{3,}"), "\n\n")
             .trim()
 
+    private fun flattenToolOutputPart(part: JsonElement): String = when (part) {
+        is JsonPrimitive -> if (part.isString) part.content else part.toString()
+        is JsonObject -> {
+            val text = part["text"]?.stringOrNull()
+            if (part["type"]?.stringOrNull() == "text" && text != null) text else part.toString()
+        }
+        else -> part.toString()
+    }
+
     /** Port of translate.ts flattenToolOutput. */
     private fun flattenToolOutput(value: JsonElement?): String = when (value) {
         null, is JsonNull -> ""
         is JsonPrimitive -> if (value.isString) value.content else value.toString()
-        is JsonArray -> value.joinToString("") { p ->
-            when {
-                p is JsonPrimitive && p.isString -> p.content
-                p is JsonObject && p["type"]?.stringOrNull() == "text" && p["text"]?.stringOrNull() != null ->
-                    p["text"]!!.stringOrNull()!!
-                else -> p.toString()
-            }
-        }
+        is JsonArray -> value.joinToString("", transform = ::flattenToolOutputPart)
         is JsonObject -> value.toString()
     }
 
@@ -242,7 +243,7 @@ internal class LocalBackendMessageProjection(private val support: LocalBackendSt
             put("run_id", ctx.projectedRunId)
             put("content", content)
             // attachRefsToWireMessage: only user_message, only when refs present.
-            if (wireType == "user_message" && ctx.attachmentRefs != null && ctx.attachmentRefs.isNotEmpty()) {
+            if (wireType == "user_message" && !ctx.attachmentRefs.isNullOrEmpty()) {
                 put("attachments", ctx.attachmentRefs)
             }
         }
@@ -316,7 +317,7 @@ internal class LocalBackendMessageProjection(private val support: LocalBackendSt
         // Legacy `tool-call` + new camelCase `toolCall`.
         type == "tool-call" || type == "toolCall" -> listOf(buildToolCall(ctx, i, part))
         // Native LocalBackend tool part: `tool-<name>` with toolCallId.
-        type.startsWith("tool-") && type != "tool-call" && type != "tool-return" &&
+        type.startsWith("tool-") && type != "tool-return" &&
             part["toolCallId"]?.stringOrNull() != null -> projectNativeToolPart(ctx, type, part)
         type == "tool-return" -> listOf(buildToolReturnPart(ctx, i, part))
         else -> null
@@ -326,7 +327,7 @@ internal class LocalBackendMessageProjection(private val support: LocalBackendSt
     private fun projectAssistantParts(ctx: ProjCtx, parts: JsonArray): List<JsonObject> {
         val out = ArrayList<JsonObject>()
         val acc = TextAccumulator()
-        for (i in 0 until parts.size) {
+        for (i in parts.indices) {
             val part = parts[i] as? JsonObject ?: continue
             val type = part["type"]?.stringOrNull() ?: continue
             val text = if (type == "text") part["text"]?.stringOrNull() else null
@@ -477,9 +478,9 @@ internal class LocalBackendMessageProjection(private val support: LocalBackendSt
     }
 
     /** Resolve the `tool_return` raw value to its wire text: verbatim string, `"\"\""` for null, else JSON. */
-    private fun resolveToolReturnText(returnRaw: JsonElement?): String = when {
-        returnRaw is JsonPrimitive && returnRaw.isString -> returnRaw.content
-        returnRaw == null || returnRaw is JsonNull -> "\"\""
+    private fun resolveToolReturnText(returnRaw: JsonElement?): String = when (returnRaw) {
+        null, is JsonNull -> "\"\""
+        is JsonPrimitive -> if (returnRaw.isString) returnRaw.content else returnRaw.toString()
         else -> returnRaw.toString()
     }
 

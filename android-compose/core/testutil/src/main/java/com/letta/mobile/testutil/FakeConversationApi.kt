@@ -8,6 +8,7 @@ import com.letta.mobile.data.model.ConversationCreateParams
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.ConversationUpdateParams
 import io.mockk.mockk
+import java.util.concurrent.atomic.AtomicInteger
 
 class FakeConversationApi : ConversationApi(mockk(relaxed = true)) {
     var conversations = mutableListOf<Conversation>()
@@ -19,8 +20,8 @@ class FakeConversationApi : ConversationApi(mockk(relaxed = true)) {
     // underlying API. Increment on entry, decrement on completion, track
     // the peak we observed across all calls. Tests assert peak == 1 to
     // prove the mutex serializes the fetch path.
-    private val inFlightListConversations = java.util.concurrent.atomic.AtomicInteger(0)
-    val peakConcurrentListConversations = java.util.concurrent.atomic.AtomicInteger(0)
+    private val inFlightListConversations = AtomicInteger(0)
+    val peakConcurrentListConversations: AtomicInteger = AtomicInteger(0)
 
     override suspend fun listConversations(
         agentId: AgentId?,

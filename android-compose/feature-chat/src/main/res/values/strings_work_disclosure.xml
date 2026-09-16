@@ -7,6 +7,11 @@
     <string name="work_disclosure_worked_duration">Worked for %1$s</string>
     <string name="work_disclosure_expand">Expand agent work</string>
     <string name="work_disclosure_collapse">Collapse agent work</string>
+    <string name="reasoning_disclosure_expand">Expand reasoning</string>
+    <string name="reasoning_disclosure_collapse">Collapse reasoning</string>
+    <string name="reasoning_disclosure_state_collapsed">Reasoning collapsed</string>
+    <string name="reasoning_disclosure_state_expanded">Reasoning expanded</string>
+    <string name="reasoning_disclosure_state_working">Reasoning in progress</string>
     <string name="work_disclosure_state_working">Agent work in progress</string>
     <string name="work_disclosure_state_collapsed">Agent work collapsed</string>
     <string name="work_disclosure_state_expanded">Agent work expanded</string>

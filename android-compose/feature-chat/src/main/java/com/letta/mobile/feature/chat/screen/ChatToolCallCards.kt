@@ -1,5 +1,7 @@
 package com.letta.mobile.feature.chat.screen
 
+import com.letta.mobile.data.chat.projection.activityLabel
+
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
@@ -50,7 +52,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.UiImageAttachment
@@ -145,7 +149,7 @@ internal fun SubagentNotificationCard(
     val haptic = LocalHapticFeedback.current
     val view = LocalView.current
     val effectiveToolCallId = toolCallId ?: notification.toolCallId ?: notification.taskId
-    val canOpenSubagent = !effectiveToolCallId.isNullOrBlank()
+    val canOpenSubagent = notification.activityLabel() == "Subagent" && !effectiveToolCallId.isNullOrBlank()
     val openSubagent = {
         if (!effectiveToolCallId.isNullOrBlank()) {
             HapticEffects.segmentTick(haptic, view)
@@ -159,51 +163,56 @@ internal fun SubagentNotificationCard(
         }
     }
     val headerOpenTodosModifier = if (canOpenSubagent) Modifier.clickable { openSubagent() } else Modifier
-    val isFailure = notification.status.equals("failed", ignoreCase = true) ||
-        notification.status.equals("error", ignoreCase = true)
-    // Collapse the full report by default — the summary already conveys the
-    // outcome; the report is opt-in so a long markdown dump never floods the
-    // timeline (recede-by-default).
-    var reportExpanded by remember(notification.taskId, effectiveToolCallId, notification.result) {
+    val normalizedStatus = notification.status.trim().lowercase()
+    val isFailure = normalizedStatus == "failed" || normalizedStatus == "error"
+    // The task-notification protocol names completed as its successful terminal state.
+    // Accept success too because older producers emitted it, but never compact a status
+    // we cannot positively identify as successful.
+    val isSuccessfulCompletion = normalizedStatus == "completed" || normalizedStatus == "success"
+    val headline = notification.status.trim().ifBlank { "unknown" }
+    var detailsExpanded by remember(notification.taskId, effectiveToolCallId, notification.result) {
         mutableStateOf(false)
     }
     val report = notification.result?.takeIf { it.isNotBlank() }
-    Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface,
-        ),
-        border = BorderStroke(
-            width = 1.dp,
-            color = if (isFailure) MaterialTheme.colorScheme.error.copy(alpha = 0.62f) else MaterialTheme.colorScheme.outlineVariant,
-        ),
+    val hasDetails = report != null || notification.transcriptUri != null
+    val toggleDetails = {
+        HapticEffects.segmentTick(haptic, view)
+        detailsExpanded = !detailsExpanded
+    }
+
+    Column(
+        modifier = modifier.padding(vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .then(headerOpenTodosModifier),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    imageVector = if (isFailure) LettaIcons.Error else LettaIcons.CheckCircle,
-                    contentDescription = null,
-                    modifier = Modifier.size(LettaIconSizing.Inline),
-                    tint = if (isFailure) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+        if (isSuccessfulCompletion) {
+            // A completed activity contributes one touch-sized timeline row. Its raw
+            // notification payload, identity, and actions remain available on disclosure.
+            SubagentCompletedSummaryRow(
+                summary = notification.summary ?: fallbackDescription,
+                hasReport = report != null,
+                expanded = detailsExpanded,
+                onToggleDetails = toggleDetails,
+            )
+            AnimatedVisibility(visible = detailsExpanded) {
+                SubagentNotificationExpandedContent(
+                    notification = notification,
+                    report = report,
+                    canOpenSubagent = canOpenSubagent,
+                    hasDetails = hasDetails,
+                    expanded = detailsExpanded,
+                    onOpenSubagent = openSubagent,
+                    onToggleDetails = toggleDetails,
                 )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = "Subagent ${if (isFailure) "failed" else "completed"}",
-                    style = MaterialTheme.typography.chatBubbleSender,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.weight(1f),
-                )
-                SubagentMetaChip(text = notification.status)
             }
+        } else {
+            // Do not recast in-flight, cancelled, failed, or unknown notifications as
+            // successful work: their status and supporting evidence stay in the timeline.
+            SubagentNotificationHeader(
+                notification = notification,
+                headline = headline,
+                isFailure = isFailure,
+                modifier = Modifier.fillMaxWidth().then(headerOpenTodosModifier),
+            )
             notification.summary?.let { summary ->
                 Text(
                     text = summary,
@@ -211,62 +220,218 @@ internal fun SubagentNotificationCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                notification.durationMs?.let(::formatToolExecutionTime)?.let { SubagentMetaChip(text = it) }
-                notification.taskId?.let { SubagentMetaChip(text = it) }
+            SubagentNotificationMetadata(notification)
+            SubagentNotificationActions(
+                canOpenSubagent = canOpenSubagent,
+                hasReport = report != null,
+                hasDetails = hasDetails,
+                expanded = detailsExpanded,
+                onOpenSubagent = openSubagent,
+                onToggleDetails = toggleDetails,
+            )
+            AnimatedVisibility(visible = detailsExpanded && hasDetails) {
+                SubagentNotificationDetails(report = report, transcriptUri = notification.transcriptUri)
             }
-            if (canOpenSubagent) {
+        }
+    }
+}
+
+@Composable
+private fun SubagentCompletedSummaryRow(
+    summary: String,
+    hasReport: Boolean,
+    expanded: Boolean,
+    onToggleDetails: () -> Unit,
+) {
+    val disclosure = if (hasReport) {
+        if (expanded) "Hide full report" else "Show full report"
+    } else {
+        if (expanded) "Hide details" else "Show details"
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = 48.dp)
+            .testTag("completed-activity-summary")
+            .semantics { contentDescription = "Completed" }
+            .clickable(onClick = onToggleDetails)
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = LettaIcons.CheckCircle,
+            contentDescription = null,
+            modifier = Modifier.size(LettaIconSizing.Inline),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = summary,
+            style = MaterialTheme.typography.listItemSupporting,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        Icon(
+            imageVector = LettaIcons.ExpandMore,
+            contentDescription = disclosure,
+            modifier = Modifier
+                .size(14.dp)
+                .rotate(if (expanded) 180f else 0f),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun SubagentNotificationExpandedContent(
+    notification: UiSubagentNotification,
+    report: String?,
+    canOpenSubagent: Boolean,
+    hasDetails: Boolean,
+    expanded: Boolean,
+    onOpenSubagent: () -> Unit,
+    onToggleDetails: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        notification.summary?.let { summary ->
+            Text(
+                text = summary,
+                style = MaterialTheme.typography.listItemSupporting,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        SubagentNotificationMetadata(notification)
+        SubagentNotificationActions(
+            canOpenSubagent = canOpenSubagent,
+            hasReport = report != null,
+            hasDetails = hasDetails,
+            expanded = expanded,
+            onOpenSubagent = onOpenSubagent,
+            onToggleDetails = onToggleDetails,
+        )
+        if (hasDetails) {
+            SubagentNotificationDetails(report = report, transcriptUri = notification.transcriptUri)
+        }
+    }
+}
+
+@Composable
+private fun SubagentNotificationMetadata(notification: UiSubagentNotification) {
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        notification.usage?.takeIf { it.isNotBlank() }?.let { SubagentMetaChip(text = it) }
+        notification.durationMs?.let(::formatToolExecutionTime)?.let { SubagentMetaChip(text = it) }
+        notification.taskId?.let { SubagentMetaChip(text = it) }
+    }
+}
+
+@Composable
+private fun SubagentNotificationHeader(
+    notification: UiSubagentNotification,
+    headline: String,
+    isFailure: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            imageVector = if (isFailure) LettaIcons.Error else LettaIcons.CheckCircle,
+            contentDescription = null,
+            modifier = Modifier.size(LettaIconSizing.Inline),
+            tint = if (isFailure) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = "${notification.activityLabel()} $headline",
+            style = MaterialTheme.typography.chatBubbleSender,
+            color = if (isFailure) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+        )
+        // Anything the header does not already say. "completed" beside "Subagent completed" was
+        // the same word twice.
+        notification.status.takeIf { !it.equals(headline, ignoreCase = true) }
+            ?.let { SubagentMetaChip(text = it) }
+    }
+}
+
+/**
+ * One row, not one line each: opening the subagent's conversation and opening its report are the
+ * two ways into the same result.
+ */
+@Composable
+private fun SubagentNotificationActions(
+    canOpenSubagent: Boolean,
+    hasReport: Boolean,
+    hasDetails: Boolean,
+    expanded: Boolean,
+    onOpenSubagent: () -> Unit,
+    onToggleDetails: () -> Unit,
+) {
+    if (!canOpenSubagent && !hasDetails) return
+    val disclosure = when {
+        hasReport && expanded -> "Hide full report"
+        hasReport -> "Show full report"
+        expanded -> "Hide transcript"
+        else -> "Show transcript"
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        if (canOpenSubagent) {
+            Text(
+                text = "View conversation",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .defaultMinSize(minHeight = 32.dp)
+                    .clickable(onClick = onOpenSubagent)
+                    .padding(vertical = 8.dp),
+            )
+        }
+        if (hasDetails) {
+            Row(
+                modifier = Modifier
+                    .defaultMinSize(minHeight = 32.dp)
+                    .clickable(onClick = onToggleDetails)
+                    .padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text(
-                    text = "View conversation",
+                    text = disclosure,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
+                )
+                Icon(
+                    imageVector = LettaIcons.ExpandMore,
+                    contentDescription = disclosure,
                     modifier = Modifier
-                        .defaultMinSize(minHeight = 32.dp)
-                        .clickable { openSubagent() }
-                        .padding(vertical = 8.dp),
+                        .size(14.dp)
+                        .rotate(if (expanded) 180f else 0f),
+                    tint = MaterialTheme.colorScheme.primary,
                 )
             }
-            if (report != null) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            HapticEffects.segmentTick(haptic, view)
-                            reportExpanded = !reportExpanded
-                        },
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = if (reportExpanded) "Hide full report" else "Show full report",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Icon(
-                        imageVector = LettaIcons.ExpandMore,
-                        contentDescription = if (reportExpanded) "Hide full report" else "Show full report",
-                        modifier = Modifier
-                            .size(14.dp)
-                            .rotate(if (reportExpanded) 180f else 0f),
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                }
-                AnimatedVisibility(visible = reportExpanded) {
-                    MarkdownText(
-                        text = report,
-                        textColor = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-            }
-            notification.transcriptUri?.let { transcript ->
-                Text(
-                    text = "Transcript: $transcript",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+        }
+    }
+}
+
+@Composable
+private fun SubagentNotificationDetails(report: String?, transcriptUri: String?) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        report?.let {
+            MarkdownText(text = it, textColor = MaterialTheme.colorScheme.onSurface)
+        }
+        // A path on the build host is for whoever goes looking, which is never at a glance. It
+        // used to hold a line of every card whether or not anyone wanted it.
+        transcriptUri?.let { transcript ->
+            Text(
+                text = "Transcript: $transcript",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
@@ -288,84 +453,83 @@ internal fun SubagentDispatchCard(
             opener(SubagentTodoSheetTarget(toolCallId = callId, description = dispatch.description))
         }
     } ?: Modifier
-    Card(
-        modifier = modifier.then(openTodosModifier),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.70f),
-        ),
-        border = BorderStroke(
-            width = 1.dp,
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f),
-        ),
+    // Same reason as the return card: whatever hosts this already draws the chrome, so filling
+    // and outlining it here put a box inside a box.
+    Column(
+        modifier = modifier
+            .then(openTodosModifier)
+            .padding(vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = LettaIcons.Agent,
-                    contentDescription = null,
-                    modifier = Modifier.size(LettaIconSizing.Inline),
-                    tint = MaterialTheme.colorScheme.tertiary,
-                )
-                Spacer(modifier = Modifier.width(6.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = LettaIcons.Agent,
+                contentDescription = null,
+                modifier = Modifier.size(LettaIconSizing.Inline),
+                tint = MaterialTheme.colorScheme.tertiary,
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = "Dispatched: ${dispatch.description}",
+                style = MaterialTheme.typography.chatBubbleSender,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            if (dispatch.runInBackground) {
+                SubagentMetaChip(text = "background")
+                Spacer(modifier = Modifier.width(4.dp))
+            }
+            SubagentMetaChip(text = dispatch.subagentType)
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            status?.let { SubagentMetaChip(text = subagentDispatchStatus(it)) }
+            executionTimeMs?.let(::formatToolExecutionTime)?.let { SubagentMetaChip(text = it) }
+            dispatch.taskId?.let { SubagentMetaChip(text = it) }
+        }
+        if (dispatch.prompt.isNotBlank()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        HapticEffects.segmentTick(haptic, view)
+                        expanded = !expanded
+                    },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text(
-                    text = "Dispatched: ${dispatch.description}",
-                    style = MaterialTheme.typography.chatBubbleSender,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                    text = if (expanded) "Hide prompt" else "Show prompt",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.weight(1f),
                 )
-                if (dispatch.runInBackground) {
-                    SubagentMetaChip(text = "background")
-                    Spacer(modifier = Modifier.width(4.dp))
-                }
-                SubagentMetaChip(text = dispatch.subagentType)
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                status?.let { SubagentMetaChip(text = it) }
-                executionTimeMs?.let(::formatToolExecutionTime)?.let { SubagentMetaChip(text = it) }
-                dispatch.taskId?.let { SubagentMetaChip(text = it) }
-            }
-            if (dispatch.prompt.isNotBlank()) {
-                Row(
+                Icon(
+                    imageVector = LettaIcons.ExpandMore,
+                    contentDescription = if (expanded) "Hide prompt" else "Show prompt",
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            HapticEffects.segmentTick(haptic, view)
-                            expanded = !expanded
-                        },
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = if (expanded) "Hide prompt" else "Show prompt",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Icon(
-                        imageVector = LettaIcons.ExpandMore,
-                        contentDescription = if (expanded) "Hide prompt" else "Show prompt",
-                        modifier = Modifier
-                            .size(14.dp)
-                            .rotate(if (expanded) 180f else 0f),
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                }
-                AnimatedVisibility(visible = expanded) {
-                    Text(
-                        text = dispatch.prompt,
-                        style = MaterialTheme.typography.listItemSupporting,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 12,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+                        .size(14.dp)
+                        .rotate(if (expanded) 180f else 0f),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+            AnimatedVisibility(visible = expanded) {
+                Text(
+                    text = dispatch.prompt,
+                    style = MaterialTheme.typography.listItemSupporting,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 12,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
     }
+}
+
+internal fun subagentDispatchStatus(toolStatus: String): String = when (toolStatus.lowercase()) {
+    "success", "succeeded", "completed", "complete", "done" -> "Sub-agent dispatched"
+    "error", "failed" -> "Dispatch failed"
+    else -> "Sub-agent dispatching"
 }
 
 @Composable
@@ -397,32 +561,7 @@ private fun SubagentMetaChip(text: String) {
  * `MessageMapper.extractSubagentNotification`. (CodeRabbit #343.)
  */
 internal fun parseTaskNotificationForToolCard(raw: String): UiSubagentNotification? {
-    if (raw.indexOf("<task-notification", ignoreCase = true) < 0) return null
-    fun tag(name: String): String? {
-        return Regex("<$name(?:\\s[^>]*)?>([\\s\\S]*?)</$name>", RegexOption.IGNORE_CASE)
-            .find(raw)
-            ?.groupValues
-            ?.getOrNull(1)
-            ?.trim()
-            ?.takeIf { it.isNotBlank() }
-    }
-    fun lineAfter(marker: String): String? {
-        val index = raw.indexOf(marker, ignoreCase = true)
-        if (index < 0) return null
-        val start = index + marker.length
-        val end = raw.indexOf('\n', start).let { if (it < 0) raw.length else it }
-        return raw.substring(start, end).trim().trimStart(':').trim().takeIf { it.isNotBlank() }
-    }
-    return UiSubagentNotification(
-        status = tag("status") ?: "completed",
-        summary = tag("summary"),
-        result = tag("result"),
-        usage = tag("usage"),
-        transcriptUri = tag("transcript") ?: lineAfter("Full transcript at"),
-        toolCallId = tag("tool_call_id") ?: tag("toolCallId"),
-        taskId = tag("task_id") ?: tag("taskId"),
-        subagentAgentId = tag("agent_id") ?: tag("agentId"),
-    )
+    return com.letta.mobile.data.chat.projection.extractSubagentNotification(raw)
 }
 
 
@@ -562,7 +701,7 @@ internal fun ToolCallCard(
             Spacer(modifier = Modifier.width(6.dp))
             Text(
                 text = compactTitle,
-                style = MaterialTheme.typography.chatBubbleSender.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
+                style = MaterialTheme.typography.chatBubbleSender.copy(fontFamily = codeStyle.fontFamily),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSurface,
@@ -922,7 +1061,7 @@ private fun ToolCallExpandedBodyContentInner(
             executionTimeText?.let { time ->
                 Text(
                     text = "Execution time: $time",
-                    style = MaterialTheme.typography.listItemSupporting.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
+                    style = MaterialTheme.typography.listItemSupporting.copy(fontFamily = codeStyle.fontFamily),
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.76f),
                 )
             }
@@ -930,7 +1069,7 @@ private fun ToolCallExpandedBodyContentInner(
             display.detailLine?.let { detail ->
                 Text(
                     text = detail,
-                    style = MaterialTheme.typography.listItemSupporting.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
+                    style = MaterialTheme.typography.listItemSupporting.copy(fontFamily = codeStyle.fontFamily),
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.76f),
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
@@ -971,7 +1110,7 @@ private fun ToolCallExpandedBodyContentInner(
                 ) {
                     Text(
                         text = if (isError) "Error" else "Output",
-                        style = MaterialTheme.typography.sectionTitle.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
+                        style = MaterialTheme.typography.sectionTitle.copy(fontFamily = codeStyle.fontFamily),
                         color = if (isError) {
                             MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
                         } else {
@@ -983,7 +1122,7 @@ private fun ToolCallExpandedBodyContentInner(
                     if (lineCount > 1 || result.length > 80) {
                         Text(
                             text = if (resultExpanded) "collapse" else "$lineCount line${if (lineCount == 1) "" else "s"}",
-                            style = MaterialTheme.typography.labelSmall.scaledBy(fontScale),
+                            style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.68f),
                         )
                         Spacer(modifier = Modifier.width(4.dp))
@@ -1121,7 +1260,7 @@ internal fun ToolSummaryLine(
     Row(modifier = Modifier.fillMaxWidth()) {
         Text(
             text = "$label: ",
-            style = MaterialTheme.typography.sectionTitle.scaledBy(fontScale),
+            style = MaterialTheme.typography.sectionTitle,
             color = if (isError) {
                 MaterialTheme.colorScheme.error.copy(alpha = 0.8f)
             } else if (isWarning) {
@@ -1132,7 +1271,7 @@ internal fun ToolSummaryLine(
         )
         Text(
             text = value,
-            style = MaterialTheme.typography.listItemSupporting.scaledBy(fontScale),
+            style = MaterialTheme.typography.listItemSupporting,
             color = if (isError) MaterialTheme.colorScheme.error else if (isWarning) MaterialTheme.customColors.warningTextColor else MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = maxLines,
             overflow = TextOverflow.Ellipsis,

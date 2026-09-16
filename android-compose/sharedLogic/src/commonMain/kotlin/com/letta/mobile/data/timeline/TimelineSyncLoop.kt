@@ -4,15 +4,30 @@ import com.letta.mobile.util.Telemetry
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.ToolReturnMessage
+import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore
+import com.letta.mobile.data.timeline.snapshot.NoOpConfirmedTimelineStore
+import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineCommitPlan
+import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineCommitPlanner
+import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineWriteResult
+import com.letta.mobile.data.timeline.snapshot.StoredTimelineEnvelope
+import com.letta.mobile.data.timeline.snapshot.TimelineScope
+import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
+import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotMutationCharacterizer
+import com.letta.mobile.data.timeline.snapshot.TimelineIncrementalSnapshotPlanner
+import com.letta.mobile.data.timeline.snapshot.SnapshotStructuralSummary
 import kotlin.concurrent.Volatile
+import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -22,6 +37,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 /**
  * Single sync loop per conversation. Acts as a thin orchestrator (under 200 lines).
@@ -42,34 +58,81 @@ class TimelineSyncLoop(
     // scoping. Null when unknown/legacy. LAST param so positional callers are
     // unaffected.
     private val agentId: String? = null,
+    private val confirmedTimelineStore: ConfirmedTimelineStore = NoOpConfirmedTimelineStore,
+    private val timelineScope: TimelineScope? = null,
+    initialTimeline: Timeline? = null,
+    initialRevision: Long = 0L,
+    // The last durably-acknowledged full envelope (from repository hydration), used as the
+    // incremental commit planner's structural baseline. Without this, a loop created after a
+    // process restart would plan every mutation against `previous = null`, i.e. baseRevision
+    // 0, and the very first commit would be rejected Stale by the store's CAS check against
+    // the already-durable revision from the prior session.
+    initialPersistedEnvelope: StoredTimelineEnvelope? = null,
+    private val ioDispatcher: kotlinx.coroutines.CoroutineDispatcher = timelineIoDispatcher,
 ) {
     private val loopJob = SupervisorJob(scope.coroutineContext[Job])
-    private val loopScope = CoroutineScope(scope.coroutineContext + loopJob)
-
-    private val _state = MutableStateFlow(Timeline(conversationId))
-    val state: StateFlow<Timeline> = _state.asStateFlow()
+    private val loopScope = object : CoroutineScope {
+        override val coroutineContext = scope.coroutineContext + loopJob
+    }
 
     private val _streamSubscriberActive = MutableStateFlow(false)
     val streamSubscriberActive: StateFlow<Boolean> = _streamSubscriberActive.asStateFlow()
 
-    private val writeMutex = Mutex()
-    internal val eventQueue = Channel<TimelineGatewayEvent>(Channel.UNLIMITED)
+    internal val eventQueue = Channel<TimelineGatewayEvent>(GATEWAY_EVENT_CAPACITY)
     private val _events = MutableSharedFlow<TimelineSyncEvent>(replay = 1, extraBufferCapacity = 64)
     val events: SharedFlow<TimelineSyncEvent> = _events.asSharedFlow()
 
-    private val pendingToolReturnsByCallId = LinkedHashMap<String, ToolReturnMessage>()
+    private var snapshotRevision: Long = initialRevision
+    private var lastPersistedFingerprint: Long? = null
+    // The first successful write establishes this compact baseline; failed/stale writes do not advance it.
+    private var lastPersistedSnapshot: SnapshotStructuralSummary? = null
+    // Full envelope of the last durably-committed (normalized OR legacy) write. This is the
+    // incremental commit planner's `previous`. Only successful commits/no-ops advance it;
+    // stale/invalid/failed attempts never do (letta-mobile-827s9.4 requirement 5).
+    private var lastPersistedEnvelope: StoredTimelineEnvelope? = initialPersistedEnvelope
+    // Legacy v11 checkpoint cadence: write a full envelope (readable by rollback/older builds)
+    // every LEGACY_CHECKPOINT_INTERVAL successful normalized commits, plus always on the very
+    // first commit for a scope. Bounds legacy staleness to at most that many revisions.
+    // A reopened normalized baseline has already passed the first-commit checkpoint. Start a
+    // fresh interval so the first ordinary post-restart mutation stays incremental.
+    private var commitsSinceLegacyCheckpoint: Int = 0
+    // Set when a persist was suppressed during an active turn, so the per-turn safety timer
+    // only writes when there is actually something deferred to write.
+    @Volatile
+    private var deferredDuringTurn: Boolean = false
+    private var turnSafetyFlushJob: Job? = null
+    // Consecutive Stale results. Reset by any durable commit; a duplicate holder never
+    // resets and so detaches quickly, while a transient loser recovers.
+    private var consecutiveStaleRejections: Int = 0
+    // Generation guard for the one-shot safety deadline: only the owning generation may clear
+    // ownership or enqueue, so an old timer cannot clear a replacement or write post-terminal.
+    private var turnSafetyFlushGeneration: Long = 0L
+    // Stable for one loop lifetime, distinct across concurrent holders. conversationId +
+    // agentId cannot tell two duplicate holders apart, which is exactly what the device
+    // capture needed to attribute writes.
+    private val holderId: String = "holder-" + holderSequence.incrementAndGet()
+    // Best-effort run/turn identity for telemetry. Emitted as explicit empty when unknown.
+    @Volatile
+    private var currentRunId: String? = null
+    @Volatile
+    private var currentTurnId: String? = null
+    // Set once this loop is proven not to own its conversation's durable state (see
+    // onStaleRejection). A detached loop still serves reads; it just stops writing.
+    @Volatile
+    private var detachedAsStaleWriter: Boolean = false
+
+    /** One turn schedules one terminal write, however many times turnEnded is called. */
+    private var turnEndScheduled: Boolean = false
+    private val persistRequests = Channel<SnapshotPersistRequest>(Channel.CONFLATED)
+    private val persistMutex = Mutex()
+    private val persistJob: Job
+    private val eventProcessorJob: Job
+    private val streamSubscriberJob: Job?
+
     private val seenStreamMessageLock = SynchronizedObject()
     private val seenStreamMessageKeys = ArrayDeque<String>()
     private val seenStreamMessageKeySet = mutableSetOf<String>()
-    private val holderFramesIn = MutableSharedFlow<LettaMessage>(extraBufferCapacity = 64)
-    private val holderHydrationSeed = MutableStateFlow(Timeline(conversationId))
-    
-    private val holder = com.letta.mobile.data.timeline.experimental.ConversationStateHolder(
-        conversationId = conversationId,
-        scope = loopScope,
-        frames = holderFramesIn.asSharedFlow(),
-        hydrationSeed = holderHydrationSeed,
-    )
+    private val pendingPersistenceDelta = PendingTimelinePersistenceDelta()
 
     private val ingestNotificationDispatcher = TimelineIngestNotificationDispatcher(
         conversationId = conversationId,
@@ -79,49 +142,590 @@ class TimelineSyncLoop(
 
     private val wsSubscription = TimelineWsSubscription(conversationId)
 
-    private val streamDispatcher = TimelineStreamDispatcher(
-        conversationId = conversationId,
-        agentId = agentId,
-        writeMutex = writeMutex,
-        state = _state,
-        events = _events,
-        pendingToolReturnsByCallId = pendingToolReturnsByCallId,
-        conversationCursorStore = conversationCursorStore,
-        loopScope = loopScope,
-        ingestNotificationDispatcher = ingestNotificationDispatcher,
-        holderFramesIn = holderFramesIn,
-        getHolderEventCount = { holder.state.value.events.size }
-    )
+    private val streamDispatcher by lazy {
+        TimelineStreamDispatcher(
+            conversationId = conversationId,
+            agentId = agentId,
+            processor = timelineProcessor,
+            onStreamFrameIngested = { scheduleSnapshotPersist(SnapshotPersistReason.STREAM_FRAME) },
+        )
+    }
 
-    private val recentMessagesReconciler = TimelineRecentMessagesReconciler(
+    private val recentMessagesReconciler by lazy {
+        TimelineRecentMessagesReconciler(
         conversationId = conversationId,
+        scope = loopScope,
         messageApi = messageApi,
         eventQueue = eventQueue,
-        state = _state,
+        state = state,
         streamSubscriberActive = _streamSubscriberActive.asStateFlow(),
-        writeMutex = writeMutex,
-        applyReturnsAndResponsesFromSnapshot = { snapshot -> applyReturnsAndResponsesFromSnapshot(snapshot, _state) }
+        processor = timelineProcessor,
+            onSnapshotApplied = { scheduleSnapshotPersist(SnapshotPersistReason.RECONCILE) },
+        )
+    }
+
+    private val hydrator by lazy {
+        TimelineHydrator(
+            conversationId = conversationId,
+            messageApi = messageApi,
+            pendingLocalStore = pendingLocalStore,
+            events = _events,
+            timelineProcessor = timelineProcessor,
+            onHydrationCommitted = { scheduleSnapshotPersist(SnapshotPersistReason.HYDRATION) },
+        )
+    }
+
+    /**
+     * letta-mobile-827s9.4, dogfood round 3 item 1: every scheduling source is now TYPED.
+     *
+     * The previous boolean gated only `Debounced` requests, and 12 of the 13 call sites passed
+     * `immediate = true` -- so hydration, reconcile, cursor repair and local-mutation callbacks
+     * all bypassed the streaming deferral entirely. That is why the capture still showed 12
+     * commits in 106 s, including a background conversation committing 11 times at 182-207 ms
+     * each while a different conversation was under test.
+     *
+     * During an active turn only [SnapshotPersistReason.isTurnBoundary] reasons may write.
+     * Everything else coalesces behind that boundary instead of jumping it.
+     */
+    internal fun scheduleSnapshotPersist(reason: SnapshotPersistReason) {
+        timelineScope ?: return
+        if (confirmedTimelineStore === NoOpConfirmedTimelineStore) return
+        if (detachedAsStaleWriter) return
+        if (turnActive && !reason.isTurnBoundary) {
+            Telemetry.event(
+                "TimelineSync", "snapshotPersist.streamingDeferred",
+                *identityAttrs(),
+                "reason" to reason.name,
+            )
+            deferredDuringTurn = true
+            armSafetyFlushDeadline()
+            return
+        }
+        Telemetry.event(
+            "TimelineSync", "snapshotPersist.scheduled",
+            *identityAttrs(),
+            "reason" to reason.name,
+            "turnActive" to turnActive.toString(),
+        )
+        persistRequests.trySend(
+            if (reason.isDebounced) SnapshotPersistRequest.Debounced else SnapshotPersistRequest.Immediate,
+        )
+    }
+
+    private suspend fun runSnapshotPersistence() {
+        for (request in persistRequests) {
+            if (request == SnapshotPersistRequest.Debounced) {
+                delay(SNAPSHOT_PERSIST_DEBOUNCE)
+            }
+            while (persistRequests.tryReceive().isSuccess) {
+                // Coalesce all timeline changes received during the debounce window into the latest state.
+            }
+            // Deferral is decided at SCHEDULING time by reason now, not here on arrival --
+            // arrival-based gating let unrelated later requests decide when a write happened,
+            // which is what produced the irregular 2.5-17 s commit spacing in the capture.
+            flushSnapshotNow(prune = true)
+        }
+    }
+
+
+    suspend fun flushSnapshotNow(prune: Boolean = false) {
+        val snapshotScope = timelineScope ?: return
+        if (confirmedTimelineStore === NoOpConfirmedTimelineStore) return
+        // Round 4: the detach guard was only on scheduleSnapshotPersist, so every direct
+        // caller of this -- including closeAndJoin -- could still run a full O(N) plan and a
+        // rejected commit after the loop had been proven not to own its conversation. Returning
+        // BEFORE the mutex and the planner is the point: a detached writer must cost nothing,
+        // not merely fail cheaply at the store.
+        if (detachedAsStaleWriter) return
+        persistMutex.withLock {
+            persistCurrentSnapshot(snapshotScope, prune)
+        }
+    }
+
+    private suspend fun persistCurrentSnapshot(snapshotScope: TimelineScope, prune: Boolean) {
+        // Capture one immutable processor commit so content and sequence cannot race.
+        val committedState = timelineProcessor.state.value
+        val capturedDelta = pendingPersistenceDelta.snapshot()
+        val planningDecision = decideIncrementalPlan(snapshotScope, committedState.timeline, capturedDelta)
+        emitPlanningDecision(planningDecision, capturedDelta)
+        if (planningDecision.result is TimelineIncrementalSnapshotPlanner.Result.NoWork) {
+            // Sequence-safe known-no-persisted-change state: local-only updates (append, retry,
+            // delivery state) produce no confirmed delta against an already-persisted baseline.
+            // Acknowledge the sequence without full-envelope planning, store write, or revision consumption.
+            pendingPersistenceDelta.acknowledge(capturedDelta.throughSequence)
+            return
+        }
+        val incremental = planningDecision.result
+        if (canPersistIncremental(planningDecision)) {
+            persistIncrementalSnapshot(
+                snapshotScope,
+                committedState.timeline,
+                capturedDelta,
+                incremental as TimelineIncrementalSnapshotPlanner.Result.Planned,
+                prune,
+            )
+            return
+        }
+        // letta-mobile-94bt8.1 AC1: EVERY full scan reports why.
+        // Reuse planningDecision.reason directly so that store_unsupported is preserved
+        // rather than being incorrectly reported as checkpoint_due.
+        val fallbackReason = requireNotNull(planningDecision.reason) {
+            "planningDecision.reason must not be null when full scan fallback is planned"
+        }
+        Telemetry.event(
+            "TimelineSync", "snapshotPersist.fullScanPlanned",
+            *identityAttrs(),
+            "reason" to fallbackReason.name,
+            "dirtyIdentities" to capturedDelta.dirtyIdentityCount,
+            "metadataChanged" to capturedDelta.metadataChanged,
+        )
+        val (provisionalEnvelope, fingerprint) = withContext(ioDispatcher) {
+            val envelope = TimelineSnapshotCodec.timelineToStoredEnvelope(
+                timeline = committedState.timeline,
+                scope = snapshotScope,
+                revision = snapshotRevision,
+                writtenAtMillis = timelineCurrentTimeMillis(),
+            )
+            envelope to TimelineSnapshotCodec.computeStoredEnvelopeFingerprint(envelope)
+        }
+
+        if (fingerprint == lastPersistedFingerprint) {
+            Telemetry.event(
+                "TimelineSync", "snapshotPersist.identicalSkipped",
+                "conversationId" to conversationId,
+                "revision" to snapshotRevision,
+                "fingerprint" to fingerprint,
+                "eventCount" to provisionalEnvelope.events.size,
+            )
+            return
+        }
+
+        // PM review item 2: allocate the candidate revision WITHOUT mutating
+        // snapshotRevision. It is committed only on a successful Committed/NoOp result
+        // below. Incrementing here meant a Stale/Invalid/failed attempt burned a
+        // revision while lastPersistedEnvelope stayed put: the retry still converged
+        // (the CAS base comes from the acknowledged envelope, not from this counter)
+        // but the emitted revision sequence developed permanent gaps, which makes
+        // "did we skip a write?" unanswerable from telemetry. Success-safe ownership
+        // instead: no durable write, no revision consumed.
+        val revision = snapshotRevision + 1
+        val envelope = provisionalEnvelope.copy(revision = revision)
+        val startedAtMs = timelineCurrentTimeMillis()
+        val plan = NormalizedTimelineCommitPlanner.plan(lastPersistedEnvelope, envelope)
+        val checkpointDue = isLegacyCheckpointDue(plan)
+
+        try {
+            withContext(ioDispatcher + NonCancellable) {
+                val result = confirmedTimelineStore.commitNormalized(plan, envelope, checkpointDue)
+                val durationMs = timelineCurrentTimeMillis() - startedAtMs
+                when (result) {
+                    is NormalizedTimelineWriteResult.Committed, is NormalizedTimelineWriteResult.NoOp ->
+                        onDurableCommit(
+                            DurableCommitOutcome(
+                                result, envelope, revision, fingerprint, checkpointDue, durationMs,
+                                capturedDelta.throughSequence,
+                            ),
+                        )
+                    is NormalizedTimelineWriteResult.Stale -> onStaleRejection(result, revision)
+                    is NormalizedTimelineWriteResult.Invalid ->
+                        onInvalidPlan(result, envelope, revision, fingerprint, capturedDelta.throughSequence)
+                }
+                if (prune) {
+                    confirmedTimelineStore.prune(snapshotScope.backendId, MAX_RETAINED_SNAPSHOTS)
+                }
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Throwable) {
+            Telemetry.error(
+                "TimelineSync", "snapshotPersist.failed", error,
+                "conversationId" to conversationId,
+                "revision" to revision,
+            )
+        }
+    }
+
+    internal data class IncrementalPlanningDecision(
+        val result: TimelineIncrementalSnapshotPlanner.Result,
+        val checkpointDue: Boolean,
+        val reason: SnapshotPlanningFallback?,
+        val baseRevision: Long?,
+        val targetRevision: Long,
+        // Whether the underlying store can serve a real incremental commit. When false, a
+        // `Planned` planner result still has to fall back to the legacy full-scan path because
+        // the default `commitNormalized` shim only writes the full envelope.
+        val storeSupportsIncremental: Boolean,
     )
 
-    private val hydrator = TimelineHydrator(
-        conversationId = conversationId,
-        messageApi = messageApi,
-        pendingLocalStore = pendingLocalStore,
-        conversationCursorStore = conversationCursorStore,
-        writeMutex = writeMutex,
-        state = _state,
-        events = _events,
-        holderHydrationSeed = holderHydrationSeed
+    internal fun decideIncrementalPlan(
+        snapshotScope: TimelineScope,
+        timeline: Timeline,
+        delta: PendingTimelinePersistenceDelta.Snapshot,
+    ): IncrementalPlanningDecision {
+        val targetRevision = snapshotRevision + 1
+        val baseline = lastPersistedEnvelope
+        val storeSupportsIncremental = confirmedTimelineStore.supportsIncrementalCommit
+        val result = when {
+            baseline == null -> {
+                TimelineIncrementalSnapshotPlanner.Result.FullScan(SnapshotPlanningFallback.BASELINE_MISSING)
+            }
+            delta.requiresFullRescan -> {
+                TimelineIncrementalSnapshotPlanner.Result.FullScan(
+                    requireNotNull(delta.fallbackReason),
+                )
+            }
+            delta.isNoWork -> {
+                TimelineIncrementalSnapshotPlanner.Result.NoWork
+            }
+            delta.isEmpty -> {
+                TimelineIncrementalSnapshotPlanner.Result.FullScan(SnapshotPlanningFallback.DELTA_EMPTY)
+            }
+            else -> {
+                TimelineIncrementalSnapshotPlanner.plan(
+                    timeline = timeline,
+                    scope = snapshotScope,
+                    baseRevision = baseline.revision,
+                    targetRevision = targetRevision,
+                    writtenAtMillis = timelineCurrentTimeMillis(),
+                    delta = delta,
+                )
+            }
+        }
+        val checkpointDue = result is TimelineIncrementalSnapshotPlanner.Result.Planned && isLegacyCheckpointDue(result.plan)
+        // Reason precedence for telemetry: explicit gates first, planner verdict last.
+        val reason: SnapshotPlanningFallback? = when {
+            checkpointDue -> SnapshotPlanningFallback.CHECKPOINT_DUE
+            result is TimelineIncrementalSnapshotPlanner.Result.Planned && !storeSupportsIncremental -> SnapshotPlanningFallback.STORE_UNSUPPORTED
+            result is TimelineIncrementalSnapshotPlanner.Result.FullScan -> result.reason
+            else -> null
+        }
+        return IncrementalPlanningDecision(
+            result = result,
+            checkpointDue = checkpointDue,
+            reason = reason,
+            baseRevision = baseline?.revision,
+            targetRevision = targetRevision,
+            storeSupportsIncremental = storeSupportsIncremental,
+        )
+    }
+
+    private fun emitPlanningDecision(
+        decision: IncrementalPlanningDecision,
+        delta: PendingTimelinePersistenceDelta.Snapshot,
+    ) {
+        val plan = (decision.result as? TimelineIncrementalSnapshotPlanner.Result.Planned)?.plan
+        val comparisonEvents = (plan as? NormalizedTimelineCommitPlan.Apply)?.commit?.comparisonEvents ?: 0
+        val encodedRows = (plan as? NormalizedTimelineCommitPlan.Apply)?.commit?.encodedRows ?: 0
+        val planningMode = when {
+            decision.result is TimelineIncrementalSnapshotPlanner.Result.NoWork -> "no_work"
+            canPersistIncremental(decision) -> "delta"
+            else -> "full_scan"
+        }
+        val reasonStr = when {
+            decision.reason != null -> decision.reason.name
+            decision.result is TimelineIncrementalSnapshotPlanner.Result.NoWork -> "no_work"
+            else -> "delta"
+        }
+        Telemetry.event(
+            "TimelineSync", "snapshotPersist.planningDecision",
+            *identityAttrs(),
+            "planningMode" to planningMode,
+            "reason" to reasonStr,
+            "throughSequence" to delta.throughSequence,
+            "dirtyChanged" to delta.changedConfirmedServerIds.size,
+            "dirtyDeleted" to delta.deletedConfirmedServerIds.size,
+            "metadataChanged" to delta.metadataChanged,
+            "baselineRevision" to (decision.baseRevision ?: 0L),
+            "targetRevision" to decision.targetRevision,
+            "comparisonEvents" to comparisonEvents,
+            "encodedRows" to encodedRows,
+            "storeSupportsIncremental" to decision.storeSupportsIncremental,
+        )
+    }
+
+    private suspend fun persistIncrementalSnapshot(
+        snapshotScope: TimelineScope,
+        timeline: Timeline,
+        capturedDelta: PendingTimelinePersistenceDelta.Snapshot,
+        incremental: TimelineIncrementalSnapshotPlanner.Result.Planned,
+        prune: Boolean,
+    ) {
+        val revision = snapshotRevision + 1
+        val startedAtMs = timelineCurrentTimeMillis()
+        val envelope = TimelineSnapshotCodec.timelineToStoredEnvelope(
+            timeline = timeline,
+            scope = snapshotScope,
+            revision = revision,
+            writtenAtMillis = startedAtMs,
+        )
+        val fingerprint = TimelineSnapshotCodec.computeStoredEnvelopeFingerprint(envelope)
+        try {
+            withContext(ioDispatcher + NonCancellable) {
+                when (val result = confirmedTimelineStore.commitNormalized(incremental.plan, envelope, false)) {
+                    is NormalizedTimelineWriteResult.Committed, is NormalizedTimelineWriteResult.NoOp -> {
+                        val durationMs = timelineCurrentTimeMillis() - startedAtMs
+                        consecutiveStaleRejections = 0
+                        snapshotRevision = revision
+                        lastPersistedFingerprint = fingerprint
+                        lastPersistedEnvelope = envelope
+                        pendingPersistenceDelta.acknowledge(capturedDelta.throughSequence)
+                        recordSuccessfulSnapshotMutation(envelope, revision)
+                        commitsSinceLegacyCheckpoint += 1
+                        Telemetry.event(
+                            "TimelineSync", "snapshotPersist.written",
+                            *identityAttrs(),
+                            "revision" to revision,
+                            "eventCount" to envelope.events.size,
+                            "durationMs" to durationMs,
+                            "committed" to (result is NormalizedTimelineWriteResult.Committed),
+                            "planningMode" to "delta",
+                            "dirtyIdentities" to capturedDelta.dirtyIdentityCount,
+                            "rowPayloadsEncoded" to incremental.changedEvents.size,
+                            "fullEnvelopeEncodes" to 0,
+                        )
+                    }
+                    is NormalizedTimelineWriteResult.Stale -> onStaleRejection(result, revision)
+                    is NormalizedTimelineWriteResult.Invalid ->
+                        onInvalidPlan(result, envelope, revision, fingerprint, capturedDelta.throughSequence)
+                }
+                if (prune) confirmedTimelineStore.prune(snapshotScope.backendId, MAX_RETAINED_SNAPSHOTS)
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Throwable) {
+            Telemetry.error("TimelineSync", "snapshotPersist.failed", error, "conversationId" to conversationId, "revision" to revision)
+        }
+    }
+
+    /**
+     * Legacy v11 checkpoint policy: always checkpoint the very first commit for a scope (so a
+     * brand-new conversation has an immediately rollback-readable legacy envelope), then every
+     * [LEGACY_CHECKPOINT_INTERVAL] successful commits after that. Bounds legacy staleness to at
+     * most that many revisions. This is only a *hint* passed to
+     * [ConfirmedTimelineStore.commitNormalized]; whether/how a checkpoint is actually staged
+     * (and that a checkpoint failure never fails an otherwise-successful normalized commit) is
+     * the store implementation's responsibility -- see the Android Room
+     * `RoomConfirmedTimelineStore.commitNormalized` implementation for the real
+     * incremental-commit + best-effort-checkpoint behavior.
+     */
+    private fun isLegacyCheckpointDue(plan: NormalizedTimelineCommitPlan): Boolean {
+        val isInitialCommit = plan is NormalizedTimelineCommitPlan.Apply && plan.commit.baseRevision.value == 0L
+        return isInitialCommit || commitsSinceLegacyCheckpoint + 1 >= LEGACY_CHECKPOINT_INTERVAL
+    }
+
+    /**
+     * Round 5 item 2: the identity block every persistence-lifecycle event carries.
+     *
+     * `conversationId + agentId` could not distinguish the duplicate holders observed on
+     * device, which is precisely what a capture needs to attribute a write. [holderId] is
+     * stable for one loop lifetime and distinct across concurrent holders.
+     *
+     * Run and turn are emitted as explicit empty values when unknown rather than omitted, so
+     * captures stay mechanically comparable across events.
+     */
+    private fun identityAttrs(): Array<Pair<String, String>> = arrayOf(
+        "holderId" to holderId,
+        "conversationId" to conversationId,
+        "agentId" to agentId.orEmpty(),
+        "runId" to currentRunId.orEmpty(),
+        "turnId" to currentTurnId.orEmpty(),
     )
+
+    /**
+     * letta-mobile-827s9.4, dogfood round 2, item 2: a stale writer must STOP, not spin.
+     *
+     * The Pixel capture showed repeated `revision=1 actualHighWaterRevision=...` rejections
+     * from holders that could never commit. Each rejection still cost a full O(N) plan over a
+     * 2k-event timeline, so a duplicate holder burned real CPU and heap producing nothing,
+     * concurrently with the visible conversation's own commits.
+     *
+     * A `Stale` result means another holder owns this conversation's durable state. Retrying
+     * cannot help: this loop's acknowledged baseline is behind and nothing in this loop will
+     * advance it. So the loop detaches as a writer — it keeps serving reads and its in-memory
+     * timeline, but stops scheduling persists entirely.
+     *
+     * NOTE this is a bounded mitigation, not the cure. The duplicate holders themselves are
+     * letta-mobile-grrhq: a subagent dispatch acquires a SECOND holder for the parent's
+     * conversation under the child agent id. This stops the wasted work; grrhq stops the
+     * second holder existing.
+     */
+    private fun onStaleRejection(result: NormalizedTimelineWriteResult.Stale, revision: Long) {
+        // Round 4: detach after a BOUNDED run of consecutive stales, not the first one.
+        //
+        // First-stale detachment is the stricter reading of the review, and I implemented it
+        // that way initially -- but it permanently stops a writer that lost a single transient
+        // race, and it broke a documented pre-existing behaviour (a rejected write followed by
+        // a successful retry). Trading a durability guarantee for CPU is the wrong direction;
+        // the goal was to stop UNBOUNDED spinning, and a small cap does that. A duplicate
+        // holder never succeeds, so it still detaches almost immediately; a transient loser
+        // recovers on its next attempt and resets the counter.
+        consecutiveStaleRejections += 1
+        val detaching = consecutiveStaleRejections >= MAX_CONSECUTIVE_STALE_REJECTIONS
+        if (detaching) {
+            detachedAsStaleWriter = true
+            // Drain anything already queued so the detach takes effect immediately.
+            while (persistRequests.tryReceive().isSuccess) {
+                // Drain queue
+            }
+        }
+        Telemetry.event(
+            "TimelineSync", "snapshotPersist.staleRejected",
+            *identityAttrs(),
+            "revision" to revision,
+            "actualHighWaterRevision" to result.highWaterRevision.value,
+            "consecutiveStale" to consecutiveStaleRejections,
+            "detachedAsWriter" to detaching,
+            level = Telemetry.Level.WARN,
+        )
+    }
+
+    /**
+     * The durable write landed. Only here is the candidate revision consumed and the
+     * acknowledged baseline advanced -- see the allocation comment in
+     * [persistCurrentSnapshot] for why nothing above this point may mutate them.
+     */
+    private fun onDurableCommit(outcome: DurableCommitOutcome) {
+        val (result, envelope, revision, fingerprint, checkpointDue, durationMs, acknowledgedSequence) = outcome
+        consecutiveStaleRejections = 0
+        snapshotRevision = revision
+        lastPersistedFingerprint = fingerprint
+        lastPersistedEnvelope = envelope
+        pendingPersistenceDelta.acknowledge(acknowledgedSequence)
+        recordSuccessfulSnapshotMutation(envelope, revision)
+        commitsSinceLegacyCheckpoint = if (checkpointDue) 0 else commitsSinceLegacyCheckpoint + 1
+        Telemetry.event(
+            "TimelineSync", "snapshotPersist.written",
+            *identityAttrs(),
+            "revision" to revision,
+            "eventCount" to envelope.events.size,
+            "durationMs" to durationMs,
+            "committed" to (result is NormalizedTimelineWriteResult.Committed),
+        )
+    }
+
+    /**
+     * An `Invalid` plan is NOT transient: an oversized event row makes every subsequent plan
+     * for this conversation Invalid too, so logging alone meant the conversation silently
+     * stopped being durable forever -- the worst shape a persistence bug can take, because
+     * nothing ever surfaces.
+     *
+     * Explicit bounded fallback: write the full legacy v11 envelope so durable progress is
+     * preserved. Its high-water revision then exceeds the normalized head, and
+     * `readSnapshotResult`'s freshness comparison serves legacy until normalized catches up,
+     * so the two stores stay coherent. This is the ONLY path that still performs
+     * full-envelope encoding on an ordinary mutation, and it is reached only when incremental
+     * commit is structurally impossible.
+     */
+    private suspend fun onInvalidPlan(
+        result: NormalizedTimelineWriteResult.Invalid,
+        envelope: StoredTimelineEnvelope,
+        revision: Long,
+        fingerprint: Long,
+        acknowledgedSequence: Long,
+    ) {
+        val recovered = confirmedTimelineStore.writeSnapshot(envelope)
+        if (recovered) {
+            // Round 5 item 3: a durable fallback IS durable progress, so it must break the
+            // consecutive-stale sequence exactly as a normalized commit does. Without this,
+            // Stale -> Stale -> fallback success -> Stale detached a writer that had in fact
+            // just made progress.
+            consecutiveStaleRejections = 0
+            snapshotRevision = revision
+            lastPersistedFingerprint = fingerprint
+            pendingPersistenceDelta.acknowledge(acknowledgedSequence)
+            // NOTE: lastPersistedEnvelope is the NORMALIZED planning baseline and is advanced
+            // below only if normalized genuinely caught up. Legacy durability at `revision` is
+            // recorded by snapshotRevision.
+            recordSuccessfulSnapshotMutation(envelope, revision)
+            commitsSinceLegacyCheckpoint = 0
+            // Round 6 item 5: the fallback writes LEGACY only, so normalized state is left
+            // behind at the previous revision while the acknowledged envelope advances to this
+            // one. Every later commit would then plan baseRevision = N against a normalized
+            // head still at N-1, be rejected Stale forever, and eventually detach the writer --
+            // durable progress that permanently disables durability.
+            //
+            // Reconcile by reading through the store: readSnapshotResult already bootstraps
+            // normalized rows from a validated legacy snapshot when normalized is behind, so
+            // this brings the normalized head up to N and the next commit's CAS matches.
+            // Best-effort -- a failure here leaves us no worse off than before the fallback.
+            timelineScope?.let { scope ->
+                runCatching {
+                    confirmedTimelineStore.readSnapshotResult(scope)
+                    // Advance the NORMALIZED planning baseline only if normalized actually
+                    // reached this revision. A representable envelope is bootstrapped by the
+                    // read above and reaches N. A genuinely unrepresentable one -- a real
+                    // OVERSIZED_ROW, which is what drives this path in production -- cannot be
+                    // bootstrapped at all, so normalized stays at N-1.
+                    //
+                    // Advancing unconditionally is what stranded the writer: planning would
+                    // then base at N against a normalized head at N-1 and be rejected Stale
+                    // forever. Leaving the baseline at N-1 instead means the next commit bases
+                    // at N-1, matches, and succeeds as soon as the oversized event is gone.
+                    if (confirmedTimelineStore.normalizedHeadRevision(scope) == revision) {
+                        lastPersistedEnvelope = envelope
+                    }
+                }
+                    .onFailure { failure ->
+                        if (failure is CancellationException) throw failure
+                        Telemetry.error(
+                            "TimelineSync", "snapshotPersist.fallbackReconcileFailed", failure,
+                            "conversationId" to conversationId,
+                            "revision" to revision,
+                        )
+                    }
+            }
+        }
+        Telemetry.event(
+            "TimelineSync", "snapshotPersist.invalidRejected",
+            *identityAttrs(),
+            "revision" to revision,
+            "reason" to result.reason.name,
+            "legacyFallbackWritten" to recovered,
+            level = Telemetry.Level.WARN,
+        )
+    }
+
+    private object TimelineMetricAvailability {
+        const val UNAVAILABLE = "unavailable"
+    }
+
+    private fun recordSuccessfulSnapshotMutation(envelope: StoredTimelineEnvelope, revision: Long) {
+        val structuralSummary = TimelineSnapshotMutationCharacterizer.summarize(envelope)
+        val mutationShape = TimelineSnapshotMutationCharacterizer.characterize(lastPersistedSnapshot, structuralSummary)
+        lastPersistedSnapshot = structuralSummary
+        Telemetry.event(
+            "TimelineSync", "snapshotPersist.mutationShape",
+            "revision" to revision,
+            "previousCount" to mutationShape.previousCount,
+            "eventCount" to mutationShape.currentCount,
+            "inserted" to mutationShape.inserted,
+            "updated" to mutationShape.updated,
+            "deleted" to mutationShape.deleted,
+            "moved" to mutationShape.moved,
+            "cursorMetadataChanged" to mutationShape.cursorMetadataChanged,
+            "noOp" to mutationShape.noOp,
+            "unclassifiable" to mutationShape.unclassifiable,
+            "comparisonEvents" to mutationShape.eventComparisons,
+            "fullEnvelopeEncodes" to mutationShape.fullEnvelopeEncodes,
+            // This operation already owns the envelope and summary counts. Expose
+            // residency/copy amplification without another history traversal.
+            "durableRows" to mutationShape.currentCount,
+            "residentRows" to envelope.events.size,
+            "settledEventsVisited" to mutationShape.eventComparisons,
+            "pagesCopied" to TimelineMetricAvailability.UNAVAILABLE,
+            "liveProjected" to TimelineMetricAvailability.UNAVAILABLE,
+            "boundaryRebuilt" to TimelineMetricAvailability.UNAVAILABLE,
+        )
+    }
 
     // letta-mobile-dangling-tool: canonical-record-driven post-turn sweep +
     // hydration guard for tool-call cards left unresolved after PR #900
     // removed the guess-based settle-on-clean-completion behavior. See
     // DanglingToolCallResolver's kdoc for the never-guess principle.
-    private val danglingToolCallResolver = DanglingToolCallResolver(
+    private val danglingToolCallResolver by lazy { DanglingToolCallResolver(
         conversationId = conversationId,
-        state = _state,
-        writeMutex = writeMutex,
+        processor = timelineProcessor,
+        state = state,
         scope = loopScope,
         reconcile = { reason, forceRefresh ->
             when (val outcome = reconcileRecentMessages(reason, forceRefresh)) {
@@ -130,65 +734,87 @@ class TimelineSyncLoop(
                 is RecentMessagesReconcileOutcome.Failed -> throw outcome.cause
             }
         },
-    )
+        onSettlementCommitted = { scheduleSnapshotPersist(SnapshotPersistReason.SETTLEMENT) },
+    ) }
 
     /** True while a turn is believed active for this conversation. Toggled by [turnStarted]/[turnEnded]. */
     @Volatile
     private var turnActive: Boolean = false
 
+    private val timelineProcessor = TimelineProcessor(
+        initialState = TimelineReducerState(initialTimeline ?: Timeline(conversationId)),
+        scope = loopScope,
+        effectHandler = { effect ->
+            when (effect) {
+                is TimelineReductionEffect.EmitSyncEvent -> _events.emit(effect.event)
+                is TimelineReductionEffect.Notify -> ingestNotificationDispatcher.dispatch(effect.notification)
+                is TimelineReductionEffect.Send -> outboundSendProcessor.sendQueue.send(effect.pending)
+                is TimelineReductionEffect.PersistPendingLocal -> pendingLocalStore.save(
+                    PendingLocalRecord(
+                        otid = effect.pending.otid,
+                        conversationId = conversationId,
+                        content = effect.pending.content,
+                        attachments = effect.pending.attachments,
+                        sentAt = effect.sentAt,
+                    ),
+                )
+                is TimelineReductionEffect.DeletePendingLocal -> pendingLocalStore.delete(effect.otid)
+                is TimelineReductionEffect.RecordStreamSequence -> {
+                    conversationCursorStore.recordFrame(conversationId, effect.sequence)
+                }
+                is TimelineReductionEffect.RepairHydrationCursor -> {
+                    conversationCursorStore.recordFrame(conversationId, effect.sequence)
+                    Telemetry.event(
+                        "TimelineSync", "hydrate.cursorRepaired",
+                        "conversationId" to conversationId,
+                        "cursorSeq" to effect.sequence,
+                    )
+                }
+                is TimelineReductionEffect.AdvanceCursor -> Unit
+            }
+        },
+        onStateCommitted = pendingPersistenceDelta::merge,
+    )
+
+    val state: StateFlow<Timeline> = timelineProcessor.timeline
+
     private val outboundSendProcessor = TimelineOutboundSendProcessor(
         conversationId = conversationId,
         messageApi = messageApi,
         eventQueue = eventQueue,
-        writeMutex = writeMutex,
-        state = _state,
+        state = state,
         events = _events,
         pendingLocalStore = pendingLocalStore,
         logTag = logTag,
         scope = loopScope,
         ingestStreamEvent = ::ingestStreamEvent,
-        // letta-mobile-r3i1z: every ingestStreamEvent above marks the ws/external-
-        // transport latch active (correct WHILE our own turn streams through the
-        // send flow — the persistent subscriber sees the same frames and must not
-        // double-ingest). Clear it when the send stream ends, or the subscriber
-        // stays muted forever and fanned-out turns from OTHER clients (Iroh
-        // observer frames) are dropped at submitStreamEvent as skippedDualIngest:
-        // the desktop rendered the prompt (via the external-run reconcile) but
-        // never the reply. ChatSendCoordinator clears the same latch at turn end
-        // on the WS/iroh coordinator path; this is the loop-owned send's mirror.
         onSendStreamEnded = { wsSubscription.clear() },
-        // letta-mobile-dangling-tool (Codex #902 finding 1): the REST/timeline-
-        // transport send path never went through ChatSendCoordinator's
-        // turnStarted/turnEnded hooks, so a dangling tool_call streamed here
-        // never got a sweep scheduled. Mirror the WS path's semantics directly
-        // around this loop-owned send stream.
         onTurnStarted = ::turnStarted,
         onTurnEnded = ::turnEnded,
     )
 
     private val stateTransitionHandler = TimelineStateTransitionHandler(
         conversationId = conversationId,
-        state = _state,
-        events = _events,
-        sendQueue = outboundSendProcessor.sendQueue,
-        writeMutex = writeMutex
+        processor = timelineProcessor,
     )
 
     private val externalTransportAppender = TimelineExternalTransportAppender(
         conversationId = conversationId,
         messageApi = messageApi,
         eventQueue = eventQueue,
-        state = _state,
         events = _events,
-        writeMutex = writeMutex,
+        processor = timelineProcessor,
         pendingLocalStore = pendingLocalStore,
         submitReconcileAfterSendSnapshot = ::submitReconcileAfterSendSnapshot
     )
 
     init {
-        loopScope.launch { processEventQueue() }
-        if (startStreamSubscriber) {
+        persistJob = loopScope.launch { runSnapshotPersistence() }
+        eventProcessorJob = loopScope.launch { processEventQueue() }
+        streamSubscriberJob = if (startStreamSubscriber) {
             loopScope.launch { runStreamSubscriber() }
+        } else {
+            null
         }
     }
 
@@ -197,9 +823,25 @@ class TimelineSyncLoop(
     }
 
     fun close() {
+        persistRequests.close()
         eventQueue.close(CancellationException("TimelineSyncLoop closed"))
         outboundSendProcessor.sendQueue.close(CancellationException("TimelineSyncLoop closed"))
+        timelineProcessor.close()
         loopJob.cancel(CancellationException("TimelineSyncLoop closed"))
+    }
+
+    suspend fun closeAndJoin() {
+        persistRequests.close()
+        eventQueue.close()
+        streamSubscriberJob?.cancel(CancellationException("TimelineSyncLoop draining"))
+        withContext(NonCancellable) {
+            streamSubscriberJob?.join()
+            eventProcessorJob.join()
+            timelineProcessor.closeAndJoin()
+            persistJob.join()
+            flushSnapshotNow(prune = true)
+        }
+        close()
     }
 
     @Volatile
@@ -207,13 +849,19 @@ class TimelineSyncLoop(
         private set
 
     suspend fun hydrate(limit: Int = 50, recordConversationCursor: Boolean = false, fallbackCursorSeq: Long? = null) {
-        hydrator.hydrate(limit, recordConversationCursor, fallbackCursorSeq)
-        hasHydratedSuccessfully = true
-        // letta-mobile-dangling-tool: heal stale spinners that survived an
-        // app restart or a dropped stream. Escalates to the same bounded
-        // backoff sweep as turnEnded if the immediate reconcile alone
-        // doesn't resolve everything, so there's always a terminal outcome.
-        danglingToolCallResolver.runHydrationGuardIfIdle(turnActive)
+        when (hydrator.hydrate(limit, recordConversationCursor, fallbackCursorSeq)) {
+            TimelineHydrationOutcome.Rejected -> Unit
+            TimelineHydrationOutcome.Accepted,
+            TimelineHydrationOutcome.DefaultShimAccepted,
+            -> {
+                hasHydratedSuccessfully = true
+                // letta-mobile-dangling-tool: heal stale spinners that survived an
+                // app restart or a dropped stream. Escalates to the same bounded
+                // backoff sweep as turnEnded if the immediate reconcile alone
+                // doesn't resolve everything, so there's always a terminal outcome.
+                danglingToolCallResolver.runHydrationGuardIfIdle(turnActive)
+            }
+        }
     }
 
     /**
@@ -221,9 +869,62 @@ class TimelineSyncLoop(
      * supersedes whatever the previous turn's sweep left pending — see
      * [DanglingToolCallResolver.cancelPendingSweep].
      */
-    fun turnStarted() {
+    suspend fun turnStarted(runId: String? = null, turnId: String? = null) {
         turnActive = true
+        // Round 8 item 5: these were declared and emitted but never assigned, so runId/turnId
+        // were structurally guaranteed to be empty on every persistence event -- the fields
+        // existed and could never correlate a write to its run. The ids come from
+        // WsTimelineEvent.TurnStarted via TurnIdentityLifecycle; they are simply carried here.
+        currentRunId = runId
+        currentTurnId = turnId
+        turnEndScheduled = false
+        deferredDuringTurn = false
+        startTurnSafetyFlushTimer()
         danglingToolCallResolver.cancelPendingSweep()
+    }
+
+    /**
+     * letta-mobile-827s9.4, dogfood round 3 item 2: a real per-turn DEADLINE, not
+     * request-arrival behaviour.
+     *
+     * The previous safety flush only took effect when some later request happened to arrive
+     * after the window had elapsed, so unrelated callbacks decided when the write happened.
+     * That is why the capture showed irregular 2.5-17 s spacing instead of a bound. A deferred
+     * request now enqueues nothing; this timer owns the boundary, firing at most once per
+     * [STREAMING_SAFETY_FLUSH] and only when something was actually deferred.
+     */
+    private fun startTurnSafetyFlushTimer() {
+        turnSafetyFlushJob?.cancel()
+        turnSafetyFlushJob = null
+    }
+
+    /**
+     * Arms a ONE-SHOT deadline the first time a persist is deferred in this turn.
+     *
+     * Deliberately not a `while (turnActive) { delay(...) }` poll. A never-completing delay
+     * loop makes `advanceUntilIdle()` spin forever in tests, and in production it wakes every
+     * 5 s for the whole turn even when nothing was deferred. One-shot, re-armed only by the
+     * next deferral, costs nothing on an idle conversation and terminates.
+     */
+    private fun armSafetyFlushDeadline() {
+        if (turnSafetyFlushJob?.isActive == true) return
+        val generation = ++turnSafetyFlushGeneration
+        turnSafetyFlushJob = loopScope.launch {
+            delay(STREAMING_SAFETY_FLUSH)
+            // Round 5: RELEASE OWNERSHIP FIRST. Previously this scheduled the safety write
+            // while turnSafetyFlushJob still pointed at this very coroutine, so a delta
+            // arriving before it completed saw isActive == true and skipped arming the next
+            // window -- leaving the rest of a long turn with no further bounded write.
+            //
+            // Identity-guarded by generation so an OLD timer can never clear a REPLACEMENT
+            // timer's ownership, and so a timer that fires after turnEnded (which bumps the
+            // generation) cannot enqueue a post-terminal write.
+            if (turnSafetyFlushGeneration != generation) return@launch
+            turnSafetyFlushJob = null
+            if (!turnActive || !deferredDuringTurn) return@launch
+            deferredDuringTurn = false
+            scheduleSnapshotPersist(SnapshotPersistReason.SAFETY_FLUSH)
+        }
     }
 
     /**
@@ -242,8 +943,31 @@ class TimelineSyncLoop(
      * settled synchronously by AppServerTurnEngine, so they never appear in
      * [Timeline.unresolvedToolCallIds] to begin with.
      */
-    fun turnEnded(clean: Boolean) {
+    suspend fun turnEnded(clean: Boolean) {
         turnActive = false
+        // Bump the generation so a timer already past its delay cannot enqueue a
+        // post-terminal write, then cancel the current one.
+        turnSafetyFlushGeneration++
+        turnSafetyFlushJob?.cancel()
+        turnSafetyFlushJob = null
+        // letta-mobile-827s9.4: this is the settled boundary the streaming defer in
+        // shouldDeferStreamingPersist relies on. Without it, a turn whose final delta was
+        // deferred stays memory-only until some unrelated trigger happens along -- the
+        // deferral would be trading a real durability guarantee for frame rate, which is not
+        // the bargain. Scheduled AFTER clearing turnActive so it is never itself deferred.
+        // Round 8 item 3: ChatSendCoordinator ends a turn from two paths (bridge status and
+        // the failure/cleanup route), so a single turn reached here twice and scheduled TURN_END
+        // twice ~41 ms apart on device. The second converged to an identical skip, but it still
+        // cost a full O(N) plan. One turn schedules one terminal write.
+        val alreadyEnded = turnEndScheduled
+        turnEndScheduled = true
+        if (alreadyEnded) {
+            Telemetry.event("TimelineSync", "snapshotPersist.duplicateTurnEndSkipped", *identityAttrs())
+        } else {
+            scheduleSnapshotPersist(SnapshotPersistReason.TURN_END)
+        }
+        // The sweep stays unconditional: it is idempotent and the second call may carry a
+        // different `clean`.
         danglingToolCallResolver.scheduleSweepIfUnresolved(clean)
     }
 
@@ -268,8 +992,8 @@ class TimelineSyncLoop(
 
     /**
      * letta-mobile-mxwtn: synchronous optimistic Local append. Writes a
-     * `TimelineEvent.Local` with the given otid directly into the timeline
-     * state (under the write mutex) and returns `true`. Idempotent: returns
+     * `TimelineEvent.Local` with the given otid through [TimelineProcessor]
+     * and returns `true`. Idempotent: returns
      * `false` if an event with the same otid is already present, so a
      * duplicate caller cannot fork the timeline.
      */
@@ -277,12 +1001,15 @@ class TimelineSyncLoop(
         otid: String,
         content: String,
         attachments: List<MessageContentPart.Image> = emptyList(),
-    ): Boolean = stateTransitionHandler.appendOptimisticLocalSync(
-        otid = otid,
-        content = content,
-        attachments = attachments.toTimelinePersistentList(),
-        sentAt = timelineNow(),
-    )
+    ): Boolean {
+        recentMessagesReconciler.invalidateFreshness()
+        return stateTransitionHandler.appendOptimisticLocalSync(
+            otid = otid,
+            content = content,
+            attachments = attachments.toTimelinePersistentList(),
+            sentAt = timelineNow(),
+        )
+    }
 
     /** letta-mobile-mxwtn: synchronous SENT transition on a Local event. */
     suspend fun markOptimisticLocalSentSync(otid: String) {
@@ -295,7 +1022,9 @@ class TimelineSyncLoop(
     }
 
     suspend fun appendExternalTransportLocal(content: String, otid: String, attachments: List<MessageContentPart.Image> = emptyList()): String {
-        return externalTransportAppender.appendExternalTransportLocal(content, otid, attachments)
+        return externalTransportAppender.appendExternalTransportLocal(
+            TimelineExternalAppendRequest(content, TimelineExternalOtid(otid), attachments),
+        )
     }
 
     suspend fun postHandlerCollapse() {
@@ -318,18 +1047,52 @@ class TimelineSyncLoop(
                         if (shouldDropDuplicateStreamMessage(event.message, event.source)) {
                             event.ack?.complete(Unit)
                         } else {
+                            recentMessagesReconciler.invalidateFreshness()
                             streamDispatcher.dispatch(event.message, event.source)
                             event.ack?.complete(Unit)
                         }
                     }
-                    is TimelineGatewayEvent.LocalSendAppend -> stateTransitionHandler.applyLocalSendAppend(event)
-                    is TimelineGatewayEvent.ExternalTransportLocalAppend -> externalTransportAppender.applyExternalTransportLocalAppend(event)
+                    is TimelineGatewayEvent.LocalSendAppend -> {
+                        recentMessagesReconciler.invalidateFreshness()
+                        try {
+                            stateTransitionHandler.applyLocalSendAppend(event)
+                        } finally {
+                            scheduleSnapshotPersist(SnapshotPersistReason.LOCAL_MUTATION)
+                        }
+                    }
+                    is TimelineGatewayEvent.ExternalTransportLocalAppend -> {
+                        recentMessagesReconciler.invalidateFreshness()
+                        try {
+                            externalTransportAppender.applyExternalTransportLocalAppend(event)
+                        } finally {
+                            scheduleSnapshotPersist(SnapshotPersistReason.LOCAL_MUTATION)
+                        }
+                    }
                     is TimelineGatewayEvent.ReconcileAfterSendSnapshot -> applyReconcileAfterSendSnapshot(event)
                     is TimelineGatewayEvent.RecentMessagesSnapshot -> recentMessagesReconciler.applyRecentMessagesSnapshot(event)
                     is TimelineGatewayEvent.PostHandlerCollapse -> event.ack.complete(Unit)
-                    is TimelineGatewayEvent.RetrySend -> stateTransitionHandler.applyRetrySend(event)
-                    is TimelineGatewayEvent.MarkSent -> stateTransitionHandler.applyMarkSent(event)
-                    is TimelineGatewayEvent.MarkFailed -> stateTransitionHandler.applyMarkFailed(event)
+                    is TimelineGatewayEvent.RetrySend -> {
+                        recentMessagesReconciler.invalidateFreshness()
+                        try {
+                            stateTransitionHandler.applyRetrySend(event)
+                        } finally {
+                            scheduleSnapshotPersist(SnapshotPersistReason.LOCAL_MUTATION)
+                        }
+                    }
+                    is TimelineGatewayEvent.MarkSent -> {
+                        try {
+                            stateTransitionHandler.applyMarkSent(event)
+                        } finally {
+                            scheduleSnapshotPersist(SnapshotPersistReason.LOCAL_MUTATION)
+                        }
+                    }
+                    is TimelineGatewayEvent.MarkFailed -> {
+                        try {
+                            stateTransitionHandler.applyMarkFailed(event)
+                        } finally {
+                            scheduleSnapshotPersist(SnapshotPersistReason.LOCAL_MUTATION)
+                        }
+                    }
                     is TimelineGatewayEvent.CleanupAbandonedAssistantFragments -> applyCleanupAbandonedAssistantFragments(event)
                 }
             } catch (cancelled: CancellationException) {
@@ -358,17 +1121,21 @@ class TimelineSyncLoop(
     }
 
     private suspend fun applyReconcileAfterSendSnapshot(event: TimelineGatewayEvent.ReconcileAfterSendSnapshot) {
-        val result = applyReconcileAfterSendSnapshot(
-            otid = event.otid,
-            conversationId = conversationId,
-            serverMessages = event.serverMessages,
-            writeMutex = writeMutex,
-            state = _state,
+        val applied = timelineProcessor.submit(
+            TimelineMutation.ReconcileAfterSendSnapshot(event.otid, event.serverMessages),
         )
-        writeMutex.withLock {
-            applyReturnsAndResponsesFromSnapshot(event.serverMessages, _state)
+        when (applied) {
+            is TimelineProcessorAck.Applied -> {
+                val result = applied.result as? TimelineReductionResult.ReconcileAfterSendApplied
+                    ?: error("post-send acknowledgement did not carry reconcile result")
+                if (result.changed) scheduleSnapshotPersist(SnapshotPersistReason.LOCAL_MUTATION)
+                event.ack.complete(result.result)
+            }
+            is TimelineProcessorAck.Rejected,
+            is TimelineProcessorAck.Failed -> event.ack.completeExceptionally(
+                TimelineProcessorMutationException("post-send reconciliation was not applied: $applied"),
+            )
         }
-        event.ack.complete(result)
     }
 
     private suspend fun submitReconcileAfterSendSnapshot(otid: String, serverMessages: List<LettaMessage>): ReconcileAfterSendResult {
@@ -389,21 +1156,32 @@ class TimelineSyncLoop(
     }
 
     private suspend fun applyCleanupAbandonedAssistantFragments(event: TimelineGatewayEvent.CleanupAbandonedAssistantFragments) {
-        var removed = 0
-        writeMutex.withLock {
-            val result = _state.value.cleanupAbandonedAssistantFragments(
+        when (val ack = timelineProcessor.submitMaintenanceMutation(
+            TimelineMutation.CleanupAbandonedFragments(
                 runId = event.runId,
                 turnId = event.turnId,
                 reason = event.reason,
                 candidateRunIds = event.candidateRunIds,
+            ),
+        )) {
+            is TimelineProcessorAck.Applied -> {
+                val result = ack.result as? TimelineReductionResult.CleanupApplied
+                val removed = result?.removed ?: 0
+                if (result?.changed == true) {
+                    scheduleSnapshotPersist(SnapshotPersistReason.LOCAL_MUTATION)
+                    if (!event.runId.isNullOrBlank()) {
+                        _events.emit(TimelineSyncEvent.OrphanAssistantFragmentsCleaned(event.runId, event.turnId, removed, event.reason))
+                    }
+                }
+                event.ack.complete(removed)
+            }
+            is TimelineProcessorAck.Rejected -> event.ack.completeExceptionally(
+                TimelineProcessorMutationException("cleanup was not applied: $ack"),
             )
-            removed = result.suppressions.size
-            _state.value = result.timeline
+            is TimelineProcessorAck.Failed -> event.ack.completeExceptionally(
+                TimelineProcessorMutationException("cleanup was not applied: $ack"),
+            )
         }
-        if (removed > 0 && !event.runId.isNullOrBlank()) {
-            _events.emit(TimelineSyncEvent.OrphanAssistantFragmentsCleaned(event.runId, event.turnId, removed, event.reason))
-        }
-        event.ack.complete(removed)
     }
 
     /**
@@ -423,9 +1201,11 @@ class TimelineSyncLoop(
             }
             .getOrNull() as? ToolReturnMessage ?: return false
         if (message.toolReturnTruncated == true) return false
-        writeMutex.withLock {
-            applyReturnsAndResponsesFromSnapshot(listOf(message), _state)
-        }
+        val applied = timelineProcessor.submitMaintenanceMutation(TimelineMutation.RepairFullToolReturn(message))
+        val result = (applied as? TimelineProcessorAck.Applied)?.result as? TimelineReductionResult.FullToolReturnRepaired
+            ?: return false
+        if (!result.changed) return false
+        scheduleSnapshotPersist(SnapshotPersistReason.LOCAL_MUTATION)
         Telemetry.event(
             "TimelineSync", "toolReturn.resolved",
             "conversationId" to conversationId,
@@ -436,12 +1216,12 @@ class TimelineSyncLoop(
     }
 
     suspend fun reconcileForExternalRun(runId: String) {
-        reconcileForExternalRun(runId) { name, attrs, allowWhileActive ->
-            when (val outcome = recentMessagesReconciler.reconcileRecentMessagesFromServer(name, attrs, allowWhileActive)) {
-                is RecentMessagesReconcileOutcome.Applied -> outcome.appended
-                is RecentMessagesReconcileOutcome.Skipped -> 0
-                is RecentMessagesReconcileOutcome.Failed -> throw outcome.cause
-            }
+        reconcileForExternalRun(runId) { name, _, allowWhileActive ->
+            val outcome = recentMessagesReconciler.reconcileRecentMessages(
+                reason = name,
+                forceRefresh = allowWhileActive,
+            )
+            if (outcome is RecentMessagesReconcileOutcome.Failed) throw outcome.cause
         }
     }
 
@@ -454,15 +1234,17 @@ class TimelineSyncLoop(
     }
 
     suspend fun markExternalTransportLocalSent(otid: String) {
-        externalTransportAppender.markExternalTransportLocalSent(otid)
+        externalTransportAppender.markExternalTransportLocalSent(TimelineExternalOtid(otid))
     }
 
     suspend fun markExternalTransportLocalFailed(otid: String) {
-        externalTransportAppender.markExternalTransportLocalFailed(otid)
+        externalTransportAppender.markExternalTransportLocalFailed(TimelineExternalOtid(otid))
     }
 
     suspend fun reconcileExternalTransportSend(agentId: String, externalConversationId: String, otid: String) {
-        externalTransportAppender.reconcileExternalTransportSend(agentId, externalConversationId, otid)
+        externalTransportAppender.reconcileExternalTransportSend(
+            TimelineExternalReconcileRequest(agentId, externalConversationId, TimelineExternalOtid(otid)),
+        )
     }
 
     private suspend fun runStreamSubscriber() {
@@ -545,14 +1327,66 @@ class TimelineSyncLoop(
         wsSubscription.clear()
     }
 
+    /**
+     * Round 5 item 5: the six arguments onDurableCommit needed were flagged as excess. They
+     * are one cohesive thing -- the outcome of a durable write -- so they travel together.
+     */
+    private data class DurableCommitOutcome(
+        val result: NormalizedTimelineWriteResult,
+        val envelope: StoredTimelineEnvelope,
+        val revision: Long,
+        val fingerprint: Long,
+        val checkpointDue: Boolean,
+        val durationMs: Long,
+        val acknowledgedSequence: Long,
+    )
+
+    private enum class SnapshotPersistRequest {
+        Immediate,
+        Debounced,
+    }
+
     companion object {
+        private val SNAPSHOT_PERSIST_DEBOUNCE = 100.milliseconds
+
+        /**
+         * Upper bound on how long a streaming turn may go without a durable write. Large
+         * enough that an ordinary turn persists once at settlement rather than dozens of
+         * times mid-stream; small enough that a very long response is never wholly at risk.
+         */
+        internal val STREAMING_SAFETY_FLUSH = 5_000.milliseconds
+
+        /** Bound on wasted planning by a writer that cannot commit. */
+        internal const val MAX_CONSECUTIVE_STALE_REJECTIONS = 3
+
+        /**
+         * Shared dedupe gate: the planner produced [TimelineIncrementalSnapshotPlanner.Result.Planned],
+         * no legacy checkpoint is due, AND the underlying [ConfirmedTimelineStore] reports
+         * [ConfirmedTimelineStore.supportsIncrementalCommit]. Exposed at internal visibility
+         * for the [SnapshotPlannerStoreGatePolicyTest] fail-on-revert contract; the function is
+         * a pure derivation of the decision fields, so it lives on the companion to avoid
+         * forcing test fixtures to construct a loop instance (which would spin up collector
+         * scopes and leak coroutines into [runTest]).
+         */
+        internal fun canPersistIncremental(decision: IncrementalPlanningDecision): Boolean =
+            decision.result is TimelineIncrementalSnapshotPlanner.Result.Planned &&
+                !decision.checkpointDue &&
+                decision.storeSupportsIncremental
+
+        /** Process-wide sequence giving each loop a holder id distinct from its peers. */
+        private val holderSequence = atomic(0L)
         private const val STREAM_HEARTBEAT_EXPECTED_MS = 30_000L
         // letta-mobile-5pi: 6x multiplier = 3 minute silence timeout.
         // Previously 12x (6 minutes) — a dead stream could go undetected
         // for too long. 6x still tolerates 6 missed heartbeats (plenty of
         // margin for network jitter) while detecting stuck streams faster.
         private const val STREAM_SILENCE_TIMEOUT_MS = STREAM_HEARTBEAT_EXPECTED_MS * 6
+        private const val GATEWAY_EVENT_CAPACITY = 64
         private const val MAX_SEEN_STREAM_MESSAGES = 512
+        private const val MAX_RETAINED_SNAPSHOTS = 50
+        // letta-mobile-827s9.4: bounds legacy v11 checkpoint staleness to at most this many
+        // normalized commits (plus the always-checkpointed initial commit for a scope).
+        internal const val LEGACY_CHECKPOINT_INTERVAL = 25
         private val activeStreamCount = TimelineAtomicCounter(0)
         internal val DEFAULT_INCLUDE_TYPES = listOf("assistant_message", "reasoning_message", "tool_call_message", "tool_return_message")
     }

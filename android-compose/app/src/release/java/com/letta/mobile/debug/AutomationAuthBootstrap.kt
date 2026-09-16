@@ -3,6 +3,7 @@ package com.letta.mobile.debug
 import android.content.Context
 import android.util.Base64
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.chat.runtime.BackendConfigPolicy
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.ui.screens.config.ConfigViewModel
 import com.letta.mobile.util.Telemetry
@@ -70,7 +71,7 @@ object AutomationAuthBootstrap {
                 serverUrl.trim()
                     .ifBlank { throw IllegalArgumentException("serverUrl is required") }
                     .let { url ->
-                        if (url.startsWith("http://") || url.startsWith("https://")) url else "https://$url"
+                        if (BackendConfigPolicy.REMOTE_URL_PREFIXES.any { url.startsWith(it) }) url else "https://$url"
                     }
                     .removeSuffix("/")
             }

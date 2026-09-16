@@ -240,6 +240,51 @@ class TimelineSyncLoopStreamingTest {
     }
 
     @Test
+    fun `serialized gateway promotes observer assistant after intervening event le5m6`() = runTest {
+        val api = FakeSyncApi()
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val scope = CoroutineScope(dispatcher)
+        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv-identity-race", scope)
+
+        sync.submitStreamEvent(
+            AssistantMessage(
+                id = "observer-assistant",
+                contentRaw = JsonPrimitive("Su"),
+                runId = "iroh-observer-run-77",
+                otid = "observer-otid",
+                seqId = 0,
+            )
+        )
+        runCurrent()
+        sync.submitStreamEvent(
+            ReasoningMessage(
+                id = "reasoning-between-copies",
+                reasoning = "Checking the request",
+                runId = "run-real-77",
+                otid = "reasoning-otid",
+                seqId = 1,
+            )
+        )
+        sync.submitStreamEvent(
+            AssistantMessage(
+                id = "canonical-assistant",
+                contentRaw = JsonPrimitive("Sure, here it is."),
+                runId = "run-real-77",
+                otid = "canonical-otid",
+                seqId = 2,
+            )
+        )
+        runCurrent()
+
+        val assistants = sync.state.value.events.filterIsInstance<TimelineEvent.Confirmed>()
+            .filter { it.messageType == TimelineMessageType.ASSISTANT }
+        assertEquals("observer and initiator copies must project as one assistant row", 1, assistants.size)
+        assertEquals("Sure, here it is.", assistants.single().content)
+        assertEquals("observer-assistant", assistants.single().serverId)
+        scope.coroutineContext.job.cancel()
+    }
+
+    @Test
     fun `externalTransportActive does not auto-expire after long idle (letta-mobile-y8tvn)`() = runTest {
         val api = FakeSyncApi()
         val dispatcher = StandardTestDispatcher(testScheduler)

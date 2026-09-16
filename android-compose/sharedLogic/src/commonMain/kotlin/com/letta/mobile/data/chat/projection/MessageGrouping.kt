@@ -3,8 +3,8 @@ package com.letta.mobile.data.chat.projection
 import androidx.compose.runtime.Immutable
 import com.letta.mobile.data.model.SyntheticSkillEnvelopeDetector
 import com.letta.mobile.data.model.UiMessage
-import com.letta.mobile.data.model.parseSkillEnvelope
 import com.letta.mobile.ui.common.GroupPosition
+import kotlinx.atomicfu.atomic
 
 /** LazyColumn-stable identity: prefer client otid across Pending → Confirmed. */
 internal fun UiMessage.stableListKey(): String {
@@ -151,32 +151,6 @@ sealed interface ChatRenderItem {
             messages.any { it.first.id == messageId }
     }
 
-    /**
-     * A synthetic skill-instruction envelope, rendered as a collapsed chip.
-     * 
-     * These are role:user messages containing skill documentation that the
-     * backend injects as model context. Instead of rendering as a giant blue
-     * bubble, we render a compact, inspectable chip that shows the skill name
-     * and arguments when collapsed, and the full envelope text when expanded.
-     *
-     * letta-mobile-o7ua9
-     */
-    @Immutable
-    data class SkillEnvelopeChip(
-        val messageId: String,
-        val timestamp: String,
-        val slug: String,
-        val name: String,
-        val description: String,
-        val args: String,
-        val rawContent: String,
-        val keyOverride: String? = null,
-    ) : ChatRenderItem {
-        override val key: String = keyOverride ?: "skill-envelope-$messageId"
-        override val stableItemDiscriminator: String = messageId
-        override val boundaryTimestamp: String = timestamp
-        override fun containsMessageId(messageId: String): Boolean = this.messageId == messageId
-    }
 }
 
 /**
@@ -218,33 +192,38 @@ fun groupMessagesForRender(
         runIdCounts[rid] = (runIdCounts[rid] ?: 0) + 1
     }
 
+    // letta-mobile-p0gc (ANR fix): echo compaction used to rebuild the
+    // "older plain assistant text" set from scratch for EVERY run block,
+    // regex-normalizing each older message once per block — superlinear
+    // O(blocks × messages) on long conversations (Pixel ANR:
+    // runPanelEchoKey → compactRunBlockEchoes with 1k+ history). Now:
+    //
+    //   1. Each message's echo key is normalized AT MOST ONCE per build
+    //      into [echoKeys] (single-pass whitespace normalization — no Regex).
+    //   2. [lastEchoKeyIndex] records the LAST index each key occurs at.
+    //      For a block spanning [i, j), a key is shadowed by older history
+    //      iff `lastEchoKeyIndex[key] >= j` — exactly equivalent to
+    //      membership in the old per-block `olderPlainAssistantText` set,
+    //      but computed with ONE pre-pass instead of one set-build per block.
+    //
+    // Total cost: O(n) normalizations + O(n) map operations per build.
+    val echoIndex = buildEchoCompactionIndex(reversed)
+
     val out = ArrayList<ChatRenderItem>(reversed.size)
     var i = 0
     while (i < reversed.size) {
         val (msg, pos) = reversed[i]
-        
-        // letta-mobile-o7ua9: classify synthetic skill envelopes as chips
-        // instead of user prose bubbles. Detection + parse happen once here
-        // in the render model build (frame-budget rule: never per recompose).
+
+        // letta-mobile-45e2k: synthetic skill-instruction envelopes are
+        // backend/model context, not user-visible prose. Filter them from
+        // presentation so they never render as bubbles or special chips.
+        // The canonical skill tool call (assistant TOOL_CALL event) remains
+        // and renders through the normal UiToolCall card path.
         if (msg.role == "user" && SyntheticSkillEnvelopeDetector.isSyntheticSkillEnvelope("user", msg.content)) {
-            val parsed = parseSkillEnvelope(msg.content)
-            if (parsed != null) {
-                out.add(
-                    ChatRenderItem.SkillEnvelopeChip(
-                        messageId = msg.id,
-                        timestamp = msg.timestamp,
-                        slug = parsed.slug,
-                        name = parsed.name,
-                        description = parsed.description,
-                        args = parsed.args,
-                        rawContent = parsed.rawContent,
-                    )
-                )
-                i++
-                continue
-            }
+            i++
+            continue
         }
-        
+
         val runId = msg.runId.takeIf { msg.role == "assistant" && !it.isNullOrBlank() }
         if (runId == null) {
             out.add(ChatRenderItem.Single(msg, pos))
@@ -269,9 +248,8 @@ fun groupMessagesForRender(
             }
         }
         val compactedAcc = compactRunBlockEchoes(
-            accumulator = acc,
-            reversed = reversed,
-            olderStartIndex = j,
+            block = EchoBlock(accumulator = acc, startIndex = i, olderStartIndex = j),
+            echoIndex = echoIndex,
         )
         if (compactedAcc.size == 1) {
             // Adopt the future RunBlock key when this runId is unique in the
@@ -384,7 +362,6 @@ fun deduplicateRenderItemsByMessageId(items: List<ChatRenderItem>): List<ChatRen
                 out.add(item)
             }
             is ChatRenderItem.RunBlock -> out.add(item)
-            is ChatRenderItem.SkillEnvelopeChip -> out.add(item)
         }
     }
     return if (droppedAny) out else items
@@ -413,7 +390,6 @@ fun deduplicateRenderKeys(items: List<ChatRenderItem>): List<ChatRenderItem> {
             when (item) {
                 is ChatRenderItem.Single -> item.copy(keyOverride = candidate)
                 is ChatRenderItem.RunBlock -> item.copy(keyOverride = candidate)
-                is ChatRenderItem.SkillEnvelopeChip -> item.copy(keyOverride = candidate)
             }
         )
     }
@@ -421,28 +397,125 @@ fun deduplicateRenderKeys(items: List<ChatRenderItem>): List<ChatRenderItem> {
 }
 
 private const val MinRunPanelEchoLength = 24
-private val RunPanelWhitespaceRegex = Regex("\\s+")
+
+private class EchoCompactionIndex(
+    val keys: Array<String?>,
+    val lastIndexByKey: Map<String, Int>,
+)
+
+private fun buildEchoCompactionIndex(
+    reversed: List<Pair<UiMessage, GroupPosition>>,
+): EchoCompactionIndex {
+    val keys = arrayOfNulls<String>(reversed.size)
+    val lastIndexByKey = HashMap<String, Int>()
+    reversed.forEachIndexed { index, entry ->
+        val key = entry.first.runPanelEchoKey()
+        keys[index] = key
+        if (key != null) lastIndexByKey[key] = index
+    }
+    return EchoCompactionIndex(keys, lastIndexByKey)
+}
+
+/**
+ * letta-mobile-p0gc (ANR fix): per-build instrumentation for the echo-key
+ * hot path. [normalizationCount] counts how many times a message's content
+ * was whitespace-normalized into a [runPanelEchoKey] during
+ * [groupMessagesForRender] builds since the last reset. The linear
+ * implementation normalizes each eligible message AT MOST ONCE per build,
+ * so the count is bounded by the number of eligible messages; the retired
+ * per-block implementation re-normalized every older plain assistant once
+ * PER RUN BLOCK (superlinear). Test-only hook — never read on production
+ * render paths.
+ */
+internal object EchoCompactionInstrumentation {
+    private val normalizationCount = atomic(0L)
+
+    fun recordNormalization() {
+        normalizationCount.incrementAndGet()
+    }
+
+    val normalizations: Long get() = normalizationCount.value
+
+    fun resetForTest() {
+        normalizationCount.value = 0L
+    }
+}
+
+/**
+ * Collapse duplicate "echoed" plain assistant text inside one run block.
+ *
+ * A message is an echo candidate when [runPanelEchoKey] yields a key (plain
+ * assistant prose ≥ 24 normalized chars, no tools/reasoning/errors/…).
+ * Within the block the FIRST occurrence (newest, because input is reversed)
+ * is kept; any later duplicate is dropped — as is any candidate whose text
+ * already appears in OLDER history (indices ≥ [olderStartIndex]).
+ *
+ * letta-mobile-p0gc (ANR fix): signature changed to consume the build-scoped
+ * [echoKeys] memo + [lastEchoKeyIndex] map computed ONCE per
+ * [groupMessagesForRender] call. `lastEchoKeyIndex[key] >= olderStartIndex`
+ * is logically identical to `key in olderPlainAssistantText` from the
+ * previous implementation: the key occurs somewhere at index ≥
+ * olderStartIndex iff its LAST occurrence is at index ≥ olderStartIndex.
+ */
+private data class EchoBlock(
+    val accumulator: List<Pair<UiMessage, GroupPosition>>,
+    val startIndex: Int,
+    val olderStartIndex: Int,
+)
 
 private fun compactRunBlockEchoes(
-    accumulator: List<Pair<UiMessage, GroupPosition>>,
-    reversed: List<Pair<UiMessage, GroupPosition>>,
-    olderStartIndex: Int,
+    block: EchoBlock,
+    echoIndex: EchoCompactionIndex,
 ): List<Pair<UiMessage, GroupPosition>> {
-    if (accumulator.size < 2) return accumulator
+    if (block.accumulator.size < 2) return block.accumulator
 
-    val olderPlainAssistantText = buildSet {
-        for (index in olderStartIndex until reversed.size) {
-            reversed[index].first.runPanelEchoKey()?.let(::add)
-        }
+    val context = EchoFilterContext(HashSet(), block.olderStartIndex, echoIndex)
+    val out = block.accumulator.filterIndexed { offset, _ ->
+        val key = echoIndex.keys[block.startIndex + offset]
+        key == null || key.shouldKeepEcho(context)
     }
-    val seenInBlock = HashSet<String>()
-    return accumulator.filter { (message, _) ->
-        val key = message.runPanelEchoKey() ?: return@filter true
-        seenInBlock.add(key) && key !in olderPlainAssistantText
-    }.ifEmpty {
-        // Never erase an entire run. If the server sent only duplicate text
-        // frames, keep the newest one so the conversation still has an anchor.
-        listOf(accumulator.first())
+    if (out.size == block.accumulator.size) return block.accumulator
+    // Never erase an entire run. If the server sent only duplicate text frames,
+    // retain the newest one so the conversation still has an anchor.
+    return out.ifEmpty { listOf(block.accumulator.first()) }
+}
+
+private data class EchoFilterContext(
+    val seenInBlock: MutableSet<String>,
+    val olderStartIndex: Int,
+    val echoIndex: EchoCompactionIndex,
+)
+
+private fun String.shouldKeepEcho(context: EchoFilterContext): Boolean =
+    context.seenInBlock.add(this) &&
+        (context.echoIndex.lastIndexByKey[this] ?: -1) < context.olderStartIndex
+
+/**
+ * The exact set of chars JVM `Regex("\\s+")` matches without
+ * UNICODE_CHARACTER_CLASS: space, tab, LF, VT, FF, CR. Kept explicit (instead
+ * of Char.isWhitespace()) so normalization output stays byte-identical to the
+ * retired regex implementation across platforms.
+ */
+private fun Char.isJvmRegexWhitespace(): Boolean =
+    this == ' ' || this == '\t' || this == '\n' || this == '\u000B' || this == '\u000C' || this == '\r'
+
+/**
+ * Equivalent to `content.trim().replace(RunPanelWhitespaceRegex, " ")`
+ * (`\s+` → single space after trimming), but single-pass with NO Regex
+ * allocation — this runs once per eligible assistant message per render-model
+ * build on the Main thread (letta-mobile-p0gc ANR fix).
+ */
+internal fun String.normalizeRunPanelEchoText(): String {
+    val trimmed = trim()
+    if (trimmed.none { it.isJvmRegexWhitespace() }) return trimmed
+    return buildString(trimmed.length) {
+        var previousWasWhitespace = false
+        trimmed.forEach { character ->
+            val isWhitespace = character.isJvmRegexWhitespace()
+            if (!isWhitespace) append(character)
+            if (isWhitespace && !previousWasWhitespace) append(' ')
+            previousWasWhitespace = isWhitespace
+        }
     }
 }
 
@@ -452,7 +525,8 @@ private fun UiMessage.runPanelEchoKey(): String? {
     if (!toolCalls.isNullOrEmpty()) return null
     if (generatedUi != null || approvalRequest != null || approvalResponse != null) return null
     if (attachments.isNotEmpty()) return null
-    val normalized = content.trim().replace(RunPanelWhitespaceRegex, " ")
+    EchoCompactionInstrumentation.recordNormalization()
+    val normalized = content.normalizeRunPanelEchoText()
     return normalized.takeIf { it.length >= MinRunPanelEchoLength }
 }
 

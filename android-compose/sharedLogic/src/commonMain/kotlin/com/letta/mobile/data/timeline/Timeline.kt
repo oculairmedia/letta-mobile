@@ -423,11 +423,10 @@ data class Timeline(
         if (events.size <= evictTriggerSize) return this
         val protectedFloorIndex = protectedFloorIndex()
         val desiredCutoff = events.size - maxResident
-        val cutoff = minOf(desiredCutoff, protectedFloorIndex)
-        if (cutoff <= 0) return this
+        val evictedCount = minOf(desiredCutoff, protectedFloorIndex)
+        if (evictedCount <= 0) return this
 
-        val evictedCount = cutoff
-        val remaining = events.subList(cutoff, events.size).toPersistentList()
+        val remaining = events.subList(evictedCount, events.size).toPersistentList()
         val newOldestServerId = remaining.firstNotNullOfOrNull { (it as? TimelineEvent.Confirmed)?.serverId }
         Telemetry.event(
             "Timeline", "slideResidentWindow.evicted",
@@ -576,6 +575,8 @@ data class Timeline(
             "turnId" to (turnId ?: ""),
             "reason" to reason,
             "count" to removeServerIds.size,
+            "removedServerIds" to removeServerIds.take(MAX_REMOVED_SERVER_IDS_TELEMETRY).joinToString(","),
+            "removedServerIdsTruncated" to (removeServerIds.size > MAX_REMOVED_SERVER_IDS_TELEMETRY),
         )
         return AbandonedAssistantFragmentCleanupResult(
             timeline = copy(
@@ -619,6 +620,12 @@ data class AbandonedAssistantFragmentCleanupResult(
     val suppressions: Set<AbandonedAssistantFragmentSuppression>,
 )
 
+/**
+ * Exact legacy decision fields, NOT whole-content equality: the fingerprint is
+ * content.trim().take(256), together with normalized server and run identity.
+ * Assistant-only gating, cleanup tail/run conditions and the 32-entry cap remain unchanged.
+ */
+@kotlinx.serialization.Serializable
 data class AbandonedAssistantFragmentSuppression(
     val serverId: String?,
     val runId: String?,
@@ -655,6 +662,7 @@ internal const val DEFAULT_EVICT_BUFFER = 200
 
 private const val ORPHAN_ASSISTANT_FRAGMENT_MIN_CHARS = 3
 private const val MAX_ABANDONED_ASSISTANT_FRAGMENT_SUPPRESSIONS = 32
+private const val MAX_REMOVED_SERVER_IDS_TELEMETRY = 16
 private const val ABANDONED_FRAGMENT_CONTENT_FINGERPRINT_CHARS = 256
 
 private fun String?.matchesCleanupRun(targetRunIds: Set<String>): Boolean {
@@ -666,7 +674,7 @@ private fun String?.matchesCleanupRun(targetRunIds: Set<String>): Boolean {
 
 private fun String.isSyntheticIrohRunFamily(): Boolean = startsWith("iroh-run-") || startsWith("local-run-")
 
-private fun TimelineEvent.Confirmed.toAbandonedAssistantFragmentSuppression(): AbandonedAssistantFragmentSuppression =
+internal fun TimelineEvent.Confirmed.toAbandonedAssistantFragmentSuppression(): AbandonedAssistantFragmentSuppression =
     AbandonedAssistantFragmentSuppression(
         serverId = serverId.takeIf { it.isNotBlank() },
         runId = runId?.takeIf { it.isNotBlank() },

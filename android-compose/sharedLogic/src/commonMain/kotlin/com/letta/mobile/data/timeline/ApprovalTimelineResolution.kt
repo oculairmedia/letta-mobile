@@ -36,8 +36,7 @@ internal fun TimelineEvent.Confirmed.hasExplicitApprovalResponse(evidence: Appro
     val requestId = approvalRequestId?.takeIf(String::isNotBlank) ?: return false
     val response = evidence.responsesByRequestId[requestId]
         .orEmpty()
-        .filter(ApprovalResponseMessage::hasExplicitDecision)
-        .singleOrNull()
+        .singleOrNull(ApprovalResponseMessage::hasExplicitDecision)
         ?: return false
     return response.runId.isCompatibleRun(runId)
 }
@@ -142,7 +141,7 @@ internal fun TimelineEvent.Confirmed.willCompleteWith(returnedCallIds: Set<Strin
  * Requiring an explicit decision here previously matched the historical
  * intent (only real approve/reject responses should resolve the card), but
  * it silently discarded the auto-approve echo instead — the snapshot/
- * reconcile path (`applyReturnsAndResponsesFromSnapshot`) already treats any
+ * reconcile enrichment reducer already treats any
  * response echo as resolving evidence via [hasAnyApprovalResponse]; this
  * keeps the live and snapshot paths consistent. The Approved/Rejected LABEL
  * is unaffected: it is derived separately in [TimelineEventToUiMessage] from
@@ -155,7 +154,7 @@ internal fun TimelineEvent.Confirmed.matchesApprovalResponse(response: ApprovalR
         (runId.isNullOrBlank() || response.runId.isNullOrBlank() || runId == response.runId)
 
 internal fun Timeline.matchingApprovalEvent(response: ApprovalResponseMessage): TimelineEvent.Confirmed? =
-    events.filterIsInstance<TimelineEvent.Confirmed>().filter { it.matchesApprovalResponse(response) }.singleOrNull()
+    events.filterIsInstance<TimelineEvent.Confirmed>().singleOrNull { it.matchesApprovalResponse(response) }
 
 internal fun TimelineEvent.Confirmed.takeMatchingPendingReturns(
     pendingReturns: MutableMap<String, ToolReturnMessage>,

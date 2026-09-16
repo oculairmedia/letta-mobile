@@ -3,6 +3,8 @@ package com.letta.mobile.desktop
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -322,10 +324,28 @@ private fun RecentsRow(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 6.dp),
         )
+        val recentsScroll = rememberScrollState()
+        // Without this the strip clipped an avatar in half at the pane edge and
+        // read as a broken layout rather than a scrollable row.
+        val fadeStart by animateFloatAsState(
+            targetValue = if (recentsScroll.canScrollBackward) 1f else 0f,
+            animationSpec = tween(durationMillis = 180),
+            label = "recentsFadeStart",
+        )
+        val fadeEnd by animateFloatAsState(
+            targetValue = if (recentsScroll.canScrollForward) 1f else 0f,
+            animationSpec = tween(durationMillis = 180),
+            label = "recentsFadeEnd",
+        )
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
+                .horizontalFadingEdges(
+                    startFadeAlpha = fadeStart,
+                    endFadeAlpha = fadeEnd,
+                    fadeLength = 28.dp,
+                )
+                .horizontalScroll(recentsScroll)
                 .padding(horizontal = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
@@ -337,7 +357,7 @@ private fun RecentsRow(
                         .width(64.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    AgentOrb(index = row.orbIndex, size = 44.dp, cornerRadius = 12.dp)
+                    AgentOrb(agentId = row.id, index = row.orbIndex, size = 44.dp, cornerRadius = 12.dp)
                     Text(
                         text = row.name,
                         style = MaterialTheme.typography.labelMedium,
@@ -363,7 +383,7 @@ private fun AgentDirectoryRow(row: NewConversationAgentRow, onClick: () -> Unit)
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        AgentOrb(index = row.orbIndex, size = 34.dp, cornerRadius = 9.dp)
+        AgentOrb(agentId = row.id, index = row.orbIndex, size = 34.dp, cornerRadius = 9.dp)
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = row.name,

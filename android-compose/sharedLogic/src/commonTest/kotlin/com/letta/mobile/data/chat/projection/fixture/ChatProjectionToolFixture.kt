@@ -20,8 +20,8 @@ internal object ToolApprovalFixture {
     private val instant = parseTimelineInstant("2026-08-16T01:00:00Z")
     private val pendingCall = ToolCall(
         id = "call-pending",
-        name = "Bash",
-        arguments = "{\"command\":\"echo ready\"}",
+        name = "AskUserQuestion",
+        arguments = "{\"questions\":[{\"question\":\"Continue?\",\"options\":[{\"label\":\"Yes\"}]}]}",
     )
     private val approvedCall = ToolCall(
         id = "call-approved",

@@ -5,71 +5,6 @@ import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.util.Telemetry
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.collections.immutable.toPersistentSet
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-
-/**
- * Reconcile timeline state after sending a message. Swaps Local→Confirmed
- * for the outbound message, pulls in any server messages we don't yet have,
- * and advances liveCursor.
- */
-suspend fun reconcileAfterSend(
-    otid: String,
-    conversationId: String,
-    writeMutex: Mutex,
-    state: MutableStateFlow<Timeline>,
-    events: MutableSharedFlow<TimelineSyncEvent>,
-    pendingLocalStore: PendingLocalStore,
-    listMessagesWithRetry: suspend (String) -> List<LettaMessage>,
-) {
-    val timer = Telemetry.startTimer("TimelineSync", "reconcile")
-    var confirmedLocal: Boolean
-    var appendedMissing: Int
-    var confirmedServerId: String?
-    var shouldDeletePendingLocal: Boolean
-    try {
-        // letta-mobile-j44j: retry the GET on transient failures before
-        // surfacing a user-visible error. The stream already landed the
-        // assistant reply as Confirmed events (see streamAndReconcile),
-        // so reconcile's job here is the lower-stakes work of swapping
-        // the Local user bubble to Confirmed and picking up anything
-        // the SSE missed. A network blip on that GET shouldn't leave
-        // the bubble stuck in SENT forever. Keep this fetch outside the
-        // write mutex so timeline mutation/rendering is not blocked by
-        // network latency.
-        val serverMessages = listMessagesWithRetry(otid).reversed()
-
-        val result = applyReconcileAfterSendSnapshot(
-            otid = otid,
-            conversationId = conversationId,
-            serverMessages = serverMessages,
-            writeMutex = writeMutex,
-            state = state,
-        )
-        confirmedLocal = result.confirmedLocal
-        appendedMissing = result.appendedMissing
-        confirmedServerId = result.confirmedServerId
-        shouldDeletePendingLocal = result.shouldDeletePendingLocal
-
-        confirmedServerId?.let { serverId ->
-            events.emit(TimelineSyncEvent.LocalConfirmed(otid, serverId))
-        }
-        if (shouldDeletePendingLocal) {
-            runCatching { pendingLocalStore.delete(otid) }
-        }
-        timer.stop(
-            "otid" to otid,
-            "serverCount" to serverMessages.size,
-            "confirmedLocal" to confirmedLocal,
-            "appendedMissing" to appendedMissing,
-        )
-    } catch (t: Throwable) {
-        timer.stopError(t, "otid" to otid)
-        events.emit(TimelineSyncEvent.ReconcileError(t.message ?: "unknown"))
-    }
-}
 
 @Immutable
 data class ReconcileAfterSendResult(
@@ -79,81 +14,50 @@ data class ReconcileAfterSendResult(
     val shouldDeletePendingLocal: Boolean,
 )
 
-suspend fun applyReconcileAfterSendSnapshot(
+data class PureReconcileAfterSendResult(
+    val timeline: Timeline,
+    val result: ReconcileAfterSendResult,
+)
+
+fun reconcileAfterSendSnapshot(
+    initial: Timeline,
     otid: String,
-    conversationId: String,
     serverMessages: List<LettaMessage>,
-    writeMutex: Mutex,
-    state: MutableStateFlow<Timeline>,
-): ReconcileAfterSendResult {
+): PureReconcileAfterSendResult {
+    var timeline = initial
     var confirmedLocal = false
-    var appendedMissing = 0
     var confirmedServerId: String? = null
     var shouldDeletePendingLocal = false
-
-    writeMutex.withLock {
-        // 1. Swap Local→Confirmed for our outbound message
-        val myMatch = serverMessages.firstOrNull { it.otid == otid }
-        if (myMatch != null) {
-            val existing = state.value.findByOtid(otid)
-            if (existing is TimelineEvent.Local) {
-                val confirmed = myMatch.toTimelineEvent(position = existing.position)
-                if (confirmed != null) {
-                    state.value = state.value.replaceLocal(otid, confirmed)
-                    confirmedServerId = myMatch.id
-                    confirmedLocal = true
-                    // mge5.24: server echoed our send back, so any
-                    // disk-persisted Local for this otid is now obsolete.
-                    // (For text sends nothing was persisted; for images
-                    // this branch will rarely fire today because the
-                    // server drops them — but if/when it does, clean up.)
-                    shouldDeletePendingLocal = true
-                }
-            }
-        } else {
-            // letta-mobile-20tat (P1): when the server message.list response
-            // does NOT echo the client otid (common over Iroh if the serve path
-            // doesn't persist/echo client_message_id), fall back to content+
-            // recency matching: find the Local user row we're trying to confirm,
-            // and swap it with the reconciled server copy. This ensures the
-            // optimistic send row and its disk twin collapse into one confirmed
-            // event instead of rendering twice.
-            val existing = state.value.findByOtid(otid)
-            if (existing is TimelineEvent.Local && existing.role == Role.USER) {
-                val contentMatch = serverMessages.firstOrNull { msg ->
-                    val confirmed = msg.toTimelineEvent(position = 0.0)
-                    confirmed?.messageType == TimelineMessageType.USER &&
-                        confirmed.content.trim() == existing.content.trim()
-                }
-                if (contentMatch != null) {
-                    val confirmed = contentMatch.toTimelineEvent(position = existing.position)
-                    if (confirmed != null) {
-                        state.value = state.value.replaceLocal(otid, confirmed)
-                        confirmedServerId = contentMatch.id
-                        confirmedLocal = true
-                        shouldDeletePendingLocal = true
-                    }
-                }
-            }
-        }
-
-        // 2. Pull in any server messages we don't yet have (missed stream events)
-        val mergeResult = state.value.mergeServerMessages(serverMessages)
-        state.value = mergeResult.first
-        appendedMissing = mergeResult.second
-
-        // 3. Advance liveCursor
-        serverMessages.lastOrNull()?.id?.let {
-            state.value = state.value.copy(liveCursor = it)
+    val existing = timeline.findByOtid(otid)
+    if (existing is TimelineEvent.Local) {
+        val match = serverMessages.firstOrNull { it.otid == otid }
+            ?: serverMessages.lastOrNull { it.matchesRecentLocalUser(existing) }
+        val confirmed = match?.toTimelineEvent(position = existing.position)
+        if (confirmed != null) {
+            timeline = timeline.replaceLocal(otid, confirmed)
+            confirmedServerId = match.id
+            confirmedLocal = true
+            shouldDeletePendingLocal = true
         }
     }
-
-    return ReconcileAfterSendResult(
-        confirmedLocal = confirmedLocal,
-        appendedMissing = appendedMissing,
-        confirmedServerId = confirmedServerId,
-        shouldDeletePendingLocal = shouldDeletePendingLocal,
+    val mergeResult = timeline.mergeServerMessages(serverMessages)
+    timeline = mergeResult.first
+    serverMessages.lastOrNull()?.id?.let { timeline = timeline.copy(liveCursor = it) }
+    return PureReconcileAfterSendResult(
+        timeline,
+        ReconcileAfterSendResult(confirmedLocal, mergeResult.second, confirmedServerId, shouldDeletePendingLocal),
     )
+}
+
+private fun LettaMessage.matchesRecentLocalUser(local: TimelineEvent.Local): Boolean {
+    if (local.role != Role.USER || !otid.isNullOrBlank()) return false
+    val confirmed = toTimelineEvent(position = 0.0)
+        ?.takeIf { it.messageType == TimelineMessageType.USER }
+        ?: return false
+    if (confirmed.content.trim() != local.content.trim()) return false
+    val messageDate = date?.let(::parseTimelineInstantOrNull) ?: return false
+    val ageMillis = timelineInstantDurationMillis(local.sentAt, messageDate)
+    return ageMillis in 0..CONTENT_FALLBACK_RECENCY_MS
 }
 
 fun Timeline.mergeServerMessages(
@@ -177,12 +81,6 @@ fun Timeline.mergeServerMessages(
         if (timeline.containsIdentityFor(confirmed)) return@forEach
         val existingByServerId = timeline.findByServerId(confirmed.serverId, confirmed.messageType)
         if (existingByServerId == null && timeline.recentTailContainsEquivalent(confirmed)) {
-            // The HTTP backend mints its OWN message ids (ui-msg-*) that never
-            // match the App Server ids (letta-msg-*) carried by the live Iroh
-            // frames, and it omits run_id/original otid. No id-based identity
-            // can catch that copy, so a live-delivered reply re-appends on the
-            // next reconcile poll. Dedupe by (messageType + identical trimmed
-            // content) within the recent tail window instead of inserting.
             Telemetry.event(
                 "TimelineSync", "recentReconcile.contentDeduped",
                 "conversationId" to timeline.conversationId,
@@ -191,81 +89,100 @@ fun Timeline.mergeServerMessages(
             )
             return@forEach
         }
-        if (existingByServerId?.canReplaceIrohSyntheticLiveRow(confirmed) == true) {
-            // letta-mobile-9lgfu: terminal settlement fence. The synthetic live
-            // row may already hold deltas the reconciled snapshot predates; a
-            // stale, non-superset final must not shrink it. Keep the promotion
-            // (ids/run id come from `confirmed`) but fold the text so the
-            // accumulator can only keep-or-grow.
-            val settled = settleTerminalEvent(timeline.conversationId, existingByServerId, confirmed)
-            timeline = timeline.replaceByServerId(settled)
-            merged++
-        } else if (existingByServerId == null) {
-            val prefixIndex = timeline.findRecentAssistantPrefixIndex(confirmed)
-            // letta-mobile-x1xnl (SECOND path). The live Iroh stream lands the
-            // assistant reply as a draft row keyed on the turn-anchored SYNTHETIC
-            // otid (iroh-assistant-<turnId>) with a rotating letta-msg-* serverId,
-            // then a moment later the SAME reply arrives again via this reconcile
-            // snapshot carrying a REAL, DIFFERENT server id/otid and the full
-            // text. serverId/otid/semantic identity all miss (different ids;
-            // first-word-lag means the draft text is not even a clean prefix of
-            // the full text — "Still" strands), so without this guard the
-            // reconciled final is inserted as a SECOND, near-duplicate assistant
-            // row. Because both rows carry the SAME REAL run id and share
-            // overlapping content, they are the same in-flight message split by
-            // the transport: collapse the snapshot INTO the draft row (snapshot
-            // REPLACE, never append) instead of stranding a duplicate.
-            val sameRunIndex = if (prefixIndex == null) {
-                timeline.findRecentSameRealRunAssistantIndex(confirmed)
-            } else {
-                null
-            }
-            // letta-mobile-h30cy (THE reconcile dup, ground-truthed via
-            // app-server-iroh-probe --dump-frames + admin message.list): the
-            // reconciled FINAL has id==otid==ui-msg-*, run_id=NULL, and content
-            // that is a SUPERSET of the streamed row (first-word-lag means it is
-            // NOT byte-identical, so recentTailContainsEquivalent's exact match
-            // misses; null run means findRecentSameRealRunAssistantIndex can't
-            // fire). Fall back to CONTENT-SUPERSET: a recent assistant row whose
-            // content is contained within the incoming full text is the same
-            // in-flight reply — replace it with the fuller final (one row).
-            val contentSupersetIndex = if (prefixIndex == null && sameRunIndex == null) {
-                timeline.findRecentAssistantContentSupersetIndex(confirmed)
-            } else {
-                null
-            }
-            val replaceIndex = prefixIndex ?: sameRunIndex ?: contentSupersetIndex
-            if (replaceIndex != null) {
-                timeline = timeline.replaceEventAt(replaceIndex, confirmed.copy(position = timeline.events[replaceIndex].position))
-                Telemetry.event(
-                    "TimelineSync",
-                    if (prefixIndex != null) "recentReconcile.assistantPrefixReplaced"
-                    else "recentReconcile.assistantSameRunReplaced",
-                    "conversationId" to timeline.conversationId,
-                    "serverId" to confirmed.serverId,
-                    "incomingLen" to confirmed.content.length,
-                )
-                merged++
-            } else {
-                timeline = timeline.insertOrdered(confirmed)
-                merged++
-            }
-        } else if (existingByServerId.sharesRunIdentityWith(confirmed)) {
-            // Same server id + message type, and at least one side lacks a
-            // run id (REST /messages replies often omit run_id while the live
-            // Iroh/WS row carries the real one). #780 run-scoped identity keys
-            // no longer overlap in that case, so without this guard the
-            // reconciled copy re-inserts and the reply renders twice. Only a
-            // REAL run-id mismatch on both sides (recycled server id across
-            // runs) may append.
-            return@forEach
-        } else {
-            timeline = timeline.insertOrdered(confirmed)
-            merged++
-        }
+        val result = timeline.mergeConfirmedServerMessage(confirmed)
+        timeline = result.timeline
+        if (result.merged) merged++
     }
     return timeline to merged
 }
+
+private data class ConfirmedServerMergeResult(val timeline: Timeline, val merged: Boolean)
+
+private fun Timeline.mergeConfirmedServerMessage(
+    confirmed: TimelineEvent.Confirmed,
+): ConfirmedServerMergeResult {
+    val existingByServerId = findByServerId(confirmed.serverId, confirmed.messageType)
+    if (existingByServerId?.canReplaceIrohSyntheticLiveRow(confirmed) == true) {
+        val settled = settleTerminalEvent(conversationId, existingByServerId, confirmed)
+        return ConfirmedServerMergeResult(replaceByServerId(settled), true)
+    }
+    if (existingByServerId == null) return mergeMissingServerIdentity(confirmed)
+    if (existingByServerId.sharesRunIdentityWith(confirmed)) return ConfirmedServerMergeResult(this, false)
+    return ConfirmedServerMergeResult(insertOrdered(confirmed), true)
+}
+
+private fun Timeline.mergeMissingServerIdentity(
+    confirmed: TimelineEvent.Confirmed,
+): ConfirmedServerMergeResult {
+    when (val decision = resolveCrossBoundaryAssistantIdentity(confirmed)) {
+        is CrossBoundaryAssistantDecision.ExactAlias -> {
+            val replacement = confirmed.copy(position = events[decision.index].position)
+            return ConfirmedServerMergeResult(replaceEventAt(decision.index, replacement), true)
+        }
+        CrossBoundaryAssistantDecision.UnresolvedUiFinal -> {
+            reportUnresolvedCrossBoundaryIdentity(confirmed)
+            return ConfirmedServerMergeResult(insertOrdered(confirmed), true)
+        }
+        CrossBoundaryAssistantDecision.UseLegacyFallbacks -> Unit
+    }
+    return mergeViaLegacyAssistantHeuristics(confirmed)
+}
+
+private fun Timeline.mergeViaLegacyAssistantHeuristics(
+    confirmed: TimelineEvent.Confirmed,
+): ConfirmedServerMergeResult {
+    val prefixIndex = findRecentAssistantPrefixIndex(confirmed)
+    // letta-mobile-x1xnl (SECOND path). The live Iroh stream lands the
+    // assistant reply as a draft row keyed on the turn-anchored SYNTHETIC
+    // otid (iroh-assistant-<turnId>) with a rotating letta-msg-* serverId,
+    // then a moment later the SAME reply arrives again via this reconcile
+    // snapshot carrying a REAL, DIFFERENT server id/otid and the full
+    // text. serverId/otid/semantic identity all miss (different ids;
+    // first-word-lag means the draft text is not even a clean prefix of
+    // the full text — "Still" strands), so without this guard the
+    // reconciled final is inserted as a SECOND, near-duplicate assistant
+    // row. Because both rows carry the SAME REAL run id and share
+    // overlapping content, they are the same in-flight message split by
+    // the transport: collapse the snapshot INTO the draft row (snapshot
+    // REPLACE, never append) instead of stranding a duplicate.
+    val sameRunIndex = if (prefixIndex == null) {
+        findRecentSameRealRunAssistantIndex(confirmed)
+    } else {
+        null
+    }
+    // letta-mobile-h30cy (THE reconcile dup, ground-truthed via
+    // app-server-iroh-probe --dump-frames + admin message.list): the
+    // reconciled FINAL has id==otid==ui-msg-*, run_id=NULL, and content
+    // that is a SUPERSET of the streamed row (first-word-lag means it is
+    // NOT byte-identical, so recentTailContainsEquivalent's exact match
+    // misses; null run means findRecentSameRealRunAssistantIndex can't
+    // fire). Fall back to CONTENT-SUPERSET: a recent assistant row whose
+    // content is contained within the incoming full text is the same
+    // in-flight reply — replace it with the fuller final (one row).
+    val contentSupersetIndex = if (prefixIndex == null && sameRunIndex == null) {
+        findRecentAssistantContentSupersetIndex(confirmed)
+    } else {
+        null
+    }
+    val replaceIndex = prefixIndex ?: sameRunIndex ?: contentSupersetIndex
+    return if (replaceIndex != null) {
+        val timeline = replaceEventAt(replaceIndex, confirmed.copy(position = events[replaceIndex].position))
+        Telemetry.event(
+            "TimelineSync",
+            if (prefixIndex != null) "recentReconcile.assistantPrefixReplaced"
+            else "recentReconcile.assistantSameRunReplaced",
+            "conversationId" to conversationId,
+            "serverId" to confirmed.serverId,
+            "incomingLen" to confirmed.content.length,
+        )
+        ConfirmedServerMergeResult(timeline, true)
+    } else {
+        ConfirmedServerMergeResult(insertOrdered(confirmed), true)
+    }
+}
+
+
+internal const val CONTENT_FALLBACK_RECENCY_MS = 2 * 60 * 1000L
 
 private fun Timeline.replaceEventAt(index: Int, event: TimelineEvent.Confirmed): Timeline {
     val updated = events.toMutableList()
@@ -277,6 +194,47 @@ private fun Timeline.replaceEventAt(index: Int, event: TimelineEvent.Confirmed):
             residentOtids = updatedEvents.mapTo(mutableSetOf()) { it.otid }.toPersistentSet(),
             invariantsKnown = true,
         )
+}
+
+private sealed interface CrossBoundaryAssistantDecision {
+    data class ExactAlias(val index: Int) : CrossBoundaryAssistantDecision
+    data object UnresolvedUiFinal : CrossBoundaryAssistantDecision
+    data object UseLegacyFallbacks : CrossBoundaryAssistantDecision
+}
+
+/** Keeps identity decisions explicit before any legacy content heuristics run. */
+private fun Timeline.resolveCrossBoundaryAssistantIdentity(
+    incoming: TimelineEvent.Confirmed,
+): CrossBoundaryAssistantDecision {
+    val exactAliasIndex = findExactAssistantAliasIndex(incoming)
+    if (exactAliasIndex != null) return CrossBoundaryAssistantDecision.ExactAlias(exactAliasIndex)
+    if (incoming.messageType == TimelineMessageType.ASSISTANT && incoming.serverId.startsWith("ui-msg-")) {
+        return CrossBoundaryAssistantDecision.UnresolvedUiFinal
+    }
+    return CrossBoundaryAssistantDecision.UseLegacyFallbacks
+}
+
+private fun Timeline.reportUnresolvedCrossBoundaryIdentity(incoming: TimelineEvent.Confirmed) {
+    Telemetry.event(
+        "TimelineSync", "recentReconcile.unresolvedCrossBoundaryIdentity",
+        "conversationId" to conversationId,
+        "serverId" to incoming.serverId,
+        "messageType" to incoming.messageType.name,
+        level = Telemetry.Level.WARN,
+    )
+}
+
+private fun TimelineEvent.Confirmed.matchesAssistantAlias(incomingAliases: Set<String>): Boolean =
+    messageType == TimelineMessageType.ASSISTANT && (serverId in incomingAliases || otid in incomingAliases)
+
+private fun Timeline.findExactAssistantAliasIndex(incoming: TimelineEvent.Confirmed): Int? {
+    if (incoming.messageType != TimelineMessageType.ASSISTANT) return null
+    val incomingAliases = setOf(incoming.serverId, incoming.otid)
+    for (index in events.indices.reversed()) {
+        val event = events[index] as? TimelineEvent.Confirmed ?: continue
+        if (event.matchesAssistantAlias(incomingAliases)) return index
+    }
+    return null
 }
 
 private fun Timeline.findRecentAssistantPrefixIndex(incoming: TimelineEvent.Confirmed): Int? {
@@ -495,33 +453,35 @@ private fun TimelineEvent.Confirmed.canReplaceIrohSyntheticLiveRow(
  */
 private const val RECONCILE_CONTENT_DEDUPE_TAIL = 30
 
-private fun Timeline.recentTailContainsEquivalent(incoming: TimelineEvent.Confirmed): Boolean {
-    if (incoming.messageType != TimelineMessageType.ASSISTANT &&
-        incoming.messageType != TimelineMessageType.USER &&
-        incoming.messageType != TimelineMessageType.REASONING
-    ) {
+private fun canDedupeContentInRecentTail(incoming: TimelineEvent.Confirmed): Boolean {
+    if (incoming.messageType == TimelineMessageType.ASSISTANT && incoming.serverId.startsWith("ui-msg-")) {
         return false
     }
+    return incoming.messageType in setOf(
+        TimelineMessageType.ASSISTANT,
+        TimelineMessageType.USER,
+        TimelineMessageType.REASONING,
+    )
+}
+
+private fun TimelineEvent.matchesRecentTailContent(
+    incomingType: TimelineMessageType,
+    incomingContent: String,
+): Boolean = when (this) {
+    is TimelineEvent.Confirmed -> messageType == incomingType && content.trim() == incomingContent
+    is TimelineEvent.Local -> incomingType == TimelineMessageType.USER &&
+        role == Role.USER &&
+        content.trim() == incomingContent
+}
+
+private fun Timeline.recentTailContainsEquivalent(incoming: TimelineEvent.Confirmed): Boolean {
+    if (!canDedupeContentInRecentTail(incoming)) return false
     val incomingContent = incoming.content.trim()
     if (incomingContent.isEmpty()) return false
     val start = (events.size - RECONCILE_CONTENT_DEDUPE_TAIL).coerceAtLeast(0)
     for (i in events.size - 1 downTo start) {
-        // letta-mobile-20tat: check both Confirmed AND Local user events
-        when (val event = events[i]) {
-            is TimelineEvent.Confirmed -> {
-                if (event.messageType != incoming.messageType) continue
-                if (event.content.trim() == incomingContent) return true
-            }
-            is TimelineEvent.Local -> {
-                // Only dedupe user messages against Local rows (assistant/
-                // reasoning never appear as Local in production flow)
-                if (incoming.messageType == TimelineMessageType.USER &&
-                    event.role == Role.USER &&
-                    event.content.trim() == incomingContent
-                ) {
-                    return true
-                }
-            }
+        if (events[i].matchesRecentTailContent(incoming.messageType, incomingContent)) {
+            return true
         }
     }
     return false
@@ -565,11 +525,7 @@ fun Timeline.positionForServerMessageDate(message: LettaMessage): Double {
 
 suspend fun reconcileForExternalRun(
     runId: String,
-    reconcileRecentMessagesFromServer: suspend (String, Array<Pair<String, Any?>>, Boolean) -> Unit,
+    reconcileRecentMessagesFromServer: suspend (String, String, Boolean) -> Unit,
 ) {
-    reconcileRecentMessagesFromServer(
-        "externalRunReconcile",
-        arrayOf("runId" to runId),
-        true
-    )
+    reconcileRecentMessagesFromServer("externalRunReconcile", runId, true)
 }

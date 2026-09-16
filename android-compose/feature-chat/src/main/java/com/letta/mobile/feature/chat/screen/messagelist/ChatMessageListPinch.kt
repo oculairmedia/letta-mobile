@@ -228,7 +228,6 @@ private class ChatPinchVisibleContentCounts {
                 runBlocks++
                 item.messages.forEach { (message, _) -> countMessage(message) }
             }
-            is ChatRenderItem.SkillEnvelopeChip -> Unit
         }
     }
 

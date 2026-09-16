@@ -31,6 +31,8 @@ class ToolDisplayRegistry {
         "Edit" to ToolDisplayInfo("✏️", "Editing file"),
         "Bash" to ToolDisplayInfo("⚡", "Running command"),
         "BashOutput" to ToolDisplayInfo("⚡", "Running command"),
+        "exec_command" to ToolDisplayInfo("⚡", "Running command"),
+        "functions.exec_command" to ToolDisplayInfo("⚡", "Running command"),
         "Grep" to ToolDisplayInfo("🔍", "Searching files"),
         "Glob" to ToolDisplayInfo("📁", "Finding files"),
     )
@@ -39,10 +41,8 @@ class ToolDisplayRegistry {
         val known = registry[toolName]
         if (known != null) {
             val detail = extractDetail(toolName, args)
-            // letta-mobile-mge5.19: prefer the extracted detail (e.g. the
-            // actual Bash command, file path, search query) as the PRIMARY
-            // header label — it's what the user wants to see at a glance.
-            // Fall back to the canned verb if we couldn't extract.
+            // Prefer a purpose for shell commands, but retain the existing
+            // command/path/query detail behavior for other recognized tools.
             val label = detail ?: known.label
             return known.copy(label = label, detailLine = null)
         }
@@ -67,11 +67,25 @@ class ToolDisplayRegistry {
                 ?: extractJsonStringField(args, "search")?.truncate(60)
             "Read", "Write", "Edit" -> extractJsonStringField(args, "file_path")?.truncate(80)
                 ?: args.take(80)
-            "Bash", "BashOutput" -> extractJsonStringField(args, "command")?.truncate(60)
-                ?: args.take(60)
+            "Bash", "BashOutput", "exec_command", "functions.exec_command" ->
+                extractShellDescription(args)
             "Grep" -> extractJsonStringField(args, "pattern")?.truncate(60)
             "Glob" -> extractJsonStringField(args, "pattern")?.truncate(60)
             else -> null
+        }
+    }
+
+    private fun extractShellDescription(args: String): String? {
+        return try {
+            val objectArgs = Json.parseToJsonElement(args) as? kotlinx.serialization.json.JsonObject
+                ?: return null
+            val description = objectArgs["description"] as? kotlinx.serialization.json.JsonPrimitive
+                ?: return null
+            if (!description.isString) return null
+            description.content.replace(Regex("\\s+"), " ").trim()
+                .takeIf { it.isNotEmpty() }?.truncate(SHELL_DESCRIPTION_MAX_LENGTH)
+        } catch (e: Exception) {
+            null
         }
     }
 
@@ -124,6 +138,8 @@ class ToolDisplayRegistry {
         if (length > max) take(max) + "…" else this
 
     companion object {
+        private const val SHELL_DESCRIPTION_MAX_LENGTH = 80
+
         @Volatile
         private var INSTANCE: ToolDisplayRegistry? = null
 

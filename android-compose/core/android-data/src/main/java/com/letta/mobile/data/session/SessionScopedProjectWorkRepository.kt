@@ -20,6 +20,8 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 
+// The singleton repository owns this scope and cancels it explicitly in close().
+@Suppress("NoDetachedCoroutineLifecycle")
 internal fun defaultSessionScopedProjectWorkRepositoryScope(): CoroutineScope =
     CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -90,7 +92,7 @@ class SessionScopedProjectWorkRepository internal constructor(
     override suspend fun getIssue(issueId: String, forceRefresh: Boolean): ProjectIssueDetail =
         sessionManager.withCurrentSession { it.projectWorkRepository.getIssue(issueId, forceRefresh) }
 
-    override suspend fun invalidateProjectCache(projectId: String) = sessionManager.withCurrentSession { it.projectWorkRepository.invalidateProjectCache(projectId) }
+    override suspend fun invalidateProjectCache(projectId: String): Unit = sessionManager.withCurrentSession { it.projectWorkRepository.invalidateProjectCache(projectId) }
     override suspend fun claimIssue(issueId: String, assignee: String, ifMatch: String, idempotencyKey: String): ProjectIssueSummary =
         sessionManager.withCurrentSession { it.projectWorkRepository.claimIssue(issueId, assignee, ifMatch, idempotencyKey) }
 

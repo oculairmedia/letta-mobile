@@ -3,13 +3,11 @@ package com.letta.mobile.data.transport.appserver
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 
 /**
@@ -55,6 +53,17 @@ interface AppServerClient {
     suspend fun runtimeStart(command: AppServerCommand.RuntimeStart): AppServerInboundFrame.RuntimeStartResponse
 
     suspend fun input(command: AppServerCommand.Input)
+
+    /**
+     * Sends [command] and waits for its `input_accepted` (0.32+). Requires `request_id`. The ack
+     * says the input was started or queued (or rejected); it is not the end of the turn.
+     */
+    suspend fun inputAwaitingAcceptance(command: AppServerCommand.Input): AppServerInboundFrame.InputAccepted =
+        throw UnsupportedOperationException("input_accepted correlation is not supported by this client")
+
+    /** Sends `change_device_state`; there is no direct response (see [AppServerCommand.ChangeDeviceState]). */
+    suspend fun changeDeviceState(command: AppServerCommand.ChangeDeviceState): Unit =
+        throw UnsupportedOperationException("change_device_state is not supported by this client")
 
     suspend fun sync(command: AppServerCommand.Sync): AppServerInboundFrame.SyncResponse
 
@@ -250,6 +259,21 @@ class DefaultAppServerClient(
         )
 
     override suspend fun input(command: AppServerCommand.Input) {
+        transport.sendControl(command)
+    }
+
+    override suspend fun inputAwaitingAcceptance(command: AppServerCommand.Input): AppServerInboundFrame.InputAccepted {
+        val requestId = requireNotNull(command.requestId) {
+            "input requires request_id to await input_accepted."
+        }
+        return registry.request(
+            requestId = requestId,
+            response = { it as? AppServerInboundFrame.InputAccepted },
+            send = { transport.sendControl(command) },
+        )
+    }
+
+    override suspend fun changeDeviceState(command: AppServerCommand.ChangeDeviceState) {
         transport.sendControl(command)
     }
 

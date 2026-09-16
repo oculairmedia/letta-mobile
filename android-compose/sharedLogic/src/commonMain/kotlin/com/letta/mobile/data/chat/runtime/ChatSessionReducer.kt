@@ -52,6 +52,14 @@ object ChatSessionReducer {
             errorMessage = errorMessage,
         )
 
+    /**
+     * letta-mobile-rgn9u: the generation is the timeline observer's identity for its
+     * selection, so bumping it retires the live presentation and rebuilds the whole list.
+     * Re-publishing the conversation the user is already reading — which every hydration,
+     * remote-load completion and post-send resolve does — must therefore leave the
+     * generation, and the messages already on screen, exactly where they are. Only an
+     * actual change of selected conversation is a new generation.
+     */
     fun conversationsLoaded(
         state: ChatSessionState,
         conversations: List<ChatConversationSummary>,
@@ -59,14 +67,21 @@ object ChatSessionReducer {
         emptyStatusMessage: String = "No conversations",
     ): ChatSessionState {
         val selectedId = conversations.firstOrNull()?.id
+        val selectionChanged = selectedId != null && selectedId != state.selectedConversationId
         return state.copy(
             conversations = conversations,
             selectedConversationId = selectedId,
-            messagesByConversationId = emptyMap(),
+            messagesByConversationId = if (selectionChanged || selectedId == null) {
+                emptyMap()
+            } else {
+                state.messagesByConversationId
+            },
             composer = ChatComposerState(),
             isLoading = false,
             isSending = false,
             isRemoteBacked = true,
+            snapshotAvailability = SnapshotAvailability.None,
+            remoteSyncState = RemoteSyncState.Idle,
             connectionState = if (conversations.isEmpty()) {
                 ChatConnectionState.NoConversations
             } else {
@@ -74,10 +89,10 @@ object ChatSessionReducer {
             },
             statusMessage = if (conversations.isEmpty()) emptyStatusMessage else liveStatusMessage,
             errorMessage = null,
-            selectionGeneration = if (selectedId == null) {
-                state.selectionGeneration
-            } else {
+            selectionGeneration = if (selectionChanged) {
                 state.selectionGeneration + 1
+            } else {
+                state.selectionGeneration
             },
         )
     }
@@ -117,6 +132,8 @@ object ChatSessionReducer {
             composer = ChatComposerState(),
             isSending = false,
             isLoading = nextSelected != null && state.isRemoteBacked,
+            snapshotAvailability = SnapshotAvailability.None,
+            remoteSyncState = RemoteSyncState.Idle,
             connectionState = when {
                 nextSelected == null -> ChatConnectionState.NoConversations
                 state.isRemoteBacked -> ChatConnectionState.Loading
@@ -165,46 +182,35 @@ object ChatSessionReducer {
         state: ChatSessionState,
         conversationId: String,
         remoteBacked: Boolean = state.isRemoteBacked,
+        hasSnapshot: Boolean = false,
     ): ChatSessionState {
-        if (conversationId == state.selectedConversationId || state.conversations.none { it.id == conversationId }) {
-            return state
-        }
-
-        val nextGeneration = if (remoteBacked) {
-            state.selectionGeneration + 1
-        } else {
-            state.selectionGeneration
-        }
-
+        if (!state.canSelect(conversationId)) return state
+        val transition = SelectionTransition.create(state, remoteBacked, hasSnapshot)
         return state.copy(
             selectedConversationId = conversationId,
-            conversations = state.conversations.map { conversation ->
-                if (conversation.id == conversationId) {
-                    conversation.copy(unreadCount = 0)
-                } else {
-                    conversation
-                }
-            },
+            conversations = state.conversations.clearUnreadFor(conversationId),
             composer = ChatComposerState(),
             isLoading = remoteBacked,
-            connectionState = if (remoteBacked) ChatConnectionState.Loading else state.connectionState,
-            statusMessage = if (remoteBacked) "Loading messages" else state.statusMessage,
+            connectionState = transition.connectionState,
+            snapshotAvailability = transition.snapshotAvailability,
+            remoteSyncState = transition.remoteSyncState,
+            statusMessage = transition.statusMessage,
             errorMessage = null,
-            selectionGeneration = nextGeneration,
+            selectionGeneration = transition.selectionGeneration,
         )
     }
 
     fun beginSelectedConversationHydrate(
         state: ChatSessionState,
         generation: Long,
-        statusMessage: String = "Loading messages",
+        statusMessage: String = "Syncing...",
     ): ChatSessionState =
         if (!isCurrentSelection(state, generation)) {
             state
         } else {
             state.copy(
                 isLoading = true,
-                connectionState = ChatConnectionState.Loading,
+                remoteSyncState = RemoteSyncState.Refreshing,
                 statusMessage = statusMessage,
                 errorMessage = null,
             )
@@ -221,8 +227,27 @@ object ChatSessionReducer {
             state.copy(
                 isLoading = false,
                 connectionState = ChatConnectionState.Live,
+                snapshotAvailability = SnapshotAvailability.Live,
+                remoteSyncState = RemoteSyncState.Live,
                 statusMessage = statusMessage,
                 errorMessage = null,
+            )
+        }
+
+    fun hydrateFailed(
+        state: ChatSessionState,
+        generation: Long,
+        errorMessage: String,
+        statusMessage: String = "Sync failed",
+    ): ChatSessionState =
+        if (!isCurrentSelection(state, generation)) {
+            state
+        } else {
+            state.copy(
+                isLoading = false,
+                remoteSyncState = RemoteSyncState.Failed,
+                statusMessage = statusMessage,
+                errorMessage = errorMessage,
             )
         }
 
@@ -238,6 +263,7 @@ object ChatSessionReducer {
             state.copy(
                 isLoading = false,
                 connectionState = ChatConnectionState.StreamDisconnected,
+                remoteSyncState = RemoteSyncState.StreamDisconnected,
                 statusMessage = statusMessage,
                 errorMessage = errorMessage,
             )
@@ -332,22 +358,68 @@ object ChatSessionReducer {
         )
     }
 
+    /**
+     * Resolves a send whose outcome is reported by the turn lifecycle rather than by the send call.
+     * [beginSend] raises two gates the composer reads — `isSending` and the `Sending` connection
+     * state — so a route that settles only one leaves the composer dead for the rest of the session.
+     * The error text belongs to whoever reported the failure, so this never writes or clears one.
+     */
+    fun sendSettled(state: ChatSessionState, failed: Boolean): ChatSessionState =
+        if (!state.isSending && state.connectionState != ChatConnectionState.Sending) {
+            state
+        } else {
+            state.copy(
+                isSending = false,
+                connectionState = if (failed) ChatConnectionState.SendFailed else ChatConnectionState.Live,
+                statusMessage = if (failed) "Send failed" else "Live",
+            )
+        }
+
     fun canSend(state: ChatSessionState): Boolean =
         state.isRemoteBacked &&
             !state.isSending &&
-            !state.isLoading &&
             state.connectionState in sendEnabledStates
 
     fun shouldShowStatePanel(state: ChatSessionState): Boolean =
-        state.selectedConversationId == null ||
-            (state.connectionState == ChatConnectionState.StreamDisconnected && state.selectedMessages.isEmpty()) ||
-            state.connectionState in panelStates
+        state.connectionState == ChatConnectionState.ConfigNeeded ||
+            (state.selectedConversationId == null && (state.connectionState == ChatConnectionState.Loading || state.connectionState == ChatConnectionState.Offline || state.connectionState == ChatConnectionState.NoConversations))
 
     fun isCurrentSelection(
         state: ChatSessionState,
         generation: Long,
     ): Boolean =
         generation == state.selectionGeneration
+
+    private fun ChatSessionState.canSelect(conversationId: String): Boolean =
+        conversationId != selectedConversationId && conversations.any { it.id == conversationId }
+
+    private fun List<ChatConversationSummary>.clearUnreadFor(conversationId: String): List<ChatConversationSummary> =
+        map { conversation ->
+            if (conversation.id == conversationId) conversation.copy(unreadCount = 0) else conversation
+        }
+
+    private data class SelectionTransition(
+        val connectionState: ChatConnectionState,
+        val snapshotAvailability: SnapshotAvailability,
+        val remoteSyncState: RemoteSyncState,
+        val statusMessage: String,
+        val selectionGeneration: Long,
+    ) {
+        companion object {
+            fun create(
+                state: ChatSessionState,
+                remoteBacked: Boolean,
+                hasSnapshot: Boolean,
+            ): SelectionTransition =
+                SelectionTransition(
+                    connectionState = if (remoteBacked) ChatConnectionState.Live else state.connectionState,
+                    snapshotAvailability = if (hasSnapshot) SnapshotAvailability.Persisted else SnapshotAvailability.None,
+                    remoteSyncState = if (remoteBacked) RemoteSyncState.Refreshing else RemoteSyncState.Idle,
+                    statusMessage = if (remoteBacked) "Syncing..." else state.statusMessage.orEmpty(),
+                    selectionGeneration = state.selectionGeneration + if (remoteBacked) 1 else 0,
+                )
+        }
+    }
 
     private fun List<UiMessage>.lastPreviewOr(fallback: String): String =
         lastOrNull { it.content.isNotBlank() }?.content?.lineSequence()?.firstOrNull()?.take(140) ?: fallback
@@ -363,7 +435,6 @@ object ChatSessionReducer {
     )
 
     private val panelStates = setOf(
-        ChatConnectionState.Loading,
         ChatConnectionState.ConfigNeeded,
         ChatConnectionState.Offline,
         ChatConnectionState.NoConversations,

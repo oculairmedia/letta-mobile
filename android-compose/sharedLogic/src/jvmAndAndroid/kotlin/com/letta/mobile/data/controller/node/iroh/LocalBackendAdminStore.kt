@@ -40,7 +40,7 @@ import java.io.File
 open class LocalBackendAdminStore(
     private val baseDir: File,
     /** Mirrors admin-shim's `process.env.LMSTUDIO_BASE_URL || "https://api.openai.com/v1"`. */
-    private val lmstudioBaseUrl: String =
+    lmstudioBaseUrl: String =
         System.getenv("LMSTUDIO_BASE_URL")?.takeIf { it.isNotBlank() } ?: DEFAULT_MODEL_ENDPOINT,
 ) {
     private val support = LocalBackendStoreSupport(baseDir, lmstudioBaseUrl)

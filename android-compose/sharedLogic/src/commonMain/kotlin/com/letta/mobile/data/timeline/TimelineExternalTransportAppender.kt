@@ -3,15 +3,32 @@ package com.letta.mobile.data.timeline
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.util.Telemetry
+import kotlin.jvm.JvmInline
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 
 import kotlin.time.Duration.Companion.milliseconds
+@JvmInline
+value class TimelineExternalOtid(val value: String)
+
+data class TimelineExternalAppendRequest(
+    val content: String,
+    val otid: TimelineExternalOtid,
+    val attachments: List<MessageContentPart.Image> = emptyList(),
+)
+
+data class TimelineExternalReconcileRequest(
+    val agentId: String,
+    val externalConversationId: String,
+    val otid: TimelineExternalOtid,
+)
+
+@JvmInline
+private value class ReconcileAttempt(val value: Int)
+
 /**
  * Handles appending local events from external transport (admin-shim WS),
  * marking them as sent/failed, and doing agent-specific reconciliation.
@@ -20,24 +37,19 @@ class TimelineExternalTransportAppender(
     private val conversationId: String,
     private val messageApi: TimelineTransport,
     private val eventQueue: Channel<TimelineGatewayEvent>,
-    private val state: MutableStateFlow<Timeline>,
     private val events: MutableSharedFlow<TimelineSyncEvent>,
-    private val writeMutex: Mutex,
+    private val processor: TimelineProcessor,
     private val pendingLocalStore: PendingLocalStore,
     private val submitReconcileAfterSendSnapshot: suspend (String, List<LettaMessage>) -> ReconcileAfterSendResult,
 ) {
-    suspend fun appendExternalTransportLocal(
-        content: String,
-        otid: String,
-        attachments: List<MessageContentPart.Image> = emptyList(),
-    ): String {
+    suspend fun appendExternalTransportLocal(request: TimelineExternalAppendRequest): String {
         val sentAt = timelineNow()
         val ack = CompletableDeferred<String>()
         eventQueue.send(
             TimelineGatewayEvent.ExternalTransportLocalAppend(
-                content = content,
-                otid = otid,
-                attachments = attachments.toTimelinePersistentList(),
+                content = request.content,
+                otid = request.otid.value,
+                attachments = request.attachments.toTimelinePersistentList(),
                 sentAt = sentAt,
                 ack = ack,
             )
@@ -48,102 +60,107 @@ class TimelineExternalTransportAppender(
     suspend fun applyExternalTransportLocalAppend(
         event: TimelineGatewayEvent.ExternalTransportLocalAppend,
     ) {
-        writeMutex.withLock {
-            val local = TimelineEvent.Local(
-                position = state.value.nextLocalPosition(),
-                otid = event.otid,
-                content = event.content,
-                role = Role.USER,
+        val result = processor.submit(
+            TimelineMutation.LocalAppend(
+                pending = PendingSend(event.otid, event.content, event.attachments),
                 sentAt = event.sentAt,
-                deliveryState = DeliveryState.SENDING,
-                attachments = event.attachments,
-                source = MessageSource.LETTA_SERVER,
-            )
-            state.value = state.value.append(local)
-        }
-        events.emit(TimelineSyncEvent.LocalAppended(event.otid))
+                mode = TimelineLocalAppendMode.EXTERNAL_TRANSPORT,
+            ),
+        ).appliedResultOrThrow()
         Telemetry.event(
             "TimelineSync", "send.externalTransportLocalAppended",
             "otid" to event.otid,
             "conversationId" to conversationId,
             "contentLength" to event.content.length,
+            "changed" to result.changed,
         )
         event.ack.complete(event.otid)
     }
 
-    suspend fun markExternalTransportLocalSent(otid: String) {
+    suspend fun markExternalTransportLocalSent(otid: TimelineExternalOtid) {
         val ack = CompletableDeferred<Unit>()
-        eventQueue.send(TimelineGatewayEvent.MarkSent(otid, ack))
+        eventQueue.send(TimelineGatewayEvent.MarkSent(otid.value, ack))
         ack.await()
     }
 
-    suspend fun markExternalTransportLocalFailed(otid: String) {
+    suspend fun markExternalTransportLocalFailed(otid: TimelineExternalOtid) {
         val ack = CompletableDeferred<Unit>()
-        eventQueue.send(TimelineGatewayEvent.MarkFailed(otid, ack))
+        eventQueue.send(TimelineGatewayEvent.MarkFailed(otid.value, ack))
         ack.await()
     }
 
-    suspend fun reconcileExternalTransportSend(
-        agentId: String,
-        externalConversationId: String,
-        otid: String,
-    ) {
+    suspend fun reconcileExternalTransportSend(request: TimelineExternalReconcileRequest) {
         val timer = Telemetry.startTimer("TimelineSync", "reconcile")
         try {
-            val serverMessages = listAgentMessagesWithRetry(
-                agentId = agentId,
-                externalConversationId = externalConversationId,
-                otid = otid,
-            ).reversed()
-            val result = submitReconcileAfterSendSnapshot(otid, serverMessages)
+            val serverMessages = listAgentMessagesWithRetry(request).reversed()
+            val result = submitReconcileAfterSendSnapshot(request.otid.value, serverMessages)
             result.confirmedServerId?.let { serverId ->
-                events.emit(TimelineSyncEvent.LocalConfirmed(otid, serverId))
+                events.emit(TimelineSyncEvent.LocalConfirmed(request.otid.value, serverId))
             }
             if (result.shouldDeletePendingLocal) {
-                runCatching { pendingLocalStore.delete(otid) }
+                runCatching { pendingLocalStore.delete(request.otid.value) }
             }
             timer.stop(
-                "otid" to otid,
+                "otid" to request.otid.value,
                 "serverCount" to serverMessages.size,
                 "confirmedLocal" to result.confirmedLocal,
                 "appendedMissing" to result.appendedMissing,
             )
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (t: Throwable) {
-            timer.stopError(t, "otid" to otid)
+            timer.stopError(t, "otid" to request.otid.value)
             events.emit(TimelineSyncEvent.ReconcileError(t.message ?: "unknown"))
         }
     }
 
     private suspend fun listAgentMessagesWithRetry(
-        agentId: String,
-        externalConversationId: String,
-        otid: String,
+        request: TimelineExternalReconcileRequest,
     ): List<LettaMessage> {
-        var lastError: Throwable? = null
-        for (attempt in 0 until RECONCILE_RETRY_ATTEMPTS) {
-            try {
-                return messageApi.listAgentMessages(
-                    agentId = agentId,
-                    limit = RECONCILE_LIMIT,
-                    order = "desc",
-                    conversationId = externalConversationId,
-                )
-            } catch (t: Throwable) {
-                if (!isRetryableReconcileError(t) || attempt == RECONCILE_RETRY_ATTEMPTS - 1) {
-                    throw t
-                }
-                lastError = t
-                Telemetry.error(
-                    "TimelineSync", "reconcile.ws.retry", t,
-                    "otid" to otid,
-                    "agentId" to agentId,
-                    "conversationId" to externalConversationId,
-                    "attempt" to attempt + 1,
-                )
-                delay((RECONCILE_RETRY_BACKOFF_MS shl attempt).milliseconds)
-            }
+        repeat(RECONCILE_RETRY_ATTEMPTS) { attemptValue ->
+            val attempt = ReconcileAttempt(attemptValue)
+            val result = fetchAgentMessages(request)
+            result.getOrNull()?.let { return it }
+            val failure = checkNotNull(result.exceptionOrNull())
+            if (!shouldRetryReconcile(failure, attempt)) throw failure
+            logReconcileRetry(failure, request, attempt)
+            delay((RECONCILE_RETRY_BACKOFF_MS shl attempt.value).milliseconds)
         }
-        throw lastError ?: IllegalStateException("listAgentMessagesWithRetry exhausted without error")
+        error("reconcile retry loop exhausted")
+    }
+
+    private suspend fun fetchAgentMessages(
+        request: TimelineExternalReconcileRequest,
+    ): Result<List<LettaMessage>> = try {
+        Result.success(
+            messageApi.listAgentMessages(
+                agentId = request.agentId,
+                limit = RECONCILE_LIMIT,
+                order = "desc",
+                conversationId = request.externalConversationId,
+            ),
+        )
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (failure: Throwable) {
+        Result.failure(failure)
+    }
+
+    private fun shouldRetryReconcile(failure: Throwable, attempt: ReconcileAttempt): Boolean =
+        isRetryableReconcileError(failure) && attempt.value < RECONCILE_RETRY_ATTEMPTS - 1
+
+    private fun logReconcileRetry(
+        failure: Throwable,
+        request: TimelineExternalReconcileRequest,
+        attempt: ReconcileAttempt,
+    ) {
+        Telemetry.error(
+            "TimelineSync", "reconcile.ws.retry", failure,
+            "otid" to request.otid.value,
+            "agentId" to request.agentId,
+            "conversationId" to request.externalConversationId,
+            "attempt" to attempt.value + 1,
+        )
     }
 
     companion object {

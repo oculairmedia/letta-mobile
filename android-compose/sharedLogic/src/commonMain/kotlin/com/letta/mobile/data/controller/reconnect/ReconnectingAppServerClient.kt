@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * One connection generation minted by [ReconnectingAppServerClient.connect]:
@@ -105,10 +106,11 @@ class ReconnectingAppServerClient(
     private val backoff: FullJitterBackoff = FullJitterBackoff(),
     private val maxAttempts: Int = DEFAULT_MAX_ATTEMPTS,
     private val random: kotlin.random.Random = kotlin.random.Random.Default,
-    private val sleep: suspend (Long) -> Unit = { delay(it) },
+    private val sleep: suspend (Long) -> Unit = { delay(it.milliseconds) },
 ) : AppServerClient {
     private val _state = MutableStateFlow<ReconnectingClientState>(ReconnectingClientState.Stopped)
     val state: StateFlow<ReconnectingClientState> = _state.asStateFlow()
+    private val emptyServerInfoFlow: StateFlow<AppServerInfoData?> = MutableStateFlow(null)
 
     private val _events = MutableSharedFlow<AppServerReceivedFrame>(extraBufferCapacity = EVENT_BUFFER)
     override val events: Flow<AppServerReceivedFrame> = _events.asSharedFlow()
@@ -292,6 +294,11 @@ class ReconnectingAppServerClient(
 
     override suspend fun input(command: AppServerCommand.Input) = ready().input(command)
 
+    override suspend fun inputAwaitingAcceptance(command: AppServerCommand.Input): AppServerInboundFrame.InputAccepted =
+        ready().inputAwaitingAcceptance(command)
+
+    override suspend fun changeDeviceState(command: AppServerCommand.ChangeDeviceState) = ready().changeDeviceState(command)
+
     override suspend fun sync(command: AppServerCommand.Sync): AppServerInboundFrame.SyncResponse =
         ready().sync(command)
 
@@ -373,6 +380,5 @@ class ReconnectingAppServerClient(
     companion object {
         private const val EVENT_BUFFER = 256
         const val DEFAULT_MAX_ATTEMPTS = 10
-        private val emptyServerInfoFlow: StateFlow<AppServerInfoData?> = MutableStateFlow(null)
     }
 }

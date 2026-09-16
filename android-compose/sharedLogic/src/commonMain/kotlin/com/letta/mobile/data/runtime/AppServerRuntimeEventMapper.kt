@@ -1,7 +1,10 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.data.transport.appserver.AppServerChannel
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
+import com.letta.mobile.data.transport.appserver.AppServerStopReason
+import com.letta.mobile.data.transport.appserver.AppServerTurnBoundary
 import com.letta.mobile.runtime.RunId
 import com.letta.mobile.runtime.RuntimeEventDraft
 import com.letta.mobile.runtime.RuntimeEventPayload
@@ -13,13 +16,19 @@ import com.letta.mobile.runtime.ToolCallId
 import com.letta.mobile.runtime.ToolExecutionStatus
 import com.letta.mobile.runtime.ToolName
 import com.letta.mobile.runtime.TurnCommand
+import com.letta.mobile.util.Telemetry
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
-class AppServerRuntimeEventMapper {
-    fun map(command: TurnCommand, received: AppServerReceivedFrame): List<RuntimeEventDraft> =
+/**
+ * letta-mobile-gdvbf: `open` so the injected-mapper seam that
+ * [AppServerTurnEngine] already exposes is actually usable — the engine takes
+ * a mapper as a constructor parameter for testing, but the type being final
+ * made that impossible to exercise.
+ */
+open class AppServerRuntimeEventMapper {
+    open fun map(command: TurnCommand, received: AppServerReceivedFrame): List<RuntimeEventDraft> =
         when (val frame = received.frame) {
             is AppServerInboundFrame.AuthResponse -> emptyList()
             is AppServerInboundFrame.RuntimeStartResponse -> emptyList()
@@ -63,7 +72,11 @@ class AppServerRuntimeEventMapper {
             // Capability discovery (lgns8.24): correlated by the request registry,
             // not a runtime turn event.
             is AppServerInboundFrame.AppServerInfoResponse,
+            // Acknowledges an input that carried request_id; correlated by the registry.
+            is AppServerInboundFrame.InputAccepted,
             -> emptyList()
+            // Decoded as Unknown before 0.32 typing; kept on the same observable path.
+            is AppServerInboundFrame.TurnFinished -> listOf(received.toExternalTransportDraft(command))
             is AppServerInboundFrame.AbortMessageResponse -> frame.toAbortDraft(command)
             is AppServerInboundFrame.StreamDelta -> frame.toStreamDeltaDraft(command, received.raw)
             is AppServerInboundFrame.UpdateLoopStatus -> frame.toLoopStatusDraft(command)
@@ -89,11 +102,51 @@ class AppServerRuntimeEventMapper {
             emptyList()
         }
 
+    /**
+     * letta-mobile-gdvbf: a `stream_delta` whose `delta` is not a JSON object.
+     *
+     * Because this shape is now HANDLED rather than thrown, it would otherwise
+     * be invisible — no exception means no `frame.projection_failed` event, so
+     * the exact malformed shape that motivated this work would stop
+     * self-identifying. It gets its own classification event instead, and the
+     * frame is still surfaced as an external-transport draft (the treatment
+     * Unknown and DecodeFailure frames get) so it stays observable in the
+     * timeline without deciding the terminal.
+     */
+    private fun AppServerInboundFrame.StreamDelta.unprojectableDelta(
+        command: TurnCommand,
+        raw: JsonObject,
+    ): List<RuntimeEventDraft> {
+        Telemetry.event(
+            "AppServerRuntimeEventMapper", "frame.unprojectable_delta",
+            "reason" to "delta_not_an_object",
+            "deltaKind" to (delta::class.simpleName ?: "JsonElement"),
+            "conversationId" to runtime.conversationId,
+            "agentId" to runtime.agentId,
+            "eventSeq" to eventSeq,
+            "idempotencyKey" to idempotencyKey,
+        )
+        return listOf(
+            AppServerReceivedFrame(
+                channel = AppServerChannel.Stream,
+                frame = this,
+                raw = raw,
+            ).toExternalTransportDraft(command),
+        )
+    }
+
     private fun AppServerInboundFrame.StreamDelta.toStreamDeltaDraft(
         command: TurnCommand,
         raw: JsonObject,
     ): List<RuntimeEventDraft> {
-        val deltaObject = delta.jsonObject
+        // letta-mobile-gdvbf: `.jsonObject` THROWS on a non-object delta, and
+        // that throw used to escape into the turn collect loop and settle the
+        // whole turn as a stream error. A delta we cannot read is one frame we
+        // cannot project — surface it as an external-transport draft (the same
+        // treatment Unknown and DecodeFailure frames get) so it stays
+        // observable without deciding the terminal.
+        val deltaObject = delta as? JsonObject
+            ?: return unprojectableDelta(command, raw)
         val messageType = deltaObject.string("message_type")
         val runId = deltaObject.string("run_id")?.let(::RunId)
         return when (messageType) {
@@ -108,21 +161,18 @@ class AppServerRuntimeEventMapper {
                         body = raw.toString(),
                     ),
                 )
-                if (deltaObject.isTerminalStopReason()) {
-                    val stopReason = deltaObject.string("stop_reason") ?: deltaObject.string("reason")
-                    val lifecycleDraft = when (stopReason) {
-                        "cancelled" -> command.lifecycle(RuntimeRunStatus.Cancelled, runId = runId)
-                        "error" -> command.lifecycle(
-                            RuntimeRunStatus.Failed,
-                            runId = runId,
-                            reason = deltaObject.errorMessage("App Server turn stopped with error"),
-                        )
-                        else -> command.lifecycle(RuntimeRunStatus.Completed, runId = runId)
-                    }
-                    listOf(stopDraft, lifecycleDraft)
-                } else {
-                    listOf(stopDraft)
+                val stopReason = deltaObject.string("stop_reason") ?: deltaObject.string("reason")
+                val lifecycleDraft = when (AppServerStopReason.boundaryOf(stopReason)) {
+                    AppServerTurnBoundary.AwaitingApproval, AppServerTurnBoundary.Continuing -> null
+                    AppServerTurnBoundary.Cancelled -> command.lifecycle(RuntimeRunStatus.Cancelled, runId = runId)
+                    AppServerTurnBoundary.Failed -> command.lifecycle(
+                        RuntimeRunStatus.Failed,
+                        runId = runId,
+                        reason = deltaObject.errorMessage("App Server turn stopped with ${stopReason ?: "error"}"),
+                    )
+                    AppServerTurnBoundary.Completed -> command.lifecycle(RuntimeRunStatus.Completed, runId = runId)
                 }
+                listOfNotNull(stopDraft, lifecycleDraft)
             }
             "loop_error",
             "error_message",
@@ -251,21 +301,24 @@ class AppServerRuntimeEventMapper {
             payload = payload,
         )
 
-    private fun JsonObject.string(key: String): String? = this[key]?.jsonPrimitive?.contentOrNull
+    /**
+     * letta-mobile-fkpd4: FAIL-SOFT wire read — see the sibling accessor in
+     * [com.letta.mobile.data.subagents.SubagentParentProjection]. `.jsonPrimitive`
+     * THROWS on a JsonArray/JsonObject, and this mapper runs inside
+     * [AppServerTurnEngine]'s turn collect loop over RAW App Server deltas,
+     * where `content`, `status`, `output` and `message` can all legitimately
+     * arrive non-scalar. A throw here does not degrade one field — it kills the
+     * whole turn and settles it as "Tool execution interrupted by stream
+     * error". Never throw on a wire read.
+     */
+    private fun JsonObject.string(key: String): String? =
+        (this[key] as? JsonPrimitive)?.contentOrNull
 
-    private fun JsonObject.isTerminalStopReason(): Boolean {
-        val reason = string("stop_reason") ?: string("reason") ?: return true
-        // `length` is the OpenAI-compat finish_reason for output/context caps;
-        // providers on the lmstudio path (e.g. MiniMax-M3) emit it instead of
-        // `max_tokens`. Treat it as terminal Completed the same way — otherwise
-        // the turn stays open until a later error_message paints a false Failed.
-        return reason == "end_turn" || reason == "stop_sequence" || reason == "max_tokens" ||
-            reason == "length" || reason == "cancelled" || reason == "error"
-    }
+    private fun JsonObject.objectOrNull(key: String): JsonObject? = this[key] as? JsonObject
 
     private fun JsonObject.errorMessage(fallback: String = "App Server turn failed"): String =
         string("message")
-            ?: this["api_error"]?.jsonObject?.string("message")
-            ?: this["api_error"]?.jsonObject?.string("detail")
+            ?: objectOrNull("api_error")?.string("message")
+            ?: objectOrNull("api_error")?.string("detail")
             ?: fallback
 }

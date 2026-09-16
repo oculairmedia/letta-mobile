@@ -19,6 +19,8 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 
+// The singleton repository owns this scope and cancels it explicitly in close().
+@Suppress("NoDetachedCoroutineLifecycle")
 internal fun defaultSessionScopedRunRepositoryScope(): CoroutineScope =
     CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -49,7 +51,7 @@ class SessionScopedRunRepository internal constructor(
     private val current: IRunRepository
         get() = sessionManager.current.runRepository
 
-    override suspend fun refreshRuns(params: RunListParams) = sessionManager.withCurrentSession { it.runRepository.refreshRuns(params) }
+    override suspend fun refreshRuns(params: RunListParams): Unit = sessionManager.withCurrentSession { it.runRepository.refreshRuns(params) }
 
     override suspend fun getRecentRuns(limit: Int): List<Run> = sessionManager.withCurrentSession { it.runRepository.getRecentRuns(limit) }
 
@@ -65,9 +67,9 @@ class SessionScopedRunRepository internal constructor(
 
     override suspend fun cancelRun(run: Run): Run = sessionManager.withCurrentSession { it.runRepository.cancelRun(run) }
 
-    override suspend fun deleteRun(runId: String) = sessionManager.withCurrentSession { it.runRepository.deleteRun(runId) }
+    override suspend fun deleteRun(runId: String): Unit = sessionManager.withCurrentSession { it.runRepository.deleteRun(runId) }
 
-    override fun upsertRun(run: Run) = current.upsertRun(run)
+    override fun upsertRun(run: Run): Unit = current.upsertRun(run)
 
     fun close() { proxyScope.cancel() }
 }

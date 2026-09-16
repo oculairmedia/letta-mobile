@@ -105,9 +105,9 @@ class A2uiToolApprovalRoundTripTest {
         if (warmedUp) return
         warmedUp = true
         val server = A2uiShimServer()
-        val transport = ChannelTransport(RunCursorStore.inMemory(), NoOpConversationCursorStore)
         try {
             runBlocking {
+                val transport = ChannelTransport(this, RunCursorStore.inMemory())
                 withTimeout(WARM_UP_TIMEOUT) {
                     val connected = collectSubscribed {
                         transport.state.first { it is ChannelTransportState.Connected }
@@ -669,13 +669,13 @@ class A2uiToolApprovalRoundTripTest {
     private fun openServer(): A2uiShimServer =
         A2uiShimServer().also(openServers::add)
 
-    private fun openTransport(
+    private fun TestScope.openTransport(
         cursorStore: RunCursorStore = RunCursorStore.inMemory(),
         conversationCursorStore: ConversationCursorStore = NoOpConversationCursorStore,
     ): ChannelTransport =
         // letta-mobile-2rkdj: keep tests deterministic by using the
         // in-memory cursor store, optionally pre-seeded by resume tests.
-        ChannelTransport(cursorStore, conversationCursorStore).also(openTransports::add)
+        ChannelTransport(backgroundScope, cursorStore, conversationCursorStore).also(openTransports::add)
 }
 
 private class FakeConversationCursorStore(

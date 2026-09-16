@@ -73,10 +73,9 @@ class CrashReporter @Inject constructor(
         }
     }
 
-    /** Clear the last-crash record (called when user dismisses the banner). */
+    /** Dismiss this session's notification without deleting the diagnostic record. */
     fun dismiss() {
         _lastCrash.value = null
-        runCatching { crashFile.delete() }
     }
 
     private fun persistCrash(thread: Thread, throwable: Throwable) {

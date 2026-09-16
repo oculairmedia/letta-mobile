@@ -59,11 +59,14 @@ internal fun DesktopAgentSidebar(
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         // Work | Play lens switcher (Penpot "App Mockups v2": top of sidebar).
-        WorkPlaySwitcher(
-            mode = state.mode,
-            onModeChange = actions.onModeChange,
-            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-        )
+        // Temporarily hidden — restore by uncommenting. The lens itself still
+        // drives the sidebar (WorkPlayLens reads state.mode in the nav and
+        // conversation sections); only the toggle that changes it is hidden.
+        // WorkPlaySwitcher(
+        //     mode = state.mode,
+        //     onModeChange = actions.onModeChange,
+        //     modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+        // )
         SidebarAgentHeader(state = state, actions = actions)
         SidebarNavSection(state = state, actions = actions)
         SidebarConversationList(state = state, actions = actions)
@@ -92,7 +95,13 @@ internal fun lensNavTarget(
     LensDestination.Conversations -> DesktopDestination.Conversations to Icons.Outlined.ChatBubbleOutline
 }
 
-/** Segmented Work | Play toggle (Penpot "App Mockups v2", top of the sidebar). */
+/**
+ * Segmented Work | Play toggle (Penpot "App Mockups v2", top of the sidebar).
+ *
+ * Currently not rendered — see the commented-out call in [DesktopAgentSidebar].
+ * Kept intact so restoring it is a one-line uncomment.
+ */
+@Suppress("UnusedPrivateMember", "unused")
 @Composable
 private fun WorkPlaySwitcher(
     mode: WorkPlayMode,

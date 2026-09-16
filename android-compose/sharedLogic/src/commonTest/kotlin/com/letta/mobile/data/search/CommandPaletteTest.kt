@@ -62,4 +62,26 @@ class CommandPaletteTest {
         val result = CommandPalette.grouped(items, "xyz")
         assertTrue(result.isEmpty())
     }
+
+    @Test
+    fun mascotAgentIdUsesAgentIdOrFallsBackToId() {
+        val agent = PaletteItem("agent-1", "Alice", null, PaletteItemKind.Agent)
+        assertEquals("agent-1", agent.mascotAgentId())
+        val explicit = agent.copy(agentId = "agent-explicit")
+        assertEquals("agent-explicit", explicit.mascotAgentId())
+    }
+
+    @Test
+    fun mascotAgentIdForConversationIsOptionalOwningAgent() {
+        val conversation = PaletteItem("conv-1", "Chat", "Alice", PaletteItemKind.Conversation)
+        assertEquals(null, conversation.mascotAgentId())
+        val withOwner = conversation.copy(agentId = "agent-1")
+        assertEquals("agent-1", withOwner.mascotAgentId())
+    }
+
+    @Test
+    fun mascotAgentIdForDestinationIsAlwaysNull() {
+        val destination = PaletteItem("Settings", "Settings", null, PaletteItemKind.Destination, agentId = "ignored")
+        assertEquals(null, destination.mascotAgentId())
+    }
 }

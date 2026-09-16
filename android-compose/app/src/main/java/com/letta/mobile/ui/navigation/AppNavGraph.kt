@@ -24,7 +24,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.rememberNavController
 import com.letta.mobile.AppLaunchTarget
 import com.letta.mobile.channel.ChatPushAlarmScheduler
+import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.toBackendLabel
+import com.letta.mobile.data.repository.LastChatSelection
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.feature.chat.route.AgentChatRoute
 import com.letta.mobile.feature.chat.route.chatGraph
@@ -33,6 +35,8 @@ import com.letta.mobile.feature.editagent.editAgentGraph
 import com.letta.mobile.ui.screens.config.BackendSwitcherSheet
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -86,11 +90,11 @@ class NavViewModel @Inject constructor(
     private val settingsRepository: ISettingsRepository,
     @param:ApplicationContext private val appContext: Context,
 ) : ViewModel() {
-    val hasConfig = settingsRepository.activeConfig.map { it != null }
-    val activeConfig = settingsRepository.activeConfig
-    val favoriteAgentId = settingsRepository.favoriteAgentId
-    val adminAgentId = settingsRepository.adminAgentId
-    val lastChatSelection = settingsRepository.lastChatSelection
+    val hasConfig: Flow<Boolean> = settingsRepository.activeConfig.map { it != null }
+    val activeConfig: StateFlow<LettaConfig?> = settingsRepository.activeConfig
+    val favoriteAgentId: StateFlow<String?> = settingsRepository.favoriteAgentId
+    val adminAgentId: StateFlow<String?> = settingsRepository.adminAgentId
+    val lastChatSelection: StateFlow<LastChatSelection?> = settingsRepository.lastChatSelection
 
     fun clearAllData() {
         ChatPushAlarmScheduler.cancel(appContext)
@@ -99,6 +103,7 @@ class NavViewModel @Inject constructor(
 
 }
 
+@Suppress("NoAnyType") // NavHost.startDestination is Any; each branch is a typed route object.
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun AppNavGraph(

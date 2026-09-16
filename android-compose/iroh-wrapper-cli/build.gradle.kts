@@ -55,7 +55,7 @@ version = providers.exec {
     commandLine("git", "rev-parse", "--short=12", "HEAD")
     isIgnoreExitValue = true
 }.standardOutput.asText.map { it.trim() }.orElse("").map { sha ->
-    if (sha.isEmpty()) "dev" else sha
+    sha.ifEmpty { "dev" }
 }.get()
 
 application {
@@ -71,9 +71,9 @@ application {
 dependencies {
     api(project(":sharedLogic"))
 
-    api("com.github.ajalt.clikt:clikt:5.1.0")
+    api(libs.clikt)
     implementation(libs.kotlinx.coroutines.core)
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+    implementation(libs.kotlinx.serialization.json)
     implementation(libs.ktor.client.core)
     implementation(libs.ktor.client.cio)
     implementation(libs.ktor.client.websockets)
@@ -94,7 +94,7 @@ dependencies {
     // irohNativeBindingIsOnTheDistributionRuntimeClasspath test still passes
     // after the removal (it resolves `computer.iroh.Endpoint` through the
     // production `implementation` declaration).
-    implementation("computer.iroh:iroh:1.1.0")
+    implementation(libs.iroh)
 
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.kotlinx.coroutines.test)
@@ -102,7 +102,7 @@ dependencies {
     // ZXing's reader + BufferedImageLuminanceSource to prove the CLI's
     // PNG renderer produces a scannable image. The `core` jar comes
     // transitively from :sharedLogic's `api` declaration.
-    testImplementation("com.google.zxing:javase:3.5.3")
+    testImplementation(libs.zxing.javase)
     testRuntimeOnly(libs.junit.platform.launcher)
 }
 

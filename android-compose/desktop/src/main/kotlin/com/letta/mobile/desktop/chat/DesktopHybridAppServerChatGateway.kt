@@ -311,6 +311,13 @@ class DesktopHybridAppServerChatGateway internal constructor(
         order: String?,
     ): List<LettaMessage> = adminGateway.listConversationMessages(conversationId, limit, after, order)
 
+    override suspend fun listConversationMessagesBefore(
+        conversationId: String,
+        limit: Int,
+        before: String,
+        order: String,
+    ): List<LettaMessage>? = adminGateway.listConversationMessagesBefore(conversationId, limit, before, order)
+
     override suspend fun listAgentMessages(
         agentId: String,
         limit: Int?,

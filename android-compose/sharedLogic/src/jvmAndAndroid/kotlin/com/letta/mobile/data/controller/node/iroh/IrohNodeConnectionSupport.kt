@@ -10,7 +10,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 /**
@@ -197,9 +196,10 @@ internal data class ActiveTurnTracking(
  */
 internal class ConversationViewerSubscription(
     private val registry: ConnectionRegistry,
-    private val viewer: ViewerHandle,
+    private val registration: ViewerRegistration,
 ) {
     private val mutex = Mutex()
+    private val viewer: ViewerHandle = registration.viewer
     private var viewed: String? = null
 
     /** The conversation currently viewed (test/telemetry). */
@@ -216,16 +216,11 @@ internal class ConversationViewerSubscription(
             if (previous != null && previous != conversationId) {
                 runCatching { registry.unregister(previous, viewer) }
             }
-            // ALWAYS (re-)register. register() is an idempotent Set.add, so a
-            // repeat signal for the SAME conversation is a no-op when we're still
-            // present, but re-adds this viewer when it was evicted from the
-            // registry by a fan-out dead-viewer drop or a redial teardown
-            // unregisterAll (both key on NodeId and can drop a live viewer). Fixes
-            // the desync where `viewed` still names the conversation but the
-            // registry no longer holds us — the cause of passive viewers silently
-            // dropping out of realtime fan-out.
-            runCatching { registry.register(conversationId, viewer) }
-            viewed = conversationId
+            // ALWAYS (re-)register while this connection still owns the endpoint
+            // claim. A stale generation is rejected atomically, so late polling
+            // from an overlapped reconnect cannot reclaim or evict its successor.
+            val registered = runCatching { registry.register(conversationId, registration) }.getOrDefault(false)
+            viewed = conversationId.takeIf { registered }
         }
     }
 }
@@ -297,8 +292,16 @@ internal object DanglingToolCallSynthesizer {
         obj["delta"]?.jsonObject ?: obj
     }.getOrNull()
 
-    fun messageType(delta: JsonObject): String? =
-        delta["message_type"]?.jsonPrimitive?.contentOrNull
+    /**
+     * letta-mobile-fkpd4: FAIL-SOFT wire read. `.jsonPrimitive` THROWS on a
+     * JsonArray/JsonObject, and these helpers run over RAW frames on the
+     * fanout path where `id`, `status` and `content` can legitimately arrive
+     * non-scalar. A throw here does not degrade one field — it escapes the turn
+     * collect loop and settles the whole parent turn as a stream error.
+     */
+    private fun JsonObject.str(key: String): String? = (this[key] as? JsonPrimitive)?.contentOrNull
+
+    fun messageType(delta: JsonObject): String? = delta.str("message_type")
 
     /** tool_call ids opened by a tool_call/approval_request delta. */
     fun toolCallIds(delta: JsonObject): List<String> {
@@ -307,24 +310,20 @@ internal object DanglingToolCallSynthesizer {
         }.orEmpty()
         if (explicit.isNotEmpty()) return explicit
         (delta["tool_call"] as? JsonObject)?.toolCallId()?.let { return listOf(it) }
-        return listOfNotNull(
-            delta["tool_call_id"]?.jsonPrimitive?.contentOrNull
-                ?: delta["id"]?.jsonPrimitive?.contentOrNull,
-        )
+        return listOfNotNull(delta.str("tool_call_id") ?: delta.str("id"))
     }
 
     /** tool_call ids closed by a tool_return delta. */
     fun toolReturnCallIds(delta: JsonObject): List<String> {
-        val direct = delta["tool_call_id"]?.jsonPrimitive?.contentOrNull
-        val nested = (delta["tool_return"] as? JsonObject)
-            ?.get("tool_call_id")?.jsonPrimitive?.contentOrNull
+        val direct = delta.str("tool_call_id")
+        val nested = (delta["tool_return"] as? JsonObject)?.str("tool_call_id")
         return listOfNotNull(direct ?: nested)
     }
 
     private fun JsonObject.toolCallId(): String? =
-        this["tool_call_id"]?.jsonPrimitive?.contentOrNull
-            ?: this["id"]?.jsonPrimitive?.contentOrNull
-            ?: (this["function"] as? JsonObject)?.get("tool_call_id")?.jsonPrimitive?.contentOrNull
+        str("tool_call_id")
+            ?: str("id")
+            ?: (this["function"] as? JsonObject)?.str("tool_call_id")
 
     /**
      * Delta for a synthetic terminal tool_return closing an open tool_call after
@@ -347,9 +346,11 @@ internal object DanglingToolCallSynthesizer {
  * the stream — so mobile cannot dedupe the streamed row against the disk-fetched
  * copy and renders it twice (Iroh dupes; HTTPS does not, because the WS/HTTP shim
  * paths already apply this tag). Rewrite an assistant/reasoning stream_delta's id
- * to a stable `cm-stream-<otid>` / `cm-reason-<otid>`, which mobile's
- * optimistic-twin dedup collapses against the disk copy. tool_call/tool_return
- * keep their stable ids; frames without an otid are left unchanged; idempotent.
+ * to a stable `cm-stream-<message_id-or-otid>` / `cm-reason-<message_id-or-otid>`.
+ * `message_id` is preferred because it identifies one logical assistant message;
+ * run/turn are deliberately never used because they can contain several messages.
+ * tool_call/tool_return keep their stable ids; frames without an exact stable alias
+ * are left unchanged; idempotent.
  */
 internal fun tagStreamDeltaForOptimisticDedup(
     delta: JsonObject,
@@ -361,15 +362,17 @@ internal fun tagStreamDeltaForOptimisticDedup(
         "reasoning_message", "hidden_reasoning_message" -> "cm-reason-"
         else -> return delta
     }
-    val otid = delta["otid"]?.let { (it as? JsonPrimitive)?.contentOrNull }
-    if (otid.isNullOrEmpty()) return delta
     val currentId = delta["id"]?.let { (it as? JsonPrimitive)?.contentOrNull }
     if (currentId != null && (currentId.startsWith("cm-stream-") || currentId.startsWith("cm-reason-"))) {
         return delta
     }
+    val stableAlias = delta["message_id"]?.let { (it as? JsonPrimitive)?.contentOrNull }?.takeIf { it.isNotBlank() }
+        ?: delta["otid"]?.let { (it as? JsonPrimitive)?.contentOrNull }?.takeIf { it.isNotBlank() }
+        ?: delta["client_message_id"]?.let { (it as? JsonPrimitive)?.contentOrNull }?.takeIf { it.isNotBlank() }
+        ?: return delta
     return buildJsonObject {
         delta.forEach { (k, v) -> if (k != "id") put(k, v) }
-        put("id", "$prefix$otid")
+        put("id", "$prefix$stableAlias")
     }
 }
 

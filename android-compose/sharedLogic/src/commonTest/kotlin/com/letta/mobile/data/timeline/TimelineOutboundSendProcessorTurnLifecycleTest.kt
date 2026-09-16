@@ -8,13 +8,12 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -82,6 +81,57 @@ class TimelineOutboundSendProcessorTurnLifecycleTest {
     }
 
     @Test
+    fun `cancellation during turn start still completes end transition before propagating`() = runTest(UnconfinedTestDispatcher()) {
+        val startEntered = CompletableDeferred<Unit>()
+        val releaseStart = CompletableDeferred<Unit>()
+        val ended = CompletableDeferred<Boolean>()
+        val harness = newProcessor(
+            transport = SingleToolCallSendTransport(fail = false),
+            scope = backgroundScope,
+            onTurnStarted = {
+                startEntered.complete(Unit)
+                releaseStart.await()
+            },
+            onTurnEnded = { clean -> ended.complete(clean) },
+        )
+
+        harness.processor.send("hello")
+        runCurrent()
+        startEntered.await()
+        backgroundScope.coroutineContext[kotlinx.coroutines.Job]?.cancel(CancellationException("test cancellation"))
+        runCurrent()
+
+        assertEquals(false, ended.await())
+    }
+
+    @Test
+    fun `cancellation while collecting runs end transition in non cancellable context`() = runTest(UnconfinedTestDispatcher()) {
+        val streamEntered = CompletableDeferred<Unit>()
+        val neverComplete = CompletableDeferred<Unit>()
+        val ended = CompletableDeferred<Boolean>()
+        val harness = newProcessor(
+            transport = SingleToolCallSendTransport(
+                fail = false,
+                afterToolCall = {
+                    streamEntered.complete(Unit)
+                    neverComplete.await()
+                },
+            ),
+            scope = backgroundScope,
+            onTurnStarted = {},
+            onTurnEnded = { clean -> ended.complete(clean) },
+        )
+
+        harness.processor.send("hello")
+        runCurrent()
+        streamEntered.await()
+        backgroundScope.coroutineContext[kotlinx.coroutines.Job]?.cancel(CancellationException("test cancellation"))
+        runCurrent()
+
+        assertEquals(false, ended.await())
+    }
+
+    @Test
     fun `a dangling tool call streamed via the send path is resolvable once turnEnded schedules a sweep`() = runTest(UnconfinedTestDispatcher()) {
         // Demonstrates the end-to-end payoff of finding 1's fix: once
         // TimelineOutboundSendProcessor's onTurnEnded fires (wired to
@@ -90,19 +140,23 @@ class TimelineOutboundSendProcessorTurnLifecycleTest {
         // and run its bounded sweep — exactly as it already does for the
         // WS/iroh path.
         val transport = SingleToolCallSendTransport(fail = false)
-        val state = MutableStateFlow(Timeline("conv-send-dangle"))
+        val timelineProcessor = TimelineProcessor(
+            initialState = TimelineReducerState(Timeline("conv-send-dangle")),
+            scope = backgroundScope,
+        )
+        val state = timelineProcessor.timeline
         var reconcileCalls = 0
         val resolver = DanglingToolCallResolver(
             conversationId = "conv-send-dangle",
+            processor = timelineProcessor,
             state = state,
-            writeMutex = Mutex(),
             scope = backgroundScope,
             reconcile = { _, _ -> reconcileCalls++; 0 },
         )
         val harness = newProcessor(
             transport = transport,
             scope = backgroundScope,
-            state = state,
+            timelineProcessor = timelineProcessor,
             onTurnStarted = { resolver.cancelPendingSweep() },
             onTurnEnded = { clean -> resolver.scheduleSweepIfUnresolved(clean) },
         )
@@ -130,9 +184,12 @@ class TimelineOutboundSendProcessorTurnLifecycleTest {
     private fun newProcessor(
         transport: SingleToolCallSendTransport,
         scope: kotlinx.coroutines.CoroutineScope,
-        state: MutableStateFlow<Timeline> = MutableStateFlow(Timeline("conv-send-dangle")),
-        onTurnStarted: () -> Unit,
-        onTurnEnded: (Boolean) -> Unit,
+        timelineProcessor: TimelineProcessor = TimelineProcessor(
+            initialState = TimelineReducerState(Timeline("conv-send-dangle")),
+            scope = scope,
+        ),
+        onTurnStarted: suspend () -> Unit,
+        onTurnEnded: suspend (Boolean) -> Unit,
     ): ProcessorHarness {
         val eventQueue = Channel<TimelineGatewayEvent>(Channel.UNLIMITED)
         lateinit var processor: TimelineOutboundSendProcessor
@@ -155,6 +212,9 @@ class TimelineOutboundSendProcessorTurnLifecycleTest {
                     }
                     is TimelineGatewayEvent.MarkSent -> event.ack.complete(Unit)
                     is TimelineGatewayEvent.MarkFailed -> event.ack.complete(Unit)
+                    is TimelineGatewayEvent.ReconcileAfterSendSnapshot -> event.ack.complete(
+                        ReconcileAfterSendResult(false, 0, null, false),
+                    )
                     else -> error("Unexpected gateway event in send-path test: $event")
                 }
             }
@@ -163,31 +223,14 @@ class TimelineOutboundSendProcessorTurnLifecycleTest {
             conversationId = "conv-send-dangle",
             messageApi = transport,
             eventQueue = eventQueue,
-            writeMutex = Mutex(),
-            state = state,
+            state = timelineProcessor.timeline,
             events = MutableSharedFlow(replay = 1, extraBufferCapacity = 64),
             pendingLocalStore = NoOpPendingLocalStore,
             logTag = "TestSend",
             scope = scope,
             ingestStreamEvent = { message ->
-                if (message is ToolCallMessage) {
-                    val toolCall = requireNotNull(message.toolCall)
-                    state.value = state.value.append(
-                        TimelineEvent.Confirmed(
-                            position = (state.value.events.size + 1).toDouble(),
-                            otid = "otc-send-1",
-                            content = "tool call",
-                            serverId = message.id,
-                            messageType = TimelineMessageType.TOOL_CALL,
-                            date = timelineNow(),
-                            runId = message.runId,
-                            stepId = null,
-                            toolCalls = kotlinx.collections.immutable.persistentListOf(toolCall),
-                            toolReturnContentByCallId = kotlinx.collections.immutable.persistentMapOf(),
-                            toolReturnIsErrorByCallId = kotlinx.collections.immutable.persistentMapOf(),
-                        )
-                    )
-                }
+                val acknowledgement = timelineProcessor.submit(TimelineMutation.StreamFrame(message))
+                assertTrue(acknowledgement is TimelineProcessorAck.Applied)
             },
             onSendStreamEnded = {},
             onTurnStarted = onTurnStarted,
@@ -196,7 +239,10 @@ class TimelineOutboundSendProcessorTurnLifecycleTest {
         return ProcessorHarness(processor)
     }
 
-    private class SingleToolCallSendTransport(private val fail: Boolean) : TimelineTransport {
+    private class SingleToolCallSendTransport(
+        private val fail: Boolean,
+        private val afterToolCall: suspend () -> Unit = {},
+    ) : TimelineTransport by EmptyTimelineTransport {
         override suspend fun sendConversationMessage(
             conversationId: String,
             request: MessageCreateRequest,
@@ -208,27 +254,8 @@ class TimelineOutboundSendProcessorTurnLifecycleTest {
                     runId = "run-send-1",
                 )
             )
+            afterToolCall()
             if (fail) throw IllegalStateException("stream dropped")
         }
-
-        override suspend fun streamConversation(conversationId: String): Flow<TimelineStreamFrame> = emptyFlow()
-
-        // reconcileAfterSend's post-stream GET is irrelevant to the
-        // turnStarted/turnEnded wiring under test here; an empty result
-        // keeps its merge a no-op against the TOOL_CALL event this test
-        // appends directly via ingestStreamEvent below.
-        override suspend fun listConversationMessages(
-            conversationId: String,
-            limit: Int?,
-            after: String?,
-            order: String?,
-        ): List<LettaMessage> = emptyList()
-
-        override suspend fun listAgentMessages(
-            agentId: String,
-            limit: Int?,
-            order: String?,
-            conversationId: String?,
-        ): List<LettaMessage> = emptyList()
     }
 }

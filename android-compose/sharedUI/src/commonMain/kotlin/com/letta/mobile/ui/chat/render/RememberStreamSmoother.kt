@@ -41,6 +41,11 @@ fun rememberSmoothedStreamingText(
 ): String {
     val smoother = remember { StreamingDisplayTextSmoother() }
     val currentOnRevealStep by rememberUpdatedState(onRevealStep)
+    // Keep the latest target visible to one session-scoped paint coroutine
+    // the paint coroutine without keying the effect to every raw-text delta.
+    // without restarting it for every raw assistant delta.
+    val rawTextState = rememberUpdatedState(rawText)
+    val isStreamingState = rememberUpdatedState(isStreaming)
 
     // letta-mobile-uoiu6: seed the smoother (and the initial displayed value)
     // with the prefix that was already painted before streaming engaged.
@@ -71,14 +76,15 @@ fun rememberSmoothedStreamingText(
     // first target the smoother sees re-clamps any provisional seed cursor.
     smoother.updateTarget(rawText, isStreaming, nowMs())
 
-    // Paint loop: runs while the smoother hasn't fully caught up.
-    // Use the same cadence as StreamingMarkdownText's markdown coalescer so
-    // one raw chunk produces at most one visible text tree/layout update per
-    // paint window instead of a 60fps stream of mostly redundant substring
-    // writes. This keeps long-history streaming focused on chunk/paint cadence
-    // while the pure smoother still estimates velocity from monotonic time.
-    LaunchedEffect(rawText, isStreaming) {
-        while (isActive && !(smoother.isFullyRevealed && !isStreaming)) {
+    // Paint loop: keyed on streaming-state transitions, not on every raw-text
+    // growth. rememberUpdatedState lets the running coroutine observe the
+    // latest terminal state without cancelling and restarting the paint
+    // coroutine on each assistant delta. The loop starts when a row begins
+    // streaming, continues (sleeping on the delay when fully caught up) while
+    // the target grows, and stops only after the source closes and fully
+    // reveals.
+    LaunchedEffect(isStreaming) {
+        while (isActive && !(smoother.isFullyRevealed && !isStreamingState.value)) {
             val nextText = smoother.step(nowMs())
             if (nextText.length > displayedText.length) {
                 currentOnRevealStep?.invoke(nextText)
@@ -100,9 +106,9 @@ fun rememberSmoothedStreamingText(
         // which then never content-matches the reconciled final -> duplicate row.
         // The smoother's own skipToEnd() should reach this, but the settle here is
         // the invariant guarantee independent of step timing / cancellation races.
-        if (!isStreaming && displayedText != rawText) {
-            currentOnRevealStep?.invoke(rawText)
-            displayedText = rawText
+        if (!isStreamingState.value && displayedText != rawTextState.value) {
+            currentOnRevealStep?.invoke(rawTextState.value)
+            displayedText = rawTextState.value
         }
     }
 

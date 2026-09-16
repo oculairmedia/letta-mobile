@@ -6,12 +6,11 @@ import com.letta.mobile.ui.chat.render.ChatRenderItemState
 import com.letta.mobile.ui.chat.render.chatGeometrySignature
 import com.letta.mobile.feature.chat.render.LocalToolCardBodyParentVisible
 import com.letta.mobile.feature.chat.screen.RunBlock
-import com.letta.mobile.feature.chat.screen.SkillEnvelopeChip
 import com.letta.mobile.feature.chat.screen.chatRenderItemSeesLiveScale
 import com.letta.mobile.ui.components.DateSeparator
 import com.letta.mobile.ui.theme.ChatDimens
 import com.letta.mobile.ui.theme.ChatShapes
-import com.letta.mobile.ui.theme.LocalChatFontScale
+import com.letta.mobile.ui.theme.TimelineZoomScope
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -68,7 +67,6 @@ internal fun LazyListScope.chatMessageListItems(params: ChatMessageListItemsPara
         item(key = renderItem.key, contentType = when (renderItem) {
             is ChatRenderItem.Single -> "single"
             is ChatRenderItem.RunBlock -> "runblock"
-            is ChatRenderItem.SkillEnvelopeChip -> "skill-envelope"
         }) {
             ChatMessageListRenderItem(
                 params = ChatMessageListRenderItemParams(
@@ -78,6 +76,7 @@ internal fun LazyListScope.chatMessageListItems(params: ChatMessageListItemsPara
                     chatDimens = params.chatDimens,
                     chatShapes = params.chatShapes,
                 ),
+                modifier = Modifier.animateItem(),
             )
         }
 
@@ -110,7 +109,10 @@ internal fun LazyListScope.chatMessageListItems(params: ChatMessageListItemsPara
 }
 
 @Composable
-private fun ChatMessageListRenderItem(params: ChatMessageListRenderItemParams) {
+internal fun ChatMessageListRenderItem(
+    params: ChatMessageListRenderItemParams,
+    modifier: Modifier = Modifier,
+) {
     val renderItem = params.renderItem
     val context = params.context
     if (com.letta.mobile.ui.chat.render.RenderDiagnostics.enabled()) {
@@ -121,7 +123,6 @@ private fun ChatMessageListRenderItem(params: ChatMessageListRenderItemParams) {
                 contentType = when (renderItem) {
                     is ChatRenderItem.Single -> "single"
                     is ChatRenderItem.RunBlock -> "runblock"
-                    is ChatRenderItem.SkillEnvelopeChip -> "skill-envelope"
                 },
             )
         }
@@ -143,24 +144,32 @@ private fun ChatMessageListRenderItem(params: ChatMessageListRenderItemParams) {
         itemIndex = params.index,
     )
     val perItemFontScale = if (itemSeesLiveScale) context.liveFontScale else context.activeFontScale
-    CompositionLocalProvider(
-        LocalChatFontScale provides perItemFontScale,
-        LocalToolCardBodyParentVisible provides itemSeesLiveScale,
-    ) {
-        MeasuredChatRenderItem(
-            signature = geometrySignature,
-            geometryState = context.itemGeometryState,
-        ) {
-            ChatMessageListRenderItemBody(
-                params = ChatMessageListRenderItemBodyParams(
-                    renderItem = renderItem,
-                    context = context,
-                    chatDimens = params.chatDimens,
-                    chatShapes = params.chatShapes,
-                    isStreamingRenderItem = isStreamingRenderItem,
-                    showTimestamp = params.index == 0,
-                ),
-            )
+    // The row's zoom scope owns both the scale and the styles built from it, so text inside a row
+    // tracks the gesture whether it reads chatTypography or scales a Material style itself.
+    TimelineZoomScope(perItemFontScale) {
+        CompositionLocalProvider(LocalToolCardBodyParentVisible provides itemSeesLiveScale) {
+            // Markdown also reflows after measurement. Let content own its height;
+            // a cached outer minimum can keep blank space after the text shrinks.
+            MeasuredChatRenderItem(
+                signature = geometrySignature,
+                geometryState = context.itemGeometryState,
+                applyCachedMinHeight = false,
+                // The signature carries the committed scale, so while the live scale differs the
+                // cached height describes a size this row is no longer drawn at.
+                scaleIsTransient = perItemFontScale != context.activeFontScale,
+                modifier = modifier,
+            ) {
+                ChatMessageListRenderItemBody(
+                    params = ChatMessageListRenderItemBodyParams(
+                        renderItem = renderItem,
+                        context = context,
+                        chatDimens = params.chatDimens,
+                        chatShapes = params.chatShapes,
+                        isStreamingRenderItem = isStreamingRenderItem,
+                        showTimestamp = params.index == 0,
+                    ),
+                )
+            }
         }
     }
 }
@@ -177,17 +186,6 @@ private fun ChatMessageListRenderItemBody(params: ChatMessageListRenderItemBodyP
                 showTimestamp = params.showTimestamp,
             ),
         )
-        is ChatRenderItem.SkillEnvelopeChip -> {
-            SkillEnvelopeChip(
-                slug = renderItem.slug,
-                name = renderItem.name,
-                description = renderItem.description,
-                args = renderItem.args,
-                rawContent = renderItem.rawContent,
-                chatMode = params.context.chatMode,
-                modifier = Modifier.padding(top = params.chatDimens.ungroupedMessageSpacing),
-            )
-        }
         is ChatRenderItem.RunBlock -> ChatMessageListRenderRunBlockItem(
             params = ChatMessageListRenderRunBlockItemParams(
                 renderItem = renderItem,
@@ -265,7 +263,8 @@ private fun ChatMessageListRenderRunBlockItem(params: ChatMessageListRenderRunBl
         onToggleCollapsed = {
             context.callbacks.onToggleRunCollapsed(renderItem.runId)
         },
-        modifier = highlightModifier.padding(top = params.chatDimens.ungroupedMessageSpacing),
+        modifier = highlightModifier.padding(top = if (renderItem.messages.all { !it.first.toolCalls.isNullOrEmpty() })
+            params.chatDimens.groupedMessageSpacing else params.chatDimens.ungroupedMessageSpacing),
         isStreaming = params.isStreamingRenderItem,
         activeApprovalRequestId = context.itemState.activeApprovalRequestId,
         onApprovalDecision = context.callbacks.onSubmitApproval,

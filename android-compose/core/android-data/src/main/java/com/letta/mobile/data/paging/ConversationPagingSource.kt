@@ -5,6 +5,7 @@ import androidx.paging.PagingState
 import com.letta.mobile.data.api.ConversationApi
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
+import kotlinx.coroutines.CancellationException
 
 internal typealias ConversationPageLoader = suspend (
     agentId: AgentId?,
@@ -28,32 +29,30 @@ class ConversationPagingSource(
 
     override suspend fun load(params: LoadParams<String>): LoadResult<String, Conversation> {
         return try {
-            val conversations = if (pageLoader != null) {
-                pageLoader.invoke(
-                    agentId,
-                    params.loadSize,
-                    params.key,
-                    archiveStatus,
-                    summarySearch,
-                    order,
-                    orderBy,
-                )
-            } else {
-                conversationApi.listConversations(
-                    agentId = agentId,
-                    limit = params.loadSize,
-                    after = params.key,
-                    archiveStatus = archiveStatus,
-                    summarySearch = summarySearch,
-                    order = order,
-                    orderBy = orderBy,
-                )
-            }
+            val conversations = pageLoader?.invoke(
+                agentId,
+                params.loadSize,
+                params.key,
+                archiveStatus,
+                summarySearch,
+                order,
+                orderBy,
+            ) ?: conversationApi.listConversations(
+                agentId = agentId,
+                limit = params.loadSize,
+                after = params.key,
+                archiveStatus = archiveStatus,
+                summarySearch = summarySearch,
+                order = order,
+                orderBy = orderBy,
+            )
             LoadResult.Page(
                 data = conversations,
                 prevKey = null,
                 nextKey = conversations.lastOrNull()?.id?.value?.takeIf { conversations.size >= params.loadSize },
             )
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             LoadResult.Error(e)
         }

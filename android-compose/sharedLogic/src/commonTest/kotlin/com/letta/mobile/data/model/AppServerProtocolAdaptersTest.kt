@@ -6,10 +6,12 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.add
 
 class AppServerSubagentSnapshotAdapterTest {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
@@ -27,7 +29,7 @@ class AppServerSubagentSnapshotAdapterTest {
             """.trimIndent(),
         ).jsonObject
 
-        val entry = AppServerSubagentSnapshotAdapter.toEntry(raw, "parent-conv", "parent-agent")
+        val entry = AppServerSubagentSnapshotAdapter.toEntry(raw, SubagentParentIdentity("parent-conv", "parent-agent"))
         assertEquals("sa-pending-1", entry!!.toolCallId)
         assertEquals(SubagentStatus.RUNNING, entry.status)
         assertEquals("sub-conv-1", entry.subagentConversationId)
@@ -48,7 +50,7 @@ class AppServerSubagentSnapshotAdapterTest {
             """.trimIndent(),
         ).jsonObject
 
-        val entry = AppServerSubagentSnapshotAdapter.toEntry(raw, "parent-conv", null)
+        val entry = AppServerSubagentSnapshotAdapter.toEntry(raw, SubagentParentIdentity("parent-conv", null))
         assertEquals(SubagentStatus.FAILED, entry!!.status)
         assertEquals("sub-conv-err", entry.subagentConversationId)
         assertEquals("1700000000000", entry.startedAt)
@@ -61,8 +63,32 @@ class AppServerSubagentSnapshotAdapterTest {
             put("tool_call_id", "tool/1")
             put("status", "running")
         }
-        val entry = AppServerSubagentSnapshotAdapter.toEntry(raw, "c", "a")
+        val entry = AppServerSubagentSnapshotAdapter.toEntry(raw, SubagentParentIdentity("c", "a"))
         assertEquals("tool/1", entry!!.toolCallId)
+    }
+
+    @Test
+    fun activityIsSanitizedDeduplicatedAndBoundedToLatestFourLines() {
+        val raw = buildJsonObject {
+            put("tool_call_id", "tool/activity")
+            put("status", "running")
+            put("activity", buildJsonObject {
+                put("lines", buildJsonArray {
+                    add("first")
+                    add("second")
+                    add("second")
+                    add("Prompt: secret child context")
+                    add("third")
+                    add("x".repeat(500))
+                    add("fourth")
+                })
+            })
+        }
+
+        val activity = AppServerSubagentSnapshotAdapter.toEntry(raw, SubagentParentIdentity("c", "a"))!!.activity!!
+        assertEquals(listOf("second", "third", "x".repeat(240), "fourth"), activity.lines)
+        assertTrue(activity.truncated)
+        assertTrue(activity.lines.all { it.encodeToByteArray().size <= SUBAGENT_ACTIVITY_MAX_LINE_BYTES })
     }
 }
 

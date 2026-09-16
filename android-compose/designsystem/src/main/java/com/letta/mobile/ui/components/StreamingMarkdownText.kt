@@ -408,7 +408,7 @@ private fun StreamingMarkdownDocumentBlocks(
                 Text(
                     text = textToDraw,
                     color = textColor,
-                    style = MaterialTheme.typography.bodyMedium.scaledBy(LocalChatFontScale.current),
+                    style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -434,7 +434,7 @@ internal fun StreamingMarkdownDocumentBlock.supportsAppendedDeltaFade(): Boolean
     }
 
 internal fun String.isUnicodeSafeBoundary(index: Int): Boolean {
-    if (index <= 0 || index >= length) return true
+    if (index !in 1 until length) return true
     if (Character.isLowSurrogate(this[index]) && Character.isHighSurrogate(this[index - 1])) {
         return false
     }
@@ -610,7 +610,7 @@ internal class StreamingAppendedDeltaFadeState {
     /** First sighting of a block: the whole body is the appended range. */
     private fun beginBlock(blockId: Long, source: String): Boolean {
         // No empty-source branch here: update()'s guard already returned for that case.
-        fadingDeltaRange = 0 until source.length
+        fadingDeltaRange = source.indices
         fadingBlockId = blockId
         lastActiveBlockId = blockId
         lastActiveSource = source

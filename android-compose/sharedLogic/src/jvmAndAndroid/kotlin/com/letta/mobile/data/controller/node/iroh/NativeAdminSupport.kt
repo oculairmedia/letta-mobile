@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.transport.appserver.AppServerClient
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -82,6 +83,7 @@ internal object NativeAdmin {
      * [op] supplies both the telemetry method name and the explicit
      * [NativeAdminOperationPolicy] — no name-suffix heuristics.
      */
+    @Suppress("NoAnyType") // Native commands return heterogeneous non-null model types.
     suspend fun <T : Any> require(
         client: AppServerClient?,
         op: NativeAdminOp,
@@ -110,6 +112,7 @@ internal object NativeAdmin {
     internal fun policyForMethod(method: String): NativeAdminOperationPolicy? =
         NativeAdminOp.byMethod(method)?.policy
 
+    @Suppress("NoAnyType")
     private suspend fun <T : Any> executeRequire(
         client: AppServerClient,
         op: NativeAdminOp,
@@ -118,7 +121,7 @@ internal object NativeAdmin {
         val method = op.method
         val timeoutMs = timeoutMsFor(op.policy)
         return try {
-            completeRequire(method, kotlinx.coroutines.withTimeout(timeoutMs) { block(client) })
+            completeRequire(method, kotlinx.coroutines.withTimeout(timeoutMs.milliseconds) { block(client) })
         } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
             onRequireTimeout(method, op.policy)
         } catch (e: kotlinx.coroutines.CancellationException) {
@@ -132,6 +135,7 @@ internal object NativeAdmin {
         }
     }
 
+    @Suppress("NoAnyType")
     private fun <T : Any> completeRequire(op: String, result: T?): T {
         if (result == null) {
             markSelected(op, "error", "native_unsuccessful")
@@ -154,6 +158,7 @@ internal object NativeAdmin {
      * Legacy null-on-failure helper retained for characterization tests.
      * Production handlers must use [require].
      */
+    @Suppress("NoAnyType") // Legacy helper preserves the same heterogeneous response contract.
     suspend fun <T : Any> attempt(
         client: AppServerClient?,
         op: String,
@@ -165,7 +170,7 @@ internal object NativeAdmin {
             return null
         }
         return try {
-            val result = kotlinx.coroutines.withTimeout(NATIVE_ATTEMPT_TIMEOUT_MS) { block(client) }
+            val result = kotlinx.coroutines.withTimeout(NATIVE_ATTEMPT_TIMEOUT_MS.milliseconds) { block(client) }
             if (result != null) {
                 clearBreaker(op)
                 markSelected(op, "success")

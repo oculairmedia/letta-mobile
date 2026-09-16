@@ -10,6 +10,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -66,6 +68,8 @@ import kotlin.time.Duration.Companion.milliseconds
 internal data class ChatDetailPaneState(
     val surface: DesktopChatSurfaceState,
     val isThinking: Boolean,
+    val canonicalPresentation: com.letta.mobile.data.timeline.CanonicalTimelinePresentation? = null,
+    val canonicalStatus: String? = null,
     val isStreamingReply: Boolean = false,
     val modelOptions: List<Pair<String, String>>,
     val commands: List<ComposerCommand>,
@@ -74,6 +78,8 @@ internal data class ChatDetailPaneState(
     /** Approval request ids whose answer/dismiss is currently in flight. */
     val submittingApprovalRequestIds: Set<String> = emptySet(),
     val agentNamesById: Map<String, String> = emptyMap(),
+    /** Each agent's mascot identity (shape + colour) for the hero and, in P3, every orb. */
+    val agentIdentitiesById: Map<String, com.letta.mobile.avatar.core.MascotIdentity> = emptyMap(),
     val contextUsage: ContextWindowUsageState = ContextWindowUsageState(),
     /**
      * letta-mobile folder-settings #2: the SELECTED conversation's working
@@ -193,31 +199,10 @@ private fun ChatDetailBody(
                 onChangeDirectory = actions.onChangeWorkingDirectory,
             )
         }
-        if (surface.shouldShowStatePanel) {
-            ChatStatePanel(
-                state = surface,
-                onRetryConnection = actions.onRetryConnection,
-                modifier = Modifier.weight(1f),
-            )
-        } else if (surface.renderItems.isEmpty() && !state.isThinking) {
-            NewConversationWelcome(
-                agentName = surface.selectedConversation?.agentName,
-                onStarterPrompt = actions.onComposerTextChanged,
-                onOnboardingTask = actions.onOnboardingTask,
-                modifier = Modifier.weight(1f),
-            )
-        } else {
-            MessageList(
-                params = MessageListParams(
-                    conversationId = surface.selectedConversationId,
-                    renderItems = surface.renderItems,
-                    isSending = state.isThinking,
-                    isStreamingReply = state.isStreamingReply,
-                ),
-                modifier = Modifier.weight(1f),
-            )
-        }
+        val companion = rememberComposerCompanion(surface, state)
+        ChatDetailContent(surface, state, actions, showThinkingRow = companion == null, modifier = Modifier.weight(1f))
         ComposerBar(
+            companion = companion,
             state = ComposerBarState(
                 text = surface.composerText,
                 pendingImageAttachments = surface.pendingImageAttachments,
@@ -240,6 +225,66 @@ private fun ChatDetailBody(
         )
     }
 }
+
+/** The thread area above the composer: whichever of the canonical list, status, state panel, welcome or message list applies. */
+@Composable
+private fun ChatDetailContent(
+    surface: DesktopChatSurfaceState,
+    state: ChatDetailPaneState,
+    actions: ChatDetailPaneActions,
+    showThinkingRow: Boolean,
+    modifier: Modifier,
+) {
+    when {
+        state.canonicalPresentation != null -> DesktopCanonicalMessageList(state.canonicalPresentation, modifier)
+        state.canonicalStatus != null -> Text(state.canonicalStatus, modifier = modifier)
+        surface.shouldShowStatePanel -> ChatStatePanel(
+            state = surface,
+            onRetryConnection = actions.onRetryConnection,
+            modifier = modifier,
+        )
+        surface.isFreshConversation(state) -> NewConversationWelcome(
+            agentName = surface.selectedConversation?.agentName,
+            agentId = surface.selectedConversation?.agentId,
+            identity = surface.selectedConversation?.agentId?.let { state.agentIdentitiesById[it] },
+            onStarterPrompt = actions.onComposerTextChanged,
+            onOnboardingTask = actions.onOnboardingTask,
+            modifier = modifier,
+        )
+        else -> MessageList(
+            params = MessageListParams(
+                conversationId = surface.selectedConversationId,
+                renderItems = surface.renderItems,
+                isSending = state.isThinking,
+                isStreamingReply = state.isStreamingReply,
+                showThinkingRow = showThinkingRow,
+            ),
+            modifier = modifier,
+        )
+    }
+}
+
+private fun DesktopChatSurfaceState.isFreshConversation(state: ChatDetailPaneState): Boolean =
+    renderItems.isEmpty() && !state.isThinking
+
+/**
+ * The agent keeps the user company at the prompt: its live mascot beside the text box, persistent
+ * across the whole conversation, thinking/listening/speaking where the user types. Null when the
+ * selected agent has no identity or the host has no renderer (the composer then stands alone).
+ */
+@Composable
+private fun rememberComposerCompanion(
+    surface: DesktopChatSurfaceState,
+    state: ChatDetailPaneState,
+): (@Composable () -> Unit)? {
+    val agentId = surface.selectedConversation?.agentId ?: return null
+    val identity = state.agentIdentitiesById[agentId] ?: return null
+    if (!com.letta.mobile.ui.mascot.mascotAvailable(agentId)) return null
+    return { com.letta.mobile.ui.mascot.MascotLive(agentId = agentId, identity = identity, size = ComposerCompanionSize) }
+}
+
+/** The composer companion's live size; the body spans ~60 % of it. */
+private val ComposerCompanionSize = 120.dp
 
 /**
  * letta-mobile folder-settings #2: compact row showing the SELECTED
@@ -303,9 +348,12 @@ private fun DesktopWorkingDirectoryRow(
  * (persona / channel / skills), and "or just start chatting" starter prompts.
  * Copy + tasks come from the shared [AgentOnboarding].
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun NewConversationWelcome(
     agentName: String?,
+    agentId: String?,
+    identity: com.letta.mobile.avatar.core.MascotIdentity?,
     onStarterPrompt: (String) -> Unit,
     onOnboardingTask: ((OnboardingTaskKind) -> Unit)?,
     modifier: Modifier = Modifier,
@@ -314,15 +362,21 @@ private fun NewConversationWelcome(
         modifier = modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = 40.dp, vertical = 28.dp),
+            .padding(horizontal = 40.dp, vertical = 16.dp),
         contentAlignment = Alignment.Center,
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            modifier = Modifier.widthIn(max = 620.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.widthIn(max = ChatColumnMaxWidth),
         ) {
-            AgentSphere(size = 72.dp)
+            // The agent itself, at hero size, live when the native bridge is here; the gradient
+            // sphere otherwise. It is the page: everything below is a compact strip of first moves.
+            if (identity != null && agentId != null && com.letta.mobile.ui.mascot.mascotAvailable(agentId)) {
+                com.letta.mobile.ui.mascot.MascotLive(agentId = agentId, identity = identity, size = 220.dp)
+            } else {
+                AgentSphere(size = 96.dp)
+            }
             Text(
                 text = AgentOnboarding.greeting(agentName),
                 style = MaterialTheme.typography.headlineSmall,
@@ -335,51 +389,43 @@ private fun NewConversationWelcome(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.widthIn(max = 480.dp),
+                modifier = Modifier.widthIn(max = ChatProseMaxWidth),
             )
             // First-run 2×2 action grid (Phase 5), category-colored. Each card
             // pre-fills the composer so a fresh agent has an obvious first move.
             FirstRunActionGrid(onAction = onStarterPrompt)
+            // Setup tasks as a row of chips: the same three actions, a fifth of the height.
             if (onOnboardingTask != null) {
-                Surface(
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainer,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 ) {
-                    Column {
-                        AgentOnboarding.tasks(agentName).forEachIndexed { index, task ->
-                            if (index > 0) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(1.dp)
-                                        .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                    AgentOnboarding.tasks(agentName).forEach { task ->
+                        Surface(
+                            onClick = { onOnboardingTask(task.kind) },
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainer,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                        ) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            ) {
+                                Icon(
+                                    imageVector = when (task.kind) {
+                                        OnboardingTaskKind.SetPersona -> Icons.Outlined.Edit
+                                        OnboardingTaskKind.ConnectChannel -> Icons.Outlined.Hub
+                                        else -> Icons.Outlined.Build
+                                    },
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp),
                                 )
+                                Text(task.title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
                             }
-                            OnboardingTaskRow(task = task, onClick = { onOnboardingTask(task.kind) })
                         }
-                    }
-                }
-            }
-            Text(
-                text = AgentOnboarding.STARTER_HEADER,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                AgentOnboarding.starterPrompts.forEach { prompt ->
-                    Surface(
-                        onClick = { onStarterPrompt(prompt) },
-                        shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    ) {
-                        Text(
-                            text = prompt,
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
-                        )
                     }
                 }
             }
@@ -396,6 +442,7 @@ private fun NewConversationWelcome(
 @Composable
 private fun FirstRunActionGrid(onAction: (String) -> Unit) {
     val cc = MaterialTheme.customColors
+    // One row of four: the mascot is the page now, the moves are a strip under it.
     Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
             FirstRunCard("Start a conversation", "Just say hello", MaterialTheme.colorScheme.primary, Modifier.weight(1f)) {
@@ -404,8 +451,6 @@ private fun FirstRunActionGrid(onAction: (String) -> Unit) {
             FirstRunCard("Seed a memory", "Tell me about you", cc.categoryHumanColor, Modifier.weight(1f)) {
                 onAction("Remember this about me: ")
             }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
             FirstRunCard("Connect a tool", "See what I can use", cc.categoryProjectColor, Modifier.weight(1f)) {
                 onAction("What tools can you use?")
             }
@@ -431,25 +476,22 @@ private fun FirstRunCard(
         color = MaterialTheme.colorScheme.surfaceContainer,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
+        // One line: the title is the move; the subtitle rides in the tooltip-sized muted text after it.
         Row(
-            modifier = Modifier.padding(14.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Box(Modifier.size(10.dp).clip(CircleShape).background(accent))
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    subtitle,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.customColors.onSurfaceMutedColor,
-                )
-            }
+            Box(Modifier.size(8.dp).clip(CircleShape).background(accent))
+            Text(
+                title,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            @Suppress("UNUSED_EXPRESSION") subtitle
         }
     }
 }
@@ -505,32 +547,54 @@ internal fun ChatStatePanel(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface)
+            // Same ground as the message list and the welcome pane (both paint
+            // `background`): this hero sits over the ambient glow beside them,
+            // and `surface` made the connect/error state a shade off its own pane.
+            .background(MaterialTheme.colorScheme.background)
             .padding(horizontal = 40.dp, vertical = 28.dp),
         contentAlignment = Alignment.Center,
     ) {
+        val failureHeadline = failureHeadline(screenStatus, state.errorMessage)
         Column(
-            modifier = Modifier.widthIn(max = 680.dp),
+            modifier = Modifier.widthIn(max = ChatColumnMaxWidth),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Text(
-                text = "LETTA DESKTOP",
-                style = MaterialTheme.typography.displayLarge.copy(
-                    fontFamily = FontFamily.Serif,
+            // The wordmark is a welcome, not a diagnosis. When the pane is here
+            // because something BROKE, a display-size brand lockup on top pushes
+            // the one line that says what happened into second place — so a
+            // failure leads with its own headline and drops the wordmark.
+            if (failureHeadline != null) {
+                Text(
+                    text = failureHeadline,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
-                    letterSpacing = 0.sp,
-                ),
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+                    textAlign = TextAlign.Center,
+                )
+            } else {
+                Text(
+                    text = "LETTA DESKTOP",
+                    style = MaterialTheme.typography.displayLarge.copy(
+                        fontFamily = FontFamily.Serif,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        letterSpacing = 0.sp,
+                    ),
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
             Text(
                 text = state.errorMessage ?: screenStatus.heroBody(),
                 style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (failureHeadline != null) {
+                    MaterialTheme.colorScheme.onSurface
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
                 textAlign = TextAlign.Center,
-                modifier = Modifier.widthIn(max = 520.dp),
+                modifier = Modifier.widthIn(max = ChatProseMaxWidth),
             )
             if (screenStatus.isConnectionRetryable) {
                 DesktopDefaultButton(
@@ -545,6 +609,21 @@ internal fun ChatStatePanel(
             }
         }
     }
+}
+
+
+/**
+ * The headline for a pane that is showing a FAILURE, or null when the pane is
+ * simply idle/loading and the brand wordmark is the right thing to show.
+ *
+ * A carried [errorMessage] means something failed even when the status itself
+ * reads as ordinary, so it counts as a failure regardless of [status].
+ */
+internal fun failureHeadline(status: ChatScreenStatus, errorMessage: String?): String? = when {
+    status is ChatScreenStatus.BackendOffline -> "Can't reach the backend"
+    status is ChatScreenStatus.SendFailed -> "Message wasn't sent"
+    errorMessage != null -> "Something went wrong"
+    else -> null
 }
 
 private fun ChatScreenStatus.heroBody(): String = when (this) {

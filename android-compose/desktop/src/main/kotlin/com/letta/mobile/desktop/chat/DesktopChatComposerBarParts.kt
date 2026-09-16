@@ -46,6 +46,7 @@ import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
@@ -60,6 +61,8 @@ import com.letta.mobile.data.composer.MentionCatalog
 import com.letta.mobile.data.composer.MentionKind
 import com.letta.mobile.data.composer.Mentionable
 import com.letta.mobile.desktop.DesktopTooltip
+import com.letta.mobile.ui.mascot.MascotGazeSurface
+import com.letta.mobile.ui.mascot.mascotGazeTarget
 import com.letta.mobile.ui.theme.customColors
 
 internal data class ComposerAutocompleteUi(
@@ -96,7 +99,7 @@ internal fun ComposerCommandSuggestions(
 ) {
     if (matchedCommands.isEmpty()) return
     Surface(
-        modifier = Modifier.fillMaxWidth().widthIn(max = 760.dp),
+        modifier = Modifier.widthIn(max = ChatColumnMaxWidth).fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
@@ -138,13 +141,36 @@ private fun ComposerCommandSuggestionRow(
     }
 }
 
+/**
+ * Whether the keyboard-affordance strip under the composer is showing.
+ *
+ * The strip is discovery copy: it tells you `@` and `/` exist and which key
+ * sends. Once you are mid-message you have already used or ignored all of it,
+ * so it stops being help and becomes a line of permanent chrome pinned under
+ * every conversation. It shows while the composer is empty and fades as soon
+ * as there is something to send — then returns for the next message.
+ */
+internal fun composerHintVisible(text: String, hasAttachments: Boolean): Boolean =
+    text.isBlank() && !hasAttachments
+
 @Composable
-internal fun ComposerHintRow() {
+internal fun ComposerHintRow(visible: Boolean) {
+    // Faded rather than removed: the strip keeps its space in the layout, so
+    // typing the first character dims a line instead of yanking the whole
+    // composer down by its height.
+    val alpha by animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = tween(durationMillis = 180),
+        label = "composerHintAlpha",
+    )
     Row(
         modifier = Modifier
+            .widthIn(max = ChatColumnMaxWidth)
             .fillMaxWidth()
-            .widthIn(max = 760.dp)
-            .padding(start = 8.dp, top = 2.dp, bottom = 2.dp),
+            .padding(start = 8.dp, top = 2.dp, bottom = 2.dp)
+            .graphicsLayer { this.alpha = alpha }
+            // Hidden copy must not be announced or hit-tested.
+            .clearAndSetSemantics { },
     ) {
         Text(
             text = "@ add files   ·   / commands   ·   Enter or Ctrl+Enter send   ·   Shift+Enter newline",
@@ -164,9 +190,13 @@ internal data class ComposerInputSurfaceParams(
 @Composable
 internal fun ComposerInputSurface(params: ComposerInputSurfaceParams) {
     Surface(
+// Order matters: widthIn BEFORE fillMaxWidth. fillMaxWidth pins the incoming
+// constraints to min == max == available, and widthIn then coerces its own
+// maximum into that fixed range, discarding the cap — so the bar grew to the
+// full width of the window while the messages above it stayed in their column.
         modifier = Modifier
-            .fillMaxWidth()
-            .widthIn(max = 760.dp),
+            .widthIn(max = ChatColumnMaxWidth)
+            .fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
         color = MaterialTheme.colorScheme.surfaceContainer,
         contentColor = MaterialTheme.colorScheme.onSurface,
@@ -235,6 +265,7 @@ private fun ComposerTextField(params: ComposerInputSurfaceParams) {
             .fillMaxWidth()
             .heightIn(min = 24.dp, max = 120.dp)
             .testTag("composer-input")
+            .mascotGazeTarget(MascotGazeSurface.INPUT)
             .onPreviewKeyEvent { event ->
                 composerEnterKeyHandled(
                     ComposerEnterKeyParams(

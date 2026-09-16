@@ -32,7 +32,7 @@ class ProbeStubNativeClient(
     override suspend fun input(command: AppServerCommand.Input) =
         error("ProbeStubNativeClient does not own input")
 
-    override suspend fun sync(command: AppServerCommand.Sync) =
+    override suspend fun sync(command: AppServerCommand.Sync): AppServerInboundFrame.SyncResponse =
         AppServerInboundFrame.SyncResponse(
             requestId = command.requestId ?: "stub-sync",
             runtime = command.runtime,

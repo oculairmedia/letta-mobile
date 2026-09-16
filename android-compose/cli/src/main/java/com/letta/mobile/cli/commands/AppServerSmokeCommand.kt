@@ -49,7 +49,7 @@ internal class AppServerSmokeCommand : CliktCommand(
         .long()
         .default(120_000)
 
-    override fun run() = runBlocking {
+    override fun run(): Unit = runBlocking {
         if (timeoutMs <= 0) throw UsageError("--timeout-ms must be > 0")
 
         runAppServerSmokeTurn(

@@ -9,6 +9,7 @@ import com.letta.mobile.data.model.UiSubagentDispatch
 import com.letta.mobile.data.model.UiToolApprovalDecision
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.data.model.UiToolResultTruncation
+import com.letta.mobile.runtime.RuntimeUserInputTools
 
 /**
  * State of a tool call lifecycle in the timeline.
@@ -32,6 +33,7 @@ data class ToolTimelineCall(
     val name: String,
     val arguments: String,
     val result: String?,
+    val displayTarget: String? = null,
     val state: ToolTimelineState,
     val summary: String,
     val executionTimeMs: Long? = null,
@@ -98,15 +100,19 @@ fun classifyToolCallState(
 /**
  * A call is awaiting approval only while it has no decision, no status and no result, and the
  * owning request actually references it (by id, or by name when the call carries no id).
+ *
+ * Ordinary calls may retain an `approval_request_message` after the runtime has auto-allowed
+ * them. Only canonical runtime user-input tools can remain parked without a decision.
  */
 private fun UiToolCall.isAwaitingApproval(request: UiApprovalRequest?): Boolean {
     if (request == null) return false
+    if (!RuntimeUserInputTools.requiresUserInput(name)) return false
     if (approvalDecision != null || result != null || status != null) return false
     // Match on ID whenever IDs are available on BOTH sides. Falling back to the name
     // marked sibling calls pending too: parallel same-name calls where the request lists
     // only one id had every sibling reported as AwaitingApproval. Name matching is only
     // safe when the request carries no usable ids at all.
-    if (toolCallId != null && request.toolCalls.any { it.toolCallId != null }) {
+    if (request.toolCalls.any { it.toolCallId != null }) {
         return request.toolCalls.any { it.toolCallId == toolCallId }
     }
     return request.toolCalls.any { it.name == name }
@@ -121,9 +127,16 @@ private fun String.toTerminalState(): ToolTimelineState? = when {
     else -> null
 }
 
-/** With no usable status, a call is Succeeded once a result exists and Running until then. */
+/**
+ * With no usable status, a call is Succeeded once a result exists.
+ *
+ * Until then it is only Running if it could still be running. A call read back from the ledger
+ * cannot be: its turn ended long ago, and its result lives in a separate row that this one was
+ * never going to carry. Treating that as Running is what made old tool cards announce themselves
+ * as executing and auto-expand their arguments.
+ */
 private fun UiToolCall.settledStateWithoutStatus(): ToolTimelineState =
-    if (result != null) ToolTimelineState.Succeeded else ToolTimelineState.Running
+    if (result != null || settled) ToolTimelineState.Succeeded else ToolTimelineState.Running
 
 /**
  * Derives a human-readable safe summary for a tool call without risking platform exceptions.
@@ -194,7 +207,10 @@ fun projectToolTimelineCall(
     }
 
     val state = classifyToolCallState(toolCall, messageApprovalRequest)
-    val summary = deriveToolCallSummary(toolCall.name, toolCall.arguments)
+    val summary = toolCall.displayTarget
+        ?.takeIf { it.isNotBlank() }
+        ?.let { "${toolCall.name.ifBlank { "Tool" }} · $it" }
+        ?: deriveToolCallSummary(toolCall.name, toolCall.arguments)
 
     val fresh = ToolTimelineCall(
         key = key,
@@ -202,6 +218,7 @@ fun projectToolTimelineCall(
         name = toolCall.name,
         arguments = toolCall.arguments,
         result = toolCall.result,
+        displayTarget = toolCall.displayTarget,
         state = state,
         summary = summary,
         executionTimeMs = toolCall.executionTimeMs,

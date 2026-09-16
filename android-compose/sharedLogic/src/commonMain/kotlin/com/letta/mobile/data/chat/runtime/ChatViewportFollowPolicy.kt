@@ -8,6 +8,7 @@ data class ChatViewportSnapshot(
     val totalItems: Int,
     val lastVisibleIndex: Int?,
     val isUserScrolling: Boolean = false,
+    val dateHeaderOffset: Int = 0,
 )
 
 object ChatViewportFollowPolicy {
@@ -17,17 +18,20 @@ object ChatViewportFollowPolicy {
     fun isNearLatest(
         snapshot: ChatViewportSnapshot,
         thresholdItems: Int = DEFAULT_NEAR_LATEST_THRESHOLD_ITEMS,
+        dateHeaderOffset: Int = snapshot.dateHeaderOffset,
     ): Boolean {
         if (snapshot.totalItems <= 0) return true
         val lastVisibleIndex = snapshot.lastVisibleIndex ?: return true
-        return lastVisibleIndex >= snapshot.totalItems - 1 - thresholdItems
+        val effectiveThreshold = thresholdItems + dateHeaderOffset.coerceAtLeast(0)
+        return lastVisibleIndex >= snapshot.totalItems - 1 - effectiveThreshold
     }
 
     fun shouldShowScrollToLatest(
         snapshot: ChatViewportSnapshot,
         thresholdItems: Int = DEFAULT_NEAR_LATEST_THRESHOLD_ITEMS,
+        dateHeaderOffset: Int = snapshot.dateHeaderOffset,
     ): Boolean =
-        snapshot.totalItems > 0 && !isNearLatest(snapshot, thresholdItems)
+        snapshot.totalItems > 0 && !isNearLatest(snapshot, thresholdItems, dateHeaderOffset)
 
     fun shouldUpdateFollowModeAfterScroll(snapshot: ChatViewportSnapshot): Boolean =
         !snapshot.isUserScrolling
@@ -36,9 +40,10 @@ object ChatViewportFollowPolicy {
         currentFollowMode: Boolean,
         snapshot: ChatViewportSnapshot,
         thresholdItems: Int = DEFAULT_NEAR_LATEST_THRESHOLD_ITEMS,
+        dateHeaderOffset: Int = snapshot.dateHeaderOffset,
     ): Boolean =
         if (shouldUpdateFollowModeAfterScroll(snapshot)) {
-            isNearLatest(snapshot, thresholdItems)
+            isNearLatest(snapshot, thresholdItems, dateHeaderOffset)
         } else {
             currentFollowMode
         }

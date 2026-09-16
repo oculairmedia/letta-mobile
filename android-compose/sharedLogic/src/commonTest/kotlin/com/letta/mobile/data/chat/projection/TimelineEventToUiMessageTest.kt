@@ -378,8 +378,19 @@ class TimelineEventToUiMessageTest {
         assertNull(timelineEventToUiMessage(ev))
     }
 
+    /**
+     * letta-mobile-jt4wq: was `failed USER Local events render as error bubbles`.
+     *
+     * The old assertion (`isError == true`) locked in a conflation introduced
+     * incidentally by af56cf1be ("fix(network): keep websocket alive in
+     * foreground"), not by any decision about how a failed send should look.
+     * Downstream it made the user's own prompt render as a left-aligned
+     * destructive bubble labelled "Error" — observed on device. A failed send
+     * is still surfaced, now as itself. See
+     * [FailedUserSendIsNotAnErrorFrameTest].
+     */
     @Test
-    fun `failed USER Local events render as error bubbles`() {
+    fun `failed USER Local events are flagged as send failures rather than error frames`() {
         val ev = TimelineEvent.Local(
             position = 1.0,
             otid = "cm-android-failed",
@@ -395,7 +406,8 @@ class TimelineEventToUiMessageTest {
         assertEquals("user", ui.role)
         assertEquals("did this land?", ui.content)
         assertFalse(ui.isPending)
-        assertTrue(ui.isError)
+        assertTrue(ui.isSendFailed)
+        assertFalse(ui.isError)
     }
 
     @Test

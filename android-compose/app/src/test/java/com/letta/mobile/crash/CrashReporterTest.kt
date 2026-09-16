@@ -95,7 +95,7 @@ class CrashReporterTest {
     }
 
     @Test
-    fun `dismiss clears stateflow and deletes file`() {
+    fun `dismiss clears notification but retains diagnostic file`() {
         val file = crashFile()
         file.parentFile?.mkdirs()
         file.writeText(
@@ -115,7 +115,8 @@ class CrashReporterTest {
         reporter.dismiss()
 
         assertNull(reporter.lastCrash.value)
-        assertFalse(file.exists())
+        assertTrue(file.exists())
+        assertEquals("s", JSONObject(file.readText()).getString("stackHead"))
     }
 
     @Test

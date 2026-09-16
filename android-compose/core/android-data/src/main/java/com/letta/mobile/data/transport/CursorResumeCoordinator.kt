@@ -144,7 +144,9 @@ internal class CursorResumeCoordinator(
     }
 
     /**
-     * Resets the active cursor store and deletes the expired hello resume cursors on receiving a cursor_expired error.
+     * Clears active run cursors on cursor_expired. Captured backend conversation watermarks are
+     * retained so generation-fenced repair can CAS-replace after a durable canonical commit.
+     * Legacy unscoped stores still clear immediately.
      */
     fun clearExpiredCursor(frame: ServerFrame.Error, stateValueSimpleName: () -> String) {
         val cleared = mutableListOf<String>()
@@ -176,7 +178,16 @@ internal class CursorResumeCoordinator(
         if (expiredConversationIds.isNotEmpty()) {
             scope.launch {
                 expiredConversationIds.forEach { expiredConversationId ->
-                    runCatching { conversationCursorStore.clearCursor(expiredConversationId) }
+                    runCatching {
+                        val captured = conversationCursorStore as? com.letta.mobile.data.local.CapturedBackendConversationCursorStore
+                        if (captured != null) {
+                            // Keep the expected row for commit-spanning CAS replacement.
+                            helloResumeAfterSeqByConversation.remove(expiredConversationId)
+                            helloResumeReplayCountsByConversation.remove(expiredConversationId)
+                        } else {
+                            conversationCursorStore.clearCursor(expiredConversationId)
+                        }
+                    }
                         .onFailure { t ->
                             Telemetry.error(
                                 "ChannelTransport", "cursorExpired.clearConversationCursorFailed", t,

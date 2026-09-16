@@ -3,11 +3,17 @@ package com.letta.mobile.data.timeline
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.session.BackendScopedCache
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
+import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineReadResult
+import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore
+import com.letta.mobile.data.timeline.snapshot.NoOpConfirmedTimelineStore
+import com.letta.mobile.data.timeline.snapshot.SnapshotReadFailure
+import com.letta.mobile.data.timeline.snapshot.TimelineScope
+import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
 import com.letta.mobile.util.Telemetry
 import kotlin.concurrent.Volatile
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -37,21 +43,39 @@ open class TimelineRepository(
     private val timelineTransport: TimelineTransport,
     private val pendingLocalStore: PendingLocalStore,
     private val conversationCursorStore: ConversationCursorStore,
+    private val confirmedTimelineStore: ConfirmedTimelineStore = NoOpConfirmedTimelineStore,
+    private val backendIdProvider: () -> String = { "default" },
+    private val repositoryScope: CoroutineScope,
     private val startLoopStreamSubscribers: Boolean = true,
+    /**
+     * letta-mobile-grrhq: injection seam so tests assert exact provenance
+     * correlation chains instead of pattern-matching random tokens.
+     * Diagnostic only — never influences holder identity or aliasing.
+     */
+    private val acquisitionIdGenerator: AcquisitionIdGenerator = SequentialAcquisitionIdGenerator(),
 ) : TimelineExternalTransportWriter, BackendScopedCache {
     constructor(
         timelineTransport: TimelineTransport,
         pendingLocalStore: PendingLocalStore,
         maxCachedLoops: Int,
-    ) : this(timelineTransport, pendingLocalStore, NoOpConversationCursorStore) {
+        repositoryScope: CoroutineScope,
+    ) : this(
+        timelineTransport,
+        pendingLocalStore,
+        NoOpConversationCursorStore,
+        repositoryScope = repositoryScope,
+    ) {
         require(maxCachedLoops > 0) { "maxCachedLoops must be positive" }
         this.maxCachedLoops = maxCachedLoops
     }
 
-    // Dedicated supervisor scope — child jobs fail in isolation.
-    private val scope = CoroutineScope(SupervisorJob() + timelineIoDispatcher)
-
     private var maxCachedLoops = DEFAULT_MAX_CACHED_LOOPS
+
+    /**
+     * letta-mobile-grrhq: mint an acquisition id for a creator path that has no
+     * caller-supplied provenance. Diagnostic only.
+     */
+    fun nextAcquisitionId(): String = acquisitionIdGenerator.next()
 
     // LRU registry. Kotlin common has no access-order LinkedHashMap
     // constructor (JVM-only), so we keep an insertion-ordered map and
@@ -60,6 +84,40 @@ open class TimelineRepository(
     // [loopsMutex], which makes the remove+reinsert touch safe.
     private val loops = LinkedHashMap<TimelineCacheKey, TimelineSyncLoop>()
     private val loopsMutex = Mutex()
+    private val legacyAdmission = TimelineLegacyAdmission()
+    private val externalAdmission = TimelineLegacyAdmission()
+    val admittedExternalWriter: TimelineExternalTransportWriter by lazy {
+        AdmittedTimelineExternalWriter(this, externalAdmission)
+    }
+
+    /** Stop creators/hydration before draining persistence. Does not delete durable history. */
+    suspend fun drainForCanonicalHandoff(conversationId: String) {
+        // Drain whole external operations before closing the nested creator gate.
+        externalAdmission.close(conversationId)
+        legacyAdmission.close(conversationId)
+        val retiring = loopsMutex.withLock {
+            val keys = loops.keys.filter { it.conversationId == conversationId }
+            val owned = keys.mapNotNull { loops.remove(it) }
+            publishLoopSnapshotLocked()
+            owned
+        }
+        // Never join while holding the repository map mutex.
+        withContext(kotlinx.coroutines.NonCancellable) {
+            retiring.forEach { loop ->
+                removeHydrateFlight(loop)
+                loop.closeAndJoin()
+            }
+        }
+    }
+
+    // Immutable publication for synchronous UI cache probes. Replaced only
+    // while loopsMutex is held, so readers never touch the mutable LRU map.
+    @Volatile
+    private var loopSnapshot: Map<TimelineCacheKey, TimelineSyncLoop> = emptyMap()
+
+    private fun publishLoopSnapshotLocked() {
+        loopSnapshot = loops.toMap()
+    }
     private val externalSeenMutex = Mutex()
     private val externalSeenByConversation = LinkedHashMap<String, LinkedHashSet<String>>()
 
@@ -78,18 +136,24 @@ open class TimelineRepository(
      * and must not be reused by a different scoped agent with the same bare
      * conversation id.
      */
-    private fun getAliasedLoopLocked(key: TimelineCacheKey): TimelineSyncLoop? {
+    private fun getAliasedLoopLocked(
+        key: TimelineCacheKey,
+        // letta-mobile-grrhq: DIAGNOSTIC ONLY. Never read by canAlias or by any
+        // branch below — it is forwarded to telemetry and nothing else.
+        provenance: TimelineAcquisitionProvenance = TimelineAcquisitionProvenance.UNSPECIFIED,
+    ): TimelineSyncLoop? {
         val candidates = loops.entries.filter { it.key.conversationId == key.conversationId }
         if (candidates.isEmpty()) return null
         val compatible = candidates.filter { canAlias(it.key, key) }
         candidates.filterNot { canAlias(it.key, key) }.forEach { (existingKey, _) ->
-            emitAliasRefused(existingKey, key)
+            emitAliasRefused(existingKey, key, provenance)
         }
         val match = compatible.singleOrNull() ?: return null
         val existingKey = match.key
         val loop = loops.remove(existingKey) ?: return null
         val promotedKey = if (existingKey.agentId == null && key.agentId != null) key else existingKey
         loops[promotedKey] = loop
+        publishLoopSnapshotLocked()
         Telemetry.event(
             "TimelineRepo", "loop.aliasResolved",
             "requestedAgentId" to key.agentId.orEmpty(),
@@ -102,7 +166,7 @@ open class TimelineRepository(
     private fun removeAliasedLoopLocked(key: TimelineCacheKey): TimelineSyncLoop? {
         val candidates = loops.entries.filter { it.key.conversationId == key.conversationId }
         val match = candidates.singleOrNull { canAlias(it.key, key) } ?: return null
-        return loops.remove(match.key)
+        return loops.remove(match.key)?.also { publishLoopSnapshotLocked() }
     }
 
     private fun canAlias(existing: TimelineCacheKey, requested: TimelineCacheKey): Boolean =
@@ -110,13 +174,30 @@ open class TimelineRepository(
             existing.agentId == null ||
             requested.agentId == null
 
-    private fun emitAliasRefused(existing: TimelineCacheKey, requested: TimelineCacheKey) {
+    /**
+     * letta-mobile-grrhq: this early return is load-bearing EVIDENCE, not just a
+     * guard. Because the refusal is suppressed whenever either side is unscoped,
+     * a logged `loop.aliasRefused` PROVES both competing cache keys carried
+     * non-null, differing agent ids — which eliminates every unscoped
+     * acquisition path in the tree as the producer without further evidence.
+     */
+    private fun emitAliasRefused(
+        existing: TimelineCacheKey,
+        requested: TimelineCacheKey,
+        provenance: TimelineAcquisitionProvenance = TimelineAcquisitionProvenance.UNSPECIFIED,
+    ) {
         if (existing.agentId == null || requested.agentId == null) return
         Telemetry.event(
             "TimelineRepo", "loop.aliasRefused",
             "existingAgentId" to existing.agentId,
             "requestedAgentId" to requested.agentId,
             "conversationId" to requested.conversationId,
+            // Provenance of the REQUESTING acquisition, correlated to its
+            // acquisition.entry and to the cacheMiss that follows this refusal.
+            *TimelineAcquisitionTelemetry.baseAttrs(
+                TimelineAcquisitionTarget(requested.agentId, requested.conversationId),
+                provenance,
+            ),
             level = Telemetry.Level.WARN,
         )
     }
@@ -138,23 +219,43 @@ open class TimelineRepository(
      */
     suspend fun getOrCreate(conversationId: String): TimelineSyncLoop = getOrCreate(agentId = null, conversationId = conversationId)
 
-    suspend fun getOrCreate(agentId: String?, conversationId: String): TimelineSyncLoop {
+    suspend fun getOrCreate(
+        agentId: String?,
+        conversationId: String,
+        // letta-mobile-grrhq: DIAGNOSTIC ONLY, defaulted so every existing call
+        // site keeps compiling and reports UNSPECIFIED rather than vanishing.
+        provenance: TimelineAcquisitionProvenance = TimelineAcquisitionProvenance.UNSPECIFIED,
+    ): TimelineSyncLoop = legacyAdmission.admitted(conversationId) {
+        getOrCreateAdmitted(agentId, conversationId, provenance)
+    }
+
+    private suspend fun getOrCreateAdmitted(
+        agentId: String?,
+        conversationId: String,
+        provenance: TimelineAcquisitionProvenance,
+    ): TimelineSyncLoop {
         val key = TimelineCacheKey(agentId = agentId, conversationId = conversationId)
+        TimelineAcquisitionTelemetry.emitEntry(
+            TimelineAcquisitionTarget(agentId, conversationId, creator = "getOrCreate"),
+            provenance,
+        )
         // Fast path for already-cached loops. The access-order map mutates on
         // reads, so even cache hits go through the mutex.
-        loopsMutex.withLock { getLoopLocked(key) ?: getAliasedLoopLocked(key) }?.let { cached ->
+        loopsMutex.withLock { getLoopLocked(key) ?: getAliasedLoopLocked(key, provenance) }?.let { cached ->
             Telemetry.event(
                 "TimelineRepo", "getOrCreate.cacheHit",
                 "agentId" to agentId.orEmpty(),
                 "conversationId" to conversationId,
                 "hydrated" to cached.hasHydratedSuccessfully,
+                "acquisitionId" to TimelineProvenanceRedaction.boundedIdentifier(provenance.acquisitionId),
+                "source" to provenance.source.name,
             )
             if (!cached.hasHydratedSuccessfully) {
                 hydrateSingleFlight(cached, key)
             }
             return cached
         }
-        val loop = getOrCreateLoopWithoutHydrate(key)
+        val loop = createWithoutHydrateAdmitted(key, provenance, emitEntry = false)
         // Hydrate OUTSIDE the mutex so parallel callers don't block each other.
         // letta-mobile-oznnh: concurrent same-conversation callers now JOIN the
         // in-flight hydration instead of starting a duplicate one — the loop
@@ -183,96 +284,256 @@ open class TimelineRepository(
         val completion: CompletableDeferred<Unit>,
     )
 
+    private sealed interface HydrateFlightClaim {
+        data object AlreadyHydrated : HydrateFlightClaim
+        data class Owner(val flight: HydrateFlight) : HydrateFlightClaim
+        data class Joiner(val flight: HydrateFlight) : HydrateFlightClaim
+    }
+
     /** conversationId -> loop-owned in-flight hydration. Guarded by [hydrateFlightsMutex]. */
     private val hydrateFlights = LinkedHashMap<String, HydrateFlight>()
 
     private suspend fun hydrateSingleFlight(loop: TimelineSyncLoop, key: TimelineCacheKey) {
-        val created = HydrateFlight(loop, CompletableDeferred())
-        val joined = hydrateFlightsMutex.withLock {
+        when (val claim = claimHydrationFlight(loop, key)) {
+            HydrateFlightClaim.AlreadyHydrated -> return
+            is HydrateFlightClaim.Owner -> runOwnedHydration(claim.flight, key)
+            is HydrateFlightClaim.Joiner -> joinHydration(claim.flight, key)
+        }
+    }
+
+    private suspend fun claimHydrationFlight(
+        loop: TimelineSyncLoop,
+        key: TimelineCacheKey,
+    ): HydrateFlightClaim = hydrateFlightsMutex.withLock {
+        // Re-check under the same mutex that guards flight removal. A caller
+        // may have observed false before waiting while the owner completed
+        // hydration and removed its flight.
+        if (loop.hasHydratedSuccessfully) {
+            HydrateFlightClaim.AlreadyHydrated
+        } else {
             val existing = hydrateFlights[key.conversationId]
             if (existing?.loop === loop) {
-                existing
+                HydrateFlightClaim.Joiner(existing)
             } else {
+                val created = HydrateFlight(loop, CompletableDeferred())
                 hydrateFlights[key.conversationId] = created
-                null
-            }
-        }
-        if (joined != null) {
-            Telemetry.event(
-                "TimelineRepo", "hydrate.joined",
-                "agentId" to key.agentId.orEmpty(),
-                "conversationId" to key.conversationId,
-            )
-            // Joiner swallows the shared outcome: the OWNER already emitted
-            // HydrateFailed on the loop's event queue on failure — re-emitting
-            // here would deliver duplicate events for one hydration attempt.
-            runCatching { joined.completion.await() }
-                .onFailure { t ->
-                    Telemetry.error(
-                        "TimelineRepo", "hydrate.joinedFailed", t,
-                        "agentId" to key.agentId.orEmpty(),
-                        "conversationId" to key.conversationId,
-                    )
-                }
-            return
-        }
-        try {
-            withContext(timelineIoDispatcher) {
-                loop.hydrate()
-            }
-            created.completion.complete(Unit)
-        } catch (t: Throwable) {
-            // Remove the flight BEFORE completing so a waiter that retries
-            // immediately isn't blocked by the dead flight.
-            hydrateFlightsMutex.withLock {
-                if (hydrateFlights[key.conversationId] === created) {
-                    hydrateFlights.remove(key.conversationId)
-                }
-            }
-            created.completion.completeExceptionally(t)
-            Telemetry.error(
-                "TimelineRepo", "hydrate.failed", t,
-                "agentId" to key.agentId.orEmpty(),
-                "conversationId" to key.conversationId,
-            )
-            runCatching { loop.emitHydrateFailed(t.message ?: "unknown") }
-        } finally {
-            hydrateFlightsMutex.withLock {
-                if (hydrateFlights[key.conversationId] === created) {
-                    hydrateFlights.remove(key.conversationId)
-                }
+                HydrateFlightClaim.Owner(created)
             }
         }
     }
 
-    private suspend fun getOrCreateLoopWithoutHydrate(key: TimelineCacheKey): TimelineSyncLoop =
-        // Mutex protects the map-insert critical section only (not hydrate).
-        // Hydrate used to run inside the mutex which serialized all concurrent
-        // warmup calls — an observed cause of "oldish state": conv-1598043a
-        // wasn't hydrated until ~15s after app start because earlier slots in
-        // the warmup list each held the lock for ~500ms. letta-mobile-mge5.
-        loopsMutex.withLock {
-            getLoopLocked(key)?.let { return@withLock it }
-            getAliasedLoopLocked(key)?.let { return@withLock it }
-            Telemetry.event(
-                "TimelineRepo", "getOrCreate.cacheMiss",
+    private suspend fun joinHydration(flight: HydrateFlight, key: TimelineCacheKey) {
+        Telemetry.event(
+            "TimelineRepo", "hydrate.joined",
+            "agentId" to key.agentId.orEmpty(),
+            "conversationId" to key.conversationId,
+        )
+        try {
+            flight.completion.await()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Throwable) {
+            Telemetry.error(
+                "TimelineRepo", "hydrate.joinedFailed", failure,
                 "agentId" to key.agentId.orEmpty(),
                 "conversationId" to key.conversationId,
             )
-            val created = TimelineSyncLoop(
-                messageApi = timelineTransport,
-                conversationId = key.conversationId,
-                agentId = key.agentId,
-                scope = scope,
-                ingestedListenerProvider = { ingestedListener },
-                pendingLocalStore = pendingLocalStore,
-                conversationCursorStore = conversationCursorStore,
-                startStreamSubscriber = startLoopStreamSubscribers,
-            )
-            loops[key] = created
-            evictEldestLoopsIfNeededLocked()
-            created
         }
+    }
+
+    private suspend fun runOwnedHydration(flight: HydrateFlight, key: TimelineCacheKey) {
+        try {
+            withContext(timelineIoDispatcher) {
+                flight.loop.hydrate()
+            }
+            flight.completion.complete(Unit)
+        } catch (cancelled: CancellationException) {
+            releaseHydrationFlight(key, flight)
+            flight.completion.cancel(cancelled)
+            throw cancelled
+        } catch (failure: Throwable) {
+            handleOwnedHydrationFailure(flight, key, failure)
+        } finally {
+            releaseHydrationFlight(key, flight)
+        }
+    }
+
+    private suspend fun handleOwnedHydrationFailure(
+        flight: HydrateFlight,
+        key: TimelineCacheKey,
+        failure: Throwable,
+    ) {
+        // Release before completion so an immediate retry cannot join a dead flight.
+        releaseHydrationFlight(key, flight)
+        flight.completion.completeExceptionally(failure)
+        Telemetry.error(
+            "TimelineRepo", "hydrate.failed", failure,
+            "agentId" to key.agentId.orEmpty(),
+            "conversationId" to key.conversationId,
+        )
+        runCatching { flight.loop.emitHydrateFailed(failure.message ?: "unknown") }
+    }
+
+    private suspend fun releaseHydrationFlight(key: TimelineCacheKey, flight: HydrateFlight) {
+        hydrateFlightsMutex.withLock {
+            if (hydrateFlights[key.conversationId] === flight) {
+                hydrateFlights.remove(key.conversationId)
+            }
+        }
+    }
+
+    /**
+     * letta-mobile-grrhq: the SECOND creator path. Reached from
+     * [repairExpiredConversationCursorScoped] and [warmConversations] without
+     * passing through [getOrCreate], so instrumenting only getOrCreate would
+     * leave two blind spots.
+     */
+    private suspend fun getOrCreateLoopWithoutHydrate(
+        key: TimelineCacheKey,
+        provenance: TimelineAcquisitionProvenance = TimelineAcquisitionProvenance.UNSPECIFIED,
+        // [getOrCreate] already emitted the entry for this acquisition; emitting
+        // again here would double-log every acquisition and make the correlated
+        // chain ambiguous. Direct callers of this creator emit their own.
+        emitEntry: Boolean = true,
+    ): TimelineSyncLoop = legacyAdmission.admitted(key.conversationId) {
+        createWithoutHydrateAdmitted(key, provenance, emitEntry)
+    }
+
+    private suspend fun createWithoutHydrateAdmitted(
+        key: TimelineCacheKey,
+        provenance: TimelineAcquisitionProvenance,
+        emitEntry: Boolean,
+    ): TimelineSyncLoop {
+        if (emitEntry) {
+            TimelineAcquisitionTelemetry.emitEntry(
+                TimelineAcquisitionTarget(key.agentId, key.conversationId, creator = "getOrCreateLoopWithoutHydrate"),
+                provenance,
+            )
+        }
+        loopsMutex.withLock { getLoopLocked(key) ?: getAliasedLoopLocked(key, provenance) }?.let { return it }
+        val timelineScope = TimelineScope(
+            backendId = backendIdProvider(),
+            conversationId = key.conversationId,
+            agentId = key.agentId,
+        )
+        val readResult = readStoredSnapshot(timelineScope)
+        return loopsMutex.withLock {
+            getLoopLocked(key)
+                ?: getAliasedLoopLocked(key, provenance)
+                ?: createLoop(key, timelineScope, readResult, provenance)
+        }
+    }
+
+    private suspend fun readStoredSnapshot(timelineScope: TimelineScope): ConfirmedTimelineReadResult =
+        withContext(timelineIoDispatcher) {
+            try {
+                confirmedTimelineStore.readSnapshotResult(timelineScope)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Throwable) {
+                Telemetry.error(
+                    "TimelineRepo", "snapshot.readFailed", failure,
+                    "backendId" to timelineScope.backendId,
+                    "conversationId" to timelineScope.conversationId,
+                )
+                ConfirmedTimelineReadResult.ReconciliationRequired(SnapshotReadFailure.STORAGE_FAILURE)
+            }
+        }
+
+    private fun createLoop(
+        key: TimelineCacheKey,
+        timelineScope: TimelineScope,
+        readResult: ConfirmedTimelineReadResult,
+        provenance: TimelineAcquisitionProvenance = TimelineAcquisitionProvenance.UNSPECIFIED,
+    ): TimelineSyncLoop {
+        val recoveryFailure = when (readResult) {
+            is ConfirmedTimelineReadResult.Active -> null
+            is ConfirmedTimelineReadResult.Fallback -> readResult.activeFailure
+            is ConfirmedTimelineReadResult.ReconciliationRequired -> readResult.failure
+        }
+        // letta-mobile-grrhq: THE SECOND-HOLDER CREATION EVENT. Correlated to
+        // the acquisition entry and to any preceding alias refusal by
+        // acquisitionId. snapshotOutcome=ReconciliationRequired with
+        // remoteReconciliationReason=METADATA_INVALID here is the exact signature
+        // of a holder that found another agent's head for this conversation.
+        Telemetry.event(
+            "TimelineRepo", "getOrCreate.cacheMiss",
+            "agentId" to key.agentId.orEmpty(),
+            "conversationId" to key.conversationId,
+            "snapshotOutcome" to readResult::class.simpleName.orEmpty(),
+            "snapshotHighWaterRevision" to readResult.highWaterRevision,
+            "remoteReconciliationReason" to recoveryFailure?.name.orEmpty(),
+            "acquisitionId" to TimelineProvenanceRedaction.boundedIdentifier(provenance.acquisitionId),
+            "source" to provenance.source.name,
+            "operation" to TimelineProvenanceRedaction.boundedIdentifier(provenance.operation),
+            "callSite" to TimelineProvenanceRedaction.boundedIdentifier(provenance.callSite),
+            "frameFamily" to provenance.frameFamily.name,
+            "selectionMode" to provenance.selectionMode.name,
+            "attribution" to (
+                provenance.attribution?.attribution?.name
+                    ?: TimelineConversationAttribution.UNKNOWN.name
+                ),
+        )
+        if (recoveryFailure != null) {
+            Telemetry.event(
+                "TimelineRepo", "snapshot.remoteReconciliationRequested",
+                "agentId" to key.agentId.orEmpty(),
+                "conversationId" to key.conversationId,
+                "reason" to recoveryFailure.name,
+                "fallbackAvailable" to (readResult.snapshot != null),
+                level = Telemetry.Level.WARN,
+            )
+        }
+        val storedSnapshot = readResult.snapshot
+        // The incremental commit planner's `previous` must carry the store's actual durable
+        // high-water revision (not necessarily storedSnapshot.revision, which can trail it in
+        // the Fallback-recovery case) so the first commit's baseRevision matches the store's
+        // CAS precondition instead of being rejected Stale forever.
+        val persistedBaseline = storedSnapshot?.takeIf { it.revision == readResult.highWaterRevision }
+            ?: storedSnapshot?.copy(revision = readResult.highWaterRevision)
+        val created = TimelineSyncLoop(
+            messageApi = timelineTransport, conversationId = key.conversationId, agentId = key.agentId, scope = repositoryScope,
+            ingestedListenerProvider = { ingestedListener }, pendingLocalStore = pendingLocalStore,
+            conversationCursorStore = conversationCursorStore, startStreamSubscriber = startLoopStreamSubscribers,
+            confirmedTimelineStore = confirmedTimelineStore, timelineScope = timelineScope,
+            initialTimeline = storedSnapshot?.let(TimelineSnapshotCodec::storedEnvelopeToTimeline),
+            initialRevision = readResult.highWaterRevision,
+            initialPersistedEnvelope = persistedBaseline,
+        )
+        loops[key] = created
+        evictEldestLoopsIfNeededLocked()
+        publishLoopSnapshotLocked()
+        return created
+    }
+
+    /**
+     * Pre-warms likely/recent conversation timelines from persisted snapshots without blocking.
+     */
+    suspend fun warmConversations(
+        conversationIds: List<Pair<String?, String>>,
+        // letta-mobile-grrhq: this path has NO production caller today. It is
+        // instrumented anyway so the blind spot cannot return silently when
+        // somebody wires it up later.
+        provenance: TimelineAcquisitionProvenance = TimelineAcquisitionProvenance(
+            acquisitionId = "",
+            source = TimelineAcquisitionSource.WARM,
+            operation = "warmConversations",
+            callSite = "TimelineRepository.kt:warmConversations",
+        ),
+    ) {
+        withContext(timelineIoDispatcher) {
+            val maxWarm = (maxCachedLoops - 2).coerceAtLeast(1)
+            conversationIds.forEach { (agentId, conversationId) ->
+                val key = TimelineCacheKey(agentId = agentId, conversationId = conversationId)
+                val shouldWarm = loopsMutex.withLock {
+                    key !in loops && loops.size < maxWarm
+                }
+                if (shouldWarm) {
+                    getOrCreateLoopWithoutHydrate(key, provenance)
+                }
+            }
+        }
+    }
 
     /**
      * Number of cached sync loops currently owned by the singleton registry.
@@ -287,13 +548,25 @@ open class TimelineRepository(
         val count = loops.size
         loops.values.forEach { loop ->
             removeHydrateFlight(loop)
-            loop.close()
+            loop.closeAndJoin()
         }
         loops.clear()
+        publishLoopSnapshotLocked()
         Telemetry.event("TimelineRepo", "clearAll", "clearedLoopCount" to count)
     }
 
-    override suspend fun clearForBackendSwitch() = clearAll()
+    override suspend fun clearForBackendSwitch() {
+        val backendId = backendIdProvider()
+        clearAll()
+        confirmedTimelineStore.clearForBackend(backendId)
+    }
+
+    /**
+     * Returns the exact agent-scoped cached timeline without creating, aliasing,
+     * touching LRU order, or triggering hydration.
+     */
+    fun peekCached(agentId: String?, conversationId: String): Timeline? =
+        loopSnapshot[TimelineCacheKey(agentId = agentId, conversationId = conversationId)]?.state?.value
 
     /** Observe a conversation's timeline state. */
     suspend fun observe(conversationId: String): StateFlow<Timeline> =
@@ -301,6 +574,13 @@ open class TimelineRepository(
 
     suspend fun observe(agentId: String?, conversationId: String): StateFlow<Timeline> =
         getOrCreate(agentId, conversationId).state
+
+    /** letta-mobile-grrhq: provenance-carrying observe. Diagnostic only. */
+    suspend fun observe(
+        agentId: String?,
+        conversationId: String,
+        provenance: TimelineAcquisitionProvenance,
+    ): StateFlow<Timeline> = getOrCreate(agentId, conversationId, provenance).state
 
     /** Send a user message. Returns the client-generated otid. */
     suspend fun sendMessage(conversationId: String, content: String): String =
@@ -493,8 +773,8 @@ open class TimelineRepository(
     // supersede a pending sweep (turnStarted) and when to (re)schedule one
     // (turnEnded — unconditionally, regardless of clean; see Codex #902
     // review finding 3 / DanglingToolCallResolver.scheduleSweepIfUnresolved).
-    override suspend fun turnStarted(agentId: String?, conversationId: String) {
-        getOrCreate(agentId, conversationId).turnStarted()
+    override suspend fun turnStarted(agentId: String?, conversationId: String, runId: String?, turnId: String?) {
+        getOrCreate(agentId, conversationId).turnStarted(runId = runId, turnId = turnId)
     }
 
     override suspend fun turnEnded(agentId: String?, conversationId: String, clean: Boolean) {
@@ -595,7 +875,21 @@ open class TimelineRepository(
         fallbackSeq: Long?,
     ) {
         conversationCursorStore.clearCursor(conversationId)
-        val loop = getOrCreateLoopWithoutHydrate(TimelineCacheKey(agentId, conversationId))
+        // letta-mobile-grrhq: creator path that bypasses getOrCreate. The
+        // interface signature is deliberately unchanged (it has several
+        // implementors and fakes), so provenance is minted here at the
+        // repository boundary rather than passed by the caller.
+        val loop = getOrCreateLoopWithoutHydrate(
+            TimelineCacheKey(agentId, conversationId),
+            TimelineAcquisitionProvenance(
+                acquisitionId = nextAcquisitionId(),
+                source = TimelineAcquisitionSource.REPLAY_RECONCILE,
+                operation = "repairExpiredConversationCursor",
+                callSite = "TimelineRepository.kt:repairExpiredConversationCursorScoped",
+                frameFamily = TimelineAcquisitionFrameFamily.REPLAY,
+                isReplay = true,
+            ),
+        )
         runCatching {
             withContext(timelineIoDispatcher) {
                 loop.hydrate(
@@ -625,9 +919,9 @@ open class TimelineRepository(
     /** Force a reload — clears the cached loop for the conversation. */
     suspend fun clear(conversationId: String) = loopsMutex.withLock {
         val key = TimelineCacheKey(null, conversationId)
-        (loops.remove(key) ?: removeAliasedLoopLocked(key))?.let { loop ->
+        (loops.remove(key)?.also { publishLoopSnapshotLocked() } ?: removeAliasedLoopLocked(key))?.let { loop ->
             removeHydrateFlight(loop)
-            loop.close()
+            loop.closeAndJoin()
             Telemetry.event(
                 "TimelineRepo", "loop.cleared",
                 "conversationId" to conversationId,
@@ -637,9 +931,9 @@ open class TimelineRepository(
 
     suspend fun clear(agentId: String?, conversationId: String) = loopsMutex.withLock {
         val key = TimelineCacheKey(agentId, conversationId)
-        (loops.remove(key) ?: removeAliasedLoopLocked(key))?.let { loop ->
+        (loops.remove(key)?.also { publishLoopSnapshotLocked() } ?: removeAliasedLoopLocked(key))?.let { loop ->
             removeHydrateFlight(loop)
-            loop.close()
+            loop.closeAndJoin()
             Telemetry.event(
                 "TimelineRepo", "loop.cleared",
                 "agentId" to agentId.orEmpty(),
@@ -652,7 +946,7 @@ open class TimelineRepository(
         while (loops.size > maxCachedLoops) {
             val eldestKey = loops.entries.firstOrNull()?.key ?: return
             loops.remove(eldestKey)?.let { loop ->
-                scope.launch { removeHydrateFlight(loop) }
+                repositoryScope.launch { removeHydrateFlight(loop) }
                 loop.close()
                 Telemetry.event(
                     "TimelineRepo", "loop.evicted",

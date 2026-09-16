@@ -54,6 +54,7 @@ class SafOnDeviceModelImporter @Inject constructor(
         )
     }
 
+    @Suppress("UnusedReceiverParameter")
     private fun Context.displayNameFor(uri: Uri): String {
         contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
             val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)

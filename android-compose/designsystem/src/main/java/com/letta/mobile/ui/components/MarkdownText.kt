@@ -39,8 +39,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mikepenz.markdown.coil3.Coil3ImageTransformerImpl
 import com.mikepenz.markdown.compose.components.markdownComponents
+import com.mikepenz.markdown.compose.elements.MarkdownCodeFence
 import com.mikepenz.markdown.compose.elements.MarkdownHighlightedCodeBlock
-import com.mikepenz.markdown.compose.elements.MarkdownHighlightedCodeFence
 import com.mikepenz.markdown.compose.extendedspans.ExtendedSpans
 import com.mikepenz.markdown.compose.extendedspans.RoundedCornerSpanPainter
 import com.mikepenz.markdown.compose.Markdown as CoreMarkdown
@@ -70,72 +70,68 @@ fun MarkdownText(
     if (text.isBlank()) return
 
     val effectiveTextColor = remember(textColor, appendedFadeRange, appendedFadeAlpha) {
-        if (appendedFadeRange != null && appendedFadeRange.first == 0 && appendedFadeAlpha < 0.999f) {
-            textColor.copy(alpha = appendedFadeAlpha.coerceIn(0f, 1f))
-        } else {
-            textColor
-        }
+        fadedTextColor(textColor, appendedFadeRange, appendedFadeAlpha)
     }
 
     val renderText = remember(text) { exposeA2uiJsonTagsAsCodeFences(text) }
-    if (renderText != text) {
+    // perf/frame-budget-audit: the math classify runs a regex; during streaming MarkdownText is
+    // re-invoked for the active block at paint cadence (~17Hz per message), so it is remembered
+    // per text and only re-runs when the text changes. A2UI-exposed text skips math entirely.
+    val mathSegments = remember(renderText, text) {
+        if (renderText != text) null else mathSegmentsToRender(renderText)
+    }
+    if (mathSegments == null) {
         MarkdownTextRaw(text = renderText, modifier = modifier, textColor = effectiveTextColor)
-        return
+    } else {
+        MathSegmentsColumn(segments = mathSegments, modifier = modifier, textColor = effectiveTextColor)
     }
+}
 
-    // Pre-pass: if the text contains display-math fences ($$…$$) OR a
-    // plausible inline-math span ($…$), split into alternating Markdown /
-    // MathBlock segments. Display-math is block-level (stacked column);
-    // inline-math is interleaved with prose (wrapping row). Cheap fast-path
-    // when neither marker is present.
-    //
-    // perf/frame-budget-audit: the inline-math precheck compiles a Regex on
-    // every recompose (containsLikelyInlineMath -> Regex(...)). During
-    // streaming MarkdownText is re-invoked for the active block at paint
-    // cadence, so this ran ~17Hz per message. Gate the whole math classify
-    // behind remember(renderText) so the regex match (and its compile, now
-    // a precompiled module-level Regex) only runs when the text changes.
-    val mathMarkers = remember(renderText) {
-        val display = renderText.contains("$$")
-        MathMarkers(
-            hasDisplay = display,
-            hasInline = !display && renderText.contains('$') && containsLikelyInlineMath(renderText),
-        )
-    }
-    val hasDisplay = mathMarkers.hasDisplay
-    val hasInline = mathMarkers.hasInline
-    if (hasDisplay || hasInline) {
-        val blockSegments = remember(renderText) { splitDisplayMathSegments(renderText) }
-        val hasBlockSplit = blockSegments.any { it is MathSegment.Math } && blockSegments.size > 1
-        val hasAnyInline = blockSegments
-            .filterIsInstance<MathSegment.Text>()
-            .any { containsLikelyInlineMath(it.content) }
+/** The text colour with the appended-fade alpha applied when the fade covers the whole text. */
+private fun fadedTextColor(textColor: Color, fadeRange: IntRange?, fadeAlpha: Float): Color {
+    val fadesWholeText = fadeRange?.first == 0 && fadeAlpha < 0.999f
+    return if (fadesWholeText) textColor.copy(alpha = fadeAlpha.coerceIn(0f, 1f)) else textColor
+}
 
-        if (hasBlockSplit || hasAnyInline) {
-            Column(modifier = modifier) {
-                blockSegments.forEach { seg ->
-                    when (seg) {
-                        is MathSegment.Text -> {
-                            if (containsLikelyInlineMath(seg.content)) {
-                                InlineMathParagraph(text = seg.content, textColor = effectiveTextColor)
-                            } else {
-                                MarkdownTextRaw(
-                                    text = seg.content,
-                                    modifier = Modifier,
-                                    textColor = effectiveTextColor,
-                                )
-                            }
-                        }
-                        is MathSegment.Math ->
-                            MathBlock(source = seg.content, displayMode = true)
-                    }
-                }
+/**
+ * Pre-pass: if the text contains display-math fences ($$…$$) OR a plausible inline-math span
+ * ($…$), the alternating Markdown / MathBlock segments to render; null when plain markdown will
+ * do. Display-math is block-level (stacked column); inline-math is interleaved with prose
+ * (wrapping row). Cheap fast-path when neither marker is present.
+ */
+internal fun mathSegmentsToRender(text: String): List<MathSegment>? {
+    val markers = mathMarkersOf(text)
+    if (!markers.hasDisplay && !markers.hasInline) return null
+    val segments = splitDisplayMathSegments(text)
+    val hasBlockSplit = segments.size > 1 && segments.any { it is MathSegment.Math }
+    val hasAnyInline = segments.filterIsInstance<MathSegment.Text>().any { containsLikelyInlineMath(it.content) }
+    return segments.takeIf { hasBlockSplit || hasAnyInline }
+}
+
+private fun mathMarkersOf(text: String): MathMarkers {
+    val display = text.contains("$$")
+    return MathMarkers(hasDisplay = display, hasInline = !display && containsLikelyInlineMath(text))
+}
+
+@Composable
+private fun MathSegmentsColumn(segments: List<MathSegment>, modifier: Modifier, textColor: Color) {
+    Column(modifier = modifier) {
+        segments.forEach { seg ->
+            when (seg) {
+                is MathSegment.Text -> MathTextSegment(content = seg.content, textColor = textColor)
+                is MathSegment.Math -> MathBlock(source = seg.content, displayMode = true)
             }
-            return
         }
     }
+}
 
-    MarkdownTextRaw(text = renderText, modifier = modifier, textColor = effectiveTextColor)
+@Composable
+private fun MathTextSegment(content: String, textColor: Color) {
+    if (containsLikelyInlineMath(content)) {
+        InlineMathParagraph(text = content, textColor = textColor)
+    } else {
+        MarkdownTextRaw(text = content, modifier = Modifier, textColor = textColor)
+    }
 }
 
 /**
@@ -183,7 +179,7 @@ private fun InlineRichTextChunk(text: String, textColor: Color) {
     val fontScale = LocalChatFontScale.current
     Text(
         text = text,
-        style = MaterialTheme.typography.bodyMedium.scaledBy(fontScale),
+        style = MaterialTheme.typography.bodyMedium,
         color = textColor,
     )
 }
@@ -505,7 +501,6 @@ private fun MarkdownTextRaw(
                             content = it.content,
                             node = it.node,
                             style = it.typography.code,
-                            highlights = highlightsBuilder,
                         )
                     }
                 }
@@ -637,18 +632,18 @@ private fun CodeFenceWithHeader(
     content: String,
     node: ASTNode,
     style: TextStyle,
-    highlights: Highlights.Builder,
 ) {
     val clipboardManager = LocalClipboardManager.current
 
     val (language, codeText) = remember(content, node) {
         extractCodeFenceInfo(content, node)
     }
-    val capA2uiFallback = language.equals("a2ui-json", ignoreCase = true) &&
-        (codeText.length > A2UI_JSON_FALLBACK_COLLAPSE_CHAR_LIMIT ||
-            codeText.lineSequence().count() > A2UI_JSON_FALLBACK_COLLAPSE_LINE_LIMIT)
+    val capA2uiFallback = remember(language, codeText) {
+        language.equals("a2ui-json", ignoreCase = true) &&
+            (codeText.length > A2UI_JSON_FALLBACK_COLLAPSE_CHAR_LIMIT ||
+                codeText.lineSequence().count() > A2UI_JSON_FALLBACK_COLLAPSE_LINE_LIMIT)
+    }
     var expanded by remember(content) { mutableStateOf(false) }
-    val scrollState = rememberScrollState()
 
     Surface(
         shape = RoundedCornerShape(8.dp),
@@ -693,37 +688,53 @@ private fun CodeFenceWithHeader(
                 }
             }
 
-            // NOTE: do NOT wrap MarkdownHighlightedCodeFence in a horizontalScroll
-            // here — the library already applies its own horizontalScroll internally.
-            // Nesting two horizontal scrollers produces infinite-width constraints
-            // during Compose's lookahead measure pass, which crashes the app with
-            // "Horizontally scrollable component was measured with an infinity
-            // maximum width constraints" (seen when scrolling back to messages
-            // that contain fenced code blocks). See letta-mobile-o2v7 followup.
-            // letta-mobile-pcir: center the code surface horizontally so a
-            // narrow ASCII diagram (e.g. a 30-char tree) sits in the middle
-            // of the fence rather than left-anchored against a wide gutter.
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .then(
-                        if (capA2uiFallback && !expanded) {
-                            Modifier
-                                .heightIn(max = A2UI_JSON_FALLBACK_COLLAPSED_MAX_HEIGHT)
-                                .verticalScroll(scrollState)
-                        } else {
-                            Modifier
-                        }
-                    )
-                    .padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
-                contentAlignment = Alignment.TopCenter,
-            ) {
-                MarkdownHighlightedCodeFence(
-                    content = content,
-                    node = node,
-                    highlightsBuilder = highlights,
-                )
-            }
+            CodeFenceBody(content = content, node = node, style = style, collapsed = capA2uiFallback && !expanded)
+        }
+    }
+}
+
+@Composable
+private fun CodeFenceBody(
+    content: String,
+    node: ASTNode,
+    style: TextStyle,
+    collapsed: Boolean,
+) {
+    val isDarkTheme = isSystemInDarkTheme()
+    val scrollState = rememberScrollState()
+    // NOTE: do NOT wrap the fence body in a second horizontalScroll here —
+    // HighlightedCodeText applies its own horizontalScroll internally.
+    // Nesting two horizontal scrollers produces infinite-width constraints
+    // during Compose's lookahead measure pass, which crashes the app with
+    // "Horizontally scrollable component was measured with an infinity
+    // maximum width constraints" (seen when scrolling back to messages
+    // that contain fenced code blocks). See letta-mobile-o2v7 followup.
+    // letta-mobile-pcir: center the code surface horizontally so a
+    // narrow ASCII diagram (e.g. a 30-char tree) sits in the middle
+    // of the fence rather than left-anchored against a wide gutter.
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (collapsed) {
+                    Modifier
+                        .heightIn(max = A2UI_JSON_FALLBACK_COLLAPSED_MAX_HEIGHT)
+                        .verticalScroll(scrollState)
+                } else {
+                    Modifier
+                }
+            )
+            .padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
+        contentAlignment = Alignment.TopCenter,
+    ) {
+        // Our own highlighter, not the library's: it never flips to plain text while a
+        // recompute runs, coalesces streaming updates, and caches finished results, so a
+        // code box no longer relays out twice per token or on every scroll back into view.
+        MarkdownCodeFence(content = content, node = node, style = style) { code, fenceLanguage, codeStyle ->
+            HighlightedCodeText(
+                request = HighlightRequest(code, fenceLanguage, isDarkTheme),
+                style = codeStyle,
+            )
         }
     }
 }

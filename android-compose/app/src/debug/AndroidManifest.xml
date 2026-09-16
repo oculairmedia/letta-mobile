@@ -51,5 +51,12 @@
             android:exported="true"
             android:noHistory="true"
             android:theme="@style/Theme.LettaMobile.Starting" />
+
+        <!-- Rive mascot spike bench. Debug-only, launched by ADB:
+             am start -n <applicationId>/com.letta.mobile.debug.MascotDebugActivity -->
+        <activity
+            android:name="com.letta.mobile.debug.MascotDebugActivity"
+            android:exported="true"
+            android:label="Mascot bench" />
     </application>
 </manifest>

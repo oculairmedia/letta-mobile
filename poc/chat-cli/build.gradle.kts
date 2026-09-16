@@ -1,6 +1,6 @@
 plugins {
-    kotlin("jvm") version "1.9.22"
-    kotlin("plugin.serialization") version "1.9.22"
+    kotlin("jvm") version "2.4.10"
+    kotlin("plugin.serialization") version "2.4.10"
     application
 }
 
@@ -11,8 +11,8 @@ repositories {
     mavenCentral()
 }
 
-val ktorVersion = "2.3.12"
-val coroutinesVersion = "1.7.3"
+val ktorVersion = "3.5.0"
+val coroutinesVersion = "1.10.1"
 
 dependencies {
     // Kotlin coroutines
@@ -26,7 +26,7 @@ dependencies {
     implementation("io.ktor:ktor-client-logging:$ktorVersion")
 
     // Serialization
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
 
     // Logging
     implementation("org.slf4j:slf4j-simple:2.0.12")
@@ -45,5 +45,5 @@ tasks.test {
 }
 
 kotlin {
-    jvmToolchain(17)
+    jvmToolchain(21)
 }

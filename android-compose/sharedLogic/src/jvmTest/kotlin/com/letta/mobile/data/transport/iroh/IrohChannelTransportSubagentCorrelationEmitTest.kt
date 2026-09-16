@@ -185,7 +185,7 @@ class IrohChannelTransportSubagentCorrelationEmitTest {
     }
 
     @Test
-    fun `return emits a SubagentsUpdated marking the entry completed`() = runBlocking {
+    fun `dispatch return does not emit a false child completion`() = runBlocking {
         val transport = transport()
         val frames = CopyOnWriteArrayList<ServerFrame>()
         val collector = clientScope.async { transport.events.collect { frames.add(it) } }
@@ -201,18 +201,13 @@ class IrohChannelTransportSubagentCorrelationEmitTest {
                 while (frames.none { it is ServerFrame.SubagentsUpdated }) delay(10.milliseconds)
             }
             assertTrue(observerStream.tryEmit(agentReturnDelta("tc-1")))
-            withTimeout(3.seconds) {
-                while (frames.filterIsInstance<ServerFrame.SubagentsUpdated>().none {
-                        it.reason == IrohChannelTransport.SUBAGENT_REASON_COMPLETED
-                    }
-                ) delay(10.milliseconds)
-            }
+            delay(300.milliseconds)
 
-            val completed = frames.filterIsInstance<ServerFrame.SubagentsUpdated>()
-                .single { it.reason == IrohChannelTransport.SUBAGENT_REASON_COMPLETED }
-            assertEquals("tc-1", completed.subagent?.toolCallId)
-            assertEquals(SubagentStatus.COMPLETED, completed.subagent?.status)
-            assertEquals(SubagentStatus.COMPLETED, completed.subagentsActive.single().status)
+            val updates = frames.filterIsInstance<ServerFrame.SubagentsUpdated>()
+            assertEquals(1, updates.size)
+            assertEquals(IrohChannelTransport.SUBAGENT_REASON_STARTED, updates.single().reason)
+            assertEquals(SubagentStatus.RUNNING, updates.single().subagentsActive.single().status)
+
         } finally {
             collector.cancel()
             transport.disconnect()

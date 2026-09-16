@@ -4,6 +4,7 @@ import com.letta.mobile.feature.chat.screen.LocalChatShouldDeferHeavyToolCards
 import com.letta.mobile.feature.chat.screen.ChatFadeEdgeLength
 import com.letta.mobile.feature.chat.coordination.ChatHydrationTrace
 import com.letta.mobile.feature.chat.screen.ChatFadingEdgesBox
+import com.letta.mobile.feature.chat.screen.chatFadeScrimColor
 import com.letta.mobile.feature.chat.screen.chatFadeTargetColor
 import com.letta.mobile.feature.chat.screen.toChatViewportSnapshot
 import com.letta.mobile.ui.chat.render.toChatRenderItemState
@@ -141,6 +142,12 @@ private fun ChatMessageListLazyColumnContent(params: ChatMessageListLazyColumnPa
         chatBackground = bodyParams.appearance.chatBackground,
         fallbackContainerColor = MaterialTheme.colorScheme.surfaceContainer,
     )
+    // The dissolve grades into the scaffold container, but the darkening pass lies over
+    // the ambient glow and must use the surface the chat is really drawn on.
+    val fadeScrimColor = chatFadeScrimColor(
+        chatBackground = bodyParams.appearance.chatBackground,
+        surfaceColor = MaterialTheme.colorScheme.background,
+    )
     val topFadeLength = chatMessageListTopFadeLength(bodyParams.appearance.topPadding)
     val bottomFadeLength = chatMessageListBottomFadeLength(bodyParams.appearance.bottomPadding)
     val suppressBottomFade = rememberChatMessageListSuppressBottomFade(bodyParams)
@@ -149,6 +156,7 @@ private fun ChatMessageListLazyColumnContent(params: ChatMessageListLazyColumnPa
         listState = bodyParams.listState,
         targetColor = fadeTargetColor,
         modifier = Modifier.fillMaxSize(),
+        scrimColor = fadeScrimColor,
         topPadding = bodyParams.appearance.topPadding,
         topFadeLength = topFadeLength,
         bottomFadeLength = bottomFadeLength,
@@ -162,7 +170,7 @@ private fun chatMessageListTopFadeLength(topPadding: Dp): Dp {
     return if (topPadding > 0.dp) topPadding + 16.dp else ChatFadeEdgeLength
 }
 
-private fun chatMessageListBottomFadeLength(bottomPadding: Dp): Dp {
+internal fun chatMessageListBottomFadeLength(bottomPadding: Dp): Dp {
     return if (bottomPadding > 0.dp) bottomPadding + 48.dp else ChatFadeEdgeLength + 48.dp
 }
 
@@ -172,7 +180,7 @@ private fun rememberChatMessageListSuppressBottomFade(params: ChatMessageListBod
         derivedStateOf {
             val lastMessage = params.state.messages.lastOrNull()
             val isNearBottom = ChatViewportFollowPolicy.isNearLatest(
-                params.listState.toChatViewportSnapshot(params.isUserScrolling, params.renderItems.size),
+                params.listState.toChatViewportSnapshot(params.isUserScrolling, params.renderItems),
             )
             isNearBottom && lastMessage?.role == "user" && params.state.isStreaming
         }

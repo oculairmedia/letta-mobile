@@ -41,6 +41,18 @@ data class UiMessage(
      */
     val isError: Boolean = false,
     /**
+     * letta-mobile-jt4wq: this LOCAL message could not be handed to the
+     * transport (delivery state FAILED). It is NOT [isError].
+     *
+     * These were previously folded together, which meant a user's own prompt
+     * was re-rendered as a left-aligned destructive "Error" bubble containing
+     * their own words — the message looked like a server failure report rather
+     * than something they said. The two states need different treatment: a
+     * send failure is local, retryable, and belongs to the user's own bubble;
+     * an error frame is the server telling us the run went wrong.
+     */
+    val isSendFailed: Boolean = false,
+    /**
      * Best-effort elapsed time from the triggering user prompt to this
      * assistant-side message. Populated at render time when server timestamps
      * are available; null means latency should be hidden.
@@ -75,6 +87,13 @@ data class UiMessage(
 data class UiImageAttachment(
     val base64: String,
     val mediaType: String,
+    /**
+     * Round-tripped from a snapshot pointer whose inline thumbnail exceeded
+     * the 16 KB budget. Non-null + empty base64 means the attachment exists
+     * but the bytes were not rehydrated; renderers show a stored-pointer
+     * placeholder labelled with [storedByteSize].
+     */
+    val storedByteSize: Long? = null,
 )
 
 @Immutable
@@ -82,6 +101,8 @@ data class UiToolCall(
     val name: String,
     val arguments: String,
     val result: String?,
+    /** Optional compact target shown beside [name] without replacing expanded arguments. */
+    val displayTarget: String? = null,
     val status: String? = null,
     val generatedImageAttachments: List<UiImageAttachment> = emptyList(),
     /**
@@ -91,6 +112,14 @@ data class UiToolCall(
      */
     val executionTimeMs: Long? = null,
     val toolCallId: String? = null,
+    /**
+     * True when this call was read back from the durable ledger rather than observed live.
+     *
+     * The ledger stores a call and its return as separate rows, so a call row read on its own
+     * never carries a result. Without this, "no result yet" is indistinguishable from "still
+     * running", and every rehydrated tool call claims to be executing.
+     */
+    val settled: Boolean = false,
     /**
      * Folded-in approval outcome for this specific tool call, when the mapper
      * absorbed a bare `approve=true` / `approve=false` `APPROVAL_RESPONSE`
@@ -191,7 +220,22 @@ data class UiApprovalResponse(
     val approved: Boolean? = null,
     val reason: String? = null,
     val approvals: List<UiApprovalDecision> = emptyList(),
-)
+) {
+    /**
+     * letta-mobile-soa3i.4: the one verdict every client renders. It fails closed: any explicit
+     * rejection, top-level or per call, makes the whole response Rejected (false), so a mixed
+     * response never reads as Approved. Null when no explicit decision exists at all.
+     */
+    val verdict: Boolean?
+        get() {
+            val explicit = listOfNotNull(approved) + approvals.mapNotNull { it.approved }
+            return when {
+                explicit.isEmpty() -> null
+                explicit.any { !it } -> false
+                else -> true
+            }
+        }
+}
 
 @Immutable
 data class UiApprovalDecision(

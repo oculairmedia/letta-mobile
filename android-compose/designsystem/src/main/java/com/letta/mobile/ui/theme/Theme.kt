@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.theme
 
+import android.annotation.SuppressLint
+import android.content.Context
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ColorScheme
@@ -465,6 +467,11 @@ internal fun presetThemeColors(themePreset: ThemePreset): PresetThemeColors = wh
     ThemePreset.SPRING -> SpringThemeColors
 }
 
+// The only caller performs the API 31 SDK check; Qodana does not propagate that guard into this helper.
+@SuppressLint("NewApi")
+private fun dynamicColorSchemeForApi31(context: Context, useDarkTheme: Boolean): ColorScheme =
+    if (useDarkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun LettaTheme(
@@ -482,13 +489,10 @@ fun LettaTheme(
     }
 
     val presetColors = presetThemeColors(themePreset)
-    val useDynamicColor = dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-
-    val baseColorScheme = when {
-        useDynamicColor && useDarkTheme -> dynamicDarkColorScheme(context)
-        useDynamicColor && !useDarkTheme -> dynamicLightColorScheme(context)
-        useDarkTheme -> presetColors.darkScheme
-        else -> presetColors.lightScheme
+    val baseColorScheme = if (dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        dynamicColorSchemeForApi31(context, useDarkTheme)
+    } else {
+        if (useDarkTheme) presetColors.darkScheme else presetColors.lightScheme
     }
     val colorScheme = baseColorScheme.withLettaContrastBoost()
 

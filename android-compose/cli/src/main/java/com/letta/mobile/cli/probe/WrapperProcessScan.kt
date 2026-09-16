@@ -90,16 +90,19 @@ object WrapperProcessScan {
      */
     fun validateScanOptions(mode: WrapperScanMode, pid: Int?, notApplicableReason: String?): String? {
         val reason = notApplicableReason?.takeIf { it.isNotBlank() }
-        return when {
-            mode == WrapperScanMode.DEPLOYMENT && reason != null ->
+        return when (mode) {
+            WrapperScanMode.DEPLOYMENT -> if (reason != null) {
                 "--wrapper-scan-not-applicable is only valid with --wrapper-scan-mode=hermetic; " +
                     "the deployment gate must scan the real wrapper process"
-            mode == WrapperScanMode.HERMETIC && pid != null && reason != null ->
-                "--wrapper-pid and --wrapper-scan-not-applicable are mutually exclusive"
-            mode == WrapperScanMode.HERMETIC && pid == null && reason == null ->
-                "--wrapper-scan-mode=hermetic requires --wrapper-pid <spawned wrapper pid> " +
-                    "(or --wrapper-scan-not-applicable <reason> when the harness spawns no wrapper process)"
-            else -> null
+            } else null
+            WrapperScanMode.HERMETIC -> when {
+                pid != null && reason != null ->
+                    "--wrapper-pid and --wrapper-scan-not-applicable are mutually exclusive"
+                pid == null && reason == null ->
+                    "--wrapper-scan-mode=hermetic requires --wrapper-pid <spawned wrapper pid> " +
+                        "(or --wrapper-scan-not-applicable <reason> when the harness spawns no wrapper process)"
+                else -> null
+            }
         }
     }
 

@@ -2,6 +2,9 @@ package com.letta.mobile.runtime.local
 
 import com.letta.mobile.data.controller.node.iroh.LocalBackendAdminStore
 import com.letta.mobile.data.controller.node.iroh.MessagePage
+import com.letta.mobile.data.timeline.toTimelineEvent
+import com.letta.mobile.data.timeline.snapshot.toStoredTimelineEvent
+import com.letta.mobile.data.timeline.snapshot.toConfirmedTimelineEvent
 import com.letta.mobile.runtime.TurnImagePart
 import com.letta.mobile.runtime.TurnInput
 import com.letta.mobile.util.Telemetry
@@ -84,6 +87,27 @@ import org.junit.rules.TemporaryFolder
  *     — read off real rows in that same live store.
  */
 class ImagePipelineEndToEndTest {
+
+    @Test
+    fun `small durable reference hydrates through native history DTO snapshot and render data`() {
+        val base = tmp.newFolder("reference-store")
+        val directory = conversationDir(base, DEFAULT_CONV_KEY)
+        val ref = LocalImageBlobStore(directory).putBytes("image/png", Base64.getDecoder().decode(TINY_PNG_BASE64))
+        val pointer = json.parseToJsonElement("""{"type":"text","text":"[image]","image_ref":"$ref","mediaType":"image/png"}""").jsonObject
+        writeTranscript(base, DEFAULT_CONV_KEY, listOf(sessionHeader(), messageEnvelope("m-ref", userRow("ui-ref", JsonArray(listOf(pointer))))))
+        val wire = readConversation(base, DEFAULT_CONV_ID).single()
+        val dto = json.decodeFromJsonElement(com.letta.mobile.data.model.LettaMessage.serializer(), wire)
+        val event = requireNotNull(dto.toTimelineEvent(1.0))
+        val stored = event.toStoredTimelineEvent()
+        val encoded = json.encodeToString(com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent.serializer(), stored)
+        val restored = json.decodeFromString(com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent.serializer(), encoded).toConfirmedTimelineEvent()
+        assertEquals(TINY_PNG_BASE64, restored.attachments.single().base64)
+        assertEquals("data:image/png;base64,$TINY_PNG_BASE64", restored.attachments.single().toDataUrl())
+        // A fresh reader must resolve the durable reference; corruption must fail closed.
+        directory.resolve("blobs/${ref.removePrefix("sha256:")}.png").writeText("corrupt")
+        val corrupt = json.decodeFromJsonElement(com.letta.mobile.data.model.LettaMessage.serializer(), readConversation(base, DEFAULT_CONV_ID).single())
+        assertTrue(requireNotNull(corrupt.toTimelineEvent(1.0)).attachments.isEmpty())
+    }
 
     @get:Rule
     val tmp = TemporaryFolder()

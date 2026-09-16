@@ -33,6 +33,8 @@ import com.letta.mobile.ui.components.LettaSearchBar
 import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.mascot.AgentAvatar
+import com.letta.mobile.ui.mascot.mascotAtWork
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -44,6 +46,12 @@ internal fun AgentScaffoldTopBar(state: AgentScaffoldRuntimeState) {
 
     TopAppBar(
         title = {
+            androidx.compose.material3.Surface(
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(50),
+                color = Color.Black,
+                contentColor = Color.White,
+            ) {
+                androidx.compose.foundation.layout.Box(Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
             if (showSearchField) {
                 AgentScaffoldSearchTopBarTitle(
                     searchQuery = state.uiState.searchQuery,
@@ -54,6 +62,7 @@ internal fun AgentScaffoldTopBar(state: AgentScaffoldRuntimeState) {
             } else {
                 AgentScaffoldAgentTopBarTitle(
                     params = AgentScaffoldAgentTopBarTitleParams(
+                        agentId = state.agentIdValue,
                         agentName = state.agentName,
                         screenTitle = state.screenTitle,
                         currentAgentIsFavorite = state.currentAgentIsFavorite,
@@ -69,6 +78,8 @@ internal fun AgentScaffoldTopBar(state: AgentScaffoldRuntimeState) {
                         },
                     ),
                 )
+            }
+                }
             }
         },
         modifier = Modifier.padding(top = with(LocalDensity.current) { WindowInsets.safeDrawing.getTop(this).toDp() }),
@@ -117,6 +128,7 @@ private fun AgentScaffoldSearchTopBarTitle(
 }
 
 internal data class AgentScaffoldAgentTopBarTitleParams(
+    val agentId: String,
     val agentName: String,
     val screenTitle: String,
     val currentAgentIsFavorite: Boolean,
@@ -130,7 +142,6 @@ internal data class AgentScaffoldAgentTopBarTitleParams(
 private fun AgentScaffoldAgentTopBarTitle(params: AgentScaffoldAgentTopBarTitleParams) {
     Row(
         modifier = Modifier
-            .fillMaxWidth()
             .testTag(AgentScaffoldTestTags.CONVERSATION_PICKER_TRIGGER)
             .combinedClickable(
                 onClick = params.onAgentTitleClick,
@@ -140,6 +151,16 @@ private fun AgentScaffoldAgentTopBarTitle(params: AgentScaffoldAgentTopBarTitleP
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
+        // The agent's avatar as a chip before its name (letta-mobile-8jtf3). Alive while the agent
+        // is idle; the moment a run starts it turns into a still and the composer companion carries
+        // the motion - one moving character per screen.
+        AgentAvatar(
+            agentId = params.agentId,
+            name = params.agentName.ifBlank { params.screenTitle },
+            size = TopBarMascotSize,
+            modifier = Modifier.padding(end = 4.dp),
+            live = !mascotAtWork(params.agentId),
+        )
         Text(
             text = params.agentName.ifBlank { params.screenTitle },
             maxLines = 1,
@@ -166,10 +187,12 @@ private fun AgentScaffoldAgentTopBarTitle(params: AgentScaffoldAgentTopBarTitleP
             LettaIcons.ArrowDropDown,
             contentDescription = "Switch agent",
             modifier = Modifier.size(LettaIconSizing.Inline),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = Color.White,
         )
     }
 }
+
+private val TopBarMascotSize = 28.dp
 
 @Composable
 private fun AgentScaffoldTopBarActions(
@@ -178,6 +201,10 @@ private fun AgentScaffoldTopBarActions(
     IconButton(
         onClick = onMenuClick,
         modifier = Modifier.testTag(AgentScaffoldTestTags.MENU_BUTTON),
+        colors = androidx.compose.material3.IconButtonDefaults.iconButtonColors(
+            containerColor = Color.Black,
+            contentColor = Color.White,
+        ),
     ) {
         Icon(LettaIcons.Menu, "Menu")
     }

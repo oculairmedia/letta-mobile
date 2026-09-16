@@ -15,7 +15,7 @@ import com.letta.mobile.ui.chat.render.RenderDiagnostics
 import kotlinx.collections.immutable.toImmutableList
 
 internal object ToolCallRenderer : MessageContentRenderer {
-    override fun canRender(message: UiMessage) =
+    override fun canRender(message: UiMessage): Boolean =
         !message.toolCalls.isNullOrEmpty()
 
     @Composable

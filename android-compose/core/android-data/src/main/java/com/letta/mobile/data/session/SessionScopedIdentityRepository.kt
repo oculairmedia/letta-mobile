@@ -22,6 +22,8 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 
+// The singleton repository owns this scope and cancels it explicitly in close().
+@Suppress("NoDetachedCoroutineLifecycle")
 internal fun defaultSessionScopedIdentityRepositoryScope(): CoroutineScope =
     CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -49,7 +51,7 @@ class SessionScopedIdentityRepository internal constructor(
             .launchIn(proxyScope)
     }
 
-    override suspend fun refreshIdentities() = sessionManager.withCurrentSession { it.identityRepository.refreshIdentities() }
+    override suspend fun refreshIdentities(): Unit = sessionManager.withCurrentSession { it.identityRepository.refreshIdentities() }
 
     override suspend fun countIdentities(): Int = sessionManager.withCurrentSession { it.identityRepository.countIdentities() }
 
@@ -67,12 +69,12 @@ class SessionScopedIdentityRepository internal constructor(
         properties: List<IdentityProperty>,
     ): Identity = sessionManager.withCurrentSession { it.identityRepository.upsertIdentityProperties(identityId, properties) }
 
-    override suspend fun deleteIdentity(identityId: IdentityId) = sessionManager.withCurrentSession { it.identityRepository.deleteIdentity(identityId) }
+    override suspend fun deleteIdentity(identityId: IdentityId): Unit = sessionManager.withCurrentSession { it.identityRepository.deleteIdentity(identityId) }
 
-    override suspend fun attachIdentity(agentId: AgentId, identityId: IdentityId) =
+    override suspend fun attachIdentity(agentId: AgentId, identityId: IdentityId): Unit =
         sessionManager.withCurrentSession { it.identityRepository.attachIdentity(agentId, identityId) }
 
-    override suspend fun detachIdentity(agentId: AgentId, identityId: IdentityId) =
+    override suspend fun detachIdentity(agentId: AgentId, identityId: IdentityId): Unit =
         sessionManager.withCurrentSession { it.identityRepository.detachIdentity(agentId, identityId) }
 
     override suspend fun listAgentsForIdentity(identityId: IdentityId): List<Agent> =

@@ -48,11 +48,16 @@ class ConversationViewerSubscriptionTest {
         maxFrameBytes = IrohFrameCodec.DEFAULT_MAX_FRAME_BYTES,
     )
 
+    private suspend fun subscription(
+        registry: ConnectionRegistry,
+        viewer: ViewerHandle,
+    ): ConversationViewerSubscription = ConversationViewerSubscription(registry, registry.claim(viewer))
+
     @Test
     fun runtimeStartThenMessageListDeScopesToTheNewConversation() = runTest {
         val registry = ConnectionRegistry()
         val connViewer = viewer("conn-A")
-        val subscription = ConversationViewerSubscription(registry, connViewer)
+        val subscription = subscription(registry, connViewer)
 
         // Signal 1: runtime_start(convA) — the initiator/sender path.
         subscription.subscribe("convA")
@@ -73,7 +78,7 @@ class ConversationViewerSubscriptionTest {
     fun reSubscribingToSameConversationIsIdempotent() = runTest {
         val registry = ConnectionRegistry()
         val connViewer = viewer("conn-A")
-        val subscription = ConversationViewerSubscription(registry, connViewer)
+        val subscription = subscription(registry, connViewer)
 
         subscription.subscribe("convA")
         subscription.subscribe("convA")
@@ -94,7 +99,7 @@ class ConversationViewerSubscriptionTest {
         // realtime fan-out forever ("desktop -> mobile not realtime").
         val registry = ConnectionRegistry()
         val v = viewer("conn-A")
-        val subscription = ConversationViewerSubscription(registry, v)
+        val subscription = subscription(registry, v)
 
         subscription.subscribe("convA")
         assertEquals(setOf<ViewerHandle>(v), registry.viewersFor("convA"))
@@ -117,9 +122,9 @@ class ConversationViewerSubscriptionTest {
         val registry = ConnectionRegistry()
         val a = viewer("conn-A")
         val b = viewer("conn-B")
-        val subA = ConversationViewerSubscription(registry, a)
+        val subA = subscription(registry, a)
         // conn-B never subscribes to anything.
-        val subB = ConversationViewerSubscription(registry, b)
+        val subB = subscription(registry, b)
 
         subA.subscribe("convA")
 
@@ -136,8 +141,8 @@ class ConversationViewerSubscriptionTest {
         val registry = ConnectionRegistry()
         val a = viewer("conn-A")
         val b = viewer("conn-B")
-        ConversationViewerSubscription(registry, a).subscribe("convA")
-        ConversationViewerSubscription(registry, b).subscribe("convA")
+        subscription(registry, a).subscribe("convA")
+        subscription(registry, b).subscribe("convA")
 
         assertEquals(setOf<ViewerHandle>(a, b), registry.viewersFor("convA"))
     }
@@ -152,7 +157,7 @@ class ConversationViewerSubscriptionTest {
         // the connection subscribe itself as a viewer of the hydrated conversation.
         val registry = ConnectionRegistry()
         val connViewer = viewer("conn-A")
-        val subscription = ConversationViewerSubscription(registry, connViewer)
+        val subscription = subscription(registry, connViewer)
 
         val router = AdminRpcRouter().apply {
             register("message.list") { kotlinx.serialization.json.JsonPrimitive("[]") }

@@ -112,18 +112,18 @@ class SubagentCorrelatorTest {
     }
 
     @Test
-    fun `return marks the entry completed`() {
+    fun `dispatch return keeps child running until authoritative lifecycle`() {
         val correlator = SubagentCorrelator()
         correlator.onAgentDispatch(
             "tc-1",
             """{"description":"d","subagent_type":"researcher"}""",
             fullParent,
         )
-        correlator.onAgentReturn("tc-1", fullParent)
+        correlator.onDispatchReturn("tc-1", fullParent)
 
         val entry = correlator.snapshot().single()
-        assertEquals(SubagentStatus.COMPLETED, entry.status)
-        // Provenance survives the terminal transition.
+        assertEquals(SubagentStatus.RUNNING, entry.status)
+        // Provenance survives dispatch acknowledgement.
         assertEquals("agent-parent", entry.parentAgentId)
     }
 
@@ -131,7 +131,7 @@ class SubagentCorrelatorTest {
     fun `return for an unknown tool call id is ignored`() {
         val correlator = SubagentCorrelator()
         val revBefore = correlator.revision
-        correlator.onAgentReturn("never-dispatched", fullParent)
+        correlator.onDispatchReturn("never-dispatched", fullParent)
 
         assertTrue(correlator.snapshot().isEmpty())
         assertEquals(revBefore, correlator.revision)
@@ -173,7 +173,7 @@ class SubagentCorrelatorTest {
         val afterDispatch = correlator.revision
         assertTrue(afterDispatch > 0L)
 
-        correlator.onAgentReturn("tc-1", fullParent)
-        assertTrue(correlator.revision > afterDispatch)
+        correlator.onDispatchReturn("tc-1", fullParent)
+        assertEquals(afterDispatch, correlator.revision)
     }
 }

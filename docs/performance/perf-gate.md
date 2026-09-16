@@ -33,10 +33,9 @@ The CI workflow runs the benchmark methods that back `perf/baselines.json`:
 - `StartupBenchmark#coldStartupCompilationPartial`
 - `StartupBenchmark#warmStartup`
 
-Only **cold startup is gating** on the shared GitHub Actions API 33 emulator.
-Warm startup is still collected and reported, but it is informational-only on
-this runner because repeated healthy benchmark runs showed wide warm variance
-that would make a blocking PR gate flaky rather than protective.
+Both **cold and warm startup are gating** on the shared GitHub Actions API 33
+emulator. Each metric must provide at least ten samples and remain within its
+configured tolerance.
 
 The repo still contains `ScrollJankBenchmark` and `ComposerTypingBenchmark`,
 but they are **not gating in CI yet**. On a fresh API 33 emulator the app
@@ -53,7 +52,9 @@ The parser reads AndroidX benchmark JSON output from:
 Each CI run also writes compact summaries under `android-compose/build/perf-summary/`:
 
 - `attempt-1/perf-summary.json` and `.md` for the first benchmark sample
-- `attempt-2/perf-summary.json` and `.md` only when the cold-start retry path runs
+- `attempt-2/perf-summary.json` and `.md` only when the bounded startup retry path runs
+- `attempt-1/results/` and `attempt-1/reports/` when a retry runs, preserving the
+  first attempt rather than replacing its evidence with the terminal attempt
 
 The summaries include observed value, baseline, ceiling, percent delta, benchmark source, AndroidX metric name, source JSON path, and whether the metric is gating or informational.
 
@@ -65,42 +66,45 @@ in the checker.
 Current policy:
 
 - `startup.cold.p95_ms`: `+20%`
-- `startup.warm.p95_ms`: informational only (`gate: false`)
+- `startup.warm.p95_ms`: `+20%`
 
-Warm startup keeps a wider envelope than cold startup because consecutive seed
-and verify runs on the canonical API 33 emulator drifted by `+17.4%`
-(`285.988 ms` -> `335.808 ms`) during gate bring-up. Cold startup also needed a
-modest bump after the first PR-triggered verify run on the updated branch
-measured bounded drift up to `1772.844 ms` against a `1512.749 ms` seed
-(`+17.2%`), so the cold envelope is now `+20%` on this shared runner.
+Warm startup was refreshed to a `405.889 ms` baseline after consecutive
+canonical PR runs measured `353.541 ms` and `405.889 ms` while cold startup
+remained below its baseline. That evidence showed the previous `285.988 ms`
+seed no longer represented the shared runner. Cold startup retains its
+`1512.749 ms` baseline after healthy runs measured bounded drift up to
+`1772.844 ms` (`+17.2%`).
 
-Warm startup is non-gating because later PR runs on the same healthy emulator
-showed one-sided warm spikes (for example `434.843 ms` against a `285.988 ms`
-seed) while cold startup simultaneously improved, which is a strong signal of
-shared-runner noise rather than a trustworthy per-PR regression detector.
+Both startup metrics use a `+20%` envelope and gate by default. Their minimum
+sample counts prevent absent or undersampled output from silently passing.
 
 ## Retry behavior
 
 The workflow automatically performs **one bounded retry** when, and only when,
-the first baseline check finds a regression limited to
-`startup.cold.p95_ms`. The first check exits through a dedicated retryable
-status, the job reruns the macrobenchmark suite on a fresh emulator action
-invocation, clears the first attempt's AndroidX output, and then runs the
+the first baseline check finds one regression limited to either
+`startup.cold.p95_ms` or `startup.warm.p95_ms`. The first check exits through a
+dedicated retryable status, the job copies the first attempt's AndroidX results
+and reports into the attempt-specific artifact directory, reruns the complete
+macrobenchmark suite on a fresh emulator action invocation, and then runs the
 baseline check again without the retryable exit code.
 
 Outcomes:
 
 - attempt 1 passes: job passes, no retry
-- attempt 1 has only `startup.cold.p95_ms` above ceiling and attempt 2 passes:
-  job passes and both attempt summaries are uploaded
-- attempt 2 also has `startup.cold.p95_ms` above ceiling: job fails and should
-  be treated as a repeatable startup regression
-- any non-retryable failure, malformed input, unseeded gating baseline, or
-  benchmark task failure: job fails immediately
+- attempt 1 has exactly one startup metric above ceiling and attempt 2 passes:
+  job passes; artifacts retain both complete attempts and their summaries
+- attempt 2 has any regression, missing measurement, malformed input, or
+  unseeded gating baseline: job fails and remains red
+- attempt 1 has multiple failures or a non-startup failure: job fails immediately
 
-This retry does **not** raise the `+20%` ceiling and does not make warm startup
-or future informational metrics gating. It exists only to separate a single
-shared-emulator cold-start spike from a repeatable regression.
+The retry is prospective: it applies to every qualifying PR and does not bypass
+or rebaseline a particular change. It does **not** raise the `+20%` ceiling.
+It is supported by noisy healthy warm-start p95 observations on the unlocked
+shared emulator (428.617, 432.252, 503.493, 521.637, and 538.351 ms), while a
+second fully evaluated attempt continues to detect repeatable regressions.
+Preserving the first attempt prevents the former semantic false-pass mode where
+a cold-only retry's terminal success could hide an earlier warm breach in an
+artifact.
 
 ## Re-baselining
 
@@ -188,8 +192,8 @@ If the job fails unexpectedly:
 3. inspect the underlying `*-benchmarkData.json` files and HTML reports for the
    failing attempt
 4. verify the failing metric is from the expected benchmark method
-5. if the workflow already used attempt 2 and cold startup failed again, treat
-   it as repeatable rather than manually rerunning to hide the failure
+5. if the workflow already used attempt 2 and any metric failed or was missing,
+   treat it as terminal rather than manually rerunning to hide the failure
 6. if the change is legitimate and repeatable, rebaseline deliberately
 
 ## Regression simulation

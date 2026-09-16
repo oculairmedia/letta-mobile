@@ -2,6 +2,9 @@ import dev.nucleusframework.desktop.application.dsl.TargetFormat
 import dev.nucleusframework.desktop.application.dsl.ReleaseChannel
 import dev.nucleusframework.desktop.application.dsl.ReleaseType
 import dev.nucleusframework.desktop.application.dsl.SigningAlgorithm
+import org.gradle.jvm.toolchain.JavaInstallationMetadata
+import org.gradle.jvm.toolchain.JavaLanguageVersion
+import org.gradle.jvm.toolchain.JavaLauncher
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 // WiX 4 still resolves installer sources through Win32 paths. Keep CI's
@@ -11,10 +14,7 @@ providers.environmentVariable("LETTA_DESKTOP_BUILD_DIR").orNull
     ?.takeIf(String::isNotBlank)
     ?.let { layout.buildDirectory.set(file(it)) }
 
-// Desktop-only library versions stay named here until the project catalog
-// grows beyond the Android SDK constants in gradle/libs.versions.toml.
-//
-// WARNING — the Compose versions below are FLOORS, not the versions that ship.
+// WARNING — the Compose versions in libs.versions.toml are FLOORS, not the versions that ship.
 // The runtime classpath resolves the whole `org.jetbrains.compose` atomic group
 // to 1.11.1 by conflict resolution across eight requested versions (1.11.1,
 // 1.10.3, 1.10.0, 1.9.3, 1.9.1, 1.9.0, 1.7.0, 1.7.0-beta01). The 1.11.1 comes
@@ -27,23 +27,6 @@ providers.environmentVariable("LETTA_DESKTOP_BUILD_DIR").orNull
 // Pinning the group deliberately is worth doing, but it must be validated
 // against Jewel AND Nucleus together (both are compiled against different
 // Compose baselines) — do it as its own change, not as a drive-by bump.
-val composeDesktopMaterial3Version = "1.9.0"
-val composeDesktopMaterialIconsVersion = "1.7.3"
-val jewelVersion = "0.37.0-262.4852.51"
-val kuiverVersion = "0.3.0"
-val autoLinkTextVersion = "2.0.2"
-val textyVersion = "1.0.0-alpha"
-// Kizitonwose Calendar (Compose Multiplatform) — backs the Schedules surface's
-// Agenda date-strip (WeekCalendar) and History reliability grid
-// (HeatMapCalendar). Uses kotlinx-datetime types, matching our shared
-// schedule projection (Phase 7).
-val calendarVersion = "2.10.1"
-// Pet-window surface host (avatar PRD P4): embedded Chromium for the
-// off-screen renderer + Win32 window styles (no-activate / click-through).
-val jcefMavenVersion = "146.0.10"
-val jnaVersion = "5.17.0"
-val nucleusVersion = "2.1.5"
-val nativeTrayVersion = "2.0.1"
 val desktopNodeVersion = "24.13.1"
 val desktopLettaCodeVersion = "0.29.12"
 val desktopNodeArchiveName = "node-v$desktopNodeVersion-win-x64.zip"
@@ -53,8 +36,8 @@ val desktopNodeArchiveSha256 = "fba577c4bb87df04d54dd87bbdaa5a2272f1f99a2acbf915
 // AWT/InputMethod bridge Compose Multiplatform uses to surface the OS
 // touch-keyboard on text input — Temurin's InputMethod bridge resolves to a
 // no-op for non-Swing text components, so the keyboard never pops on touch
-// devices. The bundled JCEF runtime used by the avatar/pet window is fetched
-// separately via jcefmaven, so we use the vanilla `jbrsdk` (not `jbrsdk_jcef`).
+// devices. The bundled JCEF runtime (Mermaid, tool cards) is fetched separately
+// via jcefmaven, so we use the vanilla `jbrsdk` (not `jbrsdk_jcef`).
 // SHA-512 is published by JetBrains alongside the artifact.
 val jbrVersion = "25.0.4"
 val jbrBuild = "b508.27"
@@ -169,44 +152,55 @@ tasks.named("processResources") {
 
 dependencies {
     implementation(project(":sharedLogic"))
+    implementation(libs.androidx.paging.compose)
     implementation(project(":sharedUI"))
     // letta-mobile-cq2ju: Iroh QUIC transport for desktop. sharedLogic declares
     // computer.iroh:iroh as `implementation` (not `api`), so it is NOT exposed
     // transitively for desktop compilation — declare it directly here. The JAR
     // bundles host-OS native libs (linux/darwin/win, x86-64 + aarch64), so no
     // native packaging is needed.
-    implementation("computer.iroh:iroh:1.1.0")
-    // Avatar companion: renderer bridge + loopback web host (brings :avatar:core).
-    implementation(project(":avatar:renderer-web"))
-    // Avatar library: import pipeline + local catalog (license capture/display).
-    implementation(project(":avatar:asset-pipeline"))
+    implementation(libs.iroh)
+    // The mascot: the shared Rive mapping (brings :avatar:core), driven natively on desktop.
+    implementation(project(":avatar:renderer-rive"))
 
-    implementation("io.github.vinceglb:filekit-core-jvm:0.14.1")
-    implementation("io.github.vinceglb:filekit-dialogs-compose-jvm:0.14.1")
+    implementation(libs.filekit.core.jvm)
+    implementation(libs.filekit.dialogs.compose.jvm)
     implementation(compose.desktop.currentOs)
-    implementation("dev.nucleusframework:nucleus.nucleus-application:$nucleusVersion")
-    implementation("dev.nucleusframework:nucleus.updater-runtime:$nucleusVersion")
-    implementation("dev.nucleusframework:nucleus.native-http:$nucleusVersion")
-    implementation("dev.nucleusframework:nucleus.native-ssl:$nucleusVersion")
-    implementation("dev.nucleusframework:nucleus.notification-common:$nucleusVersion")
+    implementation(libs.nucleus.application)
+    implementation(libs.nucleus.updater.runtime)
+    implementation(libs.nucleus.native.http)
+    implementation(libs.nucleus.native.ssl)
+    implementation(libs.nucleus.notification.common)
     // The common NotificationManager delegates to the matching per-OS bridge,
     // so every desktop OS backend must be on the runtime classpath.
-    implementation("dev.nucleusframework:nucleus.notification-windows:$nucleusVersion")
-    implementation("dev.nucleusframework:nucleus.notification-macos:$nucleusVersion")
-    implementation("dev.nucleusframework:nucleus.notification-linux:$nucleusVersion")
-    implementation("dev.nucleusframework:nucleus.system-info:$nucleusVersion")
-    implementation("dev.nucleusframework:nucleus.darkmode-detector:$nucleusVersion")
-    implementation("dev.nucleusframework:nucleus.system-color:$nucleusVersion")
-    implementation("dev.nucleusframework:nucleus.taskbar-progress:$nucleusVersion")
-    implementation("dev.nucleusframework:nucleus.autolaunch:$nucleusVersion")
-    implementation("dev.nucleusframework:nucleus.launcher-windows:$nucleusVersion")
-    implementation("dev.nucleusframework:nucleus.launcher-linux:$nucleusVersion")
-    implementation("dev.nucleusframework:nucleus.launcher-macos:$nucleusVersion")
-    implementation("dev.nucleusframework:nucleus.global-hotkey:$nucleusVersion")
-    implementation("dev.nucleusframework:nucleus.energy-manager:$nucleusVersion")
-    implementation("dev.nucleusframework:nucleus.media-control:$nucleusVersion")
-    implementation("dev.nucleusframework:nucleus.linux-hidpi:$nucleusVersion")
-    implementation("dev.nucleusframework:composenativetray-jvm:$nativeTrayVersion")
+    implementation(libs.nucleus.notification.windows)
+    implementation(libs.nucleus.notification.macos)
+    implementation(libs.nucleus.notification.linux)
+    implementation(libs.nucleus.system.info)
+    implementation(libs.nucleus.darkmode.detector)
+    implementation(libs.nucleus.system.color)
+    implementation(libs.nucleus.taskbar.progress)
+    implementation(libs.nucleus.autolaunch)
+    implementation(libs.nucleus.launcher.windows)
+    implementation(libs.nucleus.launcher.linux)
+    implementation(libs.nucleus.launcher.macos)
+    implementation(libs.nucleus.global.hotkey)
+    implementation(libs.nucleus.energy.manager)
+    implementation(libs.nucleus.media.control)
+    implementation(libs.nucleus.linux.hidpi)
+    // The tray drags in Nucleus's Tao window backend, which registers a
+    // MainDispatcherFactory at load priority 100 and so wins Dispatchers.Main
+    // over kotlinx-coroutines-swing for the WHOLE process. Its dispatcher only
+    // queues: it drains when the native Tao event loop pumps, and this app runs
+    // NucleusBackend.Awt, so that loop never exists and every task dispatched to
+    // Dispatchers.Main is lost forever. paging-compose hardcodes Dispatchers.Main
+    // as its presenter dispatcher on desktop, which is why the canonical
+    // transcript sat on a spinner with rows already loaded (letta-mobile-x13xi).
+    // We never call Tao — the backend below is AWT + JNI — so keep it off the
+    // classpath entirely rather than leaving a dead Main dispatcher installed.
+    implementation(libs.nucleus.composenativetray.jvm) {
+        exclude(group = "dev.nucleusframework", module = "nucleus.decorated-window-tao")
+    }
     // Letta Desktop embeds JCEF and uses Swing/AWT integration, so Nucleus must
     // use its portable JNI-backed AWT window backend rather than Tao.
     //
@@ -219,29 +213,29 @@ dependencies {
     // real WS_CAPTION/WS_THICKFRAME frame. Nucleus's JNI backend keeps a real
     // native frame under custom-drawn chrome instead — the maintained
     // alternative to subclassing GWLP_WNDPROC ourselves via JNA.
-    implementation("dev.nucleusframework:nucleus.decorated-window-core:$nucleusVersion")
-    implementation("dev.nucleusframework:nucleus.decorated-window-awt:$nucleusVersion")
+    implementation(libs.nucleus.decorated.window.core)
+    implementation(libs.nucleus.decorated.window.awt)
     // `DecoratedWindow`/`TitleBar` themselves (the public entry points we call
     // from DesktopJewelWindow.kt) are published from this module, not -core —
     // it must be a compile-time dependency, not runtimeOnly.
-    implementation("dev.nucleusframework:nucleus.decorated-window-jni:$nucleusVersion")
-    implementation("org.jetbrains.jewel:jewel-decorated-window:$jewelVersion")
-    implementation("org.jetbrains.compose.material3:material3:$composeDesktopMaterial3Version")
-    implementation("org.jetbrains.compose.material:material-icons-extended:$composeDesktopMaterialIconsVersion")
-    implementation("org.jetbrains.skiko:skiko-awt:0.9.37.3")
-    implementation("io.github.justdeko:kuiver:$kuiverVersion")
-    implementation("sh.calvin.autolinktext:autolinktext:$autoLinkTextVersion")
+    implementation(libs.nucleus.decorated.window.jni)
+    implementation(libs.jewel.decorated.window)
+    implementation(libs.compose.desktop.material3)
+    implementation(libs.compose.desktop.material.icons)
+    implementation(libs.skiko.awt)
+    implementation(libs.kuiver)
+    implementation(libs.autolinktext)
     // Conversation tab strip drag-to-reorder (letta-mobile#1258): same
     // library the mobile dashboard already uses for its pinned-items grid
     // (see app/build.gradle.kts and HomeScreenWidgets.kt's
     // ReorderablePinnedItemsGrid) -- Kotlin Multiplatform, resolves to the
     // JVM/desktop artifact here via Gradle module metadata.
-    implementation("sh.calvin.reorderable:reorderable:3.1.0")
-    implementation("com.arjunjadeja:texty:$textyVersion")
-    implementation("com.kizitonwose.calendar:compose-multiplatform:$calendarVersion")
+    implementation(libs.reorderable)
+    implementation(libs.texty)
+    implementation(libs.calendar.compose.multiplatform)
     implementation(libs.kotlinx.coroutines.swing)
-    implementation("me.friwi:jcefmaven:$jcefMavenVersion")
-    implementation("net.java.dev.jna:jna-platform:$jnaVersion")
+    implementation(libs.jcefmaven)
+    implementation(libs.jna.platform)
     implementation(libs.ktor.client.cio)
     implementation(libs.ktor.client.websockets)
     implementation(libs.ktor.client.content.negotiation)
@@ -251,10 +245,10 @@ dependencies {
     // the generated `io.kotzilla.generated` package (reflective lookup so
     // the wrapper still compiles when the plugin isn't applied, e.g.
     // CI without a developer's local kotzilla.json).
-    implementation("io.kotzilla:kotzilla-sdk-compose-jvm:2.3.3")
+    implementation(libs.kotzilla.sdk.compose.jvm)
 
     testImplementation(kotlin("test"))
-    testImplementation("org.jetbrains.compose.ui:ui-test:1.11.1")
+    testImplementation(libs.compose.desktop.ui.test)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.ktor.client.mock)
 }
@@ -263,20 +257,27 @@ tasks.withType<Test>().configureEach {
     useJUnitPlatform()
 }
 
-// P4 spike entry point (see avatar/DESIGN-BRIEF.md + docs/design/avatar-system-prd.md):
-// frameless transparent pet window hosting the web avatar renderer off-screen.
-tasks.register<JavaExec>("runPetSpike") {
+// letta-mobile-0s5bi spike: native Rive (rive-runtime + D3D11 Rive Renderer) as a Compose node.
+// Needs a locally built bridge DLL; see avatar/renderer-rive/native/desktop/README.md.
+//   -PriveBridge=path\to\rive_desktop_bridge.dll -PriveFile=path\to\file.riv
+//   [-PriveStateMachine=name] [-PriveTriggers=a,b,c]
+tasks.register<JavaExec>("runRiveSpike") {
     group = "application"
-    description = "Runs the frameless pet-window spike (-PpetVrm=path\\to\\model.vrm to override the avatar)."
-    mainClass.set("com.letta.mobile.desktop.avatar.pet.PetWindowSpikeKt")
+    description = "Runs the native Rive spike window (Windows / D3D11)."
+    mainClass.set("com.letta.mobile.desktop.avatar.rive.RiveDesktopSpikeKt")
     classpath = sourceSets.main.get().runtimeClasspath
-    jvmArgs(
-        // jcefmaven OSR-mode requirements.
-        "--add-exports=java.base/java.lang=ALL-UNNAMED",
-        "--add-exports=java.desktop/sun.awt=ALL-UNNAMED",
-        "--add-exports=java.desktop/sun.java2d=ALL-UNNAMED",
+    providers.gradleProperty("riveBridge").orNull?.let { systemProperty("rive.bridge.path", it) }
+    providers.gradleProperty("riveSelfTest").orNull?.let { systemProperty("rive.spike.selfTest", it) }
+    // -PriveRecord=enter-thinking takes one motion signature as soon as the file loads and prints it.
+    providers.gradleProperty("riveRecord").orNull?.let { systemProperty("rive.spike.record", it) }
+    // -PriveOnion=true opens with the live onion skin already on.
+    providers.gradleProperty("riveOnion").orNull?.let { systemProperty("rive.spike.onion", it) }
+    args(
+        providers.gradleProperty("riveFile").orElse("").get(),
+        providers.gradleProperty("riveStateMachine").orElse("").get(),
+        providers.gradleProperty("riveTriggers").orElse("").get(),
+        rootProject.layout.projectDirectory.file("avatar/renderer-rive/src/androidMain/res/raw/mascot.riv").asFile.absolutePath,
     )
-    providers.gradleProperty("petVrm").orNull?.let { args(it) }
 }
 
 // Realtime lookdev for the ambient agent-status shader: live-editable SkSL,
@@ -610,6 +611,62 @@ tasks.matching { it.name == "prepareAppResources" }.configureEach {
     dependsOn(prepareDesktopLettaCodeRuntime)
 }
 
+/*
+ * The native Rive mascot renderer (avatar/renderer-rive/native/desktop). It is built outside Gradle -
+ * VS 2022 plus a rive-runtime checkout, scripted by build-bridge.sh - and handed in by path:
+ *   -PriveBridge=C:\path\to\rive_desktop_bridge.dll   or   LETTA_RIVE_BRIDGE_DLL
+ * It is staged into the app resources, so `:desktop:run` and the installed app both find it through
+ * compose.application.resources.dir (RiveBridgeNative.PATH). Without it every agent draws the
+ * gradient orb, so packaging refuses to run without one unless -PallowMissingRiveBridge=true.
+ */
+val riveBridgeSource: String? = providers.gradleProperty("riveBridge")
+    .orElse(providers.environmentVariable("LETTA_RIVE_BRIDGE_DLL"))
+    .orNull
+    ?.takeIf { it.isNotBlank() }
+val allowMissingRiveBridge = providers.gradleProperty("allowMissingRiveBridge").orNull.toBoolean()
+val stagedRiveBridge = desktopAppResourcesDir.map { it.file("windows/rive_desktop_bridge.dll") }
+val stageDesktopRiveBridge = tasks.register("stageDesktopRiveBridge") {
+    val source = riveBridgeSource?.let(::File)
+    val target = stagedRiveBridge.get().asFile
+    enabled = isWindowsHost
+    inputs.property("source", riveBridgeSource.orEmpty())
+    source?.takeIf { it.isFile }?.let { inputs.file(it) }
+    outputs.file(target)
+    doLast {
+        if (source == null) {
+            // Nothing handed in: make sure a DLL staged by an earlier build does not linger silently.
+            target.delete()
+            logger.lifecycle("stageDesktopRiveBridge: no -PriveBridge / LETTA_RIVE_BRIDGE_DLL; mascots fall back to orbs.")
+            return@doLast
+        }
+        require(source.isFile) { "Rive bridge DLL not found at $source (-PriveBridge / LETTA_RIVE_BRIDGE_DLL)" }
+        target.parentFile.mkdirs()
+        source.copyTo(target, overwrite = true)
+        logger.lifecycle("stageDesktopRiveBridge: staged $source")
+    }
+}
+
+tasks.matching { it.name == "prepareAppResources" }.configureEach {
+    dependsOn(stageDesktopRiveBridge)
+}
+
+tasks.matching {
+    it.name.startsWith("createDistributable") ||
+    it.name.startsWith("createReleaseDistributable") ||
+    it.name.startsWith("packageDistributionForCurrentOS") ||
+    it.name.startsWith("packageReleaseDistributionForCurrentOS")
+}.configureEach {
+    val staged = stagedRiveBridge
+    doFirst {
+        if (!isWindowsHost || allowMissingRiveBridge) return@doFirst
+        check(staged.get().asFile.isFile) {
+            "No rive_desktop_bridge.dll staged: this installer would ship without the mascot renderer. " +
+                "Build it with avatar/renderer-rive/native/desktop/build-bridge.sh and pass " +
+                "-PriveBridge=<dll> (or LETTA_RIVE_BRIDGE_DLL), or -PallowMissingRiveBridge=true to package orbs only."
+        }
+    }
+}
+
 tasks.matching { it.name == "checkRuntime" || it.name == "checkReleaseRuntime" }.configureEach {
     dependsOn(extractDesktopJbr)
 }
@@ -712,10 +769,10 @@ afterEvaluate {
             val jbrJava = desktopJbrHome.map { it.file("bin/java.exe") }
             javaLauncher.set(provider {
                 val executable = jbrJava.get()
-                object : org.gradle.jvm.toolchain.JavaLauncher {
+                object : JavaLauncher {
                     override fun getExecutablePath() = executable
-                    override fun getMetadata() = object : org.gradle.jvm.toolchain.JavaInstallationMetadata {
-                        override fun getLanguageVersion() = org.gradle.jvm.toolchain.JavaLanguageVersion.of(minimumRuntimeJdk)
+                    override fun getMetadata() = object : JavaInstallationMetadata {
+                        override fun getLanguageVersion() = JavaLanguageVersion.of(minimumRuntimeJdk)
                         override fun getJavaRuntimeVersion() = jbrVersion
                         override fun getJvmVersion() = jbrVersion
                         override fun getVendor() = "JetBrains"

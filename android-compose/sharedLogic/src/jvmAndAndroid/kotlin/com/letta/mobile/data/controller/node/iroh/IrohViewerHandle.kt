@@ -54,7 +54,10 @@ internal class IrohViewerHandle(
     private val streamWriteMutex: Mutex,
     private val frameParts: () -> Boolean,
     private val maxFrameBytes: Int,
+    private val agentEventsGate: () -> Boolean = { false },
 ) : ViewerHandle {
+
+    override fun receivesAgentEvents(): Boolean = agentEventsGate()
 
     /**
      * Re-wrap an already-cumulated + cm-stream-tagged assistant/tool/terminal
@@ -96,7 +99,6 @@ internal class IrohViewerHandle(
     } catch (e: Exception) {
         Telemetry.event(
             "IrohNode", "viewer.write.failed",
-            "connectionId" to connectionId,
             "error" to (e.message ?: e.toString()),
             level = Telemetry.Level.WARN,
         )

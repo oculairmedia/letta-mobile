@@ -33,6 +33,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.letta.mobile.ui.mascot.MascotGazeSurface
+import com.letta.mobile.ui.mascot.mascotGazeTarget
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
@@ -84,9 +86,14 @@ internal fun ChatMessageList(
     val isUserScrolling by listState.interactionSource.collectIsDraggedAsState()
     val scope = rememberCoroutineScope()
     val currentRenderItems by rememberUpdatedState(renderItems)
-    val itemGeometryState = remember { ChatMessageGeometryState() }
-    var highlightedMessageId by remember { mutableStateOf<String?>(null) }
-    var hasScrolledToTarget by remember { mutableStateOf(false) }
+    val conversationId = (state.conversationState as? com.letta.mobile.ui.chat.render.ConversationState.Ready)
+        ?.conversationId
+    // Geometry signatures intentionally omit conversation identity. Scope the
+    // cache itself so an equal server message/run id in another conversation
+    // cannot inherit a stale minimum height or hide content after navigation.
+    val itemGeometryState = remember(conversationId) { ChatMessageGeometryState() }
+    var highlightedMessageId by remember(conversationId) { mutableStateOf<String?>(null) }
+    var hasScrolledToTarget by remember(conversationId, scrollToMessageId) { mutableStateOf(false) }
     var showFontIndicator by remember { mutableStateOf(false) }
     var pinchTick by remember { mutableStateOf(0L) }
     var pinchAnimationSuppressionTick by remember { mutableStateOf(0L) }
@@ -168,10 +175,10 @@ internal fun ChatMessageList(
     }
     val currentLoadPressureSummary by rememberUpdatedState(loadPressureSummary)
 
-    val showScrollFab by remember(renderItems.size) {
+    val showScrollFab by remember(listState, renderItems.size, isUserScrolling) {
         derivedStateOf {
             ChatViewportFollowPolicy.shouldShowScrollToLatest(
-                listState.toChatViewportSnapshot(isUserScrolling, renderItems.size),
+                listState.toChatViewportSnapshot(isUserScrolling, renderItems),
             )
         }
     }
@@ -190,7 +197,9 @@ internal fun ChatMessageList(
             onSuppressPinchLayoutAnimations = { suppressPinchLayoutAnimations = it },
             scope = scope,
         ),
-        modifier = modifier,
+        // The timeline is a gaze target for this agent's mascots (parity with desktop): the eyes can
+        // rest on the thread, not only on the field or the pointer.
+        modifier = modifier.mascotGazeTarget(MascotGazeSurface.TIMELINE),
     ) {
         ChatMessageListBody(
             params = ChatMessageListBodyParams(

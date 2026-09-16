@@ -45,7 +45,7 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.preview.LettaPreviewFrame
 import androidx.compose.material3.Text
 
-private fun <T> androidx.compose.foundation.lazy.LazyListScope.SearchSection(
+private fun <T> androidx.compose.foundation.lazy.LazyListScope.searchSection(
     keyPrefix: String,
     headerTitle: String,
     items: List<T>,
@@ -56,7 +56,7 @@ private fun <T> androidx.compose.foundation.lazy.LazyListScope.SearchSection(
     primaryText: (T) -> androidx.compose.ui.text.AnnotatedString,
     secondaryText: (T) -> androidx.compose.ui.text.AnnotatedString?,
     onClick: (T) -> Unit,
-    idOf: (T) -> Any,
+    idOf: (T) -> String,
 ) {
     if (items.isEmpty()) return
     item(key = "$keyPrefix-header") {
@@ -141,7 +141,7 @@ internal fun SearchResultsContent(
         contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 0.dp, bottom = 8.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        SearchSection(
+        searchSection(
             keyPrefix = "agents",
             headerTitle = agentsHeader,
             items = agentResults,
@@ -152,10 +152,10 @@ internal fun SearchResultsContent(
             primaryText = { highlightSearchMatches(it.name, searchQuery, highlightColors) },
             secondaryText = { it.description?.let { desc -> highlightSearchMatches(desc, searchQuery, highlightColors) } },
             onClick = { onAgentClick(it) },
-            idOf = { it.id },
+            idOf = { it.id.value },
         )
 
-        SearchSection(
+        searchSection(
             keyPrefix = "tools",
             headerTitle = toolsHeader,
             items = toolResults,
@@ -166,10 +166,10 @@ internal fun SearchResultsContent(
             primaryText = { highlightSearchMatches(it.name, searchQuery, highlightColors) },
             secondaryText = { it.description?.let { desc -> highlightSearchMatches(desc, searchQuery, highlightColors) } },
             onClick = { onToolClick(it.id.value) },
-            idOf = { it.id },
+            idOf = { it.id.value },
         )
 
-        SearchSection(
+        searchSection(
             keyPrefix = "blocks",
             headerTitle = blocksHeader,
             items = blockResults,
@@ -183,7 +183,7 @@ internal fun SearchResultsContent(
             },
             secondaryText = { it.description?.let { desc -> highlightSearchMatches(desc, searchQuery, highlightColors) } },
             onClick = { onBlockClick(it.id.value) },
-            idOf = { it.id },
+            idOf = { it.id.value },
         )
 
         if (messageResults.isNotEmpty()) {

@@ -23,6 +23,8 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 
+// The singleton repository owns this scope and cancels it explicitly in close().
+@Suppress("NoDetachedCoroutineLifecycle")
 internal fun defaultSessionScopedAgentRepositoryScope(): CoroutineScope =
     CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -77,7 +79,7 @@ class SessionScopedAgentRepository internal constructor(
     override suspend fun listAgentSummaries(): List<AgentSummary> =
         sessionManager.withCurrentSession { it.agentRepository.listAgentSummaries() }
 
-    override suspend fun refreshAgents() = sessionManager.withCurrentSession {
+    override suspend fun refreshAgents(): Unit = sessionManager.withCurrentSession {
         it.agentRepository.refreshAgents()
         syncProxyState(it)
     }
@@ -110,7 +112,7 @@ class SessionScopedAgentRepository internal constructor(
     override suspend fun getContextWindow(agentId: AgentId, conversationId: ConversationId?): ContextWindowOverview =
         sessionManager.withCurrentSession { it.agentRepository.getContextWindow(agentId, conversationId) }
 
-    override suspend fun checkpointAndRestoreConfig(agentId: AgentId, operation: suspend () -> Unit) =
+    override suspend fun checkpointAndRestoreConfig(agentId: AgentId, operation: suspend () -> Unit): Unit =
         current.checkpointAndRestoreConfig(agentId, operation)
 
     override suspend fun createAgent(params: AgentCreateParams): Agent = sessionManager.withCurrentSession { it.agentRepository.createAgent(params) }
@@ -119,16 +121,16 @@ class SessionScopedAgentRepository internal constructor(
 
     override suspend fun updateAgent(id: AgentId, params: AgentUpdateParams): Agent = sessionManager.withCurrentSession { it.agentRepository.updateAgent(id, params) }
 
-    override suspend fun deleteAgent(id: AgentId) = sessionManager.withCurrentSession { it.agentRepository.deleteAgent(id) }
+    override suspend fun deleteAgent(id: AgentId): Unit = sessionManager.withCurrentSession { it.agentRepository.deleteAgent(id) }
 
     override suspend fun exportAgent(id: AgentId): String = sessionManager.withCurrentSession { it.agentRepository.exportAgent(id) }
 
     override suspend fun importAgent(params: AgentImportParams): ImportedAgentsResponse =
         sessionManager.withCurrentSession { it.agentRepository.importAgent(params) }
 
-    override suspend fun attachArchive(agentId: AgentId, archiveId: String) = sessionManager.withCurrentSession { it.agentRepository.attachArchive(agentId, archiveId) }
+    override suspend fun attachArchive(agentId: AgentId, archiveId: String): Unit = sessionManager.withCurrentSession { it.agentRepository.attachArchive(agentId, archiveId) }
 
-    override suspend fun detachArchive(agentId: AgentId, archiveId: String) = sessionManager.withCurrentSession { it.agentRepository.detachArchive(agentId, archiveId) }
+    override suspend fun detachArchive(agentId: AgentId, archiveId: String): Unit = sessionManager.withCurrentSession { it.agentRepository.detachArchive(agentId, archiveId) }
 
     fun close() { proxyScope.cancel() }
 }

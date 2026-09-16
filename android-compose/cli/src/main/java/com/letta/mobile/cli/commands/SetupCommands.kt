@@ -25,7 +25,6 @@ import com.letta.mobile.cli.runtime.writeCliSetupPlan
 import io.ktor.client.HttpClient
 import io.ktor.client.statement.bodyAsText
 import java.nio.file.Files
-import java.nio.file.Path
 import java.nio.file.Paths
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonElement

@@ -47,11 +47,11 @@ import kotlin.time.Duration.Companion.milliseconds
  * Lean desktop implementation of [IChannelTransport] over the shim's mobile WS
  * protocol (`{serverUrl}/shim/v1/mobile`), built on Ktor's WebSocket client.
  *
- * Desktop streams chat over SSE (see DesktopLettaHttpChatGateway); this is a
- * *side-channel* opened purely for the registries that only exist on the shim's
- * WS protocol — currently the active-subagent registry that backs the Background
- * tasks panel (letta-mobile-0yf7o, phase 2). It deliberately implements only the
- * subagent subset; the chat/cron/a2ui methods are not used on desktop.
+ * Opened originally as a *side-channel* for the registries that only exist on the shim's WS
+ * protocol — the active-subagent registry behind the Background tasks panel (letta-mobile-0yf7o,
+ * phase 2) — while chat streamed over SSE. It still implements only the subagent request subset,
+ * but [frameEvents] now republishes every inbound frame, which is what lets the shared send
+ * coordinator read this transport on backends where Iroh is not in use.
  *
  * Protocol (verified against the live shim): on connect, open the socket and
  * send a [HelloFrame]; the shim replies with [ServerFrame.Welcome] →
@@ -79,9 +79,11 @@ class DesktopWsChannelTransport(
     private val _events = MutableSharedFlow<ServerFrame>(extraBufferCapacity = 128)
     override val events: SharedFlow<ServerFrame> = _events.asSharedFlow()
 
-    // Desktop's registries don't consume the chat frame stream; expose an empty
-    // hot flow to satisfy the interface.
-    private val _frameEvents = MutableSharedFlow<TransportFrameEvent>(extraBufferCapacity = 1)
+    // Every inbound frame, republished in the shape chat consumers read. WsChatBridge maps this
+    // into WsTimelineEvent, so leaving it empty (as it was while only the subagent registries used
+    // this transport) makes the shared send coordinator silent on the non-Iroh desktop path.
+    // Buffered like the Android transport: a slow collector must not drop turn frames.
+    private val _frameEvents = MutableSharedFlow<TransportFrameEvent>(extraBufferCapacity = 128)
     override val frameEvents: SharedFlow<TransportFrameEvent> = _frameEvents.asSharedFlow()
 
     private val pending = mutableMapOf<String, CompletableDeferred<ServerFrame>>()
@@ -158,6 +160,10 @@ class DesktopWsChannelTransport(
             pendingMutex.withLock { pending.remove(requestId) }?.complete(frame)
         }
         _events.emit(frame)
+        // This transport has no replay window: the shim does not re-send a turn's frames to it on
+        // reconnect, so every frame reaching here is live. Claiming replay would make the send
+        // coordinator treat a first delivery as a redelivery and drop it.
+        _frameEvents.emit(TransportFrameEvent(frame = frame, isReplay = false))
     }
 
     override suspend fun sendSubagentList(all: Boolean, timeoutMs: Long): ServerFrame.SubagentListResponse {

@@ -56,7 +56,7 @@ class DesktopIrohIdentityStore(
 /** Process-wide default identity, rooted in the desktop state directory. */
 object DesktopIrohIdentity {
     private val store by lazy {
-        val stateDirectory = java.nio.file.Path.of(System.getProperty("user.home"), ".letta-mobile")
+        val stateDirectory = Path.of(System.getProperty("user.home"), ".letta-mobile")
         DesktopIrohIdentityStore(stateDirectory, DesktopSecretVaults.forCurrentOs(stateDirectory))
     }
 

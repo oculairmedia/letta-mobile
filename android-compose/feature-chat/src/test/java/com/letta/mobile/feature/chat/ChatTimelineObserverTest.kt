@@ -29,6 +29,9 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -68,23 +71,185 @@ class ChatTimelineObserverTest {
     }
 
     @Test
-    fun `switching conversations clears stale messages and marks loading`() = runTest {
+    fun `warm switch publishes cached target rows without empty loading frame`() = runTest {
         val harness = Harness(backgroundScope)
-        harness.seedTimeline(
-            "conv-1",
-            listOf(confirmed("assistant-1", "from-1", TimelineMessageType.ASSISTANT)),
-        )
-        harness.seedTimeline("conv-2")
+        harness.seedTimeline("conv-1", listOf(confirmed("assistant-1", "from-1", TimelineMessageType.ASSISTANT)))
+        harness.seedTimeline("conv-2", listOf(confirmed("assistant-2", "from-2", TimelineMessageType.ASSISTANT)))
 
         harness.observer.start("conv-1")
         runCurrent()
-        assertEquals(listOf("assistant-1"), harness.uiState.value.messages.map { it.id })
+        val publications = mutableListOf<ChatUiState>()
+        val collection = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            harness.uiState.collect { publications += it }
+        }
+        runCurrent()
+        publications.clear()
+        Telemetry.clear()
 
         harness.observer.start("conv-2")
+
+        assertEquals(listOf("assistant-2"), harness.uiState.value.messages.map { it.id })
+        assertFalse(harness.uiState.value.isLoadingMessages)
+        assertTrue(publications.none { it.messages.isEmpty() && it.isLoadingMessages })
+        assertTrue(publications.none { state -> state.messages.any { it.id == "assistant-1" } })
+        collection.cancel()
+    }
+
+    @Test
+    fun `warm bootstrap does not republish identical target geometry`() = runTest {
+        val harness = Harness(backgroundScope, activeReplyConversationIds = setOf("conv-2"))
+        harness.seedTimeline("conv-1", listOf(confirmed("source-1", "source")))
+        harness.seedTimeline(
+            "conv-2",
+            listOf(
+                confirmed("target-10", "question"),
+                confirmed("target-15", "reasoning", TimelineMessageType.REASONING, runId = "run-target"),
+                confirmed("target-20", "answer", TimelineMessageType.ASSISTANT, runId = "run-target"),
+            ),
+        )
+        harness.observer.start("conv-1")
         runCurrent()
+        val publications = mutableListOf<ChatUiState>()
+        val collection = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            harness.uiState.collect { publications += it }
+        }
+        runCurrent()
+        publications.clear()
+
+        harness.observer.start("conv-2")
+        val warmState = harness.uiState.value
+        assertFalse(warmState.collapsedRunIds.contains("run-target"))
+        runCurrent()
+
+        assertEquals(1, publications.size)
+        assertSame(warmState, publications.single())
+        assertEquals(
+            listOf("target-10", "target-15:REASONING", "target-20"),
+            harness.uiState.value.messages.map { it.id },
+        )
+        assertFalse(harness.uiState.value.collapsedRunIds.contains("run-target"))
+        assertTrue(Telemetry.snapshot().any {
+            it.tag == "TimelineSync" && it.name == "warmBootstrap.suppressed"
+        })
+        collection.cancel()
+    }
+
+    @Test
+    fun `first collector update after warm projection still publishes new timeline`() = runTest {
+        Telemetry.clear()
+        val harness = Harness(backgroundScope)
+        val flow = harness.seedTimeline(
+            "conv-1",
+            listOf(confirmed("assistant-10", "cached", TimelineMessageType.ASSISTANT)),
+        )
+
+        harness.observer.start("conv-1")
+        flow.value = flow.value.append(confirmed("assistant-20", "new", TimelineMessageType.ASSISTANT))
+        runCurrent()
+
+        assertEquals(
+            listOf("assistant-10", "assistant-20"),
+            harness.uiState.value.messages.map { it.id },
+        )
+        assertFalse(Telemetry.snapshot().any {
+            it.tag == "TimelineSync" && it.name == "warmBootstrap.suppressed"
+        })
+    }
+
+    @Test
+    fun `identical warm bootstrap still publishes genuine presence change`() = runTest {
+        var turnActive = false
+        val observeStarted = CompletableDeferred<Unit>()
+        val releaseObserve = CompletableDeferred<Unit>()
+        val harness = Harness(backgroundScope, hasActiveChatTurn = { turnActive })
+        harness.seedTimeline(
+            "conv-1",
+            listOf(confirmed("assistant-10", "cached", TimelineMessageType.ASSISTANT)),
+        )
+        coEvery { harness.timelineRepository.observe(null, "conv-1") } coAnswers {
+            observeStarted.complete(Unit)
+            releaseObserve.await()
+            harness.timelineFlows.getValue(TimelineHarnessKey(null, "conv-1"))
+        }
+
+        harness.observer.start("conv-1")
+        assertFalse(harness.uiState.value.isStreaming)
+        observeStarted.await()
+        turnActive = true
+        releaseObserve.complete(Unit)
+        runCurrent()
+
+        assertTrue(harness.uiState.value.isStreaming)
+    }
+
+    @Test
+    fun `warm switch with shared conversation id projects only target agent cache`() = runTest {
+        val harness = Harness(backgroundScope)
+        harness.seedTimeline("agent-a", "default", listOf(confirmed("assistant-a", "from a")))
+        harness.seedTimeline("agent-b", "default", listOf(confirmed("assistant-b", "from b")))
+
+        harness.observer.start("agent-a", "default")
+        runCurrent()
+        harness.observer.start("agent-b", "default")
+
+        assertEquals(listOf("assistant-b"), harness.uiState.value.messages.map { it.id })
+        assertFalse(harness.uiState.value.isLoadingMessages)
+    }
+
+    @Test
+    fun `cached empty target is immediately ready empty`() = runTest {
+        val harness = Harness(backgroundScope)
+        harness.seedTimeline("conv-1", listOf(confirmed("assistant-1", "from-1")))
+        harness.seedTimeline("conv-2")
+        harness.observer.start("conv-1")
+        runCurrent()
+
+        harness.observer.start("conv-2")
+
+        assertTrue(harness.uiState.value.messages.isEmpty())
+        assertFalse(harness.uiState.value.isLoadingMessages)
+    }
+
+    @Test
+    fun `true cache miss target may load`() = runTest {
+        val harness = Harness(backgroundScope)
+        harness.seedTimeline("conv-1", listOf(confirmed("assistant-1", "from-1")))
+        harness.observer.start("conv-1")
+        runCurrent()
+
+        harness.observer.start("conv-miss")
 
         assertTrue(harness.uiState.value.messages.isEmpty())
         assertTrue(harness.uiState.value.isLoadingMessages)
+    }
+
+    @Test
+    fun `delayed old binding cannot replace newer warm selection`() = runTest {
+        val oldObserveStarted = CompletableDeferred<Unit>()
+        val releaseOldObserve = CompletableDeferred<Unit>()
+        val harness = Harness(backgroundScope)
+        harness.seedTimeline("conv-old", listOf(confirmed("assistant-old", "old")))
+        harness.seedTimeline("conv-new", listOf(confirmed("assistant-new", "new")))
+        coEvery { harness.timelineRepository.observe(null, "conv-old") } coAnswers {
+            oldObserveStarted.complete(Unit)
+            releaseOldObserve.await()
+            harness.timelineFlows.getValue(TimelineHarnessKey(null, "conv-old"))
+        }
+
+        harness.observer.start("conv-old")
+        oldObserveStarted.await()
+        harness.observer.start("conv-new")
+        runCurrent()
+
+        assertEquals(listOf("assistant-new"), harness.uiState.value.messages.map { it.id })
+        assertEquals("conv-new", harness.currentConversationTracker.current)
+
+        releaseOldObserve.complete(Unit)
+        runCurrent()
+
+        assertEquals(listOf("assistant-new"), harness.uiState.value.messages.map { it.id })
+        assertEquals("conv-new", harness.currentConversationTracker.current)
+        coVerify(exactly = 0) { harness.timelineRepository.getOrCreate(null, "conv-old") }
     }
 
     @Test
@@ -102,6 +267,24 @@ class ChatTimelineObserverTest {
         harness.emitSyncEvent(TimelineSyncEvent.Hydrated(messageCount = 0))
         runCurrent()
         assertFalse(harness.uiState.value.isLoadingMessages)
+    }
+
+    @Test
+    fun `recoverable hydration failure keeps fallback rows without init error`() = runTest {
+        val harness = Harness(backgroundScope)
+        harness.seedTimeline(
+            "conv-fallback",
+            listOf(confirmed("assistant-fallback", "last known good", TimelineMessageType.ASSISTANT)),
+        )
+
+        harness.observer.start("conv-fallback")
+        runCurrent()
+        harness.emitSyncEvent(TimelineSyncEvent.HydrateFailed("active snapshot corrupt; remote offline"))
+        runCurrent()
+
+        assertEquals(listOf("assistant-fallback"), harness.uiState.value.messages.map { it.id })
+        assertFalse(harness.uiState.value.isLoadingMessages)
+        assertTrue(harness.uiState.value.error?.contains("Timeline init failed") != true)
     }
 
     @Test
@@ -499,6 +682,8 @@ class ChatTimelineObserverTest {
 
         harness.observer.start("conv-1")
         runCurrent()
+        flow.value = timeline.copy(liveCursor = "prime")
+        runCurrent()
         val stateAfterFirst = harness.uiState.value
         val messagesAfterFirst = harness.uiState.value.messages
         Telemetry.clear()
@@ -519,11 +704,6 @@ class ChatTimelineObserverTest {
             it.tag == "TimelineSync" && it.name == "uiProjection.snapshot"
         }
         assertTrue("expected no uiProjection.snapshot for a no-op tick", snapshots.isEmpty())
-        // A suppressed counter is surfaced instead so the dedupe is observable.
-        val suppressed = Telemetry.snapshot().filter {
-            it.tag == "TimelineSync" && it.name == "uiProjection.suppressed"
-        }
-        assertTrue("expected a uiProjection.suppressed event", suppressed.isNotEmpty())
     }
 
     @Test
@@ -674,12 +854,10 @@ class ChatTimelineObserverTest {
         assertEquals("frame-1", harness.uiState.value.messages.first().id)
     }
 
-    // region letta-mobile-ah1ng: terminal-run collapse reconciliation through
-    // the REAL observer→ChatRunExpansionState production path (the harness no
-    // longer injects a no-op collapse callback).
+    // region stable live / hydration presentation through the real observer path
 
     @Test
-    fun `completed run first seen via hydration defaults collapsed`() = runTest {
+    fun `completed run first seen via hydration remains inline`() = runTest {
         val harness = Harness(backgroundScope)
         harness.seedTimeline(
             "conv-1",
@@ -693,13 +871,11 @@ class ChatTimelineObserverTest {
         runCurrent()
 
         assertEquals(listOf("h-10", "h-20"), harness.uiState.value.messages.map { it.id })
-        // No isStreaming edge ever fired here; per-run terminal reconciliation
-        // must still fold the completed run.
-        assertTrue(harness.uiState.value.collapsedRunIds.contains("run-hist"))
+        assertFalse(harness.uiState.value.collapsedRunIds.contains("run-hist"))
     }
 
     @Test
-    fun `live terminal transition collapses run once presence clears`() = runTest {
+    fun `live terminal transition keeps the streamed run inline`() = runTest {
         val harness = Harness(backgroundScope, activeReplyConversationIds = setOf("conv-1"))
         val flow = harness.seedTimeline(
             "conv-1",
@@ -711,61 +887,14 @@ class ChatTimelineObserverTest {
 
         harness.observer.start("conv-1")
         runCurrent()
-
         assertTrue(harness.uiState.value.isStreaming)
-        assertFalse(harness.uiState.value.collapsedRunIds.contains("run-live"))
 
-        // Presence clears via a presence-only (deduped projection) tick — the
-        // publication must still route through terminal reconciliation.
         harness.activeReplyStreams.value = emptySet()
         flow.value = flow.value.copy(liveCursor = "presence-bump")
         runCurrent()
 
         assertFalse(harness.uiState.value.isStreaming)
-        assertTrue(harness.uiState.value.collapsedRunIds.contains("run-live"))
-    }
-
-    @Test
-    fun `terminal run collapses even when a newer turn starts before presence clears`() = runTest {
-        // Ordering regression: run-1's terminal projection landed while the
-        // streaming edge was consumed by a later turn. The old newest-run-only,
-        // edge-gated selection left run-1 expanded forever.
-        val harness = Harness(backgroundScope, activeReplyConversationIds = setOf("conv-1"))
-        val flow = harness.seedTimeline(
-            "conv-1",
-            listOf(
-                confirmed("d-10", "first question"),
-                confirmed("d-20", "answer one", TimelineMessageType.ASSISTANT, runId = "run-1"),
-            ),
-        )
-
-        harness.observer.start("conv-1")
-        runCurrent()
-
-        assertTrue(harness.uiState.value.isStreaming)
-        assertFalse(harness.uiState.value.collapsedRunIds.contains("run-1"))
-
-        // A second turn starts before presence ever drops.
-        flow.value = Timeline(
-            "conv-1",
-            events = persistentListOf(
-                confirmed("d-10", "first question"),
-                confirmed("d-20", "answer one", TimelineMessageType.ASSISTANT, runId = "run-1"),
-                confirmed("d-30", "second question"),
-                confirmed("d-40", "working", TimelineMessageType.ASSISTANT, runId = "run-2"),
-            ),
-        )
-        runCurrent()
-
-        assertTrue(harness.uiState.value.collapsedRunIds.contains("run-1"))
-        assertFalse("active newest run stays open", harness.uiState.value.collapsedRunIds.contains("run-2"))
-
-        // Presence finally clears; run-2 settles as well and prior runs stay folded.
-        harness.activeReplyStreams.value = emptySet()
-        flow.value = flow.value.copy(liveCursor = "settle-bump")
-        runCurrent()
-
-        assertTrue(harness.uiState.value.collapsedRunIds.containsAll(setOf("run-1", "run-2")))
+        assertFalse(harness.uiState.value.collapsedRunIds.contains("run-live"))
     }
 
     // endregion
@@ -773,6 +902,7 @@ class ChatTimelineObserverTest {
     private class Harness(
         scope: CoroutineScope,
         activeReplyConversationIds: Set<String> = emptySet(),
+        hasActiveChatTurn: () -> Boolean = { false },
         a2uiThinkingStartMessageCount: () -> Int? = { null },
         clearA2uiThinkingOnResponse: () -> Unit = {},
         isFollowingDuplicateInitialMessageInFlight: () -> Boolean = { false },
@@ -802,6 +932,7 @@ class ChatTimelineObserverTest {
             activeReplyStreams = activeReplyStreams,
             uiState = uiState,
             isClientModeStreamInFlight = { false },
+            hasActiveChatTurn = hasActiveChatTurn,
             a2uiThinkingStartMessageCount = a2uiThinkingStartMessageCount,
             clearA2uiThinkingOnResponse = clearA2uiThinkingOnResponse,
             isFollowingDuplicateInitialMessageInFlight = isFollowingDuplicateInitialMessageInFlight,
@@ -825,6 +956,9 @@ class ChatTimelineObserverTest {
             }
             coEvery { timelineRepository.getOrCreate(any<String>()) } returns loop
             coEvery { timelineRepository.getOrCreate(any<String>(), any()) } returns loop
+            every { timelineRepository.peekCached(any(), any()) } answers {
+                timelineFlows[TimelineHarnessKey(firstArg(), secondArg())]?.value
+            }
         }
 
         fun seedTimeline(

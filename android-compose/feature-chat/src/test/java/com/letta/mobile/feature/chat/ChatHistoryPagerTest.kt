@@ -16,7 +16,9 @@ import kotlinx.collections.immutable.persistentListOf
 import java.time.Instant
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -59,22 +61,79 @@ class ChatHistoryPagerTest {
         harness.pager.loadOlderMessages(clientModeEnabled = false)
         advanceUntilIdle()
 
+        assertFalse(harness.uiState.value.isLoadingOlderMessages)
         coVerify(exactly = 0) { harness.messageRepository.fetchOlderMessagesPage(any<AgentId>(), any<ConversationId>(), any()) }
     }
 
     @Test
-    fun `stale older page result does not mutate messages`() = runTest {
+    fun `switch accepts B while A is suspended and stale A cannot overwrite B`() = assertStaleCompletionPreservesB {
+        complete(OlderMessagesPage(listOf(appMessage("older-1", "old")), hasMore = false))
+    }
+
+    @Test
+    fun `stale cancellation cannot clear pending B ownership`() = assertStaleCompletionPreservesB {
+        completeExceptionally(kotlinx.coroutines.CancellationException("stale A"))
+    }
+
+    @Test
+    fun `stale failure cannot clear pending B ownership`() = assertStaleCompletionPreservesB {
+        completeExceptionally(IllegalStateException("stale A"))
+    }
+
+    private fun assertStaleCompletionPreservesB(
+        completeA: CompletableDeferred<OlderMessagesPage>.() -> Unit,
+    ) = runTest {
         val harness = Harness(scope = this)
-        harness.activeConversationId = "conv-1"
-        coEvery { harness.messageRepository.fetchOlderMessagesPage(any<AgentId>(), any<ConversationId>(), any()) } answers {
-            harness.activeConversationId = "conv-2"
-            OlderMessagesPage(listOf(appMessage(id = "older-1", content = "old")), hasMore = null)
-        }
+        val a = CompletableDeferred<OlderMessagesPage>()
+        val b = CompletableDeferred<OlderMessagesPage>()
+        coEvery { harness.messageRepository.fetchOlderMessagesPage(AgentId("agent-1"), ConversationId("conv-1"), any()) } coAnswers { a.await() }
+        coEvery { harness.messageRepository.fetchOlderMessagesPage(AgentId("agent-1"), ConversationId("conv-2"), any()) } coAnswers { b.await() }
+        harness.pager.loadOlderMessages(clientModeEnabled = false)
+        runCurrent()
+        harness.activeConversationId = "conv-2"
+        harness.selectionGeneration++
+        harness.uiState.value = harness.uiState.value.copy(
+            messages = persistentListOf(uiMessage("live-2", "new")),
+            hasMoreOlderMessages = true,
+            isLoadingOlderMessages = false,
+        )
+        harness.pager.loadOlderMessages(clientModeEnabled = false)
+        runCurrent()
+        val pendingB = harness.uiState.value
+        assertTrue(pendingB.isLoadingOlderMessages)
+        a.completeA()
+        runCurrent()
+        assertEquals(pendingB, harness.uiState.value)
+        harness.pager.loadOlderMessages(clientModeEnabled = false)
+        runCurrent()
+        coVerify(exactly = 1) { harness.messageRepository.fetchOlderMessagesPage(AgentId("agent-1"), ConversationId("conv-2"), "live-2") }
+        b.complete(OlderMessagesPage(listOf(appMessage("older-2", "old")), hasMore = false))
+        advanceUntilIdle()
+        assertEquals(listOf("older-2", "live-2"), harness.uiState.value.messages.map { it.id })
+        assertFalse(harness.uiState.value.isLoadingOlderMessages)
+        assertFalse(harness.uiState.value.hasMoreOlderMessages)
+    }
+
+    @Test
+    fun `same conversation generation change fences stale failure`() = runTest {
+        val harness = Harness(scope = this)
+        val a = CompletableDeferred<OlderMessagesPage>()
+        coEvery { harness.messageRepository.fetchOlderMessagesPage(any<AgentId>(), any<ConversationId>(), any()) } coAnswers { a.await() }
 
         harness.pager.loadOlderMessages(clientModeEnabled = false)
+        runCurrent()
+        harness.selectionGeneration++
+        harness.uiState.value = harness.uiState.value.copy(
+            messages = persistentListOf(uiMessage("replacement", "new")),
+            hasMoreOlderMessages = true,
+            isLoadingOlderMessages = true,
+        )
+        a.completeExceptionally(IllegalStateException("stale"))
         advanceUntilIdle()
 
-        assertEquals(listOf("live-1"), harness.uiState.value.messages.map { it.id })
+        assertEquals(listOf("replacement"), harness.uiState.value.messages.map { it.id })
+        assertTrue(harness.uiState.value.hasMoreOlderMessages)
+        assertTrue(harness.uiState.value.isLoadingOlderMessages)
     }
 
     /**
@@ -149,6 +208,7 @@ class ChatHistoryPagerTest {
         val messageRepository: MessageRepository = mockk(relaxed = true)
         val chatTimelineObserver: ChatTimelineObserver = mockk(relaxed = true)
         var activeConversationId: String? = "conv-1"
+        var selectionGeneration: Long = 0
         val uiState = MutableStateFlow(
             ChatUiState(
                 messages = persistentListOf(uiMessage("live-1", "new")),
@@ -163,6 +223,7 @@ class ChatHistoryPagerTest {
             chatTimelineObserver = chatTimelineObserver,
             uiState = uiState,
             activeConversationId = { activeConversationId },
+            selectionGeneration = { selectionGeneration },
         )
 
         init {

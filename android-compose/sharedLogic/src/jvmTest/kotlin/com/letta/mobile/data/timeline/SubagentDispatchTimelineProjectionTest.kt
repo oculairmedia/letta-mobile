@@ -12,8 +12,11 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 
@@ -181,7 +184,9 @@ class SubagentDispatchTimelineProjectionTest {
             """.trimIndent(),
         )
         val projected = MessageListWireProjection.projectMessageList(persistedPage, "conv-1")
-        assertEquals(persistedPage, projected)
+        val projectedReturn = assertIs<JsonArray>(projected)[1].jsonObject
+        assertEquals(result, projectedReturn.getValue("tool_return").jsonPrimitive.content)
+        assertFalse(projectedReturn.toString().contains("Trace the persisted Iroh turn"))
 
         val messages = json.decodeFromJsonElement(
             ListSerializer(LettaMessage.serializer()),

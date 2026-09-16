@@ -45,7 +45,7 @@ fun interface AvatarStateListener {
  * signals into (a) an observable [AvatarState] (PRD §4 P2, 12 states) and (b)
  * the [AvatarRuntime] command stream per the §6 state matrix. This is
  * deliberately the ONLY place avatar behavior lives — renderers are mechanism,
- * so every renderer (web three-vrm today, filament-vrm later) inherits
+ * so every renderer (the Rive mascot on both platforms) inherits
  * identical life.
  *
  * The director owns *what* and *when* (the seconds in §6 are encoded as named

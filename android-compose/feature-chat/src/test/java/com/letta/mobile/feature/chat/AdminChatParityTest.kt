@@ -10,16 +10,28 @@ import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.feature.chat.coordination.ChatConversationCoordinator
+import com.letta.mobile.feature.chat.coordination.ChatConversationCoordinatorConfig
+import com.letta.mobile.feature.chat.coordination.ChatConversationRoute
+import com.letta.mobile.feature.chat.coordination.ChatHydrationTrace
+import com.letta.mobile.feature.chat.coordination.ClientModeBootstrapConfig
+import com.letta.mobile.feature.chat.coordination.ConversationSendConfig
+import com.letta.mobile.feature.chat.coordination.HydrationRouteConfig
+import com.letta.mobile.feature.chat.coordination.TimelineObserverConfig
 import com.letta.mobile.feature.chat.coordination.ChatSessionResolver
+import com.letta.mobile.feature.chat.coordination.ConversationAccessMode
+import com.letta.mobile.feature.chat.coordination.RecentMessagesReconcileLauncher
 import com.letta.mobile.testutil.TestData
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -59,9 +71,16 @@ class AdminChatParityTest {
     @Test
     fun `resolve conversation failure triggers offline state and sets error message`() = runTest {
         val harness = Harness(scope = this)
+        // letta-mobile-grrhq: production resolves through
+        // resolveMostRecentConversationWithProvenance now. Stubbing only the
+        // plain overload leaves this test vacuous — the throw never fires and
+        // the state stays Live.
+        coEvery {
+            harness.chatSessionResolver.resolveMostRecentConversationWithProvenance("agent-1", any(), any())
+        } throws RuntimeException("Network error")
         coEvery { harness.chatSessionResolver.resolveMostRecentConversation("agent-1", any()) } throws RuntimeException("Network error")
 
-        harness.coordinator.resolveConversationAndLoad(useClientModeForResolve = false)
+        harness.coordinator.resolveConversationAndLoad(ConversationAccessMode.Timeline)
         advanceUntilIdle()
 
         // Verify KMP state transitioned to Offline
@@ -135,10 +154,75 @@ class AdminChatParityTest {
         val harness = Harness(this)
         harness.routeConversationId = "conversation-1"
 
-        harness.coordinator.resolveConversationAndLoad(useClientModeForResolve = false)
+        harness.coordinator.resolveConversationAndLoad(ConversationAccessMode.Timeline)
         advanceUntilIdle()
 
         assertEquals("Ada", harness.uiState.value.agentName)
+    }
+
+    @Test
+    fun `cold metadata lookup cannot block timeline observer startup`() = runTest {
+        val harness = Harness(this)
+        val metadataRelease = CompletableDeferred<Unit>()
+        harness.routeConversationId = "conversation-1"
+        coEvery { harness.agentRepository.getAgent(AgentId("agent-1")) } returns flow {
+            metadataRelease.await()
+            emit(TestData.agent(id = "agent-1", name = "Ada"))
+        }
+
+        harness.coordinator.resolveConversationAndLoad(ConversationAccessMode.Timeline)
+        runCurrent()
+
+        try {
+            assertEquals(listOf("conversation-1"), harness.startedObservers)
+            assertEquals(1, harness.coordinator.rosterNameResolverForTest.resolveCallsForTest())
+            coVerify(exactly = 1) { harness.agentRepository.getAgent(AgentId("agent-1")) }
+        } finally {
+            metadataRelease.complete(Unit)
+        }
+        advanceUntilIdle()
+        assertEquals("Ada", harness.uiState.value.agentName)
+    }
+
+    @Test
+    fun `failed metadata lookup does not erase loaded timeline`() = runTest {
+        val harness = Harness(this)
+        harness.routeConversationId = "conversation-1"
+        coEvery { harness.agentRepository.getAgent(AgentId("agent-1")) } throws RuntimeException("metadata unavailable")
+
+        harness.coordinator.resolveConversationAndLoad(ConversationAccessMode.Timeline)
+        advanceUntilIdle()
+
+        assertEquals(listOf("conversation-1"), harness.startedObservers)
+        assertEquals("", harness.uiState.value.agentName)
+        assertEquals(ChatConnectionState.Live, harness.sessionState.value.connectionState)
+    }
+
+    @Test
+    fun `stale metadata completion after returning to same conversation cannot replace current name`() = runTest {
+        val harness = Harness(this)
+        val firstNameRelease = CompletableDeferred<Unit>()
+        harness.routeConversationId = "conversation-a"
+        coEvery { harness.agentRepository.getAgent(AgentId("agent-1")) } returns flow {
+            firstNameRelease.await()
+            emit(TestData.agent(id = "agent-1", name = "Stale Ada"))
+        }
+
+        harness.coordinator.resolveConversationAndLoad(ConversationAccessMode.Timeline)
+        runCurrent()
+        every { harness.agentRepository.getCachedAgent(AgentId("agent-1")) } returns
+            TestData.agent(id = "agent-1", name = "Current Ada")
+        harness.routeConversationId = "conversation-b"
+        harness.coordinator.resolveConversationAndLoad(ConversationAccessMode.Timeline)
+        runCurrent()
+        harness.routeConversationId = "conversation-a"
+        harness.coordinator.resolveConversationAndLoad(ConversationAccessMode.Timeline)
+        runCurrent()
+        firstNameRelease.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(listOf("conversation-a", "conversation-b", "conversation-a"), harness.startedObservers)
+        assertEquals("Current Ada", harness.uiState.value.agentName)
     }
 
     @Test
@@ -148,15 +232,13 @@ class AdminChatParityTest {
         every { harness.agentRepository.getCachedAgent(AgentId("agent-1")) } returns
             TestData.agent(id = "agent-1", name = "Cached Ada")
 
-        harness.coordinator.resolveConversationAndLoad(useClientModeForResolve = false)
+        harness.coordinator.resolveConversationAndLoad(ConversationAccessMode.Timeline)
         advanceUntilIdle()
 
-        // letta-mobile-xl1o2 AC: when the cache already has the agent, the
-        // resolver MUST NOT trigger a per-id fetch. The only getAgent call
-        // the harness ever sees is the one from loadMessagesInternal, not
-        // the resolver's getAgent.
+        // A cached display name must never trigger the asynchronous resolver.
         val resolverCalls = harness.coordinator.rosterNameResolverForTest.resolveCallsForTest()
         assertEquals(0, resolverCalls)
+        coVerify(exactly = 0) { harness.agentRepository.getAgent(AgentId("agent-1")) }
     }
 
     @Test
@@ -191,7 +273,7 @@ class AdminChatParityTest {
         val collector = launch(UnconfinedTestDispatcher(testScheduler)) {
             harness.sessionState.collect { seen += it.connectionState }
         }
-        harness.coordinator.resolveConversationAndLoad(useClientModeForResolve = false)
+        harness.coordinator.resolveConversationAndLoad(ConversationAccessMode.Timeline)
         advanceUntilIdle()
         collector.cancel()
 
@@ -205,6 +287,55 @@ class AdminChatParityTest {
     }
 
     @Test
+    fun `messages from another conversation do not skip the Loading transition`() = runTest {
+        for (mode in ConversationAccessMode.entries) {
+            val harness = Harness(this)
+            harness.routeConversationId = "conversation-a"
+            harness.uiState.value = harness.uiState.value.copy(
+                messages = persistentListOf(
+                    UiMessage(
+                        id = "m1",
+                        role = "assistant",
+                        content = "from conversation A",
+                        timestamp = "2026-05-16T00:00:00Z",
+                    )
+                ),
+            )
+            val coordinator = harness.coordinator
+            harness.routeConversationId = "conversation-b"
+
+            val seen = mutableListOf<ChatConnectionState>()
+            val collector = launch(UnconfinedTestDispatcher(testScheduler)) {
+                harness.sessionState.collect { seen += it.connectionState }
+            }
+            coordinator.resolveConversationAndLoad(mode)
+            advanceUntilIdle()
+            collector.cancel()
+
+            assertTrue("expected $mode hydration for conversation B, saw: $seen", ChatConnectionState.Loading in seen)
+        }
+    }
+
+    @Test
+    fun `metadata failure completes timeline resolution before retry`() = runTest {
+        val harness = Harness(this, pinnedConversationId = "pinned-conversation")
+        harness.routeConversationId = "stale-before-first-attempt"
+        coEvery { harness.agentRepository.getAgent(AgentId("agent-1")) } throws RuntimeException("Network error")
+
+        harness.coordinator.resolveConversationAndLoad(ConversationAccessMode.Timeline)
+        advanceUntilIdle()
+
+        harness.routeConversationId = "stale-before-retry"
+        coEvery { harness.agentRepository.getAgent(AgentId("agent-1")) } returns
+            flowOf(TestData.agent(id = "agent-1", name = "Ada"))
+        harness.coordinator.resolveConversationAndLoad(ConversationAccessMode.Timeline)
+        advanceUntilIdle()
+
+        assertEquals("stale-before-retry", harness.routeConversationId)
+        assertEquals(listOf("pinned-conversation", "stale-before-retry"), harness.startedObservers)
+    }
+
+    @Test
     fun `fresh conversation still shows the Loading flash`() = runTest {
         val harness = Harness(this)
         harness.routeConversationId = "conversation-1"
@@ -213,7 +344,7 @@ class AdminChatParityTest {
         val collector = launch(UnconfinedTestDispatcher(testScheduler)) {
             harness.sessionState.collect { seen += it.connectionState }
         }
-        harness.coordinator.resolveConversationAndLoad(useClientModeForResolve = false)
+        harness.coordinator.resolveConversationAndLoad(ConversationAccessMode.Timeline)
         advanceUntilIdle()
         collector.cancel()
 
@@ -223,7 +354,10 @@ class AdminChatParityTest {
         assertEquals(ChatConnectionState.Live, harness.sessionState.value.connectionState)
     }
 
-    private class Harness(scope: CoroutineScope) {
+    private class Harness(
+        scope: CoroutineScope,
+        private val pinnedConversationId: String? = null,
+    ) {
         val chatSessionResolver: ChatSessionResolver = mockk(relaxed = true)
         val agentRepository: IAgentRepository = mockk(relaxed = true)
         val currentConversationTracker = CurrentConversationTracker()
@@ -245,30 +379,41 @@ class AdminChatParityTest {
 
         var routeConversationId: String? = null
         var pendingBootstrapMessages = persistentListOf<UiMessage>()
+        val startedObservers = mutableListOf<String>()
 
-        val coordinator = ChatConversationCoordinator(
-            scope = scope,
-            agentId = "agent-1",
-            initialMessage = null,
-            explicitConversationId = { routeConversationId },
-            pinnedExplicitConversationId = null,
-            setRouteConversationId = { routeConversationId = it },
-            isFreshRoute = false,
-            chatSessionResolver = chatSessionResolver,
-            agentRepository = agentRepository,
-            currentConversationTracker = currentConversationTracker,
-            uiState = uiState,
-            updateSessionState = ::updateSessionState,
-            pendingClientModeBootstrapMessages = { pendingBootstrapMessages },
-            setPendingClientModeBootstrapUserMessage = { pendingBootstrapMessages = persistentListOf(it) },
-            currentClientModeConversationId = { null },
-            startTimelineObserver = {},
-            stopTimelineObserver = {},
-            reconcileRecentMessages = { _, _ -> },
-            sendMessageViaClientMode = {},
-            sendMessageViaTimeline = {},
-            markFollowingDuplicateInitialMessageInFlight = {},
-        )
+        val coordinator by lazy {
+            ChatConversationCoordinator(
+                ChatConversationCoordinatorConfig(
+                    scope = scope,
+                    route = ChatConversationRoute(
+                        agentId = "agent-1",
+                        initialMessage = null,
+                        explicitConversationId = { routeConversationId },
+                        pinnedExplicitConversationId = pinnedConversationId,
+                        setConversationId = { routeConversationId = it },
+                        isFresh = false,
+                    ),
+                    chatSessionResolver = chatSessionResolver,
+                    agentRepository = agentRepository,
+                    currentConversationTracker = currentConversationTracker,
+                    uiState = uiState,
+                    updateSessionState = ::updateSessionState,
+                    bootstrap = ClientModeBootstrapConfig(
+                        pendingMessages = { pendingBootstrapMessages },
+                        setPendingUserMessage = { pendingBootstrapMessages = persistentListOf(it) },
+                        currentConversationId = { null },
+                    ),
+                    observer = TimelineObserverConfig(start = { startedObservers += it }, stop = {}),
+                    reconcileLauncher = RecentMessagesReconcileLauncher(scope = scope, reconcile = { }),
+                    send = ConversationSendConfig({}, {}, {}),
+                    hydration = HydrationRouteConfig(
+                        identity = { conversationId ->
+                            ChatHydrationTrace.Identity(agentId = "agent-1", conversationId = conversationId)
+                        },
+                    ),
+                ),
+            )
+        }
 
         init {
             every { agentRepository.getCachedAgent(AgentId("agent-1")) } returns null

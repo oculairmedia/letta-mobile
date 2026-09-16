@@ -24,8 +24,8 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.put
+import kotlin.time.Duration.Companion.milliseconds
 
 internal class WasmAppServerSession(
     val client: DefaultAppServerClient,
@@ -48,7 +48,7 @@ internal class WasmAppServerSession(
             pending.await().also { conversationByAgent[agentId] = it }
         } finally {
             if (pending.isCompleted && conversationInFlight[agentId] === pending) {
-                conversationInFlight.remove(agentId)
+                conversationInFlight -= agentId
             }
         }
     }
@@ -168,7 +168,7 @@ internal suspend fun connectWasmAppServerSession(
 }
 
 internal suspend fun <T> bounded(timeoutMs: Long, message: String, block: suspend () -> T): T = try {
-    withTimeout(timeoutMs) { block() }
+    withTimeout(timeoutMs.milliseconds) { block() }
 } catch (timeout: TimeoutCancellationException) {
     throw IllegalStateException(message, timeout)
 }

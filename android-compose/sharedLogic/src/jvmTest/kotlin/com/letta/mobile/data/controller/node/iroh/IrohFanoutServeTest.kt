@@ -113,7 +113,6 @@ class IrohFanoutServeTest {
     ) = ConversationTurnFanout(
         conversationId = conversationId,
         runtime = runtimeFor(conversationId),
-        remoteEndpointId = initiator?.connectionId ?: "conn-init",
         viewersFor = { conv -> registry.viewersFor(conv) },
         initiatorViewer = initiator,
         trackInitiatorFrame = { parked.add(it) },
@@ -461,11 +460,11 @@ class IrohFanoutServeTest {
         // First two deltas BEFORE any observer joins / while a leaver is present.
         val leaverSink = CapturingSink()
         val leaver = viewer("conn-leaver", leaverSink)
-        registry.register("conv-C", leaver)
+        val leaverRegistration = registry.register("conv-C", leaver)
         fanout.onDraft(assistant("Hel"))
 
-        // Leaver disconnects mid-turn (eaczz.1 unregisterAll on disconnect).
-        registry.unregisterAll("conn-leaver")
+        // Leaver disconnects mid-turn and releases its exact generation.
+        registry.release(leaverRegistration)
         assertFalse(
             registry.viewersFor("conv-C").any { it.connectionId == "conn-leaver" },
             "disconnected observer removed from viewersFor",

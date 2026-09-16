@@ -1,24 +1,16 @@
 package com.letta.mobile.data.timeline
 
-import com.letta.mobile.data.api.MessageApi
 import com.letta.mobile.data.model.AssistantMessage
-import com.letta.mobile.data.model.LettaMessage
-import com.letta.mobile.data.model.MessageContentPart
-import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.model.ToolReturnMessage
 import io.mockk.mockk
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -42,85 +34,52 @@ class TimelineHandlersIsolationTest {
     }
 
     @Test
-    fun `TimelineReturnsResponsesProcessor updates approval status and tool returns`() {
-        val initialTimeline = Timeline("conv1")
-            .append(
-                TimelineEvent.Confirmed(
-                    position = 1.0,
-                    otid = "otid-tc",
-                    content = "",
-                    serverId = "tc-1",
-                    messageType = TimelineMessageType.TOOL_CALL,
-                    date = Instant.now(),
-                    runId = "run-1",
-                    stepId = "step-1",
-                    toolCalls = persistentListOf(
-                        com.letta.mobile.data.model.ToolCall(
-                            id = "call-id-1",
-                            name = "test_tool",
-                            arguments = ""
-                        )
-                    ),
-                    approvalRequestId = "req-1"
-                )
-            )
-
-        val state = MutableStateFlow(initialTimeline)
-        val snapshot = listOf(
-            ToolReturnMessage(
-                id = "tr-1",
-                toolCallId = "call-id-1",
-                toolReturnRaw = JsonPrimitive("success_response"),
-                isErr = false,
-                runId = "run-1",
-            )
+    fun `TimelineReturnsResponsesProcessor handles identified and blank tool returns`() {
+        val identifiedState = toolCallState(
+            serverId = "tc-1",
+            toolCall = com.letta.mobile.data.model.ToolCall(
+                id = "call-id-1",
+                name = "test_tool",
+                arguments = "",
+            ),
         )
-
-        applyReturnsAndResponsesFromSnapshot(snapshot, state)
-
-        val updated = state.value.events.single() as TimelineEvent.Confirmed
+        identifiedState.value = enrichTimelineFromSnapshot(
+            identifiedState.value,
+            listOf(
+                ToolReturnMessage(
+                    id = "tr-1",
+                    toolCallId = "call-id-1",
+                    toolReturnRaw = JsonPrimitive("success_response"),
+                    isErr = false,
+                    runId = "run-1",
+                ),
+            ),
+        )
+        val updated = identifiedState.value.events.single() as TimelineEvent.Confirmed
         assertTrue(updated.approvalDecided)
         assertEquals("success_response", updated.toolReturnContent)
         assertEquals("success_response", updated.toolReturnContentByCallId["call-id-1"])
-    }
 
-    @Test
-    fun `TimelineReturnsResponsesProcessor ignores blank tool return ids`() {
-        val initialTimeline = Timeline("conv1")
-            .append(
-                TimelineEvent.Confirmed(
-                    position = 1.0,
-                    otid = "otid-tc",
-                    content = "",
-                    serverId = "tc-blank",
-                    messageType = TimelineMessageType.TOOL_CALL,
-                    date = Instant.now(),
-                    runId = "run-1",
-                    stepId = "step-1",
-                    toolCalls = persistentListOf(
-                        com.letta.mobile.data.model.ToolCall(
-                            name = "synthetic_tool",
-                            arguments = ""
-                        )
-                    ),
-                    approvalRequestId = "req-1"
-                )
-            )
-
-        val state = MutableStateFlow(initialTimeline)
-        val snapshot = listOf(
-            ToolReturnMessage(
-                id = "tr-blank",
-                toolCallId = "",
-                toolReturnRaw = JsonPrimitive("should_not_attach"),
-                isErr = true,
-                status = "error"
-            )
+        val blankState = toolCallState(
+            serverId = "tc-blank",
+            toolCall = com.letta.mobile.data.model.ToolCall(
+                name = "synthetic_tool",
+                arguments = "",
+            ),
         )
-
-        applyReturnsAndResponsesFromSnapshot(snapshot, state)
-
-        val unchanged = state.value.events.single() as TimelineEvent.Confirmed
+        blankState.value = enrichTimelineFromSnapshot(
+            blankState.value,
+            listOf(
+                ToolReturnMessage(
+                    id = "tr-blank",
+                    toolCallId = "",
+                    toolReturnRaw = JsonPrimitive("should_not_attach"),
+                    isErr = true,
+                    status = "error",
+                ),
+            ),
+        )
+        val unchanged = blankState.value.events.single() as TimelineEvent.Confirmed
         assertFalse(unchanged.approvalDecided)
         assertEquals(null, unchanged.toolReturnContent)
         assertTrue(unchanged.toolReturnContentByCallId.isEmpty())
@@ -128,11 +87,11 @@ class TimelineHandlersIsolationTest {
 
     @Test
     fun `TimelineStateTransitionHandler transitions local event states`() = runTest {
-        val state = MutableStateFlow(Timeline("conv1"))
         val events = MutableSharedFlow<TimelineSyncEvent>(extraBufferCapacity = 8)
         val sendQueue = Channel<PendingSend>(Channel.UNLIMITED)
-        val writeMutex = Mutex()
-        val handler = TimelineStateTransitionHandler("conv1", state, events, sendQueue, writeMutex)
+        val processor = timelineProcessor(Timeline("conv1"), events, sendQueue)
+        val state = processor.timeline
+        val handler = TimelineStateTransitionHandler("conv1", processor)
 
         // 1. Local Append
         val pending = PendingSend("otid-1", "hello")
@@ -159,22 +118,22 @@ class TimelineHandlersIsolationTest {
         assertTrue(failedAck.isCompleted)
         val failed = state.value.events.single() as TimelineEvent.Local
         assertEquals(DeliveryState.FAILED, failed.deliveryState)
+        processor.closeAndJoin()
     }
 
     @Test
     fun `TimelineExternalTransportAppender appends external messages`() = runTest {
-        val state = MutableStateFlow(Timeline("conv1"))
         val events = MutableSharedFlow<TimelineSyncEvent>(extraBufferCapacity = 8)
         val eventQueue = Channel<TimelineGatewayEvent>(Channel.UNLIMITED)
-        val writeMutex = Mutex()
         val pendingLocalStore = NoOpPendingLocalStore
+        val processor = timelineProcessor(Timeline("conv1"), events, Channel(Channel.UNLIMITED))
+        val state = processor.timeline
         val appender = TimelineExternalTransportAppender(
             conversationId = "conv1",
             messageApi = mockk(),
             eventQueue = eventQueue,
-            state = state,
             events = events,
-            writeMutex = writeMutex,
+            processor = processor,
             pendingLocalStore = pendingLocalStore,
             submitReconcileAfterSendSnapshot = { _, _ -> mockk() }
         )
@@ -194,21 +153,62 @@ class TimelineHandlersIsolationTest {
         val local = state.value.events.single() as TimelineEvent.Local
         assertEquals("external msg", local.content)
         assertEquals(MessageSource.LETTA_SERVER, local.source)
+        processor.closeAndJoin()
     }
+
+    private fun toolCallState(
+        serverId: String,
+        toolCall: com.letta.mobile.data.model.ToolCall,
+    ): MutableStateFlow<Timeline> = MutableStateFlow(
+        Timeline("conv1").append(
+            TimelineEvent.Confirmed(
+                position = 1.0,
+                otid = "otid-tc",
+                content = "",
+                serverId = serverId,
+                messageType = TimelineMessageType.TOOL_CALL,
+                date = Instant.now(),
+                runId = "run-1",
+                stepId = "step-1",
+                toolCalls = persistentListOf(toolCall),
+                approvalRequestId = "req-1",
+            ),
+        ),
+    )
+
+    private fun CoroutineScope.timelineProcessor(
+        initial: Timeline,
+        events: MutableSharedFlow<TimelineSyncEvent>,
+        sendQueue: Channel<PendingSend>,
+    ) = TimelineProcessor(
+        initialState = TimelineReducerState(initial),
+        scope = this,
+        effectHandler = { effect ->
+            when (effect) {
+                is TimelineReductionEffect.Send -> sendQueue.send(effect.pending)
+                is TimelineReductionEffect.EmitSyncEvent -> events.emit(effect.event)
+                else -> Unit
+            }
+        },
+    )
 
     @Test
     fun `TimelineRecentMessagesReconciler merges snapshot correctly`() = runTest {
-        val state = MutableStateFlow(Timeline("conv1"))
         val eventQueue = Channel<TimelineGatewayEvent>(Channel.UNLIMITED)
-        val writeMutex = Mutex()
+        val processor = TimelineProcessor(
+            initialState = TimelineReducerState(Timeline("conv1")),
+            scope = this,
+        )
+        val state = processor.timeline
         val reconciler = TimelineRecentMessagesReconciler(
             conversationId = "conv1",
+            scope = this,
             messageApi = mockk(),
             eventQueue = eventQueue,
             state = state,
             streamSubscriberActive = MutableStateFlow(false),
-            writeMutex = writeMutex,
-            applyReturnsAndResponsesFromSnapshot = {}
+            processor = processor,
+            onSnapshotApplied = {},
         )
 
         val serverMsgs = listOf(
@@ -224,7 +224,7 @@ class TimelineHandlersIsolationTest {
             TimelineGatewayEvent.RecentMessagesSnapshot(
                 serverMessages = serverMsgs,
                 telemetryName = "test",
-                telemetryAttrs = emptyList(),
+                telemetryReason = "test",
                 ack = ack
             )
         )
@@ -234,5 +234,6 @@ class TimelineHandlersIsolationTest {
         val confirmed = state.value.events.single() as TimelineEvent.Confirmed
         assertEquals("server-1", confirmed.serverId)
         assertEquals("hi from server", confirmed.content)
+        processor.closeAndJoin()
     }
 }

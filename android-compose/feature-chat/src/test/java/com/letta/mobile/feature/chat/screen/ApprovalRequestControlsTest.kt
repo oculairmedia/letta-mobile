@@ -28,6 +28,34 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], manifest = Config.NONE)
 class ApprovalRequestControlsTest {
+    @Test
+    fun ordinaryAutoAllowedRequestRendersNoApprovalChrome() {
+        val request = UiApprovalRequest(
+            requestId = "auto-allowed",
+            toolCalls = listOf(
+                UiApprovalToolCall(
+                    toolCallId = "call-1",
+                    name = "Bash",
+                    arguments = """{"command":"pwd"}""",
+                ),
+            ),
+        )
+
+        composeRule.setContent {
+            LettaTheme(AppTheme.LIGHT, ThemePreset.DEFAULT, false) {
+                ApprovalRequestControls(
+                    approval = request,
+                    isSubmitting = false,
+                    onDecision = { _, _, _, _ -> error("ordinary calls must not expose approval actions") },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Review the requested tool actions before continuing.").assertDoesNotExist()
+        composeRule.onNodeWithText("Reject").assertDoesNotExist()
+        composeRule.onNodeWithText("Approve").assertDoesNotExist()
+    }
+
     @get:Rule
     val composeRule = createComposeRule()
 
@@ -48,10 +76,8 @@ class ApprovalRequestControlsTest {
                 }
             }
         }
-        composeRule.onNodeWithText("Review the requested tool actions before continuing.")
-            .assertIsDisplayed()
-        composeRule.onNodeWithText("Approve").assertIsDisplayed()
-        composeRule.onNodeWithText("Reject").assertIsDisplayed()
+        composeRule.onNodeWithText("The agent has a question").assertIsDisplayed()
+        composeRule.onNodeWithText("Continue?").assertIsDisplayed()
     }
 
     @Test
@@ -75,7 +101,7 @@ class ApprovalRequestControlsTest {
         }
 
         // Sanity: while the request is present the controls are on screen.
-        composeRule.onNodeWithText("Approve").assertIsDisplayed()
+        composeRule.onNodeWithText("The agent has a question").assertIsDisplayed()
 
         // Simulate the server-side decision: the request clears from the message.
         composeRule.runOnUiThread { approval = null }
@@ -83,10 +109,8 @@ class ApprovalRequestControlsTest {
 
         // The latch regression: this used to stay rendered because `rememberedApproval`
         // held the previous non-null request forever.
-        composeRule.onNodeWithText("Approve").assertDoesNotExist()
-        composeRule.onNodeWithText("Reject").assertDoesNotExist()
-        composeRule.onNodeWithText("Review the requested tool actions before continuing.")
-            .assertDoesNotExist()
+        composeRule.onNodeWithText("The agent has a question").assertDoesNotExist()
+        composeRule.onNodeWithText("Continue?").assertDoesNotExist()
     }
 
     private fun sampleApproval() = UiApprovalRequest(
@@ -94,8 +118,8 @@ class ApprovalRequestControlsTest {
         toolCalls = listOf(
             UiApprovalToolCall(
                 toolCallId = "call-a",
-                name = "Bash",
-                arguments = """{"command":"pwd"}""",
+                name = "AskUserQuestion",
+                arguments = """{"questions":[{"question":"Continue?","options":[{"label":"Yes"}]}]}""",
             ),
         ),
     )

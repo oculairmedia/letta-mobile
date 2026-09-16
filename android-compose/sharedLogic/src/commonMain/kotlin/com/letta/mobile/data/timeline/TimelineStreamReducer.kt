@@ -4,10 +4,12 @@ import com.letta.mobile.data.model.ApprovalResponseMessage
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.ReasoningMessage
 import com.letta.mobile.data.model.LettaMessage
+import com.letta.mobile.data.model.ToolCall
 import com.letta.mobile.data.model.ToolReturnMessage
 import com.letta.mobile.util.Telemetry
 import kotlinx.collections.immutable.PersistentList
 import kotlinx.collections.immutable.PersistentMap
+import kotlinx.collections.immutable.toPersistentList
 
 data class TimelineReducerInput(
     val prev: Timeline,
@@ -240,7 +242,7 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
         val newScore = newCalls.count { !it.arguments.isNullOrBlank() }
         val mergedCalls = if (newCalls.isEmpty() && oldCalls.isNotEmpty()) oldCalls
             else if (oldCalls.isEmpty()) newCalls
-            else if (newScore >= oldScore) newCalls
+            else if (newScore >= oldScore) preserveSettledToolCalls(oldCalls, newCalls, existing.toolReturnContentByCallId)
             else oldCalls
         val merged = applyPendingToolReturns(
             confirmed.copy(
@@ -464,56 +466,23 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
     //
     // Merge ONLY on STRICT forward growth: the immediately-preceding (last) event
     // is a same-run assistant row AND the incoming content EXTENDS it
-    // (incoming.startsWith(existing) && incoming strictly longer). This excludes:
+    // (incoming.startsWith(existing) && incoming strictly longer). A second,
+    // observer-only fallback below may cross bounded intervening run events, but
+    // only when promoting a recognized synthetic observer run to a real run.
+    // This excludes:
     //   • post-tool continuations — those START a new message ("Y" after a longer
     //     prior assistant), where incoming is SHORTER, so existing.startsWith(incoming)
     //     not incoming.startsWith(existing) → not a forward growth → not merged.
     //   • distinct same-run assistant messages — no forward-prefix relationship.
-    val liveAssistant = (timeline.events.lastOrNull() as? TimelineEvent.Confirmed)
-        ?.takeIf { it.messageType == TimelineMessageType.ASSISTANT }
-    val isForwardGrowthFragment = liveAssistant != null &&
-        confirmed.messageType == TimelineMessageType.ASSISTANT &&
-        liveAssistant.serverId != confirmed.serverId &&
-        // letta-mobile-w0ctr: widen the run-id gate by EXACTLY the promotion case —
-        // a synthetic existing run id growing into a real incoming one. The first streamed
-        // fragment is committed before run-id promotion lands, so `iroh-run-*` vs `run-*`
-        // failed isCompatibleAssistantPrefixRunId (which only accepts equal ids, or BOTH
-        // sides synthetic) and the second fragment appended a new row instead of growing
-        // the first — stranding the opening chunk as its own bubble.
-        //
-        // Both ids must stay non-blank. A blank existing run id is indistinguishable from
-        // an older RECONCILED reply (those carry runId = null), and merging into one would
-        // overwrite an unrelated earlier message whose text happens to be a prefix — the
-        // #827 regression guarded by "reconcile final does not overwrite an unrelated older
-        // reply that is a substring". So the blank case is deliberately NOT relaxed here.
-        run {
-            val existingRun = liveAssistant.runId?.takeIf { it.isNotBlank() }
-            val incomingRun = confirmed.runId?.takeIf { it.isNotBlank() }
-            existingRun != null && incomingRun != null &&
-                (existingRun == incomingRun || existingRun.isIrohSyntheticRunId())
-        } &&
-        run {
-            val existing = liveAssistant.content.trim()
-            val incoming = confirmed.content.trim()
-            existing.isNotEmpty() && incoming.length > existing.length && incoming.startsWith(existing)
-        }
-    if (isForwardGrowthFragment && liveAssistant != null) {
-        val merged = liveAssistant.copy(
-            content = confirmed.content,
-            runId = promoteRunId(liveAssistant.runId, confirmed.runId),
-            seqId = latestSeqId(liveAssistant.seqId, confirmed.seqId),
-        )
-        timeline = timeline.replaceByServerId(merged)
-        timeline = timeline.copy(liveCursor = liveAssistant.serverId)
-        pendingEvents += TimelineSyncEvent.StreamEventIngested(liveAssistant.serverId, message.messageType)
-        hotPathTelemetry(
-            "streamSubscriber.forwardGrowthMerged",
-            "serverId" to liveAssistant.serverId,
-            "incomingServerId" to confirmed.serverId,
-            "runId" to (confirmed.runId ?: "<null>"),
-            "mergedLen" to confirmed.content.length,
-            "conversationId" to conversationId,
-        )
+    applyForwardGrowthMerge(timeline, confirmed, conversationId)?.let { growth ->
+        timeline = growth.timeline
+        pendingEvents += TimelineSyncEvent.StreamEventIngested(growth.stableServerId, message.messageType)
+        return output()
+    }
+
+    applyObserverStreamPromotion(timeline, confirmed, conversationId)?.let { promotion ->
+        timeline = promotion.timeline
+        pendingEvents += TimelineSyncEvent.StreamEventIngested(promotion.stableServerId, message.messageType)
         return output()
     }
 
@@ -552,9 +521,9 @@ private fun StreamTextMergeResult.defensiveTelemetryName(): String? = when (bran
     StreamTextMergeBranch.APPEND -> null
 }
 
-private fun hotPathTelemetry(
+internal fun hotPathTelemetry(
     name: String,
-    vararg attrs: Pair<String, Any?>,
+    vararg attrs: TelemetryAttribute,
 ) {
     if (!Telemetry.isChatHotPathDebugEnabled()) return
     Telemetry.event(
@@ -595,7 +564,7 @@ private fun TimelineEvent.Confirmed.hasIrohSyntheticRunId(): Boolean =
  * intentionally kept separate: it only ever evaluates an `ActiveTurn` run id
  * (always born `iroh-run-*` in `send()`), and observer ids can never reach it.
  */
-internal val IROH_SYNTHETIC_RUN_ID_PREFIXES = listOf("iroh-run-", "iroh-observer-run-")
+internal val IROH_SYNTHETIC_RUN_ID_PREFIXES = listOf("iroh-run-", ObserverStreamPromotionPolicy.OBSERVER_RUN_ID_PREFIX)
 
 internal fun String.isIrohSyntheticRunId(): Boolean =
     IROH_SYNTHETIC_RUN_ID_PREFIXES.any { startsWith(it) }
@@ -607,7 +576,7 @@ internal fun String.isIrohSyntheticRunId(): Boolean =
  * existing id (never regress a real id back to a synthetic one, and never
  * clobber with a blank incoming id).
  */
-private fun promoteRunId(existing: String?, incoming: String?): String? {
+internal fun promoteRunId(existing: String?, incoming: String?): String? {
     val existingRunId = existing?.takeIf { it.isNotBlank() }
     val incomingRunId = incoming?.takeIf { it.isNotBlank() } ?: return existingRunId
     if (existingRunId == null) return incomingRunId
@@ -655,6 +624,44 @@ private fun Timeline.findSameRunAssistantPrefixOrBlankTarget(
             if (existingRunId != null && incoming.seqId == 1 && incomingText.length <= 1) return@firstOrNull false
             true
         }
+}
+
+/**
+ * letta-mobile-x13xi.13.1.2: when a cursor re-emit or hydration backfill
+ * replaces `oldCalls` with `newCalls` (the arg-score-wins branch used by
+ * the incoming chat frame), preserve any `oldCalls` entry whose
+ * `effectiveId` already has an entry in `existing.toolReturnContentByCallId`.
+ * Without this, the projection layer at
+ * `TimelineEventToUiMessage.toUiToolCall` reads
+ * `ev.toolReturnContentByCallId[callId]` and gets `null` for calls whose
+ * id was rotated server-side during a re-emit — the tool card flips
+ * back to "Running" (status derived from a now-null result) until the
+ * next tool_return frame arrives. Prepending the old (settled) call is
+ * the cheapest invariant that survives both re-emit shapes:
+ *
+ *   - same effectiveId → no-op (newCalls already contains the entry)
+ *   - rotated effectiveId (rare but observed) → kept in the list so the
+ *     projection keeps its existing map lookup intact.
+ *
+ * Returned list order: the new calls first (so the projection surface
+ * stays consistent with the rest of the chat), with any preserved
+ * settled calls appended at the tail. toolReturnContentByCallId is
+ * keyed by callId and is order-insensitive, so the projection sees the
+ * same `result` either way.
+ */
+private fun preserveSettledToolCalls(
+    oldCalls: List<ToolCall>,
+    newCalls: List<ToolCall>,
+    settledByCallId: PersistentMap<String, String>,
+): PersistentList<ToolCall> {
+    if (oldCalls.isEmpty() || settledByCallId.isEmpty()) return newCalls.toPersistentList()
+    val newIds = newCalls.mapTo(mutableSetOf()) { it.effectiveId.takeIf(String::isNotBlank) ?: "" }
+    val preserved = oldCalls.filter { call ->
+        val id = call.effectiveId.takeIf(String::isNotBlank) ?: return@filter false
+        id in settledByCallId && id !in newIds
+    }
+    if (preserved.isEmpty()) return newCalls.toPersistentList()
+    return (newCalls + preserved).toPersistentList()
 }
 
 /**
