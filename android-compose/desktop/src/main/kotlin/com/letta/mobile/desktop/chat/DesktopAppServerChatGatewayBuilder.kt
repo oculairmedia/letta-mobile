@@ -1,6 +1,7 @@
 package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.canvas.CanvasExternalTools
+import com.letta.mobile.data.canvas.CanvasSessionRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
 import com.letta.mobile.data.model.LettaConfig
@@ -46,6 +47,9 @@ import kotlinx.coroutines.withContext
  * Desktop does not use Hilt; callers inject this builder (or a test fake of
  * [DesktopAppServerChatGatewayFactory]) instead of constructing the stack inline.
  */
+// Compatibility default; production injects its window-owned scope. The client scope below is a
+// child of whichever scope that is, so it is not detached either.
+@Suppress("NoDetachedCoroutineLifecycle")
 class DesktopAppServerChatGatewayBuilder(
     /** Coroutine scope for the controller and transport. */
     private val controllerScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
@@ -54,6 +58,8 @@ class DesktopAppServerChatGatewayBuilder(
      * vault-protected NodeId across restarts instead of an ephemeral keypair.
      */
     private val irohIdentity: () -> ByteArray = { DesktopIrohIdentity.loadOrCreate() },
+    /** Must be the registry the canvas UI registers into, or agent edits miss the open session. */
+    private val canvasSessions: CanvasSessionRegistry = CanvasSessionRegistry(),
 ) : DesktopAppServerChatGatewayFactory {
 
     override suspend fun create(
@@ -105,7 +111,7 @@ class DesktopAppServerChatGatewayBuilder(
                 client = client,
                 scope = controllerScope,
                 externalToolRegistry = ExternalToolRegistry.hostTools(
-                    CanvasExternalTools.all(DesktopCanvasDocumentStore())
+                    CanvasExternalTools.all(DesktopCanvasDocumentStore(), canvasSessions)
                 ),
                 config = DesktopAppServerEngineConfig(
                     eventRouter = router,

@@ -10,8 +10,11 @@ import computer.iroh.Connection
 import computer.iroh.Endpoint
 import computer.iroh.RecvStream
 import computer.iroh.SendStream
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -84,11 +87,18 @@ class IrohCanvasSyncTransport(
                     }
                 }
             } finally {
-                mutex.withLock {
-                    activeSendStreams.remove(sendStream)
+                // NonCancellable: this runs on the cancellation path too, and a suspending
+                // withLock there would resume with CancellationException and leave the stream
+                // registered forever (AGENTS.md, concurrent-collection defaults).
+                withContext(NonCancellable) {
+                    mutex.withLock {
+                        activeSendStreams.remove(sendStream)
+                    }
+                    runCatching { sendStream.finish() }
                 }
-                runCatching { sendStream.finish() }
             }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (t: Throwable) {
             Telemetry.event("CanvasSync", "connection.error", "error" to (t.message ?: t.toString()))
         }
@@ -109,7 +119,10 @@ class IrohCanvasSyncTransport(
                 val stream = iterator.next()
                 try {
                     stream.write(frame)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
                 } catch (_: Throwable) {
+                    // A peer that will not take the frame is dropped, not retried.
                     iterator.remove()
                 }
             }

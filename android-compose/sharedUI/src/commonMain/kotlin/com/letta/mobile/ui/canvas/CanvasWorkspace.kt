@@ -50,6 +50,11 @@ fun CanvasWorkspace(
     modifier: Modifier = Modifier,
     controller: DrawBoxController = remember { DrawBoxController(Reducer(UseCase())) },
     session: CanvasSession? = null,
+    /**
+     * The registry external tools look the open session up in. Null means agent commands only
+     * reach the store, not this session, so a host that wires canvas tools must pass its own.
+     */
+    sessionRegistry: CanvasSessionRegistry? = null,
     initialJson: String? = null,
     presenceTransport: CanvasPresenceTransport? = null,
     currentPeerId: String? = null,
@@ -74,7 +79,7 @@ fun CanvasWorkspace(
     // Load initial JSON diagram or session document & observe external session updates (Card I2.3 & I3.3)
     LaunchedEffect(session, initialJson) {
         if (session != null) {
-            CanvasSessionRegistry.register(session)
+            sessionRegistry?.register(session)
             val syncJob = session.startSync(this)
             try {
                 session.load()
@@ -102,7 +107,7 @@ fun CanvasWorkspace(
                     }
                 }
             } finally {
-                CanvasSessionRegistry.unregister(session.canvasId)
+                sessionRegistry?.unregister(session.canvasId)
             }
         } else {
             if (!initialJson.isNullOrBlank()) {
