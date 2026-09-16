@@ -294,6 +294,11 @@ class ReconnectingAppServerClient(
 
     override suspend fun input(command: AppServerCommand.Input) = ready().input(command)
 
+    override suspend fun inputAwaitingAcceptance(command: AppServerCommand.Input): AppServerInboundFrame.InputAccepted =
+        ready().inputAwaitingAcceptance(command)
+
+    override suspend fun changeDeviceState(command: AppServerCommand.ChangeDeviceState) = ready().changeDeviceState(command)
+
     override suspend fun sync(command: AppServerCommand.Sync): AppServerInboundFrame.SyncResponse =
         ready().sync(command)
 

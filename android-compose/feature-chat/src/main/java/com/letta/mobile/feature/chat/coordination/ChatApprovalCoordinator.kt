@@ -2,6 +2,7 @@ package com.letta.mobile.feature.chat.coordination
 
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.repository.MessageRepository
+import kotlinx.coroutines.CancellationException
 
 internal class ChatApprovalCoordinator(
     private val messageRepository: MessageRepository,
@@ -27,6 +28,10 @@ internal class ChatApprovalCoordinator(
                 conversationId = activeConversationId,
             )
             ChatApprovalResult.Submitted
+        } catch (cancelled: CancellationException) {
+            // Not a failed submission: ChatApprovalController must see the cancellation to release
+            // the in-flight card, instead of showing an error banner.
+            throw cancelled
         } catch (e: Exception) {
             ChatApprovalResult.Failed(e.message ?: "Failed to submit approval")
         }

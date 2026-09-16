@@ -1,17 +1,32 @@
 {
   "source": {
     "package": "@letta-ai/letta-code",
-    "version": "0.29.12",
+    "version": "0.32.10",
     "node_version": "v24.18.0",
     "public_export": "dist/types/types/app-server-protocol.d.ts",
     "protocol_declaration": "dist/types/types/protocol_v2.d.ts",
-    "protocol_sha256": "41874aad00d23d3f63a5aaab86986ac707e1437a0d02625d7ee161d261f0a285",
-    "protocol_corpus_sha256": "ed16a93a9e9c96dacb95e3597c7a48f62a5172fb1844b50372e8f531b4084713",
+    "protocol_sha256": "09138d9e5dc36b8a22575a24c35e4bc6768892e7e41a753400d047b3ee37f86a",
+    "protocol_corpus_sha256": "872e5dbcaf851bc679915f9a3fbb18456151e3ce25f7d8bde361289a668b4477",
     "protocol_corpus_files": [
+      "dist/types/backend/api/ephemeral-conversations.d.ts",
+      "dist/types/runtime-execution-settings.d.ts",
       "dist/types/types/app-server-info.d.ts",
       "dist/types/types/app-server-protocol.d.ts",
+      "dist/types/types/approval-classification-protocol.d.ts",
+      "dist/types/types/background-process-protocol.d.ts",
+      "dist/types/types/chatgpt-oauth.d.ts",
       "dist/types/types/conversation-fork-protocol.d.ts",
-      "dist/types/types/protocol_v2.d.ts"
+      "dist/types/types/cwd-protocol.d.ts",
+      "dist/types/types/external-tool-protocol.d.ts",
+      "dist/types/types/loop-status-protocol.d.ts",
+      "dist/types/types/protocol_v2.d.ts",
+      "dist/types/types/queue-update-protocol.d.ts",
+      "dist/types/types/runtime-scope.d.ts",
+      "dist/types/types/runtime-start-protocol.d.ts",
+      "dist/types/types/schedule-protocol.d.ts",
+      "dist/types/types/task-control-protocol.d.ts",
+      "dist/types/types/teleport-protocol.d.ts",
+      "dist/types/types/toolset-protocol.d.ts"
     ],
     "source_map_origin": "src/types/protocol_v2.ts",
     "observation": "installed_package_declaration_unions",
@@ -21,8 +36,13 @@
     "input",
     "change_device_state",
     "abort_message",
+    "resume_queue",
     "sync",
     "runtime_start",
+    "teleport_probe",
+    "teleport_request",
+    "teleport_failed",
+    "runtime_external_tools_update",
     "external_tool_call_response",
     "terminal_spawn",
     "terminal_input",
@@ -58,6 +78,8 @@
     "cron_get",
     "cron_runs",
     "cron_trigger",
+    "cron_pause",
+    "cron_resume",
     "cron_update",
     "cron_delete",
     "cron_delete_all",
@@ -78,6 +100,7 @@
     "conversation_fork",
     "conversation_messages_list",
     "conversation_compact",
+    "set_boot_working_directory",
     "get_cwd_map",
     "get_reflection_settings",
     "set_reflection_settings",
@@ -105,6 +128,7 @@
     "channel_route_update",
     "execute_command",
     "remove_queue_item",
+    "monitor_stop",
     "search_branches",
     "checkout_branch",
     "secret_list",
@@ -112,14 +136,21 @@
   ],
   "messages": [
     "control_request",
+    "input_accepted",
+    "teleport_probe_response",
+    "teleport_ready",
+    "execute_command_response",
     "update_device_status",
     "update_loop_status",
     "update_queue",
     "stream_delta",
+    "turn_finished",
     "update_subagent_state",
     "external_tool_call_request",
     "abort_message_response",
+    "resume_queue_response",
     "sync_response",
+    "runtime_external_tools_update_response",
     "terminal_output",
     "terminal_spawned",
     "terminal_exited",
@@ -153,6 +184,8 @@
     "cron_get_response",
     "cron_runs_response",
     "cron_trigger_response",
+    "cron_pause_response",
+    "cron_resume_response",
     "cron_update_response",
     "cron_delete_response",
     "cron_delete_all_response",
@@ -205,12 +238,14 @@
     "channel_pairings_updated",
     "channel_routes_updated",
     "channel_targets_updated",
+    "set_boot_working_directory_response",
     "get_cwd_map_response",
     "search_branches_response",
     "checkout_branch_response",
     "secret_list_response",
     "secret_apply_response",
-    "remove_queue_item_response"
+    "remove_queue_item_response",
+    "monitor_stop_response"
   ],
   "capabilities": [
     {
@@ -223,7 +258,11 @@
         "abort_message",
         "change_device_state",
         "remove_queue_item",
-        "app_server_info"
+        "app_server_info",
+        "resume_queue",
+        "teleport_request",
+        "teleport_probe",
+        "teleport_failed"
       ],
       "messages": [
         "runtime_start_response",
@@ -236,7 +275,12 @@
         "control_request",
         "update_subagent_state",
         "remove_queue_item_response",
-        "app_server_info_response"
+        "app_server_info_response",
+        "input_accepted",
+        "turn_finished",
+        "resume_queue_response",
+        "teleport_probe_response",
+        "teleport_ready"
       ]
     },
     {
@@ -345,7 +389,7 @@
         "skill_disable_response",
         "skills_updated"
       ],
-      "hydration": "none advertised: device_status.current_available_skills is hard-coded [] and skills_updated is {type,timestamp} (letta-code 0.29.12)",
+      "hydration": "none advertised: device_status.current_available_skills is hard-coded [] and skills_updated is {type,timestamp} (letta-code 0.29.12; unchanged in the 0.32.10 unions)",
       "absent_operations": [
         "skill_list_command",
         "skill_enumeration_in_runtime_start_response"
@@ -362,7 +406,9 @@
         "cron_trigger",
         "cron_update",
         "cron_delete",
-        "cron_delete_all"
+        "cron_delete_all",
+        "cron_pause",
+        "cron_resume"
       ],
       "messages": [
         "cron_list_response",
@@ -373,7 +419,9 @@
         "cron_update_response",
         "cron_delete_response",
         "cron_delete_all_response",
-        "crons_updated"
+        "crons_updated",
+        "cron_pause_response",
+        "cron_resume_response"
       ]
     },
     {
@@ -462,7 +510,9 @@
         "file_ops",
         "get_cwd_map",
         "search_branches",
-        "checkout_branch"
+        "checkout_branch",
+        "monitor_stop",
+        "set_boot_working_directory"
       ],
       "messages": [
         "terminal_output",
@@ -479,17 +529,21 @@
         "file_changed",
         "get_cwd_map_response",
         "search_branches_response",
-        "checkout_branch_response"
+        "checkout_branch_response",
+        "monitor_stop_response",
+        "set_boot_working_directory_response"
       ]
     },
     {
       "id": "external_tools",
       "classification": "exposed",
       "commands": [
-        "external_tool_call_response"
+        "external_tool_call_response",
+        "runtime_external_tools_update"
       ],
       "messages": [
-        "external_tool_call_request"
+        "external_tool_call_request",
+        "runtime_external_tools_update_response"
       ]
     },
     {
@@ -506,7 +560,8 @@
         "get_experiments_response",
         "set_experiment_response",
         "get_reflection_settings_response",
-        "set_reflection_settings_response"
+        "set_reflection_settings_response",
+        "execute_command_response"
       ]
     }
   ]
