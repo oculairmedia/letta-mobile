@@ -28,6 +28,32 @@ class CanvasSession(
 
     private var lamportClock: Long = 0L
 
+    private suspend fun currentDoc(): CanvasDocument =
+        _document.value ?: store.get(canvasId) ?: CanvasDocument(
+            id = canvasId,
+            title = "Untitled Canvas",
+            revision = 0L,
+            sceneJson = "",
+            updatedAtEpochMs = clock(),
+        )
+
+    private suspend fun commitUpdate(updated: CanvasDocument): CanvasDocument {
+        store.upsert(updated)
+        _document.value = updated
+        return updated
+    }
+
+    private suspend fun commitScene(sceneJson: String): CanvasDocument {
+        val current = currentDoc()
+        return commitUpdate(
+            current.copy(
+                revision = current.revision + 1L,
+                sceneJson = sceneJson,
+                updatedAtEpochMs = clock(),
+            )
+        )
+    }
+
     /**
      * Loads the document from [store] into memory and updates [document] state.
      */
@@ -48,46 +74,14 @@ class CanvasSession(
      * An empty [sceneJson] is explicitly allowed (e.g. canvas cleared).
      */
     suspend fun saveScene(sceneJson: String): CanvasDocument = mutex.withLock {
-        val current = _document.value ?: store.get(canvasId) ?: CanvasDocument(
-            id = canvasId,
-            title = "Untitled Canvas",
-            revision = 0L,
-            sceneJson = "",
-            updatedAtEpochMs = clock(),
-        )
-
-        val updated = current.copy(
-            revision = current.revision + 1L,
-            sceneJson = sceneJson,
-            updatedAtEpochMs = clock(),
-        )
-
-        store.upsert(updated)
-        _document.value = updated
-        updated
+        commitScene(sceneJson)
     }
 
     /**
      * Applies an agent-driven scene replacement, incrementing revision and updating timestamp.
      */
     suspend fun applyAgentReplace(sceneJson: String): CanvasDocument = mutex.withLock {
-        val current = _document.value ?: store.get(canvasId) ?: CanvasDocument(
-            id = canvasId,
-            title = "Untitled Canvas",
-            revision = 0L,
-            sceneJson = "",
-            updatedAtEpochMs = clock(),
-        )
-
-        val updated = current.copy(
-            revision = current.revision + 1L,
-            sceneJson = sceneJson,
-            updatedAtEpochMs = clock(),
-        )
-
-        store.upsert(updated)
-        _document.value = updated
-        updated
+        commitScene(sceneJson)
     }
 
     /**
@@ -97,23 +91,9 @@ class CanvasSession(
     suspend fun applyLocal(op: CanvasOp): CanvasDocument = mutex.withLock {
         opLog.append(canvasId, op)
         if (op.lamport > lamportClock) lamportClock = op.lamport
-        val current = _document.value ?: store.get(canvasId) ?: CanvasDocument(
-            id = canvasId,
-            title = "Untitled Canvas",
-            revision = 0L,
-            sceneJson = "",
-            updatedAtEpochMs = clock(),
-        )
-
+        val current = currentDoc()
         val newScene = CanvasOpProjector.project(current.sceneJson, listOf(op))
-        val updated = current.copy(
-            revision = current.revision + 1L,
-            sceneJson = newScene,
-            updatedAtEpochMs = clock(),
-        )
-
-        store.upsert(updated)
-        _document.value = updated
+        val updated = commitScene(newScene)
         syncTransport?.publish(canvasId, op)
         updated
     }
@@ -126,38 +106,16 @@ class CanvasSession(
         if (opLog.has(canvasId, op.opId)) return null
         opLog.append(canvasId, op)
         if (op.lamport > lamportClock) lamportClock = op.lamport
-        val current = _document.value ?: store.get(canvasId) ?: CanvasDocument(
-            id = canvasId,
-            title = "Untitled Canvas",
-            revision = 0L,
-            sceneJson = "",
-            updatedAtEpochMs = clock(),
-        )
-
+        val current = currentDoc()
         val newScene = CanvasOpProjector.project(current.sceneJson, listOf(op))
-        val updated = current.copy(
-            revision = current.revision + 1L,
-            sceneJson = newScene,
-            updatedAtEpochMs = clock(),
-        )
-
-        store.upsert(updated)
-        _document.value = updated
-        updated
+        commitScene(newScene)
     }
 
     /**
      * Applies a sequence of operations as a single revision bump.
      */
     suspend fun applyOps(ops: List<CanvasOp>, isRemote: Boolean = false): CanvasDocument = mutex.withLock {
-        val current = _document.value ?: store.get(canvasId) ?: CanvasDocument(
-            id = canvasId,
-            title = "Untitled Canvas",
-            revision = 0L,
-            sceneJson = "",
-            updatedAtEpochMs = clock(),
-        )
-
+        val current = currentDoc()
         val opsToApply = mutableListOf<CanvasOp>()
         for (op in ops) {
             if (isRemote && opLog.has(canvasId, op.opId)) continue
@@ -169,14 +127,7 @@ class CanvasSession(
         if (opsToApply.isEmpty()) return current
 
         val newScene = CanvasOpProjector.project(current.sceneJson, opsToApply)
-        val updated = current.copy(
-            revision = current.revision + 1L,
-            sceneJson = newScene,
-            updatedAtEpochMs = clock(),
-        )
-
-        store.upsert(updated)
-        _document.value = updated
+        val updated = commitScene(newScene)
         if (!isRemote && syncTransport != null) {
             for (op in opsToApply) {
                 syncTransport.publish(canvasId, op)
@@ -230,22 +181,13 @@ class CanvasSession(
      * Updates document title.
      */
     suspend fun updateTitle(newTitle: String): CanvasDocument = mutex.withLock {
-        val current = _document.value ?: store.get(canvasId) ?: CanvasDocument(
-            id = canvasId,
-            title = newTitle,
-            revision = 0L,
-            sceneJson = "",
-            updatedAtEpochMs = clock(),
+        val current = currentDoc()
+        commitUpdate(
+            current.copy(
+                title = newTitle,
+                updatedAtEpochMs = clock(),
+            )
         )
-
-        val updated = current.copy(
-            title = newTitle,
-            updatedAtEpochMs = clock(),
-        )
-
-        store.upsert(updated)
-        _document.value = updated
-        updated
     }
 
     companion object {

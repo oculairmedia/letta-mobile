@@ -109,6 +109,7 @@ internal fun DesktopMainContentPane(
         ) {
             CanvasWorkspace(
                 session = inputs.activeCanvasSession,
+                presenceTransport = com.letta.mobile.desktop.canvas.DesktopCanvasHostSync.presenceTransport,
                 onNavigateBack = actions.onCloseCanvas,
                 modifier = Modifier.fillMaxSize(),
             )

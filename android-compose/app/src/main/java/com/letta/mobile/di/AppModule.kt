@@ -128,6 +128,16 @@ abstract class AppModule {
             }
         )
 
+        @Provides
+        @Singleton
+        fun provideCanvasSyncTransport(): com.letta.mobile.data.canvas.CanvasSyncTransport =
+            com.letta.mobile.data.canvas.LoopbackCanvasSyncTransport()
+
+        @Provides
+        @Singleton
+        fun provideCanvasPresenceTransport(): com.letta.mobile.data.canvas.CanvasPresenceTransport =
+            com.letta.mobile.data.canvas.InMemoryCanvasPresenceTransport()
+
         // letta-mobile-qfa81 (P4 row 13): approval submission routed over
         // admin_rpc when the active backend is iroh://. Injected into
         // MessageRepository.submitApproval.

@@ -32,10 +32,15 @@ data class CanvasOpWirePacket(
 )
 
 /**
- * Dedicated Iroh QUIC transport for peer-to-peer Canvas synchronization.
+ * Architecture framing sketch and codec contract for dedicated Iroh ALPN `meridian/canvas-sync/1`.
  *
  * Runs independently from App Server chat WebSocket framing, operating over
  * dedicated BiStreams with length-prefixed binary framing.
+ *
+ * NOTE (P3 Status): This type establishes the packet layout and 4-byte prefix codec.
+ * Live Endpoint lifecycle wiring (automatic peer accept/dial and background connection
+ * registration) is deferred to P3.1/P4. Collaborative multi-client sync in current hosts
+ * operates over [LoopbackCanvasSyncTransport].
  */
 class IrohCanvasSyncTransport(
     private val scope: CoroutineScope,

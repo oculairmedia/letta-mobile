@@ -81,7 +81,8 @@ fun CanvasWorkspace(
                 val sessionJson = session.sceneJsonOrEmpty()
                 var lastImportedRev = session.document.value?.revision ?: 0L
                 if (sessionJson.isNotBlank()) {
-                    controller.importPath(sessionJson)
+                    val cleanJson = com.letta.mobile.data.canvas.CanvasOpProjector.stripMetadataForDrawBox(sessionJson)
+                    controller.importPath(cleanJson)
                     lastExportedJson = sessionJson
                     statusMessage = "Loaded from session (rev ${session.document.value?.revision ?: 1})"
                 }
@@ -94,7 +95,8 @@ fun CanvasWorkspace(
                     if (doc != null && doc.revision > lastImportedRev) {
                         lastImportedRev = doc.revision
                         if (doc.sceneJson.isNotBlank() && doc.sceneJson != lastExportedJson) {
-                            controller.importPath(doc.sceneJson)
+                            val cleanJson = com.letta.mobile.data.canvas.CanvasOpProjector.stripMetadataForDrawBox(doc.sceneJson)
+                            controller.importPath(cleanJson)
                             statusMessage = "Agent updated canvas (rev ${doc.revision})"
                         }
                     }

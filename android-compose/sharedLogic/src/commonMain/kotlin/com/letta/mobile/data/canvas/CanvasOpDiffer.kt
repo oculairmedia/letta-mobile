@@ -23,6 +23,11 @@ object CanvasOpDiffer {
         return "$prefix-$high-$low"
     }
 
+    fun canonicalize(sceneJson: String): String {
+        val parsed = parseScene(sceneJson)
+        return json.encodeToString(JsonObject.serializer(), parsed)
+    }
+
     /**
      * Diffs [oldSceneJson] against [newSceneJson] and returns a list of discrete operations.
      *
@@ -43,6 +48,7 @@ object CanvasOpDiffer {
 
         val oldParsed = parseScene(oldSceneJson)
         val newParsed = parseScene(newSceneJson)
+        if (oldParsed == newParsed) return emptyList()
 
         val ops = mutableListOf<CanvasOp>()
 

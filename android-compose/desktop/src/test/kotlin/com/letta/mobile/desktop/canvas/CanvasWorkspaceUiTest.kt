@@ -209,4 +209,78 @@ class CanvasWorkspaceUiTest {
         }
         onAllNodesWithText("Alice (Peer)").assertCountEquals(0)
     }
+
+    @Test
+    fun canvasWorkspace_twoSessionsWithSharedHostTransport_converge() = runComposeUiTest {
+        val sharedTransport = DesktopCanvasHostSync.syncTransport
+        val storeA = com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore()
+        val storeB = com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore()
+        val canvasId = com.letta.mobile.data.canvas.CanvasId("host-sync-canvas")
+
+        val sessionA = kotlinx.coroutines.runBlocking {
+            com.letta.mobile.data.canvas.CanvasSession.create(
+                store = storeA,
+                canvasId = canvasId,
+                title = "Host Sync A",
+                syncTransport = sharedTransport,
+            )
+        }
+        val sessionB = kotlinx.coroutines.runBlocking {
+            com.letta.mobile.data.canvas.CanvasSession.create(
+                store = storeB,
+                canvasId = canvasId,
+                title = "Host Sync B",
+                syncTransport = sharedTransport,
+            )
+        }
+
+        // Host UI binds sessionA (startSync is invoked internally in LaunchedEffect)
+        setContent {
+            CanvasWorkspace(
+                session = sessionA,
+                presenceTransport = DesktopCanvasHostSync.presenceTransport,
+                currentPeerId = "host-a",
+            )
+        }
+
+        // Initially 0 elements
+        onNodeWithText("Elements: 0", substring = true).assertExists()
+
+        val peerElementJson = """
+            {
+                "id": "card-b",
+                "type": "Text",
+                "zIndex": 10,
+                "points": [],
+                "strokeColor": "#1b2a41ff",
+                "strokeWidth": 0.0,
+                "modifiedAt": 1782669085173,
+                "text": "Card From Peer",
+                "fontFamilyKey": "serif",
+                "fontSize": 64.0,
+                "alignment": "CENTER",
+                "textTopLeft": "502.0,212.0",
+                "wrapWidth": 900.0
+            }
+        """.trimIndent()
+
+        // Session B applies a remote op over shared host transport
+        kotlinx.coroutines.runBlocking {
+            sessionB.applyLocal(
+                com.letta.mobile.data.canvas.CanvasOp.AddElementOp(
+                    opId = "op-shared-1",
+                    actorId = "host-b",
+                    lamport = 1L,
+                    elementId = "card-b",
+                    elementJson = peerElementJson,
+                )
+            )
+        }
+
+        // Session A observes and projects into DrawBox controller
+        waitUntil(timeoutMillis = 5000) {
+            onAllNodesWithText("Elements: 1", substring = true).fetchSemanticsNodes().isNotEmpty()
+        }
+        onNodeWithText("Elements: 1", substring = true).assertExists()
+    }
 }
