@@ -18,6 +18,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
@@ -136,6 +138,8 @@ fun MascotLive(
     identity: MascotIdentity,
     size: Dp,
     modifier: Modifier = Modifier,
+    /** The mascot is a control (it opens its agent): pointer becomes a hand and the tile is clickable. */
+    onClick: (() -> Unit)? = null,
 ) {
     val host = LocalMascotHost.current
     val registry = LocalMascotRegistry.current
@@ -176,9 +180,14 @@ fun MascotLive(
     }
     // requiredSize: an overscaled mascot must exceed its tile so the tile's clip crops it;
     // plain size() is coerced down to the parent's constraints and never overscales.
+    val clickable = if (onClick != null) {
+        Modifier.pointerHoverIcon(PointerIcon.Hand).clickable(onClick = onClick)
+    } else {
+        Modifier
+    }
     host.Surface(
         entry,
-        modifier.requiredSize(size).onGloballyPositioned {
+        modifier.then(clickable).requiredSize(size).onGloballyPositioned {
             val r = it.boundsInWindow()
             bounds = r
             val slot = MascotSlot(agentId, GazeRect(r.left, r.top, r.right, r.bottom))

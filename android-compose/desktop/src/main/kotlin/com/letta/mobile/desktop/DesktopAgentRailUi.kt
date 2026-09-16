@@ -30,6 +30,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -163,6 +164,8 @@ internal data class DesktopAgentRailState(
     val focus: DesktopAgentRailFocus,
     /** Spotify-style expanded library mode: names + spaces, not just orbs. */
     val expanded: Boolean = false,
+    /** The fleet Home page is showing; its rail icon draws selected. */
+    val homeSelected: Boolean = false,
 )
 
 @Immutable
@@ -170,6 +173,8 @@ internal data class DesktopAgentRailActions(
     val onAgentSelected: (String) -> Unit,
     val onNewSession: () -> Unit,
     val onToggleExpanded: () -> Unit = {},
+    /** Opens the fleet Home page. Home lives here in the rail, not in the per-agent sidebar. */
+    val onHome: () -> Unit = {},
 )
 
 /**
@@ -230,6 +235,19 @@ internal fun DesktopAgentRail(
                     ),
                 )
             }
+        }
+        // Home is fleet-wide, so it sits with the other fleet-wide controls up
+        // here - always, in both rail modes - and not in the per-agent sidebar,
+        // whose header is then the agent's mascot alone.
+        RailHeaderRow(onClick = actions.onHome, label = if (state.expanded) "Home" else null) {
+            RailActionIcon(
+                RailActionIconModel(
+                    icon = Icons.Outlined.Home,
+                    description = "Home",
+                    onClick = actions.onHome,
+                    selected = state.homeSelected,
+                ),
+            )
         }
         Spacer(Modifier.height(4.dp))
         if (state.expanded) {
@@ -662,6 +680,8 @@ private data class RailActionIconModel(
     val description: String,
     val onClick: () -> Unit,
     val tint: Color = Color.Unspecified,
+    /** The destination this icon opens is the one showing; drawn like a selected agent orb. */
+    val selected: Boolean = false,
 )
 
 @Composable
@@ -671,6 +691,7 @@ private fun RailActionIcon(model: RailActionIconModel) {
             modifier = Modifier
                 .size(34.dp)
                 .clip(CircleShape)
+                .background(if (model.selected) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent)
                 .clickable(onClick = model.onClick),
             contentAlignment = Alignment.Center,
         ) {
@@ -678,7 +699,7 @@ private fun RailActionIcon(model: RailActionIconModel) {
                 imageVector = model.icon,
                 contentDescription = model.description,
                 tint = model.tint.takeIf { it != Color.Unspecified }
-                    ?: MaterialTheme.colorScheme.onSurfaceVariant,
+                    ?: if (model.selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(18.dp),
             )
         }

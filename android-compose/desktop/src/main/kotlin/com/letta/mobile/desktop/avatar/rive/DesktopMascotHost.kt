@@ -18,6 +18,8 @@ class DesktopMascotEntry(val scene: RiveDesktopScene, runtime: RiveAvatarRuntime
 
     override suspend fun load() = rive.load(MASCOT_MODEL)
 
+    override fun writeIdentity(identity: MascotIdentity) = RiveAvatarContract.applyIdentity(scene.inputSink, identity)
+
     override fun dispose() = scene.close()
 }
 
@@ -27,10 +29,7 @@ class DesktopMascotEntry(val scene: RiveDesktopScene, runtime: RiveAvatarRuntime
  * the shared [com.letta.mobile.ui.mascot.MascotAvatar]'s; nothing here is policy.
  */
 object DesktopMascotHost : MascotHost {
-    private val entries = MascotEntries<DesktopMascotEntry>(
-        create = ::create,
-        applyIdentity = { entry, identity -> RiveAvatarContract.applyIdentity(entry.scene.inputSink, identity) },
-    )
+    private val entries = MascotEntries<DesktopMascotEntry>(create = ::create)
 
     override fun entry(agentId: String, identity: MascotIdentity): MascotEntry? =
         if (RiveBridgeNative.AVAILABLE) entries.get(agentId, identity) else null

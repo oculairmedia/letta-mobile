@@ -15,7 +15,6 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.selection.LocalTextSelectionColors
 import androidx.compose.foundation.text.selection.TextSelectionColors
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -43,6 +42,7 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.timeline.CanonicalTimelinePresentation
 import com.letta.mobile.desktop.fadingEdges
+import com.letta.mobile.ui.mascot.MascotLoading
 import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -59,18 +59,20 @@ import kotlinx.coroutines.launch
 @Composable
 internal fun DesktopCanonicalMessageList(
     presentation: CanonicalTimelinePresentation,
+    agentId: String?,
     modifier: Modifier = Modifier,
 ) {
     // A new presentation is a new conversation: its list state, follow mode and viewport anchor
     // must not be inherited from the one before it.
     key(presentation) {
-        CanonicalMessageListContent(presentation, modifier)
+        CanonicalMessageListContent(presentation, agentId, modifier)
     }
 }
 
 @Composable
 private fun CanonicalMessageListContent(
     presentation: CanonicalTimelinePresentation,
+    agentId: String?,
     modifier: Modifier,
 ) {
     val settled = presentation.settled.collectAsLazyPagingItems()
@@ -153,7 +155,8 @@ private fun CanonicalMessageListContent(
                 }
                 val load = settled.loadState
                 if (load.refresh is LoadState.Loading || load.append is LoadState.Loading) {
-                    item(key = "canonical-loading") { CircularProgressIndicator() }
+                    // The agent fetching its own history, not an anonymous spinner (wbin4.2).
+                    item(key = "canonical-loading") { MascotLoading(agentId) }
                 }
                 if (load.refresh is LoadState.Error || load.append is LoadState.Error ||
                     load.prepend is LoadState.Error

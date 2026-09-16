@@ -9,6 +9,7 @@ import androidx.compose.ui.Alignment
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.ui.components.DateSeparator
 import com.letta.mobile.ui.components.ScrollToBottomFab
+import com.letta.mobile.ui.mascot.MascotLoading
 import com.letta.mobile.ui.theme.LettaSpacing
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
@@ -59,6 +60,8 @@ internal fun PagedChatMessageList(
 ) {
     if (presentation.opening || presentation.openError != null) {
         androidx.compose.foundation.layout.Column(modifier) {
+            // The agent opening its own conversation, not an anonymous wait (wbin4.2).
+            if (presentation.openError == null) MascotLoading(state.agentId)
             androidx.compose.material3.Text(presentation.openError ?: "Opening conversation...")
             if (presentation.openError != null) androidx.compose.material3.TextButton(onClick = presentation.retryOpen) {
                 androidx.compose.material3.Text("Retry")
@@ -324,7 +327,7 @@ private fun PagedChatMessageListContent(
                 }
                 val load = pages.loadState
                 if (load.refresh is LoadState.Loading || load.append is LoadState.Loading) {
-                    item(key = "paging-loading") { CircularProgressIndicator() }
+                    item(key = "paging-loading") { MascotLoading(state.agentId) }
                 }
                 if (load.refresh is LoadState.Error || load.append is LoadState.Error || load.prepend is LoadState.Error) {
                     item(key = "paging-retry") { TextButton(onClick = pages::retry) { Text("Retry history") } }
