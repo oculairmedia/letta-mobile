@@ -65,47 +65,64 @@ private suspend fun executeCreateCanvas(
     return newId
 }
 
-private suspend fun executeReplaceScene(
+private suspend fun updateDocumentScene(
     store: CanvasDocumentStore,
     canvasId: CanvasId,
-    sceneJson: String,
+    newScene: String,
+    onSession: suspend (CanvasSession) -> Long,
 ): Long {
     val activeSession = CanvasSessionRegistry.get(canvasId)
     if (activeSession != null) {
-        return activeSession.applyAgentReplace(sceneJson).revision
+        return onSession(activeSession)
     }
     val doc = store.get(canvasId) ?: throw NoSuchElementException("Canvas not found: ${canvasId.value}")
     val updated = doc.copy(
         revision = doc.revision + 1L,
-        sceneJson = sceneJson,
+        sceneJson = newScene,
         updatedAtEpochMs = kotlin.time.Clock.System.now().toEpochMilliseconds(),
     )
     store.upsert(updated)
     return updated.revision
 }
 
+private suspend fun executeReplaceScene(
+    store: CanvasDocumentStore,
+    input: JsonObject,
+): ExternalToolResult {
+    val canvasIdStr = input["canvas_id"]?.jsonPrimitive?.contentOrNull
+        ?: return ExternalToolResult.Error("Missing required parameter: canvas_id")
+    val sceneJson = input["scene_json"]?.jsonPrimitive?.contentOrNull
+        ?: return ExternalToolResult.Error("Missing required parameter: scene_json")
+    val canvasId = CanvasId(canvasIdStr)
+    val revision = updateDocumentScene(store, canvasId, sceneJson) { session ->
+        session.applyAgentReplace(sceneJson).revision
+    }
+    return ExternalToolResult.Success(
+        canvasJson.encodeToString(CanvasReplaceSceneResult(ok = true, revision = revision))
+    )
+}
+
 private suspend fun executeApplyOps(
     store: CanvasDocumentStore,
-    canvasId: CanvasId,
-    ops: List<CanvasOp>,
-): Long {
+    input: JsonObject,
+): ExternalToolResult {
+    val canvasIdStr = input["canvas_id"]?.jsonPrimitive?.contentOrNull
+        ?: return ExternalToolResult.Error("Missing required parameter: canvas_id")
+    val opsJson = input["ops"] ?: return ExternalToolResult.Error("Missing required parameter: ops")
+    val ops = canvasJson.decodeFromJsonElement<List<CanvasOp>>(opsJson)
+    val canvasId = CanvasId(canvasIdStr)
     val replaceOp = ops.filterIsInstance<CanvasOp.ReplaceSceneOp>().lastOrNull()
-    val activeSession = CanvasSessionRegistry.get(canvasId)
-    if (activeSession != null) {
-        return if (replaceOp != null) {
-            activeSession.applyAgentReplace(replaceOp.sceneJson).revision
+    val fallbackScene = replaceOp?.sceneJson ?: (store.get(canvasId)?.sceneJson ?: "")
+    val revision = updateDocumentScene(store, canvasId, fallbackScene) { session ->
+        if (replaceOp != null) {
+            session.applyAgentReplace(replaceOp.sceneJson).revision
         } else {
-            activeSession.saveScene(activeSession.sceneJsonOrEmpty()).revision
+            session.saveScene(session.sceneJsonOrEmpty()).revision
         }
     }
-    val doc = store.get(canvasId) ?: throw NoSuchElementException("Canvas not found: ${canvasId.value}")
-    val updated = doc.copy(
-        revision = doc.revision + 1L,
-        sceneJson = replaceOp?.sceneJson ?: doc.sceneJson,
-        updatedAtEpochMs = kotlin.time.Clock.System.now().toEpochMilliseconds(),
+    return ExternalToolResult.Success(
+        canvasJson.encodeToString(CanvasApplyOpsResult(ok = true, revision = revision))
     )
-    store.upsert(updated)
-    return updated.revision
 }
 
 private suspend fun executeListCanvases(
@@ -211,14 +228,7 @@ class CanvasReplaceSceneTool(private val store: CanvasDocumentStore) : HostExter
     override val capability: Capability = Capability.ImageHydration
 
     override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult = runCatching {
-        val canvasIdStr = input["canvas_id"]?.jsonPrimitive?.contentOrNull
-            ?: return ExternalToolResult.Error("Missing required parameter: canvas_id")
-        val sceneJson = input["scene_json"]?.jsonPrimitive?.contentOrNull
-            ?: return ExternalToolResult.Error("Missing required parameter: scene_json")
-        val revision = executeReplaceScene(store, CanvasId(canvasIdStr), sceneJson)
-        ExternalToolResult.Success(
-            canvasJson.encodeToString(CanvasReplaceSceneResult(ok = true, revision = revision))
-        )
+        executeReplaceScene(store, input)
     }.getOrElse { ExternalToolResult.Error("Failed to replace scene: ${it.message}") }
 
     companion object {
@@ -249,14 +259,7 @@ class CanvasApplyOpsTool(private val store: CanvasDocumentStore) : HostExternalT
     override val capability: Capability = Capability.ImageHydration
 
     override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult = runCatching {
-        val canvasIdStr = input["canvas_id"]?.jsonPrimitive?.contentOrNull
-            ?: return ExternalToolResult.Error("Missing required parameter: canvas_id")
-        val opsJson = input["ops"] ?: return ExternalToolResult.Error("Missing required parameter: ops")
-        val ops = canvasJson.decodeFromJsonElement<List<CanvasOp>>(opsJson)
-        val revision = executeApplyOps(store, CanvasId(canvasIdStr), ops)
-        ExternalToolResult.Success(
-            canvasJson.encodeToString(CanvasApplyOpsResult(ok = true, revision = revision))
-        )
+        executeApplyOps(store, input)
     }.getOrElse { ExternalToolResult.Error("Failed to apply ops: ${it.message}") }
 
     companion object {
