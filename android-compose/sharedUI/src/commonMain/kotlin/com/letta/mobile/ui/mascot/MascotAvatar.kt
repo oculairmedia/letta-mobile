@@ -1,17 +1,13 @@
 package com.letta.mobile.ui.mascot
 
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -50,7 +46,18 @@ import com.letta.mobile.data.presence.AgentPresence
  * agent, presence, time, gaze, sizing, clipping - is shared and lives in [MascotAvatar].
  */
 interface MascotHost {
-    /** The live entry for [agentId], or null when the renderer is unavailable (draw the fallback). */
+    /**
+     * Whether this host can draw mascots at all. A cheap flag: every "is there a mascot?" check
+     * reads this and nothing else, so listing an agent never brings up a renderer scene for it.
+     */
+    val available: Boolean
+
+    /**
+     * The live entry for [agentId], or null when the renderer is unavailable. Creating an entry is
+     * the expensive step (a scene per agent), so only a surface about to draw calls this - never a
+     * check. Entries load lazily: [MascotEntry.ensureLoaded] does the renderer work off the UI
+     * thread, and [Surface] draws nothing until it has.
+     */
     fun entry(agentId: String, identity: MascotIdentity): MascotEntry?
 
     /**
@@ -64,6 +71,8 @@ interface MascotHost {
 
 /** No renderer: every mascot draws its fallback. Platforms provide a real host at their root. */
 object NoMascotHost : MascotHost {
+    override val available: Boolean = false
+
     override fun entry(agentId: String, identity: MascotIdentity): MascotEntry? = null
 
     @Composable
@@ -89,8 +98,8 @@ fun mascotAtWork(agentId: String?): Boolean {
 @Composable
 fun mascotAvailable(agentId: String?): Boolean {
     if (agentId == null) return false
-    val identity = LocalMascotRegistry.current.identities[agentId] ?: return false
-    return LocalMascotHost.current.entry(agentId, identity) != null
+    if (LocalMascotRegistry.current.identities[agentId] == null) return false
+    return LocalMascotHost.current.available
 }
 
 /**
@@ -112,7 +121,7 @@ fun MascotAvatar(
     fallback: @Composable () -> Unit,
 ) {
     val identity = agentId?.let { LocalMascotRegistry.current.identities[it] }
-    if (agentId == null || identity == null || LocalMascotHost.current.entry(agentId, identity) == null) {
+    if (agentId == null || identity == null || !LocalMascotHost.current.available) {
         fallback()
         return
     }
@@ -197,37 +206,31 @@ fun MascotLive(
         contentAlignment = Alignment.Center,
     ) {
         host.Surface(entry, Modifier.matchParentSize(), playing = true)
-        if (onClick != null) MascotHitRing(size, onClick)
+        if (onClick != null) MascotHitArea(size, onClick)
     }
 }
 
 /**
- * The control over a clickable mascot: a hit area the size of the body (the rig draws it across
- * ~60 % of the tile, a little below centre), outlined on hover so the affordance is the character
- * itself, not a large invisible box around it.
+ * The control over a clickable mascot: an invisible hit area the size of the body (the rig draws
+ * it across ~60 % of the tile, a little below centre) and a hand cursor. No highlight of its own -
+ * the character already answers a hover with motion (the rig's Hover layer), and that is the
+ * affordance.
  */
 @Composable
-private fun MascotHitRing(size: Dp, onClick: () -> Unit) {
-    val interaction = remember { MutableInteractionSource() }
-    val hovered by interaction.collectIsHoveredAsState()
-    val ring = MaterialTheme.colorScheme.primary.copy(alpha = if (hovered) HIT_RING_ALPHA else 0f)
+private fun MascotHitArea(size: Dp, onClick: () -> Unit) {
     Box(
         Modifier
             .offset(y = size * BODY_DROP_FRACTION)
             .size(size * BODY_FRACTION)
             .clip(CircleShape)
-            .border(HIT_RING_WIDTH, ring, CircleShape)
-            .hoverable(interaction)
             .pointerHoverIcon(PointerIcon.Hand)
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick),
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick),
     )
 }
 
 /** The body's share of a tile and how far below the tile's centre it sits (see the 8yee3 framing note). */
 private const val BODY_FRACTION = 0.62f
 private const val BODY_DROP_FRACTION = 0.06f
-private const val HIT_RING_ALPHA = 0.7f
-private val HIT_RING_WIDTH = 1.5.dp
 
 /**
  * The real mascot for an identity that belongs to no agent - a picker option, a preview - drawn
@@ -247,8 +250,7 @@ fun MascotCandidate(
 
 /** True when the host can draw [identity] as a [MascotCandidate]. */
 @Composable
-fun mascotCandidateAvailable(identity: MascotIdentity): Boolean =
-    LocalMascotHost.current.entry(candidateSceneKey(identity), identity) != null
+fun mascotCandidateAvailable(identity: MascotIdentity): Boolean = LocalMascotHost.current.available
 
 /**
  * Which scene a candidate identity draws on. Scenes live in one table keyed by string and re-skin

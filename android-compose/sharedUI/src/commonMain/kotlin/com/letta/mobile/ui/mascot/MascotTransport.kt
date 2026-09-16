@@ -2,11 +2,19 @@ package com.letta.mobile.ui.mascot
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -18,17 +26,20 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
 import com.letta.mobile.avatar.core.MascotIdentity
 import kotlin.math.roundToInt
 import kotlinx.coroutines.coroutineScope
@@ -38,25 +49,42 @@ import kotlinx.coroutines.launch
 
 /**
  * The places an agent's mascot can stand. One character per agent, in one place at a time: it
- * rests beside the composer, and is *transported* - moved, not duplicated - to the agent pane's
- * hero seat when the user opens the agent, and to the editor's when they edit it. Lower [rank] is
- * nearer rest; a mascot whose requested seat goes away settles into its lowest-ranked seat.
+ * rests beside the composer and is *transported* - moved, not duplicated - to the agent pane's
+ * hero seat when the pane shows. Editing the agent moves nothing: the editor is configuration,
+ * and the character morphs where it stands as the user picks (see [MascotTransport.preview]).
+ * Lower [rank] is nearer rest; a mascot whose requested seat goes away settles into its
+ * lowest-ranked seat.
  */
 enum class MascotStage(internal val rank: Int) {
     /** A fresh conversation's greeting: the agent at hero size, the page itself. Rest while it shows. */
     WELCOME_HERO(0),
     COMPOSER_COMPANION(1),
     AGENT_PANE_HERO(2),
-    EDIT_AGENT_HERO(3),
 }
 
-/** A declared seat: where it is in the window, how large the character draws there, and what a click does. */
+/**
+ * A declared seat: where it is in the window, how large the character draws there, and its
+ * handlers. The handlers live in a [SeatHandlers] holder that is identity-equal on purpose: a
+ * recomposition hands a seat fresh lambdas, and if they took part in equality every pass would
+ * write the seat back into the transport's state and recompose the layer - a loop, every frame.
+ */
 internal data class MascotSeatInfo(
     val bounds: Rect,
     val overscale: Float,
     val identity: MascotIdentity?,
-    val onClick: (() -> Unit)?,
-)
+    val handlers: SeatHandlers,
+) {
+    val onClick: (() -> Unit)? get() = handlers.onClick
+    val onEdit: (() -> Unit)? get() = handlers.onEdit
+}
+
+/** The latest click / edit handlers of one seat; updated in place, never compared. */
+internal class SeatHandlers {
+    var onClick: (() -> Unit)? = null
+
+    /** Opens the agent's editor; every drawn mascot offers it as a pencil badge on hover. */
+    var onEdit: (() -> Unit)? = null
+}
 
 /**
  * The transport verb, and the seats it can send a mascot to. One per window (or activity): every
@@ -67,6 +95,17 @@ internal data class MascotSeatInfo(
 class MascotTransport {
     internal val seats = mutableStateMapOf<SeatKey, MascotSeatInfo>()
     private val requested = mutableStateMapOf<String, MascotStage>()
+    private val previews = mutableStateMapOf<String, MascotIdentity>()
+
+    /**
+     * An identity to draw for [agentId] instead of its own - the editor's unsaved pick - so the
+     * character morphs live wherever it stands while the user chooses; null ends the preview.
+     */
+    fun preview(agentId: String, identity: MascotIdentity?) {
+        if (identity == null) previews.remove(agentId) else previews[agentId] = identity
+    }
+
+    internal fun previewOf(agentId: String): MascotIdentity? = previews[agentId]
 
     /** True while a [MascotTransportLayer] draws; without one every seat draws its own mascot in place. */
     internal var layerMounted by mutableStateOf(false)
@@ -78,9 +117,11 @@ class MascotTransport {
      */
     internal class Flight(initial: MascotStage?) {
         val presence = Animatable(1f)
-        val rect = Animatable(Rect.Zero, Rect.VectorConverter)
+        /** 0..1 along the hop; 1 when standing. */
+        val progress = Animatable(1f)
+        /** Where the hop started; the endpoint is the destination seat as it is each frame. */
+        var from: Rect = Rect.Zero
         var shownStage: MascotStage? = initial
-        var flying: Boolean = false
     }
 
     private val flights = HashMap<String, Flight>()
@@ -134,13 +175,17 @@ fun MascotSeat(
     overscale: Float = 1f,
     identity: MascotIdentity? = null,
     onClick: (() -> Unit)? = null,
+    onEdit: (() -> Unit)? = null,
     empty: @Composable () -> Unit,
 ) {
     val transport = LocalMascotTransport.current
     val registry = LocalMascotRegistry.current
-    val shown = identity ?: agentId?.let { registry.identities[it] }
-    val available = agentId != null && shown != null && LocalMascotHost.current.entry(agentId, shown) != null
+    val shown = identity ?: agentId?.let { transport.previewOf(it) ?: registry.identities[it] }
+    val available = agentId != null && shown != null && LocalMascotHost.current.available
     val key = agentId?.let { MascotTransport.SeatKey(it, stage) }
+    val handlers = remember { SeatHandlers() }
+    handlers.onClick = onClick
+    handlers.onEdit = onEdit
     DisposableEffect(transport, key) {
         onDispose { key?.let { transport.seats.remove(it) } }
     }
@@ -148,7 +193,7 @@ fun MascotSeat(
     Box(
         modifier = modifier.requiredSize(size).onGloballyPositioned { coords ->
             if (key == null || !available) return@onGloballyPositioned
-            val next = MascotSeatInfo(coords.boundsInWindow(), overscale, identity, onClick)
+            val next = MascotSeatInfo(coords.boundsInWindow(), overscale, identity, handlers)
             if (transport.seats[key] != next) transport.seats[key] = next
         },
         contentAlignment = Alignment.Center,
@@ -184,7 +229,7 @@ fun MascotTransportLayer(
         for (agentId in transport.agentsSeated()) {
             val stage = transport.activeStage(agentId) ?: continue
             val seat = transport.seat(agentId, stage) ?: continue
-            val identity = seat.identity ?: registry.identities[agentId] ?: continue
+            val identity = seat.identity ?: transport.previewOf(agentId) ?: registry.identities[agentId] ?: continue
             key(agentId) {
                 TransportedMascot(agentId, identity, stage, seat, origin, reducedMotion)
             }
@@ -203,48 +248,42 @@ private fun TransportedMascot(
 ) {
     val transport = LocalMascotTransport.current
     val flight = transport.flight(agentId)
-    // Every hop is the same function of (from, to): the character fades and shrinks as it leaves,
-    // moves along one eased path, and fades and grows back as it arrives. A hop only starts once
-    // the destination seat has stopped moving (a pane opening animates its own layout for a few
-    // frames), so the path is one curve rather than a chase after a target that is still sliding -
-    // that chase was why the same hop felt different from seat to seat. Hops run one after another
-    // off a conflated stream of stage changes, so a flicker mid-flight cannot restart one halfway.
+    // Every hop is the same function: progress runs the one 360 ms curve while the character
+    // fades and shrinks as it leaves and fades and grows back as it arrives. The endpoint is the
+    // destination seat *as it is each frame* - a pane that is still opening moves its seat, and
+    // the character follows it in without the curve restarting - so every pair of seats gets the
+    // identical motion and no hop waits. Hops run one after another off a conflated stream of
+    // stage changes, so a flicker mid-flight cannot restart one halfway.
     LaunchedEffect(agentId, reducedMotion) {
         snapshotFlow { transport.activeStage(agentId) }
             .distinctUntilChanged()
             .conflate()
             .collect { next ->
                 if (next == null || next == flight.shownStage) return@collect
-                val to = settledBounds(transport, agentId, next) ?: return@collect
+                flight.from = shownRect(flight, transport.seat(agentId, flight.shownStage ?: next)?.bounds ?: flight.from)
                 flight.shownStage = next
                 if (reducedMotion) {
-                    flight.rect.snapTo(to)
+                    flight.progress.snapTo(1f)
                     flight.presence.snapTo(1f)
                     return@collect
                 }
-                flight.flying = true
-                try {
-                    coroutineScope {
-                        launch { flight.rect.animateTo(to, tween(TRANSPORT_MILLIS, easing = FastOutSlowInEasing)) }
-                        flight.presence.animateTo(0f, tween(TRANSPORT_LEAVE_MILLIS))
-                        flight.presence.animateTo(1f, tween(TRANSPORT_MILLIS - TRANSPORT_LEAVE_MILLIS, easing = FastOutSlowInEasing))
-                    }
-                } finally {
-                    flight.flying = false
+                flight.progress.snapTo(0f)
+                coroutineScope {
+                    launch { flight.progress.animateTo(1f, tween(TRANSPORT_MILLIS, easing = FastOutSlowInEasing)) }
+                    flight.presence.animateTo(0f, tween(TRANSPORT_LEAVE_MILLIS))
+                    flight.presence.animateTo(1f, tween(TRANSPORT_MILLIS - TRANSPORT_LEAVE_MILLIS, easing = FastOutSlowInEasing))
                 }
             }
-    }
-    // Between hops the character simply follows its seat (window resize, sidebar width).
-    LaunchedEffect(flight, seat.bounds, stage) {
-        if (!flight.flying && stage == flight.shownStage) flight.rect.snapTo(seat.bounds)
     }
     // The renderer's node keeps the DESTINATION size for the whole flight and the change of size
     // is a layer scale: a Rive surface re-allocates its readback buffer and restarts its frame
     // loop on every size change, so resizing it per frame is what made a hop stutter.
-    val rect = flight.rect.value
+    val rect = shownRect(flight, seat.bounds)
     val density = LocalDensity.current
     val boxSize = with(density) { seat.bounds.width.toDp() }
     val flightScale = if (seat.bounds.width > 0f) rect.width / seat.bounds.width else 1f
+    val hover = remember { MutableInteractionSource() }
+    val hovered by hover.collectIsHoveredAsState()
     Box(
         modifier = Modifier
             .offset {
@@ -260,31 +299,48 @@ private fun TransportedMascot(
                 val scale = flightScale * (TRANSPORT_MIN_SCALE + (1f - TRANSPORT_MIN_SCALE) * presence)
                 scaleX = scale
                 scaleY = scale
-            },
+            }
+            .hoverable(hover),
         contentAlignment = Alignment.Center,
     ) {
         MascotLive(agentId, identity, size = boxSize * seat.overscale, onClick = seat.onClick)
+        // The pencil, in front of the character (the layer draws above every seat), on hover only:
+        // one way to edit the agent from any mascot, so no seat needs to travel to the editor.
+        seat.onEdit?.let { onEdit ->
+            if (hovered) MascotEditBadge(onEdit, Modifier.align(Alignment.BottomEnd))
+        }
     }
 }
 
-/**
- * The seat's bounds once they have held still for two frames, or null when the seat left before it
- * settled (the stage stream will name the next one).
- */
-private suspend fun settledBounds(transport: MascotTransport, agentId: String, stage: MascotStage): Rect? {
-    var last: Rect? = null
-    var stillFrames = 0
-    while (stillFrames < SETTLE_FRAMES) {
-        val now = transport.seat(agentId, stage)?.bounds ?: return null
-        stillFrames = if (now == last) stillFrames + 1 else 0
-        last = now
-        withFrameNanos { }
+@Composable
+private fun MascotEditBadge(onEdit: () -> Unit, modifier: Modifier) {
+    Box(
+        modifier
+            .size(EDIT_BADGE_SIZE)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+            .pointerHoverIcon(PointerIcon.Hand)
+            .clickable(onClick = onEdit),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = "\u270E",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
-    return last
+}
+
+private val EDIT_BADGE_SIZE = 22.dp
+
+/** Where the character is drawn: [flight.from] eased toward [to] by the hop's progress (already eased by its spec). */
+private fun shownRect(flight: MascotTransport.Flight, to: Rect): Rect {
+    val t = flight.progress.value
+    if (t >= 1f) return to
+    return androidx.compose.ui.geometry.lerp(flight.from, to, t)
 }
 
 /** One transport: the move takes [TRANSPORT_MILLIS]; the character is gone by [TRANSPORT_LEAVE_MILLIS] and back by the end. */
 private const val TRANSPORT_MILLIS = 360
 private const val TRANSPORT_LEAVE_MILLIS = 140
 private const val TRANSPORT_MIN_SCALE = 0.6f
-private const val SETTLE_FRAMES = 2

@@ -23,6 +23,8 @@ import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
+import kotlin.math.roundToInt
+import kotlinx.coroutines.withContext
 import org.jetbrains.skia.ColorAlphaType
 import org.jetbrains.skia.ColorType
 import org.jetbrains.skia.Image
@@ -121,16 +123,28 @@ private class RiveRenderTarget(
     fun raster(pixels: ByteArray): Image = Image.makeRaster(info, pixels, size.width * 4)
 
     /** One frame of the scene as it stands; whichever live surface shares it advances it. */
-    fun renderStill() = slots.show(raster(scene.render(size.width, size.height)))
+    suspend fun renderStill() {
+        val image = withContext(RiveThread.dispatcher) { raster(scene.render(size.width, size.height)) }
+        slots.show(image)
+    }
 
-    /** Advance (once per frame even when several surfaces share the scene), render and show; returns the pixels. */
-    fun renderFrame(now: Long, onFrameStats: ((nativeMs: Double) -> Unit)?): ByteArray {
-        scene.advanceTo(now)
-        val started = System.nanoTime()
-        val pixels = scene.render(size.width, size.height)
-        onFrameStats?.invoke((System.nanoTime() - started) / 1e6)
-        slots.show(raster(pixels))
-        return pixels
+    /**
+     * Advance (once per frame even when several surfaces share the scene) and render on the Rive
+     * thread, then show on this one. The GPU round trip and its blocking readback never run on the
+     * UI thread; a frame that takes longer than the vsync simply delays the next one.
+     */
+    suspend fun renderFrame(now: Long, onFrameStats: ((nativeMs: Double) -> Unit)?, ghost: Boolean): Image? {
+        val (image, ghostImage) = withContext(RiveThread.dispatcher) {
+            scene.advanceTo(now)
+            val started = System.nanoTime()
+            val pixels = scene.render(size.width, size.height)
+            onFrameStats?.invoke((System.nanoTime() - started) / 1e6)
+            // Rasterised here, while the bytes are still this frame's: the scene reuses them. A
+            // ghost gets its own image - the two-slot rotation closes its images a frame later.
+            raster(pixels) to (if (ghost) raster(pixels) else null)
+        }
+        slots.show(image)
+        return ghostImage
     }
 }
 
@@ -144,20 +158,13 @@ private suspend fun RiveRenderTarget.play(
     ring?.clear()
     var tick = 0L
     while (true) {
-        withFrameNanos { now ->
-            val pixels = renderFrame(now, onFrameStats)
-            // A ghost gets its own image: the two-slot rotation closes its images a frame later,
-            // which would pull the pixels out from under the ring.
-            ring?.offer(tick, onion.value) { raster(pixels) }
-            tick++
-        }
+        val now = withFrameNanos { it }
+        val skin = onion.value
+        val wantGhost = ring != null && skin != null && tick % skin.stride.coerceAtLeast(1) == 0L
+        val ghost = renderFrame(now, onFrameStats, ghost = wantGhost)
+        if (ghost != null && skin != null) ring?.push(ghost, skin.frames)
+        tick++
     }
-}
-
-/** Push a ghost when the onion skin is on and [tick] lands on its stride. */
-private fun RiveGhostRing.offer(tick: Long, skin: RiveOnionSkin?, image: () -> Image) {
-    if (skin == null) return
-    if (tick % skin.stride.coerceAtLeast(1) == 0L) push(image(), skin.frames)
 }
 
 private fun rivePointerKind(type: PointerEventType): RivePointer = when (type) {
@@ -167,12 +174,16 @@ private fun rivePointerKind(type: PointerEventType): RivePointer = when (type) {
     else -> RivePointer.MOVE
 }
 
-private fun Modifier.rivePointerInput(scene: RiveDesktopScene): Modifier = pointerInput(scene) {
+/** Pointer events arrive in node pixels; the scene hit-tests in render pixels, so they are scaled by the cap. */
+private fun Modifier.rivePointerInput(scene: RiveDesktopScene, renderSize: () -> IntSize): Modifier = pointerInput(scene) {
     awaitPointerEventScope {
         while (true) {
             val event = awaitPointerEvent()
             val p = event.changes.firstOrNull()?.position ?: continue
-            scene.pointer(rivePointerKind(event.type), p.x, p.y)
+            val render = renderSize()
+            val sx = if (size.width > 0) render.width.toFloat() / size.width else 1f
+            val sy = if (size.height > 0) render.height.toFloat() / size.height else 1f
+            scene.pointer(rivePointerKind(event.type), p.x * sx, p.y * sy)
         }
     }
 }
@@ -209,7 +220,11 @@ fun RiveDesktopSurface(
     onFrameStats: ((nativeMs: Double) -> Unit)? = null,
     onion: RiveOnionSkin? = null,
 ) {
-    var size by remember { mutableStateOf(IntSize.Zero) }
+    var nodeSize by remember { mutableStateOf(IntSize.Zero) }
+    // Rendered at the node's physical size up to [MAX_RENDER_PX] on the long side: the cost of a
+    // frame is its pixels (render, readback, copy, upload), and a soft-shaped character upscaled
+    // from that is indistinguishable at hero sizes.
+    val size = remember(nodeSize) { nodeSize.cappedTo(MAX_RENDER_PX) }
     val slots = remember { RiveFrameSlots() }
     DisposableEffect(Unit) { onDispose { slots.close() } }
 
@@ -227,8 +242,24 @@ fun RiveDesktopSurface(
         if (playing) target.play(ring, currentOnion, onFrameStats) else target.renderStill()
     }
 
-    Canvas(modifier.onSizeChanged { size = it }.rivePointerInput(scene)) {
+    Canvas(modifier.onSizeChanged { nodeSize = it }.rivePointerInput(scene) { size }) {
         drawOnionGhosts(ring?.ghosts.orEmpty(), onion)
-        slots.frame?.let { drawImage(it) }
+        slots.frame?.let { frame ->
+            drawImage(
+                image = frame,
+                srcSize = IntSize(frame.width, frame.height),
+                dstSize = IntSize(this.size.width.roundToInt(), this.size.height.roundToInt()),
+            )
+        }
     }
+}
+
+/** The long side of a render, in physical pixels. */
+private const val MAX_RENDER_PX = 256
+
+private fun IntSize.cappedTo(maxPx: Int): IntSize {
+    val long = maxOf(width, height)
+    if (long <= maxPx || long == 0) return this
+    val scale = maxPx.toFloat() / long
+    return IntSize((width * scale).roundToInt().coerceAtLeast(1), (height * scale).roundToInt().coerceAtLeast(1))
 }

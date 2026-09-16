@@ -97,6 +97,8 @@ class AndroidMascotHost(
         content()
     }
 
+    override val available: Boolean get() = file != null
+
     override fun entry(agentId: String, identity: MascotIdentity): MascotEntry? =
         if (file == null) null else entries.get(agentId, identity)
 

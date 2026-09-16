@@ -108,6 +108,8 @@ internal data class ChatDetailPaneActions(
     val onOpenAgent: (String) -> Unit = {},
     /** The composer companion was clicked: show the selected agent's pane (the sidebar). */
     val onOpenAgentPane: () -> Unit = {},
+    /** The pencil on any mascot: open the selected agent's editor. */
+    val onEditAgent: () -> Unit = {},
     val onA2uiAction: (A2uiAction) -> Unit = {},
     /** Change the selected conversation's working directory (folder picker result). */
     val onChangeWorkingDirectory: ((String) -> Unit)? = null,
@@ -201,7 +203,7 @@ private fun ChatDetailBody(
                 onChangeDirectory = actions.onChangeWorkingDirectory,
             )
         }
-        val companion = rememberComposerCompanion(surface, state, onClick = actions.onOpenAgentPane)
+        val companion = rememberComposerCompanion(surface, state, onClick = actions.onOpenAgentPane, onEdit = actions.onEditAgent)
         val transport = com.letta.mobile.ui.mascot.LocalMascotTransport.current
         val companionPresent = surface.selectedConversation?.agentId
             ?.let { transport.activeStage(it) == com.letta.mobile.ui.mascot.MascotStage.COMPOSER_COMPANION } ?: false
@@ -269,6 +271,7 @@ private fun ChatDetailContent(
             identity = surface.selectedConversation?.agentId?.let { state.agentIdentitiesById[it] },
             onStarterPrompt = actions.onComposerTextChanged,
             onOnboardingTask = actions.onOnboardingTask,
+            onEditAgent = actions.onEditAgent,
             modifier = modifier,
         )
         else -> MessageList(
@@ -297,6 +300,7 @@ private fun rememberComposerCompanion(
     surface: DesktopChatSurfaceState,
     state: ChatDetailPaneState,
     onClick: () -> Unit,
+    onEdit: () -> Unit,
 ): (@Composable () -> Unit)? {
     val agentId = surface.selectedConversation?.agentId ?: return null
     val identity = state.agentIdentitiesById[agentId] ?: return null
@@ -309,6 +313,7 @@ private fun rememberComposerCompanion(
             stage = com.letta.mobile.ui.mascot.MascotStage.COMPOSER_COMPANION,
             size = ComposerCompanionSize,
             onClick = onClick,
+            onEdit = onEdit,
             empty = {},
         )
     }
@@ -386,6 +391,7 @@ private fun NewConversationWelcome(
     agentId: String?,
     identity: com.letta.mobile.avatar.core.MascotIdentity?,
     onStarterPrompt: (String) -> Unit,
+    onEditAgent: () -> Unit,
     onOnboardingTask: ((OnboardingTaskKind) -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
@@ -408,6 +414,7 @@ private fun NewConversationWelcome(
                 agentId = agentId,
                 stage = com.letta.mobile.ui.mascot.MascotStage.WELCOME_HERO,
                 size = 220.dp,
+                onEdit = onEditAgent,
             ) {
                 AgentSphere(size = 96.dp)
             }
