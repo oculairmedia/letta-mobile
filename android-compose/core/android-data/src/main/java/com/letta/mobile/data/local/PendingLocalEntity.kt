@@ -33,4 +33,5 @@ data class PendingLocalEntity(
     val content: String,
     val attachmentsJson: String,
     val sentAtEpochMs: Long,
+    val deliveryState: String,
 )
