@@ -26,11 +26,15 @@ private sealed interface CanvasLookupResult {
     data class Error(val result: ExternalToolResult.Error) : CanvasLookupResult
 }
 
-private suspend fun findCanvasDocument(input: JsonObject, store: CanvasDocumentStore): CanvasLookupResult {
+private suspend fun findCanvasDocument(
+    input: JsonObject,
+    store: CanvasDocumentStore,
+    sessions: CanvasSessionRegistry,
+): CanvasLookupResult {
     val canvasIdStr = input["canvas_id"]?.jsonPrimitive?.contentOrNull
         ?: return CanvasLookupResult.Error(ExternalToolResult.Error("Missing required parameter: canvas_id"))
     val canvasId = CanvasId(canvasIdStr)
-    val activeSession = CanvasSessionRegistry.get(canvasId)
+    val activeSession = sessions.get(canvasId)
     val doc = activeSession?.document?.value ?: store.get(canvasId)
         ?: return CanvasLookupResult.Error(ExternalToolResult.Error("Canvas not found: $canvasIdStr"))
     return CanvasLookupResult.Found(doc)
@@ -67,11 +71,12 @@ private suspend fun executeCreateCanvas(
 
 private suspend fun updateDocumentScene(
     store: CanvasDocumentStore,
+    sessions: CanvasSessionRegistry,
     canvasId: CanvasId,
     newScene: String,
     onSession: suspend (CanvasSession) -> Long,
 ): Long {
-    val activeSession = CanvasSessionRegistry.get(canvasId)
+    val activeSession = sessions.get(canvasId)
     if (activeSession != null) {
         return onSession(activeSession)
     }
@@ -87,6 +92,7 @@ private suspend fun updateDocumentScene(
 
 private suspend fun executeReplaceScene(
     store: CanvasDocumentStore,
+    sessions: CanvasSessionRegistry,
     input: JsonObject,
 ): ExternalToolResult {
     val canvasIdStr = input["canvas_id"]?.jsonPrimitive?.contentOrNull
@@ -94,7 +100,7 @@ private suspend fun executeReplaceScene(
     val sceneJson = input["scene_json"]?.jsonPrimitive?.contentOrNull
         ?: return ExternalToolResult.Error("Missing required parameter: scene_json")
     val canvasId = CanvasId(canvasIdStr)
-    val revision = updateDocumentScene(store, canvasId, sceneJson) { session ->
+    val revision = updateDocumentScene(store, sessions, canvasId, sceneJson) { session ->
         session.applyAgentReplace(sceneJson).revision
     }
     return ExternalToolResult.Success(
@@ -104,6 +110,7 @@ private suspend fun executeReplaceScene(
 
 private suspend fun executeApplyOps(
     store: CanvasDocumentStore,
+    sessions: CanvasSessionRegistry,
     input: JsonObject,
 ): ExternalToolResult {
     val canvasIdStr = input["canvas_id"]?.jsonPrimitive?.contentOrNull
@@ -113,7 +120,7 @@ private suspend fun executeApplyOps(
     val canvasId = CanvasId(canvasIdStr)
     val replaceOp = ops.filterIsInstance<CanvasOp.ReplaceSceneOp>().lastOrNull()
     val fallbackScene = replaceOp?.sceneJson ?: (store.get(canvasId)?.sceneJson ?: "")
-    val revision = updateDocumentScene(store, canvasId, fallbackScene) { session ->
+    val revision = updateDocumentScene(store, sessions, canvasId, fallbackScene) { session ->
         if (replaceOp != null) {
             session.applyAgentReplace(replaceOp.sceneJson).revision
         } else {
@@ -139,25 +146,63 @@ private suspend fun executeListCanvases(
     }
 }
 
+private fun canvasSchema(
+    properties: Map<String, String>,
+    required: List<String> = emptyList(),
+): JsonObject = buildJsonObject {
+    put("type", "object")
+    putJsonObject("properties") {
+        for ((name, type) in properties) {
+            putJsonObject(name) { put("type", type) }
+        }
+    }
+    if (required.isNotEmpty()) {
+        put("required", buildJsonArray {
+            for (req in required) add(JsonPrimitive(req))
+        })
+    }
+    put("additionalProperties", false)
+}
+
+abstract class AbstractCanvasTool(
+    final override val name: String,
+    final override val description: String,
+    final override val inputSchema: JsonObject,
+    protected val store: CanvasDocumentStore,
+    protected val sessions: CanvasSessionRegistry = CanvasSessionRegistry(),
+) : HostExternalTool {
+    final override val capability: Capability = Capability.ImageHydration
+}
+
+private suspend fun withCanvasDocument(
+    input: JsonObject,
+    store: CanvasDocumentStore,
+    sessions: CanvasSessionRegistry,
+    errorMessagePrefix: String,
+    block: (CanvasDocument) -> ExternalToolResult,
+): ExternalToolResult = runCatching {
+    when (val lookup = findCanvasDocument(input, store, sessions)) {
+        is CanvasLookupResult.Error -> lookup.result
+        is CanvasLookupResult.Found -> block(lookup.doc)
+    }
+}.getOrElse { ExternalToolResult.Error("$errorMessagePrefix: ${it.message}") }
+
 /**
  * Tool: canvas.create
  * Creates a new canvas document or resolves an existing conversation canvas.
  */
-class CanvasCreateTool(private val store: CanvasDocumentStore) : HostExternalTool {
-    override val name: String = NAME
-    override val description: String =
-        "Create a new canvas document. Returns the created canvas_id."
-    override val inputSchema: JsonObject = buildJsonObject {
-        put("type", "object")
-        putJsonObject("properties") {
-            putJsonObject("title") { put("type", "string") }
-            putJsonObject("conversation_id") { put("type", "string") }
-            putJsonObject("agent_id") { put("type", "string") }
-        }
-        put("additionalProperties", false)
-    }
-    override val capability: Capability = Capability.ImageHydration
-
+class CanvasCreateTool(
+    store: CanvasDocumentStore,
+    sessions: CanvasSessionRegistry = CanvasSessionRegistry(),
+) : AbstractCanvasTool(
+    name = NAME,
+    description = "Create a new canvas document. Returns the created canvas_id.",
+    inputSchema = canvasSchema(
+        mapOf("title" to "string", "conversation_id" to "string", "agent_id" to "string"),
+    ),
+    store = store,
+    sessions = sessions,
+) {
     override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult = runCatching {
         val canvasId = executeCreateCanvas(store, input, agentId)
         ExternalToolResult.Success(canvasJson.encodeToString(CanvasCreateResult(canvasId = canvasId.value)))
@@ -172,33 +217,27 @@ class CanvasCreateTool(private val store: CanvasDocumentStore) : HostExternalToo
  * Tool: canvas.get_scene
  * Retrieves the current DrawBox scene JSON and revision for a canvas.
  */
-class CanvasGetSceneTool(private val store: CanvasDocumentStore) : HostExternalTool {
-    override val name: String = NAME
-    override val description: String =
-        "Get the current DrawBox scene JSON and revision for a canvas."
-    override val inputSchema: JsonObject = buildJsonObject {
-        put("type", "object")
-        putJsonObject("properties") {
-            putJsonObject("canvas_id") { put("type", "string") }
-        }
-        put("required", buildJsonArray { add(JsonPrimitive("canvas_id")) })
-        put("additionalProperties", false)
-    }
-    override val capability: Capability = Capability.ImageHydration
-
-    override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult = runCatching {
-        when (val lookup = findCanvasDocument(input, store)) {
-            is CanvasLookupResult.Error -> lookup.result
-            is CanvasLookupResult.Found -> ExternalToolResult.Success(
+class CanvasGetSceneTool(
+    store: CanvasDocumentStore,
+    sessions: CanvasSessionRegistry = CanvasSessionRegistry(),
+) : AbstractCanvasTool(
+    name = NAME,
+    description = "Get the current DrawBox scene JSON and revision for a canvas.",
+    inputSchema = canvasSchema(mapOf("canvas_id" to "string"), listOf("canvas_id")),
+    store = store,
+    sessions = sessions,
+) {
+    override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult =
+        withCanvasDocument(input, store, sessions, "Failed to get scene") { doc ->
+            ExternalToolResult.Success(
                 canvasJson.encodeToString(
                     CanvasGetSceneResult(
-                        sceneJson = lookup.doc.sceneJson,
-                        revision = lookup.doc.revision,
+                        sceneJson = doc.sceneJson,
+                        revision = doc.revision,
                     )
                 )
             )
         }
-    }.getOrElse { ExternalToolResult.Error("Failed to get scene: ${it.message}") }
 
     companion object {
         const val NAME = "canvas.get_scene"
@@ -209,26 +248,21 @@ class CanvasGetSceneTool(private val store: CanvasDocumentStore) : HostExternalT
  * Tool: canvas.replace_scene
  * Replaces the DrawBox scene JSON for a canvas, incrementing revision.
  */
-class CanvasReplaceSceneTool(private val store: CanvasDocumentStore) : HostExternalTool {
-    override val name: String = NAME
-    override val description: String =
-        "Replace the DrawBox scene JSON for a canvas, incrementing its revision."
-    override val inputSchema: JsonObject = buildJsonObject {
-        put("type", "object")
-        putJsonObject("properties") {
-            putJsonObject("canvas_id") { put("type", "string") }
-            putJsonObject("scene_json") { put("type", "string") }
-        }
-        put("required", buildJsonArray {
-            add(JsonPrimitive("canvas_id"))
-            add(JsonPrimitive("scene_json"))
-        })
-        put("additionalProperties", false)
-    }
-    override val capability: Capability = Capability.ImageHydration
-
+class CanvasReplaceSceneTool(
+    store: CanvasDocumentStore,
+    sessions: CanvasSessionRegistry = CanvasSessionRegistry(),
+) : AbstractCanvasTool(
+    name = NAME,
+    description = "Replace the DrawBox scene JSON for a canvas, incrementing its revision.",
+    inputSchema = canvasSchema(
+        mapOf("canvas_id" to "string", "scene_json" to "string"),
+        listOf("canvas_id", "scene_json"),
+    ),
+    store = store,
+    sessions = sessions,
+) {
     override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult = runCatching {
-        executeReplaceScene(store, input)
+        executeReplaceScene(store, sessions, input)
     }.getOrElse { ExternalToolResult.Error("Failed to replace scene: ${it.message}") }
 
     companion object {
@@ -240,26 +274,21 @@ class CanvasReplaceSceneTool(private val store: CanvasDocumentStore) : HostExter
  * Tool: canvas.apply_ops
  * Applies a list of Canvas operations to the canvas.
  */
-class CanvasApplyOpsTool(private val store: CanvasDocumentStore) : HostExternalTool {
-    override val name: String = NAME
-    override val description: String =
-        "Apply a sequence of Canvas operations to the canvas."
-    override val inputSchema: JsonObject = buildJsonObject {
-        put("type", "object")
-        putJsonObject("properties") {
-            putJsonObject("canvas_id") { put("type", "string") }
-            putJsonObject("ops") { put("type", "array") }
-        }
-        put("required", buildJsonArray {
-            add(JsonPrimitive("canvas_id"))
-            add(JsonPrimitive("ops"))
-        })
-        put("additionalProperties", false)
-    }
-    override val capability: Capability = Capability.ImageHydration
-
+class CanvasApplyOpsTool(
+    store: CanvasDocumentStore,
+    sessions: CanvasSessionRegistry = CanvasSessionRegistry(),
+) : AbstractCanvasTool(
+    name = NAME,
+    description = "Apply a sequence of Canvas operations to the canvas.",
+    inputSchema = canvasSchema(
+        mapOf("canvas_id" to "string", "ops" to "array"),
+        listOf("canvas_id", "ops"),
+    ),
+    store = store,
+    sessions = sessions,
+) {
     override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult = runCatching {
-        executeApplyOps(store, input)
+        executeApplyOps(store, sessions, input)
     }.getOrElse { ExternalToolResult.Error("Failed to apply ops: ${it.message}") }
 
     companion object {
@@ -271,31 +300,23 @@ class CanvasApplyOpsTool(private val store: CanvasDocumentStore) : HostExternalT
  * Tool: canvas.export_svg
  * Returns the SVG export representation of a canvas.
  */
-class CanvasExportSvgTool(private val store: CanvasDocumentStore) : HostExternalTool {
-    override val name: String = NAME
-    override val description: String =
-        "Export the SVG representation of a canvas."
-    override val inputSchema: JsonObject = buildJsonObject {
-        put("type", "object")
-        putJsonObject("properties") {
-            putJsonObject("canvas_id") { put("type", "string") }
+class CanvasExportSvgTool(
+    store: CanvasDocumentStore,
+    sessions: CanvasSessionRegistry = CanvasSessionRegistry(),
+) : AbstractCanvasTool(
+    name = NAME,
+    description = "Export the SVG representation of a canvas.",
+    inputSchema = canvasSchema(mapOf("canvas_id" to "string"), listOf("canvas_id")),
+    store = store,
+    sessions = sessions,
+) {
+    override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult =
+        withCanvasDocument(input, store, sessions, "Failed to export SVG") {
+            val svgContent = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 800 600\"></svg>"
+            ExternalToolResult.Success(
+                canvasJson.encodeToString(CanvasExportSvgResult(svg = svgContent))
+            )
         }
-        put("required", buildJsonArray { add(JsonPrimitive("canvas_id")) })
-        put("additionalProperties", false)
-    }
-    override val capability: Capability = Capability.ImageHydration
-
-    override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult = runCatching {
-        when (val lookup = findCanvasDocument(input, store)) {
-            is CanvasLookupResult.Error -> lookup.result
-            is CanvasLookupResult.Found -> {
-                val svgContent = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 800 600\"></svg>"
-                ExternalToolResult.Success(
-                    canvasJson.encodeToString(CanvasExportSvgResult(svg = svgContent))
-                )
-            }
-        }
-    }.getOrElse { ExternalToolResult.Error("Failed to export SVG: ${it.message}") }
 
     companion object {
         const val NAME = "canvas.export_svg"
@@ -306,20 +327,16 @@ class CanvasExportSvgTool(private val store: CanvasDocumentStore) : HostExternal
  * Tool: canvas.list
  * Lists canvas IDs by conversation or agent.
  */
-class CanvasListTool(private val store: CanvasDocumentStore) : HostExternalTool {
-    override val name: String = NAME
-    override val description: String =
-        "List canvas IDs by conversation or agent."
-    override val inputSchema: JsonObject = buildJsonObject {
-        put("type", "object")
-        putJsonObject("properties") {
-            putJsonObject("conversation_id") { put("type", "string") }
-            putJsonObject("agent_id") { put("type", "string") }
-        }
-        put("additionalProperties", false)
-    }
-    override val capability: Capability = Capability.ImageHydration
-
+class CanvasListTool(
+    store: CanvasDocumentStore,
+    sessions: CanvasSessionRegistry = CanvasSessionRegistry(),
+) : AbstractCanvasTool(
+    name = NAME,
+    description = "List canvas IDs by conversation or agent.",
+    inputSchema = canvasSchema(mapOf("conversation_id" to "string", "agent_id" to "string")),
+    store = store,
+    sessions = sessions,
+) {
     override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult = runCatching {
         val ids = executeListCanvases(store, input, agentId)
         ExternalToolResult.Success(canvasJson.encodeToString(CanvasListResult(ids = ids)))
@@ -334,12 +351,15 @@ class CanvasListTool(private val store: CanvasDocumentStore) : HostExternalTool 
  * Factory for creating all Canvas [HostExternalTool] instances.
  */
 object CanvasExternalTools {
-    fun all(store: CanvasDocumentStore): List<HostExternalTool> = listOf(
-        CanvasCreateTool(store),
-        CanvasGetSceneTool(store),
-        CanvasReplaceSceneTool(store),
-        CanvasApplyOpsTool(store),
-        CanvasExportSvgTool(store),
-        CanvasListTool(store),
+    fun all(
+        store: CanvasDocumentStore,
+        sessions: CanvasSessionRegistry = CanvasSessionRegistry(),
+    ): List<HostExternalTool> = listOf(
+        CanvasCreateTool(store, sessions),
+        CanvasGetSceneTool(store, sessions),
+        CanvasReplaceSceneTool(store, sessions),
+        CanvasApplyOpsTool(store, sessions),
+        CanvasExportSvgTool(store, sessions),
+        CanvasListTool(store, sessions),
     )
 }

@@ -20,21 +20,17 @@ import kotlin.test.assertTrue
 class CanvasExternalToolsTest {
     private val json = Json { ignoreUnknownKeys = true }
     private lateinit var store: InMemoryCanvasDocumentStore
+    private lateinit var sessions: CanvasSessionRegistry
 
     @BeforeTest
-    fun setUp() = runTest {
+    fun setUp() {
         store = InMemoryCanvasDocumentStore()
-        CanvasSessionRegistry.clear()
-    }
-
-    @AfterTest
-    fun tearDown() = runTest {
-        CanvasSessionRegistry.clear()
+        sessions = CanvasSessionRegistry()
     }
 
     @Test
     fun advertisedInExternalToolRegistry() {
-        val tools = CanvasExternalTools.all(store)
+        val tools = CanvasExternalTools.all(store, sessions)
         val registry = ExternalToolRegistry.hostTools(tools)
         val advertised = registry.listAdvertisedTools().map { it.name }
 
@@ -58,7 +54,7 @@ class CanvasExternalToolsTest {
 
     @Test
     fun canvasCreateAndGetSceneFlow() = runTest {
-        val tools = CanvasExternalTools.all(store).associateBy { it.name }
+        val tools = CanvasExternalTools.all(store, sessions).associateBy { it.name }
         val createTool = tools.getValue("canvas.create")
         val getSceneTool = tools.getValue("canvas.get_scene")
 
@@ -93,9 +89,9 @@ class CanvasExternalToolsTest {
             title = "Active Session Canvas",
             initialSceneJson = "{\"initial\":true}",
         )
-        CanvasSessionRegistry.register(session)
+        sessions.register(session)
 
-        val replaceTool = CanvasReplaceSceneTool(store)
+        val replaceTool = CanvasReplaceSceneTool(store, sessions)
         val newSceneJson = "{\"bgColor\":-1,\"elements\":[{\"id\":\"1\"}]}"
 
         val replaceResult = replaceTool.invoke(
@@ -135,7 +131,7 @@ class CanvasExternalToolsTest {
             )
         )
 
-        val applyOpsTool = CanvasApplyOpsTool(store)
+        val applyOpsTool = CanvasApplyOpsTool(store, sessions)
         val ops: List<CanvasOp> = listOf(
             CanvasOp.ReplaceSceneOp(
                 opId = "op-1",
@@ -175,13 +171,13 @@ class CanvasExternalToolsTest {
         )
         store.upsert(doc1)
 
-        val exportSvgTool = CanvasExportSvgTool(store)
+        val exportSvgTool = CanvasExportSvgTool(store, sessions)
         val svgResult = exportSvgTool.invoke(buildJsonObject { put("canvas_id", "canvas-svg-1") })
         assertIs<ExternalToolResult.Success>(svgResult)
         val svg = json.decodeFromString<CanvasExportSvgResult>(svgResult.content)
         assertTrue(svg.svg.contains("<svg"))
 
-        val listTool = CanvasListTool(store)
+        val listTool = CanvasListTool(store, sessions)
         val listResult = listTool.invoke(buildJsonObject { put("conversation_id", "conv-list-1") })
         assertIs<ExternalToolResult.Success>(listResult)
         val list = json.decodeFromString<CanvasListResult>(listResult.content)
@@ -190,7 +186,7 @@ class CanvasExternalToolsTest {
 
     @Test
     fun errorHandlingMissingParamsOrDoc() = runTest {
-        val tools = CanvasExternalTools.all(store).associateBy { it.name }
+        val tools = CanvasExternalTools.all(store, sessions).associateBy { it.name }
         val getSceneTool = tools.getValue("canvas.get_scene")
 
         val missingParamResult = getSceneTool.invoke(buildJsonObject { })

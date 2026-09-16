@@ -112,9 +112,11 @@ class CanvasWorkspaceUiTest {
             )
         }
 
+        val registry = com.letta.mobile.data.canvas.CanvasSessionRegistry()
         setContent {
             CanvasWorkspace(
                 session = session,
+                sessions = registry,
             )
         }
 
@@ -122,7 +124,7 @@ class CanvasWorkspaceUiTest {
         onNodeWithText("Elements: 0", substring = true).assertExists()
 
         // Agent tool simulates replace_scene with Build Cycle fixture
-        val replaceTool = com.letta.mobile.data.canvas.CanvasReplaceSceneTool(store)
+        val replaceTool = com.letta.mobile.data.canvas.CanvasReplaceSceneTool(store, registry)
         kotlinx.coroutines.runBlocking {
             replaceTool.invoke(
                 kotlinx.serialization.json.buildJsonObject {

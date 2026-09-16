@@ -17,6 +17,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -48,6 +49,7 @@ fun CanvasWorkspace(
     modifier: Modifier = Modifier,
     controller: DrawBoxController = remember { DrawBoxController(Reducer(UseCase())) },
     session: CanvasSession? = null,
+    sessions: CanvasSessionRegistry = CanvasSessionRegistry(),
     initialJson: String? = null,
     onNavigateBack: (() -> Unit)? = null,
     onExportJson: ((String) -> Unit)? = null,
@@ -62,35 +64,41 @@ fun CanvasWorkspace(
     var initialLoadDone by remember { mutableStateOf(false) }
     var lastExportedJson by remember { mutableStateOf<String?>(null) }
 
+    DisposableEffect(session, sessions) {
+        if (session != null) {
+            sessions.register(session)
+        }
+        onDispose {
+            if (session != null) {
+                sessions.unregister(session.canvasId)
+            }
+        }
+    }
+
     // Load initial JSON diagram or session document & observe external session updates (Card I2.3)
     LaunchedEffect(session, initialJson) {
         if (session != null) {
-            CanvasSessionRegistry.register(session)
-            try {
-                session.load()
-                val sessionJson = session.sceneJsonOrEmpty()
-                var lastImportedRev = session.document.value?.revision ?: 0L
-                if (sessionJson.isNotBlank()) {
-                    controller.importPath(sessionJson)
-                    lastExportedJson = sessionJson
-                    statusMessage = "Loaded from session (rev ${session.document.value?.revision ?: 1})"
-                }
-                delay(100)
-                initialLoadDone = true
+            session.load()
+            val sessionJson = session.sceneJsonOrEmpty()
+            var lastImportedRev = session.document.value?.revision ?: 0L
+            if (sessionJson.isNotBlank()) {
+                controller.importPath(sessionJson)
+                lastExportedJson = sessionJson
+                statusMessage = "Loaded from session (rev ${session.document.value?.revision ?: 1})"
+            }
+            delay(100)
+            initialLoadDone = true
 
-                // Card I2.3: Session observes revision bump -> controller.importPath if JSON changed externally.
-                // Conflict: agent replace wins; toast/status.
-                session.document.collect { doc ->
-                    if (doc != null && doc.revision > lastImportedRev) {
-                        lastImportedRev = doc.revision
-                        if (doc.sceneJson.isNotBlank() && doc.sceneJson != lastExportedJson) {
-                            controller.importPath(doc.sceneJson)
-                            statusMessage = "Agent updated canvas (rev ${doc.revision})"
-                        }
+            // Card I2.3: Session observes revision bump -> controller.importPath if JSON changed externally.
+            // Conflict: agent replace wins; toast/status.
+            session.document.collect { doc ->
+                if (doc != null && doc.revision > lastImportedRev) {
+                    lastImportedRev = doc.revision
+                    if (doc.sceneJson.isNotBlank() && doc.sceneJson != lastExportedJson) {
+                        controller.importPath(doc.sceneJson)
+                        statusMessage = "Agent updated canvas (rev ${doc.revision})"
                     }
                 }
-            } finally {
-                CanvasSessionRegistry.unregister(session.canvasId)
             }
         } else {
             if (!initialJson.isNullOrBlank()) {
