@@ -64,47 +64,44 @@ fun CanvasControlsBar(
         ) {
             CanvasModes.forEach { (mode, label) ->
                 ControlButton(
-                    icon = iconFor(mode),
-                    label = label,
-                    selected = state.currentMode == mode,
-                    onClick = { dispatch(ControlsBarIntent.SelectMode(mode)) },
-                )
+                    Control(iconFor(mode), label, selected = state.currentMode == mode),
+                ) { dispatch(ControlsBarIntent.SelectMode(mode)) }
             }
-            ControlButton(
-                icon = Lucide.Undo2,
-                label = "Undo",
-                enabled = state.canUndo,
-                onClick = { dispatch(ControlsBarIntent.Undo) },
-            )
-            ControlButton(
-                icon = Lucide.Redo2,
-                label = "Redo",
-                enabled = state.canRedo,
-                onClick = { dispatch(ControlsBarIntent.Redo) },
-            )
+            ControlButton(Control(Lucide.Undo2, "Undo", enabled = state.canUndo)) {
+                dispatch(ControlsBarIntent.Undo)
+            }
+            ControlButton(Control(Lucide.Redo2, "Redo", enabled = state.canRedo)) {
+                dispatch(ControlsBarIntent.Redo)
+            }
         }
     }
 }
 
+/**
+ * What one button in the bar looks like. Separating this from what the button does keeps the
+ * appearance in one value the bar can build per tool, rather than a widening parameter list that
+ * every call site has to read positionally.
+ */
+private data class Control(
+    val icon: ImageVector,
+    val label: String,
+    val selected: Boolean = false,
+    val enabled: Boolean = true,
+)
+
 @Composable
-private fun ControlButton(
-    icon: ImageVector,
-    label: String,
-    onClick: () -> Unit,
-    selected: Boolean = false,
-    enabled: Boolean = true,
-) {
+private fun ControlButton(control: Control, onClick: () -> Unit) {
     IconButton(
         onClick = onClick,
-        enabled = enabled,
-        modifier = Modifier.size(40.dp).semantics { contentDescription = label },
-        colors = if (selected) {
+        enabled = control.enabled,
+        modifier = Modifier.size(40.dp).semantics { contentDescription = control.label },
+        colors = if (control.selected) {
             IconButtonDefaults.filledIconButtonColors()
         } else {
             IconButtonDefaults.iconButtonColors()
         },
     ) {
-        Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(20.dp))
+        Icon(imageVector = control.icon, contentDescription = null, modifier = Modifier.size(20.dp))
     }
 }
 
