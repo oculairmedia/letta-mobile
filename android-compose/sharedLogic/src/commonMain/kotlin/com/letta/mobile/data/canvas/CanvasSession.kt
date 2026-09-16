@@ -80,7 +80,12 @@ class CanvasSession(
     /**
      * Applies an agent-driven scene replacement, incrementing revision and updating timestamp.
      */
-    suspend fun applyAgentReplace(sceneJson: String): CanvasDocument = mutex.withLock {
+    suspend fun applyAgentReplace(sceneJson: String, actorId: String? = null): CanvasDocument = mutex.withLock {
+        val current = currentDoc()
+        val effectiveActor = actorId ?: current.agentId ?: "agent"
+        if (current.acl != null && !current.acl.canWrite(effectiveActor)) {
+            throw UnauthorizedCanvasMutationException(effectiveActor, canvasId)
+        }
         commitScene(sceneJson)
     }
 
@@ -89,9 +94,12 @@ class CanvasSession(
      * updates persistence, and publishes to [syncTransport].
      */
     suspend fun applyLocal(op: CanvasOp): CanvasDocument = mutex.withLock {
+        val current = currentDoc()
+        if (current.acl != null && !current.acl.canWrite(op.actorId)) {
+            throw UnauthorizedCanvasMutationException(op.actorId, canvasId)
+        }
         opLog.append(canvasId, op)
         if (op.lamport > lamportClock) lamportClock = op.lamport
-        val current = currentDoc()
         val newScene = CanvasOpProjector.project(current.sceneJson, listOf(op))
         val updated = commitScene(newScene)
         syncTransport?.publish(canvasId, op)
@@ -103,10 +111,13 @@ class CanvasSession(
      * appends to [opLog], projects state, and updates persistence.
      */
     suspend fun applyRemote(op: CanvasOp): CanvasDocument? = mutex.withLock {
+        val current = currentDoc()
+        if (current.acl != null && !current.acl.canWrite(op.actorId)) {
+            return null
+        }
         if (opLog.has(canvasId, op.opId)) return null
         opLog.append(canvasId, op)
         if (op.lamport > lamportClock) lamportClock = op.lamport
-        val current = currentDoc()
         val newScene = CanvasOpProjector.project(current.sceneJson, listOf(op))
         commitScene(newScene)
     }
@@ -122,9 +133,17 @@ class CanvasSession(
         updateLamport(op)
     }
 
-    private suspend fun filterAndRecordOps(ops: List<CanvasOp>, isRemote: Boolean): List<CanvasOp> {
+    private suspend fun filterAndRecordOps(
+        ops: List<CanvasOp>,
+        isRemote: Boolean,
+        acl: CanvasAcl?,
+    ): List<CanvasOp> {
         val opsToApply = mutableListOf<CanvasOp>()
         for (op in ops) {
+            if (acl != null && !acl.canWrite(op.actorId)) {
+                if (isRemote) continue
+                throw UnauthorizedCanvasMutationException(op.actorId, canvasId)
+            }
             if (isRemote && opLog.has(canvasId, op.opId)) continue
             recordSingleOp(op)
             opsToApply.add(op)
@@ -144,7 +163,7 @@ class CanvasSession(
      */
     suspend fun applyOps(ops: List<CanvasOp>, isRemote: Boolean = false): CanvasDocument = mutex.withLock {
         val current = currentDoc()
-        val opsToApply = filterAndRecordOps(ops, isRemote)
+        val opsToApply = filterAndRecordOps(ops, isRemote, current.acl)
         if (opsToApply.isEmpty()) return current
 
         val newScene = CanvasOpProjector.project(current.sceneJson, opsToApply)
@@ -159,6 +178,10 @@ class CanvasSession(
      * Diffs [newJson] against current scene and applies the resulting operations locally.
      */
     suspend fun applyLocalScene(newJson: String, actorId: String = "local_user"): List<CanvasOp> {
+        val doc = currentDoc()
+        if (doc.acl != null && !doc.acl.canWrite(actorId)) {
+            throw UnauthorizedCanvasMutationException(actorId, canvasId)
+        }
         val current = sceneJsonOrEmpty()
         if (newJson == current) return emptyList()
 

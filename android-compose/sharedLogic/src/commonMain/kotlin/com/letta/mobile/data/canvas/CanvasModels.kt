@@ -16,4 +16,5 @@ data class CanvasDocument(
     val revision: Long = 0L,
     val sceneJson: String = "",
     val updatedAtEpochMs: Long = 0L,
+    val acl: CanvasAcl? = null,
 )
