@@ -87,9 +87,11 @@ class CanvasExternalToolsTest {
         val canvasId = CanvasId("canvas-active-1")
         val session = CanvasSession.create(
             store = store,
-            canvasId = canvasId,
-            title = "Active Session Canvas",
-            initialSceneJson = "{\"initial\":true}",
+            options = CanvasCreateOptions(
+                canvasId = canvasId,
+                title = "Active Session Canvas",
+                initialSceneJson = "{\"initial\":true}",
+            ),
         )
         sessions.register(session)
 

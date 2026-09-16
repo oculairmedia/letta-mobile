@@ -17,7 +17,7 @@ class CanvasShareTest {
         val rawSvg = """<svg xmlns="http://www.w3.org/2000/svg"><rect width="100" height="100"/></svg>"""
         val bytes = rawSvg.encodeToByteArray()
 
-        val image = CanvasShare.createChatImageAttachment(bytes, "image/svg+xml")
+        val image = CanvasShare.createChatImageAttachment(bytes, CanvasMimeType.SVG)
 
         assertEquals("image/svg+xml", image.mediaType)
         assertEquals(bytes.size.toLong(), image.storedByteSize)
@@ -31,7 +31,7 @@ class CanvasShareTest {
         val oversized = ByteArray(101) { 1 }
 
         val error = assertFailsWith<CanvasAttachmentTooLargeException> {
-            CanvasShare.createChatImageAttachment(oversized, "image/png", limits)
+            CanvasShare.createChatImageAttachment(oversized, CanvasMimeType.PNG, limits)
         }
         assertTrue(error.message!!.contains("exceeds maxRawBytesPerImage limit"))
     }
@@ -51,29 +51,31 @@ class CanvasShareTest {
         val svg = "<svg viewBox='0 0 10 10'></svg>".encodeToByteArray()
         val xmlSvg = "<?xml version='1.0'?><svg></svg>".encodeToByteArray()
 
-        assertEquals("image/png", CanvasShare.detectMimeType(png))
-        assertEquals("image/jpeg", CanvasShare.detectMimeType(jpeg))
-        assertEquals("image/svg+xml", CanvasShare.detectMimeType(svg))
-        assertEquals("image/svg+xml", CanvasShare.detectMimeType(xmlSvg))
+        assertEquals(CanvasMimeType.PNG, CanvasShare.detectMimeType(png))
+        assertEquals(CanvasMimeType.JPEG, CanvasShare.detectMimeType(jpeg))
+        assertEquals(CanvasMimeType.SVG, CanvasShare.detectMimeType(svg))
+        assertEquals(CanvasMimeType.SVG, CanvasShare.detectMimeType(xmlSvg))
     }
 
     @Test
     fun stageAndConsume_scopedToConversationId() = runTest {
         CanvasShare.clearStagedAttachments()
 
-        val imgA = CanvasShare.createChatImageAttachment("sample-A".encodeToByteArray(), "image/png")
-        val imgB = CanvasShare.createChatImageAttachment("sample-B".encodeToByteArray(), "image/png")
+        val target123 = CanvasConversationTarget("conv-123")
+        val target456 = CanvasConversationTarget("conv-456")
+        val imgA = CanvasShare.createChatImageAttachment("sample-A".encodeToByteArray(), CanvasMimeType.PNG)
+        val imgB = CanvasShare.createChatImageAttachment("sample-B".encodeToByteArray(), CanvasMimeType.PNG)
 
-        CanvasShare.stageForConversation("conv-123", imgA)
-        CanvasShare.stageForConversation("conv-456", imgB)
+        CanvasShare.stageForConversation(target123, imgA)
+        CanvasShare.stageForConversation(target456, imgB)
 
-        val consumed123 = CanvasShare.consumeStagedAttachments("conv-123")
+        val consumed123 = CanvasShare.consumeStagedAttachments(target123)
         assertEquals(1, consumed123.size)
         assertEquals(imgA, consumed123.first())
 
         // Ensure 123 is cleared but 456 remains
-        assertTrue(CanvasShare.consumeStagedAttachments("conv-123").isEmpty())
-        val consumed456 = CanvasShare.consumeStagedAttachments("conv-456")
+        assertTrue(CanvasShare.consumeStagedAttachments(target123).isEmpty())
+        val consumed456 = CanvasShare.consumeStagedAttachments(target456)
         assertEquals(1, consumed456.size)
         assertEquals(imgB, consumed456.first())
     }

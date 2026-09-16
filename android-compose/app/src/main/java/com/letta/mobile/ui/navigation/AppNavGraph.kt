@@ -98,10 +98,14 @@ private fun androidx.navigation.NavGraphBuilder.appCanvasGraph(navController: Na
             conversationId = route.conversationId,
             onNavigateBack = { navController.popBackStack() },
             onShareToChat = { bytes, mimeType ->
-                val result = com.letta.mobile.data.canvas.CanvasShare.packageForChat(bytes, mimeType)
+                val result = com.letta.mobile.data.canvas.CanvasShare.packageForChat(
+                    bytes,
+                    com.letta.mobile.data.canvas.CanvasMimeType.fromValue(mimeType),
+                )
                 result.onSuccess { image ->
                     coroutineScope.launch {
-                        com.letta.mobile.data.canvas.CanvasShare.stageForConversation(route.conversationId, image)
+                        val target = com.letta.mobile.data.canvas.CanvasConversationTarget.from(route.conversationId)
+                        com.letta.mobile.data.canvas.CanvasShare.stageForConversation(target, image)
                     }
                 }
                 navController.popBackStack()

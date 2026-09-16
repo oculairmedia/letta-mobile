@@ -43,7 +43,13 @@ class DesktopCanvasOpLog(
         Files.createDirectories(rootDirectory)
     }
 
-    override suspend fun append(canvasId: CanvasId, op: CanvasOp): Unit = withContext(Dispatchers.IO) {
+    override suspend fun append(canvasId: CanvasId, op: CanvasOp) {
+        withContext(Dispatchers.IO) {
+            writeOpToFile(canvasId, op)
+        }
+    }
+
+    private suspend fun writeOpToFile(canvasId: CanvasId, op: CanvasOp) {
         mutex.withLock {
             val opIds = getOrLoadOpIds(canvasId)
             if (!opIds.add(op.opId)) {
@@ -62,8 +68,14 @@ class DesktopCanvasOpLog(
         }
     }
 
-    override suspend fun getOps(canvasId: CanvasId, sinceLamport: Long): List<CanvasOp> = withContext(Dispatchers.IO) {
-        mutex.withLock {
+    override suspend fun getOps(canvasId: CanvasId, sinceLamport: Long): List<CanvasOp> {
+        return withContext(Dispatchers.IO) {
+            readOpsFromFile(canvasId, sinceLamport)
+        }
+    }
+
+    private suspend fun readOpsFromFile(canvasId: CanvasId, sinceLamport: Long): List<CanvasOp> {
+        return mutex.withLock {
             val file = opLogFile(canvasId)
             if (!Files.exists(file) || !Files.isRegularFile(file)) return@withLock emptyList()
             try {
@@ -90,8 +102,14 @@ class DesktopCanvasOpLog(
         }
     }
 
-    override suspend fun has(canvasId: CanvasId, opId: String): Boolean = withContext(Dispatchers.IO) {
-        mutex.withLock {
+    override suspend fun has(canvasId: CanvasId, opId: String): Boolean {
+        return withContext(Dispatchers.IO) {
+            checkOpExists(canvasId, opId)
+        }
+    }
+
+    private suspend fun checkOpExists(canvasId: CanvasId, opId: String): Boolean {
+        return mutex.withLock {
             val opIds = getOrLoadOpIds(canvasId)
             opIds.contains(opId)
         }

@@ -9,6 +9,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
+import kotlin.jvm.JvmInline
 
 /**
  * Thrown when an exported canvas payload exceeds the maximum raw image byte limit.
@@ -16,36 +17,62 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 class CanvasAttachmentTooLargeException(message: String) : IllegalArgumentException(message)
 
 /**
+ * Strongly typed conversation target for staged canvas attachments.
+ */
+@JvmInline
+value class CanvasConversationTarget(val id: String = "") {
+    companion object {
+        val Unspecified = CanvasConversationTarget("")
+        fun from(id: String?) = CanvasConversationTarget(id.orEmpty())
+    }
+}
+
+/**
+ * Recognized canvas export MIME types.
+ */
+enum class CanvasMimeType(val value: String) {
+    PNG("image/png"),
+    JPEG("image/jpeg"),
+    SVG("image/svg+xml");
+
+    companion object {
+        fun fromValue(value: String): CanvasMimeType =
+            entries.firstOrNull { it.value.equals(value, ignoreCase = true) } ?: PNG
+    }
+}
+
+/**
  * Lifecycle-owned staging queue for shared canvas attachments.
  */
 class CanvasShareStaging {
     private val stagingMutex = Mutex()
     private val pendingAttachmentsByConversation = mutableMapOf<String, MutableList<MessageContentPart.Image>>()
-    private val _stagedAttachmentEvents = MutableSharedFlow<Pair<String, MessageContentPart.Image>>(
+    private val _stagedAttachmentEvents = MutableSharedFlow<Pair<CanvasConversationTarget, MessageContentPart.Image>>(
         extraBufferCapacity = 32,
     )
 
     /**
-     * Flow of staged canvas attachments emitted for conversations: `(conversationId, image)`.
+     * Flow of staged canvas attachments emitted for conversations: `(target, image)`.
      */
-    val stagedAttachmentEvents: Flow<Pair<String, MessageContentPart.Image>> = _stagedAttachmentEvents.asSharedFlow()
+    val stagedAttachmentEvents: Flow<Pair<CanvasConversationTarget, MessageContentPart.Image>> =
+        _stagedAttachmentEvents.asSharedFlow()
 
     /**
-     * Stages a packaged canvas attachment for the specified [conversationId].
+     * Stages a packaged canvas attachment for the specified [target].
      */
-    suspend fun stageForConversation(conversationId: String?, image: MessageContentPart.Image) {
-        val convId = conversationId.orEmpty()
+    suspend fun stageForConversation(target: CanvasConversationTarget, image: MessageContentPart.Image) {
+        val convId = target.id
         stagingMutex.withLock {
             pendingAttachmentsByConversation.getOrPut(convId) { mutableListOf() }.add(image)
         }
-        _stagedAttachmentEvents.tryEmit(convId to image)
+        _stagedAttachmentEvents.tryEmit(target to image)
     }
 
     /**
-     * Consumes and clears any staged attachments for [conversationId].
+     * Consumes and clears any staged attachments for [target].
      */
-    suspend fun consumeStagedAttachments(conversationId: String?): List<MessageContentPart.Image> {
-        val convId = conversationId.orEmpty()
+    suspend fun consumeStagedAttachments(target: CanvasConversationTarget): List<MessageContentPart.Image> {
+        val convId = target.id
         return stagingMutex.withLock {
             pendingAttachmentsByConversation.remove(convId)?.toList() ?: emptyList()
         }
@@ -69,23 +96,23 @@ object CanvasShare {
     private val staging = CanvasShareStaging()
 
     /**
-     * Flow of staged canvas attachments emitted for conversations: `(conversationId, image)`.
+     * Flow of staged canvas attachments emitted for conversations: `(target, image)`.
      */
-    val stagedAttachmentEvents: Flow<Pair<String, MessageContentPart.Image>>
+    val stagedAttachmentEvents: Flow<Pair<CanvasConversationTarget, MessageContentPart.Image>>
         get() = staging.stagedAttachmentEvents
 
     /**
-     * Stages a packaged canvas attachment for the specified [conversationId].
+     * Stages a packaged canvas attachment for the specified [target].
      */
-    suspend fun stageForConversation(conversationId: String?, image: MessageContentPart.Image) {
-        staging.stageForConversation(conversationId, image)
+    suspend fun stageForConversation(target: CanvasConversationTarget, image: MessageContentPart.Image) {
+        staging.stageForConversation(target, image)
     }
 
     /**
-     * Consumes and clears any staged attachments for [conversationId].
+     * Consumes and clears any staged attachments for [target].
      */
-    suspend fun consumeStagedAttachments(conversationId: String?): List<MessageContentPart.Image> =
-        staging.consumeStagedAttachments(conversationId)
+    suspend fun consumeStagedAttachments(target: CanvasConversationTarget): List<MessageContentPart.Image> =
+        staging.consumeStagedAttachments(target)
 
     /**
      * Clears all pending staged attachments across all conversations.
@@ -98,11 +125,11 @@ object CanvasShare {
      * Sniffs the MIME type of a byte buffer based on standard magic numbers and tags.
      * Prefers raster formats (image/png, image/jpeg) when present; falls back to SVG or PNG.
      */
-    fun detectMimeType(bytes: ByteArray): String {
-        if (isPng(bytes)) return "image/png"
-        if (isJpeg(bytes)) return "image/jpeg"
-        if (isSvg(bytes)) return "image/svg+xml"
-        return "image/png"
+    fun detectMimeType(bytes: ByteArray): CanvasMimeType {
+        if (isPng(bytes)) return CanvasMimeType.PNG
+        if (isJpeg(bytes)) return CanvasMimeType.JPEG
+        if (isSvg(bytes)) return CanvasMimeType.SVG
+        return CanvasMimeType.PNG
     }
 
     private fun isPng(bytes: ByteArray): Boolean =
@@ -126,7 +153,7 @@ object CanvasShare {
     @OptIn(ExperimentalEncodingApi::class)
     fun createChatImageAttachment(
         bytes: ByteArray,
-        mimeType: String = detectMimeType(bytes),
+        mimeType: CanvasMimeType = detectMimeType(bytes),
         limits: AttachmentLimits = AttachmentLimits.Default,
     ): MessageContentPart.Image {
         if (bytes.size > limits.maxRawBytesPerImage) {
@@ -137,7 +164,7 @@ object CanvasShare {
         val base64 = Base64.encode(bytes)
         return MessageContentPart.Image(
             base64 = base64,
-            mediaType = mimeType,
+            mediaType = mimeType.value,
             storedByteSize = bytes.size.toLong(),
         )
     }
@@ -147,8 +174,7 @@ object CanvasShare {
      */
     fun prepareAttachment(
         bytes: ByteArray,
-        mimeType: String = detectMimeType(bytes),
-        suggestedFileName: String? = null,
+        mimeType: CanvasMimeType = detectMimeType(bytes),
         limits: AttachmentLimits = AttachmentLimits.Default,
     ): MessageContentPart.Image = createChatImageAttachment(bytes, mimeType, limits)
 
@@ -157,7 +183,7 @@ object CanvasShare {
      */
     fun packageForChat(
         bytes: ByteArray,
-        mimeType: String = detectMimeType(bytes),
+        mimeType: CanvasMimeType = detectMimeType(bytes),
         limits: AttachmentLimits = AttachmentLimits.Default,
     ): Result<MessageContentPart.Image> =
         runCatching { createChatImageAttachment(bytes, mimeType, limits) }

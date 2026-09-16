@@ -42,8 +42,7 @@ class CanvasSession(
 
     private fun recordCheckpoint(
         doc: CanvasDocument,
-        actorId: String = "system",
-        description: String = "",
+        metadata: CanvasCommitMetadata = CanvasCommitMetadata(actorId = "system"),
     ) {
         val checkpoint = CanvasCheckpoint(
             checkpointId = "cp-${doc.revision}-${clock()}",
@@ -51,8 +50,8 @@ class CanvasSession(
             revision = doc.revision,
             lamport = lamportClock,
             sceneJson = doc.sceneJson,
-            actorId = actorId,
-            description = description,
+            actorId = metadata.actorId,
+            description = metadata.description,
             createdAtEpochMs = doc.updatedAtEpochMs,
         )
         val currentList = _checkpoints.value
@@ -61,19 +60,17 @@ class CanvasSession(
 
     private suspend fun commitUpdate(
         updated: CanvasDocument,
-        actorId: String = "local_user",
-        description: String = "",
+        metadata: CanvasCommitMetadata = CanvasCommitMetadata(),
     ): CanvasDocument {
         store.upsert(updated)
         _document.value = updated
-        recordCheckpoint(updated, actorId = actorId, description = description)
+        recordCheckpoint(updated, metadata = metadata)
         return updated
     }
 
     private suspend fun commitScene(
         sceneJson: String,
-        actorId: String = "local_user",
-        description: String = "",
+        metadata: CanvasCommitMetadata = CanvasCommitMetadata(),
     ): CanvasDocument {
         val current = currentDoc()
         return commitUpdate(
@@ -82,8 +79,7 @@ class CanvasSession(
                 sceneJson = sceneJson,
                 updatedAtEpochMs = clock(),
             ),
-            actorId = actorId,
-            description = description,
+            metadata = metadata,
         )
     }
 
@@ -94,7 +90,13 @@ class CanvasSession(
         val loaded = store.get(canvasId)
         _document.value = loaded
         if (loaded != null && _checkpoints.value.isEmpty()) {
-            recordCheckpoint(loaded, actorId = loaded.agentId ?: "initial", description = "Initial state")
+            recordCheckpoint(
+                loaded,
+                metadata = CanvasCommitMetadata(
+                    actorId = loaded.agentId ?: "initial",
+                    description = "Initial state",
+                ),
+            )
         }
         loaded
     }
@@ -291,8 +293,7 @@ class CanvasSession(
                 sceneJson = checkpoint.sceneJson,
                 updatedAtEpochMs = clock(),
             ),
-            actorId = actorId,
-            description = "Restored to rev ${checkpoint.revision}",
+            metadata = CanvasCommitMetadata(actorId = actorId, description = "Restored to rev ${checkpoint.revision}"),
         )
         syncTransport?.publish(canvasId, op)
         updated
@@ -305,39 +306,31 @@ class CanvasSession(
          */
         suspend fun create(
             store: CanvasDocumentStore,
-            title: String = "Untitled Canvas",
-            conversationId: String? = null,
-            agentId: String? = null,
-            acl: CanvasAcl? = null,
-            canvasId: CanvasId = CanvasId("canvas-${kotlin.time.Clock.System.now().toEpochMilliseconds()}-${(1000..9999).random()}"),
-            initialSceneJson: String = "",
-            opLog: CanvasOpLog = InMemoryCanvasOpLog(),
-            syncTransport: CanvasSyncTransport? = null,
-            clock: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
+            options: CanvasCreateOptions = CanvasCreateOptions(),
         ): CanvasSession {
-            val effectiveAcl = acl ?: if (agentId != null) {
+            val effectiveAcl = options.acl ?: if (options.agentId != null) {
                 CanvasAcl(
                     ownerUserId = "local_user",
-                    writerAgentIds = setOf(agentId),
+                    writerAgentIds = setOf(options.agentId),
                 )
             } else null
             val doc = CanvasDocument(
-                id = canvasId,
-                agentId = agentId,
-                conversationId = conversationId,
-                title = title,
+                id = options.canvasId,
+                agentId = options.agentId,
+                conversationId = options.conversationId,
+                title = options.title,
                 revision = 1L,
-                sceneJson = initialSceneJson,
+                sceneJson = options.initialSceneJson,
                 acl = effectiveAcl,
-                updatedAtEpochMs = clock(),
+                updatedAtEpochMs = options.clock(),
             )
             store.upsert(doc)
             val session = CanvasSession(
-                canvasId = canvasId,
+                canvasId = options.canvasId,
                 store = store,
-                opLog = opLog,
-                syncTransport = syncTransport,
-                clock = clock,
+                opLog = options.opLog,
+                syncTransport = options.syncTransport,
+                clock = options.clock,
             )
             session._document.value = doc
             return session
@@ -365,17 +358,42 @@ class CanvasSession(
             } else {
                 create(
                     store = store,
-                    title = options.title,
-                    conversationId = conversationId,
-                    agentId = options.agentId,
-                    opLog = options.opLog,
-                    syncTransport = options.syncTransport,
-                    clock = options.clock,
+                    options = CanvasCreateOptions(
+                        title = options.title,
+                        conversationId = conversationId,
+                        agentId = options.agentId,
+                        opLog = options.opLog,
+                        syncTransport = options.syncTransport,
+                        clock = options.clock,
+                    ),
                 )
             }
         }
     }
 }
+
+/**
+ * Metadata for tracking checkpoints and commits in [CanvasSession].
+ */
+data class CanvasCommitMetadata(
+    val actorId: String = "system",
+    val description: String = "",
+)
+
+/**
+ * Options for creating a new [CanvasDocument] and [CanvasSession].
+ */
+data class CanvasCreateOptions(
+    val title: String = "Untitled Canvas",
+    val conversationId: String? = null,
+    val agentId: String? = null,
+    val acl: CanvasAcl? = null,
+    val canvasId: CanvasId = CanvasId("canvas-${kotlin.time.Clock.System.now().toEpochMilliseconds()}-${(1000..9999).random()}"),
+    val initialSceneJson: String = "",
+    val opLog: CanvasOpLog = InMemoryCanvasOpLog(),
+    val syncTransport: CanvasSyncTransport? = null,
+    val clock: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
+)
 
 /**
  * Options for resolving or creating a conversation-linked [CanvasSession].

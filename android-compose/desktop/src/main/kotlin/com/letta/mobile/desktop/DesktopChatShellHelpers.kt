@@ -431,3 +431,53 @@ internal fun createDesktopChatDetailPaneActions(
     )
 }
 
+internal fun handleDesktopShareCanvasToChat(
+    bytes: ByteArray,
+    mimeType: String,
+    chatController: DesktopChatController,
+    onSuccessNav: () -> Unit,
+) {
+    com.letta.mobile.data.canvas.CanvasShare.packageForChat(
+        bytes,
+        com.letta.mobile.data.canvas.CanvasMimeType.fromValue(mimeType),
+    )
+        .onSuccess { image ->
+            chatController.attachImage(image)
+            onSuccessNav()
+        }
+        .onFailure { error ->
+            chatController.showComposerError(error.message ?: "Could not share canvas to chat")
+        }
+}
+
+internal data class CreateDesktopOverlayActionsParams(
+    val chatController: DesktopChatController,
+    val onSelectDestination: (DesktopDestination) -> Unit,
+    val onOpenAgent: (String) -> Unit,
+    val agentRepository: IAgentRepository,
+    val selectedAgentId: String?,
+    val onIrohIdentityReset: () -> Unit,
+)
+
+internal fun createDesktopOverlayActions(
+    params: CreateDesktopOverlayActionsParams,
+): DesktopOverlayActions = DesktopOverlayActions(
+    onModelSelected = params.chatController::setConversationModel,
+    onSelectConversation = {
+        params.chatController.selectConversation(it)
+        params.onSelectDestination(DesktopDestination.Conversations)
+    },
+    onOpenAgent = params.onOpenAgent,
+    onNavigate = params.onSelectDestination,
+    onCreateAgent = { name, modelValue ->
+        val (model, embedding) = resolveNewAgentDefaults(
+            agentRepository = params.agentRepository,
+            templateAgentId = params.selectedAgentId,
+            modelValue = modelValue,
+        )
+        params.chatController.createAgent(name = name, model = model, embedding = embedding)
+        params.onSelectDestination(DesktopDestination.Conversations)
+    },
+    onIrohIdentityReset = params.onIrohIdentityReset,
+)
+

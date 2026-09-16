@@ -12,8 +12,10 @@ class CanvasSessionTest {
         val store = InMemoryCanvasDocumentStore()
         val session = CanvasSession.create(
             store = store,
-            title = "Design Draft",
-            initialSceneJson = """{"elements":[]}""",
+            options = CanvasCreateOptions(
+                title = "Design Draft",
+                initialSceneJson = """{"elements":[]}""",
+            ),
         )
 
         assertEquals(1L, session.document.value?.revision)
@@ -34,8 +36,10 @@ class CanvasSessionTest {
         val store = InMemoryCanvasDocumentStore()
         val session = CanvasSession.create(
             store = store,
-            title = "Empty Scene Test",
-            initialSceneJson = """{"elements":[{"id":"shape"}]}""",
+            options = CanvasCreateOptions(
+                title = "Empty Scene Test",
+                initialSceneJson = """{"elements":[{"id":"shape"}]}""",
+            ),
         )
 
         assertEquals(1L, session.document.value?.revision)
@@ -59,9 +63,11 @@ class CanvasSessionTest {
         // Session 1: Create and write diagram elements
         val session1 = CanvasSession.create(
             store = store,
-            canvasId = canvasId,
-            title = "Architecture",
-            initialSceneJson = """{"bgColor":-1,"elements":[{"id":"box1","type":"rect"}]}""",
+            options = CanvasCreateOptions(
+                canvasId = canvasId,
+                title = "Architecture",
+                initialSceneJson = """{"bgColor":-1,"elements":[{"id":"box1","type":"rect"}]}""",
+            ),
         )
         session1.saveScene("""{"bgColor":-1,"elements":[{"id":"box1"},{"id":"box2"}]}""")
 

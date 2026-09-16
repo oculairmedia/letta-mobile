@@ -104,12 +104,11 @@ private suspend fun commitSceneUpdate(
     updated.revision
 }
 
-private suspend fun executeReplaceScene(
+private suspend fun executeAuthorizedMutation(
     context: CanvasToolContext,
     input: JsonObject,
+    mutate: suspend (doc: CanvasDocument, callerId: String?, activeSession: CanvasSession?) -> ExternalToolResult,
 ): ExternalToolResult {
-    val sceneJson = input["scene_json"]?.jsonPrimitive?.contentOrNull
-        ?: return ExternalToolResult.Error("Missing required parameter: scene_json")
     val callerId = context.resolveCallerId(input)
     val doc = when (val lookup = findCanvasDocument(context, input)) {
         is CanvasLookupResult.Error -> return lookup.result
@@ -118,12 +117,22 @@ private suspend fun executeReplaceScene(
     if (doc.acl != null && !doc.acl.canWrite(callerId)) {
         return ExternalToolResult.Error("Unauthorized: actor '$callerId' cannot write to canvas '${doc.id.value}'")
     }
-
     val activeSession = context.sessions.get(doc.id)
-    val revision = commitSceneUpdate(context.store, activeSession, doc, sceneJson, callerId)
-    return ExternalToolResult.Success(
-        canvasJson.encodeToString(CanvasReplaceSceneResult(ok = true, revision = revision))
-    )
+    return mutate(doc, callerId, activeSession)
+}
+
+private suspend fun executeReplaceScene(
+    context: CanvasToolContext,
+    input: JsonObject,
+): ExternalToolResult {
+    val sceneJson = input["scene_json"]?.jsonPrimitive?.contentOrNull
+        ?: return ExternalToolResult.Error("Missing required parameter: scene_json")
+    return executeAuthorizedMutation(context, input) { doc, callerId, activeSession ->
+        val revision = commitSceneUpdate(context.store, activeSession, doc, sceneJson, callerId)
+        ExternalToolResult.Success(
+            canvasJson.encodeToString(CanvasReplaceSceneResult(ok = true, revision = revision))
+        )
+    }
 }
 
 private fun validateOpAcls(doc: CanvasDocument, ops: List<CanvasOp>): ExternalToolResult.Error? {
@@ -160,23 +169,14 @@ private suspend fun executeApplyOps(
 ): ExternalToolResult {
     val opsJson = input["ops"] ?: return ExternalToolResult.Error("Missing required parameter: ops")
     val ops = canvasJson.decodeFromJsonElement<List<CanvasOp>>(opsJson)
-    val callerId = context.resolveCallerId(input)
-    val doc = when (val lookup = findCanvasDocument(context, input)) {
-        is CanvasLookupResult.Error -> return lookup.result
-        is CanvasLookupResult.Found -> lookup.doc
+    return executeAuthorizedMutation(context, input) { doc, _, activeSession ->
+        val aclError = validateOpAcls(doc, ops)
+        if (aclError != null) return@executeAuthorizedMutation aclError
+        val revision = commitOpsUpdate(context.store, activeSession, doc, ops)
+        ExternalToolResult.Success(
+            canvasJson.encodeToString(CanvasApplyOpsResult(ok = true, revision = revision))
+        )
     }
-
-    if (doc.acl != null && !doc.acl.canWrite(callerId)) {
-        return ExternalToolResult.Error("Unauthorized: actor '$callerId' cannot write to canvas '${doc.id.value}'")
-    }
-    val aclError = validateOpAcls(doc, ops)
-    if (aclError != null) return aclError
-
-    val activeSession = context.sessions.get(doc.id)
-    val revision = commitOpsUpdate(context.store, activeSession, doc, ops)
-    return ExternalToolResult.Success(
-        canvasJson.encodeToString(CanvasApplyOpsResult(ok = true, revision = revision))
-    )
 }
 
 private suspend fun executeListCanvases(

@@ -1070,12 +1070,12 @@ internal class AdminChatViewModel @Inject constructor(
 
     private fun observeCanvasShareAttachments() {
         viewModelScope.launch {
-            val initialConvId = currentOrExplicitConversationId()
-            com.letta.mobile.data.canvas.CanvasShare.consumeStagedAttachments(initialConvId).forEach { image ->
+            val initialTarget = com.letta.mobile.data.canvas.CanvasConversationTarget.from(currentOrExplicitConversationId())
+            com.letta.mobile.data.canvas.CanvasShare.consumeStagedAttachments(initialTarget).forEach { image ->
                 addAttachment(image)
             }
-            com.letta.mobile.data.canvas.CanvasShare.stagedAttachmentEvents.collect { (targetConvId, image) ->
-                if (matchesTargetConversation(targetConvId, currentOrExplicitConversationId())) {
+            com.letta.mobile.data.canvas.CanvasShare.stagedAttachmentEvents.collect { (target, image) ->
+                if (matchesTargetConversation(target.id, currentOrExplicitConversationId())) {
                     addAttachment(image)
                 }
             }

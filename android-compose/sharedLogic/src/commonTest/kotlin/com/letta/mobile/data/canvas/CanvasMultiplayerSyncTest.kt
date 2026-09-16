@@ -25,18 +25,22 @@ class CanvasMultiplayerSyncTest {
         val storeA = InMemoryCanvasDocumentStore()
         val sessionA = CanvasSession.create(
             store = storeA,
-            canvasId = canvasId,
-            title = "Shared Architecture",
-            syncTransport = sharedTransport,
+            options = CanvasCreateOptions(
+                canvasId = canvasId,
+                title = "Shared Architecture",
+                syncTransport = sharedTransport,
+            ),
         )
 
         // Client B
         val storeB = InMemoryCanvasDocumentStore()
         val sessionB = CanvasSession.create(
             store = storeB,
-            canvasId = canvasId,
-            title = "Shared Architecture",
-            syncTransport = sharedTransport,
+            options = CanvasCreateOptions(
+                canvasId = canvasId,
+                title = "Shared Architecture",
+                syncTransport = sharedTransport,
+            ),
         )
 
         val jobA = sessionA.startSync(backgroundScope)
@@ -115,8 +119,10 @@ class CanvasMultiplayerSyncTest {
         val store = InMemoryCanvasDocumentStore()
         val session = CanvasSession.create(
             store = store,
-            canvasId = canvasId,
-            syncTransport = sharedTransport,
+            options = CanvasCreateOptions(
+                canvasId = canvasId,
+                syncTransport = sharedTransport,
+            ),
         )
         session.startSync(backgroundScope)
         runCurrent()

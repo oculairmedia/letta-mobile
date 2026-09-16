@@ -96,14 +96,14 @@ class AdminChatViewModelStartupTest {
         var viewModel: AdminChatViewModel? = null
         try {
             val agent = TestData.agent("agent-canvas", "CanvasAgent")
-            val convId = "conversation-canvas-share"
+            val target = com.letta.mobile.data.canvas.CanvasConversationTarget("conversation-canvas-share")
             val sampleImage = com.letta.mobile.data.canvas.CanvasShare.createChatImageAttachment(
                 bytes = "canvas-test-image-content".encodeToByteArray(),
-                mimeType = "image/png",
+                mimeType = com.letta.mobile.data.canvas.CanvasMimeType.PNG,
             )
-            com.letta.mobile.data.canvas.CanvasShare.stageForConversation(convId, sampleImage)
+            com.letta.mobile.data.canvas.CanvasShare.stageForConversation(target, sampleImage)
 
-            val vm = createTestViewModel(agent, convId)
+            val vm = createTestViewModel(agent, target.id)
             viewModel = vm
 
             assertEquals(1, vm.composerState.value.pendingAttachments.size)
@@ -111,9 +111,9 @@ class AdminChatViewModelStartupTest {
 
             val secondImage = com.letta.mobile.data.canvas.CanvasShare.createChatImageAttachment(
                 bytes = "canvas-second-image".encodeToByteArray(),
-                mimeType = "image/png",
+                mimeType = com.letta.mobile.data.canvas.CanvasMimeType.PNG,
             )
-            com.letta.mobile.data.canvas.CanvasShare.stageForConversation(convId, secondImage)
+            com.letta.mobile.data.canvas.CanvasShare.stageForConversation(target, secondImage)
             assertEquals(2, vm.composerState.value.pendingAttachments.size)
         } finally {
             viewModel?.viewModelScope?.cancel()
@@ -122,35 +122,38 @@ class AdminChatViewModelStartupTest {
         }
     }
 
+    private fun createMockSettings(): ISettingsRepository = mockk(relaxed = true) {
+        every { activeConfig } returns MutableStateFlow(null)
+        every { activeConfigChanges } returns emptyFlow()
+        every { favoriteAgentId } returns MutableStateFlow(null)
+        every { getChatBackgroundKey() } returns flowOf("default")
+        every { getChatFontScale() } returns flowOf(1f)
+        every { getHapticsEnabled() } returns flowOf(false)
+        every { getPinnedAgentIds() } returns flowOf(emptySet())
+    }
+
+    private fun createMockSessionManager(): SessionManager = mockk(relaxed = true) {
+        every { current.localRuntimeBackend } returns null
+        every { current.backendDescriptor.backendId } returns BackendId("startup")
+        every { current.backendDescriptor.runtimeId } returns RuntimeId("startup")
+    }
+
+    private fun createMockBridge(): WsChatBridge = mockk(relaxed = true) {
+        every { connection } returns emptyFlow()
+        every { state } returns MutableStateFlow(mockk(relaxed = true))
+        every { events } returns emptyFlow()
+        every { a2uiEvents } returns emptyFlow()
+    }
+
     private fun createTestViewModel(agent: Agent, convId: String): AdminChatViewModel {
         val agents = mockk<IAgentRepository>(relaxed = true) {
             every { this@mockk.agents } returns MutableStateFlow(listOf(agent))
             every { getCachedAgent(agent.id) } returns agent
             every { getAgent(agent.id) } returns flowOf(agent)
         }
-        val settings = mockk<ISettingsRepository>(relaxed = true) {
-            every { activeConfig } returns MutableStateFlow(null)
-            every { activeConfigChanges } returns emptyFlow()
-            every { favoriteAgentId } returns MutableStateFlow(null)
-            every { getChatBackgroundKey() } returns flowOf("default")
-            every { getChatFontScale() } returns flowOf(1f)
-            every { getHapticsEnabled() } returns flowOf(false)
-            every { getPinnedAgentIds() } returns flowOf(emptySet())
-        }
         val detector = mockk<ShimBackendDetector>(relaxed = true) {
             every { activeUsesChannelTransport } returns MutableStateFlow(false)
             every { activeBackendKind } returns MutableStateFlow(BackendKind.REST)
-        }
-        val bridge = mockk<WsChatBridge>(relaxed = true) {
-            every { connection } returns emptyFlow()
-            every { state } returns MutableStateFlow(mockk(relaxed = true))
-            every { events } returns emptyFlow()
-            every { a2uiEvents } returns emptyFlow()
-        }
-        val session = mockk<SessionManager>(relaxed = true) {
-            every { current.localRuntimeBackend } returns null
-            every { current.backendDescriptor.backendId } returns BackendId("startup")
-            every { current.backendDescriptor.runtimeId } returns RuntimeId("startup")
         }
         val presentation = ChatPagingPresentation(
             settled = flowOf(PagingData.empty()),
@@ -173,12 +176,12 @@ class AdminChatViewModelStartupTest {
             blockRepository = mockk(relaxed = true),
             bugReportRepository = mockk(relaxed = true),
             conversationRepository = mockk(relaxed = true),
-            settingsRepository = settings,
-            sessionManager = session,
+            settingsRepository = createMockSettings(),
+            sessionManager = createMockSessionManager(),
             runtimeEventOutbox = mockk(relaxed = true),
             currentConversationTracker = mockk(relaxed = true),
             shimBackendDetector = detector,
-            wsChatBridge = bridge,
+            wsChatBridge = createMockBridge(),
             subagentRepository = mockk(relaxed = true),
             slashCommandRepository = mockk(relaxed = true) {
                 coEvery { listForAgent(any()) } returns Result.success(emptyList())

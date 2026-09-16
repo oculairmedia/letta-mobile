@@ -955,29 +955,18 @@ internal fun LettaDesktopApp(
                     avatarStyleByAgentId = avatarStyleByAgentId,
                     isDragActive = isDragActive,
                 ),
-                actions = DesktopOverlayActions(
-                    onModelSelected = chatController::setConversationModel,
-                    onSelectConversation = {
-                        chatController.selectConversation(it)
-                        selectedDestination = DesktopDestination.Conversations
-                    },
-                    onOpenAgent = ::openAgent,
-                    onNavigate = { selectedDestination = it },
-                    onCreateAgent = { name, modelValue ->
-                        val (model, embedding) = resolveNewAgentDefaults(
-                            agentRepository = dataBindings.sessionGraphProvider.current.agentRepository,
-                            templateAgentId = selectedAgentId,
-                            modelValue = modelValue,
-                        )
-                        chatController.createAgent(name = name, model = model, embedding = embedding)
-                        selectedDestination = DesktopDestination.Conversations
-                    },
-                    onIrohIdentityReset = {
-                        com.letta.mobile.desktop.security.DesktopIrohIdentity.reset()
-                        // Rebuild the session graph so the next dial mints and
-                        // uses the new identity.
-                        applyConfig(activeConfig)
-                    },
+                actions = createDesktopOverlayActions(
+                    CreateDesktopOverlayActionsParams(
+                        chatController = chatController,
+                        onSelectDestination = { selectedDestination = it },
+                        onOpenAgent = ::openAgent,
+                        agentRepository = dataBindings.sessionGraphProvider.current.agentRepository,
+                        selectedAgentId = selectedAgentId,
+                        onIrohIdentityReset = {
+                            com.letta.mobile.desktop.security.DesktopIrohIdentity.reset()
+                            applyConfig(activeConfig)
+                        },
+                    ),
                 ),
             )
           }
@@ -1105,22 +1094,6 @@ private fun workingAgentName(params: WorkingAgentNameParams): String {
 private fun desktopActiveTitle(destination: DesktopDestination, conversationTitle: String?): String {
     if (destination != DesktopDestination.Conversations) return destination.label
     return conversationTitle ?: "Letta Desktop"
-}
-
-private fun handleDesktopShareCanvasToChat(
-    bytes: ByteArray,
-    mimeType: String,
-    chatController: DesktopChatController,
-    onSuccessNav: () -> Unit,
-) {
-    com.letta.mobile.data.canvas.CanvasShare.packageForChat(bytes, mimeType)
-        .onSuccess { image ->
-            chatController.attachImage(image)
-            onSuccessNav()
-        }
-        .onFailure { error ->
-            chatController.showComposerError(error.message ?: "Could not share canvas to chat")
-        }
 }
 
 
