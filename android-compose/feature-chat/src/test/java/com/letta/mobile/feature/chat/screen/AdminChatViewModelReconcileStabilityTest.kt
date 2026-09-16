@@ -31,6 +31,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
 /**
  * letta-mobile-rgn9u: the whole timeline flashed at every reconcile point (post-send,
@@ -49,6 +52,8 @@ import org.junit.Test
  * records the whole sequence of publications across the reconcile.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34], manifest = Config.NONE)
 class AdminChatViewModelReconcileStabilityTest {
 
     @Test
