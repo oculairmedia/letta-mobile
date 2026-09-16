@@ -189,6 +189,29 @@ fun MascotLive(
 }
 
 /**
+ * The real mascot for an identity that belongs to no agent - a picker option, a preview - drawn
+ * paused: the same Rive scene every live surface draws, with its clock stopped. It is not an
+ * approximation of the character and not a separate still asset, so the shape, the body's pose and
+ * the identity's rotation are exactly what the agent will look like (letta-mobile-0bvjw).
+ *
+ * [key] separates one candidate's scene from another's; candidates of the same picker must not
+ * share a key or they re-skin each other. Callers check [mascotCandidateAvailable] and draw their
+ * own fallback when the renderer is unavailable.
+ */
+@Composable
+fun MascotCandidate(
+    key: String,
+    identity: MascotIdentity,
+    size: Dp,
+    modifier: Modifier = Modifier,
+) = MascotStill(key, identity, size, modifier)
+
+/** True when the host can draw [identity] as a [MascotCandidate] under [key]. */
+@Composable
+fun mascotCandidateAvailable(key: String, identity: MascotIdentity): Boolean =
+    LocalMascotHost.current.entry(key, identity) != null
+
+/**
  * One frame of the agent's mascot at [size], with no clock and no gaze. The agent's live surfaces
  * still drive the entry; a list of stills must not register one frame callback per row.
  */

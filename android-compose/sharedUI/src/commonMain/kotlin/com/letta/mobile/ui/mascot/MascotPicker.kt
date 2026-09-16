@@ -48,9 +48,9 @@ const val MASCOT_ROTATION_STEP: Int = 15
 
 /**
  * The Grokbot-style identity picker: a grid of the eight bodies, drawn in the chosen colour and at
- * the chosen turn, the palette's colour dots, and the turn itself. Pure Compose, no renderer - the
- * preview is the body silhouette, which is exactly what the identity is. Shared by every platform's
- * edit-agent surface.
+ * the chosen turn, the palette's colour dots, and the turn itself. Each body is the real mascot
+ * paused, not a drawing of it, so what the user picks is what the agent becomes; hosts with no
+ * renderer fall back to the flat silhouette. Shared by every platform's edit-agent surface.
  */
 @Composable
 fun MascotPicker(
@@ -146,8 +146,29 @@ private fun MascotShapeChoice(
             )
             .semantics { contentDescription = shape.name.lowercase() },
         contentAlignment = Alignment.Center,
-    ) { MascotShapeGlyph(shape, identity.argb, 36.dp, Modifier.rotate(identity.rotationDegrees.toFloat())) }
+    ) {
+        // letta-mobile-0bvjw: the option is the character itself, paused - the same Rive scene the
+        // agent will draw, so the shape, the pose and the turn are what the user is actually
+        // picking. The silhouette stays only for hosts with no renderer, where it is the honest
+        // fallback rather than a second source of truth; there the turn is applied by Compose,
+        // since only Rive rotates the real body.
+        val candidate = identity.copy(shape = shape)
+        val key = mascotPickerKey(shape)
+        if (mascotCandidateAvailable(key, candidate)) {
+            MascotCandidate(key, candidate, size = 36.dp * MASCOT_TILE_OVERSCALE)
+        } else {
+            MascotShapeGlyph(shape, identity.argb, 36.dp, Modifier.rotate(identity.rotationDegrees.toFloat()))
+        }
+    }
 }
+
+/**
+ * The scene key for one picker option. Entries are keyed by this string, and an entry re-skins
+ * itself when it is asked for a different identity - so two options sharing a key would fight over
+ * one scene and every option would end up drawing the last shape asked for. The prefix keeps them
+ * clear of the real agent ids that share the same table.
+ */
+internal fun mascotPickerKey(shape: MascotShape): String = "mascot-picker:${shape.name}"
 
 @Composable
 private fun MascotColorChoice(
