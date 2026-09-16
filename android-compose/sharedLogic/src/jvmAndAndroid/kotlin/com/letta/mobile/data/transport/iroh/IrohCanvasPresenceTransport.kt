@@ -10,11 +10,13 @@ import computer.iroh.Connection
 import computer.iroh.Endpoint
 import computer.iroh.EndpointAddr
 import computer.iroh.EndpointTicket
+import computer.iroh.Incoming
 import computer.iroh.RecvStream
 import computer.iroh.SendStream
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,6 +25,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -79,22 +82,11 @@ class IrohCanvasPresenceTransport(
             while (isActive) {
                 try {
                     val incoming = ep.acceptNext() ?: continue
-                    launch {
-                        runCatching {
-                            val accepting = incoming.accept()
-                            val peerAlpn = accepting.alpn()
-                            if (peerAlpn.contentEquals(CANVAS_PRESENCE_ALPN)) {
-                                val connection = accepting.connect()
-                                Telemetry.event("CanvasPresence", "incoming.connected")
-                                registerConnection(connection, isInbound = true)
-                            }
-                        }.onFailure { t ->
-                            Telemetry.event("CanvasPresence", "incoming.error", "error" to (t.message ?: t.toString()))
-                        }
-                    }
+                    launch { handleIncomingConnection(incoming) }
                 } catch (t: Throwable) {
                     if (t is CancellationException) throw t
-                    Telemetry.event("CanvasPresence", "accept.error", "error" to (t.message ?: t.toString()))
+                    val errorMsg = t.message ?: t.toString()
+                    Telemetry.event("CanvasPresence", "accept.error", "error" to errorMsg)
                 }
             }
         }
@@ -102,32 +94,53 @@ class IrohCanvasPresenceTransport(
         return job
     }
 
+    private suspend fun handleIncomingConnection(incoming: Incoming) {
+        runCatching {
+            val accepting = incoming.accept()
+            val peerAlpn = accepting.alpn()
+            if (peerAlpn.contentEquals(CANVAS_PRESENCE_ALPN)) {
+                val connection = accepting.connect()
+                Telemetry.event("CanvasPresence", "incoming.connected")
+                registerConnection(connection, isInbound = true)
+            }
+        }.onFailure { t ->
+            val errorMsg = t.message ?: t.toString()
+            Telemetry.event("CanvasPresence", "incoming.error", "error" to errorMsg)
+        }
+    }
+
     private fun startReaper(): Job {
         reaperJob?.cancel()
         val job = scope.launch {
             while (isActive) {
                 delay(2_000L)
-                mutex.withLock {
-                    val now = clock()
-                    for ((canvasId, map) in presencesByCanvas) {
-                        val iterator = map.entries.iterator()
-                        var changed = false
-                        while (iterator.hasNext()) {
-                            val entry = iterator.next()
-                            if (now - entry.value.lastActiveEpochMs > ttlMs) {
-                                iterator.remove()
-                                changed = true
-                            }
-                        }
-                        if (changed) {
-                            flowsByCanvas[canvasId]?.value = map.values.toList()
-                        }
-                    }
-                }
+                reapExpiredPresences()
             }
         }
         reaperJob = job
         return job
+    }
+
+    private suspend fun reapExpiredPresences() = mutex.withLock {
+        val now = clock()
+        for ((canvasId, map) in presencesByCanvas) {
+            if (pruneExpired(map, now)) {
+                flowsByCanvas[canvasId]?.value = map.values.toList()
+            }
+        }
+    }
+
+    private fun pruneExpired(map: MutableMap<String, CanvasPresence>, now: Long): Boolean {
+        val iterator = map.entries.iterator()
+        var changed = false
+        while (iterator.hasNext()) {
+            val entry = iterator.next()
+            if (now - entry.value.lastActiveEpochMs > ttlMs) {
+                iterator.remove()
+                changed = true
+            }
+        }
+        return changed
     }
 
     suspend fun connectToPeer(endpointAddr: EndpointAddr): Connection {
@@ -155,28 +168,41 @@ class IrohCanvasPresenceTransport(
             }
 
             try {
-                while (isActive) {
-                    val frameBytes = readFrame(recvStream) ?: break
-                    val packet = runCatching {
-                        json.decodeFromString<CanvasPresenceWirePacket>(frameBytes.decodeToString())
-                    }.getOrNull()
-
-                    if (packet != null) {
-                        val canvasId = CanvasId(packet.canvasId)
-                        applyPresenceInternal(canvasId, packet.presence)
-                        fallback.updatePresence(canvasId, packet.presence)
-                    }
-                }
+                consumePackets(recvStream)
             } finally {
-                mutex.withLock {
-                    activeSendStreams.remove(sendStream)
-                }
-                runCatching { sendStream.finish() }
+                removeActiveSendStream(sendStream)
             }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (t: Throwable) {
-            if (t !is CancellationException) {
-                Telemetry.event("CanvasPresence", "connection.error", "error" to (t.message ?: t.toString()))
+            val errorMsg = t.message ?: t.toString()
+            Telemetry.event("CanvasPresence", "connection.error", "error" to errorMsg)
+        }
+    }
+
+    private suspend fun consumePackets(recvStream: RecvStream) {
+        while (true) {
+            val frameBytes = readFrame(recvStream) ?: break
+            dispatchIncomingPacket(frameBytes)
+        }
+    }
+
+    private suspend fun dispatchIncomingPacket(frameBytes: ByteArray) {
+        val packet = runCatching {
+            json.decodeFromString<CanvasPresenceWirePacket>(frameBytes.decodeToString())
+        }.getOrNull() ?: return
+
+        val canvasId = CanvasId(packet.canvasId)
+        applyPresenceInternal(canvasId, packet.presence)
+        fallback.updatePresence(canvasId, packet.presence)
+    }
+
+    private suspend fun removeActiveSendStream(sendStream: SendStream) {
+        withContext(NonCancellable) {
+            mutex.withLock {
+                activeSendStreams.remove(sendStream)
             }
+            runCatching { sendStream.finish() }
         }
     }
 
@@ -218,14 +244,7 @@ class IrohCanvasPresenceTransport(
             map[presence.peerId] = presence.copy(lastActiveEpochMs = now)
         }
 
-        // Clean up expired peers
-        val iterator = map.entries.iterator()
-        while (iterator.hasNext()) {
-            val entry = iterator.next()
-            if (now - entry.value.lastActiveEpochMs > ttlMs) {
-                iterator.remove()
-            }
-        }
+        pruneExpired(map, now)
 
         val list = map.values.toList()
         val flow = synchronized(flowsByCanvas) {
@@ -250,17 +269,19 @@ class IrohCanvasPresenceTransport(
         var offset = 0
         while (offset < PREFIX_BYTES) {
             val chunk = stream.read((PREFIX_BYTES - offset).toUInt())
-            if (chunk.isEmpty()) {
-                return null
-            }
+            if (chunk.isEmpty()) return null
             chunk.copyInto(prefix, destinationOffset = offset)
             offset += chunk.size
         }
-        val length = ((prefix[0].toInt() and 0xff) shl 24) or
+        val length = decodePrefixLength(prefix)
+        if (length !in 0..MAX_PAYLOAD_BYTES) return null
+        return stream.readExact(length.toUInt())
+    }
+
+    private fun decodePrefixLength(prefix: ByteArray): Int {
+        return ((prefix[0].toInt() and 0xff) shl 24) or
             ((prefix[1].toInt() and 0xff) shl 16) or
             ((prefix[2].toInt() and 0xff) shl 8) or
             (prefix[3].toInt() and 0xff)
-        if (length !in 0..MAX_PAYLOAD_BYTES) return null
-        return stream.readExact(length.toUInt())
     }
 }

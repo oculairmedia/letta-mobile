@@ -11,6 +11,7 @@ import computer.iroh.Connection
 import computer.iroh.Endpoint
 import computer.iroh.EndpointAddr
 import computer.iroh.EndpointTicket
+import computer.iroh.Incoming
 import computer.iroh.RecvStream
 import computer.iroh.SendStream
 import kotlinx.coroutines.CancellationException
@@ -90,7 +91,7 @@ class IrohCanvasSyncTransport(
         return job
     }
 
-    private suspend fun handleIncomingConnection(incoming: computer.iroh.IncomingConnection) {
+    private suspend fun handleIncomingConnection(incoming: Incoming) {
         runCatching {
             val accepting = incoming.accept()
             val peerAlpn = accepting.alpn()
@@ -143,7 +144,7 @@ class IrohCanvasSyncTransport(
     }
 
     private suspend fun consumePackets(recvStream: RecvStream, sendStream: SendStream) {
-        while (isActive) {
+        while (true) {
             val frameBytes = readFrame(recvStream) ?: break
             dispatchIncomingPacket(frameBytes, sendStream)
         }
