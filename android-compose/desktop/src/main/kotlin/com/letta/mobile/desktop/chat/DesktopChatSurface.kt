@@ -202,9 +202,13 @@ private fun ChatDetailBody(
             )
         }
         val companion = rememberComposerCompanion(surface, state, onClick = actions.onOpenAgentPane)
+        val transport = com.letta.mobile.ui.mascot.LocalMascotTransport.current
+        val companionPresent = surface.selectedConversation?.agentId
+            ?.let { transport.activeStage(it) == com.letta.mobile.ui.mascot.MascotStage.COMPOSER_COMPANION } ?: false
         ChatDetailContent(surface, state, actions, showThinkingRow = companion == null, modifier = Modifier.weight(1f))
         ComposerBar(
             companion = companion,
+            companionPresent = companionPresent,
             state = ComposerBarState(
                 text = surface.composerText,
                 pendingImageAttachments = surface.pendingImageAttachments,
