@@ -170,15 +170,12 @@ fun AppNavGraph(
         fallbackAgentId = favoriteAgentId ?: adminAgentId,
     )
 
-    LaunchedEffect(notificationTarget) {
-        val target = notificationTarget ?: return@LaunchedEffect
-        if (target != initialNotificationTarget) {
-            navController.navigate(target.toRoute()) {
-                launchSingleTop = true
-            }
-        }
-        onNotificationTargetConsumed()
-    }
+    HandleNotificationTarget(
+        notificationTarget = notificationTarget,
+        initialNotificationTarget = initialNotificationTarget,
+        navController = navController,
+        onConsumed = onNotificationTargetConsumed,
+    )
 
     NavHost(
         navController = navController,
@@ -197,9 +194,7 @@ fun AppNavGraph(
             clearAllData = { navViewModel.clearAllData() },
         )
 
-        configGraph(
-            navController = navController,
-        )
+        configGraph(navController = navController)
 
         conversationsGraph(
             navController = navController,
@@ -207,28 +202,49 @@ fun AppNavGraph(
             openBackendSwitcher = openBackendSwitcher,
         )
 
-        editAgentGraph(
-            onNavigateBack = { navController.popBackStack() }
-        )
+        editAgentGraph(onNavigateBack = { navController.popBackStack() })
 
         appChatGraph(navController)
 
         appCanvasGraph(navController)
     }
 
-    // letta-mobile-cdlk: render the backend-switcher sheet at the top level
-    // so it overlays whichever screen owns the pill. The Hilt-scoped
-    // ConfigListViewModel that BackendSwitcherSheet pulls observes the
-    // settings flow, so the sheet contents stay fresh across reopens.
-    if (showBackendSwitcher) {
+    AppBackendSwitcherHost(
+        show = showBackendSwitcher,
+        onDismiss = { showBackendSwitcher = false },
+        navController = navController,
+    )
+}
+
+@Composable
+private fun HandleNotificationTarget(
+    notificationTarget: AppLaunchTarget?,
+    initialNotificationTarget: AppLaunchTarget?,
+    navController: NavHostController,
+    onConsumed: () -> Unit,
+) {
+    LaunchedEffect(notificationTarget) {
+        val target = notificationTarget ?: return@LaunchedEffect
+        if (target != initialNotificationTarget) {
+            navController.navigate(target.toRoute()) {
+                launchSingleTop = true
+            }
+        }
+        onConsumed()
+    }
+}
+
+@Composable
+private fun AppBackendSwitcherHost(
+    show: Boolean,
+    onDismiss: () -> Unit,
+    navController: NavHostController,
+) {
+    if (show) {
         BackendSwitcherSheet(
-            onDismiss = { showBackendSwitcher = false },
-            onNavigateToAddNewServer = {
-                navController.navigate(ConfigRoute(createNew = true))
-            },
-            onNavigateToEditServer = {
-                navController.navigate(ConfigRoute())
-            },
+            onDismiss = onDismiss,
+            onNavigateToAddNewServer = { navController.navigate(ConfigRoute(createNew = true)) },
+            onNavigateToEditServer = { navController.navigate(ConfigRoute()) },
         )
     }
 }
