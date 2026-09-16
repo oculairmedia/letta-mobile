@@ -111,14 +111,19 @@ private suspend fun executeApplyOps(
     val opsJson = input["ops"] ?: return ExternalToolResult.Error("Missing required parameter: ops")
     val ops = canvasJson.decodeFromJsonElement<List<CanvasOp>>(opsJson)
     val canvasId = CanvasId(canvasIdStr)
-    val replaceOp = ops.filterIsInstance<CanvasOp.ReplaceSceneOp>().lastOrNull()
-    val fallbackScene = replaceOp?.sceneJson ?: (store.get(canvasId)?.sceneJson ?: "")
-    val revision = updateDocumentScene(store, canvasId, fallbackScene) { session ->
-        if (replaceOp != null) {
-            session.applyAgentReplace(replaceOp.sceneJson).revision
-        } else {
-            session.saveScene(session.sceneJsonOrEmpty()).revision
-        }
+    val activeSession = CanvasSessionRegistry.get(canvasId)
+    val revision = if (activeSession != null) {
+        activeSession.applyOps(ops).revision
+    } else {
+        val doc = store.get(canvasId) ?: return ExternalToolResult.Error("Canvas not found: $canvasIdStr")
+        val projected = CanvasOpProjector.project(doc.sceneJson, ops)
+        val updated = doc.copy(
+            revision = doc.revision + 1L,
+            sceneJson = projected,
+            updatedAtEpochMs = kotlin.time.Clock.System.now().toEpochMilliseconds(),
+        )
+        store.upsert(updated)
+        updated.revision
     }
     return ExternalToolResult.Success(
         canvasJson.encodeToString(CanvasApplyOpsResult(ok = true, revision = revision))

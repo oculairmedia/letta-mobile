@@ -27,6 +27,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.data.canvas.CanvasPresence
+import com.letta.mobile.data.canvas.CanvasPresenceTransport
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.CanvasSessionRegistry
 import io.ak1.drawbox.DrawBox
@@ -49,6 +51,8 @@ fun CanvasWorkspace(
     controller: DrawBoxController = remember { DrawBoxController(Reducer(UseCase())) },
     session: CanvasSession? = null,
     initialJson: String? = null,
+    presenceTransport: CanvasPresenceTransport? = null,
+    currentPeerId: String? = null,
     onNavigateBack: (() -> Unit)? = null,
     onExportJson: ((String) -> Unit)? = null,
     onExportSvg: ((String) -> Unit)? = null,
@@ -57,15 +61,21 @@ fun CanvasWorkspace(
     val canUndo by controller.canUndo.collectAsState()
     val canRedo by controller.canRedo.collectAsState()
     val sessionDoc by (session?.document?.collectAsState() ?: remember { mutableStateOf(null) })
+    val presences by if (presenceTransport != null && session != null) {
+        presenceTransport.observePresence(session.canvasId).collectAsState(emptyList())
+    } else {
+        remember { mutableStateOf(emptyList<CanvasPresence>()) }
+    }
 
     var statusMessage by remember { mutableStateOf("Ready") }
     var initialLoadDone by remember { mutableStateOf(false) }
     var lastExportedJson by remember { mutableStateOf<String?>(null) }
 
-    // Load initial JSON diagram or session document & observe external session updates (Card I2.3)
+    // Load initial JSON diagram or session document & observe external session updates (Card I2.3 & I3.3)
     LaunchedEffect(session, initialJson) {
         if (session != null) {
             CanvasSessionRegistry.register(session)
+            val syncJob = session.startSync(this)
             try {
                 session.load()
                 val sessionJson = session.sceneJsonOrEmpty()
@@ -134,7 +144,7 @@ fun CanvasWorkspace(
                     }
                     if (session != null && session.sceneJsonOrEmpty() != event.json) {
                         withContext(Dispatchers.Default) {
-                            session.saveScene(event.json)
+                            session.applyLocalScene(event.json)
                         }
                     }
                     onExportJson?.invoke(event.json)
@@ -176,6 +186,12 @@ fun CanvasWorkspace(
                 modifier = Modifier
                     .fillMaxSize()
                     .clipToBounds(),
+            )
+
+            // Presence layer (Card I3.5)
+            PresenceLayer(
+                presences = presences,
+                currentPeerId = currentPeerId,
             )
 
             // Top action bar: Sample loader + Exports + Status

@@ -2,6 +2,7 @@
 
 package com.letta.mobile.desktop.canvas
 
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -140,5 +141,72 @@ class CanvasWorkspaceUiTest {
         // Verify diagram is visible without human drawing (15 elements from Build Cycle fixture)
         onNodeWithText("Agent updated canvas (rev 2)", substring = true).assertExists()
         onNodeWithText("Elements: 15", substring = true).assertExists()
+    }
+
+    @Test
+    fun canvasWorkspace_withPresence_rendersPeerCursorAndRemovesOnLeave() = runComposeUiTest {
+        val presenceTransport = com.letta.mobile.data.canvas.InMemoryCanvasPresenceTransport()
+        val store = com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore()
+        val canvasId = com.letta.mobile.data.canvas.CanvasId("presence-test-canvas")
+        val session = kotlinx.coroutines.runBlocking {
+            com.letta.mobile.data.canvas.CanvasSession.create(
+                store = store,
+                canvasId = canvasId,
+                title = "Presence Canvas",
+            )
+        }
+
+        setContent {
+            CanvasWorkspace(
+                session = session,
+                presenceTransport = presenceTransport,
+                currentPeerId = "local-user",
+            )
+        }
+
+        // Initially no peer cursor
+        onAllNodesWithText("Alice (Peer)").assertCountEquals(0)
+
+        // Peer arrives and updates cursor position
+        kotlinx.coroutines.runBlocking {
+            presenceTransport.updatePresence(
+                canvasId = canvasId,
+                presence = com.letta.mobile.data.canvas.CanvasPresence(
+                    peerId = "peer-alice",
+                    displayName = "Alice (Peer)",
+                    colorHex = "#e5484dff",
+                    cursorX = 120f,
+                    cursorY = 180f,
+                    isActive = true,
+                )
+            )
+        }
+
+        // Second client cursor visible!
+        waitUntil(timeoutMillis = 5000) {
+            onAllNodesWithText("Alice (Peer)").fetchSemanticsNodes().isNotEmpty()
+        }
+        onNodeWithText("Alice (Peer)").assertExists()
+
+        // Peer leaves (isActive = false)
+        kotlinx.coroutines.runBlocking {
+            presenceTransport.updatePresence(
+                canvasId = canvasId,
+                presence = com.letta.mobile.data.canvas.CanvasPresence(
+                    peerId = "peer-alice",
+                    displayName = "Alice (Peer)",
+                    colorHex = "#e5484dff",
+                    cursorX = 120f,
+                    cursorY = 180f,
+                    isActive = false,
+                )
+            )
+        }
+
+        // Leave removes presence!
+        waitUntil(timeoutMillis = 5000) {
+            onAllNodesWithText("Alice (Peer)").fetchSemanticsNodes().isEmpty()
+        }
+        onAllNodesWithText("Alice (Peer)").assertCountEquals(0)
     }
 }

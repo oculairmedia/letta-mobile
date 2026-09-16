@@ -1,25 +1,32 @@
 package com.letta.mobile.data.canvas
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /**
- * Single-player runtime session managing a [CanvasDocument].
+ * Runtime session managing a [CanvasDocument] with multi-writer op-log support.
  *
- * Owns revision sequencing, in-memory state projection, and persistence synchronization.
+ * Owns revision sequencing, in-memory state projection, op log append, and persistence synchronization.
  * Pure Kotlin Multiplatform domain logic in :sharedLogic, decoupled from any Compose UI.
  */
 class CanvasSession(
     val canvasId: CanvasId,
     private val store: CanvasDocumentStore,
+    val opLog: CanvasOpLog = InMemoryCanvasOpLog(),
+    val syncTransport: CanvasSyncTransport? = null,
     private val clock: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
 ) {
     private val mutex = Mutex()
     private val _document = MutableStateFlow<CanvasDocument?>(null)
     val document: StateFlow<CanvasDocument?> = _document.asStateFlow()
+
+    private var lamportClock: Long = 0L
 
     /**
      * Loads the document from [store] into memory and updates [document] state.
@@ -84,6 +91,142 @@ class CanvasSession(
     }
 
     /**
+     * Applies a single locally-generated [CanvasOp], appends to [opLog], projects state,
+     * updates persistence, and publishes to [syncTransport].
+     */
+    suspend fun applyLocal(op: CanvasOp): CanvasDocument = mutex.withLock {
+        opLog.append(canvasId, op)
+        if (op.lamport > lamportClock) lamportClock = op.lamport
+        val current = _document.value ?: store.get(canvasId) ?: CanvasDocument(
+            id = canvasId,
+            title = "Untitled Canvas",
+            revision = 0L,
+            sceneJson = "",
+            updatedAtEpochMs = clock(),
+        )
+
+        val newScene = CanvasOpProjector.project(current.sceneJson, listOf(op))
+        val updated = current.copy(
+            revision = current.revision + 1L,
+            sceneJson = newScene,
+            updatedAtEpochMs = clock(),
+        )
+
+        store.upsert(updated)
+        _document.value = updated
+        syncTransport?.publish(canvasId, op)
+        updated
+    }
+
+    /**
+     * Applies a remote [CanvasOp], ignoring if already present in [opLog] (deduplication),
+     * appends to [opLog], projects state, and updates persistence.
+     */
+    suspend fun applyRemote(op: CanvasOp): CanvasDocument? = mutex.withLock {
+        if (opLog.has(canvasId, op.opId)) return null
+        opLog.append(canvasId, op)
+        if (op.lamport > lamportClock) lamportClock = op.lamport
+        val current = _document.value ?: store.get(canvasId) ?: CanvasDocument(
+            id = canvasId,
+            title = "Untitled Canvas",
+            revision = 0L,
+            sceneJson = "",
+            updatedAtEpochMs = clock(),
+        )
+
+        val newScene = CanvasOpProjector.project(current.sceneJson, listOf(op))
+        val updated = current.copy(
+            revision = current.revision + 1L,
+            sceneJson = newScene,
+            updatedAtEpochMs = clock(),
+        )
+
+        store.upsert(updated)
+        _document.value = updated
+        updated
+    }
+
+    /**
+     * Applies a sequence of operations as a single revision bump.
+     */
+    suspend fun applyOps(ops: List<CanvasOp>, isRemote: Boolean = false): CanvasDocument = mutex.withLock {
+        val current = _document.value ?: store.get(canvasId) ?: CanvasDocument(
+            id = canvasId,
+            title = "Untitled Canvas",
+            revision = 0L,
+            sceneJson = "",
+            updatedAtEpochMs = clock(),
+        )
+
+        val opsToApply = mutableListOf<CanvasOp>()
+        for (op in ops) {
+            if (isRemote && opLog.has(canvasId, op.opId)) continue
+            opLog.append(canvasId, op)
+            if (op.lamport > lamportClock) lamportClock = op.lamport
+            opsToApply.add(op)
+        }
+
+        if (opsToApply.isEmpty()) return current
+
+        val newScene = CanvasOpProjector.project(current.sceneJson, opsToApply)
+        val updated = current.copy(
+            revision = current.revision + 1L,
+            sceneJson = newScene,
+            updatedAtEpochMs = clock(),
+        )
+
+        store.upsert(updated)
+        _document.value = updated
+        if (!isRemote && syncTransport != null) {
+            for (op in opsToApply) {
+                syncTransport.publish(canvasId, op)
+            }
+        }
+        updated
+    }
+
+    /**
+     * Diffs [newJson] against current scene and applies the resulting operations locally.
+     */
+    suspend fun applyLocalScene(newJson: String, actorId: String = "local_user"): List<CanvasOp> {
+        val current = sceneJsonOrEmpty()
+        if (newJson == current) return emptyList()
+
+        val generatedOps = CanvasOpDiffer.diff(
+            oldSceneJson = current,
+            newSceneJson = newJson,
+            actorId = actorId,
+            lamportSupplier = { ++lamportClock },
+        )
+
+        if (generatedOps.isEmpty()) {
+            val replaceOp = CanvasOp.ReplaceSceneOp(
+                opId = CanvasOpDiffer.generateOpId("replace"),
+                actorId = actorId,
+                lamport = ++lamportClock,
+                sceneJson = newJson,
+            )
+            applyLocal(replaceOp)
+            return listOf(replaceOp)
+        }
+
+        applyOps(generatedOps, isRemote = false)
+        return generatedOps
+    }
+
+    /**
+     * Starts listening for remote ops on [syncTransport] and projecting them.
+     */
+    fun startSync(scope: CoroutineScope): Job? {
+        val transport = syncTransport ?: return null
+        return scope.launch {
+            transport.subscribe(canvasId).collect { remoteOp ->
+                applyRemote(remoteOp)
+            }
+        }
+    }
+
+    /**
      * Updates document title.
      */
     suspend fun updateTitle(newTitle: String): CanvasDocument = mutex.withLock {
@@ -116,6 +259,8 @@ class CanvasSession(
             agentId: String? = null,
             canvasId: CanvasId = CanvasId("canvas-${kotlin.time.Clock.System.now().toEpochMilliseconds()}-${(1000..9999).random()}"),
             initialSceneJson: String = "",
+            opLog: CanvasOpLog = InMemoryCanvasOpLog(),
+            syncTransport: CanvasSyncTransport? = null,
             clock: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
         ): CanvasSession {
             val doc = CanvasDocument(
@@ -128,7 +273,13 @@ class CanvasSession(
                 updatedAtEpochMs = clock(),
             )
             store.upsert(doc)
-            val session = CanvasSession(canvasId = canvasId, store = store, clock = clock)
+            val session = CanvasSession(
+                canvasId = canvasId,
+                store = store,
+                opLog = opLog,
+                syncTransport = syncTransport,
+                clock = clock,
+            )
             session._document.value = doc
             return session
         }
@@ -141,10 +292,19 @@ class CanvasSession(
             conversationId: String,
             agentId: String? = null,
             title: String = "Conversation Canvas",
+            opLog: CanvasOpLog = InMemoryCanvasOpLog(),
+            syncTransport: CanvasSyncTransport? = null,
+            clock: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
         ): CanvasSession {
             val existing = store.getForConversation(conversationId)
             return if (existing != null) {
-                val session = CanvasSession(canvasId = existing.id, store = store)
+                val session = CanvasSession(
+                    canvasId = existing.id,
+                    store = store,
+                    opLog = opLog,
+                    syncTransport = syncTransport,
+                    clock = clock,
+                )
                 session._document.value = existing
                 session
             } else {
@@ -153,6 +313,9 @@ class CanvasSession(
                     title = title,
                     conversationId = conversationId,
                     agentId = agentId,
+                    opLog = opLog,
+                    syncTransport = syncTransport,
+                    clock = clock,
                 )
             }
         }
