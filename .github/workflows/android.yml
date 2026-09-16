@@ -34,7 +34,14 @@ on:
       # pull_request paths filter and always runs.
       # qodana.yaml lives at the repo root, not under android-compose/. A
       # Qodana-exclude-only PR would otherwise skip these required jobs forever.
+      # docs/** is here for the same reason: a docs-only PR reports perf-gate
+      # (android-perf.yml has no paths filter) but none of the other required
+      # contexts, so branch protection blocks it with nothing to fix and no
+      # check to re-run. letta-mobile-je4k7 tracks replacing this allowlist,
+      # which has now grown an entry per discovery, with heavy jobs that always
+      # report and short-circuit when nothing they gate has changed.
       - ".github/workflows/**"
+      - "docs/**"
       - "android-compose/**"
       - "third_party/overmorrow/**"
       - "scripts/ci/**"

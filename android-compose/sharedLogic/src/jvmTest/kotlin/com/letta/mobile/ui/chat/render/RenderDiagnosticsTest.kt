@@ -265,4 +265,47 @@ class RenderDiagnosticsTest {
         assertFalse(RenderDiagnostics.contentDupesSampleDue())
         RenderDiagnostics.resetContentDupesSampleCounter()
     }
+
+    @Test
+    fun testNewRenderGeneration_scopesComposedKeys_soAPagedHostDoesNotFalselyWarn() {
+        // letta-mobile-x1xnl: a host that builds its rows from LazyPagingItems
+        // never calls onRenderItemsBuilt, so without a generation bump the
+        // composed-key set spans every list rebuild and the SECOND pass over the
+        // same key is reported as a double-compose at WARN. Fail-on-revert: drop
+        // the newRenderGeneration() call below and the second pass warns.
+        Telemetry.renderDiagEnabled.set(true)
+
+        RenderDiagnostics.newRenderGeneration()
+        RenderDiagnostics.onLazyItemComposed("conv-paged", "msg-1", "single")
+        RenderDiagnostics.onLazyItemComposed("conv-paged", "msg-2", "single")
+
+        // Next list rebuild in the same host: same keys, legitimately re-composed.
+        RenderDiagnostics.newRenderGeneration()
+        RenderDiagnostics.onLazyItemComposed("conv-paged", "msg-1", "single")
+        RenderDiagnostics.onLazyItemComposed("conv-paged", "msg-2", "single")
+
+        val events = Telemetry.snapshot().filter { it.name.startsWith("lazyItem.") }
+        assertEquals(4, events.size)
+        assertEquals(0, events.count { it.name == "lazyItem.doubleComposed" })
+
+        // The probe still catches a real double-compose WITHIN one generation.
+        RenderDiagnostics.onLazyItemComposed("conv-paged", "msg-1", "single")
+        assertEquals(
+            1,
+            Telemetry.snapshot().count { it.name == "lazyItem.doubleComposed" },
+        )
+    }
+
+    @Test
+    fun testNewRenderGeneration_isANoOpWhenRenderDiagOff() {
+        assertFalse(RenderDiagnostics.enabled())
+        val before = Telemetry.snapshot().size
+
+        RenderDiagnostics.newRenderGeneration()
+        RenderDiagnostics.newRenderGeneration()
+
+        // No generation bump is observable and, critically, no telemetry is
+        // emitted: the bump alone must never add to the event stream.
+        assertEquals(before, Telemetry.snapshot().size)
+    }
 }

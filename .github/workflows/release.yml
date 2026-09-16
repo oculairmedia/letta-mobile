@@ -170,6 +170,25 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-jbr-
 
+      - name: Cache rive-runtime build (desktop mascot renderer)
+        # build-bridge.sh keeps rive-runtime's headers and release libraries (~1.7 GB, mostly
+        # rive.lib) as D:\rb\work\sdk and reuses them at the pinned commit, so a hit skips the
+        # clone and the ~3 min library build; the bridge itself always recompiles.
+        uses: actions/cache@v4
+        with:
+          path: D:\rb\work\sdk
+          key: ${{ runner.os }}-rive-runtime-sdk-${{ hashFiles('android-compose/avatar/renderer-rive/native/desktop/rive-runtime.version', 'android-compose/avatar/renderer-rive/native/desktop/tools/**', 'android-compose/avatar/renderer-rive/native/desktop/build-bridge.sh') }}
+
+      - name: Build Rive desktop bridge (rive_desktop_bridge.dll)
+        # The mascot renderer. Packaging refuses to run without it (desktop/build.gradle.kts,
+        # stageDesktopRiveBridge), so a release installer can never silently ship orbs only.
+        # Without this step :desktop:createDistributable fails on Windows — that is what broke
+        # the v0.18.0 release run (#1563 added the fence and the desktop.yml step but not this one).
+        shell: bash
+        run: |
+          bash avatar/renderer-rive/native/desktop/build-bridge.sh /d/rb/work /d/rb/out
+          echo 'LETTA_RIVE_BRIDGE_DLL=D:\rb\out\rive_desktop_bridge.dll' >> "$GITHUB_ENV"
+
       - name: Build Windows EXE + MSI installers
         env:
           # Match desktop CI's drive-root workspace so WiX source paths stay
