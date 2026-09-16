@@ -481,30 +481,11 @@ private fun ConfigContent(
             )
         }
 
-        CardGroup(title = {
-            ConfigSectionTitle(stringResource(R.string.screen_config_integrations_section))
-        }) {
-            item(
-                onClick = onNavigateToSystemAccess,
-                headlineContent = { Text(stringResource(R.string.screen_system_access_title)) },
-                supportingContent = { Text(stringResource(R.string.screen_system_access_entry_description)) },
-                leadingContent = { Icon(LettaIcons.Key, contentDescription = null) },
-            )
-            if (BuildConfig.DEBUG) {
-                item(
-                    onClick = onNavigateToVibesyncDebug,
-                    headlineContent = { Text(stringResource(R.string.screen_vibesync_debug_title)) },
-                    supportingContent = { Text(stringResource(R.string.screen_vibesync_debug_entry_description)) },
-                    leadingContent = { Icon(LettaIcons.Database, contentDescription = null) },
-                )
-                item(
-                    onClick = onNavigateToCanvasDebug,
-                    headlineContent = { Text(stringResource(R.string.screen_canvas_debug_title)) },
-                    supportingContent = { Text(stringResource(R.string.screen_canvas_debug_entry_description)) },
-                    leadingContent = { Icon(LettaIcons.Edit, contentDescription = null) },
-                )
-            }
-        }
+        IntegrationsSection(
+            onNavigateToSystemAccess = onNavigateToSystemAccess,
+            onNavigateToVibesyncDebug = onNavigateToVibesyncDebug,
+            onNavigateToCanvasDebug = onNavigateToCanvasDebug,
+        )
 
         CardGroup {
             item(
@@ -1137,3 +1118,40 @@ private fun ConfigRefreshStatusErrorPreview() {
 }
 
 // endregion
+
+/**
+ * The integrations card, plus the debug-only entries that sit under it. Each new debug surface
+ * lands here rather than deeper inside [ConfigContent], which is what kept growing every time one
+ * was added.
+ */
+@Composable
+private fun IntegrationsSection(
+    onNavigateToSystemAccess: () -> Unit,
+    onNavigateToVibesyncDebug: () -> Unit,
+    onNavigateToCanvasDebug: () -> Unit,
+) {
+    CardGroup(title = {
+        ConfigSectionTitle(stringResource(R.string.screen_config_integrations_section))
+    }) {
+        item(
+            onClick = onNavigateToSystemAccess,
+            headlineContent = { Text(stringResource(R.string.screen_system_access_title)) },
+            supportingContent = { Text(stringResource(R.string.screen_system_access_entry_description)) },
+            leadingContent = { Icon(LettaIcons.Key, contentDescription = null) },
+        )
+        if (BuildConfig.DEBUG) {
+            item(
+                onClick = onNavigateToVibesyncDebug,
+                headlineContent = { Text(stringResource(R.string.screen_vibesync_debug_title)) },
+                supportingContent = { Text(stringResource(R.string.screen_vibesync_debug_entry_description)) },
+                leadingContent = { Icon(LettaIcons.Database, contentDescription = null) },
+            )
+            item(
+                onClick = onNavigateToCanvasDebug,
+                headlineContent = { Text(stringResource(R.string.screen_canvas_debug_title)) },
+                supportingContent = { Text(stringResource(R.string.screen_canvas_debug_entry_description)) },
+                leadingContent = { Icon(LettaIcons.Edit, contentDescription = null) },
+            )
+        }
+    }
+}
