@@ -194,22 +194,29 @@ fun MascotLive(
  * approximation of the character and not a separate still asset, so the shape, the body's pose and
  * the identity's rotation are exactly what the agent will look like (letta-mobile-0bvjw).
  *
- * [key] separates one candidate's scene from another's; candidates of the same picker must not
- * share a key or they re-skin each other. Callers check [mascotCandidateAvailable] and draw their
- * own fallback when the renderer is unavailable.
+ * Callers check [mascotCandidateAvailable] and draw their own fallback when the renderer is
+ * unavailable.
  */
 @Composable
 fun MascotCandidate(
-    key: String,
     identity: MascotIdentity,
     size: Dp,
     modifier: Modifier = Modifier,
-) = MascotStill(key, identity, size, modifier)
+) = MascotStill(candidateSceneKey(identity), identity, size, modifier)
 
-/** True when the host can draw [identity] as a [MascotCandidate] under [key]. */
+/** True when the host can draw [identity] as a [MascotCandidate]. */
 @Composable
-fun mascotCandidateAvailable(key: String, identity: MascotIdentity): Boolean =
-    LocalMascotHost.current.entry(key, identity) != null
+fun mascotCandidateAvailable(identity: MascotIdentity): Boolean =
+    LocalMascotHost.current.entry(candidateSceneKey(identity), identity) != null
+
+/**
+ * Which scene a candidate identity draws on. Scenes live in one table keyed by string and re-skin
+ * themselves when asked for a different identity, so the split has to be the part of the identity a
+ * caller shows several of at once - the body - while colour and turn are skinned onto the scene the
+ * body already has. Deriving it here rather than taking a key means a caller cannot forge one that
+ * collides with an agent's, or accidentally give two candidates the same scene.
+ */
+internal fun candidateSceneKey(identity: MascotIdentity): String = "mascot-candidate:${identity.shape.name}"
 
 /**
  * One frame of the agent's mascot at [size], with no clock and no gaze. The agent's live surfaces

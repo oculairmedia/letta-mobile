@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.mascot
 
+import com.letta.mobile.avatar.core.MascotIdentity
 import com.letta.mobile.avatar.core.MascotShape
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -17,9 +18,19 @@ class MascotPickerCandidateTest {
 
     @Test
     fun everyShapeGetsItsOwnSceneKey() {
-        val keys = MascotShape.entries.map(::mascotPickerKey)
+        val keys = MascotShape.entries.map { candidateSceneKey(MascotIdentity.DEFAULT.copy(shape = it)) }
 
         assertEquals(MascotShape.entries.size, keys.toSet().size, "options would share a scene: $keys")
+    }
+
+    @Test
+    fun colourAndTurnReskinTheBodyRatherThanAskingForAnotherScene() {
+        // Scenes are never evicted, so keying on the whole identity would leak one per colour and
+        // per slider step while the user drags. Only the body may split them.
+        val red = MascotIdentity.DEFAULT.copy(argb = 0xFFFF0000.toInt(), rotationDegrees = 0)
+        val blue = red.copy(argb = 0xFF0000FF.toInt(), rotationDegrees = 90)
+
+        assertEquals(candidateSceneKey(red), candidateSceneKey(blue))
     }
 
     @Test
@@ -27,7 +38,9 @@ class MascotPickerCandidateTest {
         // Agent ids are opaque and come from the backend; the prefix is what keeps a picker scene
         // from being handed out as some agent's live mascot, and vice versa.
         assertTrue(
-            MascotShape.entries.all { mascotPickerKey(it).startsWith("mascot-picker:") },
+            MascotShape.entries.all {
+                candidateSceneKey(MascotIdentity.DEFAULT.copy(shape = it)).startsWith("mascot-candidate:")
+            },
             "picker scenes must stay namespaced away from agent entries",
         )
     }

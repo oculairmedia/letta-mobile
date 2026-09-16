@@ -153,22 +153,14 @@ private fun MascotShapeChoice(
         // fallback rather than a second source of truth; there the turn is applied by Compose,
         // since only Rive rotates the real body.
         val candidate = identity.copy(shape = shape)
-        val key = mascotPickerKey(shape)
-        if (mascotCandidateAvailable(key, candidate)) {
-            MascotCandidate(key, candidate, size = 36.dp * MASCOT_TILE_OVERSCALE)
+        if (mascotCandidateAvailable(candidate)) {
+            MascotCandidate(candidate, size = 36.dp * MASCOT_TILE_OVERSCALE)
         } else {
             MascotShapeGlyph(shape, identity.argb, 36.dp, Modifier.rotate(identity.rotationDegrees.toFloat()))
         }
     }
 }
 
-/**
- * The scene key for one picker option. Entries are keyed by this string, and an entry re-skins
- * itself when it is asked for a different identity - so two options sharing a key would fight over
- * one scene and every option would end up drawing the last shape asked for. The prefix keeps them
- * clear of the real agent ids that share the same table.
- */
-internal fun mascotPickerKey(shape: MascotShape): String = "mascot-picker:${shape.name}"
 
 @Composable
 private fun MascotColorChoice(
