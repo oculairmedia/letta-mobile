@@ -1,7 +1,10 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.canvas.CanvasExternalTools
+import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.desktop.canvas.DesktopCanvasDocumentStore
 import com.letta.mobile.data.runtime.AppServerContextWindowPreflight
 import com.letta.mobile.data.runtime.AppServerTurnEngine
 import com.letta.mobile.data.runtime.TurnContextPreflight
@@ -106,6 +109,9 @@ class DesktopAppServerChatGatewayBuilder(
                 } else {
                     AppServerContextWindowPreflight(client)
                 },
+                externalToolRegistry = ExternalToolRegistry.hostTools(
+                    CanvasExternalTools.all(DesktopCanvasDocumentStore())
+                ),
             )
             val adminGateway: DesktopAdminChatGateway = if (lettaConfig.mode == LettaConfig.Mode.LOCAL) {
                 DesktopLocalBackendAdminGateway(appServerClient = client)
@@ -206,6 +212,7 @@ internal fun buildDesktopAppServerTurnEngine(
     scope: CoroutineScope,
     eventRouter: AppServerRuntimeEventRouter = AppServerRuntimeEventRouter(),
     turnContextPreflight: TurnContextPreflight = AppServerContextWindowPreflight(client),
+    externalToolRegistry: ExternalToolRegistry? = null,
 ): AppServerTurnEngine {
     // lgns8.22.3: one inbound collector per desktop gateway generation.
     eventRouter.attach(scope, client.events)
@@ -219,6 +226,7 @@ internal fun buildDesktopAppServerTurnEngine(
         permissionMode = AppServerPermissionMode.Unrestricted,
         turnContextPreflight = turnContextPreflight,
         eventRouter = eventRouter,
+        externalToolRegistry = externalToolRegistry,
     )
 }
 
