@@ -16,20 +16,24 @@ import kotlinx.coroutines.flow.asStateFlow
  *   (override the `on*` hooks to forward to the actual renderer);
  * - a test double the app and tests can assert against.
  */
-open class HeadlessAvatarRuntime : AvatarRuntime {
+open class HeadlessAvatarRuntime : AvatarRuntime, AvatarHeadTurn {
     private val _state = MutableStateFlow<AvatarRuntimeState>(AvatarRuntimeState.Idle)
     override val state: StateFlow<AvatarRuntimeState> = _state.asStateFlow()
 
     /** Current expression weights by normalized key (clamped 0..1). */
     val expressionWeights: Map<String, Float> get() = expressions.toMap()
 
-    /** Current viseme weights by normalized key (clamped 0..1). */
-    val visemeWeights: Map<String, Float> get() = visemes.toMap()
-
     var mouthOpen: Float = 0f
         private set
 
     var lookTarget: AvatarLookTarget? = null
+        private set
+
+    /** Last [AvatarHeadTurn] written; 0..0 until the gaze director aims the head. */
+    var headTurnX: Float = 0f
+        private set
+
+    var headTurnY: Float = 0f
         private set
 
     /** Accessory ids currently toggled off (default is enabled). */
@@ -42,7 +46,6 @@ open class HeadlessAvatarRuntime : AvatarRuntime {
         private set
 
     private val expressions = mutableMapOf<String, Float>()
-    private val visemes = mutableMapOf<String, Float>()
     private val disabledAccessories = mutableSetOf<String>()
 
     /**
@@ -59,11 +62,8 @@ open class HeadlessAvatarRuntime : AvatarRuntime {
      */
     protected open suspend fun loadCapabilities(model: AvatarModel): AvatarCapabilities =
         AvatarCapabilities(
-            supportsHumanoid = model.format.isHumanoidProfile,
             supportsExpressions = true,
-            supportsVisemes = true,
             supportsLookAt = true,
-            supportsSpringBones = false,
             supportsEmbeddedAnimations = true,
             supportsAccessories = true,
         )
@@ -127,15 +127,8 @@ open class HeadlessAvatarRuntime : AvatarRuntime {
         onExpressionChanged(expression, clamped)
     }
 
-    override fun setViseme(viseme: AvatarViseme, weight: Float) {
-        if (readyCapabilities()?.supportsVisemes != true) return
-        val clamped = sanitizeWeight(weight)
-        visemes[viseme.key] = clamped
-        onVisemeChanged(viseme, clamped)
-    }
-
     override fun setMouthOpen(value: Float) {
-        if (readyCapabilities()?.supportsVisemes != true) return
+        if (readyCapabilities() == null) return
         mouthOpen = sanitizeWeight(value)
         onMouthOpenChanged(mouthOpen)
     }
@@ -144,6 +137,12 @@ open class HeadlessAvatarRuntime : AvatarRuntime {
         if (readyCapabilities()?.supportsLookAt != true) return
         lookTarget = target
         onLookTargetChanged(target)
+    }
+
+    override fun setHeadTurn(turnX: Float, turnY: Float) {
+        if (readyCapabilities()?.supportsLookAt != true) return
+        headTurnX = if (turnX.isNaN()) 0f else turnX.coerceIn(-1f, 1f)
+        headTurnY = if (turnY.isNaN()) 0f else turnY.coerceIn(-1f, 1f)
     }
 
     override fun playGesture(gesture: AvatarGesture, fadeSeconds: Float) {
@@ -204,9 +203,6 @@ open class HeadlessAvatarRuntime : AvatarRuntime {
     /** Hook for subclasses: an expression weight changed (already clamped). */
     protected open fun onExpressionChanged(expression: AvatarExpression, weight: Float) {}
 
-    /** Hook for subclasses: a viseme weight changed (already clamped). */
-    protected open fun onVisemeChanged(viseme: AvatarViseme, weight: Float) {}
-
     /** Hook for subclasses: the mouth-open level changed (already clamped). */
     protected open fun onMouthOpenChanged(value: Float) {}
 
@@ -227,10 +223,11 @@ open class HeadlessAvatarRuntime : AvatarRuntime {
 
     private fun resetCommandState() {
         expressions.clear()
-        visemes.clear()
         disabledAccessories.clear()
         mouthOpen = 0f
         lookTarget = null
+        headTurnX = 0f
+        headTurnY = 0f
         cameraFraming = AvatarCameraFraming.FULL_BODY
     }
 

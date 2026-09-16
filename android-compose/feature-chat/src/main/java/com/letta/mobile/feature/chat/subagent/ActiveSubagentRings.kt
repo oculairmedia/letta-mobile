@@ -92,14 +92,24 @@ fun ActiveSubagentRings(
     // FAILED rings are always visible.
     val completedRingHolds = remember { mutableStateMapOf<String, Long>() }
 
+    // letta-mobile-l3j5l: track which ids have already been registered as
+    // COMPLETED so the linger timer cannot be refreshed by re-registration.
+    // Without this, a SideEffect-driven clear+re-register cycle resets `ts`
+    // to the freshest `now`, and the ring never expires while the source
+    // still lists the entry as COMPLETED. Lives for the composition's
+    // lifetime (regular non-Snapshot set; writes do not invalidate).
+    val seenAsCompleted = remember { mutableSetOf<String>() }
+
     // letta-mobile-lgns8.26: production chrome is ActiveSubagentRings (the
     // chip bar is preview/test-only). Apply the same reflection hide here.
     val ringCandidates = subagents.filterNot { it.isHiddenReflection() }
 
     SideEffect {
-        // Register new completions
+        // Register new completions exactly once per id. The `seenAsCompleted`
+        // set is what makes the linger window terminate even when the source
+        // keeps the entry in COMPLETED for the whole snapshot.
         for (s in ringCandidates) {
-            if (s.status == ActiveSubagent.Status.COMPLETED && s.id !in completedRingHolds) {
+            if (s.status == ActiveSubagent.Status.COMPLETED && seenAsCompleted.add(s.id)) {
                 completedRingHolds[s.id] = now
             }
         }

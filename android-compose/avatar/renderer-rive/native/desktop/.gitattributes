@@ -1,0 +1,2 @@
+# build-bridge.sh runs under Git Bash on Windows runners, which check out with core.autocrlf=true.
+*.sh text eol=lf

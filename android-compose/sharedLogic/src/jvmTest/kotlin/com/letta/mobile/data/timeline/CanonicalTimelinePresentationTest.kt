@@ -4,6 +4,7 @@ import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageCreateRequest
+import com.letta.mobile.data.model.ReasoningMessage
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
@@ -101,6 +102,29 @@ class CanonicalTimelinePresentationTest {
         assertTrue(coordinator.retire(owner))
     }
 
+    @Test fun reasoningRendersOnceAcrossLiveToSettledHandoff() = runTest {
+        val coordinator = CanonicalTimelineCoordinator(EmptyStore(), NoTransport)
+        val owner = coordinator.acquire(TimelineScope("backend", "conversation"))
+        val presentation = CanonicalTimelinePresentation.open(coordinator, owner, backgroundScope)
+        val fence = coordinator.beginLive(owner)
+        assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(reasoning("private thought", "thought-1"))))
+        assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(assistant("answer", "reply-1"))))
+        assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Done))
+        runCurrent()
+        assertEquals(1, thoughtCount(presentation.live.value))
+
+        presentation.onResidentRows(
+            listOf(
+                row("ledger-thought", 1L, serverId = "thought-1"),
+                row("reply-1", 1L),
+            ),
+        )
+        runCurrent()
+
+        assertEquals(0, thoughtCount(presentation.live.value))
+        presentation.close()
+    }
+
     @Test fun optimisticBubbleStaysSuppressedAcrossTheWholeDrainWindow() = runTest {
         val coordinator = CanonicalTimelineCoordinator(EmptyStore(), NoTransport)
         val owner = coordinator.acquire(TimelineScope("backend", "conversation"))
@@ -150,15 +174,24 @@ class CanonicalTimelinePresentationTest {
     private fun contents(items: List<ChatRenderItem>) =
         items.map { (it as ChatRenderItem.Single).message.content }
 
+    private fun thoughtCount(items: List<ChatRenderItem>) = items.count { item ->
+        (item as? ChatRenderItem.Single)?.message?.isReasoning == true
+    }
+
     /** A settled row as the pager hands it back: identity plus the revision it was read at. */
-    private fun row(identity: String, revision: Long, otid: String = "") = CanonicalTimelinePresentation.Row(
+    private fun row(identity: String, revision: Long, otid: String = "", serverId: String = identity) = CanonicalTimelinePresentation.Row(
         TimelineMessageId(identity), revision,
         ChatRenderItem.Single(UiMessage(identity, "assistant", "settled", timestamp = ""), GroupPosition.None),
         otid = otid,
+        serverId = serverId,
     )
 
     private fun assistant(content: String, id: String) = AssistantMessage(
         id = id, contentRaw = kotlinx.serialization.json.JsonPrimitive(content), date = "2026-01-01T00:00:00Z",
+    )
+
+    private fun reasoning(content: String, id: String) = ReasoningMessage(
+        id = id, reasoning = content, date = "2026-01-01T00:00:00Z",
     )
 
     private fun echo(content: String, id: String, otid: String) = UserMessage(

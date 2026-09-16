@@ -153,6 +153,8 @@ internal data class DesktopAgentRailFocus(
     val selectedAgentId: String?,
     val thinkingAgentId: String?,
     val avatarStyleByAgentId: Map<String, Int>,
+    /** Agents with a mascot identity draw their silhouette in their colour instead of the gradient orb. */
+    val identityByAgentId: Map<String, com.letta.mobile.avatar.core.MascotIdentity> = emptyMap(),
 )
 
 @Immutable
@@ -188,8 +190,12 @@ internal fun DesktopAgentRail(
     // "Agent <short-id>" placeholder share nothing, and stacking them hides
     // every member but one behind an orb that cannot select them. Only a real,
     // shared name means "same fleet".
-    val groups = remember(state.agents) {
+    // The selected agent is already on screen as the composer companion; listing it here too
+    // draws the same mascot twice. It leaves the rail while selected and returns on switch.
+    val selectedAgentId = state.focus.selectedAgentId
+    val groups = remember(state.agents, selectedAgentId) {
         state.agents
+            .filter { (id, _) -> id != selectedAgentId }
             .groupBy { (id, name) -> if (DisplayNames.isAgentFallback(name)) id else name }
             .map { (_, members) ->
                 AgentRailGroup(name = members.first().second, agentIds = members.map { it.first })
@@ -442,17 +448,11 @@ private fun ExpandedAgentRow(params: AgentRailOrbParams) {
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Box(contentAlignment = Alignment.Center) {
-            if (flags.thinking) {
+            // A live mascot shows thinking itself; the ring is for the gradient orb only.
+            if (flags.thinking && target.identity == null) {
                 ThinkingRing(diameter = 32.dp)
             }
-            AgentOrb(index = target.orbStyle, size = 28.dp, cornerRadius = 8.dp) {
-                Text(
-                    text = params.group.name.firstOrNull()?.uppercase() ?: "?",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.White,
-                )
-            }
+            RailAgentTile(target = target, initial = params.group.name.firstOrNull()?.uppercase() ?: "?", size = 40.dp, cornerRadius = 10.dp)
         }
         Text(
             text = params.group.name,
@@ -506,7 +506,7 @@ private fun ColumnScope.AgentRailOrbList(
         // so this spacing is ON TOP of that: 4dp here is an 8dp gap between
         // adjacent orbs. The slot itself stays 34dp — the thinking ring is
         // exactly that size, so shrinking the slot would crowd it.
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         itemsIndexed(groups, key = { _, group -> "orb-${group.name}" }) { index, group ->
             AgentRailOrb(
@@ -560,6 +560,7 @@ private data class AgentRailOrbTarget(
     val agentId: String,
     val orbStyle: Int,
     val tooltip: String,
+    val identity: com.letta.mobile.avatar.core.MascotIdentity? = null,
 )
 
 private fun AgentRailOrbParams.toFlags(): AgentRailOrbFlags {
@@ -584,7 +585,8 @@ private fun AgentRailOrbParams.toTarget(flags: AgentRailOrbFlags): AgentRailOrbT
         if (flags.count > 1) append(" · ${flags.count} agents")
         if (flags.thinking) append(" · thinking…")
     }
-    return AgentRailOrbTarget(agentId = targetAgentId, orbStyle = orbStyle, tooltip = tooltip)
+    val identity = group.agentIds.firstNotNullOfOrNull { focus.identityByAgentId[it] }
+    return AgentRailOrbTarget(agentId = targetAgentId, orbStyle = orbStyle, tooltip = tooltip, identity = identity)
 }
 
 @Composable
@@ -607,32 +609,41 @@ private fun AgentRailOrbContent(
     target: AgentRailOrbTarget,
 ) {
     Box(
-        modifier = Modifier.size(width = 46.dp, height = 34.dp),
+        // Square slot for a square tile (it was 46x34 for the old 30 dp orbs).
+        modifier = Modifier.size(width = 48.dp, height = 44.dp),
         contentAlignment = Alignment.Center,
     ) {
         if (flags.selected) {
             SelectedAgentRailMarker(modifier = Modifier.align(Alignment.CenterStart))
         }
-        if (flags.thinking) {
+        if (flags.thinking && target.identity == null) {
             // Concentric with the 30dp orb (2dp gap) and sized to fit the
             // slot so it doesn't crowd neighbouring orbs.
             ThinkingRing(diameter = 34.dp)
         }
-        AgentOrb(
-            index = target.orbStyle,
-            size = 30.dp,
+        RailAgentTile(
+            target = target,
+            initial = params.group.name.firstOrNull()?.uppercase() ?: "?",
+            size = 40.dp,
             onClick = { params.onAgentSelected(target.agentId) },
-        ) {
-            Text(
-                text = params.group.name.firstOrNull()?.uppercase() ?: "?",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = Color.White,
-            )
-        }
+        )
         // No member-count chip on stacked orbs: PM groups aggregate hundreds
         // of spawns, so every orb wore a meaningless "99+". The tooltip still
         // reports the exact count for anyone who cares.
+    }
+}
+
+/** A rail slot: [AgentOrb] with the agent id, so it is the mascot when the agent has an identity. */
+@Composable
+private fun RailAgentTile(
+    target: AgentRailOrbTarget,
+    initial: String,
+    size: androidx.compose.ui.unit.Dp,
+    cornerRadius: androidx.compose.ui.unit.Dp = 7.dp,
+    onClick: (() -> Unit)? = null,
+) {
+    AgentOrb(index = target.orbStyle, size = size, cornerRadius = cornerRadius, onClick = onClick, agentId = target.agentId) {
+        Text(text = initial, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = Color.White)
     }
 }
 

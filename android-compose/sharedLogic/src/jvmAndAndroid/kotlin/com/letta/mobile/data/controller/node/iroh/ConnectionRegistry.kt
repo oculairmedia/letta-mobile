@@ -20,6 +20,13 @@ interface ViewerHandle {
      * registry/fanout can de-register a dead viewer.
      */
     suspend fun writeFrame(frame: String): Boolean
+
+    /**
+     * Whether this connection may receive device-wide `agent_updated` pushes, which name agents: the
+     * peer must be allowed to read them. Evaluated at send time, so a peer whose grants change stops
+     * receiving. Default: no.
+     */
+    fun receivesAgentEvents(): Boolean = false
 }
 
 /** Opaque ownership token for one canonical endpoint connection generation. */
@@ -99,6 +106,11 @@ class ConnectionRegistry {
     /** Snapshot of viewers for a conversation (defensive copy — safe to iterate + write outside the lock). */
     suspend fun viewersFor(conversationId: String): Set<ViewerHandle> = mutex.withLock {
         viewersByConversation[conversationId]?.values?.mapTo(linkedSetOf()) { it.viewer } ?: emptySet()
+    }
+
+    /** Snapshot of every live connection's current handle, for device-wide broadcasts. */
+    suspend fun connections(): List<ViewerHandle> = mutex.withLock {
+        activeByEndpoint.values.map { it.viewer }
     }
 
     /** Test/telemetry: total distinct conversations currently viewed. */

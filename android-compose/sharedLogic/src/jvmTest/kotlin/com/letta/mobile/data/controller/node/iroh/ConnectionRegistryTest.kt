@@ -17,6 +17,60 @@ class ConnectionRegistryTest {
         override suspend fun writeFrame(frame: String): Boolean = true
     }
 
+    private class BroadcastViewer(
+        override val connectionId: String,
+        private val capabilities: Set<String>,
+        private val writable: Boolean = true,
+    ) : ViewerHandle {
+        val frames = mutableListOf<String>()
+        override suspend fun writeFrame(frame: String): Boolean = writable.also { if (it) frames += frame }
+        override fun receivesAgentEvents(): Boolean = IrohPeerCapabilities.CHAT_READ in capabilities
+    }
+
+    @Test
+    fun broadcastReachesOnlyLiveConnectionsHoldingTheCapability() = runTest {
+        val registry = ConnectionRegistry()
+        val reader = BroadcastViewer("endpoint-reader", setOf(IrohPeerCapabilities.CHAT_READ))
+        val unauthorised = BroadcastViewer("endpoint-other", emptySet())
+        val dead = BroadcastViewer("endpoint-dead", setOf(IrohPeerCapabilities.CHAT_READ), writable = false)
+        val released = BroadcastViewer("endpoint-gone", setOf(IrohPeerCapabilities.CHAT_READ))
+        listOf(reader, unauthorised, dead).forEach { registry.claim(it) }
+        registry.release(registry.claim(released))
+
+        val result = registry.broadcast("""{"type":"agent_updated"}""") { it.receivesAgentEvents() }
+
+        assertEquals(BroadcastResult(recipients = 2, delivered = 1), result)
+        assertEquals(1, reader.frames.size)
+        assertTrue(unauthorised.frames.isEmpty(), "a peer without agent-read must not learn agent ids")
+        assertTrue(released.frames.isEmpty(), "a closed connection is not a recipient")
+    }
+
+    @Test
+    fun aSlowConnectionDoesNotHoldUpBroadcastToTheOthers() = runTest {
+        val registry = ConnectionRegistry()
+        val slowWrite = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val slow = object : ViewerHandle {
+            override val connectionId = "endpoint-slow"
+            override suspend fun writeFrame(frame: String): Boolean = slowWrite.await().let { true }
+            override fun receivesAgentEvents() = true
+        }
+        val fast = BroadcastViewer("endpoint-fast", setOf(IrohPeerCapabilities.CHAT_READ))
+        registry.claim(slow)
+        registry.claim(fast)
+
+        val result = async { registry.broadcast("frame") { it.receivesAgentEvents() } }
+        testScheduler.runCurrent()
+
+        assertEquals(listOf("frame"), fast.frames, "the fast connection is written while the slow one is still blocked")
+        slowWrite.complete(Unit)
+        assertEquals(BroadcastResult(recipients = 2, delivered = 2), result.await())
+    }
+
+    @Test
+    fun theDefaultViewerHandleReceivesNoBroadcasts() {
+        assertFalse(FakeViewer("endpoint-a").receivesAgentEvents())
+    }
+
     @Test
     fun distinctCanonicalEndpointsNeverCollapseEvenWithSharedPrefix() = runTest {
         val registry = ConnectionRegistry()

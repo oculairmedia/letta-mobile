@@ -55,7 +55,12 @@ import com.letta.mobile.desktop.DesktopDefaultButton
 import com.letta.mobile.desktop.DesktopButtonContent
 import com.letta.mobile.desktop.DesktopTextArea
 import com.letta.mobile.desktop.DesktopTextField
-import com.letta.mobile.desktop.chat.AgentOrb
+import com.letta.mobile.avatar.core.MascotIdentity
+import com.letta.mobile.ui.mascot.MascotPicker
+import com.letta.mobile.ui.mascot.resolveMascotIdentity
+import com.letta.mobile.ui.mascot.withinAgentMetadata
+import kotlinx.serialization.json.JsonElement
+import com.letta.mobile.ui.mascot.MascotShapeGlyph
 import com.letta.mobile.desktop.memory.DesktopBlockApi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
@@ -67,7 +72,6 @@ import org.jetbrains.jewel.ui.component.PopupMenu as JewelPopupMenu
 
 private val ToneOptions = listOf("Concise", "Friendly", "Technical", "Mentor", "Playful", "Formal")
 private val VoiceOptions = listOf("Caring", "Neutral", "Warm", "Energetic", "Calm", "Direct")
-private const val AvatarStyleCount = 6
 
 // Core-memory block labels the editor reads/writes. Persona is the standard
 // Letta persona block; the rest are app-defined labelled blocks so the values
@@ -105,11 +109,11 @@ internal fun DesktopEditAgentSurface(
     settings: SecureSettingsStore,
     scope: CoroutineScope,
     onClose: () -> Unit,
-    onSaved: (avatarStyle: Int, nameChanged: Boolean) -> Unit,
+    onSaved: (identity: MascotIdentity, nameChanged: Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var name by remember(agentId) { mutableStateOf("") }
-    var avatarStyle by remember(agentId) { mutableStateOf(0) }
+    var identity by remember(agentId) { mutableStateOf(MascotIdentity.DEFAULT) }
     var persona by remember(agentId) { mutableStateOf("") }
     var tone by remember(agentId) { mutableStateOf<String?>(null) }
     var customInstructions by remember(agentId) { mutableStateOf("") }
@@ -133,6 +137,8 @@ internal fun DesktopEditAgentSurface(
     var loadedTone by remember(agentId) { mutableStateOf<String?>(null) }
     var loadedInstructions by remember(agentId) { mutableStateOf("") }
     var loadedInterests by remember(agentId) { mutableStateOf("") }
+    var loadedIdentity by remember(agentId) { mutableStateOf<MascotIdentity?>(null) }
+    var loadedMetadata by remember(agentId) { mutableStateOf<Map<String, JsonElement>?>(null) }
 
     LaunchedEffect(agentId) {
         // Fetch fresh — the flow's last emission re-fetches and refreshes the
@@ -157,7 +163,12 @@ internal fun DesktopEditAgentSurface(
             interests.clear()
             b?.value?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }?.let { interests.addAll(it) }
         }
-        avatarStyle = settings.getString(agentAvatarStyleKey(agentId))?.toIntOrNull()?.coerceIn(0, AvatarStyleCount - 1) ?: 0
+        // The agent's own identity (its metadata - the same field mobile writes) first, then this
+        // machine's cached / legacy setting, else the one generated from the agent id - the mascot the
+        // agent already shows everywhere. Loading it is not a change, so opening the editor saves nothing.
+        loadedIdentity = resolveMascotIdentity(agentId, agent, settings.getString(agentAvatarStyleKey(agentId)))
+        loadedMetadata = agent.metadata
+        identity = loadedIdentity ?: MascotIdentity.DEFAULT
         voice = settings.getString(agentVoiceKey(agentId))?.takeIf { it in VoiceOptions } ?: VoiceOptions.first()
         loadedName = name
         loadedModel = modelValue
@@ -209,6 +220,16 @@ internal fun DesktopEditAgentSurface(
                                 Unit
                             },
                         )
+                        // The mascot identity lives on the agent so every client shows the same one.
+                        if (identity != loadedIdentity) add(
+                            async {
+                                agentRepository.updateAgent(
+                                    AgentId(agentId),
+                                    AgentUpdateParams(metadata = identity.withinAgentMetadata(loadedMetadata)),
+                                )
+                                Unit
+                            },
+                        )
                         if (persona != loadedPersona) add(async { personaBlockId = upsertBlock(PersonaLabel, persona, personaBlockId) })
                         if (tone != loadedTone) add(async { toneBlockId = upsertBlock(ToneLabel, tone.orEmpty(), toneBlockId) })
                         if (customInstructions.trim() != loadedInstructions.trim()) {
@@ -219,11 +240,11 @@ internal fun DesktopEditAgentSurface(
                         }
                     }.awaitAll()
                 }
-                // Display-only config stays local (and out of the context window).
-                settings.putString(agentAvatarStyleKey(agentId), avatarStyle.toString())
+                // Local cache of the identity (offline / pre-refresh); the voice stays local.
+                settings.putString(agentAvatarStyleKey(agentId), identity.encode())
                 settings.putString(agentVoiceKey(agentId), voice)
             }
-                .onSuccess { onSaved(avatarStyle, nameChanged) }
+                .onSuccess { onSaved(identity, nameChanged) }
                 .onFailure { error = it.message ?: "Save failed"; busy = false }
         }
     }
@@ -276,32 +297,25 @@ internal fun DesktopEditAgentSurface(
                 ) {
             // Avatar + Name
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.Top) {
-                AgentOrb(index = avatarStyle, size = 64.dp, cornerRadius = 12.dp)
-                LabeledSection("Name", accent, Modifier.weight(1f)) {
-                    DesktopTextField(value = name, onValueChange = { name = it }, modifier = Modifier.fillMaxWidth())
-                }
-            }
-
-            // Avatar style swatches
-            LabeledSection("Avatar style", accent) {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    repeat(AvatarStyleCount) { i ->
-                        val selected = i == avatarStyle
-                        Box(
-                            modifier = Modifier
-                                .size(34.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .border(
-                                    width = if (selected) 2.dp else 0.dp,
-                                    color = if (selected) accent else Color.Transparent,
-                                    shape = RoundedCornerShape(8.dp),
-                                )
-                                .clickable { avatarStyle = i }
-                                .padding(if (selected) 3.dp else 0.dp),
-                        ) {
-                            AgentOrb(index = i, size = if (selected) 28.dp else 34.dp, cornerRadius = 6.dp)
+                // The avatar is the picker: click it, choose shape and colour in a popover.
+                var pickerOpen by remember { mutableStateOf(false) }
+                Box(
+                    Modifier.size(72.dp).clip(RoundedCornerShape(16.dp)).clickable { pickerOpen = true },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (com.letta.mobile.ui.mascot.LocalMascotHost.current.entry(agentId, identity) != null) {
+                        com.letta.mobile.ui.mascot.MascotLive(agentId = agentId, identity = identity, size = 110.dp)
+                    } else {
+                        MascotShapeGlyph(identity.shape, identity.argb, 64.dp)
+                    }
+                    androidx.compose.material3.DropdownMenu(expanded = pickerOpen, onDismissRequest = { pickerOpen = false }) {
+                        Box(Modifier.padding(12.dp)) {
+                            MascotPicker(identity = identity, onChange = { identity = it }, accent = accent)
                         }
                     }
+                }
+                LabeledSection("Name", accent, Modifier.weight(1f)) {
+                    DesktopTextField(value = name, onValueChange = { name = it }, modifier = Modifier.fillMaxWidth())
                 }
             }
 

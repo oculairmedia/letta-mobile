@@ -2,3 +2,6 @@ name: mascot
 logs:
   file: build/rive.log
   problems: build/problems.log
+push:
+  projectId: 1882737
+  fileId: 2578084

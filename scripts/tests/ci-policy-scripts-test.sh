@@ -13,6 +13,13 @@ assert_not_contains() { [[ "$1" != *"$2"* ]] || fail "expected output not to con
 # Keep the required Android jobs fanned out. Reintroducing a dependency from
 # build-apk to test adds the full test duration to the workflow critical path.
 android_workflow="$SOURCE_ROOT/.github/workflows/android.yml"
+# Required Android/perf workflows must report on Cloud Agent stacked feat/**
+# and cursor/** PRs, not only main and letta/**. pull_request.branches filters
+# the PR base. Missing these patterns is why stacked reviews never got
+# test / build-apk-pass / shared-multiplatform / perf-gate.
+android_workflow_text="$(<"$android_workflow")"
+assert_contains "$android_workflow_text" '- "feat/**"'
+assert_contains "$android_workflow_text" '- "cursor/**"'
 build_apk_job="$(
   awk '
     /^  build-apk:$/ { in_job = 1; next }
@@ -38,10 +45,17 @@ assert_contains "$test_job" 'Run Android verification task graph'
 assert_contains "$test_job" ':app:compileSideloadDebugKotlin'
 assert_not_contains "$test_job" ':app:compileRootDebugKotlin'
 assert_not_contains "$test_job" ':app:compilePlayDebugKotlin'
+# Stacked PRs must diff additive modules against the GitHub PR base. Diffing
+# vs origin/main re-runs lower-stack modules and lets unrelated flakes fail
+# required `test` (StreamingMarkdownRecompositionGateTest on #1556).
+assert_contains "$test_job" 'github.event.pull_request.base.sha'
+assert_not_contains "$test_job" 'changed-gradle-modules.sh origin/main'
 gradle_invocations="$(grep -Ec '^[[:space:]]*\./gradlew ' <<<"$test_job")"
 assert_eq "$gradle_invocations" '1'
 
 perf_workflow="$(<"$SOURCE_ROOT/.github/workflows/android-perf.yml")"
+assert_contains "$perf_workflow" '- "feat/**"'
+assert_contains "$perf_workflow" '- "cursor/**"'
 assert_contains "$perf_workflow" 'cache-read-only: ${{ github.event_name =='
 assert_contains "$perf_workflow" '  perf-gate:'
 assert_contains "$perf_workflow" 'Classify performance impact'
@@ -129,6 +143,16 @@ touch "$repo/android-compose/feature-chat/src/Chat.kt" "$repo/android-compose/de
 git -C "$repo" add . && git -C "$repo" commit -qm modules
 actual="$(bash "$repo/scripts/ci/changed-gradle-modules.sh" "$base")"
 assert_eq "$actual" ":feature-chat:testDebugUnitTest :designsystem:testDebugUnitTest :desktop:test :cli:testDebugUnitTest"
+
+# Stacked PR: designsystem landed on the lower branch; this commit only
+# touches app/. Diff vs the stack base must not schedule designsystem.
+mkdir -p "$repo/android-compose/app/src"
+stack_base="$(git -C "$repo" rev-parse HEAD)"
+touch "$repo/android-compose/app/src/Conversations.kt"
+git -C "$repo" add . && git -C "$repo" commit -qm stacked-app-only
+actual="$(bash "$repo/scripts/ci/changed-gradle-modules.sh" "$stack_base")"
+assert_eq "$actual" ""
+git -C "$repo" reset --hard "$stack_base" -q
 
 mkdir -p "$repo/android-compose/feature-editagent/src"
 git -C "$repo" mv "$repo/android-compose/feature-chat/src/Chat.kt" "$repo/android-compose/feature-editagent/src/Editor.kt"

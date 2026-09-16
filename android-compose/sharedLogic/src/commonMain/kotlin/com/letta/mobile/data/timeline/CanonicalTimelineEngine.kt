@@ -477,16 +477,52 @@ class CanonicalTimelineEngine(
         event: TimelineEvent.Confirmed,
     ): Boolean = mutex.withLock {
         if (selection !== mutablePublication.value.selection) return@withLock true
+        store.read(selection.scope) { isSuppressed(identity, revision, event) }
+    }
+
+    /**
+     * Builds one bounded settled page while holding both the engine generation fence and one storage
+     * snapshot. Presentation and its suppression evidence cannot be split by a concurrent writer.
+     */
+    suspend fun preparePage(
+        selection: TimelineEngineSelection,
+        position: TimelineReadPosition,
+        maxRows: Int,
+        ownAgentId: String?,
+        adapter: TimelineSettledProjectionAdapter,
+    ): TimelinePreparedPage = mutex.withLock {
+        check(selection === mutablePublication.value.selection) { "Stale selection" }
+        require(maxRows > 0)
         store.read(selection.scope) {
-            require(revision <= checkpoint().revision) { "Future presentation revision" }
-            val exact = writer as? TimelineExactCanonicalWriter ?: error("Exact writer required")
-            val canonical = exact.canonicalIdentity(this, event.serverId, event.otid)
-            require(identity == canonical) { "Suppression identity mismatch" }
-            val bytes = evidence("suppression/server/${identity.value}", 64 * 1024)
-            event.messageType == TimelineMessageType.ASSISTANT && bytes != null &&
-                TimelineSnapshotCodec.json.decodeFromString(AbandonedAssistantFragmentSuppression.serializer(), bytes.decodeToString()) ==
-                event.toAbandonedAssistantFragmentSuppression()
+            val page = TimelineBoundedReader(store).run {
+                preview(position, budget.copy(maxMetadataRows = minOf(maxRows, budget.maxMetadataRows)))
+            }
+            val records = page.metadata.rows.zip(page.bodies) { metadata, body ->
+                TimelineSettledRecord(metadata.key, metadata.contentType, body, page.metadata.revision, metadata.body)
+            }.map { record ->
+                val presentation = record.presentationWithAdapter(ownAgentId, adapter)
+                val prepared = if (presentation is TimelineSettledPresentation.Render &&
+                    isSuppressed(record.key.identity, record.revision, presentation.event)
+                ) TimelineSettledPresentation.Drop else presentation
+                record.copy(preparedPresentation = prepared)
+            }
+            TimelinePreparedPage(page.metadata, records)
         }
+    }
+
+    private suspend fun TimelineStoreReader.isSuppressed(
+        identity: TimelineMessageId,
+        revision: Long,
+        event: TimelineEvent.Confirmed,
+    ): Boolean {
+        require(revision <= checkpoint().revision) { "Future presentation revision" }
+        val exact = writer as? TimelineExactCanonicalWriter ?: error("Exact writer required")
+        val canonical = exact.canonicalIdentity(this, event.serverId, event.otid)
+        require(identity == canonical) { "Suppression identity mismatch" }
+        val bytes = evidence("suppression/server/${identity.value}", 64 * 1024)
+        return event.messageType == TimelineMessageType.ASSISTANT && bytes != null &&
+            TimelineSnapshotCodec.json.decodeFromString(AbandonedAssistantFragmentSuppression.serializer(), bytes.decodeToString()) ==
+            event.toAbandonedAssistantFragmentSuppression()
     }
 
     /** Suppress exact abandoned tail fragments without deleting their raw durable bodies. */

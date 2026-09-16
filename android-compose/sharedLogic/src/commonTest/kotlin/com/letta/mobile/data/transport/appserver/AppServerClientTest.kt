@@ -50,6 +50,45 @@ class AppServerClientTest {
     }
 
     @Test
+    fun inputWithRequestIdAwaitsItsInputAcceptedAndIgnoresOthers() = runTest {
+        val transport = FakeAppServerTransport()
+        val client = DefaultAppServerClient(transport, parentScope = backgroundScope, requestTimeoutMs = 1_000)
+        val input = AppServerCommand.Input(
+            runtime = runtime,
+            payload = AppServerInputPayload.CreateMessage(listOf(AppServerInputMessage.userText("hi"))),
+            requestId = "input-1",
+        )
+
+        val accepted = backgroundScope.async { client.inputAwaitingAcceptance(input) }
+        runCurrent()
+
+        assertEquals("input-1", assertIs<AppServerCommand.Input>(transport.sentControlCommands.single()).requestId)
+        transport.emitControl(AppServerInboundFrame.InputAccepted("other", runtime, accepted = true, disposition = "started"))
+        transport.emitControl(AppServerInboundFrame.InputAccepted("input-1", runtime, accepted = true, disposition = "queued"))
+
+        val ack = accepted.await()
+        assertEquals(true, ack.accepted)
+        assertEquals(true, ack.queued)
+    }
+
+    @Test
+    fun awaitingAcceptanceRequiresARequestIdAndPlainInputStillSendsWithout() = runTest {
+        val transport = FakeAppServerTransport()
+        val client = DefaultAppServerClient(transport, parentScope = backgroundScope, requestTimeoutMs = 1_000)
+        val input = AppServerCommand.Input(
+            runtime = runtime,
+            payload = AppServerInputPayload.CreateMessage(listOf(AppServerInputMessage.userText("hi"))),
+        )
+
+        assertFailsWith<IllegalArgumentException> { client.inputAwaitingAcceptance(input) }
+        client.input(input)
+        client.changeDeviceState(AppServerCommand.ChangeDeviceState(runtime, AppServerDeviceStatePayload(mode = AppServerPermissionMode.Strict)))
+
+        assertEquals(null, assertIs<AppServerCommand.Input>(transport.sentControlCommands[0]).requestId)
+        assertIs<AppServerCommand.ChangeDeviceState>(transport.sentControlCommands[1])
+    }
+
+    @Test
     fun generationIsNotPoisonedWhenTransportStartsDisconnected() = runTest {
         // Regression: the init disconnect-watcher used `dropWhile { it }`, but the
         // real transport's isConnected StateFlow starts `false`, so the watcher

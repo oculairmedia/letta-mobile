@@ -51,6 +51,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.stateIn
@@ -132,9 +133,11 @@ internal fun resolveLocalRuntimeRouting(
 internal fun chatFontScaleState(
     scales: Flow<Float>,
     scope: CoroutineScope,
-): StateFlow<Float?> = scales
-    .map<Float, Float?> { it }
-    .stateIn(scope, SharingStarted.WhileSubscribed(5000), null)
+): MutableStateFlow<Float?> = MutableStateFlow<Float?>(null).also { current ->
+    // Storage seeds the current zoom once; later disk emissions cannot roll back a gesture.
+    // Unknown remains null until loaded, and an early local choice wins over a late read.
+    scope.launch { current.compareAndSet(null, scales.first()) }
+}
 
 @HiltViewModel
 internal class AdminChatViewModel @Inject constructor(
@@ -161,6 +164,9 @@ internal class AdminChatViewModel @Inject constructor(
         AttachmentLimits.Default,
     private val pagingHost: ChatPagingHost = ChatPagingHost(),
     private val selectedRuntimeProvider: com.letta.mobile.feature.chat.coordination.SelectedChatRuntimeProvider? = null,
+    /** App-wide run state; this screen publishes its conversation here for the lists and the mascots. */
+    private val runRegistry: com.letta.mobile.data.presence.ConversationRunRegistry =
+        com.letta.mobile.data.presence.ConversationRunRegistry(),
 ) : ViewModel() {
     companion object {
         private const val RESUME_CACHE_MAX_AGE_MS = 60_000L
@@ -513,10 +519,11 @@ internal class AdminChatViewModel @Inject constructor(
         .map { ChatBackground.fromKey(it) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ChatBackground.Default)
 
-    val chatFontScale: StateFlow<Float?> = chatFontScaleState(
+    private val currentChatFontScale = chatFontScaleState(
         settingsRepository.getChatFontScale(),
         viewModelScope,
     )
+    val chatFontScale: StateFlow<Float?> = currentChatFontScale
 
     // Master switch for the expressive Jindong activity haptics (streaming +
     // tool-call pattern cues). Default-on; gates the new ChatScreen effects.
@@ -579,8 +586,12 @@ internal class AdminChatViewModel @Inject constructor(
     fun clearChatSearch() = chatSearchCoordinator.clear()
 
     fun setChatFontScale(scale: Float) {
+        if (!scale.isFinite()) return
+        val clamped = scale.coerceIn(0.7f, 1.6f)
+        if (currentChatFontScale.value == clamped) return
+        currentChatFontScale.value = clamped
         viewModelScope.launch {
-            settingsRepository.setChatFontScale(scale)
+            settingsRepository.setChatFontScale(clamped)
         }
     }
 
@@ -993,6 +1004,7 @@ internal class AdminChatViewModel @Inject constructor(
     fun onScreenResumed() = screenLifecycleCoordinator.onScreenResumed()
 
     override fun onCleared() {
+        publishedRunKey?.let(runRegistry::clear)
         abandonTimelineObserver()
         adminChatA2uiCoordinator.release()
         screenLifecycleCoordinator.onCleared()
@@ -1052,5 +1064,36 @@ internal class AdminChatViewModel @Inject constructor(
         adminChatA2uiCoordinator
         sendPipeline.ensureEagerInit()
         chatSessionInitializer.run()
+        publishRunState()
+    }
+
+    /** The registry key for this screen's conversation; the agent stands in until the conversation has an id. */
+    private var publishedRunKey: String? = null
+
+    /**
+     * Publishes this conversation's run to the app-wide registry on every change: busy from send
+     * to terminal (the streaming flag covers the run, the typing dots the gaps before the first
+     * token and between tool phases), tokens when streaming without the dots, typing while the
+     * composer holds text, error while the last attempt failed. The chat's own screen and every
+     * other surface (the conversation list, the mascots) read presence from that one place.
+     */
+    private fun publishRunState() {
+        viewModelScope.launch {
+            kotlinx.coroutines.flow.combine(uiState, composerState) { ui, composer ->
+                val key = conversationId?.value ?: "agent:${agentId.value}"
+                com.letta.mobile.data.presence.ConversationRunState(
+                    conversationId = key,
+                    agentId = agentId.value,
+                    running = ui.isStreaming || ui.isAgentTyping,
+                    streamingTokens = ui.isStreaming && !ui.isAgentTyping,
+                    userTyping = composer.inputText.isNotBlank(),
+                    error = ui.error != null,
+                )
+            }.collect { state ->
+                publishedRunKey?.takeIf { it != state.conversationId }?.let(runRegistry::clear)
+                publishedRunKey = state.conversationId
+                runRegistry.publish(state)
+            }
+        }
     }
 }

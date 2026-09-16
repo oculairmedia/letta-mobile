@@ -30,6 +30,7 @@ import com.letta.mobile.data.repository.api.ISubagentRepository
 import com.letta.mobile.data.repository.api.IToolRepository
 import com.letta.mobile.data.repository.api.IVibesyncEventStreamRepository
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
+import com.letta.mobile.data.repository.iroh.IrohAgentRepository
 import com.letta.mobile.data.repository.iroh.buildIrohAdminReadRepositories
 import com.letta.mobile.data.session.DEFAULT_REMOTE_LETTA_URL
 import com.letta.mobile.data.session.DefaultSessionRepositoryGraphProvider
@@ -210,7 +211,17 @@ class DesktopRepositoryAdapters(
         null
     }
     private val adminRepositories = buildHttpAdminRepositories(config, irohMode)
+    private val transportBoundJob = SupervisorJob()
+    private val transportBoundScope = CoroutineScope(transportBoundJob + Dispatchers.Default)
     private val irohRepositories = buildIrohRepositories(irohMode, irohAgentDirectoryProvider)
+
+    // The Iroh agent roster follows Meridian's agent_updated pushes (and refreshes on reconnect) on
+    // the transport-bound scope, so changes made on another device show without a restart.
+    private val irohAgentRepository = if (irohMode) {
+        IrohAgentRepository(irohAgentDirectoryProvider, channelTransport, transportBoundScope)
+    } else {
+        null
+    }
     private val irohAdminReads = if (irohMode) {
         buildIrohAdminReadRepositories(
             channelTransport = channelTransport,
@@ -219,8 +230,6 @@ class DesktopRepositoryAdapters(
     } else {
         null
     }
-    private val transportBoundJob = SupervisorJob()
-    private val transportBoundScope = CoroutineScope(transportBoundJob + Dispatchers.Default)
     private val boundCronRepository = CronRepository(channelTransport, transportBoundScope)
     private val boundSelfTodoRepository = SelfTodoRepository(channelTransport, transportBoundScope)
     private val boundSubagentRepository = SubagentRepository(
@@ -238,7 +247,7 @@ class DesktopRepositoryAdapters(
     )
 
     val agentRepository: IAgentRepository = localRepositories?.agentRepository
-        ?: selectIrohOrHttp(irohRepositories?.agentRepository, adminRepositories)
+        ?: selectIrohOrHttp(irohAgentRepository, adminRepositories)
     val blockRepository: IAgentBlockRepository = localRepositories?.blockRepository
         ?: selectIrohOrHttp(irohRepositories?.blockRepository, adminRepositories)
     val archiveRepository: IArchiveRepository =

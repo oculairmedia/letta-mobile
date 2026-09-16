@@ -47,6 +47,36 @@ class ChatSessionReducerTest {
         assertEquals(4, empty.selectionGeneration)
     }
 
+    /**
+     * letta-mobile-rgn9u: the whole timeline flashed on every reconcile. The generation is the
+     * timeline observer's selection identity — a bump retires the live presentation, publishes an
+     * "opening" placeholder over the list and rebuilds the LazyColumn from a new composition
+     * identity. Hydration, remote-load completion and the post-send resolve all re-publish the
+     * conversation the user is already reading, so an unconditional bump made that teardown happen
+     * at every one of the reconcile points the bug report names. Re-publishing the same selection
+     * must be inert.
+     */
+    @Test
+    fun republishingTheSelectedConversationKeepsItsGenerationAndMessages() {
+        val messages = mapOf("a" to listOf(message("a-message", "a")))
+        val live = ChatSessionState(
+            conversations = listOf(conversation("a")),
+            selectedConversationId = "a",
+            messagesByConversationId = messages,
+            selectionGeneration = 7,
+        )
+
+        val republished = ChatSessionReducer.conversationsLoaded(live, listOf(conversation("a")))
+        val switched = ChatSessionReducer.conversationsLoaded(live, listOf(conversation("b")))
+
+        assertEquals(7, republished.selectionGeneration)
+        assertEquals(messages, republished.messagesByConversationId)
+        assertEquals(ChatConnectionState.Live, republished.connectionState)
+        // A real selection change is still a new generation, and drops the other conversation's rows.
+        assertEquals(8, switched.selectionGeneration)
+        assertTrue(switched.messagesByConversationId.isEmpty())
+    }
+
     @Test
     fun groupsConversationsByAgentNameForNavigation() {
         val groups = groupConversationsByAgentName(

@@ -52,6 +52,14 @@ object ChatSessionReducer {
             errorMessage = errorMessage,
         )
 
+    /**
+     * letta-mobile-rgn9u: the generation is the timeline observer's identity for its
+     * selection, so bumping it retires the live presentation and rebuilds the whole list.
+     * Re-publishing the conversation the user is already reading — which every hydration,
+     * remote-load completion and post-send resolve does — must therefore leave the
+     * generation, and the messages already on screen, exactly where they are. Only an
+     * actual change of selected conversation is a new generation.
+     */
     fun conversationsLoaded(
         state: ChatSessionState,
         conversations: List<ChatConversationSummary>,
@@ -59,10 +67,15 @@ object ChatSessionReducer {
         emptyStatusMessage: String = "No conversations",
     ): ChatSessionState {
         val selectedId = conversations.firstOrNull()?.id
+        val selectionChanged = selectedId != null && selectedId != state.selectedConversationId
         return state.copy(
             conversations = conversations,
             selectedConversationId = selectedId,
-            messagesByConversationId = emptyMap(),
+            messagesByConversationId = if (selectionChanged || selectedId == null) {
+                emptyMap()
+            } else {
+                state.messagesByConversationId
+            },
             composer = ChatComposerState(),
             isLoading = false,
             isSending = false,
@@ -76,10 +89,10 @@ object ChatSessionReducer {
             },
             statusMessage = if (conversations.isEmpty()) emptyStatusMessage else liveStatusMessage,
             errorMessage = null,
-            selectionGeneration = if (selectedId == null) {
-                state.selectionGeneration
-            } else {
+            selectionGeneration = if (selectionChanged) {
                 state.selectionGeneration + 1
+            } else {
+                state.selectionGeneration
             },
         )
     }

@@ -17,6 +17,24 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.Alignment
+import com.letta.mobile.ui.mascot.AgentAvatar
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
+import com.letta.mobile.ui.icons.LettaIconSizing
+import com.letta.mobile.ui.theme.listItemMetadata
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.draw.rotate
+import com.letta.mobile.ui.components.rememberReducedMotionEnabled
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -152,6 +170,8 @@ private fun conversationCardTitle(display: ConversationDisplay): String =
 private val ConversationCardShape = RoundedCornerShape(12.dp)
 
 @OptIn(ExperimentalFoundationApi::class)
+private val ConversationCardMascotSize = 44.dp
+
 @Composable
 private fun ConversationCardSurface(params: ConversationCardSurfaceParams) {
     Card(
@@ -167,41 +187,120 @@ private fun ConversationCardSurface(params: ConversationCardSurfaceParams) {
         colors = LettaCardDefaults.listCardColors(),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        ConversationCardRow(params)
+    }
+}
+
+@Composable
+private fun ConversationCardRow(params: ConversationCardSurfaceParams) {
+    Row(
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AgentAvatar(
+            agentId = params.display.conversation.agentId.value,
+            name = params.display.agentName,
+            size = ConversationCardMascotSize,
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            ConversationCardTitleRow(params)
+            Spacer(modifier = Modifier.height(2.dp))
+            ConversationCardStatusRow(params)
+        }
+    }
+}
+
+@Composable
+private fun ConversationCardTitleRow(params: ConversationCardSurfaceParams) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = params.title,
+            style = MaterialTheme.typography.listItemHeadline,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        conversationActivityText(params.display.conversation)?.let { time ->
             Text(
-                text = params.title,
-                style = MaterialTheme.typography.listItemHeadline,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = conversationCardMetadata(params.display),
-                style = MaterialTheme.typography.listItemSupporting,
+                text = time,
+                style = MaterialTheme.typography.listItemMetadata,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(start = 8.dp),
             )
         }
     }
 }
 
 @Composable
-private fun conversationCardMetadata(display: ConversationDisplay): String {
-    val timeText = conversationActivityText(display.conversation)
-    return buildString {
-        if (display.isPinned) {
-            append("Pinned • ")
+private fun ConversationCardStatusRow(params: ConversationCardSurfaceParams) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        conversationStatus(params.display)?.let { status ->
+            Icon(
+                imageVector = status.icon,
+                contentDescription = null,
+                tint = status.tint,
+                modifier = Modifier
+                    .size(LettaIconSizing.Inline)
+                    .then(if (status.spins) Modifier.rotate(rememberSpinAngle()) else Modifier),
+            )
+            Text(text = status.label, style = MaterialTheme.typography.listItemSupporting, color = status.tint)
+            Text(
+                text = "\u2022",
+                style = MaterialTheme.typography.listItemSupporting,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
-        if (display.conversation.archived == true) {
-            append("Archived • ")
-        }
-        append(display.agentName)
-        if (timeText != null) {
-            append(" • ")
-            append(timeText)
-        }
+        Text(
+            text = params.display.agentName,
+            style = MaterialTheme.typography.listItemSupporting,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
+}
+
+/** The row's status line: what the conversation is doing, in the reference's "Connected" slot. */
+private data class ConversationStatus(val icon: ImageVector, val label: String, val tint: Color, val spins: Boolean = false)
+
+/** A smooth full turn per second for the working spinner; frozen under reduced motion. */
+@Composable
+private fun rememberSpinAngle(): Float {
+    if (rememberReducedMotionEnabled()) return 0f
+    val transition = rememberInfiniteTransition(label = "conversation-working-spin")
+    val angle by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(durationMillis = 1000, easing = LinearEasing), RepeatMode.Restart),
+        label = "conversation-working-angle",
+    )
+    return angle
+}
+
+@Composable
+private fun conversationStatus(display: ConversationDisplay): ConversationStatus? = when {
+    display.conversation.archived == true -> ConversationStatus(
+        LettaIcons.Archive,
+        stringResource(R.string.screen_conversations_filter_archived),
+        MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    display.isWorking -> ConversationStatus(
+        LettaIcons.Loader,
+        stringResource(R.string.screen_conversations_filter_working),
+        MaterialTheme.colorScheme.primary,
+        spins = true,
+    )
+    display.isPinned -> ConversationStatus(
+        LettaIcons.Pin,
+        stringResource(R.string.screen_conversations_status_pinned),
+        MaterialTheme.colorScheme.tertiary,
+    )
+    else -> null
 }
 
 @Composable
@@ -313,12 +412,7 @@ private fun ConversationCardTextInputDialog(params: ConversationCardTextInputDia
 @Composable
 private fun conversationActivityText(conversation: com.letta.mobile.data.model.Conversation): String? {
     val timestamp = conversation.lastMessageAt ?: conversation.createdAt ?: return null
-    val relative = formatRelativeTime(timestamp).takeIf { it.isNotBlank() } ?: return null
-    return if (conversation.lastMessageAt != null) {
-        stringResource(R.string.screen_conversations_last_activity_format, relative)
-    } else {
-        stringResource(R.string.screen_conversations_created_format, relative)
-    }
+    return formatRelativeTime(timestamp).takeIf { it.isNotBlank() }?.removeSuffix(" ago")
 }
 
 // region Previews

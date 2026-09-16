@@ -1729,9 +1729,9 @@ dependencies {
     implementation(libs.androidx.lifecycle.process)
     implementation(libs.androidx.lifecycle.service)
     implementation(libs.molecule.runtime)
-    // Rive mascot spike: debug-only, so the renderer and its 1.3 MB native runtime never reach a
-    // shipped build while the experiment is still an experiment.
-    debugImplementation(project(":avatar:renderer-rive"))
+    // The Rive mascot renderer (letta-mobile-8jtf3): the agent's avatar in the list, the chat top
+    // bar and beside the composer. Ships with the app; the ~1.3 MB native runtime is the cost.
+    implementation(project(":avatar:renderer-rive"))
     debugImplementation(libs.androidx.compose.ui.tooling)
     implementation(libs.androidx.metrics.performance)
     debugImplementation(libs.leakcanary.android)

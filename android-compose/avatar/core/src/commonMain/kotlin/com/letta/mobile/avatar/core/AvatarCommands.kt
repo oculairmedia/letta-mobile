@@ -29,38 +29,8 @@ sealed class AvatarExpression(val key: String) {
     }
 }
 
-/**
- * Mouth-shape identity for lip sync. Keys follow the VRM 1.0 preset viseme
- * names (`aa`/`ih`/`ou`/`ee`/`oh`); VRM 0.x `A`/`I`/`U`/`E`/`O` blend shapes
- * are normalized to these at import.
- */
-sealed class AvatarViseme(val key: String) {
-    object A : AvatarViseme("aa")
-    object I : AvatarViseme("ih")
-    object U : AvatarViseme("ou")
-    object E : AvatarViseme("ee")
-    object O : AvatarViseme("oh")
-    object Closed : AvatarViseme("closed")
-
-    /** A model-specific viseme declared in the manifest. */
-    data class Custom(val name: String) : AvatarViseme(name)
-
-    override fun toString(): String = "AvatarViseme($key)"
-
-    companion object {
-        val presets: List<AvatarViseme> = listOf(A, I, U, E, O, Closed)
-
-        /** Resolve a manifest key back to a preset, else [Custom]. */
-        fun fromKey(key: String): AvatarViseme =
-            presets.firstOrNull { it.key == key } ?: Custom(key)
-    }
-}
-
-/** Where the avatar should look. Renderers map this to head/eye bones. */
+/** Where the avatar should look. Renderers map this to the rig's gaze inputs. */
 sealed interface AvatarLookTarget {
-    /** A point in world space (renderer scene units). */
-    data class World(val x: Float, val y: Float, val z: Float) : AvatarLookTarget
-
     /**
      * A point in normalized screen space: (0,0) = top-left, (1,1) =
      * bottom-right of the viewport the avatar is rendered into.

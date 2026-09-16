@@ -54,6 +54,7 @@ import com.letta.mobile.desktop.home.FleetSort
 import com.letta.mobile.desktop.home.buildFleetOverview
 import com.letta.mobile.desktop.home.preferredComposerConversationId
 import com.letta.mobile.desktop.home.toggled
+import com.letta.mobile.avatar.core.MascotIdentity
 import com.letta.mobile.desktop.agent.agentAvatarStyleKey
 import com.letta.mobile.data.commands.AgentSlashCommand
 import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
@@ -94,7 +95,7 @@ internal fun LettaDesktopApp(
     val overlays = remember { DesktopOverlayVisibility() }
     // Avatar styles chosen via the editor this session, applied immediately to the
     // orbs regardless of whether the backend round-trips agent metadata.
-    var avatarOverrides by remember { mutableStateOf(emptyMap<String, Int>()) }
+    var avatarOverrides by remember { mutableStateOf(emptyMap<String, MascotIdentity>()) }
     var editAgentId by remember { mutableStateOf<String?>(null) }
     val bootstrap = rememberDesktopConfigBootstrap()
     val secureSettingsStore = bootstrap.secureSettingsStore
@@ -245,8 +246,6 @@ internal fun LettaDesktopApp(
         ),
     )
 
-    val avatar = rememberAvatarCompanion(chatScope, secureSettingsStore)
-
     DesktopControllerLifecycles(
         DesktopControllerLifecycleParams(
             chatController = chatController,
@@ -389,18 +388,24 @@ internal fun LettaDesktopApp(
             ?: chatController.createConversation()
     }
 
-    // Per-agent avatar-style override chosen in the editor (stored in agent
-    // metadata). Re-derived whenever the roster changes — which includes the
-    // post-save reload — so a freshly-saved icon is reflected on the orbs.
-    // Agents without an override fall back to their position-derived colour.
-    val cachedAvatarStyles = remember(railAgents) {
-        railAgents.mapNotNull { (id, _) ->
-            secureSettingsStore.getString(agentAvatarStyleKey(id))?.toIntOrNull()?.let { id to it }
-        }.toMap()
+    // Every known agent's identity - the rail's and the whole roster's, so the palette and quick
+    // query draw roster-only agents too: the one chosen in the editor (agent metadata, then this
+    // machine's cache), else the one generated from the agent id. Re-derived whenever the roster
+    // changes - which includes the post-save reload - so a freshly-saved icon shows on the orbs.
+    val cachedIdentities = remember(railAgents, rosterAgents) {
+        val rosterById = rosterAgents.associateBy { it.id.value }
+        (railAgents.map { it.first } + rosterById.keys).distinct().associateWith { id ->
+            com.letta.mobile.ui.mascot.resolveMascotIdentity(id, rosterById[id], secureSettingsStore.getString(agentAvatarStyleKey(id)))
+        }
     }
     // Session overrides win over the cached/backend value so a just-saved icon
     // shows instantly.
-    val avatarStyleByAgentId = cachedAvatarStyles + avatarOverrides
+    val identityByAgentId = cachedIdentities + avatarOverrides
+    // The gradient orbs (until the rollout's P3 replaces them) keep taking a slot index.
+    val avatarStyleByAgentId = identityByAgentId.mapValues { it.value.legacyOrbIndex() }
+    // Every AgentOrb in the app reads identities from the registry; keep it current.
+    val mascotRegistry = com.letta.mobile.ui.mascot.LocalMascotRegistry.current
+    androidx.compose.runtime.SideEffect { mascotRegistry.update(identityByAgentId) }
     val selectedAgentOrbIndex = avatarStyleByAgentId[selectedAgentId]
         ?: railAgents.indexOfFirst { it.first == selectedAgentId }.coerceAtLeast(0)
     val selectedAgentName = railAgents.firstOrNull { it.first == selectedAgentId }?.second
@@ -453,6 +458,23 @@ internal fun LettaDesktopApp(
     // bespoke desktop check, so the "is the agent working" semantics stay in one
     // place across platforms.
     val replyPresence by chatController.replyPresence.collectAsState()
+    // Presence -> the mascots' directors. Busy is the whole run (send -> terminal), speaking while
+    // tokens stream, listening while the user composes, error when the attempt failed.
+    val runningConversationId by chatController.streamingConversationId.collectAsState()
+    val mascotPresence = remember(chatState.conversations, runningConversationId, thinkingConversationId, replyPresence, chatState.selectedConversationId, chatState.composerText, chatState.errorMessage) {
+        com.letta.mobile.data.presence.AgentPresenceResolver.resolve(
+            conversations = chatState.conversations,
+            // Either run signal: the controller's streaming id (send -> terminal) or its thinking id.
+            runningConversationId = runningConversationId ?: thinkingConversationId,
+            // Tokens are arriving when the run is streaming and the "agent typing" dots are off;
+            // the dots (before the first token, between tool phases) are thinking.
+            streamingTokens = replyPresence.isStreaming && !replyPresence.isAgentTyping,
+            selectedConversationId = chatState.selectedConversationId,
+            composerText = chatState.composerText,
+            errorConversationId = chatState.selectedConversationId.takeIf { chatState.errorMessage != null },
+        )
+    }
+    androidx.compose.runtime.SideEffect { mascotRegistry.updatePresence(mascotPresence) }
     val isStreamingReplySelected = replyPresence.isStreaming
 
     // Background work can belong to a conversation the user has switched away
@@ -623,13 +645,6 @@ internal fun LettaDesktopApp(
         )
     }
 
-    AvatarPresenceEffects(
-        avatar = avatar,
-        isStreamingReplySelected = isStreamingReplySelected,
-        thinkingConversationId = thinkingConversationId,
-        errorMessage = chatState.errorMessage,
-    )
-
     // Load the skills registry + the focused agent's installed skills when the
     // Skills page is open (or the focused agent changes).
     LaunchedEffect(selectedDestination, skillsPanel, selectedAgentId) {
@@ -697,6 +712,7 @@ internal fun LettaDesktopApp(
                             selectedAgentId = selectedAgentId,
                             thinkingAgentId = thinkingAgentId,
                             avatarStyleByAgentId = avatarStyleByAgentId,
+                            identityByAgentId = identityByAgentId,
                         ),
                         expanded = railExpanded,
                     ),
@@ -725,6 +741,8 @@ internal fun LettaDesktopApp(
                     state = DesktopAgentSidebarState(
                         agentName = selectedAgentName,
                         agentOrbIndex = selectedAgentOrbIndex,
+                        agentId = selectedAgentId,
+                        agentIdentity = selectedAgentId?.let { identityByAgentId[it] },
                         conversations = agentConversations,
                         selectedConversationId = chatState.selectedConversationId,
                         thinkingConversationId = thinkingConversationId,
@@ -796,6 +814,7 @@ internal fun LettaDesktopApp(
                             ),
                             submittingApprovalRequestIds = submittingApprovals,
                             agentNamesById = rosterAgents.associate { it.id.value to it.name },
+                            agentIdentitiesById = identityByAgentId,
                             workingDirectory = selectedConversationWorkingDirectory,
                             workingDirectorySupported = chatController.supportsWorkingDirectory,
                             workingDirectoryLoading = workingDirectoryLoading,
@@ -833,8 +852,8 @@ internal fun LettaDesktopApp(
                     ),
                     actions = DesktopMainContentActions(
                         onEditAgentClose = { editAgentId = null },
-                        onEditAgentSaved = { style, nameChanged ->
-                            avatarOverrides = avatarOverrides + (editAgentId.orEmpty() to style)
+                        onEditAgentSaved = { identity, nameChanged ->
+                            avatarOverrides = avatarOverrides + (editAgentId.orEmpty() to identity)
                             editAgentId = null
                             if (nameChanged) chatController.retryConnection()
                         },
@@ -976,7 +995,6 @@ internal fun LettaDesktopApp(
                 isStreamingReplySelected = isStreamingReplySelected,
                 avatarStyleByAgentId = avatarStyleByAgentId,
                 fallbackOrbIndex = selectedAgentOrbIndex,
-                avatarCompanionActive = avatar.isActive,
             ),
             actions = NowActiveBarHostActions(
                 onOpenConversation = { conversationId ->
@@ -984,7 +1002,6 @@ internal fun LettaDesktopApp(
                     chatController.selectConversation(conversationId)
                     selectedDestination = DesktopDestination.Conversations
                 },
-                onAvatarCompanion = avatar.toggle,
                 onStopRun = chatController::stopActiveRun,
             ),
         )

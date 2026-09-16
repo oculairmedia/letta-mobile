@@ -31,6 +31,8 @@ internal data class EditableAgentEnvironmentVariable(
 internal data class EditAgentUiState(
     val agent: Agent? = null,
     val agentId: String = "",
+    /** The mascot identity chosen for this agent, null until one is picked (letta-mobile-8jtf3). */
+    val avatarIdentity: com.letta.mobile.avatar.core.MascotIdentity? = null,
     val name: String = "",
     val description: String = "",
     val model: String = "",

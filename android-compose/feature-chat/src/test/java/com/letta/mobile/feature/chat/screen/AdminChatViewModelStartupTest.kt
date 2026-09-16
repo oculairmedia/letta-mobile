@@ -44,35 +44,6 @@ class AdminChatViewModelStartupTest {
         try {
             assertFalse(Dispatchers.Main.immediate.isDispatchNeeded(coroutineContext))
             val agent = TestData.agent("agent-startup", "Startup")
-            val agents = mockk<IAgentRepository>(relaxed = true) {
-                every { this@mockk.agents } returns MutableStateFlow(listOf(agent))
-                every { getCachedAgent(agent.id) } returns agent
-                every { getAgent(agent.id) } returns flowOf(agent)
-            }
-            val settings = mockk<ISettingsRepository>(relaxed = true) {
-                every { activeConfig } returns MutableStateFlow(null)
-                every { activeConfigChanges } returns emptyFlow()
-                every { favoriteAgentId } returns MutableStateFlow(null)
-                every { getChatBackgroundKey() } returns flowOf("default")
-                every { getChatFontScale() } returns flowOf(1f)
-                every { getHapticsEnabled() } returns flowOf(false)
-                every { getPinnedAgentIds() } returns flowOf(emptySet())
-            }
-            val detector = mockk<ShimBackendDetector>(relaxed = true) {
-                every { activeUsesChannelTransport } returns MutableStateFlow(false)
-                every { activeBackendKind } returns MutableStateFlow(BackendKind.REST)
-            }
-            val bridge = mockk<WsChatBridge>(relaxed = true) {
-                every { connection } returns emptyFlow()
-                every { state } returns MutableStateFlow(mockk(relaxed = true))
-                every { events } returns emptyFlow()
-                every { a2uiEvents } returns emptyFlow()
-            }
-            val session = mockk<SessionManager>(relaxed = true) {
-                every { current.localRuntimeBackend } returns null
-                every { current.backendDescriptor.backendId } returns BackendId("startup")
-                every { current.backendDescriptor.runtimeId } returns RuntimeId("startup")
-            }
             var constructorReturned = false
             var opens = 0
             var closes = 0
@@ -95,37 +66,7 @@ class AdminChatViewModelStartupTest {
                     presentation
                 }
             }
-            val vm = AdminChatViewModel(
-                routeArgs = ChatRouteArgs(SavedStateHandle(mapOf(
-                    "agentId" to agent.id.value,
-                    "conversationId" to "conversation-startup",
-                ))),
-                messageRepository = mockk(relaxed = true),
-                timelineRepository = mockk(relaxed = true),
-                externalTimelineWriter = mockk(relaxed = true),
-                agentRepository = agents,
-                blockRepository = mockk(relaxed = true),
-                bugReportRepository = mockk(relaxed = true),
-                conversationRepository = mockk(relaxed = true),
-                settingsRepository = settings,
-                sessionManager = session,
-                runtimeEventOutbox = mockk(relaxed = true),
-                currentConversationTracker = mockk(relaxed = true),
-                shimBackendDetector = detector,
-                wsChatBridge = bridge,
-                subagentRepository = mockk(relaxed = true),
-                slashCommandRepository = mockk(relaxed = true) {
-                    coEvery { listForAgent(any()) } returns Result.success(emptyList())
-                    coEvery { listGlobal() } returns Result.success(emptyList())
-                    coEvery { getGoalStatus(any()) } returns Result.failure(IllegalStateException("Unsupported"))
-                },
-                clientVersionProvider = mockk(relaxed = true),
-                selfTodoRepository = mockk(relaxed = true),
-                modelRepository = mockk(relaxed = true) {
-                    every { llmModels } returns MutableStateFlow(emptyList())
-                },
-                pagingHost = host,
-            )
+            val vm = openedChatViewModel(host, agent, "conversation-startup", "startup")
             viewModel = vm
             constructorReturned = true
             assertEquals(1, opens)

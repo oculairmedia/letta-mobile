@@ -17,8 +17,7 @@ class AvatarDirectorStateMachineTest {
     private val model = AvatarModel(
         id = "avatar-1",
         displayName = "Buddy",
-        uri = "file:///buddy.vrm",
-        format = AvatarFormat.VRM_1,
+        uri = "res://raw/mascot.riv",
     )
 
     private suspend fun readyRuntime(): HeadlessAvatarRuntime =
@@ -408,7 +407,8 @@ class AvatarDirectorStateMachineTest {
         val (runtime, d) = director()
         d.setActivity(AvatarActivity.THINKING)
         d.tick(0.4f)
-        assertTrue((runtime.expressionWeights["relaxed"] ?: 0f) > 0f)
+        // THINKING relaxed 0.6wt, attack 0.4s (section 6): one 0.4 s tick lands the full weight.
+        assertEquals(0.6f, runtime.expressionWeights["relaxed"] ?: 0f, 0.05f)
         d.setAwaitingApproval(true) // → WAITING_INPUT
         assertEquals(0f, runtime.expressionWeights["relaxed"]) // relaxed cleared
         assertEquals(0.3f, runtime.expressionWeights["surprised"])

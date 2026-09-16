@@ -47,6 +47,8 @@ import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.runtime.ChatViewportFollowPolicy
 import com.letta.mobile.data.chat.runtime.ChatViewportSnapshot
 import com.letta.mobile.desktop.fadingEdges
+import com.letta.mobile.ui.mascot.MascotGazeSurface
+import com.letta.mobile.ui.mascot.mascotGazeTarget
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
@@ -56,6 +58,12 @@ internal data class MessageListParams(
     val conversationId: String?,
     val renderItems: List<ChatRenderItem>,
     val isSending: Boolean,
+    /**
+     * Whether a "Thinking…" row trails the thread while sending. Off when the agent's live
+     * mascot sits beside the composer: it is already thinking there, in view, so a second
+     * indicator in the thread is noise.
+     */
+    val showThinkingRow: Boolean = true,
     val isStreamingReply: Boolean = false,
 )
 
@@ -66,6 +74,7 @@ internal fun MessageList(
 ) {
     val renderItems = params.renderItems
     val isSending = params.isSending
+    val thinkingRow = isSending && params.showThinkingRow
     val listState = rememberLazyListState()
     val isUserScrolling by listState.interactionSource.collectIsDraggedAsState()
     val scope = rememberCoroutineScope()
@@ -96,7 +105,7 @@ internal fun MessageList(
     // rows.size - 1, and the thinking row (when sending) one past it. The scroll
     // targets below must use this index — landing one row short is why a fresh
     // prompt/reply once needed a manual nudge to the bottom.
-    val chatBottomIndex = (rows.size - 1 + if (isSending) 1 else 0).coerceAtLeast(0)
+    val chatBottomIndex = (rows.size - 1 + if (thinkingRow) 1 else 0).coerceAtLeast(0)
     val tailContentLength = remember(renderItems) { renderItems.tailContentLength() }
 
     MessageListFollowEffects(
@@ -133,14 +142,15 @@ internal fun MessageList(
                     bottomFadeAlpha = fadeAlphas.bottom,
                     topFadeLength = 72.dp,
                     bottomFadeLength = 44.dp,
-                ),
+                )
+                .mascotGazeTarget(MascotGazeSurface.TIMELINE),
         ) {
             MessageListColumn(
                 MessageListColumnParams(
                     listState = listState,
                     rows = rows,
                     streamingMessageId = streamingMessageId,
-                    isSending = isSending,
+                    thinkingRow = thinkingRow,
                 ),
             )
         }
@@ -312,7 +322,7 @@ private data class MessageListColumnParams(
     val listState: LazyListState,
     val rows: List<DesktopChatRow>,
     val streamingMessageId: StreamingMessageId?,
-    val isSending: Boolean,
+    val thinkingRow: Boolean,
 )
 
 internal fun ChatRenderItem.isUserPrompt(): Boolean =
@@ -324,7 +334,6 @@ private fun MessageListColumn(params: MessageListColumnParams) {
     val listState = params.listState
     val rows = params.rows
     val streamingMessageId = params.streamingMessageId
-    val isSending = params.isSending
     // Hoisted: one midnight watcher for the whole list, not one per divider.
     val today = rememberCurrentDate()
     val selectionColors = TextSelectionColors(
@@ -405,7 +414,7 @@ private fun MessageListColumn(params: MessageListColumnParams) {
                     }
                 }
             }
-            if (isSending) {
+            if (params.thinkingRow) {
                 item(key = "__thinking__") {
                     Box(modifier = Modifier.widthIn(max = ChatColumnMaxWidth).fillMaxWidth()) {
                         ThinkingMessageRow()

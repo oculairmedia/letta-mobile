@@ -45,6 +45,20 @@ class ChatReasoningTest {
         composeRule.waitForIdle()
     }
 
+    /**
+     * Waits for the reasoning body to finish entering or leaving instead of advancing the clock by
+     * a fixed amount and asserting on whatever frame follows: the enter/exit runs behind an
+     * AnimatedVisibility, so on a loaded machine one 1s advance plus waitForIdle could land while
+     * the node was still absent (collapseStateSurvivesContentUpdatesAndStreamingCompletion failed
+     * that way in CI). waitUntil drives the same test clock, so this stays deterministic.
+     */
+    private fun awaitReasoningContent(present: Boolean) {
+        composeRule.waitUntil(REASONING_MOTION_TIMEOUT_MS) {
+            composeRule.onAllNodesWithTag(ChatReasoningTestTags.Content).fetchSemanticsNodes().isNotEmpty() == present
+        }
+        composeRule.waitForIdle()
+    }
+
     @Test
     fun activeReasoningWithBlankContentShowsLiveStatusIndicator() {
         val blankActiveMessage = UiMessage(
@@ -302,8 +316,7 @@ class ChatReasoningTest {
         content.assertDoesNotExist()
 
         header.performClick()
-        composeRule.mainClock.advanceTimeBy(1_000)
-        composeRule.waitForIdle()
+        awaitReasoningContent(present = true)
         header.assert(reasoningState("Reasoning expanded", actionLabel = "Collapse reasoning"))
         content.assertIsDisplayed()
 
@@ -313,15 +326,14 @@ class ChatReasoningTest {
         content.assertIsDisplayed()
 
         header.performClick()
-        composeRule.mainClock.advanceTimeBy(1_000)
-        composeRule.waitForIdle()
+        awaitReasoningContent(present = false)
         content.assertDoesNotExist()
 
         composeRule.runOnIdle {
             streamingState.value = true
             messageState.value = messageState.value.copy(content = "Streaming reasoning")
         }
-        composeRule.mainClock.advanceTimeBy(1_000)
+        awaitReasoningContent(present = true)
         header.assert(reasoningState("Reasoning in progress", actionLabel = null))
         content.assertIsDisplayed()
 
@@ -329,8 +341,7 @@ class ChatReasoningTest {
             messageState.value = messageState.value.copy(content = "Streaming reasoning completed", isError = true)
             streamingState.value = false
         }
-        composeRule.mainClock.advanceTimeBy(1_000)
-        composeRule.waitForIdle()
+        awaitReasoningContent(present = false)
         header.assert(reasoningState("Reasoning collapsed", actionLabel = "Expand reasoning"))
         content.assertDoesNotExist()
     }
@@ -345,5 +356,10 @@ class ChatReasoningTest {
             }
         }
         return stateMatcher.and(actionMatcher)
+    }
+
+    private companion object {
+        /** Generous: it bounds a hang, it is not the expected duration (the clock is virtual). */
+        const val REASONING_MOTION_TIMEOUT_MS = 10_000L
     }
 }

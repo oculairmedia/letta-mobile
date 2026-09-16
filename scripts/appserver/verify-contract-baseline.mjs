@@ -9,15 +9,25 @@ import { fileURLToPath } from "node:url";
 const args = process.argv.slice(2);
 const packageRootIndex = args.indexOf("--package-root");
 if (packageRootIndex < 0 || !args[packageRootIndex + 1]) {
-  throw new Error("Usage: verify-contract-baseline.mjs --package-root <installed-package-root>");
+  throw new Error("Usage: verify-contract-baseline.mjs --package-root <installed-package-root> [--unions-only]");
 }
 
 const packageRootArgument = resolve(args[packageRootIndex + 1]);
+// --unions-only: compare just the command/message unions, e.g. to ask whether a newer release
+// changed the protocol surface the Kotlin client is pinned to.
+const unionsOnly = args.includes("--unions-only");
 const repositoryRoot = resolve(fileURLToPath(new URL("../..", import.meta.url)));
 const fixtureRoot = join(repositoryRoot, "android-compose/sharedLogic/src/jvmTest/resources/appserver");
 const matrix = readJson(join(fixtureRoot, "app-server-v2-contract-matrix.json"));
 const inventory = readJson(join(fixtureRoot, "installed-protocol-v2-inventory.json"));
 const packageRoot = resolveInstalledPackageRoot(packageRootArgument, matrix.baseline.package);
+if (unionsOnly) {
+  const corpus = loadDeclarationCorpus(packageRoot, join(packageRoot, inventory.source.protocol_declaration)).map(({ text }) => text).join("\n");
+  assertEqual("command union", inventory.commands, extractDiscriminants(corpus, "WsProtocolCommand"));
+  assertEqual("message union", inventory.messages, extractDiscriminants(corpus, "WsProtocolMessage"));
+  console.log(`Unions match the pinned App Server v2 inventory at ${packageRoot}.`);
+  process.exit(0);
+}
 const packageJson = readJson(join(packageRoot, "package.json"));
 const entrypoint = join(packageRoot, "letta.js");
 const declaration = join(packageRoot, inventory.source.protocol_declaration);
@@ -148,16 +158,34 @@ function normalizePath(path) {
 }
 
 function extractDiscriminants(source, unionName) {
-  const unionMatch = source.match(new RegExp(`export type ${unionName} = ([^;]+);`));
-  if (!unionMatch) throw new Error(`Missing ${unionName} union`);
-
-  return unionMatch[1].split("|").map((member) => member.trim()).map((member) => {
-    const declarationMatch = source.match(new RegExp(`export (?:interface|type) ${member}(?: extends [^{]+)? \\{([\\s\\S]*?)\\n\\}`));
+  return unionMembers(source, unionName).map((member) => {
+    const declarationMatch = source.match(new RegExp(`export (?:interface|type) ${member}(?:<[^>]*>)?(?: extends [^{]+)? \\{([\\s\\S]*?)\\n\\}`));
     if (!declarationMatch) throw new Error(`Missing declaration for ${member}`);
     const typeMatch = declarationMatch[1].match(/\btype:\s*"([^"]+)"/);
     if (!typeMatch) throw new Error(`Missing type discriminant for ${member}`);
     return typeMatch[1];
   });
+}
+
+// Flattens a union to its object members, in declaration order. Since 0.32.x members can be
+// written `Name`, `Namespace.Name` or `import("./module").Name`, and a member may itself be a
+// union declared in a sibling module (e.g. TeleportProtocol.TeleportProtocolCommand). The corpus
+// holds every followed sibling, so a bare name resolves against all of it.
+function unionMembers(source, unionName, seen = new Set()) {
+  if (seen.has(unionName)) throw new Error(`Cyclic union ${unionName}`);
+  seen.add(unionName);
+  const unionMatch = source.match(new RegExp(`export type ${unionName} = ([^;{]+);`));
+  if (!unionMatch) throw new Error(`Missing ${unionName} union`);
+
+  return unionMatch[1].split("|").map((member) => bareTypeName(member.trim())).flatMap((member) => {
+    const nestedUnion = source.match(new RegExp(`export type ${member} = ([^;{]+);`));
+    return nestedUnion ? unionMembers(source, member, seen) : [member];
+  });
+}
+
+function bareTypeName(member) {
+  const withoutImport = member.replace(/^import\(\s*["'][^"']+["']\s*\)\./, "");
+  return withoutImport.includes(".") ? withoutImport.slice(withoutImport.lastIndexOf(".") + 1) : withoutImport;
 }
 
 function readJson(path) {

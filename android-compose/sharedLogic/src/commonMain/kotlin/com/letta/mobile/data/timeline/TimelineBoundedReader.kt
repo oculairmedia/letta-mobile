@@ -34,7 +34,13 @@ class TimelineBoundedReader(private val store: TimelineBoundedStore) {
         scope: TimelineScope,
         position: TimelineReadPosition,
         budget: TimelinePageBudget,
-    ): TimelineBodyPage = store.read(scope) {
+    ): TimelineBodyPage = store.read(scope) { preview(position, budget) }
+
+    /** Runs the preview algorithm inside a caller-owned consistent store snapshot. */
+    suspend fun TimelineStoreReader.preview(
+        position: TimelineReadPosition,
+        budget: TimelinePageBudget,
+    ): TimelineBodyPage {
         val page = metadata(position, budget.maxMetadataRows)
         require(page.rows.size <= budget.maxMetadataRows)
         require(page.rows.zipWithNext().all { (a, b) -> a.key < b.key })
@@ -49,7 +55,7 @@ class TimelineBoundedReader(private val store: TimelineBoundedStore) {
             remaining -= size
             bytes
         }
-        TimelineBodyPage(page, bodies)
+        return TimelineBodyPage(page, bodies)
     }
 
     /**

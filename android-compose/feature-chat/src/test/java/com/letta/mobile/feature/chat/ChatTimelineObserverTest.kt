@@ -854,12 +854,10 @@ class ChatTimelineObserverTest {
         assertEquals("frame-1", harness.uiState.value.messages.first().id)
     }
 
-    // region letta-mobile-ah1ng: terminal-run collapse reconciliation through
-    // the REAL observer→ChatRunExpansionState production path (the harness no
-    // longer injects a no-op collapse callback).
+    // region stable live / hydration presentation through the real observer path
 
     @Test
-    fun `completed run first seen via hydration defaults collapsed`() = runTest {
+    fun `completed run first seen via hydration remains inline`() = runTest {
         val harness = Harness(backgroundScope)
         harness.seedTimeline(
             "conv-1",
@@ -873,13 +871,11 @@ class ChatTimelineObserverTest {
         runCurrent()
 
         assertEquals(listOf("h-10", "h-20"), harness.uiState.value.messages.map { it.id })
-        // No isStreaming edge ever fired here; per-run terminal reconciliation
-        // must still fold the completed run.
-        assertTrue(harness.uiState.value.collapsedRunIds.contains("run-hist"))
+        assertFalse(harness.uiState.value.collapsedRunIds.contains("run-hist"))
     }
 
     @Test
-    fun `live terminal transition collapses run once presence clears`() = runTest {
+    fun `live terminal transition keeps the streamed run inline`() = runTest {
         val harness = Harness(backgroundScope, activeReplyConversationIds = setOf("conv-1"))
         val flow = harness.seedTimeline(
             "conv-1",
@@ -891,86 +887,14 @@ class ChatTimelineObserverTest {
 
         harness.observer.start("conv-1")
         runCurrent()
-
         assertTrue(harness.uiState.value.isStreaming)
-        assertFalse(harness.uiState.value.collapsedRunIds.contains("run-live"))
 
-        // Presence clears via a presence-only (deduped projection) tick — the
-        // publication must still route through terminal reconciliation.
         harness.activeReplyStreams.value = emptySet()
         flow.value = flow.value.copy(liveCursor = "presence-bump")
         runCurrent()
 
         assertFalse(harness.uiState.value.isStreaming)
-        assertTrue(harness.uiState.value.collapsedRunIds.contains("run-live"))
-    }
-
-    @Test
-    fun `reconcile error presence clear collapses the terminal run`() = runTest {
-        val harness = Harness(backgroundScope, activeReplyConversationIds = setOf("conv-1"))
-        harness.seedTimeline(
-            "conv-1",
-            listOf(
-                confirmed("e-10", "go"),
-                confirmed("e-20", "partial answer", TimelineMessageType.ASSISTANT, runId = "run-error"),
-            ),
-        )
-
-        harness.observer.start("conv-1")
-        runCurrent()
-        assertTrue(harness.uiState.value.isStreaming)
-        assertFalse(harness.uiState.value.collapsedRunIds.contains("run-error"))
-
-        harness.emitSyncEvent(TimelineSyncEvent.ReconcileError("sync failed"))
-        runCurrent()
-
-        assertFalse(harness.uiState.value.isStreaming)
-        assertFalse(harness.uiState.value.isAgentTyping)
-        assertEquals("Couldn't sync agent reply — pull to refresh", harness.uiState.value.error)
-        assertTrue(harness.uiState.value.collapsedRunIds.contains("run-error"))
-    }
-
-    @Test
-    fun `terminal run collapses even when a newer turn starts before presence clears`() = runTest {
-        // Ordering regression: run-1's terminal projection landed while the
-        // streaming edge was consumed by a later turn. The old newest-run-only,
-        // edge-gated selection left run-1 expanded forever.
-        val harness = Harness(backgroundScope, activeReplyConversationIds = setOf("conv-1"))
-        val flow = harness.seedTimeline(
-            "conv-1",
-            listOf(
-                confirmed("d-10", "first question"),
-                confirmed("d-20", "answer one", TimelineMessageType.ASSISTANT, runId = "run-1"),
-            ),
-        )
-
-        harness.observer.start("conv-1")
-        runCurrent()
-
-        assertTrue(harness.uiState.value.isStreaming)
-        assertFalse(harness.uiState.value.collapsedRunIds.contains("run-1"))
-
-        // A second turn starts before presence ever drops.
-        flow.value = Timeline(
-            "conv-1",
-            events = persistentListOf(
-                confirmed("d-10", "first question"),
-                confirmed("d-20", "answer one", TimelineMessageType.ASSISTANT, runId = "run-1"),
-                confirmed("d-30", "second question"),
-                confirmed("d-40", "working", TimelineMessageType.ASSISTANT, runId = "run-2"),
-            ),
-        )
-        runCurrent()
-
-        assertTrue(harness.uiState.value.collapsedRunIds.contains("run-1"))
-        assertFalse("active newest run stays open", harness.uiState.value.collapsedRunIds.contains("run-2"))
-
-        // Presence finally clears; run-2 settles as well and prior runs stay folded.
-        harness.activeReplyStreams.value = emptySet()
-        flow.value = flow.value.copy(liveCursor = "settle-bump")
-        runCurrent()
-
-        assertTrue(harness.uiState.value.collapsedRunIds.containsAll(setOf("run-1", "run-2")))
+        assertFalse(harness.uiState.value.collapsedRunIds.contains("run-live"))
     }
 
     // endregion

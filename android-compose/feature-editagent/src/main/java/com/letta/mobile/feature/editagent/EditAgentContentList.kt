@@ -155,6 +155,13 @@ private fun LazyListScope.editAgentBasicsSection(params: EditAgentContentListPar
     item(key = "identity") {
         EditAgentIdentityCard(params.state, params.callbacks)
     }
+    item(key = "avatar") {
+        EditAgentAvatarCard(
+            agentId = params.state.agentId,
+            identity = params.state.avatarIdentity,
+            onChange = params.callbacks.onAvatarIdentityChange,
+        )
+    }
     item(key = "system_prompt") {
         EditAgentSystemPromptCard(params.state, params.callbacks)
     }

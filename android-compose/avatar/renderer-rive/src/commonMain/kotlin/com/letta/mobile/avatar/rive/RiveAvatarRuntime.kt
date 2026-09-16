@@ -4,12 +4,12 @@ import com.letta.mobile.avatar.core.AvatarCameraFraming
 import com.letta.mobile.avatar.core.AvatarCapabilities
 import com.letta.mobile.avatar.core.AvatarExpression
 import com.letta.mobile.avatar.core.AvatarGesture
+import com.letta.mobile.avatar.core.AvatarHeadTurn
 import com.letta.mobile.avatar.core.AvatarLookTarget
 import com.letta.mobile.avatar.core.AvatarModel
 import com.letta.mobile.avatar.core.AvatarRuntime
 import com.letta.mobile.avatar.core.AvatarRuntimeState
 import com.letta.mobile.avatar.core.AvatarState
-import com.letta.mobile.avatar.core.AvatarViseme
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -22,15 +22,15 @@ import kotlinx.coroutines.flow.asStateFlow
  * which is what lets every mapping decision here be tested without a device, and what lets the
  * desktop JCEF surface reuse this class unchanged rather than growing a parallel copy.
  *
- * A flat mascot is honest about what it is not. It has no skeleton, no spring bones and no embedded
- * glTF clips, so those capabilities are reported false and the matching commands are dropped - which
+ * A flat mascot is honest about what it is not. It has no embedded clips and no accessories, so
+ * those capabilities are reported false and the matching commands are dropped - which
  * the [AvatarRuntime] contract already defines as the behavior for an unsupported capability, so the
  * app keeps one code path for every asset.
  */
 class RiveAvatarRuntime(
     private val sink: RiveInputSink,
     private val capabilities: AvatarCapabilities = MASCOT_CAPABILITIES,
-) : AvatarRuntime {
+) : AvatarRuntime, AvatarHeadTurn {
 
     private val _state = MutableStateFlow<AvatarRuntimeState>(AvatarRuntimeState.Idle)
     override val state: StateFlow<AvatarRuntimeState> = _state.asStateFlow()
@@ -59,13 +59,16 @@ class RiveAvatarRuntime(
      * one drawing per mood, and blending two of them is exactly what a flat rig cannot do. Weight is
      * therefore a switch - anything at or below zero leaves the current state alone.
      */
-    override fun setExpression(expression: AvatarExpression, weight: Float) {
-        if (!ready() || weight <= 0f) return
-        stateForExpression(expression)?.let(::applyState)
-    }
+    /**
+     * A no-op on purpose. The director installs an expression on every state it enters
+     * (Neutral for LISTENING, Happy 0.2 for SPEAKING...), and mapping those back onto the
+     * sustained enum fought the real state: LISTENING became IDLE, SPEAKING fired the success
+     * flash. The mascot has one channel for state - [applyState], driven from the director's
+     * state transitions by the host - and its expressions live inside the file's states.
+     */
+    override fun setExpression(expression: AvatarExpression, weight: Float) = Unit
 
-    /** No viseme rig. Lip sync arrives as [setMouthOpen], which a flat mouth can honour. */
-    override fun setViseme(viseme: AvatarViseme, weight: Float) = Unit
+    /** Lip sync arrives as [setMouthOpen], which a flat mouth can honour. */
 
     override fun setMouthOpen(value: Float) {
         if (!ready()) return
@@ -81,10 +84,20 @@ class RiveAvatarRuntime(
         val (x, y) = when (target) {
             null -> 0f to 0f
             is AvatarLookTarget.Screen -> (target.x * 2f - 1f) to (target.y * 2f - 1f)
-            is AvatarLookTarget.World -> return
         }
         sink.setNumber(RiveAvatarContract.INPUT_LOOK_X, x.coerceIn(-1f, 1f))
         sink.setNumber(RiveAvatarContract.INPUT_LOOK_Y, y.coerceIn(-1f, 1f))
+    }
+
+    /**
+     * The head turning toward the gaze, -1..1 on each axis. [AvatarHeadTurn]
+     * is a mascot-specific channel the [com.letta.mobile.avatar.core.GazeDirector]
+     * writes after the eyes have led; it is not an [AvatarRuntime] command.
+     */
+    override fun setHeadTurn(turnX: Float, turnY: Float) {
+        if (!ready()) return
+        sink.setNumber(RiveAvatarContract.INPUT_TURN_X, turnX.coerceIn(-1f, 1f))
+        sink.setNumber(RiveAvatarContract.INPUT_TURN_Y, turnY.coerceIn(-1f, 1f))
     }
 
     /** Blink is the one gesture a flat mascot has; the rest need a rig it does not carry. */
@@ -107,10 +120,31 @@ class RiveAvatarRuntime(
         _state.value = AvatarRuntimeState.Idle
     }
 
-    /** The director's arbitrated state, which is what the mascot's state machine actually reads. */
+    private var dragged = false
+
+    /**
+     * The director's arbitrated state, written the way the file's state machine reads it:
+     * sustained states as the enum, SUCCESS as a trigger the file plays and returns from, ERROR as
+     * a trigger for the flash plus the sustained `error` settle, DRAGGED as a boolean held until
+     * the next non-dragged state. The director still owns priority; the file owns choreography.
+     */
     fun applyState(state: AvatarState) {
         if (disposed) return
-        sink.setEnum(RiveAvatarContract.INPUT_STATE, RiveAvatarContract.stateKey(state))
+        when (state) {
+            AvatarState.SUCCESS -> sink.fire(RiveAvatarContract.TRIGGER_SUCCESS)
+            AvatarState.DRAGGED -> {
+                dragged = true
+                sink.setBoolean(RiveAvatarContract.INPUT_DRAGGED, true)
+            }
+            else -> {
+                if (dragged) {
+                    dragged = false
+                    sink.setBoolean(RiveAvatarContract.INPUT_DRAGGED, false)
+                }
+                if (state == AvatarState.ERROR) sink.fire(RiveAvatarContract.TRIGGER_ERROR)
+                sink.setEnum(RiveAvatarContract.INPUT_STATE, checkNotNull(RiveAvatarContract.stateKey(state)))
+            }
+        }
     }
 
     private fun ready(): Boolean = !disposed && _state.value is AvatarRuntimeState.Ready
@@ -129,15 +163,12 @@ class RiveAvatarRuntime(
         const val BLINK_GESTURE: String = "blink"
 
         /**
-         * What a flat mascot can actually do. Not humanoid, no viseme rig, no spring bones and no
-         * embedded clips; expressions and gaze are state-machine inputs, so those hold.
+         * What a flat mascot can actually do: expressions and gaze are state-machine inputs, so
+         * those hold; there are no embedded clips and no accessories.
          */
         val MASCOT_CAPABILITIES: AvatarCapabilities = AvatarCapabilities(
-            supportsHumanoid = false,
             supportsExpressions = true,
-            supportsVisemes = false,
             supportsLookAt = true,
-            supportsSpringBones = false,
             supportsEmbeddedAnimations = false,
             supportsAccessories = false,
         )

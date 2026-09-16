@@ -36,8 +36,8 @@ val desktopNodeArchiveSha256 = "fba577c4bb87df04d54dd87bbdaa5a2272f1f99a2acbf915
 // AWT/InputMethod bridge Compose Multiplatform uses to surface the OS
 // touch-keyboard on text input — Temurin's InputMethod bridge resolves to a
 // no-op for non-Swing text components, so the keyboard never pops on touch
-// devices. The bundled JCEF runtime used by the avatar/pet window is fetched
-// separately via jcefmaven, so we use the vanilla `jbrsdk` (not `jbrsdk_jcef`).
+// devices. The bundled JCEF runtime (Mermaid, tool cards) is fetched separately
+// via jcefmaven, so we use the vanilla `jbrsdk` (not `jbrsdk_jcef`).
 // SHA-512 is published by JetBrains alongside the artifact.
 val jbrVersion = "25.0.4"
 val jbrBuild = "b508.27"
@@ -160,12 +160,8 @@ dependencies {
     // bundles host-OS native libs (linux/darwin/win, x86-64 + aarch64), so no
     // native packaging is needed.
     implementation(libs.iroh)
-    // Avatar companion: renderer bridge + loopback web host (brings :avatar:core).
-    implementation(project(":avatar:renderer-web"))
-    // letta-mobile-0s5bi spike: the shared Rive mapping, driven natively on desktop.
+    // The mascot: the shared Rive mapping (brings :avatar:core), driven natively on desktop.
     implementation(project(":avatar:renderer-rive"))
-    // Avatar library: import pipeline + local catalog (license capture/display).
-    implementation(project(":avatar:asset-pipeline"))
 
     implementation(libs.filekit.core.jvm)
     implementation(libs.filekit.dialogs.compose.jvm)
@@ -261,22 +257,6 @@ tasks.withType<Test>().configureEach {
     useJUnitPlatform()
 }
 
-// P4 spike entry point (see avatar/DESIGN-BRIEF.md + docs/design/avatar-system-prd.md):
-// frameless transparent pet window hosting the web avatar renderer off-screen.
-tasks.register<JavaExec>("runPetSpike") {
-    group = "application"
-    description = "Runs the frameless pet-window spike (-PpetVrm=path\\to\\model.vrm to override the avatar)."
-    mainClass.set("com.letta.mobile.desktop.avatar.pet.PetWindowSpikeKt")
-    classpath = sourceSets.main.get().runtimeClasspath
-    jvmArgs(
-        // jcefmaven OSR-mode requirements.
-        "--add-exports=java.base/java.lang=ALL-UNNAMED",
-        "--add-exports=java.desktop/sun.awt=ALL-UNNAMED",
-        "--add-exports=java.desktop/sun.java2d=ALL-UNNAMED",
-    )
-    providers.gradleProperty("petVrm").orNull?.let { args(it) }
-}
-
 // letta-mobile-0s5bi spike: native Rive (rive-runtime + D3D11 Rive Renderer) as a Compose node.
 // Needs a locally built bridge DLL; see avatar/renderer-rive/native/desktop/README.md.
 //   -PriveBridge=path\to\rive_desktop_bridge.dll -PriveFile=path\to\file.riv
@@ -288,6 +268,10 @@ tasks.register<JavaExec>("runRiveSpike") {
     classpath = sourceSets.main.get().runtimeClasspath
     providers.gradleProperty("riveBridge").orNull?.let { systemProperty("rive.bridge.path", it) }
     providers.gradleProperty("riveSelfTest").orNull?.let { systemProperty("rive.spike.selfTest", it) }
+    // -PriveRecord=enter-thinking takes one motion signature as soon as the file loads and prints it.
+    providers.gradleProperty("riveRecord").orNull?.let { systemProperty("rive.spike.record", it) }
+    // -PriveOnion=true opens with the live onion skin already on.
+    providers.gradleProperty("riveOnion").orNull?.let { systemProperty("rive.spike.onion", it) }
     args(
         providers.gradleProperty("riveFile").orElse("").get(),
         providers.gradleProperty("riveStateMachine").orElse("").get(),
@@ -625,6 +609,62 @@ val prepareDesktopLettaCodeRuntime = tasks.register<Exec>("prepareDesktopLettaCo
 
 tasks.matching { it.name == "prepareAppResources" }.configureEach {
     dependsOn(prepareDesktopLettaCodeRuntime)
+}
+
+/*
+ * The native Rive mascot renderer (avatar/renderer-rive/native/desktop). It is built outside Gradle -
+ * VS 2022 plus a rive-runtime checkout, scripted by build-bridge.sh - and handed in by path:
+ *   -PriveBridge=C:\path\to\rive_desktop_bridge.dll   or   LETTA_RIVE_BRIDGE_DLL
+ * It is staged into the app resources, so `:desktop:run` and the installed app both find it through
+ * compose.application.resources.dir (RiveBridgeNative.PATH). Without it every agent draws the
+ * gradient orb, so packaging refuses to run without one unless -PallowMissingRiveBridge=true.
+ */
+val riveBridgeSource: String? = providers.gradleProperty("riveBridge")
+    .orElse(providers.environmentVariable("LETTA_RIVE_BRIDGE_DLL"))
+    .orNull
+    ?.takeIf { it.isNotBlank() }
+val allowMissingRiveBridge = providers.gradleProperty("allowMissingRiveBridge").orNull.toBoolean()
+val stagedRiveBridge = desktopAppResourcesDir.map { it.file("windows/rive_desktop_bridge.dll") }
+val stageDesktopRiveBridge = tasks.register("stageDesktopRiveBridge") {
+    val source = riveBridgeSource?.let(::File)
+    val target = stagedRiveBridge.get().asFile
+    enabled = isWindowsHost
+    inputs.property("source", riveBridgeSource.orEmpty())
+    source?.takeIf { it.isFile }?.let { inputs.file(it) }
+    outputs.file(target)
+    doLast {
+        if (source == null) {
+            // Nothing handed in: make sure a DLL staged by an earlier build does not linger silently.
+            target.delete()
+            logger.lifecycle("stageDesktopRiveBridge: no -PriveBridge / LETTA_RIVE_BRIDGE_DLL; mascots fall back to orbs.")
+            return@doLast
+        }
+        require(source.isFile) { "Rive bridge DLL not found at $source (-PriveBridge / LETTA_RIVE_BRIDGE_DLL)" }
+        target.parentFile.mkdirs()
+        source.copyTo(target, overwrite = true)
+        logger.lifecycle("stageDesktopRiveBridge: staged $source")
+    }
+}
+
+tasks.matching { it.name == "prepareAppResources" }.configureEach {
+    dependsOn(stageDesktopRiveBridge)
+}
+
+tasks.matching {
+    it.name.startsWith("createDistributable") ||
+    it.name.startsWith("createReleaseDistributable") ||
+    it.name.startsWith("packageDistributionForCurrentOS") ||
+    it.name.startsWith("packageReleaseDistributionForCurrentOS")
+}.configureEach {
+    val staged = stagedRiveBridge
+    doFirst {
+        if (!isWindowsHost || allowMissingRiveBridge) return@doFirst
+        check(staged.get().asFile.isFile) {
+            "No rive_desktop_bridge.dll staged: this installer would ship without the mascot renderer. " +
+                "Build it with avatar/renderer-rive/native/desktop/build-bridge.sh and pass " +
+                "-PriveBridge=<dll> (or LETTA_RIVE_BRIDGE_DLL), or -PallowMissingRiveBridge=true to package orbs only."
+        }
+    }
 }
 
 tasks.matching { it.name == "checkRuntime" || it.name == "checkReleaseRuntime" }.configureEach {

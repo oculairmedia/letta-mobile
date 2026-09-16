@@ -45,6 +45,7 @@ internal fun MeasuredChatRenderItem(
      * came from.
      */
     scaleIsTransient: Boolean = false,
+    modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
     // The legacy list publishes the gesture through this local; the paged list does not, so the
@@ -95,7 +96,7 @@ internal fun MeasuredChatRenderItem(
     }
 
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .then(heightModifier)
             .onSizeChanged { size ->

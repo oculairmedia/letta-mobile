@@ -426,9 +426,8 @@ private fun PromptExpandButton(expanded: Boolean, onToggle: () -> Unit) {
  */
 @Composable
 internal fun ThinkingMessageRow() {
-    // Quiet, current treatment: a small breathing glow-dot plus a shimmering
-    // "Thinking…" label. The previous 40dp glossy sphere + three grey dots
-    // read as a toy marble in an otherwise flat, dark surface.
+    // Agents with a live mascot think beside the composer instead (DesktopChatSurface); this
+    // row is the indicator for agents without one.
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,

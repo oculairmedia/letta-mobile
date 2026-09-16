@@ -28,12 +28,19 @@ data class TimelineLiveBlock(
     val events: List<TimelineEvent.Confirmed> = emptyList(),
 )
 
+data class TimelinePreparedPage(
+    val metadata: TimelineMetadataPage,
+    val records: List<TimelineSettledRecord>,
+)
+
 data class TimelineSettledRecord(
     val key: TimelinePageKey,
     val contentType: String,
     val body: ByteArray,
     val revision: Long,
     val pointer: TimelineBodyPointer? = null,
+    /** Page-local result prepared inside the storage snapshot; never persisted or shared across pages. */
+    val preparedPresentation: TimelineSettledPresentation? = null,
 ) {
     val isPreview: Boolean get() = pointer?.encodedBytes?.let { it > body.size } ?: false
 }
@@ -76,24 +83,51 @@ sealed interface TimelineSettledPresentation {
     /** Stored whole but held back from inline decoding; the card reads it a page at a time. */
     data object Defer : TimelineSettledPresentation
 
-    /** Decoded and renderable. Carries the event so the caller need not decode it twice. */
-    data class Render(val event: TimelineEvent.Confirmed) : TimelineSettledPresentation
+    /** Carries the complete decode and projection through filtering to avoid repeating either. */
+    data class Render(
+        val event: TimelineEvent.Confirmed,
+        val item: com.letta.mobile.data.chat.projection.ChatRenderItem,
+    ) : TimelineSettledPresentation
 }
 
+/** Testable seam for the complete-record decode and UI projection used by the settled pager. */
+data class TimelineSettledProjectionAdapter(
+    val decode: (TimelineSettledRecord) -> TimelineEvent.Confirmed,
+    val project: (TimelineSettledRecord, TimelineEvent.Confirmed, String?) -> com.letta.mobile.data.chat.projection.ChatRenderItem?,
+)
+
+internal val DefaultTimelineSettledProjectionAdapter = TimelineSettledProjectionAdapter(
+    decode = { record ->
+        com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec.json.decodeFromString(
+            com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent.serializer(),
+            record.body.decodeToString(throwOnInvalidSequence = true),
+        ).toConfirmedTimelineEvent()
+    },
+    project = project@{ record, event, ownAgentId ->
+        val message = com.letta.mobile.data.chat.projection.timelineEventToUiMessage(event, ownAgentId) ?: return@project null
+        if (message.runId != null) com.letta.mobile.data.chat.projection.ChatRenderItem.RunBlock(
+            message.runId, listOf(message to com.letta.mobile.ui.common.GroupPosition.None),
+            stableKey = "segment-${record.key.identity.value}",
+        ) else com.letta.mobile.data.chat.projection.ChatRenderItem.Single(
+            message, com.letta.mobile.ui.common.GroupPosition.None, keyOverride = "segment-${record.key.identity.value}",
+        )
+    },
+)
+
 /** Malformed bodies still throw: a body that cannot be read is a fault, not an empty conversation. */
-fun TimelineSettledRecord.presentation(ownAgentId: String? = null): TimelineSettledPresentation = when {
+fun TimelineSettledRecord.presentation(ownAgentId: String? = null): TimelineSettledPresentation =
+    presentationWithAdapter(ownAgentId, DefaultTimelineSettledProjectionAdapter)
+
+internal fun TimelineSettledRecord.presentationWithAdapter(
+    ownAgentId: String?,
+    adapter: TimelineSettledProjectionAdapter,
+): TimelineSettledPresentation = when {
     contentType != TIMELINE_EVENT_CONTENT_TYPE -> TimelineSettledPresentation.Drop
     isPreview -> TimelineSettledPresentation.Defer
     else -> {
-        val event = com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec.json.decodeFromString(
-            com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent.serializer(),
-            body.decodeToString(throwOnInvalidSequence = true),
-        ).toConfirmedTimelineEvent()
-        if (com.letta.mobile.data.chat.projection.timelineEventToUiMessage(event, ownAgentId) == null) {
-            TimelineSettledPresentation.Drop
-        } else {
-            TimelineSettledPresentation.Render(event)
-        }
+        val event = adapter.decode(this)
+        adapter.project(this, event, ownAgentId)?.let { TimelineSettledPresentation.Render(event, it) }
+            ?: TimelineSettledPresentation.Drop
     }
 }
 

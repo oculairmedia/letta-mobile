@@ -281,6 +281,51 @@ class AppServerRuntimeEventMapperTest {
         assertEquals(raw.toString(), payload.body)
     }
 
+    @Test
+    fun requiresApprovalStopEmitsTheFrameButNoLifecycle() {
+        val drafts = mapper.map(command, received(stopWith("requires_approval")))
+
+        assertIs<RuntimeEventPayload.RemoteStreamFrame>(drafts.single().payload)
+    }
+
+    @Test
+    fun officialLimitAndFailureStopReasonsSettleTheTurn() {
+        // Previously outside the allowlist, these left the turn open until the idle timeout.
+        val completed = mapper.map(command, received(stopWith("max_steps")))
+        assertEquals(RuntimeRunStatus.Completed, assertIs<RuntimeEventPayload.RunLifecycleChanged>(completed[1].payload).status)
+
+        val failed = mapper.map(command, received(stopWith("llm_api_error")))
+        val failure = assertIs<RuntimeEventPayload.RunLifecycleChanged>(failed[1].payload)
+        assertEquals(RuntimeRunStatus.Failed, failure.status)
+        assertEquals("App Server turn stopped with llm_api_error", failure.reason)
+    }
+
+    @Test
+    fun inputAcceptedIsNotATurnEventAndTurnFinishedStaysObservable() {
+        val ack = AppServerInboundFrame.InputAccepted("input-1", runtime, accepted = true, disposition = "started")
+        assertEquals(emptyList(), mapper.map(command, received(ack)))
+
+        val finished = AppServerInboundFrame.TurnFinished(
+            runtime = runtime,
+            eventSeq = 9,
+            emittedAt = "2026-09-15T00:00:00Z",
+            idempotencyKey = "turn_finished:9",
+            turnId = "turn-1",
+            stopReason = "end_turn",
+        )
+        assertIs<RuntimeEventPayload.ExternalTransportFrame>(mapper.map(command, received(finished)).single().payload)
+    }
+
+    private fun stopWith(reason: String) = streamDelta(
+        messageType = "stop_reason",
+        runId = "run-1",
+        body = buildJsonObject {
+            put("message_type", "stop_reason")
+            put("run_id", "run-1")
+            put("stop_reason", reason)
+        },
+    )
+
     private fun received(frame: AppServerInboundFrame): AppServerReceivedFrame =
         AppServerReceivedFrame(
             channel = AppServerChannel.Stream,

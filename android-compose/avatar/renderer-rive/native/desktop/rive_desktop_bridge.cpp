@@ -20,6 +20,8 @@
 #include "rive/renderer/rive_renderer.hpp"
 #include "rive/animation/state_machine_input_instance.hpp"
 #include "rive/viewmodel/viewmodel_instance.hpp"
+#include "rive/viewmodel/viewmodel_instance_boolean.hpp"
+#include "rive/viewmodel/viewmodel_instance_color.hpp"
 #include "rive/viewmodel/viewmodel_instance_enum.hpp"
 #include "rive/viewmodel/viewmodel_instance_number.hpp"
 #include "rive/viewmodel/viewmodel_instance_trigger.hpp"
@@ -49,6 +51,95 @@ struct RiveBridge
     rcp<ViewModelInstance> viewModel;
     Mat2D viewTransform;
 };
+
+// --- Load helpers --------------------------------------------------------------------------------
+
+// Picks the artboard: `artboardName` null/empty takes the file's default. Returns 0, 4 when a named
+// artboard does not exist, or 2 when the file has no default artboard.
+static int pick_artboard(RiveBridge* bridge, const char* artboardName)
+{
+    const bool named = artboardName && *artboardName;
+    bridge->artboard = named ? bridge->file->artboardNamed(std::string(artboardName)) : bridge->file->artboardDefault();
+    if (bridge->artboard)
+        return 0;
+    return named ? 4 : 2;
+}
+
+static std::unique_ptr<StateMachineInstance> state_machine_named(ArtboardInstance* artboard, const char* name)
+{
+    if (!name || !*name)
+        return nullptr;
+    for (size_t i = 0; i < artboard->stateMachineCount(); ++i)
+    {
+        auto candidate = artboard->stateMachineAt(i);
+        if (candidate && candidate->name() == name)
+            return candidate;
+    }
+    return nullptr;
+}
+
+// The named state machine, else the artboard's default, else its first. Returns 0, or 3 when the
+// artboard has none.
+static int pick_state_machine(RiveBridge* bridge, const char* stateMachineName)
+{
+    ArtboardInstance* artboard = bridge->artboard.get();
+    bridge->stateMachine = state_machine_named(artboard, stateMachineName);
+    if (!bridge->stateMachine)
+        bridge->stateMachine = artboard->defaultStateMachine();
+    if (!bridge->stateMachine && artboard->stateMachineCount() > 0)
+        bridge->stateMachine = artboard->stateMachineAt(0);
+    return bridge->stateMachine ? 0 : 3;
+}
+
+// The artboard's view model, as its authored DEFAULT instance: that is what carries the authored
+// colour and enum values. `createViewModelInstance(artboard)` hands back a blank instance, which is
+// why the body drew black until the host wrote a colour. A file with no view model still drives
+// through state machine inputs.
+static void bind_view_model(RiveBridge* bridge)
+{
+    bridge->viewModel = bridge->file->createDefaultViewModelInstance(bridge->artboard.get());
+    if (!bridge->viewModel)
+        bridge->viewModel = bridge->file->createViewModelInstance(bridge->artboard.get());
+    if (!bridge->viewModel)
+        return;
+    bridge->artboard->bindViewModelInstance(bridge->viewModel);
+    bridge->stateMachine->bindViewModelInstance(bridge->viewModel);
+}
+
+// --- View model helpers --------------------------------------------------------------------------
+
+// The named view-model property as a T, or null when there is no view model, no such property, or
+// the property is of another type.
+template <typename T> static T* vm_property(RiveBridge* bridge, const char* name)
+{
+    auto* property = bridge->viewModel ? bridge->viewModel->propertyValue(std::string(name)) : nullptr;
+    return property && property->is<T>() ? property->as<T>() : nullptr;
+}
+
+// Runs `apply` on the named property when it exists as a T and returns its result; 1 otherwise.
+template <typename T, typename Apply> static int with_vm_property(RiveBridge* bridge, const char* name, Apply apply)
+{
+    T* property = vm_property<T>(bridge, name);
+    return property ? apply(property) : 1;
+}
+
+// Newline-joined names of every number property on the bound view model; returns how many.
+static int join_number_names(RiveBridge* bridge, std::string& joined)
+{
+    if (!bridge->viewModel)
+        return 0;
+    int count = 0;
+    for (const auto& value : bridge->viewModel->propertyValues())
+    {
+        if (!value || !value->is<ViewModelInstanceNumber>())
+            continue;
+        if (!joined.empty())
+            joined.push_back('\n');
+        joined += value->name();
+        ++count;
+    }
+    return count;
+}
 
 extern "C" {
 
@@ -92,9 +183,12 @@ __declspec(dllexport) void rive_bridge_destroy(RiveBridge* bridge)
     delete bridge;
 }
 
-// Returns 0 on success.
-__declspec(dllexport) int rive_bridge_load(RiveBridge* bridge, const uint8_t* bytes, int length,
-                                           const char* stateMachineName)
+// Returns 0 on success. `artboardName` null/empty picks the file's default artboard; a name that
+// no artboard carries is an error (4) rather than a silent fall back to the default, so the bench
+// cannot believe it is looking at `Harness` while showing `Mascot`.
+__declspec(dllexport) int rive_bridge_load_artboard(RiveBridge* bridge, const uint8_t* bytes, int length,
+                                                    const char* stateMachineName,
+                                                    const char* artboardName)
 {
     bridge->stateMachine.reset();
     bridge->artboard.reset();
@@ -103,38 +197,20 @@ __declspec(dllexport) int rive_bridge_load(RiveBridge* bridge, const uint8_t* by
     bridge->file = File::import(Span<const uint8_t>(bytes, length), bridge->renderContext.get(), &result);
     if (!bridge->file)
         return 1;
-    bridge->artboard = bridge->file->artboardDefault();
-    if (!bridge->artboard)
-        return 2;
-    if (stateMachineName && *stateMachineName)
-    {
-        for (size_t i = 0; i < bridge->artboard->stateMachineCount(); ++i)
-        {
-            auto candidate = bridge->artboard->stateMachineAt(i);
-            if (candidate && candidate->name() == stateMachineName)
-            {
-                bridge->stateMachine = std::move(candidate);
-                break;
-            }
-        }
-    }
-    if (!bridge->stateMachine)
-        bridge->stateMachine = bridge->artboard->defaultStateMachine();
-    if (!bridge->stateMachine && bridge->artboard->stateMachineCount() > 0)
-        bridge->stateMachine = bridge->artboard->stateMachineAt(0);
-    if (!bridge->stateMachine)
-        return 3;
-
-    // Same binding the Android runtime's autoBind performs: the artboard's own view model, else
-    // none. A file with no view model still drives through state machine inputs.
-    bridge->viewModel = bridge->file->createViewModelInstance(bridge->artboard.get());
-    if (bridge->viewModel)
-    {
-        bridge->artboard->bindViewModelInstance(bridge->viewModel);
-        bridge->stateMachine->bindViewModelInstance(bridge->viewModel);
-    }
+    if (int code = pick_artboard(bridge, artboardName))
+        return code;
+    if (int code = pick_state_machine(bridge, stateMachineName))
+        return code;
+    bind_view_model(bridge);
     bridge->stateMachine->advanceAndApply(0);
     return 0;
+}
+
+// The original entry point: the file's default artboard.
+__declspec(dllexport) int rive_bridge_load(RiveBridge* bridge, const uint8_t* bytes, int length,
+                                           const char* stateMachineName)
+{
+    return rive_bridge_load_artboard(bridge, bytes, length, stateMachineName, nullptr);
 }
 
 __declspec(dllexport) float rive_bridge_artboard_width(RiveBridge* bridge)
@@ -153,10 +229,37 @@ __declspec(dllexport) void rive_bridge_advance(RiveBridge* bridge, float seconds
         bridge->stateMachine->advanceAndApply(seconds);
 }
 
-static void ensure_target(RiveBridge* bridge, uint32_t width, uint32_t height)
+static bool create_offscreen_textures(RiveBridge* bridge, D3D11_TEXTURE2D_DESC desc)
 {
-    if (bridge->width == width && bridge->height == height && bridge->drawTexture)
-        return;
+    if (FAILED(bridge->gpu->CreateTexture2D(&desc, nullptr, bridge->drawTexture.ReleaseAndGetAddressOf())))
+        return false;
+    desc.Usage = D3D11_USAGE_STAGING;
+    desc.BindFlags = 0;
+    desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+    if (FAILED(bridge->gpu->CreateTexture2D(&desc, nullptr, bridge->readbackTexture.ReleaseAndGetAddressOf())))
+        return false;
+    return bridge->drawTexture && bridge->readbackTexture;
+}
+
+static bool target_size_matches(RiveBridge* bridge, uint32_t width, uint32_t height)
+{
+    return bridge->width == width && bridge->height == height;
+}
+
+static bool target_textures_ready(RiveBridge* bridge)
+{
+    return bridge->drawTexture && bridge->readbackTexture;
+}
+
+static bool target_ready(RiveBridge* bridge, uint32_t width, uint32_t height)
+{
+    return target_size_matches(bridge, width, height) && target_textures_ready(bridge);
+}
+
+static bool ensure_target(RiveBridge* bridge, uint32_t width, uint32_t height)
+{
+    if (target_ready(bridge, width, height))
+        return true;
     D3D11_TEXTURE2D_DESC desc{};
     desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
     desc.MipLevels = 1;
@@ -166,17 +269,14 @@ static void ensure_target(RiveBridge* bridge, uint32_t width, uint32_t height)
     desc.SampleDesc.Count = 1;
     desc.Usage = D3D11_USAGE_DEFAULT;
     desc.BindFlags = D3D11_BIND_RENDER_TARGET;
-    bridge->gpu->CreateTexture2D(&desc, nullptr, bridge->drawTexture.ReleaseAndGetAddressOf());
-
-    desc.Usage = D3D11_USAGE_STAGING;
-    desc.BindFlags = 0;
-    desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
-    bridge->gpu->CreateTexture2D(&desc, nullptr, bridge->readbackTexture.ReleaseAndGetAddressOf());
+    if (!create_offscreen_textures(bridge, desc))
+        return false;
 
     bridge->renderTarget =
         bridge->renderContext->static_impl_cast<RenderContextD3DImpl>()->makeRenderTarget(width, height);
     bridge->width = width;
     bridge->height = height;
+    return true;
 }
 
 // Draws the current scene and copies it into `rgbaOut` (width * height * 4 bytes, premultiplied
@@ -186,7 +286,8 @@ __declspec(dllexport) int rive_bridge_render(RiveBridge* bridge, int width, int 
 {
     if (!bridge->artboard || width <= 0 || height <= 0)
         return 1;
-    ensure_target(bridge, (uint32_t)width, (uint32_t)height);
+    if (!ensure_target(bridge, (uint32_t)width, (uint32_t)height))
+        return 3;
 
     bridge->renderContext->beginFrame({
         .renderTargetWidth = (uint32_t)width,
@@ -271,28 +372,69 @@ __declspec(dllexport) int rive_bridge_set_number(RiveBridge* bridge, const char*
 
 __declspec(dllexport) int rive_bridge_vm_set_number(RiveBridge* bridge, const char* name, float value)
 {
-    auto* property = bridge->viewModel ? bridge->viewModel->propertyValue(std::string(name)) : nullptr;
-    if (!property || !property->is<ViewModelInstanceNumber>())
-        return 1;
-    property->as<ViewModelInstanceNumber>()->propertyValue(value);
-    return 0;
+    return with_vm_property<ViewModelInstanceNumber>(bridge, name, [&](ViewModelInstanceNumber* number) {
+        number->propertyValue(value);
+        return 0;
+    });
+}
+
+// Reads a view-model number back. This is the probe path: with `--probe`'s two-way data binds in
+// the file, a node property's real post-state-machine value arrives here every frame. Returns 0 and
+// writes `*out` when the property exists and is a number.
+__declspec(dllexport) int rive_bridge_vm_get_number(RiveBridge* bridge, const char* name, float* out)
+{
+    if (!out)
+        return 3;
+    return with_vm_property<ViewModelInstanceNumber>(bridge, name, [&](ViewModelInstanceNumber* number) {
+        *out = number->propertyValue();
+        return 0;
+    });
+}
+
+// Newline-separated names of every number property on the bound view model, so the bench can find
+// the `telemetry*` probes without being told what they are. Returns the number of names written, or
+// -1 when the buffer is too small (nothing is written then).
+__declspec(dllexport) int rive_bridge_vm_number_names(RiveBridge* bridge, char* out, int cap)
+{
+    if (!out || cap <= 0)
+        return -1;
+    std::string joined;
+    const int count = join_number_names(bridge, joined);
+    if ((int)joined.size() + 1 > cap)
+        return -1;
+    std::memcpy(out, joined.c_str(), joined.size() + 1);
+    return count;
 }
 
 __declspec(dllexport) int rive_bridge_vm_set_enum(RiveBridge* bridge, const char* name, const char* key)
 {
-    auto* property = bridge->viewModel ? bridge->viewModel->propertyValue(std::string(name)) : nullptr;
-    if (!property || !property->is<ViewModelInstanceEnum>())
-        return 1;
-    return property->as<ViewModelInstanceEnum>()->value(std::string(key)) ? 0 : 2;
+    return with_vm_property<ViewModelInstanceEnum>(bridge, name, [&](ViewModelInstanceEnum* enumeration) {
+        return enumeration->value(std::string(key)) ? 0 : 2;
+    });
+}
+
+__declspec(dllexport) int rive_bridge_vm_set_color(RiveBridge* bridge, const char* name, int argb)
+{
+    return with_vm_property<ViewModelInstanceColor>(bridge, name, [&](ViewModelInstanceColor* color) {
+        color->propertyValue(argb);
+        return 0;
+    });
 }
 
 __declspec(dllexport) int rive_bridge_vm_fire(RiveBridge* bridge, const char* name)
 {
-    auto* property = bridge->viewModel ? bridge->viewModel->propertyValue(std::string(name)) : nullptr;
-    if (!property || !property->is<ViewModelInstanceTrigger>())
-        return 1;
-    property->as<ViewModelInstanceTrigger>()->trigger();
-    return 0;
+    return with_vm_property<ViewModelInstanceTrigger>(bridge, name, [](ViewModelInstanceTrigger* trigger) {
+        trigger->trigger();
+        return 0;
+    });
+}
+
+__declspec(dllexport) int rive_bridge_vm_set_boolean(RiveBridge* bridge, const char* name, int value)
+{
+    return with_vm_property<ViewModelInstanceBoolean>(bridge, name, [&](ViewModelInstanceBoolean* boolean) {
+        boolean->propertyValue(value != 0);
+        return 0;
+    });
 }
 
 } // extern "C"

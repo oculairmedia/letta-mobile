@@ -1,0 +1,54 @@
+name: App Server contract baseline
+
+# Advisory (not a required check). Keeps the pinned App Server protocol baseline honest:
+# - on PRs touching the contract fixtures or tooling, the committed inventory, hashes and CLI
+#   probe fixtures must match the real pinned @letta-ai/letta-code package;
+# - weekly, a newer npm release whose command/message unions differ raises a warning so the
+#   Kotlin client is caught up deliberately (see scripts/appserver/verify-contract-baseline.mjs).
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/appserver-contract.yml"
+      - "scripts/appserver/**"
+      - "android-compose/sharedLogic/src/jvmTest/resources/appserver/**"
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  appserver-contract-baseline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read the pinned baseline
+        id: pin
+        run: |
+          matrix=android-compose/sharedLogic/src/jvmTest/resources/appserver/app-server-v2-contract-matrix.json
+          echo "version=$(jq -r .baseline.version "$matrix")" >> "$GITHUB_OUTPUT"
+          echo "node=$(jq -r .baseline.node "$matrix" | sed 's/^v//')" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ steps.pin.outputs.node }}
+
+      - name: Verify the committed baseline against the pinned package
+        run: |
+          npm install --prefix "$RUNNER_TEMP/pinned" "@letta-ai/letta-code@${{ steps.pin.outputs.version }}" --no-audit --no-fund
+          node scripts/appserver/verify-contract-baseline.mjs --package-root "$RUNNER_TEMP/pinned"
+
+      - name: Warn when a newer release changes the protocol unions
+        if: github.event_name != 'pull_request'
+        run: |
+          latest=$(npm view @letta-ai/letta-code version)
+          pinned="${{ steps.pin.outputs.version }}"
+          if [ "$latest" = "$pinned" ]; then echo "pinned $pinned is latest"; exit 0; fi
+          npm install --prefix "$RUNNER_TEMP/latest" "@letta-ai/letta-code@$latest" --no-audit --no-fund
+          if node scripts/appserver/verify-contract-baseline.mjs --package-root "$RUNNER_TEMP/latest" --unions-only; then
+            echo "::notice::@letta-ai/letta-code $latest keeps the $pinned command/message unions"
+          else
+            echo "::warning::@letta-ai/letta-code $latest changes the App Server protocol unions pinned at $pinned; refresh the baseline and the Kotlin client"
+          fi

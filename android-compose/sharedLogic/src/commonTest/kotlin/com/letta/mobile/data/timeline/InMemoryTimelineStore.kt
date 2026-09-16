@@ -18,6 +18,7 @@ internal class InMemoryTimelineStore(
 ) : TimelineBoundedStore {
     var current: TimelineDurableCheckpoint = initial
     var bodyReads = 0
+    var reads = 0
     var puts = 0
     val rows = mutableMapOf<TimelinePageKey, TimelineStoredRecord>()
     val evidence = mutableMapOf<String, ByteArray>()
@@ -28,8 +29,10 @@ internal class InMemoryTimelineStore(
         evidence[key] = value.copyOf()
     }
 
-    override suspend fun <T> read(scope: TimelineScope, block: suspend TimelineStoreReader.() -> T): T =
-        block(Tx(tools[scope]?.snapshot() ?: TestToolIndexState()))
+    override suspend fun <T> read(scope: TimelineScope, block: suspend TimelineStoreReader.() -> T): T {
+        reads++
+        return block(Tx(tools[scope]?.snapshot() ?: TestToolIndexState()))
+    }
 
     override suspend fun <T> transaction(scope: TimelineScope, block: suspend TimelineStoreTransaction.() -> T): T {
         val before = current
