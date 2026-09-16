@@ -216,6 +216,7 @@ class LettaDatabaseMigrationTest {
             content = "image message",
             attachmentsJson = """[{"base64":"abc","mediaType":"image/png"}]""",
             sentAtEpochMs = 123L,
+            deliveryState = "SENT",
         )
         createLegacyDatabase(version = 3) { db ->
             createAgentsTable(db)

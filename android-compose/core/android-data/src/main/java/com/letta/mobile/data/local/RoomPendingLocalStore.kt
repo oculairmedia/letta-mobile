@@ -33,11 +33,16 @@ class RoomPendingLocalStore @Inject constructor(
                 content = record.content,
                 attachmentsJson = JSON.encodeToString(LIST_SER, payload),
                 sentAtEpochMs = record.sentAt.toEpochMilli(),
+                deliveryState = record.deliveryState.name,
             )
         )
     }
 
     override suspend fun delete(otid: String) = dao.deleteByOtid(otid)
+
+    override suspend fun markFailed(otid: String) {
+        dao.markFailedAndKeepNewest(otid)
+    }
 
     override suspend fun load(conversationId: String): List<PendingLocalRecord> {
         return dao.listForConversation(conversationId).map { row ->
@@ -50,6 +55,8 @@ class RoomPendingLocalStore @Inject constructor(
                 content = row.content,
                 attachments = images,
                 sentAt = Instant.ofEpochMilli(row.sentAtEpochMs),
+                deliveryState = runCatching { com.letta.mobile.data.timeline.DeliveryState.valueOf(row.deliveryState) }
+                    .getOrDefault(com.letta.mobile.data.timeline.DeliveryState.SENT),
             )
         }
     }

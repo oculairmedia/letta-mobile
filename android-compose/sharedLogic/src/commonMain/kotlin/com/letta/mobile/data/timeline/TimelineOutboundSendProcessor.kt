@@ -109,12 +109,6 @@ internal class TimelineOutboundSendProcessor(
             // the existing Local stays SENDING while the transport runs;
             // applyMarkSent on stream completion transitions it to SENT and
             // reconcileAfterSend swaps it for the Confirmed echo.
-            sendQueue.send(pending)
-            Telemetry.event(
-                logTag, "send.optimisticLocalSkippedEventQueue",
-                "otid" to otid,
-                "conversationId" to conversationId,
-            )
         }
         if (attachments.isNotEmpty()) {
             runCatching {
@@ -130,6 +124,16 @@ internal class TimelineOutboundSendProcessor(
             }.onFailure { t ->
                 Telemetry.error(logTag, "send.persistFailed", t, "otid" to otid)
             }
+        }
+        if (!appendLocal) {
+            // Persist image-bearing sends before transport can fail. Otherwise the queue consumer
+            // can mark the in-memory row failed before its durable counterpart exists.
+            sendQueue.send(pending)
+            Telemetry.event(
+                logTag, "send.optimisticLocalSkippedEventQueue",
+                "otid" to otid,
+                "conversationId" to conversationId,
+            )
         }
     }
 
@@ -155,6 +159,7 @@ internal class TimelineOutboundSendProcessor(
                 val ack = CompletableDeferred<Unit>()
                 eventQueue.send(TimelineGatewayEvent.MarkFailed(pending.otid, ack))
                 ack.await()
+                if (pending.attachments.isNotEmpty()) pendingLocalStore.markFailed(pending.otid)
                 events.emit(TimelineSyncEvent.StreamError("send", t.message ?: "unknown"))
             }
         }
