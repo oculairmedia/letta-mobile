@@ -40,10 +40,12 @@ class ChatReasoningTest {
      * displayed. Settle that motion on the test clock rather than asserting on the frame that
      * happens to follow setContent, which passes or fails with machine load.
      */
-    private fun settleReasoningEnter() {
-        composeRule.mainClock.advanceTimeBy(1_000)
-        composeRule.waitForIdle()
-    }
+    /**
+     * Every caller asserts the reasoning body is displayed next, so settle on that condition
+     * rather than a fixed 1s clock advance: under a loaded full-suite run the enter transition
+     * could still be at zero height on the frame after the advance and the assert would flake.
+     */
+    private fun settleReasoningEnter() = awaitReasoningContent(present = true)
 
     /**
      * Waits for the reasoning body to finish entering or leaving instead of advancing the clock by
@@ -54,7 +56,16 @@ class ChatReasoningTest {
      */
     private fun awaitReasoningContent(present: Boolean) {
         composeRule.waitUntil(REASONING_MOTION_TIMEOUT_MS) {
-            composeRule.onAllNodesWithTag(ChatReasoningTestTags.Content).fetchSemanticsNodes().isNotEmpty() == present
+            val mounted = composeRule.onAllNodesWithTag(ChatReasoningTestTags.Content).fetchSemanticsNodes().isNotEmpty()
+            when {
+                !present -> !mounted
+                !mounted -> false
+                // Mounted is not yet visible: the expand transition starts at zero height, so wait
+                // for the frame where the body actually occupies the screen before asserting on it.
+                else -> runCatching {
+                    composeRule.onNodeWithTag(ChatReasoningTestTags.Content).assertIsDisplayed()
+                }.isSuccess
+            }
         }
         composeRule.waitForIdle()
     }
@@ -279,7 +290,7 @@ class ChatReasoningTest {
             }
         }
 
-        settleReasoningEnter()
+        awaitReasoningContent(present = true)
         composeRule.onNodeWithTag(ChatReasoningTestTags.Content).assertIsDisplayed()
     }
 
