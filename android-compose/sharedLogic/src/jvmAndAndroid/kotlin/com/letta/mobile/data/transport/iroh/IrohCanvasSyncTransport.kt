@@ -2,12 +2,15 @@ package com.letta.mobile.data.transport.iroh
 
 import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.canvas.CanvasOp
+import com.letta.mobile.data.canvas.CanvasOpLog
 import com.letta.mobile.data.canvas.CanvasSyncTransport
 import com.letta.mobile.data.canvas.LoopbackCanvasSyncTransport
 import com.letta.mobile.util.Telemetry
 import computer.iroh.BiStream
 import computer.iroh.Connection
 import computer.iroh.Endpoint
+import computer.iroh.EndpointAddr
+import computer.iroh.EndpointTicket
 import computer.iroh.RecvStream
 import computer.iroh.SendStream
 import kotlinx.coroutines.CancellationException
@@ -18,6 +21,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -31,23 +35,21 @@ import kotlinx.serialization.json.Json
 @Serializable
 data class CanvasOpWirePacket(
     val canvasId: String,
-    val op: CanvasOp,
+    val op: CanvasOp? = null,
+    val requestCatchUpSinceLamport: Long? = null,
 )
 
 /**
- * Architecture framing sketch and codec contract for dedicated Iroh ALPN `meridian/canvas-sync/1`.
+ * Live Iroh-backed transport for multi-device canvas synchronization.
  *
  * Runs independently from App Server chat WebSocket framing, operating over
- * dedicated BiStreams with length-prefixed binary framing.
- *
- * NOTE (P3 Status): This type establishes the packet layout and 4-byte prefix codec.
- * Live Endpoint lifecycle wiring (automatic peer accept/dial and background connection
- * registration) is deferred to P3.1/P4. Collaborative multi-client sync in current hosts
- * operates over [LoopbackCanvasSyncTransport].
+ * dedicated BiStreams with length-prefixed binary framing on ALPN `meridian/canvas-sync/1`.
+ * Supports peer dialing via ticket or address, automatic accept loop, and historical op catch-up.
  */
 class IrohCanvasSyncTransport(
     private val scope: CoroutineScope,
     private val endpoint: Endpoint? = null,
+    private val opLog: CanvasOpLog? = null,
     private val fallback: CanvasSyncTransport = LoopbackCanvasSyncTransport(),
 ) : CanvasSyncTransport {
 
@@ -61,10 +63,65 @@ class IrohCanvasSyncTransport(
     private val mutex = Mutex()
     private val activeSendStreams = mutableListOf<SendStream>()
     private val flowsByCanvas = mutableMapOf<CanvasId, MutableSharedFlow<CanvasOp>>()
+    private var acceptJob: Job? = null
 
-    fun registerConnection(connection: Connection): Job = scope.launch {
+    init {
+        if (endpoint != null) {
+            startAcceptLoop()
+        }
+    }
+
+    fun startAcceptLoop(): Job {
+        acceptJob?.cancel()
+        val ep = endpoint ?: return Job().apply { complete() }
+        val job = scope.launch {
+            while (isActive) {
+                try {
+                    val incoming = ep.acceptNext() ?: continue
+                    launch { handleIncomingConnection(incoming) }
+                } catch (t: Throwable) {
+                    if (t is CancellationException) throw t
+                    val errorMsg = t.message ?: t.toString()
+                    Telemetry.event("CanvasSync", "accept.error", "error" to errorMsg)
+                }
+            }
+        }
+        acceptJob = job
+        return job
+    }
+
+    private suspend fun handleIncomingConnection(incoming: computer.iroh.IncomingConnection) {
+        runCatching {
+            val accepting = incoming.accept()
+            val peerAlpn = accepting.alpn()
+            if (peerAlpn.contentEquals(CANVAS_SYNC_ALPN)) {
+                val connection = accepting.connect()
+                Telemetry.event("CanvasSync", "incoming.connected")
+                registerConnection(connection, isInbound = true)
+            }
+        }.onFailure { t ->
+            val errorMsg = t.message ?: t.toString()
+            Telemetry.event("CanvasSync", "incoming.error", "error" to errorMsg)
+        }
+    }
+
+    suspend fun connectToPeer(endpointAddr: EndpointAddr): Connection {
+        val ep = endpoint ?: error("Iroh endpoint is not configured")
+        Telemetry.event("CanvasSync", "dial.start")
+        val connection = ep.connect(endpointAddr, CANVAS_SYNC_ALPN)
+        Telemetry.event("CanvasSync", "dial.connected")
+        registerConnection(connection, isInbound = false)
+        return connection
+    }
+
+    suspend fun connectToPeerByTicket(ticketString: String): Connection {
+        val ticket = EndpointTicket.fromString(ticketString)
+        return connectToPeer(ticket.endpointAddr())
+    }
+
+    fun registerConnection(connection: Connection, isInbound: Boolean = false): Job = scope.launch {
         try {
-            val biStream = connection.openBi()
+            val biStream = if (isInbound) connection.acceptBi() else connection.openBi()
             val sendStream = biStream.send()
             val recvStream = biStream.recv()
 
@@ -73,7 +130,7 @@ class IrohCanvasSyncTransport(
             }
 
             try {
-                consumePackets(recvStream)
+                consumePackets(recvStream, sendStream)
             } finally {
                 removeActiveSendStream(sendStream)
             }
@@ -85,22 +142,39 @@ class IrohCanvasSyncTransport(
         }
     }
 
-    private suspend fun consumePackets(recvStream: RecvStream) {
-        while (true) {
+    private suspend fun consumePackets(recvStream: RecvStream, sendStream: SendStream) {
+        while (isActive) {
             val frameBytes = readFrame(recvStream) ?: break
-            dispatchIncomingPacket(frameBytes)
+            dispatchIncomingPacket(frameBytes, sendStream)
         }
     }
 
-    private suspend fun dispatchIncomingPacket(frameBytes: ByteArray) {
+    private suspend fun dispatchIncomingPacket(frameBytes: ByteArray, sendStream: SendStream) {
         val packet = runCatching {
             json.decodeFromString<CanvasOpWirePacket>(frameBytes.decodeToString())
         }.getOrNull() ?: return
 
         val canvasId = CanvasId(packet.canvasId)
-        val flow = getOrCreateFlow(canvasId)
-        flow.emit(packet.op)
-        fallback.publish(canvasId, packet.op)
+        if (packet.op != null) {
+            val flow = getOrCreateFlow(canvasId)
+            flow.emit(packet.op)
+            fallback.publish(canvasId, packet.op)
+        }
+        val sinceLamport = packet.requestCatchUpSinceLamport
+        if (sinceLamport != null && opLog != null) {
+            sendCatchUpOps(canvasId, sinceLamport, sendStream)
+        }
+    }
+
+    private suspend fun sendCatchUpOps(canvasId: CanvasId, sinceLamport: Long, sendStream: SendStream) {
+        val log = opLog ?: return
+        val historicalOps = log.getOps(canvasId, sinceLamport)
+        for (historicalOp in historicalOps) {
+            val replyPacket = CanvasOpWirePacket(canvasId = canvasId.value, op = historicalOp)
+            val payload = json.encodeToString(replyPacket).encodeToByteArray()
+            val frame = encodeFrame(payload)
+            runCatching { sendStream.write(frame) }
+        }
     }
 
     private suspend fun removeActiveSendStream(sendStream: SendStream) {
@@ -138,7 +212,26 @@ class IrohCanvasSyncTransport(
     }
 
     override fun subscribe(canvasId: CanvasId): Flow<CanvasOp> {
+        scope.launch {
+            requestCatchUp(canvasId, sinceLamport = 0L)
+        }
         return getOrCreateFlow(canvasId).asSharedFlow()
+    }
+
+    suspend fun requestCatchUp(canvasId: CanvasId, sinceLamport: Long = 0L) {
+        val packet = CanvasOpWirePacket(
+            canvasId = canvasId.value,
+            op = null,
+            requestCatchUpSinceLamport = sinceLamport,
+        )
+        val payload = json.encodeToString(packet).encodeToByteArray()
+        val frame = encodeFrame(payload)
+
+        mutex.withLock {
+            for (stream in activeSendStreams) {
+                runCatching { stream.write(frame) }
+            }
+        }
     }
 
     private fun getOrCreateFlow(canvasId: CanvasId): MutableSharedFlow<CanvasOp> {
