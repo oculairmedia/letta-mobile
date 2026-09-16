@@ -21,27 +21,8 @@ class CanvasMultiplayerSyncTest {
         val sharedTransport = LoopbackCanvasSyncTransport()
         val canvasId = CanvasId("canvas-collab-1")
 
-        // Client A
-        val storeA = InMemoryCanvasDocumentStore()
-        val sessionA = CanvasSession.create(
-            store = storeA,
-            options = CanvasCreateOptions(
-                canvasId = canvasId,
-                title = "Shared Architecture",
-                syncTransport = sharedTransport,
-            ),
-        )
-
-        // Client B
-        val storeB = InMemoryCanvasDocumentStore()
-        val sessionB = CanvasSession.create(
-            store = storeB,
-            options = CanvasCreateOptions(
-                canvasId = canvasId,
-                title = "Shared Architecture",
-                syncTransport = sharedTransport,
-            ),
-        )
+        val sessionA = createCollabSession(canvasId, sharedTransport)
+        val sessionB = createCollabSession(canvasId, sharedTransport)
 
         val jobA = sessionA.startSync(backgroundScope)
         val jobB = sessionB.startSync(backgroundScope)
@@ -158,4 +139,14 @@ class CanvasMultiplayerSyncTest {
         assertEquals(1, elements?.size)
         assertEquals("clean-diagram", elements?.get(0)?.jsonObject?.get("id")?.jsonPrimitive?.content)
     }
+
+    private suspend fun createCollabSession(canvasId: CanvasId, syncTransport: CanvasSyncTransport): CanvasSession =
+        CanvasSession.create(
+            store = InMemoryCanvasDocumentStore(),
+            options = CanvasCreateOptions(
+                canvasId = canvasId,
+                title = "Shared Architecture",
+                syncTransport = syncTransport,
+            ),
+        )
 }
