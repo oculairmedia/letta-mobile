@@ -1,28 +1,45 @@
 {
   "baseline": {
     "package": "@letta-ai/letta-code",
-    "version": "0.29.12",
+    "version": "0.32.10",
     "node": "v24.18.0",
     "package_engine": ">=22.19.0",
     "protocol_export": "dist/types/types/app-server-protocol.d.ts -> dist/types/types/protocol_v2.d.ts",
-    "protocol_sha256": "41874aad00d23d3f63a5aaab86986ac707e1437a0d02625d7ee161d261f0a285",
-    "protocol_corpus_sha256": "ed16a93a9e9c96dacb95e3597c7a48f62a5172fb1844b50372e8f531b4084713",
+    "protocol_sha256": "09138d9e5dc36b8a22575a24c35e4bc6768892e7e41a753400d047b3ee37f86a",
+    "protocol_corpus_sha256": "872e5dbcaf851bc679915f9a3fbb18456151e3ce25f7d8bde361289a668b4477",
     "protocol_corpus_files": [
+      "dist/types/backend/api/ephemeral-conversations.d.ts",
+      "dist/types/runtime-execution-settings.d.ts",
       "dist/types/types/app-server-info.d.ts",
       "dist/types/types/app-server-protocol.d.ts",
+      "dist/types/types/approval-classification-protocol.d.ts",
+      "dist/types/types/background-process-protocol.d.ts",
+      "dist/types/types/chatgpt-oauth.d.ts",
       "dist/types/types/conversation-fork-protocol.d.ts",
-      "dist/types/types/protocol_v2.d.ts"
+      "dist/types/types/cwd-protocol.d.ts",
+      "dist/types/types/external-tool-protocol.d.ts",
+      "dist/types/types/loop-status-protocol.d.ts",
+      "dist/types/types/protocol_v2.d.ts",
+      "dist/types/types/queue-update-protocol.d.ts",
+      "dist/types/types/runtime-scope.d.ts",
+      "dist/types/types/runtime-start-protocol.d.ts",
+      "dist/types/types/schedule-protocol.d.ts",
+      "dist/types/types/task-control-protocol.d.ts",
+      "dist/types/types/teleport-protocol.d.ts",
+      "dist/types/types/toolset-protocol.d.ts"
     ],
-    "captured_at": "2026-07-29",
+    "captured_at": "2026-09-15",
     "capture_method": "executed the resolved installed package entrypoint with the pinned Node v24.18.0 runtime; retained stdout fixtures and omitted local wrapper stderr",
     "reproduction": "scripts/appserver/verify-contract-baseline.mjs --package-root <installed-package-root-or-npm-prefix>"
   },
   "observed_installed_contract": {
     "classification": "app_server_v2",
-    "source": "installed @letta-ai/letta-code 0.29.12 declarations and bundled runtime",
+    "source": "installed @letta-ai/letta-code 0.32.10 declarations and bundled runtime",
     "protocol_inventory_fixture": "installed-protocol-v2-inventory.json",
     "mobile_typed_frame_fixture": "protocol-frames.jsonl",
-    "deprecation_claim": "letta app-server --help warns it is deprecated and prints letta server --listen usage"
+    "deprecation_claim": "letta app-server --help warns it is deprecated and prints letta server --listen usage",
+    "live_server_golden_fixture": "golden/letta-code-0.32.3-live.jsonl",
+    "live_server_note": "The deployed App Server runs 0.32.3; its WsProtocolCommand/WsProtocolMessage unions are identical to 0.32.10 (100 commands, 111 messages)."
   },
   "downstream_ownership_policy": {
     "status": "mobile migration policy, not an upstream protocol limitation",
@@ -98,7 +115,7 @@
       ],
       "not_capabilities": [],
       "fixture": "cli-app-server-help.txt",
-      "note": "0.29.x: app-server prints deprecation on stderr and emits the unified letta server --listen help on stdout"
+      "note": "0.29.x-0.32.x: app-server prints deprecation on stderr and emits the unified letta server --listen help on stdout"
     }
   ],
   "frames": [
