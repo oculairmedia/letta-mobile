@@ -8,6 +8,8 @@ import com.letta.mobile.channel.ChannelSyncStateStore
 import com.letta.mobile.channel.IChannelNotificationPublisher
 import com.letta.mobile.channel.IChannelSyncStateStore
 import com.letta.mobile.chat.BuildConfigChatClientVersionProvider
+import com.letta.mobile.data.canvas.CanvasDocumentStore
+import com.letta.mobile.data.canvas.CanvasExternalTools
 import com.letta.mobile.data.channel.NotificationDelivery
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.health.IServerHealthRepository
@@ -118,8 +120,12 @@ abstract class AppModule {
         @Singleton
         fun provideAndroidExternalToolRegistry(
             runner: DeviceActionCommandRunner,
+            canvasStore: CanvasDocumentStore,
         ): ExternalToolRegistry = ExternalToolRegistry.hostTools(
-            listOf(DeviceActionExternalTool(runner)),
+            buildList {
+                add(DeviceActionExternalTool(runner))
+                addAll(CanvasExternalTools.all(canvasStore))
+            }
         )
 
         // letta-mobile-qfa81 (P4 row 13): approval submission routed over
