@@ -87,4 +87,30 @@ class CanvasOpDifferTest {
         assertEquals("box-1", (totalOps[0] as CanvasOp.AddElementOp).elementId)
         assertEquals("circle-1", (totalOps[1] as CanvasOp.AddElementOp).elementId)
     }
+
+    @Test
+    fun diff_prettyVsCompactIdenticalScenesProducesZeroOps() {
+        val compactScene = """{"bgColor":"#ffffffff","elements":[{"id":"node-1","type":"Text","text":"Hello"}]}"""
+        val prettyScene = """
+        {
+            "bgColor": "#ffffffff",
+            "elements": [
+                {
+                    "id": "node-1",
+                    "type": "Text",
+                    "text": "Hello"
+                }
+            ]
+        }
+        """.trimIndent()
+
+        val ops = CanvasOpDiffer.diff(
+            oldSceneJson = prettyScene,
+            newSceneJson = compactScene,
+            actorId = "test_user",
+            lamportSupplier = { 1L },
+        )
+
+        assertTrue(ops.isEmpty(), "Formatting-only differences must produce zero ops, got: $ops")
+    }
 }

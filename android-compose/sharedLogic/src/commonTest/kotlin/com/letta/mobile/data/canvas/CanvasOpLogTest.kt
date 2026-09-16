@@ -172,4 +172,58 @@ class CanvasOpLogTest {
         assertEquals("node-1", elements?.get(0)?.jsonObject?.get("id")?.jsonPrimitive?.content)
         assertEquals("node-2", elements?.get(1)?.jsonObject?.get("id")?.jsonPrimitive?.content)
     }
+
+    @Test
+    fun opProjector_elementLevelLwwResolvesOutOfOrderDelivery() {
+        val initialScene = CanvasOpProjector.emptySceneJson()
+
+        // 1. Newer op applied first (lamport = 10)
+        val newerOp = CanvasOp.AddElementOp(
+            opId = "op-newer",
+            actorId = "alice",
+            lamport = 10L,
+            elementId = "card-1",
+            elementJson = """{"id": "card-1", "type": "Text", "text": "Alice's Newer Title"}""",
+        )
+        val sceneAfterNewer = CanvasOpProjector.project(initialScene, listOf(newerOp))
+
+        // 2. Older op arrives out-of-order (lamport = 5)
+        val olderOp = CanvasOp.UpdateElementOp(
+            opId = "op-older",
+            actorId = "bob",
+            lamport = 5L,
+            elementId = "card-1",
+            elementJson = """{"id": "card-1", "type": "Text", "text": "Bob's Stale Title"}""",
+        )
+        val sceneAfterStale = CanvasOpProjector.project(sceneAfterNewer, listOf(olderOp))
+
+        // Under LWW, Alice's newer title must prevail
+        val parsed1 = json.parseToJsonElement(sceneAfterStale).jsonObject
+        val elem1 = parsed1["elements"]?.jsonArray?.get(0)?.jsonObject
+        assertEquals("Alice's Newer Title", elem1?.get("text")?.jsonPrimitive?.content)
+
+        // 3. Equal lamport: actorId tie-break (bob > alice)
+        val tieOpBob = CanvasOp.UpdateElementOp(
+            opId = "op-tie-bob",
+            actorId = "bob",
+            lamport = 10L,
+            elementId = "card-1",
+            elementJson = """{"id": "card-1", "type": "Text", "text": "Bob Wins Tie"}""",
+        )
+        val sceneAfterTie = CanvasOpProjector.project(sceneAfterNewer, listOf(tieOpBob))
+        val parsed2 = json.parseToJsonElement(sceneAfterTie).jsonObject
+        val elem2 = parsed2["elements"]?.jsonArray?.get(0)?.jsonObject
+        assertEquals("Bob Wins Tie", elem2?.get("text")?.jsonPrimitive?.content)
+
+        // 4. Stale remove arrives after newer update
+        val staleRemove = CanvasOp.RemoveElementOp(
+            opId = "op-stale-rm",
+            actorId = "carol",
+            lamport = 8L,
+            elementId = "card-1",
+        )
+        val sceneAfterStaleRemove = CanvasOpProjector.project(sceneAfterTie, listOf(staleRemove))
+        val parsed3 = json.parseToJsonElement(sceneAfterStaleRemove).jsonObject
+        assertEquals(1, parsed3["elements"]?.jsonArray?.size, "Stale remove must not delete newer element")
+    }
 }

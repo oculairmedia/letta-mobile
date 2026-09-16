@@ -43,6 +43,12 @@ All scene mutations are expressed as typed `CanvasOp` instances carrying:
    - When concurrent edits target the same `elementId`, the operation with the higher `lamport` timestamp wins. If Lamport timestamps match, lexicographical ordering of `actorId` breaks ties deterministically.
 3. **Agent Replace Precedence (P2/P3)**:
    - An agent `ReplaceSceneOp` represents a full authoritative diagram generation. It replaces the scene at its logical revision and advances the document version.
-4. **Wire Framing Isolation**:
+4. **Wire Framing & Transport Status (M2)**:
    - Canvas synchronization operates over a dedicated Iroh QUIC ALPN (`meridian/canvas-sync/1`) or loopback memory transport.
    - Canvas operations are **never** multiplexed onto App Server WebSocket chat frames.
+   - **Current Status**: `IrohCanvasSyncTransport` serves as an architectural framing sketch and codec contract for ALPN `meridian/canvas-sync/1`. Live peer endpoint lifecycle (connecting, listening, accept loops, NAT punch) is deferred to P3.1/P4. Host runtimes currently inject `LoopbackCanvasSyncTransport` for live multi-session testability without dropping frames.
+
+5. **Op Log Durability & Cold Recovery (M4)**:
+   - `CanvasOpLog` is currently in-memory (`InMemoryCanvasOpLog`).
+   - Cold process restarts recover the latest projected scene JSON snapshot from `CanvasDocumentStore` (Room on Android, file on Desktop).
+   - Durable op logging (persisting individual `canvas_ops` rows across restarts for historic delta replay) is deferred to P3.1/P4.
