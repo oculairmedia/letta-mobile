@@ -26,6 +26,9 @@ class CanvasSession(
     private val _document = MutableStateFlow<CanvasDocument?>(null)
     val document: StateFlow<CanvasDocument?> = _document.asStateFlow()
 
+    private val _checkpoints = MutableStateFlow<List<CanvasCheckpoint>>(emptyList())
+    val checkpoints: StateFlow<List<CanvasCheckpoint>> = _checkpoints.asStateFlow()
+
     private var lamportClock: Long = 0L
 
     private suspend fun currentDoc(): CanvasDocument =
@@ -37,20 +40,50 @@ class CanvasSession(
             updatedAtEpochMs = clock(),
         )
 
-    private suspend fun commitUpdate(updated: CanvasDocument): CanvasDocument {
+    private fun recordCheckpoint(
+        doc: CanvasDocument,
+        actorId: String = "system",
+        description: String = "",
+    ) {
+        val checkpoint = CanvasCheckpoint(
+            checkpointId = "cp-${doc.revision}-${clock()}",
+            canvasId = doc.id,
+            revision = doc.revision,
+            lamport = lamportClock,
+            sceneJson = doc.sceneJson,
+            actorId = actorId,
+            description = description,
+            createdAtEpochMs = doc.updatedAtEpochMs,
+        )
+        val currentList = _checkpoints.value
+        _checkpoints.value = (listOf(checkpoint) + currentList).take(MAX_CHECKPOINTS)
+    }
+
+    private suspend fun commitUpdate(
+        updated: CanvasDocument,
+        actorId: String = "local_user",
+        description: String = "",
+    ): CanvasDocument {
         store.upsert(updated)
         _document.value = updated
+        recordCheckpoint(updated, actorId = actorId, description = description)
         return updated
     }
 
-    private suspend fun commitScene(sceneJson: String): CanvasDocument {
+    private suspend fun commitScene(
+        sceneJson: String,
+        actorId: String = "local_user",
+        description: String = "",
+    ): CanvasDocument {
         val current = currentDoc()
         return commitUpdate(
             current.copy(
                 revision = current.revision + 1L,
                 sceneJson = sceneJson,
                 updatedAtEpochMs = clock(),
-            )
+            ),
+            actorId = actorId,
+            description = description,
         )
     }
 
@@ -60,6 +93,9 @@ class CanvasSession(
     suspend fun load(): CanvasDocument? = mutex.withLock {
         val loaded = store.get(canvasId)
         _document.value = loaded
+        if (loaded != null && _checkpoints.value.isEmpty()) {
+            recordCheckpoint(loaded, actorId = loaded.agentId ?: "initial", description = "Initial state")
+        }
         loaded
     }
 
@@ -225,7 +261,41 @@ class CanvasSession(
         )
     }
 
+    /**
+     * Restores canvas to a prior [CanvasCheckpoint], generating and applying a [CanvasOp.ReplaceSceneOp]
+     * locally and broadcasting to peers.
+     */
+    suspend fun restoreCheckpoint(checkpointId: String, actorId: String = "local_user"): CanvasDocument = mutex.withLock {
+        val checkpoint = _checkpoints.value.firstOrNull { it.checkpointId == checkpointId }
+            ?: throw IllegalArgumentException("Checkpoint not found: $checkpointId")
+
+        val current = currentDoc()
+        if (current.acl != null && !current.acl.canWrite(actorId)) {
+            throw UnauthorizedCanvasMutationException(actorId, canvasId)
+        }
+
+        val op = CanvasOp.ReplaceSceneOp(
+            opId = "restore-${++lamportClock}-${clock()}",
+            actorId = actorId,
+            lamport = ++lamportClock,
+            sceneJson = checkpoint.sceneJson,
+        )
+        opLog.append(canvasId, op)
+        val updated = commitUpdate(
+            current.copy(
+                revision = current.revision + 1L,
+                sceneJson = checkpoint.sceneJson,
+                updatedAtEpochMs = clock(),
+            ),
+            actorId = actorId,
+            description = "Restored to rev ${checkpoint.revision}",
+        )
+        syncTransport?.publish(canvasId, op)
+        updated
+    }
+
     companion object {
+        const val MAX_CHECKPOINTS: Int = 30
         /**
          * Creates a new [CanvasDocument] in [store] and returns an initialized [CanvasSession].
          */
