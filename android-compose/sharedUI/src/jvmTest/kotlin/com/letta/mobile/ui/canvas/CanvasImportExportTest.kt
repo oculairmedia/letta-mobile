@@ -23,17 +23,9 @@ class CanvasImportExportTest {
 
     private fun createController() = DrawBoxController(Reducer(UseCase()))
 
-    @Test
-    fun importBuildCycleSample_populatesElementsAndExports() = runTest {
-        val controller = createController()
-        val json = CanvasSamples.buildCycleJson
+    private data class ExportResult(val json: String, val svg: String)
 
-        controller.importPath(json)
-
-        val elements = controller.state.value.elements
-        assertTrue(elements.isNotEmpty(), "Build cycle elements should not be empty")
-        assertEquals(15, elements.size, "Build cycle diagram should contain 15 elements")
-
+    private fun kotlinx.coroutines.test.TestScope.exportDiagram(controller: DrawBoxController): ExportResult {
         var exportedJson: String? = null
         var exportedSvg: String? = null
         val job = launch(UnconfinedTestDispatcher(testScheduler)) {
@@ -54,11 +46,27 @@ class CanvasImportExportTest {
 
         val validJson = requireNotNull(exportedJson) { "Exported JSON should not be null" }
         assertTrue(validJson.contains("\"elements\""), "Exported JSON must contain 'elements'")
-        assertTrue(validJson.contains("Build Cycle"), "Exported JSON must contain 'Build Cycle' title")
 
         val validSvg = requireNotNull(exportedSvg) { "Exported SVG should not be null" }
         assertTrue(validSvg.contains("<svg", ignoreCase = true), "Exported SVG must contain '<svg'")
-        assertTrue(validSvg.contains("Build Cycle"), "Exported SVG must contain text in SVG")
+
+        return ExportResult(json = validJson, svg = validSvg)
+    }
+
+    @Test
+    fun importBuildCycleSample_populatesElementsAndExports() = runTest {
+        val controller = createController()
+        val json = CanvasSamples.buildCycleJson
+
+        controller.importPath(json)
+
+        val elements = controller.state.value.elements
+        assertTrue(elements.isNotEmpty(), "Build cycle elements should not be empty")
+        assertEquals(15, elements.size, "Build cycle diagram should contain 15 elements")
+
+        val exports = exportDiagram(controller)
+        assertTrue(exports.json.contains("Build Cycle"), "Exported JSON must contain 'Build Cycle' title")
+        assertTrue(exports.svg.contains("Build Cycle"), "Exported SVG must contain text in SVG")
     }
 
     @Test
@@ -71,29 +79,7 @@ class CanvasImportExportTest {
         val elements = controller.state.value.elements
         assertTrue(elements.isNotEmpty(), "Daily loop elements should not be empty")
 
-        var exportedJson: String? = null
-        var exportedSvg: String? = null
-        val job = launch(UnconfinedTestDispatcher(testScheduler)) {
-            controller.events.collect { event ->
-                when (event) {
-                    is Event.JsonExported -> exportedJson = event.json
-                    is Event.SvgExported -> exportedSvg = event.svg
-                    else -> Unit
-                }
-            }
-        }
-        runCurrent()
-
-        controller.exportJson()
-        controller.exportSvg()
-        runCurrent()
-        job.cancel()
-
-        val validJson = requireNotNull(exportedJson) { "Exported JSON should not be null" }
-        assertTrue(validJson.contains("\"elements\""), "Exported JSON must contain 'elements'")
-
-        val validSvg = requireNotNull(exportedSvg) { "Exported SVG should not be null" }
-        assertTrue(validSvg.contains("<svg", ignoreCase = true), "Exported SVG must contain '<svg'")
+        exportDiagram(controller)
     }
 
     @Test
