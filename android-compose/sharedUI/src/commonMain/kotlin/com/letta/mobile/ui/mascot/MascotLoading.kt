@@ -28,8 +28,7 @@ import androidx.compose.ui.unit.dp
  * A wait, shown as the agent: its live mascot inside an orbiting ring. Anywhere the product has to
  * make the user wait on an agent - a conversation opening, older history paging in, the editor
  * loading - this replaces the anonymous spinner, so the wait reads as the agent getting ready
- * rather than the app stalling. The mascot keeps its own presence (it may well be thinking); the
- * ring is what says "loading".
+ * rather than the app stalling. The character is drawn as a still; the ring is what says "loading".
  *
  * Without an agent, or without a renderer for it, [fallback] draws instead - the plain spinner by
  * default - so a call site never has to branch.
@@ -47,11 +46,14 @@ fun MascotLoading(
     }
     Box(modifier.size(size + MascotLoadingRingInset * 2), contentAlignment = Alignment.Center) {
         LoadingOrbit(diameter = size + MascotLoadingRingInset * 2)
+        // A still, not a live surface: this sits in list rows that come and go with the paging
+        // state, and every live tile is one more native render of the scene per frame. The ring
+        // carries the motion; the character is the agent, paused mid-pose.
         MascotAvatar(
             agentId = agentId,
             size = size,
             cornerRadius = size / 2,
-            live = true,
+            live = false,
             modifier = Modifier.padding(MascotLoadingRingInset),
             fallback = fallback,
         )

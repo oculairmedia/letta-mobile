@@ -707,15 +707,12 @@ internal fun LettaDesktopApp(
             val measuredWidthDp = maxWidth.value
             val isSidebarVisible = shellLayoutState.isSidebarVisible &&
                 !ShellLayoutReducer.defaultCollapsedForWidth(measuredWidthDp)
-            // One rule for where the mascot stands (wbin4.4): the editor's seat while an agent is
-            // being edited, the agent pane's hero seat while the sidebar shows (however it was
-            // opened), else rest at the composer. The previous agent is let go when focus moves.
-            val mascotStageAgent = editAgentId ?: selectedAgentId
-            val mascotStage = when {
-                editAgentId != null -> MascotStage.EDIT_AGENT_HERO
-                isSidebarVisible -> MascotStage.AGENT_PANE_HERO
-                else -> null
-            }
+            // One rule for where the mascot stands (wbin4.4): the agent pane's hero seat while the
+            // sidebar shows (however it was opened), else rest. Editing moves nothing - the editor
+            // previews its pick on the character where it stands. The previous agent is let go
+            // when focus moves.
+            val mascotStageAgent = selectedAgentId
+            val mascotStage = if (isSidebarVisible) MascotStage.AGENT_PANE_HERO else null
             LaunchedEffect(mascotStageAgent, mascotStage) {
                 placedMascotAgent?.takeIf { it != mascotStageAgent }?.let(mascotTransport::rest)
                 placedMascotAgent = mascotStageAgent
@@ -911,6 +908,7 @@ internal fun LettaDesktopApp(
                                     selectedDestination = DesktopDestination.Conversations
                                     shellLayoutController.dispatch(ShellLayoutEvent.SetSidebarCollapsed(false))
                                 },
+                                onEditAgent = { editAgentId = selectedAgentId },
                             ),
                             destinationActions = DestinationContentActions(
                                 onRetryConnection = chatController::retryConnection,

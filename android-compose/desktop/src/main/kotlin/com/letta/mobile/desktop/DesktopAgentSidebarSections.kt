@@ -142,7 +142,7 @@ private fun SidebarAgentIdentity(
     onEditAgent: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // The mascot (its hit ring) and the name open the Edit Agent settings; the
+    // The mascot's pencil badge and the name open the Edit Agent settings; the
     // ⋮ menu keeps the other actions. Nothing larger than those is clickable.
     Column(
         modifier = modifier,
@@ -157,7 +157,7 @@ private fun SidebarAgentIdentity(
             agentId = identity.agentId,
             stage = MascotStage.AGENT_PANE_HERO,
             size = if (mascot != null) SidebarHeroSeatSize else 30.dp,
-            onClick = onEditAgent,
+            onEdit = onEditAgent,
         ) {
             if (mascot == null) AgentOrb(index = identity.agentOrbIndex, size = 30.dp, cornerRadius = 6.dp)
         }
