@@ -1,26 +1,14 @@
 package com.letta.mobile.feature.chat.screen
 
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
-import com.letta.mobile.data.health.ShimBackendDetector
-import com.letta.mobile.data.model.BackendKind
-import com.letta.mobile.data.repository.api.IAgentRepository
-import com.letta.mobile.data.repository.api.ISettingsRepository
-import com.letta.mobile.data.session.SessionManager
-import com.letta.mobile.data.transport.WsChatBridge
-import com.letta.mobile.feature.chat.route.ChatRouteArgs
-import com.letta.mobile.runtime.BackendId
-import com.letta.mobile.runtime.RuntimeId
 import com.letta.mobile.testutil.TestData
-import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -74,7 +62,7 @@ class AdminChatViewModelReconcileStabilityTest {
                     presentation
                 }
             }
-            val vm = openChatViewModel(host)
+            val vm = openedChatViewModel(host, TestData.agent("agent-reconcile", "Reconcile"), CONVERSATION_ID, "reconcile")
             viewModel = vm
             assertEquals("The conversation must be open before the reconcile", 1, opens)
             assertSame(presentation, vm.pagingPresentation.value)
@@ -105,74 +93,6 @@ class AdminChatViewModelReconcileStabilityTest {
             viewModel?.viewModelScope?.cancel()
             Dispatchers.resetMain()
         }
-    }
-
-    /** A ViewModel already showing [CONVERSATION_ID], with every collaborator it reads stubbed. */
-    private fun openChatViewModel(pagingHost: ChatPagingHost): AdminChatViewModel {
-        val agent = TestData.agent("agent-reconcile", "Reconcile")
-        return AdminChatViewModel(
-            routeArgs = ChatRouteArgs(
-                SavedStateHandle(mapOf("agentId" to agent.id.value, "conversationId" to CONVERSATION_ID)),
-            ),
-            messageRepository = mockk(relaxed = true),
-            timelineRepository = mockk(relaxed = true),
-            externalTimelineWriter = mockk(relaxed = true),
-            agentRepository = agentRepository(agent),
-            blockRepository = mockk(relaxed = true),
-            bugReportRepository = mockk(relaxed = true),
-            conversationRepository = mockk(relaxed = true),
-            settingsRepository = settingsRepository(),
-            sessionManager = sessionManager(),
-            runtimeEventOutbox = mockk(relaxed = true),
-            currentConversationTracker = mockk(relaxed = true),
-            shimBackendDetector = mockk(relaxed = true) {
-                every { activeUsesChannelTransport } returns MutableStateFlow(false)
-                every { activeBackendKind } returns MutableStateFlow(BackendKind.REST)
-            },
-            wsChatBridge = chatBridge(),
-            subagentRepository = mockk(relaxed = true),
-            slashCommandRepository = mockk(relaxed = true) {
-                coEvery { listForAgent(any()) } returns Result.success(emptyList())
-                coEvery { listGlobal() } returns Result.success(emptyList())
-                coEvery { getGoalStatus(any()) } returns Result.failure(IllegalStateException("Unsupported"))
-            },
-            clientVersionProvider = mockk(relaxed = true),
-            selfTodoRepository = mockk(relaxed = true),
-            modelRepository = mockk(relaxed = true) {
-                every { llmModels } returns MutableStateFlow(emptyList())
-            },
-            pagingHost = pagingHost,
-        )
-    }
-
-    private fun agentRepository(agent: com.letta.mobile.data.model.Agent) =
-        mockk<IAgentRepository>(relaxed = true) {
-            every { agents } returns MutableStateFlow(listOf(agent))
-            every { getCachedAgent(agent.id) } returns agent
-            every { getAgent(agent.id) } returns flowOf(agent)
-        }
-
-    private fun settingsRepository() = mockk<ISettingsRepository>(relaxed = true) {
-        every { activeConfig } returns MutableStateFlow(null)
-        every { activeConfigChanges } returns emptyFlow()
-        every { favoriteAgentId } returns MutableStateFlow(null)
-        every { getChatBackgroundKey() } returns flowOf("default")
-        every { getChatFontScale() } returns flowOf(1f)
-        every { getHapticsEnabled() } returns flowOf(false)
-        every { getPinnedAgentIds() } returns flowOf(emptySet())
-    }
-
-    private fun chatBridge() = mockk<WsChatBridge>(relaxed = true) {
-        every { connection } returns emptyFlow()
-        every { state } returns MutableStateFlow(mockk(relaxed = true))
-        every { events } returns emptyFlow()
-        every { a2uiEvents } returns emptyFlow()
-    }
-
-    private fun sessionManager() = mockk<SessionManager>(relaxed = true) {
-        every { current.localRuntimeBackend } returns null
-        every { current.backendDescriptor.backendId } returns BackendId("reconcile")
-        every { current.backendDescriptor.runtimeId } returns RuntimeId("reconcile")
     }
 
     private companion object {
