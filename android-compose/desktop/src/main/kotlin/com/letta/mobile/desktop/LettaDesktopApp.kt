@@ -58,8 +58,6 @@ import com.letta.mobile.avatar.core.MascotIdentity
 import com.letta.mobile.desktop.agent.agentAvatarStyleKey
 import com.letta.mobile.data.commands.AgentSlashCommand
 import com.letta.mobile.ui.mascot.MascotTransportLayer
-import com.letta.mobile.ui.mascot.MascotStage
-import com.letta.mobile.ui.mascot.LocalMascotTransport
 import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
 import io.github.vinceglb.filekit.dialogs.FileKitMode
 import io.github.vinceglb.filekit.dialogs.FileKitType
@@ -265,29 +263,7 @@ internal fun LettaDesktopApp(
     val activeTitle = desktopActiveTitle(selectedDestination, chatState.selectedConversation?.title)
     LaunchedEffect(activeTitle) { onActiveTitleChange(activeTitle) }
 
-    LaunchedEffect(selectedDestination, chatState.selectedConversationId) {
-        val selectedId = chatState.selectedConversationId
-        if (
-            selectedDestination == DesktopDestination.Conversations &&
-            selectedId != null &&
-            selectedId !in conversationTabsState.openConversationIds
-        ) {
-            conversationTabsState = ConversationTabsReducer.select(conversationTabsState, selectedId)
-        }
-    }
-    LaunchedEffect(chatState.connectionState, chatState.conversations) {
-        if (
-            chatState.connectionState == DesktopChatConnectionState.Live ||
-            chatState.connectionState == DesktopChatConnectionState.NoConversations
-        ) {
-            val availableIds = chatState.conversations.mapTo(mutableSetOf()) { it.id }
-            conversationTabsState = ConversationTabsReducer.retainAvailable(
-                state = conversationTabsState,
-                availableConversationIds = availableIds,
-                selectedConversationId = chatState.selectedConversationId,
-            )
-        }
-    }
+    SyncConversationTabs(chatState, selectedDestination, conversationTabsState) { conversationTabsState = it }
     val conversationById = remember(chatState.conversations) { chatState.conversations.associateBy { it.id } }
     val conversationTabs = remember(conversationTabsState, conversationById) {
         conversationTabsState.openConversationIds.mapNotNull { conversationId ->
@@ -410,10 +386,6 @@ internal fun LettaDesktopApp(
     // Every AgentOrb in the app reads identities from the registry; keep it current.
     val mascotRegistry = com.letta.mobile.ui.mascot.LocalMascotRegistry.current
     androidx.compose.runtime.SideEffect { mascotRegistry.update(identityByAgentId) }
-    // The transport verb is driven from the shell's own state (below, once the sidebar's
-    // visibility is known) so every control that opens a pane moves the mascot the same way.
-    val mascotTransport = LocalMascotTransport.current
-    var placedMascotAgent by remember { mutableStateOf<String?>(null) }
     val selectedAgentOrbIndex = avatarStyleByAgentId[selectedAgentId]
         ?: railAgents.indexOfFirst { it.first == selectedAgentId }.coerceAtLeast(0)
     val selectedAgentName = railAgents.firstOrNull { it.first == selectedAgentId }?.second
@@ -708,18 +680,8 @@ internal fun LettaDesktopApp(
             val measuredWidthDp = maxWidth.value
             val isSidebarVisible = shellLayoutState.isSidebarVisible &&
                 !ShellLayoutReducer.defaultCollapsedForWidth(measuredWidthDp)
-            // One rule for where the mascot stands (wbin4.4): the agent pane's hero seat while the
-            // sidebar shows (however it was opened), else rest. Editing moves nothing - the editor
-            // previews its pick on the character where it stands. The previous agent is let go
-            // when focus moves.
-            val mascotStageAgent = selectedAgentId
-            val mascotStage = if (isSidebarVisible) MascotStage.AGENT_PANE_HERO else null
-            LaunchedEffect(mascotStageAgent, mascotStage) {
-                placedMascotAgent?.takeIf { it != mascotStageAgent }?.let(mascotTransport::rest)
-                placedMascotAgent = mascotStageAgent
-                val agent = mascotStageAgent ?: return@LaunchedEffect
-                if (mascotStage != null) mascotTransport.transportTo(agent, mascotStage) else mascotTransport.rest(agent)
-            }
+            // One rule for where the mascot stands (wbin4.4), driven from the shell's own state.
+            DriveMascotStage(selectedAgentId, agentPaneVisible = isSidebarVisible)
             LaunchedEffect(measuredWidthDp) {
                 shellLayoutController.dispatch(ShellLayoutEvent.WindowWidthChanged(measuredWidthDp))
             }

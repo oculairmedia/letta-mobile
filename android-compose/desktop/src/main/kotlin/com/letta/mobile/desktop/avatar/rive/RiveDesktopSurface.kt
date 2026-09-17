@@ -175,15 +175,17 @@ private fun rivePointerKind(type: PointerEventType): RivePointer = when (type) {
 }
 
 /** Pointer events arrive in node pixels; the scene hit-tests in render pixels, so they are scaled by the cap. */
-private fun Modifier.rivePointerInput(scene: RiveDesktopScene, renderSize: () -> IntSize): Modifier = pointerInput(scene) {
-    awaitPointerEventScope {
-        while (true) {
-            val event = awaitPointerEvent()
-            val p = event.changes.firstOrNull()?.position ?: continue
-            val render = renderSize()
-            val sx = if (size.width > 0) render.width.toFloat() / size.width else 1f
-            val sy = if (size.height > 0) render.height.toFloat() / size.height else 1f
-            scene.pointer(rivePointerKind(event.type), p.x * sx, p.y * sy)
+private fun Modifier.rivePointerInput(scene: RiveDesktopScene, renderSize: () -> IntSize): Modifier {
+    return pointerInput(scene) {
+        awaitPointerEventScope {
+            while (true) {
+                val event = awaitPointerEvent()
+                val p = event.changes.firstOrNull()?.position ?: continue
+                val render = renderSize()
+                val sx = if (size.width > 0) render.width.toFloat() / size.width else 1f
+                val sy = if (size.height > 0) render.height.toFloat() / size.height else 1f
+                scene.pointer(rivePointerKind(event.type), p.x * sx, p.y * sy)
+            }
         }
     }
 }

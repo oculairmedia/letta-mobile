@@ -66,7 +66,8 @@ abstract class MascotEntry(
      * reduced motion or a scene nobody is looking at.
      */
     fun retarget(target: MascotIdentity, seconds: Float = MORPH_SECONDS) {
-        if (target == identity && morph == null) return
+        // Already the target, standing or mid-morph: a recomposition must not restart the hop.
+        if (target == identity) return
         val start = shownIdentity()
         identity = target
         if (seconds <= 0f || start == target) {
