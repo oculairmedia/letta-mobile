@@ -38,8 +38,13 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import com.letta.mobile.data.presence.ConversationRunRegistry
+import com.letta.mobile.data.presence.ConversationRunState
+import com.letta.mobile.runtime.RuntimeEventPayload
+import com.letta.mobile.runtime.RuntimeRunStatus
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -60,6 +65,8 @@ class DesktopChatController(
     loadArchivedConversationIds: () -> Set<String> = { emptySet() },
     private val persistArchivedConversationIds: (Set<String>) -> Unit = {},
     private val timelinePersistence: DesktopTimelinePersistence = DesktopTimelinePersistence(),
+    /** Window-scoped run state; every conversation this window drives publishes its phase here. */
+    private val runRegistry: ConversationRunRegistry = ConversationRunRegistry(),
     private val loopFactory: suspend (
         gateway: DesktopChatGateway,
         conversation: DesktopConversationSummary,
@@ -229,8 +236,28 @@ class DesktopChatController(
                 turnInFlight = streamingConversationId != null && streamingConversationId == selectedConversationId,
                 previous = previous,
             )
-        }.collect { _replyPresence.value = it }
+        }
+            // Tokens arriving for the selected conversation are the one phase this controller
+            // observes first-hand; everything richer comes from the gateway's runtime events.
+            .onEach { if (it.isStreaming && !it.isAgentTyping) runPhases.publishTokens(_state.value.selectedConversationId) }
+            .collect { _replyPresence.value = it }
     }
+
+    // --- run phases (letta-mobile-8a3bz) --------------------------------------
+
+    /**
+     * What every conversation in this window is doing, as phases rather than booleans: reduced
+     * from the runtime's own events by the shared [RunPhaseReducer], not from this controller's
+     * timeline projection. The shell reads presence from here
+     * ([com.letta.mobile.data.presence.presenceByAgent]) — there is no desktop-only resolver any
+     * more, so a parked approval and a failed turn belong to the conversation they happened in
+     * rather than to whichever one is selected.
+     */
+    val runs: StateFlow<Map<String, ConversationRunState>> = runRegistry.runs
+
+    // `by lazy` so the presence collector above (which publishes into it) can never observe it
+    // before construction reaches this line.
+    private val runPhases by lazy { DesktopChatRunPhases(scope, state, runRegistry, closed = { closed }) }
 
     /**
      * Streaming/typing for the selected conversation through the shared presenter, so desktop and
@@ -344,23 +371,17 @@ class DesktopChatController(
         onAttemptCompleted = ::onRemoteSendAttemptCompleted,
     )
 
-    private fun onRemoteSendSucceeded(attempt: RemoteSendAttempt) {
+    private fun onRemoteSendSucceeded(attempt: RemoteSendAttempt) =
         _state.update { it.withRuntimeState(ChatSessionReducer.sendSucceeded(it.runtimeState)) }
-    }
 
     /** The draft comes back with the failure, so a failed send never costs the user what they typed. */
     private fun onRemoteSendFailed(attempt: RemoteSendAttempt, errorMessage: String) {
         if (closed) return
         clearThinkingFor(attempt.conversationId)
+        runPhases.publish(attempt.conversationId, RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Failed, errorMessage))
         _state.update {
-            it.withRuntimeState(
-                ChatSessionReducer.sendFailed(
-                    state = it.runtimeState,
-                    text = attempt.text,
-                    attachments = attempt.attachments,
-                    errorMessage = errorMessage,
-                ),
-            )
+            val failed = ChatSessionReducer.sendFailed(it.runtimeState, attempt.text, attempt.attachments, errorMessage)
+            it.withRuntimeState(failed)
         }
     }
 
@@ -369,17 +390,21 @@ class DesktopChatController(
      * clearing the indicator of the one that replaced it, and a cancel is only finished once the
      * turn's own terminal frame arrives, never optimistically when stop was pressed.
      */
-    private fun onRemoteSendAttemptCompleted(attempt: RemoteSendAttempt) {
-        if (attempt.streamGen == streamingGeneration &&
-            _streamingConversationId.value == attempt.conversationId
-        ) {
-            _streamingConversationId.value = null
+    private fun onRemoteSendAttemptCompleted(attempt: RemoteSendAttempt, outcome: RemoteSendOutcome) {
+        if (attempt.isTheLiveStream()) _streamingConversationId.value = null
+        // A failed attempt already published its FAILED terminal and a cancelled one publishes
+        // CANCELLED when the turn's own terminal lands. Only a run that finished is COMPLETED.
+        if (outcome == RemoteSendOutcome.Completed) {
+            runPhases.publish(attempt.conversationId, RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Completed))
         }
         if (cancellingConversationId.value != attempt.conversationId) return
         interruptCoordinator.clearCancelling()
         clearThinkingFor(attempt.conversationId)
         attempt.conversationId?.let(interruptCoordinator::recordTerminalAfterCancel)
     }
+
+    private fun RemoteSendAttempt.isTheLiveStream(): Boolean =
+        streamGen == streamingGeneration && _streamingConversationId.value == conversationId
 
     private fun clearThinkingFor(conversationId: String?) {
         if (_thinkingConversationId.value == conversationId) _thinkingConversationId.value = null
@@ -390,6 +415,7 @@ class DesktopChatController(
             modelCatalogHelper.reset()
         }
         gateway = next
+        runPhases.bind(next)
         approvalCoordinator.bindGateway(next)
         connectionWatcher.start(next)
     }
@@ -448,6 +474,7 @@ class DesktopChatController(
         if (closed) return
         closed = true
         presenceJob.cancel()
+        runPhases.close()
         connectionWatcher.stop()
         loadJob?.cancel()
         selectJob?.cancel()
@@ -833,6 +860,7 @@ class DesktopChatController(
         if (_streamingConversationId.value == conversationId) {
             _streamingConversationId.value = null
         }
+        runPhases.publish(conversationId, RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Cancelled, reason))
         Telemetry.event(
             TELEMETRY_TAG,
             "interrupt.forcedLocalClear",
@@ -909,11 +937,10 @@ class DesktopChatController(
         val sendingConversationId = _state.value.selectedConversationId
         val titleToPersist = titleCandidateForSend(sendingConversationId, text)
         clearUnsentIfMatching(sendingConversationId)
-        _state.update {
-            it.withRuntimeState(ChatSessionReducer.beginSend(it.runtimeState, draft))
-        }
+        _state.update { it.withRuntimeState(ChatSessionReducer.beginSend(it.runtimeState, draft)) }
         beginThinking(sendingConversationId)
         _streamingConversationId.value = sendingConversationId
+        runPhases.publish(sendingConversationId, RuntimeEventPayload.LocalUserAppend("desktop-send-$streamingGeneration", text))
         val streamGen = ++streamingGeneration
         sendJob?.cancel()
         sendJob = scope.launch {

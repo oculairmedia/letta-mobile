@@ -55,6 +55,13 @@ object GazePlan {
             GazeLook(GazeTarget.TIMELINE, 25, 2f..5f),
             GazeLook(GazeTarget.PEER, 10, 1.5f..3f),
         ),
+        // WORKING looks at its work: the timeline where the tool output is landing.
+        AvatarState.WORKING to listOf(
+            GazeLook(GazeTarget.TIMELINE, 45, 2f..5f),
+            GazeLook(GazeTarget.AWAY, 25, 2f..6f),
+            GazeLook(GazeTarget.OWN, 20, 2f..5f),
+            GazeLook(GazeTarget.PEER, 10, 1.5f..3f),
+        ),
         AvatarState.SPEAKING to listOf(
             GazeLook(GazeTarget.USER, 45, 2.5f..6f, 0.3f..1.5f),
             GazeLook(GazeTarget.TIMELINE, 25, 1.5f..4f),

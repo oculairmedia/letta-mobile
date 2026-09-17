@@ -101,6 +101,10 @@ object RiveAvatarContract {
         AvatarState.IDLE -> "idle"
         AvatarState.LISTENING -> "listening"
         AvatarState.THINKING -> "thinking"
+        // TODO(letta-mobile-z4b83): the rig has no `working` state or glyph yet, and this change
+        // deliberately does not touch the .riv. Until the art lands, tool execution plays the
+        // thinking rig state — the director and every non-Rive surface already know the difference.
+        AvatarState.WORKING -> "thinking"
         AvatarState.WAITING_INPUT -> "waitingInput"
         AvatarState.SPEAKING -> "speaking"
         AvatarState.ERROR -> "error"
