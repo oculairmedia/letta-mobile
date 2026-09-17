@@ -40,7 +40,12 @@ internal class BridgeEventDeduplicator {
     }
 
     private fun WsTimelineEvent.key(fallbackConversationId: String?): String? = when (this) {
-        is WsTimelineEvent.TurnStarted -> "started|$conversationId|$turnId|$runId|$isReplay"
+        // `isReplay` is deliberately NOT part of the key. A resume replay
+        // re-delivers the turn_started the live connection already delivered;
+        // including the flag guaranteed the two could never collide, which
+        // defeated the only thing this key exists to do. (conversation, turn,
+        // run) identifies the turn regardless of how it reached us.
+        is WsTimelineEvent.TurnStarted -> "started|$conversationId|$turnId|$runId"
         is WsTimelineEvent.MessageDelta -> {
             val owner = conversationId ?: fallbackConversationId.orEmpty()
             "message|$owner|${message.id}|${message.messageType}|${message.runId.orEmpty()}|${message.contentForDedupe()}"

@@ -1513,6 +1513,14 @@ class ChatSendCoordinator(
         }
         val messageRunId = message.runId?.takeIf { it.isNotBlank() }
         if (messageRunId == null) return
+        // A replayed frame describes a run that already finished. This set
+        // feeds activeCleanupCandidateRunIds, so latching a historical run id
+        // onto the CURRENT turn hands abandoned-fragment cleanup a licence to
+        // sweep rows belonging to older completed runs the next time this turn
+        // reaches turn_done or the connection drops. Replay may still mark
+        // delivery above (that check carries its own replay guard); it must
+        // never widen the set of runs this turn is allowed to clean up.
+        if (isReplay) return
         state.activeAssistantMessageRunIds += messageRunId
         while (state.activeAssistantMessageRunIds.size > MAX_ACTIVE_ASSISTANT_RUN_IDS) {
             state.activeAssistantMessageRunIds.remove(state.activeAssistantMessageRunIds.first())

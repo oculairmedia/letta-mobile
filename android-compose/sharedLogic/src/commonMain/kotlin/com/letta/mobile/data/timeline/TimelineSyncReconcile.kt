@@ -160,7 +160,7 @@ private fun Timeline.mergeViaLegacyAssistantHeuristics(
     // content is contained within the incoming full text is the same
     // in-flight reply — replace it with the fuller final (one row).
     val contentSupersetIndex = if (prefixIndex == null && sameRunIndex == null) {
-        findRecentAssistantContentSupersetIndex(confirmed)
+        findRecentContentSupersetIndex(confirmed)
     } else {
         null
     }
@@ -326,8 +326,19 @@ private fun Timeline.findRecentSameRealRunAssistantIndex(incoming: TimelineEvent
  * fuller final of that in-flight reply). Guarded to a meaningful length and the
  * recent tail so distinct short messages don't coincidentally collapse.
  */
-private fun Timeline.findRecentAssistantContentSupersetIndex(incoming: TimelineEvent.Confirmed): Int? {
-    if (incoming.messageType != TimelineMessageType.ASSISTANT) return null
+private fun Timeline.findRecentContentSupersetIndex(incoming: TimelineEvent.Confirmed): Int? {
+    // letta-mobile-6bw72: REASONING runs the same gauntlet as ASSISTANT. The
+    // post-send reconcile refetches the settled turn and the reconciled thought
+    // comes back as a SUPERSET of the streamed row, not byte-identical, so
+    // recentTailContainsEquivalent's exact match misses and the thought
+    // re-appends AFTER the turn has settled — the user-visible "echoed thought".
+    // Assistant prose was invisible here only because the run-panel echo
+    // compaction in MessageGrouping hides it downstream, and that filter
+    // explicitly skips reasoning. Every guard below is identity/shape based, not
+    // prose based, so it discriminates reasoning exactly as well as assistant;
+    // the candidate must additionally be the SAME type as the incoming row so a
+    // thought can never collapse into a reply or vice versa.
+    if (incoming.messageType !in RECONCILE_SUPERSET_MESSAGE_TYPES) return null
     // #826 review (P1) + headless-replay guard: only the RECONCILE final has this
     // signature — a NULL (or reconcile-synthetic) run id. The live stream frames
     // and normal replayed assistant messages carry a real run id, so restricting
@@ -366,7 +377,7 @@ private fun Timeline.findRecentAssistantContentSupersetIndex(incoming: TimelineE
     val normalizedIncoming = incomingText.filterLettersAndDigits()
     for (index in events.size - 1 downTo start) {
         val event = events[index] as? TimelineEvent.Confirmed ?: continue
-        if (event.messageType != TimelineMessageType.ASSISTANT) continue
+        if (event.messageType != incoming.messageType) continue
         if (event.serverId == incoming.serverId) continue
         val existingText = event.content.trim()
         if (existingText.length < 3) continue
@@ -452,6 +463,18 @@ private fun TimelineEvent.Confirmed.canReplaceIrohSyntheticLiveRow(
  * server doesn't echo otid (common over Iroh).
  */
 private const val RECONCILE_CONTENT_DEDUPE_TAIL = 30
+
+/**
+ * Message types whose streamed row and reconciled superset are the same logical
+ * message. REASONING joins ASSISTANT here (letta-mobile-6bw72); the other
+ * reconcile fallbacks stay assistant-only because their looser matching
+ * (bidirectional overlap on a MATCHING real run id) is not justified for
+ * thoughts, which legitimately repeat within one run.
+ */
+private val RECONCILE_SUPERSET_MESSAGE_TYPES = setOf(
+    TimelineMessageType.ASSISTANT,
+    TimelineMessageType.REASONING,
+)
 
 private fun canDedupeContentInRecentTail(incoming: TimelineEvent.Confirmed): Boolean {
     if (incoming.messageType == TimelineMessageType.ASSISTANT && incoming.serverId.startsWith("ui-msg-")) {

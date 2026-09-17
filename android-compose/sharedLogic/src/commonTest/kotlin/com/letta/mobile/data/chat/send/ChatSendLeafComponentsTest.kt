@@ -54,6 +54,50 @@ class ChatSendLeafComponentsTest {
     }
 
     @Test
+    fun bridgeEventDeduplicatorDropsReplayedTurnStartedAlreadySeenLive() {
+        val deduplicator = BridgeEventDeduplicator()
+        val live = WsTimelineEvent.TurnStarted(
+            turnId = "resume-turn",
+            agentId = "resume-agent",
+            conversationId = "resume-conversation",
+            runId = "resume-run",
+        )
+        val replayed = live.copy(isReplay = true)
+
+        assertFalse(deduplicator.isDuplicate(live, fallbackConversationId = null))
+        assertTrue(deduplicator.isDuplicate(replayed, fallbackConversationId = null))
+    }
+
+    @Test
+    fun bridgeEventDeduplicatorDropsLiveTurnStartedAlreadySeenAsReplay() {
+        val deduplicator = BridgeEventDeduplicator()
+        val replayed = WsTimelineEvent.TurnStarted(
+            turnId = "resume-turn",
+            agentId = "resume-agent",
+            conversationId = "resume-conversation",
+            runId = "resume-run",
+            isReplay = true,
+        )
+
+        assertFalse(deduplicator.isDuplicate(replayed, fallbackConversationId = null))
+        assertTrue(deduplicator.isDuplicate(replayed.copy(isReplay = false), fallbackConversationId = null))
+    }
+
+    @Test
+    fun bridgeEventDeduplicatorSeparatesDistinctTurns() {
+        val deduplicator = BridgeEventDeduplicator()
+        val first = WsTimelineEvent.TurnStarted(
+            turnId = "turn-one",
+            agentId = "resume-agent",
+            conversationId = "resume-conversation",
+            runId = "run-one",
+        )
+
+        assertFalse(deduplicator.isDuplicate(first, fallbackConversationId = null))
+        assertFalse(deduplicator.isDuplicate(first.copy(turnId = "turn-two", runId = "run-two"), fallbackConversationId = null))
+    }
+
+    @Test
     fun bridgeEventDeduplicatorKeepsSharedMessageFanoutProcessWide() {
         val firstCoordinator = BridgeEventDeduplicator()
         val secondCoordinator = BridgeEventDeduplicator()
