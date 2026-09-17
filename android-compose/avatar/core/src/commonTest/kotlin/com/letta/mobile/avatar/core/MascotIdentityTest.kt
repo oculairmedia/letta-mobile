@@ -65,11 +65,24 @@ class MascotIdentityTest {
     }
 
     @Test
+    fun `the lists generated identities draw from are frozen`() {
+        // Any change here re-rolls every agent without a chosen identity: see SEEDED_SHAPES.
+        assertEquals(
+            listOf("CIRCLE", "BLOB", "ROUNDED_SQUARE", "PILL", "TRIANGLE", "HEXAGON", "CLOUD", "DROP"),
+            MascotIdentity.SEEDED_SHAPES.map { it.name },
+        )
+        assertEquals(
+            listOf(MascotPalette.BROWN, MascotPalette.RED, MascotPalette.ORANGE, MascotPalette.AMBER, MascotPalette.GREEN, MascotPalette.TEAL, MascotPalette.BLUE, MascotPalette.PURPLE, MascotPalette.PINK),
+            MascotPalette.SEEDED,
+        )
+    }
+
+    @Test
     fun `seeded identities use saturated colours, 45 degree turns and spread over the options`() {
         val identities = (0 until 400).map { MascotIdentity.seeded("agent-$it") }
         assertTrue(identities.all { it.argb in MascotPalette.SEEDED })
         assertTrue(identities.all { it.rotationDegrees % MascotIdentity.SEEDED_ROTATION_STEP == 0 })
-        assertEquals(MascotShape.entries.toSet(), identities.map { it.shape }.toSet())
+        assertEquals(MascotIdentity.SEEDED_SHAPES.toSet(), identities.map { it.shape }.toSet())
         assertEquals(MascotPalette.SEEDED.toSet(), identities.map { it.argb }.toSet())
         assertEquals(8, identities.map { it.rotationDegrees }.toSet().size)
         assertNotEquals(MascotIdentity.seeded("agent-1"), MascotIdentity.seeded("agent-2"))

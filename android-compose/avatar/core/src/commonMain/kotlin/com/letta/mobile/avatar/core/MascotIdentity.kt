@@ -2,8 +2,8 @@ package com.letta.mobile.avatar.core
 
 /**
  * The body a user picks for an agent's mascot. Order is the picker's grid order; the Rive asset
- * addresses shapes by key, so reordering here is safe - but [MascotIdentity.seeded] indexes into
- * [entries], so appending is safe and reordering changes every generated identity.
+ * addresses shapes by key, and generated identities draw from their own frozen
+ * [MascotIdentity.SEEDED_SHAPES], so adding or reordering entries here changes neither.
  */
 enum class MascotShape {
     CIRCLE,
@@ -62,6 +62,23 @@ data class MascotIdentity(
         /** How far apart the turns a generated identity can take are. */
         const val SEEDED_ROTATION_STEP: Int = 45
 
+        /**
+         * The shapes a generated identity draws from. FROZEN: [seeded] takes a value modulo this
+         * list's size, so adding, removing or reordering anything here changes the mascot of every
+         * agent nobody picked one for. A new [MascotShape] joins the picker only; giving generated
+         * identities new options needs a versioned seeding scheme, not an edit here.
+         */
+        val SEEDED_SHAPES: List<MascotShape> = listOf(
+            MascotShape.CIRCLE,
+            MascotShape.BLOB,
+            MascotShape.ROUNDED_SQUARE,
+            MascotShape.PILL,
+            MascotShape.TRIANGLE,
+            MascotShape.HEXAGON,
+            MascotShape.CLOUD,
+            MascotShape.DROP,
+        )
+
         val DEFAULT: MascotIdentity = MascotIdentity(MascotShape.CIRCLE, MascotPalette.BLUE)
 
         /** [degrees] folded into 0..359, so -90 is 270 and 450 is 90. */
@@ -94,7 +111,7 @@ data class MascotIdentity(
          */
         fun seeded(agentId: String): MascotIdentity {
             val random = SeededRandom(SeededRandom.seedOf(agentId))
-            val shape = MascotShape.entries[random.nextInt(MascotShape.entries.size)]
+            val shape = SEEDED_SHAPES[random.nextInt(SEEDED_SHAPES.size)]
             val argb = MascotPalette.SEEDED[random.nextInt(MascotPalette.SEEDED.size)]
             val rotation = random.nextInt(FULL_TURN / SEEDED_ROTATION_STEP) * SEEDED_ROTATION_STEP
             return MascotIdentity(shape, argb, rotation)
@@ -155,8 +172,9 @@ object MascotPalette {
 
     /**
      * The colours a generated identity draws from: the saturated ones. White and grey read as
-     * "unset" next to a coloured agent, so they stay a deliberate pick. Append only - see
-     * [MascotIdentity.seeded].
+     * "unset" next to a coloured agent, so they stay a deliberate pick. FROZEN, like
+     * [MascotIdentity.SEEDED_SHAPES]: even appending changes the modulo bound and so every generated
+     * identity. New colours join [ALL] (the picker) only.
      */
     val SEEDED: List<Int> = listOf(BROWN, RED, ORANGE, AMBER, GREEN, TEAL, BLUE, PURPLE, PINK)
 

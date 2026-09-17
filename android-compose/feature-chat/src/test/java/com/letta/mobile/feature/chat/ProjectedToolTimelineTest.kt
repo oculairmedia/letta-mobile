@@ -74,11 +74,10 @@ class ProjectedToolTimelineTest {
             }
         }
 
-        // Verify rows render in projected mode
-        composeRule.onNodeWithText("Bash(pwd)").assertIsDisplayed()
-        composeRule.onNodeWithText("Bash(ls)").assertIsDisplayed()
-        composeRule.onNodeWithText("Bash(git status)").assertIsDisplayed()
-        composeRule.onNodeWithText("Bash(git diff)").assertIsDisplayed()
+        // Mobile projects the entire run as one row; individual calls live in the details sheet.
+        composeRule.onNodeWithText("Running Bash - 4 commands -", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("Bash(pwd)").assertDoesNotExist()
+        composeRule.onNodeWithText("Bash(ls)").assertDoesNotExist()
         composeRule.onNodeWithText("Worked").assertIsDisplayed()
         composeRule.onNodeWithText("4 tools").assertIsDisplayed()
         composeRule.onNodeWithText("Done").assertDoesNotExist()
@@ -153,8 +152,8 @@ class ProjectedToolTimelineTest {
         }
 
         composeRule.onNodeWithText("Done").assertDoesNotExist()
-        composeRule.onNodeWithText("Bash(pwd)").performClick()
-        composeRule.onNodeWithText("Done").assertIsDisplayed()
+        composeRule.onNodeWithText("Ran 2 commands").assertIsDisplayed()
+        composeRule.onNodeWithText("Bash(pwd)").assertDoesNotExist()
     }
 
     @Test
@@ -227,7 +226,7 @@ class ProjectedToolTimelineTest {
             }
         }
 
-        composeRule.onNodeWithText("Bash(pwd)").assertIsDisplayed()
+        composeRule.onNodeWithText("Running Bash - 2 commands -", substring = true).assertIsDisplayed()
         composeRule.onNodeWithText("Awaiting approval").assertDoesNotExist()
         composeRule.onNodeWithText("Review the requested tool actions before continuing.").assertDoesNotExist()
         composeRule.onNodeWithText("Reject").assertDoesNotExist()
@@ -281,8 +280,9 @@ class ProjectedToolTimelineTest {
             }
         }
 
-        // Verify dedicated subagent dispatch card fallback is rendered
-        composeRule.onNodeWithText("Dispatched: Search codebase for usages").assertIsDisplayed()
+        // Specialized calls no longer escape the compact timeline surface.
+        composeRule.onNodeWithText("Running Bash - 2 commands -", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("Dispatched: Search codebase for usages").assertDoesNotExist()
     }
 
     @Test
@@ -319,15 +319,15 @@ class ProjectedToolTimelineTest {
             }
         }
 
-        // Before delay expires, live status is not visible in collapsed state
+        // Active calls remain a single summary row; they never auto-expand in the timeline.
+        composeRule.onNodeWithText("Running Bash - 1 command -", substring = true).assertIsDisplayed()
         composeRule.onNodeWithText("Executing Bash...").assertDoesNotExist()
 
         // Advance virtual time past bounded auto-expand delay (200ms)
         composeRule.mainClock.advanceTimeBy(250L)
         composeRule.waitForIdle()
 
-        // Auto-expand fires: live status line inside expanded content is now displayed
-        composeRule.onNodeWithText("Executing Bash...").assertIsDisplayed()
+        composeRule.onNodeWithText("Executing Bash...").assertDoesNotExist()
     }
 
     @Test
@@ -366,12 +366,7 @@ class ProjectedToolTimelineTest {
             }
         }
 
-        // User explicitly clicks row to expand before auto-expand delay
-        composeRule.onNodeWithText("Bash(pwd)").performClick()
-        composeRule.waitForIdle()
-
-        // Verify content expanded by user
-        composeRule.onNodeWithText("Executing Bash...").assertIsDisplayed()
+        composeRule.onNodeWithText("Running Bash - 1 command -", substring = true).assertIsDisplayed()
 
         // Complete the call
         groupState = com.letta.mobile.data.chat.projection.ToolTimelineGroup(
@@ -395,8 +390,8 @@ class ProjectedToolTimelineTest {
         composeRule.mainClock.advanceTimeBy(300L)
         composeRule.waitForIdle()
 
-        // Explicit user expansion MUST WIN over auto-collapse: content stays displayed!
-        composeRule.onNodeWithText("/home/user").assertIsDisplayed()
+        composeRule.onNodeWithText("Ran 1 command").assertIsDisplayed()
+        composeRule.onNodeWithText("/home/user").assertDoesNotExist()
     }
 
     @Test
@@ -435,10 +430,10 @@ class ProjectedToolTimelineTest {
             }
         }
 
-        // Advance clock so row auto-expands
+        // Advancing time only updates the aggregate timer; it never mounts call details.
         composeRule.mainClock.advanceTimeBy(150L)
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("Executing Bash...").assertIsDisplayed()
+        composeRule.onNodeWithText("Executing Bash...").assertDoesNotExist()
 
         // Complete the tool call
         groupState = com.letta.mobile.data.chat.projection.ToolTimelineGroup(
@@ -458,14 +453,13 @@ class ProjectedToolTimelineTest {
             state = com.letta.mobile.data.chat.projection.ToolTimelineState.Succeeded,
         )
 
-        // Frame 1 after completion: static summary ("120ms") is visible immediately
-        composeRule.onNodeWithText("120ms").assertIsDisplayed()
+        composeRule.onNodeWithText("Ran 1 command").assertIsDisplayed()
 
         // Advance past staged collapse delay (300ms)
         composeRule.mainClock.advanceTimeBy(350L)
         composeRule.waitForIdle()
 
-        // Auto-expanded row collapsed after staged delay: detail output is no longer displayed
+        // Detail output remains out of the chat timeline.
         composeRule.onNodeWithText("/root").assertDoesNotExist()
     }
 
@@ -500,18 +494,13 @@ class ProjectedToolTimelineTest {
             }
         }
 
-        // Structured summaries render.
-        composeRule.onNodeWithText("Bash(uname -srm)").assertIsDisplayed()
-        composeRule.onNodeWithText("Bash(id -un)").assertIsDisplayed()
+        composeRule.onNodeWithText("Ran 2 commands").assertIsDisplayed()
+        composeRule.onNodeWithText("Bash(uname -srm)").assertDoesNotExist()
+        composeRule.onNodeWithText("Bash(id -un)").assertDoesNotExist()
 
         // The raw request envelope must appear nowhere — collapsed...
         composeRule.onNodeWithText(rawArgsA).assertDoesNotExist()
         composeRule.onNodeWithText(rawArgsB).assertDoesNotExist()
-
-        // ...and expanded.
-        composeRule.onNodeWithText("Bash(uname -srm)").performClick()
-        composeRule.waitForIdle()
-        composeRule.onNodeWithText(rawArgsA).assertDoesNotExist()
 
         // And no unexpected fallback row was emitted alongside the projected cards.
         composeRule.onNodeWithText("LEGACY-ROW-tc-a").assertDoesNotExist()
@@ -559,7 +548,7 @@ class ProjectedToolTimelineTest {
             }
         }
 
-        composeRule.onNodeWithText("Bash(pwd)").assertIsDisplayed()
+        composeRule.onNodeWithText("Running Bash - 1 command -", substring = true).assertIsDisplayed()
         composeRule.onNodeWithText("LEGACY-ROW-tc-only").assertDoesNotExist()
     }
 
@@ -589,8 +578,8 @@ class ProjectedToolTimelineTest {
             }
         }
 
-        // Expand the first call's row.
-        composeRule.onNodeWithText("Bash(pwd)").performClick()
+        // Open the single details surface rather than expanding a timeline card.
+        composeRule.onNodeWithTag(com.letta.mobile.feature.chat.screen.ToolRunSummaryTestTags.Row).performClick()
         composeRule.waitForIdle()
 
         // The structured summary is what carries the command; the raw JSON envelope
@@ -626,7 +615,7 @@ class ProjectedToolTimelineTest {
         }
 
         // The projected row family renders the projector's summary label.
-        composeRule.onNodeWithText("Bash(pwd)").assertIsDisplayed()
+        composeRule.onNodeWithText("Running Bash - 1 command -", substring = true).assertIsDisplayed()
     }
 
     private fun runMessage(id: String, content: String) = UiMessage(

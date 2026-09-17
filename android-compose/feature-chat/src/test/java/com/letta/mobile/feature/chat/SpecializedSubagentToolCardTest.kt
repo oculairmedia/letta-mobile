@@ -6,12 +6,14 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.data.model.UiSubagentDispatch
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.feature.chat.screen.MessageToolCalls
+import com.letta.mobile.feature.chat.screen.ToolRunSummaryTestTags
 import com.letta.mobile.feature.chat.screen.subagentDispatchStatus
 import com.letta.mobile.ui.theme.LettaChatTheme
 import com.letta.mobile.ui.theme.LettaTheme
@@ -63,6 +65,7 @@ class SpecializedSubagentToolCardTest {
             }
         }
 
+        openDetails()
         composeRule.onNodeWithText("Dispatched: Investigate restore").assertIsDisplayed()
         composeRule.onNodeWithText("researcher").assertIsDisplayed()
         composeRule.onNodeWithText("background").assertIsDisplayed()
@@ -107,6 +110,7 @@ class SpecializedSubagentToolCardTest {
             }
         }
 
+        openDetails()
         composeRule.onAllNodesWithText("Sub-agent dispatched", substring = true).assertCountEquals(1)
         composeRule.onAllNodesWithText("Subagent completed").assertCountEquals(0)
     }
@@ -146,6 +150,7 @@ class SpecializedSubagentToolCardTest {
             }
         }
 
+        openDetails()
         composeRule.onNodeWithContentDescription("Completed").assertIsDisplayed()
         composeRule.onNodeWithText("Finished research").assertIsDisplayed()
         // The status chip said "completed" beside a header reading "Subagent completed".
@@ -168,6 +173,7 @@ class SpecializedSubagentToolCardTest {
             """.trimIndent(),
         )
 
+        openDetails()
         composeRule.onNodeWithText("Task cancelled").assertIsDisplayed()
         composeRule.onAllNodesWithText("Subagent completed").assertCountEquals(0)
         composeRule.onNodeWithText("Stopped early").assertIsDisplayed()
@@ -188,6 +194,7 @@ class SpecializedSubagentToolCardTest {
             """.trimIndent(),
         )
 
+        openDetails()
         composeRule.onAllNodesWithText("/tmp/letta-background-P2Xz9b/exec_16.log", substring = true)
             .assertCountEquals(0)
         composeRule.onNodeWithContentDescription("Show full report").performClick()
@@ -209,11 +216,21 @@ class SpecializedSubagentToolCardTest {
             """.trimIndent(),
         )
 
+        openDetails()
         composeRule.onAllNodesWithText("Show full report").assertCountEquals(0)
         composeRule.onNodeWithContentDescription("Show details").assertIsDisplayed().performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithText("/tmp/letta-background-P2Xz9b/exec_16.log", substring = true)
             .assertIsDisplayed()
+    }
+
+    /**
+     * Mobile collapses a message's tool calls into one summary row; the specialized
+     * sub-agent cards render inside the details sheet that row opens.
+     */
+    private fun openDetails() {
+        composeRule.onNodeWithTag(ToolRunSummaryTestTags.Row).performClick()
+        composeRule.waitForIdle()
     }
 
     private fun setNotificationContent(notification: String) {

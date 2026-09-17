@@ -24,6 +24,47 @@ class SkillToolRenderClassificationTest {
     // region Synthetic envelope filtering
 
     @Test
+    fun `skill content returned as assistant text is never projected`() {
+        val skillContent = """
+            <skill_content name="kotzilla-mcp-console">
+            ---
+            name: kotzilla-mcp-console
+            description: Query performance telemetry from the console.
+            ---
+            ${"Read-only operational instructions. ".repeat(20)}
+            </skill_content>
+        """.trimIndent()
+
+        val renderModel = buildChatRenderModel(
+            listOf(
+                assistant("skill-content", content = skillContent),
+                assistant("answer", content = "I checked the telemetry."),
+            ),
+            ChatDisplayMode.Interactive,
+        )
+
+        assertEquals(listOf("answer"), renderModel.visibleMessages.map { it.id })
+        assertEquals(1, renderModel.renderItems.size)
+    }
+
+    @Test
+    fun `assistant skill content is rejected by direct render grouping`() {
+        val skillContent = """
+            <skill_content name="asus-router">
+            ---
+            name: asus-router
+            description: Query router status.
+            ---
+            ${"Internal skill instructions. ".repeat(20)}
+            </skill_content>
+        """.trimIndent()
+        val message = assistant("skill-content-direct", content = skillContent)
+        val grouped = listOf(message to com.letta.mobile.ui.common.GroupPosition.None)
+
+        assertTrue(groupMessagesForRender(grouped.asReversed()).isEmpty())
+    }
+
+    @Test
     fun `synthetic skill envelope is filtered from render items`() {
         val skillEnvelopeContent = """
             <asus-router>
