@@ -7,7 +7,9 @@ import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.doubleClick
 import androidx.compose.ui.test.performClick
+import io.ak1.drawbox.domain.model.bounds
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.requestFocus
@@ -325,6 +327,31 @@ class CanvasWorkspaceUiTest {
         waitUntil(timeoutMillis = 5000) { controller.state.value.selectedIds.isNotEmpty() }
         onNodeWithContentDescription("Canvas workspace").performKeyInput { pressKey(androidx.compose.ui.input.key.Key.Escape) }
         waitUntil(timeoutMillis = 5000) { controller.state.value.selectedIds.isEmpty() }
+    }
+
+    @Test
+    fun canvasWorkspace_fitToContent_showsEveryElement() = runComposeUiTest {
+        val controller = io.ak1.drawbox.presentation.viewmodel.DrawBoxController(
+            io.ak1.drawbox.presentation.reducer.Reducer(io.ak1.drawbox.domain.usecase.UseCase()),
+        )
+        setContent { CanvasWorkspace(controller = controller, initialJson = CanvasSamples.buildCycleJson) }
+        waitUntil(timeoutMillis = 5000) { controller.state.value.elements.size == 15 }
+        onNodeWithContentDescription("Zoom in").performClick()
+        onNodeWithText("125%").assertExists()
+
+        onNodeWithContentDescription("Fit to content").performClick()
+        waitUntil(timeoutMillis = 5000) { controller.state.value.viewport.scale != 1.25f }
+        val board = onNodeWithContentDescription("Canvas board").fetchSemanticsNode().size
+        val viewport = controller.state.value.viewport
+        controller.state.value.elements.forEach { element ->
+            val r = element.bounds()
+            val tl = viewport.worldToScreen(androidx.compose.ui.geometry.Offset(r.left, r.top))
+            val br = viewport.worldToScreen(androidx.compose.ui.geometry.Offset(r.right, r.bottom))
+            kotlin.test.assertTrue(tl.x >= 0f && tl.y >= 0f && br.x <= board.width && br.y <= board.height, "${element.id} at $tl..$br outside $board")
+        }
+        // Double-clicking the percentage returns to 100%.
+        onNodeWithContentDescription("Zoom level").performMouseInput { doubleClick() }
+        waitUntil(timeoutMillis = 5000) { controller.state.value.viewport.scalePercent == 100 }
     }
 
     @Test

@@ -469,7 +469,21 @@ fun CanvasWorkspace(
                     scalePercent = state.viewport.scalePercent,
                     onZoomOut = { controller.zoomBy(1f / ZOOM_STEP, boardCenter) },
                     onZoomIn = { controller.zoomBy(ZOOM_STEP, boardCenter) },
-                    onReset = { controller.resetCamera() },
+                    // Fit everything on the board (elements and notes) with padding; an empty
+                    // board just goes back to 100% at the origin.
+                    onReset = {
+                        val content = CanvasViewportFit.contentBounds(state.elements, documents)
+                        controller.resetCamera()
+                        if (content != null && boardSize.width > 0 && boardSize.height > 0) {
+                            val fit = CanvasViewportFit.fit(content, boardSize.width.toFloat(), boardSize.height.toFloat())
+                            // From the reset camera (scale 1, no offset): zooming about the origin
+                            // leaves the offset at zero, then one pan places the content.
+                            controller.zoomBy(fit.scale, Offset.Zero)
+                            controller.panBy(fit.offset)
+                            statusMessage = "Fitted to content"
+                        }
+                    },
+                    onActualSize = { controller.zoomTo(1f, boardCenter) },
                 ),
                 checkpointCount = if (session != null) checkpoints.size else null,
                 onHistory = if (session != null) ({ showHistoryDialog = true }) else null,

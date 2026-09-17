@@ -4,6 +4,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Arrangement
@@ -108,7 +110,10 @@ internal data class CanvasZoom(
     val scalePercent: Int,
     val onZoomOut: () -> Unit,
     val onZoomIn: () -> Unit,
+    /** Fit to content. */
     val onReset: () -> Unit,
+    /** Back to 100%, on a double-click of the percentage. */
+    val onActualSize: () -> Unit = {},
 )
 
 /** Top-right: zoom, then history and share as icons, everything else behind the overflow. */
@@ -128,11 +133,14 @@ internal fun CanvasActionsPill(
         Text(
             text = "${zoom.scalePercent}%",
             style = MaterialTheme.typography.labelMedium,
-            modifier = Modifier.widthIn(min = 36.dp).semantics { contentDescription = "Zoom level" },
+            modifier = Modifier
+                .widthIn(min = 36.dp)
+                .semantics { contentDescription = "Zoom level" }
+                .pointerInput(zoom.onActualSize) { detectTapGestures(onDoubleTap = { zoom.onActualSize() }) },
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )
         PillIconButton(Lucide.ZoomIn, "Zoom in", onClick = zoom.onZoomIn)
-        PillIconButton(Lucide.Maximize, "Reset view", onClick = zoom.onReset)
+        PillIconButton(Lucide.Maximize, "Fit to content", onClick = zoom.onReset)
         PillDivider()
         if (onHistory != null) {
             PillIconButton(Lucide.History, "History (${checkpointCount ?: 0})", onClick = onHistory)
