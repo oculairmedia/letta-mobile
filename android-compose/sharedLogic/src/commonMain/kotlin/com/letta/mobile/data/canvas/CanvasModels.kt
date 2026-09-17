@@ -19,10 +19,24 @@ data class CanvasDocument(
     val acl: CanvasAcl? = null,
 )
 
-/** A block document attached to a canvas: [json] is the Cascade editor document JSON. */
+/**
+ * A block document attached to a canvas: [json] is the Cascade editor document JSON and [frame]
+ * is where it sits on the board, in the drawing's world units. A document without a frame has
+ * never been placed; the workspace gives it a default spot until someone moves it.
+ */
 data class CanvasSceneDocument(
     val id: String,
     val json: String,
+    val frame: CanvasDocumentFrame? = null,
+)
+
+/** Where a block document sits on the board: top-left corner and size in world units. */
+@Serializable
+data class CanvasDocumentFrame(
+    val x: Float,
+    val y: Float,
+    val width: Float,
+    val height: Float,
 )
 
 /** The document every canvas carries by default: its notes beside the drawing. */
