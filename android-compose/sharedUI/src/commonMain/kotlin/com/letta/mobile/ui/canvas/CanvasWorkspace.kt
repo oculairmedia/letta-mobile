@@ -274,13 +274,22 @@ fun CanvasWorkspace(
                     }
                 },
         ) {
-            // DrawBox Canvas layer
+            // DrawBox Canvas layer. A press that reaches the drawing (not a note card, not the
+            // chrome above it) is a click on the board, which lets the active note go.
             DrawBox(
                 state = state,
                 onIntent = controller::onIntent,
                 modifier = Modifier
                     .fillMaxSize()
-                    .clipToBounds(),
+                    .clipToBounds()
+                    .pointerInput(Unit) {
+                        awaitPointerEventScope {
+                            while (true) {
+                                val event = awaitPointerEvent(PointerEventPass.Initial)
+                                if (event.type == PointerEventType.Press && expandedNoteId == null) activeNoteId = null
+                            }
+                        }
+                    },
             )
 
             // Block documents live on the board as note cards, in world coordinates.
@@ -296,14 +305,6 @@ fun CanvasWorkspace(
                     onToolbar = { noteToolbar = it },
                     modifier = Modifier.fillMaxSize().clipToBounds(),
                 )
-                val expanded = documents.firstOrNull { it.id == expandedNoteId }
-                if (expanded != null) {
-                    CanvasNoteEditorDialog(
-                        session = session,
-                        document = expanded,
-                        onClose = { expandedNoteId = null },
-                    )
-                }
             }
 
             // Presence layer (Card I3.5)
@@ -311,6 +312,9 @@ fun CanvasWorkspace(
                 presences = presences,
                 currentPeerId = currentPeerId,
             )
+
+            // Picking a drawing element hands the selection to DrawBox; the note lets go.
+            LaunchedEffect(hasSelection) { if (hasSelection) activeNoteId = null }
 
             if (showTitle) {
                 CanvasTitlePill(
@@ -453,7 +457,9 @@ fun CanvasWorkspace(
             }
 
             // Properties for the selection, or for the closed shape about to be drawn, top-centre.
-            if (hasSelection || controlsBarState.showFillTarget) {
+            // With a note active and nothing drawn selected, the bar is the note's.
+            val activeNote = activeNoteId?.let { id -> documents.firstOrNull { it.id == id } }
+            if (hasSelection || controlsBarState.showFillTarget || (activeNote != null && expandedNoteId == null)) {
                 CanvasSelectionBar(
                     state = controlsBarState,
                     hasSelection = hasSelection,
@@ -461,6 +467,18 @@ fun CanvasWorkspace(
                     onBringToFront = { controller.bringSelectionToFront() },
                     onSendToBack = { controller.sendSelectionToBack() },
                     onDelete = { controller.deleteSelected() },
+                    note = if (activeNote != null && session != null && !hasSelection) {
+                        NoteBarActions(
+                            onOpen = { expandedNoteId = activeNote.id },
+                            onDelete = {
+                                val id = activeNote.id
+                                activeNoteId = null
+                                coroutineScope.launch { runCatching { session.removeDocument(id) } }
+                            },
+                        )
+                    } else {
+                        null
+                    },
                     modifier = Modifier.align(Alignment.TopCenter).padding(top = if (showTitle) 64.dp else CHROME_INSET),
                 )
             }
@@ -504,6 +522,17 @@ fun CanvasWorkspace(
                     .padding(start = CHROME_INSET, top = 72.dp, bottom = 64.dp),
             )
 
+            // A note opened large sits over the board, under the foot bar so formatting stays reachable.
+            val expanded = documents.firstOrNull { it.id == expandedNoteId }
+            if (expanded != null && session != null) {
+                CanvasNoteEditorPanel(
+                    session = session,
+                    document = expanded,
+                    onClose = { expandedNoteId = null },
+                    onToolbar = { noteToolbar = it },
+                )
+            }
+
             // The foot of the board: the active note's formatting bar, centred, above the status line.
             Column(
                 modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(CHROME_INSET),
@@ -511,7 +540,7 @@ fun CanvasWorkspace(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 val toolbar = noteToolbar
-                if (toolbar != null && activeNoteId != null && expandedNoteId == null) {
+                if (toolbar != null && (activeNoteId != null || expandedNoteId != null)) {
                     CanvasFormattingBar(toolbar = toolbar)
                 }
                 CanvasStatusLine(
