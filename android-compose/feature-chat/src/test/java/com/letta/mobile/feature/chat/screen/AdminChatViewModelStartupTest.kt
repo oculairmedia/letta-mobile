@@ -118,6 +118,20 @@ class AdminChatViewModelStartupTest {
                 strangerImage,
             )
             assertEquals(2, vm.composerState.value.pendingAttachments.size)
+
+            // Past the composer's attachment cap, the image is not lost: it waits in staging.
+            val limits = com.letta.mobile.data.attachment.AttachmentLimits.Default
+            var staged = 0
+            while (vm.composerState.value.pendingAttachments.size < limits.maxAttachmentCount) {
+                com.letta.mobile.data.canvas.CanvasShare.stageForConversation(
+                    target,
+                    com.letta.mobile.data.canvas.CanvasShare.createChatImageAttachment("fill-${staged++}".encodeToByteArray(), com.letta.mobile.data.canvas.CanvasMimeType.PNG),
+                )
+            }
+            val overflow = com.letta.mobile.data.canvas.CanvasShare.createChatImageAttachment("overflow".encodeToByteArray(), com.letta.mobile.data.canvas.CanvasMimeType.PNG)
+            com.letta.mobile.data.canvas.CanvasShare.stageForConversation(target, overflow)
+            assertEquals(limits.maxAttachmentCount, vm.composerState.value.pendingAttachments.size)
+            assertEquals(listOf(overflow), com.letta.mobile.data.canvas.CanvasShare.consumeStagedAttachments(target))
         } finally {
             viewModel?.viewModelScope?.cancel()
             com.letta.mobile.data.canvas.CanvasShare.clearStagedAttachments()

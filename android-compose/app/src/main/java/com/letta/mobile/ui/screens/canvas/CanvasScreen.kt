@@ -54,7 +54,7 @@ class CanvasViewModel @Inject constructor(
                     ),
                 )
             } else {
-                val effectiveId = if (canvasId.isNotBlank()) CanvasId(canvasId) else CanvasId("canvas-${System.currentTimeMillis()}")
+                val effectiveId = if (canvasId.isNotBlank()) CanvasId(canvasId) else CanvasId.generate()
                 val s = CanvasSession(canvasId = effectiveId, store = store, opLog = opLog, syncTransport = syncTransport)
                 s.load()
                 s

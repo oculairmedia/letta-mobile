@@ -424,7 +424,7 @@ data class CanvasCreateOptions(
     val conversationId: String? = null,
     val agentId: String? = null,
     val acl: CanvasAcl? = null,
-    val canvasId: CanvasId = CanvasId("canvas-${kotlin.time.Clock.System.now().toEpochMilliseconds()}-${(1000..9999).random()}"),
+    val canvasId: CanvasId = CanvasId.generate(),
     val initialSceneJson: String = "",
     val opLog: CanvasOpLog = InMemoryCanvasOpLog(),
     val syncTransport: CanvasSyncTransport? = null,

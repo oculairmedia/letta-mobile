@@ -75,7 +75,7 @@ private suspend fun executeCreateCanvas(
 
     val now = kotlin.time.Clock.System.now().toEpochMilliseconds()
     val candidate = CanvasDocument(
-        id = CanvasId("canvas-$now-${(1000..9999).random()}"),
+        id = CanvasId.generate(),
         agentId = callerAgentId,
         conversationId = conversationId,
         title = title,

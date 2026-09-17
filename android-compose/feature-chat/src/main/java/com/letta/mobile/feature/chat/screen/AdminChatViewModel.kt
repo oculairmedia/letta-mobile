@@ -1107,8 +1107,13 @@ internal class AdminChatViewModel @Inject constructor(
         }
     }
 
+    /**
+     * An image leaves the staging queue only once the composer has taken it. `addAttachment`
+     * returns false at the count or byte cap; that image and the ones behind it stay queued so
+     * they are still there after the user makes room, instead of vanishing with the error.
+     */
     private suspend fun drainStagedCanvasAttachments() {
-        com.letta.mobile.data.canvas.CanvasShare.consumeStagedAttachments(canvasShareRecipient).forEach { image ->
+        com.letta.mobile.data.canvas.CanvasShare.consumeStagedAttachments(canvasShareRecipient) { image ->
             addAttachment(image)
         }
     }
