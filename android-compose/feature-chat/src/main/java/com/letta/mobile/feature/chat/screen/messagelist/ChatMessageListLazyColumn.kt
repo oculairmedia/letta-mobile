@@ -219,6 +219,7 @@ private fun ChatMessageListRenderSingleItem(params: ChatMessageListRenderSingleI
             onApprovalDecision = context.callbacks.onSubmitApproval,
             chatMode = context.chatMode,
             showCompletedDisclosure = params.showTimestamp,
+            onOpenToolRunDetails = context.callbacks.onOpenToolRunDetails,
         ) { message, position, rowModifier ->
             RenderChatMessageRow(
                 params = RenderChatMessageRowParams(
@@ -270,6 +271,7 @@ private fun ChatMessageListRenderRunBlockItem(params: ChatMessageListRenderRunBl
         onApprovalDecision = context.callbacks.onSubmitApproval,
         chatMode = context.chatMode,
         showCompletedDisclosure = params.showTimestamp,
+        onOpenToolRunDetails = context.callbacks.onOpenToolRunDetails,
     ) { message, position, rowModifier ->
         RenderChatMessageRow(
             params = RenderChatMessageRowParams(

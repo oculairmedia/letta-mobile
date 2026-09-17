@@ -99,6 +99,7 @@ private fun androidx.navigation.NavGraphBuilder.appCanvasGraph(navController: Na
     }
 }
 
+@Suppress("NoAnyType")
 private fun resolveStartDestination(
     hasConfig: Boolean,
     initialNotificationTarget: AppLaunchTarget?,

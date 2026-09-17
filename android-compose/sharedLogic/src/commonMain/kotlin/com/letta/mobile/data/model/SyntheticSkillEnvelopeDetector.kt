@@ -7,20 +7,25 @@ object SyntheticSkillEnvelopeDetector {
     private val closingSlugTag = Regex("""</[a-z0-9-]+>\s*$""")
     private val nameLine = Regex("""^name\s*:\s*\S+.*$""", RegexOption.IGNORE_CASE)
     private val descriptionLine = Regex("""^description\s*:\s*\S+.*$""", RegexOption.IGNORE_CASE)
-    private val literalSkillOpening = Regex("""<skill(?:\s|[>/])""", RegexOption.IGNORE_CASE)
-    private val literalSkillClosing = Regex("""</skill>""", RegexOption.IGNORE_CASE)
+    private val literalSkillOpening = Regex("""<skill(?:_content)?(?:\s|[>/])""", RegexOption.IGNORE_CASE)
+    private val literalSkillClosing = Regex("""</skill(?:_content)?>""", RegexOption.IGNORE_CASE)
 
     fun isSyntheticSkillEnvelope(role: String?, content: String?): Boolean {
-        if (role != "user") return false
+        if (role != "user" && role != "assistant") return false
         val text = content?.trim() ?: return false
         if (text.length < MIN_ENVELOPE_CHARS) return false
 
         return hasFrontmatterSignal(text) || hasArgumentsClosingSignal(text) || hasLiteralSkillSignal(text)
     }
 
-    fun isSyntheticSkillEnvelope(message: LettaMessage): Boolean = when (message) {
-        is UserMessage -> isSyntheticSkillEnvelope(role = "user", content = message.content)
-        else -> false
+    fun isSyntheticSkillEnvelope(message: LettaMessage): Boolean =
+        isSyntheticSkillEnvelope(role = "user", content = message.textContentOrNull())
+
+    private fun LettaMessage.textContentOrNull(): String? = when (this) {
+        is UserMessage -> content
+        is AssistantMessage -> content
+        is SystemMessage -> content
+        else -> null
     }
 
     private fun hasFrontmatterSignal(text: String): Boolean {

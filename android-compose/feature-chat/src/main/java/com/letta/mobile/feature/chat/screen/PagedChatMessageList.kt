@@ -28,6 +28,7 @@ import androidx.paging.compose.itemKey
 import com.letta.mobile.feature.chat.screen.messagelist.*
 import com.letta.mobile.ui.chat.render.ChatMessageGeometryState
 import com.letta.mobile.ui.chat.render.ChatUiState
+import com.letta.mobile.ui.chat.render.RenderDiagnostics
 import com.letta.mobile.ui.chat.render.toChatRenderItemState
 import com.letta.mobile.ui.theme.chatDimens
 import com.letta.mobile.ui.theme.chatShapes
@@ -100,6 +101,12 @@ private fun PagedChatMessageListContent(
     }
     LaunchedEffect(presentation, pages) {
         snapshotFlow { pages.itemSnapshotList.items }.collect { resident ->
+            // letta-mobile-x1xnl: this host builds its rows from LazyPagingItems,
+            // so it never calls RenderDiagnostics.onRenderItemsBuilt — the hook
+            // that ends a render generation. Without a bump here the composed-key
+            // set accumulates across every page load and each legitimate
+            // re-composition is reported as lazyItem.doubleComposed at WARN.
+            RenderDiagnostics.newRenderGeneration()
             presentation.onResidentRows(resident)
         }
     }
@@ -124,6 +131,9 @@ private fun PagedChatMessageListContent(
             wasScrolling = scrolling
         }
     }
+    // The live (unpaged) tail is the other source this host renders from; it
+    // changes independently of the resident page rows, so it ends a generation too.
+    LaunchedEffect(live) { RenderDiagnostics.newRenderGeneration() }
     var previousLiveUser by remember(presentation) {
         mutableStateOf((live.firstOrNull() as? ChatRenderItem.Single)?.message?.id)
     }
@@ -229,6 +239,7 @@ private fun PagedChatMessageListContent(
             pinch.cancel()
         }
     }) {
+        val newestMessage = (live.firstOrNull() ?: pages.itemSnapshotList.items.firstOrNull())?.newestMessage()
         val context = ChatMessageListLazyContext(
             itemState = state.toChatRenderItemState(),
             conversationId = (state.conversationState as? com.letta.mobile.ui.chat.render.ConversationState.Ready)?.conversationId,
@@ -238,19 +249,12 @@ private fun PagedChatMessageListContent(
             layoutDirection = direction,
             activeFontScale = appearance.activeFontScale,
             liveFontScale = liveScale,
-            newestMessageId = when (val newest = live.firstOrNull() ?: pages.itemSnapshotList.items.firstOrNull()) {
-                is ChatRenderItem.Single -> newest.message.id
-                is ChatRenderItem.RunBlock -> newest.messages.lastOrNull()?.first?.id
-                else -> null
-            },
+            newestMessageId = newestMessage?.id,
             highlightedMessageId = highlightedTarget,
             itemGeometryState = geometry,
             pinchFontScaleController = pinch,
             scaleWindowIndexRange = IntRange.EMPTY,
-            callbacks = ChatMessageRenderCallbacks(
-                callbacks.onSendMessage, callbacks.onRerunMessage, callbacks.onSubmitApproval,
-                callbacks.onToggleRunCollapsed, callbacks.onToggleReasoningExpanded, callbacks.onAttachmentImageTap,
-            ),
+            callbacks = callbacks.toRenderCallbacks(),
         )
         val reducedMotion = com.letta.mobile.ui.components.rememberReducedMotionEnabled()
         val kineticOverscroll = rememberTimelineKineticOverscroll(
@@ -276,11 +280,7 @@ private fun PagedChatMessageListContent(
         )
         val topFadeLength = appearance.topPadding + ChatFadeEdgeLength
         val bottomFadeLength = chatMessageListBottomFadeLength(appearance.bottomPadding)
-        val newestRole = when (val newest = live.firstOrNull() ?: pages.itemSnapshotList.items.firstOrNull()) {
-            is ChatRenderItem.Single -> newest.message.role
-            is ChatRenderItem.RunBlock -> newest.messages.lastOrNull()?.first?.role
-            else -> null
-        }
+        val newestRole = newestMessage?.role
         // Paging can briefly report a backward scroll range while the live tail settles.
         // Keep a streaming user prompt at the newest edge fully visible during that window.
         val suppressBottomFade = following && newestRole == "user" && state.isStreaming

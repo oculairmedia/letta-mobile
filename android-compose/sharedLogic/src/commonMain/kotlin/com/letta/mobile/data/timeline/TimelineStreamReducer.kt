@@ -4,6 +4,7 @@ import com.letta.mobile.data.model.ApprovalResponseMessage
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.ReasoningMessage
 import com.letta.mobile.data.model.LettaMessage
+import com.letta.mobile.data.model.SyntheticSkillEnvelopeDetector
 import com.letta.mobile.data.model.ToolCall
 import com.letta.mobile.data.model.ToolReturnMessage
 import com.letta.mobile.util.Telemetry
@@ -35,6 +36,18 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
     val pendingEvents = mutableListOf<TimelineSyncEvent>()
     val conversationId = input.prev.conversationId
     val message = input.frame
+
+    // Loaded skill documents are model-only context emitted as user-shaped
+    // frames. Reject them at ingest so canonical storage, direct incremental
+    // projections, and every host agree that they are not conversation rows.
+    if (SyntheticSkillEnvelopeDetector.isSyntheticSkillEnvelope(message)) {
+        return TimelineReducerOutput(
+            next = timeline,
+            updatedPendingToolReturnsByCallId = pendingToolReturnsByCallId.toTimelinePersistentMap(),
+            emittedEvents = pendingEvents.toTimelinePersistentList(),
+            notification = null,
+        )
+    }
 
     // FrameFlowDiag: content-length at the reducer INGEST gate. Compare against
     // gate1.emit (IrohChannelTransport) to locate where fragment characters are

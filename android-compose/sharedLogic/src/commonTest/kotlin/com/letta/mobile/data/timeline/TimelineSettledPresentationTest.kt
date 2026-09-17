@@ -34,6 +34,20 @@ class TimelineSettledPresentationTest {
         assertEquals("hello", rendered.event.content)
     }
 
+    @Test fun persistedUserShapedSkillContentIsDropped() {
+        val skillContent = """
+            <skill_content name="asus-router">
+            ---
+            name: asus-router
+            description: Query router status.
+            ---
+            ${"Internal skill instructions. ".repeat(20)}
+            </skill_content>
+        """.trimIndent()
+
+        assertEquals(TimelineSettledPresentation.Drop, record(event("user_message", skillContent)).presentation())
+    }
+
     @Test fun completeRenderableRecordDecodesAndProjectsOnce() {
         var decodes = 0
         var projections = 0
