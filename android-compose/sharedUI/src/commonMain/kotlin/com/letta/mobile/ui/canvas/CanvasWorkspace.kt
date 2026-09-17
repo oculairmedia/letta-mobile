@@ -282,21 +282,14 @@ fun CanvasWorkspace(
                         statusMessage = "Cleared canvas"
                     },
                 ),
+                background = state.bgColor,
+                onBackground = { color ->
+                    controller.setBgColor(color)
+                    statusMessage = "Background changed"
+                },
                 modifier = Modifier.align(Alignment.TopEnd).padding(CHROME_INSET),
             )
 
-            CanvasStatusLine(
-                text = "Elements: ${state.elements.size} | $statusMessage",
-                modifier = Modifier.align(Alignment.BottomStart).padding(CHROME_INSET),
-            )
-
-            CanvasZoomPill(
-                scalePercent = state.viewport.scalePercent,
-                onZoomOut = { controller.zoomBy(1f / ZOOM_STEP, boardCenter) },
-                onZoomIn = { controller.zoomBy(ZOOM_STEP, boardCenter) },
-                onReset = { controller.resetCamera() },
-                modifier = Modifier.align(Alignment.BottomEnd).padding(CHROME_INSET),
-            )
 
             // History dialog
             if (showHistoryDialog && session != null) {
@@ -376,32 +369,67 @@ fun CanvasWorkspace(
                 )
             }
 
-            // Floating tool bar. Our own: the drawbox-ui one loads drawables its Android artifact
-            // never ships (letta-mobile-r5f3r). See CanvasControlsBar.
+            val dispatch: (io.ak1.drawbox.ui.controls.ControlsBarIntent) -> Unit = { intent ->
+                CanvasControlsBridge.dispatchIntent(
+                    controller = controller,
+                    intent = intent,
+                    hasSelection = hasSelection,
+                )
+            }
+
+            // Properties for the selection, or for the closed shape about to be drawn, top-centre.
+            if (hasSelection || controlsBarState.showFillTarget) {
+                CanvasSelectionBar(
+                    state = controlsBarState,
+                    hasSelection = hasSelection,
+                    dispatch = dispatch,
+                    onBringToFront = { controller.bringSelectionToFront() },
+                    onSendToBack = { controller.sendSelectionToBack() },
+                    onDelete = { controller.deleteSelected() },
+                    modifier = Modifier.align(Alignment.TopCenter).padding(top = if (showTitle) 64.dp else CHROME_INSET),
+                )
+            }
+
+            // The tool rail down the left, clear of the title pill above and the foot row below.
+            // Our own: the drawbox-ui one loads drawables its Android artifact never ships
+            // (letta-mobile-r5f3r). See CanvasControlsBar.
             CanvasControlsBar(
                 state = controlsBarState,
-                dispatch = { intent ->
-                    CanvasControlsBridge.dispatchIntent(
-                        controller = controller,
-                        intent = intent,
-                        hasSelection = hasSelection,
-                    )
-                },
+                dispatch = dispatch,
                 onAddNote = session?.let { s ->
                     {
                         val frame = newNoteFrame(state.viewport.screenToWorld(boardCenter))
                         val id = "note-${Clock.System.now().toEpochMilliseconds()}"
                         coroutineScope.launch {
-                            runCatching { s.setDocument(id, "", frame = frame) }
+                            runCatching { s.setDocument(id, "", frame = frame, color = NoteColors.first().hex) }
                                 .onSuccess { statusMessage = "Added note" }
                                 .onFailure { statusMessage = "Error: could not add note (${it.message})" }
                         }
                     }
                 },
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 20.dp),
+                    .align(Alignment.CenterStart)
+                    .padding(start = CHROME_INSET, top = 72.dp, bottom = 64.dp),
             )
+
+            // The foot of the board: status left, zoom right.
+            Row(
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(CHROME_INSET),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Bottom,
+            ) {
+                CanvasStatusLine(
+                    text = "Elements: ${state.elements.size} | $statusMessage",
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                CanvasZoomPill(
+                    scalePercent = state.viewport.scalePercent,
+                    onZoomOut = { controller.zoomBy(1f / ZOOM_STEP, boardCenter) },
+                    onZoomIn = { controller.zoomBy(ZOOM_STEP, boardCenter) },
+                    onReset = { controller.resetCamera() },
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+            }
         }
     }
 }

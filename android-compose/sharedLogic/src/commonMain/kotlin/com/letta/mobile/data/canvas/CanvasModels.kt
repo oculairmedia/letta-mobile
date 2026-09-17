@@ -40,6 +40,8 @@ data class CanvasSceneDocument(
     val id: String,
     val json: String,
     val frame: CanvasDocumentFrame? = null,
+    /** The card's colour as `#rrggbb`; null is the workspace's default note colour. */
+    val color: String? = null,
 )
 
 /** Where a block document sits on the board: top-left corner and size in world units. */
