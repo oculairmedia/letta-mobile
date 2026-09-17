@@ -32,6 +32,7 @@ import com.letta.mobile.data.desktopshell.ShellLayoutEvent
 import com.letta.mobile.data.desktopshell.ShellLayoutReducer
 import com.letta.mobile.data.lens.WorkPlayLens
 import com.letta.mobile.data.lens.WorkPlayMode
+import com.letta.mobile.data.presence.presenceByAgent
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.onboarding.OnboardingTaskKind
 import com.letta.mobile.data.model.SubagentStatus
@@ -57,8 +58,6 @@ import com.letta.mobile.desktop.home.toggled
 import com.letta.mobile.avatar.core.MascotIdentity
 import com.letta.mobile.desktop.agent.agentAvatarStyleKey
 import com.letta.mobile.data.commands.AgentSlashCommand
-import com.letta.mobile.ui.mascot.LocalMascotTransport
-import com.letta.mobile.ui.mascot.MascotStage
 import com.letta.mobile.ui.mascot.MascotTransportLayer
 import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
 import io.github.vinceglb.filekit.dialogs.FileKitMode
@@ -265,29 +264,7 @@ internal fun LettaDesktopApp(
     val activeTitle = desktopActiveTitle(selectedDestination, chatState.selectedConversation?.title)
     LaunchedEffect(activeTitle) { onActiveTitleChange(activeTitle) }
 
-    LaunchedEffect(selectedDestination, chatState.selectedConversationId) {
-        val selectedId = chatState.selectedConversationId
-        if (
-            selectedDestination == DesktopDestination.Conversations &&
-            selectedId != null &&
-            selectedId !in conversationTabsState.openConversationIds
-        ) {
-            conversationTabsState = ConversationTabsReducer.select(conversationTabsState, selectedId)
-        }
-    }
-    LaunchedEffect(chatState.connectionState, chatState.conversations) {
-        if (
-            chatState.connectionState == DesktopChatConnectionState.Live ||
-            chatState.connectionState == DesktopChatConnectionState.NoConversations
-        ) {
-            val availableIds = chatState.conversations.mapTo(mutableSetOf()) { it.id }
-            conversationTabsState = ConversationTabsReducer.retainAvailable(
-                state = conversationTabsState,
-                availableConversationIds = availableIds,
-                selectedConversationId = chatState.selectedConversationId,
-            )
-        }
-    }
+    SyncConversationTabs(chatState, selectedDestination, conversationTabsState) { conversationTabsState = it }
     val conversationById = remember(chatState.conversations) { chatState.conversations.associateBy { it.id } }
     val conversationTabs = remember(conversationTabsState, conversationById) {
         conversationTabsState.openConversationIds.mapNotNull { conversationId ->
@@ -410,10 +387,6 @@ internal fun LettaDesktopApp(
     // Every AgentOrb in the app reads identities from the registry; keep it current.
     val mascotRegistry = com.letta.mobile.ui.mascot.LocalMascotRegistry.current
     androidx.compose.runtime.SideEffect { mascotRegistry.update(identityByAgentId) }
-    // The transport verb is driven from the shell's own state (below, once the sidebar's
-    // visibility is known) so every control that opens a pane moves the mascot the same way.
-    val mascotTransport = LocalMascotTransport.current
-    var placedMascotAgent by remember { mutableStateOf<String?>(null) }
     val selectedAgentOrbIndex = avatarStyleByAgentId[selectedAgentId]
         ?: railAgents.indexOfFirst { it.first == selectedAgentId }.coerceAtLeast(0)
     val selectedAgentName = railAgents.firstOrNull { it.first == selectedAgentId }?.second
@@ -466,22 +439,14 @@ internal fun LettaDesktopApp(
     // bespoke desktop check, so the "is the agent working" semantics stay in one
     // place across platforms.
     val replyPresence by chatController.replyPresence.collectAsState()
-    // Presence -> the mascots' directors. Busy is the whole run (send -> terminal), speaking while
-    // tokens stream, listening while the user composes, error when the attempt failed.
+    // Presence -> the mascots' directors, read from the window's run registry exactly as Android's
+    // ProvideMascotShell reads the app-wide one. The controller folds the runtime's events through
+    // the shared RunPhaseReducer, so what arrives here is the phase the turn is actually in -
+    // running a tool, parked on an approval, responding - attributed to the conversation it
+    // happened in rather than to whichever one is selected (letta-mobile-8a3bz, -s4krx).
     val runningConversationId by chatController.streamingConversationId.collectAsState()
-    val mascotPresence = remember(chatState.conversations, runningConversationId, thinkingConversationId, replyPresence, chatState.selectedConversationId, chatState.composerText, chatState.errorMessage) {
-        com.letta.mobile.data.presence.AgentPresenceResolver.resolve(
-            conversations = chatState.conversations,
-            // Either run signal: the controller's streaming id (send -> terminal) or its thinking id.
-            runningConversationId = runningConversationId ?: thinkingConversationId,
-            // Tokens are arriving when the run is streaming and the "agent typing" dots are off;
-            // the dots (before the first token, between tool phases) are thinking.
-            streamingTokens = replyPresence.isStreaming && !replyPresence.isAgentTyping,
-            selectedConversationId = chatState.selectedConversationId,
-            composerText = chatState.composerText,
-            errorConversationId = chatState.selectedConversationId.takeIf { chatState.errorMessage != null },
-        )
-    }
+    val runs by chatController.runs.collectAsState()
+    val mascotPresence = remember(runs) { runs.presenceByAgent() }
     androidx.compose.runtime.SideEffect { mascotRegistry.updatePresence(mascotPresence) }
     val isStreamingReplySelected = replyPresence.isStreaming
 
@@ -708,18 +673,8 @@ internal fun LettaDesktopApp(
             val measuredWidthDp = maxWidth.value
             val isSidebarVisible = shellLayoutState.isSidebarVisible &&
                 !ShellLayoutReducer.defaultCollapsedForWidth(measuredWidthDp)
-            // One rule for where the mascot stands (wbin4.4): the agent pane's hero seat while the
-            // sidebar shows (however it was opened), else rest. Editing moves nothing - the editor
-            // previews its pick on the character where it stands. The previous agent is let go
-            // when focus moves.
-            val mascotStageAgent = selectedAgentId
-            val mascotStage = if (isSidebarVisible) MascotStage.AGENT_PANE_HERO else null
-            LaunchedEffect(mascotStageAgent, mascotStage) {
-                placedMascotAgent?.takeIf { it != mascotStageAgent }?.let(mascotTransport::rest)
-                placedMascotAgent = mascotStageAgent
-                val agent = mascotStageAgent ?: return@LaunchedEffect
-                if (mascotStage != null) mascotTransport.transportTo(agent, mascotStage) else mascotTransport.rest(agent)
-            }
+            // One rule for where the mascot stands (wbin4.4), driven from the shell's own state.
+            DriveMascotStage(selectedAgentId, agentPaneVisible = isSidebarVisible)
             LaunchedEffect(measuredWidthDp) {
                 shellLayoutController.dispatch(ShellLayoutEvent.WindowWidthChanged(measuredWidthDp))
             }
@@ -792,24 +747,24 @@ internal fun LettaDesktopApp(
                     )
                     RailDivider()
                     }
-                val canvasStore = remember { com.letta.mobile.desktop.canvas.DesktopCanvasDocumentStore() }
-                var activeCanvasSession by remember { mutableStateOf<com.letta.mobile.data.canvas.CanvasSession?>(null) }
-                val composerCommands = rememberDesktopComposerCommands(
-                    DesktopComposerCommandsParams(
-                        chatController = chatController,
-                        agentSlashCommands = agentSlashCommands,
-                        selectedConversationId = chatState.selectedConversationId,
-                        selectedAgentId = selectedAgentId,
-                        selectedAgentName = selectedAgentName,
-                        selectedDestination = selectedDestination,
-                        canvasStore = canvasStore,
-                        chatScope = chatScope,
-                        onNavigate = { selectedDestination = it },
-                        onCreateAgent = { overlays.newAgent = true },
-                        onEditAgent = { editAgentId = it },
-                        onCanvasSessionChange = { activeCanvasSession = it },
-                    ),
-                )
+                    val canvasStore = remember { com.letta.mobile.desktop.canvas.DesktopCanvasDocumentStore() }
+                    var activeCanvasSession by remember { mutableStateOf<com.letta.mobile.data.canvas.CanvasSession?>(null) }
+                    val composerCommands = rememberDesktopComposerCommands(
+                        DesktopComposerCommandsParams(
+                            chatController = chatController,
+                            agentSlashCommands = agentSlashCommands,
+                            selectedConversationId = chatState.selectedConversationId,
+                            selectedAgentId = selectedAgentId,
+                            selectedAgentName = selectedAgentName,
+                            selectedDestination = selectedDestination,
+                            canvasStore = canvasStore,
+                            chatScope = chatScope,
+                            onNavigate = { selectedDestination = it },
+                            onCreateAgent = { overlays.newAgent = true },
+                            onEditAgent = { editAgentId = it },
+                            onCanvasSessionChange = { activeCanvasSession = it },
+                        ),
+                    )
                     val contextUsage = rememberFocusedContextUsage(
                         agentId = selectedAgentId,
                         conversationId = chatState.selectedConversationId,
@@ -876,7 +831,7 @@ internal fun LettaDesktopApp(
                             showBackgroundTasks = showBackgroundTasks,
                             subagentRepository = subagentRepository,
                             activeSubagents = activeSubagents,
-                        activeCanvasSession = activeCanvasSession,
+                            activeCanvasSession = activeCanvasSession,
                         ),
                         actions = DesktopMainContentActions(
                             onEditAgentClose = { editAgentId = null },
@@ -885,34 +840,40 @@ internal fun LettaDesktopApp(
                                 editAgentId = null
                                 if (nameChanged) chatController.retryConnection()
                             },
-                        onCloseCanvas = { activeCanvasSession = null },
-                        onShareCanvasToChat = { bytes, mimeType ->
-                            handleDesktopShareCanvasToChat(bytes, mimeType, chatController) {
-                                selectedDestination = DesktopDestination.Conversations
-                                activeCanvasSession = null
-                            }
-                        },
-                        chatDetailActions = createDesktopChatDetailPaneActions(
-                            CreateDesktopChatDetailPaneActionsParams(
-                                chatController = chatController,
-                                canSubmitApprovals = canSubmitApprovals,
-                                onA2uiAction = ::dispatchA2uiAction,
-                                onAttachImage = { pickerLauncher.launch() },
-                                onOpenModelPicker = { overlays.modelPicker = true },
-                                onSetPersona = { editAgentId = selectedAgentId },
-                                onNavigateToChannels = { selectedDestination = DesktopDestination.Channels },
-                                onNavigateToAgents = { selectedDestination = DesktopDestination.Agents },
-                                onOpenAgent = ::openAgent,
-                                // The companion mascot is the way into its agent: bring the agent
-                                // pane (the sidebar) back if it was collapsed and leave any editor.
-                                onOpenAgentPane = {
-                                    editAgentId = null
+                            onCloseCanvas = { activeCanvasSession = null },
+                            onShareCanvasToChat = { bytes, mimeType ->
+                                handleDesktopShareCanvasToChat(bytes, mimeType, chatController) {
                                     selectedDestination = DesktopDestination.Conversations
-                                    shellLayoutController.dispatch(ShellLayoutEvent.SetSidebarCollapsed(false))
-                                },
-                                onEditAgent = { editAgentId = selectedAgentId },
+                                    activeCanvasSession = null
+                                }
+                            },
+                            chatDetailActions = createDesktopChatDetailPaneActions(
+                                CreateDesktopChatDetailPaneActionsParams(
+                                    chatController = chatController,
+                                    canSubmitApprovals = canSubmitApprovals,
+                                    onA2uiAction = ::dispatchA2uiAction,
+                                    onAttachImage = { pickerLauncher.launch() },
+                                    onOpenModelPicker = { overlays.modelPicker = true },
+                                    onSetPersona = { editAgentId = selectedAgentId },
+                                    onNavigateToChannels = { selectedDestination = DesktopDestination.Channels },
+                                    onNavigateToAgents = { selectedDestination = DesktopDestination.Agents },
+                                    onOpenAgent = ::openAgent,
+                                    onEditAgent = { editAgentId = selectedAgentId },
+                                    // The companion mascot is the way into its agent: bring the agent
+                                    // pane (the sidebar) back if it was collapsed and leave any editor.
+                                    onOpenAgentPane = {
+                                        editAgentId = null
+                                        selectedDestination = DesktopDestination.Conversations
+                                        shellLayoutController.dispatch(ShellLayoutEvent.SetSidebarCollapsed(false))
+                                    },
+                                ),
+                                onConfigSaved = { applyConfig(it) },
+                                onTokenCleared = { applyConfig(activeConfig.copy(accessToken = null)) },
+                                onIrohIdentityReset = { overlays.irohResetConfirm = true },
+                                nucleus = destinationNucleusActions(nucleusController, window),
+                                localRuntimeProvider = localConfig.providerActions,
+                                localBackendDirectory = localConfig.directoryActions,
                             ),
-                        ),
                             destinationActions = DestinationContentActions(
                                 onRetryConnection = chatController::retryConnection,
                                 home = DesktopHomeActions(

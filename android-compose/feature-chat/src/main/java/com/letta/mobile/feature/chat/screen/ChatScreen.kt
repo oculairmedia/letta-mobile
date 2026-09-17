@@ -31,6 +31,7 @@ internal fun ChatScreen(
     onViewSubagentConversation: ((String, String) -> Unit)? = null,
     onOpenAgentPane: (() -> Unit)? = null,
     onOpenCanvas: (() -> Unit)? = null,
+    onOpenAgentPane: (() -> Unit)? = null,
     activeSubagentSource: ActiveSubagentSource? = null,
     selfTodoSource: com.letta.mobile.feature.chat.subagent.SelfTodoSource? = null,
     viewModel: AdminChatViewModel = hiltViewModel(),
@@ -55,6 +56,7 @@ internal fun ChatScreen(
             onViewSubagentConversation = onViewSubagentConversation,
             onOpenAgentPane = onOpenAgentPane,
             onOpenCanvas = onOpenCanvas,
+            onOpenAgentPane = onOpenAgentPane,
         )
     }
 

@@ -149,22 +149,7 @@ private fun runDesktopApplication(
                         // chrome alone.
                         DesktopChatFontScaleHost {
                             // Every mascot in the app looks toward the cursor; capture it once, at the root.
-                            Box(
-                                Modifier.fillMaxSize().pointerInput(Unit) {
-                                    awaitPointerEventScope {
-                                        while (true) {
-                                            val e = awaitPointerEvent(PointerEventPass.Initial)
-                                            when (e.type) {
-                                                PointerEventType.Move ->
-                                                    mascots.cursor.value = e.changes.firstOrNull()?.position
-                                                PointerEventType.Exit ->
-                                                    mascots.cursor.value = null
-                                                else -> Unit
-                                            }
-                                        }
-                                    }
-                                },
-                            ) {
+                            MascotCursorCapture(mascots) {
                             LettaDesktopApp(
                                 shell = DesktopAppShellBindings(
                                     nucleusApplicationScope = nucleusScope,

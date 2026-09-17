@@ -4,13 +4,12 @@ import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.canvas.CanvasOp
 import com.letta.mobile.data.canvas.CanvasOpLog
 import java.io.IOException
-import java.util.concurrent.ConcurrentHashMap
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.nio.file.StandardOpenOption
 import java.security.MessageDigest
-import kotlinx.coroutines.CancellationException
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -43,13 +42,7 @@ class DesktopCanvasOpLog(
         Files.createDirectories(rootDirectory)
     }
 
-    override suspend fun append(canvasId: CanvasId, op: CanvasOp) {
-        withContext(Dispatchers.IO) {
-            writeOpToFile(canvasId, op)
-        }
-    }
-
-    private suspend fun writeOpToFile(canvasId: CanvasId, op: CanvasOp) {
+    override suspend fun append(canvasId: CanvasId, op: CanvasOp): Unit = withContext(Dispatchers.IO) {
         mutex.withLock {
             val opIds = getOrLoadOpIds(canvasId)
             if (!opIds.add(op.opId)) {
@@ -68,33 +61,36 @@ class DesktopCanvasOpLog(
         }
     }
 
-    override suspend fun getOps(canvasId: CanvasId, sinceLamport: Long): List<CanvasOp> {
-        return withContext(Dispatchers.IO) {
-            readOpsFromFile(canvasId, sinceLamport)
+    override suspend fun getOps(canvasId: CanvasId, sinceLamport: Long): List<CanvasOp> = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            val file = opLogFile(canvasId)
+            if (!Files.exists(file) || !Files.isRegularFile(file)) return@withLock emptyList()
+            try {
+                val lines = Files.readAllLines(file)
+                val ops = mutableListOf<CanvasOp>()
+                for (line in lines) {
+                    val trimmed = line.trim()
+                    if (trimmed.isEmpty()) continue
+                    try {
+                        val op = json.decodeFromString(CanvasOp.serializer(), trimmed)
+                        if (op.lamport > sinceLamport) {
+                            ops.add(op)
+                        }
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
+                    } catch (_: Exception) {
+                        // Skip corrupted line
+                    }
+                }
+                ops.sortedBy { it.lamport }
+            } catch (e: IOException) {
+                emptyList()
+            }
         }
     }
 
-    private suspend fun readOpsFromFile(canvasId: CanvasId, sinceLamport: Long): List<CanvasOp> = mutex.withLock {
-        val file = opLogFile(canvasId)
-        if (!isReadableFile(file)) return@withLock emptyList()
-        try {
-            Files.readAllLines(file)
-                .mapNotNull(::parseOpLine)
-                .filter { it.lamport > sinceLamport }
-                .sortedBy { it.lamport }
-        } catch (_: IOException) {
-            emptyList()
-        }
-    }
-
-    override suspend fun has(canvasId: CanvasId, opId: String): Boolean {
-        return withContext(Dispatchers.IO) {
-            checkOpExists(canvasId, opId)
-        }
-    }
-
-    private suspend fun checkOpExists(canvasId: CanvasId, opId: String): Boolean {
-        return mutex.withLock {
+    override suspend fun has(canvasId: CanvasId, opId: String): Boolean = withContext(Dispatchers.IO) {
+        mutex.withLock {
             val opIds = getOrLoadOpIds(canvasId)
             opIds.contains(opId)
         }
@@ -102,34 +98,32 @@ class DesktopCanvasOpLog(
 
     override fun observe(canvasId: CanvasId): Flow<CanvasOp> {
         val flow = flowsByCanvas.computeIfAbsent(canvasId) {
-            MutableSharedFlow<CanvasOp>(replay = 16, extraBufferCapacity = 64)
+            MutableSharedFlow(replay = 16, extraBufferCapacity = 64)
         }
         return flow.asSharedFlow()
     }
 
-    private fun isReadableFile(file: Path): Boolean =
-        Files.exists(file) && Files.isRegularFile(file)
-
-    private fun parseOpLine(line: String): CanvasOp? {
-        val trimmed = line.trim()
-        if (trimmed.isEmpty()) return null
-        return try {
-            json.decodeFromString(CanvasOp.serializer(), trimmed)
-        } catch (_: Exception) {
-            null
-        }
-    }
-
-    private fun getOrLoadOpIds(canvasId: CanvasId): MutableSet<String> = opIdsByCanvas.getOrPut(canvasId) {
-        val set = mutableSetOf<String>()
-        val file = opLogFile(canvasId)
-        if (isReadableFile(file)) {
-            try {
-                Files.readAllLines(file).mapNotNull(::parseOpLine).mapTo(set) { it.opId }
-            } catch (_: IOException) {
+    private fun getOrLoadOpIds(canvasId: CanvasId): MutableSet<String> {
+        return opIdsByCanvas.getOrPut(canvasId) {
+            val set = mutableSetOf<String>()
+            val file = opLogFile(canvasId)
+            if (Files.exists(file) && Files.isRegularFile(file)) {
+                try {
+                    val lines = Files.readAllLines(file)
+                    for (line in lines) {
+                        val trimmed = line.trim()
+                        if (trimmed.isEmpty()) continue
+                        try {
+                            val op = json.decodeFromString(CanvasOp.serializer(), trimmed)
+                            set.add(op.opId)
+                        } catch (_: Exception) {
+                        }
+                    }
+                } catch (_: IOException) {
+                }
             }
+            set
         }
-        set
     }
 
     private fun opLogFile(canvasId: CanvasId): Path {

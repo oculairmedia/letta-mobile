@@ -16,7 +16,7 @@ import com.letta.mobile.data.presence.AgentPresence
 /**
  * Every agent's mascot identity and presence, as the app currently knows them. The shell owns
  * one instance and keeps it current (identity from the agent list, presence from
- * [com.letta.mobile.data.presence.AgentPresenceResolver]); any surface that draws an agent reads
+ * [com.letta.mobile.data.presence.presenceByAgent]); any surface that draws an agent reads
  * it through [LocalMascotRegistry] and [MascotAvatar] without the identity having to be threaded
  * through every row model on the way. Platform-neutral: the same registry feeds the Android shell.
  */

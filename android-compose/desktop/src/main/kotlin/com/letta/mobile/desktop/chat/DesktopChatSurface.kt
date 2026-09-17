@@ -410,15 +410,14 @@ private fun NewConversationWelcome(
             // The agent itself, at hero size - the mascot's rest seat while the greeting shows (it
             // slides down to the composer the moment the conversation starts). While the character
             // stands elsewhere (the agent pane is open) the seat is simply empty - no stand-in - and
-            // the gradient sphere appears only when there is no renderer at all.
-            val hasRenderer = com.letta.mobile.ui.mascot.LocalMascotHost.current.available
+            // the gradient sphere appears only when this agent has no mascot to draw at all.
             com.letta.mobile.ui.mascot.MascotSeat(
                 agentId = agentId,
                 stage = com.letta.mobile.ui.mascot.MascotStage.WELCOME_HERO,
                 size = 220.dp,
                 onEdit = onEditAgent,
-            ) {
-                if (!hasRenderer) AgentSphere(size = 96.dp)
+            ) { vacancy ->
+                if (vacancy == com.letta.mobile.ui.mascot.MascotSeatVacancy.NO_MASCOT) AgentSphere(size = 96.dp)
             }
             Text(
                 text = AgentOnboarding.greeting(agentName),

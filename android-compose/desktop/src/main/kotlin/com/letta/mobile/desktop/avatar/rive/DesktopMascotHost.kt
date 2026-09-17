@@ -10,7 +10,6 @@ import com.letta.mobile.avatar.core.MascotIdentity
 import com.letta.mobile.avatar.rive.MASCOT_MODEL
 import com.letta.mobile.avatar.rive.RiveAvatarContract
 import com.letta.mobile.avatar.rive.RiveAvatarRuntime
-import com.letta.mobile.avatar.rive.RiveInputSink
 import com.letta.mobile.ui.mascot.MascotEntries
 import com.letta.mobile.ui.mascot.MascotEntry
 import com.letta.mobile.ui.mascot.MascotHost
@@ -51,7 +50,8 @@ class DesktopMascotEntry private constructor(
     override suspend fun load() {
         val created = withContext(RiveThread.dispatcher) {
             runCatching {
-                RiveDesktopScene.create().also { scene ->
+                val scene = RiveDesktopScene.create()
+                runCatching {
                     scene.load(bytes)
                     // Host rule: identity before the first advance, or the first frame is a black body -
                     // attaching replays every write made so far, the identity first among them.
@@ -60,7 +60,8 @@ class DesktopMascotEntry private constructor(
                     // mascots on one screen blink, wander and fidget in lockstep. A random head start
                     // (0-20 s in small steps, so the state machines take their transitions) breaks it.
                     repeat(kotlin.random.Random.nextInt(0, 60)) { _ -> scene.advance(kotlin.random.Random.nextFloat() * 0.3f + 0.05f) }
-                }
+                }.onFailure { scene.close() }.getOrThrow() // a scene that failed after creation is released, not leaked
+                scene
             }.onFailure { System.err.println("[mascot] scene failed to load: ${'$'}it") }.getOrNull()
         }
         if (created == null) {
@@ -77,37 +78,6 @@ class DesktopMascotEntry private constructor(
         scene?.close()
         scene = null
     }
-}
-
-/**
- * An input sink that records writes until a scene exists, then replays them in order and forwards
- * everything after. Lets the runtime and director be built - and written to - before the native
- * scene has been created.
- */
-internal class DeferredSink : RiveInputSink {
-    private var target: RiveInputSink? = null
-    private val pending = ArrayList<(RiveInputSink) -> Unit>()
-
-    fun attach(sink: RiveInputSink) {
-        synchronized(pending) {
-            pending.forEach { it(sink) }
-            pending.clear()
-            target = sink
-        }
-    }
-
-    private fun write(op: (RiveInputSink) -> Unit) {
-        synchronized(pending) {
-            val t = target
-            if (t != null) op(t) else pending += op
-        }
-    }
-
-    override fun setNumber(input: String, value: Float) = write { it.setNumber(input, value) }
-    override fun setBoolean(input: String, value: Boolean) = write { it.setBoolean(input, value) }
-    override fun setEnum(input: String, key: String) = write { it.setEnum(input, key) }
-    override fun setColor(input: String, argb: Int) = write { it.setColor(input, argb) }
-    override fun fire(input: String) = write { it.fire(input) }
 }
 
 /**

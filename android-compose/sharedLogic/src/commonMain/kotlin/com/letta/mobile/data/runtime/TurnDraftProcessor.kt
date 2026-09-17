@@ -1,6 +1,5 @@
 package com.letta.mobile.data.runtime
 
-import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.runtime.RunId
 import com.letta.mobile.runtime.RuntimeEventDraft
 import com.letta.mobile.runtime.RuntimeEventPayload
@@ -9,8 +8,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import kotlin.time.Duration.Companion.milliseconds
 
 internal class TurnToolCallLedger {
@@ -155,8 +152,6 @@ private val terminalStatuses = setOf(
     RuntimeRunStatus.Cancelled,
 )
 private val abnormalTerminalStatuses = setOf(RuntimeRunStatus.Failed, RuntimeRunStatus.Cancelled)
-private val toolReturnTypes = setOf("client_tool_end", "tool_return_message")
-private val toolCallTypes = setOf("client_tool_start", "tool_call_message")
 
 private fun RuntimeEventDraft.isTerminalLifecycle(): Boolean =
     (payload as? RuntimeEventPayload.RunLifecycleChanged)?.status in terminalStatuses
@@ -169,24 +164,24 @@ private fun RuntimeEventDraft.isAbnormalTerminal(): Boolean =
 
 private fun RuntimeEventDraft.isToolReturnFrame(): Boolean = when (val event = payload) {
     is RuntimeEventPayload.ToolReturnObserved -> true
-    is RuntimeEventPayload.RemoteStreamFrame -> event.matchesAnyType(toolReturnTypes)
+    is RuntimeEventPayload.RemoteStreamFrame -> event.matchesAnyType(RuntimeFrameTypes.toolReturn)
     else -> false
 }
 
 private fun RuntimeEventDraft.isAssistantFrame(): Boolean = when (val event = payload) {
-    is RuntimeEventPayload.RemoteStreamFrame -> event.matchesAnyType(setOf("assistant_message"))
+    is RuntimeEventPayload.RemoteStreamFrame -> event.matchesAnyType(RuntimeFrameTypes.assistant)
     else -> false
 }
 
 private fun RuntimeEventDraft.isToolCallFrame(): Boolean = when (val event = payload) {
     is RuntimeEventPayload.ToolCallObserved -> true
     is RuntimeEventPayload.ApprovalRequested -> true
-    is RuntimeEventPayload.RemoteStreamFrame -> event.matchesAnyType(toolCallTypes)
+    is RuntimeEventPayload.RemoteStreamFrame -> event.matchesAnyType(RuntimeFrameTypes.toolCall)
     else -> false
 }
 
 private fun RuntimeEventDraft.isUsageStatisticsFrame(): Boolean = when (val event = payload) {
-    is RuntimeEventPayload.RemoteStreamFrame -> event.matchesAnyType(setOf("usage_statistics"))
+    is RuntimeEventPayload.RemoteStreamFrame -> event.matchesAnyType(RuntimeFrameTypes.usage)
     is RuntimeEventPayload.ExternalTransportFrame -> listOf(
         event.body.startsWith("usage:"),
         frameMessageType(event.body) == "usage_statistics",
@@ -195,16 +190,8 @@ private fun RuntimeEventDraft.isUsageStatisticsFrame(): Boolean = when (val even
 }
 
 private fun RuntimeEventDraft.isStopReasonFrame(): Boolean = when (val event = payload) {
-    is RuntimeEventPayload.RemoteStreamFrame -> event.matchesAnyType(setOf("stop_reason"))
+    is RuntimeEventPayload.RemoteStreamFrame -> event.matchesAnyType(RuntimeFrameTypes.stopReason)
     is RuntimeEventPayload.ExternalTransportFrame -> frameMessageType(event.body) == "stop_reason"
     else -> false
 }
 
-private fun RuntimeEventPayload.RemoteStreamFrame.matchesAnyType(types: Set<String>): Boolean =
-    listOf(messageType, frameMessageType(body)).any(types::contains)
-
-private fun frameMessageType(body: String): String? = runCatching {
-    val raw = AppServerProtocol.json.parseToJsonElement(body).jsonObject
-    val delta = raw["delta"]?.jsonObject ?: raw
-    delta["message_type"]?.jsonPrimitive?.content
-}.getOrNull()

@@ -1,5 +1,6 @@
 package com.letta.mobile.feature.chat.screen
 
+import com.letta.mobile.data.presence.RunScope
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -168,6 +169,17 @@ internal class AdminChatViewModel @Inject constructor(
     private val runRegistry: com.letta.mobile.data.presence.ConversationRunRegistry =
         com.letta.mobile.data.presence.ConversationRunRegistry(),
 ) : ViewModel() {
+    /**
+     * Folds this screen's runtime events into the app-wide registry through the shared reducer, so
+     * what the lists and the mascots see is the phase the turn is actually in - reasoning, running
+     * a tool (and which one), parked on an approval, responding, failed - rather than the two
+     * booleans the UI state carried. The reducer is shared code; this is the Android binding.
+     *
+     * Declared first: the send pipeline below hands `::onRuntimeEvents` to its observer during
+     * construction, and cached repositories can deliver events before the constructor returns.
+     */
+    private val runPhases = com.letta.mobile.data.presence.ConversationRunPhasePublisher(runRegistry)
+
     companion object {
         private const val RESUME_CACHE_MAX_AGE_MS = 60_000L
     }
@@ -377,6 +389,7 @@ internal class AdminChatViewModel @Inject constructor(
             setActiveConversationId = chatConversationCoordinator::setActiveConversationId,
             startTimelineObserver = ::startTimelineObserver,
             selectedOwner = selectedSendOwner,
+            runtimeEventObserver = ::onRuntimeEvents,
         )
 
     private val composerCoordinator: AdminChatComposerCoordinator
@@ -1004,7 +1017,7 @@ internal class AdminChatViewModel @Inject constructor(
     fun onScreenResumed() = screenLifecycleCoordinator.onScreenResumed()
 
     override fun onCleared() {
-        publishedRunKey?.let(runRegistry::clear)
+        publishedRunKey?.let(runPhases::clear)
         abandonTimelineObserver()
         adminChatA2uiCoordinator.release()
         screenLifecycleCoordinator.onCleared()
@@ -1092,28 +1105,37 @@ internal class AdminChatViewModel @Inject constructor(
     private var publishedRunKey: String? = null
 
     /**
-     * Publishes this conversation's run to the app-wide registry on every change: busy from send
-     * to terminal (the streaming flag covers the run, the typing dots the gaps before the first
-     * token and between tool phases), tokens when streaming without the dots, typing while the
-     * composer holds text, error while the last attempt failed. The chat's own screen and every
-     * other surface (the conversation list, the mascots) read presence from that one place.
+     * Every runtime event the send pipeline records, folded into the run phase for this screen's
+     * conversation. Published under the screen's own key so a conversation that has not been named
+     * by the server yet still has presence.
+     */
+    private fun onRuntimeEvents(drafts: List<com.letta.mobile.runtime.RuntimeEventDraft>) {
+        if (drafts.isEmpty()) return
+        runPhases.onEvents(RunScope(currentRunKey(), agentId.value), drafts.map { it.payload })
+    }
+
+    /**
+     * This screen's registry key, carrying an in-flight run over to the server-assigned
+     * conversation id the moment it lands.
+     */
+    @Synchronized
+    private fun currentRunKey(): String {
+        val key = conversationId?.value ?: "agent:${agentId.value}"
+        val previous = publishedRunKey
+        if (previous != null && previous != key) runPhases.rekey(previous, RunScope(key, agentId.value))
+        publishedRunKey = key
+        return key
+    }
+
+    /**
+     * Keeps the orthogonal facts (who the conversation is, whether the user is composing to it)
+     * in step with the reduced phase. The conversation's id can arrive after its first events, so
+     * the run carries over to the new key rather than starting again from rest.
      */
     private fun publishRunState() {
         viewModelScope.launch {
-            kotlinx.coroutines.flow.combine(uiState, composerState) { ui, composer ->
-                val key = conversationId?.value ?: "agent:${agentId.value}"
-                com.letta.mobile.data.presence.ConversationRunState(
-                    conversationId = key,
-                    agentId = agentId.value,
-                    running = ui.isStreaming || ui.isAgentTyping,
-                    streamingTokens = ui.isStreaming && !ui.isAgentTyping,
-                    userTyping = composer.inputText.isNotBlank(),
-                    error = ui.error != null,
-                )
-            }.collect { state ->
-                publishedRunKey?.takeIf { it != state.conversationId }?.let(runRegistry::clear)
-                publishedRunKey = state.conversationId
-                runRegistry.publish(state)
+            composerState.collect { composer ->
+                runPhases.setUserTyping(RunScope(currentRunKey(), agentId.value), composer.inputText.isNotBlank())
             }
         }
     }

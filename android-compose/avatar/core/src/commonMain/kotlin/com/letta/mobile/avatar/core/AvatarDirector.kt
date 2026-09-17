@@ -20,8 +20,14 @@ enum class AvatarActivity {
     /** The user is talking / composing — attentive, still. */
     LISTENING,
 
-    /** The agent is reasoning or running tools — relaxed, inward. */
+    /** The agent is reasoning — relaxed, inward. */
     THINKING,
+
+    /** The agent is running a tool — the honest middle of a turn, distinct from reasoning. */
+    WORKING,
+
+    /** The agent is running a tool that spawned subagents. Reads as [WORKING] until z4b83's own look. */
+    DELEGATING,
 
     /** The agent's reply is streaming/being spoken — mouth animates. */
     SPEAKING,
@@ -105,6 +111,16 @@ class AvatarDirector(
         /** THINKING relaxed 0.6wt, attack 0.4s (§6). */
         val thinkingWeight: Float = 0.6f,
         val thinkingAttackSeconds: Float = 0.4f,
+        /**
+         * WORKING minimum dwell (letta-mobile-z4b83): a tool call holds the state this long, and
+         * the same timer is the quiet-gap release — a turn that alternates tool / reasoning /
+         * tool faster than this never drops back to THINKING in between, so the mascot reads as
+         * steadily working instead of strobing.
+         */
+        val workingMinDwellSeconds: Float = 1.5f,
+        /** WORKING relaxed 0.5wt, attack 0.2s: the same family as THINKING, a touch more alert. */
+        val workingWeight: Float = 0.5f,
+        val workingAttackSeconds: Float = 0.2f,
         /** WAITING_INPUT surprised 0.3wt (§6). */
         val waitingWeight: Float = 0.3f,
         /** LISTENING lean-in 0.3wt (§6). */
@@ -142,8 +158,10 @@ class AvatarDirector(
     private var quietHours = false
     private var userTyping = false
     private var typingReleaseRemaining = 0f
-    /** The activity fed via the legacy [setActivity] input (THINKING/SPEAKING/ERROR/IDLE/LISTENING). */
+    /** The activity fed via the legacy [setActivity] input (THINKING/WORKING/SPEAKING/ERROR/IDLE/LISTENING). */
     private var legacyActivity: AvatarActivity = AvatarActivity.IDLE
+    /** WORKING is latched while the activity says so, and lingers [Config.workingMinDwellSeconds] after. */
+    private var workingHoldRemaining = 0f
     /** SUCCESS is a momentary self-expiring signal, counted down in [tick]. */
     private var successRemaining = 0f
     /** ERROR from [setActivity]/[notifyError]: latched until a non-error legacy activity or success clears it. */
@@ -212,6 +230,11 @@ class AvatarDirector(
     fun setActivity(next: AvatarActivity) {
         legacyActivity = next
         errorLatched = next == AvatarActivity.ERROR
+        // Every WORKING/DELEGATING signal re-arms the dwell; the residue of that same timer is the
+        // quiet-gap release once the activity moves on (§6 / letta-mobile-z4b83).
+        if (next == AvatarActivity.WORKING || next == AvatarActivity.DELEGATING) {
+            workingHoldRemaining = config.workingMinDwellSeconds
+        }
         // LISTENING can arrive via this legacy input too; keep typing-derived
         // LISTENING independent so setUserTyping(false) doesn't cancel it.
         arbitrate()
@@ -337,17 +360,14 @@ class AvatarDirector(
         // SLEEPING gates every remaining behavior (§4 P2).
         if (quietHours) return AvatarState.SLEEPING
 
-        // Remaining priority order: WAITING_INPUT > SPEAKING > SUCCESS >
+        // Remaining priority order: WAITING_INPUT > SPEAKING > SUCCESS > WORKING >
         // THINKING > LISTENING > IDLE.
         if (awaitingApproval) return AvatarState.WAITING_INPUT
         if (legacyActivity == AvatarActivity.SPEAKING) return AvatarState.SPEAKING
         if (successRemaining > 0f) return AvatarState.SUCCESS
+        if (workingHoldRemaining > 0f) return AvatarState.WORKING
         if (legacyActivity == AvatarActivity.THINKING) return AvatarState.THINKING
-        if (userTyping || typingReleaseRemaining > 0f ||
-            legacyActivity == AvatarActivity.LISTENING
-        ) {
-            return AvatarState.LISTENING
-        }
+        if (listening()) return AvatarState.LISTENING
         return AvatarState.IDLE
     }
 
@@ -380,6 +400,9 @@ class AvatarDirector(
         when (entered) {
             AvatarState.THINKING ->
                 installStateExpression(AvatarExpression.Relaxed, config.thinkingWeight, config.thinkingAttackSeconds)
+
+            AvatarState.WORKING ->
+                installStateExpression(AvatarExpression.Relaxed, config.workingWeight, config.workingAttackSeconds)
 
             AvatarState.WAITING_INPUT ->
                 installStateExpression(AvatarExpression.Surprised, config.waitingWeight, attackSeconds = 0f)
@@ -461,23 +484,26 @@ class AvatarDirector(
 
     /** Count down the self-expiring / lingering signals, then re-arbitrate. */
     private fun tickTimedSignals(delta: Float) {
-        var changed = false
+        val working = legacyActivity == AvatarActivity.WORKING || legacyActivity == AvatarActivity.DELEGATING
+        var expired = false
         if (successRemaining > 0f) {
-            successRemaining -= delta
-            if (successRemaining <= 0f) {
-                successRemaining = 0f
-                changed = true
-            }
+            successRemaining = (successRemaining - delta).coerceAtLeast(0f)
+            expired = expired or (successRemaining == 0f)
+        }
+        if (!working && workingHoldRemaining > 0f) {
+            workingHoldRemaining = (workingHoldRemaining - delta).coerceAtLeast(0f)
+            expired = expired or (workingHoldRemaining == 0f)
         }
         if (!userTyping && typingReleaseRemaining > 0f) {
-            typingReleaseRemaining -= delta
-            if (typingReleaseRemaining <= 0f) {
-                typingReleaseRemaining = 0f
-                changed = true
-            }
+            typingReleaseRemaining = (typingReleaseRemaining - delta).coerceAtLeast(0f)
+            expired = expired or (typingReleaseRemaining == 0f)
         }
-        if (changed) arbitrate()
+        if (expired) arbitrate()
     }
+
+    /** The user is talking / composing, or the release timer after they stopped is still running. */
+    private fun listening(): Boolean =
+        userTyping || typingReleaseRemaining > 0f || legacyActivity == AvatarActivity.LISTENING
 
     /** Ramp the current state's base expression toward its target over its attack time. */
     private fun tickStateExpression(delta: Float) {
