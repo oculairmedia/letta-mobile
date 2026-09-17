@@ -9,13 +9,13 @@ DrawBox acts exclusively as a local view/editor in `:sharedUI`. In-memory state,
 [ DrawBox UI (local) ]
         |
         v (local scene JSON on autosave)
-[ CanvasOpDiffer ] -> [ CanvasOp ] -> [ CanvasOpLog ]
+[ CanvasOpDiffer ] -> [ CanvasOp ] -> [ CanvasOpLog (Room on Android, JSONL on Desktop) ]
                                           |
                                     +-----+-----+
                                     |           |
                                     v           v
-                            [ CanvasSession ]  [ CanvasSyncTransport (Loopback live / Iroh sketch P3.1+) ]
-                                    |
+                            [ CanvasSession ]  [ CanvasSyncTransport (Iroh QUIC live / Loopback) ]
+                                    |          [ CanvasPresenceTransport (Iroh QUIC live / InMemory) ]
                             [ CanvasDocumentStore ]
 ```
 
@@ -41,17 +41,23 @@ All scene mutations are expressed as typed `CanvasOp` instances carrying:
    - Elements are uniquely keyed by `id`.
    - Concurrent updates to distinct elements merge cleanly without collision.
    - When concurrent edits target the same `elementId`, the operation with the higher `lamport` timestamp wins. If Lamport timestamps match, lexicographical ordering of `actorId` breaks ties deterministically.
+   - Sync metadata keys (`_lamport`, `_actorId`) are preserved in session scene JSON for LWW comparison, but are stripped by `CanvasOpDiffer` during autosave diffing to prevent phantom ops, and stripped by `stripMetadataForDrawBox` before importing into DrawBox to ensure strict deserializer compatibility.
 3. **Agent Replace Precedence (P2/P3)**:
    - An agent `ReplaceSceneOp` represents a full authoritative diagram generation. It replaces the scene at its logical revision and advances the document version.
-4. **Wire Framing & Transport Status (M2)**:
-   - Canvas synchronization operates over a dedicated Iroh QUIC ALPN (`meridian/canvas-sync/1`) or loopback memory transport.
-   - Canvas operations are **never** multiplexed onto App Server WebSocket chat frames.
-   - **Current Status**: `IrohCanvasSyncTransport` serves as an architectural framing sketch and codec contract for ALPN `meridian/canvas-sync/1`. Live peer endpoint lifecycle (connecting, listening, accept loops, NAT punch) is deferred to P3.1/P4. Host runtimes currently inject `LoopbackCanvasSyncTransport` for live multi-session testability without dropping frames.
+4. **Wire Framing & Live Transport (P3.1 Live LAN MVP)**:
+   - Canvas synchronization operates over a dedicated Iroh QUIC ALPN (`meridian/canvas-sync/1`).
+   - Ephemeral peer presence and cursor telemetry operate over dedicated Iroh QUIC ALPN (`meridian/canvas-presence/1`).
+   - Canvas operations and presence are **never** multiplexed onto App Server WebSocket chat frames.
+   - **Current Status (P3.1)**:
+     - `IrohCanvasSyncTransport`: Full live endpoint lifecycle with accept loop, dial APIs (`connectToPeer`, `connectToPeerByTicket`), length-prefixed binary framing, and historical catch-up via `requestCatchUpSinceLamport`. Fallback to `LoopbackCanvasSyncTransport` when endpoint is absent.
+     - `IrohCanvasPresenceTransport`: Full live endpoint lifecycle with accept loop, dial APIs, length-prefixed framing, and 10-second TTL heartbeat with background reaper. Fallback to `InMemoryCanvasPresenceTransport` when endpoint is absent.
+     - Multi-process verification runbook available at `CANVAS-P31-IROH-SMOKE.md`.
+     - Labeled honestly as LAN / direct QUIC MVP (hard NAT traversal and production relay fleet hardening deferred to P4).
 
-5. **Op Log Durability & Cold Recovery (M4)**:
-   - `CanvasOpLog` is currently in-memory (`InMemoryCanvasOpLog`).
-   - Cold process restarts recover the latest projected scene JSON snapshot from `CanvasDocumentStore` (Room on Android, file on Desktop).
-   - Durable op logging (persisting individual `canvas_ops` rows across restarts for historic delta replay) is deferred to P3.1/P4.
+5. **Op Log Durability & Cold Recovery (P3.1)**:
+   - **Android**: `RoomCanvasOpLog` backed by Room table `canvas_ops` in `letta_database` (Schema version 16, created via explicit `MIGRATION_15_16`).
+   - **Desktop**: `DesktopCanvasOpLog` backed by append-only `.jsonl` files under `~/.letta/canvas/ops/{canvasId_sha256}.jsonl` with thread-safe Mutex and in-memory $O(1)$ op ID index.
+   - **Cold Start Model**: `CanvasSession` loads `CanvasDocument.sceneJson` snapshot from `CanvasDocumentStore` for instant rendering. Historical operations are retained in `CanvasOpLog` for deduplication, live fanout, and peer catch-up.
 
 6. **Background Color Semantics (N3)**:
-   - `SetBackgroundOp` follows last-apply order in the P3 spike; element-level LWW is enforced on discrete elements. Concurrent background LWW is deferred to P3.1/P4.
+   - `SetBackgroundOp` follows last-apply order in current releases; element-level LWW is strictly enforced on discrete scene elements.

@@ -1,10 +1,9 @@
 package com.letta.mobile.data.transport.iroh
 
 import com.letta.mobile.data.canvas.CanvasId
-import com.letta.mobile.data.canvas.CanvasOp
-import com.letta.mobile.data.canvas.CanvasOpLog
-import com.letta.mobile.data.canvas.CanvasSyncTransport
-import com.letta.mobile.data.canvas.LoopbackCanvasSyncTransport
+import com.letta.mobile.data.canvas.CanvasPresence
+import com.letta.mobile.data.canvas.CanvasPresenceTransport
+import com.letta.mobile.data.canvas.InMemoryCanvasPresenceTransport
 import com.letta.mobile.util.Telemetry
 import computer.iroh.BiStream
 import computer.iroh.Connection
@@ -18,58 +17,62 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 /**
- * Wire packet for transmitting [CanvasOp]s over the dedicated Iroh ALPN `meridian/canvas-sync/1`.
+ * Wire packet for peer presence telemetry over dedicated ALPN `meridian/canvas-presence/1`.
  */
 @Serializable
-data class CanvasOpWirePacket(
+data class CanvasPresenceWirePacket(
     val canvasId: String,
-    val op: CanvasOp? = null,
-    val requestCatchUpSinceLamport: Long? = null,
+    val presence: CanvasPresence,
 )
 
 /**
- * Live Iroh-backed transport for multi-device canvas synchronization.
+ * Live Iroh-backed transport for ephemeral peer presence and cursor telemetry.
  *
- * Runs independently from App Server chat WebSocket framing, operating over
- * dedicated BiStreams with length-prefixed binary framing on ALPN `meridian/canvas-sync/1`.
- * Supports peer dialing via ticket or address, automatic accept loop, and historical op catch-up.
+ * Transmits [CanvasPresence] state over QUIC streams using ALPN `meridian/canvas-presence/1`.
+ * Operates independently from document ops, with automatic 10-second TTL expiry and
+ * periodic reaper cleanup.
  */
-class IrohCanvasSyncTransport(
+class IrohCanvasPresenceTransport(
     private val scope: CoroutineScope,
     private val endpoint: Endpoint? = null,
-    private val opLog: CanvasOpLog? = null,
-    private val fallback: CanvasSyncTransport = LoopbackCanvasSyncTransport(),
-) : CanvasSyncTransport {
+    private val ttlMs: Long = 10_000L,
+    private val clock: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
+    private val fallback: CanvasPresenceTransport = InMemoryCanvasPresenceTransport(ttlMs, clock),
+) : CanvasPresenceTransport {
 
     companion object {
-        val CANVAS_SYNC_ALPN = "meridian/canvas-sync/1".encodeToByteArray()
+        val CANVAS_PRESENCE_ALPN = "meridian/canvas-presence/1".encodeToByteArray()
         private const val PREFIX_BYTES = 4
-        private const val MAX_PAYLOAD_BYTES = 4 * 1024 * 1024 // 4MB
+        private const val MAX_PAYLOAD_BYTES = 1024 * 1024 // 1MB
     }
 
     private val json = Json { ignoreUnknownKeys = true }
     private val mutex = Mutex()
     private val activeSendStreams = mutableListOf<SendStream>()
-    private val flowsByCanvas = mutableMapOf<CanvasId, MutableSharedFlow<CanvasOp>>()
+    private val presencesByCanvas = mutableMapOf<CanvasId, MutableMap<String, CanvasPresence>>()
+    private val flowsByCanvas = mutableMapOf<CanvasId, MutableStateFlow<List<CanvasPresence>>>()
     private var acceptJob: Job? = null
+    private var reaperJob: Job? = null
 
     init {
         if (endpoint != null) {
             startAcceptLoop()
         }
+        startReaper()
     }
 
     fun startAcceptLoop(): Job {
@@ -83,7 +86,7 @@ class IrohCanvasSyncTransport(
                 } catch (t: Throwable) {
                     if (t is CancellationException) throw t
                     val errorMsg = t.message ?: t.toString()
-                    Telemetry.event("CanvasSync", "accept.error", "error" to errorMsg)
+                    Telemetry.event("CanvasPresence", "accept.error", "error" to errorMsg)
                 }
             }
         }
@@ -95,22 +98,56 @@ class IrohCanvasSyncTransport(
         runCatching {
             val accepting = incoming.accept()
             val peerAlpn = accepting.alpn()
-            if (peerAlpn.contentEquals(CANVAS_SYNC_ALPN)) {
+            if (peerAlpn.contentEquals(CANVAS_PRESENCE_ALPN)) {
                 val connection = accepting.connect()
-                Telemetry.event("CanvasSync", "incoming.connected")
+                Telemetry.event("CanvasPresence", "incoming.connected")
                 registerConnection(connection, isInbound = true)
             }
         }.onFailure { t ->
             val errorMsg = t.message ?: t.toString()
-            Telemetry.event("CanvasSync", "incoming.error", "error" to errorMsg)
+            Telemetry.event("CanvasPresence", "incoming.error", "error" to errorMsg)
         }
+    }
+
+    private fun startReaper(): Job {
+        reaperJob?.cancel()
+        val job = scope.launch {
+            while (isActive) {
+                delay(2_000L)
+                reapExpiredPresences()
+            }
+        }
+        reaperJob = job
+        return job
+    }
+
+    private suspend fun reapExpiredPresences() = mutex.withLock {
+        val now = clock()
+        for ((canvasId, map) in presencesByCanvas) {
+            if (pruneExpired(map, now)) {
+                flowsByCanvas[canvasId]?.value = map.values.toList()
+            }
+        }
+    }
+
+    private fun pruneExpired(map: MutableMap<String, CanvasPresence>, now: Long): Boolean {
+        val iterator = map.entries.iterator()
+        var changed = false
+        while (iterator.hasNext()) {
+            val entry = iterator.next()
+            if (now - entry.value.lastActiveEpochMs > ttlMs) {
+                iterator.remove()
+                changed = true
+            }
+        }
+        return changed
     }
 
     suspend fun connectToPeer(endpointAddr: EndpointAddr): Connection {
         val ep = endpoint ?: error("Iroh endpoint is not configured")
-        Telemetry.event("CanvasSync", "dial.start")
-        val connection = ep.connect(endpointAddr, CANVAS_SYNC_ALPN)
-        Telemetry.event("CanvasSync", "dial.connected")
+        Telemetry.event("CanvasPresence", "dial.start")
+        val connection = ep.connect(endpointAddr, CANVAS_PRESENCE_ALPN)
+        Telemetry.event("CanvasPresence", "dial.connected")
         registerConnection(connection, isInbound = false)
         return connection
     }
@@ -131,7 +168,7 @@ class IrohCanvasSyncTransport(
             }
 
             try {
-                consumePackets(recvStream, sendStream)
+                consumePackets(recvStream)
             } finally {
                 removeActiveSendStream(sendStream)
             }
@@ -139,43 +176,25 @@ class IrohCanvasSyncTransport(
             throw cancelled
         } catch (t: Throwable) {
             val errorMsg = t.message ?: t.toString()
-            Telemetry.event("CanvasSync", "connection.error", "error" to errorMsg)
+            Telemetry.event("CanvasPresence", "connection.error", "error" to errorMsg)
         }
     }
 
-    private suspend fun consumePackets(recvStream: RecvStream, sendStream: SendStream) {
+    private suspend fun consumePackets(recvStream: RecvStream) {
         while (true) {
             val frameBytes = readFrame(recvStream) ?: break
-            dispatchIncomingPacket(frameBytes, sendStream)
+            dispatchIncomingPacket(frameBytes)
         }
     }
 
-    private suspend fun dispatchIncomingPacket(frameBytes: ByteArray, sendStream: SendStream) {
+    private suspend fun dispatchIncomingPacket(frameBytes: ByteArray) {
         val packet = runCatching {
-            json.decodeFromString<CanvasOpWirePacket>(frameBytes.decodeToString())
+            json.decodeFromString<CanvasPresenceWirePacket>(frameBytes.decodeToString())
         }.getOrNull() ?: return
 
         val canvasId = CanvasId(packet.canvasId)
-        if (packet.op != null) {
-            val flow = getOrCreateFlow(canvasId)
-            flow.emit(packet.op)
-            fallback.publish(canvasId, packet.op)
-        }
-        val sinceLamport = packet.requestCatchUpSinceLamport
-        if (sinceLamport != null && opLog != null) {
-            sendCatchUpOps(canvasId, sinceLamport, sendStream)
-        }
-    }
-
-    private suspend fun sendCatchUpOps(canvasId: CanvasId, sinceLamport: Long, sendStream: SendStream) {
-        val log = opLog ?: return
-        val historicalOps = log.getOps(canvasId, sinceLamport)
-        for (historicalOp in historicalOps) {
-            val replyPacket = CanvasOpWirePacket(canvasId = canvasId.value, op = historicalOp)
-            val payload = json.encodeToString(replyPacket).encodeToByteArray()
-            val frame = encodeFrame(payload)
-            runCatching { sendStream.write(frame) }
-        }
+        applyPresenceInternal(canvasId, packet.presence)
+        fallback.updatePresence(canvasId, packet.presence)
     }
 
     private suspend fun removeActiveSendStream(sendStream: SendStream) {
@@ -187,12 +206,11 @@ class IrohCanvasSyncTransport(
         }
     }
 
-    override suspend fun publish(canvasId: CanvasId, op: CanvasOp) {
-        // Also emit to local subscribers
-        getOrCreateFlow(canvasId).emit(op)
-        fallback.publish(canvasId, op)
+    override suspend fun updatePresence(canvasId: CanvasId, presence: CanvasPresence) {
+        applyPresenceInternal(canvasId, presence)
+        fallback.updatePresence(canvasId, presence)
 
-        val packet = CanvasOpWirePacket(canvasId = canvasId.value, op = op)
+        val packet = CanvasPresenceWirePacket(canvasId = canvasId.value, presence = presence)
         val payload = json.encodeToString(packet).encodeToByteArray()
         val frame = encodeFrame(payload)
 
@@ -202,49 +220,43 @@ class IrohCanvasSyncTransport(
                 val stream = iterator.next()
                 try {
                     stream.write(frame)
-                } catch (cancelled: CancellationException) {
-                    throw cancelled
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
                 } catch (_: Throwable) {
-                    // A peer that will not take the frame is dropped, not retried.
                     iterator.remove()
                 }
             }
         }
     }
 
-    override fun subscribe(canvasId: CanvasId): Flow<CanvasOp> {
-        scope.launch {
-            requestCatchUp(canvasId, sinceLamport = 0L)
-        }
-        return getOrCreateFlow(canvasId).asSharedFlow()
-    }
-
-    suspend fun requestCatchUp(canvasId: CanvasId, sinceLamport: Long = 0L) {
-        val packet = CanvasOpWirePacket(
-            canvasId = canvasId.value,
-            op = null,
-            requestCatchUpSinceLamport = sinceLamport,
-        )
-        val payload = json.encodeToString(packet).encodeToByteArray()
-        val frame = encodeFrame(payload)
-
-        mutex.withLock {
-            for (stream in activeSendStreams) {
-                runCatching { stream.write(frame) }
-            }
-        }
-    }
-
-    private fun getOrCreateFlow(canvasId: CanvasId): MutableSharedFlow<CanvasOp> {
+    override fun observePresence(canvasId: CanvasId): Flow<List<CanvasPresence>> {
         return synchronized(flowsByCanvas) {
             flowsByCanvas.getOrPut(canvasId) {
-                MutableSharedFlow(replay = 32, extraBufferCapacity = 64)
-            }
+                MutableStateFlow(emptyList())
+            }.asStateFlow()
         }
+    }
+
+    private suspend fun applyPresenceInternal(canvasId: CanvasId, presence: CanvasPresence) = mutex.withLock {
+        val map = presencesByCanvas.getOrPut(canvasId) { mutableMapOf() }
+        val now = clock()
+        if (!presence.isActive) {
+            map.remove(presence.peerId)
+        } else {
+            map[presence.peerId] = presence.copy(lastActiveEpochMs = now)
+        }
+
+        pruneExpired(map, now)
+
+        val list = map.values.toList()
+        val flow = synchronized(flowsByCanvas) {
+            flowsByCanvas.getOrPut(canvasId) { MutableStateFlow(emptyList()) }
+        }
+        flow.value = list
     }
 
     private fun encodeFrame(payload: ByteArray): ByteArray {
-        require(payload.size <= MAX_PAYLOAD_BYTES) { "Canvas op frame too large: ${payload.size}" }
+        require(payload.size <= MAX_PAYLOAD_BYTES) { "Canvas presence frame too large: ${payload.size}" }
         val frame = ByteArray(PREFIX_BYTES + payload.size)
         frame[0] = (payload.size ushr 24).toByte()
         frame[1] = (payload.size ushr 16).toByte()
@@ -275,4 +287,3 @@ class IrohCanvasSyncTransport(
             (prefix[3].toInt() and 0xff)
     }
 }
-
