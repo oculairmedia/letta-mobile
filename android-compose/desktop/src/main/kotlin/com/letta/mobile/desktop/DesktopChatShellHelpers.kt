@@ -337,6 +337,7 @@ internal fun openDesktopCanvasSession(params: OpenDesktopCanvasParams) {
             conversationId = convId,
             agentId = params.agentId,
             title = "Canvas ($displayName)",
+            syncTransport = com.letta.mobile.desktop.canvas.DesktopCanvasHostSync.syncTransport,
         )
         params.onSessionReady(session)
     }
