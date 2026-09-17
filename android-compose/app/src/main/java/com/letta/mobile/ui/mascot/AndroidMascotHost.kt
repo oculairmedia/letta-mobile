@@ -154,7 +154,11 @@ class AndroidMascotHost(
                         entry.scene,
                         modifier = Modifier.matchParentSize(),
                         playing = false,
-                        onFirstFrame = { getBitmap -> runCatching { stills[key] = getBitmap().asImageBitmap() } },
+                        // Mid-morph the scene draws an in-between look under the target's key; a still
+                        // cached then would be wrong for as long as the cache lives. Wait for the target.
+                        onFirstFrame = { getBitmap ->
+                            if (entry.shownIdentity() == entry.identity) runCatching { stills[key] = getBitmap().asImageBitmap() }
+                        },
                     )
                 }
             }

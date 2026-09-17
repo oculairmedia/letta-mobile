@@ -123,11 +123,15 @@ class MascotTransport {
         /** Where the hop started; the endpoint is the destination seat as it is each frame. */
         var from: Rect = Rect.Zero
         var shownStage: MascotStage? = initial
+        /** The agent last shown in this slot; a slot that is re-skinned to another agent hops from *its* seat. */
+        var shownAgent: String? = null
     }
 
     private val flights = HashMap<String, Flight>()
 
-    internal fun flight(agentId: String): Flight = flights.getOrPut(agentId) { Flight(activeStage(agentId)) }
+    internal fun flight(agentId: String): Flight {
+        return flights.getOrPut(agentId) { Flight(activeStage(agentId)) }
+    }
 
     /** Sends [agentId]'s mascot to [stage]. It goes as soon as that stage has a seat and comes back to rest when the seat leaves. */
     fun transportTo(agentId: String, stage: MascotStage) {
@@ -140,118 +144,50 @@ class MascotTransport {
     }
 
     /** Where [agentId] stands right now, or null when it has no seat anywhere. */
-    fun activeStage(agentId: String): MascotStage? =
-        activeStage(seated = seats.keys.filter { it.agentId == agentId }.map { it.stage }.toSet(), requested = requested[agentId])
+    fun activeStage(agentId: String): MascotStage? {
+        val seated = seats.keys.filter { it.agentId == agentId }.map { it.stage }.toSet()
+        return activeStage(seated = seated, requested = requested[agentId])
+    }
 
-    internal fun agentsSeated(): List<String> = seats.keys.map { it.agentId }.distinct()
+    internal fun agentsSeated(): List<String> {
+        return seats.keys.map { it.agentId }.distinct()
+    }
 
-    internal fun seat(agentId: String, stage: MascotStage): MascotSeatInfo? = seats[SeatKey(agentId, stage)]
+    internal fun seat(key: SeatKey): MascotSeatInfo? = seats[key]
 
     internal data class SeatKey(val agentId: String, val stage: MascotStage)
 
     companion object {
         /** The rule, on its own so it can be tested: the requested stage while it is seated, else rest (the lowest rank present). */
-        fun activeStage(seated: Set<MascotStage>, requested: MascotStage?): MascotStage? =
-            requested?.takeIf { it in seated } ?: seated.minByOrNull { it.rank }
+        fun activeStage(seated: Set<MascotStage>, requested: MascotStage?): MascotStage? {
+            return requested?.takeIf { it in seated } ?: seated.minByOrNull { it.rank }
+        }
     }
 }
 
 /** The window's transport; the default is a private one so a seat outside any shell still draws. */
 val LocalMascotTransport = compositionLocalOf { MascotTransport() }
 
-/**
- * Reserves [size] for [agentId]'s mascot at [stage] and tells the transport where that is. While
- * the mascot stands here the layer draws it over this box (at [size] times [overscale], the way
- * [MascotAvatar] overscales a tile); while it stands elsewhere, or the agent has no mascot,
- * [empty] draws - the seat the character has left, or a plain orb for an agent without one.
- * [identity] overrides the registry's for this seat (the editor previews an unsaved pick this way
- * and the live mascot morphs into it).
- */
-@Composable
-fun MascotSeat(
-    agentId: String?,
-    stage: MascotStage,
-    size: Dp,
-    modifier: Modifier = Modifier,
-    overscale: Float = 1f,
-    identity: MascotIdentity? = null,
-    onClick: (() -> Unit)? = null,
-    onEdit: (() -> Unit)? = null,
-    empty: @Composable () -> Unit,
-) {
-    val transport = LocalMascotTransport.current
-    val registry = LocalMascotRegistry.current
-    val shown = identity ?: agentId?.let { transport.previewOf(it) ?: registry.identities[it] }
-    val host = LocalMascotHost.current
-    val available = agentId != null && shown != null && host.available && host.entry(agentId, shown) != null
-    val key = agentId?.let { MascotTransport.SeatKey(it, stage) }
-    val handlers = remember { SeatHandlers() }
-    handlers.onClick = onClick
-    handlers.onEdit = onEdit
-    DisposableEffect(transport, key) {
-        onDispose { key?.let { transport.seats.remove(it) } }
-    }
-    val standsHere = available && transport.layerMounted && transport.activeStage(agentId!!) == stage
-    Box(
-        modifier = modifier.requiredSize(size).onGloballyPositioned { coords ->
-            if (key == null || !available) return@onGloballyPositioned
-            val next = MascotSeatInfo(coords.boundsInWindow(), overscale, identity, handlers)
-            if (transport.seats[key] != next) transport.seats[key] = next
-        },
-        contentAlignment = Alignment.Center,
-    ) {
-        when {
-            !available -> empty()
-            !transport.layerMounted -> MascotLive(agentId!!, shown!!, size = size * overscale, onClick = onClick)
-            !standsHere -> empty()
-        }
-    }
+/** Publishes seat [key] at [bounds] as [describe] says, or nothing while either is unknown; unchanged seats are not rewritten. */
+internal fun MascotTransport.publishSeat(key: MascotTransport.SeatKey?, bounds: Rect?, describe: (Rect) -> MascotSeatInfo) {
+    if (key == null || bounds == null) return
+    val next = describe(bounds)
+    if (seats[key] != next) seats[key] = next
 }
 
-/**
- * Draws, over [content], one live mascot per seated agent at its active seat, and slides and
- * scales it between seats when the active seat changes - the whole transport animation, in one
- * place. Mount once at the window root, inside the mascot host and registry providers.
- */
-@Composable
-fun MascotTransportLayer(
-    reducedMotion: Boolean = false,
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit,
-) {
-    val transport = LocalMascotTransport.current
-    val registry = LocalMascotRegistry.current
-    var origin by remember { mutableStateOf(Offset.Zero) }
-    DisposableEffect(transport) {
-        transport.layerMounted = true
-        onDispose { transport.layerMounted = false }
-    }
-    Box(modifier.onGloballyPositioned { origin = it.boundsInWindow().topLeft }) {
-        content()
-        // Keyed by slot, not by agent: the focused character is one scene that is re-skinned when
-        // the focused agent changes, so agent A morphs into agent B where it stands instead of a
-        // fresh scene loading in with a flash.
-        transport.agentsSeated().forEachIndexed { slot, agentId ->
-            val stage = transport.activeStage(agentId) ?: return@forEachIndexed
-            val seat = transport.seat(agentId, stage) ?: return@forEachIndexed
-            val identity = seat.identity ?: transport.previewOf(agentId) ?: registry.identities[agentId] ?: return@forEachIndexed
-            key(slot) {
-                TransportedMascot(agentId, identity, stage, seat, origin, reducedMotion, sceneKey = "mascot-focus-$slot")
-            }
-        }
-    }
-}
+/** One agent's mascot as the layer draws it: who, in what look, at which seat. */
+private class SeatedMascot(val agentId: String, val identity: MascotIdentity, val seat: MascotSeatInfo)
 
 @Composable
 private fun TransportedMascot(
-    agentId: String,
-    identity: MascotIdentity,
-    stage: MascotStage,
-    seat: MascotSeatInfo,
+    seated: SeatedMascot,
     origin: Offset,
     reducedMotion: Boolean,
     sceneKey: String,
 ) {
+    val agentId = seated.agentId
+    val identity = seated.identity
+    val seat = seated.seat
     val transport = LocalMascotTransport.current
     val flight = transport.flight(sceneKey)
     // Every hop is the same function: progress runs the one 360 ms curve while the character
@@ -268,8 +204,10 @@ private fun TransportedMascot(
             .conflate()
             .collect { next ->
                 if (next == null || next == flight.shownStage) return@collect
-                flight.from = shownRect(flight, transport.seat(agentId, flight.shownStage ?: next)?.bounds ?: flight.from)
+                val shownSeat = MascotTransport.SeatKey(flight.shownAgent ?: currentAgent, flight.shownStage ?: next)
+                flight.from = shownRect(flight, transport.seat(shownSeat)?.bounds ?: flight.from)
                 flight.shownStage = next
+                flight.shownAgent = currentAgent
                 if (reducedMotion) {
                     flight.progress.snapTo(1f)
                     flight.presence.snapTo(1f)
@@ -352,3 +290,45 @@ private fun shownRect(flight: MascotTransport.Flight, to: Rect): Rect {
 private const val TRANSPORT_MILLIS = 360
 private const val TRANSPORT_LEAVE_MILLIS = 140
 private const val TRANSPORT_MIN_SCALE = 0.6f
+
+/** Every agent with an active seat, in what look it draws there; an agent with no seat or no identity draws nothing. */
+private fun MascotTransport.seatedMascots(registry: MascotIdentityRegistry): List<SeatedMascot> {
+    return agentsSeated().mapNotNull { agentId ->
+        val stage = activeStage(agentId) ?: return@mapNotNull null
+        val seat = seat(MascotTransport.SeatKey(agentId, stage)) ?: return@mapNotNull null
+        val identity = seat.identity ?: previewOf(agentId) ?: registry.identities[agentId] ?: return@mapNotNull null
+        SeatedMascot(agentId, identity, seat)
+    }
+}
+
+/**
+ * Draws, over [content], one live mascot per seated agent at its active seat, and slides and
+ * scales it between seats when the active seat changes - the whole transport animation, in one
+ * place. Mount once at the window root, inside the mascot host and registry providers.
+ */
+@Composable
+fun MascotTransportLayer(
+    reducedMotion: Boolean = false,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    val transport = LocalMascotTransport.current
+    val registry = LocalMascotRegistry.current
+    var origin by remember { mutableStateOf(Offset.Zero) }
+    DisposableEffect(transport) {
+        transport.layerMounted = true
+        onDispose { transport.layerMounted = false }
+    }
+    Box(modifier.onGloballyPositioned { origin = it.boundsInWindow().topLeft }) {
+        content()
+        // Keyed by slot, not by agent: the focused character is one scene that is re-skinned when
+        // the focused agent changes, so agent A morphs into agent B where it stands instead of a
+        // fresh scene loading in with a flash.
+        transport.seatedMascots(registry).forEachIndexed { slot, seated ->
+            key(slot) {
+                TransportedMascot(seated, origin, reducedMotion, sceneKey = "mascot-focus-$slot")
+            }
+        }
+    }
+}
+
