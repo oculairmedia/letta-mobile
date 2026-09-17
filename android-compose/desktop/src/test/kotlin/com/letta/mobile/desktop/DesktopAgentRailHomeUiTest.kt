@@ -25,8 +25,17 @@ class DesktopAgentRailHomeUiTest {
         expanded = expanded,
     )
 
+    // letta-mobile-oosow: this used to assert a "Search agents" rail control sat
+    // above Home. #1595 added it against a rail that really had one; #1597 (P5)
+    // then removed the separate search trigger — the plus menu's "New chat" opens
+    // the agent picker, which searches — and left the assertion behind. The only
+    // "Search agents" text left is a placeholder inside the EXPANDED library's
+    // Jewel field, which this test deliberately does not compose (see below), so
+    // the node could never resolve and :desktop:test has been red on main ever
+    // since, blocking every PR that touches shared code. Home is what this test
+    // is actually for; assert that and nothing else.
     @Test
-    fun `collapsed rail shows Home under Search and clicking it opens Home`() = runComposeUiTest {
+    fun `collapsed rail shows Home and clicking it opens Home`() = runComposeUiTest {
         var homeClicks = 0
         setContent {
             MaterialTheme {
@@ -41,7 +50,6 @@ class DesktopAgentRailHomeUiTest {
             }
         }
 
-        onNodeWithContentDescription("Search agents").assertIsDisplayed()
         onNodeWithContentDescription("Home").assertIsDisplayed().performClick()
         assertEquals(1, homeClicks)
     }
