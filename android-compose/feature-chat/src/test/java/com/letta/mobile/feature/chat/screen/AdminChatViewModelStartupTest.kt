@@ -82,16 +82,18 @@ class AdminChatViewModelStartupTest {
         var viewModel: AdminChatViewModel? = null
         try {
             val agent = TestData.agent("agent-canvas", "CanvasAgent")
-            val target = com.letta.mobile.data.canvas.CanvasConversationTarget("conversation-canvas-share")
+            // The chat screen exists before a canvas can be opened from it, and the canvas
+            // stages under that screen's own recipient key, never the conversation id.
+            val vm = createTestViewModel(agent, "conversation-canvas-share")
+            viewModel = vm
+            val target = vm.canvasShareRecipient
+            assertEquals(0, vm.composerState.value.pendingAttachments.size)
+
             val sampleImage = com.letta.mobile.data.canvas.CanvasShare.createChatImageAttachment(
                 bytes = "canvas-test-image-content".encodeToByteArray(),
                 mimeType = com.letta.mobile.data.canvas.CanvasMimeType.PNG,
             )
             com.letta.mobile.data.canvas.CanvasShare.stageForConversation(target, sampleImage)
-
-            val vm = createTestViewModel(agent, target.id)
-            viewModel = vm
-
             assertEquals(1, vm.composerState.value.pendingAttachments.size)
             assertEquals("image/png", vm.composerState.value.pendingAttachments.first().mediaType)
 
@@ -100,6 +102,21 @@ class AdminChatViewModelStartupTest {
                 mimeType = com.letta.mobile.data.canvas.CanvasMimeType.PNG,
             )
             com.letta.mobile.data.canvas.CanvasShare.stageForConversation(target, secondImage)
+            assertEquals(2, vm.composerState.value.pendingAttachments.size)
+
+            // An image staged for another screen, or under a bare conversation id, is not ours.
+            val strangerImage = com.letta.mobile.data.canvas.CanvasShare.createChatImageAttachment(
+                bytes = "not-for-this-chat".encodeToByteArray(),
+                mimeType = com.letta.mobile.data.canvas.CanvasMimeType.PNG,
+            )
+            com.letta.mobile.data.canvas.CanvasShare.stageForConversation(
+                com.letta.mobile.data.canvas.CanvasConversationTarget("conversation-canvas-share"),
+                strangerImage,
+            )
+            com.letta.mobile.data.canvas.CanvasShare.stageForConversation(
+                com.letta.mobile.data.canvas.CanvasConversationTarget("chat-screen-someone-else"),
+                strangerImage,
+            )
             assertEquals(2, vm.composerState.value.pendingAttachments.size)
         } finally {
             viewModel?.viewModelScope?.cancel()
