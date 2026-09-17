@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.runComposeUiTest
 import com.letta.mobile.ui.canvas.CanvasSamples
@@ -32,25 +33,62 @@ class CanvasWorkspaceUiTest {
             CanvasWorkspace(controller = controller)
         }
 
-        // Stroke colour from the rail, by preset and then by hex through the same picker.
+        // The rail's stroke swatch opens the one master control; a preset and then a hex value
+        // both reach the tool's stroke colour through the same picker.
         onNodeWithContentDescription("Stroke color").performClick()
+        onNodeWithContentDescription("Property panel").assertExists()
         onNodeWithContentDescription("Color red").performClick()
         waitUntil(timeoutMillis = 5000) { controller.state.value.strokeColor == androidx.compose.ui.graphics.Color(0xFFE5484D) }
-        onNodeWithContentDescription("Stroke color").performClick()
         onNodeWithContentDescription("Hex color").performTextReplacement("#123456")
         waitUntil(timeoutMillis = 5000) { controller.state.value.strokeColor == androidx.compose.ui.graphics.Color(0xFF123456) }
         // The red preset picked a moment ago is offered again as a recent colour.
         onNodeWithContentDescription("Color recent 1").assertExists()
         onNodeWithContentDescription("Color recent 1").performClick()
         waitUntil(timeoutMillis = 5000) { controller.state.value.strokeColor == androidx.compose.ui.graphics.Color(0xFFE5484D) }
+        // Width, opacity and dash for the tool, from the same control.
+        onNodeWithContentDescription("Width Thick").performClick()
+        waitUntil(timeoutMillis = 5000) { controller.state.value.strokeWidth == 8f }
+        onNodeWithContentDescription("Stroke Dashed").performClick()
+        waitUntil(timeoutMillis = 5000) { controller.state.value.currentItemStrokeStyle == io.ak1.drawbox.domain.model.StrokeStyle.DASHED }
+        onNodeWithContentDescription("Close properties").performClick()
+        onAllNodesWithContentDescription("Property panel").assertCountEquals(0)
 
-        // A closed-shape tool brings up fill and outline; picking a fill reaches the tool settings.
+        // A closed-shape tool brings up fill, outline and corner radius; picking a fill reaches
+        // the tool settings.
         onNodeWithContentDescription("Rectangle").performClick()
-        onNodeWithContentDescription("Fill color").performClick()
+        onNodeWithContentDescription("Properties").performClick()
+        onNodeWithContentDescription("Target fill").performClick()
         onNodeWithContentDescription("Color blue").performClick()
         waitUntil(timeoutMillis = 5000) { controller.state.value.currentItemFillColor == androidx.compose.ui.graphics.Color(0xFF3B82F6) }
         onNodeWithContentDescription("Outline on").performClick()
         waitUntil(timeoutMillis = 5000) { !controller.state.value.currentItemStrokeEnabled }
+        onNodeWithContentDescription("Corner radius").assertExists()
+        onNodeWithContentDescription("Close properties").performClick()
+
+        // A drawn rectangle, once selected, is the control's target: fill, width and opacity
+        // land on the element (and opacity on the tool default too, as DrawBox keeps it).
+        controller.importPath(
+            """{"bgColor":"#ffffffff","elements":[{"id":"rect-1","type":"Shape","zIndex":1,
+            "points":["10.0,10.0","120.0,90.0"],"strokeColor":"#000000ff","strokeWidth":4.0,
+            "shapeType":"RECTANGLE","modifiedAt":1}]}""",
+        )
+        waitUntil(timeoutMillis = 5000) { controller.state.value.elements.size == 1 }
+        onNodeWithContentDescription("Select").performClick()
+        waitUntil(timeoutMillis = 5000) { controller.state.value.mode == io.ak1.drawbox.domain.model.Mode.SELECT }
+        controller.onIntent(io.ak1.drawbox.domain.model.Intent.SelectAt(androidx.compose.ui.geometry.Offset(60f, 10f), 12f))
+        waitUntil(timeoutMillis = 5000) { controller.state.value.selectedIds == setOf("rect-1") }
+        onNodeWithContentDescription("Properties").performClick()
+        onNodeWithContentDescription("Target fill").performClick()
+        onNodeWithContentDescription("Color green").performClick()
+        onNodeWithContentDescription("Width Bold").performClick()
+        waitUntil(timeoutMillis = 5000) {
+            val rect = controller.state.value.elements.filterIsInstance<io.ak1.drawbox.domain.model.Element.Shape>().single()
+            rect.fillColor == androidx.compose.ui.graphics.Color(0xFF22C55E) && rect.strokeWidth == 14f
+        }
+        onNodeWithContentDescription("Opacity").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.SetProgress) { it(0.5f) }
+        waitUntil(timeoutMillis = 5000) { controller.state.value.opacity == 0.5f }
+        onNodeWithContentDescription("Close properties").performClick()
+        controller.clearSelection()
 
         // Board background from the overflow menu.
         onNodeWithContentDescription("More").performClick()
@@ -91,10 +129,12 @@ class CanvasWorkspaceUiTest {
         }
         onNodeWithContentDescription("Remove note").assertExists()
 
-        // Recolouring from the card's swatch is written to the session.
-        onNodeWithContentDescription("Note color").performClick()
+        // Recolouring the active note through the master control is written to the session.
+        onNodeWithContentDescription("Properties").performClick()
+        onNodeWithContentDescription("Target card").performClick()
         onNodeWithContentDescription("Color blue").performClick()
         waitUntil(timeoutMillis = 5000) { session.documents().single().color == "#bfdbfe" }
+        onNodeWithContentDescription("Close properties").performClick()
         onNodeWithText("125%").assertExists()
 
         // Opening the note large shows the full editor over the board, and closing it returns.
@@ -122,17 +162,19 @@ class CanvasWorkspaceUiTest {
         // The one "Move note" grip on the board belongs to the sticky note placed above.
         onAllNodesWithContentDescription("Move note").assertCountEquals(1)
         onNodeWithContentDescription("Move text").assertExists()
+        onNodeWithContentDescription("Properties").performClick()
+        onAllNodesWithContentDescription("Target card").assertCountEquals(0)
         onNodeWithContentDescription("Size L").performClick()
         waitUntil(timeoutMillis = 5000) { session.documents().first { it.id == text.id }.style?.fontScale == 1.4f }
-        onNodeWithContentDescription("Size Serif").performClick()
+        onNodeWithContentDescription("Font Serif").performClick()
         waitUntil(timeoutMillis = 5000) { session.documents().first { it.id == text.id }.style?.fontFamily == "serif" }
         onNodeWithContentDescription("Align center").performClick()
         waitUntil(timeoutMillis = 5000) { session.documents().first { it.id == text.id }.style?.align == "center" }
-        onNodeWithContentDescription("Text color").performClick()
         onNodeWithContentDescription("Color blue").performClick()
         waitUntil(timeoutMillis = 5000) { session.documents().first { it.id == text.id }.style?.textColor == "#3b82f6" }
         val styled = session.documents().first { it.id == text.id }.style!!
         kotlin.test.assertEquals(1.4f, styled.fontScale, "colour must not reset the size")
+        onNodeWithContentDescription("Close properties").performClick()
 
         // The active note's bar deletes it.
         onNodeWithContentDescription("Delete note").performClick()

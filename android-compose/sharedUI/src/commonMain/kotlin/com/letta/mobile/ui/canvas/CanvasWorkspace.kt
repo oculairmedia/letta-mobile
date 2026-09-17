@@ -239,6 +239,10 @@ fun CanvasWorkspace(
         canUndo = canUndo,
         canRedo = canRedo,
     )
+    val properties = CanvasControlsBridge.buildProperties(state)
+    val dispatchProperty: (CanvasPropertyIntent) -> Unit = { intent ->
+        CanvasControlsBridge.dispatchProperty(controller = controller, intent = intent, state = state)
+    }
     val boardCenter = Offset(boardSize.width / 2f, boardSize.height / 2f)
 
     // Ctrl/Cmd + wheel over the board zooms the board, not the window: the host that owns that
@@ -466,8 +470,10 @@ fun CanvasWorkspace(
             if (hasSelection || controlsBarState.showFillTarget || (activeNote != null && expandedNoteId == null)) {
                 CanvasSelectionBar(
                     state = controlsBarState,
+                    properties = properties,
                     hasSelection = hasSelection,
                     dispatch = dispatch,
+                    dispatchProperty = dispatchProperty,
                     onBringToFront = { controller.bringSelectionToFront() },
                     onSendToBack = { controller.sendSelectionToBack() },
                     onDelete = { controller.deleteSelected() },
@@ -505,6 +511,8 @@ fun CanvasWorkspace(
             CanvasControlsBar(
                 state = controlsBarState,
                 dispatch = dispatch,
+                properties = properties,
+                dispatchProperty = dispatchProperty,
                 onAddNote = session?.let { s ->
                     {
                         val frame = newNoteFrame(state.viewport.screenToWorld(boardCenter))

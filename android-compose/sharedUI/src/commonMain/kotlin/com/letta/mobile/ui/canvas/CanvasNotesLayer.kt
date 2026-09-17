@@ -183,7 +183,6 @@ private fun CanvasNoteCard(
                 onDragStart = { gestureActive = true },
                 onDrag = { delta -> frame = frame.copy(x = frame.x + delta.x, y = frame.y + delta.y) },
                 onDragEnd = ::commit,
-                onRecolor = { color -> scope.launch { runCatching { session.recolorDocument(document.id, color.hex) } } },
                 onExpand = onExpand,
                 onRemove = { scope.launch { runCatching { session.removeDocument(document.id) } } },
             )
@@ -238,7 +237,6 @@ private fun NoteHandleBar(
     onDragStart: () -> Unit,
     onDrag: (Offset) -> Unit,
     onDragEnd: () -> Unit,
-    onRecolor: (NamedColor) -> Unit,
     onExpand: () -> Unit,
     onRemove: () -> Unit,
 ) {
@@ -274,14 +272,6 @@ private fun NoteHandleBar(
             fontWeight = FontWeight.SemiBold,
             color = onCard,
             modifier = Modifier.weight(1f),
-        )
-        ColorSwatchPicker(
-            current = cardColor,
-            palette = NoteColors,
-            label = "Note color",
-            onPick = { picked -> onRecolor(NamedColor(picked, "picked")) },
-            swatchSize = 16.dp,
-            modifier = Modifier.size(HANDLE_HEIGHT),
         )
         IconButton(onClick = onExpand, modifier = Modifier.size(HANDLE_HEIGHT)) {
             Icon(

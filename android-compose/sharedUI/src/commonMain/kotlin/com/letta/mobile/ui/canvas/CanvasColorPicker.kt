@@ -147,17 +147,19 @@ fun CanvasColorPicker(
     palette: List<NamedColor>,
     allowNone: Boolean,
     onPick: (color: Color, done: Boolean) -> Unit,
+    /** True when embedded in another panel, which then owns the surface and padding. */
+    flat: Boolean = false,
 ) {
     var hsl by remember(current) { mutableStateOf(current.toHsl()) }
     var hexText by remember(current) { mutableStateOf(current.toHex()) }
     val recent = rememberRecentColors()
     Surface(
         shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shadowElevation = 6.dp,
+        color = if (flat) Color.Transparent else MaterialTheme.colorScheme.surfaceContainerHigh,
+        shadowElevation = if (flat) 0.dp else 6.dp,
     ) {
         Column(
-            modifier = Modifier.padding(10.dp).width(PICKER_WIDTH),
+            modifier = if (flat) Modifier.fillMaxWidth() else Modifier.padding(10.dp).width(PICKER_WIDTH),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             SwatchRow(current = current, entries = palette.map { it.color to it.name }, allowNone = allowNone) { onPick(it, true) }

@@ -63,6 +63,8 @@ fun CanvasControlsBar(
     state: ControlsBarState,
     dispatch: (ControlsBarIntent) -> Unit,
     modifier: Modifier = Modifier,
+    properties: CanvasProperties? = null,
+    dispatchProperty: (CanvasPropertyIntent) -> Unit = {},
     onAddNote: (() -> Unit)? = null,
     onAddText: (() -> Unit)? = null,
 ) {
@@ -96,11 +98,15 @@ fun CanvasControlsBar(
                 ControlButton(Control(Lucide.StickyNote, "Add note"), onClick = onAddNote)
             }
             RailDivider()
-            ColorSwatchPicker(
-                current = state.strokeColor,
-                palette = StrokePalette,
+            // The rail's swatch is the same master control the selection bar opens: one place
+            // for every colour and property, targeting the selection or else the current tool.
+            CanvasPropertyControl(
+                state = state,
+                properties = properties ?: CanvasProperties(0, 4f, 1f, io.ak1.drawbox.domain.model.StrokeStyle.SOLID, 0f, false),
+                dispatch = dispatch,
+                dispatchProperty = dispatchProperty,
                 label = "Stroke color",
-                onPick = { dispatch(ControlsBarIntent.SetStrokeColor(it)) },
+                beside = true,
                 modifier = Modifier.size(BUTTON_SIZE),
             )
             RailDivider()
