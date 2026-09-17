@@ -464,6 +464,8 @@ fun CanvasWorkspace(
                     onSendToBack = { controller.sendSelectionToBack() },
                     onDelete = { controller.deleteSelected() },
                     note = if (activeNote != null && session != null && !hasSelection) {
+                        val tint = parseHexColor(activeNote.color)
+                        val plain = tint != null && tint.alpha == 0f
                         NoteBarActions(
                             onOpen = { expandedNoteId = activeNote.id },
                             onDelete = {
@@ -471,6 +473,16 @@ fun CanvasWorkspace(
                                 activeNoteId = null
                                 coroutineScope.launch { runCatching { session.removeDocument(id) } }
                             },
+                            style = activeNote.style,
+                            onStyle = { style ->
+                                coroutineScope.launch { runCatching { session.restyleDocument(activeNote.id, style) } }
+                            },
+                            color = tint ?: MaterialTheme.colorScheme.surfaceContainerHigh,
+                            onColor = { color ->
+                                coroutineScope.launch { runCatching { session.recolorDocument(activeNote.id, color.toHex()) } }
+                            },
+                            defaultTextColor = if (tint != null && !plain) contrastOn(tint) else MaterialTheme.colorScheme.onSurface,
+                            plain = plain,
                         )
                     } else {
                         null

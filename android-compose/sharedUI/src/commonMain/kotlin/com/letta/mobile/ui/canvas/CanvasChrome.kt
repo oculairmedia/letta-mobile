@@ -164,6 +164,14 @@ internal fun CanvasActionsPill(
                                 .clickable { onBackground(entry.color) },
                         )
                     }
+                    ColorSwatchPicker(
+                        current = background,
+                        palette = BoardBackgrounds,
+                        label = "Background color",
+                        onPick = onBackground,
+                        swatchSize = 26.dp,
+                        modifier = Modifier.size(26.dp),
+                    )
                 }
             }
         }

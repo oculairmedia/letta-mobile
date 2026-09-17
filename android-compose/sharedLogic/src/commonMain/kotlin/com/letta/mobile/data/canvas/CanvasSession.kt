@@ -232,11 +232,13 @@ class CanvasSession(
         actorId: String = "local_user",
         frame: CanvasDocumentFrame? = null,
         color: String? = null,
+        style: CanvasTextStyle? = null,
     ): CanvasDocument? {
         val existing = documents().firstOrNull { it.id == documentId }
         val unchanged = existing?.json == documentJson &&
             (frame == null || frame == existing.frame) &&
-            (color == null || color == existing.color)
+            (color == null || color == existing.color) &&
+            (style == null || style == existing.style)
         if (unchanged) return null
         return applyLocal(
             CanvasOp.SetDocumentOp(
@@ -247,8 +249,19 @@ class CanvasSession(
                 documentJson = documentJson,
                 frame = frame,
                 color = color,
+                style = style,
             ),
         )
+    }
+
+    /** Changes how a block document's text is set; a no-op for a document that is not there. */
+    suspend fun restyleDocument(
+        documentId: String,
+        style: CanvasTextStyle,
+        actorId: String = "local_user",
+    ): CanvasDocument? {
+        val existing = documents().firstOrNull { it.id == documentId } ?: return null
+        return setDocument(documentId, existing.json, actorId, style = style)
     }
 
     /** Recolours a block document on the board; a no-op for a document that is not there. */
