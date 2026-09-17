@@ -33,7 +33,7 @@ import com.letta.mobile.ui.mascot.mascotAvailable
  * renderer only [status] draws, exactly where it did before.
  */
 @Composable
-internal fun ChatComposerCompanion(agentId: String?, status: (@Composable () -> Unit)?) {
+internal fun ChatComposerCompanion(agentId: String?, status: (@Composable () -> Unit)?, onClick: (() -> Unit)? = null) {
     val registry = LocalMascotRegistry.current
     val identity = agentId?.let { registry.identities[it] }
     val hasMascot = agentId != null && identity != null && mascotAvailable(agentId)
@@ -44,10 +44,7 @@ internal fun ChatComposerCompanion(agentId: String?, status: (@Composable () -> 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            // Keep the companion lane stable after work completes. Removing
-            // this height makes the entire timeline jump toward the composer
-            // when the mascot and thinking token leave composition.
-            .height(ChatComposerCompanionSize)
+            .height(if (atWork) ChatComposerCompanionSize else ChatComposerCompanionIdleSize)
             .padding(start = ChatComposerInputHorizontalPadding, bottom = ChatComposerCompanionGap),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(ChatComposerCompanionGap),
@@ -68,16 +65,21 @@ internal fun ChatComposerCompanion(agentId: String?, status: (@Composable () -> 
                     fadeOut() + slideOutVertically { it / 2 } + scaleOut(targetScale = 0.5f, transformOrigin = base)
                 },
             ) {
-                MascotLive(checkNotNull(agentId), checkNotNull(identity), size = ChatComposerCompanionSize)
+                MascotLive(checkNotNull(agentId), checkNotNull(identity), size = ChatComposerCompanionSize, onClick = onClick)
             }
         }
         // The rig draws the body below its surface's centre (see the 8yee3 framing follow-up), so the
         // status drops by that much to sit on the eye line rather than on the surface's midline.
-        status?.let { Box(Modifier.padding(top = ChatComposerCompanionBodyDrop)) { it() } }
+        status?.let {
+            Box(Modifier.padding(top = if (atWork) ChatComposerCompanionBodyDrop else ChatComposerCompanionBodyDrop / 2)) {
+                it()
+            }
+        }
     }
 }
 
-/** The companion's surface; the body spans ~60 % of it, so this reads as a ~34 dp character. */
-private val ChatComposerCompanionSize = 56.dp
+/** The companion's surface; the body spans ~60 % of it, so this reads as a ~39 dp character. */
+private val ChatComposerCompanionSize = 64.dp
+private val ChatComposerCompanionIdleSize = 32.dp
 private val ChatComposerCompanionGap = 2.dp
 private val ChatComposerCompanionBodyDrop = 7.dp

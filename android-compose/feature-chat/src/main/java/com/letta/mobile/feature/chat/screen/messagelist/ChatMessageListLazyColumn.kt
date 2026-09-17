@@ -8,6 +8,7 @@ import com.letta.mobile.feature.chat.render.LocalToolCardBodyParentVisible
 import com.letta.mobile.feature.chat.screen.RunBlock
 import com.letta.mobile.feature.chat.screen.chatRenderItemSeesLiveScale
 import com.letta.mobile.ui.components.DateSeparator
+import com.letta.mobile.ui.mascot.MascotLoading
 import com.letta.mobile.ui.theme.ChatDimens
 import com.letta.mobile.ui.theme.ChatShapes
 import com.letta.mobile.ui.theme.TimelineZoomScope
@@ -17,7 +18,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -53,6 +53,8 @@ internal data class ChatMessageListLazyContext(
 internal data class ChatMessageListItemsParams(
     val renderItems: List<ChatRenderItem>,
     val isLoadingOlderMessages: Boolean,
+    /** Whose history is loading: the older-messages row shows this agent's mascot at work. */
+    val agentId: String?,
     val context: ChatMessageListLazyContext,
     val chatDimens: ChatDimens,
     val chatShapes: ChatShapes,
@@ -102,7 +104,7 @@ internal fun LazyListScope.chatMessageListItems(params: ChatMessageListItemsPara
                     .padding(vertical = LettaSpacing.INNER_PADDING_SMALL),
                 contentAlignment = Alignment.Center,
             ) {
-                CircularProgressIndicator()
+                MascotLoading(params.agentId)
             }
         }
     }
@@ -219,6 +221,7 @@ private fun ChatMessageListRenderSingleItem(params: ChatMessageListRenderSingleI
             onApprovalDecision = context.callbacks.onSubmitApproval,
             chatMode = context.chatMode,
             showCompletedDisclosure = params.showTimestamp,
+            onOpenToolRunDetails = context.callbacks.onOpenToolRunDetails,
         ) { message, position, rowModifier ->
             RenderChatMessageRow(
                 params = RenderChatMessageRowParams(
@@ -270,6 +273,7 @@ private fun ChatMessageListRenderRunBlockItem(params: ChatMessageListRenderRunBl
         onApprovalDecision = context.callbacks.onSubmitApproval,
         chatMode = context.chatMode,
         showCompletedDisclosure = params.showTimestamp,
+        onOpenToolRunDetails = context.callbacks.onOpenToolRunDetails,
     ) { message, position, rowModifier ->
         RenderChatMessageRow(
             params = RenderChatMessageRowParams(

@@ -403,6 +403,8 @@ internal data class CreateDesktopChatDetailPaneActionsParams(
     val onNavigateToChannels: () -> Unit,
     val onNavigateToAgents: () -> Unit,
     val onOpenAgent: (String) -> Unit,
+    val onOpenAgentPane: () -> Unit = {},
+    val onEditAgent: () -> Unit = {},
 )
 
 internal fun createDesktopChatDetailPaneActions(
@@ -428,6 +430,8 @@ internal fun createDesktopChatDetailPaneActions(
             }
         },
         onOpenAgent = params.onOpenAgent,
+        onOpenAgentPane = params.onOpenAgentPane,
+        onEditAgent = params.onEditAgent,
     )
 }
 

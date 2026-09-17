@@ -4,6 +4,7 @@ import com.letta.mobile.avatar.rive.RiveInputSink
 import com.sun.jna.Library
 import com.sun.jna.Memory
 import com.sun.jna.Native
+import kotlinx.coroutines.asCoroutineDispatcher
 import com.sun.jna.NativeLibrary
 import com.sun.jna.Pointer
 
@@ -103,11 +104,38 @@ data class RiveSceneTarget(val stateMachine: String? = null, val artboard: Strin
 enum class RivePointer(internal val code: Int) { MOVE(0), DOWN(1), UP(2), EXIT(3) }
 
 /**
+ * The one thread every native scene is driven from. A D3D11 immediate context is single-threaded,
+ * and the render is a GPU round trip with a blocking readback - so it runs here, off the UI
+ * thread, and the input writes queue behind it in order rather than racing it. One thread for
+ * every scene: the scenes are cheap and serialising them keeps the readbacks from contending.
+ */
+internal object RiveThread {
+    private val thread = java.util.concurrent.atomic.AtomicReference<Thread?>(null)
+    private val executor = java.util.concurrent.Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "rive-render").apply { isDaemon = true }.also { thread.set(it) }
+    }
+
+    /** For the frame loop: suspend on the UI thread while the scene advances and renders here. */
+    val dispatcher: kotlinx.coroutines.CoroutineDispatcher = executor.asCoroutineDispatcher()
+
+    private val onThread: Boolean get() = Thread.currentThread() === thread.get()
+
+    /** Queues [block] behind whatever the thread is doing; input writes go this way. */
+    fun post(block: () -> Unit) {
+        if (onThread) block() else executor.execute(block)
+    }
+
+    /** Runs [block] on the thread and waits for it; creation, loading, stills and the bench go this way. */
+    fun <T> call(block: () -> T): T = if (onThread) block() else executor.submit(block).get()
+}
+
+/**
  * One native scene: a D3D11 device, a loaded file, and its state machine.
  *
- * Not thread-safe by construction - a D3D11 immediate context is single-threaded - so every call
- * must come from the thread that created it. The Compose surface keeps all of them on the UI
- * thread's frame clock.
+ * Not thread-safe by construction - a D3D11 immediate context is single-threaded - so every native
+ * call is routed through [RiveThread]: writes are posted, reads and renders are called and
+ * awaited. Callers may use any thread; the frame loop suspends on [RiveThread.dispatcher] so the
+ * readback never stalls the UI.
  */
 class RiveDesktopScene private constructor(
     private val native: RiveBridgeNative,
@@ -115,10 +143,11 @@ class RiveDesktopScene private constructor(
     val adapterName: String,
 ) : AutoCloseable {
     private var buffer: Memory? = null
-    private var closed = false
+    private var pixels: ByteArray? = null
+    @Volatile private var closed = false
 
-    val artboardWidth: Float get() = native.rive_bridge_artboard_width(openHandle())
-    val artboardHeight: Float get() = native.rive_bridge_artboard_height(openHandle())
+    val artboardWidth: Float get() = RiveThread.call { native.rive_bridge_artboard_width(openHandle()) }
+    val artboardHeight: Float get() = RiveThread.call { native.rive_bridge_artboard_height(openHandle()) }
 
     private fun openHandle(): Pointer {
         check(!closed) { "RiveDesktopScene is closed" }
@@ -126,7 +155,7 @@ class RiveDesktopScene private constructor(
     }
 
     /** Load a .riv and bind [target] (see [RiveSceneTarget]). */
-    fun load(bytes: ByteArray, target: RiveSceneTarget = RiveSceneTarget()) {
+    fun load(bytes: ByteArray, target: RiveSceneTarget = RiveSceneTarget()) = RiveThread.call {
         val artboard = target.artboard
         val code = if (artboard == null) {
             native.rive_bridge_load(openHandle(), bytes, bytes.size, target.stateMachine)
@@ -139,7 +168,7 @@ class RiveDesktopScene private constructor(
         check(code == 0) { "rive_bridge_load failed ($code)" }
     }
 
-    fun advance(seconds: Float) = native.rive_bridge_advance(openHandle(), seconds)
+    fun advance(seconds: Float) = RiveThread.post { native.rive_bridge_advance(openHandle(), seconds) }
 
     private var lastFrameNanos = 0L
 
@@ -155,20 +184,26 @@ class RiveDesktopScene private constructor(
         if (dt > 0f) advance(dt)
     }
 
-    /** Renders into a reused native buffer and returns it: premultiplied RGBA, top row first. */
-    fun render(width: Int, height: Int, clearArgb: Int = 0): ByteArray {
+    /**
+     * Renders into a reused native buffer and copies it into a reused byte array: premultiplied
+     * RGBA, top row first. The array is the scene's and is overwritten by the next render - read it
+     * before then (the surface rasterises it into a Skia image at once).
+     */
+    fun render(width: Int, height: Int, clearArgb: Int = 0): ByteArray = RiveThread.call {
         val size = width.toLong() * height * 4
         val target = buffer?.takeIf { it.size() == size } ?: Memory(size).also { buffer = it }
         val code = native.rive_bridge_render(openHandle(), width, height, clearArgb, target)
         check(code == 0) { "rive_bridge_render failed ($code)" }
-        return target.getByteArray(0, size.toInt())
+        val out = pixels?.takeIf { it.size.toLong() == size } ?: ByteArray(size.toInt()).also { pixels = it }
+        target.read(0, out, 0, out.size)
+        out
     }
 
-    fun pointer(kind: RivePointer, x: Float, y: Float) = native.rive_bridge_pointer(openHandle(), kind.code, x, y)
+    fun pointer(kind: RivePointer, x: Float, y: Float) = RiveThread.post { native.rive_bridge_pointer(openHandle(), kind.code, x, y) }
 
-    fun fireTrigger(name: String): Boolean = native.rive_bridge_fire_trigger(openHandle(), name) == 0
+    fun fireTrigger(name: String): Boolean = RiveThread.call { native.rive_bridge_fire_trigger(openHandle(), name) == 0 }
 
-    fun setNumber(name: String, value: Float): Boolean = native.rive_bridge_set_number(openHandle(), name, value) == 0
+    fun setNumber(name: String, value: Float): Boolean = RiveThread.call { native.rive_bridge_set_number(openHandle(), name, value) == 0 }
 
     /**
      * Reads a view-model number back: the probe path of MOTION-PIPELINE section 0, where a two-way
@@ -178,57 +213,61 @@ class RiveDesktopScene private constructor(
     fun getNumber(name: String): Float? {
         if (!RiveBridgeNative.PROBE_READBACK) return null
         val out = FloatArray(1)
-        return if (native.rive_bridge_vm_get_number(openHandle(), name, out) == 0) out[0] else null
+        return RiveThread.call { if (native.rive_bridge_vm_get_number(openHandle(), name, out) == 0) out[0] else null }
     }
 
     /** Every number property on the bound view model, so a caller can discover `telemetry*` probes. */
     fun numberNames(): List<String> {
         if (!RiveBridgeNative.PROBE_READBACK) return emptyList()
         val out = ByteArray(NAME_BUFFER_BYTES)
-        if (native.rive_bridge_vm_number_names(openHandle(), out, out.size) <= 0) return emptyList()
+        if (RiveThread.call { native.rive_bridge_vm_number_names(openHandle(), out, out.size) } <= 0) return emptyList()
         return Native.toString(out).split('\n').filter { it.isNotBlank() }
     }
 
     /** The view-model path [com.letta.mobile.avatar.rive.RiveAvatarRuntime] writes through. */
     val inputSink: RiveInputSink = object : RiveInputSink {
-        override fun setNumber(input: String, value: Float) {
-            native.rive_bridge_vm_set_number(openHandle(), input, value)
+        override fun setNumber(input: String, value: Float) = RiveThread.post {
+            if (!closed) native.rive_bridge_vm_set_number(handle, input, value)
         }
 
-        override fun setBoolean(input: String, value: Boolean) {
-            native.rive_bridge_vm_set_boolean(openHandle(), input, if (value) 1 else 0)
+        override fun setBoolean(input: String, value: Boolean) = RiveThread.post {
+            if (!closed) native.rive_bridge_vm_set_boolean(handle, input, if (value) 1 else 0)
         }
 
-        override fun setEnum(input: String, key: String) {
-            native.rive_bridge_vm_set_enum(openHandle(), input, key)
+        override fun setEnum(input: String, key: String) = RiveThread.post {
+            if (!closed) native.rive_bridge_vm_set_enum(handle, input, key)
         }
 
-        override fun setColor(input: String, argb: Int) {
-            native.rive_bridge_vm_set_color(openHandle(), input, argb)
+        override fun setColor(input: String, argb: Int) = RiveThread.post {
+            if (!closed) native.rive_bridge_vm_set_color(handle, input, argb)
         }
 
-        override fun fire(input: String) {
-            native.rive_bridge_vm_fire(openHandle(), input)
+        override fun fire(input: String) = RiveThread.post {
+            if (!closed) native.rive_bridge_vm_fire(handle, input)
         }
     }
 
     override fun close() {
         if (closed) return
         closed = true
-        native.rive_bridge_destroy(handle)
-        buffer = null
+        // Behind every queued write, so nothing touches a destroyed handle.
+        RiveThread.post {
+            native.rive_bridge_destroy(handle)
+            buffer = null
+            pixels = null
+        }
     }
 
     companion object {
         /** Room for a few hundred property names; the bridge refuses rather than truncate. */
         private const val NAME_BUFFER_BYTES = 16 * 1024
 
-        fun create(): RiveDesktopScene {
+        fun create(): RiveDesktopScene = RiveThread.call {
             val native = RiveBridgeNative.INSTANCE
             val name = ByteArray(256)
             val handle = native.rive_bridge_create(name, name.size)
                 ?: error("rive_bridge_create failed: no D3D11 feature level 11.1 device")
-            return RiveDesktopScene(native, handle, Native.toString(name))
+            RiveDesktopScene(native, handle, Native.toString(name))
         }
     }
 }

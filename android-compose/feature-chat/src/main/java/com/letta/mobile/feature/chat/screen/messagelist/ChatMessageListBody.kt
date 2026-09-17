@@ -52,6 +52,7 @@ internal fun ChatMessageListBody(
             onSubmitApproval = params.callbacks.onSubmitApproval,
             onToggleRunCollapsed = params.callbacks.onToggleRunCollapsed,
             onToggleReasoningExpanded = params.callbacks.onToggleReasoningExpanded,
+            onOpenToolRunDetails = params.callbacks.onOpenToolRunDetails,
             onAttachmentImageTap = params.callbacks.onAttachmentImageTap,
         )
     }
@@ -206,6 +207,7 @@ private fun ChatMessageListLazyColumn(params: ChatMessageListLazyColumnParams) {
             ChatMessageListItemsParams(
                 renderItems = bodyParams.renderItems,
                 isLoadingOlderMessages = bodyParams.state.isLoadingOlderMessages,
+                agentId = bodyParams.state.agentId,
                 context = ChatMessageListLazyContext(
                     itemState = params.itemState,
                     conversationId = params.conversationId,
@@ -238,7 +240,7 @@ private fun BoxScope.ChatMessageListScrollFab(params: ChatMessageListBodyParams)
             .align(Alignment.BottomEnd)
             .padding(
                 end = LettaSpacing.INNER_PADDING,
-                bottom = LettaSpacing.INNER_PADDING + params.appearance.bottomPadding,
+                bottom = LettaSpacing.INNER_PADDING,
             ),
     )
 }

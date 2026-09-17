@@ -1,9 +1,12 @@
 package com.letta.mobile.ui.mascot
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -18,6 +21,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
@@ -41,7 +46,18 @@ import com.letta.mobile.data.presence.AgentPresence
  * agent, presence, time, gaze, sizing, clipping - is shared and lives in [MascotAvatar].
  */
 interface MascotHost {
-    /** The live entry for [agentId], or null when the renderer is unavailable (draw the fallback). */
+    /**
+     * Whether this host can draw mascots at all. A cheap flag: every "is there a mascot?" check
+     * reads this and nothing else, so listing an agent never brings up a renderer scene for it.
+     */
+    val available: Boolean
+
+    /**
+     * The live entry for [agentId], or null when the renderer is unavailable. Creating an entry is
+     * the expensive step (a scene per agent), so only a surface about to draw calls this - never a
+     * check. Entries load lazily: [MascotEntry.ensureLoaded] does the renderer work off the UI
+     * thread, and [Surface] draws nothing until it has.
+     */
     fun entry(agentId: String, identity: MascotIdentity): MascotEntry?
 
     /**
@@ -55,6 +71,8 @@ interface MascotHost {
 
 /** No renderer: every mascot draws its fallback. Platforms provide a real host at their root. */
 object NoMascotHost : MascotHost {
+    override val available: Boolean = false
+
     override fun entry(agentId: String, identity: MascotIdentity): MascotEntry? = null
 
     @Composable
@@ -80,8 +98,8 @@ fun mascotAtWork(agentId: String?): Boolean {
 @Composable
 fun mascotAvailable(agentId: String?): Boolean {
     if (agentId == null) return false
-    val identity = LocalMascotRegistry.current.identities[agentId] ?: return false
-    return LocalMascotHost.current.entry(agentId, identity) != null
+    if (LocalMascotRegistry.current.identities[agentId] == null) return false
+    return LocalMascotHost.current.available
 }
 
 /**
@@ -103,7 +121,8 @@ fun MascotAvatar(
     fallback: @Composable () -> Unit,
 ) {
     val identity = agentId?.let { LocalMascotRegistry.current.identities[it] }
-    if (agentId == null || identity == null || LocalMascotHost.current.entry(agentId, identity) == null) {
+    val host = LocalMascotHost.current
+    if (agentId == null || identity == null || !host.available || host.entry(agentId, identity) == null) {
         fallback()
         return
     }
@@ -136,10 +155,19 @@ fun MascotLive(
     identity: MascotIdentity,
     size: Dp,
     modifier: Modifier = Modifier,
+    /** The mascot is a control (it opens its agent): pointer becomes a hand and the tile is clickable. */
+    onClick: (() -> Unit)? = null,
+    /**
+     * Which scene draws: the agent's own by default. A surface that shows one agent after another
+     * in the same place (the transport layer's focused character) passes a key of its own, so the
+     * scene it already has is re-skinned - one character morphing into the next - rather than
+     * a new scene brought up for each agent.
+     */
+    sceneKey: String = agentId,
 ) {
     val host = LocalMascotHost.current
     val registry = LocalMascotRegistry.current
-    val entry = remember(host, agentId, identity) { host.entry(agentId, identity) } ?: return
+    val entry = remember(host, sceneKey, identity) { host.entry(sceneKey, identity) } ?: return
     val presence = registry.presence[agentId] ?: AgentPresence.IDLE
     LaunchedEffect(entry, presence) { entry.ensureLoaded(); entry.apply(presence) }
     // The director's timers (listening release, success hold, blink schedule) need a clock;
@@ -176,17 +204,70 @@ fun MascotLive(
     }
     // requiredSize: an overscaled mascot must exceed its tile so the tile's clip crops it;
     // plain size() is coerced down to the parent's constraints and never overscales.
-    host.Surface(
-        entry,
-        modifier.requiredSize(size).onGloballyPositioned {
+    Box(
+        modifier = modifier.requiredSize(size).onGloballyPositioned {
             val r = it.boundsInWindow()
             bounds = r
             val slot = MascotSlot(agentId, GazeRect(r.left, r.top, r.right, r.bottom))
             if (registry.mascotBounds[slotKey] != slot) registry.mascotBounds[slotKey] = slot
         },
-        playing = true,
+        contentAlignment = Alignment.Center,
+    ) {
+        host.Surface(entry, Modifier.matchParentSize(), playing = true)
+        if (onClick != null) MascotHitArea(size, onClick)
+    }
+}
+
+/**
+ * The control over a clickable mascot: an invisible hit area the size of the body (the rig draws
+ * it across ~60 % of the tile, a little below centre) and a hand cursor. No highlight of its own -
+ * the character already answers a hover with motion (the rig's Hover layer), and that is the
+ * affordance.
+ */
+@Composable
+private fun MascotHitArea(size: Dp, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .offset(y = size * BODY_DROP_FRACTION)
+            .size(size * BODY_FRACTION)
+            .clip(CircleShape)
+            .pointerHoverIcon(PointerIcon.Hand)
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick),
     )
 }
+
+/** The body's share of a tile and how far below the tile's centre it sits (see the 8yee3 framing note). */
+private const val BODY_FRACTION = 0.62f
+private const val BODY_DROP_FRACTION = 0.06f
+
+/**
+ * The real mascot for an identity that belongs to no agent - a picker option, a preview - drawn
+ * paused: the same Rive scene every live surface draws, with its clock stopped. It is not an
+ * approximation of the character and not a separate still asset, so the shape, the body's pose and
+ * the identity's rotation are exactly what the agent will look like (letta-mobile-0bvjw).
+ *
+ * Callers check [mascotCandidateAvailable] and draw their own fallback when the renderer is
+ * unavailable.
+ */
+@Composable
+fun MascotCandidate(
+    identity: MascotIdentity,
+    size: Dp,
+    modifier: Modifier = Modifier,
+) = MascotStill(candidateSceneKey(identity), identity, size, modifier)
+
+/** True when the host can draw [identity] as a [MascotCandidate]. */
+@Composable
+fun mascotCandidateAvailable(identity: MascotIdentity): Boolean = LocalMascotHost.current.available
+
+/**
+ * Which scene a candidate identity draws on. Scenes live in one table keyed by string and re-skin
+ * themselves when asked for a different identity, so the split has to be the part of the identity a
+ * caller shows several of at once - the body - while colour and turn are skinned onto the scene the
+ * body already has. Deriving it here rather than taking a key means a caller cannot forge one that
+ * collides with an agent's, or accidentally give two candidates the same scene.
+ */
+internal fun candidateSceneKey(identity: MascotIdentity): String = "mascot-candidate:${identity.shape.name}"
 
 /**
  * One frame of the agent's mascot at [size], with no clock and no gaze. The agent's live surfaces

@@ -11,14 +11,17 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import com.letta.mobile.data.chat.projection.ToolTimelineGroup
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.feature.chat.screen.RunActivityDisclosureTestTags
 import com.letta.mobile.feature.chat.screen.RunBlock
+import com.letta.mobile.feature.chat.screen.ToolRunSummaryTestTags
 import com.letta.mobile.ui.theme.LettaChatTheme
 import com.letta.mobile.ui.theme.LettaTheme
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.jupiter.api.Tag
@@ -41,6 +44,7 @@ class RunBlockCollapsedDisclosureTest {
     @Test
     fun collapsedCompletedRunHidesToolRowsButKeepsDisclosureTappable() {
         val collapsedState = mutableStateOf(true)
+        var openedDetails: List<ToolTimelineGroup>? = null
         composeRule.setContent {
             LettaTheme(
                 appTheme = AppTheme.LIGHT,
@@ -57,6 +61,7 @@ class RunBlockCollapsedDisclosureTest {
                         collapsed = collapsedState.value,
                         onToggleCollapsed = { collapsedState.value = !collapsedState.value },
                         showCompletedDisclosure = true,
+                        onOpenToolRunDetails = { openedDetails = it },
                     ) { message, _, rowModifier ->
                         Box(
                             modifier = rowModifier.testTag("run-row-${message.id}"),
@@ -81,9 +86,18 @@ class RunBlockCollapsedDisclosureTest {
             .performClick()
         composeRule.waitForIdle()
 
-        // …and tapping it expands the previously hidden work.
-        composeRule.onNodeWithText("Bash(collapse-check)").assertIsDisplayed()
+        // …and tapping it expands the previously hidden work. Tool calls come back as
+        // the run summary row; the per-call detail is one tap further, in the sheet the
+        // screen mounts from the groups this row hands back.
+        composeRule.onNodeWithTag(ToolRunSummaryTestTags.Row).assertIsDisplayed()
         composeRule.onNodeWithTag("run-row-reasoning-1").assertIsDisplayed()
+        composeRule.onNodeWithText("Bash(collapse-check)").assertDoesNotExist()
+        composeRule.onNodeWithTag(ToolRunSummaryTestTags.Row).performClick()
+        composeRule.waitForIdle()
+        assertEquals(
+            listOf("Bash(collapse-check)"),
+            openedDetails.orEmpty().flatMap { it.calls }.map { it.summary },
+        )
     }
 
     @Test

@@ -23,8 +23,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material3.Icon
@@ -71,6 +72,9 @@ import kotlinx.coroutines.launch
 import org.jetbrains.jewel.ui.component.PopupMenu as JewelPopupMenu
 
 private val ToneOptions = listOf("Concise", "Friendly", "Technical", "Mentor", "Playful", "Formal")
+
+/** The editor's avatar tile: the flat silhouette that opens the picker. */
+private val EditorAvatarTileSize = 72.dp
 private val VoiceOptions = listOf("Caring", "Neutral", "Warm", "Energetic", "Calm", "Direct")
 
 // Core-memory block labels the editor reads/writes. Persona is the standard
@@ -113,7 +117,9 @@ internal fun DesktopEditAgentSurface(
     modifier: Modifier = Modifier,
 ) {
     var name by remember(agentId) { mutableStateOf("") }
-    var identity by remember(agentId) { mutableStateOf(MascotIdentity.DEFAULT) }
+    // Seeded, not DEFAULT, until the load lands: what every surface already draws for this agent,
+    // so an early Save (or a failed load) can never write the blue circle into the cache.
+    var identity by remember(agentId) { mutableStateOf(MascotIdentity.seeded(agentId)) }
     var persona by remember(agentId) { mutableStateOf("") }
     var tone by remember(agentId) { mutableStateOf<String?>(null) }
     var customInstructions by remember(agentId) { mutableStateOf("") }
@@ -168,7 +174,7 @@ internal fun DesktopEditAgentSurface(
         // agent already shows everywhere. Loading it is not a change, so opening the editor saves nothing.
         loadedIdentity = resolveMascotIdentity(agentId, agent, settings.getString(agentAvatarStyleKey(agentId)))
         loadedMetadata = agent.metadata
-        identity = loadedIdentity ?: MascotIdentity.DEFAULT
+        identity = loadedIdentity ?: MascotIdentity.seeded(agentId)
         voice = settings.getString(agentVoiceKey(agentId))?.takeIf { it in VoiceOptions } ?: VoiceOptions.first()
         loadedName = name
         loadedModel = modelValue
@@ -272,9 +278,11 @@ internal fun DesktopEditAgentSurface(
                         .clickable(onClick = onClose),
                     contentAlignment = Alignment.Center,
                 ) {
+                    // The editor is a pane docked on the right; closing sends it back
+                    // out that way, so the glyph points where the pane goes.
                     Icon(
-                        Icons.AutoMirrored.Outlined.ArrowBack,
-                        contentDescription = "Back",
+                        Icons.AutoMirrored.Outlined.ArrowForward,
+                        contentDescription = "Close editor",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(18.dp),
                     )
@@ -289,7 +297,10 @@ internal fun DesktopEditAgentSurface(
             }
 
             if (loading) {
-                Text("Loading…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    com.letta.mobile.ui.mascot.MascotLoading(agentId)
+                    Text("Loading…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             } else {
                 Column(
                     modifier = Modifier.widthIn(max = 980.dp).fillMaxWidth(),
@@ -298,20 +309,49 @@ internal fun DesktopEditAgentSurface(
             // Avatar + Name
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.Top) {
                 // The avatar is the picker: click it, choose shape and colour in a popover.
+                // A pencil badge says so - a bare mascot gave no hint it could be changed.
                 var pickerOpen by remember { mutableStateOf(false) }
-                Box(
-                    Modifier.size(72.dp).clip(RoundedCornerShape(16.dp)).clickable { pickerOpen = true },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (com.letta.mobile.ui.mascot.LocalMascotHost.current.entry(agentId, identity) != null) {
-                        com.letta.mobile.ui.mascot.MascotLive(agentId = agentId, identity = identity, size = 110.dp)
-                    } else {
-                        MascotShapeGlyph(identity.shape, identity.argb, 64.dp)
+                // The editor moves nothing: the pick previews on the character where it stands
+                // (the transport morphs it live) and this tile is the flat silhouette that opens
+                // the picker.
+                val transport = com.letta.mobile.ui.mascot.LocalMascotTransport.current
+                LaunchedEffect(identity, loadedIdentity) {
+                    transport.preview(agentId, identity.takeIf { it != loadedIdentity })
+                }
+                androidx.compose.runtime.DisposableEffect(agentId) {
+                    onDispose { transport.preview(agentId, null) }
+                }
+                Box(Modifier.size(EditorAvatarTileSize)) {
+                    Box(
+                        Modifier
+                            .matchParentSize()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                            .clickable { pickerOpen = true },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        MascotShapeGlyph(identity.shape, identity.argb, 48.dp)
                     }
                     androidx.compose.material3.DropdownMenu(expanded = pickerOpen, onDismissRequest = { pickerOpen = false }) {
                         Box(Modifier.padding(12.dp)) {
                             MascotPicker(identity = identity, onChange = { identity = it }, accent = accent)
                         }
+                    }
+                    Box(
+                        Modifier
+                            .align(Alignment.BottomEnd)
+                            .size(22.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                            .clickable { pickerOpen = true },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Outlined.Edit,
+                            contentDescription = "Change mascot",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(12.dp),
+                        )
                     }
                 }
                 LabeledSection("Name", accent, Modifier.weight(1f)) {
