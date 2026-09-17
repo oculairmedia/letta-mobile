@@ -17,6 +17,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -28,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.canvas.CanvasSession
+import com.letta.mobile.data.canvas.CanvasSessionRegistry
 import io.ak1.drawbox.DrawBox
 import io.ak1.drawbox.domain.model.Event
 import io.ak1.drawbox.domain.usecase.UseCase
@@ -47,6 +49,7 @@ fun CanvasWorkspace(
     modifier: Modifier = Modifier,
     controller: DrawBoxController = remember { DrawBoxController(Reducer(UseCase())) },
     session: CanvasSession? = null,
+    sessions: CanvasSessionRegistry = CanvasSessionRegistry(),
     initialJson: String? = null,
     onNavigateBack: (() -> Unit)? = null,
     onExportJson: ((String) -> Unit)? = null,
@@ -59,23 +62,55 @@ fun CanvasWorkspace(
 
     var statusMessage by remember { mutableStateOf("Ready") }
     var initialLoadDone by remember { mutableStateOf(false) }
+    var lastExportedJson by remember { mutableStateOf<String?>(null) }
 
-    // Load initial JSON diagram or session document
+    DisposableEffect(session, sessions) {
+        if (session != null) {
+            sessions.register(session)
+        }
+        onDispose {
+            if (session != null) {
+                sessions.unregister(session.canvasId)
+            }
+        }
+    }
+
+    // Load initial JSON diagram or session document & observe external session updates (Card I2.3)
     LaunchedEffect(session, initialJson) {
         if (session != null) {
             session.load()
             val sessionJson = session.sceneJsonOrEmpty()
+            var lastImportedRev = session.document.value?.revision ?: 0L
             if (sessionJson.isNotBlank()) {
                 controller.importPath(sessionJson)
+                lastExportedJson = sessionJson
                 statusMessage = "Loaded from session (rev ${session.document.value?.revision ?: 1})"
             }
-        } else if (!initialJson.isNullOrBlank()) {
-            controller.importPath(initialJson)
-            statusMessage = "Loaded diagram (${state.elements.size} elements)"
+            delay(100)
+            initialLoadDone = true
+
+            // Card I2.3: Session observes revision bump -> controller.importPath if JSON changed externally.
+            // Conflict: agent replace wins; toast/status.
+            session.document.collect { doc ->
+                if (doc != null && doc.revision > lastImportedRev) {
+                    lastImportedRev = doc.revision
+                    if (doc.sceneJson.isNotBlank() && doc.sceneJson != lastExportedJson) {
+                        controller.importPath(doc.sceneJson)
+                        statusMessage = "Agent updated canvas (rev ${doc.revision})"
+                    }
+                }
+            }
+        } else {
+            if (!initialJson.isNullOrBlank()) {
+                controller.importPath(initialJson)
+                statusMessage = "Loaded diagram (${state.elements.size} elements)"
+            }
+            delay(100)
+            initialLoadDone = true
         }
-        delay(100)
-        initialLoadDone = true
     }
+
+    var isAutosaving by remember { mutableStateOf(false) }
 
     // Card I1.6: Autosave debounce
     // Debounce ~500ms on dirty signal (elements change) -> exportJson()
@@ -85,6 +120,7 @@ fun CanvasWorkspace(
     LaunchedEffect(state.elements, initialLoadDone, session) {
         if (!initialLoadDone || session == null) return@LaunchedEffect
         delay(500)
+        isAutosaving = true
         controller.exportJson()
     }
 
@@ -93,11 +129,16 @@ fun CanvasWorkspace(
         controller.events.collect { event ->
             when (event) {
                 is Event.JsonExported -> {
+                    lastExportedJson = event.json
+                    val wasAutosaving = isAutosaving
+                    isAutosaving = false
                     val hasElements = event.json.contains("\"elements\"")
-                    statusMessage = if (hasElements) {
-                        "Exported JSON (${event.json.length} chars, verified)"
-                    } else {
-                        "Warning: Exported JSON missing 'elements' key"
+                    if (!wasAutosaving) {
+                        statusMessage = if (hasElements) {
+                            "Exported JSON (${event.json.length} chars, verified)"
+                        } else {
+                            "Warning: Exported JSON missing 'elements' key"
+                        }
                     }
                     if (session != null && session.sceneJsonOrEmpty() != event.json) {
                         withContext(Dispatchers.Default) {

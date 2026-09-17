@@ -61,6 +61,29 @@ class CanvasSession(
     }
 
     /**
+     * Applies an agent-driven scene replacement, incrementing revision and updating timestamp.
+     */
+    suspend fun applyAgentReplace(sceneJson: String): CanvasDocument = mutex.withLock {
+        val current = _document.value ?: store.get(canvasId) ?: CanvasDocument(
+            id = canvasId,
+            title = "Untitled Canvas",
+            revision = 0L,
+            sceneJson = "",
+            updatedAtEpochMs = clock(),
+        )
+
+        val updated = current.copy(
+            revision = current.revision + 1L,
+            sceneJson = sceneJson,
+            updatedAtEpochMs = clock(),
+        )
+
+        store.upsert(updated)
+        _document.value = updated
+        updated
+    }
+
+    /**
      * Updates document title.
      */
     suspend fun updateTitle(newTitle: String): CanvasDocument = mutex.withLock {
