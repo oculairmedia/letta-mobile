@@ -1,5 +1,6 @@
 package com.letta.mobile.feature.chat.screen
 
+import com.letta.mobile.data.presence.RunScope
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -1089,7 +1090,7 @@ internal class AdminChatViewModel @Inject constructor(
      */
     private fun onRuntimeEvents(drafts: List<com.letta.mobile.runtime.RuntimeEventDraft>) {
         if (drafts.isEmpty()) return
-        runPhases.onEvents(currentRunKey(), agentId.value, drafts.map { it.payload })
+        runPhases.onEvents(RunScope(currentRunKey(), agentId.value), drafts.map { it.payload })
     }
 
     /**
@@ -1100,7 +1101,7 @@ internal class AdminChatViewModel @Inject constructor(
     private fun currentRunKey(): String {
         val key = conversationId?.value ?: "agent:${agentId.value}"
         val previous = publishedRunKey
-        if (previous != null && previous != key) runPhases.rekey(previous, key, agentId.value)
+        if (previous != null && previous != key) runPhases.rekey(previous, RunScope(key, agentId.value))
         publishedRunKey = key
         return key
     }
@@ -1113,7 +1114,7 @@ internal class AdminChatViewModel @Inject constructor(
     private fun publishRunState() {
         viewModelScope.launch {
             composerState.collect { composer ->
-                runPhases.setUserTyping(currentRunKey(), agentId.value, composer.inputText.isNotBlank())
+                runPhases.setUserTyping(RunScope(currentRunKey(), agentId.value), composer.inputText.isNotBlank())
             }
         }
     }

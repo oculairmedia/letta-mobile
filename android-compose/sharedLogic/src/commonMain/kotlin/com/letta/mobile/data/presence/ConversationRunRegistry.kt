@@ -89,6 +89,12 @@ fun Map<String, ConversationRunState>.presenceByAgent(): Map<String, AgentPresen
             awaitingApproval = states.any { it.awaitingApproval },
             userTyping = states.any { it.userTyping },
             error = states.any { it.error },
-            toolName = states.firstOrNull { it.phase.isToolRunning }?.toolName,
+            // The name of the tool behind the activity that won, never a WORKING conversation's
+            // tool while another one is DELEGATING, and none at all while the agent is speaking.
+            toolName = when {
+                states.any { it.phase == RunPhase.RESPONDING } -> null
+                states.any { it.phase == RunPhase.DELEGATING } -> states.firstOrNull { it.phase == RunPhase.DELEGATING }?.toolName
+                else -> states.firstOrNull { it.phase == RunPhase.WORKING }?.toolName
+            },
         )
     }

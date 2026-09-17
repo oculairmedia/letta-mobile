@@ -17,6 +17,9 @@ import kotlin.time.Clock
  * Thread-safe: events arrive on transport dispatchers while the composer's typing flag is set from
  * the UI one.
  */
+/** The conversation a run belongs to and the agent driving it: what every phase is published under. */
+data class RunScope(val conversationId: String, val agentId: String)
+
 class ConversationRunPhasePublisher(
     private val registry: ConversationRunRegistry,
     private val now: () -> Long = { Clock.System.now().toEpochMilliseconds() },
@@ -25,67 +28,65 @@ class ConversationRunPhasePublisher(
     private val states = mutableMapOf<String, ConversationRunState>()
 
     /** Fold one runtime event for [conversationId] and publish the new phase. */
-    fun onEvent(conversationId: String, agentId: String, event: RuntimeEventPayload) {
-        update(conversationId, agentId) { RunPhaseReducer.reduce(it, event, now()) }
+    fun onEvent(scope: RunScope, event: RuntimeEventPayload) {
+        update(scope) { RunPhaseReducer.reduce(it, event, now()) }
     }
 
     /** Fold a batch in arrival order (transports deliver drafts in batches). */
-    fun onEvents(conversationId: String, agentId: String, events: List<RuntimeEventPayload>) {
+    fun onEvents(scope: RunScope, events: List<RuntimeEventPayload>) {
         if (events.isEmpty()) return
-        update(conversationId, agentId) { start ->
+        update(scope) { start ->
             val stamp = now()
             events.fold(start) { state, event -> RunPhaseReducer.reduce(state, event, stamp) }
         }
     }
 
     /** The user is composing to this conversation. Orthogonal to the phase; published the same way. */
-    fun setUserTyping(conversationId: String, agentId: String, typing: Boolean) {
-        update(conversationId, agentId) { it.copy(userTyping = typing) }
+    fun setUserTyping(scope: RunScope, typing: Boolean) {
+        update(scope) { it.copy(userTyping = typing) }
     }
 
     /** How many subagents are running under this conversation's current tool call. */
-    fun setSubagentCount(conversationId: String, agentId: String, count: Int) {
-        update(conversationId, agentId) { RunPhaseReducer.withSubagents(it, count, now()) }
+    fun setSubagentCount(scope: RunScope, count: Int) {
+        update(scope) { RunPhaseReducer.withSubagents(it, count, now()) }
     }
 
     /** The user asked to cancel; the terminal has not landed yet. */
-    fun markInterrupting(conversationId: String, agentId: String) {
-        update(conversationId, agentId) { RunPhaseReducer.interrupting(it, now()) }
+    fun markInterrupting(scope: RunScope) {
+        update(scope) { RunPhaseReducer.interrupting(it, now()) }
     }
 
     /** Re-key a conversation that was published under a placeholder id before the server named it. */
-    fun rekey(fromConversationId: String, toConversationId: String, agentId: String) {
-        if (fromConversationId == toConversationId) return
-        val carried = synchronized(lock) { states.remove(fromConversationId) }
-        registry.clear(fromConversationId)
-        val next = (carried ?: ConversationRunState(toConversationId, agentId))
-            .copy(conversationId = toConversationId, agentId = agentId)
-        synchronized(lock) { states[toConversationId] = next }
-        registry.publish(next)
+    fun rekey(fromConversationId: String, to: RunScope) {
+        if (fromConversationId == to.conversationId) return
+        synchronized(lock) {
+            val carried = states.remove(fromConversationId)
+            registry.clear(fromConversationId)
+            val next = (carried ?: ConversationRunState(to.conversationId, to.agentId))
+                .copy(conversationId = to.conversationId, agentId = to.agentId)
+            states[to.conversationId] = next
+            registry.publish(next)
+        }
     }
 
     /** Forget this conversation entirely (the screen driving it is gone). */
     fun clear(conversationId: String) {
-        synchronized(lock) { states.remove(conversationId) }
-        registry.clear(conversationId)
+        synchronized(lock) {
+            states.remove(conversationId)
+            registry.clear(conversationId)
+        }
     }
 
-    private fun update(
-        conversationId: String,
-        agentId: String,
-        transform: (ConversationRunState) -> ConversationRunState,
-    ) {
-        val next = synchronized(lock) {
-            val known = states[conversationId]
-            val current = known ?: ConversationRunState(conversationId, agentId)
-            val updated = transform(current).copy(conversationId = conversationId, agentId = agentId)
-            if (updated == known) {
-                null // nothing changed and the registry already has it
-            } else {
-                states[conversationId] = updated
-                updated
-            }
-        } ?: return
-        registry.publish(next)
+    // Each mutation of [states] and its publication into the registry happen under the one lock:
+    // two updates racing could otherwise store A, store-and-publish B, then publish the stale A.
+    private fun update(scope: RunScope, transform: (ConversationRunState) -> ConversationRunState) {
+        synchronized(lock) {
+            val known = states[scope.conversationId]
+            val current = known ?: ConversationRunState(scope.conversationId, scope.agentId)
+            val updated = transform(current).copy(conversationId = scope.conversationId, agentId = scope.agentId)
+            if (updated == known) return // nothing changed and the registry already has it
+            states[scope.conversationId] = updated
+            registry.publish(updated)
+        }
     }
 }

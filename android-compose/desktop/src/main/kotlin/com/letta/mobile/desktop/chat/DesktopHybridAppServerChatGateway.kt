@@ -38,6 +38,7 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlin.jvm.JvmInline
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.merge
@@ -205,8 +206,7 @@ class DesktopHybridAppServerChatGateway internal constructor(
             var deliveredAssistantContent = false
             var mainReplyCompleted = false
             try {
-                turnEngine.runTurn(command).collect { draft ->
-                    runtimeEventRelay.emit(conversationId.value, agentId.value, draft.payload)
+                turnEngine.runTurn(command).relayedFor(conversationId, agentId).collect { draft ->
                     draft.runId?.value?.takeIf { it.isNotBlank() }?.let {
                         activeRunIdByConversation[conversationId] = DesktopRunId(it)
                     }
@@ -286,7 +286,22 @@ class DesktopHybridAppServerChatGateway internal constructor(
         return merge(frames, heartbeats)
     }
 
-    private fun observedStreamMessages(
+    /** Every runtime event this gateway maps is republished for presence, whichever path produced it. */
+    private fun Flow<RuntimeEventDraft>.relayedFor(conversationId: ConversationId, agentId: AgentId): Flow<RuntimeEventDraft> =
+        onEach { draft -> runtimeEventRelay.emit(conversationId.value, agentId.value, draft.payload) }
+
+    /** An observed draft is scoped to what it names, else to the stream it arrived on. */
+    private suspend fun relayObserved(draft: RuntimeEventDraft, conversationId: ConversationId, agentId: AgentId) {
+        runtimeEventRelay.emit(
+            draft.conversationId?.value ?: conversationId.value,
+            draft.agentId?.value ?: agentId.value,
+            draft.payload,
+        )
+    }
+
+    // Suspending only for the relay: an externally started or background turn reaches the timeline
+    // through this path, and its tool / approval phases have to reach presence the same way.
+    private suspend fun observedStreamMessages(
         received: AppServerReceivedFrame,
         conversationId: ConversationId,
         fallbackAgentId: AgentId,
@@ -302,6 +317,7 @@ class DesktopHybridAppServerChatGateway internal constructor(
         }
         val command = streamObserverCommand(effectiveAgentId, conversationId)
         return runtimeEventMapper.map(command, received).flatMap { draft ->
+            relayObserved(draft, conversationId, effectiveAgentId)
             RuntimeEventServerFrameMapper.map(
                 payload = draft.payload,
                 context = RuntimeEventServerFrameMapper.Context(

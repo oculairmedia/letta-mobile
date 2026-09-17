@@ -105,12 +105,15 @@ object RunPhaseReducer {
         // Approved: the tool the user was asked about now runs.
         ToolApprovalDecisionValue.Approved ->
             if (openToolCalls > 0) at(toolPhase(), nowMs) else at(RunPhase.WORKING, nowMs)
-        // Denied / timed out: that call will never return, so it stops counting as in flight and
-        // the turn goes back to the gap.
+        // Denied / timed out: that call will never return, so it stops counting as in flight. Any
+        // other call still open keeps the turn working; only an empty set is back in the gap.
         ToolApprovalDecisionValue.Denied,
         ToolApprovalDecisionValue.TimedOut,
-        -> copy(toolName = null, openToolCallIds = openToolCallIds - event.decision.callId.value)
-            .at(RunPhase.QUEUED, nowMs)
+        -> {
+            val remaining = openToolCallIds - event.decision.callId.value
+            copy(toolName = if (remaining.isEmpty()) null else toolName, openToolCallIds = remaining)
+                .at(if (remaining.isEmpty()) RunPhase.QUEUED else toolPhase(), nowMs)
+        }
     }
 
     private fun ConversationRunState.onLifecycle(status: RuntimeRunStatus, nowMs: Long): ConversationRunState =
@@ -158,9 +161,13 @@ object RunPhaseReducer {
     private fun ConversationRunState.toolPhase(): RunPhase =
         if (subagentCount > 0) RunPhase.DELEGATING else RunPhase.WORKING
 
-    /** Same conversation, nothing in flight. Keeps identity and the orthogonal user-typing flag. */
+    /**
+     * Same conversation, nothing in flight. Keeps identity and the orthogonal user-typing flag.
+     * The subagent count goes too: it described the finished turn's tool call, and a new turn's
+     * first tool must not read as DELEGATING until the subagent registry has spoken again.
+     */
     private fun ConversationRunState.reset(): ConversationRunState =
-        copy(phase = RunPhase.IDLE, toolName = null, openToolCallIds = emptySet())
+        copy(phase = RunPhase.IDLE, toolName = null, openToolCallIds = emptySet(), subagentCount = 0)
 
     /** Move to [phase], stamping [nowMs] only when the phase actually changed. */
     private fun ConversationRunState.at(phase: RunPhase, nowMs: Long): ConversationRunState =

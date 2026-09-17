@@ -27,7 +27,7 @@ class DesktopChatControllerRunPhasesTest {
     private class EventEmittingGateway : FakeDesktopChatGateway(), DesktopRuntimeEventSource {
         private val relay = DesktopRuntimeEventRelay()
         override val runtimeEvents: SharedFlow<ScopedDesktopRuntimeEvent> = relay.runtimeEvents
-        fun emit(payload: RuntimeEventPayload) = relay.emit("conv-1", "agent-0", payload)
+        suspend fun emit(payload: RuntimeEventPayload) = relay.emit("conv-1", "agent-0", payload)
     }
 
     @Test

@@ -119,6 +119,41 @@ class RunPhaseReducerTest {
     }
 
     @Test
+    fun denyingOneOfTwoOpenCallsKeepsTheOtherRunning() {
+        feed(RuntimeEventPayload.LocalUserAppend("local-1", "two at once"))
+        assertEquals(RunPhase.WORKING, feed(toolCall("t1", "grep")))
+        feed(
+            RuntimeEventPayload.ApprovalRequested(
+                ToolApprovalRequest(ToolApprovalId("ap-2"), ToolCallId("t2"), ToolName("Bash"), "rm -rf"),
+            ),
+        )
+        val denied = ToolApprovalDecision(
+            approvalId = ToolApprovalId("ap-2"),
+            callId = ToolCallId("t2"),
+            decision = ToolApprovalDecisionValue.Denied,
+            scope = ToolApprovalScope.Once,
+        )
+        // t1 is still in flight: the turn is working, not idling in the gap, and still names a tool.
+        assertEquals(RunPhase.WORKING, feed(RuntimeEventPayload.ApprovalResolved(denied)))
+        assertEquals(1, state.openToolCalls)
+        assertEquals("Bash", state.toolName, "the name stays what the turn last did until nothing is open")
+        assertEquals(RunPhase.QUEUED, feed(toolReturn("t1")))
+    }
+
+    @Test
+    fun aNewTurnForgetsTheLastTurnsSubagents() {
+        feed(RuntimeEventPayload.LocalUserAppend("local-1", "fan out"))
+        feed(toolCall("t1", "Task"))
+        state = RunPhaseReducer.withSubagents(state, 3, ++clock)
+        assertEquals(RunPhase.DELEGATING, state.phase)
+        assertEquals(RunPhase.DONE, feed(lifecycle(RuntimeRunStatus.Completed)))
+        // The next turn's first tool is plain WORKING until the subagent registry speaks again.
+        feed(RuntimeEventPayload.LocalUserAppend("local-2", "again"))
+        assertEquals(0, state.subagentCount)
+        assertEquals(RunPhase.WORKING, feed(toolCall("t2", "grep")))
+    }
+
+    @Test
     fun theSameToolCallSeenTwiceIsStillOneCallInFlight() {
         feed(RuntimeEventPayload.LocalUserAppend("local-1", "go"))
         // The approval request carries the call, and its tool-call frame follows: one call, not two.

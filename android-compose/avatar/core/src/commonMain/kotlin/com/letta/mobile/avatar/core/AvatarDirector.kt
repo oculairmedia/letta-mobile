@@ -367,11 +367,7 @@ class AvatarDirector(
         if (successRemaining > 0f) return AvatarState.SUCCESS
         if (workingHoldRemaining > 0f) return AvatarState.WORKING
         if (legacyActivity == AvatarActivity.THINKING) return AvatarState.THINKING
-        if (userTyping || typingReleaseRemaining > 0f ||
-            legacyActivity == AvatarActivity.LISTENING
-        ) {
-            return AvatarState.LISTENING
-        }
+        if (listening()) return AvatarState.LISTENING
         return AvatarState.IDLE
     }
 
@@ -488,31 +484,26 @@ class AvatarDirector(
 
     /** Count down the self-expiring / lingering signals, then re-arbitrate. */
     private fun tickTimedSignals(delta: Float) {
-        var changed = false
-        if (successRemaining > 0f) {
-            successRemaining -= delta
-            if (successRemaining <= 0f) {
-                successRemaining = 0f
-                changed = true
-            }
-        }
         val working = legacyActivity == AvatarActivity.WORKING || legacyActivity == AvatarActivity.DELEGATING
+        var expired = false
+        if (successRemaining > 0f) {
+            successRemaining = (successRemaining - delta).coerceAtLeast(0f)
+            expired = expired or (successRemaining == 0f)
+        }
         if (!working && workingHoldRemaining > 0f) {
-            workingHoldRemaining -= delta
-            if (workingHoldRemaining <= 0f) {
-                workingHoldRemaining = 0f
-                changed = true
-            }
+            workingHoldRemaining = (workingHoldRemaining - delta).coerceAtLeast(0f)
+            expired = expired or (workingHoldRemaining == 0f)
         }
         if (!userTyping && typingReleaseRemaining > 0f) {
-            typingReleaseRemaining -= delta
-            if (typingReleaseRemaining <= 0f) {
-                typingReleaseRemaining = 0f
-                changed = true
-            }
+            typingReleaseRemaining = (typingReleaseRemaining - delta).coerceAtLeast(0f)
+            expired = expired or (typingReleaseRemaining == 0f)
         }
-        if (changed) arbitrate()
+        if (expired) arbitrate()
     }
+
+    /** The user is talking / composing, or the release timer after they stopped is still running. */
+    private fun listening(): Boolean =
+        userTyping || typingReleaseRemaining > 0f || legacyActivity == AvatarActivity.LISTENING
 
     /** Ramp the current state's base expression toward its target over its attack time. */
     private fun tickStateExpression(delta: Float) {

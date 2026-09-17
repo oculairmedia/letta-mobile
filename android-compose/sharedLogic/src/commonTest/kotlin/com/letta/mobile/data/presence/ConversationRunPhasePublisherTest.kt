@@ -15,7 +15,7 @@ class ConversationRunPhasePublisherTest {
 
     @Test
     fun anEventReachesTheRegistryAsAPhaseInTheSameCall() {
-        publisher.onEvent("c1", "a1", RuntimeEventPayload.ToolCallObserved(ToolCallId("t1"), ToolName("grep")))
+        publisher.onEvent(RunScope("c1", "a1"), RuntimeEventPayload.ToolCallObserved(ToolCallId("t1"), ToolName("grep")))
         val run = registry.runs.value.getValue("c1")
         assertEquals(RunPhase.WORKING, run.phase)
         assertEquals("grep", run.toolName)
@@ -24,8 +24,8 @@ class ConversationRunPhasePublisherTest {
 
     @Test
     fun typingIsOrthogonalToThePhase() {
-        publisher.onEvent("c1", "a1", RuntimeEventPayload.ToolCallObserved(ToolCallId("t1"), ToolName("grep")))
-        publisher.setUserTyping("c1", "a1", true)
+        publisher.onEvent(RunScope("c1", "a1"), RuntimeEventPayload.ToolCallObserved(ToolCallId("t1"), ToolName("grep")))
+        publisher.setUserTyping(RunScope("c1", "a1"), true)
         val run = registry.runs.value.getValue("c1")
         assertEquals(RunPhase.WORKING, run.phase)
         assertEquals(true, run.userTyping)
@@ -33,18 +33,18 @@ class ConversationRunPhasePublisherTest {
 
     @Test
     fun aRunCarriesOverToTheServerAssignedConversationId() {
-        publisher.onEvent("agent:a1", "a1", RuntimeEventPayload.LocalUserAppend("local-1", "hi"))
-        publisher.rekey("agent:a1", "conv-7", "a1")
+        publisher.onEvent(RunScope("agent:a1", "a1"), RuntimeEventPayload.LocalUserAppend("local-1", "hi"))
+        publisher.rekey("agent:a1", RunScope("conv-7", "a1"))
         assertNull(registry.runs.value["agent:a1"])
         assertEquals(RunPhase.QUEUED, registry.runs.value.getValue("conv-7").phase)
 
-        publisher.onEvent("conv-7", "a1", RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Completed))
+        publisher.onEvent(RunScope("conv-7", "a1"), RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Completed))
         assertEquals(RunPhase.DONE, registry.runs.value.getValue("conv-7").phase)
     }
 
     @Test
     fun clearingForgetsTheConversation() {
-        publisher.onEvent("c1", "a1", RuntimeEventPayload.LocalUserAppend("local-1", "hi"))
+        publisher.onEvent(RunScope("c1", "a1"), RuntimeEventPayload.LocalUserAppend("local-1", "hi"))
         publisher.clear("c1")
         assertNull(registry.runs.value["c1"])
     }

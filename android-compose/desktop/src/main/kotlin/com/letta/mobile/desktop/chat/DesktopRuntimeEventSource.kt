@@ -25,18 +25,17 @@ interface DesktopRuntimeEventSource {
 }
 
 /**
- * The emitter side. Bounded and non-suspending on purpose: presence is a live signal, so a slow
- * collector drops the oldest events rather than back-pressuring the turn that produced them.
+ * The emitter side. Buffered but lossless: the reducer folds every event, so dropping one (a tool
+ * return, a terminal) would leave a phase stuck until a later event happened to repair it. A
+ * collector that falls more than [BUFFER_CAPACITY] events behind back-pressures the turn's
+ * collector briefly instead - the emitting call sites are already inside suspending collects.
  */
 class DesktopRuntimeEventRelay : DesktopRuntimeEventSource {
-    private val _events = MutableSharedFlow<ScopedDesktopRuntimeEvent>(
-        extraBufferCapacity = BUFFER_CAPACITY,
-        onBufferOverflow = kotlinx.coroutines.channels.BufferOverflow.DROP_OLDEST,
-    )
+    private val _events = MutableSharedFlow<ScopedDesktopRuntimeEvent>(extraBufferCapacity = BUFFER_CAPACITY)
     override val runtimeEvents: SharedFlow<ScopedDesktopRuntimeEvent> = _events.asSharedFlow()
 
-    fun emit(conversationId: String, agentId: String, payload: RuntimeEventPayload) {
-        _events.tryEmit(ScopedDesktopRuntimeEvent(conversationId, agentId, payload))
+    suspend fun emit(conversationId: String, agentId: String, payload: RuntimeEventPayload) {
+        _events.emit(ScopedDesktopRuntimeEvent(conversationId, agentId, payload))
     }
 
     private companion object {

@@ -31,6 +31,19 @@ class ConversationRunRegistryTest {
     }
 
     @Test
+    fun theToolNameBelongsToThePhaseThatWonTheActivity() {
+        val working = ConversationRunState("c1", "a1", phase = RunPhase.WORKING, toolName = "grep")
+        val delegating = ConversationRunState("c2", "a1", phase = RunPhase.DELEGATING, toolName = "Task")
+        // A delegating conversation outranks a working one, so its tool is the one named.
+        val presence = mapOf("c1" to working, "c2" to delegating).presenceByAgent().getValue("a1")
+        assertEquals(AgentActivityKind.DELEGATING, presence.activity)
+        assertEquals("Task", presence.toolName)
+        // Speaking names no tool, whatever else the agent has in flight.
+        val speaking = ConversationRunState("c3", "a1", phase = RunPhase.RESPONDING)
+        assertNull(mapOf("c1" to working, "c3" to speaking).presenceByAgent().getValue("a1").toolName)
+    }
+
+    @Test
     fun thinkingWhenRunningWithoutTokens() {
         val presence = mapOf("c1" to ConversationRunState("c1", "a1", phase = RunPhase.QUEUED)).presenceByAgent()
         assertEquals(AgentActivityKind.THINKING, presence.getValue("a1").activity)
