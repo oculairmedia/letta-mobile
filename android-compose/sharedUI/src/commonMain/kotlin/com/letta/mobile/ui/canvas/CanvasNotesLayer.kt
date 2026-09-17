@@ -1,4 +1,4 @@
-﻿package com.letta.mobile.ui.canvas
+package com.letta.mobile.ui.canvas
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
