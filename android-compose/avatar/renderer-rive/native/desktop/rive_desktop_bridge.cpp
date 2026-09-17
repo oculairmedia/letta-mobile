@@ -5,8 +5,10 @@
 // side wraps as a Skia image. The GPU renderer is the point: feathering (soft glow, blur) only
 // exists there - Skia- and Canvas2D-backed Rive renderers silently drop it.
 //
-// Threading: a D3D11 immediate context is single-threaded, so every call on one handle must come
-// from the same thread.
+// Threading: a D3D11 immediate context is single-threaded, so every call into this DLL must come
+// from one thread (the JVM's Rive thread). The device, the render context and each parsed file are
+// shared by every scene in the process - a scene is an artboard instance, which Rive makes in
+// microseconds, not a device of its own, which took hundreds of milliseconds per mascot.
 
 #include "rive/animation/state_machine_instance.hpp"
 #include "rive/artboard.hpp"
@@ -29,16 +31,35 @@
 #include <cstring>
 #include <memory>
 #include <string>
+#include <vector>
 #include <dxgi1_2.h>
 
 using namespace rive;
 using namespace rive::gpu;
 
-struct RiveBridge
+// The process's one GPU: device, immediate context and Rive render context (whose shaders compile
+// once). Created on first use, kept for the life of the process; every scene renders through it.
+struct SharedGpu
 {
     ComPtr<ID3D11Device> gpu;
     ComPtr<ID3D11DeviceContext> gpuContext;
     std::unique_ptr<RenderContext> renderContext;
+    std::string adapterName;
+};
+
+// A parsed .riv, shared by every scene loaded from the same bytes: parsing is per file, instancing
+// an artboard from it is cheap. Keyed by content hash and length; the mascot is one file, so this
+// stays tiny.
+struct CachedFile
+{
+    uint64_t hash;
+    int length;
+    rcp<File> file;
+};
+
+struct RiveBridge
+{
+    SharedGpu* shared = nullptr;
     rcp<RenderTargetD3D> renderTarget;
     ComPtr<ID3D11Texture2D> drawTexture;
     ComPtr<ID3D11Texture2D> readbackTexture;
@@ -51,6 +72,76 @@ struct RiveBridge
     rcp<ViewModelInstance> viewModel;
     Mat2D viewTransform;
 };
+
+// --- Shared GPU + file cache ---------------------------------------------------------------------
+
+static SharedGpu* g_sharedGpu = nullptr;
+static std::vector<CachedFile> g_files;
+
+static SharedGpu* shared_gpu()
+{
+    if (g_sharedGpu)
+        return g_sharedGpu;
+    ComPtr<IDXGIFactory2> factory;
+    if (FAILED(CreateDXGIFactory(__uuidof(IDXGIFactory2),
+                                 reinterpret_cast<void**>(factory.ReleaseAndGetAddressOf()))))
+        return nullptr;
+
+    ComPtr<IDXGIAdapter> adapter;
+    DXGI_ADAPTER_DESC desc{};
+    D3DContextOptions options;
+    if (factory->EnumAdapters(0, adapter.ReleaseAndGetAddressOf()) != DXGI_ERROR_NOT_FOUND)
+    {
+        adapter->GetDesc(&desc);
+        options.isIntel = desc.VendorId == 0x163C || desc.VendorId == 0x8086 ||
+                          desc.VendorId == 0x8087;
+    }
+
+    auto shared = std::make_unique<SharedGpu>();
+    char name[256] = {0};
+    WideCharToMultiByte(CP_UTF8, 0, desc.Description, -1, name, sizeof(name), nullptr, nullptr);
+    shared->adapterName = name;
+
+    D3D_FEATURE_LEVEL levels[] = {D3D_FEATURE_LEVEL_11_1};
+    if (FAILED(D3D11CreateDevice(adapter.Get(), D3D_DRIVER_TYPE_UNKNOWN, nullptr, 0, levels, 1,
+                                 D3D11_SDK_VERSION, shared->gpu.ReleaseAndGetAddressOf(), nullptr,
+                                 shared->gpuContext.ReleaseAndGetAddressOf())))
+        return nullptr;
+
+    shared->renderContext = RenderContextD3DImpl::MakeContext(shared->gpu, shared->gpuContext, options);
+    if (!shared->renderContext)
+        return nullptr;
+    g_sharedGpu = shared.release();
+    return g_sharedGpu;
+}
+
+static uint64_t fnv1a(const uint8_t* bytes, int length)
+{
+    uint64_t hash = 1469598103934665603ull;
+    for (int i = 0; i < length; ++i)
+    {
+        hash ^= bytes[i];
+        hash *= 1099511628211ull;
+    }
+    return hash;
+}
+
+// The parsed file for these bytes: cached from the first load, so the second mascot (and the
+// fortieth) costs no parse. A parse failure is not cached.
+static rcp<File> cached_file(SharedGpu* shared, const uint8_t* bytes, int length)
+{
+    const uint64_t hash = fnv1a(bytes, length);
+    for (const auto& entry : g_files)
+    {
+        if (entry.hash == hash && entry.length == length)
+            return entry.file;
+    }
+    ImportResult result;
+    rcp<File> file = File::import(Span<const uint8_t>(bytes, length), shared->renderContext.get(), &result);
+    if (file)
+        g_files.push_back({hash, length, file});
+    return file;
+}
 
 // --- Load helpers --------------------------------------------------------------------------------
 
@@ -143,38 +234,20 @@ static int join_number_names(RiveBridge* bridge, std::string& joined)
 
 extern "C" {
 
+// A scene: cheap, because the device and render context are the process's shared ones (brought
+// up by the first call) and the file comes from the parse cache at load.
 __declspec(dllexport) RiveBridge* rive_bridge_create(char* adapterNameOut, int adapterNameCap)
 {
-    ComPtr<IDXGIFactory2> factory;
-    if (FAILED(CreateDXGIFactory(__uuidof(IDXGIFactory2),
-                                 reinterpret_cast<void**>(factory.ReleaseAndGetAddressOf()))))
+    SharedGpu* shared = shared_gpu();
+    if (!shared)
         return nullptr;
-
-    ComPtr<IDXGIAdapter> adapter;
-    DXGI_ADAPTER_DESC desc{};
-    D3DContextOptions options;
-    if (factory->EnumAdapters(0, adapter.ReleaseAndGetAddressOf()) != DXGI_ERROR_NOT_FOUND)
-    {
-        adapter->GetDesc(&desc);
-        options.isIntel = desc.VendorId == 0x163C || desc.VendorId == 0x8086 ||
-                          desc.VendorId == 0x8087;
-    }
     if (adapterNameOut && adapterNameCap > 0)
     {
-        WideCharToMultiByte(CP_UTF8, 0, desc.Description, -1, adapterNameOut, adapterNameCap,
-                            nullptr, nullptr);
+        std::strncpy(adapterNameOut, shared->adapterName.c_str(), (size_t)adapterNameCap - 1);
+        adapterNameOut[adapterNameCap - 1] = 0;
     }
-
     auto bridge = std::make_unique<RiveBridge>();
-    D3D_FEATURE_LEVEL levels[] = {D3D_FEATURE_LEVEL_11_1};
-    if (FAILED(D3D11CreateDevice(adapter.Get(), D3D_DRIVER_TYPE_UNKNOWN, nullptr, 0, levels, 1,
-                                 D3D11_SDK_VERSION, bridge->gpu.ReleaseAndGetAddressOf(), nullptr,
-                                 bridge->gpuContext.ReleaseAndGetAddressOf())))
-        return nullptr;
-
-    bridge->renderContext = RenderContextD3DImpl::MakeContext(bridge->gpu, bridge->gpuContext, options);
-    if (!bridge->renderContext)
-        return nullptr;
+    bridge->shared = shared;
     return bridge.release();
 }
 
@@ -193,8 +266,7 @@ __declspec(dllexport) int rive_bridge_load_artboard(RiveBridge* bridge, const ui
     bridge->stateMachine.reset();
     bridge->artboard.reset();
     bridge->viewModel = nullptr;
-    ImportResult result;
-    bridge->file = File::import(Span<const uint8_t>(bytes, length), bridge->renderContext.get(), &result);
+    bridge->file = cached_file(bridge->shared, bytes, length);
     if (!bridge->file)
         return 1;
     if (int code = pick_artboard(bridge, artboardName))
@@ -231,12 +303,13 @@ __declspec(dllexport) void rive_bridge_advance(RiveBridge* bridge, float seconds
 
 static bool create_offscreen_textures(RiveBridge* bridge, D3D11_TEXTURE2D_DESC desc)
 {
-    if (FAILED(bridge->gpu->CreateTexture2D(&desc, nullptr, bridge->drawTexture.ReleaseAndGetAddressOf())))
+    ID3D11Device* gpu = bridge->shared->gpu.Get();
+    if (FAILED(gpu->CreateTexture2D(&desc, nullptr, bridge->drawTexture.ReleaseAndGetAddressOf())))
         return false;
     desc.Usage = D3D11_USAGE_STAGING;
     desc.BindFlags = 0;
     desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
-    if (FAILED(bridge->gpu->CreateTexture2D(&desc, nullptr, bridge->readbackTexture.ReleaseAndGetAddressOf())))
+    if (FAILED(gpu->CreateTexture2D(&desc, nullptr, bridge->readbackTexture.ReleaseAndGetAddressOf())))
         return false;
     return bridge->drawTexture && bridge->readbackTexture;
 }
@@ -273,7 +346,7 @@ static bool ensure_target(RiveBridge* bridge, uint32_t width, uint32_t height)
         return false;
 
     bridge->renderTarget =
-        bridge->renderContext->static_impl_cast<RenderContextD3DImpl>()->makeRenderTarget(width, height);
+        bridge->shared->renderContext->static_impl_cast<RenderContextD3DImpl>()->makeRenderTarget(width, height);
     bridge->width = width;
     bridge->height = height;
     return true;
@@ -289,14 +362,16 @@ __declspec(dllexport) int rive_bridge_render(RiveBridge* bridge, int width, int 
     if (!ensure_target(bridge, (uint32_t)width, (uint32_t)height))
         return 3;
 
-    bridge->renderContext->beginFrame({
+    RenderContext* renderContext = bridge->shared->renderContext.get();
+    ID3D11DeviceContext* gpuContext = bridge->shared->gpuContext.Get();
+    renderContext->beginFrame({
         .renderTargetWidth = (uint32_t)width,
         .renderTargetHeight = (uint32_t)height,
         .loadAction = LoadAction::clear,
         .clearColor = clearArgb,
     });
 
-    RiveRenderer renderer(bridge->renderContext.get());
+    RiveRenderer renderer(renderContext);
     bridge->viewTransform = computeAlignment(Fit::contain, Alignment::center,
                                              AABB(0, 0, (float)width, (float)height),
                                              bridge->artboard->bounds());
@@ -309,19 +384,19 @@ __declspec(dllexport) int rive_bridge_render(RiveBridge* bridge, int width, int 
     renderer.restore();
 
     bridge->renderTarget->setTargetTexture(bridge->drawTexture);
-    bridge->renderContext->flush({.renderTarget = bridge->renderTarget.get()});
+    renderContext->flush({.renderTarget = bridge->renderTarget.get()});
     bridge->renderTarget->setTargetTexture(nullptr);
 
-    bridge->gpuContext->CopyResource(bridge->readbackTexture.Get(), bridge->drawTexture.Get());
+    gpuContext->CopyResource(bridge->readbackTexture.Get(), bridge->drawTexture.Get());
     D3D11_MAPPED_SUBRESOURCE map;
-    if (FAILED(bridge->gpuContext->Map(bridge->readbackTexture.Get(), 0, D3D11_MAP_READ, 0, &map)))
+    if (FAILED(gpuContext->Map(bridge->readbackTexture.Get(), 0, D3D11_MAP_READ, 0, &map)))
         return 2;
     for (int y = 0; y < height; ++y)
     {
         std::memcpy(rgbaOut + (size_t)y * width * 4,
                     static_cast<const uint8_t*>(map.pData) + (size_t)y * map.RowPitch, (size_t)width * 4);
     }
-    bridge->gpuContext->Unmap(bridge->readbackTexture.Get(), 0);
+    gpuContext->Unmap(bridge->readbackTexture.Get(), 0);
     return 0;
 }
 

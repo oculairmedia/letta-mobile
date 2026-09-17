@@ -207,6 +207,7 @@ private fun ChatMessageListLazyColumn(params: ChatMessageListLazyColumnParams) {
             ChatMessageListItemsParams(
                 renderItems = bodyParams.renderItems,
                 isLoadingOlderMessages = bodyParams.state.isLoadingOlderMessages,
+                agentId = bodyParams.state.agentId,
                 context = ChatMessageListLazyContext(
                     itemState = params.itemState,
                     conversationId = params.conversationId,

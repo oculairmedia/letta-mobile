@@ -33,7 +33,7 @@ import com.letta.mobile.ui.mascot.mascotAvailable
  * renderer only [status] draws, exactly where it did before.
  */
 @Composable
-internal fun ChatComposerCompanion(agentId: String?, status: (@Composable () -> Unit)?) {
+internal fun ChatComposerCompanion(agentId: String?, status: (@Composable () -> Unit)?, onClick: (() -> Unit)? = null) {
     val registry = LocalMascotRegistry.current
     val identity = agentId?.let { registry.identities[it] }
     val hasMascot = agentId != null && identity != null && mascotAvailable(agentId)
@@ -65,7 +65,7 @@ internal fun ChatComposerCompanion(agentId: String?, status: (@Composable () -> 
                     fadeOut() + slideOutVertically { it / 2 } + scaleOut(targetScale = 0.5f, transformOrigin = base)
                 },
             ) {
-                MascotLive(checkNotNull(agentId), checkNotNull(identity), size = ChatComposerCompanionSize)
+                MascotLive(checkNotNull(agentId), checkNotNull(identity), size = ChatComposerCompanionSize, onClick = onClick)
             }
         }
         // The rig draws the body below its surface's centre (see the 8yee3 framing follow-up), so the
