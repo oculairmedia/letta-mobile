@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop.chat
 
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.width
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -47,6 +49,8 @@ internal fun ComposerBar(
     modifier: Modifier = Modifier,
     /** The agent's live mascot, drawn at the input box's left edge so it sits with the text, not the pane. */
     companion: (@Composable () -> Unit)? = null,
+    /** The mascot actually stands at the composer (not away in a pane): the slot holds its width only then. */
+    companionPresent: Boolean = true,
 ) {
     val canSend = state.enabled &&
         (state.text.isNotBlank() || state.pendingImageAttachments.isNotEmpty())
@@ -73,14 +77,20 @@ internal fun ComposerBar(
         // The box keeps its centred max width; the companion hangs off its left edge, so the
         // pair is centred together and the mascot stays beside the text at any pane width.
         // Without a companion the row is the column's width, so the box stays centred.
-        val rowMaxWidth = if (companion != null) ChatColumnMaxWidth + ComposerCompanionSlot else ChatColumnMaxWidth
+        // The slot closes when the mascot is away (in the agent pane or the editor), so the box
+        // takes its full width back; it reopens as the character returns.
+        val slot by animateDpAsState(
+            targetValue = if (companion != null && companionPresent) ComposerCompanionSlot else 0.dp,
+            label = "companionSlot",
+        )
+        val rowMaxWidth = ChatColumnMaxWidth + slot
         Row(
             modifier = Modifier.widthIn(max = rowMaxWidth).fillMaxWidth(),
             verticalAlignment = Alignment.Bottom,
         ) {
             if (companion != null) {
                 Box(
-                    Modifier.width(ComposerCompanionSlot).padding(end = ComposerCompanionGap),
+                    Modifier.width(slot).padding(end = ComposerCompanionGap),
                     contentAlignment = Alignment.BottomCenter,
                 ) { companion() }
             }

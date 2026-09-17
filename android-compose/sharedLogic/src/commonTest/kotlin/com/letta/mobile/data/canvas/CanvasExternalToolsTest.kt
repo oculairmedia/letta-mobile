@@ -9,7 +9,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -20,10 +19,13 @@ import kotlin.test.assertTrue
 class CanvasExternalToolsTest {
     private val json = Json { ignoreUnknownKeys = true }
     private lateinit var store: InMemoryCanvasDocumentStore
+
+    // A fresh registry per test is the isolation now; it used to be a process-global object that
+    // every test had to remember to clear by hand, before and after.
     private lateinit var sessions: CanvasSessionRegistry
 
     @BeforeTest
-    fun setUp() {
+    fun setUp() = runTest {
         store = InMemoryCanvasDocumentStore()
         sessions = CanvasSessionRegistry()
     }
@@ -155,7 +157,13 @@ class CanvasExternalToolsTest {
 
         val doc = store.get(canvasId)
         assertNotNull(doc)
-        assertEquals("{\"elements\":[{\"id\":\"circle\"}]}", doc.sceneJson)
+        // The stored scene now carries the replace's lamport and actor on each element, so a
+        // stale element op arriving later loses against it instead of finding unstamped content
+        // to overwrite. What DrawBox is handed is still exactly the scene the agent sent.
+        assertEquals(
+            "{\"elements\":[{\"id\":\"circle\"}]}",
+            CanvasOpProjector.stripMetadataForDrawBox(doc.sceneJson),
+        )
     }
 
     @Test

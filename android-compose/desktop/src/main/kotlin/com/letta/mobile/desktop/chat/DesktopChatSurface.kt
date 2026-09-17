@@ -106,6 +106,10 @@ internal data class ChatDetailPaneActions(
     /** Answer / dismiss a parked approval: (requestId, toolCallIds, approve, reason). */
     val onSubmitApproval: ((String, List<String>, Boolean, String?) -> Unit)? = null,
     val onOpenAgent: (String) -> Unit = {},
+    /** The composer companion was clicked: show the selected agent's pane (the sidebar). */
+    val onOpenAgentPane: () -> Unit = {},
+    /** The pencil on any mascot: open the selected agent's editor. */
+    val onEditAgent: () -> Unit = {},
     val onA2uiAction: (A2uiAction) -> Unit = {},
     /** Change the selected conversation's working directory (folder picker result). */
     val onChangeWorkingDirectory: ((String) -> Unit)? = null,
@@ -199,10 +203,14 @@ private fun ChatDetailBody(
                 onChangeDirectory = actions.onChangeWorkingDirectory,
             )
         }
-        val companion = rememberComposerCompanion(surface, state)
+        val companion = rememberComposerCompanion(surface, state, onClick = actions.onOpenAgentPane, onEdit = actions.onEditAgent)
+        val transport = com.letta.mobile.ui.mascot.LocalMascotTransport.current
+        val companionPresent = surface.selectedConversation?.agentId
+            ?.let { transport.activeStage(it) == com.letta.mobile.ui.mascot.MascotStage.COMPOSER_COMPANION } ?: false
         ChatDetailContent(surface, state, actions, showThinkingRow = companion == null, modifier = Modifier.weight(1f))
         ComposerBar(
             companion = companion,
+            companionPresent = companionPresent,
             state = ComposerBarState(
                 text = surface.composerText,
                 pendingImageAttachments = surface.pendingImageAttachments,
@@ -226,6 +234,19 @@ private fun ChatDetailBody(
     }
 }
 
+/** "Opening conversation..." as the agent getting ready: its mascot in the loading orbit beside the status line. */
+@Composable
+private fun CanonicalStatusRow(status: String, agentId: String?, modifier: Modifier) {
+    Row(
+        modifier = modifier.padding(horizontal = 28.dp, vertical = 24.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        com.letta.mobile.ui.mascot.MascotLoading(agentId)
+        Text(status, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
 /** The thread area above the composer: whichever of the canonical list, status, state panel, welcome or message list applies. */
 @Composable
 private fun ChatDetailContent(
@@ -236,8 +257,9 @@ private fun ChatDetailContent(
     modifier: Modifier,
 ) {
     when {
-        state.canonicalPresentation != null -> DesktopCanonicalMessageList(state.canonicalPresentation, modifier)
-        state.canonicalStatus != null -> Text(state.canonicalStatus, modifier = modifier)
+        state.canonicalPresentation != null ->
+            DesktopCanonicalMessageList(state.canonicalPresentation, surface.selectedConversation?.agentId, modifier)
+        state.canonicalStatus != null -> CanonicalStatusRow(state.canonicalStatus, surface.selectedConversation?.agentId, modifier)
         surface.shouldShowStatePanel -> ChatStatePanel(
             state = surface,
             onRetryConnection = actions.onRetryConnection,
@@ -249,6 +271,7 @@ private fun ChatDetailContent(
             identity = surface.selectedConversation?.agentId?.let { state.agentIdentitiesById[it] },
             onStarterPrompt = actions.onComposerTextChanged,
             onOnboardingTask = actions.onOnboardingTask,
+            onEditAgent = actions.onEditAgent,
             modifier = modifier,
         )
         else -> MessageList(
@@ -276,11 +299,24 @@ private fun DesktopChatSurfaceState.isFreshConversation(state: ChatDetailPaneSta
 private fun rememberComposerCompanion(
     surface: DesktopChatSurfaceState,
     state: ChatDetailPaneState,
+    onClick: () -> Unit,
+    onEdit: () -> Unit,
 ): (@Composable () -> Unit)? {
     val agentId = surface.selectedConversation?.agentId ?: return null
     val identity = state.agentIdentitiesById[agentId] ?: return null
     if (!com.letta.mobile.ui.mascot.mascotAvailable(agentId)) return null
-    return { com.letta.mobile.ui.mascot.MascotLive(agentId = agentId, identity = identity, size = ComposerCompanionSize) }
+    // The mascot's rest seat. The transport layer draws the character here (and carries it away to
+    // the agent pane or the editor); clicking it opens the agent's pane - the mascot is the way in.
+    return {
+        com.letta.mobile.ui.mascot.MascotSeat(
+            agentId = agentId,
+            stage = com.letta.mobile.ui.mascot.MascotStage.COMPOSER_COMPANION,
+            size = ComposerCompanionSize,
+            onClick = onClick,
+            onEdit = onEdit,
+            empty = {},
+        )
+    }
 }
 
 /** The composer companion's live size; the body spans ~60 % of it. */
@@ -355,6 +391,7 @@ private fun NewConversationWelcome(
     agentId: String?,
     identity: com.letta.mobile.avatar.core.MascotIdentity?,
     onStarterPrompt: (String) -> Unit,
+    onEditAgent: () -> Unit,
     onOnboardingTask: ((OnboardingTaskKind) -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
@@ -370,12 +407,18 @@ private fun NewConversationWelcome(
             verticalArrangement = Arrangement.spacedBy(10.dp),
             modifier = Modifier.widthIn(max = ChatColumnMaxWidth),
         ) {
-            // The agent itself, at hero size, live when the native bridge is here; the gradient
-            // sphere otherwise. It is the page: everything below is a compact strip of first moves.
-            if (identity != null && agentId != null && com.letta.mobile.ui.mascot.mascotAvailable(agentId)) {
-                com.letta.mobile.ui.mascot.MascotLive(agentId = agentId, identity = identity, size = 220.dp)
-            } else {
-                AgentSphere(size = 96.dp)
+            // The agent itself, at hero size - the mascot's rest seat while the greeting shows (it
+            // slides down to the composer the moment the conversation starts). While the character
+            // stands elsewhere (the agent pane is open) the seat is simply empty - no stand-in - and
+            // the gradient sphere appears only when there is no renderer at all.
+            val hasRenderer = com.letta.mobile.ui.mascot.LocalMascotHost.current.available
+            com.letta.mobile.ui.mascot.MascotSeat(
+                agentId = agentId,
+                stage = com.letta.mobile.ui.mascot.MascotStage.WELCOME_HERO,
+                size = 220.dp,
+                onEdit = onEditAgent,
+            ) {
+                if (!hasRenderer) AgentSphere(size = 96.dp)
             }
             Text(
                 text = AgentOnboarding.greeting(agentName),

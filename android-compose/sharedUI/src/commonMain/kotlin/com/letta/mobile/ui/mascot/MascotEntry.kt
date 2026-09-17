@@ -25,10 +25,21 @@ import com.letta.mobile.data.presence.AgentPresence
  */
 abstract class MascotEntry(
     val runtime: AvatarRuntime,
-    var identity: MascotIdentity,
+    identity: MascotIdentity,
     /** The renderer's write for an arbitrated state (Rive: the state machine's inputs). */
     applyState: (AvatarState) -> Unit,
 ) {
+    /** The identity this mascot is (or is becoming - see [retarget]). */
+    var identity: MascotIdentity = identity
+        private set
+
+    /** A change of identity in flight: where it started, and how far along it is. */
+    private class Morph(val from: MascotIdentity, val seconds: Float) {
+        var elapsed = 0f
+    }
+
+    private var morph: Morph? = null
+
     val director = AvatarDirector(runtime).also { d ->
         d.addStateListener { _, enter -> applyState(enter) }
     }
@@ -43,6 +54,35 @@ abstract class MascotEntry(
 
     /** Loads the runtime's model; called once, from the first surface that draws this agent. */
     protected abstract suspend fun load()
+
+    /** Writes an identity into the renderer: the platform's binding of the asset's identity inputs. */
+    protected abstract fun writeIdentity(identity: MascotIdentity)
+
+    /**
+     * Re-skins this mascot toward [target]. Any mascot can become any other: the shape flips at
+     * once and the asset morphs the outline (a 240 ms vertex morph in the file), while the colour
+     * and the turn are eased here over [seconds] on the entry's own clock ([tickTo]) - so the picker,
+     * the transport and a roster refresh all morph the same way. Zero [seconds] cuts, for
+     * reduced motion or a scene nobody is looking at.
+     */
+    fun retarget(target: MascotIdentity, seconds: Float = MORPH_SECONDS) {
+        if (target == identity && morph == null) return
+        val start = shownIdentity()
+        identity = target
+        if (seconds <= 0f || start == target) {
+            morph = null
+            writeIdentity(target)
+            return
+        }
+        morph = Morph(from = start, seconds = seconds)
+        writeIdentity(MascotIdentity.lerp(start, target, 0f))
+    }
+
+    /** What the renderer is drawing right now: the target, or the identity partway toward it. */
+    fun shownIdentity(): MascotIdentity {
+        val m = morph ?: return identity
+        return MascotIdentity.lerp(m.from, identity, easeInOut(m.elapsed / m.seconds))
+    }
 
     /** Releases the renderer's scene. */
     abstract fun dispose()
@@ -79,6 +119,18 @@ abstract class MascotEntry(
         if (dt > 0f) {
             director.tick(dt)
             applyGaze(gaze.tick(dt, director.state, gazeWorld))
+            advanceMorph(dt)
+        }
+    }
+
+    private fun advanceMorph(dt: Float) {
+        val m = morph ?: return
+        m.elapsed += dt
+        if (m.elapsed >= m.seconds) {
+            morph = null
+            writeIdentity(identity)
+        } else {
+            writeIdentity(MascotIdentity.lerp(m.from, identity, easeInOut(m.elapsed / m.seconds)))
         }
     }
 
@@ -89,33 +141,37 @@ abstract class MascotEntry(
         if (pose.blink) runtime.playGesture(BLINK)
     }
 
-    private companion object {
-        const val NANOS_PER_SECOND = 1e9f
+    companion object {
+        /** How long a colour / turn morph takes; matches the asset's own shape morph so the two land together. */
+        const val MORPH_SECONDS: Float = 0.24f
+        private const val NANOS_PER_SECOND = 1e9f
+
+        /** Smoothstep: slow in, slow out, so a morph reads as a change of mind rather than a snap. */
+        private fun easeInOut(t: Float): Float {
+            val x = t.coerceIn(0f, 1f)
+            return x * x * (3f - 2f * x)
+        }
         /** A tab that was hidden for a minute comes back with one frame of motion, not sixty seconds of it. */
-        const val MAX_TICK_SECONDS = 0.1f
-        val BLINK = AvatarGesture("blink")
+        private const val MAX_TICK_SECONDS = 0.1f
+        private val BLINK = AvatarGesture("blink")
     }
 }
 
 /**
  * The per-agent [MascotEntry] table. [create] is the platform's renderer bring-up (scene, file,
- * identity applied before the first advance); [applyIdentity] re-skins a live entry when the
- * agent's identity changes. Null from [create] means the renderer is unavailable and the caller
- * draws its fallback.
+ * identity applied before the first advance); a live entry whose agent's identity changes morphs
+ * into it ([MascotEntry.retarget]). Null from [create] means the renderer is unavailable and the
+ * caller draws its fallback.
  */
 class MascotEntries<E : MascotEntry>(
     private val create: (identity: MascotIdentity) -> E?,
-    private val applyIdentity: (entry: E, identity: MascotIdentity) -> Unit,
 ) {
     private val entries = HashMap<String, E>()
 
     /** The entry for [agentId], created on first use. Called from composition, i.e. the UI thread, on both hosts. */
     fun get(agentId: String, identity: MascotIdentity): E? {
         entries[agentId]?.let { entry ->
-            if (entry.identity != identity) {
-                entry.identity = identity
-                applyIdentity(entry, identity)
-            }
+            entry.retarget(identity)
             return entry
         }
         return create(identity)?.also { entries[agentId] = it }

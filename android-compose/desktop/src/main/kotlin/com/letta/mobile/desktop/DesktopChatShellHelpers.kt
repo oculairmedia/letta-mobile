@@ -337,6 +337,7 @@ internal fun openDesktopCanvasSession(params: OpenDesktopCanvasParams) {
             conversationId = convId,
             agentId = params.agentId,
             title = "Canvas ($displayName)",
+            syncTransport = com.letta.mobile.desktop.canvas.DesktopCanvasHostSync.syncTransport,
         )
         params.onSessionReady(session)
     }
@@ -399,6 +400,9 @@ internal data class CreateDesktopChatDetailPaneActionsParams(
     val onNavigateToChannels: () -> Unit,
     val onNavigateToAgents: () -> Unit,
     val onOpenAgent: (String) -> Unit,
+    /** The composer companion mascot taps into the agent pane. */
+    val onOpenAgentPane: () -> Unit = {},
+    val onEditAgent: () -> Unit = {},
 )
 
 internal fun createDesktopChatDetailPaneActions(
@@ -416,6 +420,8 @@ internal fun createDesktopChatDetailPaneActions(
         onModelSelected = chatController::setConversationModel,
         onChangeWorkingDirectory = chatController::changeSelectedConversationWorkingDirectory,
         onOpenModelPicker = params.onOpenModelPicker,
+        onOpenAgentPane = params.onOpenAgentPane,
+        onEditAgent = params.onEditAgent,
         onOnboardingTask = { kind ->
             when (kind) {
                 OnboardingTaskKind.SetPersona -> params.onSetPersona()
