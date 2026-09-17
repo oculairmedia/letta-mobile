@@ -132,6 +132,13 @@ internal fun ChatScreenLayout(
                 onTargetUpdate = localState.onTappedSubagentTargetChange,
             ),
         )
+        localState.toolRunDetails?.let { groups ->
+            ToolRunDetailsSheet(
+                groups = groups,
+                onDismiss = { localState.onToolRunDetailsChange(null) },
+                onAttachmentImageTap = localState.contentCallbacks.onAttachmentImageTap,
+            )
+        }
         ChatScreenFloatingOverlays(
             params = ChatScreenFloatingOverlaysParams(
                 floatingBannerMessage = params.floatingBannerMessage,
@@ -463,13 +470,41 @@ private fun ChatScreenThinkingTokenSection(
     val thinkingTokenActive = state.isStreaming ||
         state.isAgentTyping ||
         !state.a2uiThinkingDelayMessage.isNullOrBlank()
+    val activity = remember(state.messages) { activeRunActivity(state.messages) }
+    val elapsedSeconds by rememberRunElapsedSeconds(thinkingTokenActive, activity.startedAtEpochMs)
     ThinkingTextToken(
         visible = thinkingTokenActive,
         delayMessage = state.a2uiThinkingDelayMessage,
+        textOverride = if (thinkingTokenActive) activity.label(elapsedSeconds) else null,
         reducedMotion = reducedMotion,
         reserveSpace = thinkingTokenActive,
         // Beside the mascot companion: no leading inset, the row already places it.
         contentPadding = androidx.compose.foundation.layout.PaddingValues(end = 16.dp, top = 4.dp, bottom = 4.dp),
+    )
+}
+
+/** What the newest run is doing right now, for the composer's thinking token. */
+internal data class ActiveRunActivity(
+    val runningToolName: String?,
+    val startedAtEpochMs: Long?,
+) {
+    fun label(elapsedSeconds: Long): String {
+        val phase = runningToolName?.let { "Running $it" } ?: "Thinking…"
+        return "${formatElapsedSeconds(elapsedSeconds)}  $phase"
+    }
+}
+
+internal fun activeRunActivity(messages: List<com.letta.mobile.data.model.UiMessage>): ActiveRunActivity {
+    val newestRunId = messages.lastOrNull()?.runId
+    val activeRunMessages = messages.takeLastWhile { it.runId != null && it.runId == newestRunId }
+    return ActiveRunActivity(
+        runningToolName = activeRunMessages
+            .flatMap { it.toolCalls.orEmpty() }
+            .lastOrNull { it.status.isNullOrBlank() || it.status.equals("running", ignoreCase = true) }
+            ?.name,
+        startedAtEpochMs = activeRunMessages.firstNotNullOfOrNull {
+            com.letta.mobile.data.chat.projection.parseTimestampEpochMillis(it.timestamp)
+        },
     )
 }
 

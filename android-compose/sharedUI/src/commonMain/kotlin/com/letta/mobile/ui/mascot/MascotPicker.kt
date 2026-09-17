@@ -17,6 +17,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,9 +48,9 @@ const val MASCOT_ROTATION_STEP: Int = 15
 
 /**
  * The Grokbot-style identity picker: a grid of the eight bodies, drawn in the chosen colour and at
- * the chosen turn, the palette's colour dots, and the turn itself. Pure Compose, no renderer - the
- * preview is the body silhouette, which is exactly what the identity is. Shared by every platform's
- * edit-agent surface.
+ * the chosen turn, the palette's colour dots, and the turn itself. Each body is the real mascot
+ * paused, not a drawing of it, so what the user picks is what the agent becomes; hosts with no
+ * renderer fall back to the flat silhouette. Shared by every platform's edit-agent surface.
  */
 @Composable
 fun MascotPicker(
@@ -55,33 +59,45 @@ fun MascotPicker(
     modifier: Modifier = Modifier,
     accent: Color = MaterialTheme.colorScheme.primary,
 ) {
+    // A turn being dragged shows in the picker at once but reaches [onChange] only on release: the
+    // caller persists every change, and a drag must be one write, not one per slider step.
+    var draggedRotation by remember(identity) { mutableStateOf<Int?>(null) }
+    val shown = draggedRotation?.let { identity.copy(rotationDegrees = it) } ?: identity
     Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Shape", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         MascotChoiceRows(MascotShape.entries.toList(), columns = 4) { shape ->
-            MascotShapeChoice(shape, identity, accent) { onChange(identity.copy(shape = shape)) }
+            MascotShapeChoice(shape, shown, accent) { onChange(shown.copy(shape = shape)) }
         }
         Text("Colour", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         MascotChoiceRows(MascotPalette.ALL, columns = 5) { argb ->
-            MascotColorChoice(argb, identity, accent) { onChange(identity.copy(argb = argb)) }
+            MascotColorChoice(argb, shown, accent) { onChange(shown.copy(argb = argb)) }
         }
-        MascotRotationChoice(identity, onChange)
+        MascotRotationChoice(
+            rotationDegrees = shown.rotationDegrees,
+            onDrag = { draggedRotation = it },
+            // Reads the drag state when called, not the composition's `shown`: a tap on the track
+            // can report the value and the release in one frame, before any recomposition.
+            onRelease = {
+                val released = draggedRotation
+                draggedRotation = null
+                if (released != null && released != identity.rotationDegrees) onChange(identity.copy(rotationDegrees = released))
+            },
+        )
     }
 }
 
 @Composable
-private fun MascotRotationChoice(identity: MascotIdentity, onChange: (MascotIdentity) -> Unit) {
+private fun MascotRotationChoice(rotationDegrees: Int, onDrag: (Int) -> Unit, onRelease: () -> Unit) {
     Text(
-        "Rotation ${identity.rotationDegrees}°",
+        "Rotation $rotationDegrees°",
         style = MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
     val positions = MascotIdentity.FULL_TURN / MASCOT_ROTATION_STEP
     Slider(
-        value = snapRotation(identity.rotationDegrees).toFloat(),
-        onValueChange = { degrees ->
-            val snapped = snapRotation(degrees.toInt())
-            if (snapped != identity.rotationDegrees) onChange(identity.copy(rotationDegrees = snapped))
-        },
+        value = snapRotation(rotationDegrees).toFloat(),
+        onValueChange = { degrees -> onDrag(snapRotation(degrees.toInt())) },
+        onValueChangeFinished = onRelease,
         valueRange = 0f..(MascotIdentity.FULL_TURN - MASCOT_ROTATION_STEP).toFloat(),
         steps = positions - 2,
         modifier = Modifier.semantics { contentDescription = "rotation" },
@@ -130,8 +146,21 @@ private fun MascotShapeChoice(
             )
             .semantics { contentDescription = shape.name.lowercase() },
         contentAlignment = Alignment.Center,
-    ) { MascotShapeGlyph(shape, identity.argb, 36.dp, Modifier.rotate(identity.rotationDegrees.toFloat())) }
+    ) {
+        // letta-mobile-0bvjw: the option is the character itself, paused - the same Rive scene the
+        // agent will draw, so the shape, the pose and the turn are what the user is actually
+        // picking. The silhouette stays only for hosts with no renderer, where it is the honest
+        // fallback rather than a second source of truth; there the turn is applied by Compose,
+        // since only Rive rotates the real body.
+        val candidate = identity.copy(shape = shape)
+        if (mascotCandidateAvailable(candidate)) {
+            MascotCandidate(candidate, size = 36.dp * MASCOT_TILE_OVERSCALE)
+        } else {
+            MascotShapeGlyph(shape, identity.argb, 36.dp, Modifier.rotate(identity.rotationDegrees.toFloat()))
+        }
+    }
 }
+
 
 @Composable
 private fun MascotColorChoice(

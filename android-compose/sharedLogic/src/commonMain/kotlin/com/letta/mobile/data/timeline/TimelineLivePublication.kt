@@ -126,10 +126,36 @@ internal fun TimelineSettledRecord.presentationWithAdapter(
     isPreview -> TimelineSettledPresentation.Defer
     else -> {
         val event = adapter.decode(this)
-        adapter.project(this, event, ownAgentId)?.let { TimelineSettledPresentation.Render(event, it) }
-            ?: TimelineSettledPresentation.Drop
+        if (event.isSyntheticSkillEnvelope()) {
+            Telemetry.event(
+                "TimelineSettledPresentation", "skillEnvelope.dropped",
+                "identity" to key.identity.value,
+                "messageType" to event.messageType.name,
+                "chars" to event.content.length,
+                level = Telemetry.Level.WARN,
+            )
+            TimelineSettledPresentation.Drop
+        } else {
+            adapter.project(this, event, ownAgentId)?.let { TimelineSettledPresentation.Render(event, it) }
+                ?: TimelineSettledPresentation.Drop
+        }
     }
 }
+
+/**
+ * The settled/durable read path is the last projection seam a persisted synthetic skill envelope
+ * can reach; the live/hydration/stream reducers filter it earlier. Without this check a
+ * `<skill_content …>` body persisted as a USER row renders as a real "You" bubble on relaunch.
+ */
+private fun TimelineEvent.Confirmed.isSyntheticSkillEnvelope(): Boolean =
+    com.letta.mobile.data.model.SyntheticSkillEnvelopeDetector.isSyntheticSkillEnvelope(
+        role = when (messageType) {
+            TimelineMessageType.USER -> "user"
+            TimelineMessageType.ASSISTANT -> "assistant"
+            else -> null
+        },
+        content = content,
+    )
 
 /** Project only complete canonical bodies; partial JSON must never become a missing message. */
 fun TimelineSettledRecord.toRenderItem(ownAgentId: String? = null): com.letta.mobile.data.chat.projection.ChatRenderItem? {

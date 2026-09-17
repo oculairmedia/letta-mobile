@@ -69,6 +69,31 @@ object RenderDiagnostics {
     }
 
     /**
+     * Start a new render generation WITHOUT the list-shape probe.
+     *
+     * [onLazyItemComposed] flags a key as double-composed when it is composed
+     * twice inside one generation, and the only thing that ends a generation is
+     * [onRenderItemsBuilt]. Hosts that drive the LazyColumn from a source other
+     * than `rememberChatRenderItems` (the Paging host builds its rows from
+     * `LazyPagingItems`, so it calls neither hook) would otherwise accumulate
+     * composed keys forever in one generation: every legitimate re-composition
+     * of a key after the first is reported as `lazyItem.doubleComposed` at WARN.
+     *
+     * Such a host calls this on each list rebuild so the per-generation key set
+     * is scoped to a single pass. No telemetry is emitted — this is the
+     * generation bump alone, and it is a no-op while renderDiag is off so the
+     * generation only advances on paths that are actually being observed.
+     *
+     * @return the new generation, or the current one when renderDiag is off.
+     */
+    fun newRenderGeneration(): Long {
+        if (!enabled()) return renderGeneration.value
+        val gen = renderGeneration.incrementAndGet()
+        synchronized(lock) { composedKeysThisGeneration.clear() }
+        return gen
+    }
+
+    /**
      * Call once whenever the render-item list is (re)built for the chat list.
      * Bumps the render generation and logs the list shape + keys.
      */

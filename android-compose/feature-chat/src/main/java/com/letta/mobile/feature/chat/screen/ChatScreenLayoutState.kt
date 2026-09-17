@@ -10,6 +10,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.UiImageAttachment
+import com.letta.mobile.data.chat.projection.ToolTimelineGroup
 import com.letta.mobile.feature.chat.subagent.SubagentTodoSheetTarget
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
@@ -27,6 +28,8 @@ internal data class ChatScreenLayoutLocalState(
     val bottomPaddingDp: Dp,
     val onComposerHeightChange: (Dp) -> Unit,
     val contentCallbacks: ChatContentCallbacks,
+    val toolRunDetails: List<ToolTimelineGroup>?,
+    val onToolRunDetailsChange: (List<ToolTimelineGroup>?) -> Unit,
 )
 
 @Composable
@@ -37,6 +40,7 @@ internal fun rememberChatScreenLayoutLocalState(params: ChatScreenLayoutParams):
     var imageViewerState by remember {
         mutableStateOf<Pair<ImmutableList<UiImageAttachment>, Int>?>(null)
     }
+    var toolRunDetails by remember { mutableStateOf<List<ToolTimelineGroup>?>(null) }
     var composerHeightDp by remember { mutableStateOf(0.dp) }
     val bottomPaddingDp = composerHeightDp + params.bottomInsetDp
 
@@ -45,25 +49,11 @@ internal fun rememberChatScreenLayoutLocalState(params: ChatScreenLayoutParams):
             imageViewerState = attachments.toImmutableList() to index
         }
     }
-    val activeFontScaleChange = rememberUpdatedState(params.onActiveFontScaleChange)
-    val contentCallbacks = remember(params.viewModel, openImageViewer) {
-        ChatContentCallbacks(
-            onSendMessage = { params.viewModel.sendMessage(it) },
-            onRerunMessage = { params.viewModel.rerunMessage(it) },
-            onLoadOlderMessages = { params.viewModel.loadOlderMessages() },
-            onReleaseOlderMessages = { params.viewModel.releaseOlderMessages() },
-            onSubmitApproval = { requestId, toolCallIds, approve, reason ->
-                params.viewModel.submitApproval(requestId, toolCallIds, approve, reason)
-            },
-            onToggleRunCollapsed = params.viewModel::toggleRunCollapsed,
-            onToggleReasoningExpanded = params.viewModel::toggleReasoningExpanded,
-            onA2uiAction = params.viewModel::submitA2uiAction,
-            onDismissA2uiSurface = params.viewModel::dismissA2uiSurface,
-            onAttachmentImageTap = openImageViewer,
-            onActiveFontScaleChange = { activeFontScaleChange.value(it) },
-            onFontScaleChange = { params.viewModel.setChatFontScale(it) },
-        )
-    }
+    val contentCallbacks = rememberChatContentCallbacks(
+        params = params,
+        openImageViewer = openImageViewer,
+        openToolRunDetails = { toolRunDetails = it },
+    )
     val openSubagentTarget: (SubagentTodoSheetTarget) -> Unit = remember(
         params.resolvedSubagentSource,
         subagentNavigationScope,
@@ -99,5 +89,36 @@ internal fun rememberChatScreenLayoutLocalState(params: ChatScreenLayoutParams):
         bottomPaddingDp = bottomPaddingDp,
         onComposerHeightChange = { composerHeightDp = it },
         contentCallbacks = contentCallbacks,
+        toolRunDetails = toolRunDetails,
+        onToolRunDetailsChange = { toolRunDetails = it },
     )
+}
+
+@Composable
+private fun rememberChatContentCallbacks(
+    params: ChatScreenLayoutParams,
+    openImageViewer: (List<UiImageAttachment>, Int) -> Unit,
+    openToolRunDetails: (List<ToolTimelineGroup>?) -> Unit,
+): ChatContentCallbacks {
+    val activeFontScaleChange = rememberUpdatedState(params.onActiveFontScaleChange)
+    val currentOpenToolRunDetails = rememberUpdatedState(openToolRunDetails)
+    return remember(params.viewModel, openImageViewer) {
+        ChatContentCallbacks(
+            onSendMessage = { params.viewModel.sendMessage(it) },
+            onRerunMessage = { params.viewModel.rerunMessage(it) },
+            onLoadOlderMessages = { params.viewModel.loadOlderMessages() },
+            onReleaseOlderMessages = { params.viewModel.releaseOlderMessages() },
+            onSubmitApproval = { requestId, toolCallIds, approve, reason ->
+                params.viewModel.submitApproval(requestId, toolCallIds, approve, reason)
+            },
+            onToggleRunCollapsed = params.viewModel::toggleRunCollapsed,
+            onToggleReasoningExpanded = params.viewModel::toggleReasoningExpanded,
+            onOpenToolRunDetails = { currentOpenToolRunDetails.value(it) },
+            onA2uiAction = params.viewModel::submitA2uiAction,
+            onDismissA2uiSurface = params.viewModel::dismissA2uiSurface,
+            onAttachmentImageTap = openImageViewer,
+            onActiveFontScaleChange = { activeFontScaleChange.value(it) },
+            onFontScaleChange = { params.viewModel.setChatFontScale(it) },
+        )
+    }
 }
