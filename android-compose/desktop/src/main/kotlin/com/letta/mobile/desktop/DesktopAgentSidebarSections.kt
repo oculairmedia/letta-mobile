@@ -46,6 +46,7 @@ import com.letta.mobile.desktop.chat.DesktopConversationSummary
 import com.letta.mobile.data.chat.runtime.displayTitle
 import com.letta.mobile.desktop.components.DesktopChipTab
 import com.letta.mobile.ui.mascot.MascotSeat
+import com.letta.mobile.ui.mascot.MascotSeatVacancy
 import com.letta.mobile.ui.mascot.MascotStage
 import org.jetbrains.jewel.ui.component.PopupMenu as JewelPopupMenu
 
@@ -158,8 +159,8 @@ private fun SidebarAgentIdentity(
             stage = MascotStage.AGENT_PANE_HERO,
             size = if (mascot != null) SidebarHeroSeatSize else 30.dp,
             onEdit = onEditAgent,
-        ) {
-            if (mascot == null) AgentOrb(index = identity.agentOrbIndex, size = 30.dp, cornerRadius = 6.dp)
+        ) { vacancy ->
+            if (vacancy == MascotSeatVacancy.NO_MASCOT) AgentOrb(index = identity.agentOrbIndex, size = 30.dp, cornerRadius = 6.dp)
         }
         Text(
             text = identity.agentName,

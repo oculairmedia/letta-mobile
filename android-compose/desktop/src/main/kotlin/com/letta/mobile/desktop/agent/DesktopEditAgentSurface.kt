@@ -25,7 +25,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material3.Icon
@@ -57,7 +56,6 @@ import com.letta.mobile.desktop.DesktopButtonContent
 import com.letta.mobile.desktop.DesktopTextArea
 import com.letta.mobile.desktop.DesktopTextField
 import com.letta.mobile.avatar.core.MascotIdentity
-import com.letta.mobile.ui.mascot.MascotPicker
 import com.letta.mobile.ui.mascot.resolveMascotIdentity
 import com.letta.mobile.ui.mascot.withinAgentMetadata
 import kotlinx.serialization.json.JsonElement
@@ -72,9 +70,6 @@ import kotlinx.coroutines.launch
 import org.jetbrains.jewel.ui.component.PopupMenu as JewelPopupMenu
 
 private val ToneOptions = listOf("Concise", "Friendly", "Technical", "Mentor", "Playful", "Formal")
-
-/** The editor's avatar tile: the flat silhouette that opens the picker. */
-private val EditorAvatarTileSize = 72.dp
 private val VoiceOptions = listOf("Caring", "Neutral", "Warm", "Energetic", "Calm", "Direct")
 
 // Core-memory block labels the editor reads/writes. Persona is the standard
@@ -308,52 +303,7 @@ internal fun DesktopEditAgentSurface(
                 ) {
             // Avatar + Name
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.Top) {
-                // The avatar is the picker: click it, choose shape and colour in a popover.
-                // A pencil badge says so - a bare mascot gave no hint it could be changed.
-                var pickerOpen by remember { mutableStateOf(false) }
-                // The editor moves nothing: the pick previews on the character where it stands
-                // (the transport morphs it live) and this tile is the flat silhouette that opens
-                // the picker.
-                val transport = com.letta.mobile.ui.mascot.LocalMascotTransport.current
-                LaunchedEffect(identity, loadedIdentity) {
-                    transport.preview(agentId, identity.takeIf { it != loadedIdentity })
-                }
-                androidx.compose.runtime.DisposableEffect(agentId) {
-                    onDispose { transport.preview(agentId, null) }
-                }
-                Box(Modifier.size(EditorAvatarTileSize)) {
-                    Box(
-                        Modifier
-                            .matchParentSize()
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                            .clickable { pickerOpen = true },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        MascotShapeGlyph(identity.shape, identity.argb, 48.dp)
-                    }
-                    androidx.compose.material3.DropdownMenu(expanded = pickerOpen, onDismissRequest = { pickerOpen = false }) {
-                        Box(Modifier.padding(12.dp)) {
-                            MascotPicker(identity = identity, onChange = { identity = it }, accent = accent)
-                        }
-                    }
-                    Box(
-                        Modifier
-                            .align(Alignment.BottomEnd)
-                            .size(22.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-                            .clickable { pickerOpen = true },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            Icons.Outlined.Edit,
-                            contentDescription = "Change mascot",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(12.dp),
-                        )
-                    }
-                }
+                EditorAvatarTile(agentId, identity, loadedIdentity, onChange = { identity = it })
                 LabeledSection("Name", accent, Modifier.weight(1f)) {
                     DesktopTextField(value = name, onValueChange = { name = it }, modifier = Modifier.fillMaxWidth())
                 }
