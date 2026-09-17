@@ -16,6 +16,8 @@ import com.letta.mobile.data.composer.ComposerAutocomplete
 import com.letta.mobile.data.context.ContextWindowUsageState
 import com.letta.mobile.data.composer.Mentionable
 import com.letta.mobile.data.model.MessageContentPart
+import com.letta.mobile.ui.chat.MentionPopup
+import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 
 /** Read-only composer inputs (text, attachments, model catalog, autocomplete sources). */
 internal data class ComposerBarState(
@@ -36,6 +38,8 @@ internal data class ComposerBarActions(
     val onTextChanged: (String) -> Unit,
     val onSend: () -> Unit,
     val onAttachImage: () -> Unit,
+    /** Composer plus menu: open the conversation's canvas beside the chat. Null hides the entry. */
+    val onOpenCanvas: (() -> Unit)? = null,
     val onRemoveImageAttachment: (Int) -> Unit,
     val onOpenModelPicker: (() -> Unit)? = null,
 )

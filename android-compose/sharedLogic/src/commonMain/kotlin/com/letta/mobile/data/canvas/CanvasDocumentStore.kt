@@ -11,4 +11,7 @@ interface CanvasDocumentStore {
     suspend fun getForConversation(conversationId: String): CanvasDocument?
     suspend fun upsert(doc: CanvasDocument)
     suspend fun listForAgent(agentId: String): List<CanvasDocument>
+
+    /** Every stored canvas, most recently updated first. Canvases are shared, so this is the library view. */
+    suspend fun listAll(): List<CanvasDocument>
 }

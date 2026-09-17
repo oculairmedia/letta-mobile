@@ -50,8 +50,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.Agent
-import com.letta.mobile.desktop.chat.AgentOrb
 import org.jetbrains.jewel.ui.component.TextField as JewelTextField
+import com.letta.mobile.ui.chat.AgentOrb
+import androidx.compose.ui.graphics.vector.ImageVector
+import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Palette
 
 /** One agent entry in the New Conversation directory. */
 internal data class NewConversationAgentRow(
@@ -65,6 +68,8 @@ internal data class DesktopNewConversationActions(
     val onAgentSelected: (String) -> Unit,
     val onCreateNewAgent: () -> Unit,
     val onDismiss: () -> Unit,
+    /** Grok-style action row under "Create new agent"; null hides it. */
+    val onNewCanvas: (() -> Unit)? = null,
 )
 
 /**
@@ -170,7 +175,10 @@ internal fun DesktopNewConversationSurface(
                     focusRequester = focusRequester,
                 )
                 DirectoryDivider()
-                CreateAgentRow(onClick = actions.onCreateNewAgent)
+                DirectoryActionRow(icon = Icons.Outlined.Add, text = "Create new agent", onClick = actions.onCreateNewAgent)
+                actions.onNewCanvas?.let { onNewCanvas ->
+                    DirectoryActionRow(icon = Lucide.Palette, text = "New canvas", onClick = onNewCanvas)
+                }
                 DirectoryDivider()
                 NewConversationDirectoryList(
                     queryText = query.text,
@@ -286,8 +294,9 @@ private fun DirectoryDivider() {
     )
 }
 
+/** An action at the top of the directory (Grok Bot's "Create new Bot" / "Create group chat" rows). */
 @Composable
-private fun CreateAgentRow(onClick: () -> Unit) {
+private fun DirectoryActionRow(icon: ImageVector, text: String, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -297,13 +306,13 @@ private fun CreateAgentRow(onClick: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Icon(
-            imageVector = Icons.Outlined.Add,
+            imageVector = icon,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
             modifier = Modifier.size(20.dp),
         )
         Text(
-            text = "Create new agent",
+            text = text,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.primary,

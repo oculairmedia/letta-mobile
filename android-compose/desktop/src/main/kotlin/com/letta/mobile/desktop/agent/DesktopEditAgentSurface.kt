@@ -109,6 +109,8 @@ internal fun DesktopEditAgentSurface(
     settings: SecureSettingsStore,
     scope: CoroutineScope,
     onClose: () -> Unit,
+    /** False when hosted in [com.letta.mobile.desktop.DesktopSidePane], which draws the title and close. */
+    showHeader: Boolean = true,
     onSaved: (identity: MascotIdentity, nameChanged: Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -260,11 +262,11 @@ internal fun DesktopEditAgentSurface(
                 .weight(1f)
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .padding(start = 40.dp, top = 28.dp, end = 40.dp, bottom = 20.dp),
+                .padding(start = 40.dp, top = if (showHeader) 28.dp else 4.dp, end = 40.dp, bottom = 20.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
-            // Header: back · title
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            // Header: back · title (the side pane draws its own when it hosts us)
+            if (showHeader) Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
                         .size(34.dp)

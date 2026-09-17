@@ -25,4 +25,8 @@ class InMemoryCanvasDocumentStore : CanvasDocumentStore {
     override suspend fun listForAgent(agentId: String): List<CanvasDocument> = mutex.withLock {
         documents.values.filter { it.agentId == agentId }
     }
+
+    override suspend fun listAll(): List<CanvasDocument> = mutex.withLock {
+        documents.values.sortedByDescending { it.updatedAtEpochMs }
+    }
 }

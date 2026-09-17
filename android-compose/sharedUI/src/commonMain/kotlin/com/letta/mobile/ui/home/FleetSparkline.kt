@@ -1,4 +1,4 @@
-package com.letta.mobile.desktop.home
+package com.letta.mobile.ui.home
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.material3.MaterialTheme
@@ -17,7 +17,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
  * series draws a hairline baseline instead of nothing so columns stay aligned.
  */
 @Composable
-internal fun FleetBarSpark(
+fun FleetBarSpark(
     values: List<Int>,
     modifier: Modifier = Modifier,
     color: Color = MaterialTheme.colorScheme.primary,

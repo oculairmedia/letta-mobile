@@ -1,4 +1,4 @@
-package com.letta.mobile.desktop.schedules
+package com.letta.mobile.ui.schedules
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -46,7 +45,7 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Instant
 
-internal data class WeekViewParams(
+data class WeekViewParams(
     val defs: List<ScheduleDef>,
     val weekStart: LocalDate,
     val today: LocalDate,
@@ -74,7 +73,7 @@ private data class WeekDayColumnParams(
     val onRunClick: (ScheduleRun) -> Unit,
 )
 
-internal data class WeekRunBarParams(
+data class WeekRunBarParams(
     val run: ScheduleRun,
     val minuteOfDay: Int,
     val emphasized: Boolean,
@@ -82,7 +81,7 @@ internal data class WeekRunBarParams(
 )
 
 @Composable
-internal fun WeekView(params: WeekViewParams) {
+fun WeekView(params: WeekViewParams) {
     val model = rememberWeekGridModel(params)
     Column(Modifier.fillMaxSize()) {
         WeekDayHeaderRow(days = model.grid.days, today = params.today, gutter = model.gutter)
@@ -138,7 +137,7 @@ private fun RowScope.WeekDayHeaderCell(date: LocalDate, isToday: Boolean) {
     ) {
         Column(
             Modifier.fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
+                .clip(MaterialTheme.shapes.medium)
                 .background(if (isToday) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent)
                 .padding(vertical = 6.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -163,7 +162,7 @@ private fun WeekHighFreqBanner(hiddenCount: Int) {
     val noun = if (hiddenCount == 1) "schedule" else "schedules"
     Box(
         Modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 6.dp)
-            .clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .clip(MaterialTheme.shapes.medium).background(MaterialTheme.colorScheme.surfaceContainerLow)
             .padding(horizontal = 14.dp, vertical = 8.dp),
     ) {
         Text(
@@ -282,7 +281,7 @@ private fun WeekNowMarker(gutter: Dp, nowMinutes: Int) {
 }
 
 @Composable
-internal fun WeekRunBar(params: WeekRunBarParams) {
+fun WeekRunBar(params: WeekRunBarParams) {
     val color = statusColor(params.run.status)
     val filled = params.run.status == RunStatus.Done || params.run.status == RunStatus.Running
     val fillAlpha = if (params.emphasized) 0.9f else 0.4f
@@ -293,9 +292,9 @@ internal fun WeekRunBar(params: WeekRunBarParams) {
             .padding(horizontal = 3.dp)
             .offset(y = HOUR_HEIGHT * (params.minuteOfDay / 60f))
             .height(18.dp)
-            .clip(RoundedCornerShape(4.dp))
+            .clip(MaterialTheme.shapes.extraSmall)
             .background(if (filled) color.copy(alpha = fillAlpha) else Color.Transparent)
-            .border(1.dp, color.copy(alpha = borderAlpha), RoundedCornerShape(4.dp))
+            .border(1.dp, color.copy(alpha = borderAlpha), MaterialTheme.shapes.extraSmall)
             .clickable(onClick = params.onClick)
             .padding(horizontal = 5.dp),
         contentAlignment = Alignment.CenterStart,

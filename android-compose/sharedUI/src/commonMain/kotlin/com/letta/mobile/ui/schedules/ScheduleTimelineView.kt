@@ -1,4 +1,4 @@
-package com.letta.mobile.desktop.schedules
+package com.letta.mobile.ui.schedules
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -45,7 +45,7 @@ import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Instant
 
-internal data class TimelineViewParams(
+data class TimelineViewParams(
     val defs: List<ScheduleDef>,
     val weekStart: LocalDate,
     val today: LocalDate,
@@ -54,7 +54,7 @@ internal data class TimelineViewParams(
     val onLaneClick: (String) -> Unit,
 )
 
-internal data class TimelineDayCellParams(
+data class TimelineDayCellParams(
     val date: LocalDate,
     val today: LocalDate,
     val highFreq: Boolean,
@@ -73,7 +73,7 @@ private data class TimelineLaneRowParams(
 )
 
 @Composable
-internal fun TimelineView(params: TimelineViewParams) {
+fun TimelineView(params: TimelineViewParams) {
     val timeline = remember(params.defs, params.weekStart, params.now) {
         ScheduleProjection.timeline(params.defs, params.now, params.zone, startDate = params.weekStart, days = 7)
     }
@@ -125,7 +125,7 @@ private fun RowScope.TimelineDayHeaderCell(date: LocalDate, isToday: Boolean) {
         if (isToday) {
             Spacer(Modifier.height(2.dp))
             Box(
-                Modifier.clip(RoundedCornerShape(6.dp))
+                Modifier.clip(MaterialTheme.shapes.small)
                     .background(MaterialTheme.colorScheme.primary)
                     .padding(horizontal = 7.dp, vertical = 1.dp),
             ) {
@@ -178,7 +178,7 @@ private fun TimelineLaneRow(params: TimelineLaneRowParams) {
 }
 
 @Composable
-internal fun TimelineDayCell(
+fun TimelineDayCell(
     params: TimelineDayCellParams,
     modifier: Modifier = Modifier,
 ) {
@@ -244,7 +244,7 @@ private fun TimelineNowLine(nowFrac: Float) {
 }
 
 @Composable
-internal fun TimelineLegend() {
+fun TimelineLegend() {
     Row(
         Modifier.fillMaxWidth().padding(vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -261,7 +261,7 @@ internal fun TimelineLegend() {
 }
 
 @Composable
-internal fun LegendItem(color: Color, label: String, filled: Boolean) {
+fun LegendItem(color: Color, label: String, filled: Boolean) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
             Modifier.size(10.dp).clip(RoundedCornerShape(2.dp))

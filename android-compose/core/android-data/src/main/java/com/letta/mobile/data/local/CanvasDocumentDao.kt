@@ -23,6 +23,9 @@ interface CanvasDocumentDao {
     @Query("SELECT $CANVAS_COLUMNS FROM canvas_documents WHERE agentId = :agentId ORDER BY updatedAtEpochMs DESC")
     suspend fun listForAgent(agentId: String): List<CanvasDocumentEntity>
 
+    @Query("SELECT $CANVAS_COLUMNS FROM canvas_documents ORDER BY updatedAtEpochMs DESC")
+    suspend fun listAll(): List<CanvasDocumentEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: CanvasDocumentEntity)
 }

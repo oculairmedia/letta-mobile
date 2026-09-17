@@ -1,4 +1,4 @@
-package com.letta.mobile.desktop.schedules
+package com.letta.mobile.ui.schedules
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -28,7 +28,7 @@ import com.letta.mobile.data.schedules.ScheduleReliability
 import com.letta.mobile.ui.theme.customColors
 
 @Composable
-internal fun HistoryView(summary: HistorySummary) {
+fun HistoryView(summary: HistorySummary) {
     LazyColumn(
         Modifier.fillMaxSize().padding(horizontal = 28.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -80,9 +80,9 @@ private fun ReliabilityRow(rel: ScheduleReliability) {
 }
 
 @Composable
-internal fun StatsCard(summary: HistorySummary) {
+fun StatsCard(summary: HistorySummary) {
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+        Modifier.fillMaxWidth().clip(MaterialTheme.shapes.large)
             .background(MaterialTheme.colorScheme.surfaceContainer)
             .padding(vertical = 18.dp),
     ) {
@@ -98,7 +98,7 @@ internal fun StatsCard(summary: HistorySummary) {
 }
 
 @Composable
-internal fun StatCell(value: String, label: String, valueColor: Color, modifier: Modifier) {
+fun StatCell(value: String, label: String, valueColor: Color, modifier: Modifier) {
     Column(modifier.padding(horizontal = 18.dp)) {
         Text(
             value,
@@ -111,7 +111,7 @@ internal fun StatCell(value: String, label: String, valueColor: Color, modifier:
 }
 
 @Composable
-internal fun ReliabilityStrip(squares: List<Boolean?>, count: Int = 12) {
+fun ReliabilityStrip(squares: List<Boolean?>, count: Int = 12) {
     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         val padded = (squares.takeLast(count) + List(count) { null }).take(count)
         padded.forEach { ok ->

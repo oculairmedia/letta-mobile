@@ -38,6 +38,9 @@ import org.jetbrains.jewel.ui.component.RadioButtonChip as JewelRadioButtonChip
 import org.jetbrains.jewel.ui.component.TextArea as JewelTextArea
 import org.jetbrains.jewel.ui.component.TextField as JewelTextField
 import org.jetbrains.jewel.ui.component.Text as JewelText
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.text.font.FontWeight
 
 // Snappy: 450ms read as "the tooltip is broken" on quick hovers.
 private const val TooltipShowDelayMs = 150
@@ -93,8 +96,33 @@ internal fun DesktopTooltipArea(
     )
 }
 
+/**
+ * The same tooltip with a time label beside the title and a short body under it (the rail's
+ * agent hover: name, last activity, last message). One primitive, two densities.
+ */
 @Composable
-private fun DesktopTooltipSurface(text: String) {
+internal fun DesktopRichTooltip(
+    title: String,
+    modifier: Modifier = Modifier,
+    timeLabel: String? = null,
+    body: String? = null,
+    delayMillis: Int = TooltipShowDelayMs,
+    position: DesktopTooltipPosition = DesktopTooltipPosition.Cursor,
+    content: @Composable () -> Unit,
+) {
+    DesktopTooltipArea(
+        modifier = modifier,
+        delayMillis = delayMillis,
+        position = position,
+        tooltip = { DesktopTooltipSurface(title, timeLabel = timeLabel, body = body) },
+    ) {
+        content()
+    }
+}
+
+@Composable
+private fun DesktopTooltipSurface(text: String, timeLabel: String? = null, body: String? = null) {
+    val rich = timeLabel != null || !body.isNullOrBlank()
     Surface(
         shape = RoundedCornerShape(6.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -102,11 +130,48 @@ private fun DesktopTooltipSurface(text: String) {
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         shadowElevation = 6.dp,
     ) {
-        Text(
-            text = text,
-            modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
-            style = MaterialTheme.typography.labelMedium,
-        )
+        if (!rich) {
+            Text(
+                text = text,
+                modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
+                style = MaterialTheme.typography.labelMedium,
+            )
+        } else {
+            Column(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp).widthIn(max = 320.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Text(
+                        text = text,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    if (timeLabel != null) {
+                        Text(
+                            text = timeLabel,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                if (!body.isNullOrBlank()) {
+                    Text(
+                        text = body,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
     }
 }
 

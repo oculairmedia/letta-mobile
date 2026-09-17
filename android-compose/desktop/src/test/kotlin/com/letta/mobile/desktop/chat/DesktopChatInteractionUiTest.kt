@@ -39,6 +39,7 @@ import com.letta.mobile.data.model.UiToolCall
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 import kotlin.test.assertTrue
 
 class DesktopChatInteractionUiTest {

@@ -1,4 +1,4 @@
-package com.letta.mobile.desktop.chat
+package com.letta.mobile.ui.chat
 
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode

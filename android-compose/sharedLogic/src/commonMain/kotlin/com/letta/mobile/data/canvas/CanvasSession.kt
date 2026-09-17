@@ -337,6 +337,34 @@ class CanvasSession(
         }
 
         /**
+         * Opens a session over the stored canvas [canvasId], or returns null when no such canvas exists.
+         */
+        suspend fun open(
+            store: CanvasDocumentStore,
+            canvasId: CanvasId,
+            options: CanvasConversationOptions = CanvasConversationOptions(),
+        ): CanvasSession? {
+            val existing = store.get(canvasId) ?: return null
+            return forExisting(store, existing, options)
+        }
+
+        private fun forExisting(
+            store: CanvasDocumentStore,
+            existing: CanvasDocument,
+            options: CanvasConversationOptions,
+        ): CanvasSession {
+            val session = CanvasSession(
+                canvasId = existing.id,
+                store = store,
+                opLog = options.opLog,
+                syncTransport = options.syncTransport,
+                clock = options.clock,
+            )
+            session._document.value = existing
+            return session
+        }
+
+        /**
          * Resolves an existing session for [conversationId], or creates a new one if none exists.
          */
         suspend fun getOrCreateForConversation(
@@ -346,15 +374,7 @@ class CanvasSession(
         ): CanvasSession {
             val existing = store.getForConversation(conversationId)
             return if (existing != null) {
-                val session = CanvasSession(
-                    canvasId = existing.id,
-                    store = store,
-                    opLog = options.opLog,
-                    syncTransport = options.syncTransport,
-                    clock = options.clock,
-                )
-                session._document.value = existing
-                session
+                forExisting(store, existing, options)
             } else {
                 create(
                     store = store,

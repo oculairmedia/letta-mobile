@@ -43,6 +43,13 @@ import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Clock
 
 import kotlin.time.Duration.Companion.milliseconds
+import com.letta.mobile.ui.schedules.AgendaView
+import com.letta.mobile.ui.schedules.AgendaViewParams
+import com.letta.mobile.ui.schedules.HistoryView
+import com.letta.mobile.ui.schedules.TimelineView
+import com.letta.mobile.ui.schedules.TimelineViewParams
+import com.letta.mobile.ui.schedules.WeekView
+import com.letta.mobile.ui.schedules.WeekViewParams
 /** The four schedule views (Penpot "Desktop · Schedules (week/timeline)"). */
 internal enum class ScheduleView(val label: String) {
     Week("Week"),
@@ -58,10 +65,6 @@ internal sealed interface RailState {
 }
 
 internal val RAIL_WIDTH = 372.dp
-internal val HOUR_HEIGHT = 44.dp
-internal const val GRID_HOURS = 24
-internal const val HOUR_LABEL_STEP = 3
-internal const val WEEK_GRID_MAX_PER_DAY = 4
 internal const val NOW_TICK_MILLIS = 30_000L
 
 /**

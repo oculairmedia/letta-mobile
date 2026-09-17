@@ -29,7 +29,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.letta.mobile.desktop.chat.AgentOrb
+import com.letta.mobile.ui.chat.AgentOrb
+import com.letta.mobile.ui.home.FleetBarSpark
 
 /**
  * The fleet dashboard: counters plus a sortable agent table.

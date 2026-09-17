@@ -43,6 +43,8 @@ import com.letta.mobile.data.model.SubagentTodo
 import com.letta.mobile.data.subagents.projectSubagentTasks
 import java.time.Duration
 import java.time.Instant
+import com.letta.mobile.ui.chat.AgentActivity
+import com.letta.mobile.ui.chat.AgentActivityOrb
 
 /**
  * Right-side "Background tasks" panel (Penpot "App Mockups v2" desktop board):
@@ -56,6 +58,8 @@ internal fun DesktopBackgroundTasksPanel(
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
     onFetchTodos: (suspend (String) -> List<SubagentTodo>)? = null,
+    /** False when hosted in [com.letta.mobile.desktop.DesktopSidePane], which draws the title and close. */
+    showHeader: Boolean = true,
 ) {
     var clearedKeys by remember { mutableStateOf<Set<String>>(emptySet()) }
     // The panel stays open while subagents stream status updates, so keep these
@@ -68,11 +72,11 @@ internal fun DesktopBackgroundTasksPanel(
 
     Column(
         modifier = modifier
-            .width(360.dp)
+            .then(if (showHeader) Modifier.width(360.dp) else Modifier.fillMaxWidth())
             .fillMaxHeight()
             .background(MaterialTheme.colorScheme.surfaceContainerLow),
     ) {
-        Row(
+        if (showHeader) Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp, vertical = 18.dp),

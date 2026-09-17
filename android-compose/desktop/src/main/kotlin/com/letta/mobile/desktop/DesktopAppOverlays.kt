@@ -13,6 +13,7 @@ import com.letta.mobile.data.search.PaletteItem
 import com.letta.mobile.data.search.PaletteItemKind
 import com.letta.mobile.desktop.chat.DesktopCommandPalette
 import com.letta.mobile.desktop.chat.DesktopModelPickerSheet
+import com.letta.mobile.ui.components.ImageDropOverlay
 
 /** Avatar chips shown in the New Conversation "Recent" row. */
 internal const val NEW_CONVERSATION_RECENTS_LIMIT = 8
@@ -47,6 +48,7 @@ internal data class DesktopOverlayActions(
     val onNavigate: (DesktopDestination) -> Unit,
     val onCreateAgent: (name: String, modelValue: String?) -> Unit,
     val onIrohIdentityReset: () -> Unit,
+    val onNewCanvas: () -> Unit = {},
 )
 
 /**
@@ -85,6 +87,10 @@ internal fun DesktopAppOverlays(
                     visibility.newAgent = true
                 },
                 onDismiss = { visibility.newConversation = false },
+                onNewCanvas = {
+                    visibility.newConversation = false
+                    actions.onNewCanvas()
+                },
             ),
         )
     }
@@ -104,7 +110,7 @@ internal fun DesktopAppOverlays(
         )
     }
     if (data.isDragActive) {
-        DesktopImageDropOverlay()
+        ImageDropOverlay()
     }
     if (visibility.irohResetConfirm) {
         DesktopConfirmDialog(
