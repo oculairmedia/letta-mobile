@@ -123,6 +123,7 @@ fun CanvasBlockEditor(
         stateHolder = stateHolder,
         textStates = textStates,
         spanStates = spanStates,
+        registry = rememberCanvasBlockRegistry(),
         theme = theme,
         modifier = modifier,
         toolbar = toolbar,
@@ -159,6 +160,7 @@ fun CanvasBlockPreview(
     CascadeDocumentPreview(
         blocks = holder.state.blocks,
         modifier = modifier,
+        registry = rememberCanvasBlockRegistry(),
         theme = rememberCascadeTheme(forceLight = onLightSurface, style = style),
         config = CascadeDocumentPreviewConfig.Default,
     )

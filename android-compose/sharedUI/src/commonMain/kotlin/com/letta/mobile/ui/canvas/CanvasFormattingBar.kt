@@ -37,6 +37,7 @@ import com.composables.icons.lucide.ListOrdered
 import com.composables.icons.lucide.ListTodo
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Minus
+import com.composables.icons.lucide.Table
 import com.composables.icons.lucide.Pilcrow
 import com.composables.icons.lucide.SquareCode
 import com.composables.icons.lucide.Strikethrough
@@ -176,6 +177,7 @@ val BlockButtons: List<BlockButton> = listOf(
     BlockButton(BlockKind.Convert(BlockType.Quote), Lucide.TextQuote, "Quote"),
     BlockButton(BlockKind.Convert(BlockType.Code), Lucide.SquareCode, "Code block"),
     BlockButton(BlockKind.Insert { Block.divider() }, Lucide.Minus, "Divider"),
+    BlockButton(BlockKind.Insert { CanvasTableBlock.descriptor.createBlock() }, Lucide.Table, "Table"),
 )
 
 private val FormattingButtons = listOf(

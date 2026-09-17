@@ -15,6 +15,7 @@ import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.runComposeUiTest
 import com.letta.mobile.ui.canvas.CanvasSamples
@@ -396,6 +397,38 @@ class CanvasWorkspaceUiTest {
         // Delete removes every selected note and leaves the far one.
         onNodeWithContentDescription("Delete selection").performClick()
         waitUntil(timeoutMillis = 5000) { session.documents().map { it.id } == listOf("note-far") }
+    }
+
+    @Test
+    fun canvasWorkspace_tableBlock_isInsertedEditedAndPersisted() = runComposeUiTest {
+        val store = com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore()
+        val session = kotlinx.coroutines.runBlocking {
+            com.letta.mobile.data.canvas.CanvasSession.create(
+                store = store,
+                options = com.letta.mobile.data.canvas.CanvasCreateOptions(title = "Table Board", initialSceneJson = ""),
+            )
+        }
+        setContent { CanvasWorkspace(session = session) }
+        onNodeWithContentDescription("Add note").performClick()
+        waitUntil(timeoutMillis = 5000) { session.documents().size == 1 }
+        val note = session.documents().single()
+        waitUntil(timeoutMillis = 5000) { onAllNodesWithContentDescription("Table").fetchSemanticsNodes().isNotEmpty() }
+
+        // The bar inserts a 2x2 table block; it is written to the session as custom content.
+        onNodeWithContentDescription("Table").performClick()
+        waitUntil(timeoutMillis = 5000) { session.documents().single().json.contains(com.letta.mobile.ui.canvas.CanvasTableBlock.TYPE_ID) }
+        onNodeWithContentDescription("Table cell 1,1").performTextInput("Owner")
+        waitUntil(timeoutMillis = 5000) { session.documents().single().json.contains("Owner") }
+        onNodeWithContentDescription("Add table row").performClick()
+        waitUntil(timeoutMillis = 5000) {
+            onAllNodesWithContentDescription("Table cell 3,1").fetchSemanticsNodes().isNotEmpty()
+        }
+        waitUntil(timeoutMillis = 5000) { session.documents().single().json.contains("Owner") }
+
+        // What the session holds decodes back to the same table (ids aside).
+        val json = session.documents().single().json
+        kotlin.test.assertTrue(json.contains("\"rows\""), json)
+        kotlin.test.assertEquals(note.id, session.documents().single().id)
     }
 
     @Test
