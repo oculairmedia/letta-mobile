@@ -98,6 +98,9 @@ fun CanvasWorkspace(
     var isSharingToChat by remember { mutableStateOf(false) }
     var showHistoryDialog by remember { mutableStateOf(false) }
     var boardSize by remember { mutableStateOf(IntSize.Zero) }
+    // The note being worked in (toolbar and block handles shown) and the one opened large.
+    var activeNoteId by remember { mutableStateOf<String?>(null) }
+    var expandedNoteId by remember { mutableStateOf<String?>(null) }
 
     // Load initial JSON diagram or session document & observe external session updates (Card I2.3 & I3.3)
     LaunchedEffect(session, initialJson) {
@@ -233,8 +236,20 @@ fun CanvasWorkspace(
                     session = session,
                     documents = documents,
                     viewport = state.viewport,
+                    activeNoteId = activeNoteId,
+                    expandedNoteId = expandedNoteId,
+                    onActivate = { activeNoteId = it },
+                    onExpand = { expandedNoteId = it },
                     modifier = Modifier.fillMaxSize().clipToBounds(),
                 )
+                val expanded = documents.firstOrNull { it.id == expandedNoteId }
+                if (expanded != null) {
+                    CanvasNoteEditorDialog(
+                        session = session,
+                        document = expanded,
+                        onClose = { expandedNoteId = null },
+                    )
+                }
             }
 
             // Presence layer (Card I3.5)
@@ -402,7 +417,10 @@ fun CanvasWorkspace(
                         val id = "note-${Clock.System.now().toEpochMilliseconds()}"
                         coroutineScope.launch {
                             runCatching { s.setDocument(id, "", frame = frame, color = NoteColors.first().hex) }
-                                .onSuccess { statusMessage = "Added note" }
+                                .onSuccess {
+                                    activeNoteId = id
+                                    statusMessage = "Added note"
+                                }
                                 .onFailure { statusMessage = "Error: could not add note (${it.message})" }
                         }
                     }
