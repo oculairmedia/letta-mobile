@@ -17,7 +17,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -28,6 +27,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.data.canvas.CanvasPresence
+import com.letta.mobile.data.canvas.CanvasPresenceTransport
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.CanvasSessionRegistry
 import io.ak1.drawbox.DrawBox
@@ -49,8 +50,14 @@ fun CanvasWorkspace(
     modifier: Modifier = Modifier,
     controller: DrawBoxController = remember { DrawBoxController(Reducer(UseCase())) },
     session: CanvasSession? = null,
-    sessions: CanvasSessionRegistry = CanvasSessionRegistry(),
+    /**
+     * The registry external tools look the open session up in. Null means agent commands only
+     * reach the store, not this session, so a host that wires canvas tools must pass its own.
+     */
+    sessionRegistry: CanvasSessionRegistry? = null,
     initialJson: String? = null,
+    presenceTransport: CanvasPresenceTransport? = null,
+    currentPeerId: String? = null,
     onNavigateBack: (() -> Unit)? = null,
     onExportJson: ((String) -> Unit)? = null,
     onExportSvg: ((String) -> Unit)? = null,
@@ -59,46 +66,48 @@ fun CanvasWorkspace(
     val canUndo by controller.canUndo.collectAsState()
     val canRedo by controller.canRedo.collectAsState()
     val sessionDoc by (session?.document?.collectAsState() ?: remember { mutableStateOf(null) })
+    val presences by if (presenceTransport != null && session != null) {
+        presenceTransport.observePresence(session.canvasId).collectAsState(emptyList())
+    } else {
+        remember { mutableStateOf(emptyList<CanvasPresence>()) }
+    }
 
     var statusMessage by remember { mutableStateOf("Ready") }
     var initialLoadDone by remember { mutableStateOf(false) }
     var lastExportedJson by remember { mutableStateOf<String?>(null) }
 
-    DisposableEffect(session, sessions) {
-        if (session != null) {
-            sessions.register(session)
-        }
-        onDispose {
-            if (session != null) {
-                sessions.unregister(session.canvasId)
-            }
-        }
-    }
-
-    // Load initial JSON diagram or session document & observe external session updates (Card I2.3)
+    // Load initial JSON diagram or session document & observe external session updates (Card I2.3 & I3.3)
     LaunchedEffect(session, initialJson) {
         if (session != null) {
-            session.load()
-            val sessionJson = session.sceneJsonOrEmpty()
-            var lastImportedRev = session.document.value?.revision ?: 0L
-            if (sessionJson.isNotBlank()) {
-                controller.importPath(sessionJson)
-                lastExportedJson = sessionJson
-                statusMessage = "Loaded from session (rev ${session.document.value?.revision ?: 1})"
-            }
-            delay(100)
-            initialLoadDone = true
+            sessionRegistry?.register(session)
+            val syncJob = session.startSync(this)
+            try {
+                session.load()
+                val sessionJson = session.sceneJsonOrEmpty()
+                var lastImportedRev = session.document.value?.revision ?: 0L
+                if (sessionJson.isNotBlank()) {
+                    val cleanJson = com.letta.mobile.data.canvas.CanvasOpProjector.stripMetadataForDrawBox(sessionJson)
+                    controller.importPath(cleanJson)
+                    lastExportedJson = sessionJson
+                    statusMessage = "Loaded from session (rev ${session.document.value?.revision ?: 1})"
+                }
+                delay(100)
+                initialLoadDone = true
 
-            // Card I2.3: Session observes revision bump -> controller.importPath if JSON changed externally.
-            // Conflict: agent replace wins; toast/status.
-            session.document.collect { doc ->
-                if (doc != null && doc.revision > lastImportedRev) {
-                    lastImportedRev = doc.revision
-                    if (doc.sceneJson.isNotBlank() && doc.sceneJson != lastExportedJson) {
-                        controller.importPath(doc.sceneJson)
-                        statusMessage = "Agent updated canvas (rev ${doc.revision})"
+                // Card I2.3: Session observes revision bump -> controller.importPath if JSON changed externally.
+                // Conflict: agent replace wins; toast/status.
+                session.document.collect { doc ->
+                    if (doc != null && doc.revision > lastImportedRev) {
+                        lastImportedRev = doc.revision
+                        if (doc.sceneJson.isNotBlank() && doc.sceneJson != lastExportedJson) {
+                            val cleanJson = com.letta.mobile.data.canvas.CanvasOpProjector.stripMetadataForDrawBox(doc.sceneJson)
+                            controller.importPath(cleanJson)
+                            statusMessage = "Agent updated canvas (rev ${doc.revision})"
+                        }
                     }
                 }
+            } finally {
+                sessionRegistry?.unregister(session.canvasId)
             }
         } else {
             if (!initialJson.isNullOrBlank()) {
@@ -142,7 +151,7 @@ fun CanvasWorkspace(
                     }
                     if (session != null && session.sceneJsonOrEmpty() != event.json) {
                         withContext(Dispatchers.Default) {
-                            session.saveScene(event.json)
+                            session.applyLocalScene(event.json)
                         }
                     }
                     onExportJson?.invoke(event.json)
@@ -184,6 +193,12 @@ fun CanvasWorkspace(
                 modifier = Modifier
                     .fillMaxSize()
                     .clipToBounds(),
+            )
+
+            // Presence layer (Card I3.5)
+            PresenceLayer(
+                presences = presences,
+                currentPeerId = currentPeerId,
             )
 
             // Top action bar: Sample loader + Exports + Status
