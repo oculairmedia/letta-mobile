@@ -41,6 +41,7 @@ class ChatComposerActionSheetTest {
         val pendingAttachments: ImmutableList<MessageContentPart.Image> = persistentListOf(),
         val onTextChange: (String) -> Unit = {},
         val onAttachImage: () -> Unit = {},
+        val onOpenCanvas: (() -> Unit)? = null,
         val availableTools: List<Tool>? = null,
     )
 
@@ -158,6 +159,18 @@ class ChatComposerActionSheetTest {
         composeRule.onNodeWithText("Add to message").assertDoesNotExist()
     }
 
+    @Test
+    fun `open canvas action invokes callback and closes the sheet`() {
+        var canvasInvoked = false
+        setComposer(ComposerScenario(onOpenCanvas = { canvasInvoked = true }))
+
+        openComposerActions()
+        composeRule.onNodeWithText("Open canvas").assertIsDisplayed().performClick()
+
+        assertTrue(canvasInvoked)
+        composeRule.onNodeWithText("Add to message").assertDoesNotExist()
+    }
+
     private fun setComposer(scenario: ComposerScenario = ComposerScenario()) {
         composeRule.setContent {
             LettaTheme {
@@ -171,6 +184,7 @@ class ChatComposerActionSheetTest {
                     onStop = {},
                     onRemoveAttachment = {},
                     onAttachImage = scenario.onAttachImage,
+                    onOpenCanvas = scenario.onOpenCanvas,
                     availableTools = scenario.availableTools ?: listOf(tool),
                 )
             }

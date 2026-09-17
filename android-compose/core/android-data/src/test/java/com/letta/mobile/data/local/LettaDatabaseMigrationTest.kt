@@ -400,6 +400,77 @@ class LettaDatabaseMigrationTest {
         assertEquals(42L, db.conversationCursorDao().getCursor("conversation-1")?.highestSeenSeq)
     }
 
+    @Test
+    fun `migrates legacy database to v16 and creates canvas_documents table`() = runBlocking {
+        createLegacyDatabase(version = 1) { db ->
+            createAgentsTable(db)
+        }
+
+        val db = openMigratedDatabase()
+        val dao = db.canvasDocumentDao()
+        val doc = CanvasDocumentEntity(
+            id = "canvas-1",
+            agentId = "agent-1",
+            conversationId = "conv-1",
+            title = "Test Canvas",
+            revision = 1L,
+            sceneJson = """{"bgColor":-1,"elements":[]}""",
+            updatedAtEpochMs = 12345L,
+        )
+        dao.upsert(doc)
+        val loaded = dao.getById("canvas-1")
+        assertEquals(doc, loaded)
+        assertEquals(doc, dao.getForConversation("conv-1"))
+        assertEquals(listOf(doc), dao.listForAgent("agent-1"))
+    }
+
+    @Test
+    fun `migrates legacy database to v17 and creates canvas_ops table`() = runBlocking {
+        createLegacyDatabase(version = 1) { db ->
+            createAgentsTable(db)
+        }
+
+        val db = openMigratedDatabase()
+        val dao = db.canvasOpDao()
+        val op = CanvasOpEntity(
+            opId = "op-v17-1",
+            canvasId = "canvas-v17-test",
+            lamport = 1L,
+            actorId = "user-1",
+            opType = "set_background",
+            payloadJson = """{"type":"set_background","opId":"op-v17-1","actorId":"user-1","lamport":1,"colorHex":"#000000"}""",
+            createdAtEpochMs = 99999L,
+        )
+        dao.insert(op)
+        val loaded = dao.getSince("canvas-v17-test", 0L)
+        assertEquals(listOf(op), loaded)
+        assertTrue(dao.has("canvas-v17-test", "op-v17-1"))
+    }
+    @Test
+    fun `migrates legacy database to v18 and adds aclJson column`() = runBlocking {
+        createLegacyDatabase(version = 1) { db ->
+            createAgentsTable(db)
+        }
+
+        val db = openMigratedDatabase()
+        val dao = db.canvasDocumentDao()
+        val doc = CanvasDocumentEntity(
+            id = "canvas-v18-1",
+            agentId = "agent-1",
+            conversationId = "conv-1",
+            title = "Test Canvas",
+            revision = 1L,
+            sceneJson = """{"bgColor":-1,"elements":[]}""",
+            updatedAtEpochMs = 12345L,
+            aclJson = """{"ownerUserId":"user-1","writerUserIds":["user-2"]}""",
+        )
+        dao.upsert(doc)
+        val loaded = dao.getById("canvas-v18-1")
+        assertEquals(doc, loaded)
+        val domainDoc = loaded?.toCanvasDocument()
+        assertEquals("user-1", domainDoc?.acl?.ownerUserId)
+        assertTrue(domainDoc?.acl?.canWrite("user-2") == true)
+    }
     private fun createLegacyDatabase(version: Int, createSchema: (SQLiteDatabase) -> Unit) {
         context.deleteDatabase(dbName)
         val db = context.openOrCreateDatabase(dbName, Context.MODE_PRIVATE, null)

@@ -1,27 +1,14 @@
 package com.letta.mobile.feature.chat.screen
 
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
-import com.letta.mobile.data.health.ShimBackendDetector
-import com.letta.mobile.data.model.BackendKind
+import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.ConversationId
-import com.letta.mobile.data.repository.api.IAgentRepository
-import com.letta.mobile.data.repository.api.ISettingsRepository
-import com.letta.mobile.data.session.SessionManager
-import com.letta.mobile.data.transport.WsChatBridge
-import com.letta.mobile.feature.chat.route.ChatRouteArgs
-import com.letta.mobile.runtime.BackendId
-import com.letta.mobile.runtime.RuntimeId
 import com.letta.mobile.testutil.TestData
-import io.mockk.coEvery
-import io.mockk.every
-import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -87,5 +74,54 @@ class AdminChatViewModelStartupTest {
             viewModel?.viewModelScope?.cancel()
             Dispatchers.resetMain()
         }
+    }
+
+    @Test
+    fun `staged canvas attachment delivered to composer pending attachments`() = runTest {
+        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        var viewModel: AdminChatViewModel? = null
+        try {
+            val agent = TestData.agent("agent-canvas", "CanvasAgent")
+            val target = com.letta.mobile.data.canvas.CanvasConversationTarget("conversation-canvas-share")
+            val sampleImage = com.letta.mobile.data.canvas.CanvasShare.createChatImageAttachment(
+                bytes = "canvas-test-image-content".encodeToByteArray(),
+                mimeType = com.letta.mobile.data.canvas.CanvasMimeType.PNG,
+            )
+            com.letta.mobile.data.canvas.CanvasShare.stageForConversation(target, sampleImage)
+
+            val vm = createTestViewModel(agent, target.id)
+            viewModel = vm
+
+            assertEquals(1, vm.composerState.value.pendingAttachments.size)
+            assertEquals("image/png", vm.composerState.value.pendingAttachments.first().mediaType)
+
+            val secondImage = com.letta.mobile.data.canvas.CanvasShare.createChatImageAttachment(
+                bytes = "canvas-second-image".encodeToByteArray(),
+                mimeType = com.letta.mobile.data.canvas.CanvasMimeType.PNG,
+            )
+            com.letta.mobile.data.canvas.CanvasShare.stageForConversation(target, secondImage)
+            assertEquals(2, vm.composerState.value.pendingAttachments.size)
+        } finally {
+            viewModel?.viewModelScope?.cancel()
+            com.letta.mobile.data.canvas.CanvasShare.clearStagedAttachments()
+            Dispatchers.resetMain()
+        }
+    }
+
+    private fun createTestViewModel(agent: Agent, convId: String): AdminChatViewModel {
+        val presentation = ChatPagingPresentation(
+            settled = flowOf(PagingData.empty()),
+            live = MutableStateFlow(emptyList()),
+            close = { },
+        )
+        val host = ChatPagingHost().apply {
+            openCanonical = { _, _, _, _ -> presentation }
+        }
+        return openedChatViewModel(
+            pagingHost = host,
+            agent = agent,
+            conversationId = convId,
+            tag = "startup",
+        )
     }
 }

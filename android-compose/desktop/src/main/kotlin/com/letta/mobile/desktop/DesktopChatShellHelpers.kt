@@ -29,6 +29,9 @@ import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
 import com.letta.mobile.desktop.memory.DesktopMemorySurfaceState
 import com.letta.mobile.data.commands.AgentSlashCommand
+import com.letta.mobile.data.onboarding.OnboardingTaskKind
+import com.letta.mobile.desktop.chat.ChatDetailPaneActions
+import kotlinx.coroutines.launch
 
 /** Model picker options: display label to route-stable selection token. */
 internal fun buildModelOptions(availableModels: List<LlmModel>): List<Pair<String, String>> =
@@ -274,6 +277,7 @@ internal data class BuildComposerCommandsParams(
     val onCreateAgent: () -> Unit,
     val onEditAgent: () -> Unit,
     val onNavigate: (DesktopDestination) -> Unit,
+    val onOpenCanvas: (() -> Unit)? = null,
 )
 
 internal fun buildComposerCommands(params: BuildComposerCommandsParams): List<ComposerCommand> = buildList {
@@ -282,6 +286,7 @@ internal fun buildComposerCommands(params: BuildComposerCommandsParams): List<Co
     add(ComposerCommand("new", "Start a new chat") { chatController.createConversation() })
     add(ComposerCommand("agent", "Create a new agent") { params.onCreateAgent() })
     add(ComposerCommand("edit", "Edit this agent") { params.onEditAgent() })
+    add(ComposerCommand("canvas", "Open canvas workspace") { params.onOpenCanvas?.invoke() })
     add(ComposerCommand("memory", "Open memory") { onNavigate(DesktopDestination.Memory) })
     add(ComposerCommand("schedules", "Open schedules") { onNavigate(DesktopDestination.Schedules) })
     add(ComposerCommand("skills", "Open skills & tools") { onNavigate(DesktopDestination.Agents) })
@@ -313,4 +318,166 @@ internal fun resolveNewAgentDefaults(
 internal fun conversationRecency(label: String): java.time.Instant =
     runCatching { java.time.Instant.parse(label) }.getOrNull()
         ?: if (label == "Queued") java.time.Instant.MAX else java.time.Instant.MIN
+
+internal data class OpenDesktopCanvasParams(
+    val scope: CoroutineScope,
+    val store: com.letta.mobile.desktop.canvas.DesktopCanvasDocumentStore,
+    val conversationId: String?,
+    val agentId: String?,
+    val agentName: String,
+    val onSessionReady: (com.letta.mobile.data.canvas.CanvasSession) -> Unit,
+)
+
+internal fun openDesktopCanvasSession(params: OpenDesktopCanvasParams) {
+    val convId = params.conversationId ?: "desktop-default-conversation"
+    val displayName = if (params.agentName.isBlank()) "Conversation" else params.agentName
+    params.scope.launch {
+        val session = com.letta.mobile.data.canvas.CanvasSession.getOrCreateForConversation(
+            store = params.store,
+            conversationId = convId,
+            options = com.letta.mobile.data.canvas.CanvasConversationOptions(
+                agentId = params.agentId,
+                title = "Canvas ($displayName)",
+                opLog = com.letta.mobile.desktop.canvas.DesktopCanvasHostSync.opLog,
+                syncTransport = com.letta.mobile.desktop.canvas.DesktopCanvasHostSync.syncTransport,
+            ),
+        )
+        params.onSessionReady(session)
+    }
+}
+
+internal data class DesktopComposerCommandsParams(
+    val chatController: DesktopChatController,
+    val agentSlashCommands: List<AgentSlashCommand>,
+    val selectedConversationId: String?,
+    val selectedAgentId: String?,
+    val selectedAgentName: String,
+    val selectedDestination: DesktopDestination,
+    val canvasStore: com.letta.mobile.desktop.canvas.DesktopCanvasDocumentStore,
+    val chatScope: CoroutineScope,
+    val onNavigate: (DesktopDestination) -> Unit,
+    val onCreateAgent: () -> Unit,
+    val onEditAgent: (String?) -> Unit,
+    val onCanvasSessionChange: (com.letta.mobile.data.canvas.CanvasSession?) -> Unit,
+)
+
+@Composable
+internal fun rememberDesktopComposerCommands(params: DesktopComposerCommandsParams): List<ComposerCommand> {
+    return remember(
+        params.selectedConversationId,
+        params.agentSlashCommands,
+        params.selectedDestination,
+        params.selectedAgentId,
+    ) {
+        buildComposerCommands(
+            BuildComposerCommandsParams(
+                chatController = params.chatController,
+                agentSlashCommands = params.agentSlashCommands,
+                onCreateAgent = params.onCreateAgent,
+                onEditAgent = { params.onEditAgent(params.selectedAgentId) },
+                onNavigate = params.onNavigate,
+                onOpenCanvas = {
+                    openDesktopCanvasSession(
+                        OpenDesktopCanvasParams(
+                            scope = params.chatScope,
+                            store = params.canvasStore,
+                            conversationId = params.selectedConversationId,
+                            agentId = params.selectedAgentId,
+                            agentName = params.selectedAgentName,
+                            onSessionReady = params.onCanvasSessionChange,
+                        ),
+                    )
+                },
+            ),
+        )
+    }
+}
+
+internal data class CreateDesktopChatDetailPaneActionsParams(
+    val chatController: DesktopChatController,
+    val canSubmitApprovals: Boolean,
+    val onA2uiAction: (com.letta.mobile.data.a2ui.A2uiAction) -> Unit,
+    val onAttachImage: () -> Unit,
+    val onOpenModelPicker: () -> Unit,
+    val onSetPersona: () -> Unit,
+    val onNavigateToChannels: () -> Unit,
+    val onNavigateToAgents: () -> Unit,
+    val onOpenAgent: (String) -> Unit,
+)
+
+internal fun createDesktopChatDetailPaneActions(
+    params: CreateDesktopChatDetailPaneActionsParams,
+): ChatDetailPaneActions {
+    val chatController = params.chatController
+    return ChatDetailPaneActions(
+        onComposerTextChanged = chatController::updateComposerText,
+        onSend = chatController::send,
+        onSubmitApproval = chatController::submitApproval.takeIf { params.canSubmitApprovals },
+        onA2uiAction = params.onA2uiAction,
+        onAttachImage = params.onAttachImage,
+        onRemoveImageAttachment = chatController::removeImageAttachment,
+        onRetryConnection = chatController::retryConnection,
+        onModelSelected = chatController::setConversationModel,
+        onChangeWorkingDirectory = chatController::changeSelectedConversationWorkingDirectory,
+        onOpenModelPicker = params.onOpenModelPicker,
+        onOnboardingTask = { kind ->
+            when (kind) {
+                OnboardingTaskKind.SetPersona -> params.onSetPersona()
+                OnboardingTaskKind.ConnectChannel -> params.onNavigateToChannels()
+                OnboardingTaskKind.AddSkills -> params.onNavigateToAgents()
+            }
+        },
+        onOpenAgent = params.onOpenAgent,
+    )
+}
+
+internal fun handleDesktopShareCanvasToChat(
+    bytes: ByteArray,
+    mimeType: String,
+    chatController: DesktopChatController,
+    onSuccessNav: () -> Unit,
+) {
+    com.letta.mobile.data.canvas.CanvasShare.packageForChat(
+        bytes,
+        com.letta.mobile.data.canvas.CanvasMimeType.fromValue(mimeType),
+    )
+        .onSuccess { image ->
+            chatController.attachImage(image)
+            onSuccessNav()
+        }
+        .onFailure { error ->
+            chatController.showComposerError(error.message ?: "Could not share canvas to chat")
+        }
+}
+
+internal data class CreateDesktopOverlayActionsParams(
+    val chatController: DesktopChatController,
+    val onSelectDestination: (DesktopDestination) -> Unit,
+    val onOpenAgent: (String) -> Unit,
+    val agentRepository: IAgentRepository,
+    val selectedAgentId: String?,
+    val onIrohIdentityReset: () -> Unit,
+)
+
+internal fun createDesktopOverlayActions(
+    params: CreateDesktopOverlayActionsParams,
+): DesktopOverlayActions = DesktopOverlayActions(
+    onModelSelected = params.chatController::setConversationModel,
+    onSelectConversation = {
+        params.chatController.selectConversation(it)
+        params.onSelectDestination(DesktopDestination.Conversations)
+    },
+    onOpenAgent = params.onOpenAgent,
+    onNavigate = params.onSelectDestination,
+    onCreateAgent = { name, modelValue ->
+        val (model, embedding) = resolveNewAgentDefaults(
+            agentRepository = params.agentRepository,
+            templateAgentId = params.selectedAgentId,
+            modelValue = modelValue,
+        )
+        params.chatController.createAgent(name = name, model = model, embedding = embedding)
+        params.onSelectDestination(DesktopDestination.Conversations)
+    },
+    onIrohIdentityReset = params.onIrohIdentityReset,
+)
 

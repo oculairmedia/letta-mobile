@@ -553,6 +553,7 @@ private fun ChatScreenComposerInputSection(
         } else {
             emptyList()
         },
+        onOpenCanvas = navigation.onOpenCanvas,
     )
 }
 

@@ -222,7 +222,7 @@ class DesktopAppServerChatGatewayBuilderTest {
         val engine = buildDesktopAppServerTurnEngine(
             client = client,
             scope = this,
-            eventRouter = eventRouter,
+            config = DesktopAppServerEngineConfig(eventRouter = eventRouter),
         )
 
         try {

@@ -1066,7 +1066,28 @@ internal class AdminChatViewModel @Inject constructor(
         sendPipeline.ensureEagerInit()
         chatSessionInitializer.run()
         publishRunState()
+        observeCanvasShareAttachments()
     }
+
+    private fun observeCanvasShareAttachments() {
+        viewModelScope.launch {
+            val initialTarget = com.letta.mobile.data.canvas.CanvasConversationTarget.from(currentOrExplicitConversationId())
+            com.letta.mobile.data.canvas.CanvasShare.consumeStagedAttachments(initialTarget).forEach { image ->
+                addAttachment(image)
+            }
+            com.letta.mobile.data.canvas.CanvasShare.stagedAttachmentEvents.collect { (target, image) ->
+                if (matchesTargetConversation(target.id, currentOrExplicitConversationId())) {
+                    addAttachment(image)
+                }
+            }
+        }
+    }
+
+    private fun currentOrExplicitConversationId(): String? =
+        conversationId?.value ?: routeArgs.explicitConversationId
+
+    private fun matchesTargetConversation(targetConvId: String, currentConvId: String?): Boolean =
+        targetConvId.isEmpty() || currentConvId == null || targetConvId == currentConvId
 
     /** The registry key for this screen's conversation; the agent stands in until the conversation has an id. */
     private var publishedRunKey: String? = null

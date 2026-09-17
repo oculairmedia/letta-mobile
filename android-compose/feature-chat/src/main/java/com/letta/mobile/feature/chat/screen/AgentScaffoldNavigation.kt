@@ -13,6 +13,7 @@ internal data class AgentScaffoldNavigationCallbacks(
     val onNavigateToConversationList: (() -> Unit)? = null,
     val onNavigateToSchedules: ((String) -> Unit)? = null,
     val onNavigateToProjects: (() -> Unit)? = null,
+    val onNavigateToCanvas: ((String?) -> Unit)? = null,
 )
 
 internal data class AgentScaffoldSheetVisibility(

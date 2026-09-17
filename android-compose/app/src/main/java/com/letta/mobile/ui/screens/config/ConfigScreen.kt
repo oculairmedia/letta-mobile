@@ -61,86 +61,23 @@ fun ConfigScreen(
     onNavigateToConfigList: () -> Unit,
     onNavigateToSystemAccess: () -> Unit = {},
     onNavigateToVibesyncDebug: () -> Unit = {},
+    onNavigateToCanvasDebug: () -> Unit = {},
     viewModel: ConfigViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbar = LocalSnackbarDispatcher.current
     val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
-    var batteryOptimizationExempt by remember {
-        mutableStateOf(BatteryOptimizationHelper.isIgnoringBatteryOptimizations(context))
-    }
-
-    fun refreshBatteryOptimizationStatus(source: String) {
-        val exempt = BatteryOptimizationHelper.isIgnoringBatteryOptimizations(context)
-        batteryOptimizationExempt = exempt
-        Telemetry.event(
-            "BatteryOptimization",
-            "status",
-            "source" to source,
-            "exempt" to exempt,
-        )
-    }
-
-    val batteryOptimizationLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult(),
-    ) {
-        refreshBatteryOptimizationStatus("requestReturned")
-        Telemetry.event(
-            "BatteryOptimization",
-            "requestReturned",
-            "exempt" to BatteryOptimizationHelper.isIgnoringBatteryOptimizations(context),
-        )
-    }
-    val localModelImportLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument(),
-    ) { uri ->
-        if (uri != null) {
-            viewModel.importLocalModel(
-                uri = uri,
-                onSuccess = { fileName ->
-                    snackbar.dispatch(context.getString(R.string.screen_config_local_model_import_success, fileName))
-                },
-                onError = { snackbar.dispatch(it) },
-            )
-        }
-    }
-
-    DisposableEffect(context, lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                refreshBatteryOptimizationStatus("resume")
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
+    val batteryOptimization = rememberBatteryOptimizationState(context)
+    val localModelImportLauncher = rememberLocalModelImportLauncher(viewModel, context)
 
     Scaffold(
         containerColor = LettaTopBarDefaults.scaffoldContainerColor(),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.common_settings)) },
-                colors = LettaTopBarDefaults.topAppBarColors(),
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))
-                    }
-                },
-                actions = {
-                    IconButton(onClick = onNavigateToConfigList) {
-                        Icon(LettaIcons.ListIcon, stringResource(R.string.screen_config_list_title))
-                    }
-                }
-            )
-        }
+        topBar = { ConfigTopAppBar(onNavigateBack, onNavigateToConfigList) }
     ) { paddingValues ->
         when (val state = uiState) {
             is UiState.Loading -> ShimmerCard(
-                modifier = Modifier
-                    .padding(paddingValues)
-                    .padding(16.dp),
+                modifier = Modifier.padding(paddingValues).padding(16.dp),
             )
             is UiState.Error -> ErrorContent(
                 message = state.message,
@@ -171,22 +108,16 @@ fun ConfigScreen(
                 onDownloadEmbeddedModel = { viewModel.downloadEmbeddedModel(it) },
                 onCancelEmbeddedModelDownload = { viewModel.cancelEmbeddedModelDownload(it) },
                 onSelectEmbeddedModel = { viewModel.selectEmbeddedModel(it) },
-                batteryOptimizationExempt = batteryOptimizationExempt,
-                onRequestBatteryOptimizationExemption = {
-                    requestBatteryOptimizationExemption(
-                        context = context,
-                        launcher = batteryOptimizationLauncher,
-                        exempt = batteryOptimizationExempt,
-                        onFailure = snackbar::dispatch,
-                    )
-                },
+                batteryOptimizationExempt = batteryOptimization.exempt,
+                onRequestBatteryOptimizationExemption = batteryOptimization.requestExemption,
                 onNavigateToSystemAccess = onNavigateToSystemAccess,
                 onNavigateToVibesyncDebug = onNavigateToVibesyncDebug,
+                onNavigateToCanvasDebug = onNavigateToCanvasDebug,
                 onRefresh = viewModel::loadConfig,
                 onSave = {
                     viewModel.saveConfig(
                         onSuccess = { snackbar.dispatch("Configuration saved"); onNavigateBack() },
-                        onError = { snackbar.dispatch(it) },
+                        onError = snackbar::dispatch,
                     )
                 },
                 modifier = Modifier.padding(paddingValues)
@@ -248,6 +179,7 @@ private fun ConfigContent(
     onRequestBatteryOptimizationExemption: () -> Unit,
     onNavigateToSystemAccess: () -> Unit,
     onNavigateToVibesyncDebug: () -> Unit,
+    onNavigateToCanvasDebug: () -> Unit = {},
     onRefresh: () -> Unit,
     onSave: () -> Unit,
     modifier: Modifier = Modifier
@@ -478,24 +410,11 @@ private fun ConfigContent(
             )
         }
 
-        CardGroup(title = {
-            ConfigSectionTitle(stringResource(R.string.screen_config_integrations_section))
-        }) {
-            item(
-                onClick = onNavigateToSystemAccess,
-                headlineContent = { Text(stringResource(R.string.screen_system_access_title)) },
-                supportingContent = { Text(stringResource(R.string.screen_system_access_entry_description)) },
-                leadingContent = { Icon(LettaIcons.Key, contentDescription = null) },
-            )
-            if (BuildConfig.DEBUG) {
-                item(
-                    onClick = onNavigateToVibesyncDebug,
-                    headlineContent = { Text(stringResource(R.string.screen_vibesync_debug_title)) },
-                    supportingContent = { Text(stringResource(R.string.screen_vibesync_debug_entry_description)) },
-                    leadingContent = { Icon(LettaIcons.Database, contentDescription = null) },
-                )
-            }
-        }
+        IntegrationsSection(
+            onNavigateToSystemAccess = onNavigateToSystemAccess,
+            onNavigateToVibesyncDebug = onNavigateToVibesyncDebug,
+            onNavigateToCanvasDebug = onNavigateToCanvasDebug,
+        )
 
         CardGroup {
             item(
@@ -1128,3 +1047,143 @@ private fun ConfigRefreshStatusErrorPreview() {
 }
 
 // endregion
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ConfigTopAppBar(
+    onNavigateBack: () -> Unit,
+    onNavigateToConfigList: () -> Unit,
+) {
+    TopAppBar(
+        title = { Text(stringResource(R.string.common_settings)) },
+        colors = LettaTopBarDefaults.topAppBarColors(),
+        navigationIcon = {
+            IconButton(onClick = onNavigateBack) {
+                Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))
+            }
+        },
+        actions = {
+            IconButton(onClick = onNavigateToConfigList) {
+                Icon(LettaIcons.ListIcon, stringResource(R.string.screen_config_list_title))
+            }
+        }
+    )
+}
+
+private class BatteryOptimizationState(
+    val exempt: Boolean,
+    val requestExemption: () -> Unit,
+)
+
+@Composable
+private fun rememberBatteryOptimizationState(
+    context: Context,
+): BatteryOptimizationState {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val snackbar = LocalSnackbarDispatcher.current
+    var batteryOptimizationExempt by remember {
+        mutableStateOf(BatteryOptimizationHelper.isIgnoringBatteryOptimizations(context))
+    }
+
+    fun refreshBatteryOptimizationStatus(source: String) {
+        val exempt = BatteryOptimizationHelper.isIgnoringBatteryOptimizations(context)
+        batteryOptimizationExempt = exempt
+        Telemetry.event(
+            "BatteryOptimization",
+            "status",
+            "source" to source,
+            "exempt" to exempt,
+        )
+    }
+
+    val batteryOptimizationLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult(),
+    ) {
+        refreshBatteryOptimizationStatus("requestReturned")
+        Telemetry.event(
+            "BatteryOptimization",
+            "requestReturned",
+            "exempt" to BatteryOptimizationHelper.isIgnoringBatteryOptimizations(context),
+        )
+    }
+
+    DisposableEffect(context, lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                refreshBatteryOptimizationStatus("resume")
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    return BatteryOptimizationState(
+        exempt = batteryOptimizationExempt,
+        requestExemption = {
+            requestBatteryOptimizationExemption(
+                context = context,
+                launcher = batteryOptimizationLauncher,
+                exempt = batteryOptimizationExempt,
+                onFailure = snackbar::dispatch,
+            )
+        }
+    )
+}
+
+@Composable
+private fun rememberLocalModelImportLauncher(
+    viewModel: ConfigViewModel,
+    context: Context,
+): ActivityResultLauncher<Array<String>> {
+    val snackbar = LocalSnackbarDispatcher.current
+    return rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) {
+            viewModel.importLocalModel(
+                uri = uri,
+                onSuccess = { fileName ->
+                    snackbar.dispatch(context.getString(R.string.screen_config_local_model_import_success, fileName))
+                },
+                onError = snackbar::dispatch,
+            )
+        }
+    }
+}
+
+/**
+ * The integrations card, plus the debug-only entries that sit under it. Each new debug surface
+ * lands here rather than deeper inside [ConfigContent], which is what kept growing every time one
+ * was added.
+ */
+@Composable
+private fun IntegrationsSection(
+    onNavigateToSystemAccess: () -> Unit,
+    onNavigateToVibesyncDebug: () -> Unit,
+    onNavigateToCanvasDebug: () -> Unit,
+) {
+    CardGroup(title = {
+        ConfigSectionTitle(stringResource(R.string.screen_config_integrations_section))
+    }) {
+        item(
+            onClick = onNavigateToSystemAccess,
+            headlineContent = { Text(stringResource(R.string.screen_system_access_title)) },
+            supportingContent = { Text(stringResource(R.string.screen_system_access_entry_description)) },
+            leadingContent = { Icon(LettaIcons.Key, contentDescription = null) },
+        )
+        if (BuildConfig.DEBUG) {
+            item(
+                onClick = onNavigateToVibesyncDebug,
+                headlineContent = { Text(stringResource(R.string.screen_vibesync_debug_title)) },
+                supportingContent = { Text(stringResource(R.string.screen_vibesync_debug_entry_description)) },
+                leadingContent = { Icon(LettaIcons.Database, contentDescription = null) },
+            )
+            item(
+                onClick = onNavigateToCanvasDebug,
+                headlineContent = { Text(stringResource(R.string.screen_canvas_debug_title)) },
+                supportingContent = { Text(stringResource(R.string.screen_canvas_debug_entry_description)) },
+                leadingContent = { Icon(LettaIcons.Edit, contentDescription = null) },
+            )
+        }
+    }
+}

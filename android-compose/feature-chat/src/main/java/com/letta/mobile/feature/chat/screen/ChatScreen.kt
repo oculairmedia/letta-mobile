@@ -30,6 +30,7 @@ internal fun ChatScreen(
     onBugCommand: (() -> Unit)? = null,
     onViewSubagentConversation: ((String, String) -> Unit)? = null,
     onOpenAgentPane: (() -> Unit)? = null,
+    onOpenCanvas: (() -> Unit)? = null,
     activeSubagentSource: ActiveSubagentSource? = null,
     selfTodoSource: com.letta.mobile.feature.chat.subagent.SelfTodoSource? = null,
     viewModel: AdminChatViewModel = hiltViewModel(),
@@ -48,11 +49,12 @@ internal fun ChatScreen(
         is ChatBackground.Gradient -> Modifier.background(chatBackground.toBrush())
     }
 
-    val navigation = remember(onBugCommand, onViewSubagentConversation, onOpenAgentPane) {
+    val navigation = remember(onBugCommand, onViewSubagentConversation, onOpenAgentPane, onOpenCanvas) {
         ChatScreenNavigationCallbacks(
             onBugCommand = onBugCommand,
             onViewSubagentConversation = onViewSubagentConversation,
             onOpenAgentPane = onOpenAgentPane,
+            onOpenCanvas = onOpenCanvas,
         )
     }
 

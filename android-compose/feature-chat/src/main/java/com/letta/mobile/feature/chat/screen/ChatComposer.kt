@@ -119,6 +119,7 @@ private data class ChatComposerCallbacks(
     val onAttachImage: () -> Unit,
     val onSlashCommandSelected: (SlashCommand) -> Unit,
     val onSlashCommandUninstall: (SlashCommand) -> Unit,
+    val onOpenCanvas: (() -> Unit)? = null,
 )
 
 private data class ChatComposerVoice(
@@ -156,6 +157,7 @@ internal fun ChatComposer(
     availableTools: List<Tool> = emptyList(),
     isCancelling: Boolean = false,
     agentId: String? = null,
+    onOpenCanvas: (() -> Unit)? = null,
     /** Status beside the mascot companion (the thinking indicator); drawn in the same row, after the character. */
     companionStatus: (@Composable () -> Unit)? = null,
     /** The companion mascot was tapped: open the agent's pane. */
@@ -179,6 +181,7 @@ internal fun ChatComposer(
         onAttachImage = onAttachImage,
         onSlashCommandSelected = onSlashCommandSelected,
         onSlashCommandUninstall = onSlashCommandUninstall,
+        onOpenCanvas = onOpenCanvas,
     )
     ChatComposerContent(
         model = model,
@@ -270,6 +273,12 @@ private fun ChatComposerContent(
             onToolSelected = { tool ->
                 showComposerActions = false
                 onToolSelected(tool)
+            },
+            onOpenCanvas = callbacks.onOpenCanvas?.let { openCanvas ->
+                {
+                    showComposerActions = false
+                    openCanvas()
+                }
             },
         ),
     )

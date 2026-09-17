@@ -13,6 +13,7 @@ internal data class ChatScreenNavigationCallbacks(
     val onViewSubagentConversation: ((String, String) -> Unit)? = null,
     /** Open the agent's pane (the scaffold drawer) - the composer companion mascot taps into it. */
     val onOpenAgentPane: (() -> Unit)? = null,
+    val onOpenCanvas: (() -> Unit)? = null,
 )
 
 internal data class ChatContentCallbacks(

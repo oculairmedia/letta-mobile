@@ -350,6 +350,55 @@ object LettaDatabaseMigrations {
         }
     }
 
+    val MIGRATION_15_16 = object : Migration(15, 16) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `canvas_documents` (
+                    `id` TEXT NOT NULL,
+                    `agentId` TEXT,
+                    `conversationId` TEXT,
+                    `title` TEXT NOT NULL,
+                    `revision` INTEGER NOT NULL,
+                    `sceneJson` TEXT NOT NULL,
+                    `updatedAtEpochMs` INTEGER NOT NULL,
+                    PRIMARY KEY(`id`)
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_canvas_documents_agentId` ON `canvas_documents` (`agentId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_canvas_documents_conversationId` ON `canvas_documents` (`conversationId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_canvas_documents_updatedAtEpochMs` ON `canvas_documents` (`updatedAtEpochMs`)")
+        }
+    }
+
+    val MIGRATION_16_17 = object : Migration(16, 17) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `canvas_ops` (
+                    `opId` TEXT NOT NULL,
+                    `canvasId` TEXT NOT NULL,
+                    `lamport` INTEGER NOT NULL,
+                    `actorId` TEXT NOT NULL,
+                    `opType` TEXT NOT NULL,
+                    `payloadJson` TEXT NOT NULL,
+                    `createdAtEpochMs` INTEGER NOT NULL,
+                    PRIMARY KEY(`opId`)
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_canvas_ops_canvasId_lamport` ON `canvas_ops` (`canvasId`, `lamport`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_canvas_ops_canvasId` ON `canvas_ops` (`canvasId`)")
+        }
+    }
+
+    val MIGRATION_17_18 = object : Migration(17, 18) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `canvas_documents` ADD COLUMN `aclJson` TEXT")
+        }
+    }
+
     val ALL: Array<Migration> = arrayOf(
         MIGRATION_1_2,
         MIGRATION_2_3,
@@ -365,5 +414,8 @@ object LettaDatabaseMigrations {
         MIGRATION_12_13,
         MIGRATION_13_14,
         MIGRATION_14_15,
+        MIGRATION_15_16,
+        MIGRATION_16_17,
+        MIGRATION_17_18,
     )
 }

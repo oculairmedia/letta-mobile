@@ -19,7 +19,9 @@ import com.letta.mobile.desktop.chat.ChatDetailPane
 import com.letta.mobile.desktop.chat.ChatDetailPaneActions
 import com.letta.mobile.desktop.chat.ChatDetailPaneState
 import com.letta.mobile.desktop.chat.DesktopBackgroundTasksToggle
+import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.desktop.memory.DesktopBlockApi
+import com.letta.mobile.ui.canvas.CanvasWorkspace
 import kotlinx.coroutines.CoroutineScope
 
 internal data class DesktopMainContentInputs(
@@ -35,6 +37,7 @@ internal data class DesktopMainContentInputs(
     val showBackgroundTasks: Boolean,
     val subagentRepository: SubagentRepository?,
     val activeSubagents: List<SubagentEntry>,
+    val activeCanvasSession: CanvasSession? = null,
 )
 
 internal data class DesktopMainContentActions(
@@ -43,6 +46,8 @@ internal data class DesktopMainContentActions(
     val chatDetailActions: ChatDetailPaneActions,
     val destinationActions: DestinationContentActions,
     val onShowBackgroundTasks: () -> Unit,
+    val onCloseCanvas: () -> Unit = {},
+    val onShareCanvasToChat: ((bytes: ByteArray, mimeType: String) -> Unit)? = null,
 )
 
 @Composable
@@ -94,6 +99,20 @@ internal fun DesktopMainContentPane(
                 scope = inputs.chatScope,
                 onClose = actions.onEditAgentClose,
                 onSaved = actions.onEditAgentSaved,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    } else if (inputs.activeCanvasSession != null) {
+        androidx.compose.material3.Surface(
+            modifier = Modifier.width(540.dp).fillMaxHeight(),
+            color = androidx.compose.material3.MaterialTheme.colorScheme.surface,
+            border = androidx.compose.foundation.BorderStroke(1.dp, androidx.compose.material3.MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+        ) {
+            CanvasWorkspace(
+                session = inputs.activeCanvasSession,
+                presenceTransport = com.letta.mobile.desktop.canvas.DesktopCanvasHostSync.presenceTransport,
+                onNavigateBack = actions.onCloseCanvas,
+                onShareToChat = actions.onShareCanvasToChat,
                 modifier = Modifier.fillMaxSize(),
             )
         }

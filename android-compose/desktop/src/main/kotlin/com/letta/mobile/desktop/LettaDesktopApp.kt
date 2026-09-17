@@ -67,6 +67,7 @@ import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.letta.mobile.desktop.chat.DesktopChatController
 import kotlinx.coroutines.flow.StateFlow
 import kotlin.time.Duration.Companion.seconds
 import java.awt.Window
@@ -784,21 +785,24 @@ internal fun LettaDesktopApp(
                     )
                     RailDivider()
                     }
-                    val composerCommands = remember(
-                        chatController,
-                        agentSlashCommands,
-                        selectedAgentId,
-                    ) {
-                        buildComposerCommands(
-                            BuildComposerCommandsParams(
-                                chatController = chatController,
-                                agentSlashCommands = agentSlashCommands,
-                                onCreateAgent = { overlays.newAgent = true },
-                                onEditAgent = { editAgentId = selectedAgentId },
-                                onNavigate = { selectedDestination = it },
-                            ),
-                        )
-                    }
+                val canvasStore = remember { com.letta.mobile.desktop.canvas.DesktopCanvasDocumentStore() }
+                var activeCanvasSession by remember { mutableStateOf<com.letta.mobile.data.canvas.CanvasSession?>(null) }
+                val composerCommands = rememberDesktopComposerCommands(
+                    DesktopComposerCommandsParams(
+                        chatController = chatController,
+                        agentSlashCommands = agentSlashCommands,
+                        selectedConversationId = chatState.selectedConversationId,
+                        selectedAgentId = selectedAgentId,
+                        selectedAgentName = selectedAgentName,
+                        selectedDestination = selectedDestination,
+                        canvasStore = canvasStore,
+                        chatScope = chatScope,
+                        onNavigate = { selectedDestination = it },
+                        onCreateAgent = { overlays.newAgent = true },
+                        onEditAgent = { editAgentId = it },
+                        onCanvasSessionChange = { activeCanvasSession = it },
+                    ),
+                )
                     val contextUsage = rememberFocusedContextUsage(
                         agentId = selectedAgentId,
                         conversationId = chatState.selectedConversationId,
@@ -865,6 +869,7 @@ internal fun LettaDesktopApp(
                             showBackgroundTasks = showBackgroundTasks,
                             subagentRepository = subagentRepository,
                             activeSubagents = activeSubagents,
+                        activeCanvasSession = activeCanvasSession,
                         ),
                         actions = DesktopMainContentActions(
                             onEditAgentClose = { editAgentId = null },
@@ -873,27 +878,25 @@ internal fun LettaDesktopApp(
                                 editAgentId = null
                                 if (nameChanged) chatController.retryConnection()
                             },
-                            chatDetailActions = ChatDetailPaneActions(
-                                onComposerTextChanged = chatController::updateComposerText,
-                                onSend = chatController::send,
-                                onSubmitApproval = chatController::submitApproval.takeIf { canSubmitApprovals },
+                        onCloseCanvas = { activeCanvasSession = null },
+                        onShareCanvasToChat = { bytes, mimeType ->
+                            handleDesktopShareCanvasToChat(bytes, mimeType, chatController) {
+                                selectedDestination = DesktopDestination.Conversations
+                                activeCanvasSession = null
+                            }
+                        },
+                        chatDetailActions = createDesktopChatDetailPaneActions(
+                            CreateDesktopChatDetailPaneActionsParams(
+                                chatController = chatController,
+                                canSubmitApprovals = canSubmitApprovals,
                                 onA2uiAction = ::dispatchA2uiAction,
                                 onAttachImage = { pickerLauncher.launch() },
-                                onRemoveImageAttachment = chatController::removeImageAttachment,
-                                onRetryConnection = chatController::retryConnection,
-                                onModelSelected = chatController::setConversationModel,
-                                onChangeWorkingDirectory = chatController::changeSelectedConversationWorkingDirectory,
                                 onOpenModelPicker = { overlays.modelPicker = true },
-                                onOnboardingTask = { kind ->
-                                    when (kind) {
-                                        OnboardingTaskKind.SetPersona -> editAgentId = selectedAgentId
-                                        OnboardingTaskKind.ConnectChannel ->
-                                            selectedDestination = DesktopDestination.Channels
-                                        OnboardingTaskKind.AddSkills ->
-                                            selectedDestination = DesktopDestination.Agents
-                                    }
-                                },
+                                onSetPersona = { editAgentId = selectedAgentId },
+                                onNavigateToChannels = { selectedDestination = DesktopDestination.Channels },
+                                onNavigateToAgents = { selectedDestination = DesktopDestination.Agents },
                                 onOpenAgent = ::openAgent,
+                            ),
                                 // The companion mascot is the way into its agent: bring the agent
                                 // pane (the sidebar) back if it was collapsed and leave any editor.
                                 onOpenAgentPane = {
@@ -977,29 +980,18 @@ internal fun LettaDesktopApp(
                     avatarStyleByAgentId = avatarStyleByAgentId,
                     isDragActive = isDragActive,
                 ),
-                actions = DesktopOverlayActions(
-                    onModelSelected = chatController::setConversationModel,
-                    onSelectConversation = {
-                        chatController.selectConversation(it)
-                        selectedDestination = DesktopDestination.Conversations
-                    },
-                    onOpenAgent = ::openAgent,
-                    onNavigate = { selectedDestination = it },
-                    onCreateAgent = { name, modelValue ->
-                        val (model, embedding) = resolveNewAgentDefaults(
-                            agentRepository = dataBindings.sessionGraphProvider.current.agentRepository,
-                            templateAgentId = selectedAgentId,
-                            modelValue = modelValue,
-                        )
-                        chatController.createAgent(name = name, model = model, embedding = embedding)
-                        selectedDestination = DesktopDestination.Conversations
-                    },
-                    onIrohIdentityReset = {
-                        com.letta.mobile.desktop.security.DesktopIrohIdentity.reset()
-                        // Rebuild the session graph so the next dial mints and
-                        // uses the new identity.
-                        applyConfig(activeConfig)
-                    },
+                actions = createDesktopOverlayActions(
+                    CreateDesktopOverlayActionsParams(
+                        chatController = chatController,
+                        onSelectDestination = { selectedDestination = it },
+                        onOpenAgent = ::openAgent,
+                        agentRepository = dataBindings.sessionGraphProvider.current.agentRepository,
+                        selectedAgentId = selectedAgentId,
+                        onIrohIdentityReset = {
+                            com.letta.mobile.desktop.security.DesktopIrohIdentity.reset()
+                            applyConfig(activeConfig)
+                        },
+                    ),
                 ),
             )
           }
@@ -1128,6 +1120,7 @@ private fun desktopActiveTitle(destination: DesktopDestination, conversationTitl
     if (destination != DesktopDestination.Conversations) return destination.label
     return conversationTitle ?: "Letta Desktop"
 }
+
 
 /**
  * Modal for creating a new agent: name + optional model, created with base

@@ -13,6 +13,7 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -21,7 +22,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.toRoute
 import com.letta.mobile.AppLaunchTarget
 import com.letta.mobile.channel.ChatPushAlarmScheduler
 import com.letta.mobile.data.model.LettaConfig
@@ -80,7 +83,55 @@ private fun androidx.navigation.NavGraphBuilder.appChatGraph(navController: NavH
                 popUpTo<AgentChatRoute> { inclusive = true }
             }
         },
+        onNavigateToCanvas = { conversationId ->
+            navController.navigate(CanvasRoute(canvasId = "", conversationId = conversationId))
+        },
     )
+}
+
+private fun androidx.navigation.NavGraphBuilder.appCanvasGraph(navController: NavHostController) {
+    composable<CanvasRoute> { backStackEntry ->
+        val route = backStackEntry.toRoute<CanvasRoute>()
+        val coroutineScope = rememberCoroutineScope()
+        com.letta.mobile.ui.screens.canvas.CanvasScreen(
+            canvasId = route.canvasId,
+            conversationId = route.conversationId,
+            onNavigateBack = { navController.popBackStack() },
+            onShareToChat = { bytes, mimeType ->
+                val result = com.letta.mobile.data.canvas.CanvasShare.packageForChat(
+                    bytes,
+                    com.letta.mobile.data.canvas.CanvasMimeType.fromValue(mimeType),
+                )
+                result.onSuccess { image ->
+                    coroutineScope.launch {
+                        val target = com.letta.mobile.data.canvas.CanvasConversationTarget.from(route.conversationId)
+                        com.letta.mobile.data.canvas.CanvasShare.stageForConversation(target, image)
+                    }
+                }
+                navController.popBackStack()
+            },
+        )
+    }
+}
+
+@Suppress("NoAnyType")
+private fun resolveStartDestination(
+    hasConfig: Boolean,
+    initialNotificationTarget: AppLaunchTarget?,
+    restoredChatSelection: LastChatSelection?,
+    fallbackAgentId: String?,
+): Any = when {
+    hasConfig && initialNotificationTarget != null -> initialNotificationTarget.toRoute()
+    hasConfig && restoredChatSelection != null -> restoredChatSelection.let { selection ->
+        AgentChatRoute(
+            agentId = selection.agentId,
+            agentName = selection.agentName,
+            conversationId = selection.conversationId,
+        )
+    }
+    hasConfig && fallbackAgentId != null -> AgentChatRoute(agentId = fallbackAgentId)
+    hasConfig -> ConversationsRoute
+    else -> ConfigRoute()
 }
 
 val LocalAnimatedVisibilityScope = compositionLocalOf<AnimatedVisibilityScope?> { null }
@@ -128,34 +179,19 @@ fun AppNavGraph(
     val openBackendSwitcher: () -> Unit = remember { { showBackendSwitcher = true } }
 
     val initialNotificationTarget = remember { notificationTarget }
-    val restoredChatSelection = lastChatSelection
-    val fallbackAgentId = favoriteAgentId ?: adminAgentId
-    val startDestination: Any = when {
-        hasConfig && initialNotificationTarget != null -> initialNotificationTarget.toRoute()
-        hasConfig && restoredChatSelection != null -> restoredChatSelection.let { selection ->
-            AgentChatRoute(
-                agentId = selection.agentId,
-                agentName = selection.agentName,
-                conversationId = selection.conversationId,
-            )
-        }
-        hasConfig && fallbackAgentId != null -> AgentChatRoute(agentId = fallbackAgentId)
-        // Default landing surface is Conversations, not the Projects home —
-        // opening the app should drop the user into their chats (2026-08-01,
-        // user-requested; Projects stays one tap away on the nav rail).
-        hasConfig -> ConversationsRoute
-        else -> ConfigRoute()
-    }
+    val startDestination = resolveStartDestination(
+        hasConfig = hasConfig,
+        initialNotificationTarget = initialNotificationTarget,
+        restoredChatSelection = lastChatSelection,
+        fallbackAgentId = favoriteAgentId ?: adminAgentId,
+    )
 
-    LaunchedEffect(notificationTarget) {
-        val target = notificationTarget ?: return@LaunchedEffect
-        if (target != initialNotificationTarget) {
-            navController.navigate(target.toRoute()) {
-                launchSingleTop = true
-            }
-        }
-        onNotificationTargetConsumed()
-    }
+    HandleNotificationTarget(
+        notificationTarget = notificationTarget,
+        initialNotificationTarget = initialNotificationTarget,
+        navController = navController,
+        onConsumed = onNotificationTargetConsumed,
+    )
 
     NavHost(
         navController = navController,
@@ -174,9 +210,7 @@ fun AppNavGraph(
             clearAllData = { navViewModel.clearAllData() },
         )
 
-        configGraph(
-            navController = navController,
-        )
+        configGraph(navController = navController)
 
         conversationsGraph(
             navController = navController,
@@ -184,26 +218,49 @@ fun AppNavGraph(
             openBackendSwitcher = openBackendSwitcher,
         )
 
-        editAgentGraph(
-            onNavigateBack = { navController.popBackStack() }
-        )
+        editAgentGraph(onNavigateBack = { navController.popBackStack() })
 
         appChatGraph(navController)
+
+        appCanvasGraph(navController)
     }
 
-    // letta-mobile-cdlk: render the backend-switcher sheet at the top level
-    // so it overlays whichever screen owns the pill. The Hilt-scoped
-    // ConfigListViewModel that BackendSwitcherSheet pulls observes the
-    // settings flow, so the sheet contents stay fresh across reopens.
-    if (showBackendSwitcher) {
+    AppBackendSwitcherHost(
+        show = showBackendSwitcher,
+        onDismiss = { showBackendSwitcher = false },
+        navController = navController,
+    )
+}
+
+@Composable
+private fun HandleNotificationTarget(
+    notificationTarget: AppLaunchTarget?,
+    initialNotificationTarget: AppLaunchTarget?,
+    navController: NavHostController,
+    onConsumed: () -> Unit,
+) {
+    LaunchedEffect(notificationTarget) {
+        val target = notificationTarget ?: return@LaunchedEffect
+        if (target != initialNotificationTarget) {
+            navController.navigate(target.toRoute()) {
+                launchSingleTop = true
+            }
+        }
+        onConsumed()
+    }
+}
+
+@Composable
+private fun AppBackendSwitcherHost(
+    show: Boolean,
+    onDismiss: () -> Unit,
+    navController: NavHostController,
+) {
+    if (show) {
         BackendSwitcherSheet(
-            onDismiss = { showBackendSwitcher = false },
-            onNavigateToAddNewServer = {
-                navController.navigate(ConfigRoute(createNew = true))
-            },
-            onNavigateToEditServer = {
-                navController.navigate(ConfigRoute())
-            },
+            onDismiss = onDismiss,
+            onNavigateToAddNewServer = { navController.navigate(ConfigRoute(createNew = true)) },
+            onNavigateToEditServer = { navController.navigate(ConfigRoute()) },
         )
     }
 }

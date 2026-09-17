@@ -292,6 +292,14 @@ tasks.register<JavaExec>("runShaderLookdev") {
     systemProperty("lookdev.shaderDir", layout.projectDirectory.dir("lookdev-shaders").asFile.absolutePath)
 }
 
+// Dedicated runner for the Canvas Workspace debug window (P0 interactive review).
+tasks.register<JavaExec>("runCanvas") {
+    group = "application"
+    description = "Runs the standalone Canvas Workspace window (interactive DrawBox editor + sample import/export)."
+    mainClass.set("com.letta.mobile.desktop.canvas.CanvasDebugWindowKt")
+    classpath = sourceSets.main.get().runtimeClasspath
+}
+
 /**
  * Lowest JDK that can RUN this app: Jewel ships class-file v69 (Java 25).
  * Compilation still targets JVM 21 for the Iroh binding, so this is
