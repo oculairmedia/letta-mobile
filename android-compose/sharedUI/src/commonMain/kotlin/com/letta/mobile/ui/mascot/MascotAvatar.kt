@@ -103,45 +103,6 @@ fun mascotAvailable(agentId: String?): Boolean {
 }
 
 /**
- * The agent's avatar: a tile of [size] the live mascot fills edge to edge, overscaled by
- * [overscale] and cropped by the tile's clip - an avatar photo, not a figure in a frame. Draws
- * [fallback] when the agent has no identity or the host has no renderer. [live] defaults to the
- * product rule ([mascotAtWork]: moving while the agent works, a still otherwise); pass false for a
- * chip that sits next to a live mascot of the same agent, where two of them moving is one too many.
- */
-@Composable
-fun MascotAvatar(
-    agentId: String?,
-    size: Dp,
-    modifier: Modifier = Modifier,
-    cornerRadius: Dp = 7.dp,
-    onClick: (() -> Unit)? = null,
-    overscale: Float = MASCOT_TILE_OVERSCALE,
-    live: Boolean = mascotAtWork(agentId),
-    fallback: @Composable () -> Unit,
-) {
-    val identity = agentId?.let { LocalMascotRegistry.current.identities[it] }
-    val host = LocalMascotHost.current
-    if (agentId == null || identity == null || !host.available || host.entry(agentId, identity) == null) {
-        fallback()
-        return
-    }
-    Box(
-        modifier = modifier
-            .size(size)
-            .clip(RoundedCornerShape(cornerRadius))
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (live) {
-            MascotLive(agentId, identity, size = size * overscale)
-        } else {
-            MascotStill(agentId, identity, size = size * overscale)
-        }
-    }
-}
-
-/**
  * The live mascot for one agent at [size], from the process-wide entry so it never restarts
  * when the view changes. Feeds the entry's director the agent's presence and the frame clock,
  * and feeds [com.letta.mobile.avatar.core.GazeDirector] the pointer, this tile, and any
@@ -310,3 +271,51 @@ const val MASCOT_TILE_OVERSCALE = 1.6f
 /** Distinguishes several surfaces of one agent in [MascotIdentityRegistry.mascotBounds]; composition-thread only. */
 private var slotCounter = 0
 private val GAZE_MIN_REACH = 360.dp
+
+/** The identity to draw for [agentId], or null when it has none or the host cannot draw it. */
+@Composable
+private fun drawableIdentity(agentId: String?): MascotIdentity? {
+    val identity = agentId?.let { LocalMascotRegistry.current.identities[it] } ?: return null
+    val host = LocalMascotHost.current
+    return identity.takeIf { host.available && host.entry(agentId, identity) != null }
+}
+
+private fun Modifier.clickableIfSet(onClick: (() -> Unit)?): Modifier {
+    return if (onClick != null) clickable(onClick = onClick) else this
+}
+
+/**
+ * The agent's avatar: a tile of [size] the live mascot fills edge to edge, overscaled by
+ * [overscale] and cropped by the tile's clip - an avatar photo, not a figure in a frame. Draws
+ * [fallback] when the agent has no identity or the host has no renderer. [live] defaults to the
+ * product rule ([mascotAtWork]: moving while the agent works, a still otherwise); pass false for a
+ * chip that sits next to a live mascot of the same agent, where two of them moving is one too many.
+ */
+@Composable
+fun MascotAvatar(
+    agentId: String?,
+    size: Dp,
+    modifier: Modifier = Modifier,
+    cornerRadius: Dp = 7.dp,
+    onClick: (() -> Unit)? = null,
+    overscale: Float = MASCOT_TILE_OVERSCALE,
+    live: Boolean = mascotAtWork(agentId),
+    fallback: @Composable () -> Unit,
+) {
+    val identity = drawableIdentity(agentId)
+    if (agentId == null || identity == null) {
+        fallback()
+        return
+    }
+    Box(
+        modifier = modifier.size(size).clip(RoundedCornerShape(cornerRadius)).clickableIfSet(onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (live) {
+            MascotLive(agentId, identity, size = size * overscale)
+        } else {
+            MascotStill(agentId, identity, size = size * overscale)
+        }
+    }
+}
+

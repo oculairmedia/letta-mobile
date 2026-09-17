@@ -143,8 +143,7 @@ private fun CanonicalMessageListContent(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 items(live.size, key = { "overlay-" + live[it].key }) { index ->
-                    val older = live.getOrNull(index + 1)
-                        ?: settled.itemSnapshotList.items.firstOrNull()?.item
+                    val older = live.getOrNull(index + 1) ?: settled.itemSnapshotList.items.firstOrNull()?.item
                     CanonicalRow(live[index], older, today)
                 }
                 items(

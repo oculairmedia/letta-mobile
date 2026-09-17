@@ -107,8 +107,6 @@ private fun runDesktopApplication(
             // LettaDesktopApp. See letta-mobile-3arhe.1.
             var headerChrome by remember { mutableStateOf(DesktopHeaderChromeState.Empty) }
             val mascots = remember { com.letta.mobile.ui.mascot.MascotIdentityRegistry() }
-            // The transport verb: one mascot per agent, moved between the seats the surfaces declare.
-            val mascotTransport = remember { com.letta.mobile.ui.mascot.MascotTransport() }
             CompositionLocalProvider(
                 LocalWindowExceptionHandlerFactory provides CrashReportingExceptionHandlerFactory,
                 LocalMermaidDiagramRenderer provides DesktopMermaidDiagramRenderer,
@@ -116,7 +114,8 @@ private fun runDesktopApplication(
                 // with the window-owned registry of identities, presence and the pointer.
                 com.letta.mobile.ui.mascot.LocalMascotHost provides com.letta.mobile.desktop.avatar.rive.DesktopMascotHost,
                 com.letta.mobile.ui.mascot.LocalMascotRegistry provides mascots,
-                com.letta.mobile.ui.mascot.LocalMascotTransport provides mascotTransport,
+                // The transport verb: one mascot per agent, moved between the seats the surfaces declare.
+                com.letta.mobile.ui.mascot.LocalMascotTransport provides remember { com.letta.mobile.ui.mascot.MascotTransport() },
             ) {
                 // Windows touchscreens: every text field that starts an input
                 // session while the last pointer input came from a finger gets
@@ -149,22 +148,7 @@ private fun runDesktopApplication(
                         // chrome alone.
                         DesktopChatFontScaleHost {
                             // Every mascot in the app looks toward the cursor; capture it once, at the root.
-                            Box(
-                                Modifier.fillMaxSize().pointerInput(Unit) {
-                                    awaitPointerEventScope {
-                                        while (true) {
-                                            val e = awaitPointerEvent(PointerEventPass.Initial)
-                                            when (e.type) {
-                                                PointerEventType.Move ->
-                                                    mascots.cursor.value = e.changes.firstOrNull()?.position
-                                                PointerEventType.Exit ->
-                                                    mascots.cursor.value = null
-                                                else -> Unit
-                                            }
-                                        }
-                                    }
-                                },
-                            ) {
+                            MascotCursorCapture(mascots) {
                             LettaDesktopApp(
                                 shell = DesktopAppShellBindings(
                                     nucleusApplicationScope = nucleusScope,
