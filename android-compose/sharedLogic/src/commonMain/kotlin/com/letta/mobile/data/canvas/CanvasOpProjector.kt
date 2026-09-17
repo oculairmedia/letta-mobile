@@ -45,6 +45,7 @@ object CanvasOpProjector {
     private const val DOC_REMOVED = "_removed"
     private const val DOC_FRAME = "frame"
     private const val DOC_COLOR = "color"
+    private const val DOC_STYLE = "style"
 
     /**
      * How many tombstones a scene keeps. They cannot grow without bound, and the ones that matter
@@ -232,7 +233,13 @@ object CanvasOpProjector {
             .mapNotNull { entry ->
                 val id = runCatching { entry["id"]?.jsonPrimitive?.content }.getOrNull() ?: return@mapNotNull null
                 val json = runCatching { entry[DOC_JSON]?.jsonPrimitive?.content }.getOrNull() ?: return@mapNotNull null
-                CanvasSceneDocument(id = id, json = json, frame = documentFrame(entry), color = documentColor(entry))
+                CanvasSceneDocument(
+                    id = id,
+                    json = json,
+                    frame = documentFrame(entry),
+                    color = documentColor(entry),
+                    style = documentStyle(entry),
+                )
             }
             .sortedBy { it.id }
     }
@@ -256,6 +263,14 @@ object CanvasOpProjector {
 
     private fun documentColor(entry: JsonObject): String? =
         runCatching { entry[DOC_COLOR]?.jsonPrimitive?.content }.getOrNull()?.takeIf { it.isNotBlank() }
+
+    private fun documentStyle(entry: JsonObject): CanvasTextStyle? {
+        val raw = runCatching { entry[DOC_STYLE]?.jsonObject }.getOrNull() ?: return null
+        return runCatching { json.decodeFromJsonElement(CanvasTextStyle.serializer(), raw) }.getOrNull()
+    }
+
+    private fun styleJson(style: CanvasTextStyle): JsonObject =
+        json.encodeToJsonElement(CanvasTextStyle.serializer(), style).jsonObject
 
     private fun frameJson(frame: CanvasDocumentFrame): JsonObject = buildJsonObject {
         put("x", JsonPrimitive(frame.x))
@@ -282,6 +297,7 @@ object CanvasOpProjector {
         json: String?,
         frame: CanvasDocumentFrame? = null,
         color: String? = null,
+        style: CanvasTextStyle? = null,
     ): String {
         val parsed = parseScene(sceneJson)
         val entries = documentEntries(parsed).toMutableList()
@@ -290,11 +306,13 @@ object CanvasOpProjector {
         val existing = entries.getOrNull(index)?.takeIf { !isRemovedDocument(it) }
         val keptFrame = frame ?: existing?.let(::documentFrame)
         val keptColor = color ?: existing?.let(::documentColor)
+        val keptStyle = style ?: existing?.let(::documentStyle)
         val entry = buildJsonObject {
             put("id", JsonPrimitive(documentId))
             if (json != null) put(DOC_JSON, JsonPrimitive(json)) else put(DOC_REMOVED, JsonPrimitive(true))
             if (json != null && keptFrame != null) put(DOC_FRAME, frameJson(keptFrame))
             if (json != null && keptColor != null) put(DOC_COLOR, JsonPrimitive(keptColor))
+            if (json != null && keptStyle != null) put(DOC_STYLE, styleJson(keptStyle))
             put(LAMPORT, JsonPrimitive(provenance.lamport))
             put(ACTOR, JsonPrimitive(provenance.actorId))
         }
@@ -309,7 +327,7 @@ object CanvasOpProjector {
     }
 
     private fun upsertDocumentWithLww(sceneJson: String, op: CanvasOp.SetDocumentOp): String =
-        writeDocument(sceneJson, op.documentId, WriterProvenance(op.lamport, op.actorId), op.documentJson, op.frame, op.color)
+        writeDocument(sceneJson, op.documentId, WriterProvenance(op.lamport, op.actorId), op.documentJson, op.frame, op.color, op.style)
 
     private fun removeDocumentWithLww(sceneJson: String, op: CanvasOp.RemoveDocumentOp): String =
         writeDocument(sceneJson, op.documentId, WriterProvenance(op.lamport, op.actorId), null)

@@ -175,7 +175,9 @@ private fun CanvasNoteCard(
         },
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            if (!plain || active) NoteHandleBar(
+            // A note has a handle bar; a text element is just text, with a grip to move it by
+            // while active and everything else in the bar at the top of the board.
+            if (!plain) NoteHandleBar(
                 cardColor = cardColor,
                 onCard = onCard,
                 onDragStart = { gestureActive = true },
@@ -189,8 +191,9 @@ private fun CanvasNoteCard(
                 if (expanded) {
                     CanvasBlockPreview(
                         json = document.json,
-                        onLightSurface = tint != null,
-                        modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 4.dp),
+                        onLightSurface = tint != null && !plain,
+                        style = document.style,
+                        modifier = Modifier.fillMaxSize().padding(start = if (plain) 18.dp else 10.dp, end = 10.dp, top = 4.dp, bottom = 4.dp),
                     )
                 } else {
                     CanvasBlockEditor(
@@ -200,7 +203,16 @@ private fun CanvasNoteCard(
                         active = active,
                         onLightSurface = tint != null && !plain,
                         onToolbar = onToolbar,
-                        modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 4.dp),
+                        style = document.style,
+                        modifier = Modifier.fillMaxSize().padding(start = if (plain) 18.dp else 10.dp, end = 10.dp, top = 4.dp, bottom = 4.dp),
+                    )
+                }
+                if (plain && active) {
+                    TextMoveGrip(
+                        modifier = Modifier.align(Alignment.TopStart),
+                        onDragStart = { gestureActive = true },
+                        onDrag = { delta -> frame = frame.copy(x = frame.x + delta.x, y = frame.y + delta.y) },
+                        onDragEnd = ::commit,
                     )
                 }
                 NoteResizeHandle(
@@ -267,7 +279,7 @@ private fun NoteHandleBar(
             current = cardColor,
             palette = NoteColors,
             label = "Note color",
-            onPick = { picked -> NoteColors.firstOrNull { it.color == picked }?.let(onRecolor) },
+            onPick = { picked -> onRecolor(NamedColor(picked, "picked")) },
             swatchSize = 16.dp,
             modifier = Modifier.size(HANDLE_HEIGHT),
         )
@@ -287,6 +299,40 @@ private fun NoteHandleBar(
                 tint = onCard,
             )
         }
+    }
+}
+
+/** The grip a text element is moved by: a small handle in its top-left corner while active. */
+@Composable
+private fun TextMoveGrip(
+    modifier: Modifier,
+    onDragStart: () -> Unit,
+    onDrag: (Offset) -> Unit,
+    onDragEnd: () -> Unit,
+) {
+    Box(
+        modifier = modifier
+            .size(18.dp)
+            .pointerInput(Unit) {
+                detectDragGestures(
+                    onDragStart = { onDragStart() },
+                    onDragEnd = onDragEnd,
+                    onDragCancel = onDragEnd,
+                    onDrag = { change, dragAmount ->
+                        change.consume()
+                        onDrag(dragAmount)
+                    },
+                )
+            }
+            .semantics { contentDescription = "Move text" },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = Lucide.GripVertical,
+            contentDescription = null,
+            modifier = Modifier.size(14.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

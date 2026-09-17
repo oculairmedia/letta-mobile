@@ -88,9 +88,7 @@ fun CanvasNoteEditorPanel(
                         palette = NoteColors,
                         label = "Note color",
                         onPick = { picked ->
-                            NoteColors.firstOrNull { it.color == picked }?.let { named ->
-                                scope.launch { runCatching { session.recolorDocument(document.id, named.hex) } }
-                            }
+                            scope.launch { runCatching { session.recolorDocument(document.id, picked.toHex()) } }
                         },
                         modifier = Modifier.size(40.dp),
                     )
@@ -105,6 +103,7 @@ fun CanvasNoteEditorPanel(
                     active = true,
                     onLightSurface = tint != null,
                     onToolbar = onToolbar,
+                    style = document.style,
                     modifier = Modifier.fillMaxHeight().fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
                 )
             }

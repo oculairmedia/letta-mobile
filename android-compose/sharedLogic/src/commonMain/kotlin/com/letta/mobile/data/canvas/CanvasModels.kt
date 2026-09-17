@@ -42,6 +42,21 @@ data class CanvasSceneDocument(
     val frame: CanvasDocumentFrame? = null,
     /** The card's colour as `#rrggbb`; null is the workspace's default note colour. */
     val color: String? = null,
+    /** How the text is set; null is the editor's default. */
+    val style: CanvasTextStyle? = null,
+)
+
+/**
+ * How a block document's text is set on the board. [fontScale] multiplies the editor's sizes,
+ * [fontFamily] is one of `sans`, `serif`, `mono`, [textColor] is `#rrggbb`, [align] is `start`,
+ * `center` or `end`. Null fields mean the editor's default, so a style only says what differs.
+ */
+@Serializable
+data class CanvasTextStyle(
+    val fontScale: Float? = null,
+    val fontFamily: String? = null,
+    val textColor: String? = null,
+    val align: String? = null,
 )
 
 /** Where a block document sits on the board: top-left corner and size in world units. */

@@ -85,6 +85,26 @@ class CanvasDocumentBlocksTest {
     }
 
     @Test
+    fun textStyleKeepsAcrossWritesAndDropsOnRemoval() = runTest {
+        val big = CanvasTextStyle(fontScale = 1.4f, fontFamily = "serif", textColor = "#e5484d", align = "center")
+        val s1 = CanvasOpProjector.project("", listOf(
+            CanvasOp.SetDocumentOp(opId = "s1", actorId = "a", lamport = 1, documentId = "t", documentJson = "{}", style = big),
+        ))
+        assertEquals(big, CanvasOpProjector.documentsOf(s1).single().style)
+        val s2 = CanvasOpProjector.project(s1, listOf(set("t", "{\"v\":2}", lamport = 2)))
+        assertEquals(big, CanvasOpProjector.documentsOf(s2).single().style, "typing must not restyle the text")
+        val s3 = CanvasOpProjector.project(s2, listOf(remove("t", lamport = 3), set("t", "{}", lamport = 4)))
+        assertNull(CanvasOpProjector.documentsOf(s3).single().style)
+
+        val session = CanvasSession.create(InMemoryCanvasDocumentStore(), CanvasCreateOptions(title = "t", canvasId = CanvasId("c4")))
+        session.setDocument("t", "")
+        assertNull(session.restyleDocument("missing", big))
+        session.restyleDocument("t", big)
+        assertEquals(big, session.documents().single().style)
+        assertNull(session.setDocument("t", "", style = big), "an unchanged style is not written again")
+    }
+
+    @Test
     fun sessionMovesANoteWithoutRewritingItsText() = runTest {
         val store = InMemoryCanvasDocumentStore()
         val session = CanvasSession.create(store, CanvasCreateOptions(title = "t", canvasId = CanvasId("c2")))

@@ -12,7 +12,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
 import com.letta.mobile.data.canvas.CanvasSession
+import com.letta.mobile.data.canvas.CanvasTextStyle
 import io.github.linreal.cascade.editor.core.Block
 import io.github.linreal.cascade.editor.serialization.loadFromJson
 import io.github.linreal.cascade.editor.serialization.toJson
@@ -60,11 +63,13 @@ fun CanvasBlockEditor(
     onLightSurface: Boolean = false,
     /** Receives the editor's formatting controls while active, null again when it leaves. */
     onToolbar: ((NoteToolbar?) -> Unit)? = null,
+    /** How this document's text is set: size, family, colour, alignment. */
+    style: CanvasTextStyle? = null,
 ) {
     val stateHolder = rememberEditorState(initialBlocks = listOf(Block.paragraph("")))
     val textStates = remember { BlockTextStates() }
     val spanStates = remember { BlockSpanStates() }
-    val theme = rememberCascadeTheme(forceLight = onLightSurface)
+    val theme = rememberCascadeTheme(forceLight = onLightSurface, style = style)
     // What the session last held for this document, verbatim, and the editor's own encoding of it.
     var lastStoredJson by remember(session.canvasId, documentId) { mutableStateOf<String?>(null) }
     var lastEditorJson by remember(session.canvasId, documentId) { mutableStateOf<String?>(null) }
@@ -139,6 +144,7 @@ fun CanvasBlockPreview(
     json: String,
     modifier: Modifier = Modifier,
     onLightSurface: Boolean = false,
+    style: CanvasTextStyle? = null,
 ) {
     val holder = rememberEditorState(initialBlocks = listOf(Block.paragraph("")))
     val textStates = remember { BlockTextStates() }
@@ -153,15 +159,55 @@ fun CanvasBlockPreview(
     CascadeDocumentPreview(
         blocks = holder.state.blocks,
         modifier = modifier,
-        theme = rememberCascadeTheme(forceLight = onLightSurface),
+        theme = rememberCascadeTheme(forceLight = onLightSurface, style = style),
         config = CascadeDocumentPreviewConfig.Default,
     )
 }
 
 @Composable
-internal fun rememberCascadeTheme(forceLight: Boolean = false): CascadeEditorTheme {
+internal fun rememberCascadeTheme(forceLight: Boolean = false, style: CanvasTextStyle? = null): CascadeEditorTheme {
     val dark = !forceLight && MaterialTheme.colorScheme.background.luminance() < DARK_LUMINANCE_THRESHOLD
-    return remember(dark) { if (dark) CascadeEditorTheme.dark() else CascadeEditorTheme.light() }
+    return remember(dark, style) {
+        val base = if (dark) CascadeEditorTheme.dark() else CascadeEditorTheme.light()
+        if (style == null) base else base.applyStyle(style)
+    }
+}
+
+/** The document's [CanvasTextStyle] laid over a base theme: sizes scaled, family, colour, alignment. */
+internal fun CascadeEditorTheme.applyStyle(style: CanvasTextStyle): CascadeEditorTheme {
+    val scale = style.fontScale ?: 1f
+    val family = when (style.fontFamily) {
+        "serif" -> FontFamily.Serif
+        "mono" -> FontFamily.Monospace
+        "sans" -> FontFamily.SansSerif
+        else -> null
+    }
+    val align = when (style.align) {
+        "center" -> TextAlign.Center
+        "end" -> TextAlign.End
+        "start" -> TextAlign.Start
+        else -> null
+    }
+    val color = parseHexColor(style.textColor)
+    fun androidx.compose.ui.text.TextStyle.styled(): androidx.compose.ui.text.TextStyle = copy(
+        fontSize = if (fontSize.isSp) fontSize * scale else fontSize,
+        fontFamily = family ?: fontFamily,
+        textAlign = align ?: textAlign,
+    )
+    val t = typography
+    return copy(
+        typography = t.copy(
+            body = t.body.styled(),
+            heading1 = t.heading1.styled(),
+            heading2 = t.heading2.styled(),
+            heading3 = t.heading3.styled(),
+            heading4 = t.heading4.styled(),
+            heading5 = t.heading5.styled(),
+            heading6 = t.heading6.styled(),
+            code = t.code.styled(),
+        ),
+        colors = if (color != null) colors.copy(text = color, cursor = color) else colors,
+    )
 }
 
 private const val PERSIST_INTERVAL_MS = 750L

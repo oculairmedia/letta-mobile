@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.runComposeUiTest
 import com.letta.mobile.ui.canvas.CanvasSamples
 import com.letta.mobile.ui.canvas.CanvasWorkspace
@@ -31,9 +32,16 @@ class CanvasWorkspaceUiTest {
             CanvasWorkspace(controller = controller)
         }
 
-        // Stroke colour from the rail.
+        // Stroke colour from the rail, by preset and then by hex through the same picker.
         onNodeWithContentDescription("Stroke color").performClick()
         onNodeWithContentDescription("Color red").performClick()
+        waitUntil(timeoutMillis = 5000) { controller.state.value.strokeColor == androidx.compose.ui.graphics.Color(0xFFE5484D) }
+        onNodeWithContentDescription("Stroke color").performClick()
+        onNodeWithContentDescription("Hex color").performTextReplacement("#123456")
+        waitUntil(timeoutMillis = 5000) { controller.state.value.strokeColor == androidx.compose.ui.graphics.Color(0xFF123456) }
+        // The red preset picked a moment ago is offered again as a recent colour.
+        onNodeWithContentDescription("Color recent 1").assertExists()
+        onNodeWithContentDescription("Color recent 1").performClick()
         waitUntil(timeoutMillis = 5000) { controller.state.value.strokeColor == androidx.compose.ui.graphics.Color(0xFFE5484D) }
 
         // A closed-shape tool brings up fill and outline; picking a fill reaches the tool settings.
@@ -108,6 +116,21 @@ class CanvasWorkspaceUiTest {
         waitUntil(timeoutMillis = 5000) {
             session.documents().first { it.id == text.id }.json.contains("\"todo\"")
         }
+
+        // A text element has no note chrome, and its bar sets size, family, alignment and colour,
+        // all of which persist with the document.
+        onAllNodesWithContentDescription("Move note").assertCountEquals(0)
+        onNodeWithContentDescription("Size L").performClick()
+        waitUntil(timeoutMillis = 5000) { session.documents().first { it.id == text.id }.style?.fontScale == 1.4f }
+        onNodeWithContentDescription("Size Serif").performClick()
+        waitUntil(timeoutMillis = 5000) { session.documents().first { it.id == text.id }.style?.fontFamily == "serif" }
+        onNodeWithContentDescription("Align center").performClick()
+        waitUntil(timeoutMillis = 5000) { session.documents().first { it.id == text.id }.style?.align == "center" }
+        onNodeWithContentDescription("Text color").performClick()
+        onNodeWithContentDescription("Color blue").performClick()
+        waitUntil(timeoutMillis = 5000) { session.documents().first { it.id == text.id }.style?.textColor == "#3b82f6" }
+        val styled = session.documents().first { it.id == text.id }.style!!
+        kotlin.test.assertEquals(1.4f, styled.fontScale, "colour must not reset the size")
 
         // The active note's bar deletes it.
         onNodeWithContentDescription("Delete note").performClick()
