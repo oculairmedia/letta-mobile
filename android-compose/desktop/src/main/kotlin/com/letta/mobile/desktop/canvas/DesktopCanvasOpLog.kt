@@ -76,6 +76,8 @@ class DesktopCanvasOpLog(
                         if (op.lamport > sinceLamport) {
                             ops.add(op)
                         }
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
                     } catch (_: Exception) {
                         // Skip corrupted line
                     }

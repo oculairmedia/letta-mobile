@@ -220,6 +220,8 @@ class IrohCanvasPresenceTransport(
                 val stream = iterator.next()
                 try {
                     stream.write(frame)
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
                 } catch (_: Throwable) {
                     iterator.remove()
                 }
