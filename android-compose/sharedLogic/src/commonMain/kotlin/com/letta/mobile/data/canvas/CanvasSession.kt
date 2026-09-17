@@ -219,6 +219,37 @@ class CanvasSession(
     /**
      * Diffs [newJson] against current scene and applies the resulting operations locally.
      */
+    /** The canvas's block documents as of the current scene. */
+    fun documents(): List<CanvasSceneDocument> = CanvasOpProjector.documentsOf(sceneJsonOrEmpty())
+
+    /** Writes a block document (Cascade JSON) as a local op; a no-op when the JSON is unchanged. */
+    suspend fun setDocument(
+        documentId: String,
+        documentJson: String,
+        actorId: String = "local_user",
+    ): CanvasDocument? {
+        if (documents().firstOrNull { it.id == documentId }?.json == documentJson) return null
+        return applyLocal(
+            CanvasOp.SetDocumentOp(
+                opId = CanvasOpDiffer.generateOpId("doc"),
+                actorId = actorId,
+                lamport = lamportClock + 1,
+                documentId = documentId,
+                documentJson = documentJson,
+            ),
+        )
+    }
+
+    suspend fun removeDocument(documentId: String, actorId: String = "local_user"): CanvasDocument =
+        applyLocal(
+            CanvasOp.RemoveDocumentOp(
+                opId = CanvasOpDiffer.generateOpId("doc"),
+                actorId = actorId,
+                lamport = lamportClock + 1,
+                documentId = documentId,
+            ),
+        )
+
     suspend fun applyLocalScene(newJson: String, actorId: String = "local_user"): List<CanvasOp> {
         val doc = currentDoc()
         if (doc.acl != null && !doc.acl.canWrite(actorId)) {
