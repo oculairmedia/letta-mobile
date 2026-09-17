@@ -112,6 +112,7 @@ internal fun DesktopMainContentPane(
                 presenceTransport = com.letta.mobile.desktop.canvas.DesktopCanvasHostSync.presenceTransport,
                 onNavigateBack = actions.onCloseCanvas,
                 onShareToChat = actions.onShareCanvasToChat,
+                showTitle = false,
                 modifier = Modifier.fillMaxSize(),
             )
         }

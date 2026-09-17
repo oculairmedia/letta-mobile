@@ -3,7 +3,9 @@
 package com.letta.mobile.desktop.canvas
 
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
@@ -15,6 +17,38 @@ import kotlin.test.Test
 
 class CanvasWorkspaceUiTest {
 
+    private fun androidx.compose.ui.test.ComposeUiTest.openMenuItem(label: String) {
+        onNodeWithContentDescription("More").performClick()
+        onNodeWithText(label).performClick()
+    }
+
+    @Test
+    fun canvasWorkspace_addNote_placesABlockDocumentOnTheBoard() = runComposeUiTest {
+        val store = com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore()
+        val session = kotlinx.coroutines.runBlocking {
+            com.letta.mobile.data.canvas.CanvasSession.create(
+                store = store,
+                options = com.letta.mobile.data.canvas.CanvasCreateOptions(title = "Notes Board", initialSceneJson = ""),
+            )
+        }
+
+        setContent {
+            CanvasWorkspace(session = session)
+        }
+
+        onAllNodesWithContentDescription("Note ", substring = true).assertCountEquals(0)
+        onNodeWithContentDescription("Add note").performClick()
+
+        // The note is written to the session with a frame and shows up on the board as a card.
+        waitUntil(timeoutMillis = 5000) { session.documents().size == 1 }
+        val note = session.documents().single()
+        kotlin.test.assertNotNull(note.frame, "a placed note carries its board frame")
+        waitUntil(timeoutMillis = 5000) {
+            onAllNodesWithContentDescription("Note ${note.id}").fetchSemanticsNodes().isNotEmpty()
+        }
+        onNodeWithContentDescription("Remove note").assertExists()
+    }
+
     @Test
     fun canvasWorkspace_rendersAndRespondsToButtonClicks() = runComposeUiTest {
         setContent {
@@ -23,23 +57,24 @@ class CanvasWorkspaceUiTest {
             )
         }
 
-        // Verify initial action buttons exist
+        // The rarely used commands live behind the overflow menu, not on the board.
+        onNodeWithContentDescription("More").performClick()
         onNodeWithText("Import Build Cycle").assertExists()
         onNodeWithText("Import Daily Loop").assertExists()
         onNodeWithText("Clear").assertExists()
         onNodeWithText("Export JSON").assertExists()
         onNodeWithText("Export SVG").assertExists()
 
-        // Click Clear button and assert state updates
+        // Clear and assert state updates
         onNodeWithText("Clear").performClick()
         onNodeWithText("Elements: 0 | Cleared canvas").assertExists()
 
-        // Click Import Build Cycle button and assert elements load
-        onNodeWithText("Import Build Cycle").performClick()
+        // Import Build Cycle and assert elements load
+        openMenuItem("Import Build Cycle")
         onNodeWithText("Elements: 15 | Imported Build Cycle sample").assertExists()
 
-        // Click Import Daily Loop button and assert elements load
-        onNodeWithText("Import Daily Loop").performClick()
+        // Import Daily Loop and assert elements load
+        openMenuItem("Import Daily Loop")
         onNodeWithText("Imported Daily Loop sample", substring = true).assertExists()
     }
 
@@ -66,8 +101,8 @@ class CanvasWorkspaceUiTest {
         onNodeWithText("Session Diagram", substring = true).assertExists()
         onNodeWithText("Elements: 15", substring = true).assertExists()
 
-        // Click Export JSON
-        onNodeWithText("Export JSON").performClick()
+        // Export JSON
+        openMenuItem("Export JSON")
         onNodeWithText("Exported JSON", substring = true).assertExists()
     }
 
@@ -93,8 +128,8 @@ class CanvasWorkspaceUiTest {
         // Initially revision is 1 and sceneJson is empty
         kotlin.test.assertEquals(1L, session.document.value?.revision)
 
-        // Click Import Build Cycle button to mutate canvas elements
-        onNodeWithText("Import Build Cycle").performClick()
+        // Import Build Cycle to mutate canvas elements
+        openMenuItem("Import Build Cycle")
         onNodeWithText("Elements: 15", substring = true).assertExists()
 
         // Wait for 500ms debounce to fire and saveScene to complete

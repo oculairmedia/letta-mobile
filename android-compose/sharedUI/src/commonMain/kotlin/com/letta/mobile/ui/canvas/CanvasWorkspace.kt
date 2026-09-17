@@ -1,7 +1,6 @@
 package com.letta.mobile.ui.canvas
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,15 +12,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,13 +31,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.canvas.CanvasOpProjector
 import com.letta.mobile.data.canvas.CanvasPresence
 import com.letta.mobile.data.canvas.CanvasPresenceTransport
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.CanvasSessionRegistry
-import kotlinx.coroutines.launch
 import io.ak1.drawbox.DrawBox
 import io.ak1.drawbox.domain.model.Event
 import io.ak1.drawbox.domain.usecase.UseCase
@@ -49,15 +47,18 @@ import io.ak1.drawbox.presentation.reducer.Reducer
 import io.ak1.drawbox.presentation.viewmodel.DrawBoxController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import androidx.compose.material3.FilterChip
-import androidx.compose.runtime.saveable.rememberSaveable
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 /**
- * Shared Canvas Workspace composable for Meridian.
- * Hosts DrawBox editor with lifted demo UI ControlsBar, sample diagram import,
- * JSON/SVG export capabilities, and optional persistent [CanvasSession] integration.
+ * Shared Canvas Workspace composable for Meridian: the DrawBox board with block-document notes
+ * placed on it as elements, whiteboard-style chrome (title and actions pills, floating tool bar,
+ * zoom pill), sample import and JSON/SVG export, and optional persistent [CanvasSession]
+ * integration.
  */
+@OptIn(ExperimentalTime::class)
 @Composable
 fun CanvasWorkspace(
     modifier: Modifier = Modifier,
@@ -75,6 +76,8 @@ fun CanvasWorkspace(
     onExportJson: ((String) -> Unit)? = null,
     onExportSvg: ((String) -> Unit)? = null,
     onShareToChat: ((bytes: ByteArray, mimeType: String) -> Unit)? = null,
+    /** False when the host already shows the canvas title and a way back, as the desktop side pane does. */
+    showTitle: Boolean = true,
 ) {
     val state by controller.state.collectAsState()
     val canUndo by controller.canUndo.collectAsState()
@@ -86,6 +89,7 @@ fun CanvasWorkspace(
         remember { mutableStateOf(emptyList<CanvasPresence>()) }
     }
     val checkpoints by (session?.checkpoints?.collectAsState() ?: remember { mutableStateOf(emptyList()) })
+    val documents = remember(sessionDoc) { session?.documents().orEmpty() }
     val coroutineScope = rememberCoroutineScope()
 
     var statusMessage by remember { mutableStateOf("Ready") }
@@ -93,6 +97,7 @@ fun CanvasWorkspace(
     var lastExportedJson by remember { mutableStateOf<String?>(null) }
     var isSharingToChat by remember { mutableStateOf(false) }
     var showHistoryDialog by remember { mutableStateOf(false) }
+    var boardSize by remember { mutableStateOf(IntSize.Zero) }
 
     // Load initial JSON diagram or session document & observe external session updates (Card I2.3 & I3.3)
     LaunchedEffect(session, initialJson) {
@@ -104,7 +109,7 @@ fun CanvasWorkspace(
                 val sessionJson = session.sceneJsonOrEmpty()
                 var lastImportedRev = session.document.value?.revision ?: 0L
                 if (sessionJson.isNotBlank()) {
-                    val cleanJson = com.letta.mobile.data.canvas.CanvasOpProjector.stripMetadataForDrawBox(sessionJson)
+                    val cleanJson = CanvasOpProjector.stripMetadataForDrawBox(sessionJson)
                     controller.importPath(cleanJson)
                     lastExportedJson = sessionJson
                     statusMessage = "Loaded from session (rev ${session.document.value?.revision ?: 1})"
@@ -118,7 +123,7 @@ fun CanvasWorkspace(
                     if (doc != null && doc.revision > lastImportedRev) {
                         lastImportedRev = doc.revision
                         if (doc.sceneJson.isNotBlank() && doc.sceneJson != lastExportedJson) {
-                            val cleanJson = com.letta.mobile.data.canvas.CanvasOpProjector.stripMetadataForDrawBox(doc.sceneJson)
+                            val cleanJson = CanvasOpProjector.stripMetadataForDrawBox(doc.sceneJson)
                             controller.importPath(cleanJson)
                             statusMessage = "Agent updated canvas (rev ${doc.revision})"
                         }
@@ -142,8 +147,6 @@ fun CanvasWorkspace(
     // Card I1.6: Autosave debounce
     // Debounce ~500ms on dirty signal (elements change) -> exportJson()
     // The resulting Event.JsonExported persists the updated scene off the main thread.
-    // Document: Full JSON replace is acceptable for single-player session in P1;
-    // multi-writer op-log projection will be introduced in P3.
     LaunchedEffect(state.elements, initialLoadDone, session) {
         if (!initialLoadDone || session == null) return@LaunchedEffect
         delay(500)
@@ -203,19 +206,18 @@ fun CanvasWorkspace(
     }
 
     val hasSelection = state.selectedIds.isNotEmpty()
-    // Draw or Notes: the drawing and the block document share the canvas, one in view at a time.
-    var workspaceMode by rememberSaveable { mutableStateOf(CanvasWorkspaceMode.DRAW) }
     val controlsBarState = CanvasControlsBridge.buildControlsBarState(
         state = state,
         canUndo = canUndo,
         canRedo = canRedo,
     )
+    val boardCenter = Offset(boardSize.width / 2f, boardSize.height / 2f)
 
     Surface(
         modifier = modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background,
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxSize().onSizeChanged { boardSize = it }) {
             // DrawBox Canvas layer
             DrawBox(
                 state = state,
@@ -225,161 +227,76 @@ fun CanvasWorkspace(
                     .clipToBounds(),
             )
 
+            // Block documents live on the board as note cards, in world coordinates.
+            if (session != null && documents.isNotEmpty()) {
+                CanvasNotesLayer(
+                    session = session,
+                    documents = documents,
+                    viewport = state.viewport,
+                    modifier = Modifier.fillMaxSize().clipToBounds(),
+                )
+            }
+
             // Presence layer (Card I3.5)
             PresenceLayer(
                 presences = presences,
                 currentPeerId = currentPeerId,
             )
 
-            if (workspaceMode == CanvasWorkspaceMode.NOTES && session != null) {
-                Surface(
-                    modifier = Modifier.fillMaxSize().padding(top = 56.dp),
-                    color = MaterialTheme.colorScheme.background,
-                ) {
-                    CanvasBlockEditor(session = session, modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp))
-                }
-            } else if (session != null) {
-                CanvasNotesPreviewCard(
-                    session = session,
-                    onOpen = { workspaceMode = CanvasWorkspaceMode.NOTES },
-                    modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 88.dp),
+            if (showTitle) {
+                CanvasTitlePill(
+                    title = sessionDoc?.title ?: "Canvas",
+                    revision = sessionDoc?.revision,
+                    onNavigateBack = onNavigateBack?.let { back ->
+                        {
+                            if (session != null) controller.exportJson()
+                            back()
+                        }
+                    },
+                    modifier = Modifier.align(Alignment.TopStart).padding(CHROME_INSET),
                 )
             }
 
-            // Top action bar: Sample loader + Exports + Status
-            Column(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .fillMaxWidth()
-                    .padding(8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.95f),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-                    shadowElevation = 2.dp,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState())
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        if (onNavigateBack != null) {
-                            OutlinedButton(
-                                onClick = {
-                                    if (session != null) {
-                                        controller.exportJson()
-                                    }
-                                    onNavigateBack()
-                                },
-                            ) {
-                                Text("Back")
-                            }
-                        }
-                        if (session != null) {
-                            FilterChip(
-                                selected = workspaceMode == CanvasWorkspaceMode.DRAW,
-                                onClick = { workspaceMode = CanvasWorkspaceMode.DRAW },
-                                label = { Text("Draw") },
-                            )
-                            FilterChip(
-                                selected = workspaceMode == CanvasWorkspaceMode.NOTES,
-                                onClick = { workspaceMode = CanvasWorkspaceMode.NOTES },
-                                label = { Text("Notes") },
-                            )
-                        }
-
-                        if (session != null) {
-                            OutlinedButton(
-                                onClick = { showHistoryDialog = true },
-                            ) {
-                                Text("History (${checkpoints.size})")
-                            }
-                        }
-
-                        Button(
-                            onClick = {
-                                controller.importPath(CanvasSamples.buildCycleJson)
-                                statusMessage = "Imported Build Cycle sample"
-                            },
-                        ) {
-                            Text("Import Build Cycle")
-                        }
-
-                        Button(
-                            onClick = {
-                                controller.importPath(CanvasSamples.dailyLoopJson)
-                                statusMessage = "Imported Daily Loop sample"
-                            },
-                        ) {
-                            Text("Import Daily Loop")
-                        }
-
-                        OutlinedButton(
-                            onClick = {
-                                controller.reset()
-                                statusMessage = "Cleared canvas"
-                            },
-                        ) {
-                            Text("Clear")
-                        }
-
-                        Button(
-                            onClick = { controller.exportJson() },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.secondary,
-                            ),
-                        ) {
-                            Text("Export JSON")
-                        }
-
-                        Button(
-                            onClick = { controller.exportSvg() },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.tertiary,
-                            ),
-                        ) {
-                            Text("Export SVG")
-                        }
-
-                        if (onShareToChat != null) {
-                            Button(
-                                onClick = {
-                                    isSharingToChat = true
-                                    controller.exportSvg()
-                                },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.primary,
-                                ),
-                            ) {
-                                Text("Share to Chat")
-                            }
-                        }
+            CanvasActionsPill(
+                checkpointCount = if (session != null) checkpoints.size else null,
+                onHistory = if (session != null) ({ showHistoryDialog = true }) else null,
+                onShare = onShareToChat?.let {
+                    {
+                        isSharingToChat = true
+                        controller.exportSvg()
                     }
-                }
+                },
+                menu = CanvasMenuActions(
+                    onImportBuildCycle = {
+                        controller.importPath(CanvasSamples.buildCycleJson)
+                        statusMessage = "Imported Build Cycle sample"
+                    },
+                    onImportDailyLoop = {
+                        controller.importPath(CanvasSamples.dailyLoopJson)
+                        statusMessage = "Imported Daily Loop sample"
+                    },
+                    onExportJson = { controller.exportJson() },
+                    onExportSvg = { controller.exportSvg() },
+                    onClear = {
+                        controller.reset()
+                        statusMessage = "Cleared canvas"
+                    },
+                ),
+                modifier = Modifier.align(Alignment.TopEnd).padding(CHROME_INSET),
+            )
 
-                // Status chip
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.95f),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-                    shadowElevation = 1.dp,
-                    modifier = Modifier.padding(horizontal = 8.dp),
-                ) {
-                    val sessionSuffix = sessionDoc?.let { " | ${it.title} (rev ${it.revision})" }.orEmpty()
-                    Text(
-                        text = "Elements: ${state.elements.size}$sessionSuffix | $statusMessage",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                    )
-                }
-            }
+            CanvasStatusLine(
+                text = "Elements: ${state.elements.size} | $statusMessage",
+                modifier = Modifier.align(Alignment.BottomStart).padding(CHROME_INSET),
+            )
+
+            CanvasZoomPill(
+                scalePercent = state.viewport.scalePercent,
+                onZoomOut = { controller.zoomBy(1f / ZOOM_STEP, boardCenter) },
+                onZoomIn = { controller.zoomBy(ZOOM_STEP, boardCenter) },
+                onReset = { controller.resetCamera() },
+                modifier = Modifier.align(Alignment.BottomEnd).padding(CHROME_INSET),
+            )
 
             // History dialog
             if (showHistoryDialog && session != null) {
@@ -459,9 +376,8 @@ fun CanvasWorkspace(
                 )
             }
 
-            // Lifted Bottom ControlsBar
-            // Our own bar: the drawbox-ui one loads drawables its Android artifact never ships
-            // (letta-mobile-r5f3r). See CanvasControlsBar.
+            // Floating tool bar. Our own: the drawbox-ui one loads drawables its Android artifact
+            // never ships (letta-mobile-r5f3r). See CanvasControlsBar.
             CanvasControlsBar(
                 state = controlsBarState,
                 dispatch = { intent ->
@@ -471,13 +387,24 @@ fun CanvasWorkspace(
                         hasSelection = hasSelection,
                     )
                 },
+                onAddNote = session?.let { s ->
+                    {
+                        val frame = newNoteFrame(state.viewport.screenToWorld(boardCenter))
+                        val id = "note-${Clock.System.now().toEpochMilliseconds()}"
+                        coroutineScope.launch {
+                            runCatching { s.setDocument(id, "", frame = frame) }
+                                .onSuccess { statusMessage = "Added note" }
+                                .onFailure { statusMessage = "Error: could not add note (${it.message})" }
+                        }
+                    }
+                },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 24.dp),
+                    .padding(bottom = 20.dp),
             )
         }
     }
 }
 
-/** What the workspace shows: the drawing, or the canvas's block document. */
-enum class CanvasWorkspaceMode { DRAW, NOTES }
+private val CHROME_INSET = 12.dp
+private const val ZOOM_STEP = 1.25f
