@@ -96,7 +96,7 @@ class CanvasWorkspaceUiTest {
         onAllNodesWithContentDescription("Note editor").assertCountEquals(0)
 
         // The Text tool places a plain (transparent) block document; the active note's formatting
-        // controls sit at the foot of the board, not inside the card.
+        // controls sit at the foot of the board, not inside the card, with every block kind.
         onNodeWithContentDescription("Text").performClick()
         waitUntil(timeoutMillis = 5000) { session.documents().size == 2 }
         val text = session.documents().first { it.id.startsWith("text-") }
@@ -104,6 +104,15 @@ class CanvasWorkspaceUiTest {
         waitUntil(timeoutMillis = 5000) {
             onAllNodesWithContentDescription("Bold").fetchSemanticsNodes().isNotEmpty()
         }
+        onNodeWithContentDescription("To-do").performClick()
+        waitUntil(timeoutMillis = 5000) {
+            session.documents().first { it.id == text.id }.json.contains("\"todo\"")
+        }
+
+        // The active note's bar deletes it.
+        onNodeWithContentDescription("Delete note").performClick()
+        waitUntil(timeoutMillis = 5000) { session.documents().none { it.id == text.id } }
+        onAllNodesWithContentDescription("Delete note").assertCountEquals(0)
     }
 
     @Test

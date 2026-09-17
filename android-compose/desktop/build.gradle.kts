@@ -253,6 +253,7 @@ dependencies {
     testImplementation(libs.ktor.client.mock)
     // The canvas UI tests drive DrawBox's controller directly; sharedUI keeps it an implementation detail.
     testImplementation(libs.drawbox)
+    testImplementation("io.github.linreal:cascade-editor:1.9.2")
 }
 
 tasks.withType<Test>().configureEach {

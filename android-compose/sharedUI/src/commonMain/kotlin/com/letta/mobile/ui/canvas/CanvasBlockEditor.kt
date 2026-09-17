@@ -8,6 +8,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.luminance
@@ -27,6 +28,7 @@ import io.github.linreal.cascade.editor.ui.ExperimentalCascadePreviewApi
 import io.github.linreal.cascade.editor.ui.ToolbarSlot
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 
 /**
  * One block document of the canvas, edited with the Cascade block editor and persisted through
@@ -77,16 +79,22 @@ fun CanvasBlockEditor(
         }
     }
 
+    // Writes the editor's document to the session when it differs from what was last written.
+    suspend fun persist() {
+        val current = runCatching { stateHolder.toJson(textStates, spanStates) }.getOrNull() ?: return
+        if (current == lastEditorJson) return
+        lastEditorJson = current
+        lastStoredJson = current
+        runCatching { session.setDocument(documentId, current, actorId) }
+    }
+
     LaunchedEffect(session.canvasId, documentId) {
         while (isActive) {
             delay(PERSIST_INTERVAL_MS)
-            val current = runCatching { stateHolder.toJson(textStates, spanStates) }.getOrNull() ?: continue
-            if (current == lastEditorJson) continue
-            lastEditorJson = current
-            lastStoredJson = current
-            runCatching { session.setDocument(documentId, current, actorId) }
+            persist()
         }
     }
+    val scope = rememberCoroutineScope()
 
     if (onToolbar != null) {
         DisposableEffect(active) { onDispose { onToolbar(null) } }
@@ -95,7 +103,14 @@ fun CanvasBlockEditor(
         !active -> ToolbarSlot.None
         onToolbar != null -> ToolbarSlot.Custom { formatting, actions ->
             // Rendered by the host; the slot only reports what it was handed.
-            SideEffect { onToolbar(NoteToolbar(formatting, actions)) }
+            SideEffect {
+                onToolbar(
+                    NoteToolbar(formatting, actions, stateHolder, textStates, spanStates) {
+                        // A block change from the bar is a deliberate edit: save it now, not on the tick.
+                        scope.launch { persist() }
+                    },
+                )
+            }
         }
         else -> ToolbarSlot.Default()
     }

@@ -24,6 +24,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.BringToFront
 import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Maximize2
 import com.composables.icons.lucide.PaintBucket
 import com.composables.icons.lucide.PenLine
 import com.composables.icons.lucide.SendToBack
@@ -37,7 +38,8 @@ import io.ak1.drawbox.ui.controls.ControlsBarState
  * about to draw a closed shape), then ordering and delete when something is selected.
  *
  * Colour intents go through [dispatch] so [CanvasControlsBridge] applies them to the selection
- * when there is one and to the current tool otherwise.
+ * when there is one and to the current tool otherwise. With a [note] active the bar is the
+ * note's: open it large, or delete it.
  */
 @Composable
 fun CanvasSelectionBar(
@@ -48,7 +50,28 @@ fun CanvasSelectionBar(
     onSendToBack: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
+    note: NoteBarActions? = null,
 ) {
+    if (note != null) {
+        Surface(
+            modifier = modifier,
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.96f),
+            tonalElevation = 2.dp,
+            shadowElevation = 6.dp,
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                BarButton(Lucide.Maximize2, "Open note large", onClick = note.onOpen)
+                Divider()
+                BarButton(Lucide.Trash2, "Delete note", onClick = note.onDelete)
+            }
+        }
+        return
+    }
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(12.dp),
@@ -95,6 +118,9 @@ fun CanvasSelectionBar(
         }
     }
 }
+
+/** What the bar offers for the active note. */
+class NoteBarActions(val onOpen: () -> Unit, val onDelete: () -> Unit)
 
 @Composable
 private fun BarButton(icon: ImageVector, label: String, selected: Boolean = false, onClick: () -> Unit) {

@@ -1,5 +1,8 @@
-﻿package com.letta.mobile.ui.canvas
+package com.letta.mobile.ui.canvas
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -19,12 +22,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Minimize2
 import com.letta.mobile.data.canvas.CanvasSceneDocument
@@ -32,27 +34,36 @@ import com.letta.mobile.data.canvas.CanvasSession
 import kotlinx.coroutines.launch
 
 /**
- * A note opened large: the block editor with its full toolbar in a dialog over the board, the way
- * Miro opens a doc from a sticky. The card underneath shows a read-only preview while this is
- * open, so only one editor writes the document.
+ * A note opened large: the block editor over the board, the way Miro opens a doc from a sticky.
+ * It is a panel inside the board's own box rather than a platform dialog, so it behaves the same
+ * on desktop and Android and the host's chrome stays where it is. The card underneath shows a
+ * read-only preview while this is open, so only one editor writes the document. Its formatting
+ * controls go up through [onToolbar] like the card's, so the foot bar keeps working.
  */
 @Composable
-fun CanvasNoteEditorDialog(
+fun CanvasNoteEditorPanel(
     session: CanvasSession,
     document: CanvasSceneDocument,
     onClose: () -> Unit,
+    modifier: Modifier = Modifier,
+    onToolbar: ((NoteToolbar?) -> Unit)? = null,
 ) {
     val scope = rememberCoroutineScope()
-    val tint = parseHexColor(document.color)
-    Dialog(
-        onDismissRequest = onClose,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
+    val tint = parseHexColor(document.color)?.takeIf { it.alpha > 0f }
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.45f))
+            // A tap on the scrim closes; taps on the panel stay in the panel.
+            .pointerInput(Unit) { detectTapGestures(onTap = { onClose() }) },
+        contentAlignment = Alignment.Center,
     ) {
         Surface(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp)
+                .padding(horizontal = 24.dp, vertical = 56.dp)
                 .widthIn(max = 880.dp)
+                .pointerInput(Unit) { detectTapGestures(onTap = {}) }
                 .semantics { contentDescription = "Note editor" },
             shape = RoundedCornerShape(16.dp),
             color = tint ?: MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -93,6 +104,7 @@ fun CanvasNoteEditorDialog(
                     storedJson = document.json,
                     active = true,
                     onLightSurface = tint != null,
+                    onToolbar = onToolbar,
                     modifier = Modifier.fillMaxHeight().fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
                 )
             }
