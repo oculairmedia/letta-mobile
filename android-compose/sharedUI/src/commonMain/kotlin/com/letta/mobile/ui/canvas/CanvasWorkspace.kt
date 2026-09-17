@@ -141,6 +141,9 @@ fun CanvasWorkspace(
     var altHeld by remember { mutableStateOf(false) }
     var drawingConnectorAt by remember { mutableStateOf<Offset?>(null) }
     val arrowBindings = remember(sessionDoc) { session?.arrowBindings().orEmpty() }
+    // Notes in the multi-selection (marquee or Shift-click) and the drag they are in the middle of.
+    var selectedNoteIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var groupOffset by remember { mutableStateOf(Offset.Zero) }
     // The note being worked in (toolbar and block handles shown) and the one opened large.
     var activeNoteId by remember { mutableStateOf<String?>(null) }
     var expandedNoteId by remember { mutableStateOf<String?>(null) }
@@ -284,11 +287,52 @@ fun CanvasWorkspace(
     // One recent-colours list for this board, shared by every picker on it.
     val recentColors = remember { RecentColors() }
     CompositionLocalProvider(LocalRecentColors provides recentColors) {
+    // A group drag ends: every selected note lands where it was dragged, as one batch op.
+    fun commitGroupMove() {
+        val offset = groupOffset
+        groupOffset = Offset.Zero
+        if (session == null || offset == Offset.Zero || selectedNoteIds.isEmpty()) return
+        val frames = documents.filter { it.id in selectedNoteIds }.mapNotNull { doc ->
+            doc.frame?.let { doc.id to it.copy(x = it.x + offset.x, y = it.y + offset.y) }
+        }.toMap()
+        coroutineScope.launch { runCatching { session.moveDocuments(frames) } }
+    }
+
+    // Marquee and move are DrawBox gestures; the notes follow the same intents so a marquee
+    // takes in note cards and dragging the selection moves them too, committed on release.
+    LaunchedEffect(controller, session) {
+        controller.intents.collect { intent ->
+            when (intent) {
+                is io.ak1.drawbox.domain.model.Intent.CommitMarquee -> {
+                    val rect = intent.rect
+                    selectedNoteIds = documents.filter { doc ->
+                        val f = doc.frame ?: return@filter false
+                        rect.overlaps(Rect(f.x, f.y, f.x + f.width, f.y + f.height))
+                    }.map { it.id }.toSet()
+                    if (selectedNoteIds.isNotEmpty()) activeNoteId = null
+                }
+                is io.ak1.drawbox.domain.model.Intent.MoveSelected ->
+                    if (selectedNoteIds.isNotEmpty()) groupOffset += intent.delta
+                is io.ak1.drawbox.domain.model.Intent.EndTransform -> commitGroupMove()
+                is io.ak1.drawbox.domain.model.Intent.ClearSelection,
+                is io.ak1.drawbox.domain.model.Intent.SelectAt -> if (groupOffset == Offset.Zero) selectedNoteIds = emptySet()
+                else -> Unit
+            }
+        }
+    }
+
     // Keys on the board: Delete/Backspace removes the drawn selection or the active note, Esc
     // lets both go, Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z (or +Y) undo and redo the drawing, Ctrl/Cmd+D
     // duplicates. Handled where they bubble to, so a note editor keeps every key it consumes.
     val boardFocus = remember { FocusRequester() }
     fun deleteFocused(): Boolean {
+        if (selectedNoteIds.isNotEmpty() && session != null) {
+            val ids = selectedNoteIds
+            selectedNoteIds = emptySet()
+            coroutineScope.launch { ids.forEach { id -> runCatching { session.removeDocument(id) } } }
+            if (hasSelection) controller.deleteSelected()
+            return true
+        }
         if (hasSelection) { controller.deleteSelected(); return true }
         val id = activeNoteId ?: return false
         if (session == null || expandedNoteId != null) return false
@@ -319,7 +363,7 @@ fun CanvasWorkspace(
     }
     fun onBoardKey(event: androidx.compose.ui.input.key.KeyEvent): Boolean = when (canvasKeyAction(event)) {
         CanvasKeyAction.DELETE -> deleteFocused()
-        CanvasKeyAction.ESCAPE -> { controller.clearSelection(); activeNoteId = null; expandedNoteId = null; true }
+        CanvasKeyAction.ESCAPE -> { controller.clearSelection(); activeNoteId = null; expandedNoteId = null; selectedNoteIds = emptySet(); true }
         CanvasKeyAction.UNDO -> { if (canUndo) controller.undo(); true }
         CanvasKeyAction.REDO -> { if (canRedo) controller.redo(); true }
         CanvasKeyAction.DUPLICATE -> duplicateFocused()
@@ -411,6 +455,19 @@ fun CanvasWorkspace(
                     onActivate = { activeNoteId = it },
                     onExpand = { expandedNoteId = it },
                     onToolbar = { noteToolbar = it },
+                    selectedIds = selectedNoteIds,
+                    groupOffset = groupOffset,
+                    onPress = { id, shift ->
+                        if (shift) {
+                            selectedNoteIds = if (id in selectedNoteIds) selectedNoteIds - id else selectedNoteIds + id
+                            activeNoteId = null
+                        } else if (id !in selectedNoteIds) {
+                            selectedNoteIds = emptySet()
+                            activeNoteId = id
+                        }
+                    },
+                    onGroupDrag = { delta -> groupOffset += delta },
+                    onGroupDragEnd = ::commitGroupMove,
                     modifier = Modifier.fillMaxSize().clipToBounds(),
                 )
             }
@@ -618,18 +675,19 @@ fun CanvasWorkspace(
             // Properties for the selection, or for the closed shape about to be drawn, top-centre.
             // With a note active and nothing drawn selected, the bar is the note's.
             val activeNote = activeNoteId?.let { id -> documents.firstOrNull { it.id == id } }
-            if (hasSelection || controlsBarState.showFillTarget || (activeNote != null && expandedNoteId == null)) {
+            val notesSelected = selectedNoteIds.isNotEmpty()
+            if (hasSelection || notesSelected || controlsBarState.showFillTarget || (activeNote != null && expandedNoteId == null)) {
                 CanvasSelectionBar(
                     state = controlsBarState,
                     properties = properties,
-                    hasSelection = hasSelection,
+                    hasSelection = hasSelection || notesSelected,
                     dispatch = dispatch,
                     dispatchProperty = dispatchProperty,
                     onBringToFront = { controller.bringSelectionToFront() },
                     onSendToBack = { controller.sendSelectionToBack() },
-                    onDelete = { controller.deleteSelected() },
+                    onDelete = { deleteFocused() },
                     onDuplicate = { duplicateFocused() },
-                    note = if (activeNote != null && session != null && !hasSelection) {
+                    note = if (activeNote != null && session != null && !hasSelection && !notesSelected) {
                         val tint = parseHexColor(activeNote.color)
                         val plain = tint != null && tint.alpha == 0f
                         NoteBarActions(

@@ -36,6 +36,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
@@ -79,9 +80,19 @@ fun CanvasNotesLayer(
     onActivate: (String) -> Unit = {},
     onExpand: (String) -> Unit = {},
     onToolbar: ((NoteToolbar?) -> Unit)? = null,
+    /** Notes in the board's multi-selection (marquee or shift-click); drawn with the selection border. */
+    selectedIds: Set<String> = emptySet(),
+    /** How far the multi-selection is being dragged right now, in world units, before it commits. */
+    groupOffset: Offset = Offset.Zero,
+    /** A press on a card: with Shift it toggles the card in the multi-selection instead of activating it. */
+    onPress: (id: String, shift: Boolean) -> Unit = { id, _ -> onActivate(id) },
+    /** Dragging a selected card moves the whole selection; the host owns that gesture. */
+    onGroupDrag: ((Offset) -> Unit)? = null,
+    onGroupDragEnd: (() -> Unit)? = null,
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         documents.forEachIndexed { index, document ->
+            val selected = document.id in selectedIds
             CanvasNoteCard(
                 session = session,
                 document = document,
@@ -92,10 +103,26 @@ fun CanvasNotesLayer(
                 onActivate = { onActivate(document.id) },
                 onExpand = { onExpand(document.id) },
                 onToolbar = onToolbar,
+                selection = NoteSelection(
+                    selected = selected,
+                    groupOffset = if (selected) groupOffset else Offset.Zero,
+                    onPress = { shift -> onPress(document.id, shift) },
+                    onGroupDrag = onGroupDrag?.takeIf { selected },
+                    onGroupDragEnd = onGroupDragEnd?.takeIf { selected },
+                ),
             )
         }
     }
 }
+
+/** A card's part in the board's multi-selection. */
+internal class NoteSelection(
+    val selected: Boolean,
+    val groupOffset: Offset,
+    val onPress: (shift: Boolean) -> Unit,
+    val onGroupDrag: ((Offset) -> Unit)?,
+    val onGroupDragEnd: (() -> Unit)?,
+)
 
 @Composable
 private fun CanvasNoteCard(
@@ -108,6 +135,7 @@ private fun CanvasNoteCard(
     onActivate: () -> Unit,
     onExpand: () -> Unit,
     onToolbar: ((NoteToolbar?) -> Unit)?,
+    selection: NoteSelection,
 ) {
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
@@ -117,7 +145,7 @@ private fun CanvasNoteCard(
         if (!gestureActive) frame = document.frame ?: defaultFrame
     }
 
-    val screenTopLeft = viewport.worldToScreen(Offset(frame.x, frame.y))
+    val screenTopLeft = viewport.worldToScreen(Offset(frame.x + selection.groupOffset.x, frame.y + selection.groupOffset.y))
     val scale = viewport.scale
     val tint = parseHexColor(document.color)
     // A "plain" note (transparent colour) is text sitting on the board: no card until it is active.
@@ -154,7 +182,7 @@ private fun CanvasNoteCard(
             .pointerInput(document.id) {
                 awaitEachGesture {
                     awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-                    onActivate()
+                    selection.onPress(currentEvent.keyboardModifiers.isShiftPressed)
                     do {
                         val event = awaitPointerEvent(PointerEventPass.Initial)
                     } while (event.changes.any { it.pressed })
@@ -164,7 +192,7 @@ private fun CanvasNoteCard(
         shape = RoundedCornerShape(NOTE_CORNER),
         color = cardColor,
         border = when {
-            active -> BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+            active || selection.selected -> BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
             plain -> null
             else -> BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
         },
@@ -177,12 +205,16 @@ private fun CanvasNoteCard(
         Column(modifier = Modifier.fillMaxSize()) {
             // A note has a handle bar; a text element is just text, with a grip to move it by
             // while active and everything else in the bar at the top of the board.
+            val groupDrag = selection.onGroupDrag
+            val groupDragEnd = selection.onGroupDragEnd
+            val onMove: (Offset) -> Unit = if (groupDrag != null) groupDrag else { delta -> frame = frame.copy(x = frame.x + delta.x, y = frame.y + delta.y) }
+            val onMoveEnd: () -> Unit = if (groupDragEnd != null) groupDragEnd else ::commit
             if (!plain) NoteHandleBar(
                 cardColor = cardColor,
                 onCard = onCard,
-                onDragStart = { gestureActive = true },
-                onDrag = { delta -> frame = frame.copy(x = frame.x + delta.x, y = frame.y + delta.y) },
-                onDragEnd = ::commit,
+                onDragStart = { if (groupDrag == null) gestureActive = true },
+                onDrag = onMove,
+                onDragEnd = onMoveEnd,
                 onExpand = onExpand,
                 onRemove = { scope.launch { runCatching { session.removeDocument(document.id) } } },
             )
@@ -209,9 +241,9 @@ private fun CanvasNoteCard(
                 if (plain && active) {
                     TextMoveGrip(
                         modifier = Modifier.align(Alignment.TopStart),
-                        onDragStart = { gestureActive = true },
-                        onDrag = { delta -> frame = frame.copy(x = frame.x + delta.x, y = frame.y + delta.y) },
-                        onDragEnd = ::commit,
+                        onDragStart = { if (groupDrag == null) gestureActive = true },
+                        onDrag = onMove,
+                        onDragEnd = onMoveEnd,
                     )
                 }
                 NoteResizeHandle(

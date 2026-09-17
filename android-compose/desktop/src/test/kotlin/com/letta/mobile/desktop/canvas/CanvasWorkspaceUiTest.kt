@@ -355,6 +355,50 @@ class CanvasWorkspaceUiTest {
     }
 
     @Test
+    fun canvasWorkspace_marqueeTakesInNotes_movesThemTogether_andDeleteRemovesAll() = runComposeUiTest {
+        val store = com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore()
+        val session = kotlinx.coroutines.runBlocking {
+            com.letta.mobile.data.canvas.CanvasSession.create(
+                store = store,
+                options = com.letta.mobile.data.canvas.CanvasCreateOptions(title = "Group Board", initialSceneJson = ""),
+            )
+        }
+        val controller = io.ak1.drawbox.presentation.viewmodel.DrawBoxController(
+            io.ak1.drawbox.presentation.reducer.Reducer(io.ak1.drawbox.domain.usecase.UseCase()),
+        )
+        val a = com.letta.mobile.data.canvas.CanvasDocumentFrame(100f, 100f, 200f, 100f)
+        val b = com.letta.mobile.data.canvas.CanvasDocumentFrame(400f, 100f, 200f, 100f)
+        val far = com.letta.mobile.data.canvas.CanvasDocumentFrame(2000f, 2000f, 200f, 100f)
+        kotlinx.coroutines.runBlocking {
+            session.setDocument("note-a", "", frame = a, color = "#fde68a")
+            session.setDocument("note-b", "", frame = b, color = "#fde68a")
+            session.setDocument("note-far", "", frame = far, color = "#fde68a")
+        }
+        setContent { CanvasWorkspace(controller = controller, session = session) }
+        waitUntil(timeoutMillis = 5000) { onAllNodesWithContentDescription("Note note-b").fetchSemanticsNodes().isNotEmpty() }
+
+        // A marquee over the first two notes selects them (the selection bar appears), not the far one.
+        onNodeWithContentDescription("Select").performClick()
+        controller.onIntent(io.ak1.drawbox.domain.model.Intent.CommitMarquee(androidx.compose.ui.geometry.Rect(50f, 50f, 700f, 300f)))
+        waitUntil(timeoutMillis = 5000) { onAllNodesWithContentDescription("Delete selection").fetchSemanticsNodes().isNotEmpty() }
+
+        // Moving the selection (as a drag of it does) moves both notes on release, in one revision.
+        val before = session.document.value!!.revision
+        controller.onIntent(io.ak1.drawbox.domain.model.Intent.MoveSelected(androidx.compose.ui.geometry.Offset(30f, 40f)))
+        controller.onIntent(io.ak1.drawbox.domain.model.Intent.EndTransform)
+        waitUntil(timeoutMillis = 5000) { session.documents().first { it.id == "note-a" }.frame?.x == 130f }
+        val frames = session.documents().associate { it.id to it.frame!! }
+        kotlin.test.assertEquals(com.letta.mobile.data.canvas.CanvasDocumentFrame(130f, 140f, 200f, 100f), frames["note-a"])
+        kotlin.test.assertEquals(com.letta.mobile.data.canvas.CanvasDocumentFrame(430f, 140f, 200f, 100f), frames["note-b"])
+        kotlin.test.assertEquals(far, frames["note-far"])
+        kotlin.test.assertEquals(before + 1, session.document.value!!.revision)
+
+        // Delete removes every selected note and leaves the far one.
+        onNodeWithContentDescription("Delete selection").performClick()
+        waitUntil(timeoutMillis = 5000) { session.documents().map { it.id } == listOf("note-far") }
+    }
+
+    @Test
     fun canvasWorkspace_rendersAndRespondsToButtonClicks() = runComposeUiTest {
         setContent {
             CanvasWorkspace(

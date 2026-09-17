@@ -340,6 +340,39 @@ class CanvasSession(
         )
     }
 
+    /**
+     * Moves several block documents at once, as one batch with one set_document op per document,
+     * so a group drag lands as a single revision and peers see the notes move together. Documents
+     * that are not there, or already at their frame, are skipped; nothing to do returns null.
+     */
+    suspend fun moveDocuments(
+        frames: Map<String, CanvasDocumentFrame>,
+        actorId: String = LOCAL_USER_ACTOR_ID,
+    ): CanvasDocument? {
+        val existing = documents().associateBy { it.id }
+        val ops = frames.mapNotNull { (id, frame) ->
+            val doc = existing[id] ?: return@mapNotNull null
+            if (doc.frame == frame) return@mapNotNull null
+            CanvasOp.SetDocumentOp(
+                opId = CanvasOpDiffer.generateOpId("doc"),
+                actorId = actorId,
+                lamport = lamportClock + 1,
+                documentId = id,
+                documentJson = doc.json,
+                frame = frame,
+            )
+        }
+        if (ops.isEmpty()) return null
+        return applyLocal(
+            CanvasOp.BatchOp(
+                opId = CanvasOpDiffer.generateOpId("batch"),
+                actorId = actorId,
+                lamport = lamportClock + 1,
+                ops = ops,
+            ),
+        )
+    }
+
     suspend fun removeDocument(documentId: String, actorId: String = LOCAL_USER_ACTOR_ID): CanvasDocument =
         applyLocal(
             CanvasOp.RemoveDocumentOp(
