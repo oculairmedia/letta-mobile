@@ -81,6 +81,12 @@ class CanvasWorkspaceUiTest {
         onNodeWithContentDescription("Note color").performClick()
         onNodeWithContentDescription("Color blue").performClick()
         waitUntil(timeoutMillis = 5000) { session.documents().single().color == "#bfdbfe" }
+
+        // Opening the note large shows the full editor over the board, and closing it returns.
+        onNodeWithContentDescription("Open note").performClick()
+        onNodeWithContentDescription("Note editor").assertExists()
+        onNodeWithContentDescription("Close note editor").performClick()
+        onAllNodesWithContentDescription("Note editor").assertCountEquals(0)
     }
 
     @Test

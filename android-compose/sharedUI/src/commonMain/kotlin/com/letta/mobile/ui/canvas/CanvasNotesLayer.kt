@@ -2,6 +2,8 @@
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
@@ -33,6 +35,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
@@ -43,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
 import com.composables.icons.lucide.GripVertical
 import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Maximize2
 import com.composables.icons.lucide.X
 import com.letta.mobile.data.canvas.CanvasDocumentFrame
 import com.letta.mobile.data.canvas.CanvasSceneDocument
@@ -59,6 +63,10 @@ import kotlin.math.roundToInt
  * Each card is dragged by its handle bar and resized from its corner; the frame is written to the
  * session when the gesture ends, so peers and the agent see the move as one op. A document that
  * was never placed gets a staggered default spot until someone moves it.
+ *
+ * Tapping a card makes it the [activeNoteId]: that one shows the block editor's toolbar and block
+ * handles. Its expand button asks the host, through [onExpand], to open it large; while
+ * [expandedNoteId] is open elsewhere the card only previews the text.
  */
 @Composable
 fun CanvasNotesLayer(
@@ -66,6 +74,10 @@ fun CanvasNotesLayer(
     documents: List<CanvasSceneDocument>,
     viewport: Viewport,
     modifier: Modifier = Modifier,
+    activeNoteId: String? = null,
+    expandedNoteId: String? = null,
+    onActivate: (String) -> Unit = {},
+    onExpand: (String) -> Unit = {},
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         documents.forEachIndexed { index, document ->
@@ -74,6 +86,10 @@ fun CanvasNotesLayer(
                 document = document,
                 viewport = viewport,
                 defaultFrame = defaultNoteFrame(index),
+                active = document.id == activeNoteId,
+                expanded = document.id == expandedNoteId,
+                onActivate = { onActivate(document.id) },
+                onExpand = { onExpand(document.id) },
             )
         }
     }
@@ -85,6 +101,10 @@ private fun CanvasNoteCard(
     document: CanvasSceneDocument,
     viewport: Viewport,
     defaultFrame: CanvasDocumentFrame,
+    active: Boolean,
+    expanded: Boolean,
+    onActivate: () -> Unit,
+    onExpand: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
@@ -120,12 +140,26 @@ private fun CanvasNoteCard(
                 transformOrigin = TransformOrigin(0f, 0f)
             }
             .semantics { contentDescription = "Note ${document.id}" }
-            // Taps and drags on the card belong to the note, never to the drawing beneath it.
+            // Taps and drags on the card belong to the note, never to the drawing beneath it; a
+            // tap anywhere on it (the editor's own taps included, in the initial pass) makes it
+            // the active note.
+            .pointerInput(document.id) {
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                    onActivate()
+                    do {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                    } while (event.changes.any { it.pressed })
+                }
+            }
             .pointerInput(document.id) { detectTapGestures(onTap = {}) },
         shape = RoundedCornerShape(NOTE_CORNER),
         color = cardColor,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)),
-        shadowElevation = 4.dp,
+        border = BorderStroke(
+            width = if (active) 2.dp else 1.dp,
+            color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f),
+        ),
+        shadowElevation = if (active) 8.dp else 4.dp,
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             NoteHandleBar(
@@ -135,16 +169,26 @@ private fun CanvasNoteCard(
                 onDrag = { delta -> frame = frame.copy(x = frame.x + delta.x, y = frame.y + delta.y) },
                 onDragEnd = ::commit,
                 onRecolor = { color -> scope.launch { runCatching { session.recolorDocument(document.id, color.hex) } } },
+                onExpand = onExpand,
                 onRemove = { scope.launch { runCatching { session.removeDocument(document.id) } } },
             )
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                CanvasBlockEditor(
-                    session = session,
-                    documentId = document.id,
-                    storedJson = document.json,
-                    onLightSurface = tint != null,
-                    modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 4.dp),
-                )
+                if (expanded) {
+                    CanvasBlockPreview(
+                        json = document.json,
+                        onLightSurface = tint != null,
+                        modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 4.dp),
+                    )
+                } else {
+                    CanvasBlockEditor(
+                        session = session,
+                        documentId = document.id,
+                        storedJson = document.json,
+                        active = active,
+                        onLightSurface = tint != null,
+                        modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 4.dp),
+                    )
+                }
                 NoteResizeHandle(
                     modifier = Modifier.align(Alignment.BottomEnd),
                     onDragStart = { gestureActive = true },
@@ -169,6 +213,7 @@ private fun NoteHandleBar(
     onDrag: (Offset) -> Unit,
     onDragEnd: () -> Unit,
     onRecolor: (NamedColor) -> Unit,
+    onExpand: () -> Unit,
     onRemove: () -> Unit,
 ) {
     Row(
@@ -212,6 +257,14 @@ private fun NoteHandleBar(
             swatchSize = 16.dp,
             modifier = Modifier.size(HANDLE_HEIGHT),
         )
+        IconButton(onClick = onExpand, modifier = Modifier.size(HANDLE_HEIGHT)) {
+            Icon(
+                imageVector = Lucide.Maximize2,
+                contentDescription = "Open note",
+                modifier = Modifier.size(14.dp),
+                tint = onCard,
+            )
+        }
         IconButton(onClick = onRemove, modifier = Modifier.size(HANDLE_HEIGHT)) {
             Icon(
                 imageVector = Lucide.X,
