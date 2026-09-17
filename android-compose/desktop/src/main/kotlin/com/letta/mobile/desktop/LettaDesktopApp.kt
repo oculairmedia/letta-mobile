@@ -1004,9 +1004,60 @@ internal fun LettaDesktopApp(
             },
             onCloseConversationTab = ::closeConversationTab,
             onReorderConversationTab = ::reorderConversationTab,
+            // Browser-style "+" and picker on the strip: a new chat with the focused agent, and
+            // that agent's conversations and canvases, most recent first, behind a search field.
+            onNewConversationTab = ::openNewChatForFocusedAgent,
+            tabPickerItems = remember(chatState.conversations, canvasDocuments, selectedAgentId) {
+                desktopTabPickerItems(chatState.conversations, canvasDocuments, selectedAgentId)
+            },
+            onOpenTabPickerItem = { item ->
+                when (item.kind) {
+                    com.letta.mobile.data.desktopshell.TabPickerItem.Kind.CONVERSATION -> {
+                        editAgentId = null
+                        chatController.selectConversation(item.id)
+                        selectedDestination = DesktopDestination.Conversations
+                    }
+                    com.letta.mobile.data.desktopshell.TabPickerItem.Kind.CANVAS ->
+                        canvasShell.open(com.letta.mobile.data.canvas.CanvasId(item.id))
+                }
+            },
         )
         SideEffect { onHeaderChromeChange(headerChrome) }
     }
+}
+
+/**
+ * What the tab strip's picker offers for [agentId]: its conversations, then its canvases, each
+ * most recent first. Every conversation and canvas when no agent is focused.
+ */
+internal fun desktopTabPickerItems(
+    conversations: List<com.letta.mobile.data.chat.runtime.ChatConversationSummary>,
+    canvases: List<com.letta.mobile.data.canvas.CanvasDocument>,
+    agentId: String?,
+): List<com.letta.mobile.data.desktopshell.TabPickerItem> {
+    val chats = conversations
+        .filter { agentId == null || it.agentId == agentId }
+        .sortedByDescending { conversationRecency(it.updatedAtLabel) }
+        .map {
+            com.letta.mobile.data.desktopshell.TabPickerItem(
+                id = it.id,
+                title = it.displayTitle(),
+                subtitle = it.agentName,
+                kind = com.letta.mobile.data.desktopshell.TabPickerItem.Kind.CONVERSATION,
+            )
+        }
+    val boards = canvases
+        .filter { agentId == null || it.agentId == null || it.agentId == agentId }
+        .sortedByDescending { it.updatedAtEpochMs }
+        .map {
+            com.letta.mobile.data.desktopshell.TabPickerItem(
+                id = it.id.value,
+                title = it.title,
+                subtitle = "Canvas",
+                kind = com.letta.mobile.data.desktopshell.TabPickerItem.Kind.CANVAS,
+            )
+        }
+    return chats + boards
 }
 
 private data class DesktopDeepLinkRoutingActions(
