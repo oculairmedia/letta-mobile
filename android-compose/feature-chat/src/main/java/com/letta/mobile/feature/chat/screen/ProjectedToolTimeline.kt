@@ -4,20 +4,27 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.clickable
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.testTag
 import com.letta.mobile.data.chat.projection.ToolTimelineCall
 import com.letta.mobile.data.chat.projection.ToolTimelineGroup
 import com.letta.mobile.data.chat.projection.ToolTimelineProjector
 import com.letta.mobile.data.chat.projection.ToolTimelineState
 import com.letta.mobile.data.chat.projection.projectToolTimelineGroupFromCalls
+import com.letta.mobile.data.chat.projection.parseTimestampEpochMillis
 import com.letta.mobile.data.chat.projection.toWireStatus
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiImageAttachment
@@ -45,14 +52,13 @@ import com.letta.mobile.ui.theme.LocalChatFontScale
 import com.letta.mobile.ui.theme.customColors
 
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.rememberUpdatedState
 import kotlinx.coroutines.delay
 import com.letta.mobile.ui.chat.render.RenderDiagnostics
 import com.letta.mobile.ui.motion.rememberChatMotionPolicy
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.LettaChatTheme
-import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 const val DEFAULT_AUTO_EXPAND_DELAY_MS = 1500L
 const val DEFAULT_STAGED_COLLAPSE_DELAY_MS = 300L
@@ -71,6 +77,7 @@ internal fun ProjectedToolTimelineGroupStepRow(
     onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)? = null,
     autoExpandDelayMs: Long = DEFAULT_AUTO_EXPAND_DELAY_MS,
     stagedCollapseDelayMs: Long = DEFAULT_STAGED_COLLAPSE_DELAY_MS,
+    onOpenDetails: (List<ToolTimelineGroup>) -> Unit = {},
 ) {
     // Project step.messages using ToolTimelineProjector to get stable, referentially-cached ToolTimelineGroup(s)
     val projector = remember(step.key) { ToolTimelineProjector() }
@@ -90,6 +97,8 @@ internal fun ProjectedToolTimelineGroupStepRow(
         onAttachmentImageTap = onAttachmentImageTap,
         autoExpandDelayMs = autoExpandDelayMs,
         stagedCollapseDelayMs = stagedCollapseDelayMs,
+        onOpenDetails = onOpenDetails,
+        startedAtEpochMs = step.messages.firstNotNullOfOrNull { parseTimestampEpochMillis(it.timestamp) },
     )
 }
 
@@ -121,6 +130,7 @@ internal fun ProjectedMessageToolCalls(
     approvalRequest: UiApprovalRequest? = null,
     onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)? = null,
 ) {
+    var detailsOpen by remember(messageId) { mutableStateOf(false) }
     val groupKey = remember(messageId) { "group:message:${messageId.orEmpty()}" }
     val groups = remember(toolCalls, approvalRequest, groupKey) {
         RenderDiagnostics.measureProjection {
@@ -141,7 +151,15 @@ internal fun ProjectedMessageToolCalls(
         modifier = modifier,
         animateRows = animateEntrance,
         onAttachmentImageTap = onAttachmentImageTap,
+        onOpenDetails = { detailsOpen = true },
     )
+    if (detailsOpen) {
+        ToolRunDetailsSheet(
+            groups = groups,
+            onDismiss = { detailsOpen = false },
+            onAttachmentImageTap = onAttachmentImageTap,
+        )
+    }
 }
 
 /**
@@ -159,38 +177,9 @@ internal fun ProjectedToolTimelineGroupCard(
     onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)? = null,
     autoExpandDelayMs: Long = DEFAULT_AUTO_EXPAND_DELAY_MS,
     stagedCollapseDelayMs: Long = DEFAULT_STAGED_COLLAPSE_DELAY_MS,
+    onOpenDetails: (List<ToolTimelineGroup>) -> Unit = {},
+    startedAtEpochMs: Long? = null,
 ) {
-    val motionPolicy = rememberChatMotionPolicy()
-    var autoExpandedCallKey by remember { mutableStateOf<String?>(null) }
-    val newestRunningCallKey = groups.asSequence()
-        .flatMap { it.calls.asSequence() }
-        .filter { it.state == ToolTimelineState.Running }
-        .lastOrNull()
-        ?.key
-    val latestNewestRunningCallKey by rememberUpdatedState(newestRunningCallKey)
-
-    // A single parent-owned timer prevents independently mounted rows from racing to open.
-    LaunchedEffect(newestRunningCallKey) {
-        val callKey = newestRunningCallKey ?: return@LaunchedEffect
-        autoExpandedCallKey = null
-        delay(autoExpandDelayMs.milliseconds)
-        if (latestNewestRunningCallKey != callKey) return@LaunchedEffect
-        autoExpandedCallKey = callKey
-    }
-
-    val autoExpandedCallIsTerminal = groups.asSequence()
-        .flatMap { it.calls.asSequence() }
-        .firstOrNull { it.key == autoExpandedCallKey }
-        ?.isTerminal == true
-    LaunchedEffect(autoExpandedCallKey, autoExpandedCallIsTerminal) {
-        if (autoExpandedCallIsTerminal) {
-            val collapseDelay = if (motionPolicy.isReducedMotionEnabled) 0L else stagedCollapseDelayMs
-            delay(collapseDelay.milliseconds)
-            autoExpandedCallKey = null
-        }
-    }
-
-    // Dropped the Card's background fill + outline border — chrome enough on its own.
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -203,24 +192,11 @@ internal fun ProjectedToolTimelineGroupCard(
             )
         }
 
-        // Render all tool groups through a single StatusTimeline component family
-        groups.forEach { group ->
-            key(group.key) {
-                StatusTimeline(
-                    items = group.calls,
-                    modifier = Modifier.fillMaxWidth(),
-                    key = { call -> call.key },
-                ) { call, isFirst, isLast ->
-                    ProjectedToolTimelineCallRow(
-                        call = call,
-                        isFirst = isFirst,
-                        isLast = isLast,
-                        onAttachmentImageTap = onAttachmentImageTap,
-                        autoExpanded = autoExpandedCallKey == call.key,
-                    )
-                }
-            }
-        }
+        ToolRunSummaryRow(
+            groups = groups,
+            startedAtEpochMs = startedAtEpochMs,
+            onClick = { onOpenDetails(groups) },
+        )
 
         // Ordinary calls can retain an auto-allowed request row while running. Surface
         // controls only for canonical runtime tools that are actually awaiting user input.
@@ -230,6 +206,118 @@ internal fun ProjectedToolTimelineGroupCard(
                 isSubmitting = activeApprovalRequestId == approval.requestId,
                 onDecision = onApprovalDecision,
             )
+        }
+    }
+}
+
+internal object ToolRunSummaryTestTags {
+    const val Row = "tool-run-summary-row"
+    const val Details = "tool-run-details-sheet"
+}
+
+internal data class ToolRunSummary(
+    val toolCount: Int,
+    val failureCount: Int,
+    val awaitingApprovalCount: Int,
+    val running: Boolean,
+    val activeToolName: String?,
+)
+
+internal fun summarizeToolRun(groups: List<ToolTimelineGroup>): ToolRunSummary {
+    val calls = groups.flatMap { it.calls }
+    return ToolRunSummary(
+        toolCount = calls.size,
+        failureCount = calls.count { it.state == ToolTimelineState.Failed || it.state == ToolTimelineState.Rejected },
+        awaitingApprovalCount = calls.count { it.state == ToolTimelineState.AwaitingApproval },
+        running = calls.any { it.state == ToolTimelineState.Running },
+        activeToolName = calls.lastOrNull { it.state == ToolTimelineState.Running }?.name,
+    )
+}
+
+internal fun ToolRunSummary.label(elapsedSeconds: Long = 0L): String = when {
+    awaitingApprovalCount > 0 -> "Approval needed - $toolCount ${toolNoun(toolCount)}"
+    running -> "Running ${activeToolName.orEmpty().ifBlank { "tool" }} - $toolCount ${toolNoun(toolCount)} - ${formatElapsedSeconds(elapsedSeconds)}"
+    failureCount > 0 -> "$toolCount ran - $failureCount failed"
+    else -> "Ran $toolCount ${toolNoun(toolCount)}"
+}
+
+private fun toolNoun(count: Int): String = if (count == 1) "command" else "commands"
+
+internal fun formatElapsedSeconds(totalSeconds: Long): String =
+    "${totalSeconds / 60}:${(totalSeconds % 60).toString().padStart(2, '0')}"
+
+@Composable
+private fun ToolRunSummaryRow(
+    groups: List<ToolTimelineGroup>,
+    startedAtEpochMs: Long? = null,
+    onClick: () -> Unit,
+) {
+    val summary = remember(groups) { summarizeToolRun(groups) }
+    val elapsed by rememberRunElapsedSeconds(summary.running, startedAtEpochMs)
+    val color = when {
+        summary.failureCount > 0 -> MaterialTheme.colorScheme.error
+        summary.awaitingApprovalCount > 0 -> MaterialTheme.colorScheme.secondary
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(ToolRunSummaryTestTags.Row)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 4.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = summary.label(elapsed),
+            style = MaterialTheme.typography.bodyMedium,
+            color = color,
+            modifier = Modifier.weight(1f),
+        )
+        Icon(
+            imageVector = LettaIcons.ExpandMore,
+            contentDescription = "Open command details",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp),
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun ToolRunDetailsSheet(
+    groups: List<ToolTimelineGroup>,
+    onDismiss: () -> Unit,
+    onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)? = null,
+) {
+    val calls = groups.flatMap { it.calls }
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        modifier = Modifier.testTag(ToolRunSummaryTestTags.Details),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = summarizeToolRun(groups).label(),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            StatusTimeline(
+                items = calls,
+                modifier = Modifier.fillMaxWidth(),
+                key = { it.key },
+            ) { call, isFirst, isLast ->
+                ProjectedToolTimelineCallRow(
+                    call = call,
+                    isFirst = isFirst,
+                    isLast = isLast,
+                    onAttachmentImageTap = onAttachmentImageTap,
+                    autoExpanded = false,
+                )
+            }
         }
     }
 }
