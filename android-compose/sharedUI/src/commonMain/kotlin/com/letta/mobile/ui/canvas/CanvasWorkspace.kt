@@ -73,6 +73,8 @@ fun CanvasWorkspace(
                 sessions.unregister(session.canvasId)
             }
         }
+        delay(100)
+        initialLoadDone = true
     }
 
     // Load initial JSON diagram or session document & observe external session updates (Card I2.3)
@@ -138,6 +140,11 @@ fun CanvasWorkspace(
                             "Exported JSON (${event.json.length} chars, verified)"
                         } else {
                             "Warning: Exported JSON missing 'elements' key"
+                        }
+                    }
+                    if (session != null && session.sceneJsonOrEmpty() != event.json) {
+                        withContext(Dispatchers.Default) {
+                            session.saveScene(event.json)
                         }
                     }
                     if (session != null && session.sceneJsonOrEmpty() != event.json) {
