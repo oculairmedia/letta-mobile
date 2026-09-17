@@ -433,8 +433,6 @@ internal fun createDesktopChatDetailPaneActions(
             }
         },
         onOpenAgent = params.onOpenAgent,
-        onOpenAgentPane = params.onOpenAgentPane,
-        onEditAgent = params.onEditAgent,
     )
 }
 
