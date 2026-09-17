@@ -208,31 +208,24 @@ class CanvasSession(
          */
         suspend fun create(
             store: CanvasDocumentStore,
-            title: String = "Untitled Canvas",
-            conversationId: String? = null,
-            agentId: String? = null,
-            canvasId: CanvasId = CanvasId("canvas-${kotlin.time.Clock.System.now().toEpochMilliseconds()}-${(1000..9999).random()}"),
-            initialSceneJson: String = "",
-            opLog: CanvasOpLog = InMemoryCanvasOpLog(),
-            syncTransport: CanvasSyncTransport? = null,
-            clock: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
+            options: CanvasCreateOptions = CanvasCreateOptions(),
         ): CanvasSession {
             val doc = CanvasDocument(
-                id = canvasId,
-                agentId = agentId,
-                conversationId = conversationId,
-                title = title,
+                id = options.canvasId,
+                agentId = options.agentId,
+                conversationId = options.conversationId,
+                title = options.title,
                 revision = 1L,
-                sceneJson = initialSceneJson,
-                updatedAtEpochMs = clock(),
+                sceneJson = options.initialSceneJson,
+                updatedAtEpochMs = options.clock(),
             )
             store.upsert(doc)
             val session = CanvasSession(
-                canvasId = canvasId,
+                canvasId = options.canvasId,
                 store = store,
-                opLog = opLog,
-                syncTransport = syncTransport,
-                clock = clock,
+                opLog = options.opLog,
+                syncTransport = options.syncTransport,
+                clock = options.clock,
             )
             session._document.value = doc
             return session
@@ -244,34 +237,57 @@ class CanvasSession(
         suspend fun getOrCreateForConversation(
             store: CanvasDocumentStore,
             conversationId: String,
-            agentId: String? = null,
-            title: String = "Conversation Canvas",
-            opLog: CanvasOpLog = InMemoryCanvasOpLog(),
-            syncTransport: CanvasSyncTransport? = null,
-            clock: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
+            options: CanvasConversationOptions = CanvasConversationOptions(),
         ): CanvasSession {
             val existing = store.getForConversation(conversationId)
             return if (existing != null) {
                 val session = CanvasSession(
                     canvasId = existing.id,
                     store = store,
-                    opLog = opLog,
-                    syncTransport = syncTransport,
-                    clock = clock,
+                    opLog = options.opLog,
+                    syncTransport = options.syncTransport,
+                    clock = options.clock,
                 )
                 session._document.value = existing
                 session
             } else {
                 create(
                     store = store,
-                    title = title,
-                    conversationId = conversationId,
-                    agentId = agentId,
-                    opLog = opLog,
-                    syncTransport = syncTransport,
-                    clock = clock,
+                    options = CanvasCreateOptions(
+                        title = options.title,
+                        conversationId = conversationId,
+                        agentId = options.agentId,
+                        opLog = options.opLog,
+                        syncTransport = options.syncTransport,
+                        clock = options.clock,
+                    ),
                 )
             }
         }
     }
 }
+
+/**
+ * Options for creating a new [CanvasDocument] and [CanvasSession].
+ */
+data class CanvasCreateOptions(
+    val title: String = "Untitled Canvas",
+    val conversationId: String? = null,
+    val agentId: String? = null,
+    val canvasId: CanvasId = CanvasId("canvas-${kotlin.time.Clock.System.now().toEpochMilliseconds()}-${(1000..9999).random()}"),
+    val initialSceneJson: String = "",
+    val opLog: CanvasOpLog = InMemoryCanvasOpLog(),
+    val syncTransport: CanvasSyncTransport? = null,
+    val clock: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
+)
+
+/**
+ * Options for resolving or creating a conversation-linked [CanvasSession].
+ */
+data class CanvasConversationOptions(
+    val agentId: String? = null,
+    val title: String = "Conversation Canvas",
+    val opLog: CanvasOpLog = InMemoryCanvasOpLog(),
+    val syncTransport: CanvasSyncTransport? = null,
+    val clock: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
+)

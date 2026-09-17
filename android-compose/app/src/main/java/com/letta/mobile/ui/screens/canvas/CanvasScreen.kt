@@ -12,6 +12,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import com.letta.mobile.data.canvas.CanvasConversationOptions
 import com.letta.mobile.data.canvas.CanvasDocumentStore
 import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.canvas.CanvasPresenceTransport
@@ -44,8 +45,10 @@ class CanvasViewModel @Inject constructor(
                 CanvasSession.getOrCreateForConversation(
                     store = store,
                     conversationId = conversationId,
-                    title = "Conversation Canvas",
-                    syncTransport = syncTransport,
+                    options = CanvasConversationOptions(
+                        title = "Conversation Canvas",
+                        syncTransport = syncTransport,
+                    ),
                 )
             } else {
                 val effectiveId = if (canvasId.isNotBlank()) CanvasId(canvasId) else CanvasId("canvas-${System.currentTimeMillis()}")

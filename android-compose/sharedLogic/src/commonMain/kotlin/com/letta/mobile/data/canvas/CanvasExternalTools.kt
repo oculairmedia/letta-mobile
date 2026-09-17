@@ -69,27 +69,6 @@ private suspend fun executeCreateCanvas(
     return newId
 }
 
-private suspend fun updateDocumentScene(
-    store: CanvasDocumentStore,
-    sessions: CanvasSessionRegistry,
-    canvasId: CanvasId,
-    newScene: String,
-    onSession: suspend (CanvasSession) -> Long,
-): Long {
-    val activeSession = sessions.get(canvasId)
-    if (activeSession != null) {
-        return onSession(activeSession)
-    }
-    val doc = store.get(canvasId) ?: throw NoSuchElementException("Canvas not found: ${canvasId.value}")
-    val updated = doc.copy(
-        revision = doc.revision + 1L,
-        sceneJson = newScene,
-        updatedAtEpochMs = kotlin.time.Clock.System.now().toEpochMilliseconds(),
-    )
-    store.upsert(updated)
-    return updated.revision
-}
-
 private suspend fun executeReplaceScene(
     store: CanvasDocumentStore,
     sessions: CanvasSessionRegistry,
@@ -100,8 +79,18 @@ private suspend fun executeReplaceScene(
     val sceneJson = input["scene_json"]?.jsonPrimitive?.contentOrNull
         ?: return ExternalToolResult.Error("Missing required parameter: scene_json")
     val canvasId = CanvasId(canvasIdStr)
-    val revision = updateDocumentScene(store, sessions, canvasId, sceneJson) { session ->
-        session.applyAgentReplace(sceneJson).revision
+    val activeSession = sessions.get(canvasId)
+    val revision = if (activeSession != null) {
+        activeSession.applyAgentReplace(sceneJson).revision
+    } else {
+        val doc = store.get(canvasId) ?: throw NoSuchElementException("Canvas not found: ${canvasId.value}")
+        val updated = doc.copy(
+            revision = doc.revision + 1L,
+            sceneJson = sceneJson,
+            updatedAtEpochMs = kotlin.time.Clock.System.now().toEpochMilliseconds(),
+        )
+        store.upsert(updated)
+        updated.revision
     }
     return ExternalToolResult.Success(
         canvasJson.encodeToString(CanvasReplaceSceneResult(ok = true, revision = revision))
@@ -131,7 +120,6 @@ private suspend fun executeApplyOps(
         )
         store.upsert(updated)
         updated.revision
-    }
     }
     return ExternalToolResult.Success(
         canvasJson.encodeToString(CanvasApplyOpsResult(ok = true, revision = revision))

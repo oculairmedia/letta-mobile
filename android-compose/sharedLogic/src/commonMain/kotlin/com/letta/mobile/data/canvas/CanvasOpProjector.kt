@@ -87,11 +87,8 @@ object CanvasOpProjector {
 
     private data class WriterProvenance(val lamport: Long, val actorId: String)
 
-    private fun isBgProperty(key: String): Boolean =
-        key == "bgColor" || key == BG_LAMPORT || key == BG_ACTOR
-
-    private fun isMetadataProperty(key: String): Boolean =
-        key == "id" || key == LAMPORT || key == ACTOR
+    private val bgPropertyKeys = setOf("bgColor", BG_LAMPORT, BG_ACTOR)
+    private val metadataPropertyKeys = setOf("id", LAMPORT, ACTOR)
 
     /** A write with [write] beats one already recorded at [against]. */
     private fun wins(write: WriterProvenance, against: WriterProvenance?): Boolean =
@@ -128,7 +125,8 @@ object CanvasOpProjector {
         val stamped = incoming["elements"]?.jsonArray?.map { element ->
             val obj = runCatching { element.jsonObject }.getOrNull() ?: return@map element
             val id = runCatching { obj["id"]?.jsonPrimitive?.content }.getOrNull().orEmpty()
-            parseElementWithMetadata(id, json.encodeToString(JsonObject.serializer(), obj), provenance)
+            val payload = json.encodeToString(JsonObject.serializer(), obj)
+            parseElementWithMetadata(ElementMetadataInput(id, payload, provenance))
         } ?: emptyList()
         return canonicalScene(
             buildMap {
@@ -152,7 +150,7 @@ object CanvasOpProjector {
         return canonicalScene(
             buildMap {
                 parsed.forEach { (key, value) ->
-                    if (!isBgProperty(key)) put(key, value)
+                    if (key !in bgPropertyKeys) put(key, value)
                 }
                 put("bgColor", JsonPrimitive(op.colorHex))
                 put(BG_LAMPORT, JsonPrimitive(op.lamport))
@@ -185,7 +183,7 @@ object CanvasOpProjector {
             if (!wins(opProvenance, existingProvenance)) return sceneJson
         }
 
-        val newElement = parseElementWithMetadata(elementId, elementJson, opProvenance)
+        val newElement = parseElementWithMetadata(ElementMetadataInput(elementId, elementJson, opProvenance))
         if (existingIndex >= 0) elements[existingIndex] = newElement else elements.add(newElement)
         // The write won, so any tombstone for this id is now history.
         return writeScene(parsed, elements, tombstones - elementId)
@@ -278,23 +276,25 @@ object CanvasOpProjector {
 
     fun emptySceneJson(): String = json.encodeToString(JsonObject.serializer(), parseEmptyScene())
 
-    private fun parseElementWithMetadata(
-        elementId: String,
-        elementJson: String,
-        provenance: WriterProvenance,
-    ): JsonObject {
+    private data class ElementMetadataInput(
+        val elementId: String,
+        val elementJson: String,
+        val provenance: WriterProvenance,
+    )
+
+    private fun parseElementWithMetadata(input: ElementMetadataInput): JsonObject {
         val parsed = try {
-            json.parseToJsonElement(elementJson).jsonObject
+            json.parseToJsonElement(input.elementJson).jsonObject
         } catch (_: Exception) {
             JsonObject(emptyMap())
         }
         return buildJsonObject {
-            put("id", JsonPrimitive(elementId))
+            put("id", JsonPrimitive(input.elementId))
             parsed.forEach { (key, value) ->
-                if (!isMetadataProperty(key)) put(key, value)
+                if (key !in metadataPropertyKeys) put(key, value)
             }
-            put(LAMPORT, JsonPrimitive(provenance.lamport))
-            put(ACTOR, JsonPrimitive(provenance.actorId))
+            put(LAMPORT, JsonPrimitive(input.provenance.lamport))
+            put(ACTOR, JsonPrimitive(input.provenance.actorId))
         }
     }
 

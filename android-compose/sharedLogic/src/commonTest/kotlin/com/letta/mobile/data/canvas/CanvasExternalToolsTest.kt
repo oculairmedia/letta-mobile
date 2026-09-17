@@ -19,7 +19,6 @@ import kotlin.test.assertTrue
 class CanvasExternalToolsTest {
     private val json = Json { ignoreUnknownKeys = true }
     private lateinit var store: InMemoryCanvasDocumentStore
-    private lateinit var sessions: CanvasSessionRegistry
 
     // A fresh registry per test is the isolation now; it used to be a process-global object that
     // every test had to remember to clear by hand, before and after.
@@ -88,9 +87,11 @@ class CanvasExternalToolsTest {
         val canvasId = CanvasId("canvas-active-1")
         val session = CanvasSession.create(
             store = store,
-            canvasId = canvasId,
-            title = "Active Session Canvas",
-            initialSceneJson = "{\"initial\":true}",
+            options = CanvasCreateOptions(
+                canvasId = canvasId,
+                title = "Active Session Canvas",
+                initialSceneJson = "{\"initial\":true}",
+            ),
         )
         sessions.register(session)
 

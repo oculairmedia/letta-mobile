@@ -116,7 +116,6 @@ fun CanvasWorkspace(
                     }
                 }
             }
-            }
         } else {
             if (!initialJson.isNullOrBlank()) {
                 controller.importPath(initialJson)
