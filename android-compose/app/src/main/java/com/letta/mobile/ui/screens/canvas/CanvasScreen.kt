@@ -14,6 +14,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.canvas.CanvasDocumentStore
 import com.letta.mobile.data.canvas.CanvasId
+import com.letta.mobile.data.canvas.CanvasOpLog
 import com.letta.mobile.data.canvas.CanvasPresenceTransport
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.CanvasSyncTransport
@@ -33,6 +34,7 @@ class CanvasViewModel @Inject constructor(
     private val store: CanvasDocumentStore,
     val syncTransport: CanvasSyncTransport,
     val presenceTransport: CanvasPresenceTransport,
+    private val opLog: CanvasOpLog,
 ) : ViewModel() {
     private val _session = MutableStateFlow<CanvasSession?>(null)
     val session: StateFlow<CanvasSession?> = _session.asStateFlow()
@@ -45,11 +47,12 @@ class CanvasViewModel @Inject constructor(
                     store = store,
                     conversationId = conversationId,
                     title = "Conversation Canvas",
+                    opLog = opLog,
                     syncTransport = syncTransport,
                 )
             } else {
                 val effectiveId = if (canvasId.isNotBlank()) CanvasId(canvasId) else CanvasId("canvas-${System.currentTimeMillis()}")
-                val s = CanvasSession(canvasId = effectiveId, store = store, syncTransport = syncTransport)
+                val s = CanvasSession(canvasId = effectiveId, store = store, opLog = opLog, syncTransport = syncTransport)
                 s.load()
                 s
             }
