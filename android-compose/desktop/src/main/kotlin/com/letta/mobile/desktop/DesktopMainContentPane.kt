@@ -96,8 +96,6 @@ internal fun DesktopMainContentPane(
                 blockApi = inputs.blockApi,
                 settings = inputs.secureSettingsStore,
                 scope = inputs.chatScope,
-                onClose = actions.onEditAgentClose,
-                showHeader = false,
                 onSaved = actions.onEditAgentSaved,
                 modifier = Modifier.fillMaxSize(),
             )

@@ -46,6 +46,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import org.jetbrains.jewel.ui.component.TextField as JewelTextField
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -721,3 +724,20 @@ private fun RailActionIcon(model: RailActionIconModel) {
         }
     }
 }
+
+/**
+ * Light-dismiss for the expanded agent library: any press to the right of the rail collapses
+ * it. Observed without consuming, so the press still lands on whatever was clicked.
+ */
+internal fun Modifier.railLightDismiss(expanded: Boolean, onDismiss: () -> Unit): Modifier =
+    pointerInput(expanded) {
+        if (!expanded) return@pointerInput
+        awaitPointerEventScope {
+            while (true) {
+                val event = awaitPointerEvent(PointerEventPass.Final)
+                if (event.type != PointerEventType.Release) continue
+                val x = event.changes.firstOrNull()?.position?.x ?: continue
+                if (x > 248.dp.toPx()) onDismiss()
+            }
+        }
+    }

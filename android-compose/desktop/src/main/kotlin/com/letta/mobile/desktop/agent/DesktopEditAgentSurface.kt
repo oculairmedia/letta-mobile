@@ -2,7 +2,6 @@ package com.letta.mobile.desktop.agent
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,11 +18,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.PlayArrow
@@ -107,9 +104,6 @@ internal fun DesktopEditAgentSurface(
     blockApi: DesktopBlockApi?,
     settings: SecureSettingsStore,
     scope: CoroutineScope,
-    onClose: () -> Unit,
-    /** False when hosted in [com.letta.mobile.desktop.DesktopSidePane], which draws the title and close. */
-    showHeader: Boolean = true,
     onSaved: (identity: MascotIdentity, nameChanged: Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -263,36 +257,10 @@ internal fun DesktopEditAgentSurface(
                 .weight(1f)
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .padding(start = 40.dp, top = if (showHeader) 28.dp else 4.dp, end = 40.dp, bottom = 20.dp),
+                .padding(start = 40.dp, top = 4.dp, end = 40.dp, bottom = 20.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
-            // Header: back · title (the side pane draws its own when it hosts us)
-            if (showHeader) Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(34.dp)
-                        .clip(CircleShape)
-                        .clickable(onClick = onClose),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    // The editor is a pane docked on the right; closing sends it back
-                    // out that way, so the glyph points where the pane goes.
-                    Icon(
-                        Icons.AutoMirrored.Outlined.ArrowForward,
-                        contentDescription = "Close editor",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    text = "Edit agent",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-            }
-
+            // No header of its own: the hosting side pane draws the title and close.
             if (loading) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     com.letta.mobile.ui.mascot.MascotLoading(agentId)
@@ -528,3 +496,4 @@ private fun DropdownSelector(
         }
     }
 }
+

@@ -50,6 +50,7 @@ import com.letta.mobile.ui.mascot.MascotStage
 import org.jetbrains.jewel.ui.component.PopupMenu as JewelPopupMenu
 import com.letta.mobile.ui.components.LettaEmptyHint
 import com.letta.mobile.ui.components.LettaListRow
+import com.letta.mobile.ui.components.LettaListRowSpec
 import com.letta.mobile.ui.components.LettaMenuItem
 import com.letta.mobile.ui.components.LettaPopupMenu
 import com.letta.mobile.ui.components.LettaSectionLabel
@@ -352,11 +353,13 @@ private fun SidebarCanvasListItem(
     onClick: () -> Unit,
 ) {
     LettaListRow(
-        title = canvas.title,
+        spec = LettaListRowSpec(
+            title = canvas.title,
+            icon = Lucide.Palette,
+            trailing = formatRelativeTimestamp(java.time.Instant.ofEpochMilli(canvas.updatedAtEpochMs).toString()),
+            selected = selected,
+        ),
         onClick = onClick,
-        icon = Lucide.Palette,
-        trailing = formatRelativeTimestamp(java.time.Instant.ofEpochMilli(canvas.updatedAtEpochMs).toString()),
-        selected = selected,
     )
 }
 

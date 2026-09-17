@@ -28,7 +28,7 @@ class DesktopRailRecencyTest {
             conversation("2", "a", daysAgo = 3),
             conversation("3", "b", daysAgo = 40),
         )
-        val rail = recentRailAgents(conversations, directory, now = now)
+        val rail = recentRailAgents(conversations, directory, RailRecencyPolicy(now = now))
         assertEquals(listOf("c" to "Gamma", "a" to "Alpha"), rail)
     }
 
@@ -36,14 +36,14 @@ class DesktopRailRecencyTest {
     fun `caps the rail at the maximum`() {
         val conversations = (1..10).map { conversation("$it", "agent$it", daysAgo = it.toLong()) }
         val dir = (1..10).map { "agent$it" to "Agent $it" }
-        val rail = recentRailAgents(conversations, dir, now = now, maxAgents = 3)
+        val rail = recentRailAgents(conversations, dir, RailRecencyPolicy(now = now, maxAgents = 3))
         assertEquals(listOf("agent1", "agent2", "agent3"), rail.map { it.first })
     }
 
     @Test
     fun `falls back to the directory head when nothing is recent`() {
         val conversations = listOf(conversation("1", "b", daysAgo = 90))
-        val rail = recentRailAgents(conversations, directory, now = now, maxAgents = 2)
+        val rail = recentRailAgents(conversations, directory, RailRecencyPolicy(now = now, maxAgents = 2))
         assertEquals(listOf("a" to "Alpha", "b" to "Beta"), rail)
     }
 
@@ -53,7 +53,7 @@ class DesktopRailRecencyTest {
             conversation("1", "a", daysAgo = 1),
             conversation("2", "d", daysAgo = 60),
         )
-        val rail = recentRailAgents(conversations, directory, now = now, selectedAgentId = "d")
+        val rail = recentRailAgents(conversations, directory, RailRecencyPolicy(now = now), selectedAgentId = "d")
         assertEquals(listOf("a" to "Alpha", "d" to "Delta"), rail)
     }
 }

@@ -43,16 +43,22 @@ fun LettaEmptyHint(text: String, modifier: Modifier = Modifier) {
     )
 }
 
-/** A compact selectable row: optional leading icon, title, optional trailing label (a time, a count). */
+/** What a [LettaListRow] shows: title, optional leading icon, optional trailing label (a time, a count). */
+data class LettaListRowSpec(
+    val title: String,
+    val icon: ImageVector? = null,
+    val trailing: String? = null,
+    val selected: Boolean = false,
+)
+
+/** A compact selectable row rendering a [LettaListRowSpec]. */
 @Composable
 fun LettaListRow(
-    title: String,
+    spec: LettaListRowSpec,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    icon: ImageVector? = null,
-    trailing: String? = null,
-    selected: Boolean = false,
 ) {
+    val (title, icon, trailing, selected) = spec
     val background = if (selected) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent
     Row(
         modifier = modifier
