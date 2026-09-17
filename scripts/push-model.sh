@@ -4,7 +4,7 @@
 # Cache location: /opt/stacks/letta-mobile/models-cache/
 set -euo pipefail
 DEVICE_SERIAL="${DEVICE_SERIAL:-192.168.50.235:5555}"
-PKG="${PKG:-com.letta.mobile.dev}"
+PKG="${PKG:-ca.oculair.meridian.dev}"
 CACHE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/models-cache"
 MODEL_FILE="${1:-$(ls "$CACHE_DIR"/*.litertlm 2>/dev/null | head -1)}"
 
