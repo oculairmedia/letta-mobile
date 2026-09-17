@@ -867,12 +867,6 @@ internal fun LettaDesktopApp(
                                         shellLayoutController.dispatch(ShellLayoutEvent.SetSidebarCollapsed(false))
                                     },
                                 ),
-                                onConfigSaved = { applyConfig(it) },
-                                onTokenCleared = { applyConfig(activeConfig.copy(accessToken = null)) },
-                                onIrohIdentityReset = { overlays.irohResetConfirm = true },
-                                nucleus = destinationNucleusActions(nucleusController, window),
-                                localRuntimeProvider = localConfig.providerActions,
-                                localBackendDirectory = localConfig.directoryActions,
                             ),
                             destinationActions = DestinationContentActions(
                                 onRetryConnection = chatController::retryConnection,
