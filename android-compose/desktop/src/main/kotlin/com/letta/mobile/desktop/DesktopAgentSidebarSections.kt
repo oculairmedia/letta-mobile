@@ -11,6 +11,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,7 +22,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -36,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.lens.WorkPlayLens
@@ -44,14 +45,17 @@ import com.letta.mobile.desktop.chat.ConversationArchiveFilter
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
 import com.letta.mobile.data.chat.runtime.displayTitle
 import com.letta.mobile.desktop.components.DesktopChipTab
+import com.letta.mobile.ui.mascot.MascotSeat
+import com.letta.mobile.ui.mascot.MascotStage
 import org.jetbrains.jewel.ui.component.PopupMenu as JewelPopupMenu
 
 /**
- * Sidebar header: the home button, then the title slot, then the agent's kebab.
+ * Sidebar header: the title slot, then the agent's kebab.
  *
  * The title slot is shared — normally the focused agent (orb + name, tap to
- * edit), and "Home" while the fleet page is open. Home is entered from the icon
- * here rather than from a nav row, so the nav list below stays purely per-agent.
+ * edit), and "Home" while the fleet page is open. Home is entered from the
+ * agent rail (fleet-wide controls live there), so everything in this sidebar
+ * stays purely per-agent and the header is the agent's mascot alone.
  */
 @Composable
 internal fun SidebarAgentHeader(
@@ -59,54 +63,17 @@ internal fun SidebarAgentHeader(
     actions: DesktopAgentSidebarActions,
 ) {
     val home = state.selectedDestination == DesktopDestination.Home
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        modifier = Modifier.padding(start = 2.dp, bottom = 16.dp),
-    ) {
-        SidebarHomeButton(
-            selected = home,
-            onClick = { actions.onDestinationSelected(DesktopDestination.Home) },
-        )
+    // The mascot is the header: large, the name beneath it, the kebab tucked in the corner so
+    // the character has the width to itself.
+    Box(Modifier.fillMaxWidth().padding(start = 2.dp, bottom = 16.dp)) {
         SidebarHeaderTitleSlot(
             state = state,
             onEditAgent = actions.onEditAgent,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.fillMaxWidth(),
         )
         // The kebab is the *agent's* menu; it has nothing to act on while Home
         // is showing, so it goes away with the agent identity.
-        if (!home) SidebarAgentOverflowMenu(actions = actions)
-    }
-}
-
-@Composable
-private fun SidebarHomeButton(selected: Boolean, onClick: () -> Unit) {
-    DesktopTooltip(text = "Home") {
-        Box(
-            modifier = Modifier
-                .size(26.dp)
-                .clip(RoundedCornerShape(7.dp))
-                .background(
-                    if (selected) {
-                        MaterialTheme.colorScheme.surfaceContainerHigh
-                    } else {
-                        Color.Transparent
-                    },
-                )
-                .clickable(onClick = onClick),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.Home,
-                contentDescription = "Home",
-                tint = if (selected) {
-                    MaterialTheme.colorScheme.onSurface
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-                modifier = Modifier.size(17.dp),
-            )
-        }
+        if (!home) Box(Modifier.align(Alignment.TopEnd)) { SidebarAgentOverflowMenu(actions = actions) }
     }
 }
 
@@ -159,6 +126,9 @@ private fun SidebarHeaderTitleSlot(
     }
 }
 
+/** The hero seat's box; the character draws its body across ~60 % of it, so this reads as a ~75 dp mascot. */
+private val SidebarHeroSeatSize = 124.dp
+
 private data class SidebarIdentity(
     val agentOrbIndex: Int,
     val agentId: String?,
@@ -172,17 +142,25 @@ private fun SidebarAgentIdentity(
     onEditAgent: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // Tapping the agent (orb + name) opens its Edit Agent settings; the
-    // ⋮ menu keeps the other actions.
-    Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
-            .clickable(onClick = onEditAgent),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    // The mascot's pencil badge and the name open the Edit Agent settings; the
+    // ⋮ menu keeps the other actions. Nothing larger than those is clickable.
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        // The agent itself, alive, where it lives; the gradient orb until it has an identity.
-        AgentOrb(index = identity.agentOrbIndex, size = if (identity.agentIdentity != null) 64.dp else 30.dp, cornerRadius = 6.dp, agentId = identity.agentId)
+        // The agent pane's hero seat: the mascot stands here, large, whenever the pane shows.
+        // The seat is empty while the character is away (the hop leaves nothing behind); an
+        // agent with no mascot at all keeps its gradient orb.
+        val mascot = identity.agentIdentity
+        MascotSeat(
+            agentId = identity.agentId,
+            stage = MascotStage.AGENT_PANE_HERO,
+            size = if (mascot != null) SidebarHeroSeatSize else 30.dp,
+            onEdit = onEditAgent,
+        ) {
+            if (mascot == null) AgentOrb(index = identity.agentOrbIndex, size = 30.dp, cornerRadius = 6.dp)
+        }
         Text(
             text = identity.agentName,
             style = MaterialTheme.typography.titleMedium,
@@ -190,7 +168,11 @@ private fun SidebarAgentIdentity(
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .clip(RoundedCornerShape(6.dp))
+                .clickable(onClick = onEditAgent)
+                .padding(horizontal = 8.dp, vertical = 2.dp),
         )
     }
 }

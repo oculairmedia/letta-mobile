@@ -78,7 +78,7 @@ class MascotIdentityTest {
     }
 
     @Test
-    fun `seeded identities use saturated colours, 45 degree turns and spread over the options`() {
+    fun `seeded identities use saturated colours and 45 degree turns and spread over the options`() {
         val identities = (0 until 400).map { MascotIdentity.seeded("agent-$it") }
         assertTrue(identities.all { it.argb in MascotPalette.SEEDED })
         assertTrue(identities.all { it.rotationDegrees % MascotIdentity.SEEDED_ROTATION_STEP == 0 })
@@ -90,5 +90,23 @@ class MascotIdentityTest {
 
     private companion object {
         val GOLDEN_SEEDED = listOf("blob:ff1e7bf0:90", "cloud:ffe5484d", "hexagon:ff8b5a2b:225")
+    }
+
+    @Test
+    fun `partway between two identities the shape is already the target and the colour is mixed`() {
+        val from = MascotIdentity(MascotShape.CIRCLE, 0xFF000000.toInt())
+        val to = MascotIdentity(MascotShape.TRIANGLE, 0xFFFFFFFF.toInt())
+        assertEquals(MascotIdentity(MascotShape.TRIANGLE, 0xFF000000.toInt()), MascotIdentity.lerp(from, to, 0f))
+        assertEquals(MascotIdentity(MascotShape.TRIANGLE, 0xFF808080.toInt()), MascotIdentity.lerp(from, to, 0.5f))
+        assertEquals(to, MascotIdentity.lerp(from, to, 1f))
+    }
+
+    @Test
+    fun `a morph turns the body the shorter way round`() {
+        val from = MascotIdentity(MascotShape.PILL, MascotPalette.BLUE, rotationDegrees = 350)
+        val to = MascotIdentity(MascotShape.PILL, MascotPalette.BLUE, rotationDegrees = 10)
+        assertEquals(0, MascotIdentity.lerp(from, to, 0.5f).rotationDegrees)
+        assertEquals(355, MascotIdentity.lerp(from, to, 0.25f).rotationDegrees)
+        assertEquals(180, MascotIdentity.lerp(to.copy(rotationDegrees = 90), to.copy(rotationDegrees = 270), 0.5f).rotationDegrees)
     }
 }
