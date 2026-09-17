@@ -62,6 +62,29 @@ sealed interface CanvasOp {
         val colorHex: String,
     ) : CanvasOp
 
+    /**
+     * Upserts a block document (a Cascade editor JSON document) attached to the canvas. Documents
+     * live beside the drawing, keyed by [documentId]; last writer wins per document.
+     */
+    @Serializable
+    @SerialName("set_document")
+    data class SetDocumentOp(
+        override val opId: String,
+        override val actorId: String,
+        override val lamport: Long,
+        val documentId: String,
+        val documentJson: String,
+    ) : CanvasOp
+
+    @Serializable
+    @SerialName("remove_document")
+    data class RemoveDocumentOp(
+        override val opId: String,
+        override val actorId: String,
+        override val lamport: Long,
+        val documentId: String,
+    ) : CanvasOp
+
     @Serializable
     @SerialName("batch")
     data class BatchOp(

@@ -40,6 +40,9 @@ object CanvasOpProjector {
     private const val TOMBSTONES = "_removed"
     private const val BG_LAMPORT = "_bgLamport"
     private const val BG_ACTOR = "_bgActorId"
+    private const val DOCUMENTS = "_documents"
+    private const val DOC_JSON = "json"
+    private const val DOC_REMOVED = "_removed"
 
     /**
      * How many tombstones a scene keeps. They cannot grow without bound, and the ones that matter
@@ -106,7 +109,9 @@ object CanvasOpProjector {
     }
 
     private fun projectSingle(sceneJson: String, op: CanvasOp): String = when (op) {
-        is CanvasOp.ReplaceSceneOp -> replaceScene(op)
+        is CanvasOp.ReplaceSceneOp -> replaceScene(sceneJson, op)
+        is CanvasOp.SetDocumentOp -> upsertDocumentWithLww(sceneJson, op)
+        is CanvasOp.RemoveDocumentOp -> removeDocumentWithLww(sceneJson, op)
         is CanvasOp.SetBackgroundOp -> setBackground(sceneJson, op)
         is CanvasOp.AddElementOp -> upsertElementWithLww(sceneJson, op)
         is CanvasOp.UpdateElementOp -> upsertElementWithLww(sceneJson, op)
@@ -119,8 +124,11 @@ object CanvasOpProjector {
      * own lamport and actor. Otherwise they would arrive with no provenance and the next
      * out-of-order element op — however old — would win against them.
      */
-    private fun replaceScene(op: CanvasOp.ReplaceSceneOp): String {
+    private fun replaceScene(sceneJson: String, op: CanvasOp.ReplaceSceneOp): String {
         val incoming = if (op.sceneJson.isNotBlank()) parseScene(op.sceneJson) else parseEmptyScene()
+        // A replace is a drawing, not a notebook: it carries the block documents of the scene it
+        // replaces unless it brings its own, so an agent redraw never erases the notes.
+        val carriedDocuments = if (incoming.containsKey(DOCUMENTS)) null else parseScene(sceneJson)[DOCUMENTS]
         val provenance = WriterProvenance(op.lamport, op.actorId)
         val stamped = incoming["elements"]?.jsonArray?.map { element ->
             val obj = runCatching { element.jsonObject }.getOrNull() ?: return@map element
@@ -131,6 +139,7 @@ object CanvasOpProjector {
         return canonicalScene(
             buildMap {
                 incoming.forEach { (key, value) -> if (key != "elements") put(key, value) }
+                carriedDocuments?.let { put(DOCUMENTS, it) }
                 put("elements", JsonArray(stamped))
                 put(BG_LAMPORT, JsonPrimitive(op.lamport))
                 put(BG_ACTOR, JsonPrimitive(op.actorId))
@@ -211,6 +220,63 @@ object CanvasOpProjector {
         // still refuse it when it arrives, or the two peers disagree about whether it exists.
         return writeScene(parsed, elements, tombstones + (op.elementId to opProvenance))
     }
+
+    /** The live block documents of [sceneJson], removed ones excluded, ordered by id. */
+    fun documentsOf(sceneJson: String): List<CanvasSceneDocument> {
+        if (sceneJson.isBlank()) return emptyList()
+        val parsed = runCatching { parseScene(sceneJson) }.getOrNull() ?: return emptyList()
+        return documentEntries(parsed)
+            .filter { !isRemovedDocument(it) }
+            .mapNotNull { entry ->
+                val id = runCatching { entry["id"]?.jsonPrimitive?.content }.getOrNull() ?: return@mapNotNull null
+                val json = runCatching { entry[DOC_JSON]?.jsonPrimitive?.content }.getOrNull() ?: return@mapNotNull null
+                CanvasSceneDocument(id = id, json = json)
+            }
+            .sortedBy { it.id }
+    }
+
+    private fun documentEntries(scene: JsonObject): List<JsonObject> =
+        runCatching { scene[DOCUMENTS]?.jsonArray }.getOrNull().orEmpty().mapNotNull { runCatching { it.jsonObject }.getOrNull() }
+
+    private fun isRemovedDocument(entry: JsonObject): Boolean =
+        runCatching { entry[DOC_REMOVED]?.jsonPrimitive?.content == "true" }.getOrNull() == true
+
+    private fun documentProvenance(entry: JsonObject): WriterProvenance? {
+        val lamport = runCatching { entry[LAMPORT]?.jsonPrimitive?.long }.getOrNull() ?: return null
+        val actor = runCatching { entry[ACTOR]?.jsonPrimitive?.content }.getOrNull().orEmpty()
+        return WriterProvenance(lamport, actor)
+    }
+
+    /**
+     * Last writer wins per document id, like elements. A removal stays in the array as a removed
+     * entry carrying its provenance, so an older write that arrives late still loses to it.
+     */
+    private fun writeDocument(sceneJson: String, documentId: String, provenance: WriterProvenance, json: String?): String {
+        val parsed = parseScene(sceneJson)
+        val entries = documentEntries(parsed).toMutableList()
+        val index = entries.indexOfFirst { runCatching { it["id"]?.jsonPrimitive?.content }.getOrNull() == documentId }
+        if (index >= 0 && !wins(provenance, documentProvenance(entries[index]))) return sceneJson
+        val entry = buildJsonObject {
+            put("id", JsonPrimitive(documentId))
+            if (json != null) put(DOC_JSON, JsonPrimitive(json)) else put(DOC_REMOVED, JsonPrimitive(true))
+            put(LAMPORT, JsonPrimitive(provenance.lamport))
+            put(ACTOR, JsonPrimitive(provenance.actorId))
+        }
+        if (index >= 0) entries[index] = entry else entries.add(entry)
+        entries.sortBy { runCatching { it["id"]?.jsonPrimitive?.content }.getOrNull().orEmpty() }
+        return canonicalScene(
+            buildMap {
+                parsed.forEach { (key, value) -> if (key != DOCUMENTS) put(key, value) }
+                put(DOCUMENTS, JsonArray(entries))
+            },
+        )
+    }
+
+    private fun upsertDocumentWithLww(sceneJson: String, op: CanvasOp.SetDocumentOp): String =
+        writeDocument(sceneJson, op.documentId, WriterProvenance(op.lamport, op.actorId), op.documentJson)
+
+    private fun removeDocumentWithLww(sceneJson: String, op: CanvasOp.RemoveDocumentOp): String =
+        writeDocument(sceneJson, op.documentId, WriterProvenance(op.lamport, op.actorId), null)
 
     private fun tombstonesOf(scene: JsonObject): Map<String, WriterProvenance> {
         val raw = runCatching { scene[TOMBSTONES]?.jsonObject }.getOrNull() ?: return emptyMap()

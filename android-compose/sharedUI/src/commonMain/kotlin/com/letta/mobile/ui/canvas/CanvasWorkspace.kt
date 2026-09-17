@@ -50,6 +50,8 @@ import io.ak1.drawbox.presentation.viewmodel.DrawBoxController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import androidx.compose.material3.FilterChip
+import androidx.compose.runtime.saveable.rememberSaveable
 
 /**
  * Shared Canvas Workspace composable for Meridian.
@@ -201,6 +203,8 @@ fun CanvasWorkspace(
     }
 
     val hasSelection = state.selectedIds.isNotEmpty()
+    // Draw or Notes: the drawing and the block document share the canvas, one in view at a time.
+    var workspaceMode by rememberSaveable { mutableStateOf(CanvasWorkspaceMode.DRAW) }
     val controlsBarState = CanvasControlsBridge.buildControlsBarState(
         state = state,
         canUndo = canUndo,
@@ -226,6 +230,21 @@ fun CanvasWorkspace(
                 presences = presences,
                 currentPeerId = currentPeerId,
             )
+
+            if (workspaceMode == CanvasWorkspaceMode.NOTES && session != null) {
+                Surface(
+                    modifier = Modifier.fillMaxSize().padding(top = 56.dp),
+                    color = MaterialTheme.colorScheme.background,
+                ) {
+                    CanvasBlockEditor(session = session, modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp))
+                }
+            } else if (session != null) {
+                CanvasNotesPreviewCard(
+                    session = session,
+                    onOpen = { workspaceMode = CanvasWorkspaceMode.NOTES },
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 88.dp),
+                )
+            }
 
             // Top action bar: Sample loader + Exports + Status
             Column(
@@ -261,6 +280,18 @@ fun CanvasWorkspace(
                             ) {
                                 Text("Back")
                             }
+                        }
+                        if (session != null) {
+                            FilterChip(
+                                selected = workspaceMode == CanvasWorkspaceMode.DRAW,
+                                onClick = { workspaceMode = CanvasWorkspaceMode.DRAW },
+                                label = { Text("Draw") },
+                            )
+                            FilterChip(
+                                selected = workspaceMode == CanvasWorkspaceMode.NOTES,
+                                onClick = { workspaceMode = CanvasWorkspaceMode.NOTES },
+                                label = { Text("Notes") },
+                            )
                         }
 
                         if (session != null) {
@@ -447,3 +478,6 @@ fun CanvasWorkspace(
         }
     }
 }
+
+/** What the workspace shows: the drawing, or the canvas's block document. */
+enum class CanvasWorkspaceMode { DRAW, NOTES }
