@@ -145,7 +145,7 @@ private fun AgentScaffoldChatScreenPane(
                 }
             },
         onOpenCanvas = params.navigation.onNavigateToCanvas?.let { navigate ->
-            { navigate(params.viewModel.conversationId?.value) }
+            { navigate(params.viewModel.agentId.value, params.viewModel.conversationId?.value) }
         },
         viewModel = params.viewModel,
     )

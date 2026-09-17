@@ -50,7 +50,7 @@ fun AgentScaffold(
     onNavigateToConversationList: (() -> Unit)? = null,
     onNavigateToSchedules: ((String) -> Unit)? = null,
     onNavigateToProjects: (() -> Unit)? = null,
-    onNavigateToCanvas: ((String?) -> Unit)? = null,
+    onNavigateToCanvas: ((agentId: String, conversationId: String?) -> Unit)? = null,
     viewModelKey: String? = null,
 ) {
     AgentScaffoldContent(

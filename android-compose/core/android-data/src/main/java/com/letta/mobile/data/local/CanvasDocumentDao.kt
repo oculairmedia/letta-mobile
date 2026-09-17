@@ -25,4 +25,25 @@ interface CanvasDocumentDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: CanvasDocumentEntity)
+
+    /**
+     * Writes the row only while its revision is still [expectedRevision]; the compare and the
+     * write are one SQL statement, so no other writer can slip in between. Returns rows changed.
+     */
+    @Query(
+        "UPDATE canvas_documents SET agentId = :agentId, conversationId = :conversationId, title = :title, " +
+            "revision = :revision, sceneJson = :sceneJson, updatedAtEpochMs = :updatedAtEpochMs, aclJson = :aclJson " +
+            "WHERE id = :id AND revision = :expectedRevision",
+    )
+    suspend fun updateIfRevision(
+        id: String,
+        expectedRevision: Long,
+        agentId: String?,
+        conversationId: String?,
+        title: String,
+        revision: Long,
+        sceneJson: String,
+        updatedAtEpochMs: Long,
+        aclJson: String?,
+    ): Int
 }

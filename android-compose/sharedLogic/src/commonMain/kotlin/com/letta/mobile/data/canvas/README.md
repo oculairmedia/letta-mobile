@@ -64,13 +64,16 @@ All scene mutations are expressed as typed `CanvasOp` instances carrying:
 
 7. **Access Control & Authorization (P4.2)**:
    - `CanvasAcl` defines owners (`ownerUserId`), authorized writers (`writerUserIds`, `writerAgentIds`), and authorized readers (`readerUserIds`, `readerAgentIds`).
-   - Identities support raw identifiers as well as `user:` and `agent:` prefixed strings (e.g. `agent:agent-123` and `agent-123` normalize identically).
+   - Identities support raw identifiers as well as `user:` and `agent:` prefixed strings. A prefix pins the principal type: `agent:agent-123` matches the agent entry `agent-123` but never a user entry of the same name, and `user:sam` never matches `writerAgentIds = {"sam"}`. A raw identifier carries no type and matches either.
    - `canWrite`: strictly requires the caller to be the document owner or an explicitly listed writer.
    - **Default Read Behavior**: When both `readerUserIds` and `readerAgentIds` are empty, read access defaults to public (anyone with the canvas ID can read), while write access remains strictly gated by `canWrite`. Once any explicit readers are added, read access is restricted to owners, writers, and explicitly listed readers.
-   - Canvas creation paths (`CanvasSession.create`, `CanvasCreateTool`) automatically configure sensible defaults granting write permissions to the creating agent and user.
+   - **A canvas always has an ACL.** `CanvasSession.create` and `CanvasCreateTool` default to owner `local_user` (the actor the local human edits as) plus the creating agent as a writer when one is known; with no agent the canvas is owner-only. A null ACL is only ever a pre-P4 document and is treated as unrestricted. On Android the Room store refuses to load a row whose ACL column is present but unreadable rather than treating it as absent.
+   - **External tools carry the transport identity.** Every `canvas.*` tool takes its caller from the runtime agent scope the App Server stamped on the tool-call frame and refuses a call without one; `agent_id` in the tool input is never consulted. `canvas.create` and `canvas.list` only reveal an existing conversation canvas to a caller its ACL lets read.
+   - **Writes without a live session are optimistic.** Tool calls dispatch concurrently, so `replace_scene` / `apply_ops` against a canvas no `CanvasSession` holds persist through `CanvasDocumentStore.upsertIfRevision`; a call whose read revision is no longer current gets a `Conflict` error and must re-read, instead of overwriting the other writer under the same revision.
 
 8. **In-Session Checkpoint History & Restore (P4.3)**:
    - `CanvasSession` records snapshots (`CanvasCheckpoint`) in a bounded in-memory ring (`MAX_CHECKPOINTS = 30`).
+   - The document a session is created or reopened with is its first checkpoint before the session is handed out, so the pre-edit scene is restorable even when a sync collector or a local edit lands before `load()`.
    - `restoreCheckpoint(checkpointId, actorId)` verifies `canWrite` ACL, creates an authoritative `CanvasOp.ReplaceSceneOp`, records a restore checkpoint, advances document revision, and broadcasts the op over `syncTransport`.
    - **Lifecycle Note**: Checkpoints currently live in-session per process lifecycle. Durable multi-session snapshot persistence across process death is deferred to post-P4.
 
@@ -78,5 +81,6 @@ All scene mutations are expressed as typed `CanvasOp` instances carrying:
    - Canvas exports are packaged via `CanvasShare.createChatImageAttachment` / `CanvasShare.packageForChat` enforcing `AttachmentLimits.maxRawBytesPerImage` (2 MiB limit).
    - If payload exceeds limits, `CanvasAttachmentTooLargeException` is thrown.
    - Sniffs MIME type (prefers raster `image/png` and `image/jpeg` for chat LLM vision capabilities; supports `image/svg+xml`).
+   - The `CanvasShare` pending queue is the single delivery state. `stagedAttachmentEvents` only names the conversation that has something waiting; the chat screen answers by draining `consumeStagedAttachments` (and drains once on subscription), so an image is never added twice.
    - On Android and Desktop, staged attachments are delivered directly into the owning conversation's `ChatComposerController` pending attachments bar.
 

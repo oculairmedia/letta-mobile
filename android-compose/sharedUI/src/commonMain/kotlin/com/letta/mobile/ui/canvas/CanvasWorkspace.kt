@@ -398,6 +398,10 @@ fun CanvasWorkspace(
                                                         runCatching {
                                                             session.restoreCheckpoint(cp.checkpointId)
                                                         }.onSuccess { restored ->
+                                                            // Claim the restored scene as ours first, or the external-update
+                                                            // collector sees the revision bump, imports it again and overwrites
+                                                            // this status with "Agent updated canvas".
+                                                            lastExportedJson = restored.sceneJson
                                                             controller.importPath(CanvasOpProjector.stripMetadataForDrawBox(restored.sceneJson))
                                                             statusMessage = "Restored to revision ${cp.revision}"
                                                             showHistoryDialog = false

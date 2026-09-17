@@ -9,8 +9,10 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class DesktopCanvasDocumentStoreTest {
 
@@ -101,5 +103,22 @@ class DesktopCanvasDocumentStoreTest {
         assertEquals(docV2, afterUpdate)
         assertEquals("V2 Updated", afterUpdate?.title)
         assertEquals(2L, afterUpdate?.revision)
+    }
+
+    @Test
+    fun upsertIfRevisionWritesOnlyWhileTheStoredRevisionMatches() = runTest {
+        val docId = CanvasId("canvas-cas-1")
+        val v1 = CanvasDocument(id = docId, title = "V1", revision = 1L, sceneJson = "{}", updatedAtEpochMs = 1000L)
+        val store = DesktopCanvasDocumentStore(rootDirectory = tempDir)
+        assertFalse(store.upsertIfRevision(v1, expectedRevision = 0L))
+        store.upsert(v1)
+
+        val v2 = v1.copy(revision = 2L, sceneJson = """{"elements":[{"id":"a"}]}""", updatedAtEpochMs = 2000L)
+        assertTrue(store.upsertIfRevision(v2, expectedRevision = 1L))
+        assertEquals(v2, store.get(docId))
+
+        val stale = v1.copy(revision = 2L, sceneJson = """{"stale":true}""", updatedAtEpochMs = 3000L)
+        assertFalse(store.upsertIfRevision(stale, expectedRevision = 1L))
+        assertEquals(v2, DesktopCanvasDocumentStore(rootDirectory = tempDir).get(docId))
     }
 }

@@ -54,6 +54,35 @@ class CanvasAclTest {
     }
 
     @Test
+    fun aPrefixedIdentifierNeverMatchesTheOtherPrincipalType() {
+        val acl = CanvasAcl(
+            ownerUserId = "sam",
+            writerAgentIds = setOf("sam", "agent:helper"),
+            writerUserIds = setOf("user:pat"),
+            readerUserIds = setOf("reader"),
+        )
+
+        // The user "sam" owns the canvas; the agent "sam" is listed as a writer. Each may write
+        // as itself, and neither claims the other's grant.
+        assertTrue(acl.canWrite("user:sam"))
+        assertTrue(acl.canWrite("agent:sam"))
+        assertTrue(acl.canWrite("sam"))
+
+        // An agent whose bare id equals a user grant is not that user, and vice versa.
+        assertFalse(acl.canWrite("agent:pat"))
+        assertTrue(acl.canWrite("user:pat"))
+        assertFalse(acl.canWrite("user:helper"))
+        assertTrue(acl.canWrite("agent:helper"))
+        assertFalse(acl.canRead("agent:reader"))
+        assertTrue(acl.canRead("user:reader"))
+
+        // An owner is a user, so an agent that happens to share the owner's id is not the owner.
+        val ownerOnly = CanvasAcl(ownerUserId = "sam")
+        assertFalse(ownerOnly.canWrite("agent:sam"))
+        assertTrue(ownerOnly.canWrite("user:sam"))
+    }
+
+    @Test
     fun testDefaultPublicReadWhenReadersEmpty() {
         val acl = CanvasAcl(
             ownerUserId = "alice",

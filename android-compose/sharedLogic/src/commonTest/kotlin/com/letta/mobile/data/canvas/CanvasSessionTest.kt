@@ -3,7 +3,10 @@ package com.letta.mobile.data.canvas
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class CanvasSessionTest {
 
@@ -81,6 +84,53 @@ class CanvasSessionTest {
         assertEquals("""{"bgColor":-1,"elements":[{"id":"box1"},{"id":"box2"}]}""", loaded.sceneJson)
         assertEquals("""{"bgColor":-1,"elements":[{"id":"box1"},{"id":"box2"}]}""", session2.sceneJsonOrEmpty())
         assertEquals("Architecture", loaded.title)
+    }
+
+    @Test
+    fun aCanvasCreatedWithoutAnAgentIsOwnerOnlyNotUnrestricted() = runTest {
+        val store = InMemoryCanvasDocumentStore()
+        val session = CanvasSession.create(store = store, options = CanvasCreateOptions(title = "Solo"))
+
+        val acl = session.document.value?.acl
+        assertNotNull(acl, "a new canvas must always carry an ACL")
+        assertEquals(CanvasSession.LOCAL_USER_ACTOR_ID, acl.ownerUserId)
+        assertEquals(emptySet(), acl.writerAgentIds)
+        assertTrue(acl.canWrite(CanvasSession.LOCAL_USER_ACTOR_ID))
+        assertFalse(acl.canWrite("some-agent"))
+        assertFailsWith<UnauthorizedCanvasMutationException> {
+            session.applyAgentReplace("{}", actorId = "some-agent")
+        }
+
+        val withAgent = CanvasSession.create(store = store, options = CanvasCreateOptions(agentId = "agent-7"))
+        assertTrue(withAgent.document.value?.acl?.canWrite("agent-7") == true)
+    }
+
+    @Test
+    fun theInitialSceneIsACheckpointBeforeAnyoneCanMutateTheSession() = runTest {
+        val store = InMemoryCanvasDocumentStore()
+        val created = CanvasSession.create(
+            store = store,
+            options = CanvasCreateOptions(canvasId = CanvasId("cp-first"), initialSceneJson = """{"elements":[]}"""),
+        )
+        assertEquals(1, created.checkpoints.value.size)
+        assertEquals("Initial state", created.checkpoints.value.single().description)
+
+        // A mutation before load() used to leave the original scene unrestorable.
+        created.saveScene("""{"elements":[{"id":"1"}]}""")
+        created.load()
+        val oldest = created.checkpoints.value.last()
+        assertEquals(1L, oldest.revision)
+        assertEquals("""{"elements":[]}""", oldest.sceneJson)
+
+        val reopened = CanvasSession.getOrCreateForConversation(
+            store = store,
+            conversationId = "conv-cp",
+            options = CanvasConversationOptions(),
+        )
+        reopened.saveScene("""{"elements":[{"id":"x"}]}""")
+        val again = CanvasSession.getOrCreateForConversation(store = store, conversationId = "conv-cp")
+        assertEquals(1, again.checkpoints.value.size)
+        assertEquals(2L, again.checkpoints.value.single().revision)
     }
 
     @Test

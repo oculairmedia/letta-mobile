@@ -35,8 +35,18 @@ data class CanvasDocumentEntity(
         revision = revision,
         sceneJson = sceneJson,
         updatedAtEpochMs = updatedAtEpochMs,
-        acl = aclJson?.let { runCatching { Json.decodeFromString<CanvasAcl>(it) }.getOrNull() },
+        acl = aclJson?.let(::decodeAcl),
     )
+
+    /**
+     * A null ACL means "unrestricted" to every mutation path, so a row whose ACL column is
+     * present but unreadable must not quietly load as open: the decode error is surfaced.
+     */
+    private fun decodeAcl(raw: String): CanvasAcl = try {
+        Json.decodeFromString<CanvasAcl>(raw)
+    } catch (e: IllegalArgumentException) {
+        throw IllegalStateException("Canvas '$id' has a malformed ACL and cannot be loaded", e)
+    }
 
     companion object {
         fun fromCanvasDocument(doc: CanvasDocument): CanvasDocumentEntity = CanvasDocumentEntity(

@@ -1,6 +1,9 @@
 package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.attachment.AttachmentLimits
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
@@ -78,6 +81,31 @@ class CanvasShareTest {
         val consumed456 = CanvasShare.consumeStagedAttachments(target456)
         assertEquals(1, consumed456.size)
         assertEquals(imgB, consumed456.first())
+    }
+
+    @Test
+    fun stagingSignalsTheTargetAndTheQueueDeliversTheImageOnce() = runTest {
+        CanvasShare.clearStagedAttachments()
+        val target = CanvasConversationTarget("conv-signal")
+        val image = CanvasShare.createChatImageAttachment("signal".encodeToByteArray(), CanvasMimeType.PNG)
+
+        val signals = mutableListOf<CanvasConversationTarget>()
+        val delivered = mutableListOf<com.letta.mobile.data.model.MessageContentPart.Image>()
+        val collector = backgroundScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            CanvasShare.stagedAttachmentEvents.collect { signalled ->
+                signals += signalled
+                delivered += CanvasShare.consumeStagedAttachments(signalled)
+            }
+        }
+
+        CanvasShare.stageForConversation(target, image)
+        runCurrent()
+
+        assertEquals(listOf(target), signals)
+        assertEquals(listOf(image), delivered)
+        // A later consumer (a chat screen starting up) finds nothing left to add.
+        assertTrue(CanvasShare.consumeStagedAttachments(target).isEmpty())
+        collector.cancel()
     }
 
     @Test

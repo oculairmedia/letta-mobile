@@ -48,6 +48,8 @@ import kotlinx.serialization.Serializable
 data class CanvasRoute(
     val canvasId: String = "",
     val conversationId: String? = null,
+    /** The conversation's agent, granted write access on a canvas this route creates. */
+    val agentId: String? = null,
 )
 @Serializable
 data class ProjectIssuesRoute(

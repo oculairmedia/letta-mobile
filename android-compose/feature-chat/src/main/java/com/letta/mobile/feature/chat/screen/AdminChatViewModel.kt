@@ -58,6 +58,7 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.flow.onSubscription
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
@@ -1081,17 +1082,31 @@ internal class AdminChatViewModel @Inject constructor(
         observeCanvasShareAttachments()
     }
 
+    /**
+     * The pending queue in [com.letta.mobile.data.canvas.CanvasShare] is the one delivery state
+     * for a staged canvas image; the event flow only says which conversation to drain. Draining
+     * inside `onSubscription` closes the gap where an image staged between a startup drain and
+     * the subscription would have no event to announce it.
+     */
     private fun observeCanvasShareAttachments() {
         viewModelScope.launch {
-            val initialTarget = com.letta.mobile.data.canvas.CanvasConversationTarget.from(currentOrExplicitConversationId())
-            com.letta.mobile.data.canvas.CanvasShare.consumeStagedAttachments(initialTarget).forEach { image ->
-                addAttachment(image)
-            }
-            com.letta.mobile.data.canvas.CanvasShare.stagedAttachmentEvents.collect { (target, image) ->
-                if (matchesTargetConversation(target.id, currentOrExplicitConversationId())) {
-                    addAttachment(image)
+            com.letta.mobile.data.canvas.CanvasShare.stagedAttachmentEvents
+                .onSubscription {
+                    drainStagedCanvasAttachments(
+                        com.letta.mobile.data.canvas.CanvasConversationTarget.from(currentOrExplicitConversationId()),
+                    )
                 }
-            }
+                .collect { target ->
+                    if (matchesTargetConversation(target.id, currentOrExplicitConversationId())) {
+                        drainStagedCanvasAttachments(target)
+                    }
+                }
+        }
+    }
+
+    private suspend fun drainStagedCanvasAttachments(target: com.letta.mobile.data.canvas.CanvasConversationTarget) {
+        com.letta.mobile.data.canvas.CanvasShare.consumeStagedAttachments(target).forEach { image ->
+            addAttachment(image)
         }
     }
 

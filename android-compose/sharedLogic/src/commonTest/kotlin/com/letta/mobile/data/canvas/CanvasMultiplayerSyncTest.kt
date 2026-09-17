@@ -103,6 +103,7 @@ class CanvasMultiplayerSyncTest {
             options = CanvasCreateOptions(
                 canvasId = canvasId,
                 syncTransport = sharedTransport,
+                acl = CanvasAcl(ownerUserId = "human", writerAgentIds = setOf("agent")),
             ),
         )
         session.startSync(backgroundScope)
@@ -147,6 +148,8 @@ class CanvasMultiplayerSyncTest {
                 canvasId = canvasId,
                 title = "Shared Architecture",
                 syncTransport = syncTransport,
+                // A new canvas is owner-only by default; the peers collaborating here are named.
+                acl = CanvasAcl(ownerUserId = "client_a", writerUserIds = setOf("client_b")),
             ),
         )
 }

@@ -90,15 +90,30 @@ class CanvasSession(
         val loaded = store.get(canvasId)
         _document.value = loaded
         if (loaded != null && _checkpoints.value.isEmpty()) {
-            recordCheckpoint(
-                loaded,
-                metadata = CanvasCommitMetadata(
-                    actorId = loaded.agentId ?: "initial",
-                    description = "Initial state",
-                ),
-            )
+            recordInitialCheckpoint(loaded)
         }
         loaded
+    }
+
+    private fun recordInitialCheckpoint(doc: CanvasDocument) {
+        recordCheckpoint(
+            doc,
+            metadata = CanvasCommitMetadata(
+                actorId = doc.agentId ?: "initial",
+                description = "Initial state",
+            ),
+        )
+    }
+
+    /**
+     * Seeds the session with [doc] and records it as the first checkpoint, so the scene that
+     * existed before any caller's first mutation is always restorable. Done before the session
+     * is handed out: a sync collector or a local edit can otherwise land first and [load] would
+     * then find a non-empty history and skip the original state.
+     */
+    private fun initialize(doc: CanvasDocument) {
+        _document.value = doc
+        recordInitialCheckpoint(doc)
     }
 
     /**
@@ -219,7 +234,7 @@ class CanvasSession(
     /**
      * Diffs [newJson] against current scene and applies the resulting operations locally.
      */
-    suspend fun applyLocalScene(newJson: String, actorId: String = "local_user"): List<CanvasOp> {
+    suspend fun applyLocalScene(newJson: String, actorId: String = LOCAL_USER_ACTOR_ID): List<CanvasOp> {
         val doc = currentDoc()
         if (doc.acl != null && !doc.acl.canWrite(actorId)) {
             throw UnauthorizedCanvasMutationException(actorId, canvasId)
@@ -271,7 +286,7 @@ class CanvasSession(
      * Restores canvas to a prior [CanvasCheckpoint], generating and applying a [CanvasOp.ReplaceSceneOp]
      * locally and broadcasting to peers.
      */
-    suspend fun restoreCheckpoint(checkpointId: String, actorId: String = "local_user"): CanvasDocument = mutex.withLock {
+    suspend fun restoreCheckpoint(checkpointId: String, actorId: String = LOCAL_USER_ACTOR_ID): CanvasDocument = mutex.withLock {
         val checkpoint = _checkpoints.value.firstOrNull { it.checkpointId == checkpointId }
             ?: throw IllegalArgumentException("Checkpoint not found: $checkpointId")
 
@@ -301,6 +316,9 @@ class CanvasSession(
 
     companion object {
         const val MAX_CHECKPOINTS: Int = 30
+
+        /** The actor id the local human edits as; also the default owner of every new canvas. */
+        const val LOCAL_USER_ACTOR_ID: String = "local_user"
         /**
          * Creates a new [CanvasDocument] in [store] and returns an initialized [CanvasSession].
          */
@@ -308,12 +326,13 @@ class CanvasSession(
             store: CanvasDocumentStore,
             options: CanvasCreateOptions = CanvasCreateOptions(),
         ): CanvasSession {
-            val effectiveAcl = options.acl ?: if (options.agentId != null) {
-                CanvasAcl(
-                    ownerUserId = "local_user",
-                    writerAgentIds = setOf(options.agentId),
-                )
-            } else null
+            // A canvas is never created without an ACL: a null ACL reads as "unrestricted" to
+            // every mutation path, so an absent agent would otherwise leave the document open
+            // to any actor. The local user owns it; the creating agent, when known, may write.
+            val effectiveAcl = options.acl ?: CanvasAcl(
+                ownerUserId = LOCAL_USER_ACTOR_ID,
+                writerAgentIds = options.agentId?.let { setOf(it) }.orEmpty(),
+            )
             val doc = CanvasDocument(
                 id = options.canvasId,
                 agentId = options.agentId,
@@ -332,7 +351,7 @@ class CanvasSession(
                 syncTransport = options.syncTransport,
                 clock = options.clock,
             )
-            session._document.value = doc
+            session.initialize(doc)
             return session
         }
 
@@ -353,7 +372,7 @@ class CanvasSession(
                     syncTransport = options.syncTransport,
                     clock = options.clock,
                 )
-                session._document.value = existing
+                session.initialize(existing)
                 session
             } else {
                 create(

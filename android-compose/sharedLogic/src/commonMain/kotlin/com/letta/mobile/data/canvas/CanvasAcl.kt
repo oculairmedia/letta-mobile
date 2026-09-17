@@ -6,7 +6,9 @@ import kotlinx.serialization.Serializable
  * Access Control List for a collaborative [CanvasDocument].
  *
  * Defines authorization for reading and writing canvas documents and applying operations.
- * Identifiers can be raw or prefixed with "user:" or "agent:".
+ * Identifiers can be raw or prefixed with "user:" or "agent:". A prefixed identifier only ever
+ * matches entries of its own principal type: `user:sam` is never the agent `sam`, and
+ * `agent:sam` is never the user `sam`. A raw identifier carries no type and matches either.
  */
 @Serializable
 data class CanvasAcl(
@@ -21,16 +23,16 @@ data class CanvasAcl(
      */
     fun canWrite(actorId: String?): Boolean {
         if (actorId.isNullOrBlank()) return false
-        val normalized = normalize(actorId)
-        return isOwner(actorId, normalized) || isWriter(actorId, normalized)
+        val actor = CanvasPrincipal.parse(actorId)
+        return isOwner(actor) || isWriter(actor)
     }
 
-    private fun isOwner(actorId: String, normalized: String): Boolean =
-        actorId == ownerUserId || normalized == normalize(ownerUserId)
+    private fun isOwner(actor: CanvasPrincipal): Boolean =
+        actor.matches(ownerUserId, CanvasPrincipal.Kind.USER)
 
-    private fun isWriter(actorId: String, normalized: String): Boolean =
-        actorId in writerUserIds || normalized in writerUserIds ||
-            actorId in writerAgentIds || normalized in writerAgentIds
+    private fun isWriter(actor: CanvasPrincipal): Boolean =
+        actor.matchesAny(writerUserIds, CanvasPrincipal.Kind.USER) ||
+            actor.matchesAny(writerAgentIds, CanvasPrincipal.Kind.AGENT)
 
     /**
      * Checks if [actorId] is authorized to view the canvas.
@@ -40,20 +42,48 @@ data class CanvasAcl(
         if (isPublicRead()) return true
         if (actorId.isNullOrBlank()) return false
         if (canWrite(actorId)) return true
-        val normalized = normalize(actorId)
-        return isReader(actorId, normalized)
+        return isReader(CanvasPrincipal.parse(actorId))
     }
 
     private fun isPublicRead(): Boolean =
         readerUserIds.isEmpty() && readerAgentIds.isEmpty()
 
-    private fun isReader(actorId: String, normalized: String): Boolean =
-        actorId in readerUserIds || normalized in readerUserIds ||
-            actorId in readerAgentIds || normalized in readerAgentIds
+    private fun isReader(actor: CanvasPrincipal): Boolean =
+        actor.matchesAny(readerUserIds, CanvasPrincipal.Kind.USER) ||
+            actor.matchesAny(readerAgentIds, CanvasPrincipal.Kind.AGENT)
+}
+
+/**
+ * An ACL identifier split into its principal type and bare id. [kind] is null for a raw
+ * identifier, which is untyped and so may match an entry of either type.
+ */
+internal data class CanvasPrincipal(val kind: Kind?, val id: String) {
+    enum class Kind(val prefix: String) {
+        USER("user:"),
+        AGENT("agent:"),
+    }
+
+    /**
+     * Whether this actor matches [entry], an identifier listed in a set whose entries are all of
+     * [entryKind]. An entry that carries the other type's prefix is malformed and never matches.
+     */
+    fun matches(entry: String, entryKind: Kind): Boolean {
+        if (kind != null && kind != entryKind) return false
+        val listed = parse(entry)
+        if (listed.kind != null && listed.kind != entryKind) return false
+        return id == listed.id
+    }
+
+    fun matchesAny(entries: Set<String>, entryKind: Kind): Boolean =
+        entries.any { matches(it, entryKind) }
 
     companion object {
-        private fun normalize(id: String): String =
-            id.removePrefix("user:").removePrefix("agent:")
+        fun parse(id: String): CanvasPrincipal {
+            for (kind in Kind.entries) {
+                if (id.startsWith(kind.prefix)) return CanvasPrincipal(kind, id.removePrefix(kind.prefix))
+            }
+            return CanvasPrincipal(null, id)
+        }
     }
 }
 

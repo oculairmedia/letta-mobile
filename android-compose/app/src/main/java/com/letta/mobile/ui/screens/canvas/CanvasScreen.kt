@@ -39,7 +39,7 @@ class CanvasViewModel @Inject constructor(
     private val _session = MutableStateFlow<CanvasSession?>(null)
     val session: StateFlow<CanvasSession?> = _session.asStateFlow()
 
-    fun initSession(canvasId: String, conversationId: String?) {
+    fun initSession(canvasId: String, conversationId: String?, agentId: String? = null) {
         if (_session.value != null) return
         viewModelScope.launch {
             val canvasSession = if (!conversationId.isNullOrBlank() && canvasId.isBlank()) {
@@ -47,6 +47,7 @@ class CanvasViewModel @Inject constructor(
                     store = store,
                     conversationId = conversationId,
                     options = com.letta.mobile.data.canvas.CanvasConversationOptions(
+                        agentId = agentId,
                         title = "Conversation Canvas",
                         opLog = opLog,
                         syncTransport = syncTransport,
@@ -70,12 +71,13 @@ class CanvasViewModel @Inject constructor(
 fun CanvasScreen(
     canvasId: String,
     conversationId: String? = null,
+    agentId: String? = null,
     onNavigateBack: () -> Unit,
     onShareToChat: ((ByteArray, String) -> Unit)? = null,
     viewModel: CanvasViewModel = hiltViewModel(),
 ) {
-    LaunchedEffect(canvasId, conversationId) {
-        viewModel.initSession(canvasId, conversationId)
+    LaunchedEffect(canvasId, conversationId, agentId) {
+        viewModel.initSession(canvasId, conversationId, agentId)
     }
 
     val session by viewModel.session.collectAsStateWithLifecycle()

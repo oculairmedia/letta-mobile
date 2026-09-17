@@ -9,7 +9,6 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -36,19 +35,7 @@ class DesktopCanvasDocumentStore(
     }
 
     override suspend fun get(id: CanvasId): CanvasDocument? = withContext(Dispatchers.IO) {
-        mutex.withLock {
-            val file = docFile(id)
-            if (!Files.exists(file) || !Files.isRegularFile(file)) return@withLock null
-            try {
-                val content = Files.readString(file)
-                json.decodeFromString(CanvasDocument.serializer(), content)
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (unreadable: Exception) {
-                // An unreadable or malformed document reads as absent, not as a crash.
-                null
-            }
-        }
+        mutex.withLock { readDocumentLocked(id) }
     }
 
     override suspend fun getForConversation(conversationId: String): CanvasDocument? = withContext(Dispatchers.IO) {
@@ -58,21 +45,46 @@ class DesktopCanvasDocumentStore(
     }
 
     override suspend fun upsert(doc: CanvasDocument): Unit = withContext(Dispatchers.IO) {
-        mutex.withLock {
-            Files.createDirectories(rootDirectory)
-            val file = docFile(doc.id)
-            val tempFile = Files.createTempFile(rootDirectory, "canvas_", ".tmp")
-            try {
-                val content = json.encodeToString(CanvasDocument.serializer(), doc)
-                Files.writeString(tempFile, content)
-                try {
-                    Files.move(tempFile, file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
-                } catch (e: IOException) {
-                    Files.move(tempFile, file, StandardCopyOption.REPLACE_EXISTING)
-                }
-            } finally {
-                Files.deleteIfExists(tempFile)
+        mutex.withLock { writeDocumentLocked(doc) }
+    }
+
+    override suspend fun upsertIfRevision(doc: CanvasDocument, expectedRevision: Long): Boolean =
+        withContext(Dispatchers.IO) {
+            // The store mutex spans the read and the write, so the revision check cannot be
+            // interleaved with another writer's replace of the same file.
+            mutex.withLock {
+                val current = readDocumentLocked(doc.id) ?: return@withLock false
+                if (current.revision != expectedRevision) return@withLock false
+                writeDocumentLocked(doc)
+                true
             }
+        }
+
+    private fun readDocumentLocked(id: CanvasId): CanvasDocument? {
+        val file = docFile(id)
+        if (!Files.exists(file) || !Files.isRegularFile(file)) return null
+        return try {
+            json.decodeFromString(CanvasDocument.serializer(), Files.readString(file))
+        } catch (unreadable: Exception) {
+            // An unreadable or malformed document reads as absent, not as a crash.
+            null
+        }
+    }
+
+    private fun writeDocumentLocked(doc: CanvasDocument) {
+        Files.createDirectories(rootDirectory)
+        val file = docFile(doc.id)
+        val tempFile = Files.createTempFile(rootDirectory, "canvas_", ".tmp")
+        try {
+            val content = json.encodeToString(CanvasDocument.serializer(), doc)
+            Files.writeString(tempFile, content)
+            try {
+                Files.move(tempFile, file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+            } catch (e: IOException) {
+                Files.move(tempFile, file, StandardCopyOption.REPLACE_EXISTING)
+            }
+        } finally {
+            Files.deleteIfExists(tempFile)
         }
     }
 

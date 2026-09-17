@@ -21,14 +21,27 @@ private val canvasJson = Json {
 }
 
 
+/**
+ * [agentId] is the transport-authenticated caller: the runtime scope the App Server stamped on
+ * the tool-call frame. It is never read from the tool input, which the model controls, so a
+ * caller cannot name a different agent to read or write as it.
+ */
 private data class CanvasToolContext(
     val store: CanvasDocumentStore,
     val sessions: CanvasSessionRegistry,
-    val agentId: String? = null,
+    val agentId: String,
 ) {
-    fun resolveCallerId(input: JsonObject): String? =
-        agentId ?: input["agent_id"]?.jsonPrimitive?.contentOrNull
+    fun resolveCallerId(): String = agentId
 }
+
+private fun canRead(doc: CanvasDocument, callerId: String): Boolean =
+    doc.acl == null || doc.acl.canRead(callerId)
+
+/** Two tool calls both read revision N and raced to write N+1; one of them lost. */
+private fun revisionConflict(doc: CanvasDocument): ExternalToolResult.Error =
+    ExternalToolResult.Error(
+        "Conflict: canvas '${doc.id.value}' changed since revision ${doc.revision} was read; re-read and retry",
+    )
 
 private sealed interface CanvasLookupResult {
     data class Found(val doc: CanvasDocument) : CanvasLookupResult
@@ -45,8 +58,8 @@ private suspend fun findCanvasDocument(
     val activeSession = context.sessions.get(canvasId)
     val doc = activeSession?.document?.value ?: context.store.get(canvasId)
         ?: return CanvasLookupResult.Error(ExternalToolResult.Error("Canvas not found: $canvasIdStr"))
-    val callerId = context.resolveCallerId(input)
-    if (doc.acl != null && !doc.acl.canRead(callerId)) {
+    val callerId = context.resolveCallerId()
+    if (!canRead(doc, callerId)) {
         return CanvasLookupResult.Error(ExternalToolResult.Error("Unauthorized: actor '$callerId' cannot read canvas '$canvasIdStr'"))
     }
     return CanvasLookupResult.Found(doc)
@@ -58,16 +71,18 @@ private suspend fun executeCreateCanvas(
 ): CanvasId {
     val title = input["title"]?.jsonPrimitive?.contentOrNull ?: "Untitled Canvas"
     val conversationId = input["conversation_id"]?.jsonPrimitive?.contentOrNull
-    val callerAgentId = context.resolveCallerId(input)
+    val callerAgentId = context.resolveCallerId()
 
     val defaultAcl = CanvasAcl(
-        ownerUserId = "local_user",
-        writerAgentIds = if (callerAgentId != null) setOf(callerAgentId) else emptySet(),
+        ownerUserId = CanvasSession.LOCAL_USER_ACTOR_ID,
+        writerAgentIds = setOf(callerAgentId),
     )
 
     if (conversationId != null) {
+        // The conversation id is caller-supplied, so an existing canvas is only revealed to a
+        // caller its ACL lets read; anyone else gets a fresh canvas rather than the id.
         val existing = context.store.getForConversation(conversationId)
-        if (existing != null) return existing.id
+        if (existing != null && canRead(existing, callerAgentId)) return existing.id
     }
     val now = kotlin.time.Clock.System.now().toEpochMilliseconds()
     val newId = CanvasId("canvas-$now-${(1000..9999).random()}")
@@ -86,30 +101,42 @@ private suspend fun executeCreateCanvas(
     return newId
 }
 
-private suspend fun commitSceneUpdate(
+/**
+ * Persists a new scene for [doc] with no session holding the write lock. Tool calls dispatch
+ * concurrently, so the write is conditional on the revision this call read: a stale writer
+ * gets `null` instead of silently overwriting the other call's scene under the same revision.
+ */
+private suspend fun persistWithoutSession(
     store: CanvasDocumentStore,
-    activeSession: CanvasSession?,
     doc: CanvasDocument,
     sceneJson: String,
-    callerId: String?,
-): Long = if (activeSession != null) {
-    activeSession.applyAgentReplace(sceneJson, actorId = callerId).revision
-} else {
+): Long? {
     val updated = doc.copy(
         revision = doc.revision + 1L,
         sceneJson = sceneJson,
         updatedAtEpochMs = kotlin.time.Clock.System.now().toEpochMilliseconds(),
     )
-    store.upsert(updated)
-    updated.revision
+    return if (store.upsertIfRevision(updated, expectedRevision = doc.revision)) updated.revision else null
+}
+
+private suspend fun commitSceneUpdate(
+    store: CanvasDocumentStore,
+    activeSession: CanvasSession?,
+    doc: CanvasDocument,
+    sceneJson: String,
+    callerId: String,
+): Long? = if (activeSession != null) {
+    activeSession.applyAgentReplace(sceneJson, actorId = callerId).revision
+} else {
+    persistWithoutSession(store, doc, sceneJson)
 }
 
 private suspend fun executeAuthorizedMutation(
     context: CanvasToolContext,
     input: JsonObject,
-    mutate: suspend (doc: CanvasDocument, callerId: String?, activeSession: CanvasSession?) -> ExternalToolResult,
+    mutate: suspend (doc: CanvasDocument, callerId: String, activeSession: CanvasSession?) -> ExternalToolResult,
 ): ExternalToolResult {
-    val callerId = context.resolveCallerId(input)
+    val callerId = context.resolveCallerId()
     val doc = when (val lookup = findCanvasDocument(context, input)) {
         is CanvasLookupResult.Error -> return lookup.result
         is CanvasLookupResult.Found -> lookup.doc
@@ -129,6 +156,7 @@ private suspend fun executeReplaceScene(
         ?: return ExternalToolResult.Error("Missing required parameter: scene_json")
     return executeAuthorizedMutation(context, input) { doc, callerId, activeSession ->
         val revision = commitSceneUpdate(context.store, activeSession, doc, sceneJson, callerId)
+            ?: return@executeAuthorizedMutation revisionConflict(doc)
         ExternalToolResult.Success(
             canvasJson.encodeToString(CanvasReplaceSceneResult(ok = true, revision = revision))
         )
@@ -150,17 +178,10 @@ private suspend fun commitOpsUpdate(
     activeSession: CanvasSession?,
     doc: CanvasDocument,
     ops: List<CanvasOp>,
-): Long = if (activeSession != null) {
+): Long? = if (activeSession != null) {
     activeSession.applyOps(ops).revision
 } else {
-    val projected = CanvasOpProjector.project(doc.sceneJson, ops)
-    val updated = doc.copy(
-        revision = doc.revision + 1L,
-        sceneJson = projected,
-        updatedAtEpochMs = kotlin.time.Clock.System.now().toEpochMilliseconds(),
-    )
-    store.upsert(updated)
-    updated.revision
+    persistWithoutSession(store, doc, CanvasOpProjector.project(doc.sceneJson, ops))
 }
 
 private suspend fun executeApplyOps(
@@ -173,6 +194,7 @@ private suspend fun executeApplyOps(
         val aclError = validateOpAcls(doc, ops)
         if (aclError != null) return@executeAuthorizedMutation aclError
         val revision = commitOpsUpdate(context.store, activeSession, doc, ops)
+            ?: return@executeAuthorizedMutation revisionConflict(doc)
         ExternalToolResult.Success(
             canvasJson.encodeToString(CanvasApplyOpsResult(ok = true, revision = revision))
         )
@@ -184,11 +206,14 @@ private suspend fun executeListCanvases(
     input: JsonObject,
 ): List<String> {
     val conversationId = input["conversation_id"]?.jsonPrimitive?.contentOrNull
-    val targetAgentId = context.resolveCallerId(input)
-    return when {
-        conversationId != null -> context.store.getForConversation(conversationId)?.let { listOf(it.id.value) }.orEmpty()
-        targetAgentId != null -> context.store.listForAgent(targetAgentId).map { it.id.value }
-        else -> emptyList()
+    val callerAgentId = context.resolveCallerId()
+    return if (conversationId != null) {
+        context.store.getForConversation(conversationId)
+            ?.takeIf { canRead(it, callerAgentId) }
+            ?.let { listOf(it.id.value) }
+            .orEmpty()
+    } else {
+        context.store.listForAgent(callerAgentId).map { it.id.value }
     }
 }
 
@@ -202,13 +227,22 @@ abstract class BaseCanvasTool(
     override val capability: Capability = Capability.ImageHydration
 }
 
+/**
+ * Every canvas tool needs to know who is calling before it reads an ACL or stamps ownership on
+ * a new document, so a call whose frame carried no runtime agent scope is refused outright.
+ */
 private inline fun BaseCanvasTool.runWithContext(
     agentId: String?,
     failurePrefix: String,
     action: (CanvasToolContext) -> ExternalToolResult,
-): ExternalToolResult = runCatching {
-    action(CanvasToolContext(store, sessions, agentId))
-}.getOrElse { ExternalToolResult.Error("$failurePrefix: ${it.message}") }
+): ExternalToolResult {
+    if (agentId.isNullOrBlank()) {
+        return ExternalToolResult.Error("$failurePrefix: canvas tools require an authenticated agent identity")
+    }
+    return runCatching {
+        action(CanvasToolContext(store, sessions, agentId))
+    }.getOrElse { ExternalToolResult.Error("$failurePrefix: ${it.message}") }
+}
 
 private fun singleCanvasIdSchema(): JsonObject = buildJsonObject {
     put("type", "object")
@@ -235,7 +269,6 @@ class CanvasCreateTool(
         putJsonObject("properties") {
             putJsonObject("title") { put("type", "string") }
             putJsonObject("conversation_id") { put("type", "string") }
-            putJsonObject("agent_id") { put("type", "string") }
         }
         put("additionalProperties", false)
     }
@@ -393,12 +426,11 @@ class CanvasListTool(
 ) : BaseCanvasTool(store, sessions) {
     override val name: String = NAME
     override val description: String =
-        "List canvas IDs by conversation or agent."
+        "List canvas IDs for a conversation, or every canvas the calling agent owns."
     override val inputSchema: JsonObject = buildJsonObject {
         put("type", "object")
         putJsonObject("properties") {
             putJsonObject("conversation_id") { put("type", "string") }
-            putJsonObject("agent_id") { put("type", "string") }
         }
         put("additionalProperties", false)
     }

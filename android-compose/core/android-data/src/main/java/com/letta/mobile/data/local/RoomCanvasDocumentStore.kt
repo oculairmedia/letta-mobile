@@ -21,6 +21,22 @@ class RoomCanvasDocumentStore(
         dao.upsert(CanvasDocumentEntity.fromCanvasDocument(doc))
     }
 
+    override suspend fun upsertIfRevision(doc: CanvasDocument, expectedRevision: Long): Boolean {
+        val entity = CanvasDocumentEntity.fromCanvasDocument(doc)
+        val changed = dao.updateIfRevision(
+            id = entity.id,
+            expectedRevision = expectedRevision,
+            agentId = entity.agentId,
+            conversationId = entity.conversationId,
+            title = entity.title,
+            revision = entity.revision,
+            sceneJson = entity.sceneJson,
+            updatedAtEpochMs = entity.updatedAtEpochMs,
+            aclJson = entity.aclJson,
+        )
+        return changed == 1
+    }
+
     override suspend fun listForAgent(agentId: String): List<CanvasDocument> =
         dao.listForAgent(agentId).map { it.toCanvasDocument() }
 }

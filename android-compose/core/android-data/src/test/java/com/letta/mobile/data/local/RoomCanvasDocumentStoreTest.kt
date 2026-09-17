@@ -3,13 +3,17 @@ package com.letta.mobile.data.local
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.letta.mobile.data.canvas.CanvasAcl
 import com.letta.mobile.data.canvas.CanvasDocument
 import com.letta.mobile.data.canvas.CanvasId
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -91,5 +95,42 @@ class RoomCanvasDocumentStoreTest {
         assertEquals(docV2, afterUpdate)
         assertEquals("V2", afterUpdate?.title)
         assertEquals(2L, afterUpdate?.revision)
+    }
+
+    @Test
+    fun upsertIfRevisionWritesOnlyWhileTheStoredRevisionMatches() = runBlocking {
+        val id = CanvasId("canvas-room-cas")
+        val v1 = CanvasDocument(id = id, title = "V1", revision = 1L, sceneJson = "{}", updatedAtEpochMs = 1000L)
+        assertFalse("nothing to compare against before the row exists", store.upsertIfRevision(v1, expectedRevision = 0L))
+        store.upsert(v1)
+
+        val v2 = v1.copy(revision = 2L, sceneJson = """{"elements":[{"id":"a"}]}""", updatedAtEpochMs = 2000L)
+        assertTrue(store.upsertIfRevision(v2, expectedRevision = 1L))
+        assertEquals(v2, store.get(id))
+
+        val stale = v1.copy(revision = 2L, sceneJson = """{"stale":true}""", updatedAtEpochMs = 3000L)
+        assertFalse(store.upsertIfRevision(stale, expectedRevision = 1L))
+        assertEquals(v2, store.get(id))
+    }
+
+    @Test
+    fun aRowWithAMalformedAclFailsToLoadInsteadOfLoadingUnrestricted() = runBlocking {
+        val id = CanvasId("canvas-room-bad-acl")
+        val acl = CanvasAcl(ownerUserId = "alice", writerAgentIds = setOf("agent-1"))
+        store.upsert(CanvasDocument(id = id, title = "Guarded", revision = 1L, sceneJson = "{}", updatedAtEpochMs = 1L, acl = acl))
+        assertEquals(acl, store.get(id)?.acl)
+
+        // Corrupt the persisted ACL in place, as a partial write or a schema drift would.
+        database.canvasDocumentDao().updateIfRevision(
+            id = id.value, expectedRevision = 1L, agentId = null, conversationId = null, title = "Guarded",
+            revision = 1L, sceneJson = "{}", updatedAtEpochMs = 1L, aclJson = "{not json",
+        )
+
+        val error = assertThrows(IllegalStateException::class.java) { runBlocking { store.get(id) } }
+        assertTrue(error.message!!.contains("malformed ACL"))
+
+        // A row with no ACL at all still loads as unrestricted, as before.
+        store.upsert(CanvasDocument(id = CanvasId("canvas-room-no-acl"), title = "Open", revision = 1L, sceneJson = "{}", updatedAtEpochMs = 1L))
+        assertNull(store.get(CanvasId("canvas-room-no-acl"))?.acl)
     }
 }

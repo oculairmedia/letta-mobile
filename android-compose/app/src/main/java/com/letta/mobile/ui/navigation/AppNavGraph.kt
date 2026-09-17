@@ -83,8 +83,8 @@ private fun androidx.navigation.NavGraphBuilder.appChatGraph(navController: NavH
                 popUpTo<AgentChatRoute> { inclusive = true }
             }
         },
-        onNavigateToCanvas = { conversationId ->
-            navController.navigate(CanvasRoute(canvasId = "", conversationId = conversationId))
+        onNavigateToCanvas = { agentId, conversationId ->
+            navController.navigate(CanvasRoute(canvasId = "", conversationId = conversationId, agentId = agentId))
         },
     )
 }
@@ -96,6 +96,7 @@ private fun androidx.navigation.NavGraphBuilder.appCanvasGraph(navController: Na
         com.letta.mobile.ui.screens.canvas.CanvasScreen(
             canvasId = route.canvasId,
             conversationId = route.conversationId,
+            agentId = route.agentId,
             onNavigateBack = { navController.popBackStack() },
             onShareToChat = { bytes, mimeType ->
                 val result = com.letta.mobile.data.canvas.CanvasShare.packageForChat(
@@ -103,12 +104,16 @@ private fun androidx.navigation.NavGraphBuilder.appCanvasGraph(navController: Na
                     com.letta.mobile.data.canvas.CanvasMimeType.fromValue(mimeType),
                 )
                 result.onSuccess { image ->
+                    // The scope dies with this destination, so leaving before the image is in
+                    // the staging queue would cancel the hand-off; navigate only once it landed.
                     coroutineScope.launch {
                         val target = com.letta.mobile.data.canvas.CanvasConversationTarget.from(route.conversationId)
                         com.letta.mobile.data.canvas.CanvasShare.stageForConversation(target, image)
+                        navController.popBackStack()
                     }
+                }.onFailure {
+                    navController.popBackStack()
                 }
-                navController.popBackStack()
             },
         )
     }

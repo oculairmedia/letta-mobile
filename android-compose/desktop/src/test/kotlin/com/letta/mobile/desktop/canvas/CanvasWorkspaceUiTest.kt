@@ -114,6 +114,7 @@ class CanvasWorkspaceUiTest {
                 store = store,
                 options = com.letta.mobile.data.canvas.CanvasCreateOptions(
                     title = "Agent Diagram",
+                    agentId = "agent-1",
                     initialSceneJson = "",
                 ),
             )
@@ -139,7 +140,8 @@ class CanvasWorkspaceUiTest {
                 kotlinx.serialization.json.buildJsonObject {
                     put("canvas_id", session.canvasId.value)
                     put("scene_json", CanvasSamples.buildCycleJson)
-                }
+                },
+                agentId = "agent-1",
             )
         }
 
@@ -236,6 +238,8 @@ class CanvasWorkspaceUiTest {
                     canvasId = canvasId,
                     title = "Host Sync A",
                     syncTransport = sharedTransport,
+                    // Owner-only by default; both hosts edit this canvas, so both are named.
+                    acl = com.letta.mobile.data.canvas.CanvasAcl(ownerUserId = "host-a", writerUserIds = setOf("host-b")),
                 ),
             )
         }
@@ -246,6 +250,8 @@ class CanvasWorkspaceUiTest {
                     canvasId = canvasId,
                     title = "Host Sync B",
                     syncTransport = sharedTransport,
+                    // Owner-only by default; both hosts edit this canvas, so both are named.
+                    acl = com.letta.mobile.data.canvas.CanvasAcl(ownerUserId = "host-a", writerUserIds = setOf("host-b")),
                 ),
             )
         }

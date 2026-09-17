@@ -2,8 +2,8 @@ package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.attachment.AttachmentLimits
 import com.letta.mobile.data.model.MessageContentPart
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -43,29 +43,35 @@ enum class CanvasMimeType(val value: String) {
 
 /**
  * Lifecycle-owned staging queue for shared canvas attachments.
+ *
+ * The pending queue is the single source of truth for what has been staged. The event flow only
+ * says "something was staged for this target"; a consumer answers it by draining the queue with
+ * [consumeStagedAttachments]. Carrying the image on the event as well would hand a live chat the
+ * image twice: once from the event and once more when it next drains the queue at startup.
  */
 class CanvasShareStaging {
     private val stagingMutex = Mutex()
     private val pendingAttachmentsByConversation = mutableMapOf<String, MutableList<MessageContentPart.Image>>()
-    private val _stagedAttachmentEvents = MutableSharedFlow<Pair<CanvasConversationTarget, MessageContentPart.Image>>(
-        extraBufferCapacity = 32,
-    )
+    private val _stagedAttachmentEvents = MutableSharedFlow<CanvasConversationTarget>(extraBufferCapacity = 32)
 
     /**
-     * Flow of staged canvas attachments emitted for conversations: `(target, image)`.
+     * Wake-up signals naming a conversation that has attachments waiting in the pending queue.
      */
-    val stagedAttachmentEvents: Flow<Pair<CanvasConversationTarget, MessageContentPart.Image>> =
-        _stagedAttachmentEvents.asSharedFlow()
+    val stagedAttachmentEvents: SharedFlow<CanvasConversationTarget> = _stagedAttachmentEvents.asSharedFlow()
 
     /**
      * Stages a packaged canvas attachment for the specified [target].
+     *
+     * Suspends rather than drops if every subscriber's buffer is full, so a live chat never
+     * misses the signal; with no subscriber the signal is simply not needed, because the next
+     * consumer drains the queue on subscription.
      */
     suspend fun stageForConversation(target: CanvasConversationTarget, image: MessageContentPart.Image) {
         val convId = target.id
         stagingMutex.withLock {
             pendingAttachmentsByConversation.getOrPut(convId) { mutableListOf() }.add(image)
         }
-        _stagedAttachmentEvents.tryEmit(target to image)
+        _stagedAttachmentEvents.emit(target)
     }
 
     /**
@@ -96,9 +102,10 @@ object CanvasShare {
     private val staging = CanvasShareStaging()
 
     /**
-     * Flow of staged canvas attachments emitted for conversations: `(target, image)`.
+     * Wake-up signals naming a conversation that has attachments waiting; drain them with
+     * [consumeStagedAttachments].
      */
-    val stagedAttachmentEvents: Flow<Pair<CanvasConversationTarget, MessageContentPart.Image>>
+    val stagedAttachmentEvents: SharedFlow<CanvasConversationTarget>
         get() = staging.stagedAttachmentEvents
 
     /**
