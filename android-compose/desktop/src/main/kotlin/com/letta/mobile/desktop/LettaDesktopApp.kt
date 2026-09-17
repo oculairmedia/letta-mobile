@@ -981,6 +981,11 @@ internal fun LettaDesktopApp(
                 onStopRun = chatController::stopActiveRun,
             ),
         )
+        val selectConversationTab: (String) -> Unit = { conversationId ->
+            editAgentId = null
+            chatController.selectConversation(conversationId)
+            selectedDestination = DesktopDestination.Conversations
+        }
         val headerChrome = DesktopHeaderChromeState(
             identity = headerIdentity.state,
             identityActions = headerIdentity.actions,
@@ -997,11 +1002,7 @@ internal fun LettaDesktopApp(
             ),
             conversationTabs = conversationTabs,
             activeConversationId = chatState.selectedConversationId,
-            onSelectConversationTab = { conversationId ->
-                editAgentId = null
-                chatController.selectConversation(conversationId)
-                selectedDestination = DesktopDestination.Conversations
-            },
+            onSelectConversationTab = selectConversationTab,
             onCloseConversationTab = ::closeConversationTab,
             onReorderConversationTab = ::reorderConversationTab,
             // Browser-style "+" and picker on the strip: a new chat with the focused agent, and
@@ -1010,17 +1011,7 @@ internal fun LettaDesktopApp(
             tabPickerItems = remember(chatState.conversations, canvasDocuments, selectedAgentId) {
                 desktopTabPickerItems(chatState.conversations, canvasDocuments, selectedAgentId)
             },
-            onOpenTabPickerItem = { item ->
-                when (item.kind) {
-                    com.letta.mobile.data.desktopshell.TabPickerItem.Kind.CONVERSATION -> {
-                        editAgentId = null
-                        chatController.selectConversation(item.id)
-                        selectedDestination = DesktopDestination.Conversations
-                    }
-                    com.letta.mobile.data.desktopshell.TabPickerItem.Kind.CANVAS ->
-                        canvasShell.open(com.letta.mobile.data.canvas.CanvasId(item.id))
-                }
-            },
+            onOpenTabPickerItem = { openTabPickerItem(it, selectConversationTab, canvasShell::open) },
         )
         SideEffect { onHeaderChromeChange(headerChrome) }
     }
@@ -1058,6 +1049,18 @@ internal fun desktopTabPickerItems(
             )
         }
     return chats + boards
+}
+
+/** Opens what the tab strip's picker chose: a conversation in its tab, or a canvas in the pane. */
+private fun openTabPickerItem(
+    item: com.letta.mobile.data.desktopshell.TabPickerItem,
+    onConversation: (String) -> Unit,
+    onCanvas: (com.letta.mobile.data.canvas.CanvasId) -> Unit,
+) {
+    when (item.kind) {
+        com.letta.mobile.data.desktopshell.TabPickerItem.Kind.CONVERSATION -> onConversation(item.id)
+        com.letta.mobile.data.desktopshell.TabPickerItem.Kind.CANVAS -> onCanvas(com.letta.mobile.data.canvas.CanvasId(item.id))
+    }
 }
 
 private data class DesktopDeepLinkRoutingActions(
