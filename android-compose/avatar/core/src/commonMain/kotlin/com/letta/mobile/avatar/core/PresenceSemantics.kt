@@ -53,17 +53,23 @@ object PresenceSemantics {
     /** THINKING pulse period (§6: amber pulse 1.2s ease). */
     const val PULSE_MILLIS: Int = 1_200
 
+    /** WORKING pulse period: faster than THINKING's, so tool execution reads as busier. */
+    const val WORKING_PULSE_MILLIS: Int = 900
+
     /** SUCCESS flash duration (§6/§4 P3: green flash 0.6s). */
     const val FLASH_MILLIS: Int = 600
 
     /**
-     * The presence cue for [state]. Total over all 12 [AvatarState] values:
+     * The presence cue for [state]. Total over all [AvatarState] values:
      * behavior states map per §4 P3; every other state (IDLE, LISTENING,
      * SLEEPING, DRAGGED and the lifecycle states) shows no ring — presence is a
      * *status* signal, and those states carry no run status.
      */
     fun cueFor(state: AvatarState): PresenceCue = when (state) {
         AvatarState.THINKING -> PresenceCue(Color.AMBER, Mode.PULSE, PULSE_MILLIS)
+        // Running a tool is the same amber concern, pulsed faster: busier than thinking, and
+        // unmistakably not waiting on you (letta-mobile-z4b83).
+        AvatarState.WORKING -> PresenceCue(Color.AMBER, Mode.PULSE, WORKING_PULSE_MILLIS)
         AvatarState.WAITING_INPUT -> PresenceCue(Color.AMBER, Mode.STEADY)
         AvatarState.SPEAKING -> PresenceCue(Color.GREEN, Mode.STEADY)
         AvatarState.SUCCESS -> PresenceCue(Color.GREEN, Mode.FLASH, FLASH_MILLIS)

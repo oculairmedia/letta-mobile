@@ -16,6 +16,8 @@ fun AvatarDirector.applyPresence(previous: AgentPresence, presence: AgentPresenc
     setActivity(
         when (presence.activity) {
             AgentActivityKind.THINKING -> AvatarActivity.THINKING
+            AgentActivityKind.WORKING -> AvatarActivity.WORKING
+            AgentActivityKind.DELEGATING -> AvatarActivity.DELEGATING
             AgentActivityKind.SPEAKING -> AvatarActivity.SPEAKING
             AgentActivityKind.IDLE -> AvatarActivity.IDLE
         },
