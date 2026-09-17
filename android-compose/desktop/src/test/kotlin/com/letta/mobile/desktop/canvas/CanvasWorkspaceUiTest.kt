@@ -2,11 +2,14 @@
 
 package com.letta.mobile.desktop.canvas
 
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import com.letta.mobile.ui.canvas.CanvasSamples
 import com.letta.mobile.ui.canvas.CanvasWorkspace
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlin.test.Test
 
 class CanvasWorkspaceUiTest {
@@ -96,5 +99,48 @@ class CanvasWorkspaceUiTest {
 
         kotlin.test.assertEquals(2L, session.document.value?.revision)
         kotlin.test.assertTrue(session.sceneJsonOrEmpty().contains("\"elements\""))
+    }
+
+    @Test
+    fun canvasWorkspace_agentReplaceScene_projectsDiagramIntoUiWithoutHumanDrawing() = runComposeUiTest {
+        val store = com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore()
+        val session = kotlinx.coroutines.runBlocking {
+            com.letta.mobile.data.canvas.CanvasSession.create(
+                store = store,
+                title = "Agent Diagram",
+                initialSceneJson = "",
+            )
+        }
+
+        val registry = com.letta.mobile.data.canvas.CanvasSessionRegistry()
+        setContent {
+            CanvasWorkspace(
+                session = session,
+                sessions = registry,
+            )
+        }
+
+        // Initially empty
+        onNodeWithText("Elements: 0", substring = true).assertExists()
+
+        // Agent tool simulates replace_scene with Build Cycle fixture
+        val replaceTool = com.letta.mobile.data.canvas.CanvasReplaceSceneTool(store, registry)
+        kotlinx.coroutines.runBlocking {
+            replaceTool.invoke(
+                kotlinx.serialization.json.buildJsonObject {
+                    put("canvas_id", session.canvasId.value)
+                    put("scene_json", CanvasSamples.buildCycleJson)
+                }
+            )
+        }
+
+        // Wait for UI to observe revision bump and project diagram into DrawBoxController
+        waitUntil(timeoutMillis = 5000) {
+            onAllNodesWithText("Elements: 15", substring = true).fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Verify diagram is visible without human drawing (15 elements from Build Cycle fixture)
+        onNodeWithText("Agent updated canvas (rev 2)", substring = true).assertExists()
+        onNodeWithText("Elements: 15", substring = true).assertExists()
     }
 }

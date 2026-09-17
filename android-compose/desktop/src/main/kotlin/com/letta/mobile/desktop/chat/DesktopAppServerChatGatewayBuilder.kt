@@ -1,7 +1,11 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.canvas.CanvasExternalTools
+import com.letta.mobile.data.canvas.CanvasSessionRegistry
+import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.desktop.canvas.DesktopCanvasDocumentStore
 import com.letta.mobile.data.runtime.AppServerContextWindowPreflight
 import com.letta.mobile.data.runtime.AppServerTurnEngine
 import com.letta.mobile.data.runtime.TurnContextPreflight
@@ -43,6 +47,9 @@ import kotlinx.coroutines.withContext
  * Desktop does not use Hilt; callers inject this builder (or a test fake of
  * [DesktopAppServerChatGatewayFactory]) instead of constructing the stack inline.
  */
+// Compatibility default; production injects its window-owned scope. The client scope below is a
+// child of whichever scope that is, so it is not detached either.
+@Suppress("NoDetachedCoroutineLifecycle")
 class DesktopAppServerChatGatewayBuilder(
     /** Coroutine scope for the controller and transport. */
     private val controllerScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
@@ -51,6 +58,8 @@ class DesktopAppServerChatGatewayBuilder(
      * vault-protected NodeId across restarts instead of an ephemeral keypair.
      */
     private val irohIdentity: () -> ByteArray = { DesktopIrohIdentity.loadOrCreate() },
+    /** Must be the registry the canvas UI registers into, or agent edits miss the open session. */
+    private val canvasSessions: CanvasSessionRegistry = CanvasSessionRegistry(),
 ) : DesktopAppServerChatGatewayFactory {
 
     override suspend fun create(
@@ -96,16 +105,22 @@ class DesktopAppServerChatGatewayBuilder(
             }
             // Iroh turns run on the wrapper; client-local preflight would be a
             // duplicate typed-command path (Android dial already uses None).
-            eventRouter = AppServerRuntimeEventRouter()
+            val router = AppServerRuntimeEventRouter()
+            eventRouter = router
             val turnEngine = buildDesktopAppServerTurnEngine(
                 client = client,
                 scope = controllerScope,
-                eventRouter = eventRouter,
-                turnContextPreflight = if (isIroh) {
-                    TurnContextPreflight.None
-                } else {
-                    AppServerContextWindowPreflight(client)
-                },
+                externalToolRegistry = ExternalToolRegistry.hostTools(
+                    CanvasExternalTools.all(DesktopCanvasDocumentStore(), canvasSessions)
+                ),
+                config = DesktopAppServerEngineConfig(
+                    eventRouter = router,
+                    turnContextPreflight = if (isIroh) {
+                        TurnContextPreflight.None
+                    } else {
+                        AppServerContextWindowPreflight(client)
+                    },
+                ),
             )
             val adminGateway: DesktopAdminChatGateway = if (lettaConfig.mode == LettaConfig.Mode.LOCAL) {
                 DesktopLocalBackendAdminGateway(appServerClient = client)
@@ -201,14 +216,20 @@ class DesktopAppServerChatGatewayBuilder(
  * poisoned empty-assistant transcripts before the turn starts. Desktop Iroh
  * dials inject [TurnContextPreflight.None] — the wrapper owns preflight.
  */
+internal data class DesktopAppServerEngineConfig(
+    val eventRouter: AppServerRuntimeEventRouter = AppServerRuntimeEventRouter(),
+    val turnContextPreflight: TurnContextPreflight? = null,
+)
+
 internal fun buildDesktopAppServerTurnEngine(
     client: AppServerClient,
     scope: CoroutineScope,
-    eventRouter: AppServerRuntimeEventRouter = AppServerRuntimeEventRouter(),
-    turnContextPreflight: TurnContextPreflight = AppServerContextWindowPreflight(client),
+    externalToolRegistry: ExternalToolRegistry? = null,
+    config: DesktopAppServerEngineConfig = DesktopAppServerEngineConfig(),
 ): AppServerTurnEngine {
     // lgns8.22.3: one inbound collector per desktop gateway generation.
-    eventRouter.attach(scope, client.events)
+    val router = config.eventRouter
+    router.attach(scope, client.events)
     return AppServerTurnEngine(
         client = client,
         clientInfo = AppServerRuntimeStartClientInfo(
@@ -217,8 +238,9 @@ internal fun buildDesktopAppServerTurnEngine(
             version = "0.2.0",
         ),
         permissionMode = AppServerPermissionMode.Unrestricted,
-        turnContextPreflight = turnContextPreflight,
-        eventRouter = eventRouter,
+        turnContextPreflight = config.turnContextPreflight ?: AppServerContextWindowPreflight(client),
+        eventRouter = router,
+        externalToolRegistry = externalToolRegistry,
     )
 }
 
