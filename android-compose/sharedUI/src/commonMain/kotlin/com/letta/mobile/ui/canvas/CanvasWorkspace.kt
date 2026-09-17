@@ -45,6 +45,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.data.canvas.CanvasBackgroundPattern
 import com.letta.mobile.data.canvas.CanvasOpProjector
 import com.letta.mobile.data.canvas.CanvasPresence
 import com.letta.mobile.data.canvas.CanvasPresenceTransport
@@ -113,6 +114,17 @@ fun CanvasWorkspace(
     var noteToolbar by remember { mutableStateOf<NoteToolbar?>(null) }
     var isSharingToChat by remember { mutableStateOf(false) }
     var showHistoryDialog by remember { mutableStateOf(false) }
+    // The background pattern: the session's when there is one (it syncs and reloads with the
+    // scene), else this board's own for the session-less preview.
+    var localPattern by remember { mutableStateOf(CanvasBackgroundPattern()) }
+    val backgroundPattern = if (session != null) {
+        remember(sessionDoc) { session.backgroundPattern() ?: CanvasBackgroundPattern() }
+    } else {
+        localPattern
+    }
+    LaunchedEffect(backgroundPattern) {
+        controller.setBackgroundPattern(backgroundPattern.painter(), backgroundPattern.tint())
+    }
     var boardSize by remember { mutableStateOf(IntSize.Zero) }
     // The note being worked in (toolbar and block handles shown) and the one opened large.
     var activeNoteId by remember { mutableStateOf<String?>(null) }
@@ -369,11 +381,22 @@ fun CanvasWorkspace(
                         statusMessage = "Cleared canvas"
                     },
                 ),
-                background = state.bgColor,
-                onBackground = { color ->
-                    controller.setBgColor(color)
-                    statusMessage = "Background changed"
-                },
+                background = CanvasBackgroundActions(
+                    color = state.bgColor,
+                    onColor = { color ->
+                        controller.setBgColor(color)
+                        statusMessage = "Background changed"
+                    },
+                    pattern = backgroundPattern,
+                    onPattern = { pattern ->
+                        if (session != null) {
+                            coroutineScope.launch { runCatching { session.setBackgroundPattern(pattern) } }
+                        } else {
+                            localPattern = pattern
+                        }
+                        statusMessage = "Background pattern: ${pattern.kind}"
+                    },
+                ),
                 modifier = Modifier.align(Alignment.TopEnd).padding(CHROME_INSET),
             )
 

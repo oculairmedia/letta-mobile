@@ -40,6 +40,9 @@ object CanvasOpProjector {
     private const val TOMBSTONES = "_removed"
     private const val BG_LAMPORT = "_bgLamport"
     private const val BG_ACTOR = "_bgActorId"
+    private const val BG_PATTERN = "_bgPattern"
+    private const val BG_PATTERN_LAMPORT = "_bgPatternLamport"
+    private const val BG_PATTERN_ACTOR = "_bgPatternActorId"
     private const val DOCUMENTS = "_documents"
     private const val DOC_JSON = "json"
     private const val DOC_REMOVED = "_removed"
@@ -94,6 +97,7 @@ object CanvasOpProjector {
     private data class WriterProvenance(val lamport: Long, val actorId: String)
 
     private val bgPropertyKeys = setOf("bgColor", BG_LAMPORT, BG_ACTOR)
+    private val bgPatternKeys = setOf(BG_PATTERN, BG_PATTERN_LAMPORT, BG_PATTERN_ACTOR)
     private val metadataPropertyKeys = setOf("id", LAMPORT, ACTOR)
 
     /** A write with [write] beats one already recorded at [against]. */
@@ -116,6 +120,7 @@ object CanvasOpProjector {
         is CanvasOp.SetDocumentOp -> upsertDocumentWithLww(sceneJson, op)
         is CanvasOp.RemoveDocumentOp -> removeDocumentWithLww(sceneJson, op)
         is CanvasOp.SetBackgroundOp -> setBackground(sceneJson, op)
+        is CanvasOp.SetBackgroundPatternOp -> setBackgroundPattern(sceneJson, op)
         is CanvasOp.AddElementOp -> upsertElementWithLww(sceneJson, op)
         is CanvasOp.UpdateElementOp -> upsertElementWithLww(sceneJson, op)
         is CanvasOp.RemoveElementOp -> removeElementWithLww(sceneJson, op)
@@ -167,6 +172,32 @@ object CanvasOpProjector {
                 put("bgColor", JsonPrimitive(op.colorHex))
                 put(BG_LAMPORT, JsonPrimitive(op.lamport))
                 put(BG_ACTOR, JsonPrimitive(op.actorId))
+            },
+        )
+    }
+
+    /** The pattern on the scene root, or null when none was ever set (the board draws none). */
+    fun backgroundPatternOf(sceneJson: String): CanvasBackgroundPattern? {
+        val parsed = parseScene(sceneJson)
+        val element = parsed[BG_PATTERN] ?: return null
+        return runCatching { json.decodeFromJsonElement(CanvasBackgroundPattern.serializer(), element) }.getOrNull()
+    }
+
+    /** Same LWW as [setBackground], on the pattern's own provenance keys. */
+    private fun setBackgroundPattern(sceneJson: String, op: CanvasOp.SetBackgroundPatternOp): String {
+        val parsed = parseScene(sceneJson)
+        val atLamport = runCatching { parsed[BG_PATTERN_LAMPORT]?.jsonPrimitive?.long }.getOrNull()
+        val atActor = runCatching { parsed[BG_PATTERN_ACTOR]?.jsonPrimitive?.content }.getOrNull().orEmpty()
+        val currentProvenance = atLamport?.let { WriterProvenance(it, atActor) }
+        if (!wins(WriterProvenance(op.lamport, op.actorId), currentProvenance)) return sceneJson
+        return canonicalScene(
+            buildMap {
+                parsed.forEach { (key, value) ->
+                    if (key !in bgPatternKeys) put(key, value)
+                }
+                put(BG_PATTERN, json.encodeToJsonElement(CanvasBackgroundPattern.serializer(), op.pattern))
+                put(BG_PATTERN_LAMPORT, JsonPrimitive(op.lamport))
+                put(BG_PATTERN_ACTOR, JsonPrimitive(op.actorId))
             },
         )
     }

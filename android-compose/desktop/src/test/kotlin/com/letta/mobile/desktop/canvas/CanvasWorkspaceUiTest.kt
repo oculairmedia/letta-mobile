@@ -183,6 +183,40 @@ class CanvasWorkspaceUiTest {
     }
 
     @Test
+    fun canvasWorkspace_backgroundPattern_persistsToSessionAndReachesTheBoard() = runComposeUiTest {
+        val store = com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore()
+        val session = kotlinx.coroutines.runBlocking {
+            com.letta.mobile.data.canvas.CanvasSession.create(
+                store = store,
+                options = com.letta.mobile.data.canvas.CanvasCreateOptions(title = "Pattern Board", initialSceneJson = ""),
+            )
+        }
+        val controller = io.ak1.drawbox.presentation.viewmodel.DrawBoxController(
+            io.ak1.drawbox.presentation.reducer.Reducer(io.ak1.drawbox.domain.usecase.UseCase()),
+        )
+        setContent {
+            CanvasWorkspace(controller = controller, session = session)
+        }
+        kotlin.test.assertNull(session.backgroundPattern())
+
+        onNodeWithContentDescription("More").performClick()
+        onNodeWithContentDescription("Pattern dots").performClick()
+        waitUntil(timeoutMillis = 5000) { session.backgroundPattern()?.kind == com.letta.mobile.data.canvas.CanvasBackgroundPattern.DOTS }
+        waitUntil(timeoutMillis = 5000) { controller.state.value.bgPattern?.painter != null }
+        onNodeWithContentDescription("Spacing 64").performClick()
+        waitUntil(timeoutMillis = 5000) { session.backgroundPattern()?.spacing == 64f }
+        onNodeWithContentDescription("Pattern color").performClick()
+        onNodeWithContentDescription("Color blue").performClick()
+        waitUntil(timeoutMillis = 5000) { session.backgroundPattern()?.colorHex == "#3b82f6" }
+        kotlin.test.assertEquals(
+            com.letta.mobile.data.canvas.CanvasBackgroundPattern(com.letta.mobile.data.canvas.CanvasBackgroundPattern.DOTS, 64f, "#3b82f6"),
+            session.backgroundPattern(),
+        )
+        // The pattern is scene-root state, so the drawing was not re-imported (camera untouched).
+        onAllNodesWithText("Agent updated canvas", substring = true).assertCountEquals(0)
+    }
+
+    @Test
     fun canvasWorkspace_rendersAndRespondsToButtonClicks() = runComposeUiTest {
         setContent {
             CanvasWorkspace(

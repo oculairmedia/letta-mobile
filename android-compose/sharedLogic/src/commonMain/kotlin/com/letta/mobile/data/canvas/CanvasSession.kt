@@ -299,6 +299,25 @@ class CanvasSession(
         return setDocument(documentId, existing.json, actorId, frame)
     }
 
+    /** The board's background pattern as of the current scene; null when none was set. */
+    fun backgroundPattern(): CanvasBackgroundPattern? = CanvasOpProjector.backgroundPatternOf(sceneJsonOrEmpty())
+
+    /** Sets the board's background pattern as a local op; a no-op when it is already that. */
+    suspend fun setBackgroundPattern(
+        pattern: CanvasBackgroundPattern,
+        actorId: String = LOCAL_USER_ACTOR_ID,
+    ): CanvasDocument? {
+        if (backgroundPattern() == pattern) return null
+        return applyLocal(
+            CanvasOp.SetBackgroundPatternOp(
+                opId = CanvasOpDiffer.generateOpId("bg"),
+                actorId = actorId,
+                lamport = lamportClock + 1,
+                pattern = pattern,
+            ),
+        )
+    }
+
     suspend fun removeDocument(documentId: String, actorId: String = LOCAL_USER_ACTOR_ID): CanvasDocument =
         applyLocal(
             CanvasOp.RemoveDocumentOp(

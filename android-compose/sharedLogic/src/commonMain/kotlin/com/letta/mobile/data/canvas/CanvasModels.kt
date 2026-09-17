@@ -59,6 +59,29 @@ data class CanvasTextStyle(
     val align: String? = null,
 )
 
+/**
+ * The board's background pattern: [kind] is `none`, `grid`, `dots` or `lines`, [spacing] the
+ * repeat in world units, [colorHex] the pattern's `#rrggbb` tint. Kept on the scene root beside
+ * `bgColor`, last writer wins like the colour.
+ */
+@Serializable
+data class CanvasBackgroundPattern(
+    val kind: String = NONE,
+    val spacing: Float = DEFAULT_SPACING,
+    val colorHex: String = DEFAULT_COLOR,
+) {
+    companion object {
+        const val NONE = "none"
+        const val GRID = "grid"
+        const val DOTS = "dots"
+        const val LINES = "lines"
+        const val DEFAULT_SPACING = 32f
+        const val DEFAULT_COLOR = "#9ca3af"
+        val KINDS: List<String> = listOf(NONE, GRID, DOTS, LINES)
+        val SPACINGS: List<Float> = listOf(16f, 32f, 64f)
+    }
+}
+
 /** Where a block document sits on the board: top-left corner and size in world units. */
 @Serializable
 data class CanvasDocumentFrame(

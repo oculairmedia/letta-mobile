@@ -62,6 +62,16 @@ sealed interface CanvasOp {
         val colorHex: String,
     ) : CanvasOp
 
+    /** Sets the board's background pattern (kind, spacing, colour); scene-level, last writer wins. */
+    @Serializable
+    @SerialName("set_background_pattern")
+    data class SetBackgroundPatternOp(
+        override val opId: String,
+        override val actorId: String,
+        override val lamport: Long,
+        val pattern: CanvasBackgroundPattern,
+    ) : CanvasOp
+
     /**
      * Upserts a block document (a Cascade editor JSON document) attached to the canvas. Documents
      * live on the board beside the drawing, keyed by [documentId]; last writer wins per document.
@@ -111,6 +121,7 @@ fun CanvasOp.withActor(actorId: String): CanvasOp = when (this) {
     is CanvasOp.UpdateElementOp -> copy(actorId = actorId)
     is CanvasOp.RemoveElementOp -> copy(actorId = actorId)
     is CanvasOp.SetBackgroundOp -> copy(actorId = actorId)
+    is CanvasOp.SetBackgroundPatternOp -> copy(actorId = actorId)
     is CanvasOp.SetDocumentOp -> copy(actorId = actorId)
     is CanvasOp.RemoveDocumentOp -> copy(actorId = actorId)
     is CanvasOp.BatchOp -> copy(actorId = actorId, ops = ops.map { it.withActor(actorId) })

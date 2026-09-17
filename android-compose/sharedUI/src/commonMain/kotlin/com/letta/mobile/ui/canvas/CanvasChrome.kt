@@ -46,6 +46,7 @@ import com.composables.icons.lucide.Share2
 import com.composables.icons.lucide.Trash2
 import com.composables.icons.lucide.ZoomIn
 import com.composables.icons.lucide.ZoomOut
+import com.letta.mobile.data.canvas.CanvasBackgroundPattern
 
 /**
  * The board's chrome, in the layout whiteboard tools converge on: a small title pill top-left,
@@ -94,6 +95,14 @@ internal data class CanvasMenuActions(
     val onClear: () -> Unit,
 )
 
+/** The board's background as the menu shows and changes it: colour, then pattern, spacing, tint. */
+internal data class CanvasBackgroundActions(
+    val color: Color,
+    val onColor: (Color) -> Unit,
+    val pattern: CanvasBackgroundPattern,
+    val onPattern: (CanvasBackgroundPattern) -> Unit,
+)
+
 /** How far in or out the board is and the ways to change it. */
 internal data class CanvasZoom(
     val scalePercent: Int,
@@ -110,8 +119,7 @@ internal fun CanvasActionsPill(
     onHistory: (() -> Unit)?,
     onShare: (() -> Unit)?,
     menu: CanvasMenuActions,
-    background: Color,
-    onBackground: (Color) -> Unit,
+    background: CanvasBackgroundActions,
     modifier: Modifier = Modifier,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
@@ -156,25 +164,82 @@ internal fun CanvasActionsPill(
                                 .size(26.dp)
                                 .background(entry.color, CircleShape)
                                 .border(
-                                    width = if (entry.color == background) 2.dp else 1.dp,
-                                    color = if (entry.color == background) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                                    width = if (entry.color == background.color) 2.dp else 1.dp,
+                                    color = if (entry.color == background.color) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
                                     shape = CircleShape,
                                 )
                                 .semantics { contentDescription = "Background ${entry.name}" }
-                                .clickable { onBackground(entry.color) },
+                                .clickable { background.onColor(entry.color) },
                         )
                     }
                     ColorSwatchPicker(
-                        current = background,
+                        current = background.color,
                         palette = BoardBackgrounds,
                         label = "Background color",
-                        onPick = onBackground,
+                        onPick = background.onColor,
                         swatchSize = 26.dp,
                         modifier = Modifier.size(26.dp),
                     )
                 }
+                BackgroundPatternRows(background)
             }
         }
+    }
+}
+
+/** Pattern kind, spacing and tint, the way Concepts offers Grid / Dot Grid with a spacing. */
+@Composable
+private fun BackgroundPatternRows(background: CanvasBackgroundActions) {
+    val pattern = background.pattern
+    Row(
+        modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        CanvasBackgroundPattern.KINDS.forEach { kind ->
+            MenuChip(label = kind.replaceFirstChar { it.uppercase() }, description = "Pattern $kind", selected = pattern.kind == kind) {
+                background.onPattern(pattern.copy(kind = kind))
+            }
+        }
+    }
+    if (pattern.kind != CanvasBackgroundPattern.NONE) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            CanvasBackgroundPattern.SPACINGS.forEach { spacing ->
+                MenuChip(label = spacing.toInt().toString(), description = "Spacing ${spacing.toInt()}", selected = pattern.spacing == spacing) {
+                    background.onPattern(pattern.copy(spacing = spacing))
+                }
+            }
+            Box(modifier = Modifier.size(6.dp))
+            ColorSwatchPicker(
+                current = pattern.tint(),
+                palette = StrokePalette,
+                label = "Pattern color",
+                onPick = { background.onPattern(pattern.copy(colorHex = it.toHex())) },
+                swatchSize = 22.dp,
+                modifier = Modifier.size(26.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun MenuChip(label: String, description: String, selected: Boolean, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(8.dp),
+        color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerLowest,
+        modifier = Modifier.semantics { contentDescription = description },
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+        )
     }
 }
 
