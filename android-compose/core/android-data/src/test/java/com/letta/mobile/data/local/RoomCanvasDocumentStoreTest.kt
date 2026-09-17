@@ -114,6 +114,17 @@ class RoomCanvasDocumentStoreTest {
     }
 
     @Test
+    fun createForConversationIfAbsentReturnsTheExistingCanvasForTheConversation() = runBlocking {
+        val first = CanvasDocument(id = CanvasId("c-1"), conversationId = "conv-x", title = "First", revision = 1L, sceneJson = "{}", updatedAtEpochMs = 1L)
+        val second = CanvasDocument(id = CanvasId("c-2"), conversationId = "conv-x", title = "Second", revision = 1L, sceneJson = "{}", updatedAtEpochMs = 2L)
+
+        assertEquals(first, store.createForConversationIfAbsent(first))
+        assertEquals(first, store.createForConversationIfAbsent(second))
+        assertNull(store.get(CanvasId("c-2")))
+        assertEquals(first, store.getForConversation("conv-x"))
+    }
+
+    @Test
     fun aRowWithAMalformedAclFailsToLoadInsteadOfLoadingUnrestricted() = runBlocking {
         val id = CanvasId("canvas-room-bad-acl")
         val acl = CanvasAcl(ownerUserId = "alice", writerAgentIds = setOf("agent-1"))

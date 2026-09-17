@@ -21,4 +21,12 @@ interface CanvasDocumentStore {
      * for it; use [upsert] to create.
      */
     suspend fun upsertIfRevision(doc: CanvasDocument, expectedRevision: Long): Boolean
+
+    /**
+     * Returns the canvas already bound to [doc]'s `conversationId`, or inserts [doc] and
+     * returns it. Lookup and insert are one atomic step, so two concurrent creators for the
+     * same conversation end up sharing one canvas instead of each persisting their own.
+     * [doc] must carry a non-null `conversationId`.
+     */
+    suspend fun createForConversationIfAbsent(doc: CanvasDocument): CanvasDocument
 }

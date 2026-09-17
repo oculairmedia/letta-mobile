@@ -29,6 +29,11 @@ class InMemoryCanvasDocumentStore : CanvasDocumentStore {
         true
     }
 
+    override suspend fun createForConversationIfAbsent(doc: CanvasDocument): CanvasDocument = mutex.withLock {
+        val conversationId = requireNotNull(doc.conversationId) { "createForConversationIfAbsent needs a conversationId" }
+        documents.values.firstOrNull { it.conversationId == conversationId } ?: doc.also { documents[it.id] = it }
+    }
+
     override suspend fun listForAgent(agentId: String): List<CanvasDocument> = mutex.withLock {
         documents.values.filter { it.agentId == agentId }
     }

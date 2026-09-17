@@ -291,13 +291,15 @@ class CanvasExternalToolsTest {
         assertIs<ExternalToolResult.Success>(listResult)
         assertEquals(emptyList(), json.decodeFromString<CanvasListResult>(listResult.content).ids)
 
+        // A conversation has one canvas, so a stranger is refused rather than handed the id or
+        // a second canvas for the same conversation.
         val createResult = CanvasCreateTool(store, sessions).invoke(
             buildJsonObject { put("conversation_id", "conv-private") },
             agentId = "stranger",
         )
-        assertIs<ExternalToolResult.Success>(createResult)
-        val returnedId = json.decodeFromString<CanvasCreateResult>(createResult.content).canvasId
-        assertTrue(returnedId != "canvas-hidden", "the private canvas id leaked through canvas.create")
+        assertIs<ExternalToolResult.Error>(createResult)
+        assertTrue(createResult.error.contains("Unauthorized"))
+        assertTrue(createResult.error.contains("canvas-hidden").not(), "the private canvas id leaked through canvas.create")
 
         // The reader it names still resolves the existing canvas.
         val allowed = CanvasListTool(store, sessions).invoke(
@@ -333,6 +335,93 @@ class CanvasExternalToolsTest {
         assertEquals(1, conflicts.size)
         assertTrue(conflicts.single().error.startsWith("Conflict"))
         assertEquals(2L, racingStore.get(canvasId)?.revision)
+    }
+
+    @Test
+    fun applyOpsRebindsEveryOperationToTheAuthenticatedCaller() = runTest {
+        val canvasId = CanvasId("canvas-attrib")
+        store.upsert(openDocument(canvasId))
+        val ops: List<CanvasOp> = listOf(
+            CanvasOp.BatchOp(
+                opId = "batch-1",
+                actorId = "impostor",
+                lamport = 1L,
+                ops = listOf(
+                    CanvasOp.AddElementOp(
+                        opId = "add-1",
+                        actorId = "impostor",
+                        lamport = 1L,
+                        elementId = "e1",
+                        elementJson = """{"id":"e1","type":"rect"}""",
+                    ),
+                    CanvasOp.SetBackgroundOp(opId = "bg-1", actorId = "impostor", lamport = 2L, colorHex = "#ffffff"),
+                ),
+            ),
+        )
+        val result = CanvasApplyOpsTool(store, sessions).invoke(
+            buildJsonObject {
+                put("canvas_id", canvasId.value)
+                put("ops", json.parseToJsonElement(json.encodeToString<List<CanvasOp>>(ops)))
+            },
+            agentId = "agent-real",
+        )
+        assertIs<ExternalToolResult.Success>(result)
+
+        val scene = store.get(canvasId)?.sceneJson.orEmpty()
+        assertTrue(scene.contains("agent-real"), "provenance must carry the caller: $scene")
+        assertTrue(!scene.contains("impostor"), "the input's actor must not reach provenance: $scene")
+    }
+
+    @Test
+    fun withActorRebindsNestedBatches() {
+        val nested = CanvasOp.BatchOp(
+            opId = "b", actorId = "x", lamport = 1L,
+            ops = listOf(
+                CanvasOp.BatchOp(
+                    opId = "b2", actorId = "x", lamport = 1L,
+                    ops = listOf(CanvasOp.RemoveElementOp(opId = "r", actorId = "x", lamport = 1L, elementId = "e")),
+                ),
+            ),
+        )
+        val rebound = nested.withActor("me") as CanvasOp.BatchOp
+        val inner = rebound.ops.single() as CanvasOp.BatchOp
+        assertEquals("me", rebound.actorId)
+        assertEquals("me", inner.actorId)
+        assertEquals("me", inner.ops.single().actorId)
+    }
+
+    @Test
+    fun racingCreatesForOneConversationShareOneCanvas() = runTest {
+        val createTool = CanvasCreateTool(store, sessions)
+        val input = buildJsonObject { put("conversation_id", "conv-shared") }
+        val results = (1..5).map { async { createTool.invoke(input, agentId = "agent-1") } }.map { it.await() }
+        val ids = results.map { assertIs<ExternalToolResult.Success>(it); json.decodeFromString<CanvasCreateResult>(it.content).canvasId }
+        assertEquals(1, ids.toSet().size, "every creator must get the same canvas: $ids")
+        assertEquals(ids.first(), store.getForConversation("conv-shared")?.id?.value)
+
+        // The same holds for a session-level open.
+        val session = CanvasSession.getOrCreateForConversation(store, "conv-shared")
+        assertEquals(ids.first(), session.canvasId.value)
+    }
+
+    @Test
+    fun agentScopedListingAppliesTheReadCheck() = runTest {
+        // The document names agent-1 but its ACL has since stopped letting agent-1 read.
+        store.upsert(
+            CanvasDocument(
+                id = CanvasId("canvas-revoked"), agentId = "agent-1", title = "Revoked", revision = 1L, sceneJson = "{}",
+                updatedAtEpochMs = 1L, acl = CanvasAcl(ownerUserId = "alice", readerAgentIds = setOf("someone-else")),
+            ),
+        )
+        store.upsert(
+            CanvasDocument(
+                id = CanvasId("canvas-mine"), agentId = "agent-1", title = "Mine", revision = 1L, sceneJson = "{}",
+                updatedAtEpochMs = 1L, acl = CanvasAcl(ownerUserId = "alice", writerAgentIds = setOf("agent-1")),
+            ),
+        )
+        val listed = CanvasListTool(store, sessions).invoke(buildJsonObject { }, agentId = "agent-1")
+        assertIs<ExternalToolResult.Success>(listed)
+        assertEquals(listOf("canvas-mine"), json.decodeFromString<CanvasListResult>(listed.content).ids)
     }
 
     private fun openDocument(id: CanvasId, conversationId: String? = null) = CanvasDocument(

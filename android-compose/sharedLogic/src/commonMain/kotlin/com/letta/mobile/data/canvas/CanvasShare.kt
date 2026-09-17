@@ -17,7 +17,9 @@ import kotlin.jvm.JvmInline
 class CanvasAttachmentTooLargeException(message: String) : IllegalArgumentException(message)
 
 /**
- * Strongly typed conversation target for staged canvas attachments.
+ * Strongly typed recipient key for staged canvas attachments. On Android it names the chat
+ * screen instance a share was started from (see `AdminChatViewModel.canvasShareRecipient`),
+ * never a conversation id, so only that screen ever drains it.
  */
 @JvmInline
 value class CanvasConversationTarget(val id: String = "") {

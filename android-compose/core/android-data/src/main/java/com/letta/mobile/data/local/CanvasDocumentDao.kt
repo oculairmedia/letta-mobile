@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 
 /**
  * Columns are named rather than starred so a migration that adds one is a compile error here
@@ -25,6 +26,16 @@ interface CanvasDocumentDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: CanvasDocumentEntity)
+
+    /**
+     * Lookup and insert in one transaction, so two creators for the same conversation cannot
+     * both find nothing and both insert.
+     */
+    @Transaction
+    suspend fun insertIfAbsentForConversation(entity: CanvasDocumentEntity): CanvasDocumentEntity {
+        val conversationId = requireNotNull(entity.conversationId) { "insertIfAbsentForConversation needs a conversationId" }
+        return getForConversation(conversationId) ?: entity.also { upsert(it) }
+    }
 
     /**
      * Writes the row only while its revision is still [expectedRevision]; the compare and the

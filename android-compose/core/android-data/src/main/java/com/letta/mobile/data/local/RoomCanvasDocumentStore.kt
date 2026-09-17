@@ -37,6 +37,9 @@ class RoomCanvasDocumentStore(
         return changed == 1
     }
 
+    override suspend fun createForConversationIfAbsent(doc: CanvasDocument): CanvasDocument =
+        dao.insertIfAbsentForConversation(CanvasDocumentEntity.fromCanvasDocument(doc)).toCanvasDocument()
+
     override suspend fun listForAgent(agentId: String): List<CanvasDocument> =
         dao.listForAgent(agentId).map { it.toCanvasDocument() }
 }

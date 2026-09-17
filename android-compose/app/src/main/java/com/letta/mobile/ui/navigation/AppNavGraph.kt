@@ -83,8 +83,10 @@ private fun androidx.navigation.NavGraphBuilder.appChatGraph(navController: NavH
                 popUpTo<AgentChatRoute> { inclusive = true }
             }
         },
-        onNavigateToCanvas = { agentId, conversationId ->
-            navController.navigate(CanvasRoute(canvasId = "", conversationId = conversationId, agentId = agentId))
+        onNavigateToCanvas = { agentId, conversationId, shareRecipient ->
+            navController.navigate(
+                CanvasRoute(canvasId = "", conversationId = conversationId, agentId = agentId, shareRecipient = shareRecipient),
+            )
         },
     )
 }
@@ -93,12 +95,13 @@ private fun androidx.navigation.NavGraphBuilder.appCanvasGraph(navController: Na
     composable<CanvasRoute> { backStackEntry ->
         val route = backStackEntry.toRoute<CanvasRoute>()
         val coroutineScope = rememberCoroutineScope()
+        val shareRecipient = route.shareRecipient
         com.letta.mobile.ui.screens.canvas.CanvasScreen(
             canvasId = route.canvasId,
             conversationId = route.conversationId,
             agentId = route.agentId,
             onNavigateBack = { navController.popBackStack() },
-            onShareToChat = { bytes, mimeType ->
+            onShareToChat = shareRecipient?.let { recipient -> { bytes: ByteArray, mimeType: String ->
                 val result = com.letta.mobile.data.canvas.CanvasShare.packageForChat(
                     bytes,
                     com.letta.mobile.data.canvas.CanvasMimeType.fromValue(mimeType),
@@ -107,14 +110,14 @@ private fun androidx.navigation.NavGraphBuilder.appCanvasGraph(navController: Na
                     // The scope dies with this destination, so leaving before the image is in
                     // the staging queue would cancel the hand-off; navigate only once it landed.
                     coroutineScope.launch {
-                        val target = com.letta.mobile.data.canvas.CanvasConversationTarget.from(route.conversationId)
+                        val target = com.letta.mobile.data.canvas.CanvasConversationTarget(recipient)
                         com.letta.mobile.data.canvas.CanvasShare.stageForConversation(target, image)
                         navController.popBackStack()
                     }
                 }.onFailure {
                     navController.popBackStack()
                 }
-            },
+            } },
         )
     }
 }

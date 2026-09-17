@@ -326,23 +326,7 @@ class CanvasSession(
             store: CanvasDocumentStore,
             options: CanvasCreateOptions = CanvasCreateOptions(),
         ): CanvasSession {
-            // A canvas is never created without an ACL: a null ACL reads as "unrestricted" to
-            // every mutation path, so an absent agent would otherwise leave the document open
-            // to any actor. The local user owns it; the creating agent, when known, may write.
-            val effectiveAcl = options.acl ?: CanvasAcl(
-                ownerUserId = LOCAL_USER_ACTOR_ID,
-                writerAgentIds = options.agentId?.let { setOf(it) }.orEmpty(),
-            )
-            val doc = CanvasDocument(
-                id = options.canvasId,
-                agentId = options.agentId,
-                conversationId = options.conversationId,
-                title = options.title,
-                revision = 1L,
-                sceneJson = options.initialSceneJson,
-                acl = effectiveAcl,
-                updatedAtEpochMs = options.clock(),
-            )
+            val doc = newDocument(options)
             store.upsert(doc)
             val session = CanvasSession(
                 canvasId = options.canvasId,
@@ -355,6 +339,23 @@ class CanvasSession(
             return session
         }
 
+        private fun newDocument(options: CanvasCreateOptions): CanvasDocument = CanvasDocument(
+            id = options.canvasId,
+            agentId = options.agentId,
+            conversationId = options.conversationId,
+            title = options.title,
+            revision = 1L,
+            sceneJson = options.initialSceneJson,
+            // A canvas is never created without an ACL: a null ACL reads as "unrestricted" to
+            // every mutation path, so an absent agent would otherwise leave the document open
+            // to any actor. The local user owns it; the creating agent, when known, may write.
+            acl = options.acl ?: CanvasAcl(
+                ownerUserId = LOCAL_USER_ACTOR_ID,
+                writerAgentIds = options.agentId?.let { setOf(it) }.orEmpty(),
+            ),
+            updatedAtEpochMs = options.clock(),
+        )
+
         /**
          * Resolves an existing session for [conversationId], or creates a new one if none exists.
          */
@@ -363,30 +364,26 @@ class CanvasSession(
             conversationId: String,
             options: CanvasConversationOptions = CanvasConversationOptions(),
         ): CanvasSession {
-            val existing = store.getForConversation(conversationId)
-            return if (existing != null) {
-                val session = CanvasSession(
-                    canvasId = existing.id,
-                    store = store,
-                    opLog = options.opLog,
-                    syncTransport = options.syncTransport,
-                    clock = options.clock,
-                )
-                session.initialize(existing)
-                session
-            } else {
-                create(
-                    store = store,
-                    options = CanvasCreateOptions(
-                        title = options.title,
-                        conversationId = conversationId,
-                        agentId = options.agentId,
-                        opLog = options.opLog,
-                        syncTransport = options.syncTransport,
-                        clock = options.clock,
-                    ),
-                )
-            }
+            val createOptions = CanvasCreateOptions(
+                title = options.title,
+                conversationId = conversationId,
+                agentId = options.agentId,
+                opLog = options.opLog,
+                syncTransport = options.syncTransport,
+                clock = options.clock,
+            )
+            // Lookup and insert are one store step, so two callers opening the same
+            // conversation at once share a canvas instead of each persisting their own.
+            val doc = store.createForConversationIfAbsent(newDocument(createOptions))
+            val session = CanvasSession(
+                canvasId = doc.id,
+                store = store,
+                opLog = options.opLog,
+                syncTransport = options.syncTransport,
+                clock = options.clock,
+            )
+            session.initialize(doc)
+            return session
         }
     }
 }

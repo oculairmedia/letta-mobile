@@ -68,37 +68,39 @@ private suspend fun findCanvasDocument(
 private suspend fun executeCreateCanvas(
     context: CanvasToolContext,
     input: JsonObject,
-): CanvasId {
+): ExternalToolResult {
     val title = input["title"]?.jsonPrimitive?.contentOrNull ?: "Untitled Canvas"
     val conversationId = input["conversation_id"]?.jsonPrimitive?.contentOrNull
     val callerAgentId = context.resolveCallerId()
 
-    val defaultAcl = CanvasAcl(
-        ownerUserId = CanvasSession.LOCAL_USER_ACTOR_ID,
-        writerAgentIds = setOf(callerAgentId),
-    )
-
-    if (conversationId != null) {
-        // The conversation id is caller-supplied, so an existing canvas is only revealed to a
-        // caller its ACL lets read; anyone else gets a fresh canvas rather than the id.
-        val existing = context.store.getForConversation(conversationId)
-        if (existing != null && canRead(existing, callerAgentId)) return existing.id
-    }
     val now = kotlin.time.Clock.System.now().toEpochMilliseconds()
-    val newId = CanvasId("canvas-$now-${(1000..9999).random()}")
-    context.store.upsert(
-        CanvasDocument(
-            id = newId,
-            agentId = callerAgentId,
-            conversationId = conversationId,
-            title = title,
-            revision = 1L,
-            sceneJson = "",
-            acl = defaultAcl,
-            updatedAtEpochMs = now,
-        )
+    val candidate = CanvasDocument(
+        id = CanvasId("canvas-$now-${(1000..9999).random()}"),
+        agentId = callerAgentId,
+        conversationId = conversationId,
+        title = title,
+        revision = 1L,
+        sceneJson = "",
+        acl = CanvasAcl(
+            ownerUserId = CanvasSession.LOCAL_USER_ACTOR_ID,
+            writerAgentIds = setOf(callerAgentId),
+        ),
+        updatedAtEpochMs = now,
     )
-    return newId
+    val created = if (conversationId != null) {
+        // A conversation has one canvas. Lookup and insert are one store step, so two racing
+        // creators share it; and because the conversation id is caller-supplied, an existing
+        // canvas is only revealed to a caller its ACL lets read.
+        val bound = context.store.createForConversationIfAbsent(candidate)
+        if (bound.id != candidate.id && !canRead(bound, callerAgentId)) {
+            return ExternalToolResult.Error("Unauthorized: actor '$callerAgentId' cannot read the canvas for conversation '$conversationId'")
+        }
+        bound
+    } else {
+        context.store.upsert(candidate)
+        candidate
+    }
+    return ExternalToolResult.Success(canvasJson.encodeToString(CanvasCreateResult(canvasId = created.id.value)))
 }
 
 /**
@@ -163,16 +165,6 @@ private suspend fun executeReplaceScene(
     }
 }
 
-private fun validateOpAcls(doc: CanvasDocument, ops: List<CanvasOp>): ExternalToolResult.Error? {
-    if (doc.acl == null) return null
-    for (op in ops) {
-        if (!doc.acl.canWrite(op.actorId)) {
-            return ExternalToolResult.Error("Unauthorized: op actor '${op.actorId}' cannot write to canvas '${doc.id.value}'")
-        }
-    }
-    return null
-}
-
 private suspend fun commitOpsUpdate(
     store: CanvasDocumentStore,
     activeSession: CanvasSession?,
@@ -189,10 +181,11 @@ private suspend fun executeApplyOps(
     input: JsonObject,
 ): ExternalToolResult {
     val opsJson = input["ops"] ?: return ExternalToolResult.Error("Missing required parameter: ops")
-    val ops = canvasJson.decodeFromJsonElement<List<CanvasOp>>(opsJson)
-    return executeAuthorizedMutation(context, input) { doc, _, activeSession ->
-        val aclError = validateOpAcls(doc, ops)
-        if (aclError != null) return@executeAuthorizedMutation aclError
+    val suppliedOps = canvasJson.decodeFromJsonElement<List<CanvasOp>>(opsJson)
+    return executeAuthorizedMutation(context, input) { doc, callerId, activeSession ->
+        // The caller has already passed the write check; every op it sends is its own, whatever
+        // actor the input named, so the log, the broadcast and scene provenance all carry it.
+        val ops = suppliedOps.map { it.withActor(callerId) }
         val revision = commitOpsUpdate(context.store, activeSession, doc, ops)
             ?: return@executeAuthorizedMutation revisionConflict(doc)
         ExternalToolResult.Success(
@@ -213,7 +206,9 @@ private suspend fun executeListCanvases(
             ?.let { listOf(it.id.value) }
             .orEmpty()
     } else {
-        context.store.listForAgent(callerAgentId).map { it.id.value }
+        // agentId and acl are independent fields, so a document can name an agent its ACL
+        // has since stopped letting read; listing applies the same check as a direct lookup.
+        context.store.listForAgent(callerAgentId).filter { canRead(it, callerAgentId) }.map { it.id.value }
     }
 }
 
@@ -275,8 +270,7 @@ class CanvasCreateTool(
 
     override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult =
         runWithContext(agentId, "Failed to create canvas") { context ->
-            val canvasId = executeCreateCanvas(context, input)
-            ExternalToolResult.Success(canvasJson.encodeToString(CanvasCreateResult(canvasId = canvasId.value)))
+            executeCreateCanvas(context, input)
         }
 
     companion object {

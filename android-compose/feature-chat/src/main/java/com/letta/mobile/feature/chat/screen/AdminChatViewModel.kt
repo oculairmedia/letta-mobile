@@ -1083,38 +1083,35 @@ internal class AdminChatViewModel @Inject constructor(
     }
 
     /**
-     * The pending queue in [com.letta.mobile.data.canvas.CanvasShare] is the one delivery state
-     * for a staged canvas image; the event flow only says which conversation to drain. Draining
-     * inside `onSubscription` closes the gap where an image staged between a startup drain and
-     * the subscription would have no event to announce it.
+     * The key a canvas opened from this screen stages its share under, and the only key this
+     * screen drains. It names this screen instance rather than a conversation: the queue in
+     * [com.letta.mobile.data.canvas.CanvasShare] is process-wide and consuming is destructive,
+     * so matching on a conversation id would let a retained back-stack screen, or one whose
+     * conversation has not resolved yet, take an image meant for another chat.
+     */
+    val canvasShareRecipient: com.letta.mobile.data.canvas.CanvasConversationTarget =
+        com.letta.mobile.data.canvas.CanvasConversationTarget("chat-screen-${java.util.UUID.randomUUID()}")
+
+    /**
+     * The pending queue is the one delivery state for a staged canvas image; the event flow only
+     * says which recipient to drain. Draining inside `onSubscription` closes the gap where an
+     * image staged between a startup drain and the subscription would have no event to announce it.
      */
     private fun observeCanvasShareAttachments() {
         viewModelScope.launch {
             com.letta.mobile.data.canvas.CanvasShare.stagedAttachmentEvents
-                .onSubscription {
-                    drainStagedCanvasAttachments(
-                        com.letta.mobile.data.canvas.CanvasConversationTarget.from(currentOrExplicitConversationId()),
-                    )
-                }
+                .onSubscription { drainStagedCanvasAttachments() }
                 .collect { target ->
-                    if (matchesTargetConversation(target.id, currentOrExplicitConversationId())) {
-                        drainStagedCanvasAttachments(target)
-                    }
+                    if (target == canvasShareRecipient) drainStagedCanvasAttachments()
                 }
         }
     }
 
-    private suspend fun drainStagedCanvasAttachments(target: com.letta.mobile.data.canvas.CanvasConversationTarget) {
-        com.letta.mobile.data.canvas.CanvasShare.consumeStagedAttachments(target).forEach { image ->
+    private suspend fun drainStagedCanvasAttachments() {
+        com.letta.mobile.data.canvas.CanvasShare.consumeStagedAttachments(canvasShareRecipient).forEach { image ->
             addAttachment(image)
         }
     }
-
-    private fun currentOrExplicitConversationId(): String? =
-        conversationId?.value ?: routeArgs.explicitConversationId
-
-    private fun matchesTargetConversation(targetConvId: String, currentConvId: String?): Boolean =
-        targetConvId.isEmpty() || currentConvId == null || targetConvId == currentConvId
 
     /** The registry key for this screen's conversation; the agent stands in until the conversation has an id. */
     private var publishedRunKey: String? = null
