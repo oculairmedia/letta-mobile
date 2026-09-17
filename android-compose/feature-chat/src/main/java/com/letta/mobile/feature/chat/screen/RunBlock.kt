@@ -62,6 +62,7 @@ internal fun RunBlock(
     onApprovalDecision: ((String, List<String>, Boolean, String?) -> Unit)? = null,
     chatMode: String = "interactive",
     showCompletedDisclosure: Boolean = true,
+    onOpenToolRunDetails: (List<com.letta.mobile.data.chat.projection.ToolTimelineGroup>) -> Unit = {},
     renderRow: @Composable (
         message: UiMessage,
         position: GroupPosition,
@@ -203,6 +204,7 @@ internal fun RunBlock(
                                         animateRows = isStreaming,
                                         activeApprovalRequestId = activeApprovalRequestId,
                                         onApprovalDecision = onApprovalDecision,
+                                        onOpenDetails = onOpenToolRunDetails,
                                     )
                                 }
                             }
