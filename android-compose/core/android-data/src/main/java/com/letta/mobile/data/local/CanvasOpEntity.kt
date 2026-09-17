@@ -43,6 +43,8 @@ data class CanvasOpEntity(
                 is CanvasOp.UpdateElementOp -> "update_element"
                 is CanvasOp.RemoveElementOp -> "remove_element"
                 is CanvasOp.SetBackgroundOp -> "set_background"
+                is CanvasOp.SetDocumentOp -> "set_document"
+                is CanvasOp.RemoveDocumentOp -> "remove_document"
                 is CanvasOp.BatchOp -> "batch"
             }
             return CanvasOpEntity(
