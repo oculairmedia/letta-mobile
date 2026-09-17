@@ -54,8 +54,9 @@ import io.ak1.drawbox.ui.controls.ControlsBarState
  * (letta-mobile-r5f3r). DrawBox's canvas itself is unaffected and still used.
  *
  * State and intents stay DrawBox's, so [CanvasControlsBridge] and its tests are unchanged. The
- * note tool is ours: [onAddNote] places a block document on the board, and the button is only
- * offered when a host wires it.
+ * text and note tools are ours: [onAddText] places a plain block-editor text element and
+ * [onAddNote] a sticky note, both block documents; each button is only offered when a host wires
+ * it. DrawBox's own TEXT mode is not in the rail: text on this board is the block editor.
  */
 @Composable
 fun CanvasControlsBar(
@@ -63,6 +64,7 @@ fun CanvasControlsBar(
     dispatch: (ControlsBarIntent) -> Unit,
     modifier: Modifier = Modifier,
     onAddNote: (() -> Unit)? = null,
+    onAddText: (() -> Unit)? = null,
 ) {
     Surface(
         modifier = modifier,
@@ -86,6 +88,9 @@ fun CanvasControlsBar(
                 ControlButton(Control(iconFor(mode), label, selected = state.currentMode == mode)) {
                     dispatch(ControlsBarIntent.SelectMode(mode))
                 }
+            }
+            if (onAddText != null) {
+                ControlButton(Control(Lucide.Type, "Text"), onClick = onAddText)
             }
             if (onAddNote != null) {
                 ControlButton(Control(Lucide.StickyNote, "Add note"), onClick = onAddNote)
@@ -158,7 +163,6 @@ internal val DrawingModes: List<Pair<Mode, String>> = listOf(
     Mode.RECTANGLE to "Rectangle",
     Mode.CIRCLE to "Circle",
     Mode.TRIANGLE to "Triangle",
-    Mode.TEXT to "Text",
     Mode.ERASER to "Eraser",
 )
 

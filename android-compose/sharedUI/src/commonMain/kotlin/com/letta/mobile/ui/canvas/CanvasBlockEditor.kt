@@ -2,7 +2,9 @@ package com.letta.mobile.ui.canvas
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,8 +36,10 @@ import kotlinx.coroutines.isActive
  * just placed and has never been written, so the editor starts with one empty paragraph to type
  * into rather than failing to parse.
  *
- * [active] is the editor the person is working in: it shows the rich-text toolbar and enables
- * block selection and dragging. An inactive one is plain text so a board of notes stays quiet.
+ * [active] is the editor the person is working in: it enables block selection and dragging and
+ * hands its formatting controls up through [onToolbar] so the host can draw them where there is
+ * room (the foot of the board) instead of inside a small card. An inactive one is plain text so
+ * a board of notes stays quiet.
  *
  * Persistence is commit-based: the editor's JSON is compared to what the session holds on a short
  * cadence and written only when it changed, which coalesces typing into one op per pause. A newer
@@ -52,6 +56,8 @@ fun CanvasBlockEditor(
     active: Boolean = true,
     /** True when the editor sits on a pale tint (a coloured note), so its text stays dark. */
     onLightSurface: Boolean = false,
+    /** Receives the editor's formatting controls while active, null again when it leaves. */
+    onToolbar: ((NoteToolbar?) -> Unit)? = null,
 ) {
     val stateHolder = rememberEditorState(initialBlocks = listOf(Block.paragraph("")))
     val textStates = remember { BlockTextStates() }
@@ -82,13 +88,24 @@ fun CanvasBlockEditor(
         }
     }
 
+    if (onToolbar != null) {
+        DisposableEffect(active) { onDispose { onToolbar(null) } }
+    }
+    val toolbar: ToolbarSlot = when {
+        !active -> ToolbarSlot.None
+        onToolbar != null -> ToolbarSlot.Custom { formatting, actions ->
+            // Rendered by the host; the slot only reports what it was handed.
+            SideEffect { onToolbar(NoteToolbar(formatting, actions)) }
+        }
+        else -> ToolbarSlot.Default()
+    }
     CascadeEditor(
         stateHolder = stateHolder,
         textStates = textStates,
         spanStates = spanStates,
         theme = theme,
         modifier = modifier,
-        toolbar = if (active) ToolbarSlot.Default() else ToolbarSlot.None,
+        toolbar = toolbar,
         config = CascadeEditorConfig(
             blockSelectionEnabled = active,
             blockDraggingEnabled = active,

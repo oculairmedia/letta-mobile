@@ -99,6 +99,9 @@ internal fun DesktopChatFontScaleHost(
     val scaledDensity = remember(baseDensity, scale) {
         Density(density = baseDensity.density, fontScale = baseDensity.fontScale * scale)
     }
+    // Surfaces that zoom themselves on Ctrl + wheel (the canvas board) register here and are
+    // left alone; the event reaches them in their own pass.
+    val wheelZoomRegions = remember { com.letta.mobile.ui.canvas.WheelZoomRegions() }
     Box(
         modifier = Modifier.pointerInput(Unit) {
             awaitPointerEventScope {
@@ -109,6 +112,8 @@ internal fun DesktopChatFontScaleHost(
                     // screen zoom, so Cmd is the app-level convention there.
                     val modifiers = event.keyboardModifiers
                     if (!modifiers.isCtrlPressed && !modifiers.isMetaPressed) continue
+                    val position = event.changes.firstOrNull()?.position
+                    if (position != null && wheelZoomRegions.contains(position)) continue
                     val delta = event.changes.fold(0f) { acc, change -> acc + change.scrollDelta.y }
                     if (abs(delta) < FLOAT_EPSILON) continue
                     scale = nextChatFontScale(scale, delta)
@@ -121,6 +126,7 @@ internal fun DesktopChatFontScaleHost(
         CompositionLocalProvider(
             LocalDensity provides scaledDensity,
             LocalDesktopChatFontScale provides scale,
+            com.letta.mobile.ui.canvas.LocalWheelZoomRegions provides wheelZoomRegions,
         ) {
             content()
         }

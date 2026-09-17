@@ -100,6 +100,20 @@ class CanvasDocumentBlocksTest {
     }
 
     @Test
+    fun drawingsCompareByContentNotByTextSoAnAutosaveIsNotAnExternalChange() {
+        val exported = """{"bgColor":"#000000ff","elements":[{"id":"b","type":"Text"},{"id":"a","type":"Text"}]}"""
+        val stored = """{"elements":[{"type":"Text","id":"a"},{"type":"Text","id":"b"}],"bgColor":"#000000ff"}"""
+        assertTrue(CanvasOpProjector.drawingsEqual(exported, stored), "order and formatting are not changes")
+        assertTrue(!CanvasOpProjector.drawingsEqual(exported, """{"bgColor":"#ffffffff","elements":[]}"""))
+        assertTrue(!CanvasOpProjector.drawingsEqual(exported, null))
+        val withNote = CanvasOpProjector.project(stored, listOf(set("n", "{}", lamport = 1)))
+        assertTrue(
+            CanvasOpProjector.drawingsEqual(exported, CanvasOpProjector.stripMetadataForDrawBox(withNote)),
+            "a note placed beside the drawing leaves the drawing unchanged",
+        )
+    }
+
+    @Test
     fun sessionRoundTripsTheDocumentThroughTheStore() = runTest {
         val store = InMemoryCanvasDocumentStore()
         val session = CanvasSession.create(store, CanvasCreateOptions(title = "t", canvasId = CanvasId("c1")))

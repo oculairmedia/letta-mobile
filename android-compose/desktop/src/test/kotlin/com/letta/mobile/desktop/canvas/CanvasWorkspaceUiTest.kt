@@ -65,10 +65,16 @@ class CanvasWorkspaceUiTest {
         }
 
         onAllNodesWithContentDescription("Note ", substring = true).assertCountEquals(0)
+        // Zoom in first: placing and moving notes writes the session, and that must never reload
+        // the drawing and throw the camera back to 100%.
+        onNodeWithContentDescription("Zoom in").performClick()
+        onNodeWithText("125%").assertExists()
         onNodeWithContentDescription("Add note").performClick()
 
         // The note is written to the session with a frame and shows up on the board as a card.
         waitUntil(timeoutMillis = 5000) { session.documents().size == 1 }
+        onNodeWithText("125%").assertExists()
+        onAllNodesWithText("Agent updated canvas", substring = true).assertCountEquals(0)
         val note = session.documents().single()
         kotlin.test.assertNotNull(note.frame, "a placed note carries its board frame")
         kotlin.test.assertEquals("#fde68a", note.color, "a new note starts yellow")
@@ -81,12 +87,23 @@ class CanvasWorkspaceUiTest {
         onNodeWithContentDescription("Note color").performClick()
         onNodeWithContentDescription("Color blue").performClick()
         waitUntil(timeoutMillis = 5000) { session.documents().single().color == "#bfdbfe" }
+        onNodeWithText("125%").assertExists()
 
         // Opening the note large shows the full editor over the board, and closing it returns.
         onNodeWithContentDescription("Open note").performClick()
         onNodeWithContentDescription("Note editor").assertExists()
         onNodeWithContentDescription("Close note editor").performClick()
         onAllNodesWithContentDescription("Note editor").assertCountEquals(0)
+
+        // The Text tool places a plain (transparent) block document; the active note's formatting
+        // controls sit at the foot of the board, not inside the card.
+        onNodeWithContentDescription("Text").performClick()
+        waitUntil(timeoutMillis = 5000) { session.documents().size == 2 }
+        val text = session.documents().first { it.id.startsWith("text-") }
+        kotlin.test.assertEquals("#00000000", text.color)
+        waitUntil(timeoutMillis = 5000) {
+            onAllNodesWithContentDescription("Bold").fetchSemanticsNodes().isNotEmpty()
+        }
     }
 
     @Test
@@ -176,6 +193,8 @@ class CanvasWorkspaceUiTest {
         waitUntil(timeoutMillis = 5000) {
             session.document.value?.revision == 2L
         }
+        // The autosave round trip must not be mistaken for an external change and re-imported.
+        onAllNodesWithText("Agent updated canvas", substring = true).assertCountEquals(0)
 
         kotlin.test.assertEquals(2L, session.document.value?.revision)
         kotlin.test.assertTrue(session.sceneJsonOrEmpty().contains("\"elements\""))

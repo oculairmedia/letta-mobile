@@ -416,6 +416,22 @@ object CanvasOpProjector {
      * Strips the synchronization bookkeeping, producing a scene DrawBox's strict deserializer
      * accepts. Everything this projector adds is `_`-prefixed for exactly this reason.
      */
+    /**
+     * Whether two DrawBox scenes draw the same thing: the same elements (in any order, as sets)
+     * and the same root properties. Key order and formatting differ between what DrawBox exports
+     * and what the projector stores, so a string compare would call every autosave a change.
+     */
+    fun drawingsEqual(a: String?, b: String?): Boolean {
+        if (a == b) return true
+        if (a == null || b == null) return false
+        val pa = runCatching { json.parseToJsonElement(a).jsonObject }.getOrNull() ?: return false
+        val pb = runCatching { json.parseToJsonElement(b).jsonObject }.getOrNull() ?: return false
+        val ea = runCatching { pa["elements"]?.jsonArray?.toSet() }.getOrNull().orEmpty()
+        val eb = runCatching { pb["elements"]?.jsonArray?.toSet() }.getOrNull().orEmpty()
+        if (ea != eb) return false
+        return pa.filterKeys { it != "elements" } == pb.filterKeys { it != "elements" }
+    }
+
     fun stripMetadataForDrawBox(sceneJson: String): String {
         if (sceneJson.isBlank()) return emptySceneJson()
         return try {

@@ -78,6 +78,7 @@ fun CanvasNotesLayer(
     expandedNoteId: String? = null,
     onActivate: (String) -> Unit = {},
     onExpand: (String) -> Unit = {},
+    onToolbar: ((NoteToolbar?) -> Unit)? = null,
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         documents.forEachIndexed { index, document ->
@@ -90,6 +91,7 @@ fun CanvasNotesLayer(
                 expanded = document.id == expandedNoteId,
                 onActivate = { onActivate(document.id) },
                 onExpand = { onExpand(document.id) },
+                onToolbar = onToolbar,
             )
         }
     }
@@ -105,6 +107,7 @@ private fun CanvasNoteCard(
     expanded: Boolean,
     onActivate: () -> Unit,
     onExpand: () -> Unit,
+    onToolbar: ((NoteToolbar?) -> Unit)?,
 ) {
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
@@ -117,8 +120,13 @@ private fun CanvasNoteCard(
     val screenTopLeft = viewport.worldToScreen(Offset(frame.x, frame.y))
     val scale = viewport.scale
     val tint = parseHexColor(document.color)
-    val cardColor = tint ?: MaterialTheme.colorScheme.surfaceContainerHigh
-    val onCard = if (tint != null) contrastOn(tint) else MaterialTheme.colorScheme.onSurfaceVariant
+    // A "plain" note (transparent colour) is text sitting on the board: no card until it is active.
+    val plain = tint != null && tint.alpha == 0f
+    val cardColor = when {
+        plain -> if (active) MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.6f) else Color.Transparent
+        else -> tint ?: MaterialTheme.colorScheme.surfaceContainerHigh
+    }
+    val onCard = if (tint != null && !plain) contrastOn(tint) else MaterialTheme.colorScheme.onSurfaceVariant
     val widthDp = with(density) { frame.width.toDp() }
     val heightDp = with(density) { frame.height.toDp() }
 
@@ -155,14 +163,19 @@ private fun CanvasNoteCard(
             .pointerInput(document.id) { detectTapGestures(onTap = {}) },
         shape = RoundedCornerShape(NOTE_CORNER),
         color = cardColor,
-        border = BorderStroke(
-            width = if (active) 2.dp else 1.dp,
-            color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f),
-        ),
-        shadowElevation = if (active) 8.dp else 4.dp,
+        border = when {
+            active -> BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+            plain -> null
+            else -> BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
+        },
+        shadowElevation = when {
+            plain && !active -> 0.dp
+            active -> 8.dp
+            else -> 4.dp
+        },
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            NoteHandleBar(
+            if (!plain || active) NoteHandleBar(
                 cardColor = cardColor,
                 onCard = onCard,
                 onDragStart = { gestureActive = true },
@@ -185,7 +198,8 @@ private fun CanvasNoteCard(
                         documentId = document.id,
                         storedJson = document.json,
                         active = active,
-                        onLightSurface = tint != null,
+                        onLightSurface = tint != null && !plain,
+                        onToolbar = onToolbar,
                         modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 4.dp),
                     )
                 }
@@ -326,8 +340,21 @@ internal fun newNoteFrame(worldCenter: Offset): CanvasDocumentFrame = CanvasDocu
     height = NOTE_DEFAULT_HEIGHT,
 )
 
+/** A frame for a new plain text block centred on [worldCenter]: wider and shorter than a note. */
+internal fun newTextFrame(worldCenter: Offset): CanvasDocumentFrame = CanvasDocumentFrame(
+    x = worldCenter.x - TEXT_DEFAULT_WIDTH / 2f,
+    y = worldCenter.y - TEXT_DEFAULT_HEIGHT / 2f,
+    width = TEXT_DEFAULT_WIDTH,
+    height = TEXT_DEFAULT_HEIGHT,
+)
+
+/** The colour that marks a plain text block: fully transparent, so no card is drawn. */
+internal const val PLAIN_TEXT_COLOR = "#00000000"
+
 internal const val NOTE_DEFAULT_WIDTH = 320f
 internal const val NOTE_DEFAULT_HEIGHT = 240f
+private const val TEXT_DEFAULT_WIDTH = 360f
+private const val TEXT_DEFAULT_HEIGHT = 120f
 private const val NOTE_DEFAULT_ORIGIN = 80f
 private const val NOTE_STAGGER = 40f
 private const val NOTE_MIN_SIZE = 140f
