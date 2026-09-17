@@ -44,6 +44,7 @@ object CanvasOpProjector {
     private const val DOC_JSON = "json"
     private const val DOC_REMOVED = "_removed"
     private const val DOC_FRAME = "frame"
+    private const val DOC_COLOR = "color"
 
     /**
      * How many tombstones a scene keeps. They cannot grow without bound, and the ones that matter
@@ -231,7 +232,7 @@ object CanvasOpProjector {
             .mapNotNull { entry ->
                 val id = runCatching { entry["id"]?.jsonPrimitive?.content }.getOrNull() ?: return@mapNotNull null
                 val json = runCatching { entry[DOC_JSON]?.jsonPrimitive?.content }.getOrNull() ?: return@mapNotNull null
-                CanvasSceneDocument(id = id, json = json, frame = documentFrame(entry))
+                CanvasSceneDocument(id = id, json = json, frame = documentFrame(entry), color = documentColor(entry))
             }
             .sortedBy { it.id }
     }
@@ -253,6 +254,9 @@ object CanvasOpProjector {
         )
     }
 
+    private fun documentColor(entry: JsonObject): String? =
+        runCatching { entry[DOC_COLOR]?.jsonPrimitive?.content }.getOrNull()?.takeIf { it.isNotBlank() }
+
     private fun frameJson(frame: CanvasDocumentFrame): JsonObject = buildJsonObject {
         put("x", JsonPrimitive(frame.x))
         put("y", JsonPrimitive(frame.y))
@@ -269,7 +273,7 @@ object CanvasOpProjector {
     /**
      * Last writer wins per document id, like elements. A removal stays in the array as a removed
      * entry carrying its provenance, so an older write that arrives late still loses to it.
-     * A write without a [frame] keeps the frame the document already had; a removal drops it.
+     * A write without a [frame] or [color] keeps what the document already had; a removal drops both.
      */
     private fun writeDocument(
         sceneJson: String,
@@ -277,6 +281,7 @@ object CanvasOpProjector {
         provenance: WriterProvenance,
         json: String?,
         frame: CanvasDocumentFrame? = null,
+        color: String? = null,
     ): String {
         val parsed = parseScene(sceneJson)
         val entries = documentEntries(parsed).toMutableList()
@@ -284,10 +289,12 @@ object CanvasOpProjector {
         if (index >= 0 && !wins(provenance, documentProvenance(entries[index]))) return sceneJson
         val existing = entries.getOrNull(index)?.takeIf { !isRemovedDocument(it) }
         val keptFrame = frame ?: existing?.let(::documentFrame)
+        val keptColor = color ?: existing?.let(::documentColor)
         val entry = buildJsonObject {
             put("id", JsonPrimitive(documentId))
             if (json != null) put(DOC_JSON, JsonPrimitive(json)) else put(DOC_REMOVED, JsonPrimitive(true))
             if (json != null && keptFrame != null) put(DOC_FRAME, frameJson(keptFrame))
+            if (json != null && keptColor != null) put(DOC_COLOR, JsonPrimitive(keptColor))
             put(LAMPORT, JsonPrimitive(provenance.lamport))
             put(ACTOR, JsonPrimitive(provenance.actorId))
         }
@@ -302,7 +309,7 @@ object CanvasOpProjector {
     }
 
     private fun upsertDocumentWithLww(sceneJson: String, op: CanvasOp.SetDocumentOp): String =
-        writeDocument(sceneJson, op.documentId, WriterProvenance(op.lamport, op.actorId), op.documentJson, op.frame)
+        writeDocument(sceneJson, op.documentId, WriterProvenance(op.lamport, op.actorId), op.documentJson, op.frame, op.color)
 
     private fun removeDocumentWithLww(sceneJson: String, op: CanvasOp.RemoveDocumentOp): String =
         writeDocument(sceneJson, op.documentId, WriterProvenance(op.lamport, op.actorId), null)

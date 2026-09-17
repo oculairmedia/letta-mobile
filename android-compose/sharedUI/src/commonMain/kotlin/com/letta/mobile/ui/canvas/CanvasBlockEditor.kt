@@ -42,11 +42,13 @@ fun CanvasBlockEditor(
     modifier: Modifier = Modifier,
     actorId: String = "local_user",
     toolbar: ToolbarSlot = ToolbarSlot.None,
+    /** True when the editor sits on a pale tint (a coloured note), so its text stays dark. */
+    onLightSurface: Boolean = false,
 ) {
     val stateHolder = rememberEditorState()
     val textStates = remember { BlockTextStates() }
     val spanStates = remember { BlockSpanStates() }
-    val theme = rememberCascadeTheme()
+    val theme = rememberCascadeTheme(forceLight = onLightSurface)
     // What the session last held for this document, verbatim, and the editor's own encoding of it.
     var lastStoredJson by remember(session.canvasId, documentId) { mutableStateOf<String?>(null) }
     var lastEditorJson by remember(session.canvasId, documentId) { mutableStateOf<String?>(null) }
@@ -84,8 +86,8 @@ fun CanvasBlockEditor(
 }
 
 @Composable
-internal fun rememberCascadeTheme(): CascadeEditorTheme {
-    val dark = MaterialTheme.colorScheme.background.luminance() < DARK_LUMINANCE_THRESHOLD
+internal fun rememberCascadeTheme(forceLight: Boolean = false): CascadeEditorTheme {
+    val dark = !forceLight && MaterialTheme.colorScheme.background.luminance() < DARK_LUMINANCE_THRESHOLD
     return remember(dark) { if (dark) CascadeEditorTheme.dark() else CascadeEditorTheme.light() }
 }
 

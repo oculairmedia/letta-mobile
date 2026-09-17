@@ -65,7 +65,7 @@ sealed interface CanvasOp {
     /**
      * Upserts a block document (a Cascade editor JSON document) attached to the canvas. Documents
      * live on the board beside the drawing, keyed by [documentId]; last writer wins per document.
-     * A null [frame] keeps the document where it already is.
+     * A null [frame] keeps the document where it already is, and a null [color] keeps its colour.
      */
     @Serializable
     @SerialName("set_document")
@@ -76,6 +76,7 @@ sealed interface CanvasOp {
         val documentId: String,
         val documentJson: String,
         val frame: CanvasDocumentFrame? = null,
+        val color: String? = null,
     ) : CanvasOp
 
     @Serializable

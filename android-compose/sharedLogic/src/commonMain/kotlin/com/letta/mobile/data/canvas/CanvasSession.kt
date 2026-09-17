@@ -223,17 +223,21 @@ class CanvasSession(
     fun documents(): List<CanvasSceneDocument> = CanvasOpProjector.documentsOf(sceneJsonOrEmpty())
 
     /**
-     * Writes a block document (Cascade JSON) as a local op, placing it at [frame] when given; a
-     * no-op when neither the JSON nor the frame would change.
+     * Writes a block document (Cascade JSON) as a local op, placing it at [frame] and colouring it
+     * [color] when given; a no-op when nothing would change.
      */
     suspend fun setDocument(
         documentId: String,
         documentJson: String,
         actorId: String = "local_user",
         frame: CanvasDocumentFrame? = null,
+        color: String? = null,
     ): CanvasDocument? {
         val existing = documents().firstOrNull { it.id == documentId }
-        if (existing?.json == documentJson && (frame == null || frame == existing.frame)) return null
+        val unchanged = existing?.json == documentJson &&
+            (frame == null || frame == existing.frame) &&
+            (color == null || color == existing.color)
+        if (unchanged) return null
         return applyLocal(
             CanvasOp.SetDocumentOp(
                 opId = CanvasOpDiffer.generateOpId("doc"),
@@ -242,8 +246,19 @@ class CanvasSession(
                 documentId = documentId,
                 documentJson = documentJson,
                 frame = frame,
+                color = color,
             ),
         )
+    }
+
+    /** Recolours a block document on the board; a no-op for a document that is not there. */
+    suspend fun recolorDocument(
+        documentId: String,
+        colorHex: String,
+        actorId: String = "local_user",
+    ): CanvasDocument? {
+        val existing = documents().firstOrNull { it.id == documentId } ?: return null
+        return setDocument(documentId, existing.json, actorId, color = colorHex)
     }
 
     /** Moves or resizes a block document on the board; a no-op for a document that is not there. */

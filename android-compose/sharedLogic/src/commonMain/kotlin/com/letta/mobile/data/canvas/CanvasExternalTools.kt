@@ -329,8 +329,8 @@ class CanvasApplyOpsTool(
     override val name: String = NAME
     override val description: String =
         "Apply a sequence of Canvas operations to the canvas. Besides element ops, " +
-            "set_document {document_id, document_json, frame?} places a block-document note on the board " +
-            "(frame = {x, y, width, height} in world units) and remove_document {document_id} takes it off."
+            "set_document {document_id, document_json, frame?, color?} places a block-document note on the board " +
+            "(frame = {x, y, width, height} in world units, color = #rrggbb) and remove_document {document_id} takes it off."
     override val inputSchema: JsonObject = buildJsonObject {
         put("type", "object")
         putJsonObject("properties") {

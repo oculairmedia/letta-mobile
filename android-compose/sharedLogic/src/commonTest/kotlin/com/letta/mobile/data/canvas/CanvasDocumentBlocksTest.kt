@@ -8,8 +8,16 @@ import kotlin.test.assertTrue
 
 /** Block documents ride beside the drawing in the scene: last writer wins, replace keeps them, they persist. */
 class CanvasDocumentBlocksTest {
-    private fun set(id: String, json: String, lamport: Long, actor: String = "a", frame: CanvasDocumentFrame? = null) =
-        CanvasOp.SetDocumentOp(opId = "op-$lamport-$actor", actorId = actor, lamport = lamport, documentId = id, documentJson = json, frame = frame)
+    private fun set(
+        id: String,
+        json: String,
+        lamport: Long,
+        actor: String = "a",
+        frame: CanvasDocumentFrame? = null,
+        color: String? = null,
+    ) = CanvasOp.SetDocumentOp(
+        opId = "op-$lamport-$actor", actorId = actor, lamport = lamport, documentId = id, documentJson = json, frame = frame, color = color,
+    )
 
     private fun remove(id: String, lamport: Long, actor: String = "a") =
         CanvasOp.RemoveDocumentOp(opId = "rm-$lamport-$actor", actorId = actor, lamport = lamport, documentId = id)
@@ -57,6 +65,23 @@ class CanvasDocumentBlocksTest {
         assertEquals(moved, CanvasOpProjector.documentsOf(s3).single().frame)
         val s4 = CanvasOpProjector.project(s3, listOf(remove("n", lamport = 4), set("n", "{\"v\":3}", lamport = 5)))
         assertNull(CanvasOpProjector.documentsOf(s4).single().frame, "a note recreated after removal starts unplaced")
+    }
+
+    @Test
+    fun aNoteKeepsItsColourUntilRecolouredAndLosesItWhenRemoved() = runTest {
+        val s1 = CanvasOpProjector.project("", listOf(set("n", "{}", lamport = 1, color = "#fde68a")))
+        assertEquals("#fde68a", CanvasOpProjector.documentsOf(s1).single().color)
+        val s2 = CanvasOpProjector.project(s1, listOf(set("n", "{\"v\":2}", lamport = 2)))
+        assertEquals("#fde68a", CanvasOpProjector.documentsOf(s2).single().color, "typing must not recolour the note")
+        val s3 = CanvasOpProjector.project(s2, listOf(remove("n", lamport = 3), set("n", "{}", lamport = 4)))
+        assertNull(CanvasOpProjector.documentsOf(s3).single().color)
+
+        val session = CanvasSession.create(InMemoryCanvasDocumentStore(), CanvasCreateOptions(title = "t", canvasId = CanvasId("c3")))
+        session.setDocument("n", "")
+        assertNull(session.recolorDocument("missing", "#fff"))
+        session.recolorDocument("n", "#bfdbfe")
+        assertEquals("#bfdbfe", session.documents().single().color)
+        assertNull(session.setDocument("n", "", color = "#bfdbfe"), "an unchanged colour is not written again")
     }
 
     @Test

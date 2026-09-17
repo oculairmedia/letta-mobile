@@ -40,6 +40,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
 import com.composables.icons.lucide.GripVertical
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.X
@@ -95,6 +96,9 @@ private fun CanvasNoteCard(
 
     val screenTopLeft = viewport.worldToScreen(Offset(frame.x, frame.y))
     val scale = viewport.scale
+    val tint = parseHexColor(document.color)
+    val cardColor = tint ?: MaterialTheme.colorScheme.surfaceContainerHigh
+    val onCard = if (tint != null) contrastOn(tint) else MaterialTheme.colorScheme.onSurfaceVariant
     val widthDp = with(density) { frame.width.toDp() }
     val heightDp = with(density) { frame.height.toDp() }
 
@@ -119,15 +123,18 @@ private fun CanvasNoteCard(
             // Taps and drags on the card belong to the note, never to the drawing beneath it.
             .pointerInput(document.id) { detectTapGestures(onTap = {}) },
         shape = RoundedCornerShape(NOTE_CORNER),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = cardColor,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)),
         shadowElevation = 4.dp,
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             NoteHandleBar(
+                cardColor = cardColor,
+                onCard = onCard,
                 onDragStart = { gestureActive = true },
                 onDrag = { delta -> frame = frame.copy(x = frame.x + delta.x, y = frame.y + delta.y) },
                 onDragEnd = ::commit,
+                onRecolor = { color -> scope.launch { runCatching { session.recolorDocument(document.id, color.hex) } } },
                 onRemove = { scope.launch { runCatching { session.removeDocument(document.id) } } },
             )
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
@@ -135,6 +142,7 @@ private fun CanvasNoteCard(
                     session = session,
                     documentId = document.id,
                     storedJson = document.json,
+                    onLightSurface = tint != null,
                     modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 4.dp),
                 )
                 NoteResizeHandle(
@@ -155,16 +163,19 @@ private fun CanvasNoteCard(
 
 @Composable
 private fun NoteHandleBar(
+    cardColor: Color,
+    onCard: Color,
     onDragStart: () -> Unit,
     onDrag: (Offset) -> Unit,
     onDragEnd: () -> Unit,
+    onRecolor: (NamedColor) -> Unit,
     onRemove: () -> Unit,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(HANDLE_HEIGHT)
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+            .background(onCard.copy(alpha = 0.08f))
             .pointerInput(Unit) {
                 detectDragGestures(
                     onDragStart = { onDragStart() },
@@ -183,22 +194,30 @@ private fun NoteHandleBar(
             imageVector = Lucide.GripVertical,
             contentDescription = "Move note",
             modifier = Modifier.size(14.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = onCard,
         )
         Spacer(modifier = Modifier.size(6.dp))
         Text(
             text = "Note",
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = onCard,
             modifier = Modifier.weight(1f),
+        )
+        ColorSwatchPicker(
+            current = cardColor,
+            palette = NoteColors,
+            label = "Note color",
+            onPick = { picked -> NoteColors.firstOrNull { it.color == picked }?.let(onRecolor) },
+            swatchSize = 16.dp,
+            modifier = Modifier.size(HANDLE_HEIGHT),
         )
         IconButton(onClick = onRemove, modifier = Modifier.size(HANDLE_HEIGHT)) {
             Icon(
                 imageVector = Lucide.X,
                 contentDescription = "Remove note",
                 modifier = Modifier.size(14.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = onCard,
             )
         }
     }

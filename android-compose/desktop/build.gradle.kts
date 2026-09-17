@@ -1,4 +1,4 @@
-import dev.nucleusframework.desktop.application.dsl.TargetFormat
+﻿import dev.nucleusframework.desktop.application.dsl.TargetFormat
 import dev.nucleusframework.desktop.application.dsl.ReleaseChannel
 import dev.nucleusframework.desktop.application.dsl.ReleaseType
 import dev.nucleusframework.desktop.application.dsl.SigningAlgorithm
@@ -14,19 +14,19 @@ providers.environmentVariable("LETTA_DESKTOP_BUILD_DIR").orNull
     ?.takeIf(String::isNotBlank)
     ?.let { layout.buildDirectory.set(file(it)) }
 
-// WARNING — the Compose versions in libs.versions.toml are FLOORS, not the versions that ship.
+// WARNING â€” the Compose versions in libs.versions.toml are FLOORS, not the versions that ship.
 // The runtime classpath resolves the whole `org.jetbrains.compose` atomic group
 // to 1.11.1 by conflict resolution across eight requested versions (1.11.1,
 // 1.10.3, 1.10.0, 1.9.3, 1.9.1, 1.9.0, 1.7.0, 1.7.0-beta01). The 1.11.1 comes
 // transitively from `dev.nucleusframework:composenativetray-jvm`, so a Nucleus
-// bump silently moves the entire Compose runtime under us — that is exactly how
+// bump silently moves the entire Compose runtime under us â€” that is exactly how
 // Jewel's LocalTextContextMenu ABI broke (see the bridge in DesktopJewelTheme).
 // Verify with:
 //   ./gradlew :desktop:dependencyInsight --configuration runtimeClasspath \
 //     --dependency org.jetbrains.compose.runtime:runtime
 // Pinning the group deliberately is worth doing, but it must be validated
 // against Jewel AND Nucleus together (both are compiled against different
-// Compose baselines) — do it as its own change, not as a drive-by bump.
+// Compose baselines) â€” do it as its own change, not as a drive-by bump.
 val desktopNodeVersion = "24.13.1"
 val desktopLettaCodeVersion = "0.29.12"
 val desktopNodeArchiveName = "node-v$desktopNodeVersion-win-x64.zip"
@@ -34,7 +34,7 @@ val desktopNodeArchiveSha256 = "fba577c4bb87df04d54dd87bbdaa5a2272f1f99a2acbf915
 // Desktop packages bundle JetBrains Runtime 25.0.4 (JBR) rather than Temurin.
 // JBR is the JetBrains-maintained OpenJDK 25 build that ships the
 // AWT/InputMethod bridge Compose Multiplatform uses to surface the OS
-// touch-keyboard on text input — Temurin's InputMethod bridge resolves to a
+// touch-keyboard on text input â€” Temurin's InputMethod bridge resolves to a
 // no-op for non-Swing text components, so the keyboard never pops on touch
 // devices. The bundled JCEF runtime (Mermaid, tool cards) is fetched separately
 // via jcefmaven, so we use the vanilla `jbrsdk` (not `jbrsdk_jcef`).
@@ -47,7 +47,7 @@ val jbrArchiveSha512 = "22e09469aaef1190d4320e0621ea35f7e944a872c38b7c485f817672
 val jbrExtractDirName = "jbrsdk-${jbrVersion}-${jbrPlatformSegment}-${jbrBuild}"
 
 // Used by the JBR download below and by the existing Node runtime download
-// further down — declared here so both task blocks can read it.
+// further down â€” declared here so both task blocks can read it.
 val isWindowsHost = System.getProperty("os.name").startsWith("Windows", ignoreCase = true)
 
 plugins {
@@ -56,12 +56,12 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
     id("org.jetbrains.compose")
     id("dev.nucleusframework")
-    // Kotzilla observability — JVM (Desktop) target. The plugin's
+    // Kotzilla observability â€” JVM (Desktop) target. The plugin's
     // generated `io.kotzilla.generated.initKotzillaConfig()` is called
     // from Desktop's `main()` via the shared `startKotzillaMonitoring()`
     // wrapper in sharedLogic/jvmMain. Per-platform wiring because
     // sharedLogic is a KMP module and the plugin generates code into
-    // commonMain that pulls in JVM/Android-only SDK classes — applying
+    // commonMain that pulls in JVM/Android-only SDK classes â€” applying
     // it there breaks Kotlin/Native test targets.
     id("io.kotzilla.kotzilla-plugin")
 }
@@ -156,7 +156,7 @@ dependencies {
     implementation(project(":sharedUI"))
     // letta-mobile-cq2ju: Iroh QUIC transport for desktop. sharedLogic declares
     // computer.iroh:iroh as `implementation` (not `api`), so it is NOT exposed
-    // transitively for desktop compilation — declare it directly here. The JAR
+    // transitively for desktop compilation â€” declare it directly here. The JAR
     // bundles host-OS native libs (linux/darwin/win, x86-64 + aarch64), so no
     // native packaging is needed.
     implementation(libs.iroh)
@@ -196,7 +196,7 @@ dependencies {
     // Dispatchers.Main is lost forever. paging-compose hardcodes Dispatchers.Main
     // as its presenter dispatcher on desktop, which is why the canonical
     // transcript sat on a spinner with rows already loaded (letta-mobile-x13xi).
-    // We never call Tao — the backend below is AWT + JNI — so keep it off the
+    // We never call Tao â€” the backend below is AWT + JNI â€” so keep it off the
     // classpath entirely rather than leaving a dead Main dispatcher installed.
     implementation(libs.nucleus.composenativetray.jvm) {
         exclude(group = "dev.nucleusframework", module = "nucleus.decorated-window-tao")
@@ -205,18 +205,18 @@ dependencies {
     // use its portable JNI-backed AWT window backend rather than Tao.
     //
     // letta-mobile-scedm: `DecoratedWindow`/`TitleBar` (core+awt, compile-time
-    // API) plus the JNI native backend (runtime-only — installs a real Win32
+    // API) plus the JNI native backend (runtime-only â€” installs a real Win32
     // WndProc subclass on Windows) replace the hand-rolled
     // `undecorated = true` Window + DwmSetWindowAttribute-only chrome. That
     // combination lost Aero Snap, Snap Layouts, DWM min/max/restore
     // animations, and the standard drop shadow because the OS never saw a
     // real WS_CAPTION/WS_THICKFRAME frame. Nucleus's JNI backend keeps a real
-    // native frame under custom-drawn chrome instead — the maintained
+    // native frame under custom-drawn chrome instead â€” the maintained
     // alternative to subclassing GWLP_WNDPROC ourselves via JNA.
     implementation(libs.nucleus.decorated.window.core)
     implementation(libs.nucleus.decorated.window.awt)
     // `DecoratedWindow`/`TitleBar` themselves (the public entry points we call
-    // from DesktopJewelWindow.kt) are published from this module, not -core —
+    // from DesktopJewelWindow.kt) are published from this module, not -core â€”
     // it must be a compile-time dependency, not runtimeOnly.
     implementation(libs.nucleus.decorated.window.jni)
     implementation(libs.jewel.decorated.window)
@@ -240,7 +240,7 @@ dependencies {
     implementation(libs.ktor.client.websockets)
     implementation(libs.ktor.client.content.negotiation)
     implementation(libs.ktor.serialization.kotlinx.json)
-    // Kotzilla SDK — JVM Compose variant for Desktop's instrumentation.
+    // Kotzilla SDK â€” JVM Compose variant for Desktop's instrumentation.
     // The wrapper in sharedLogic/jvmMain calls initKotzillaConfig() from
     // the generated `io.kotzilla.generated` package (reflective lookup so
     // the wrapper still compiles when the plugin isn't applied, e.g.
@@ -251,6 +251,8 @@ dependencies {
     testImplementation(libs.compose.desktop.ui.test)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.ktor.client.mock)
+    // The canvas UI tests drive DrawBox's controller directly; sharedUI keeps it an implementation detail.
+    testImplementation(libs.drawbox)
 }
 
 tasks.withType<Test>().configureEach {
@@ -282,7 +284,7 @@ tasks.register<JavaExec>("runRiveSpike") {
 
 // Realtime lookdev for the ambient agent-status shader: live-editable SkSL,
 // uniform sliders, and production AmbientMotion presets over a fake chat
-// column — same Skia pipeline as the app, so what you tune is what ships.
+// column â€” same Skia pipeline as the app, so what you tune is what ships.
 tasks.register<JavaExec>("runShaderLookdev") {
     group = "application"
     description = "Runs the ambient-shader lookdev window (live SkSL editing + uniform sliders)."
@@ -374,7 +376,7 @@ val extractDesktopJbr = tasks.register<Exec>("extractDesktopJbr") {
  * resolve the path at configuration time. That is safe: `layout.buildDirectory`
  * yields an absolute path even before `extractDesktopJbr` creates the dir.
  * The earlier regression was an *existence* check that returned null and
- * skipped `javaHome=` entirely — never the path computation itself.
+ * skipped `javaHome=` entirely â€” never the path computation itself.
  * Packaging tasks still `dependsOn(extractDesktopJbr)` so the dir exists
  * before jpackage runs.
  */
@@ -383,7 +385,7 @@ val packagingJavaHome: String = desktopJbrHome.get().asFile.absolutePath
 // RUNTIME NOTE: this module compiles to JVM 21 bytecode (required by the
 // transitively-consumed Iroh transport binding, computer.iroh:iroh:1.0.0). The
 // Jewel UI dependency ships class-file version 69 (Java 25), so running the app
-// (`:desktop:run` or a packaged distribution) requires a JDK 25+ at runtime — an
+// (`:desktop:run` or a packaged distribution) requires a JDK 25+ at runtime â€” an
 // older JRE fails at startup with UnsupportedClassVersionError loading
 // org.jetbrains.jewel.*. Compilation and unit tests run on JDK 21+.
 nucleus.application {
@@ -683,7 +685,7 @@ tasks.matching { it.name == "checkRuntime" || it.name == "checkReleaseRuntime" }
  * Verify the JBR we're about to package IS actually a JetBrains Runtime.
  * Runs against the source JBR (extractDesktopJbr's output) before jpackage
  * runs, because jpackage strips IMPLEMENTOR/JAVA_VENDOR from the bundled
- * runtime/release — there is no reliable post-package signal that the
+ * runtime/release â€” there is no reliable post-package signal that the
  * runtime is JBR vs stock OpenJDK. Treating this as a `doLast` rather
  * than a Gradle config-time check means extractDesktopJbr has already
  * populated the directory by the time we read it.
@@ -702,7 +704,7 @@ tasks.matching {
     doLast {
         if (!isWindowsHost) return@doLast
         val release = File(desktopJbrHome.get().asFile, "release")
-        require(release.isFile) { "Missing JBR release file at $release — extractDesktopJbr did not produce one." }
+        require(release.isFile) { "Missing JBR release file at $release â€” extractDesktopJbr did not produce one." }
         val props = release.readLines().associate { line ->
             val key = line.substringBefore('=', missingDelimiterValue = "").trim()
             val value = line.substringAfter('=', missingDelimiterValue = "").trim().trim('"')
@@ -716,7 +718,7 @@ tasks.matching {
             "Source JBR vendor is \"$implementor\" / \"$vendor\" but must be a JetBrains Runtime build. " +
                 "Compose Multiplatform's AWT input bridge requires JBR for touch IME; a " +
                 "non-JBR source will produce a non-functional touch keyboard in the installer. " +
-                "Check the [jbrArchiveName] and [jbrArchiveSha512] constants — they pin to a " +
+                "Check the [jbrArchiveName] and [jbrArchiveSha512] constants â€” they pin to a " +
                 "specific JBR release and rejecting repointing to a different runtime."
         }
         logger.lifecycle("verifyJbrSource: bundled runtime is JBR ($implementor / $vendor).")
@@ -726,12 +728,12 @@ tasks.matching {
 /**
  * Fails the build when a packaged distribution bundles a runtime too old to
  * load the app's own classes. `:desktop:run` overrides its launcher and so
- * never exercised the packaged runtime — the JVM-21 image shipped in
+ * never exercised the packaged runtime â€” the JVM-21 image shipped in
  * v0.17.1 was only discovered by installing it. jpackage writes the
  * image's version metadata into `runtime/release` even though it strips
  * the more identifying fields, so a version check is still reliable.
  *
- * Note: this check intentionally does NOT verify JetBrains vendor — see
+ * Note: this check intentionally does NOT verify JetBrains vendor â€” see
  * the `verifyJbrSource` doLast above. That guard runs against the
  * pre-package JBR source so the vendor can still be confirmed before
  * jpackage strips it.
@@ -739,14 +741,14 @@ tasks.matching {
 fun verifyBundledRuntime(distributableDir: File) {
     val release = distributableDir.walkTopDown()
         .firstOrNull { it.name == "release" && it.parentFile?.name == "runtime" }
-        ?: error("No runtime/release under $distributableDir — cannot verify the bundled JVM.")
+        ?: error("No runtime/release under $distributableDir â€” cannot verify the bundled JVM.")
     val props = release.readLines().associate { line ->
         val key = line.substringBefore('=', missingDelimiterValue = "").trim()
         val value = line.substringAfter('=', missingDelimiterValue = "").trim().trim('"')
         key to value
     }
     val version = props["JAVA_VERSION"].orEmpty()
-    require(version.isNotBlank()) { "No JAVA_VERSION in $release — cannot verify the bundled JVM." }
+    require(version.isNotBlank()) { "No JAVA_VERSION in $release â€” cannot verify the bundled JVM." }
     val feature = version.substringBefore('.').toIntOrNull()
         ?: error("Unparseable JAVA_VERSION \"$version\" in $release.")
     check(feature >= minimumRuntimeJdk) {
@@ -791,7 +793,7 @@ afterEvaluate {
             })
             doFirst {
                 val resolved = jbrJava.get().asFile
-                check(resolved.isFile) { "JBR java missing at $resolved — extractDesktopJbr did not produce it." }
+                check(resolved.isFile) { "JBR java missing at $resolved â€” extractDesktopJbr did not produce it." }
             }
         }
     }
@@ -800,4 +802,4 @@ afterEvaluate {
 // Packaging tasks depend on extractDesktopJbr via the verifyJbrSource
 // configureEach block above (the doLast needs the directory to exist on
 // disk to read its release file). All packaging entry points are covered
-// by that match — no separate dependency wiring here.
+// by that match â€” no separate dependency wiring here.

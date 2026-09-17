@@ -23,6 +23,34 @@ class CanvasWorkspaceUiTest {
     }
 
     @Test
+    fun canvasWorkspace_colorsReachDrawBoxAndTheBoard() = runComposeUiTest {
+        val controller = io.ak1.drawbox.presentation.viewmodel.DrawBoxController(
+            io.ak1.drawbox.presentation.reducer.Reducer(io.ak1.drawbox.domain.usecase.UseCase()),
+        )
+        setContent {
+            CanvasWorkspace(controller = controller)
+        }
+
+        // Stroke colour from the rail.
+        onNodeWithContentDescription("Stroke color").performClick()
+        onNodeWithContentDescription("Color red").performClick()
+        waitUntil(timeoutMillis = 5000) { controller.state.value.strokeColor == androidx.compose.ui.graphics.Color(0xFFE5484D) }
+
+        // A closed-shape tool brings up fill and outline; picking a fill reaches the tool settings.
+        onNodeWithContentDescription("Rectangle").performClick()
+        onNodeWithContentDescription("Fill color").performClick()
+        onNodeWithContentDescription("Color blue").performClick()
+        waitUntil(timeoutMillis = 5000) { controller.state.value.currentItemFillColor == androidx.compose.ui.graphics.Color(0xFF3B82F6) }
+        onNodeWithContentDescription("Outline on").performClick()
+        waitUntil(timeoutMillis = 5000) { !controller.state.value.currentItemStrokeEnabled }
+
+        // Board background from the overflow menu.
+        onNodeWithContentDescription("More").performClick()
+        onNodeWithContentDescription("Background paper").performClick()
+        waitUntil(timeoutMillis = 5000) { controller.state.value.bgColor == androidx.compose.ui.graphics.Color(0xFFF7F3EA) }
+    }
+
+    @Test
     fun canvasWorkspace_addNote_placesABlockDocumentOnTheBoard() = runComposeUiTest {
         val store = com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore()
         val session = kotlinx.coroutines.runBlocking {
@@ -43,10 +71,16 @@ class CanvasWorkspaceUiTest {
         waitUntil(timeoutMillis = 5000) { session.documents().size == 1 }
         val note = session.documents().single()
         kotlin.test.assertNotNull(note.frame, "a placed note carries its board frame")
+        kotlin.test.assertEquals("#fde68a", note.color, "a new note starts yellow")
         waitUntil(timeoutMillis = 5000) {
             onAllNodesWithContentDescription("Note ${note.id}").fetchSemanticsNodes().isNotEmpty()
         }
         onNodeWithContentDescription("Remove note").assertExists()
+
+        // Recolouring from the card's swatch is written to the session.
+        onNodeWithContentDescription("Note color").performClick()
+        onNodeWithContentDescription("Color blue").performClick()
+        waitUntil(timeoutMillis = 5000) { session.documents().single().color == "#bfdbfe" }
     }
 
     @Test

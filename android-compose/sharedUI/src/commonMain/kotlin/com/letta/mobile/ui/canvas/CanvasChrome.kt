@@ -1,6 +1,11 @@
 package com.letta.mobile.ui.canvas
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -96,6 +101,8 @@ internal fun CanvasActionsPill(
     onHistory: (() -> Unit)?,
     onShare: (() -> Unit)?,
     menu: CanvasMenuActions,
+    background: Color,
+    onBackground: (Color) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
@@ -114,6 +121,31 @@ internal fun CanvasActionsPill(
                 MenuEntry(Lucide.FileJson, "Export JSON") { menuOpen = false; menu.onExportJson() }
                 MenuEntry(Lucide.Download, "Export SVG") { menuOpen = false; menu.onExportSvg() }
                 MenuEntry(Lucide.Trash2, "Clear") { menuOpen = false; menu.onClear() }
+                Text(
+                    text = "Background",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 16.dp, top = 10.dp, bottom = 4.dp),
+                )
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    BoardBackgrounds.forEach { entry ->
+                        Box(
+                            modifier = Modifier
+                                .size(26.dp)
+                                .background(entry.color, CircleShape)
+                                .border(
+                                    width = if (entry.color == background) 2.dp else 1.dp,
+                                    color = if (entry.color == background) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                                    shape = CircleShape,
+                                )
+                                .semantics { contentDescription = "Background ${entry.name}" }
+                                .clickable { onBackground(entry.color) },
+                        )
+                    }
+                }
             }
         }
     }
@@ -159,6 +191,16 @@ internal fun CanvasStatusLine(text: String, modifier: Modifier = Modifier) {
         )
     }
 }
+
+/** Board backgrounds: paper whites, warm and cool tints, and the dark boards. */
+internal val BoardBackgrounds: List<NamedColor> = listOf(
+    NamedColor(Color(0xFFFFFFFF), "white"),
+    NamedColor(Color(0xFFF7F3EA), "paper"),
+    NamedColor(Color(0xFFEFF6FF), "sky"),
+    NamedColor(Color(0xFFF0FDF4), "mint"),
+    NamedColor(Color(0xFF1E1E22), "charcoal"),
+    NamedColor(Color(0xFF0B0F17), "midnight"),
+)
 
 @Composable
 private fun ChromePill(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
