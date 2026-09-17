@@ -896,7 +896,6 @@ internal fun LettaDesktopApp(
                                 onNavigateToChannels = { selectedDestination = DesktopDestination.Channels },
                                 onNavigateToAgents = { selectedDestination = DesktopDestination.Agents },
                                 onOpenAgent = ::openAgent,
-                            ),
                                 // The companion mascot is the way into its agent: bring the agent
                                 // pane (the sidebar) back if it was collapsed and leave any editor.
                                 onOpenAgentPane = {
@@ -906,6 +905,7 @@ internal fun LettaDesktopApp(
                                 },
                                 onEditAgent = { editAgentId = selectedAgentId },
                             ),
+                        ),
                             destinationActions = DestinationContentActions(
                                 onRetryConnection = chatController::retryConnection,
                                 home = DesktopHomeActions(
