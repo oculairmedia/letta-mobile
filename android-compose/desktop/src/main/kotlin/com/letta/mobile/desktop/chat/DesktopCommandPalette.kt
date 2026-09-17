@@ -44,6 +44,7 @@ import com.letta.mobile.data.search.PaletteItem
 import com.letta.mobile.data.search.PaletteItemKind
 import com.letta.mobile.data.search.mascotAgentId
 import org.jetbrains.jewel.ui.component.TextField as JewelTextField
+import com.letta.mobile.ui.chat.AgentOrb
 
 /**
  * Cmd/Ctrl-K command palette (Penpot "Search (command palette)"): a centered,

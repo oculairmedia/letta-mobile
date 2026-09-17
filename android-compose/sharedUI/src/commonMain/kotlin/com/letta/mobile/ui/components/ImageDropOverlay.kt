@@ -1,4 +1,4 @@
-package com.letta.mobile.desktop
+package com.letta.mobile.ui.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material3.Icon
@@ -27,7 +26,7 @@ import com.letta.mobile.data.attachment.ImageIngressPolicy
  * tells the user where the files will land and what is accepted.
  */
 @Composable
-internal fun DesktopImageDropOverlay(modifier: Modifier = Modifier) {
+fun ImageDropOverlay(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -35,7 +34,7 @@ internal fun DesktopImageDropOverlay(modifier: Modifier = Modifier) {
         contentAlignment = Alignment.Center,
     ) {
         Surface(
-            shape = RoundedCornerShape(16.dp),
+            shape = MaterialTheme.shapes.extraLarge,
             color = MaterialTheme.colorScheme.surfaceContainer,
             border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary),
             shadowElevation = 10.dp,

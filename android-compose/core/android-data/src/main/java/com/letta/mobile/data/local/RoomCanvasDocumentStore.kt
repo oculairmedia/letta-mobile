@@ -42,4 +42,7 @@ class RoomCanvasDocumentStore(
 
     override suspend fun listForAgent(agentId: String): List<CanvasDocument> =
         dao.listForAgent(agentId).map { it.toCanvasDocument() }
+
+    override suspend fun listAll(): List<CanvasDocument> =
+        dao.listAll().map { it.toCanvasDocument() }
 }

@@ -62,6 +62,10 @@ kotlin {
                 api("org.jetbrains.compose.ui:ui:1.10.0")
                 api("org.jetbrains.compose.animation:animation:1.10.0")
                 api("com.composables:icons-lucide:1.1.0")
+                // Material icon set the lifted desktop composables still use (Lucide is the target; see letta-mobile-nm9te).
+                api(libs.compose.desktop.material.icons)
+                // Week strip in the schedules agenda view.
+                implementation(libs.calendar.compose.multiplatform)
                 // A2UI Image widget — coil3.compose.LocalPlatformContext is
                 // multiplatform (unlike androidx LocalContext).
                 api("io.coil-kt.coil3:coil-compose:3.5.0-beta01")

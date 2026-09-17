@@ -21,6 +21,9 @@ internal data class DesktopAgentSidebarState(
     val archiveFilter: ConversationArchiveFilter,
     val selectedDestination: DesktopDestination,
     val mode: WorkPlayMode,
+    /** Every canvas, newest first; canvases are shared so this is not scoped to the agent. */
+    val canvases: List<com.letta.mobile.data.canvas.CanvasDocument> = emptyList(),
+    val activeCanvasId: com.letta.mobile.data.canvas.CanvasId? = null,
 )
 
 internal data class DesktopAgentSidebarActions(
@@ -32,6 +35,8 @@ internal data class DesktopAgentSidebarActions(
     val onDeleteConversation: (String) -> Unit,
     val onNewChat: () -> Unit,
     val onEditAgent: () -> Unit,
+    val onOpenCanvas: (com.letta.mobile.data.canvas.CanvasId) -> Unit = {},
+    val onNewCanvas: () -> Unit = {},
 )
 
 @Immutable

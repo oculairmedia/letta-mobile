@@ -11,11 +11,9 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.KeyboardArrowUp
@@ -37,12 +35,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.theme.customColors
+import com.letta.mobile.ui.components.LettaSidePane
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentStatus
 import com.letta.mobile.data.model.SubagentTodo
 import com.letta.mobile.data.subagents.projectSubagentTasks
 import java.time.Duration
 import java.time.Instant
+import com.letta.mobile.ui.chat.AgentActivity
+import com.letta.mobile.ui.chat.AgentActivityOrb
 
 /**
  * Right-side "Background tasks" panel (Penpot "App Mockups v2" desktop board):
@@ -53,7 +54,6 @@ import java.time.Instant
 @Composable
 internal fun DesktopBackgroundTasksPanel(
     subagents: List<SubagentEntry>,
-    onClose: () -> Unit,
     modifier: Modifier = Modifier,
     onFetchTodos: (suspend (String) -> List<SubagentTodo>)? = null,
 ) {
@@ -68,30 +68,11 @@ internal fun DesktopBackgroundTasksPanel(
 
     Column(
         modifier = modifier
-            .width(360.dp)
+            .fillMaxWidth()
             .fillMaxHeight()
             .background(MaterialTheme.colorScheme.surfaceContainerLow),
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 18.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = "Background tasks",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.weight(1f),
-            )
-            Icon(
-                imageVector = Icons.Outlined.Close,
-                contentDescription = "Close",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(18.dp).clickable(onClick = onClose),
-            )
-        }
-
+        // No header of its own: the hosting side pane draws the title and close.
         if (running.isEmpty() && finished.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxWidth().weight(1f),
@@ -386,4 +367,19 @@ private fun SubagentEntry.elapsedLabel(): String? {
     val seconds = Duration.between(start, Instant.now()).seconds
     if (seconds < 0) return null
     return if (seconds >= 60) "${seconds / 60}m ${seconds % 60}s" else "${seconds}s"
+}
+
+/** The panel docked in a resizable side pane, which draws the title and close. */
+@Composable
+internal fun DesktopBackgroundTasksSidePane(
+    subagents: List<SubagentEntry>,
+    onFetchTodos: suspend (String) -> List<SubagentTodo>,
+    onClose: () -> Unit,
+) {
+    LettaSidePane(title = "Background tasks", onClose = onClose, initialWidth = 360.dp) {
+        DesktopBackgroundTasksPanel(
+            subagents = subagents,
+            onFetchTodos = onFetchTodos,
+        )
+    }
 }

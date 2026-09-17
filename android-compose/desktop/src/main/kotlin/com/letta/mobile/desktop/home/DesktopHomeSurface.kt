@@ -49,9 +49,9 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.a2ui.toA2uiSurfaceStateOrNull
 import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.model.UiGeneratedComponent
-import com.letta.mobile.desktop.chat.AgentOrb
 import com.letta.mobile.desktop.formatRelativeTimestamp
 import com.letta.mobile.ui.a2ui.A2uiSurfaceRenderer
+import com.letta.mobile.ui.chat.AgentOrb
 
 /** Read-only inputs for [DesktopHomeSurface]. */
 @Immutable

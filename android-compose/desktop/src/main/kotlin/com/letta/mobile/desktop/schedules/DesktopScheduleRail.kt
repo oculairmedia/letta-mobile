@@ -44,6 +44,9 @@ import com.letta.mobile.desktop.DesktopOutlinedButton
 import com.letta.mobile.ui.theme.customColors
 import kotlinx.datetime.TimeZone
 import kotlin.time.Instant
+import com.letta.mobile.ui.schedules.ReliabilityStrip
+import com.letta.mobile.ui.schedules.StatCell
+import com.letta.mobile.ui.schedules.statusColor
 
 // --- Right rail -------------------------------------------------------------
 

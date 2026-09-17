@@ -40,7 +40,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.lens.WorkPlayLens
-import com.letta.mobile.desktop.chat.AgentOrb
 import com.letta.mobile.desktop.chat.ConversationArchiveFilter
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
 import com.letta.mobile.data.chat.runtime.displayTitle
@@ -49,6 +48,15 @@ import com.letta.mobile.ui.mascot.MascotSeat
 import com.letta.mobile.ui.mascot.MascotSeatVacancy
 import com.letta.mobile.ui.mascot.MascotStage
 import org.jetbrains.jewel.ui.component.PopupMenu as JewelPopupMenu
+import com.letta.mobile.ui.components.LettaEmptyHint
+import com.letta.mobile.ui.components.LettaListRow
+import com.letta.mobile.ui.components.LettaListRowSpec
+import com.letta.mobile.ui.components.LettaMenuItem
+import com.letta.mobile.ui.components.LettaPopupMenu
+import com.letta.mobile.ui.components.LettaSectionLabel
+import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Palette
+import com.letta.mobile.ui.chat.AgentOrb
 
 /**
  * Sidebar header: the title slot, then the agent's kebab.
@@ -204,44 +212,16 @@ private fun SidebarAgentOverflowPopup(
     onDismiss: () -> Unit,
     actions: DesktopAgentSidebarActions,
 ) {
-    JewelPopupMenu(
-        onDismissRequest = {
-            onDismiss()
-            true
-        },
-        horizontalAlignment = Alignment.End,
-    ) {
-        selectableItem(
-            selected = false,
-            onClick = { onDismiss(); actions.onNewChat() },
-        ) {
-            DesktopControlText("New chat")
-        }
-        selectableItem(
-            selected = false,
-            onClick = { onDismiss(); actions.onEditAgent() },
-        ) {
-            DesktopControlText("Edit agent")
-        }
-        selectableItem(
-            selected = false,
-            onClick = {
-                onDismiss()
-                actions.onDestinationSelected(DesktopDestination.Memory)
-            },
-        ) {
-            DesktopControlText("Memory")
-        }
-        selectableItem(
-            selected = false,
-            onClick = {
-                onDismiss()
-                actions.onDestinationSelected(DesktopDestination.Settings)
-            },
-        ) {
-            DesktopControlText("Settings")
-        }
-    }
+    LettaPopupMenu(
+        expanded = true,
+        onDismiss = onDismiss,
+        items = listOf(
+            LettaMenuItem(label = "New chat", onClick = actions.onNewChat),
+            LettaMenuItem(label = "Edit agent", onClick = actions.onEditAgent),
+            LettaMenuItem(label = "Memory") { actions.onDestinationSelected(DesktopDestination.Memory) },
+            LettaMenuItem(label = "Settings") { actions.onDestinationSelected(DesktopDestination.Settings) },
+        ),
+    )
 }
 
 @Composable
@@ -296,18 +276,21 @@ internal fun ColumnScope.SidebarConversationList(
                 actions = actions,
             )
         }
-        item {
-            SidebarSection("Documents")
-        }
         if (state.conversations.isEmpty()) {
-            item {
-                Text(
-                    text = "No chats",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 4.dp, top = 2.dp),
-                )
-            }
+            item { SidebarEmptyHint("No chats") }
+        }
+        item {
+            SidebarSection("Canvases")
+        }
+        items(items = state.canvases, key = { "canvas-" + it.id.value }) { canvas ->
+            SidebarCanvasListItem(
+                canvas = canvas,
+                selected = canvas.id == state.activeCanvasId,
+                onClick = { actions.onOpenCanvas(canvas.id) },
+            )
+        }
+        if (state.canvases.isEmpty()) {
+            item { SidebarEmptyHint("No canvases") }
         }
     }
 }
@@ -360,12 +343,25 @@ private fun SidebarConversationListItem(
 }
 
 @Composable
-private fun SidebarSection(label: String) {
-    Text(
-        text = label.uppercase(),
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
-        fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.padding(top = 10.dp, start = 4.dp, bottom = 2.dp),
+private fun SidebarEmptyHint(text: String) = LettaEmptyHint(text)
+
+/** One shared canvas in the sidebar library: icon, title, last-edit time. */
+@Composable
+private fun SidebarCanvasListItem(
+    canvas: com.letta.mobile.data.canvas.CanvasDocument,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    LettaListRow(
+        spec = LettaListRowSpec(
+            title = canvas.title,
+            icon = Lucide.Palette,
+            trailing = formatRelativeTimestamp(java.time.Instant.ofEpochMilli(canvas.updatedAtEpochMs).toString()),
+            selected = selected,
+        ),
+        onClick = onClick,
     )
 }
+
+@Composable
+private fun SidebarSection(label: String) = LettaSectionLabel(label)

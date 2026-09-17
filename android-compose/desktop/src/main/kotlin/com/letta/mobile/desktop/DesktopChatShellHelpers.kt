@@ -91,6 +91,78 @@ internal fun buildRailAgents(
     )
 }
 
+/** Agents used inside this window stay on the rail; older ones live only in the picker. */
+internal val RAIL_RECENCY_WINDOW: java.time.Duration = java.time.Duration.ofDays(RAIL_RECENCY_DAYS_DEFAULT.toLong())
+internal const val RAIL_MAX_AGENTS = 8
+
+/**
+ * The rail is a recents strip, not the whole roster (Grok Bot's layout): agents with a
+ * conversation updated inside [RailRecencyPolicy.window], newest first, capped at
+ * [RailRecencyPolicy.maxAgents]. The selected agent is always kept so a pick from the
+ * directory shows up. With nothing recent (a fresh install), the head of [directory] fills
+ * the rail so it is never empty.
+ */
+internal fun recentRailAgents(
+    conversations: List<DesktopConversationSummary>,
+    directory: List<Pair<String, String>>,
+    policy: RailRecencyPolicy = RailRecencyPolicy(),
+    selectedAgentId: String? = null,
+): List<Pair<String, String>> {
+    val nameById = directory.toMap()
+    val cutoff = policy.now.minus(policy.window)
+    val recentIds = conversations
+        .filter { !it.agentId.isNullOrBlank() && it.agentId in nameById }
+        .sortedByDescending { conversationRecency(it.updatedAtLabel) }
+        .filter { conversationRecency(it.updatedAtLabel) >= cutoff }
+        .map { it.agentId!! }
+        .distinct()
+    val ids = if (recentIds.isEmpty()) directory.map { it.first } else recentIds
+    val kept = ids.take(policy.maxAgents).toMutableList()
+    if (shouldPinSelectedAgent(selectedAgentId, nameById, kept)) {
+        kept += selectedAgentId!!
+    }
+    return kept.map { it to nameById.getValue(it) }
+}
+
+/** The rail's recents cut, recomputed only when its inputs change. */
+@Composable
+internal fun rememberRecentRailAgents(
+    conversations: List<DesktopConversationSummary>,
+    directory: List<Pair<String, String>>,
+    prefs: DesktopRailPrefs,
+    selectedAgentId: String?,
+): List<Pair<String, String>> = remember(conversations, directory, selectedAgentId, prefs.recencyDays) {
+    recentRailAgents(conversations, directory, RailRecencyPolicy(window = prefs.recencyWindow), selectedAgentId)
+}
+
+/** Each agent's newest conversation, for the rail's hover card. */
+@Composable
+internal fun rememberRailActivityByAgentId(
+    conversations: List<DesktopConversationSummary>,
+): Map<String, RailAgentActivity> = remember(conversations) {
+    conversations
+        .filter { !it.agentId.isNullOrBlank() }
+        .groupBy { it.agentId!! }
+        .mapValues { (_, convs) ->
+            val latest = convs.maxBy { conversationRecency(it.updatedAtLabel) }
+            RailAgentActivity(updatedAtLabel = latest.updatedAtLabel, preview = latest.lastMessagePreview)
+        }
+}
+
+/** How far back, and how many agents, the recents rail reaches. */
+internal data class RailRecencyPolicy(
+    val now: java.time.Instant = java.time.Instant.now(),
+    val window: java.time.Duration = RAIL_RECENCY_WINDOW,
+    val maxAgents: Int = RAIL_MAX_AGENTS,
+)
+
+/** A selected agent that exists but fell off the recents cut is appended so the pick shows. */
+private fun shouldPinSelectedAgent(
+    selectedAgentId: String?,
+    nameById: Map<String, String>,
+    kept: List<String>,
+): Boolean = selectedAgentId != null && selectedAgentId in nameById && selectedAgentId !in kept
+
 /**
  * The selected stack's conversations under the archive filter, newest first.
  *
@@ -398,6 +470,7 @@ internal data class CreateDesktopChatDetailPaneActionsParams(
     val canSubmitApprovals: Boolean,
     val onA2uiAction: (com.letta.mobile.data.a2ui.A2uiAction) -> Unit,
     val onAttachImage: () -> Unit,
+    val onOpenCanvas: (() -> Unit)? = null,
     val onOpenModelPicker: () -> Unit,
     val onSetPersona: () -> Unit,
     val onNavigateToChannels: () -> Unit,
@@ -418,6 +491,7 @@ internal fun createDesktopChatDetailPaneActions(
         onSubmitApproval = chatController::submitApproval.takeIf { params.canSubmitApprovals },
         onA2uiAction = params.onA2uiAction,
         onAttachImage = params.onAttachImage,
+        onOpenCanvas = params.onOpenCanvas,
         onRemoveImageAttachment = chatController::removeImageAttachment,
         onRetryConnection = chatController::retryConnection,
         onModelSelected = chatController::setConversationModel,
@@ -462,6 +536,7 @@ internal data class CreateDesktopOverlayActionsParams(
     val agentRepository: IAgentRepository,
     val selectedAgentId: String?,
     val onIrohIdentityReset: () -> Unit,
+    val onNewCanvas: () -> Unit = {},
 )
 
 internal fun createDesktopOverlayActions(
@@ -474,6 +549,7 @@ internal fun createDesktopOverlayActions(
     },
     onOpenAgent = params.onOpenAgent,
     onNavigate = params.onSelectDestination,
+    onNewCanvas = params.onNewCanvas,
     onCreateAgent = { name, modelValue ->
         val (model, embedding) = resolveNewAgentDefaults(
             agentRepository = params.agentRepository,

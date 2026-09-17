@@ -53,6 +53,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import java.time.LocalDate
+import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 
 internal data class MessageListParams(
     val conversationId: String?,

@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -23,6 +25,7 @@ import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.desktop.memory.DesktopBlockApi
 import com.letta.mobile.ui.canvas.CanvasWorkspace
 import kotlinx.coroutines.CoroutineScope
+import com.letta.mobile.ui.components.LettaSidePane
 
 internal data class DesktopMainContentInputs(
     val editingAgentId: String?,
@@ -85,11 +88,7 @@ internal fun DesktopMainContentPane(
         }
     }
     if (editing != null) {
-        androidx.compose.material3.Surface(
-            modifier = Modifier.width(460.dp).fillMaxHeight(),
-            color = androidx.compose.material3.MaterialTheme.colorScheme.surface,
-            border = androidx.compose.foundation.BorderStroke(1.dp, androidx.compose.material3.MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
-        ) {
+        LettaSidePane(title = "Edit agent", onClose = actions.onEditAgentClose, initialWidth = 460.dp) {
             DesktopEditAgentSurface(
                 agentId = editing,
                 modelOptions = inputs.modelOptions,
@@ -97,16 +96,16 @@ internal fun DesktopMainContentPane(
                 blockApi = inputs.blockApi,
                 settings = inputs.secureSettingsStore,
                 scope = inputs.chatScope,
-                onClose = actions.onEditAgentClose,
                 onSaved = actions.onEditAgentSaved,
                 modifier = Modifier.fillMaxSize(),
             )
         }
     } else if (inputs.activeCanvasSession != null) {
-        androidx.compose.material3.Surface(
-            modifier = Modifier.width(540.dp).fillMaxHeight(),
-            color = androidx.compose.material3.MaterialTheme.colorScheme.surface,
-            border = androidx.compose.foundation.BorderStroke(1.dp, androidx.compose.material3.MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+        val canvasDocument by inputs.activeCanvasSession.document.collectAsState()
+        LettaSidePane(
+            title = canvasDocument?.title ?: "Canvas",
+            onClose = actions.onCloseCanvas,
+            initialWidth = 540.dp,
         ) {
             CanvasWorkspace(
                 session = inputs.activeCanvasSession,
