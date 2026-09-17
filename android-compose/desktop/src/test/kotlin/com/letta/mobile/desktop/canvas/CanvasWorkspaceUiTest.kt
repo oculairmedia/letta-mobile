@@ -119,7 +119,9 @@ class CanvasWorkspaceUiTest {
 
         // A text element has no note chrome, and its bar sets size, family, alignment and colour,
         // all of which persist with the document.
-        onAllNodesWithContentDescription("Move note").assertCountEquals(0)
+        // The one "Move note" grip on the board belongs to the sticky note placed above.
+        onAllNodesWithContentDescription("Move note").assertCountEquals(1)
+        onNodeWithContentDescription("Move text").assertExists()
         onNodeWithContentDescription("Size L").performClick()
         waitUntil(timeoutMillis = 5000) { session.documents().first { it.id == text.id }.style?.fontScale == 1.4f }
         onNodeWithContentDescription("Size Serif").performClick()

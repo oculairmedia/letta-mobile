@@ -111,6 +111,8 @@ fun CanvasOp.withActor(actorId: String): CanvasOp = when (this) {
     is CanvasOp.UpdateElementOp -> copy(actorId = actorId)
     is CanvasOp.RemoveElementOp -> copy(actorId = actorId)
     is CanvasOp.SetBackgroundOp -> copy(actorId = actorId)
+    is CanvasOp.SetDocumentOp -> copy(actorId = actorId)
+    is CanvasOp.RemoveDocumentOp -> copy(actorId = actorId)
     is CanvasOp.BatchOp -> copy(actorId = actorId, ops = ops.map { it.withActor(actorId) })
 }
 
