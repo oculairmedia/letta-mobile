@@ -38,4 +38,63 @@ class CanvasWorkspaceUiTest {
         onNodeWithText("Import Daily Loop").performClick()
         onNodeWithText("Imported Daily Loop sample", substring = true).assertExists()
     }
+
+    @Test
+    fun canvasWorkspace_withSession_loadsInitialSceneAndSavesExport() = runComposeUiTest {
+        val store = com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore()
+        val session = kotlinx.coroutines.runBlocking {
+            com.letta.mobile.data.canvas.CanvasSession.create(
+                store = store,
+                title = "Session Diagram",
+                initialSceneJson = CanvasSamples.buildCycleJson,
+            )
+        }
+
+        setContent {
+            CanvasWorkspace(
+                session = session,
+            )
+        }
+
+        // Verify session diagram loaded
+        onNodeWithText("Session Diagram", substring = true).assertExists()
+        onNodeWithText("Elements: 15", substring = true).assertExists()
+
+        // Click Export JSON
+        onNodeWithText("Export JSON").performClick()
+        onNodeWithText("Exported JSON", substring = true).assertExists()
+    }
+
+    @Test
+    fun canvasWorkspace_withSession_autosavesDebouncedEdits() = runComposeUiTest {
+        val store = com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore()
+        val session = kotlinx.coroutines.runBlocking {
+            com.letta.mobile.data.canvas.CanvasSession.create(
+                store = store,
+                title = "Autosave Diagram",
+                initialSceneJson = "",
+            )
+        }
+
+        setContent {
+            CanvasWorkspace(
+                session = session,
+            )
+        }
+
+        // Initially revision is 1 and sceneJson is empty
+        kotlin.test.assertEquals(1L, session.document.value?.revision)
+
+        // Click Import Build Cycle button to mutate canvas elements
+        onNodeWithText("Import Build Cycle").performClick()
+        onNodeWithText("Elements: 15", substring = true).assertExists()
+
+        // Wait for 500ms debounce to fire and saveScene to complete
+        waitUntil(timeoutMillis = 5000) {
+            session.document.value?.revision == 2L
+        }
+
+        kotlin.test.assertEquals(2L, session.document.value?.revision)
+        kotlin.test.assertTrue(session.sceneJsonOrEmpty().contains("\"elements\""))
+    }
 }

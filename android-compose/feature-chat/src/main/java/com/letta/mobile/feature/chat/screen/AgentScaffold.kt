@@ -50,6 +50,7 @@ fun AgentScaffold(
     onNavigateToConversationList: (() -> Unit)? = null,
     onNavigateToSchedules: ((String) -> Unit)? = null,
     onNavigateToProjects: (() -> Unit)? = null,
+    onNavigateToCanvas: ((String?) -> Unit)? = null,
     viewModelKey: String? = null,
 ) {
     AgentScaffoldContent(
@@ -66,6 +67,7 @@ fun AgentScaffold(
             onNavigateToConversationList = onNavigateToConversationList,
             onNavigateToSchedules = onNavigateToSchedules,
             onNavigateToProjects = onNavigateToProjects,
+            onNavigateToCanvas = onNavigateToCanvas,
         ),
         conversationRepository = null,
         viewModel = hiltViewModel(key = viewModelKey),

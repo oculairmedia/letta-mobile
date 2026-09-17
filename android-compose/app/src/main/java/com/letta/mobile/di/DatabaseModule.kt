@@ -13,6 +13,9 @@ import com.letta.mobile.data.local.RoomPendingLocalStore
 import com.letta.mobile.data.local.RuntimeEventDao
 import com.letta.mobile.data.local.ConfirmedTimelineSnapshotDao
 import com.letta.mobile.data.local.RoomConfirmedTimelineStore
+import com.letta.mobile.data.canvas.CanvasDocumentStore
+import com.letta.mobile.data.local.CanvasDocumentDao
+import com.letta.mobile.data.local.RoomCanvasDocumentStore
 import com.letta.mobile.data.timeline.ConversationCursorStore
 import com.letta.mobile.data.timeline.PendingLocalStore
 import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore
@@ -143,5 +146,15 @@ object DatabaseModule {
     @Provides
     fun provideConfirmedTimelineSnapshotDao(database: LettaDatabase): ConfirmedTimelineSnapshotDao {
         return database.confirmedTimelineSnapshotDao()
+    }
+
+    @Provides
+    fun provideCanvasDocumentDao(database: LettaDatabase): CanvasDocumentDao {
+        return database.canvasDocumentDao()
+    }
+
+    @Provides
+    fun provideCanvasDocumentStore(dao: CanvasDocumentDao): CanvasDocumentStore {
+        return RoomCanvasDocumentStore(dao)
     }
 }
