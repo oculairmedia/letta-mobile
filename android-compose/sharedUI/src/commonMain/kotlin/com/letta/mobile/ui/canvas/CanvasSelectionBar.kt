@@ -22,6 +22,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.BringToFront
+import com.composables.icons.lucide.Copy
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Maximize2
 import com.composables.icons.lucide.SendToBack
@@ -52,6 +53,7 @@ fun CanvasSelectionBar(
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
     note: NoteBarActions? = null,
+    onDuplicate: (() -> Unit)? = null,
 ) {
     Surface(
         modifier = modifier,
@@ -76,12 +78,14 @@ fun CanvasSelectionBar(
             if (note != null) {
                 Divider()
                 BarButton(Lucide.Maximize2, "Open note large", onClick = note.onOpen)
+                onDuplicate?.let { BarButton(Lucide.Copy, "Duplicate note", onClick = it) }
                 BarButton(Lucide.Trash2, "Delete note", onClick = note.onDelete)
             } else if (hasSelection) {
                 Divider()
                 BarButton(Lucide.BringToFront, "Bring to front", onClick = onBringToFront)
                 BarButton(Lucide.SendToBack, "Send to back", onClick = onSendToBack)
                 Divider()
+                onDuplicate?.let { BarButton(Lucide.Copy, "Duplicate selection", onClick = it) }
                 BarButton(Lucide.Trash2, "Delete selection", onClick = onDelete)
             }
         }

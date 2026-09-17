@@ -32,7 +32,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.focusable
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -57,6 +61,8 @@ import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.CanvasSessionRegistry
 import io.ak1.drawbox.DrawBox
 import io.ak1.drawbox.domain.model.Event
+import io.ak1.drawbox.domain.model.bounds
+import io.ak1.drawbox.domain.model.translate
 import io.ak1.drawbox.domain.usecase.UseCase
 import io.ak1.drawbox.presentation.reducer.Reducer
 import io.ak1.drawbox.presentation.viewmodel.DrawBoxController
@@ -278,6 +284,47 @@ fun CanvasWorkspace(
     // One recent-colours list for this board, shared by every picker on it.
     val recentColors = remember { RecentColors() }
     CompositionLocalProvider(LocalRecentColors provides recentColors) {
+    // Keys on the board: Delete/Backspace removes the drawn selection or the active note, Esc
+    // lets both go, Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z (or +Y) undo and redo the drawing, Ctrl/Cmd+D
+    // duplicates. Handled where they bubble to, so a note editor keeps every key it consumes.
+    val boardFocus = remember { FocusRequester() }
+    fun deleteFocused(): Boolean {
+        if (hasSelection) { controller.deleteSelected(); return true }
+        val id = activeNoteId ?: return false
+        if (session == null || expandedNoteId != null) return false
+        activeNoteId = null
+        coroutineScope.launch { runCatching { session.removeDocument(id) } }
+        return true
+    }
+    // Duplicate: the drawn selection as offset copies with fresh ids (selected afterwards), or
+    // the active note as a new document with the same text, colour and style, 20 units away.
+    fun duplicateFocused(): Boolean {
+        if (hasSelection) {
+            val copies = state.elements.filter { it.id in state.selectedIds }.map { duplicateElement(it) }
+            copies.forEach { controller.onIntent(io.ak1.drawbox.domain.model.Intent.AddElement(it)) }
+            controller.clearSelection()
+            copies.forEach { copy -> controller.onIntent(io.ak1.drawbox.domain.model.Intent.SelectAt(selectionPointOf(copy), 4f)) }
+            statusMessage = "Duplicated ${copies.size} element(s)"
+            return true
+        }
+        val note = activeNoteId?.let { id -> documents.firstOrNull { it.id == id } } ?: return false
+        if (session == null) return false
+        val frame = (note.frame ?: defaultNoteFrame(0)).let { it.copy(x = it.x + DUPLICATE_OFFSET, y = it.y + DUPLICATE_OFFSET) }
+        val id = "${note.id.substringBefore('-')}-${Clock.System.now().toEpochMilliseconds()}"
+        coroutineScope.launch {
+            runCatching { session.setDocument(id, note.json, frame = frame, color = note.color, style = note.style) }
+                .onSuccess { activeNoteId = id; statusMessage = "Duplicated note" }
+        }
+        return true
+    }
+    fun onBoardKey(event: androidx.compose.ui.input.key.KeyEvent): Boolean = when (canvasKeyAction(event)) {
+        CanvasKeyAction.DELETE -> deleteFocused()
+        CanvasKeyAction.ESCAPE -> { controller.clearSelection(); activeNoteId = null; expandedNoteId = null; true }
+        CanvasKeyAction.UNDO -> { if (canUndo) controller.undo(); true }
+        CanvasKeyAction.REDO -> { if (canRedo) controller.redo(); true }
+        CanvasKeyAction.DUPLICATE -> duplicateFocused()
+        null -> false
+    }
     Surface(
         modifier = modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background,
@@ -285,6 +332,10 @@ fun CanvasWorkspace(
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .focusRequester(boardFocus)
+                .focusable()
+                .onKeyEvent(::onBoardKey)
+                .semantics { contentDescription = "Canvas workspace" }
                 .onSizeChanged { boardSize = it }
                 .onGloballyPositioned { boardBounds = it.boundsInRoot() }
                 .pointerInput(controller) {
@@ -317,6 +368,7 @@ fun CanvasWorkspace(
                             while (true) {
                                 val event = awaitPointerEvent(PointerEventPass.Initial)
                                 if (event.type == PointerEventType.Press && expandedNoteId == null) activeNoteId = null
+                                if (event.type == PointerEventType.Press) runCatching { boardFocus.requestFocus() }
                             }
                         }
                     }
@@ -562,6 +614,7 @@ fun CanvasWorkspace(
                     onBringToFront = { controller.bringSelectionToFront() },
                     onSendToBack = { controller.sendSelectionToBack() },
                     onDelete = { controller.deleteSelected() },
+                    onDuplicate = { duplicateFocused() },
                     note = if (activeNote != null && session != null && !hasSelection) {
                         val tint = parseHexColor(activeNote.color)
                         val plain = tint != null && tint.alpha == 0f
@@ -686,6 +739,33 @@ private fun snapLatestConnector(
     }
 }
 
+/** [element] moved by [DUPLICATE_OFFSET] with a fresh id, the way whiteboards duplicate in place. */
+private fun duplicateElement(element: io.ak1.drawbox.domain.model.Element): io.ak1.drawbox.domain.model.Element {
+    val moved = element.translate(Offset(DUPLICATE_OFFSET, DUPLICATE_OFFSET))
+    val id = "${element.id}-copy-${Clock.System.now().toEpochMilliseconds()}"
+    return when (moved) {
+        is io.ak1.drawbox.domain.model.Element.Shape -> moved.copy(id = id, startBinding = null, endBinding = null)
+        is io.ak1.drawbox.domain.model.Element.Path -> moved.copy(id = id)
+        is io.ak1.drawbox.domain.model.Element.Text -> moved.copy(id = id)
+        else -> moved
+    }
+}
+
+/**
+ * A point DrawBox's hit test finds [element] at: on the outline for closed shapes (an unfilled
+ * rectangle is only hit on its stroke), the first point of a line, arrow or stroke, the centre
+ * for text (hit by its box).
+ */
+private fun selectionPointOf(element: io.ak1.drawbox.domain.model.Element): Offset = when (element) {
+    is io.ak1.drawbox.domain.model.Element.Shape -> when (element.shapeType) {
+        io.ak1.drawbox.domain.model.ShapeType.LINE, io.ak1.drawbox.domain.model.ShapeType.ARROW -> element.points.first()
+        else -> element.bounds().let { Offset(it.center.x, it.top) }
+    }
+    is io.ak1.drawbox.domain.model.Element.Path -> element.bounds().let { Offset(it.center.x, it.top) }
+    else -> element.bounds().center
+}
+
+private const val DUPLICATE_OFFSET = 20f
 private val CHROME_INSET = 12.dp
 private const val ZOOM_STEP = 1.25f
 private const val WHEEL_ZOOM_STEP = 1.1f

@@ -8,6 +8,9 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.pressKey
+import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextReplacement
@@ -262,6 +265,66 @@ class CanvasWorkspaceUiTest {
             val arrow = controller.state.value.elements.filterIsInstance<io.ak1.drawbox.domain.model.Element.Shape>().single()
             arrow.points.last() == androidx.compose.ui.geometry.Offset(500f, 360f)
         }
+    }
+
+    @Test
+    fun canvasWorkspace_keysAndDuplicate_actOnTheSelectionOrTheActiveNote() = runComposeUiTest {
+        val store = com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore()
+        val session = kotlinx.coroutines.runBlocking {
+            com.letta.mobile.data.canvas.CanvasSession.create(
+                store = store,
+                options = com.letta.mobile.data.canvas.CanvasCreateOptions(title = "Keys Board", initialSceneJson = ""),
+            )
+        }
+        val controller = io.ak1.drawbox.presentation.viewmodel.DrawBoxController(
+            io.ak1.drawbox.presentation.reducer.Reducer(io.ak1.drawbox.domain.usecase.UseCase()),
+        )
+        setContent { CanvasWorkspace(controller = controller, session = session) }
+
+        // A note: Duplicate from its bar makes a second document with the same colour, offset.
+        onNodeWithContentDescription("Add note").performClick()
+        waitUntil(timeoutMillis = 5000) { session.documents().size == 1 }
+        val first = session.documents().single()
+        onNodeWithContentDescription("Duplicate note").performClick()
+        waitUntil(timeoutMillis = 5000) { session.documents().size == 2 }
+        val copy = session.documents().first { it.id != first.id }
+        kotlin.test.assertEquals(first.color, copy.color)
+        kotlin.test.assertEquals(first.frame!!.x + 20f, copy.frame!!.x)
+        // The copy is the active note; Delete on the board removes it (its editor is not focused).
+        onNodeWithContentDescription("Canvas workspace").requestFocus()
+        onNodeWithContentDescription("Canvas workspace").performKeyInput { pressKey(androidx.compose.ui.input.key.Key.Delete) }
+        waitUntil(timeoutMillis = 5000) { session.documents().size == 1 }
+        kotlin.test.assertEquals(first.id, session.documents().single().id)
+
+        // A drawn rectangle: select it, Ctrl+D duplicates it, Delete removes the (new) selection,
+        // Ctrl+Z brings it back, Esc clears the selection.
+        controller.importPath(
+            """{"bgColor":"#ffffffff","elements":[{"id":"rect-1","type":"Shape","zIndex":1,
+            "points":["10.0,10.0","120.0,90.0"],"strokeColor":"#000000ff","strokeWidth":4.0,
+            "shapeType":"RECTANGLE","modifiedAt":1}]}""",
+        )
+        waitUntil(timeoutMillis = 5000) { controller.state.value.elements.size == 1 }
+        onNodeWithContentDescription("Select").performClick()
+        controller.onIntent(io.ak1.drawbox.domain.model.Intent.SelectAt(androidx.compose.ui.geometry.Offset(60f, 10f), 12f))
+        waitUntil(timeoutMillis = 5000) { controller.state.value.selectedIds == setOf("rect-1") }
+        onNodeWithContentDescription("Canvas workspace").requestFocus()
+        onNodeWithContentDescription("Canvas workspace").performKeyInput {
+            keyDown(androidx.compose.ui.input.key.Key.CtrlLeft); pressKey(androidx.compose.ui.input.key.Key.D); keyUp(androidx.compose.ui.input.key.Key.CtrlLeft)
+        }
+        waitUntil(timeoutMillis = 5000) { controller.state.value.elements.size == 2 }
+        val copyShape = controller.state.value.elements.filterIsInstance<io.ak1.drawbox.domain.model.Element.Shape>().first { it.id != "rect-1" }
+        kotlin.test.assertEquals(androidx.compose.ui.geometry.Offset(30f, 30f), copyShape.points.first())
+        waitUntil(timeoutMillis = 5000) { controller.state.value.selectedIds == setOf(copyShape.id) }
+        onNodeWithContentDescription("Canvas workspace").performKeyInput { pressKey(androidx.compose.ui.input.key.Key.Delete) }
+        waitUntil(timeoutMillis = 5000) { controller.state.value.elements.size == 1 }
+        onNodeWithContentDescription("Canvas workspace").performKeyInput {
+            keyDown(androidx.compose.ui.input.key.Key.CtrlLeft); pressKey(androidx.compose.ui.input.key.Key.Z); keyUp(androidx.compose.ui.input.key.Key.CtrlLeft)
+        }
+        waitUntil(timeoutMillis = 5000) { controller.state.value.elements.size == 2 }
+        controller.onIntent(io.ak1.drawbox.domain.model.Intent.SelectAt(androidx.compose.ui.geometry.Offset(60f, 10f), 12f))
+        waitUntil(timeoutMillis = 5000) { controller.state.value.selectedIds.isNotEmpty() }
+        onNodeWithContentDescription("Canvas workspace").performKeyInput { pressKey(androidx.compose.ui.input.key.Key.Escape) }
+        waitUntil(timeoutMillis = 5000) { controller.state.value.selectedIds.isEmpty() }
     }
 
     @Test
