@@ -94,9 +94,18 @@ internal data class CanvasMenuActions(
     val onClear: () -> Unit,
 )
 
-/** Top-right: history and share as icons, everything else behind the overflow. */
+/** How far in or out the board is and the ways to change it. */
+internal data class CanvasZoom(
+    val scalePercent: Int,
+    val onZoomOut: () -> Unit,
+    val onZoomIn: () -> Unit,
+    val onReset: () -> Unit,
+)
+
+/** Top-right: zoom, then history and share as icons, everything else behind the overflow. */
 @Composable
 internal fun CanvasActionsPill(
+    zoom: CanvasZoom,
     checkpointCount: Int?,
     onHistory: (() -> Unit)?,
     onShare: (() -> Unit)?,
@@ -107,6 +116,16 @@ internal fun CanvasActionsPill(
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     ChromePill(modifier = modifier) {
+        PillIconButton(Lucide.ZoomOut, "Zoom out", onClick = zoom.onZoomOut)
+        Text(
+            text = "${zoom.scalePercent}%",
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.widthIn(min = 36.dp).semantics { contentDescription = "Zoom level" },
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
+        PillIconButton(Lucide.ZoomIn, "Zoom in", onClick = zoom.onZoomIn)
+        PillIconButton(Lucide.Maximize, "Reset view", onClick = zoom.onReset)
+        PillDivider()
         if (onHistory != null) {
             PillIconButton(Lucide.History, "History (${checkpointCount ?: 0})", onClick = onHistory)
         }
@@ -151,26 +170,14 @@ internal fun CanvasActionsPill(
     }
 }
 
-/** Bottom-right: zoom out, the current scale, zoom in, and fit. */
 @Composable
-internal fun CanvasZoomPill(
-    scalePercent: Int,
-    onZoomOut: () -> Unit,
-    onZoomIn: () -> Unit,
-    onReset: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    ChromePill(modifier = modifier) {
-        PillIconButton(Lucide.ZoomOut, "Zoom out", onClick = onZoomOut)
-        Text(
-            text = "$scalePercent%",
-            style = MaterialTheme.typography.labelMedium,
-            modifier = Modifier.widthIn(min = 40.dp).semantics { contentDescription = "Zoom level" },
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-        )
-        PillIconButton(Lucide.ZoomIn, "Zoom in", onClick = onZoomIn)
-        PillIconButton(Lucide.Maximize, "Reset view", onClick = onReset)
-    }
+private fun PillDivider() {
+    Box(
+        modifier = Modifier
+            .padding(horizontal = 3.dp)
+            .size(width = 1.dp, height = 20.dp)
+            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.8f)),
+    )
 }
 
 /** Bottom-left: element count and the last thing that happened, small and out of the way. */

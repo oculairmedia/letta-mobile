@@ -21,6 +21,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -32,6 +33,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isCtrlPressed
+import androidx.compose.ui.input.pointer.isMetaPressed
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -95,6 +104,12 @@ fun CanvasWorkspace(
     var statusMessage by remember { mutableStateOf("Ready") }
     var initialLoadDone by remember { mutableStateOf(false) }
     var lastExportedJson by remember { mutableStateOf<String?>(null) }
+    // The drawing (scene minus our metadata and documents) DrawBox last agreed with the session
+    // on. Only a change to *this* re-imports, so a moved note or a saved stroke never reloads
+    // the board and throws the camera back.
+    var lastDrawing by remember { mutableStateOf<String?>(null) }
+    // The active note's formatting controls, drawn at the foot of the board.
+    var noteToolbar by remember { mutableStateOf<NoteToolbar?>(null) }
     var isSharingToChat by remember { mutableStateOf(false) }
     var showHistoryDialog by remember { mutableStateOf(false) }
     var boardSize by remember { mutableStateOf(IntSize.Zero) }
@@ -111,9 +126,11 @@ fun CanvasWorkspace(
                 session.load()
                 val sessionJson = session.sceneJsonOrEmpty()
                 var lastImportedRev = session.document.value?.revision ?: 0L
+                // Known even for an empty canvas, or the first note placed on it would read as
+                // an external change to the drawing and reload the board.
+                lastDrawing = CanvasOpProjector.stripMetadataForDrawBox(sessionJson)
                 if (sessionJson.isNotBlank()) {
-                    val cleanJson = CanvasOpProjector.stripMetadataForDrawBox(sessionJson)
-                    controller.importPath(cleanJson)
+                    controller.importPath(lastDrawing!!)
                     lastExportedJson = sessionJson
                     statusMessage = "Loaded from session (rev ${session.document.value?.revision ?: 1})"
                 }
@@ -127,8 +144,11 @@ fun CanvasWorkspace(
                         lastImportedRev = doc.revision
                         if (doc.sceneJson.isNotBlank() && doc.sceneJson != lastExportedJson) {
                             val cleanJson = CanvasOpProjector.stripMetadataForDrawBox(doc.sceneJson)
-                            controller.importPath(cleanJson)
-                            statusMessage = "Agent updated canvas (rev ${doc.revision})"
+                            if (!CanvasOpProjector.drawingsEqual(cleanJson, lastDrawing)) {
+                                controller.importPath(cleanJson)
+                                lastDrawing = cleanJson
+                                statusMessage = "Agent updated canvas (rev ${doc.revision})"
+                            }
                         }
                     }
                 }
@@ -174,9 +194,13 @@ fun CanvasWorkspace(
                         }
                     }
                     if (session != null && session.sceneJsonOrEmpty() != event.json) {
+                        // Recorded before the write so the session collector, which may run first,
+                        // already knows this drawing is DrawBox's own and not an external change.
+                        lastDrawing = CanvasOpProjector.stripMetadataForDrawBox(event.json)
                         withContext(Dispatchers.Default) {
                             session.applyLocalScene(event.json)
                         }
+                        lastDrawing = CanvasOpProjector.stripMetadataForDrawBox(session.sceneJsonOrEmpty())
                     }
                     onExportJson?.invoke(event.json)
                 }
@@ -216,11 +240,40 @@ fun CanvasWorkspace(
     )
     val boardCenter = Offset(boardSize.width / 2f, boardSize.height / 2f)
 
+    // Ctrl/Cmd + wheel over the board zooms the board, not the window: the host that owns that
+    // gesture for UI zoom is told where the board is so it leaves those events alone.
+    val wheelZoomRegions = LocalWheelZoomRegions.current
+    var boardBounds by remember { mutableStateOf<Rect?>(null) }
+    DisposableEffect(wheelZoomRegions) {
+        val unregister = wheelZoomRegions?.register { boardBounds }
+        onDispose { unregister?.invoke() }
+    }
+
     Surface(
         modifier = modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background,
     ) {
-        Box(modifier = Modifier.fillMaxSize().onSizeChanged { boardSize = it }) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .onSizeChanged { boardSize = it }
+                .onGloballyPositioned { boardBounds = it.boundsInRoot() }
+                .pointerInput(controller) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                            if (event.type != PointerEventType.Scroll) continue
+                            val modifiers = event.keyboardModifiers
+                            if (!modifiers.isCtrlPressed && !modifiers.isMetaPressed) continue
+                            val change = event.changes.firstOrNull() ?: continue
+                            val delta = event.changes.fold(0f) { acc, c -> acc + c.scrollDelta.y }
+                            if (delta == 0f) continue
+                            controller.zoomBy(if (delta > 0f) 1f / WHEEL_ZOOM_STEP else WHEEL_ZOOM_STEP, change.position)
+                            event.changes.forEach { it.consume() }
+                        }
+                    }
+                },
+        ) {
             // DrawBox Canvas layer
             DrawBox(
                 state = state,
@@ -240,6 +293,7 @@ fun CanvasWorkspace(
                     expandedNoteId = expandedNoteId,
                     onActivate = { activeNoteId = it },
                     onExpand = { expandedNoteId = it },
+                    onToolbar = { noteToolbar = it },
                     modifier = Modifier.fillMaxSize().clipToBounds(),
                 )
                 val expanded = documents.firstOrNull { it.id == expandedNoteId }
@@ -273,6 +327,12 @@ fun CanvasWorkspace(
             }
 
             CanvasActionsPill(
+                zoom = CanvasZoom(
+                    scalePercent = state.viewport.scalePercent,
+                    onZoomOut = { controller.zoomBy(1f / ZOOM_STEP, boardCenter) },
+                    onZoomIn = { controller.zoomBy(ZOOM_STEP, boardCenter) },
+                    onReset = { controller.resetCamera() },
+                ),
                 checkpointCount = if (session != null) checkpoints.size else null,
                 onHistory = if (session != null) ({ showHistoryDialog = true }) else null,
                 onShare = onShareToChat?.let {
@@ -421,27 +481,38 @@ fun CanvasWorkspace(
                         }
                     }
                 },
+                onAddText = session?.let { s ->
+                    {
+                        val frame = newTextFrame(state.viewport.screenToWorld(boardCenter))
+                        val id = "text-${Clock.System.now().toEpochMilliseconds()}"
+                        coroutineScope.launch {
+                            runCatching { s.setDocument(id, "", frame = frame, color = PLAIN_TEXT_COLOR) }
+                                .onSuccess {
+                                    activeNoteId = id
+                                    statusMessage = "Added text"
+                                }
+                                .onFailure { statusMessage = "Error: could not add text (${it.message})" }
+                        }
+                    }
+                },
                 modifier = Modifier
                     .align(Alignment.CenterStart)
                     .padding(start = CHROME_INSET, top = 72.dp, bottom = 64.dp),
             )
 
-            // The foot of the board: status left, zoom right.
-            Row(
+            // The foot of the board: the active note's formatting bar, centred, above the status line.
+            Column(
                 modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(CHROME_INSET),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Bottom,
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                val toolbar = noteToolbar
+                if (toolbar != null && activeNoteId != null && expandedNoteId == null) {
+                    CanvasFormattingBar(toolbar = toolbar)
+                }
                 CanvasStatusLine(
                     text = "Elements: ${state.elements.size} | $statusMessage",
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                CanvasZoomPill(
-                    scalePercent = state.viewport.scalePercent,
-                    onZoomOut = { controller.zoomBy(1f / ZOOM_STEP, boardCenter) },
-                    onZoomIn = { controller.zoomBy(ZOOM_STEP, boardCenter) },
-                    onReset = { controller.resetCamera() },
-                    modifier = Modifier.padding(start = 8.dp),
+                    modifier = Modifier.align(Alignment.Start),
                 )
             }
         }
@@ -450,3 +521,4 @@ fun CanvasWorkspace(
 
 private val CHROME_INSET = 12.dp
 private const val ZOOM_STEP = 1.25f
+private const val WHEEL_ZOOM_STEP = 1.1f
