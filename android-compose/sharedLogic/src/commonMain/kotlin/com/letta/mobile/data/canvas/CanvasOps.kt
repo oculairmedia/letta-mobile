@@ -62,6 +62,21 @@ sealed interface CanvasOp {
         val colorHex: String,
     ) : CanvasOp
 
+    /**
+     * Binds (or, with both ends null, unbinds) a connector element's ends to block documents.
+     * Bindings to drawn shapes are DrawBox's own, on the element; this covers what DrawBox does
+     * not know about. Last writer wins per connector.
+     */
+    @Serializable
+    @SerialName("set_arrow_binding")
+    data class SetArrowBindingOp(
+        override val opId: String,
+        override val actorId: String,
+        override val lamport: Long,
+        val elementId: String,
+        val binding: CanvasArrowBinding,
+    ) : CanvasOp
+
     /** Sets the board's background pattern (kind, spacing, colour); scene-level, last writer wins. */
     @Serializable
     @SerialName("set_background_pattern")
@@ -122,6 +137,7 @@ fun CanvasOp.withActor(actorId: String): CanvasOp = when (this) {
     is CanvasOp.RemoveElementOp -> copy(actorId = actorId)
     is CanvasOp.SetBackgroundOp -> copy(actorId = actorId)
     is CanvasOp.SetBackgroundPatternOp -> copy(actorId = actorId)
+    is CanvasOp.SetArrowBindingOp -> copy(actorId = actorId)
     is CanvasOp.SetDocumentOp -> copy(actorId = actorId)
     is CanvasOp.RemoveDocumentOp -> copy(actorId = actorId)
     is CanvasOp.BatchOp -> copy(actorId = actorId, ops = ops.map { it.withActor(actorId) })

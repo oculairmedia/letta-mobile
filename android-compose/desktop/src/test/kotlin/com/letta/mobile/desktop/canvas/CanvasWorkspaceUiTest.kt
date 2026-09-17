@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.runComposeUiTest
@@ -214,6 +215,53 @@ class CanvasWorkspaceUiTest {
         )
         // The pattern is scene-root state, so the drawing was not re-imported (camera untouched).
         onAllNodesWithText("Agent updated canvas", substring = true).assertCountEquals(0)
+    }
+
+    @Test
+    fun canvasWorkspace_arrowSnapsToANoteAndFollowsItWhenItMoves() = runComposeUiTest {
+        val store = com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore()
+        val session = kotlinx.coroutines.runBlocking {
+            com.letta.mobile.data.canvas.CanvasSession.create(
+                store = store,
+                options = com.letta.mobile.data.canvas.CanvasCreateOptions(title = "Snap Board", initialSceneJson = ""),
+            )
+        }
+        val controller = io.ak1.drawbox.presentation.viewmodel.DrawBoxController(
+            io.ak1.drawbox.presentation.reducer.Reducer(io.ak1.drawbox.domain.usecase.UseCase()),
+        )
+        // A note at world (400,100) 200x120: its left anchor is (400,160).
+        val frame = com.letta.mobile.data.canvas.CanvasDocumentFrame(x = 400f, y = 100f, width = 200f, height = 120f)
+        kotlinx.coroutines.runBlocking { session.setDocument("note-a", "", frame = frame, color = "#fde68a") }
+        setContent {
+            CanvasWorkspace(controller = controller, session = session)
+        }
+        waitUntil(timeoutMillis = 5000) { onAllNodesWithContentDescription("Note note-a").fetchSemanticsNodes().isNotEmpty() }
+
+        // Draw an arrow from open board towards the note's left edge; the end lands within the
+        // snap radius of the left anchor and is snapped onto it and bound to the note.
+        onNodeWithContentDescription("Arrow").performClick()
+        val board = onNodeWithContentDescription("Canvas board")
+        board.performMouseInput {
+            moveTo(androidx.compose.ui.geometry.Offset(200f, 300f))
+            press()
+            moveTo(androidx.compose.ui.geometry.Offset(300f, 220f))
+            moveTo(androidx.compose.ui.geometry.Offset(392f, 166f))
+            release()
+        }
+        waitUntil(timeoutMillis = 5000) {
+            val arrow = controller.state.value.elements.filterIsInstance<io.ak1.drawbox.domain.model.Element.Shape>().firstOrNull()
+            arrow != null && arrow.points.last() == androidx.compose.ui.geometry.Offset(400f, 160f)
+        }
+        val arrowId = controller.state.value.elements.single().id
+        waitUntil(timeoutMillis = 5000) { session.arrowBindings()[arrowId]?.end?.documentId == "note-a" }
+        kotlin.test.assertEquals("left", session.arrowBindings()[arrowId]?.end?.side)
+
+        // Moving the note (as a drag commit or a peer would) re-points the bound end.
+        kotlinx.coroutines.runBlocking { session.moveDocument("note-a", frame.copy(x = 500f, y = 300f)) }
+        waitUntil(timeoutMillis = 5000) {
+            val arrow = controller.state.value.elements.filterIsInstance<io.ak1.drawbox.domain.model.Element.Shape>().single()
+            arrow.points.last() == androidx.compose.ui.geometry.Offset(500f, 360f)
+        }
     }
 
     @Test

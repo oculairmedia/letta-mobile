@@ -299,6 +299,28 @@ class CanvasSession(
         return setDocument(documentId, existing.json, actorId, frame)
     }
 
+    /** Connector ends bound to block documents, by connector element id. */
+    fun arrowBindings(): Map<String, CanvasArrowBinding> = CanvasOpProjector.arrowBindingsOf(sceneJsonOrEmpty())
+
+    /** Binds a connector's ends to documents (both null unbinds); a no-op when already so. */
+    suspend fun bindArrow(
+        elementId: String,
+        binding: CanvasArrowBinding,
+        actorId: String = LOCAL_USER_ACTOR_ID,
+    ): CanvasDocument? {
+        val current = arrowBindings()[elementId] ?: CanvasArrowBinding()
+        if (current == binding) return null
+        return applyLocal(
+            CanvasOp.SetArrowBindingOp(
+                opId = CanvasOpDiffer.generateOpId("bind"),
+                actorId = actorId,
+                lamport = lamportClock + 1,
+                elementId = elementId,
+                binding = binding,
+            ),
+        )
+    }
+
     /** The board's background pattern as of the current scene; null when none was set. */
     fun backgroundPattern(): CanvasBackgroundPattern? = CanvasOpProjector.backgroundPatternOf(sceneJsonOrEmpty())
 

@@ -82,6 +82,17 @@ data class CanvasBackgroundPattern(
     }
 }
 
+/** One end of a connector attached to a block document: which document, and which side of it. */
+@Serializable
+data class CanvasEndBinding(val documentId: String, val side: String)
+
+/** Which documents a connector's ends are bound to; a null end is free (or bound to a drawn shape by DrawBox). */
+@Serializable
+data class CanvasArrowBinding(
+    val start: CanvasEndBinding? = null,
+    val end: CanvasEndBinding? = null,
+)
+
 /** Where a block document sits on the board: top-left corner and size in world units. */
 @Serializable
 data class CanvasDocumentFrame(

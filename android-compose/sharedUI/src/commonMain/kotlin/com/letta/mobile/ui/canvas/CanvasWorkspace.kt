@@ -37,15 +37,19 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isAltPressed
 import androidx.compose.ui.input.pointer.isCtrlPressed
 import androidx.compose.ui.input.pointer.isMetaPressed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.canvas.CanvasBackgroundPattern
+import com.letta.mobile.data.canvas.CanvasDocumentFrame
 import com.letta.mobile.data.canvas.CanvasOpProjector
 import com.letta.mobile.data.canvas.CanvasPresence
 import com.letta.mobile.data.canvas.CanvasPresenceTransport
@@ -126,6 +130,11 @@ fun CanvasWorkspace(
         controller.setBackgroundPattern(backgroundPattern.painter(), backgroundPattern.tint())
     }
     var boardSize by remember { mutableStateOf(IntSize.Zero) }
+    // Connector snapping: Alt held (from the last pointer event) turns it off; while a line or
+    // arrow is being drawn the nearest anchor to the pointer shows as a ring.
+    var altHeld by remember { mutableStateOf(false) }
+    var drawingConnectorAt by remember { mutableStateOf<Offset?>(null) }
+    val arrowBindings = remember(sessionDoc) { session?.arrowBindings().orEmpty() }
     // The note being worked in (toolbar and block handles shown) and the one opened large.
     var activeNoteId by remember { mutableStateOf<String?>(null) }
     var expandedNoteId by remember { mutableStateOf<String?>(null) }
@@ -302,11 +311,38 @@ fun CanvasWorkspace(
                 modifier = Modifier
                     .fillMaxSize()
                     .clipToBounds()
+                    .semantics { contentDescription = "Canvas board" }
                     .pointerInput(Unit) {
                         awaitPointerEventScope {
                             while (true) {
                                 val event = awaitPointerEvent(PointerEventPass.Initial)
                                 if (event.type == PointerEventType.Press && expandedNoteId == null) activeNoteId = null
+                            }
+                        }
+                    }
+                    // After DrawBox has handled the event (Final pass): track Alt and the pointer
+                    // while a connector is drawn, and on release snap the connector just finished.
+                    .pointerInput(session) {
+                        awaitPointerEventScope {
+                            while (true) {
+                                val event = awaitPointerEvent(PointerEventPass.Final)
+                                altHeld = event.keyboardModifiers.isAltPressed
+                                val current = controller.state.value
+                                val connectorMode = current.mode == io.ak1.drawbox.domain.model.Mode.LINE ||
+                                    current.mode == io.ak1.drawbox.domain.model.Mode.ARROW
+                                val position = event.changes.firstOrNull()?.position
+                                when {
+                                    !connectorMode -> drawingConnectorAt = null
+                                    event.type == PointerEventType.Press || event.type == PointerEventType.Move -> {
+                                        if (position != null && event.changes.any { it.pressed }) {
+                                            drawingConnectorAt = current.viewport.screenToWorld(position)
+                                        }
+                                    }
+                                    event.type == PointerEventType.Release -> {
+                                        drawingConnectorAt = null
+                                        if (!altHeld) snapLatestConnector(controller, session, documents, coroutineScope)
+                                    }
+                                }
                             }
                         }
                     },
@@ -335,6 +371,32 @@ fun CanvasWorkspace(
 
             // Picking a drawing element hands the selection to DrawBox; the note lets go.
             LaunchedEffect(hasSelection) { if (hasSelection) activeNoteId = null }
+
+            // A bound connector end follows its note: whenever a document's frame changes (a local
+            // drag, a peer, the agent), every arrow bound to it is re-pointed through DrawBox, so
+            // the move reaches the scene through the normal export rather than a re-import that
+            // would throw the camera back.
+            var lastFrames by remember { mutableStateOf<Map<String, CanvasDocumentFrame>>(emptyMap()) }
+            LaunchedEffect(documents, arrowBindings) {
+                val frames = documents.mapNotNull { doc -> doc.frame?.let { doc.id to it } }.toMap()
+                frames.forEach { (id, frame) ->
+                    if (lastFrames[id] == frame || id !in lastFrames) return@forEach
+                    arrowBindings.forEach { (elementId, binding) ->
+                        val connector = state.elements.firstOrNull { it.id == elementId } as? io.ak1.drawbox.domain.model.Element.Shape
+                            ?: return@forEach
+                        CanvasSnapping.follow(connector, binding, id, frame)?.let { points ->
+                            controller.onIntent(io.ak1.drawbox.domain.model.Intent.SetElementPoints(elementId, points))
+                        }
+                    }
+                }
+                lastFrames = frames
+            }
+            val connectorMode = state.mode == io.ak1.drawbox.domain.model.Mode.LINE || state.mode == io.ak1.drawbox.domain.model.Mode.ARROW
+            val snapAnchor = drawingConnectorAt?.takeIf { connectorMode && !altHeld }?.let { at ->
+                val drawing = CanvasSnapping.latestConnector(state.elements)
+                CanvasSnapping.nearest(at, CanvasSnapping.anchors(state.elements, documents, drawing?.id), state.viewport.scale)
+            }
+            if (snapAnchor != null) CanvasSnapIndicator(anchor = snapAnchor, viewport = state.viewport)
 
             if (showTitle) {
                 CanvasTitlePill(
@@ -597,6 +659,30 @@ fun CanvasWorkspace(
             }
         }
     }
+    }
+}
+
+/**
+ * Snaps the connector a release just finished to the nearest anchors within the snap radius:
+ * its points move onto them, ends on notes are recorded in the session, and ends on drawn
+ * shapes are handed to DrawBox's own binding pass so they follow the shape from then on.
+ */
+private fun snapLatestConnector(
+    controller: DrawBoxController,
+    session: CanvasSession?,
+    documents: List<com.letta.mobile.data.canvas.CanvasSceneDocument>,
+    scope: kotlinx.coroutines.CoroutineScope,
+) {
+    val current = controller.state.value
+    val connector = CanvasSnapping.latestConnector(current.elements) ?: return
+    val anchors = CanvasSnapping.anchors(current.elements, documents, connector.id)
+    val snapped = CanvasSnapping.snap(connector, anchors, current.viewport.scale) ?: return
+    if (snapped.points != connector.points) {
+        controller.onIntent(io.ak1.drawbox.domain.model.Intent.SetElementPoints(connector.id, snapped.points))
+    }
+    if (snapped.boundToShape) controller.onIntent(io.ak1.drawbox.domain.model.Intent.FinalizeArrowBindings(connector.id))
+    if (session != null && (snapped.binding.start != null || snapped.binding.end != null)) {
+        scope.launch { runCatching { session.bindArrow(connector.id, snapped.binding) } }
     }
 }
 

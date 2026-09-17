@@ -40,6 +40,8 @@ object CanvasOpProjector {
     private const val TOMBSTONES = "_removed"
     private const val BG_LAMPORT = "_bgLamport"
     private const val BG_ACTOR = "_bgActorId"
+    private const val ARROW_BINDINGS = "_arrowBindings"
+    private const val BINDING_VALUE = "binding"
     private const val BG_PATTERN = "_bgPattern"
     private const val BG_PATTERN_LAMPORT = "_bgPatternLamport"
     private const val BG_PATTERN_ACTOR = "_bgPatternActorId"
@@ -121,6 +123,7 @@ object CanvasOpProjector {
         is CanvasOp.RemoveDocumentOp -> removeDocumentWithLww(sceneJson, op)
         is CanvasOp.SetBackgroundOp -> setBackground(sceneJson, op)
         is CanvasOp.SetBackgroundPatternOp -> setBackgroundPattern(sceneJson, op)
+        is CanvasOp.SetArrowBindingOp -> setArrowBinding(sceneJson, op)
         is CanvasOp.AddElementOp -> upsertElementWithLww(sceneJson, op)
         is CanvasOp.UpdateElementOp -> upsertElementWithLww(sceneJson, op)
         is CanvasOp.RemoveElementOp -> removeElementWithLww(sceneJson, op)
@@ -172,6 +175,41 @@ object CanvasOpProjector {
                 put("bgColor", JsonPrimitive(op.colorHex))
                 put(BG_LAMPORT, JsonPrimitive(op.lamport))
                 put(BG_ACTOR, JsonPrimitive(op.actorId))
+            },
+        )
+    }
+
+    /** Every connector's document bindings on the scene root, by element id. */
+    fun arrowBindingsOf(sceneJson: String): Map<String, CanvasArrowBinding> {
+        val parsed = parseScene(sceneJson)
+        val table = runCatching { parsed[ARROW_BINDINGS]?.jsonObject }.getOrNull() ?: return emptyMap()
+        return table.mapNotNull { (id, entry) ->
+            val value = runCatching { entry.jsonObject[BINDING_VALUE] }.getOrNull() ?: return@mapNotNull null
+            runCatching { json.decodeFromJsonElement(CanvasArrowBinding.serializer(), value) }.getOrNull()?.let { id to it }
+        }.toMap()
+    }
+
+    /** LWW per connector, keyed by element id; an entry with both ends null is kept as the unbinding. */
+    private fun setArrowBinding(sceneJson: String, op: CanvasOp.SetArrowBindingOp): String {
+        val parsed = parseScene(sceneJson)
+        val table = runCatching { parsed[ARROW_BINDINGS]?.jsonObject }.getOrNull().orEmpty()
+        val existing = table[op.elementId]?.let { runCatching { it.jsonObject }.getOrNull() }
+        val atLamport = runCatching { existing?.get(LAMPORT)?.jsonPrimitive?.long }.getOrNull()
+        val atActor = runCatching { existing?.get(ACTOR)?.jsonPrimitive?.content }.getOrNull().orEmpty()
+        if (!wins(WriterProvenance(op.lamport, op.actorId), atLamport?.let { WriterProvenance(it, atActor) })) return sceneJson
+        val entry = buildJsonObject {
+            put(BINDING_VALUE, json.encodeToJsonElement(CanvasArrowBinding.serializer(), op.binding))
+            put(LAMPORT, JsonPrimitive(op.lamport))
+            put(ACTOR, JsonPrimitive(op.actorId))
+        }
+        val updated = buildJsonObject {
+            table.forEach { (id, value) -> if (id != op.elementId) put(id, value) }
+            put(op.elementId, entry)
+        }
+        return canonicalScene(
+            buildMap {
+                parsed.forEach { (key, value) -> if (key != ARROW_BINDINGS) put(key, value) }
+                put(ARROW_BINDINGS, updated)
             },
         )
     }
