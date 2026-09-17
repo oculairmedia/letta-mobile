@@ -168,6 +168,17 @@ internal class AdminChatViewModel @Inject constructor(
     private val runRegistry: com.letta.mobile.data.presence.ConversationRunRegistry =
         com.letta.mobile.data.presence.ConversationRunRegistry(),
 ) : ViewModel() {
+    /**
+     * Folds this screen's runtime events into the app-wide registry through the shared reducer, so
+     * what the lists and the mascots see is the phase the turn is actually in - reasoning, running
+     * a tool (and which one), parked on an approval, responding, failed - rather than the two
+     * booleans the UI state carried. The reducer is shared code; this is the Android binding.
+     *
+     * Declared first: the send pipeline below hands `::onRuntimeEvents` to its observer during
+     * construction, and cached repositories can deliver events before the constructor returns.
+     */
+    private val runPhases = com.letta.mobile.data.presence.ConversationRunPhasePublisher(runRegistry)
+
     companion object {
         private const val RESUME_CACHE_MAX_AGE_MS = 60_000L
     }
@@ -1070,14 +1081,6 @@ internal class AdminChatViewModel @Inject constructor(
 
     /** The registry key for this screen's conversation; the agent stands in until the conversation has an id. */
     private var publishedRunKey: String? = null
-
-    /**
-     * Folds this screen's runtime events into the app-wide registry through the shared reducer, so
-     * what the lists and the mascots see is the phase the turn is actually in - reasoning, running
-     * a tool (and which one), parked on an approval, responding, failed - rather than the two
-     * booleans the UI state carried. The reducer is shared code; this is the Android binding.
-     */
-    private val runPhases = com.letta.mobile.data.presence.ConversationRunPhasePublisher(runRegistry)
 
     /**
      * Every runtime event the send pipeline records, folded into the run phase for this screen's
