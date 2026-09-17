@@ -53,6 +53,8 @@ fun LettaSidePane(
     minWidth: Dp = 320.dp,
     maxWidth: Dp = 1100.dp,
     resizable: Boolean = true,
+    /** False when the content draws its own title, as the canvas does with its title pill. */
+    showHeader: Boolean = true,
     actions: @Composable RowScope.() -> Unit = {},
     content: @Composable () -> Unit,
 ) {
@@ -79,7 +81,7 @@ fun LettaSidePane(
                 .fillMaxHeight()
                 .background(MaterialTheme.colorScheme.surfaceContainerLow),
         ) {
-            LettaSidePaneHeader(title = title, onClose = onClose, actions = actions)
+            if (showHeader) LettaSidePaneHeader(title = title, onClose = onClose, actions = actions)
             Box(modifier = Modifier.fillMaxWidth().weight(1f)) { content() }
         }
     }

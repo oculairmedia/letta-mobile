@@ -106,13 +106,15 @@ internal fun DesktopMainContentPane(
             title = canvasDocument?.title ?: "Canvas",
             onClose = actions.onCloseCanvas,
             initialWidth = 540.dp,
+            // The board's own title pill (with its back arrow) is the header: a full pane
+            // header above it only pushed the board down.
+            showHeader = false,
         ) {
             CanvasWorkspace(
                 session = inputs.activeCanvasSession,
                 presenceTransport = com.letta.mobile.desktop.canvas.DesktopCanvasHostSync.presenceTransport,
                 onNavigateBack = actions.onCloseCanvas,
                 onShareToChat = actions.onShareCanvasToChat,
-                showTitle = false,
                 modifier = Modifier.fillMaxSize(),
             )
         }
