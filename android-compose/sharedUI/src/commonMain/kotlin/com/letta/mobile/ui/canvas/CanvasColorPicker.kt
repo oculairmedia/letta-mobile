@@ -20,6 +20,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -55,11 +56,11 @@ fun Color.toHex(): String {
 }
 
 /**
- * Colours picked in this session, newest first, so the next control offers them again. One list
- * for the whole workspace: stroke, fill, text, note and background all feed and read it, which is
- * what makes the picker feel central rather than per control.
+ * Colours picked on this board, newest first, so the next control offers them again. One list
+ * per workspace (provided through [LocalRecentColors]): stroke, fill, text, note and background
+ * all feed and read it, which is what makes the picker feel central rather than per control.
  */
-object RecentColors {
+class RecentColors {
     val colors = mutableStateListOf<Color>()
 
     fun remember(color: Color) {
@@ -69,6 +70,13 @@ object RecentColors {
         while (colors.size > RECENT_LIMIT) colors.removeAt(colors.size - 1)
     }
 }
+
+/** The board's recent colours; a workspace provides its own so boards do not share a list. */
+val LocalRecentColors = compositionLocalOf<RecentColors?> { null }
+
+/** The provided list, or one for this composition when no workspace provided any. */
+@Composable
+fun rememberRecentColors(): RecentColors = LocalRecentColors.current ?: remember { RecentColors() }
 
 /**
  * The one colour control of the board: a swatch showing [current] that opens [CanvasColorPicker].
@@ -87,6 +95,7 @@ fun ColorSwatchPicker(
     swatchSize: androidx.compose.ui.unit.Dp = 22.dp,
 ) {
     var open by remember { mutableStateOf(false) }
+    val recent = rememberRecentColors()
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
         Box(
             modifier = Modifier
@@ -116,7 +125,7 @@ fun ColorSwatchPicker(
                     onPick = { color, done ->
                         onPick(color)
                         if (done) {
-                            RecentColors.remember(color)
+                            recent.remember(color)
                             open = false
                         }
                     },
@@ -141,6 +150,7 @@ fun CanvasColorPicker(
 ) {
     var hsl by remember(current) { mutableStateOf(current.toHsl()) }
     var hexText by remember(current) { mutableStateOf(current.toHex()) }
+    val recent = rememberRecentColors()
     Surface(
         shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -151,11 +161,11 @@ fun CanvasColorPicker(
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             SwatchRow(current = current, entries = palette.map { it.color to it.name }, allowNone = allowNone) { onPick(it, true) }
-            if (RecentColors.colors.isNotEmpty()) {
+            if (recent.colors.isNotEmpty()) {
                 Text("Recent", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 SwatchRow(
                     current = current,
-                    entries = RecentColors.colors.mapIndexed { index, color -> color to "recent ${index + 1}" },
+                    entries = recent.colors.mapIndexed { index, color -> color to "recent ${index + 1}" },
                     allowNone = false,
                 ) { onPick(it, true) }
             }

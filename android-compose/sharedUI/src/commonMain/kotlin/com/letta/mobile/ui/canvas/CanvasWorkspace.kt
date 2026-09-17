@@ -21,6 +21,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -249,6 +250,9 @@ fun CanvasWorkspace(
         onDispose { unregister?.invoke() }
     }
 
+    // One recent-colours list for this board, shared by every picker on it.
+    val recentColors = remember { RecentColors() }
+    CompositionLocalProvider(LocalRecentColors provides recentColors) {
     Surface(
         modifier = modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background,
@@ -561,6 +565,7 @@ fun CanvasWorkspace(
                 )
             }
         }
+    }
     }
 }
 
