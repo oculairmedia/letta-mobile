@@ -47,6 +47,7 @@ internal data class DesktopMainContentActions(
     val destinationActions: DestinationContentActions,
     val onShowBackgroundTasks: () -> Unit,
     val onCloseCanvas: () -> Unit = {},
+    val onShareCanvasToChat: ((bytes: ByteArray, mimeType: String) -> Unit)? = null,
 )
 
 @Composable
@@ -111,6 +112,7 @@ internal fun DesktopMainContentPane(
                 session = inputs.activeCanvasSession,
                 presenceTransport = com.letta.mobile.desktop.canvas.DesktopCanvasHostSync.presenceTransport,
                 onNavigateBack = actions.onCloseCanvas,
+                onShareToChat = actions.onShareCanvasToChat,
                 modifier = Modifier.fillMaxSize(),
             )
         }

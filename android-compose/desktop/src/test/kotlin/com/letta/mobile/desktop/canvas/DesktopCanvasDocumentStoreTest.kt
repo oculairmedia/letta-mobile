@@ -4,13 +4,16 @@ import com.letta.mobile.data.canvas.CanvasDocument
 import com.letta.mobile.data.canvas.CanvasId
 import java.nio.file.Files
 import java.nio.file.Path
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class DesktopCanvasDocumentStoreTest {
 
@@ -101,5 +104,55 @@ class DesktopCanvasDocumentStoreTest {
         assertEquals(docV2, afterUpdate)
         assertEquals("V2 Updated", afterUpdate?.title)
         assertEquals(2L, afterUpdate?.revision)
+    }
+
+    @Test
+    fun revisionCheckHoldsAcrossStoreInstancesOnTheSameDirectory() = runTest {
+        val docId = CanvasId("canvas-cross-instance")
+        val v1 = CanvasDocument(id = docId, title = "V1", revision = 1L, sceneJson = "{}", updatedAtEpochMs = 1000L)
+        val storeA = DesktopCanvasDocumentStore(rootDirectory = tempDir)
+        val storeB = DesktopCanvasDocumentStore(rootDirectory = tempDir)
+        storeA.upsert(v1)
+
+        // Two instances, one revision-1 snapshot each: exactly one of their writes may land.
+        val fromA = v1.copy(revision = 2L, sceneJson = """{"writer":"a"}""")
+        val fromB = v1.copy(revision = 2L, sceneJson = """{"writer":"b"}""")
+        val outcomes = listOf(
+            async { storeA.upsertIfRevision(fromA, expectedRevision = 1L) },
+            async { storeB.upsertIfRevision(fromB, expectedRevision = 1L) },
+        ).map { it.await() }
+        assertEquals(1, outcomes.count { it }, "exactly one instance wins: $outcomes")
+        val stored = DesktopCanvasDocumentStore(rootDirectory = tempDir).get(docId)
+        assertEquals(2L, stored?.revision)
+        assertTrue(stored?.sceneJson == fromA.sceneJson || stored?.sceneJson == fromB.sceneJson)
+    }
+
+    @Test
+    fun createForConversationIfAbsentIsSharedAcrossInstances() = runTest {
+        val storeA = DesktopCanvasDocumentStore(rootDirectory = tempDir)
+        val storeB = DesktopCanvasDocumentStore(rootDirectory = tempDir)
+        val first = CanvasDocument(id = CanvasId("c-1"), conversationId = "conv-x", title = "First", revision = 1L, sceneJson = "{}", updatedAtEpochMs = 1L)
+        val second = CanvasDocument(id = CanvasId("c-2"), conversationId = "conv-x", title = "Second", revision = 1L, sceneJson = "{}", updatedAtEpochMs = 2L)
+
+        assertEquals(first, storeA.createForConversationIfAbsent(first))
+        assertEquals(first, storeB.createForConversationIfAbsent(second))
+        assertNull(storeB.get(CanvasId("c-2")))
+    }
+
+    @Test
+    fun upsertIfRevisionWritesOnlyWhileTheStoredRevisionMatches() = runTest {
+        val docId = CanvasId("canvas-cas-1")
+        val v1 = CanvasDocument(id = docId, title = "V1", revision = 1L, sceneJson = "{}", updatedAtEpochMs = 1000L)
+        val store = DesktopCanvasDocumentStore(rootDirectory = tempDir)
+        assertFalse(store.upsertIfRevision(v1, expectedRevision = 0L))
+        store.upsert(v1)
+
+        val v2 = v1.copy(revision = 2L, sceneJson = """{"elements":[{"id":"a"}]}""", updatedAtEpochMs = 2000L)
+        assertTrue(store.upsertIfRevision(v2, expectedRevision = 1L))
+        assertEquals(v2, store.get(docId))
+
+        val stale = v1.copy(revision = 2L, sceneJson = """{"stale":true}""", updatedAtEpochMs = 3000L)
+        assertFalse(store.upsertIfRevision(stale, expectedRevision = 1L))
+        assertEquals(v2, DesktopCanvasDocumentStore(rootDirectory = tempDir).get(docId))
     }
 }

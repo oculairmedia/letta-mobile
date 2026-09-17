@@ -446,6 +446,31 @@ class LettaDatabaseMigrationTest {
         assertEquals(listOf(op), loaded)
         assertTrue(dao.has("canvas-v17-test", "op-v17-1"))
     }
+    @Test
+    fun `migrates legacy database to v18 and adds aclJson column`() = runBlocking {
+        createLegacyDatabase(version = 1) { db ->
+            createAgentsTable(db)
+        }
+
+        val db = openMigratedDatabase()
+        val dao = db.canvasDocumentDao()
+        val doc = CanvasDocumentEntity(
+            id = "canvas-v18-1",
+            agentId = "agent-1",
+            conversationId = "conv-1",
+            title = "Test Canvas",
+            revision = 1L,
+            sceneJson = """{"bgColor":-1,"elements":[]}""",
+            updatedAtEpochMs = 12345L,
+            aclJson = """{"ownerUserId":"user-1","writerUserIds":["user-2"]}""",
+        )
+        dao.upsert(doc)
+        val loaded = dao.getById("canvas-v18-1")
+        assertEquals(doc, loaded)
+        val domainDoc = loaded?.toCanvasDocument()
+        assertEquals("user-1", domainDoc?.acl?.ownerUserId)
+        assertTrue(domainDoc?.acl?.canWrite("user-2") == true)
+    }
     private fun createLegacyDatabase(version: Int, createSchema: (SQLiteDatabase) -> Unit) {
         context.deleteDatabase(dbName)
         val db = context.openOrCreateDatabase(dbName, Context.MODE_PRIVATE, null)

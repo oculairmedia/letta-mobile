@@ -49,8 +49,10 @@ class CanvasWorkspaceUiTest {
         val session = kotlinx.coroutines.runBlocking {
             com.letta.mobile.data.canvas.CanvasSession.create(
                 store = store,
-                title = "Session Diagram",
-                initialSceneJson = CanvasSamples.buildCycleJson,
+                options = com.letta.mobile.data.canvas.CanvasCreateOptions(
+                    title = "Session Diagram",
+                    initialSceneJson = CanvasSamples.buildCycleJson,
+                ),
             )
         }
 
@@ -75,8 +77,10 @@ class CanvasWorkspaceUiTest {
         val session = kotlinx.coroutines.runBlocking {
             com.letta.mobile.data.canvas.CanvasSession.create(
                 store = store,
-                title = "Autosave Diagram",
-                initialSceneJson = "",
+                options = com.letta.mobile.data.canvas.CanvasCreateOptions(
+                    title = "Autosave Diagram",
+                    initialSceneJson = "",
+                ),
             )
         }
 
@@ -108,8 +112,11 @@ class CanvasWorkspaceUiTest {
         val session = kotlinx.coroutines.runBlocking {
             com.letta.mobile.data.canvas.CanvasSession.create(
                 store = store,
-                title = "Agent Diagram",
-                initialSceneJson = "",
+                options = com.letta.mobile.data.canvas.CanvasCreateOptions(
+                    title = "Agent Diagram",
+                    agentId = "agent-1",
+                    initialSceneJson = "",
+                ),
             )
         }
         // The workspace and the tool must share one registry, or the tool only ever sees the
@@ -133,7 +140,8 @@ class CanvasWorkspaceUiTest {
                 kotlinx.serialization.json.buildJsonObject {
                     put("canvas_id", session.canvasId.value)
                     put("scene_json", CanvasSamples.buildCycleJson)
-                }
+                },
+                agentId = "agent-1",
             )
         }
 
@@ -155,8 +163,10 @@ class CanvasWorkspaceUiTest {
         val session = kotlinx.coroutines.runBlocking {
             com.letta.mobile.data.canvas.CanvasSession.create(
                 store = store,
-                canvasId = canvasId,
-                title = "Presence Canvas",
+                options = com.letta.mobile.data.canvas.CanvasCreateOptions(
+                    canvasId = canvasId,
+                    title = "Presence Canvas",
+                ),
             )
         }
 
@@ -224,17 +234,25 @@ class CanvasWorkspaceUiTest {
         val sessionA = kotlinx.coroutines.runBlocking {
             com.letta.mobile.data.canvas.CanvasSession.create(
                 store = storeA,
-                canvasId = canvasId,
-                title = "Host Sync A",
-                syncTransport = sharedTransport,
+                options = com.letta.mobile.data.canvas.CanvasCreateOptions(
+                    canvasId = canvasId,
+                    title = "Host Sync A",
+                    syncTransport = sharedTransport,
+                    // Owner-only by default; both hosts edit this canvas, so both are named.
+                    acl = com.letta.mobile.data.canvas.CanvasAcl(ownerUserId = "host-a", writerUserIds = setOf("host-b")),
+                ),
             )
         }
         val sessionB = kotlinx.coroutines.runBlocking {
             com.letta.mobile.data.canvas.CanvasSession.create(
                 store = storeB,
-                canvasId = canvasId,
-                title = "Host Sync B",
-                syncTransport = sharedTransport,
+                options = com.letta.mobile.data.canvas.CanvasCreateOptions(
+                    canvasId = canvasId,
+                    title = "Host Sync B",
+                    syncTransport = sharedTransport,
+                    // Owner-only by default; both hosts edit this canvas, so both are named.
+                    acl = com.letta.mobile.data.canvas.CanvasAcl(ownerUserId = "host-a", writerUserIds = setOf("host-b")),
+                ),
             )
         }
 

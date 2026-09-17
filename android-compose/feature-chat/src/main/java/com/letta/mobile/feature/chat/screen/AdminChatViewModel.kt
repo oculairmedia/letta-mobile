@@ -58,6 +58,7 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.flow.onSubscription
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
@@ -1078,6 +1079,38 @@ internal class AdminChatViewModel @Inject constructor(
         sendPipeline.ensureEagerInit()
         chatSessionInitializer.run()
         publishRunState()
+        observeCanvasShareAttachments()
+    }
+
+    /**
+     * The key a canvas opened from this screen stages its share under, and the only key this
+     * screen drains. It names this screen instance rather than a conversation: the queue in
+     * [com.letta.mobile.data.canvas.CanvasShare] is process-wide and consuming is destructive,
+     * so matching on a conversation id would let a retained back-stack screen, or one whose
+     * conversation has not resolved yet, take an image meant for another chat.
+     */
+    val canvasShareRecipient: com.letta.mobile.data.canvas.CanvasConversationTarget =
+        com.letta.mobile.data.canvas.CanvasConversationTarget("chat-screen-${java.util.UUID.randomUUID()}")
+
+    /**
+     * The pending queue is the one delivery state for a staged canvas image; the event flow only
+     * says which recipient to drain. Draining inside `onSubscription` closes the gap where an
+     * image staged between a startup drain and the subscription would have no event to announce it.
+     */
+    private fun observeCanvasShareAttachments() {
+        viewModelScope.launch {
+            com.letta.mobile.data.canvas.CanvasShare.stagedAttachmentEvents
+                .onSubscription { drainStagedCanvasAttachments() }
+                .collect { target ->
+                    if (target == canvasShareRecipient) drainStagedCanvasAttachments()
+                }
+        }
+    }
+
+    private suspend fun drainStagedCanvasAttachments() {
+        com.letta.mobile.data.canvas.CanvasShare.consumeStagedAttachments(canvasShareRecipient).forEach { image ->
+            addAttachment(image)
+        }
     }
 
     /** The registry key for this screen's conversation; the agent stands in until the conversation has an id. */

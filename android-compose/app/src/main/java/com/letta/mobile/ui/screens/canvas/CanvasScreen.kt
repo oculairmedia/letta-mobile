@@ -39,16 +39,19 @@ class CanvasViewModel @Inject constructor(
     private val _session = MutableStateFlow<CanvasSession?>(null)
     val session: StateFlow<CanvasSession?> = _session.asStateFlow()
 
-    fun initSession(canvasId: String, conversationId: String?) {
+    fun initSession(canvasId: String, conversationId: String?, agentId: String? = null) {
         if (_session.value != null) return
         viewModelScope.launch {
             val canvasSession = if (!conversationId.isNullOrBlank() && canvasId.isBlank()) {
                 CanvasSession.getOrCreateForConversation(
                     store = store,
                     conversationId = conversationId,
-                    title = "Conversation Canvas",
-                    opLog = opLog,
-                    syncTransport = syncTransport,
+                    options = com.letta.mobile.data.canvas.CanvasConversationOptions(
+                        agentId = agentId,
+                        title = "Conversation Canvas",
+                        opLog = opLog,
+                        syncTransport = syncTransport,
+                    ),
                 )
             } else {
                 val effectiveId = if (canvasId.isNotBlank()) CanvasId(canvasId) else CanvasId("canvas-${System.currentTimeMillis()}")
@@ -68,11 +71,13 @@ class CanvasViewModel @Inject constructor(
 fun CanvasScreen(
     canvasId: String,
     conversationId: String? = null,
+    agentId: String? = null,
     onNavigateBack: () -> Unit,
+    onShareToChat: ((ByteArray, String) -> Unit)? = null,
     viewModel: CanvasViewModel = hiltViewModel(),
 ) {
-    LaunchedEffect(canvasId, conversationId) {
-        viewModel.initSession(canvasId, conversationId)
+    LaunchedEffect(canvasId, conversationId, agentId) {
+        viewModel.initSession(canvasId, conversationId, agentId)
     }
 
     val session by viewModel.session.collectAsStateWithLifecycle()
@@ -82,6 +87,7 @@ fun CanvasScreen(
             session = activeSession,
             presenceTransport = viewModel.presenceTransport,
             onNavigateBack = onNavigateBack,
+            onShareToChat = onShareToChat,
         )
     } else {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

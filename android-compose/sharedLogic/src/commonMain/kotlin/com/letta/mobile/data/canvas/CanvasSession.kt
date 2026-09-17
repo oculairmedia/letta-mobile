@@ -26,6 +26,9 @@ class CanvasSession(
     private val _document = MutableStateFlow<CanvasDocument?>(null)
     val document: StateFlow<CanvasDocument?> = _document.asStateFlow()
 
+    private val _checkpoints = MutableStateFlow<List<CanvasCheckpoint>>(emptyList())
+    val checkpoints: StateFlow<List<CanvasCheckpoint>> = _checkpoints.asStateFlow()
+
     private var lamportClock: Long = 0L
 
     private suspend fun currentDoc(): CanvasDocument =
@@ -37,20 +40,46 @@ class CanvasSession(
             updatedAtEpochMs = clock(),
         )
 
-    private suspend fun commitUpdate(updated: CanvasDocument): CanvasDocument {
+    private fun recordCheckpoint(
+        doc: CanvasDocument,
+        metadata: CanvasCommitMetadata = CanvasCommitMetadata(actorId = "system"),
+    ) {
+        val checkpoint = CanvasCheckpoint(
+            checkpointId = "cp-${doc.revision}-${clock()}",
+            canvasId = doc.id,
+            revision = doc.revision,
+            lamport = lamportClock,
+            sceneJson = doc.sceneJson,
+            actorId = metadata.actorId,
+            description = metadata.description,
+            createdAtEpochMs = doc.updatedAtEpochMs,
+        )
+        val currentList = _checkpoints.value
+        _checkpoints.value = (listOf(checkpoint) + currentList).take(MAX_CHECKPOINTS)
+    }
+
+    private suspend fun commitUpdate(
+        updated: CanvasDocument,
+        metadata: CanvasCommitMetadata = CanvasCommitMetadata(),
+    ): CanvasDocument {
         store.upsert(updated)
         _document.value = updated
+        recordCheckpoint(updated, metadata = metadata)
         return updated
     }
 
-    private suspend fun commitScene(sceneJson: String): CanvasDocument {
+    private suspend fun commitScene(
+        sceneJson: String,
+        metadata: CanvasCommitMetadata = CanvasCommitMetadata(),
+    ): CanvasDocument {
         val current = currentDoc()
         return commitUpdate(
             current.copy(
                 revision = current.revision + 1L,
                 sceneJson = sceneJson,
                 updatedAtEpochMs = clock(),
-            )
+            ),
+            metadata = metadata,
         )
     }
 
@@ -60,7 +89,31 @@ class CanvasSession(
     suspend fun load(): CanvasDocument? = mutex.withLock {
         val loaded = store.get(canvasId)
         _document.value = loaded
+        if (loaded != null && _checkpoints.value.isEmpty()) {
+            recordInitialCheckpoint(loaded)
+        }
         loaded
+    }
+
+    private fun recordInitialCheckpoint(doc: CanvasDocument) {
+        recordCheckpoint(
+            doc,
+            metadata = CanvasCommitMetadata(
+                actorId = doc.agentId ?: "initial",
+                description = "Initial state",
+            ),
+        )
+    }
+
+    /**
+     * Seeds the session with [doc] and records it as the first checkpoint, so the scene that
+     * existed before any caller's first mutation is always restorable. Done before the session
+     * is handed out: a sync collector or a local edit can otherwise land first and [load] would
+     * then find a non-empty history and skip the original state.
+     */
+    private fun initialize(doc: CanvasDocument) {
+        _document.value = doc
+        recordInitialCheckpoint(doc)
     }
 
     /**
@@ -80,7 +133,12 @@ class CanvasSession(
     /**
      * Applies an agent-driven scene replacement, incrementing revision and updating timestamp.
      */
-    suspend fun applyAgentReplace(sceneJson: String): CanvasDocument = mutex.withLock {
+    suspend fun applyAgentReplace(sceneJson: String, actorId: String? = null): CanvasDocument = mutex.withLock {
+        val current = currentDoc()
+        val effectiveActor = actorId ?: current.agentId ?: "agent"
+        if (current.acl != null && !current.acl.canWrite(effectiveActor)) {
+            throw UnauthorizedCanvasMutationException(effectiveActor, canvasId)
+        }
         commitScene(sceneJson)
     }
 
@@ -89,9 +147,12 @@ class CanvasSession(
      * updates persistence, and publishes to [syncTransport].
      */
     suspend fun applyLocal(op: CanvasOp): CanvasDocument = mutex.withLock {
+        val current = currentDoc()
+        if (current.acl != null && !current.acl.canWrite(op.actorId)) {
+            throw UnauthorizedCanvasMutationException(op.actorId, canvasId)
+        }
         opLog.append(canvasId, op)
         if (op.lamport > lamportClock) lamportClock = op.lamport
-        val current = currentDoc()
         val newScene = CanvasOpProjector.project(current.sceneJson, listOf(op))
         val updated = commitScene(newScene)
         syncTransport?.publish(canvasId, op)
@@ -103,10 +164,13 @@ class CanvasSession(
      * appends to [opLog], projects state, and updates persistence.
      */
     suspend fun applyRemote(op: CanvasOp): CanvasDocument? = mutex.withLock {
+        val current = currentDoc()
+        if (current.acl != null && !current.acl.canWrite(op.actorId)) {
+            return null
+        }
         if (opLog.has(canvasId, op.opId)) return null
         opLog.append(canvasId, op)
         if (op.lamport > lamportClock) lamportClock = op.lamport
-        val current = currentDoc()
         val newScene = CanvasOpProjector.project(current.sceneJson, listOf(op))
         commitScene(newScene)
     }
@@ -122,14 +186,26 @@ class CanvasSession(
         updateLamport(op)
     }
 
-    private suspend fun filterAndRecordOps(ops: List<CanvasOp>, isRemote: Boolean): List<CanvasOp> {
+    private suspend fun filterAndRecordOps(
+        ops: List<CanvasOp>,
+        isRemote: Boolean,
+        acl: CanvasAcl?,
+    ): List<CanvasOp> {
         val opsToApply = mutableListOf<CanvasOp>()
         for (op in ops) {
-            if (isRemote && opLog.has(canvasId, op.opId)) continue
+            if (shouldSkipOrReject(op, isRemote, acl)) continue
             recordSingleOp(op)
             opsToApply.add(op)
         }
         return opsToApply
+    }
+
+    private suspend fun shouldSkipOrReject(op: CanvasOp, isRemote: Boolean, acl: CanvasAcl?): Boolean {
+        if (acl != null && !acl.canWrite(op.actorId)) {
+            if (isRemote) return true
+            throw UnauthorizedCanvasMutationException(op.actorId, canvasId)
+        }
+        return isRemote && opLog.has(canvasId, op.opId)
     }
 
     private suspend fun broadcastOps(ops: List<CanvasOp>) {
@@ -144,7 +220,7 @@ class CanvasSession(
      */
     suspend fun applyOps(ops: List<CanvasOp>, isRemote: Boolean = false): CanvasDocument = mutex.withLock {
         val current = currentDoc()
-        val opsToApply = filterAndRecordOps(ops, isRemote)
+        val opsToApply = filterAndRecordOps(ops, isRemote, current.acl)
         if (opsToApply.isEmpty()) return current
 
         val newScene = CanvasOpProjector.project(current.sceneJson, opsToApply)
@@ -158,7 +234,11 @@ class CanvasSession(
     /**
      * Diffs [newJson] against current scene and applies the resulting operations locally.
      */
-    suspend fun applyLocalScene(newJson: String, actorId: String = "local_user"): List<CanvasOp> {
+    suspend fun applyLocalScene(newJson: String, actorId: String = LOCAL_USER_ACTOR_ID): List<CanvasOp> {
+        val doc = currentDoc()
+        if (doc.acl != null && !doc.acl.canWrite(actorId)) {
+            throw UnauthorizedCanvasMutationException(actorId, canvasId)
+        }
         val current = sceneJsonOrEmpty()
         if (newJson == current) return emptyList()
 
@@ -202,41 +282,79 @@ class CanvasSession(
         )
     }
 
+    /**
+     * Restores canvas to a prior [CanvasCheckpoint], generating and applying a [CanvasOp.ReplaceSceneOp]
+     * locally and broadcasting to peers.
+     */
+    suspend fun restoreCheckpoint(checkpointId: String, actorId: String = LOCAL_USER_ACTOR_ID): CanvasDocument = mutex.withLock {
+        val checkpoint = _checkpoints.value.firstOrNull { it.checkpointId == checkpointId }
+            ?: throw IllegalArgumentException("Checkpoint not found: $checkpointId")
+
+        val current = currentDoc()
+        if (current.acl != null && !current.acl.canWrite(actorId)) {
+            throw UnauthorizedCanvasMutationException(actorId, canvasId)
+        }
+
+        val op = CanvasOp.ReplaceSceneOp(
+            opId = "restore-${++lamportClock}-${clock()}",
+            actorId = actorId,
+            lamport = ++lamportClock,
+            sceneJson = checkpoint.sceneJson,
+        )
+        opLog.append(canvasId, op)
+        val updated = commitUpdate(
+            current.copy(
+                revision = current.revision + 1L,
+                sceneJson = checkpoint.sceneJson,
+                updatedAtEpochMs = clock(),
+            ),
+            metadata = CanvasCommitMetadata(actorId = actorId, description = "Restored to rev ${checkpoint.revision}"),
+        )
+        syncTransport?.publish(canvasId, op)
+        updated
+    }
+
     companion object {
+        const val MAX_CHECKPOINTS: Int = 30
+
+        /** The actor id the local human edits as; also the default owner of every new canvas. */
+        const val LOCAL_USER_ACTOR_ID: String = "local_user"
         /**
          * Creates a new [CanvasDocument] in [store] and returns an initialized [CanvasSession].
          */
         suspend fun create(
             store: CanvasDocumentStore,
-            title: String = "Untitled Canvas",
-            conversationId: String? = null,
-            agentId: String? = null,
-            canvasId: CanvasId = CanvasId("canvas-${kotlin.time.Clock.System.now().toEpochMilliseconds()}-${(1000..9999).random()}"),
-            initialSceneJson: String = "",
-            opLog: CanvasOpLog = InMemoryCanvasOpLog(),
-            syncTransport: CanvasSyncTransport? = null,
-            clock: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
+            options: CanvasCreateOptions = CanvasCreateOptions(),
         ): CanvasSession {
-            val doc = CanvasDocument(
-                id = canvasId,
-                agentId = agentId,
-                conversationId = conversationId,
-                title = title,
-                revision = 1L,
-                sceneJson = initialSceneJson,
-                updatedAtEpochMs = clock(),
-            )
+            val doc = newDocument(options)
             store.upsert(doc)
             val session = CanvasSession(
-                canvasId = canvasId,
+                canvasId = options.canvasId,
                 store = store,
-                opLog = opLog,
-                syncTransport = syncTransport,
-                clock = clock,
+                opLog = options.opLog,
+                syncTransport = options.syncTransport,
+                clock = options.clock,
             )
-            session._document.value = doc
+            session.initialize(doc)
             return session
         }
+
+        private fun newDocument(options: CanvasCreateOptions): CanvasDocument = CanvasDocument(
+            id = options.canvasId,
+            agentId = options.agentId,
+            conversationId = options.conversationId,
+            title = options.title,
+            revision = 1L,
+            sceneJson = options.initialSceneJson,
+            // A canvas is never created without an ACL: a null ACL reads as "unrestricted" to
+            // every mutation path, so an absent agent would otherwise leave the document open
+            // to any actor. The local user owns it; the creating agent, when known, may write.
+            acl = options.acl ?: CanvasAcl(
+                ownerUserId = LOCAL_USER_ACTOR_ID,
+                writerAgentIds = options.agentId?.let { setOf(it) }.orEmpty(),
+            ),
+            updatedAtEpochMs = options.clock(),
+        )
 
         /**
          * Resolves an existing session for [conversationId], or creates a new one if none exists.
@@ -244,34 +362,62 @@ class CanvasSession(
         suspend fun getOrCreateForConversation(
             store: CanvasDocumentStore,
             conversationId: String,
-            agentId: String? = null,
-            title: String = "Conversation Canvas",
-            opLog: CanvasOpLog = InMemoryCanvasOpLog(),
-            syncTransport: CanvasSyncTransport? = null,
-            clock: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
+            options: CanvasConversationOptions = CanvasConversationOptions(),
         ): CanvasSession {
-            val existing = store.getForConversation(conversationId)
-            return if (existing != null) {
-                val session = CanvasSession(
-                    canvasId = existing.id,
-                    store = store,
-                    opLog = opLog,
-                    syncTransport = syncTransport,
-                    clock = clock,
-                )
-                session._document.value = existing
-                session
-            } else {
-                create(
-                    store = store,
-                    title = title,
-                    conversationId = conversationId,
-                    agentId = agentId,
-                    opLog = opLog,
-                    syncTransport = syncTransport,
-                    clock = clock,
-                )
-            }
+            val createOptions = CanvasCreateOptions(
+                title = options.title,
+                conversationId = conversationId,
+                agentId = options.agentId,
+                opLog = options.opLog,
+                syncTransport = options.syncTransport,
+                clock = options.clock,
+            )
+            // Lookup and insert are one store step, so two callers opening the same
+            // conversation at once share a canvas instead of each persisting their own.
+            val doc = store.createForConversationIfAbsent(newDocument(createOptions))
+            val session = CanvasSession(
+                canvasId = doc.id,
+                store = store,
+                opLog = options.opLog,
+                syncTransport = options.syncTransport,
+                clock = options.clock,
+            )
+            session.initialize(doc)
+            return session
         }
     }
 }
+
+/**
+ * Metadata for tracking checkpoints and commits in [CanvasSession].
+ */
+data class CanvasCommitMetadata(
+    val actorId: String = "system",
+    val description: String = "",
+)
+
+/**
+ * Options for creating a new [CanvasDocument] and [CanvasSession].
+ */
+data class CanvasCreateOptions(
+    val title: String = "Untitled Canvas",
+    val conversationId: String? = null,
+    val agentId: String? = null,
+    val acl: CanvasAcl? = null,
+    val canvasId: CanvasId = CanvasId("canvas-${kotlin.time.Clock.System.now().toEpochMilliseconds()}-${(1000..9999).random()}"),
+    val initialSceneJson: String = "",
+    val opLog: CanvasOpLog = InMemoryCanvasOpLog(),
+    val syncTransport: CanvasSyncTransport? = null,
+    val clock: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
+)
+
+/**
+ * Options for resolving or creating a conversation-linked [CanvasSession].
+ */
+data class CanvasConversationOptions(
+    val agentId: String? = null,
+    val title: String = "Conversation Canvas",
+    val opLog: CanvasOpLog = InMemoryCanvasOpLog(),
+    val syncTransport: CanvasSyncTransport? = null,
+    val clock: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
+)

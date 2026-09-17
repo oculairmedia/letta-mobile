@@ -76,16 +76,7 @@ class IrohCanvasSyncTransport(
         acceptJob?.cancel()
         val ep = endpoint ?: return Job().apply { complete() }
         val job = scope.launch {
-            while (isActive) {
-                try {
-                    val incoming = ep.acceptNext() ?: continue
-                    launch { handleIncomingConnection(incoming) }
-                } catch (t: Throwable) {
-                    if (t is CancellationException) throw t
-                    val errorMsg = t.message ?: t.toString()
-                    Telemetry.event("CanvasSync", "accept.error", "error" to errorMsg)
-                }
-            }
+            runCanvasAcceptLoop(ep, "CanvasSync") { handleIncomingConnection(it) }
         }
         acceptJob = job
         return job

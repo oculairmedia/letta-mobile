@@ -79,16 +79,7 @@ class IrohCanvasPresenceTransport(
         acceptJob?.cancel()
         val ep = endpoint ?: return Job().apply { complete() }
         val job = scope.launch {
-            while (isActive) {
-                try {
-                    val incoming = ep.acceptNext() ?: continue
-                    launch { handleIncomingConnection(incoming) }
-                } catch (t: Throwable) {
-                    if (t is CancellationException) throw t
-                    val errorMsg = t.message ?: t.toString()
-                    Telemetry.event("CanvasPresence", "accept.error", "error" to errorMsg)
-                }
-            }
+            runCanvasAcceptLoop(ep, "CanvasPresence") { handleIncomingConnection(it) }
         }
         acceptJob = job
         return job
@@ -220,7 +211,7 @@ class IrohCanvasPresenceTransport(
                 val stream = iterator.next()
                 try {
                     stream.write(frame)
-                } catch (e: kotlinx.coroutines.CancellationException) {
+                } catch (e: CancellationException) {
                     throw e
                 } catch (_: Throwable) {
                     iterator.remove()
@@ -285,5 +276,23 @@ class IrohCanvasPresenceTransport(
             ((prefix[1].toInt() and 0xff) shl 16) or
             ((prefix[2].toInt() and 0xff) shl 8) or
             (prefix[3].toInt() and 0xff)
+    }
+}
+
+internal suspend fun CoroutineScope.runCanvasAcceptLoop(
+    endpoint: Endpoint,
+    telemetryTag: String,
+    handle: suspend (Incoming) -> Unit,
+) {
+    while (isActive) {
+        try {
+            val incoming = endpoint.acceptNext() ?: return
+            launch { handle(incoming) }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (t: Throwable) {
+            val errorMsg = t.message ?: t.toString()
+            Telemetry.event(telemetryTag, "accept.error", "error" to errorMsg)
+        }
     }
 }

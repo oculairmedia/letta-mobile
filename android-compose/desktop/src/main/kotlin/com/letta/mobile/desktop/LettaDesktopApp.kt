@@ -841,6 +841,12 @@ internal fun LettaDesktopApp(
                                 if (nameChanged) chatController.retryConnection()
                             },
                             onCloseCanvas = { activeCanvasSession = null },
+                            onShareCanvasToChat = { bytes, mimeType ->
+                                handleDesktopShareCanvasToChat(bytes, mimeType, chatController) {
+                                    selectedDestination = DesktopDestination.Conversations
+                                    activeCanvasSession = null
+                                }
+                            },
                             chatDetailActions = createDesktopChatDetailPaneActions(
                                 CreateDesktopChatDetailPaneActionsParams(
                                     chatController = chatController,
@@ -936,29 +942,18 @@ internal fun LettaDesktopApp(
                     avatarStyleByAgentId = avatarStyleByAgentId,
                     isDragActive = isDragActive,
                 ),
-                actions = DesktopOverlayActions(
-                    onModelSelected = chatController::setConversationModel,
-                    onSelectConversation = {
-                        chatController.selectConversation(it)
-                        selectedDestination = DesktopDestination.Conversations
-                    },
-                    onOpenAgent = ::openAgent,
-                    onNavigate = { selectedDestination = it },
-                    onCreateAgent = { name, modelValue ->
-                        val (model, embedding) = resolveNewAgentDefaults(
-                            agentRepository = dataBindings.sessionGraphProvider.current.agentRepository,
-                            templateAgentId = selectedAgentId,
-                            modelValue = modelValue,
-                        )
-                        chatController.createAgent(name = name, model = model, embedding = embedding)
-                        selectedDestination = DesktopDestination.Conversations
-                    },
-                    onIrohIdentityReset = {
-                        com.letta.mobile.desktop.security.DesktopIrohIdentity.reset()
-                        // Rebuild the session graph so the next dial mints and
-                        // uses the new identity.
-                        applyConfig(activeConfig)
-                    },
+                actions = createDesktopOverlayActions(
+                    CreateDesktopOverlayActionsParams(
+                        chatController = chatController,
+                        onSelectDestination = { selectedDestination = it },
+                        onOpenAgent = ::openAgent,
+                        agentRepository = dataBindings.sessionGraphProvider.current.agentRepository,
+                        selectedAgentId = selectedAgentId,
+                        onIrohIdentityReset = {
+                            com.letta.mobile.desktop.security.DesktopIrohIdentity.reset()
+                            applyConfig(activeConfig)
+                        },
+                    ),
                 ),
             )
           }

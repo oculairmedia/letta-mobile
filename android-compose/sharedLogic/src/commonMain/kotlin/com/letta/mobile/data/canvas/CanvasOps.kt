@@ -73,6 +73,20 @@ sealed interface CanvasOp {
 }
 
 /**
+ * The same operation attributed to [actorId], recursing into a [CanvasOp.BatchOp]. An
+ * externally supplied op names whoever the model chose; before it is validated, logged,
+ * broadcast or stamped into scene provenance it is rebound to the authenticated caller.
+ */
+fun CanvasOp.withActor(actorId: String): CanvasOp = when (this) {
+    is CanvasOp.ReplaceSceneOp -> copy(actorId = actorId)
+    is CanvasOp.AddElementOp -> copy(actorId = actorId)
+    is CanvasOp.UpdateElementOp -> copy(actorId = actorId)
+    is CanvasOp.RemoveElementOp -> copy(actorId = actorId)
+    is CanvasOp.SetBackgroundOp -> copy(actorId = actorId)
+    is CanvasOp.BatchOp -> copy(actorId = actorId, ops = ops.map { it.withActor(actorId) })
+}
+
+/**
  * Tool payload DTOs for App Server external tools (canvas.*).
  */
 @Serializable
