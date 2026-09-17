@@ -106,6 +106,8 @@ private data class DestinationAgentsActions(
 
 internal data class DestinationContentInputs(
     val state: DesktopBootstrapState,
+    /** Agent-rail recency window in days; 0 shows every agent. */
+    val railRecencyDays: Int = RAIL_RECENCY_DAYS_DEFAULT,
     val home: DesktopHomeState,
     val chat: DesktopChatSurfaceState,
     val memoryState: DesktopMemorySurfaceState,
@@ -140,6 +142,7 @@ internal data class DestinationContentActions(
     val onConfigSaved: (LettaConfig) -> Unit,
     val onTokenCleared: () -> Unit,
     val onIrohIdentityReset: () -> Unit,
+    val onRailRecencyDaysChange: (Int) -> Unit = {},
     val nucleus: DestinationNucleusActions,
     val localRuntimeProvider: DesktopLocalRuntimeProviderActions,
     val localBackendDirectory: DesktopLocalBackendDirectoryActions,
@@ -149,6 +152,7 @@ private data class DestinationSettingsActions(
     val onConfigSaved: (LettaConfig) -> Unit,
     val onTokenCleared: () -> Unit,
     val onIrohIdentityReset: () -> Unit,
+    val onRailRecencyDaysChange: (Int) -> Unit = {},
     val nucleus: DestinationNucleusActions,
     val localRuntimeProvider: DesktopLocalRuntimeProviderActions,
     val localBackendDirectory: DesktopLocalBackendDirectoryActions,
@@ -160,6 +164,7 @@ private data class ScrollableDestinationInputs(
     val nucleus: DesktopNucleusState,
     val localRuntimeProvider: DesktopLocalRuntimeProviderState,
     val localBackendDirectory: DesktopLocalBackendDirectoryState,
+    val railRecencyDays: Int,
 )
 
 private val DesktopDestination.icon: ImageVector
@@ -220,6 +225,7 @@ internal fun DestinationContent(
             inputs = ScrollableDestinationInputs(
                 destination = destination,
                 state = inputs.state,
+                railRecencyDays = inputs.railRecencyDays,
                 nucleus = inputs.nucleus,
                 localRuntimeProvider = inputs.localRuntimeProvider,
                 localBackendDirectory = inputs.localBackendDirectory,
@@ -228,6 +234,7 @@ internal fun DestinationContent(
                 onConfigSaved = actions.onConfigSaved,
                 onTokenCleared = actions.onTokenCleared,
                 onIrohIdentityReset = actions.onIrohIdentityReset,
+                onRailRecencyDaysChange = actions.onRailRecencyDaysChange,
                 nucleus = actions.nucleus,
                 localRuntimeProvider = actions.localRuntimeProvider,
                 localBackendDirectory = actions.localBackendDirectory,
@@ -408,6 +415,12 @@ private fun LazyListScope.scrollableDestinationItems(
                 DesktopLocalBackendDirectorySettingsCard(
                     state = inputs.localBackendDirectory,
                     actions = settings.localBackendDirectory,
+                )
+            }
+            item {
+                DesktopRailSettingsCard(
+                    recencyDays = inputs.railRecencyDays,
+                    onRecencyDaysChange = settings.onRailRecencyDaysChange,
                 )
             }
             item {

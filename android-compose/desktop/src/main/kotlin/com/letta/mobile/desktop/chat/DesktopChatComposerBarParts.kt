@@ -64,6 +64,12 @@ import com.letta.mobile.desktop.DesktopTooltip
 import com.letta.mobile.ui.mascot.MascotGazeSurface
 import com.letta.mobile.ui.mascot.mascotGazeTarget
 import com.letta.mobile.ui.theme.customColors
+import com.letta.mobile.ui.components.LettaMenuItem
+import com.letta.mobile.ui.components.LettaPopupMenu
+import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Image
+import com.composables.icons.lucide.Palette
+import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 
 internal data class ComposerAutocompleteUi(
     val matchedCommands: List<ComposerCommand>,
@@ -358,7 +364,11 @@ internal fun ComposerControlRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    ComposerAttachButton(enabled = state.enabled, onAttachImage = actions.onAttachImage)
+                    ComposerAttachButton(
+                    enabled = state.enabled,
+                    onAttachImage = actions.onAttachImage,
+                    onOpenCanvas = actions.onOpenCanvas,
+                )
                     ComposerModelControls(state = state, actions = actions)
                     Spacer(Modifier.weight(1f))
                     ComposerSendButton(canSend = canSend, onSend = actions.onSend)
@@ -379,7 +389,11 @@ internal fun ComposerControlRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                ComposerAttachButton(enabled = state.enabled, onAttachImage = actions.onAttachImage)
+                ComposerAttachButton(
+                    enabled = state.enabled,
+                    onAttachImage = actions.onAttachImage,
+                    onOpenCanvas = actions.onOpenCanvas,
+                )
                 ComposerModelControls(state = state, actions = actions)
                 ComposerSafetyChip()
                 ComposerEffortControls()
@@ -391,21 +405,44 @@ internal fun ComposerControlRow(
     }
 }
 
+/**
+ * The composer's plus. With a canvas host it is a small menu (attach images, open canvas),
+ * like the Claude Code composer; without one it stays the plain attach button.
+ */
 @Composable
-private fun ComposerAttachButton(enabled: Boolean, onAttachImage: () -> Unit) {
-    DesktopTooltip(text = "Attach") {
-        Box(
-            modifier = Modifier
-                .size(28.dp)
-                .clip(CircleShape)
-                .clickable(enabled = enabled, onClick = onAttachImage),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.Add,
-                contentDescription = "Attach",
-                modifier = Modifier.size(18.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+private fun ComposerAttachButton(
+    enabled: Boolean,
+    onAttachImage: () -> Unit,
+    onOpenCanvas: (() -> Unit)? = null,
+) {
+    var menuOpen by remember { mutableStateOf(false) }
+    Box {
+        DesktopTooltip(text = if (onOpenCanvas == null) "Attach" else "Add") {
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .clickable(enabled = enabled) {
+                        if (onOpenCanvas == null) onAttachImage() else menuOpen = true
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Add,
+                    contentDescription = if (onOpenCanvas == null) "Attach" else "Add",
+                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        if (onOpenCanvas != null) {
+            LettaPopupMenu(
+                expanded = menuOpen,
+                onDismiss = { menuOpen = false },
+                items = listOf(
+                    LettaMenuItem(label = "Attach images", icon = Lucide.Image, onClick = onAttachImage),
+                    LettaMenuItem(label = "Open canvas", icon = Lucide.Palette, onClick = onOpenCanvas),
+                ),
             )
         }
     }

@@ -33,9 +33,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.runtime.NowActiveStatus
 import com.letta.mobile.data.chat.runtime.nowActiveStatus
-import com.letta.mobile.desktop.chat.AgentOrb
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
+import com.letta.mobile.ui.chat.AgentOrb
 
 @Immutable
 internal data class NowActiveBarState(

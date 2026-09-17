@@ -71,6 +71,8 @@ import kotlin.time.Duration.Companion.seconds
 import java.awt.Window
 import java.time.Instant
 import dev.nucleusframework.application.NucleusApplicationScope
+import com.letta.mobile.ui.components.LettaSidePane
+import com.letta.mobile.ui.chat.AgentOrb
 
 /** Application-scoped inputs the desktop shell composes over. */
 internal data class DesktopAppShellBindings(
@@ -137,6 +139,13 @@ internal fun LettaDesktopApp(
         }
     }
     val chatScope = rememberCoroutineScope()
+    val railPrefs = rememberDesktopRailPrefs(secureSettingsStore)
+    // Canvas library + the open canvas: read by the rail, sidebar, content pane and the overlays.
+    val canvasStore = remember { com.letta.mobile.desktop.canvas.DesktopCanvasDocumentStore() }
+    val canvasLibrary = com.letta.mobile.desktop.canvas.rememberDesktopCanvasLibrary(canvasStore, chatScope)
+    val canvasDocuments by canvasLibrary.documents.collectAsState()
+    var activeCanvasSession by remember { mutableStateOf<com.letta.mobile.data.canvas.CanvasSession?>(null) }
+    LaunchedEffect(activeCanvasSession) { canvasLibrary.refresh() }
     val nucleusController = rememberDesktopNucleusController(chatScope)
     val nucleusState by nucleusController.state.collectAsState()
     val irohTransport = rememberIrohTransport(activeConfig, chatScope)
@@ -317,6 +326,15 @@ internal fun LettaDesktopApp(
     }
     val railAgents = remember(chatState.conversations, rosterAgents) {
         buildRailAgents(chatState.conversations, rosterAgents)
+    }
+    val railActivityByAgentId = remember(chatState.conversations) {
+        chatState.conversations
+            .filter { !it.agentId.isNullOrBlank() }
+            .groupBy { it.agentId!! }
+            .mapValues { (_, convs) ->
+                val latest = convs.maxBy { conversationRecency(it.updatedAtLabel) }
+                RailAgentActivity(updatedAtLabel = latest.updatedAtLabel, preview = latest.lastMessagePreview)
+            }
     }
 
     // Single entry point for "open this agent" from any surface (rail, command
@@ -684,9 +702,17 @@ internal fun LettaDesktopApp(
                     // Far-left workspace/agent rail.
                     DesktopAgentRail(
                         state = DesktopAgentRailState(
-                            agents = railAgents,
+                            agents = remember(chatState.conversations, railAgents, selectedAgentId, railPrefs.recencyDays) {
+                                recentRailAgents(
+                                    chatState.conversations,
+                                    railAgents,
+                                    window = railPrefs.recencyWindow,
+                                    selectedAgentId = selectedAgentId,
+                                )
+                            },
                             focus = DesktopAgentRailFocus(
                                 selectedAgentId = selectedAgentId,
+                                activityByAgentId = railActivityByAgentId,
                                 thinkingAgentId = thinkingAgentId,
                                 avatarStyleByAgentId = avatarStyleByAgentId,
                                 identityByAgentId = identityByAgentId,
@@ -729,6 +755,8 @@ internal fun LettaDesktopApp(
                             archiveFilter = archiveFilter,
                             selectedDestination = selectedDestination,
                             mode = workPlayMode,
+                            canvases = canvasDocuments,
+                            activeCanvasId = activeCanvasSession?.canvasId,
                         ),
                         actions = DesktopAgentSidebarActions(
                             onArchiveFilterChange = chatController::setArchiveFilter,
@@ -743,12 +771,14 @@ internal fun LettaDesktopApp(
                             onDeleteConversation = chatController::deleteConversation,
                             onNewChat = ::openNewChatForFocusedAgent,
                             onEditAgent = { editAgentId = selectedAgentId },
+                            onOpenCanvas = { id -> canvasLibrary.open(id) { activeCanvasSession = it } },
+                            onNewCanvas = {
+                                canvasLibrary.createNew(selectedAgentId) { activeCanvasSession = it }
+                            },
                         ),
                     )
                     RailDivider()
                     }
-                    val canvasStore = remember { com.letta.mobile.desktop.canvas.DesktopCanvasDocumentStore() }
-                    var activeCanvasSession by remember { mutableStateOf<com.letta.mobile.data.canvas.CanvasSession?>(null) }
                     val composerCommands = rememberDesktopComposerCommands(
                         DesktopComposerCommandsParams(
                             chatController = chatController,
@@ -802,6 +832,7 @@ internal fun LettaDesktopApp(
                                 workingDirectoryLoading = workingDirectoryLoading,
                             ),
                             destinationInputs = DestinationContentInputs(
+                                railRecencyDays = railPrefs.recencyDays,
                                 state = bootstrapState,
                                 home = homeState,
                                 chat = chatState,
@@ -853,6 +884,18 @@ internal fun LettaDesktopApp(
                                     canSubmitApprovals = canSubmitApprovals,
                                     onA2uiAction = ::dispatchA2uiAction,
                                     onAttachImage = { pickerLauncher.launch() },
+                                    onOpenCanvas = {
+                                        openDesktopCanvasSession(
+                                            OpenDesktopCanvasParams(
+                                                scope = chatScope,
+                                                store = canvasStore,
+                                                conversationId = chatState.selectedConversationId,
+                                                agentId = selectedAgentId,
+                                                agentName = selectedAgentName,
+                                                onSessionReady = { activeCanvasSession = it },
+                                            ),
+                                        )
+                                    },
                                     onOpenModelPicker = { overlays.modelPicker = true },
                                     onSetPersona = { editAgentId = selectedAgentId },
                                     onNavigateToChannels = { selectedDestination = DesktopDestination.Channels },
@@ -869,6 +912,7 @@ internal fun LettaDesktopApp(
                                 ),
                             ),
                             destinationActions = DestinationContentActions(
+                                onRailRecencyDaysChange = railPrefs::updateRecencyDays,
                                 onRetryConnection = chatController::retryConnection,
                                 home = DesktopHomeActions(
                                     onSortKeySelected = { homeSort = homeSort.toggled(it) },
@@ -918,14 +962,20 @@ internal fun LettaDesktopApp(
                         modifier = Modifier.weight(1f).fillMaxHeight(),
                     )
                     if (showBackgroundTasks && subagentRepository != null) {
-                        RailDivider()
-                        DesktopBackgroundTasksPanel(
-                            subagents = activeSubagents,
+                        LettaSidePane(
+                            title = "Background tasks",
                             onClose = { showBackgroundTasks = false },
-                            onFetchTodos = subagentRepository.let { repo ->
-                                { toolCallId -> repo.todos(toolCallId).getOrDefault(emptyList()) }
-                            },
-                        )
+                            initialWidth = 360.dp,
+                        ) {
+                            DesktopBackgroundTasksPanel(
+                                subagents = activeSubagents,
+                                onClose = { showBackgroundTasks = false },
+                                onFetchTodos = subagentRepository.let { repo ->
+                                    { toolCallId -> repo.todos(toolCallId).getOrDefault(emptyList()) }
+                                },
+                                showHeader = false,
+                            )
+                        }
                     }
                 }
             }
@@ -947,6 +997,7 @@ internal fun LettaDesktopApp(
                         chatController = chatController,
                         onSelectDestination = { selectedDestination = it },
                         onOpenAgent = ::openAgent,
+                        onNewCanvas = { canvasLibrary.createNew(selectedAgentId) { activeCanvasSession = it } },
                         agentRepository = dataBindings.sessionGraphProvider.current.agentRepository,
                         selectedAgentId = selectedAgentId,
                         onIrohIdentityReset = {

@@ -58,13 +58,13 @@ import com.letta.mobile.data.search.CommandPalette
 import com.letta.mobile.data.search.PaletteItem
 import com.letta.mobile.data.search.PaletteItemKind
 import com.letta.mobile.data.search.mascotAgentId
-import com.letta.mobile.desktop.chat.AgentOrb
 import com.letta.mobile.desktop.chat.PaletteItemLeading
 import dev.nucleusframework.core.runtime.Platform
 import java.awt.event.WindowEvent
 import java.awt.event.WindowFocusListener
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.jetbrains.jewel.ui.component.TextField as JewelTextField
+import com.letta.mobile.ui.chat.AgentOrb
 
 /** Actions the quick-query window routes back into the main app. */
 @Immutable

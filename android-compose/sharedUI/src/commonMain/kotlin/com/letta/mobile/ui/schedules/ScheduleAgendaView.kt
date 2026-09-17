@@ -1,4 +1,4 @@
-package com.letta.mobile.desktop.schedules
+package com.letta.mobile.ui.schedules
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -48,7 +47,7 @@ import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Instant
 
-internal data class AgendaViewParams(
+data class AgendaViewParams(
     val defs: List<ScheduleDef>,
     val selectedDate: LocalDate,
     val today: LocalDate,
@@ -58,7 +57,7 @@ internal data class AgendaViewParams(
     val onRunClick: (ScheduleRun) -> Unit,
 )
 
-internal data class AgendaRowParams(
+data class AgendaRowParams(
     val run: ScheduleRun,
     val subtitle: String?,
     val now: Instant,
@@ -67,7 +66,7 @@ internal data class AgendaRowParams(
 )
 
 @Composable
-internal fun AgendaView(params: AgendaViewParams) {
+fun AgendaView(params: AgendaViewParams) {
     val agenda = remember(params.defs, params.selectedDate, params.now) {
         ScheduleProjection.agenda(params.defs, params.selectedDate, params.now, params.zone)
     }
@@ -128,7 +127,7 @@ private fun AgendaMonthHeader(params: AgendaViewParams) {
         )
         Spacer(Modifier.weight(1f))
         Box(
-            Modifier.clip(RoundedCornerShape(8.dp))
+            Modifier.clip(MaterialTheme.shapes.medium)
                 .background(
                     if (isToday) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
                     else MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -171,7 +170,7 @@ private fun AgendaRunList(params: AgendaRunListParams) {
 }
 
 @Composable
-internal fun AgendaDateStrip(selectedDate: LocalDate, today: LocalDate, onSelect: (LocalDate) -> Unit) {
+fun AgendaDateStrip(selectedDate: LocalDate, today: LocalDate, onSelect: (LocalDate) -> Unit) {
     val state = rememberWeekCalendarState(
         startDate = today.minus(14, DateTimeUnit.DAY),
         endDate = today.plus(120, DateTimeUnit.DAY),
@@ -184,7 +183,7 @@ internal fun AgendaDateStrip(selectedDate: LocalDate, today: LocalDate, onSelect
 }
 
 @Composable
-internal fun AgendaDayCell(date: LocalDate, selectedDate: LocalDate, today: LocalDate, onSelect: (LocalDate) -> Unit) {
+fun AgendaDayCell(date: LocalDate, selectedDate: LocalDate, today: LocalDate, onSelect: (LocalDate) -> Unit) {
     val selected = date == selectedDate
     Column(
         Modifier.padding(2.dp).clickable { onSelect(date) }.padding(vertical = 6.dp),
@@ -219,7 +218,7 @@ private fun agendaDayNumberColor(selected: Boolean, isToday: Boolean): Color = w
 }
 
 @Composable
-internal fun AgendaRow(params: AgendaRowParams) {
+fun AgendaRow(params: AgendaRowParams) {
     val ldt = params.run.instant.toLocalDateTime(params.zone)
     val time = "${ScheduleFormat.pad2(ldt.hour)}:${ScheduleFormat.pad2(ldt.minute)}"
     Row(

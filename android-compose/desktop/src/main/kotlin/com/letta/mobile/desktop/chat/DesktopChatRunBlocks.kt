@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.projection.projectRunContent
 import com.letta.mobile.data.model.UiToolCall
+import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 
 @JvmInline
 internal value class StreamingMessageId(val value: String)
@@ -258,8 +259,6 @@ internal fun StepStatusCircle(state: StepState) {
         }
     }
 }
-
-internal val ChatColumnMaxWidth = 760.dp
 
 /**
  * Readable measure for centred prose in the pane's full-width states (the

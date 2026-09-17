@@ -128,6 +128,12 @@ class DesktopCanvasDocumentStore(
         }
     }
 
+    override suspend fun listAll(): List<CanvasDocument> = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            loadAllDocumentsInternal().sortedByDescending { it.updatedAtEpochMs }
+        }
+    }
+
     private fun loadAllDocumentsInternal(): List<CanvasDocument> {
         if (!Files.isDirectory(rootDirectory)) return emptyList()
         val list = mutableListOf<CanvasDocument>()

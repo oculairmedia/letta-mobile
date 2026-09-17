@@ -64,6 +64,8 @@ import com.letta.mobile.ui.theme.customColors
 import kotlinx.coroutines.delay
 
 import kotlin.time.Duration.Companion.milliseconds
+import com.letta.mobile.ui.chat.AgentSphere
+import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 /** Surface + composer catalog inputs for [ChatDetailPane]. */
 internal data class ChatDetailPaneState(
     val surface: DesktopChatSurfaceState,
@@ -98,6 +100,7 @@ internal data class ChatDetailPaneActions(
     val onComposerTextChanged: (String) -> Unit,
     val onSend: () -> Unit,
     val onAttachImage: () -> Unit,
+    val onOpenCanvas: (() -> Unit)? = null,
     val onRemoveImageAttachment: (Int) -> Unit,
     val onRetryConnection: () -> Unit,
     val onModelSelected: (String) -> Unit,
@@ -228,6 +231,7 @@ private fun ChatDetailBody(
                 onTextChanged = actions.onComposerTextChanged,
                 onSend = actions.onSend,
                 onAttachImage = actions.onAttachImage,
+                onOpenCanvas = actions.onOpenCanvas,
                 onRemoveImageAttachment = actions.onRemoveImageAttachment,
             ),
         )

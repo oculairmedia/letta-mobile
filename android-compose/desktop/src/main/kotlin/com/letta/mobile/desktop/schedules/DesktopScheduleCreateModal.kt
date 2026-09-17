@@ -402,39 +402,6 @@ internal fun ScheduleEmptyState(canCreate: Boolean) {
     }
 }
 
-@Composable
-internal fun statusColor(status: RunStatus): Color = when (status) {
-    RunStatus.Done -> MaterialTheme.customColors.successColor
-    RunStatus.Failed -> MaterialTheme.colorScheme.error
-    RunStatus.Running, RunStatus.Next -> MaterialTheme.customColors.runningColor
-    RunStatus.Upcoming -> MaterialTheme.colorScheme.outline
-}
-
-@Composable
-internal fun agendaStatusLabel(run: ScheduleRun, now: Instant): Pair<String, Color> = when (run.status) {
-    RunStatus.Done -> "Ran" to MaterialTheme.customColors.successColor
-    RunStatus.Failed -> "Failed" to MaterialTheme.colorScheme.error
-    RunStatus.Running -> "running" to MaterialTheme.customColors.runningColor
-    RunStatus.Next -> ScheduleFormat.relative(now, run.instant) to MaterialTheme.customColors.runningColor
-    RunStatus.Upcoming -> "scheduled" to MaterialTheme.colorScheme.onSurfaceVariant
-}
-
-internal fun monthDayLabel(date: LocalDate): String =
-    "${ScheduleFormat.monthShort(date.month.ordinal + 1)} ${date.day}"
-
-internal fun dayHeading(date: LocalDate, today: LocalDate): String {
-    val delta = (date.toEpochDays() - today.toEpochDays()).toInt()
-    return when (delta) {
-        0 -> "Today"
-        1 -> "Tomorrow"
-        -1 -> "Yesterday"
-        else -> "${fullWeekday(date.dayOfWeek.isoDayNumber)}, ${monthDayLabel(date)}"
-    }
-}
-
-internal fun fullWeekday(iso: Int): String =
-    listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")[(iso - 1).coerceIn(0, 6)]
-
 internal fun fullMonth(monthNumber: Int): String =
     listOf(
         "January", "February", "March", "April", "May", "June",

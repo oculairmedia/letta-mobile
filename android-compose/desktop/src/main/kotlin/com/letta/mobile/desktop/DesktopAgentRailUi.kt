@@ -62,7 +62,7 @@ import com.letta.mobile.data.agents.AgentRailSpace
 import com.letta.mobile.data.agents.deriveAgentSpaces
 import com.letta.mobile.data.model.DisplayNames
 import com.letta.mobile.data.search.TextMatch
-import com.letta.mobile.desktop.chat.AgentOrb
+import com.letta.mobile.ui.chat.AgentOrb
 
 /**
  * Fade length for the rail's scroll edges — proportionate to the rail's own
@@ -87,6 +87,18 @@ internal fun formatRelativeTimestamp(raw: String): String {
         seconds < 604_800 -> "${seconds / 86_400}d"
         seconds < 2_592_000 -> "${seconds / 604_800}w"
         else -> "${seconds / 2_592_000}mo"
+    }
+}
+
+/** "8:07 PM" for today, else the relative label ("3d"). */
+internal fun hoverTimeLabel(raw: String): String {
+    val instant = runCatching { java.time.Instant.parse(raw) }.getOrNull() ?: return raw
+    val zone = java.time.ZoneId.systemDefault()
+    val local = instant.atZone(zone)
+    return if (local.toLocalDate() == java.time.LocalDate.now(zone)) {
+        local.format(java.time.format.DateTimeFormatter.ofPattern("h:mm a"))
+    } else {
+        formatRelativeTimestamp(raw)
     }
 }
 
@@ -156,7 +168,13 @@ internal data class DesktopAgentRailFocus(
     val avatarStyleByAgentId: Map<String, Int>,
     /** Agents with a mascot identity draw their silhouette in their colour instead of the gradient orb. */
     val identityByAgentId: Map<String, com.letta.mobile.avatar.core.MascotIdentity> = emptyMap(),
+    /** Latest conversation per agent, for the hover. */
+    val activityByAgentId: Map<String, RailAgentActivity> = emptyMap(),
 )
+
+/** What the orb hover shows: when the agent last spoke and what it said. */
+@Immutable
+internal data class RailAgentActivity(val updatedAtLabel: String, val preview: String)
 
 @Immutable
 internal data class DesktopAgentRailState(
@@ -219,26 +237,9 @@ internal fun DesktopAgentRail(
         horizontalAlignment = Alignment.Start,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        // No hamburger: the search icon IS the library trigger — it expands
-        // the panel, and choosing an agent collapses it again (the shell
-        // resets `expanded` on selection).
-        RailHeaderRow(onClick = actions.onNewSession, label = if (state.expanded) "New session" else null) {
-            NewSessionButton(onNewSession = actions.onNewSession)
-        }
-        if (!state.expanded) {
-            RailHeaderRow(onClick = actions.onToggleExpanded) {
-                RailActionIcon(
-                    RailActionIconModel(
-                        icon = Icons.Outlined.Search,
-                        description = "Search agents",
-                        onClick = actions.onToggleExpanded,
-                    ),
-                )
-            }
-        }
-        // Home is fleet-wide, so it sits with the other fleet-wide controls up
-        // here - always, in both rail modes - and not in the per-agent sidebar,
-        // whose header is then the agent's mascot alone.
+        // Home is fleet-wide, so it sits at the top of the rail - always, in both
+        // rail modes - and not in the per-agent sidebar, whose header is then
+        // the agent's mascot alone.
         RailHeaderRow(onClick = actions.onHome, label = if (state.expanded) "Home" else null) {
             RailActionIcon(
                 RailActionIconModel(
@@ -250,18 +251,25 @@ internal fun DesktopAgentRail(
             )
         }
         Spacer(Modifier.height(4.dp))
-        if (state.expanded) {
-            ExpandedAgentLibrary(
-                groups = groups,
-                focus = state.focus,
-                onAgentSelected = actions.onAgentSelected,
-            )
-        } else {
-            AgentRailOrbList(
-                groups = groups,
-                focus = state.focus,
-                onAgentSelected = actions.onAgentSelected,
-            )
+        // Then the orbs, with the plus pinned at the bottom (Grok Bot layout). There is no separate
+        // search trigger: the plus menu's "New chat" opens the agent picker, which searches.
+        Column(modifier = Modifier.weight(1f)) {
+            if (state.expanded) {
+                ExpandedAgentLibrary(
+                    groups = groups,
+                    focus = state.focus,
+                    onAgentSelected = actions.onAgentSelected,
+                )
+            } else {
+                AgentRailOrbList(
+                    groups = groups,
+                    focus = state.focus,
+                    onAgentSelected = actions.onAgentSelected,
+                )
+            }
+        }
+        RailHeaderRow(onClick = actions.onNewSession, label = if (state.expanded) "New" else null) {
+            NewSessionButton(onNewSession = actions.onNewSession)
         }
     }
 }
@@ -540,9 +548,10 @@ private fun ColumnScope.AgentRailOrbList(
 }
 
 
+/** The rail's plus (Grok Bot layout): opens the agent picker, whose top rows are the create actions. */
 @Composable
 private fun NewSessionButton(onNewSession: () -> Unit) {
-    DesktopTooltip(text = "New session") {
+    DesktopTooltip(text = "New") {
         Box(
             modifier = Modifier
                 .size(28.dp)
@@ -553,7 +562,7 @@ private fun NewSessionButton(onNewSession: () -> Unit) {
         ) {
             Icon(
                 imageVector = Icons.Outlined.Add,
-                contentDescription = "New session",
+                contentDescription = "New",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(16.dp),
             )
@@ -579,6 +588,7 @@ private data class AgentRailOrbTarget(
     val orbStyle: Int,
     val tooltip: String,
     val identity: com.letta.mobile.avatar.core.MascotIdentity? = null,
+    val activity: RailAgentActivity? = null,
 )
 
 private fun AgentRailOrbParams.toFlags(): AgentRailOrbFlags {
@@ -604,14 +614,20 @@ private fun AgentRailOrbParams.toTarget(flags: AgentRailOrbFlags): AgentRailOrbT
         if (flags.thinking) append(" · thinking…")
     }
     val identity = group.agentIds.firstNotNullOfOrNull { focus.identityByAgentId[it] }
-    return AgentRailOrbTarget(agentId = targetAgentId, orbStyle = orbStyle, tooltip = tooltip, identity = identity)
+    val activity = group.agentIds.mapNotNull { focus.activityByAgentId[it] }
+        .maxByOrNull { conversationRecency(it.updatedAtLabel) }
+    return AgentRailOrbTarget(agentId = targetAgentId, orbStyle = orbStyle, tooltip = tooltip, identity = identity, activity = activity)
 }
 
 @Composable
 private fun AgentRailOrb(params: AgentRailOrbParams) {
     val flags = params.toFlags()
     val target = params.toTarget(flags)
-    DesktopTooltip(text = target.tooltip) {
+    DesktopRichTooltip(
+        title = target.tooltip,
+        timeLabel = target.activity?.let { hoverTimeLabel(it.updatedAtLabel) },
+        body = target.activity?.preview?.trim()?.takeUnless { it.equals("Loaded from backend", ignoreCase = true) },
+    ) {
         AgentRailOrbContent(
             params = params,
             flags = flags,
