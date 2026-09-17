@@ -526,6 +526,7 @@ private fun ChatScreenComposerInputSection(
         agentId = viewModel.agentId.value,
         // The thinking indicator sits beside the mascot companion, in its row (letta-mobile-8jtf3).
         companionStatus = { ChatScreenThinkingTokenSection(state, reducedMotion) },
+        onCompanionClick = navigation.onOpenAgentPane,
         inputText = composerState.inputText,
         pendingAttachments = composerState.pendingAttachments,
         isStreaming = state.isStreaming,

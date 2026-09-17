@@ -12,6 +12,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 
 @Composable
 internal fun AgentScaffoldMainContent(
@@ -135,6 +136,8 @@ private fun AgentScaffoldChatScreenPane(
         chatBackground = state.chatBackground,
         chatMode = params.chatMode,
         onBugCommand = { params.sheetVisibility.onShowBugReportSheetChange(true) },
+        // The companion mascot opens the same agent pane as the top bar's menu.
+        onOpenAgentPane = { state.scope.launch { state.drawerState.open() } },
         onViewSubagentConversation = params.navigation.onViewSubagentConversation
             ?: params.navigation.onSwitchConversation?.let { switch ->
                 { subagentAgentId, subagentConversationId ->
