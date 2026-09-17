@@ -262,6 +262,23 @@ private fun CanvasNoteCard(
     }
 }
 
+/**
+ * A drag that reports its deltas and treats cancel as an end: the one gesture the handle bar,
+ * the text grip and the resize corner all share.
+ */
+private fun Modifier.dragHandle(onDragStart: () -> Unit, onDrag: (Offset) -> Unit, onDragEnd: () -> Unit): Modifier =
+    pointerInput(Unit) {
+        detectDragGestures(
+            onDragStart = { onDragStart() },
+            onDragEnd = onDragEnd,
+            onDragCancel = onDragEnd,
+            onDrag = { change, dragAmount ->
+                change.consume()
+                onDrag(dragAmount)
+            },
+        )
+    }
+
 @Composable
 private fun NoteHandleBar(
     cardColor: Color,
@@ -277,17 +294,7 @@ private fun NoteHandleBar(
             .fillMaxWidth()
             .height(HANDLE_HEIGHT)
             .background(onCard.copy(alpha = 0.08f))
-            .pointerInput(Unit) {
-                detectDragGestures(
-                    onDragStart = { onDragStart() },
-                    onDragEnd = onDragEnd,
-                    onDragCancel = onDragEnd,
-                    onDrag = { change, dragAmount ->
-                        change.consume()
-                        onDrag(dragAmount)
-                    },
-                )
-            }
+            .dragHandle(onDragStart, onDrag, onDragEnd)
             .padding(start = 8.dp, end = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -335,17 +342,7 @@ private fun TextMoveGrip(
     Box(
         modifier = modifier
             .size(18.dp)
-            .pointerInput(Unit) {
-                detectDragGestures(
-                    onDragStart = { onDragStart() },
-                    onDragEnd = onDragEnd,
-                    onDragCancel = onDragEnd,
-                    onDrag = { change, dragAmount ->
-                        change.consume()
-                        onDrag(dragAmount)
-                    },
-                )
-            }
+            .dragHandle(onDragStart, onDrag, onDragEnd)
             .semantics { contentDescription = "Move text" },
         contentAlignment = Alignment.Center,
     ) {
@@ -368,17 +365,7 @@ private fun NoteResizeHandle(
     Box(
         modifier = modifier
             .size(18.dp)
-            .pointerInput(Unit) {
-                detectDragGestures(
-                    onDragStart = { onDragStart() },
-                    onDragEnd = onDragEnd,
-                    onDragCancel = onDragEnd,
-                    onDrag = { change, dragAmount ->
-                        change.consume()
-                        onDrag(dragAmount)
-                    },
-                )
-            }
+            .dragHandle(onDragStart, onDrag, onDragEnd)
             .semantics { contentDescription = "Resize note" },
         contentAlignment = Alignment.BottomEnd,
     ) {
