@@ -63,6 +63,7 @@ import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.letta.mobile.desktop.chat.DesktopChatController
 import kotlinx.coroutines.flow.StateFlow
 import kotlin.time.Duration.Companion.seconds
 import java.awt.Window
@@ -768,21 +769,24 @@ internal fun LettaDesktopApp(
                 )
                 RailDivider()
                 }
-                val composerCommands = remember(
-                    chatController,
-                    agentSlashCommands,
-                    selectedAgentId,
-                ) {
-                    buildComposerCommands(
-                        BuildComposerCommandsParams(
-                            chatController = chatController,
-                            agentSlashCommands = agentSlashCommands,
-                            onCreateAgent = { overlays.newAgent = true },
-                            onEditAgent = { editAgentId = selectedAgentId },
-                            onNavigate = { selectedDestination = it },
-                        ),
-                    )
-                }
+                val canvasStore = remember { com.letta.mobile.desktop.canvas.DesktopCanvasDocumentStore() }
+                var activeCanvasSession by remember { mutableStateOf<com.letta.mobile.data.canvas.CanvasSession?>(null) }
+                val composerCommands = rememberDesktopComposerCommands(
+                    DesktopComposerCommandsParams(
+                        chatController = chatController,
+                        agentSlashCommands = agentSlashCommands,
+                        selectedConversationId = chatState.selectedConversationId,
+                        selectedAgentId = selectedAgentId,
+                        selectedAgentName = selectedAgentName,
+                        selectedDestination = selectedDestination,
+                        canvasStore = canvasStore,
+                        chatScope = chatScope,
+                        onNavigate = { selectedDestination = it },
+                        onCreateAgent = { overlays.newAgent = true },
+                        onEditAgent = { editAgentId = it },
+                        onCanvasSessionChange = { activeCanvasSession = it },
+                    ),
+                )
                 val contextUsage = rememberFocusedContextUsage(
                     agentId = selectedAgentId,
                     conversationId = chatState.selectedConversationId,
@@ -849,6 +853,7 @@ internal fun LettaDesktopApp(
                         showBackgroundTasks = showBackgroundTasks,
                         subagentRepository = subagentRepository,
                         activeSubagents = activeSubagents,
+                        activeCanvasSession = activeCanvasSession,
                     ),
                     actions = DesktopMainContentActions(
                         onEditAgentClose = { editAgentId = null },
@@ -857,27 +862,19 @@ internal fun LettaDesktopApp(
                             editAgentId = null
                             if (nameChanged) chatController.retryConnection()
                         },
-                        chatDetailActions = ChatDetailPaneActions(
-                            onComposerTextChanged = chatController::updateComposerText,
-                            onSend = chatController::send,
-                            onSubmitApproval = chatController::submitApproval.takeIf { canSubmitApprovals },
-                            onA2uiAction = ::dispatchA2uiAction,
-                            onAttachImage = { pickerLauncher.launch() },
-                            onRemoveImageAttachment = chatController::removeImageAttachment,
-                            onRetryConnection = chatController::retryConnection,
-                            onModelSelected = chatController::setConversationModel,
-                            onChangeWorkingDirectory = chatController::changeSelectedConversationWorkingDirectory,
-                            onOpenModelPicker = { overlays.modelPicker = true },
-                            onOnboardingTask = { kind ->
-                                when (kind) {
-                                    OnboardingTaskKind.SetPersona -> editAgentId = selectedAgentId
-                                    OnboardingTaskKind.ConnectChannel ->
-                                        selectedDestination = DesktopDestination.Channels
-                                    OnboardingTaskKind.AddSkills ->
-                                        selectedDestination = DesktopDestination.Agents
-                                }
-                            },
-                            onOpenAgent = ::openAgent,
+                        onCloseCanvas = { activeCanvasSession = null },
+                        chatDetailActions = createDesktopChatDetailPaneActions(
+                            CreateDesktopChatDetailPaneActionsParams(
+                                chatController = chatController,
+                                canSubmitApprovals = canSubmitApprovals,
+                                onA2uiAction = ::dispatchA2uiAction,
+                                onAttachImage = { pickerLauncher.launch() },
+                                onOpenModelPicker = { overlays.modelPicker = true },
+                                onSetPersona = { editAgentId = selectedAgentId },
+                                onNavigateToChannels = { selectedDestination = DesktopDestination.Channels },
+                                onNavigateToAgents = { selectedDestination = DesktopDestination.Agents },
+                                onOpenAgent = ::openAgent,
+                            ),
                         ),
                         destinationActions = DestinationContentActions(
                             onRetryConnection = chatController::retryConnection,
@@ -1103,6 +1100,7 @@ private fun desktopActiveTitle(destination: DesktopDestination, conversationTitl
     if (destination != DesktopDestination.Conversations) return destination.label
     return conversationTitle ?: "Letta Desktop"
 }
+
 
 /**
  * Modal for creating a new agent: name + optional model, created with base

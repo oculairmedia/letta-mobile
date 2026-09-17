@@ -659,6 +659,54 @@ class TimelineStreamReducerTest {
     }
 
     @Test
+    fun `hydration drops assistant skill content payload`() {
+        val skillContent = """
+            <skill_content name="kotzilla-mcp-console">
+            ---
+            name: kotzilla-mcp-console
+            description: Query performance telemetry from the console.
+            ---
+            ${"Read-only operational instructions. ".repeat(20)}
+            </skill_content>
+        """.trimIndent()
+        val result = TimelineHydrationReducer.reduce(
+            conversationId = "conv-test",
+            serverMessagesChronological = listOf(
+                UserMessage(id = "question", contentRaw = JsonPrimitive("Check performance")),
+                AssistantMessage(id = "skill-content", contentRaw = JsonPrimitive(skillContent)),
+                AssistantMessage(id = "answer", contentRaw = JsonPrimitive("Performance is healthy.")),
+            ),
+            timelineBeforeFetch = Timeline("conv-test"),
+            currentTimeline = Timeline("conv-test"),
+            diskRecords = emptyList(),
+        )
+
+        result.timeline.events.map { (it as TimelineEvent.Confirmed).serverId } shouldBe listOf("question", "answer")
+        result.visibleEventCount shouldBe 2
+    }
+
+    @Test
+    fun `live stream drops user shaped skill content before canonical ingest`() {
+        val skillContent = """
+            <skill_content name="asus-router">
+            ---
+            name: asus-router
+            description: Query router status.
+            ---
+            ${"Internal skill instructions. ".repeat(20)}
+            </skill_content>
+        """.trimIndent()
+
+        val output = reduce(
+            frame = UserMessage(id = "skill-content-live", contentRaw = JsonPrimitive(skillContent)),
+        )
+
+        output.next.events shouldBe emptyList()
+        output.emittedEvents shouldBe emptyList()
+        output.notification shouldBe null
+    }
+
+    @Test
     fun `semantic match dedupes hydrate then ws assistant with different server id`() {
         val hydrated = TimelineHydrationReducer.reduce(
             conversationId = "conv-test",

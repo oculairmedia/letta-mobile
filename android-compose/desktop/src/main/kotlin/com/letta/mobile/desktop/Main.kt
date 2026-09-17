@@ -6,6 +6,7 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Box
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -177,14 +178,29 @@ private fun runDesktopApplication(
                     // Spotlight-style floating query bar, summoned by the global
                     // hotkey without raising the main window.
                     DesktopQuickQueryWindow(quickQuery)
-                    // Realtime shader lookdev as a second window, for tuning the
-                    // ambient glow against the real app theme and backend state.
-                    if (System.getenv("LETTA_SHADER_LOOKDEV") == "1") {
-                        com.letta.mobile.desktop.lookdev.ShaderLookdevWindow()
-                    }
+                    DebugWindows()
                 }
             }
         }
+}
+
+/**
+ * The extra windows that only open when their environment variable is set. They are kept together,
+ * and out of [runDesktopApplication], because each one is a whole verification surface that has
+ * nothing to do with bringing up the app - and because appending the next one to the startup path
+ * is how that function grows without anyone deciding it should.
+ */
+@Composable
+private fun DebugWindows() {
+    // Realtime shader lookdev, for tuning the ambient glow against the real app theme and
+    // backend state.
+    if (System.getenv("LETTA_SHADER_LOOKDEV") == "1") {
+        com.letta.mobile.desktop.lookdev.ShaderLookdevWindow()
+    }
+    // Canvas Workspace verification host.
+    if (System.getenv("MERIDIAN_CANVAS_DEBUG") == "1") {
+        com.letta.mobile.desktop.canvas.CanvasDebugWindow()
+    }
 }
 
 /**

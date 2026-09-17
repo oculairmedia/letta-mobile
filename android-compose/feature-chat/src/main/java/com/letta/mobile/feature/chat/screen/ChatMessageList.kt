@@ -55,6 +55,7 @@ internal fun ChatMessageList(
     onSubmitApproval: (String, List<String>, Boolean, String?) -> Unit,
     onToggleRunCollapsed: (String) -> Unit,
     onToggleReasoningExpanded: (String) -> Unit,
+    onOpenToolRunDetails: (List<com.letta.mobile.data.chat.projection.ToolTimelineGroup>) -> Unit = {},
     onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)?,
     modifier: Modifier = Modifier,
     chatBackground: ChatBackground = ChatBackground.Default,
@@ -71,6 +72,7 @@ internal fun ChatMessageList(
         onSubmitApproval = onSubmitApproval,
         onToggleRunCollapsed = onToggleRunCollapsed,
         onToggleReasoningExpanded = onToggleReasoningExpanded,
+        onOpenToolRunDetails = onOpenToolRunDetails,
         onAttachmentImageTap = onAttachmentImageTap,
     )
     val appearance = ChatMessageListAppearance(

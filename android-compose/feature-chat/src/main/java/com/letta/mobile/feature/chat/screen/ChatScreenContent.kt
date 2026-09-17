@@ -204,6 +204,7 @@ private fun ChatContentMessageArea(
         onSubmitApproval = callbacks.onSubmitApproval,
         onToggleRunCollapsed = callbacks.onToggleRunCollapsed,
         onToggleReasoningExpanded = callbacks.onToggleReasoningExpanded,
+        onOpenToolRunDetails = callbacks.onOpenToolRunDetails,
         onAttachmentImageTap = callbacks.onAttachmentImageTap,
         modifier = Modifier.fillMaxSize(),
         chatBackground = appearance.chatBackground,

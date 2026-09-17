@@ -8,6 +8,8 @@ import com.letta.mobile.channel.ChannelSyncStateStore
 import com.letta.mobile.channel.IChannelNotificationPublisher
 import com.letta.mobile.channel.IChannelSyncStateStore
 import com.letta.mobile.chat.BuildConfigChatClientVersionProvider
+import com.letta.mobile.data.canvas.CanvasDocumentStore
+import com.letta.mobile.data.canvas.CanvasExternalTools
 import com.letta.mobile.data.channel.NotificationDelivery
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.health.IServerHealthRepository
@@ -118,9 +120,20 @@ abstract class AppModule {
         @Singleton
         fun provideAndroidExternalToolRegistry(
             runner: DeviceActionCommandRunner,
+            canvasStore: CanvasDocumentStore,
+            canvasSessions: com.letta.mobile.data.canvas.CanvasSessionRegistry,
         ): ExternalToolRegistry = ExternalToolRegistry.hostTools(
-            listOf(DeviceActionExternalTool(runner)),
+            buildList {
+                add(DeviceActionExternalTool(runner))
+                addAll(CanvasExternalTools.all(canvasStore, canvasSessions))
+            }
         )
+
+        /** One registry per process here, but owned by the graph so it dies with it. */
+        @Provides
+        @Singleton
+        fun provideCanvasSessionRegistry(): com.letta.mobile.data.canvas.CanvasSessionRegistry =
+            com.letta.mobile.data.canvas.CanvasSessionRegistry()
 
         // letta-mobile-qfa81 (P4 row 13): approval submission routed over
         // admin_rpc when the active backend is iroh://. Injected into

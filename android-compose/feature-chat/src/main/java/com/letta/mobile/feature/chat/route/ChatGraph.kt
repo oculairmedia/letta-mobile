@@ -23,6 +23,7 @@ fun NavGraphBuilder.chatGraph(
     onNavigateToProjects: () -> Unit,
     onNavigateToConversationList: () -> Unit,
     onSwitchConversation: (AgentChatRoute) -> Unit,
+    onNavigateToCanvas: ((String?) -> Unit)? = null,
 ) {
     composable<AgentChatRoute>(
         enterTransition = enterTransition,
@@ -84,6 +85,7 @@ fun NavGraphBuilder.chatGraph(
                     )
                 )
             },
+            onNavigateToCanvas = onNavigateToCanvas,
             viewModelKey = route.toViewModelKey(),
         )
     }
