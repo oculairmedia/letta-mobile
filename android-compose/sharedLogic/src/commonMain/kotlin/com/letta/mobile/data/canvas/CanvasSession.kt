@@ -244,7 +244,7 @@ class CanvasSession(
     suspend fun setDocument(
         documentId: String,
         documentJson: String,
-        actorId: String = "local_user",
+        actorId: String = LOCAL_USER_ACTOR_ID,
         frame: CanvasDocumentFrame? = null,
         color: String? = null,
         style: CanvasTextStyle? = null,
@@ -273,7 +273,7 @@ class CanvasSession(
     suspend fun restyleDocument(
         documentId: String,
         style: CanvasTextStyle,
-        actorId: String = "local_user",
+        actorId: String = LOCAL_USER_ACTOR_ID,
     ): CanvasDocument? {
         val existing = documents().firstOrNull { it.id == documentId } ?: return null
         return setDocument(documentId, existing.json, actorId, style = style)
@@ -283,7 +283,7 @@ class CanvasSession(
     suspend fun recolorDocument(
         documentId: String,
         colorHex: String,
-        actorId: String = "local_user",
+        actorId: String = LOCAL_USER_ACTOR_ID,
     ): CanvasDocument? {
         val existing = documents().firstOrNull { it.id == documentId } ?: return null
         return setDocument(documentId, existing.json, actorId, color = colorHex)
@@ -293,13 +293,13 @@ class CanvasSession(
     suspend fun moveDocument(
         documentId: String,
         frame: CanvasDocumentFrame,
-        actorId: String = "local_user",
+        actorId: String = LOCAL_USER_ACTOR_ID,
     ): CanvasDocument? {
         val existing = documents().firstOrNull { it.id == documentId } ?: return null
         return setDocument(documentId, existing.json, actorId, frame)
     }
 
-    suspend fun removeDocument(documentId: String, actorId: String = "local_user"): CanvasDocument =
+    suspend fun removeDocument(documentId: String, actorId: String = LOCAL_USER_ACTOR_ID): CanvasDocument =
         applyLocal(
             CanvasOp.RemoveDocumentOp(
                 opId = CanvasOpDiffer.generateOpId("doc"),
@@ -309,7 +309,7 @@ class CanvasSession(
             ),
         )
 
-    suspend fun applyLocalScene(newJson: String, actorId: String = "local_user"): List<CanvasOp> {
+    suspend fun applyLocalScene(newJson: String, actorId: String = LOCAL_USER_ACTOR_ID): List<CanvasOp> {
         val doc = currentDoc()
         if (doc.acl != null && !doc.acl.canWrite(actorId)) {
             throw UnauthorizedCanvasMutationException(actorId, canvasId)
