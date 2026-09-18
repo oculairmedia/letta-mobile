@@ -78,6 +78,7 @@ import com.letta.mobile.ui.components.LettaSearchBar
 import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.customColors
 import com.letta.mobile.util.formatRelativeTime
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -136,7 +137,7 @@ internal fun ConversationPickerSheet(
             onDismiss()
         },
     ) {
-        Column(modifier = Modifier.padding(16.dp).testTag(AgentScaffoldTestTags.CONVERSATION_PICKER_SHEET)) {
+        Column(modifier = Modifier.padding(LettaDimens.Space.lg).testTag(AgentScaffoldTestTags.CONVERSATION_PICKER_SHEET)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -163,7 +164,7 @@ internal fun ConversationPickerSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(LettaDimens.Space.sm))
 
             OutlinedButton(
                 onClick = {
@@ -175,23 +176,23 @@ internal fun ConversationPickerSheet(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Icon(LettaIcons.Add, contentDescription = null, modifier = Modifier.size(LettaIconSizing.Toolbar))
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
                 Text(stringResource(R.string.screen_conversations_new_action))
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(LettaDimens.Space.sm))
 
             if (conversations.isEmpty()) {
                 Text(
                     text = stringResource(R.string.screen_conversations_empty),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 16.dp),
+                    modifier = Modifier.padding(vertical = LettaDimens.Space.lg),
                 )
             } else {
                 LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier.heightIn(max = 400.dp),
+                    verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
+                    modifier = Modifier.heightIn(max = PickerListMaxHeight),
                 ) {
                     items(conversations, key = { it.id.value }) { conversation ->
                         val isActive = conversation.id.value == currentConversationId
@@ -241,7 +242,7 @@ internal fun ConversationPickerSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(LettaDimens.Space.lg))
         }
     }
 
@@ -321,13 +322,13 @@ internal fun AgentPickerSheet(
         sheetState = sheetState,
         onDismissRequest = onDismiss,
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(LettaDimens.Space.lg)) {
             Text(
                 text = stringResource(R.string.common_agents),
                 style = MaterialTheme.typography.titleMedium,
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(LettaDimens.Space.sm))
 
             LettaSearchBar(
                 query = searchQuery,
@@ -341,7 +342,7 @@ internal fun AgentPickerSheet(
                     .testTag(AgentScaffoldTestTags.AGENT_PICKER_SEARCH_FIELD),
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(LettaDimens.Space.sm))
 
             if (filteredAgents.isEmpty()) {
                 Text(
@@ -352,12 +353,12 @@ internal fun AgentPickerSheet(
                     },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 16.dp),
+                    modifier = Modifier.padding(vertical = LettaDimens.Space.lg),
                 )
             } else {
                 LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier.heightIn(max = 400.dp),
+                    verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
+                    modifier = Modifier.heightIn(max = PickerListMaxHeight),
                 ) {
                     items(filteredAgents, key = { it.id.value }) { agent ->
                         val isActive = agent.id.value == currentAgentId
@@ -386,7 +387,7 @@ internal fun AgentPickerSheet(
                             ),
                         ) {
                             Row(
-                                modifier = Modifier.padding(12.dp),
+                                modifier = Modifier.padding(LettaDimens.Space.md),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 val defaultAgentName = stringResource(R.string.screen_drawer_default_agent_name)
@@ -413,7 +414,7 @@ internal fun AgentPickerSheet(
                                         LettaIcons.Star,
                                         contentDescription = stringResource(R.string.screen_agents_favorite_indicator),
                                         modifier = Modifier
-                                            .padding(start = 8.dp)
+                                            .padding(start = LettaDimens.Space.sm)
                                             .size(LettaIconSizing.Inline),
                                         tint = MaterialTheme.colorScheme.primary,
                                     )
@@ -423,7 +424,7 @@ internal fun AgentPickerSheet(
                                         LettaIcons.Pin,
                                         contentDescription = stringResource(R.string.screen_agents_pinned_indicator),
                                         modifier = Modifier
-                                            .padding(start = 8.dp)
+                                            .padding(start = LettaDimens.Space.sm)
                                             .size(LettaIconSizing.Inline),
                                         tint = MaterialTheme.colorScheme.tertiary,
                                     )
@@ -442,7 +443,7 @@ internal fun AgentPickerSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(LettaDimens.Space.lg))
         }
     }
 }
@@ -473,7 +474,7 @@ internal fun ConversationMenuItem(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .defaultMinSize(minHeight = 64.dp)
+            .defaultMinSize(minHeight = ConversationItemMinHeight)
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick,
@@ -483,10 +484,10 @@ internal fun ConversationMenuItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .defaultMinSize(minHeight = 64.dp)
-                .padding(horizontal = 12.dp, vertical = 10.dp),
+                .defaultMinSize(minHeight = ConversationItemMinHeight)
+                .padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.md),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         ) {
             leadingIcon()
             val fallbackTitle = stringResource(R.string.screen_conversations_unnamed)
@@ -590,7 +591,7 @@ internal fun ContextWindowCard(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         ),
     ) {
-        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+        Column(modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -599,9 +600,9 @@ internal fun ContextWindowCard(
                     LettaIcons.Database,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.tertiary,
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(LettaDimens.Space.lg),
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
                 Text(
                     text = stringResource(R.string.screen_chat_context_window_title),
                     style = MaterialTheme.typography.labelMedium,
@@ -611,22 +612,22 @@ internal fun ContextWindowCard(
                 if (state.maxTokens > 0) {
                     Text(
                         text = stringResource(
-                            R.string.screen_chat_context_window_percent,
+                             R.string.screen_chat_context_window_percent,
                             state.usagePercent,
                         ),
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
-                    Spacer(modifier = Modifier.width(4.dp))
+                    Spacer(modifier = Modifier.width(LettaDimens.Space.xs))
                 }
                 if (state.isLoading) {
-                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    CircularProgressIndicator(modifier = Modifier.size(LettaDimens.Space.lg), strokeWidth = LettaDimens.Space.hair)
                 } else {
-                    IconButton(onClick = onRefresh, modifier = Modifier.size(28.dp)) {
+                    IconButton(onClick = onRefresh, modifier = Modifier.size(LettaDimens.Control.iconButton)) {
                         Icon(
                             LettaIcons.Refresh,
                             contentDescription = stringResource(R.string.action_refresh),
-                            modifier = Modifier.size(16.dp),
+                            modifier = Modifier.size(LettaDimens.Space.lg),
                         )
                     }
                 }
@@ -634,7 +635,7 @@ internal fun ContextWindowCard(
 
             if (state.maxTokens > 0) {
                 val progress = (state.currentTokens.toFloat() / state.maxTokens.toFloat()).coerceIn(0f, 1f)
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(LettaDimens.Space.sm))
                 LinearProgressIndicator(
                     progress = { progress },
                     modifier = Modifier.fillMaxWidth(),
@@ -642,7 +643,7 @@ internal fun ContextWindowCard(
                     trackColor = MaterialTheme.colorScheme.tertiaryContainer,
                 )
             } else if (state.error != null) {
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(LettaDimens.Space.xs))
                 val errorText = state.error
                 Text(
                     text = errorText ?: "",
@@ -650,7 +651,7 @@ internal fun ContextWindowCard(
                     color = MaterialTheme.colorScheme.error,
                 )
             } else {
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(LettaDimens.Space.xs))
                 Text(
                     text = stringResource(R.string.screen_chat_context_window_unavailable),
                     style = MaterialTheme.typography.bodySmall,
@@ -704,16 +705,16 @@ internal fun ModelInfoCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
                 LettaIcons.Psychology,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.tertiary,
-                modifier = Modifier.size(16.dp),
+                modifier = Modifier.size(LettaDimens.Space.lg),
             )
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
             Text(
                 text = stringResource(R.string.screen_drawer_model_label),
                 style = MaterialTheme.typography.labelMedium,
@@ -794,7 +795,7 @@ internal fun ModelPickerSheet(
     ) {
         Column(
             modifier = Modifier
-                .padding(16.dp)
+                .padding(LettaDimens.Space.lg)
                 .testTag(AgentScaffoldTestTags.MODEL_PICKER_SHEET),
         ) {
             Row(
@@ -810,12 +811,12 @@ internal fun ModelPickerSheet(
                     Icon(
                         LettaIcons.Refresh,
                         contentDescription = stringResource(R.string.action_refresh),
-                        modifier = Modifier.size(20.dp),
+                        modifier = Modifier.size(LettaDimens.Control.iconButtonSm),
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(LettaDimens.Space.sm))
 
             if (models.isNotEmpty()) {
                 LettaSearchBar(
@@ -826,7 +827,7 @@ internal fun ModelPickerSheet(
                     compact = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(LettaDimens.Space.sm))
             }
 
             if (grouped.isEmpty()) {
@@ -838,12 +839,12 @@ internal fun ModelPickerSheet(
                     },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 16.dp),
+                    modifier = Modifier.padding(vertical = LettaDimens.Space.lg),
                 )
             } else {
                 LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier.heightIn(max = 400.dp),
+                    verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
+                    modifier = Modifier.heightIn(max = PickerListMaxHeight),
                 ) {
                     grouped.forEach { (provider, providerModels) ->
                         item(key = "provider-$provider") {
@@ -851,7 +852,7 @@ internal fun ModelPickerSheet(
                                 text = provider.uppercase(),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp),
+                                modifier = Modifier.padding(horizontal = LettaDimens.Space.xs, vertical = LettaDimens.Space.sm),
                             )
                         }
                         itemsIndexed(
@@ -888,13 +889,13 @@ internal fun ModelPickerSheet(
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(12.dp),
+                                        .padding(LettaDimens.Space.md),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
                                         Row(
                                             verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                                         ) {
                                             Text(
                                                 text = model.displayName,
@@ -913,11 +914,11 @@ internal fun ModelPickerSheet(
                                                             style = MaterialTheme.typography.labelSmall,
                                                         )
                                                     },
-                                                    modifier = Modifier.height(24.dp),
+                                                    modifier = Modifier.height(LettaDimens.Space.xl),
                                                 )
                                             }
                                         }
-                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Spacer(modifier = Modifier.height(LettaDimens.Space.hair))
                                         Text(
                                             text = buildModelSubtitle(model),
                                             style = MaterialTheme.typography.labelSmall,
@@ -931,7 +932,7 @@ internal fun ModelPickerSheet(
                                             LettaIcons.CheckCircle,
                                             contentDescription = stringResource(R.string.screen_agents_current_indicator),
                                             modifier = Modifier
-                                                .padding(start = 8.dp)
+                                                .padding(start = LettaDimens.Space.sm)
                                                 .size(LettaIconSizing.Toolbar),
                                             tint = MaterialTheme.colorScheme.primary,
                                         )
@@ -943,7 +944,7 @@ internal fun ModelPickerSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(LettaDimens.Space.lg))
         }
     }
 }
@@ -1002,7 +1003,7 @@ internal fun DrawerContent(
             .fillMaxHeight()
             .width(DrawerWidth)
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = DrawerInset, vertical = 12.dp)
+            .padding(horizontal = DrawerInset, vertical = LettaDimens.Space.md)
             .navigationBarsPadding(),
     ) {
         DrawerAgentHeader(
@@ -1018,14 +1019,14 @@ internal fun DrawerContent(
                 onEditAgent()
             },
         )
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(LettaDimens.Space.lg))
         DrawerFacts(
             currentModel = currentModel,
             contextWindow = contextWindow,
             onModelTap = onModelTap,
             onRefreshContextWindow = onRefreshContextWindow,
         )
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(LettaDimens.Space.lg))
         DrawerChatMode(chatMode = chatMode, onChatModeSelected = onChatModeSelected)
 
         DrawerSectionLabel(stringResource(R.string.screen_drawer_navigate_label))
@@ -1055,7 +1056,7 @@ internal fun DrawerContent(
             },
         )
 
-        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+        HorizontalDivider(modifier = Modifier.padding(vertical = LettaDimens.Space.md))
         DrawerFooter(
             agentId = agentId,
             onResetMessages = {
@@ -1066,8 +1067,15 @@ internal fun DrawerContent(
     }
 }
 
+@Suppress("RawDimensionLiteral") // Max list height constraint for bottom sheet content
+private val PickerListMaxHeight = 400.dp
+
+@Suppress("RawDimensionLiteral") // Touch target / minimum height for conversation card item
+private val ConversationItemMinHeight = 64.dp
+
+@Suppress("RawDimensionLiteral") // Navigation drawer width constraint
 private val DrawerWidth = 300.dp
-private val DrawerInset = 12.dp
+private val DrawerInset = LettaDimens.Space.md
 
 /** Who: the agent's avatar (the shared one), its name, the backend it talks to, and its actions. */
 @Composable
@@ -1082,12 +1090,12 @@ private fun DrawerAgentHeader(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 4.dp, vertical = 4.dp),
+            .padding(horizontal = LettaDimens.Space.xs, vertical = LettaDimens.Space.xs),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
     ) {
         // A still: on this screen the composer companion is the live one.
-        AgentAvatar(agentId = agentId, name = displayName, size = 48.dp, live = false)
+        AgentAvatar(agentId = agentId, name = displayName, size = LettaDimens.Orb.railSlotWidth, live = false)
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = displayName,
@@ -1095,11 +1103,11 @@ private fun DrawerAgentHeader(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
                 Icon(
                     LettaIcons.Storage,
                     contentDescription = null,
-                    modifier = Modifier.size(12.dp),
+                    modifier = Modifier.size(LettaDimens.Space.md),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
@@ -1154,8 +1162,8 @@ private fun DrawerFacts(
         null
     }
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.xs),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         DrawerFactTile(
             icon = LettaIcons.Psychology,
@@ -1191,18 +1199,18 @@ private fun DrawerFactTile(
         modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
     ) {
-        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.tertiary, modifier = Modifier.size(14.dp))
+        Column(modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.md)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
+                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.tertiary, modifier = Modifier.size(LettaDimens.Space.lg))
                 Text(
                     text = label,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f),
                 )
-                if (loading) CircularProgressIndicator(modifier = Modifier.size(12.dp), strokeWidth = 2.dp)
+                if (loading) CircularProgressIndicator(modifier = Modifier.size(LettaDimens.Space.md), strokeWidth = LettaDimens.Space.hair)
             }
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(LettaDimens.Space.xs))
             Text(
                 text = value,
                 style = MaterialTheme.typography.titleSmall,
@@ -1211,7 +1219,7 @@ private fun DrawerFactTile(
                 overflow = TextOverflow.Ellipsis,
             )
             if (progress != null) {
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(LettaDimens.Space.sm))
                 LinearProgressIndicator(
                     progress = { progress },
                     modifier = Modifier.fillMaxWidth(),
@@ -1235,7 +1243,7 @@ private fun DrawerChatMode(chatMode: String, onChatModeSelected: (String) -> Uni
         "interactive" to R.string.screen_drawer_chat_mode_interactive,
         "debug" to R.string.screen_drawer_chat_mode_debug,
     )
-    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
+    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.xs)) {
         chatModes.forEachIndexed { index, (mode, labelRes) ->
             SegmentedButton(
                 selected = chatMode == mode,
@@ -1258,7 +1266,7 @@ private fun DrawerSectionLabel(text: String) {
         text = text,
         style = MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 6.dp),
+        modifier = Modifier.padding(start = LettaDimens.Space.lg, end = LettaDimens.Space.lg, top = LettaDimens.Space.xl, bottom = LettaDimens.Space.sm),
     )
 }
 
@@ -1274,11 +1282,11 @@ private fun DrawerRecentConversations(
             text = stringResource(R.string.screen_conversations_empty),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
         )
         return
     }
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
         conversations.take(RECENT_CONVERSATIONS).forEach { conversation ->
             val isActive = conversation.id.value == currentConversationId
             ConversationMenuItem(
@@ -1307,8 +1315,8 @@ private fun DrawerFooter(
     onResetMessages: () -> Unit,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.xs),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         TextButton(
@@ -1320,7 +1328,7 @@ private fun DrawerFooter(
                 contentDescription = stringResource(R.string.screen_drawer_reset_icon_description),
                 modifier = Modifier.size(LettaIconSizing.Inline),
             )
-            Spacer(modifier = Modifier.width(6.dp))
+            Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
             Text(stringResource(R.string.action_reset_messages))
         }
     }
@@ -1328,7 +1336,7 @@ private fun DrawerFooter(
         text = agentId.take(12) + "\u2026",
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        modifier = Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
     )
 }
 
