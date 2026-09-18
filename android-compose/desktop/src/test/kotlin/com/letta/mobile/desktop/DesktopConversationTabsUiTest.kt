@@ -6,7 +6,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.center
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.runComposeUiTest
 import kotlin.test.Test
@@ -39,6 +42,42 @@ class DesktopConversationTabsUiTest {
         onNodeWithContentDescription("Close First tab").performClick()
 
         assertEquals("conversation-1", closedId)
+    }
+
+    @Test
+    fun plusOpensANewConversationAndThePickerSearchesConversationsAndCanvases() = runComposeUiTest {
+        var newConversations = 0
+        var opened: com.letta.mobile.data.desktopshell.TabPickerItem? = null
+        val items = listOf(
+            com.letta.mobile.data.desktopshell.TabPickerItem("c-2", "paginated response notes", "Ada", com.letta.mobile.data.desktopshell.TabPickerItem.Kind.CONVERSATION),
+            com.letta.mobile.data.desktopshell.TabPickerItem("k-4", "Canvas 4", "Canvas", com.letta.mobile.data.desktopshell.TabPickerItem.Kind.CANVAS),
+        )
+        setContent {
+            DesktopMaterialTheme {
+                DesktopConversationTabRow(
+                    tabs = listOf(DesktopConversationTab("conversation-1", "First", "Ada")),
+                    activeConversationId = "conversation-1",
+                    actions = DesktopConversationTabActions(
+                        onNewConversation = { newConversations++ },
+                        pickerItems = items,
+                        onOpenPickerItem = { opened = it },
+                    ),
+                )
+            }
+        }
+
+        onNodeWithContentDescription("New conversation tab").performClick()
+        assertEquals(1, newConversations)
+
+        onNodeWithContentDescription("Open conversation or canvas").performClick()
+        onNodeWithContentDescription("Open conversation paginated response notes").assertExists()
+        onNodeWithContentDescription("Open canvas Canvas 4").assertExists()
+        // Typing filters: "canv" leaves only the canvas.
+        onNodeWithContentDescription("Search tabs").performTextInput("canv")
+        onAllNodesWithContentDescription("Open conversation paginated response notes").assertCountEquals(0)
+        onNodeWithContentDescription("Open canvas Canvas 4").performClick()
+        assertEquals("k-4", opened?.id)
+        assertEquals(com.letta.mobile.data.desktopshell.TabPickerItem.Kind.CANVAS, opened?.kind)
     }
 
     @Test

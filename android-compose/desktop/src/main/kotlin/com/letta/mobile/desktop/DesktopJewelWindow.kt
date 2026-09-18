@@ -79,6 +79,9 @@ internal data class DesktopHeaderChromeState(
     val onSelectConversationTab: (String) -> Unit = {},
     val onCloseConversationTab: (String) -> Unit = {},
     val onReorderConversationTab: (conversationId: String, targetIndex: Int) -> Unit = { _, _ -> },
+    val onNewConversationTab: (() -> Unit)? = null,
+    val tabPickerItems: List<com.letta.mobile.data.desktopshell.TabPickerItem> = emptyList(),
+    val onOpenTabPickerItem: (com.letta.mobile.data.desktopshell.TabPickerItem) -> Unit = {},
 ) {
     companion object {
         val Empty = DesktopHeaderChromeState(
@@ -93,6 +96,9 @@ internal data class DesktopHeaderChromeState(
 /** Title-bar height: taller than a stock 32-44dp caption bar to comfortably
  * fit the two-line agent identity block (title over agent name). */
 private val TitleBarHeight = 48.dp
+
+/** With tabs the strip is one line per tab (title, then agent), so the bar can be browser-thin. */
+private val TabbedTitleBarHeight = 38.dp
 
 /**
  * Bounds the identity block by a fixed max width rather than a Row `weight`.
@@ -157,7 +163,7 @@ internal fun DesktopJewelWindow(
                             content = colorScheme.onSurface,
                             border = if (tabbed) Color.Transparent else colorScheme.outlineVariant,
                         ),
-                        metrics = TitleBarMetrics(height = TitleBarHeight),
+                        metrics = TitleBarMetrics(height = if (tabbed) TabbedTitleBarHeight else TitleBarHeight),
                     )
                 }
                 val windowStyle = remember(colorScheme) {
@@ -275,6 +281,9 @@ internal fun DesktopJewelWindow(
                                             onSelect = header.onSelectConversationTab,
                                             onClose = header.onCloseConversationTab,
                                             onReorder = header.onReorderConversationTab,
+                                            onNewConversation = header.onNewConversationTab,
+                                            pickerItems = header.tabPickerItems,
+                                            onOpenPickerItem = header.onOpenTabPickerItem,
                                         ),
                                         dragLaneWidth = MinimumTitleBarDragWidth,
                                         modifier = Modifier.fillMaxHeight(),
