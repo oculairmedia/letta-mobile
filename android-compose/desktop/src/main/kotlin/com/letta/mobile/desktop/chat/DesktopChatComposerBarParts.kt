@@ -193,6 +193,16 @@ internal data class ComposerInputSurfaceParams(
     val matchedCommands: List<ComposerCommand>,
 )
 
+/**
+ * Hides the safety / effort / context-usage chips on the composer bar.
+ *
+ * Off while the composer chrome is being reworked. All three are still local
+ * UI state that nothing reads — the safety chip in particular is decorative:
+ * desktop runs every turn Unrestricted regardless of what it shows
+ * (see DesktopAppServerChatGatewayBuilder). Flip to true to bring them back.
+ */
+private val ShowComposerStatusChips = false
+
 @Composable
 internal fun ComposerInputSurface(params: ComposerInputSurfaceParams) {
     Surface(
@@ -206,10 +216,13 @@ internal fun ComposerInputSurface(params: ComposerInputSurfaceParams) {
         shape = RoundedCornerShape(14.dp),
         color = MaterialTheme.colorScheme.surfaceContainer,
         contentColor = MaterialTheme.colorScheme.onSurface,
+        // Low-contrast hairline: the fill alone is barely a step off the page
+        // background, so the composer had no edge at all on a dark theme.
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             ComposerPendingAttachmentsRow(params.state, params.actions)
             ComposerTextField(params)
@@ -373,14 +386,16 @@ internal fun ComposerControlRow(
                     Spacer(Modifier.weight(1f))
                     ComposerSendButton(canSend = canSend, onSend = actions.onSend)
                 }
-                Row(
-                    modifier = Modifier.fillMaxWidth().testTag("composer-controls-secondary"),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    ComposerSafetyChip()
-                    ComposerEffortControls()
-                    ComposerContextChip(state.contextUsage)
+                if (ShowComposerStatusChips) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().testTag("composer-controls-secondary"),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        ComposerSafetyChip()
+                        ComposerEffortControls()
+                        ComposerContextChip(state.contextUsage)
+                    }
                 }
             }
         } else {
@@ -395,9 +410,11 @@ internal fun ComposerControlRow(
                     onOpenCanvas = actions.onOpenCanvas,
                 )
                 ComposerModelControls(state = state, actions = actions)
-                ComposerSafetyChip()
-                ComposerEffortControls()
-                ComposerContextChip(state.contextUsage)
+                if (ShowComposerStatusChips) {
+                    ComposerSafetyChip()
+                    ComposerEffortControls()
+                    ComposerContextChip(state.contextUsage)
+                }
                 Spacer(Modifier.weight(1f))
                 ComposerSendButton(canSend = canSend, onSend = actions.onSend)
             }
@@ -431,7 +448,9 @@ private fun ComposerAttachButton(
                     imageVector = Icons.Outlined.Add,
                     contentDescription = if (onOpenCanvas == null) "Attach" else "Add",
                     modifier = Modifier.size(18.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    // onSurface, not onSurfaceVariant: this is an action, and on
+                    // the composer's own container the muted role sank into it.
+                    tint = MaterialTheme.colorScheme.onSurface,
                 )
             }
         }
@@ -515,7 +534,10 @@ private fun ComposerSendButton(canSend: Boolean, onSend: () -> Unit) {
         targetValue = if (canSend) {
             MaterialTheme.colorScheme.onPrimary
         } else {
-            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+            // Not alpha 0.5: onSurfaceVariant is already the muted role, and
+            // halving it again on a dark theme put the arrow under the 3:1 a
+            // disabled control still needs to be legible as a control.
+            MaterialTheme.colorScheme.onSurfaceVariant
         },
         animationSpec = tween(durationMillis = 160),
         label = "composerSendContent",

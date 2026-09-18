@@ -45,12 +45,13 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.Agent
-import org.jetbrains.jewel.ui.component.TextField as JewelTextField
 import com.letta.mobile.ui.chat.AgentOrb
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.composables.icons.lucide.Lucide
@@ -234,13 +235,30 @@ private fun NewConversationHeader(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        JewelTextField(
+        // Borderless, not a boxed field. "To:" already frames this as an
+        // address line, so a bordered input (and Jewel's blue focus ring) drew
+        // a second frame inside a surface that is itself a bordered popup.
+        BasicTextField(
             value = query,
             onValueChange = onQueryChange,
-            placeholder = { Text("Type an agent name") },
+            singleLine = true,
+            textStyle = MaterialTheme.typography.bodyMedium.copy(
+                color = MaterialTheme.colorScheme.onSurface,
+            ),
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
             modifier = Modifier
                 .fillMaxWidth()
                 .focusRequester(focusRequester),
+            decorationBox = { inner ->
+                if (query.text.isEmpty()) {
+                    Text(
+                        text = "Search or create an agent",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                inner()
+            },
         )
     }
 }

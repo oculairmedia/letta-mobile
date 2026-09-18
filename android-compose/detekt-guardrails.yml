@@ -15,3 +15,16 @@ letta-mobile-guardrails:
     active: true
   CoroutineTestGuardrails:
     active: true
+
+letta-mobile-design-system:
+  active: true
+  # Off by default: the alignment pass (letta-mobile beads) is still working
+  # through ~2800 existing findings, tracked in config/ui-design-lint-baseline.json
+  # and enumerated by scripts/ui-design-lint.py. Flip these on per rule as each
+  # one reaches zero, so cleaned surfaces cannot drift back.
+  RawDimensionLiteral:
+    active: false
+  HardcodedComposeColor:
+    active: false
+  LowContentAlpha:
+    active: false

@@ -55,6 +55,7 @@ internal data class DesktopHeaderSidebarOverflow(
     val mode: WorkPlayMode,
     val onNewChat: () -> Unit,
     val onDestination: (LensDestination) -> Unit,
+    val onSettings: () -> Unit,
 )
 
 /**
@@ -249,6 +250,7 @@ internal fun DesktopJewelWindow(
                                         mode = overflow.mode,
                                         onNewChat = overflow.onNewChat,
                                         onDestination = overflow.onDestination,
+                                        onSettings = overflow.onSettings,
                                     )
                                 }
                             }

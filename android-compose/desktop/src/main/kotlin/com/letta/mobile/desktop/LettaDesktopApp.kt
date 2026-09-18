@@ -999,6 +999,10 @@ internal fun LettaDesktopApp(
                     editAgentId = null
                     selectedDestination = lensNavTarget(workPlayMode, lensDestination).first
                 },
+                onSettings = {
+                    editAgentId = null
+                    selectedDestination = DesktopDestination.Settings
+                },
             ),
             conversationTabs = conversationTabs,
             activeConversationId = chatState.selectedConversationId,

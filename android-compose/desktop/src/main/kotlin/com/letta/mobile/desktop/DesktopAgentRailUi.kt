@@ -15,10 +15,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -253,7 +251,10 @@ internal fun DesktopAgentRail(
                 ),
             )
         }
-        Spacer(Modifier.height(4.dp))
+        // No extra spacer under Home: the column's own 8.dp arrangement is the
+        // whole gap. A Spacer here is an item in its own right, so the
+        // arrangement applied on both sides of it and Home sat 20.dp clear of
+        // the first orb — visibly detached from the list it heads.
         // Then the orbs, with the plus pinned at the bottom (Grok Bot layout). There is no separate
         // search trigger: the plus menu's "New chat" opens the agent picker, which searches.
         Column(modifier = Modifier.weight(1f)) {

@@ -10,12 +10,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -30,7 +28,6 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
@@ -43,8 +40,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.geometry.Offset
@@ -60,6 +55,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.ui.search.LettaSearchConfig
+import com.letta.mobile.ui.search.LettaSearchDropdownContent
+import com.letta.mobile.ui.search.LettaSearchRow
+import com.letta.mobile.ui.search.LettaSearchSection
 import com.letta.mobile.data.desktopshell.TabPickerItem
 import com.letta.mobile.data.desktopshell.TabPickerSearch
 import sh.calvin.reorderable.DragGestureDetector
@@ -332,7 +331,14 @@ internal fun DesktopConversationTabRow(
             onClick = onNew,
             modifier = Modifier.size(TabControlSize).semantics { contentDescription = "New conversation tab" },
         ) {
-            Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+            // Explicit tint: the title bar's LocalContentColor is a dimmed
+            // chrome role, and inheriting it made this all but invisible.
+            Icon(
+                Icons.Outlined.Add,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+                tint = MaterialTheme.colorScheme.onSurface,
+            )
         }
     }
     if (actions.pickerItems.isNotEmpty()) {
@@ -350,62 +356,53 @@ internal fun DesktopConversationTabRow(
 private fun DesktopTabStripPicker(items: List<TabPickerItem>, onOpen: (TabPickerItem) -> Unit) {
     var open by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
-    val focus = remember { FocusRequester() }
     Box {
         IconButton(
             onClick = { open = true },
             modifier = Modifier.size(TabControlSize).semantics { contentDescription = "Open conversation or canvas" },
         ) {
-            Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = null, modifier = Modifier.size(16.dp))
+            Icon(
+                Icons.Outlined.KeyboardArrowDown,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+                tint = MaterialTheme.colorScheme.onSurface,
+            )
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false; query = "" }) {
-            LaunchedEffect(open) { if (open) runCatching { focus.requestFocus() } }
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it },
-                singleLine = true,
-                placeholder = { Text("Search conversations and canvases") },
-                leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                textStyle = MaterialTheme.typography.bodySmall,
-                modifier = Modifier
-                    .width(PickerWidth)
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-                    .focusRequester(focus)
-                    .semantics { contentDescription = "Search tabs" },
-            )
             val shown = remember(items, query) { TabPickerSearch.filter(items, query) }
-            // A plain scrolling column, not a LazyColumn: DropdownMenu sizes its content by
-            // intrinsic width, which lazy layouts refuse to answer.
-            Column(modifier = Modifier.width(PickerWidth).heightIn(max = PickerMaxHeight).verticalScroll(rememberScrollState())) {
-                shown.forEach { item ->
-                    Surface(
-                        onClick = { open = false; query = ""; onOpen(item) },
-                        color = Color.Transparent,
-                        modifier = Modifier.fillMaxWidth().semantics {
-                            contentDescription = "Open ${item.kind.name.lowercase()} ${item.title}"
-                        },
-                    ) {
-                        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
-                            Text(item.title, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(
-                                item.subtitle,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
+            val byId = remember(shown) { shown.associateBy { it.id } }
+            LettaSearchDropdownContent(
+                query = query,
+                onQueryChange = { query = it },
+                // One untitled section: a flat list, drawn by the same body the
+                // command palette's sectioned list uses.
+                sections = listOf(
+                    LettaSearchSection(
+                        title = "",
+                        rows = shown.map { item ->
+                            LettaSearchRow(
+                                id = item.id,
+                                label = item.title,
+                                sublabel = item.subtitle,
                             )
-                        }
+                        },
+                    ),
+                ),
+                onRowSelected = { row ->
+                    byId[row.id]?.let { item ->
+                        open = false
+                        query = ""
+                        onOpen(item)
                     }
-                }
-                if (shown.isEmpty()) {
-                    Text(
-                        "Nothing matches",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                    )
-                }
-            }
+                },
+                config = LettaSearchConfig(
+                    placeholder = "Search conversations and canvases",
+                    showSectionHeaders = false,
+                    maxResultsHeight = PickerMaxHeight,
+                    emptyText = { "Nothing matches" },
+                ),
+                modifier = Modifier.width(PickerWidth),
+            )
         }
     }
 }
@@ -466,7 +463,8 @@ private fun DesktopConversationTabLabel(
 ) {
     // One line, browser-thin: the title, then the agent in the quieter colour.
     Row(
-        modifier = modifier.padding(start = 12.dp, end = 30.dp),
+        // end clears the close button's 20.dp slot plus a little breathing room.
+        modifier = modifier.padding(start = 12.dp, end = 24.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
@@ -500,14 +498,18 @@ private fun DesktopConversationTabCloseButton(
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // 20/13 rather than 28/14: the hover circle is a hit target around a glyph,
+    // not a button in its own right, and at 28dp it read as a large empty disc
+    // with a small cross adrift in it.
     IconButton(
         onClick = onClose,
-        modifier = modifier.size(28.dp),
+        modifier = modifier.size(20.dp),
     ) {
         Icon(
             imageVector = Icons.Outlined.Close,
             contentDescription = "Close $title tab",
-            modifier = Modifier.size(14.dp),
+            modifier = Modifier.size(13.dp),
+            tint = MaterialTheme.colorScheme.onSurface,
         )
     }
 }

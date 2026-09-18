@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,6 +36,17 @@ import javax.swing.JOptionPane
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlin.system.exitProcess
+
+/**
+ * How much smaller desktop draws than the shared Android-density UI.
+ *
+ * 0.8 was chosen against the Home dashboard, the recents list and the composer,
+ * the three surfaces where the Android sizing was most obviously wrong on a
+ * monitor. Override at runtime with `-Dletta.desktop.density=0.9` to compare
+ * without a rebuild; values outside 0.5..1.0 are ignored.
+ */
+private val DESKTOP_DENSITY_SCALE: Float =
+    System.getProperty("letta.desktop.density")?.toFloatOrNull()?.takeIf { it in 0.5f..1.0f } ?: 0.8f
 
 internal const val LETTA_WINDOWS_AUMID = "com.letta.desktop"
 internal const val LETTA_DESKTOP_APP_NAME = "Letta Desktop"
@@ -109,7 +122,28 @@ private fun runDesktopApplication(
             val mascots = remember { com.letta.mobile.ui.mascot.MascotIdentityRegistry() }
             // The transport verb: one mascot per agent, moved between the seats the surfaces declare.
             val mascotTransport = remember { com.letta.mobile.ui.mascot.MascotTransport() }
+            // Desktop density. Compose's shared UI is authored at Android's
+            // touch density, where a 48dp row is a finger target. On a desktop
+            // pointer display that same row is simply oversized: the fleet
+            // dashboard, the recents list and the composer all read as a phone
+            // blown up to fill a monitor.
+            //
+            // Scaling LocalDensity rather than editing dimensions fixes every
+            // surface at once, including the ~2600 literals the alignment pass
+            // (letta-mobile-hzddx) has not reached yet, and it keeps one set of
+            // numbers shared with Android instead of forking them per platform.
+            // Font scale is deliberately left alone: text is already sized by
+            // the type scale, and scaling both compounds into unreadably small
+            // labels.
+            val platformDensity = LocalDensity.current
+            val desktopDensity = remember(platformDensity) {
+                Density(
+                    density = platformDensity.density * DESKTOP_DENSITY_SCALE,
+                    fontScale = platformDensity.fontScale,
+                )
+            }
             CompositionLocalProvider(
+                LocalDensity provides desktopDensity,
                 LocalWindowExceptionHandlerFactory provides CrashReportingExceptionHandlerFactory,
                 LocalMermaidDiagramRenderer provides DesktopMermaidDiagramRenderer,
                 // The native Rive bridge draws every live mascot; the shared MascotAvatar reads it here,

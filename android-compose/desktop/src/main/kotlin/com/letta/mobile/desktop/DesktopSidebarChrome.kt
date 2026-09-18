@@ -15,6 +15,7 @@ import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -137,6 +138,7 @@ internal fun DesktopSidebarOverflowMenu(
     mode: WorkPlayMode,
     onNewChat: () -> Unit,
     onDestination: (LensDestination) -> Unit,
+    onSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -180,6 +182,13 @@ internal fun DesktopSidebarOverflowMenu(
             text = { Text(WorkPlayLens.destinationLabel(mode, LensDestination.Skills)) },
             leadingIcon = { Icon(Icons.Outlined.Build, contentDescription = null) },
             onClick = { expanded = false; onDestination(LensDestination.Skills) },
+        )
+        // Settings is a desktop destination, not a LensDestination (the lens
+        // only renames the agent-scoped sections), so it takes its own callback.
+        DropdownMenuItem(
+            text = { Text("Settings") },
+            leadingIcon = { Icon(Icons.Outlined.Settings, contentDescription = null) },
+            onClick = { expanded = false; onSettings() },
         )
     }
 }
