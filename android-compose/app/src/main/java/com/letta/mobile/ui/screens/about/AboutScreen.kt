@@ -32,6 +32,7 @@ import com.letta.mobile.ui.theme.LettaTopBarDefaults
 import com.letta.mobile.ui.theme.sectionTitle
 import com.mikepenz.aboutlibraries.ui.compose.android.produceLibraries
 import com.mikepenz.aboutlibraries.ui.compose.m3.LibrariesContainer
+import com.letta.mobile.ui.theme.LettaDimens
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -62,11 +63,11 @@ fun AboutScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues),
-            contentPadding = PaddingValues(bottom = 24.dp),
+            contentPadding = PaddingValues(bottom = LettaDimens.Space.xl),
             showDescription = false,
             showFundingBadges = false,
             divider = {
-                HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp))
+                HorizontalDivider(modifier = Modifier.padding(horizontal = LettaDimens.Space.xl))
             },
             header = {
                 item(key = "about-header") {
@@ -80,7 +81,7 @@ fun AboutScreen(
                         text = stringResource(R.string.screen_about_open_source_title),
                         style = MaterialTheme.typography.sectionTitle,
                         color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 12.dp),
+                        modifier = Modifier.padding(start = LettaDimens.Space.xl, end = LettaDimens.Space.xl, top = LettaDimens.Space.sm, bottom = LettaDimens.Space.md),
                     )
                 }
             },
@@ -107,7 +108,7 @@ private fun AboutHeader(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 24.dp),
+            .padding(horizontal = LettaDimens.Space.xl, vertical = LettaDimens.Space.xl),
     ) {
         Text(
             text = stringResource(R.string.app_name),
@@ -117,19 +118,19 @@ private fun AboutHeader(
             text = stringResource(R.string.screen_about_version_format, appVersion),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 4.dp),
+            modifier = Modifier.padding(top = LettaDimens.Space.xs),
         )
         Text(
             text = stringResource(R.string.screen_about_description),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 16.dp),
+            modifier = Modifier.padding(top = LettaDimens.Space.lg),
         )
         OutlinedButton(
             onClick = onClearDataClick,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 24.dp),
+                .padding(top = LettaDimens.Space.xl),
             colors = ButtonDefaults.outlinedButtonColors(
                 contentColor = MaterialTheme.colorScheme.error,
             ),

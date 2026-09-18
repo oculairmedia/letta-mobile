@@ -31,6 +31,7 @@ import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.LettaChatTheme
 import com.letta.mobile.ui.theme.chatTypography
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * Structured renderer for a parked `AskUserQuestion` tool call. Shows each
@@ -66,7 +67,7 @@ internal fun AskUserQuestionCard(
     // question text -> free-text "Other" answer
     val otherText = remember(stateKey) { mutableStateMapOf<String, String>() }
 
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+    Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md), modifier = Modifier.fillMaxWidth()) {
         Text(
             text = stringResource(R.string.screen_chat_ask_user_question_title),
             style = MaterialTheme.chatTypography.toolLabel,
@@ -112,7 +113,7 @@ internal fun AskUserQuestionCard(
         val answers = buildAnswers(spec.questions, selections, otherText)
         val canSubmit = answers.isNotEmpty() && answers.size == spec.questions.count { it.question.isNotBlank() }
 
-        androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
             OutlinedButton(
                 onClick = {
                     HapticEffects.reject(haptic, view)
@@ -162,12 +163,12 @@ private fun AskUserQuestionBlock(
     answer: AskUserQuestionAnswerState,
     actions: AskUserQuestionAnswerActions,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+    Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm), modifier = Modifier.fillMaxWidth()) {
         question.header?.takeIf { it.isNotBlank() }?.let {
             Text(text = it, style = MaterialTheme.chatTypography.toolLabel)
         }
         Text(text = question.question, style = MaterialTheme.chatTypography.toolDetail)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
             question.options.forEach { option ->
                 val isSelected = option.label in answer.selected
                 FilterChip(
@@ -191,7 +192,7 @@ private fun AskUserQuestionBlock(
             onValueChange = actions.onOtherChanged,
             label = { Text(stringResource(R.string.screen_chat_ask_user_question_other)) },
             singleLine = true,
-            modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+            modifier = Modifier.fillMaxWidth().padding(top = LettaDimens.Space.hair),
         )
     }
 }

@@ -40,6 +40,7 @@ import com.letta.mobile.ui.components.ShimmerConversationList
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.screens.agentlist.LocalLettaCodeCreateReadiness
+import com.letta.mobile.ui.theme.LettaDimens
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -395,7 +396,7 @@ internal fun ConversationsScreenBody(
         Text(
             text = stringResource(R.string.common_conversations),
             style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(LettaDimens.Space.lg),
         )
         val error = state.error
         when {
@@ -429,8 +430,8 @@ internal fun ConversationsScreenBody(
                     modifier = Modifier
                         .weight(1f)
                         .verticalScroll(rememberScrollState())
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                        .padding(LettaDimens.Space.lg),
+                    verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                 ) {
                     state.conversations.forEach { display ->
                         ConversationCard(

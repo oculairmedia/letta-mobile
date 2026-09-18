@@ -47,6 +47,7 @@ import com.letta.mobile.data.memory.MemoryParityGraph
 import com.letta.mobile.desktop.DesktopTooltipArea
 import com.letta.mobile.ui.theme.customColors
 import com.letta.mobile.data.memory.accentRole
+import com.letta.mobile.ui.theme.LettaDimens
 
 @Composable
 internal fun MemoryGraphPanel(
@@ -98,7 +99,7 @@ internal fun MemoryGraphPanel(
                 ),
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .padding(14.dp),
+                    .padding(LettaDimens.Space.lg),
             )
         }
     }
@@ -233,15 +234,15 @@ internal fun EntityTypeFilterBar(
         shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
         contentColor = MaterialTheme.colorScheme.onSurface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = LettaDimens.Alpha.hairline)),
         modifier = modifier,
     ) {
-        Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.md), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm), verticalAlignment = Alignment.CenterVertically) {
                 Text("Entity Types", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(params.summaryLabel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor)
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
                 params.kinds.forEach { kind ->
                     val on = kind in params.enabled
                     val color = kind.accentRole(null).color()
@@ -250,15 +251,15 @@ internal fun EntityTypeFilterBar(
                             .clip(MaterialTheme.shapes.small)
                             .background(if (on) MaterialTheme.colorScheme.surfaceContainerHighest else Color.Transparent)
                             .clickable { params.onToggle(kind) }
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                            .padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs),
+                        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Box(Modifier.size(8.dp).clip(CircleShape).background(color.copy(alpha = if (on) 1f else 0.35f)))
+                        Box(Modifier.size(LettaDimens.Space.sm).clip(CircleShape).background(color.copy(alpha = if (on) 1f else 0.35f)))
                         Text(
                             memoryNodeKindLabel(kind),
                             style = MaterialTheme.typography.labelMedium,
-                            color = if (on) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            color = if (on) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = LettaDimens.Alpha.hairline),
                         )
                     }
                 }
@@ -299,7 +300,7 @@ internal fun MemoryGraphNodeDot(
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
             modifier = if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier,
         ) {
             Box(
@@ -307,7 +308,7 @@ internal fun MemoryGraphNodeDot(
                     .size(diameter)
                     .clip(CircleShape)
                     .background(accentColor)
-                    .border(2.dp, MaterialTheme.colorScheme.surface, CircleShape),
+                    .border(LettaDimens.Space.hair, MaterialTheme.colorScheme.surface, CircleShape),
             )
             Text(
                 text = resolvedNode.title,
@@ -331,14 +332,14 @@ internal fun MemoryNodeTooltip(node: MemoryGraphNode, degree: Int, accentColor: 
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         contentColor = MaterialTheme.colorScheme.onSurface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        shadowElevation = 6.dp,
+        shadowElevation = LettaDimens.Space.sm,
     ) {
-        Column(Modifier.widthIn(max = 280.dp).padding(horizontal = 14.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Box(Modifier.size(10.dp).clip(CircleShape).background(accentColor))
+        Column(Modifier.widthIn(max = 280.dp).padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
+                Box(Modifier.size(LettaDimens.Space.md).clip(CircleShape).background(accentColor))
                 Text(node.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
                 TooltipStat("Type", memoryNodeKindLabel(node.kind))
                 TooltipStat("Links", degree.toString())
                 TooltipStat("Chars", node.subtitle.length.toString())

@@ -1,8 +1,8 @@
 {
-  "total": 2833,
+  "total": 371,
   "by_rule": {
-    "raw-dimension": 2632,
+    "raw-dimension": 195,
     "hardcoded-color": 86,
-    "low-content-alpha": 115
+    "low-content-alpha": 90
   }
 }

@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.theme.LettaDimens
 
 data class StarterPrompt(
     val text: String,
@@ -36,7 +37,7 @@ fun StarterPrompts(
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier.fillMaxSize().padding(24.dp),
+        modifier = modifier.fillMaxSize().padding(LettaDimens.Space.xl),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -44,10 +45,10 @@ fun StarterPrompts(
             text = "Start a conversation",
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 16.dp),
+            modifier = Modifier.padding(bottom = LettaDimens.Space.lg),
         )
 
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
             prompts.forEach { prompt ->
                 Card(
                     onClick = { onPromptClick(prompt.text) },
@@ -55,9 +56,9 @@ fun StarterPrompts(
                     colors = LettaCardDefaults.listCardColors(),
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                        modifier = Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
                     ) {
                         Icon(
                             imageVector = prompt.icon,

@@ -65,6 +65,7 @@ import java.awt.event.WindowFocusListener
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.jetbrains.jewel.ui.component.TextField as JewelTextField
 import com.letta.mobile.ui.chat.AgentOrb
+import com.letta.mobile.ui.theme.LettaDimens
 
 /** Actions the quick-query window routes back into the main app. */
 @Immutable
@@ -263,13 +264,13 @@ private fun QuickQueryContent(coordinator: DesktopQuickQueryCoordinator) {
         coordinator.close()
     }
 
-    Box(modifier = Modifier.fillMaxWidth().padding(8.dp), contentAlignment = Alignment.TopCenter) {
+    Box(modifier = Modifier.fillMaxWidth().padding(LettaDimens.Space.sm), contentAlignment = Alignment.TopCenter) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(LettaDimens.Radius.lg),
             color = MaterialTheme.colorScheme.surfaceContainer,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-            shadowElevation = 12.dp,
+            shadowElevation = LettaDimens.Space.md,
         ) {
             Column {
                 QuickQuerySearchRow(
@@ -317,7 +318,7 @@ private fun QuickQueryFooter() {
         text = "⏎ open top result · Ctrl+⏎ ask current agent · Esc close",
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        modifier = Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
     )
 }
 
@@ -331,15 +332,15 @@ private fun QuickQuerySearchRow(
     onKeyEvent: (androidx.compose.ui.input.key.KeyEvent) -> Boolean,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
     ) {
         Icon(
             imageVector = Icons.Outlined.Search,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(18.dp),
+            modifier = Modifier.size(LettaDimens.Space.lg),
         )
         JewelTextField(
             value = query,
@@ -358,7 +359,7 @@ private fun QuickQuerySearchRow(
             },
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 40.dp)
+                .heightIn(min = LettaDimens.Orb.lg)
                 .focusRequester(focusRequester)
                 .onPreviewKeyEvent(onKeyEvent),
         )
@@ -421,7 +422,7 @@ private fun QuickQueryResults(
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 4.dp),
+                    modifier = Modifier.padding(start = LettaDimens.Space.lg, end = LettaDimens.Space.lg, top = LettaDimens.Space.md, bottom = LettaDimens.Space.xs),
                 )
             }
             items(results, key = { "qq-$kind-${it.id}" }) { item ->
@@ -442,27 +443,27 @@ private fun RecentAgentsStrip(
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 6.dp),
+            modifier = Modifier.padding(start = LettaDimens.Space.lg, end = LettaDimens.Space.lg, top = LettaDimens.Space.md, bottom = LettaDimens.Space.sm),
         )
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                .padding(horizontal = LettaDimens.Space.md),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
         ) {
             agents.forEach { item ->
                 Column(
                     modifier = Modifier
                         .clickable(onClick = { onSelect(item) })
-                        .padding(horizontal = 6.dp, vertical = 6.dp)
+                        .padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.sm)
                         .width(64.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     AgentOrb(
                         index = item.orbIndex ?: 0,
-                        size = 44.dp,
-                        cornerRadius = 12.dp,
+                        size = LettaDimens.Orb.railSlotHeight,
+                        cornerRadius = LettaDimens.Radius.md,
                         agentId = item.mascotAgentId(),
                     )
                     Text(
@@ -472,7 +473,7 @@ private fun RecentAgentsStrip(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                        modifier = Modifier.fillMaxWidth().padding(top = LettaDimens.Space.sm),
                     )
                 }
             }
@@ -495,19 +496,19 @@ private fun AmbientContextChip(title: String, onDismiss: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .padding(bottom = 8.dp),
+            .padding(horizontal = LettaDimens.Space.lg)
+            .padding(bottom = LettaDimens.Space.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Surface(
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(LettaDimens.Radius.sm),
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.xs),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
             ) {
                 Text(
                     // Caller passes an already-sanitized title (see QuickQueryContent).
@@ -522,7 +523,7 @@ private fun AmbientContextChip(title: String, onDismiss: () -> Unit) {
                     imageVector = Icons.Outlined.Close,
                     contentDescription = "Remove context",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(14.dp).clickable(onClick = onDismiss),
+                    modifier = Modifier.size(LettaDimens.Space.lg).clickable(onClick = onDismiss),
                 )
             }
         }
@@ -535,9 +536,9 @@ private fun QuickQueryRow(item: PaletteItem, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
     ) {
         PaletteItemLeading(item)
         Text(

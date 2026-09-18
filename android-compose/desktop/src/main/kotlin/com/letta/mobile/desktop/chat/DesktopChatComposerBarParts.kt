@@ -70,6 +70,7 @@ import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Image
 import com.composables.icons.lucide.Palette
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
+import com.letta.mobile.ui.theme.LettaDimens
 
 internal data class ComposerAutocompleteUi(
     val matchedCommands: List<ComposerCommand>,
@@ -106,11 +107,11 @@ internal fun ComposerCommandSuggestions(
     if (matchedCommands.isEmpty()) return
     Surface(
         modifier = Modifier.widthIn(max = ChatColumnMaxWidth).fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.md),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
-        Column(modifier = Modifier.padding(vertical = 6.dp)) {
+        Column(modifier = Modifier.padding(vertical = LettaDimens.Space.sm)) {
             matchedCommands.take(8).forEach { command ->
                 ComposerCommandSuggestionRow(command = command, onCommandRun = onCommandRun)
             }
@@ -127,8 +128,8 @@ private fun ComposerCommandSuggestionRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onCommandRun(command) }
-            .padding(horizontal = 14.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+            .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -173,7 +174,7 @@ internal fun ComposerHintRow(visible: Boolean) {
         modifier = Modifier
             .widthIn(max = ChatColumnMaxWidth)
             .fillMaxWidth()
-            .padding(start = 8.dp, top = 2.dp, bottom = 2.dp)
+            .padding(start = LettaDimens.Space.sm, top = LettaDimens.Space.hair, bottom = LettaDimens.Space.hair)
             .graphicsLayer { this.alpha = alpha }
             // Hidden copy must not be announced or hit-tested.
             .clearAndSetSemantics { },
@@ -213,16 +214,16 @@ internal fun ComposerInputSurface(params: ComposerInputSurfaceParams) {
         modifier = Modifier
             .widthIn(max = ChatColumnMaxWidth)
             .fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.lg),
         color = MaterialTheme.colorScheme.surfaceContainer,
         contentColor = MaterialTheme.colorScheme.onSurface,
         // Low-contrast hairline: the fill alone is barely a step off the page
         // background, so the composer had no edge at all on a dark theme.
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = LettaDimens.Alpha.hairline)),
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             ComposerPendingAttachmentsRow(params.state, params.actions)
             ComposerTextField(params)
@@ -242,7 +243,7 @@ private fun ComposerPendingAttachmentsRow(
 ) {
     if (state.pendingImageAttachments.isEmpty()) return
     Row(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         state.pendingImageAttachments.forEachIndexed { index, image ->
@@ -282,7 +283,7 @@ private fun ComposerTextField(params: ComposerInputSurfaceParams) {
         enabled = params.state.enabled,
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 24.dp, max = 120.dp)
+            .heightIn(min = LettaDimens.Space.xl, max = 120.dp)
             .testTag("composer-input")
             .mascotGazeTarget(MascotGazeSurface.INPUT)
             .onPreviewKeyEvent { event ->
@@ -371,10 +372,10 @@ internal fun ComposerControlRow(
 ) {
     BoxWithConstraints(modifier = Modifier.fillMaxWidth().testTag("composer-controls")) {
         if (maxWidth < 540.dp) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     ComposerAttachButton(
@@ -389,7 +390,7 @@ internal fun ComposerControlRow(
                 if (ShowComposerStatusChips) {
                     Row(
                         modifier = Modifier.fillMaxWidth().testTag("composer-controls-secondary"),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         ComposerSafetyChip()
@@ -401,7 +402,7 @@ internal fun ComposerControlRow(
         } else {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 ComposerAttachButton(
@@ -437,7 +438,7 @@ private fun ComposerAttachButton(
         DesktopTooltip(text = if (onOpenCanvas == null) "Attach" else "Add") {
             Box(
                 modifier = Modifier
-                    .size(28.dp)
+                    .size(LettaDimens.Space.xxl)
                     .clip(CircleShape)
                     .clickable(enabled = enabled) {
                         if (onOpenCanvas == null) onAttachImage() else menuOpen = true
@@ -447,7 +448,7 @@ private fun ComposerAttachButton(
                 Icon(
                     imageVector = Icons.Outlined.Add,
                     contentDescription = if (onOpenCanvas == null) "Attach" else "Add",
-                    modifier = Modifier.size(18.dp),
+                    modifier = Modifier.size(LettaDimens.Space.lg),
                     // onSurface, not onSurfaceVariant: this is an action, and on
                     // the composer's own container the muted role sank into it.
                     tint = MaterialTheme.colorScheme.onSurface,
@@ -551,7 +552,7 @@ private fun ComposerSendButton(canSend: Boolean, onSend: () -> Unit) {
         onClick = onSend,
         enabled = canSend,
         modifier = Modifier
-            .size(38.dp)
+            .size(LettaDimens.Control.actionButton)
             .testTag("composer-send")
             .graphicsLayer {
                 scaleX = scale
@@ -565,7 +566,7 @@ private fun ComposerSendButton(canSend: Boolean, onSend: () -> Unit) {
             Icon(
                 imageVector = Icons.Outlined.ArrowUpward,
                 contentDescription = "Send message",
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(LettaDimens.Space.lg),
             )
         }
     }

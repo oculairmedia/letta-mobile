@@ -61,6 +61,7 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.listItemHeadline
 import com.letta.mobile.ui.theme.listItemSupporting
+import com.letta.mobile.ui.theme.LettaDimens
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -245,7 +246,7 @@ private fun ProviderAdminBody(
         is UiState.Loading -> ShimmerCard(
             modifier = Modifier
                 .padding(paddingValues)
-                .padding(16.dp),
+                .padding(LettaDimens.Space.lg),
         )
         is UiState.Error -> ErrorContent(
             message = uiState.message,
@@ -264,8 +265,8 @@ private fun ProviderAdminBody(
             ) {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(LettaDimens.Space.lg),
+                    verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                 ) {
                     if (filtered.isEmpty()) {
                         item {
@@ -309,7 +310,7 @@ private fun ProviderCard(
         modifier = Modifier.fillMaxWidth(),
         colors = LettaCardDefaults.listCardColors(),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(LettaDimens.Space.lg)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -318,7 +319,7 @@ private fun ProviderCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(provider.name, style = MaterialTheme.typography.listItemHeadline)
                     provider.baseUrl?.takeIf { it.isNotBlank() }?.let {
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(LettaDimens.Space.xs))
                         Text(it, style = MaterialTheme.typography.listItemSupporting, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                 }
@@ -326,8 +327,8 @@ private fun ProviderCard(
                     Icon(LettaIcons.MoreVert, contentDescription = stringResource(R.string.action_more))
                 }
             }
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Spacer(modifier = Modifier.height(LettaDimens.Space.sm))
+            Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
                 AssistChip(onClick = {}, label = { Text(provider.providerType) })
                 provider.region?.let { AssistChip(onClick = {}, label = { Text(it) }) }
             }
@@ -375,7 +376,7 @@ private fun ProviderDetailDialog(
         onConfirm = onDismiss,
         onDismiss = onDismiss,
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
             ProviderDetailRefreshStatus(isRefreshing)
             CardGroup {
                 provider.id?.let { id ->
@@ -430,7 +431,7 @@ private fun ProviderDetailDialog(
                 }
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
                 TextButton(
                     onClick = onEdit,
                     enabled = !isRefreshing,
@@ -451,7 +452,7 @@ private fun ProviderDetailDialog(
 @Composable
 private fun ProviderDetailRefreshStatus(isRefreshing: Boolean) {
     if (!isRefreshing) return
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
         Text(
             text = stringResource(R.string.screen_providers_refreshing_details),
             style = MaterialTheme.typography.listItemSupporting,

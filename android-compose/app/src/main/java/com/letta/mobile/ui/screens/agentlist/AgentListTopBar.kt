@@ -32,6 +32,7 @@ import com.letta.mobile.ui.components.statefulFadingEdges
 import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
+import com.letta.mobile.ui.theme.LettaDimens
 
 internal data class AgentListTopBarActions(
     val onNavigateBack: () -> Unit,
@@ -148,7 +149,7 @@ private fun AgentListViewModeToggle(
     SingleChoiceSegmentedButtonRow(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp),
+            .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.xs),
     ) {
         SegmentedButton(
             selected = !showGrid,
@@ -182,7 +183,7 @@ private fun AgentListTopBarTagSection(
     if (shareContentPreview != null) {
         ShareContentPreviewCard(
             content = shareContentPreview,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
         )
     }
     if (allTags.isNotEmpty()) {
@@ -217,8 +218,8 @@ private fun AgentListTagFilterRow(
                 scrollState = tagRowState,
                 backgroundColor = MaterialTheme.colorScheme.surface,
             ),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+        contentPadding = PaddingValues(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.xs),
     ) {
         item {
             FilterChip(

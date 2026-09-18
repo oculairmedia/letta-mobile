@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.components.MultiFieldInputDialog
 import ca.oculair.meridian.R
 import com.letta.mobile.ui.preview.LettaPreviewFrame
+import com.letta.mobile.ui.theme.LettaDimens
 
 @Composable
 fun CreateToolDialog(
@@ -41,7 +42,7 @@ fun CreateToolDialog(
     ) {
         Column(
             modifier = Modifier.verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             Text(
                 text = stringResource(R.string.screen_create_tool_source_code_helper),

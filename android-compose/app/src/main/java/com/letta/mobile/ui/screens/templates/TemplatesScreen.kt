@@ -30,6 +30,7 @@ import com.letta.mobile.ui.tags.TagDrillInSource
 import com.letta.mobile.ui.tags.TagDrillInViewModel
 import com.letta.mobile.ui.preview.LettaPreviewFrame
 import kotlinx.collections.immutable.persistentListOf
+import com.letta.mobile.ui.theme.LettaDimens
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -62,7 +63,7 @@ fun TemplatesScreen(
         }
     ) { paddingValues ->
         when (val state = uiState) {
-            is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(16.dp))
+            is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(LettaDimens.Space.lg))
             is UiState.Error -> ErrorContent(
                 message = state.message,
                 onRetry = { viewModel.loadTemplates() },
@@ -108,7 +109,7 @@ private fun TemplatesContent(
             onNavigateToAgentList = onNavigateToAgentList,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md),
         )
 
         if (state.templates.isEmpty()) {
@@ -121,9 +122,9 @@ private fun TemplatesContent(
             LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                contentPadding = PaddingValues(start = LettaDimens.Space.lg, end = LettaDimens.Space.lg, bottom = LettaDimens.Space.lg),
+                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)
             ) {
                 items(
                     items = state.templates,
@@ -152,8 +153,8 @@ private fun StarterAgentsInfoCard(
         ),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(LettaDimens.Space.lg),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         ) {
             Text(
                 text = stringResource(R.string.screen_templates_info_title),
@@ -170,10 +171,10 @@ private fun StarterAgentsInfoCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSecondaryContainer,
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
                 FilledTonalButton(onClick = onNavigateToAgentList) {
                     Icon(LettaIcons.Agent, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
                     Text(stringResource(R.string.screen_templates_manage_agents_action))
                 }
             }
@@ -194,13 +195,13 @@ private fun TemplateCard(
         modifier = modifier
             .fillMaxWidth()
             .aspectRatio(0.9f),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.md),
         colors = LettaCardDefaults.listCardColors(),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
+                .padding(LettaDimens.Space.lg),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
@@ -209,7 +210,7 @@ private fun TemplateCard(
                 style = MaterialTheme.typography.displaySmall,
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(LettaDimens.Space.md))
 
             Text(
                 text = template.name,
@@ -219,7 +220,7 @@ private fun TemplateCard(
                 overflow = TextOverflow.Ellipsis
             )
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(LettaDimens.Space.xs))
 
             Text(
                 text = template.description,
@@ -230,11 +231,11 @@ private fun TemplateCard(
                 overflow = TextOverflow.Ellipsis
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(LettaDimens.Space.sm))
 
             FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
             ) {
                 template.tags.forEach { tag ->
                     AssistChip(

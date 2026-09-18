@@ -33,6 +33,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.desktop.DesktopIconButton
 import com.letta.mobile.desktop.DesktopTextField
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * Shared building blocks for the catalog-style pages (Skills, Tools, Channels,
@@ -53,10 +54,10 @@ internal fun DesktopCatalogHeader(
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     Column(
-        modifier = modifier.fillMaxWidth().padding(start = 32.dp, end = 32.dp, top = 16.dp, bottom = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = modifier.fillMaxWidth().padding(start = LettaDimens.Space.xxl, end = LettaDimens.Space.xxl, top = LettaDimens.Space.lg, bottom = LettaDimens.Space.sm),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md), verticalAlignment = Alignment.CenterVertically) {
             Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
             if (query != null) {
                 Box(Modifier.width(220.dp)) {
@@ -66,7 +67,7 @@ internal fun DesktopCatalogHeader(
             actions()
         }
         if (chips != null) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically, content = chips)
+            Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm), verticalAlignment = Alignment.CenterVertically, content = chips)
         }
     }
 }
@@ -95,14 +96,14 @@ internal fun DesktopChipTab(text: String, active: Boolean, onClick: () -> Unit) 
             .background(if (active) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainerLow)
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.small)
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),
     )
 }
 
 /** A thin vertical divider for separating chip groups in a header. */
 @Composable
 internal fun DesktopChipDivider() {
-    Box(Modifier.padding(horizontal = 4.dp).width(1.dp).height(20.dp).background(MaterialTheme.colorScheme.outlineVariant))
+    Box(Modifier.padding(horizontal = LettaDimens.Space.xs).width(1.dp).height(LettaDimens.Space.xl).background(MaterialTheme.colorScheme.outlineVariant))
 }
 
 /**
@@ -126,17 +127,17 @@ internal fun DesktopCatalogCard(
             .background(MaterialTheme.colorScheme.surfaceContainer)
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f), MaterialTheme.shapes.medium)
             .clickable(onClick = onClick)
-            .padding(14.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(LettaDimens.Space.lg),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            Modifier.size(38.dp).clip(MaterialTheme.shapes.small).background(accent.copy(alpha = 0.2f)),
+            Modifier.size(LettaDimens.Control.actionButton).clip(MaterialTheme.shapes.small).background(accent.copy(alpha = 0.2f)),
             contentAlignment = Alignment.Center,
         ) {
             Text(leadingLabel, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = accent)
         }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair)) {
             Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurface)
             // Always reserve two description lines so every card is the same
             // height and the grid rows line up, regardless of how short (or
@@ -168,7 +169,7 @@ internal fun <T> LazyListScope.desktopCardGrid(
             Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         items(items = sectionItems.chunked(2), key = { keyOf(it.first()) }) { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg)) {
                 row.forEach { item -> card(item, Modifier.weight(1f)) }
                 if (row.size == 1) Spacer(Modifier.weight(1f))
             }
@@ -177,7 +178,7 @@ internal fun <T> LazyListScope.desktopCardGrid(
 }
 
 /** Standard content padding for a catalog grid LazyColumn. */
-internal val DesktopCatalogGridPadding = PaddingValues(start = 32.dp, end = 32.dp, top = 16.dp, bottom = 16.dp)
+internal val DesktopCatalogGridPadding = PaddingValues(start = LettaDimens.Space.xxl, end = LettaDimens.Space.xxl, top = LettaDimens.Space.lg, bottom = LettaDimens.Space.lg)
 
 /** A small tinted pill (tags, status, type labels). */
 @Composable
@@ -193,7 +194,7 @@ internal fun DesktopPill(text: String, color: Color) {
             style = MaterialTheme.typography.labelMedium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.xs),
         )
     }
 }
@@ -201,7 +202,7 @@ internal fun DesktopPill(text: String, color: Color) {
 /** A full-width informational/empty-state box, padded to align with the grid. */
 @Composable
 internal fun DesktopInfoBox(message: String) {
-    Box(Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 12.dp)) {
+    Box(Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.xxl, vertical = LettaDimens.Space.md)) {
         Surface(
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
             contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -209,7 +210,7 @@ internal fun DesktopInfoBox(message: String) {
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.48f)),
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text(text = message, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(16.dp))
+            Text(text = message, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(LettaDimens.Space.lg))
         }
     }
 }

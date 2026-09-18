@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.attachment.ImageIngressPolicy
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * Full-content drop hint shown while an OS file drag hovers the window:
@@ -36,19 +37,19 @@ fun ImageDropOverlay(modifier: Modifier = Modifier) {
         Surface(
             shape = MaterialTheme.shapes.extraLarge,
             color = MaterialTheme.colorScheme.surfaceContainer,
-            border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary),
-            shadowElevation = 10.dp,
+            border = BorderStroke(LettaDimens.Space.hair, MaterialTheme.colorScheme.primary),
+            shadowElevation = LettaDimens.Space.md,
         ) {
             Column(
-                modifier = Modifier.padding(horizontal = 36.dp, vertical = 28.dp),
+                modifier = Modifier.padding(horizontal = LettaDimens.Space.xxl, vertical = LettaDimens.Space.xxl),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
             ) {
                 Icon(
                     imageVector = Icons.Outlined.Image,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(44.dp),
+                    modifier = Modifier.size(LettaDimens.Orb.railSlotHeight),
                 )
                 Text(
                     text = "Drop images to attach",

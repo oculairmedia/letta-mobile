@@ -51,6 +51,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.jetbrains.jewel.ui.component.TextField as JewelTextField
 import androidx.compose.ui.text.input.TextFieldValue
+import com.letta.mobile.ui.theme.LettaDimens
 
 /** Bundled inputs for [BlockEditorPanel] (keeps the composable arity low). */
 internal data class BlockEditorRequest(
@@ -189,8 +190,8 @@ private fun BlockEditorScaffold(params: BlockEditorScaffoldParams) {
             .width(380.dp)
             .fillMaxHeight()
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+            .padding(LettaDimens.Space.xl),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
     ) {
         BlockEditorHeader(title = params.title, onDismiss = params.onDismiss)
         BlockEditorFields(
@@ -283,7 +284,7 @@ private fun BlockEditorHeader(
             imageVector = Icons.Outlined.Close,
             contentDescription = "Close",
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(18.dp).clickable(onClick = onDismiss),
+            modifier = Modifier.size(LettaDimens.Space.lg).clickable(onClick = onDismiss),
         )
     }
 }
@@ -331,7 +332,7 @@ private fun ColumnScope.BlockEditorFields(params: BlockEditorFieldsParams) {
             enabled = !params.busy && !params.loadFailed,
             modifier = Modifier.weight(1f).fillMaxWidth(),
             placeholder = "Block contents…",
-            decorationBoxModifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            decorationBoxModifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.md),
         )
     }
 }
@@ -357,7 +358,7 @@ private fun BlockEditorActions(
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (!state.isNew && state.blockId != null) {

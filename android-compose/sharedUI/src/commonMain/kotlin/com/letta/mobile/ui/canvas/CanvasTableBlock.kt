@@ -41,6 +41,7 @@ import io.github.linreal.cascade.editor.registry.BlockPreviewScope
 import io.github.linreal.cascade.editor.registry.BlockRegistry
 import io.github.linreal.cascade.editor.registry.BlockRenderScope
 import io.github.linreal.cascade.editor.registry.ScopedBlockRenderer
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * A table block for notes, as a Cascade custom block: its cells live in the block's custom
@@ -111,12 +112,12 @@ internal object TableBlockRenderer : ScopedBlockRenderer<TableBlockType> {
     ) {
         val rows = CanvasTableBlock.rowsOf(block)
         fun write(next: List<List<String>>) = scope.updateBlock(block.id) { it.withContent(CanvasTableBlock.content(next)) }
-        Column(modifier = modifier.fillMaxWidth().padding(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Column(modifier = modifier.fillMaxWidth().padding(vertical = LettaDimens.Space.xs), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair)) {
             TableGrid(rows = rows, editable = !scope.readOnly && scope.canUpdateBlock) { r, c, text ->
                 write(rows.mapIndexed { ri, row -> if (ri == r) row.mapIndexed { ci, cell -> if (ci == c) text else cell } else row })
             }
             if (!scope.readOnly && scope.canEditBlockStructure) {
-                Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair), verticalAlignment = Alignment.CenterVertically) {
                     SmallAction(Lucide.Rows2, "Add table row") { write(rows + listOf(List(rows.firstOrNull()?.size ?: 1) { "" })) }
                     SmallAction(Lucide.Columns2, "Add table column") { write(rows.map { it + "" }) }
                     if (rows.size > 1) SmallAction(Lucide.Minus, "Remove table row") { write(rows.dropLast(1)) }
@@ -143,7 +144,7 @@ private fun TableGrid(
     onCell: (row: Int, column: Int, text: String) -> Unit,
 ) {
     val line = MaterialTheme.colorScheme.outlineVariant
-    Column(modifier = modifier.border(1.dp, line, RoundedCornerShape(4.dp)).semantics { contentDescription = "Table" }) {
+    Column(modifier = modifier.border(1.dp, line, RoundedCornerShape(LettaDimens.Space.xs)).semantics { contentDescription = "Table" }) {
         rows.forEachIndexed { r, row ->
             Row(modifier = Modifier.fillMaxWidth()) {
                 row.forEachIndexed { c, cell ->
@@ -151,9 +152,9 @@ private fun TableGrid(
                         modifier = Modifier
                             .weight(1f)
                             .widthIn(min = CELL_MIN_WIDTH)
-                            .border(0.5.dp, line)
+                            .border(LettaDimens.Stroke.hairline, line)
                             .background(if (r == 0) MaterialTheme.colorScheme.surfaceContainer else androidx.compose.ui.graphics.Color.Transparent)
-                            .padding(horizontal = 6.dp, vertical = 4.dp),
+                            .padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs),
                     ) {
                         if (editable) {
                             // The field keeps its own text while typing and writes every change to the
@@ -178,9 +179,9 @@ private fun TableGrid(
 
 @Composable
 private fun SmallAction(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
-    IconButton(onClick = onClick, modifier = Modifier.size(24.dp).semantics { contentDescription = label }) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(14.dp))
+    IconButton(onClick = onClick, modifier = Modifier.size(LettaDimens.Control.iconButton).semantics { contentDescription = label }) {
+        Icon(icon, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.iconSm))
     }
 }
 
-private val CELL_MIN_WIDTH = 48.dp
+private val CELL_MIN_WIDTH = LettaDimens.Orb.railSlotWidth

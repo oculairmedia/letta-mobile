@@ -45,6 +45,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import com.letta.mobile.ui.theme.LettaDimens
 
 
 @Composable
@@ -75,17 +76,17 @@ internal fun A2uiScheduleCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(LettaDimens.Space.lg),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
                 verticalAlignment = Alignment.Top,
             ) {
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
                 ) {
                     Text(
                         text = props.name,
@@ -117,7 +118,7 @@ internal fun A2uiScheduleCard(
                 )
             }
 
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
                 ScheduleMetaLine("Schedule", props.scheduleText)
                 props.nextRun?.takeIf { it.isNotBlank() }?.let { ScheduleMetaLine("Next", it) }
                 props.lastRun?.takeIf { it.isNotBlank() }?.let { ScheduleMetaLine("Last", it) }
@@ -125,7 +126,7 @@ internal fun A2uiScheduleCard(
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
             ) {
                 OutlinedButton(
                     onClick = { onAction(scheduleIdAction(surface, ScheduleRunNowAction, props.id)) },
@@ -178,7 +179,7 @@ internal fun ScheduleStatusPill(status: ScheduleStatus) {
                 ScheduleStatus.Failed -> MaterialTheme.colorScheme.onErrorContainer
                 ScheduleStatus.Idle -> MaterialTheme.colorScheme.onSurfaceVariant
             },
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs),
         )
     }
 }
@@ -187,14 +188,14 @@ internal fun ScheduleStatusPill(status: ScheduleStatus) {
 internal fun ScheduleMetaLine(label: String, value: String) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         verticalAlignment = Alignment.Top,
     ) {
         Text(
             text = label,
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.widthIn(min = 48.dp, max = 72.dp),
+            modifier = Modifier.widthIn(min = LettaDimens.Orb.railSlotWidth, max = 72.dp),
         )
         Text(
             text = value,
@@ -242,7 +243,7 @@ internal fun A2uiScheduleSelectorInput(
         modifier = modifier
             .fillMaxWidth()
             .testTag(A2uiTestTags.SCHEDULE_SELECTOR_INPUT),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         Text(
             text = label,

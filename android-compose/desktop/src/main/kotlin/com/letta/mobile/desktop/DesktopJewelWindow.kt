@@ -48,6 +48,7 @@ import dev.nucleusframework.window.styling.TitleBarColors
 import dev.nucleusframework.window.styling.TitleBarMetrics
 import dev.nucleusframework.window.styling.TitleBarStyle
 import java.awt.Rectangle
+import com.letta.mobile.ui.theme.LettaDimens
 
 /** Overflow entry points surfaced next to the sidebar toggle while the
  * sidebar is collapsed — see [DesktopSidebarOverflowMenu]. */
@@ -113,10 +114,10 @@ internal data class DesktopHeaderChromeState(
 
 /** Title-bar height: taller than a stock 32-44dp caption bar to comfortably
  * fit the two-line agent identity block (title over agent name). */
-private val TitleBarHeight = 48.dp
+private val TitleBarHeight = LettaDimens.Orb.railSlotWidth
 
 /** With tabs the strip is one line per tab (title, then agent), so the bar can be browser-thin. */
-private val TabbedTitleBarHeight = 38.dp
+private val TabbedTitleBarHeight = LettaDimens.Control.actionButton
 
 /**
  * Bounds the identity block by a fixed max width rather than a Row `weight`.
@@ -242,7 +243,7 @@ internal fun DesktopJewelWindow(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(start = 8.dp)
+                                .padding(start = LettaDimens.Space.sm)
                                 .onGloballyPositioned { coordinates ->
                                     val bounds = titleBarScreenBoundsOrNull(
                                         coordinates = coordinates,
@@ -272,7 +273,7 @@ internal fun DesktopJewelWindow(
                                     )
                                 }
                             }
-                            Box(modifier = Modifier.width(4.dp))
+                            Box(modifier = Modifier.width(LettaDimens.Space.xs))
                             header.search?.let { search ->
                                 com.letta.mobile.ui.search.LettaSearchAnchoredField(
                                     query = search.query,
@@ -338,17 +339,17 @@ internal fun DesktopJewelWindow(
                                 )
                             } else {
                                 Row(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier
                                         .widthIn(max = IdentityBlockMaxWidth)
-                                        .padding(horizontal = 8.dp),
+                                        .padding(horizontal = LettaDimens.Space.sm),
                                 ) {
                                     Icon(
                                         imageVector = Icons.Outlined.ChatBubbleOutline,
                                         contentDescription = null,
                                         tint = colorScheme.onSurface,
-                                        modifier = Modifier.size(15.dp),
+                                        modifier = Modifier.size(LettaDimens.Space.lg),
                                     )
                                     Text(
                                         text = title,

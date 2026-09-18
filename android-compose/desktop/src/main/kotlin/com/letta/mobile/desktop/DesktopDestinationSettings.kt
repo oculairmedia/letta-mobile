@@ -35,6 +35,7 @@ import com.letta.mobile.desktop.components.DesktopChipTab
 import com.letta.mobile.desktop.data.desktopConfigIdFor
 import org.jetbrains.jewel.ui.component.Text as JewelText
 import org.jetbrains.jewel.ui.component.TextField as JewelTextField
+import com.letta.mobile.ui.theme.LettaDimens
 
 @Composable
 internal fun BackendCard(config: LettaConfig) {
@@ -45,8 +46,8 @@ internal fun BackendCard(config: LettaConfig) {
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(LettaDimens.Space.xl),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         ) {
             BackendCardHeader(config = config)
             BackendCardStatusPills(modeLabel = config.mode.label)
@@ -57,7 +58,7 @@ internal fun BackendCard(config: LettaConfig) {
 @Composable
 private fun BackendCardHeader(config: LettaConfig) {
     Row(
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
@@ -84,7 +85,7 @@ private fun BackendCardHeader(config: LettaConfig) {
 @Composable
 private fun BackendCardStatusPills(modeLabel: String) {
     Row(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         val pillColors = StatusPillColors(
@@ -132,8 +133,8 @@ internal fun BackendSettingsCard(
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.padding(LettaDimens.Space.xl),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
         ) {
             Text(
                 text = "Backend",
@@ -174,9 +175,9 @@ private fun BackendModeSelector(
     mode: LettaConfig.Mode,
     onModeChange: (LettaConfig.Mode) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
         DesktopSettingsFieldLabel("Mode")
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
             LettaConfig.Mode.entries.forEach { option ->
                 DesktopChipTab(
                     text = option.label,
@@ -217,7 +218,7 @@ private data class BackendSettingsActionsParams(
 private fun BackendSettingsActions(params: BackendSettingsActionsParams) {
     val form = params.form
     Row(
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         DesktopDefaultButton(
@@ -283,8 +284,8 @@ internal fun StartupReadinessCard(featureReadiness: List<DesktopFeatureReadiness
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.padding(LettaDimens.Space.xl),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
         ) {
             Text(
                 text = "Startup readiness",
@@ -302,18 +303,18 @@ internal fun StartupReadinessCard(featureReadiness: List<DesktopFeatureReadiness
 @Composable
 internal fun ReadinessRow(feature: DesktopFeatureReadiness) {
     Row(
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
         verticalAlignment = Alignment.Top,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Box(
             modifier = Modifier
-                .padding(top = 4.dp)
-                .size(10.dp)
+                .padding(top = LettaDimens.Space.xs)
+                .size(LettaDimens.Space.md)
                 .background(feature.state.color(), MaterialTheme.shapes.small),
         )
         Column(
-            verticalArrangement = Arrangement.spacedBy(3.dp),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
             modifier = Modifier.weight(1f),
         ) {
             ReadinessRowTitle(feature = feature)
@@ -329,7 +330,7 @@ internal fun ReadinessRow(feature: DesktopFeatureReadiness) {
 @Composable
 private fun ReadinessRowTitle(feature: DesktopFeatureReadiness) {
     Row(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -388,7 +389,7 @@ internal fun StatusPill(
         Text(
             text = text,
             style = MaterialTheme.typography.labelLarge,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
         )
     }
 }

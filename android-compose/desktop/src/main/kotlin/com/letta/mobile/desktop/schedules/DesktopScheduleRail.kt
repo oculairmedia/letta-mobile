@@ -47,6 +47,7 @@ import kotlin.time.Instant
 import com.letta.mobile.ui.schedules.ReliabilityStrip
 import com.letta.mobile.ui.schedules.StatCell
 import com.letta.mobile.ui.schedules.statusColor
+import com.letta.mobile.ui.theme.LettaDimens
 
 // --- Right rail -------------------------------------------------------------
 
@@ -68,7 +69,7 @@ internal fun ScheduleRail(params: ScheduleRailParams) {
         Modifier.width(RAIL_WIDTH).fillMaxHeight()
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant)
             .background(MaterialTheme.colorScheme.surface)
-            .padding(20.dp),
+            .padding(LettaDimens.Space.xl),
     ) {
         ScheduleRailContent(params)
     }
@@ -131,15 +132,15 @@ internal fun OverviewRail(params: OverviewRailParams) {
     val history = params.history
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         Text("OVERVIEW", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor)
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(LettaDimens.Space.md))
         Row(Modifier.fillMaxWidth()) {
             StatCell("${history.totalRuns}", "runs · 30d", MaterialTheme.colorScheme.onSurface, Modifier.weight(1f))
             StatCell(history.overallSuccessRate?.let { "${(it * 100).toInt()}%" } ?: "—", "success", MaterialTheme.customColors.successColor, Modifier.weight(1f))
             StatCell("—", "avg", MaterialTheme.colorScheme.onSurface, Modifier.weight(1f))
         }
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(LettaDimens.Space.xl))
         Text("ACTIVE SCHEDULES", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor)
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(LettaDimens.Space.md))
         val globalNext = params.defs.mapNotNull { ScheduleProjection.nextRun(it, params.now) }.minOrNull()
         params.defs.forEach { def ->
             val next = ScheduleProjection.nextRun(def, params.now)
@@ -152,7 +153,7 @@ internal fun OverviewRail(params: OverviewRailParams) {
                     onClick = { params.onSelectSchedule(def.id) },
                 ),
             )
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(LettaDimens.Space.sm))
         }
     }
 }
@@ -187,9 +188,9 @@ internal fun detailControlNote(canDelete: Boolean): String =
 internal fun ActiveScheduleRow(params: ActiveScheduleRowParams) {
     val next = ScheduleProjection.nextRun(params.def, params.now)
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(LettaDimens.Radius.md))
             .background(if (params.isNext) MaterialTheme.customColors.runningColor.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceContainer)
-            .clickable(onClick = params.onClick).padding(horizontal = 14.dp, vertical = 12.dp),
+            .clickable(onClick = params.onClick).padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
@@ -220,24 +221,24 @@ internal fun DetailRail(params: DetailRailParams) {
     val reliability = params.reliability
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable(onClick = params.onBack)) {
-            Icon(Icons.Outlined.ArrowBack, "Overview", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
-            Spacer(Modifier.width(6.dp))
+            Icon(Icons.Outlined.ArrowBack, "Overview", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(LettaDimens.Control.icon))
+            Spacer(Modifier.width(LettaDimens.Space.sm))
             Text("Overview", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(LettaDimens.Space.md))
         Text(def.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
-        Spacer(Modifier.height(6.dp))
-        Box(Modifier.clip(RoundedCornerShape(6.dp)).border(1.dp, MaterialTheme.customColors.successColor, RoundedCornerShape(6.dp)).padding(horizontal = 10.dp, vertical = 3.dp)) {
+        Spacer(Modifier.height(LettaDimens.Space.sm))
+        Box(Modifier.clip(RoundedCornerShape(LettaDimens.Radius.sm)).border(1.dp, MaterialTheme.customColors.successColor, RoundedCornerShape(LettaDimens.Radius.sm)).padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.xs)) {
             Text(activeStatusLabel(def.active), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.successColor)
         }
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(LettaDimens.Space.lg))
         val next = ScheduleProjection.nextRun(def, params.now)
         Row(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.surfaceContainer).padding(14.dp),
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(LettaDimens.Radius.md)).background(MaterialTheme.colorScheme.surfaceContainer).padding(LettaDimens.Space.lg),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(Icons.Outlined.Schedule, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-            Spacer(Modifier.width(10.dp))
+            Icon(Icons.Outlined.Schedule, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(LettaDimens.Control.icon))
+            Spacer(Modifier.width(LettaDimens.Space.md))
             Column {
                 Text(nextRunHeadline(params.now, next), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                 if (next != null) {
@@ -245,25 +246,25 @@ internal fun DetailRail(params: DetailRailParams) {
                 }
             }
         }
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(LettaDimens.Space.lg))
         DefRow("Cadence", cadenceLabel(def))
         DefRow("Agent", def.name)
         DefRow("If missed", "Skip — don't catch up")
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(LettaDimens.Space.lg))
         if (reliability != null && reliability.total > 0) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("RELIABILITY", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor, modifier = Modifier.weight(1f))
                 Text("${reliability.succeeded}/${reliability.total}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(LettaDimens.Space.sm))
             ReliabilityStrip(reliability.squares)
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(LettaDimens.Space.lg))
         }
         DesktopDefaultButton(onClick = { /* run now: backend-gated */ }, enabled = false, modifier = Modifier.fillMaxWidth()) {
             DesktopButtonContent("Run now")
         }
-        Spacer(Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Spacer(Modifier.height(LettaDimens.Space.sm))
+        Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
             DesktopOutlinedButton(onClick = {}, enabled = false) { DesktopButtonContent("Pause") }
             // Delete only for cron-backed schedules — the wired callback hits
             // the cron API, which can't delete native schedule-admin schedules.
@@ -271,7 +272,7 @@ internal fun DetailRail(params: DetailRailParams) {
                 DesktopOutlinedButton(onClick = { params.onDelete(def.id) }) { DesktopButtonContent("Delete") }
             }
         }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(LettaDimens.Space.sm))
         Text(detailControlNote(params.canDelete), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor)
     }
 }
@@ -280,24 +281,24 @@ internal fun DetailRail(params: DetailRailParams) {
 internal fun RunDetailRail(run: ScheduleRun, zone: TimeZone, onBack: () -> Unit) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable(onClick = onBack)) {
-            Icon(Icons.Outlined.ArrowBack, "Back", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
-            Spacer(Modifier.width(6.dp))
+            Icon(Icons.Outlined.ArrowBack, "Back", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(LettaDimens.Control.icon))
+            Spacer(Modifier.width(LettaDimens.Space.sm))
             Text("Overview", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(LettaDimens.Space.md))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(10.dp).clip(CircleShape).background(statusColor(run.status)))
-            Spacer(Modifier.width(8.dp))
+            Box(Modifier.size(LettaDimens.Space.md).clip(CircleShape).background(statusColor(run.status)))
+            Spacer(Modifier.width(LettaDimens.Space.sm))
             Text(run.scheduleName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
         }
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(LettaDimens.Space.md))
         DefRow("When", "${ScheduleFormat.dateLabel(run.instant, zone)} · ${ScheduleFormat.timeOfDay(run.instant, zone)}")
         DefRow("Status", run.status.name)
         run.durationMillis?.let { DefRow("Duration", ScheduleFormat.duration(it)) }
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(LettaDimens.Space.md))
         Text("OUTPUT LOG", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor)
-        Spacer(Modifier.height(4.dp))
-        Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceContainerLowest).padding(12.dp)) {
+        Spacer(Modifier.height(LettaDimens.Space.xs))
+        Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(LettaDimens.Radius.sm)).background(MaterialTheme.colorScheme.surfaceContainerLowest).padding(LettaDimens.Space.md)) {
             Text(
                 run.error ?: "No captured output for this run yet.",
                 style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),

@@ -47,11 +47,12 @@ import com.letta.mobile.ui.navigation.optionalSharedElement
 import com.letta.mobile.ui.theme.listItemHeadline
 import com.letta.mobile.ui.theme.listItemMetadata
 import com.letta.mobile.ui.theme.listItemSupporting
+import com.letta.mobile.ui.theme.LettaDimens
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 /** The agent's tile in the list: the shared [AgentAvatar] - its mascot, or its initial (letta-mobile-8jtf3). */
-private val AgentTileSize = 44.dp
-private val CompactAgentTileSize = 30.dp
+private val AgentTileSize = LettaDimens.Orb.railSlotHeight
+private val CompactAgentTileSize = LettaDimens.Space.xxl
 
 @Composable
 internal fun FavoriteAgentCard(
@@ -79,8 +80,8 @@ internal fun FavoriteAgentCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             AgentAvatar(
@@ -92,7 +93,7 @@ internal fun FavoriteAgentCard(
 
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
@@ -165,8 +166,8 @@ internal fun ShareContentPreviewCard(
         ),
     ) {
         Row(
-            modifier = Modifier.padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(LettaDimens.Space.md),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
             verticalAlignment = Alignment.Top,
         ) {
             Icon(
@@ -174,7 +175,7 @@ internal fun ShareContentPreviewCard(
                 contentDescription = null,
                 modifier = Modifier.size(LettaIconSizing.Toolbar),
             )
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
                 Text(
                     text = "Pick an agent to send this content",
                     style = MaterialTheme.typography.labelLarge,
@@ -274,19 +275,19 @@ internal fun AgentCard(
                     null
                 },
             ),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.lg),
         color = if (isFavorite) {
             MaterialTheme.colorScheme.primaryContainer
         } else {
             LettaCardDefaults.listContainerColor
         },
-        tonalElevation = 3.dp,
+        tonalElevation = LettaDimens.Space.xs,
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             AgentAvatar(
@@ -298,7 +299,7 @@ internal fun AgentCard(
 
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
@@ -322,7 +323,7 @@ internal fun AgentCard(
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.tertiary,
                             modifier = Modifier
-                                .padding(start = 6.dp)
+                                .padding(start = LettaDimens.Space.sm)
                                 .size(LettaIconSizing.Inline),
                         )
                     }
@@ -425,19 +426,19 @@ internal fun CompactAgentCard(
                     null
                 },
             ),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.lg),
         color = if (isFavorite) {
             MaterialTheme.colorScheme.primaryContainer
         } else {
             LettaCardDefaults.listContainerColor
         },
-        tonalElevation = 3.dp,
+        tonalElevation = LettaDimens.Space.xs,
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+                .padding(LettaDimens.Space.md),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 AgentAvatar(
@@ -461,7 +462,7 @@ internal fun CompactAgentCard(
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.tertiary,
                         modifier = Modifier
-                            .padding(start = if (isFavorite) 6.dp else 0.dp)
+                            .padding(start = if (isFavorite) LettaDimens.Space.sm else 0.dp)
                             .size(LettaIconSizing.Inline),
                     )
                 }

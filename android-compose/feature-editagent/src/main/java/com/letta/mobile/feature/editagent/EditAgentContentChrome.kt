@@ -20,6 +20,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.components.CardGroup
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * Stable LazyColumn keys for each section sticky header. Used both as item
@@ -50,7 +51,7 @@ internal fun EditAgentSectionHeader(
         Text(
             text = title,
             style = MaterialTheme.typography.titleSmall,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),
         )
     }
 }
@@ -75,7 +76,7 @@ internal fun DangerZoneSection(
     onResetMessages: () -> Unit,
     onDeleteAgent: () -> Unit,
 ) {
-    Spacer(modifier = Modifier.height(24.dp))
+    Spacer(modifier = Modifier.height(LettaDimens.Space.xl))
     CardGroup(
         title = {
             Text(
@@ -97,9 +98,9 @@ internal fun DangerZoneSection(
                     Icon(
                         LettaIcons.Refresh,
                         contentDescription = null,
-                        modifier = Modifier.size(18.dp),
+                        modifier = Modifier.size(LettaDimens.Space.lg),
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
                     Text(stringResource(R.string.action_reset_messages))
                 }
             },
@@ -117,9 +118,9 @@ internal fun DangerZoneSection(
                     Icon(
                         LettaIcons.Delete,
                         contentDescription = null,
-                        modifier = Modifier.size(18.dp),
+                        modifier = Modifier.size(LettaDimens.Space.lg),
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
                     Text(stringResource(R.string.screen_agents_dialog_delete_title))
                 }
             },

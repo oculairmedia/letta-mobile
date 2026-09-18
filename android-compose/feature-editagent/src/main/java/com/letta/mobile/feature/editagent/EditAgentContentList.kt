@@ -44,6 +44,7 @@ import com.letta.mobile.ui.components.CardGroupScope
 import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaCodeFont
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * Bundled inputs for the edit-agent scroll surface. Keeps
@@ -63,10 +64,10 @@ internal data class EditAgentContentListParams(
 @Composable
 internal fun EditAgentContentList(params: EditAgentContentListParams) {
     val listPadding = PaddingValues(
-        start = 16.dp,
-        end = 16.dp,
-        top = params.contentPadding.calculateTopPadding() + 8.dp,
-        bottom = params.contentPadding.calculateBottomPadding() + 16.dp,
+        start = LettaDimens.Space.lg,
+        end = LettaDimens.Space.lg,
+        top = params.contentPadding.calculateTopPadding() + LettaDimens.Space.sm,
+        bottom = params.contentPadding.calculateBottomPadding() + LettaDimens.Space.lg,
     )
     LazyColumn(
         modifier = params.modifier
@@ -74,7 +75,7 @@ internal fun EditAgentContentList(params: EditAgentContentListParams) {
             .testTag(EditAgentTestTags.CONTENT_LIST),
         state = params.lazyListState,
         contentPadding = listPadding,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
     ) {
         editAgentHeaderItem(params)
         editAgentBasicsSection(params)
@@ -242,8 +243,8 @@ private fun EditAgentTagsCard(
             item(
                 headlineContent = {
                     FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+                        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
                     ) {
                         state.tags.forEach { tag ->
                             InputChip(
@@ -254,7 +255,7 @@ private fun EditAgentTagsCard(
                                     Icon(
                                         LettaIcons.Close,
                                         contentDescription = stringResource(R.string.screen_agent_edit_remove_tag),
-                                        modifier = Modifier.size(16.dp),
+                                        modifier = Modifier.size(LettaDimens.Space.lg),
                                     )
                                 },
                             )
@@ -268,7 +269,7 @@ private fun EditAgentTagsCard(
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                 ) {
                     OutlinedTextField(
                         value = newTag,
@@ -369,7 +370,7 @@ private fun CardGroupScope.addLlmProviderAndSamplingItems(
         headlineContent = {
             var localTemperature by remember { mutableStateOf(state.temperature) }
             LaunchedEffect(state.temperature) { localTemperature = state.temperature }
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
                 Text(
                     stringResource(R.string.screen_agent_edit_temperature_value, localTemperature),
                     style = MaterialTheme.typography.bodyMedium,
@@ -594,7 +595,7 @@ private fun EditAgentAttachedToolsCard(params: EditAgentContentListParams) {
                         Icon(
                             LettaIcons.Tool,
                             contentDescription = null,
-                            modifier = Modifier.size(20.dp),
+                            modifier = Modifier.size(LettaDimens.Space.xl),
                             tint = MaterialTheme.colorScheme.primary,
                         )
                     },

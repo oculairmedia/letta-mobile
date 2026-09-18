@@ -28,6 +28,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.sectionTitle
+import com.letta.mobile.ui.theme.LettaDimens
 
 @Composable
 fun Accordions(
@@ -53,7 +54,7 @@ fun Accordions(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable { onExpandedChange(!expanded) }
-                .padding(vertical = 12.dp, horizontal = 16.dp),
+                .padding(vertical = LettaDimens.Space.md, horizontal = LettaDimens.Space.lg),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
@@ -73,7 +74,7 @@ fun Accordions(
                     )
                 }
             }
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
             Icon(
                 imageVector = LettaIcons.ExpandMore,
                 contentDescription = if (expanded) "Collapse" else "Expand",

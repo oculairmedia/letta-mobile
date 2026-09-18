@@ -42,6 +42,7 @@ import com.letta.mobile.avatar.core.MascotPalette
 import com.letta.mobile.avatar.core.MascotShape
 import kotlin.math.cos
 import kotlin.math.sin
+import com.letta.mobile.ui.theme.LettaDimens
 
 /** The rotation slider's resolution: 24 positions, 0 to 345 degrees. */
 const val MASCOT_ROTATION_STEP: Int = 15
@@ -63,7 +64,7 @@ fun MascotPicker(
     // caller persists every change, and a drag must be one write, not one per slider step.
     var draggedRotation by remember(identity) { mutableStateOf<Int?>(null) }
     val shown = draggedRotation?.let { identity.copy(rotationDegrees = it) } ?: identity
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
         Text("Shape", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         MascotChoiceRows(MascotShape.entries.toList(), columns = 4) { shape ->
             MascotShapeChoice(shape, shown, accent) { onChange(shown.copy(shape = shape)) }
@@ -116,9 +117,9 @@ private fun <T> MascotChoiceRows(
     columns: Int,
     content: @Composable (T) -> Unit,
 ) {
-    Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
         items.chunked(columns).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
                 row.forEach { content(it) }
             }
         }
@@ -136,9 +137,9 @@ private fun MascotShapeChoice(
     Box(
         Modifier
             .size(52.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(LettaDimens.Radius.md))
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (selected) 0.9f else 0.4f))
-            .border(if (selected) 2.dp else 0.dp, if (selected) accent else Color.Transparent, RoundedCornerShape(12.dp))
+            .border(if (selected) LettaDimens.Space.hair else 0.dp, if (selected) accent else Color.Transparent, RoundedCornerShape(LettaDimens.Radius.md))
             .selectable(
                 selected = selected,
                 onClick = onSelect,
@@ -154,9 +155,9 @@ private fun MascotShapeChoice(
         // since only Rive rotates the real body.
         val candidate = identity.copy(shape = shape)
         if (mascotCandidateAvailable(candidate)) {
-            MascotCandidate(candidate, size = 36.dp * MASCOT_TILE_OVERSCALE)
+            MascotCandidate(candidate, size = LettaDimens.Space.xxl * MASCOT_TILE_OVERSCALE)
         } else {
-            MascotShapeGlyph(shape, identity.argb, 36.dp, Modifier.rotate(identity.rotationDegrees.toFloat()))
+            MascotShapeGlyph(shape, identity.argb, LettaDimens.Space.xxl, Modifier.rotate(identity.rotationDegrees.toFloat()))
         }
     }
 }
@@ -173,10 +174,10 @@ private fun MascotColorChoice(
     val hex = argb.toUInt().toString(16).padStart(8, '0')
     Box(
         Modifier
-            .size(28.dp)
+            .size(LettaDimens.Space.xxl)
             .clip(CircleShape)
             .background(Color(argb))
-            .border(if (selected) 3.dp else 1.dp, if (selected) accent else Color.Black.copy(alpha = 0.25f), CircleShape)
+            .border(if (selected) LettaDimens.Space.xs else 1.dp, if (selected) accent else Color.Black.copy(alpha = 0.25f), CircleShape)
             .selectable(
                 selected = selected,
                 onClick = onSelect,
@@ -189,7 +190,7 @@ private fun MascotColorChoice(
 /** A mascot body as a flat silhouette in its colour - the identity at a glance, no renderer needed. */
 @Composable
 fun MascotShapeGlyph(shape: MascotShape, argb: Int, size: Dp, modifier: Modifier = Modifier) {
-    Canvas(modifier.size(size).padding(2.dp)) { drawMascotShape(shape, Color(argb)) }
+    Canvas(modifier.size(size).padding(LettaDimens.Space.hair)) { drawMascotShape(shape, Color(argb)) }
 }
 
 /** The eight silhouettes, normalised to the draw area. Approximations of `art/body-*.svg`. */

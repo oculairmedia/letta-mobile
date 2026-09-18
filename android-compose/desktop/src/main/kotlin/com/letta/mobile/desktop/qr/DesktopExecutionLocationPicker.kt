@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.controller.node.iroh.PairedPeer
 import com.letta.mobile.desktop.DesktopMaterialTheme
 import com.letta.mobile.desktop.DesktopSelectableChip
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * letta-mobile-nonza (sixv8.3): collapsible execution-location picker on
@@ -106,21 +107,21 @@ private fun CollapsedChip(
 ) {
     Surface(
         modifier = Modifier
-            .heightIn(min = 32.dp)
-            .clip(RoundedCornerShape(16.dp))
+            .heightIn(min = LettaDimens.Space.xxl)
+            .clip(RoundedCornerShape(LettaDimens.Radius.lg))
             .clickable(onClick = onToggle)
             .semantics { contentDescription = "Execution location: $label" },
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             Icon(
                 imageVector = Icons.Outlined.Place,
                 contentDescription = null,
-                modifier = Modifier.size(16.dp),
+                modifier = Modifier.size(LettaDimens.Space.lg),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
@@ -133,7 +134,7 @@ private fun CollapsedChip(
             Icon(
                 imageVector = if (expanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
                 contentDescription = null,
-                modifier = Modifier.size(16.dp),
+                modifier = Modifier.size(LettaDimens.Space.lg),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -150,14 +151,14 @@ private fun ExpandedList(
 ) {
     Surface(
         modifier = Modifier
-            .padding(top = 4.dp)
-            .clip(RoundedCornerShape(8.dp)),
+            .padding(top = LettaDimens.Space.xs)
+            .clip(RoundedCornerShape(LettaDimens.Radius.sm)),
         color = MaterialTheme.colorScheme.surfaceContainerHighest,
-        tonalElevation = 4.dp,
+        tonalElevation = LettaDimens.Space.xs,
     ) {
         Column(
-            modifier = Modifier.padding(8.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.padding(LettaDimens.Space.sm),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
         ) {
             expandedPickerRows(peers, selectedNodeId, localLabel).forEach { row ->
                 PickerRow(
@@ -224,9 +225,9 @@ private fun PickerRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 4.dp, vertical = 4.dp),
+                .padding(horizontal = LettaDimens.Space.xs, vertical = LettaDimens.Space.xs),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             Text(
                 text = label,
@@ -236,7 +237,7 @@ private fun PickerRow(
                 overflow = TextOverflow.Ellipsis,
             )
             if (!subtitle.isNullOrBlank()) {
-                Spacer(modifier = Modifier.width(4.dp))
+                Spacer(modifier = Modifier.width(LettaDimens.Space.xs))
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,

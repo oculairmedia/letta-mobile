@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * letta-mobile-arhd: full-screen visual context for an in-flight
@@ -83,31 +84,31 @@ fun VoiceRecognizerOverlay(
                 textAlign = TextAlign.Center,
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .padding(horizontal = 32.dp),
+                    .padding(horizontal = LettaDimens.Space.xxl),
             )
 
             // Bottom instruction pill — pointer-eating so accidental
             // taps don't fall through to the underlying chat content
             // while the user is mid-dictation.
             Surface(
-                shape = RoundedCornerShape(28.dp),
+                shape = RoundedCornerShape(LettaDimens.Radius.lg),
                 color = Color.Black.copy(alpha = 0.6f),
                 contentColor = Color.White,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .windowInsetsPadding(WindowInsets.navigationBars)
-                    .padding(bottom = 96.dp, start = 24.dp, end = 24.dp)
+                    .padding(bottom = 96.dp, start = LettaDimens.Space.xl, end = LettaDimens.Space.xl)
                     .pointerInput(Unit) { /* eat all pointer events here */ },
             ) {
                 Column(
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
+                    modifier = Modifier.padding(horizontal = LettaDimens.Space.xl, vertical = LettaDimens.Space.lg),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
                         Box(
                             modifier = Modifier
-                                .size(8.dp)
+                                .size(LettaDimens.Space.sm)
                                 .clip(CircleShape)
                                 .background(MaterialTheme.colorScheme.error),
                         )

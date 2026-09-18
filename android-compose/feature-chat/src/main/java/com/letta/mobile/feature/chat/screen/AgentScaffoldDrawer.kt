@@ -61,6 +61,7 @@ import com.letta.mobile.ui.chat.render.ProjectBriefUiState
 import com.letta.mobile.ui.chat.render.ProjectBugReportDraft
 import com.letta.mobile.ui.chat.render.ProjectBugReportUiState
 import com.letta.mobile.ui.chat.render.ProjectChatContext
+import com.letta.mobile.ui.theme.LettaDimens
 
 @Composable
 internal fun ProjectAgentsCard(
@@ -75,8 +76,8 @@ internal fun ProjectAgentsCard(
         ),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(LettaDimens.Space.lg),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         ) {
             FormItem(
                 label = {
@@ -97,10 +98,10 @@ internal fun ProjectAgentsCard(
 
             if (state.isLoading) {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    CircularProgressIndicator(modifier = Modifier.size(LettaDimens.Space.xl), strokeWidth = LettaDimens.Space.hair)
                     Text(
                         text = stringResource(R.string.screen_project_agents_loading),
                         style = MaterialTheme.typography.bodyMedium,
@@ -112,8 +113,8 @@ internal fun ProjectAgentsCard(
             state.error?.let { error ->
                 Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
                     Column(
-                        modifier = Modifier.padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(LettaDimens.Space.md),
+                        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                     ) {
                         Text(
                             text = error,
@@ -138,8 +139,8 @@ internal fun ProjectAgentsCard(
             state.agents.forEach { agent ->
                 Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceBright)) {
                     Column(
-                        modifier = Modifier.padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(LettaDimens.Space.md),
+                        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -161,11 +162,11 @@ internal fun ProjectAgentsCard(
                                 label = { Text(agent.statusLabel) },
                                 leadingIcon = {
                                     Box(
-                                        modifier = Modifier.size(10.dp),
+                                        modifier = Modifier.size(LettaDimens.Space.md),
                                         contentAlignment = Alignment.Center,
                                     ) {
                                         Card(
-                                            modifier = Modifier.size(10.dp),
+                                            modifier = Modifier.size(LettaDimens.Space.md),
                                             colors = CardDefaults.cardColors(containerColor = toneColor(agent.statusTone)),
                                         ) {}
                                     }
@@ -218,8 +219,8 @@ internal fun ProjectBugReportSummaryCard(
         ),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(LettaDimens.Space.lg),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         ) {
             FormItem(
                 label = { Text(stringResource(R.string.screen_project_bug_report_title), style = MaterialTheme.typography.listItemHeadline) },
@@ -244,8 +245,8 @@ internal fun ProjectBugReportSummaryCard(
             state.recentReports.take(3).forEach { report ->
                 Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceBright)) {
                     Column(
-                        modifier = Modifier.padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.padding(LettaDimens.Space.md),
+                        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
                     ) {
                         Text(report.title, style = MaterialTheme.typography.titleSmall)
                         Text(
@@ -284,8 +285,8 @@ internal fun ProjectBugReportSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag(AgentScaffoldTestTags.PROJECT_BUG_REPORT_SHEET)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(LettaDimens.Space.lg),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         ) {
             Text(
                 text = stringResource(R.string.screen_project_bug_report_title),
@@ -342,12 +343,12 @@ internal fun ProjectBugReportSheet(
                 }
             }
 
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
                 Text(
                     text = stringResource(R.string.screen_project_bug_report_field_tags),
                     style = MaterialTheme.typography.labelLarge,
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
                     listOf("ui", "backend", "sync", "crash").forEach { tag ->
                         FilterChip(
                             selected = tag in selectedTags,
@@ -461,16 +462,16 @@ internal fun ProjectBriefCard(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                    .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md),
+                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
             ) {
                 if (brief.isLoading) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        CircularProgressIndicator(modifier = Modifier.size(LettaDimens.Space.xl), strokeWidth = LettaDimens.Space.hair)
                         Text(
                             text = stringResource(R.string.screen_project_brief_loading),
                             style = MaterialTheme.typography.bodyMedium,
@@ -486,8 +487,8 @@ internal fun ProjectBriefCard(
                         ),
                     ) {
                         Column(
-                            modifier = Modifier.padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(LettaDimens.Space.md),
+                            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                         ) {
                             Text(
                                 text = error,
@@ -520,8 +521,8 @@ internal fun ProjectBriefCard(
                         ),
                     ) {
                         Column(
-                            modifier = Modifier.padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.padding(LettaDimens.Space.md),
+                            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
                         ) {
                             FormItem(
                                 label = {
@@ -620,14 +621,14 @@ internal fun ProjectInfoTray(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         ),
     ) {
         Column(
             modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             ProjectContextCard(
                 project = project,
@@ -641,7 +642,7 @@ internal fun ProjectInfoTray(
                 enter = ChatMotion.expandEnter(),
                 exit = ChatMotion.expandExit(),
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
                     ProjectAgentsCard(
                         state = agentsState,
                         onRetry = onRetryAgents,
@@ -676,8 +677,8 @@ internal fun ProjectContextCard(
         modifier = modifier
             .fillMaxWidth()
             .clickable { onExpandedChange(!expanded) }
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+            .padding(LettaDimens.Space.lg),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -709,7 +710,7 @@ internal fun ProjectContextCard(
                     contentDescription = null,
                     modifier = Modifier.size(LettaIconSizing.Inline),
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
                 Text(
                     text = if (expanded) stringResource(R.string.common_hide) else stringResource(R.string.common_details),
                 )
@@ -721,7 +722,7 @@ internal fun ProjectContextCard(
             enter = ChatMotion.expandEnter(),
             exit = ChatMotion.expandExit(),
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
                 ProjectInfoLine(
                     label = stringResource(R.string.screen_project_chat_path_label),
                     value = project.filesystemPath,
@@ -751,7 +752,7 @@ internal fun ProjectInfoLine(
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         verticalAlignment = Alignment.Top,
     ) {
         Text(

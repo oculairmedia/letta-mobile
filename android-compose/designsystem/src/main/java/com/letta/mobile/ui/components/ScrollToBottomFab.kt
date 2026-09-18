@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.theme.LettaDimens
 
 const val SCROLL_TO_BOTTOM_FAB_TAG = "scroll_to_bottom_fab"
 
@@ -36,8 +37,8 @@ fun ScrollToBottomFab(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             contentColor = MaterialTheme.colorScheme.onSurface,
             elevation = FloatingActionButtonDefaults.elevation(
-                defaultElevation = 3.dp,
-                pressedElevation = 6.dp,
+                defaultElevation = LettaDimens.Space.xs,
+                pressedElevation = LettaDimens.Space.sm,
             ),
             modifier = Modifier
                 .testTag(SCROLL_TO_BOTTOM_FAB_TAG),

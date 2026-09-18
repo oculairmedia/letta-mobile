@@ -75,6 +75,7 @@ import com.letta.mobile.ui.chat.render.rememberSmoothedStreamingText
 import kotlinx.coroutines.delay
 
 import kotlin.time.Duration.Companion.milliseconds
+import com.letta.mobile.ui.theme.LettaDimens
 
 // letta-mobile-bccty: desktop shell-level wiring for the shared
 // AgentMessageProvenanceLabel. The shared label takes (resolveName,
@@ -122,7 +123,7 @@ private fun AssistantMessageColumn(
     streamingMessageId: StreamingMessageId?,
 ) {
     // Assistant message (standalone): reasoning / text / tool cards, full-width.
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
         if (message.isReasoning && message.content.isNotBlank()) {
             ReasoningRow(message.content)
         } else if (message.content.isNotBlank()) {
@@ -221,7 +222,7 @@ private fun CopyButtonVisual(
 ) {
     Box(
         modifier = modifier
-            .sizeIn(minWidth = 36.dp, minHeight = 36.dp)
+            .sizeIn(minWidth = LettaDimens.Control.actionButton, minHeight = LettaDimens.Control.actionButton)
             .graphicsLayer { alpha = state.visualAlpha }
             .clip(CircleShape)
             .border(1.dp, state.focusBorderColor(), CircleShape)
@@ -239,7 +240,7 @@ private fun CopyButtonVisual(
             imageVector = if (state.copied) Icons.Outlined.Check else Icons.Outlined.ContentCopy,
             contentDescription = null,
             tint = if (state.copied) MaterialTheme.customColors.successColor else style.tint,
-            modifier = Modifier.size(14.dp),
+            modifier = Modifier.size(LettaDimens.Space.lg),
         )
     }
 }
@@ -306,11 +307,11 @@ internal fun UserPrompt(
         enabled = overflowed || expanded,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = 8.dp)
+            .padding(bottom = LettaDimens.Space.sm)
             .hoverable(cardHoverSource)
             .drawBehind {
                 val stroke = 1.dp.toPx()
-                val radius = 10.dp.toPx()
+                val radius = LettaDimens.Space.md.toPx()
                 // Clip away the strip above the corner arcs so only the side
                 // and bottom segments of the rounded outline survive.
                 clipRect(top = radius) {
@@ -321,18 +322,18 @@ internal fun UserPrompt(
                     )
                 }
             },
-        shape = RoundedCornerShape(10.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.md),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
         Row(
-            modifier = Modifier.padding(start = 14.dp, end = 6.dp, top = 10.dp, bottom = 10.dp),
+            modifier = Modifier.padding(start = LettaDimens.Space.lg, end = LettaDimens.Space.sm, top = LettaDimens.Space.md, bottom = LettaDimens.Space.md),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
             ) {
                 if (provenance != null) {
                     AgentMessageProvenanceLabel(
@@ -404,7 +405,7 @@ private fun PromptExpandButton(expanded: Boolean, onToggle: () -> Unit) {
     DesktopTooltip(text = description) {
         Box(
             modifier = Modifier
-                .sizeIn(minWidth = 28.dp, minHeight = 28.dp)
+                .sizeIn(minWidth = LettaDimens.Space.xxl, minHeight = LettaDimens.Space.xxl)
                 .clip(CircleShape)
                 .clickable(onClick = onToggle),
             contentAlignment = Alignment.Center,
@@ -413,7 +414,7 @@ private fun PromptExpandButton(expanded: Boolean, onToggle: () -> Unit) {
                 imageVector = if (expanded) Icons.Outlined.KeyboardArrowUp else Icons.Outlined.KeyboardArrowDown,
                 contentDescription = description,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                modifier = Modifier.size(16.dp),
+                modifier = Modifier.size(LettaDimens.Space.lg),
             )
         }
     }
@@ -431,9 +432,9 @@ internal fun ThinkingMessageRow() {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
     ) {
-        ThinkingGlowDot(diameter = 18.dp)
+        ThinkingGlowDot(diameter = LettaDimens.Space.lg)
         ThinkingShimmerLabel("Thinking…")
     }
 }
@@ -646,7 +647,7 @@ internal fun AgentText(params: AgentTextParams) {
         SelectionContainer {
             com.letta.mobile.ui.markdown.SharedMarkdownText(
                 text = displayText,
-                modifier = Modifier.padding(end = 32.dp),
+                modifier = Modifier.padding(end = LettaDimens.Space.xxl),
                 // Retaining the previous markdown AST while parsing an update
                 // can pair stale annotation offsets with a newly reshaped block.
                 // Selectable Compose Desktop text then crashes in ParagraphBuilder.

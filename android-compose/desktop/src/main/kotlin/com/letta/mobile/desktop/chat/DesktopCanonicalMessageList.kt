@@ -46,6 +46,7 @@ import com.letta.mobile.ui.mascot.MascotLoading
 import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * The paginated Desktop transcript. Paging owns load hints, retries and page dropping; this
@@ -131,16 +132,16 @@ private fun CanonicalMessageListContent(
                 reverseLayout = true,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 28.dp)
+                    .padding(horizontal = LettaDimens.Space.xxl)
                     .fadingEdges(
                         topFadeAlpha = topFade,
                         bottomFadeAlpha = bottomFade,
                         topFadeLength = 72.dp,
-                        bottomFadeLength = 44.dp,
+                        bottomFadeLength = LettaDimens.Orb.railSlotHeight,
                     ),
-                contentPadding = PaddingValues(vertical = 24.dp),
+                contentPadding = PaddingValues(vertical = LettaDimens.Space.xl),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
             ) {
                 items(live.size, key = { "overlay-" + live[it].key }) { index ->
                     val older = live.getOrNull(index + 1) ?: settled.itemSnapshotList.items.firstOrNull()?.item
@@ -179,7 +180,7 @@ private fun CanonicalMessageListContent(
             // ambient glow as a band, and the prompt card is itself opaque.
             Box(
                 modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth()
-                    .padding(horizontal = 28.dp, vertical = 12.dp),
+                    .padding(horizontal = LettaDimens.Space.xxl, vertical = LettaDimens.Space.md),
                 contentAlignment = Alignment.TopCenter,
             ) {
                 MessageListItem(item = prompt, streamingMessageId = null)
@@ -190,7 +191,7 @@ private fun CanonicalMessageListContent(
                 text = "Message " + missing + " was not found. Showing recent history.",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.align(Alignment.TopCenter).padding(8.dp),
+                modifier = Modifier.align(Alignment.TopCenter).padding(LettaDimens.Space.sm),
             )
         }
         if (!following) {
@@ -204,7 +205,7 @@ private fun CanonicalMessageListContent(
                         listState.scrollToItem(0)
                     }
                 },
-                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp),
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = LettaDimens.Space.lg),
             )
         }
     }
@@ -361,7 +362,7 @@ private fun CanonicalSettledRow(
 ) {
     val row = settled[index]
     if (row == null) {
-        Box(Modifier.height(48.dp))
+        Box(Modifier.height(LettaDimens.Orb.railSlotWidth))
     } else {
         Column {
             row.deferred?.let { DesktopDeferredWindow(presentation, row, Dispatchers.Default) }

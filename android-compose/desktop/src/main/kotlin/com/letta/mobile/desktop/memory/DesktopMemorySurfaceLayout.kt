@@ -16,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.desktop.DesktopInlineError
+import com.letta.mobile.ui.theme.LettaDimens
 
 internal data class MemorySurfaceChrome(
     val state: DesktopMemorySurfaceState,
@@ -42,7 +43,7 @@ internal fun RowScope.MemoryMainColumn(
             canCreateBlock = agentId != null && chrome.blockApi != null,
             onNewBlock = { onEditorTargetChange(BlockEditorTarget.New) },
         )
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(LettaDimens.Space.md))
         // The graph is the focus — it takes the remaining height, flush to the
         // pane edges. Blocks stay editable by clicking their graph nodes.
         MemoryGraphPanel(
@@ -66,8 +67,8 @@ internal fun MemorySurfaceTopChrome(
     // Header / selector / summary keep their inset; the graph below runs
     // edge-to-edge so it doesn't waste space.
     Column(
-        modifier = Modifier.padding(start = 28.dp, end = 28.dp, top = 18.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.padding(start = LettaDimens.Space.xxl, end = LettaDimens.Space.xxl, top = LettaDimens.Space.lg),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
     ) {
         MemoryHeader(
             state = chrome.state,

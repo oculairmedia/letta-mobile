@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 import com.letta.mobile.ui.motion.ChatMotionTokens
+import com.letta.mobile.ui.theme.LettaDimens
 
 @Composable
 fun shimmerColor(): Color {
@@ -50,9 +51,9 @@ fun shimmerColor(): Color {
 @Composable
 fun ShimmerBox(
     modifier: Modifier = Modifier,
-    height: Dp = 14.dp,
+    height: Dp = LettaDimens.Space.lg,
     widthFraction: Float = 1f,
-    cornerRadius: Dp = 8.dp,
+    cornerRadius: Dp = LettaDimens.Radius.sm,
 ) {
     val color = shimmerColor()
     Box(
@@ -71,14 +72,14 @@ fun ShimmerCard(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(LettaDimens.Radius.md))
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(LettaDimens.Space.lg),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
-        ShimmerBox(widthFraction = 0.6f, height = 16.dp)
-        ShimmerBox(widthFraction = 1f, height = 12.dp)
-        ShimmerBox(widthFraction = 0.8f, height = 12.dp)
+        ShimmerBox(widthFraction = 0.6f, height = LettaDimens.Space.lg)
+        ShimmerBox(widthFraction = 1f, height = LettaDimens.Space.md)
+        ShimmerBox(widthFraction = 0.8f, height = LettaDimens.Space.md)
     }
 }
 
@@ -89,19 +90,19 @@ fun ShimmerGrid(
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier.padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = modifier.padding(LettaDimens.Space.md),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         repeat(rows) {
             Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
             ) {
                 repeat(columns) {
                     Box(
                         modifier = Modifier
                             .weight(1f)
                             .height(100.dp)
-                            .clip(RoundedCornerShape(12.dp))
+                            .clip(RoundedCornerShape(LettaDimens.Radius.md))
                             .background(shimmerColor())
                     )
                 }
@@ -116,8 +117,8 @@ fun ShimmerConversationList(
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier.padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = modifier.padding(LettaDimens.Space.lg),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         repeat(itemCount) {
             ShimmerConversationCard()
@@ -133,24 +134,24 @@ fun ShimmerConversationCard(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(LettaDimens.Radius.md))
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(LettaDimens.Space.lg),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
-        ShimmerBox(widthFraction = 0.7f, height = 16.dp)
+        ShimmerBox(widthFraction = 0.7f, height = LettaDimens.Space.lg)
         Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
                 modifier = Modifier
-                    .size(16.dp)
-                    .clip(RoundedCornerShape(4.dp))
+                    .size(LettaDimens.Space.lg)
+                    .clip(RoundedCornerShape(LettaDimens.Space.xs))
                     .background(color)
             )
-            ShimmerBox(widthFraction = 0.4f, height = 12.dp)
+            ShimmerBox(widthFraction = 0.4f, height = LettaDimens.Space.md)
         }
-        ShimmerBox(widthFraction = 0.25f, height = 10.dp)
+        ShimmerBox(widthFraction = 0.25f, height = LettaDimens.Space.md)
     }
 }

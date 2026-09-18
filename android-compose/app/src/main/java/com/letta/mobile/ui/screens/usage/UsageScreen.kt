@@ -61,6 +61,7 @@ import com.patrykandpatrick.vico.compose.cartesian.layer.rememberColumnCartesian
 import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
 import com.patrykandpatrick.vico.compose.common.Fill
 import com.patrykandpatrick.vico.compose.common.component.rememberLineComponent
+import com.letta.mobile.ui.theme.LettaDimens
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -95,7 +96,7 @@ fun UsageScreen(
     ) { paddingValues ->
         when (val state = uiState) {
             is UiState.Loading -> {
-                Column(modifier = Modifier.padding(paddingValues).padding(16.dp)) {
+                Column(modifier = Modifier.padding(paddingValues).padding(LettaDimens.Space.lg)) {
                     ShimmerCard(modifier = Modifier.fillMaxWidth())
                 }
             }
@@ -132,8 +133,8 @@ private fun UsageContent(
 
     LazyColumn(
         modifier = modifier,
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
     ) {
         item("time_range") {
             TimeRangeSelector(
@@ -198,7 +199,7 @@ private fun UsageContent(
                     text = stringResource(R.string.screen_usage_empty_runs),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 8.dp),
+                    modifier = Modifier.padding(vertical = LettaDimens.Space.sm),
                 )
             }
         } else {
@@ -207,7 +208,7 @@ private fun UsageContent(
             }
         }
 
-        item("bottom_spacer") { Spacer(Modifier.height(16.dp)) }
+        item("bottom_spacer") { Spacer(Modifier.height(LettaDimens.Space.lg)) }
     }
 }
 
@@ -235,7 +236,7 @@ private fun TimeRangeSelector(
 private fun SummaryStatsRow(analytics: UsageAnalytics?) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         StatMiniCard(
             label = stringResource(R.string.screen_usage_total_tokens),
@@ -290,14 +291,14 @@ private fun StatMiniCard(
         colors = CardDefaults.cardColors(containerColor = containerColor),
     ) {
         Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.padding(LettaDimens.Space.md),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
                 tint = contentColor,
-                modifier = Modifier.height(16.dp),
+                modifier = Modifier.height(LettaDimens.Space.lg),
             )
             Text(
                 text = value,
@@ -324,7 +325,7 @@ private fun TokenBreakdownRow(analytics: UsageAnalytics) {
             containerColor = accentColors.freshAccentContainer,
         ),
     ) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(modifier = Modifier.padding(LettaDimens.Space.md), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
             Text(
                 text = stringResource(R.string.screen_usage_token_breakdown),
                 style = MaterialTheme.typography.labelMedium,
@@ -332,8 +333,8 @@ private fun TokenBreakdownRow(analytics: UsageAnalytics) {
             )
             FlowRow(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
+                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
             ) {
                 TokenChip(stringResource(R.string.screen_usage_prompt_tokens), analytics.promptTokens)
                 TokenChip(stringResource(R.string.screen_usage_completion_tokens), analytics.completionTokens)
@@ -374,12 +375,12 @@ private fun ChartCard(
             containerColor = accentColors.freshAccentContainer,
         ),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(LettaDimens.Space.lg)) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleSmall,
             )
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(LettaDimens.Space.md))
 
             if (!hasData) {
                 Box(
@@ -445,8 +446,8 @@ private fun RunSummaryCard(run: RunSummary) {
         colors = CardDefaults.cardColors(containerColor = containerColor),
     ) {
         Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.padding(LettaDimens.Space.md),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -460,7 +461,7 @@ private fun RunSummaryCard(run: RunSummary) {
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(LettaDimens.Space.sm))
                 StatusChip(status = run.status)
             }
 
@@ -474,7 +475,7 @@ private fun RunSummaryCard(run: RunSummary) {
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
             ) {
                 Text(
                     text = stringResource(R.string.screen_usage_tokens_label, com.letta.mobile.util.FormatHelpers.formatCompactCount(run.totalTokens)),

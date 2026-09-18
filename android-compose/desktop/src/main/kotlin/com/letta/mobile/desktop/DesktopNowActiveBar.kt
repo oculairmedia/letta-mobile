@@ -36,6 +36,7 @@ import com.letta.mobile.data.chat.runtime.nowActiveStatus
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
 import com.letta.mobile.ui.chat.AgentOrb
+import com.letta.mobile.ui.theme.LettaDimens
 
 @Immutable
 internal data class NowActiveBarState(
@@ -200,13 +201,13 @@ internal fun DesktopHeaderIdentityBlock(
 ) {
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(LettaDimens.Radius.sm))
             .clickable(onClick = actions.onOpenConversation)
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+            .padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
     ) {
-        AgentOrb(agentId = state.agentId, index = state.orbIndex, size = 28.dp, cornerRadius = 7.dp)
+        AgentOrb(agentId = state.agentId, index = state.orbIndex, size = LettaDimens.Orb.md, cornerRadius = LettaDimens.Radius.sm)
         Column {
             Text(
                 text = state.conversationTitle,
@@ -218,7 +219,7 @@ internal fun DesktopHeaderIdentityBlock(
             )
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
             ) {
                 Text(
                     text = state.agentName,
@@ -261,7 +262,7 @@ internal fun DesktopHeaderTrailingControls(
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
     ) {
         state.backgroundWorkAgentName?.let { name ->
             BackgroundWorkChip(agentName = name, onClick = actions.onJumpToBackgroundWork)
@@ -294,7 +295,7 @@ private fun BarIconButton(
 ) {
     Box(
         modifier = Modifier
-            .size(32.dp)
+            .size(LettaDimens.Space.xxl)
             .clip(CircleShape)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
@@ -303,7 +304,7 @@ private fun BarIconButton(
             imageVector = icon,
             contentDescription = description,
             tint = tint,
-            modifier = Modifier.size(18.dp),
+            modifier = Modifier.size(LettaDimens.Space.lg),
         )
     }
 }
@@ -324,7 +325,7 @@ private fun StatusDot(status: NowActiveStatus) {
     }
     Box(
         modifier = Modifier
-            .size(6.dp)
+            .size(LettaDimens.Space.sm)
             .background(color.copy(alpha = alpha), CircleShape),
     )
 }
@@ -332,14 +333,14 @@ private fun StatusDot(status: NowActiveStatus) {
 @Composable
 private fun BackgroundWorkChip(agentName: String, onClick: () -> Unit) {
     Surface(
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.sm),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         modifier = Modifier.clickable(onClick = onClick),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             StatusDot(NowActiveStatus.Thinking)
             Text(

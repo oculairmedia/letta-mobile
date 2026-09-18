@@ -26,6 +26,7 @@ import dev.nucleusframework.autolaunch.AutoLaunchState
 import dev.nucleusframework.darkmodedetector.isSystemInDarkMode
 import dev.nucleusframework.systemcolor.isSystemInHighContrast
 import dev.nucleusframework.systemcolor.systemAccentColor
+import com.letta.mobile.ui.theme.LettaDimens
 
 @Composable
 internal fun DesktopNucleusSettingsCard(
@@ -39,8 +40,8 @@ internal fun DesktopNucleusSettingsCard(
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
+            modifier = Modifier.padding(LettaDimens.Space.xl),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xl),
         ) {
             Text("Desktop integration", style = MaterialTheme.typography.titleLarge)
             UpdateSettingsSection(state, actions)
@@ -71,7 +72,7 @@ private fun UpdateSettingsSection(state: DesktopNucleusState, actions: Destinati
             )
             Text("${state.updateProgressPercent}%", style = MaterialTheme.typography.labelMedium)
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
             when (state.updatePhase) {
                 DesktopUpdatePhase.Available -> DesktopDefaultButton(onClick = actions.onDownloadUpdate) {
                     DesktopButtonContent("Download ${state.updateVersion.orEmpty()}")
@@ -201,7 +202,7 @@ private fun SettingsSection(
     supporting: String,
     content: @Composable () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
         Text(title, style = MaterialTheme.typography.titleMedium)
         Text(
             supporting,

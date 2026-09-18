@@ -32,6 +32,7 @@ import com.letta.mobile.data.messaging.AgentMessageDirection
 import com.letta.mobile.data.messaging.AgentMessageProvenance
 import com.letta.mobile.data.messaging.agentMessageDisplayLabel
 import com.letta.mobile.data.messaging.displayLabel
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * letta-mobile-bccty: shared (Android + Desktop + Web) VISUAL render for
@@ -91,15 +92,15 @@ fun AgentMessageProvenanceMetadata(provenance: AgentMessageProvenance, tint: Col
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = 8.dp),
-        shape = RoundedCornerShape(8.dp),
+            .padding(bottom = LettaDimens.Space.sm),
+        shape = RoundedCornerShape(LettaDimens.Radius.sm),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         border = BorderStroke(1.dp, tint.copy(alpha = 0.3f)),
     ) {
         SelectionContainer {
             Column(
-                modifier = Modifier.padding(10.dp),
-                verticalArrangement = Arrangement.spacedBy(3.dp),
+                modifier = Modifier.padding(LettaDimens.Space.md),
+                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
             ) {
                 MetadataRow("Direction", provenance.direction.name.lowercase())
                 MetadataRow("From agent id", provenance.fromAgentId)
@@ -150,9 +151,9 @@ private fun AgentMessageProvenanceHeader(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onToggleExpand)
-            .padding(bottom = 4.dp),
+            .padding(bottom = LettaDimens.Space.xs),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         AgentRoute(provenance, spec, tint, onAgentClick)
         DeliveryState(provenance.deliveryState, spec.isFailed)
@@ -168,7 +169,7 @@ private fun RowScope.AgentRoute(
     onAgentClick: (String) -> Unit,
 ) {
     Row(
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.weight(1f, fill = false),
     ) {
@@ -219,7 +220,7 @@ private fun ExpansionIcon(expanded: Boolean) {
 
 @Composable
 private fun MetadataRow(label: String, value: String) {
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
         Text(
             text = "$label:",
             style = MaterialTheme.typography.labelSmall,

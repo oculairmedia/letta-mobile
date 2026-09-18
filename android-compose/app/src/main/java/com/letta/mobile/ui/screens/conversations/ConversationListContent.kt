@@ -56,6 +56,7 @@ import com.letta.mobile.ui.preview.LettaPreviewFrame
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import com.letta.mobile.ui.theme.LettaDimens
 
 internal data class ConversationListContentState(
     val conversations: List<ConversationDisplay>,
@@ -151,8 +152,8 @@ private fun ConversationListSections(
         buildConversationSections(conversations)
     }
     LazyColumn(
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(LettaDimens.Space.lg),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         var runningIndex = 0
         sections.forEach { section ->
@@ -283,7 +284,7 @@ internal fun SwipeableConversationCard(
     )
 }
 
-private val ConversationSwipeBackgroundShape = RoundedCornerShape(12.dp)
+private val ConversationSwipeBackgroundShape = RoundedCornerShape(LettaDimens.Radius.md)
 
 /** Material's disabled-content alpha, used for the archive icon on rows that refuse the swipe. */
 private const val BlockedSwipeIconAlpha = 0.38f
@@ -344,7 +345,7 @@ internal fun ConversationSwipeBackground(
             .fillMaxSize()
             .clip(ConversationSwipeBackgroundShape)
             .background(backgroundColor)
-            .padding(horizontal = 24.dp),
+            .padding(horizontal = LettaDimens.Space.xl),
         contentAlignment = if (side == SwipeSide.Archive) Alignment.CenterStart else Alignment.CenterEnd,
     ) {
         Icon(
@@ -392,7 +393,7 @@ private fun ConversationPinnedHeader() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 12.dp),
+            .padding(vertical = LettaDimens.Space.md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
@@ -401,7 +402,7 @@ private fun ConversationPinnedHeader() {
             tint = MaterialTheme.colorScheme.primary,
             modifier = Modifier.size(LettaIconSizing.Inline),
         )
-        Spacer(modifier = Modifier.width(6.dp))
+        Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
         Text(
             text = "Pinned",
             style = MaterialTheme.typography.sectionTitle,

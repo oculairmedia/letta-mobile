@@ -37,6 +37,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.ui.theme.LettaDimens
 
 @Composable
 internal fun SidebarConversationRow(
@@ -155,8 +156,8 @@ private fun SidebarConversationRowSurface(params: SidebarConversationRowSurfaceP
         Row(
             // Tight vertical rhythm: borderless rows read as sparse gaps when
             // padded generously, so the list looked full of holes at 9dp.
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-            horizontalArrangement = Arrangement.spacedBy(9.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.xs),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             SidebarConversationLeadingIcon(
@@ -250,8 +251,8 @@ private fun SidebarConversationLeadingIcon(
 ) {
     when {
         model.deleting -> CircularProgressIndicator(
-            modifier = Modifier.size(14.dp),
-            strokeWidth = 2.dp,
+            modifier = Modifier.size(LettaDimens.Space.lg),
+            strokeWidth = LettaDimens.Space.hair,
             color = MaterialTheme.colorScheme.primary,
         )
         // On hover the leading icon becomes a one-click archive/restore button.
@@ -260,7 +261,7 @@ private fun SidebarConversationLeadingIcon(
             contentDescription = if (model.archived) "Restore chat" else "Archive chat",
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier
-                .size(15.dp)
+                .size(LettaDimens.Space.lg)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
@@ -275,7 +276,7 @@ private fun SidebarConversationLeadingIcon(
             },
             contentDescription = if (model.thinking) "thinking" else null,
             tint = model.iconColor,
-            modifier = Modifier.size(15.dp),
+            modifier = Modifier.size(LettaDimens.Space.lg),
         )
     }
 }

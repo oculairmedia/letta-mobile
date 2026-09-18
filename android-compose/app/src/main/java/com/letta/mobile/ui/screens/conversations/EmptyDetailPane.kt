@@ -16,6 +16,7 @@ import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.preview.LettaPreviewFrame
+import com.letta.mobile.ui.theme.LettaDimens
 
 @Composable
 fun EmptyDetailPane(modifier: Modifier = Modifier) {
@@ -27,10 +28,10 @@ fun EmptyDetailPane(modifier: Modifier = Modifier) {
             Icon(
                 LettaIcons.Chat,
                 contentDescription = null,
-                modifier = Modifier.size(48.dp),
+                modifier = Modifier.size(LettaDimens.Orb.railSlotWidth),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
             )
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(LettaDimens.Space.lg))
             Text(
                 text = "Select a conversation",
                 style = MaterialTheme.typography.bodyLarge,

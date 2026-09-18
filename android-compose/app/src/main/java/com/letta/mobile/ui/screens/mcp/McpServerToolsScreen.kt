@@ -67,6 +67,7 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
 import com.letta.mobile.ui.theme.listItemSupporting
+import com.letta.mobile.ui.theme.LettaDimens
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -110,7 +111,7 @@ fun McpServerToolsScreen(
         },
     ) { paddingValues ->
         when (val state = uiState) {
-            is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(16.dp))
+            is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(LettaDimens.Space.lg))
             is UiState.Error -> ErrorContent(
                 message = state.message,
                 onRetry = { viewModel.loadServerTools() },
@@ -137,8 +138,8 @@ fun McpServerToolsScreen(
                         )
                     } else {
                         LazyColumn(
-                            contentPadding = PaddingValues(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            contentPadding = PaddingValues(LettaDimens.Space.lg),
+                            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                         ) {
                             items(state.data.tools, key = { it.id.value }) { tool ->
                                 McpServerToolCard(
@@ -194,10 +195,10 @@ private fun ServerSummaryCard(
     refreshSummary: McpServerResyncResult?,
 ) {
     Card(
-        modifier = Modifier.padding(16.dp).fillMaxWidth(),
+        modifier = Modifier.padding(LettaDimens.Space.lg).fillMaxWidth(),
         colors = LettaCardDefaults.listCardColors(),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(LettaDimens.Space.lg)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(serverName, style = MaterialTheme.typography.titleMedium)
                 serverType?.let {
@@ -206,12 +207,12 @@ private fun ServerSummaryCard(
                 }
             }
             serverUrl?.let {
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(LettaDimens.Space.xs))
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(LettaDimens.Space.sm))
             HorizontalDivider()
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(LettaDimens.Space.sm))
             Text(
                 pluralStringResource(R.plurals.screen_mcp_server_tools_count, toolCount, toolCount),
                 style = MaterialTheme.typography.labelMedium,
@@ -220,7 +221,7 @@ private fun ServerSummaryCard(
             refreshSummary?.let { summary ->
                 val summaryText = buildRefreshSummary(summary)
                 if (summaryText != null) {
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(LettaDimens.Space.xs))
                     Text(
                         text = summaryText,
                         style = MaterialTheme.typography.bodySmall,
@@ -242,12 +243,12 @@ private fun McpServerToolCard(
         modifier = Modifier.fillMaxWidth(),
         colors = LettaCardDefaults.listCardColors(),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(LettaDimens.Space.lg)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(tool.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                 TextButton(onClick = onRun, enabled = !isRunning) {
                     Icon(LettaIcons.Play, contentDescription = null)
-                    Spacer(modifier = Modifier.width(4.dp))
+                    Spacer(modifier = Modifier.width(LettaDimens.Space.xs))
                     Text(
                         if (isRunning) {
                             stringResource(R.string.screen_mcp_tool_run_running)
@@ -258,7 +259,7 @@ private fun McpServerToolCard(
                 }
             }
             tool.description?.let {
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(LettaDimens.Space.xs))
                 Text(
                     it,
                     style = MaterialTheme.typography.bodySmall,
@@ -268,7 +269,7 @@ private fun McpServerToolCard(
                 )
             }
             tool.toolType?.let {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(LettaDimens.Space.sm))
                 AssistChip(onClick = {}, label = { Text(it) })
             }
         }
@@ -336,7 +337,7 @@ private fun ToolExecutionResultDialog(
         onConfirm = onDismiss,
         onDismiss = onDismiss,
     ) {
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
             item {
                 CardGroup {
                     item(

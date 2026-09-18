@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import java.io.ByteArrayInputStream
 import java.util.Locale
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * Render a single LaTeX expression — block or inline — using KaTeX inside a
@@ -82,16 +83,16 @@ fun MathBlock(
     }
 
     Surface(
-        shape = RoundedCornerShape(if (displayMode) 8.dp else 4.dp),
+        shape = RoundedCornerShape(if (displayMode) LettaDimens.Space.sm else LettaDimens.Space.xs),
         color = MaterialTheme.colorScheme.surfaceVariant,
         modifier = modifier
             .then(if (displayMode) Modifier.fillMaxWidth() else Modifier)
-            .padding(vertical = if (displayMode) 4.dp else 0.dp),
+            .padding(vertical = if (displayMode) LettaDimens.Space.xs else 0.dp),
     ) {
         AndroidView(
             modifier = Modifier
                 .then(if (displayMode) Modifier.fillMaxWidth() else Modifier)
-                .defaultMinSize(minHeight = if (displayMode) 60.dp else 32.dp)
+                .defaultMinSize(minHeight = if (displayMode) 60.dp else LettaDimens.Space.xxl)
                 .semantics { contentDescription = source }
                 .combinedClickable(
                     onClick = {},
@@ -181,11 +182,11 @@ private class KatexWebViewClient(private val ctx: android.content.Context) : Web
 @Composable
 private fun MathErrorFallback(source: String, errorMessage: String, modifier: Modifier = Modifier) {
     Surface(
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.sm),
         color = MaterialTheme.colorScheme.errorContainer,
-        modifier = modifier.fillMaxWidth().padding(vertical = 4.dp),
+        modifier = modifier.fillMaxWidth().padding(vertical = LettaDimens.Space.xs),
     ) {
-        Box(modifier = Modifier.padding(12.dp)) {
+        Box(modifier = Modifier.padding(LettaDimens.Space.md)) {
             Text(
                 text = "LaTeX render failed: $errorMessage\n\n$source",
                 style = MaterialTheme.typography.bodySmall,

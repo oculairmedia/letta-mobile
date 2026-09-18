@@ -28,10 +28,11 @@ import androidx.compose.ui.util.fastForEachIndexed
 import com.letta.mobile.ui.theme.customColors
 import com.letta.mobile.ui.theme.listItemColors
 import com.letta.mobile.ui.theme.sectionTitle
+import com.letta.mobile.ui.theme.LettaDimens
 
-private val CardGroupCorner = 20.dp
-private val CardGroupItemSpacing = 2.dp
-private val CardGroupInnerCorner = 4.dp
+private val CardGroupCorner = LettaDimens.Space.xl
+private val CardGroupItemSpacing = LettaDimens.Space.hair
+private val CardGroupInnerCorner = LettaDimens.Space.xs
 
 data class CardGroupItem(
     val onClick: (() -> Unit)?,
@@ -143,7 +144,7 @@ fun CardGroup(
         if (title != null) {
             CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.primary) {
                 ProvideTextStyle(MaterialTheme.typography.sectionTitle) {
-                    Box(modifier = Modifier.padding(start = 4.dp, top = 8.dp, bottom = 8.dp)) {
+                    Box(modifier = Modifier.padding(start = LettaDimens.Space.xs, top = LettaDimens.Space.sm, bottom = LettaDimens.Space.sm)) {
                         title()
                     }
                 }

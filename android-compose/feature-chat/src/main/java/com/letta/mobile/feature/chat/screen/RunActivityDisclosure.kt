@@ -37,6 +37,7 @@ import com.letta.mobile.feature.chat.R
 import com.letta.mobile.ui.components.rememberReducedMotionEnabled
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.preview.LettaPreviewFrame
+import com.letta.mobile.ui.theme.LettaDimens
 
 internal object RunActivityDisclosureTestTags {
     const val Header = "run-activity-disclosure"
@@ -57,12 +58,12 @@ internal fun RunActivityDisclosure(
 
     // Simple mode uses more compact rendering: smaller padding, smaller fonts,
     // and no minimum height constraint to reduce visual prominence.
-    val horizontalPadding = if (isSimpleMode) 2.dp else 4.dp
-    val verticalPadding = 2.dp
-    val minHeight = if (canToggle) 44.dp else if (isSimpleMode) 24.dp else 32.dp
-    val iconSize = if (isSimpleMode) 14.dp else 16.dp
+    val horizontalPadding = if (isSimpleMode) LettaDimens.Space.hair else LettaDimens.Space.xs
+    val verticalPadding = LettaDimens.Space.hair
+    val minHeight = if (canToggle) LettaDimens.Orb.railSlotHeight else if (isSimpleMode) LettaDimens.Space.xl else LettaDimens.Space.xxl
+    val iconSize = if (isSimpleMode) LettaDimens.Space.lg else LettaDimens.Space.lg
     val textStyle = if (isSimpleMode) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium
-    val spacing = if (isSimpleMode) 4.dp else 6.dp
+    val spacing = if (isSimpleMode) LettaDimens.Space.xs else LettaDimens.Space.sm
 
     Row(
         modifier = Modifier
@@ -214,7 +215,7 @@ private fun WorkingIndicator(
     Box(
         modifier = modifier
             .testTag(RunActivityDisclosureTestTags.WorkingIndicator)
-            .size(6.dp)
+            .size(LettaDimens.Space.sm)
             .graphicsLayer {
                 alpha = indicatorAlpha.value
             }

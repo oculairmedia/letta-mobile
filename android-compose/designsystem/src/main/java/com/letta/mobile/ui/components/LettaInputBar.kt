@@ -64,13 +64,14 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.theme.LettaDimens
 
-private val ComposerActionTargetSize = 48.dp
-private val ComposerActionIconSize = 20.dp
-private val ComposerRestingCorner = 28.dp
-private val ComposerEngagedCorner = 20.dp
+private val ComposerActionTargetSize = LettaDimens.Orb.railSlotWidth
+private val ComposerActionIconSize = LettaDimens.Space.xl
+private val ComposerRestingCorner = LettaDimens.Space.xxl
+private val ComposerEngagedCorner = LettaDimens.Space.xl
 private val ComposerRestingElevation = 0.dp
-private val ComposerEngagedElevation = 2.dp
+private val ComposerEngagedElevation = LettaDimens.Space.hair
 private const val ComposerPressedScale = 0.96f
 
 internal data class LivingComposerState(
@@ -213,8 +214,8 @@ fun LettaInputBar(
     actionPulse: Boolean = false,
     actionVisible: Boolean = true,
     hasStagedContent: Boolean = false,
-    contentPadding: PaddingValues = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-    itemSpacing: Dp = 8.dp,
+    contentPadding: PaddingValues = PaddingValues(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),
+    itemSpacing: Dp = LettaDimens.Space.sm,
     leadingContent: (@Composable () -> Unit)? = null,
     customTrailingContent: (@Composable () -> Unit)? = null,
 ) {
@@ -428,7 +429,7 @@ private fun ComposerTrailingAction(
                 containerColor = spec.containerColor,
                 contentColor = spec.contentColor,
                 disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
             ),
         ) {
             ComposerActionIcon(

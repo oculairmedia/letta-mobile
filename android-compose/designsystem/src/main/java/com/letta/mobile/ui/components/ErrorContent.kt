@@ -20,6 +20,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.theme.LettaDimens
 
 @Composable
 fun ErrorContent(
@@ -45,14 +46,14 @@ fun ErrorContent(
             modifier = Modifier.size(64.dp),
             tint = MaterialTheme.colorScheme.error,
         )
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(LettaDimens.Space.lg))
         Text(
             text = message,
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.error,
             textAlign = TextAlign.Center,
         )
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(LettaDimens.Space.lg))
         Button(onClick = {
             HapticEffects.contextClick(haptic, view)
             onRetry()

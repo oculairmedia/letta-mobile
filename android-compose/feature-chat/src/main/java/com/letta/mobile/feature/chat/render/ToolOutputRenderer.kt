@@ -74,6 +74,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.letta.mobile.ui.chat.render.ToolOutputMaxRenderedChars
 import com.letta.mobile.ui.chat.render.ToolOutputMaxRenderedLines
+import com.letta.mobile.ui.theme.LettaDimens
 
 internal const val ToolOutputBackgroundParseThresholdChars = 12_000
 internal const val ToolOutputBackgroundHighlightThresholdChars = 4_000
@@ -213,7 +214,7 @@ private fun ToolOutputBody(
 
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         if (expanded) {
             // Shared cap point: every result surface (code/JSON/log,
@@ -228,7 +229,7 @@ private fun ToolOutputBody(
                     .fillMaxWidth()
                     .heightIn(max = ToolOutputExpandedMaxHeight)
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
             ) {
                 document.blocks.forEach { block ->
                     ToolOutputBlockView(block = block, isError = isError)
@@ -349,7 +350,7 @@ private fun CodeOutputSurface(
     BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 4.dp, vertical = 7.dp),
+            .padding(horizontal = LettaDimens.Space.xs, vertical = LettaDimens.Space.sm),
     ) {
         val constrainedWidthPx = remember(maxWidth, density) {
             if (maxWidth.value.isFinite()) {
@@ -450,7 +451,7 @@ private fun CodeOutputSurface(
             modifier = Modifier
                 .fillMaxWidth()
                 .onSizeChanged { size -> measuredContentWidthPx = size.width },
-            verticalArrangement = Arrangement.spacedBy(5.dp),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
         ) {
             MonospaceText(
                 text = annotatedText,
@@ -481,8 +482,8 @@ private fun DiffOutputSurface(block: ToolOutputBlock.Diff) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 4.dp, vertical = 7.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+            .padding(horizontal = LettaDimens.Space.xs, vertical = LettaDimens.Space.sm),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         Column(
             modifier = Modifier.fillMaxWidth(),
@@ -529,8 +530,8 @@ private fun StackTraceOutputSurface(block: ToolOutputBlock.StackTrace) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 4.dp, vertical = 7.dp),
-        verticalArrangement = Arrangement.spacedBy(5.dp),
+            .padding(horizontal = LettaDimens.Space.xs, vertical = LettaDimens.Space.sm),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
     ) {
         MonospaceText(text = block.headline, color = MaterialTheme.colorScheme.error)
         block.frames.take(ToolOutputMaxRenderedLines).forEach { frame ->

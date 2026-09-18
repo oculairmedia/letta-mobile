@@ -36,6 +36,7 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.mascot.AgentAvatar
 import com.letta.mobile.ui.mascot.mascotAtWork
 import kotlinx.coroutines.launch
+import com.letta.mobile.ui.theme.LettaDimens
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -51,7 +52,7 @@ internal fun AgentScaffoldTopBar(state: AgentScaffoldRuntimeState) {
                 color = Color.Black,
                 contentColor = Color.White,
             ) {
-                androidx.compose.foundation.layout.Box(Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
+                androidx.compose.foundation.layout.Box(Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md)) {
             if (showSearchField) {
                 AgentScaffoldSearchTopBarTitle(
                     searchQuery = state.uiState.searchQuery,
@@ -147,9 +148,9 @@ private fun AgentScaffoldAgentTopBarTitle(params: AgentScaffoldAgentTopBarTitleP
                 onClick = params.onAgentTitleClick,
                 onLongClick = params.onAgentTitleLongClick,
             )
-            .padding(end = 8.dp),
+            .padding(end = LettaDimens.Space.sm),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
     ) {
         // The agent's avatar as a chip before its name (letta-mobile-8jtf3). Alive while the agent
         // is idle; the moment a run starts it turns into a still and the composer companion carries
@@ -158,7 +159,7 @@ private fun AgentScaffoldAgentTopBarTitle(params: AgentScaffoldAgentTopBarTitleP
             agentId = params.agentId,
             name = params.agentName.ifBlank { params.screenTitle },
             size = TopBarMascotSize,
-            modifier = Modifier.padding(end = 4.dp),
+            modifier = Modifier.padding(end = LettaDimens.Space.xs),
             live = !mascotAtWork(params.agentId),
         )
         Text(
@@ -192,7 +193,7 @@ private fun AgentScaffoldAgentTopBarTitle(params: AgentScaffoldAgentTopBarTitleP
     }
 }
 
-private val TopBarMascotSize = 28.dp
+private val TopBarMascotSize = LettaDimens.Space.xxl
 
 @Composable
 private fun AgentScaffoldTopBarActions(

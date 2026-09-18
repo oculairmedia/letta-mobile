@@ -43,6 +43,7 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import com.letta.mobile.ui.theme.LettaDimens
 
 internal enum class EditAgentConfigTab(val label: String) {
     Memory("Memory"),
@@ -184,7 +185,7 @@ private fun EditAgentTitleJumpControl(
     Row(
         modifier = Modifier.clickable(onClick = onClick),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         Text(
             text = agentName,
@@ -236,7 +237,7 @@ internal data class EditAgentScreenBodyParams(
 @Composable
 private fun EditAgentScreenBody(params: EditAgentScreenBodyParams) {
     when (val state = params.uiState) {
-        is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(16.dp))
+        is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(LettaDimens.Space.lg))
         is UiState.Error -> ErrorContent(
             message = state.message,
             onRetry = { params.viewModel.loadAgent() },

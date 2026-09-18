@@ -25,6 +25,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import com.letta.mobile.ui.theme.LettaDimens
 
 /** Reads one string of a stored body, chosen per row rather than assumed. */
 internal typealias DeferredBodyRead = suspend (TimelineSemanticField, Long) -> TimelineSemanticWindowResult
@@ -159,7 +160,7 @@ internal fun DeferredWindowControls(rowKey: String, read: DeferredBodyRead) {
 private fun DeferredPageBar(reader: DeferredPageReader) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
     ) {
         IconButton(enabled = reader.canGoBack, onClick = reader::back) {
             Icon(LettaIcons.ChevronLeft, contentDescription = "Previous page")

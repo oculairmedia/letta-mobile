@@ -11,6 +11,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import java.util.Locale
+import com.letta.mobile.ui.theme.LettaDimens
 
 @Composable
 fun StatusChip(
@@ -32,8 +33,8 @@ fun StatusChip(
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
         modifier = modifier
-            .clip(RoundedCornerShape(4.dp))
+            .clip(RoundedCornerShape(LettaDimens.Space.xs))
             .background(backgroundColor)
-            .padding(horizontal = 6.dp, vertical = 2.dp),
+            .padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.hair),
     )
 }

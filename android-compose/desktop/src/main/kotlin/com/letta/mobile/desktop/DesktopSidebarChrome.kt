@@ -43,6 +43,7 @@ import java.awt.KeyEventDispatcher
 import java.awt.KeyboardFocusManager
 import java.awt.Toolkit
 import java.awt.event.KeyEvent
+import com.letta.mobile.ui.theme.LettaDimens
 
 /** Sidebar toggle test/automation tag, referenced by desktop UI tests. */
 internal const val SidebarToggleTestTag = "desktop-sidebar-toggle"
@@ -120,7 +121,7 @@ internal fun DesktopSidebarToggleButton(
                 // content color for chrome icons: it flips light/dark with
                 // the theme (onSurfaceVariant), unlike a hardcoded color.
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(LettaDimens.Space.lg),
             )
         }
     }
@@ -153,7 +154,7 @@ internal fun DesktopSidebarOverflowMenu(
                 imageVector = Icons.Outlined.MoreVert,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(LettaDimens.Space.lg),
             )
         }
     }

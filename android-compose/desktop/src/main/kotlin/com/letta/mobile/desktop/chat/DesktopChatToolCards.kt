@@ -72,6 +72,7 @@ import com.letta.mobile.data.messaging.displayLabel
 import com.letta.mobile.ui.chat.provenance.AgentMessageProvenanceMetadata
 import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.ui.a2ui.A2uiSurfaceRenderer
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * Collapsible single-tool disclosure. Deliberately chrome-less when it succeeds:
@@ -102,7 +103,7 @@ internal fun ToolCard(
     if (isError) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(LettaDimens.Radius.sm),
             color = MaterialTheme.colorScheme.surfaceContainer,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.7f)),
             content = body,
@@ -142,15 +143,15 @@ private fun ToolCardProvenanceHeader(
             .fillMaxWidth()
             .testTag("tool-card-toggle")
             .clickable(onClick = onToggle)
-            .padding(horizontal = 10.dp, vertical = 5.dp)
+            .padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.xs)
             .semantics { contentDescription = "$label, ${stateLabel.lowercase()}" },
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         Icon(
             imageVector = Icons.Outlined.CallMade,
             contentDescription = null,
-            modifier = Modifier.size(13.dp),
+            modifier = Modifier.size(LettaDimens.Space.md),
             tint = tint.copy(alpha = 0.85f),
         )
         Text(
@@ -183,7 +184,7 @@ private fun ToolCardDisclosureIcon(expanded: Boolean) {
     Icon(
         imageVector = glyph,
         contentDescription = label,
-        modifier = Modifier.size(14.dp),
+        modifier = Modifier.size(LettaDimens.Space.lg),
         tint = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }
@@ -222,14 +223,14 @@ private fun ToolCardHeader(
             // it currently is.
             .semantics { stateDescription = disclosureState }
             .hoverable(rowHoverSource)
-            .padding(horizontal = 10.dp, vertical = 5.dp),
+            .padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.xs),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         Icon(
             imageVector = Icons.Outlined.Terminal,
             contentDescription = null,
-            modifier = Modifier.size(13.dp),
+            modifier = Modifier.size(LettaDimens.Space.md),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
@@ -276,8 +277,8 @@ private fun ToolCardBody(toolCall: UiToolCall, isError: Boolean) {
     Column(
         modifier = Modifier
             .testTag("tool-card-body")
-            .padding(start = 31.dp, end = 10.dp, top = 2.dp, bottom = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(start = LettaDimens.Space.xxl, end = LettaDimens.Space.md, top = LettaDimens.Space.hair, bottom = LettaDimens.Space.sm),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         provenance?.let { AgentMessageProvenanceMetadata(it, provenanceTint) }
         toolCall.arguments.takeIf { it.isNotBlank() }?.let { args ->
@@ -498,7 +499,7 @@ internal fun DesktopAskUserQuestionCard(
         val canSubmit = answers.isNotEmpty() && answers.size == spec.questions.count { it.question.isNotBlank() }
         val submitLabel = if (isSubmitting) "Sending…" else "Send answer"
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
             OutlinedButton(
                 onClick = { onDecision?.invoke(approval.requestId, toolCallIds, false, null) },
                 enabled = !isSubmitting && onDecision != null,
@@ -539,7 +540,7 @@ private fun DesktopAskUserQuestionBlock(
     answer: DesktopAskUserQuestionAnswerState,
     actions: DesktopAskUserQuestionAnswerActions,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+    Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm), modifier = Modifier.fillMaxWidth()) {
         question.header?.takeIf { it.isNotBlank() }?.let {
             Text(
                 text = it,
@@ -549,8 +550,8 @@ private fun DesktopAskUserQuestionBlock(
         }
         Text(text = question.question, style = MaterialTheme.typography.bodySmall)
         FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
         ) {
             question.options.forEach { option ->
                 FilterChip(
@@ -577,7 +578,7 @@ private fun DesktopAskUserQuestionBlock(
             onValueChange = actions.onOtherChanged,
             label = { Text("Other") },
             singleLine = true,
-            modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+            modifier = Modifier.fillMaxWidth().padding(top = LettaDimens.Space.hair),
         )
     }
 }
@@ -694,23 +695,23 @@ internal fun ArtifactCard(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.md),
         color = MaterialTheme.colorScheme.surfaceContainer,
         contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.lg),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         ) {
             Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (icon != null) {
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
-                        modifier = Modifier.size(16.dp),
+                        modifier = Modifier.size(LettaDimens.Space.lg),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -738,7 +739,7 @@ internal fun ToolFailureBadge(status: ToolStatusToken) {
     val color = MaterialTheme.colorScheme.error
     Surface(
         modifier = Modifier.testTag("tool-failure-badge"),
-        shape = RoundedCornerShape(5.dp),
+        shape = RoundedCornerShape(LettaDimens.Space.xs),
         color = Color.Transparent,
         contentColor = color,
         border = BorderStroke(1.dp, color.copy(alpha = 0.55f)),
@@ -747,7 +748,7 @@ internal fun ToolFailureBadge(status: ToolStatusToken) {
             text = status.value,
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Medium,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.hair),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -759,7 +760,7 @@ internal fun ToolFailureBadge(status: ToolStatusToken) {
 internal fun CodeBlock(text: String) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.sm),
         color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f),
     ) {
         SelectionContainer {
@@ -767,7 +768,7 @@ internal fun CodeBlock(text: String) {
                 text = text,
                 style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                modifier = Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md),
             )
         }
     }

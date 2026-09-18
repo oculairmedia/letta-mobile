@@ -40,6 +40,7 @@ import com.letta.mobile.ui.theme.LocalChatIsPinching
 import com.letta.mobile.ui.theme.chatDimens
 import com.letta.mobile.ui.theme.listItemSupporting
 import com.letta.mobile.ui.theme.sectionTitle
+import com.letta.mobile.ui.theme.LettaDimens
 
 private const val REASONING_PREVIEW_MAX_LENGTH = 96
 
@@ -124,7 +125,7 @@ internal fun MessageReasoning(
             // against the run gutter while sibling tool-call rows sit 10dp
             // further right, so their content doesn't line up under a
             // shared run's dot/rail — match the same token.
-            .padding(horizontal = MaterialTheme.chatDimens.bubblePaddingHorizontal, vertical = 4.dp),
+            .padding(horizontal = MaterialTheme.chatDimens.bubblePaddingHorizontal, vertical = LettaDimens.Space.xs),
     ) {
         Row(
             modifier = Modifier
@@ -143,9 +144,9 @@ internal fun MessageReasoning(
                         Modifier
                     },
                 )
-                .padding(vertical = 4.dp),
+                .padding(vertical = LettaDimens.Space.xs),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             AnimatedVisibility(
                 visible = isActive,
@@ -154,7 +155,7 @@ internal fun MessageReasoning(
             ) {
                 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
                 LoadingIndicator(
-                    modifier = Modifier.size(18.dp),
+                    modifier = Modifier.size(LettaDimens.Space.lg),
                     color = MaterialTheme.colorScheme.primary,
                 )
             }
@@ -200,7 +201,7 @@ internal fun MessageReasoning(
         ) {
             Column(
                 modifier = Modifier
-                    .padding(top = 16.dp, start = 8.dp, bottom = 4.dp),
+                    .padding(top = LettaDimens.Space.lg, start = LettaDimens.Space.sm, bottom = LettaDimens.Space.xs),
             ) {
                 if (isActive) {
                     if (message.content.isBlank()) {

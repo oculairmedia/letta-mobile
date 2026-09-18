@@ -39,6 +39,7 @@ import com.letta.mobile.avatar.core.GazeWorld
 import com.letta.mobile.avatar.core.MascotIdentity
 import com.letta.mobile.data.presence.AgentActivityKind
 import com.letta.mobile.data.presence.AgentPresence
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * What a platform contributes to draw a live mascot: the per-agent entry (renderer scene +
@@ -296,7 +297,7 @@ fun MascotAvatar(
     agentId: String?,
     size: Dp,
     modifier: Modifier = Modifier,
-    cornerRadius: Dp = 7.dp,
+    cornerRadius: Dp = LettaDimens.Radius.sm,
     onClick: (() -> Unit)? = null,
     overscale: Float = MASCOT_TILE_OVERSCALE,
     live: Boolean = mascotAtWork(agentId),

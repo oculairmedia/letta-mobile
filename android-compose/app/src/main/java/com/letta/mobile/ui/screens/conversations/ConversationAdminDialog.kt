@@ -41,6 +41,7 @@ import com.letta.mobile.ui.theme.listItemSupporting
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.util.formatRelativeTime
+import com.letta.mobile.ui.theme.LettaDimens
 
 internal data class ConversationAdminDialogState(
     val display: ConversationDisplay,
@@ -77,7 +78,7 @@ internal fun ConversationAdminDialog(
         onConfirm = callbacks.onDismiss,
         onDismiss = callbacks.onDismiss,
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
             ConversationAdminDetailsSection(display = state.display)
             ConversationAdminRenameSection(
                 renameText = renameText,
@@ -257,7 +258,7 @@ private fun ConversationAdminInspectorSection(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(260.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
             ) {
                 items(inspectorMessages, key = { it.id }) { message ->
                     ConversationInspectorCard(message = message)
@@ -273,7 +274,7 @@ private fun ConversationAdminInspectorLoading() {
         modifier = Modifier
             .fillMaxWidth()
             .height(260.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         for (i in 0..3) {
             ShimmerBox(height = 80.dp, widthFraction = 1f)
@@ -298,8 +299,8 @@ private fun ConversationInspectorCard(message: ConversationInspectorMessage) {
         colors = LettaCardDefaults.listCardColors(),
     ) {
         Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.padding(LettaDimens.Space.md),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -377,8 +378,8 @@ private fun ConversationAdminSectionsPreview() {
     // ConversationAdminDialog is not previewable here.
     LettaPreviewFrame {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(LettaDimens.Space.lg),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         ) {
             ConversationAdminDetailsSection(display = previewAdminDialogState().display)
             ConversationAdminActionsSection(
@@ -394,8 +395,8 @@ private fun ConversationAdminSectionsPreview() {
 private fun ConversationAdminInspectorPreview() {
     LettaPreviewFrame {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(LettaDimens.Space.lg),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         ) {
             ConversationAdminInspectorSection(
                 isInspectorLoading = false,

@@ -47,6 +47,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * The places an agent's mascot can stand. One character per agent, in one place at a time: it
@@ -277,7 +278,7 @@ private fun MascotEditBadge(onEdit: () -> Unit, modifier: Modifier) {
     }
 }
 
-private val EDIT_BADGE_SIZE = 22.dp
+private val EDIT_BADGE_SIZE = LettaDimens.Space.xl
 
 /** Where the character is drawn: [flight.from] eased toward [to] by the hop's progress (already eased by its spec). */
 private fun shownRect(flight: MascotTransport.Flight, to: Rect): Rect {

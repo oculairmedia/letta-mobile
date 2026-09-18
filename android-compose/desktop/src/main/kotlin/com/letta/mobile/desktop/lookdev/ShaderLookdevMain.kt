@@ -60,6 +60,7 @@ import org.jetbrains.skia.Rect as SkiaRect
 import org.jetbrains.skia.RuntimeEffect
 import org.jetbrains.skia.RuntimeShaderBuilder
 import kotlin.math.PI
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * Realtime lookdev for the ambient agent-status shader, hosted as a SECOND
@@ -271,16 +272,16 @@ private fun LookdevRoot() {
 @Composable
 private fun Chip(label: String, selected: Boolean = false, onClick: () -> Unit) {
     Surface(
-        shape = RoundedCornerShape(5.dp),
+        shape = RoundedCornerShape(LettaDimens.Space.xs),
         color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.30f)
-        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = LettaDimens.Alpha.hairline),
         modifier = Modifier.clickable(onClick = onClick),
     ) {
         Text(
             text = label,
-            fontSize = 10.sp,
+            fontSize = LettaDimens.Type.micro,
             color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs),
         )
     }
 }
@@ -292,8 +293,8 @@ private fun ControlsColumn(state: LookdevState) {
             .width(360.dp)
             .fillMaxHeight()
             .verticalScroll(rememberScrollState())
-            .padding(10.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+            .padding(LettaDimens.Space.md),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         Text(
             "Variants — drop .sksl files into desktop/lookdev-shaders/ (live)",
@@ -305,7 +306,7 @@ private fun ControlsColumn(state: LookdevState) {
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
             items(state.variants, key = { it.name }) { variant ->
                 Chip(
                     label = variant.name,
@@ -316,7 +317,7 @@ private fun ControlsColumn(state: LookdevState) {
                 }
             }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
             Chip("proposed") {
                 state.selectedVariant = null
                 state.source = PROPOSED_DESKTOP_SKSL
@@ -330,7 +331,7 @@ private fun ControlsColumn(state: LookdevState) {
             }
         }
         Text("Status presets", style = MaterialTheme.typography.labelSmall)
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
             AmbientMotionStatus.entries.forEach { status ->
                 Chip(status.name.lowercase()) {
                     val spec = AmbientMotion.spec(status)
@@ -347,7 +348,7 @@ private fun ControlsColumn(state: LookdevState) {
         LabeledSlider("overlay scale (uScale)", state.scale, 0.25f..3f) { state.scale = it }
 
         Text("Tint", style = MaterialTheme.typography.labelSmall)
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
             listOf(
                 Color(0xFF3FE0C0), // teal (running)
                 Color(0xFFE0457B), // pink identity
@@ -357,8 +358,8 @@ private fun ControlsColumn(state: LookdevState) {
             ).forEach { color ->
                 Box(
                     Modifier
-                        .size(30.dp)
-                        .clip(RoundedCornerShape(6.dp))
+                        .size(LettaDimens.Space.xxl)
+                        .clip(RoundedCornerShape(LettaDimens.Radius.sm))
                         .background(color)
                         .clickable { state.tint = color },
                 )
@@ -376,7 +377,7 @@ private fun ControlsColumn(state: LookdevState) {
         OutlinedTextField(
             value = state.source,
             onValueChange = { state.source = it },
-            textStyle = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 11.sp),
+            textStyle = TextStyle(fontFamily = FontFamily.Monospace, fontSize = LettaDimens.Type.caption),
             modifier = Modifier.fillMaxWidth().heightIn(min = 420.dp),
         )
     }
@@ -425,7 +426,7 @@ private fun PreviewPane(
             frameShader.close()
         }
         // Fake chat content so glow strength is judged against readability.
-        Column(Modifier.fillMaxSize().padding(40.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+        Column(Modifier.fillMaxSize().padding(LettaDimens.Orb.lg), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg)) {
             repeat(8) { index ->
                 Text(
                     text = if (index % 3 == 2) {
@@ -434,7 +435,7 @@ private fun PreviewPane(
                         "Assistant narration line $index — glow must never wash this out while streaming."
                     },
                     color = Color(0xFFB8C2C4),
-                    fontSize = 14.sp,
+                    fontSize = LettaDimens.Type.caption,
                 )
             }
         }
@@ -449,7 +450,7 @@ private fun LabeledSlider(
     onChange: (Float) -> Unit,
 ) {
     Column {
-        Text("$label = ${"%.2f".format(value)}", fontSize = 10.sp)
+        Text("$label = ${"%.2f".format(value)}", fontSize = LettaDimens.Type.micro)
         Slider(value = value, onValueChange = onChange, valueRange = range)
     }
 }

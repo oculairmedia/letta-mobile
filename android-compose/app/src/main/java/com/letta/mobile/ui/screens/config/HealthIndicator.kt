@@ -28,6 +28,7 @@ import com.letta.mobile.data.health.ServerHealthState
 import com.letta.mobile.ui.preview.LettaPreviewFrame
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * letta-mobile-qmxn: status dot for a backend row.
@@ -69,7 +70,7 @@ fun HealthDot(
     }
     Box(
         modifier = modifier
-            .size(10.dp)
+            .size(LettaDimens.Space.md)
             .clip(CircleShape)
             .background(color),
     )
@@ -123,7 +124,7 @@ fun HealthRowShell(
 
     Surface(
         modifier = modifier.offset { IntOffset(shakeOffsetPx, 0) },
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.md),
         color = animatedColor,
         contentColor = contentColor,
     ) {
@@ -137,12 +138,12 @@ fun HealthRowShell(
 @Composable
 private fun HealthDotPreview() {
     LettaPreviewFrame {
-        Box(modifier = Modifier.padding(16.dp)) {
+        Box(modifier = Modifier.padding(LettaDimens.Space.lg)) {
             Column {
-                HealthDot(health = ServerHealthState.ONLINE, modifier = Modifier.padding(4.dp))
-                HealthDot(health = ServerHealthState.OFFLINE, modifier = Modifier.padding(4.dp))
-                HealthDot(health = ServerHealthState.PROBING, modifier = Modifier.padding(4.dp))
-                HealthDot(health = ServerHealthState.UNKNOWN, modifier = Modifier.padding(4.dp))
+                HealthDot(health = ServerHealthState.ONLINE, modifier = Modifier.padding(LettaDimens.Space.xs))
+                HealthDot(health = ServerHealthState.OFFLINE, modifier = Modifier.padding(LettaDimens.Space.xs))
+                HealthDot(health = ServerHealthState.PROBING, modifier = Modifier.padding(LettaDimens.Space.xs))
+                HealthDot(health = ServerHealthState.UNKNOWN, modifier = Modifier.padding(LettaDimens.Space.xs))
             }
         }
     }
@@ -156,11 +157,11 @@ private fun HealthRowShellPreview() {
             baseContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
             contentColor = MaterialTheme.colorScheme.onSurface,
             refusalTrigger = 0,
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(LettaDimens.Space.lg),
         ) {
             Text(
                 text = "Backend row",
-                modifier = Modifier.padding(16.dp),
+                modifier = Modifier.padding(LettaDimens.Space.lg),
             )
         }
     }

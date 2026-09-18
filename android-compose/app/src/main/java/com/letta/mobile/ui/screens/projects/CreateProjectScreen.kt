@@ -50,6 +50,7 @@ import com.letta.mobile.ui.common.LocalSnackbarDispatcher
 import com.letta.mobile.ui.components.FormItem
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.preview.LettaPreviewFrame
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * letta-mobile-cygd: full-screen replacement for the conversational
@@ -188,7 +189,7 @@ private fun CreateProjectBottomBar(
 ) {
     BottomAppBar(
         windowInsets = WindowInsets.navigationBars,
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        contentPadding = PaddingValues(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
         tonalElevation = BottomAppBarDefaults.ContainerElevation,
     ) {
         val backLabel = stringResource(
@@ -212,11 +213,11 @@ private fun CreateProjectBottomBar(
         ) {
             if (isSubmitting) {
                 CircularProgressIndicator(
-                    strokeWidth = 2.dp,
-                    modifier = Modifier.size(18.dp),
+                    strokeWidth = LettaDimens.Space.hair,
+                    modifier = Modifier.size(LettaDimens.Space.lg),
                     color = MaterialTheme.colorScheme.onPrimary,
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
             }
             Text(primaryLabel)
         }
@@ -254,8 +255,8 @@ private fun CreateProjectStepContent(
         modifier = Modifier
             .fillMaxWidth()
             .verticalScroll(scrollState)
-            .padding(horizontal = 16.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+            .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.lg),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
     ) {
         Text(
             text = stringResource(promptRes),
@@ -365,8 +366,8 @@ private fun CreateProjectStepContent(
 private fun CreateProjectSummaryChipPreview() {
     LettaPreviewFrame {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(LettaDimens.Space.lg),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             SummaryChip(label = "Description", value = "A new tool for capturing design decisions.")
             SummaryChip(label = "Project name", value = "letta-mobile")
@@ -405,7 +406,7 @@ private fun CreateProjectBottomBarSubmittingPreview() {
 @Composable
 private fun CreateProjectStepProgressPreview() {
     LettaPreviewFrame {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
             CreateProjectStepProgress(ConversationalProjectStep.Goal)
             CreateProjectStepProgress(ConversationalProjectStep.FilesystemPath)
             CreateProjectStepProgress(ConversationalProjectStep.Review)
@@ -423,12 +424,12 @@ private fun SummaryChip(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.lg),
         color = MaterialTheme.colorScheme.surfaceContainerHighest,
     ) {
         Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.padding(LettaDimens.Space.md),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
         ) {
             Text(
                 text = label,

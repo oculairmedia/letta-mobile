@@ -37,6 +37,7 @@ import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.projection.projectRunContent
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
+import com.letta.mobile.ui.theme.LettaDimens
 
 @JvmInline
 internal value class StreamingMessageId(val value: String)
@@ -58,7 +59,7 @@ internal fun DesktopRunBlock(
     val reasoning = projection.reasoning
     val toolCalls = projection.toolCalls
     val narration = projection.narration
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
         reasoning.forEach { ReasoningRow(it.content) }
         if (toolCalls.isNotEmpty()) {
             RunStepsCard(toolCalls)
@@ -87,13 +88,13 @@ internal fun DesktopRunBlock(
 @Composable
 internal fun ReasoningRow(text: String) {
     var open by remember { mutableStateOf(false) }
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
         Row(
             modifier = Modifier
                 .clickable(role = Role.Button) { open = !open }
                 .semantics { stateDescription = if (open) "Expanded" else "Collapsed" },
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             Text(
                 text = "Thought",
@@ -103,7 +104,7 @@ internal fun ReasoningRow(text: String) {
             Icon(
                 imageVector = if (open) Icons.Outlined.KeyboardArrowUp else Icons.Outlined.KeyboardArrowDown,
                 contentDescription = null,
-                modifier = Modifier.size(14.dp),
+                modifier = Modifier.size(LettaDimens.Space.lg),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -113,7 +114,7 @@ internal fun ReasoningRow(text: String) {
                     text = text.trim(),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 12.dp),
+                    modifier = Modifier.padding(start = LettaDimens.Space.md),
                 )
             }
         }
@@ -136,7 +137,7 @@ internal fun RunStepsCard(toolCalls: List<UiToolCall>) {
             onToggle = { expanded = !expanded },
         )
         if (expanded) {
-            Column(modifier = Modifier.padding(start = 10.dp, top = 2.dp)) {
+            Column(modifier = Modifier.padding(start = LettaDimens.Space.md, top = LettaDimens.Space.hair)) {
                 toolCalls.forEach { ToolStepRow(it) }
             }
         }
@@ -153,14 +154,14 @@ private fun RunStepsCardHeader(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onToggle)
-            .padding(horizontal = 10.dp, vertical = 4.dp),
+            .padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.xs),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         Icon(
             imageVector = Icons.Outlined.Terminal,
             contentDescription = null,
-            modifier = Modifier.size(13.dp),
+            modifier = Modifier.size(LettaDimens.Space.md),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
@@ -172,7 +173,7 @@ private fun RunStepsCardHeader(
         Icon(
             imageVector = if (expanded) Icons.Outlined.KeyboardArrowUp else Icons.Outlined.KeyboardArrowDown,
             contentDescription = if (expanded) "Collapse" else "Expand",
-            modifier = Modifier.size(14.dp),
+            modifier = Modifier.size(LettaDimens.Space.lg),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
@@ -186,9 +187,9 @@ internal fun ToolStepRow(toolCall: UiToolCall) {
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable { open = !open }
-                .padding(vertical = 3.dp),
+                .padding(vertical = LettaDimens.Space.xs),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             StepStatusCircle(toolCall.stepState())
             Text(
@@ -212,8 +213,8 @@ internal fun ToolStepRow(toolCall: UiToolCall) {
         }
         if (open) {
             Column(
-                modifier = Modifier.padding(start = 20.dp, bottom = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(start = LettaDimens.Space.xl, bottom = LettaDimens.Space.sm),
+                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
             ) {
                 toolCall.arguments.takeIf { it.isNotBlank() }?.let { CodeBlock(primaryToolArgument(ToolArgumentPayload(it))) }
                 toolCall.result?.takeIf { it.isNotBlank() }?.let { ToolOutputBlock(it) }
@@ -231,29 +232,29 @@ internal fun StepStatusCircle(state: StepState) {
     val teal = MaterialTheme.colorScheme.primary
     when (state) {
         StepState.Done -> Box(
-            modifier = Modifier.size(13.dp).background(teal, CircleShape),
+            modifier = Modifier.size(LettaDimens.Space.md).background(teal, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 imageVector = Icons.Outlined.Check,
                 contentDescription = "done",
-                modifier = Modifier.size(9.dp),
+                modifier = Modifier.size(LettaDimens.Space.sm),
                 tint = MaterialTheme.colorScheme.onPrimary,
             )
         }
         StepState.Running -> Box(
             modifier = Modifier
-                .size(13.dp)
-                .border(1.5.dp, teal, CircleShape),
+                .size(LettaDimens.Space.md)
+                .border(LettaDimens.Space.hair, teal, CircleShape),
         )
         StepState.Error -> Box(
-            modifier = Modifier.size(13.dp).background(MaterialTheme.colorScheme.error, CircleShape),
+            modifier = Modifier.size(LettaDimens.Space.md).background(MaterialTheme.colorScheme.error, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 imageVector = Icons.Outlined.Close,
                 contentDescription = "failed",
-                modifier = Modifier.size(9.dp),
+                modifier = Modifier.size(LettaDimens.Space.sm),
                 tint = MaterialTheme.colorScheme.onError,
             )
         }

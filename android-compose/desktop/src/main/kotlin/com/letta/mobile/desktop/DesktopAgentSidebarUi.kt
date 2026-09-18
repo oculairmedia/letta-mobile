@@ -39,6 +39,7 @@ import com.letta.mobile.data.lens.WorkPlayMode
 import org.jetbrains.jewel.ui.component.Icon as JewelIcon
 import org.jetbrains.jewel.ui.component.SimpleListItem as JewelSimpleListItem
 import org.jetbrains.jewel.ui.component.Text as JewelText
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * Agent sidebar (231.dp, #0D0D0D): the active agent header, per-agent
@@ -55,8 +56,8 @@ internal fun DesktopAgentSidebar(
             .width(231.dp)
             .fillMaxHeight()
             .background(MaterialTheme.colorScheme.surfaceContainerLowest)
-            .padding(horizontal = 14.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+            .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.lg),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
     ) {
         // Work | Play lens switcher (Penpot "App Mockups v2": top of sidebar).
         // Temporarily hidden — restore by uncommenting. The lens itself still
@@ -110,22 +111,22 @@ private fun WorkPlaySwitcher(
 ) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(10.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.md),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
-        Row(modifier = Modifier.padding(3.dp), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+        Row(modifier = Modifier.padding(LettaDimens.Space.xs), horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
             WorkPlayMode.entries.forEach { option ->
                 val selected = option == mode
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(RoundedCornerShape(LettaDimens.Radius.sm))
                         .background(
                             if (selected) MaterialTheme.colorScheme.surfaceContainerLowest else Color.Transparent,
                         )
                         .clickable { onModeChange(option) }
-                        .padding(vertical = 6.dp),
+                        .padding(vertical = LettaDimens.Space.sm),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
@@ -160,17 +161,17 @@ internal fun DesktopNavRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable(onClick = onClick),
-            height = 34.dp,
+            height = LettaDimens.Space.xxl,
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(9.dp),
+                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 JewelIcon(
                     imageVector = model.icon,
                     contentDescription = null,
-                    modifier = Modifier.size(17.dp),
+                    modifier = Modifier.size(LettaDimens.Space.lg),
                     tint = content,
                 )
                 JewelText(

@@ -12,6 +12,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.ui.theme.LettaDimens
 
 /** One row of a [LettaPopupMenu]. */
 @Immutable
@@ -57,12 +58,12 @@ fun LettaPopupMenu(
                             imageVector = icon,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(16.dp),
+                            modifier = Modifier.size(LettaDimens.Space.lg),
                         )
                     }
                 },
                 enabled = item.enabled,
-                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 2.dp),
+                contentPadding = PaddingValues(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.hair),
                 onClick = {
                     onDismiss()
                     item.onClick()

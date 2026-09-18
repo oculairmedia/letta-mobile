@@ -38,6 +38,7 @@ import com.letta.mobile.data.context.ContextWindowUsageState
 import com.letta.mobile.data.context.formatContextPercent
 import com.letta.mobile.data.context.formatContextShare
 import com.letta.mobile.data.context.formatContextTokens
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * Composer chip + popover for the context window: how much of the focused
@@ -78,20 +79,20 @@ private fun ContextUsagePopover(
     ) {
         Surface(
             modifier = Modifier.width(330.dp),
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(LettaDimens.Radius.md),
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-            shadowElevation = 8.dp,
+            shadowElevation = LettaDimens.Space.sm,
         ) {
-            Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+            Column(modifier = Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md)) {
                 ContextUsageHeader(state.usage)
                 val usage = state.usage
                 if (usage == null) {
                     ContextUsagePlaceholder(state)
                 } else {
-                    Box(modifier = Modifier.height(10.dp))
+                    Box(modifier = Modifier.height(LettaDimens.Space.md))
                     ContextUsageBar(usage)
-                    Box(modifier = Modifier.height(10.dp))
+                    Box(modifier = Modifier.height(LettaDimens.Space.md))
                     ContextUsageRows(usage)
                 }
             }
@@ -134,7 +135,7 @@ private fun ContextUsagePlaceholder(state: ContextWindowUsageState) {
         text = message,
         style = MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(top = 8.dp),
+        modifier = Modifier.padding(top = LettaDimens.Space.sm),
     )
 }
 
@@ -145,8 +146,8 @@ private fun ContextUsageBar(usage: ContextWindowUsage) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(8.dp)
-            .clip(RoundedCornerShape(4.dp))
+            .height(LettaDimens.Space.sm)
+            .clip(RoundedCornerShape(LettaDimens.Space.xs))
             .background(MaterialTheme.colorScheme.surfaceContainerLowest),
         horizontalArrangement = Arrangement.spacedBy(1.dp),
     ) {
@@ -155,7 +156,7 @@ private fun ContextUsageBar(usage: ContextWindowUsage) {
                 modifier = Modifier
                     .weight(segment.fraction.coerceAtLeast(MinimumBarWeight))
                     .fillMaxWidth()
-                    .height(8.dp)
+                    .height(LettaDimens.Space.sm)
                     .background(contextSegmentColor(segment.kind)),
             )
         }
@@ -163,7 +164,7 @@ private fun ContextUsageBar(usage: ContextWindowUsage) {
             Box(
                 modifier = Modifier
                     .weight(usage.freeSegment.fraction.coerceAtLeast(MinimumBarWeight))
-                    .height(8.dp)
+                    .height(LettaDimens.Space.sm)
                     .background(contextSegmentColor(ContextWindowSegmentKind.FreeSpace)),
             )
         }
@@ -172,7 +173,7 @@ private fun ContextUsageBar(usage: ContextWindowUsage) {
 
 @Composable
 private fun ContextUsageRows(usage: ContextWindowUsage) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
         usage.segments.forEach { segment -> ContextUsageRow(segment) }
         if (usage.maxTokens > 0) {
             ContextUsageRow(usage.freeSegment)
@@ -184,13 +185,13 @@ private fun ContextUsageRows(usage: ContextWindowUsage) {
 private fun ContextUsageRow(segment: ContextWindowSegment) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
             modifier = Modifier
-                .size(9.dp)
-                .clip(RoundedCornerShape(2.dp))
+                .size(LettaDimens.Space.sm)
+                .clip(RoundedCornerShape(LettaDimens.Space.xs))
                 .background(contextSegmentColor(segment.kind)),
         )
         Text(

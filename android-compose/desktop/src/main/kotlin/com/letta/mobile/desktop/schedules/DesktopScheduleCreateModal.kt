@@ -53,6 +53,7 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.isoDayNumber
 import kotlin.time.Instant
+import com.letta.mobile.ui.theme.LettaDimens
 
 // --- Create modal -----------------------------------------------------------
 
@@ -83,20 +84,20 @@ internal fun CreateScheduleModal(params: CreateScheduleModalParams) {
         contentAlignment = Alignment.Center,
     ) {
         Column(
-            Modifier.width(720.dp).clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceContainer)
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(16.dp))
-                .clickable(enabled = false) {}.padding(24.dp),
+            Modifier.width(720.dp).clip(RoundedCornerShape(LettaDimens.Radius.lg)).background(MaterialTheme.colorScheme.surfaceContainer)
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(LettaDimens.Radius.lg))
+                .clickable(enabled = false) {}.padding(LettaDimens.Space.xl),
         ) {
             CreateScheduleModalHeader(onDismiss = params.onDismiss)
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(LettaDimens.Space.lg))
             CreateScheduleNameField(
                 name = name,
                 onNameChange = { name = it },
                 focusRequester = nameFocusRequester,
             )
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(LettaDimens.Space.lg))
             CreateSchedulePromptField(prompt = prompt, onPromptChange = { prompt = it })
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(LettaDimens.Space.lg))
             CreateScheduleWhenSection(
                 CreateScheduleWhenParams(
                     draft = draft,
@@ -104,7 +105,7 @@ internal fun CreateScheduleModal(params: CreateScheduleModalParams) {
                     clock = params.clock,
                 ),
             )
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(LettaDimens.Space.xl))
             CreateScheduleModalActions(
                 CreateScheduleModalActionsParams(
                     form = CreateScheduleFormState(name = name, prompt = prompt, draft = draft),
@@ -131,7 +132,7 @@ private fun CreateScheduleModalHeader(onDismiss: () -> Unit) {
             Icons.Outlined.Close,
             "Close",
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(20.dp).clickable(onClick = onDismiss),
+            modifier = Modifier.size(LettaDimens.Space.xl).clickable(onClick = onDismiss),
         )
     }
 }
@@ -143,7 +144,7 @@ private fun CreateScheduleNameField(
     focusRequester: FocusRequester,
 ) {
     Text("NAME", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor)
-    Spacer(Modifier.height(6.dp))
+    Spacer(Modifier.height(LettaDimens.Space.sm))
     DesktopTextField(
         value = name,
         onValueChange = onNameChange,
@@ -155,13 +156,13 @@ private fun CreateScheduleNameField(
 @Composable
 private fun CreateSchedulePromptField(prompt: String, onPromptChange: (String) -> Unit) {
     Text("PROMPT", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor)
-    Spacer(Modifier.height(6.dp))
+    Spacer(Modifier.height(LettaDimens.Space.sm))
     DesktopTextArea(
         value = prompt,
         onValueChange = onPromptChange,
         placeholder = "What should the agent do when this fires?",
         modifier = Modifier.fillMaxWidth().height(140.dp),
-        decorationBoxModifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+        decorationBoxModifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.md),
     )
 }
 
@@ -174,15 +175,15 @@ private data class CreateScheduleWhenParams(
 @Composable
 private fun CreateScheduleWhenSection(params: CreateScheduleWhenParams) {
     Text("WHEN", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor)
-    Spacer(Modifier.height(6.dp))
+    Spacer(Modifier.height(LettaDimens.Space.sm))
     CadencePicker(params.draft, params.onDraftChange)
-    Spacer(Modifier.height(10.dp))
+    Spacer(Modifier.height(LettaDimens.Space.md))
     CreateSchedulePreviewBox(draft = params.draft, clock = params.clock)
 }
 
 @Composable
 private fun CreateSchedulePreviewBox(draft: CronBuilderState, clock: CreateScheduleClock) {
-    Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceContainerLow).padding(12.dp)) {
+    Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(LettaDimens.Radius.sm)).background(MaterialTheme.colorScheme.surfaceContainerLow).padding(LettaDimens.Space.md)) {
         Column {
             Text(
                 CronBuilder.preview(draft),
@@ -224,7 +225,7 @@ private fun CreateScheduleModalActions(params: CreateScheduleModalActionsParams)
         params.canCreate
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
         DesktopOutlinedButton(onClick = params.onDismiss) { DesktopButtonContent("Cancel") }
-        Spacer(Modifier.width(10.dp))
+        Spacer(Modifier.width(LettaDimens.Space.md))
         DesktopDefaultButton(
             onClick = {
                 expression?.let { params.onCreate(form.name.trim(), form.prompt.trim(), it) }
@@ -235,7 +236,7 @@ private fun CreateScheduleModalActions(params: CreateScheduleModalActionsParams)
         }
     }
     if (!params.canCreate) {
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(LettaDimens.Space.sm))
         Text(
             "This backend doesn't allow creating schedules.",
             style = MaterialTheme.typography.labelSmall,
@@ -248,14 +249,14 @@ private fun CreateScheduleModalActions(params: CreateScheduleModalActionsParams)
 internal fun CadencePicker(draft: CronBuilderState, onChange: (CronBuilderState) -> Unit) {
     Column {
         CadenceTypeRow(draft = draft, onChange = onChange)
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(LettaDimens.Space.md))
         CadenceDetails(draft = draft, onChange = onChange)
     }
 }
 
 @Composable
 private fun CadenceTypeRow(draft: CronBuilderState, onChange: (CronBuilderState) -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
         cadenceChip("Every N min", draft.cadence == CronCadence.EveryNMinutes) {
             onChange(draft.copy(cadence = CronCadence.EveryNMinutes))
         }
@@ -294,7 +295,7 @@ private fun CadenceDetails(draft: CronBuilderState, onChange: (CronBuilderState)
 
 @Composable
 private fun EveryNMinutesRow(draft: CronBuilderState, onChange: (CronBuilderState) -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
         listOf(5, 10, 15, 30).forEach { n ->
             cadenceChip("$n", draft.intervalMinutes == n) { onChange(draft.copy(intervalMinutes = n)) }
         }
@@ -305,8 +306,8 @@ private fun EveryNMinutesRow(draft: CronBuilderState, onChange: (CronBuilderStat
 private fun WeeklyCadenceDetails(draft: CronBuilderState, onChange: (CronBuilderState) -> Unit) {
     Column {
         TimeOfDayRow(draft) { onChange(it) }
-        Spacer(Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Spacer(Modifier.height(LettaDimens.Space.sm))
+        Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
             (1..7).forEach { iso ->
                 val on = iso in draft.daysOfWeek
                 cadenceChip(ScheduleFormat.weekdayShort(iso).take(1), on) {
@@ -319,7 +320,7 @@ private fun WeeklyCadenceDetails(draft: CronBuilderState, onChange: (CronBuilder
 
 @Composable
 internal fun TimeOfDayRow(draft: CronBuilderState, onChange: (CronBuilderState) -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
         TimeRow(TimeRowParams("Hour", draft.hour, 0..23) { onChange(draft.copy(hour = it)) })
         TimeRow(TimeRowParams("Minute", draft.minute, 0..59) { onChange(draft.copy(minute = it)) })
         Text(
@@ -339,7 +340,7 @@ internal data class TimeRowParams(
 
 @Composable
 internal fun TimeRow(params: TimeRowParams) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
         IconBtn(Icons.Outlined.ChevronLeft, "−") {
             params.onChange((params.value - 1).coerceAtLeast(params.range.first))
         }
@@ -358,21 +359,21 @@ internal fun TimeRow(params: TimeRowParams) {
 
 @Composable
 internal fun DefRow(label: String, value: String) {
-    Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+    Column(Modifier.fillMaxWidth().padding(vertical = LettaDimens.Space.sm)) {
         Text(label.uppercase(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor)
-        Spacer(Modifier.height(2.dp))
+        Spacer(Modifier.height(LettaDimens.Space.hair))
         Text(value, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-        Spacer(Modifier.height(6.dp))
-        Box(Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)))
+        Spacer(Modifier.height(LettaDimens.Space.sm))
+        Box(Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = LettaDimens.Alpha.hairline)))
     }
 }
 
 @Composable
 internal fun cadenceChip(label: String, selected: Boolean, onClick: () -> Unit) {
     Box(
-        Modifier.clip(RoundedCornerShape(8.dp))
+        Modifier.clip(RoundedCornerShape(LettaDimens.Radius.sm))
             .background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh)
-            .clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 7.dp),
+            .clickable(onClick = onClick).padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),
     ) {
         Text(label, style = MaterialTheme.typography.labelMedium, color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant)
     }
@@ -381,18 +382,18 @@ internal fun cadenceChip(label: String, selected: Boolean, onClick: () -> Unit) 
 @Composable
 internal fun IconBtn(icon: androidx.compose.ui.graphics.vector.ImageVector, desc: String, onClick: () -> Unit) {
     Box(
-        Modifier.size(28.dp).clip(RoundedCornerShape(6.dp)).clickable(onClick = onClick),
+        Modifier.size(LettaDimens.Space.xxl).clip(RoundedCornerShape(LettaDimens.Radius.sm)).clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, desc, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+        Icon(icon, desc, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(LettaDimens.Control.icon))
     }
 }
 
 @Composable
 internal fun ScheduleEmptyState(canCreate: Boolean) {
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-        Icon(Icons.Outlined.Schedule, null, tint = MaterialTheme.customColors.onSurfaceMutedColor, modifier = Modifier.size(40.dp))
-        Spacer(Modifier.height(10.dp))
+        Icon(Icons.Outlined.Schedule, null, tint = MaterialTheme.customColors.onSurfaceMutedColor, modifier = Modifier.size(LettaDimens.Orb.lg))
+        Spacer(Modifier.height(LettaDimens.Space.md))
         Text("No schedules yet", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
         Text(
             if (canCreate) "Use “New schedule” to create one." else "Schedules created elsewhere will appear here.",

@@ -50,6 +50,7 @@ import com.letta.mobile.ui.schedules.TimelineView
 import com.letta.mobile.ui.schedules.TimelineViewParams
 import com.letta.mobile.ui.schedules.WeekView
 import com.letta.mobile.ui.schedules.WeekViewParams
+import com.letta.mobile.ui.theme.LettaDimens
 /** The four schedule views (Penpot "Desktop · Schedules (week/timeline)"). */
 internal enum class ScheduleView(val label: String) {
     Week("Week"),
@@ -211,7 +212,7 @@ fun DesktopScheduleSurface(
                         }
                         // Surface backend failures with a retry instead of
                         // masking them as "No schedules yet" (Codex review).
-                        scheduleError != null -> Box(Modifier.fillMaxSize().padding(28.dp), contentAlignment = Alignment.TopCenter) {
+                        scheduleError != null -> Box(Modifier.fillMaxSize().padding(LettaDimens.Space.xxl), contentAlignment = Alignment.TopCenter) {
                             DesktopInlineError(message = scheduleError, onRetry = onRefresh, retrying = state.isLoading)
                         }
                         state.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -274,8 +275,8 @@ internal fun ScheduleHeader(
     // Title on its own row; the view tabs + date-nav sit BENEATH it — matching
     // Memory/Skills/Channels so every page reads the same way.
     Column(
-        modifier = Modifier.fillMaxWidth().padding(start = 28.dp, end = 28.dp, top = 16.dp, bottom = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxWidth().padding(start = LettaDimens.Space.xxl, end = LettaDimens.Space.xxl, top = LettaDimens.Space.lg, bottom = LettaDimens.Space.sm),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Schedules", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
@@ -285,7 +286,7 @@ internal fun ScheduleHeader(
                 }
             }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm), verticalAlignment = Alignment.CenterVertically) {
             ScheduleView.entries.forEach { entry ->
                 DesktopChipTab(entry.label, entry == view) { onView(entry) }
             }
@@ -294,7 +295,7 @@ internal fun ScheduleHeader(
             // never shifts the layout.
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.alpha(if (showRange) 1f else 0f)) {
                 IconBtn(Icons.Outlined.ChevronLeft, "Previous", onPrev)
-                Text(rangeLabel, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(horizontal = 8.dp))
+                Text(rangeLabel, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(horizontal = LettaDimens.Space.sm))
                 IconBtn(Icons.Outlined.ChevronRight, "Next", onNext)
             }
         }

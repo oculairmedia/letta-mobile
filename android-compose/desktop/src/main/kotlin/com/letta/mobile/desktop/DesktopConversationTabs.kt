@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import sh.calvin.reorderable.DragGestureDetector
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * What the tab strip can do to a conversation. Grouped rather than passed as
@@ -81,9 +82,9 @@ internal data class DesktopConversationTab(
 )
 
 /** Horizontal gap between tabs. */
-private val TabSpacing = 4.dp
+private val TabSpacing = LettaDimens.Space.xs
 
-private val TabControlSize = 26.dp
+private val TabControlSize = LettaDimens.Space.xl
 private val PickerWidth = 300.dp
 private val PickerMaxHeight = 360.dp
 
@@ -327,7 +328,7 @@ internal fun DesktopConversationTabRow(
             Icon(
                 Icons.Outlined.Add,
                 contentDescription = null,
-                modifier = Modifier.size(16.dp),
+                modifier = Modifier.size(LettaDimens.Space.lg),
                 tint = MaterialTheme.colorScheme.onSurface,
             )
         }
@@ -354,9 +355,9 @@ private fun DesktopConversationTabItem(
         modifier = modifier
             .fillMaxHeight()
             .widthIn(min = 132.dp, max = 220.dp)
-            .padding(top = 4.dp)
-            .then(if (dragging) Modifier.shadow(4.dp, RoundedCornerShape(topStart = 9.dp, topEnd = 9.dp)) else Modifier),
-        shape = RoundedCornerShape(topStart = 9.dp, topEnd = 9.dp),
+            .padding(top = LettaDimens.Space.xs)
+            .then(if (dragging) Modifier.shadow(LettaDimens.Space.xs, RoundedCornerShape(topStart = LettaDimens.Space.sm, topEnd = LettaDimens.Space.sm)) else Modifier),
+        shape = RoundedCornerShape(topStart = LettaDimens.Space.sm, topEnd = LettaDimens.Space.sm),
         color = when {
             active -> MaterialTheme.colorScheme.background
             hovered -> MaterialTheme.colorScheme.surfaceContainer
@@ -392,9 +393,9 @@ private fun DesktopConversationTabLabel(
     // One line, browser-thin: the title, then the agent in the quieter colour.
     Row(
         // end clears the close button's 20.dp slot plus a little breathing room.
-        modifier = modifier.padding(start = 12.dp, end = 24.dp),
+        modifier = modifier.padding(start = LettaDimens.Space.md, end = LettaDimens.Space.xl),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         Text(
             text = tab.title,
@@ -431,12 +432,12 @@ private fun DesktopConversationTabCloseButton(
     // with a small cross adrift in it.
     IconButton(
         onClick = onClose,
-        modifier = modifier.size(20.dp),
+        modifier = modifier.size(LettaDimens.Space.xl),
     ) {
         Icon(
             imageVector = Icons.Outlined.Close,
             contentDescription = "Close $title tab",
-            modifier = Modifier.size(13.dp),
+            modifier = Modifier.size(LettaDimens.Space.md),
             tint = MaterialTheme.colorScheme.onSurface,
         )
     }

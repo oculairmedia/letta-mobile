@@ -70,10 +70,11 @@ import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.ui.chat.render.buildToolCallTemplate
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.letta.mobile.ui.preview.LettaPreviewFrame
+import com.letta.mobile.ui.theme.LettaDimens
 
 // letta-mobile-awbf.1: composer sizing now references the design system tokens
 internal val ChatComposerAttachButtonSize = LettaSpacing.COMPOSER_ATTACH_BUTTON_SIZE
-private val ChatComposerActionTargetSize = 48.dp
+private val ChatComposerActionTargetSize = LettaDimens.Orb.railSlotWidth
 private val ChatComposerAttachIconSize = LettaSpacing.COMPOSER_ATTACH_ICON_SIZE
 internal val ChatComposerInputHorizontalPadding = LettaSpacing.SM
 // letta-mobile-6237v.2: padded up to 24.dp from LettaSpacing.XS (6.dp) so
@@ -81,8 +82,8 @@ internal val ChatComposerInputHorizontalPadding = LettaSpacing.SM
 // When the keyboard slides up (IME open), the bar animates back down to
 // ChatComposerInputCompactVerticalPadding so the typing surface reclaims
 // the space — the bar's previous compact state, restored live.
-private val ChatComposerInputVerticalPadding = 24.dp
-private val ChatComposerInputCompactVerticalPadding = 12.dp
+private val ChatComposerInputVerticalPadding = LettaDimens.Space.xl
+private val ChatComposerInputCompactVerticalPadding = LettaDimens.Space.md
 private const val ChatComposerImeInsetForCompactPaddingPx = 96
 private val ChatComposerInputItemSpacing = LettaSpacing.XS
 
@@ -323,7 +324,7 @@ private fun ChatComposerContextRows(
         ToolAffordanceRow(
             tools = model.availableTools,
             onToolSelected = onToolSelected,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.xs),
         )
     }
 
@@ -333,7 +334,7 @@ private fun ChatComposerContextRows(
             commands = slashCommands,
             onSelected = callbacks.onSlashCommandSelected,
             onUninstall = callbacks.onSlashCommandUninstall,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.xs),
         )
     }
 
@@ -522,8 +523,8 @@ private fun SlashCommandSuggestionRow(
 ) {
     LazyRow(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        contentPadding = PaddingValues(vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+        contentPadding = PaddingValues(vertical = LettaDimens.Space.xs),
     ) {
         items(items = commands, key = { it.command }) { command ->
             var menuOpen by remember(command.command) { mutableStateOf(false) }
@@ -547,7 +548,7 @@ private fun SlashCommandSuggestionRow(
                         onClick = { onSelected(command) },
                         onLongClick = { if (command.installed) menuOpen = true },
                     ),
-                    shape = RoundedCornerShape(8.dp),
+                    shape = RoundedCornerShape(LettaDimens.Radius.sm),
                     color = containerColor,
                     contentColor = contentColor,
                     border = androidx.compose.foundation.BorderStroke(
@@ -557,13 +558,13 @@ private fun SlashCommandSuggestionRow(
                 ) {
                     androidx.compose.foundation.layout.Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
+                        modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),
                     ) {
                         Icon(
                             imageVector = if (command.installed) LettaIcons.Check else LettaIcons.Add,
                             contentDescription = null,
-                            modifier = Modifier.size(14.dp),
+                            modifier = Modifier.size(LettaDimens.Space.lg),
                         )
                         androidx.compose.material3.Text(
                             text = command.command,
@@ -602,8 +603,8 @@ private fun AttachmentStrip(
     LazyRow(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.xs),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         itemsIndexed(
             items = attachments,
@@ -642,7 +643,7 @@ private fun AttachmentThumbnail(
             modifier = Modifier
                 .size(64.dp)
                 .testTag(ChatComposerTestTags.ATTACHMENT_THUMBNAIL),
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(LettaDimens.Radius.sm),
             color = MaterialTheme.colorScheme.surfaceVariant,
         ) {
             if (imageBitmap != null) {
@@ -665,7 +666,7 @@ private fun AttachmentThumbnail(
         // Remove button overlay (top-right)
         Surface(
             modifier = Modifier
-                .size(20.dp)
+                .size(LettaDimens.Space.xl)
                 .align(Alignment.TopEnd)
                 .clip(CircleShape),
             color = MaterialTheme.colorScheme.errorContainer,
@@ -674,13 +675,13 @@ private fun AttachmentThumbnail(
             IconButton(
                 onClick = onRemove,
                 modifier = Modifier
-                    .size(20.dp)
+                    .size(LettaDimens.Space.xl)
                     .testTag(ChatComposerTestTags.ATTACHMENT_THUMBNAIL_REMOVE_BUTTON),
             ) {
                 Icon(
                     LettaIcons.Close,
                     contentDescription = stringResource(R.string.action_remove_attachment),
-                    modifier = Modifier.size(12.dp),
+                    modifier = Modifier.size(LettaDimens.Space.md),
                 )
             }
         }
@@ -702,13 +703,13 @@ private fun AttachmentPreviewDialog(
             modifier = Modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.72f))
-                .padding(24.dp)
+                .padding(LettaDimens.Space.xl)
                 .testTag(ChatComposerTestTags.ATTACHMENT_PREVIEW_DIALOG),
             contentAlignment = Alignment.Center,
         ) {
             Surface(
                 modifier = Modifier.fillMaxSize(),
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(LettaDimens.Radius.md),
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
             ) {
                 if (imageBitmap != null) {
@@ -729,7 +730,7 @@ private fun AttachmentPreviewDialog(
                 onClick = onDismiss,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(8.dp),
+                    .padding(LettaDimens.Space.sm),
             ) {
                 Icon(
                     imageVector = LettaIcons.Close,

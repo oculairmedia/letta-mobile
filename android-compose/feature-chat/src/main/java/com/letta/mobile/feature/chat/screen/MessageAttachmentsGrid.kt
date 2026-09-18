@@ -27,6 +27,7 @@ import com.letta.mobile.feature.chat.R
 import com.letta.mobile.ui.image.decodeImageBitmap
 import com.letta.mobile.ui.preview.LettaPreviewFrame
 import kotlinx.collections.immutable.persistentListOf
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * Renders attached images for a chat bubble. Up to 4 images per row in a wrap-
@@ -53,7 +54,7 @@ internal fun MessageAttachmentsGrid(
         )
         2 -> Row(
             modifier = modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
         ) {
             attachments.forEachIndexed { index, attachment ->
                 ImageCell(
@@ -65,7 +66,7 @@ internal fun MessageAttachmentsGrid(
         }
         else -> Row(
             modifier = modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
         ) {
             attachments.take(3).forEachIndexed { index, attachment ->
                 ImageCell(
@@ -137,7 +138,7 @@ private fun AttachmentImage(
     Surface(
         modifier = interactiveModifier,
         color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.sm),
     ) {
         if (imageBitmap != null) {
             Image(

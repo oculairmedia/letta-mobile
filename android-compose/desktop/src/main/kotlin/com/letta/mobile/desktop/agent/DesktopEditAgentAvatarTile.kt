@@ -27,6 +27,7 @@ import com.letta.mobile.avatar.core.MascotIdentity
 import com.letta.mobile.ui.mascot.LocalMascotTransport
 import com.letta.mobile.ui.mascot.MascotPicker
 import com.letta.mobile.ui.mascot.MascotShapeGlyph
+import com.letta.mobile.ui.theme.LettaDimens
 
 /** The editor's avatar tile: the flat silhouette that opens the picker. */
 private val EditorAvatarTileSize = 72.dp
@@ -61,22 +62,22 @@ internal fun EditorAvatarTile(
         Box(
             Modifier
                 .matchParentSize()
-                .clip(RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(LettaDimens.Radius.lg))
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                 .clickable { pickerOpen = true },
             contentAlignment = Alignment.Center,
         ) {
-            MascotShapeGlyph(identity.shape, identity.argb, 48.dp)
+            MascotShapeGlyph(identity.shape, identity.argb, LettaDimens.Orb.railSlotWidth)
         }
         DropdownMenu(expanded = pickerOpen, onDismissRequest = { pickerOpen = false }) {
-            Box(Modifier.padding(12.dp)) {
+            Box(Modifier.padding(LettaDimens.Space.md)) {
                 MascotPicker(identity = identity, onChange = onChange, accent = MaterialTheme.colorScheme.primary)
             }
         }
         Box(
             Modifier
                 .align(Alignment.BottomEnd)
-                .size(22.dp)
+                .size(LettaDimens.Space.xl)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.surfaceContainerHighest)
                 .clickable { pickerOpen = true },
@@ -86,7 +87,7 @@ internal fun EditorAvatarTile(
                 Icons.Outlined.Edit,
                 contentDescription = "Change mascot",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(12.dp),
+                modifier = Modifier.size(LettaDimens.Space.md),
             )
         }
     }

@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.theme.LettaElevationTokens
 import com.letta.mobile.ui.theme.LettaShapeTokens
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * Lightweight in-app banner for transient chat warnings. Unlike platform
@@ -45,7 +46,7 @@ fun FloatingBanner(
             Text(
                 text = text,
                 style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                modifier = Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md),
             )
         }
     }

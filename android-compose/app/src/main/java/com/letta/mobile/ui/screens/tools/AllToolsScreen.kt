@@ -65,6 +65,7 @@ import com.letta.mobile.ui.components.ShimmerGrid
 import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.preview.LettaPreviewFrame
+import com.letta.mobile.ui.theme.LettaDimens
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -131,8 +132,8 @@ fun AllToolsScreen(
                     val selectedToolTags = (uiState as? UiState.Success)?.data?.selectedTags.orEmpty()
                     LazyRow(
                         modifier = Modifier
-                            .padding(horizontal = 16.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.xs),
+                        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                     ) {
                         item {
                             FilterChip(
@@ -195,13 +196,13 @@ fun AllToolsScreen(
                         LazyVerticalGrid(
                             columns = GridCells.Fixed(3),
                             contentPadding = PaddingValues(
-                                start = paddingValues.calculateStartPadding(layoutDirection) + 12.dp,
-                                top = paddingValues.calculateTopPadding() + 12.dp,
-                                end = paddingValues.calculateEndPadding(layoutDirection) + 12.dp,
-                                bottom = paddingValues.calculateBottomPadding() + 12.dp,
+                                start = paddingValues.calculateStartPadding(layoutDirection) + LettaDimens.Space.md,
+                                top = paddingValues.calculateTopPadding() + LettaDimens.Space.md,
+                                end = paddingValues.calculateEndPadding(layoutDirection) + LettaDimens.Space.md,
+                                bottom = paddingValues.calculateBottomPadding() + LettaDimens.Space.md,
                             ),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+                            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                         ) {
                             if (state.data.isLoadingMcpTools) {
                                 item(span = { GridItemSpan(3) }) {
@@ -225,12 +226,12 @@ fun AllToolsScreen(
                                         Box(
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .padding(16.dp),
+                                                .padding(LettaDimens.Space.lg),
                                             contentAlignment = Alignment.Center,
                                         ) {
                                             @OptIn(ExperimentalMaterial3ExpressiveApi::class)
                                             LoadingIndicator(
-                                                modifier = Modifier.size(24.dp),
+                                                modifier = Modifier.size(LettaDimens.Space.xl),
                                             )
                                         }
                                     }
@@ -259,7 +260,7 @@ private fun McpLoadingBanner(modifier: Modifier = Modifier) {
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .padding(bottom = 4.dp),
+            .padding(bottom = LettaDimens.Space.xs),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
         ),
@@ -267,13 +268,13 @@ private fun McpLoadingBanner(modifier: Modifier = Modifier) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.md),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             @OptIn(ExperimentalMaterial3ExpressiveApi::class)
             LoadingIndicator(
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(LettaDimens.Space.lg),
             )
             Column {
                 Text(
@@ -303,14 +304,14 @@ private fun ToolTile(
         colors = LettaCardDefaults.listCardColors(),
     ) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(12.dp),
+            modifier = Modifier.fillMaxSize().padding(LettaDimens.Space.md),
         ) {
             Icon(
                 imageVector = LettaIcons.Tool,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier
-                    .size(20.dp)
+                    .size(LettaDimens.Space.xl)
                     .optionalSharedElement("tool_icon_${tool.id}"),
             )
             Spacer(modifier = Modifier.weight(1f))
@@ -327,7 +328,7 @@ private fun ToolTile(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 2.dp),
+                    modifier = Modifier.padding(top = LettaDimens.Space.hair),
                 )
             }
         }
@@ -355,8 +356,8 @@ private fun previewTool(
 private fun ToolTilePreview() {
     LettaPreviewFrame {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(LettaDimens.Space.lg),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             ToolTile(tool = previewTool(), onClick = {})
             ToolTile(
@@ -375,7 +376,7 @@ private fun ToolTilePreview() {
 @Composable
 private fun McpLoadingBannerPreview() {
     LettaPreviewFrame {
-        McpLoadingBanner(modifier = Modifier.padding(16.dp))
+        McpLoadingBanner(modifier = Modifier.padding(LettaDimens.Space.lg))
     }
 }
 

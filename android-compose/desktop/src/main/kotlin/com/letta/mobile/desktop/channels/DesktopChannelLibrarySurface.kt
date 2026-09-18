@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.ui.theme.LettaDimens
 
 @Composable
 fun DesktopChannelLibrarySurface(
@@ -65,7 +66,7 @@ fun DesktopChannelLibrarySurface(
             projection.filteredChannels.isEmpty() -> DesktopInfoBox("No channels match your filter.")
             else -> LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(18.dp),
+                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
                 contentPadding = DesktopCatalogGridPadding,
             ) {
                 desktopCardGrid(projection.sections.map { it.status.label to it.channels }, keyOf = { it.id }) { channel, cardModifier ->
@@ -95,7 +96,7 @@ private fun ChannelCard(channel: ChannelDisplayItem, modifier: Modifier) {
         // device ids, …) the mapper attached — these carry the failure /
         // transport detail and were dropped when only the pill was shown
         // (Codex review).
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm), verticalAlignment = Alignment.CenterVertically) {
             DesktopPill(channel.status.label, accent)
             channel.metadataLabels
                 .filterNot { it.equals(channel.status.label, ignoreCase = true) }

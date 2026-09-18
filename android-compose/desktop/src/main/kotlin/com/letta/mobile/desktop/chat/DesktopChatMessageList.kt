@@ -54,6 +54,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import java.time.LocalDate
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
+import com.letta.mobile.ui.theme.LettaDimens
 
 internal data class MessageListParams(
     val conversationId: String?,
@@ -142,7 +143,7 @@ internal fun MessageList(
                     topFadeAlpha = fadeAlphas.top,
                     bottomFadeAlpha = fadeAlphas.bottom,
                     topFadeLength = 72.dp,
-                    bottomFadeLength = 44.dp,
+                    bottomFadeLength = LettaDimens.Orb.railSlotHeight,
                 )
                 .mascotGazeTarget(MascotGazeSurface.TIMELINE),
         ) {
@@ -164,7 +165,7 @@ internal fun MessageList(
                 },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 18.dp),
+                    .padding(bottom = LettaDimens.Space.lg),
             )
         }
     }
@@ -346,14 +347,14 @@ private fun MessageListColumn(params: MessageListColumnParams) {
             state = listState,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 28.dp),
+                .padding(horizontal = LettaDimens.Space.xxl),
             // Vertical breathing room as CONTENT padding, not a viewport inset, so
             // the scroll area itself runs to the top/bottom edges. Content then
             // clips exactly where the fade reaches full transparency — no faint
             // line from content ending mid-gradient.
-            contentPadding = PaddingValues(vertical = 24.dp),
+            contentPadding = PaddingValues(vertical = LettaDimens.Space.xl),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
         ) {
             // User prompts are sticky headers: the question stays pinned to the
             // top of the viewport while its (usually much taller) answer scrolls
@@ -378,7 +379,7 @@ private fun MessageListColumn(params: MessageListColumnParams) {
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.82f),
                                     textAlign = TextAlign.Start,
-                                    modifier = Modifier.fillMaxWidth().padding(top = 3.dp, bottom = 2.dp),
+                                    modifier = Modifier.fillMaxWidth().padding(top = LettaDimens.Space.xs, bottom = LettaDimens.Space.hair),
                                 )
                             }
                         }
@@ -403,7 +404,7 @@ private fun MessageListColumn(params: MessageListColumnParams) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(top = 12.dp, end = 44.dp),
+                                .padding(top = LettaDimens.Space.md, end = LettaDimens.Orb.railSlotHeight),
                             contentAlignment = Alignment.TopCenter,
                         ) {
                             MessageListItem(item = item, streamingMessageId = streamingMessageId)
@@ -436,11 +437,11 @@ private fun MessageListColumn(params: MessageListColumnParams) {
  */
 @Composable
 internal fun DesktopDayDividerRow(date: LocalDate, today: LocalDate) {
-    val ruleColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+    val ruleColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = LettaDimens.Alpha.hairline)
     Row(
         modifier = Modifier.widthIn(max = ChatColumnMaxWidth).fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
     ) {
         DayDividerRule(ruleColor, Modifier.weight(1f))
         Text(
@@ -481,7 +482,7 @@ internal fun MessageListItem(
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.82f),
                 textAlign = if (isUser) TextAlign.End else TextAlign.Start,
-                modifier = Modifier.fillMaxWidth().padding(top = 3.dp, bottom = 2.dp),
+                modifier = Modifier.fillMaxWidth().padding(top = LettaDimens.Space.xs, bottom = LettaDimens.Space.hair),
             )
         }
     }
@@ -496,8 +497,8 @@ internal fun ScrollToLatestButton(
     // dominated the reading area; this is a quiet utility control.
     Surface(
         onClick = onClick,
-        modifier = modifier.size(30.dp),
-        shape = RoundedCornerShape(9.dp),
+        modifier = modifier.size(LettaDimens.Space.xxl),
+        shape = RoundedCornerShape(LettaDimens.Radius.sm),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
@@ -506,7 +507,7 @@ internal fun ScrollToLatestButton(
             Icon(
                 imageVector = Icons.Outlined.KeyboardArrowDown,
                 contentDescription = "Scroll to latest message",
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(LettaDimens.Space.lg),
             )
         }
     }

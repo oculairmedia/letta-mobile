@@ -32,6 +32,7 @@ import com.composables.icons.lucide.Minimize2
 import com.letta.mobile.data.canvas.CanvasSceneDocument
 import com.letta.mobile.data.canvas.CanvasSession
 import kotlinx.coroutines.launch
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * A note opened large: the block editor over the board, the way Miro opens a doc from a sticky.
@@ -61,19 +62,19 @@ fun CanvasNoteEditorPanel(
         Surface(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 24.dp, vertical = 56.dp)
+                .padding(horizontal = LettaDimens.Space.xl, vertical = 56.dp)
                 .widthIn(max = 880.dp)
                 .pointerInput(Unit) { detectTapGestures(onTap = {}) }
                 .semantics { contentDescription = "Note editor" },
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(LettaDimens.Radius.lg),
             color = tint ?: MaterialTheme.colorScheme.surfaceContainerHigh,
-            tonalElevation = 4.dp,
-            shadowElevation = 12.dp,
+            tonalElevation = LettaDimens.Space.xs,
+            shadowElevation = LettaDimens.Space.md,
         ) {
             val onCard = if (tint != null) contrastOn(tint) else MaterialTheme.colorScheme.onSurface
             Column(modifier = Modifier.fillMaxSize()) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(start = LettaDimens.Space.xl, end = LettaDimens.Space.sm, top = LettaDimens.Space.sm),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -90,10 +91,10 @@ fun CanvasNoteEditorPanel(
                         onPick = { picked ->
                             scope.launch { runCatching { session.recolorDocument(document.id, picked.toHex()) } }
                         },
-                        modifier = Modifier.size(40.dp),
+                        modifier = Modifier.size(LettaDimens.Orb.lg),
                     )
-                    IconButton(onClick = onClose, modifier = Modifier.size(40.dp)) {
-                        Icon(Lucide.Minimize2, contentDescription = "Close note editor", modifier = Modifier.size(18.dp), tint = onCard)
+                    IconButton(onClick = onClose, modifier = Modifier.size(LettaDimens.Orb.lg)) {
+                        Icon(Lucide.Minimize2, contentDescription = "Close note editor", modifier = Modifier.size(LettaDimens.Control.icon), tint = onCard)
                     }
                 }
                 CanvasBlockEditor(
@@ -104,7 +105,7 @@ fun CanvasNoteEditorPanel(
                     onLightSurface = tint != null,
                     onToolbar = onToolbar,
                     style = document.style,
-                    modifier = Modifier.fillMaxHeight().fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+                    modifier = Modifier.fillMaxHeight().fillMaxWidth().padding(horizontal = LettaDimens.Space.xl, vertical = LettaDimens.Space.sm),
                 )
             }
         }

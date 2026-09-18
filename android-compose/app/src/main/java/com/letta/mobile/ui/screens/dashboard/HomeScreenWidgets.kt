@@ -55,6 +55,7 @@ import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyGridState
 import java.util.Locale
 import androidx.compose.material3.Text
+import com.letta.mobile.ui.theme.LettaDimens
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -112,7 +113,7 @@ internal fun PinnedAgentCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(12.dp),
+            modifier = Modifier.fillMaxSize().padding(LettaDimens.Space.md),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
@@ -120,9 +121,9 @@ internal fun PinnedAgentCard(
                 LettaIcons.Agent,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(LettaDimens.Space.xl),
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(LettaDimens.Space.xs))
             Text(
                 text = name,
                 style = MaterialTheme.typography.titleMedium,
@@ -263,7 +264,7 @@ internal fun DashboardWidgetTile(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(12.dp),
+                .padding(LettaDimens.Space.md),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
@@ -271,9 +272,9 @@ internal fun DashboardWidgetTile(
                 imageVector = shortcut.icon,
                 contentDescription = null,
                 tint = contentColor,
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(LettaDimens.Space.xl),
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(LettaDimens.Space.xs))
             if (contextualInfo != null) {
                 Text(
                     text = contextualInfo,
@@ -412,9 +413,9 @@ internal fun CollapsibleSectionHeader(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(LettaDimens.Radius.sm))
             .combinedClickable(onClick = onToggle)
-            .padding(top = if (state.topPadding) 8.dp else 0.dp, bottom = 4.dp),
+            .padding(top = if (state.topPadding) LettaDimens.Space.sm else 0.dp, bottom = LettaDimens.Space.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -422,7 +423,7 @@ internal fun CollapsibleSectionHeader(
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.primary,
         )
-        Spacer(modifier = Modifier.width(6.dp))
+        Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
         Text(
             text = "(${state.count})",
             style = MaterialTheme.typography.labelSmall,
@@ -433,7 +434,7 @@ internal fun CollapsibleSectionHeader(
             imageVector = if (state.expanded) LettaIcons.ExpandLess else LettaIcons.ExpandMore,
             contentDescription = if (state.expanded) "Collapse" else "Expand",
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(18.dp),
+            modifier = Modifier.size(LettaDimens.Space.lg),
         )
     }
 }
@@ -496,7 +497,7 @@ private fun CollapsibleSectionHeaderPreview() {
                 expanded = true,
             ),
             onToggle = {},
-            modifier = Modifier.padding(horizontal = 16.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.lg),
         )
     }
 }

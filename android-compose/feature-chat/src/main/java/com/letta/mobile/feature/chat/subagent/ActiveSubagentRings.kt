@@ -45,6 +45,7 @@ import com.letta.mobile.ui.components.rememberReducedMotionEnabled
 import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.ui.theme.customColors
 import kotlinx.collections.immutable.ImmutableList
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * letta-mobile-w8mog + i2f23: CIRCULAR progress rings stacked on the RIGHT
@@ -246,9 +247,9 @@ private fun ActivityRing(
     // (-90°) with variable sweep length.
     val drawSweep = sliverPulseSweep ?: animatedSweep
 
-    val touchTargetSize = 48.dp
-    val ringSize = 36.dp
-    val strokeWidth = 4.dp
+    val touchTargetSize = LettaDimens.Orb.railSlotWidth
+    val ringSize = LettaDimens.Space.xxl
+    val strokeWidth = LettaDimens.Space.xs
 
     Box(
         modifier = modifier
@@ -312,7 +313,7 @@ private fun OverflowBadge(
 ) {
     Box(
         modifier = modifier
-            .size(36.dp)
+            .size(LettaDimens.Space.xxl)
             .clip(CircleShape)
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .semantics {

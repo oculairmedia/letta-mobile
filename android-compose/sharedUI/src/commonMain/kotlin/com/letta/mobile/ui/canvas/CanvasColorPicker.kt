@@ -40,6 +40,7 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import com.composables.icons.lucide.Ban
 import com.composables.icons.lucide.Lucide
+import com.letta.mobile.ui.theme.LettaDimens
 
 /** One colour a picker offers, with the name its swatch reads out. */
 data class NamedColor(val color: Color, val name: String) {
@@ -92,7 +93,7 @@ fun ColorSwatchPicker(
     modifier: Modifier = Modifier,
     allowNone: Boolean = false,
     glyph: ImageVector? = null,
-    swatchSize: androidx.compose.ui.unit.Dp = 22.dp,
+    swatchSize: androidx.compose.ui.unit.Dp = LettaDimens.Space.xl,
 ) {
     var open by remember { mutableStateOf(false) }
     val recent = rememberRecentColors()
@@ -101,7 +102,7 @@ fun ColorSwatchPicker(
             modifier = Modifier
                 .size(swatchSize)
                 .background(current, CircleShape)
-                .border(2.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.6f), CircleShape)
+                .border(LettaDimens.Space.hair, MaterialTheme.colorScheme.outline.copy(alpha = 0.6f), CircleShape)
                 .semantics { contentDescription = label }
                 .clickable { open = !open },
             contentAlignment = Alignment.Center,
@@ -154,13 +155,13 @@ fun CanvasColorPicker(
     var hexText by remember(current) { mutableStateOf(current.toHex()) }
     val recent = rememberRecentColors()
     Surface(
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.md),
         color = if (flat) Color.Transparent else MaterialTheme.colorScheme.surfaceContainerHigh,
-        shadowElevation = if (flat) 0.dp else 6.dp,
+        shadowElevation = if (flat) 0.dp else LettaDimens.Space.sm,
     ) {
         Column(
-            modifier = if (flat) Modifier.fillMaxWidth() else Modifier.padding(10.dp).width(PICKER_WIDTH),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = if (flat) Modifier.fillMaxWidth() else Modifier.padding(LettaDimens.Space.md).width(PICKER_WIDTH),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             SwatchRow(current = current, entries = palette.map { it.color to it.name }, allowNone = allowNone) { onPick(it, true) }
             if (recent.colors.isNotEmpty()) {
@@ -174,10 +175,10 @@ fun CanvasColorPicker(
             HslSlider("Hue", hsl.h, 0f..360f) { hsl = hsl.copy(h = it); onPick(hsl.toColor(), false) }
             HslSlider("Saturation", hsl.s, 0f..1f) { hsl = hsl.copy(s = it); onPick(hsl.toColor(), false) }
             HslSlider("Lightness", hsl.l, 0f..1f) { hsl = hsl.copy(l = it); onPick(hsl.toColor(), false) }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
                 Box(
                     modifier = Modifier
-                        .size(22.dp)
+                        .size(LettaDimens.Space.xl)
                         .background(hsl.toColor(), CircleShape)
                         .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
                 )
@@ -195,8 +196,8 @@ fun CanvasColorPicker(
                     cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                     modifier = Modifier
                         .weight(1f)
-                        .background(MaterialTheme.colorScheme.surfaceContainerLowest, RoundedCornerShape(6.dp))
-                        .padding(horizontal = 8.dp, vertical = 6.dp)
+                        .background(MaterialTheme.colorScheme.surfaceContainerLowest, RoundedCornerShape(LettaDimens.Radius.sm))
+                        .padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.sm)
                         .semantics { contentDescription = "Hex color" },
                 )
             }
@@ -206,7 +207,7 @@ fun CanvasColorPicker(
 
 @Composable
 private fun SwatchRow(current: Color, entries: List<Pair<Color, String>>, allowNone: Boolean, onPick: (Color) -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
         if (allowNone) {
             PaletteEntry(color = Color.Transparent, name = "none", selected = current.alpha == 0f) { onPick(Color.Transparent) }
         }
@@ -223,7 +224,7 @@ private fun HslSlider(label: String, value: Float, range: ClosedFloatingPointRan
             label.take(1),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.width(14.dp),
+            modifier = Modifier.width(LettaDimens.Space.lg),
         )
         Slider(
             value = value,
@@ -238,10 +239,10 @@ private fun HslSlider(label: String, value: Float, range: ClosedFloatingPointRan
 private fun PaletteEntry(color: Color, name: String, selected: Boolean, onClick: () -> Unit) {
     Box(
         modifier = Modifier
-            .size(24.dp)
+            .size(LettaDimens.Space.xl)
             .background(color, CircleShape)
             .border(
-                width = if (selected) 2.dp else 1.dp,
+                width = if (selected) LettaDimens.Space.hair else 1.dp,
                 color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
                 shape = CircleShape,
             )
@@ -250,7 +251,7 @@ private fun PaletteEntry(color: Color, name: String, selected: Boolean, onClick:
         contentAlignment = Alignment.Center,
     ) {
         if (color.alpha == 0f) {
-            Icon(Lucide.Ban, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.outline)
+            Icon(Lucide.Ban, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.iconSm), tint = MaterialTheme.colorScheme.outline)
         }
     }
 }

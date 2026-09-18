@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.composer.MentionCatalog
 import com.letta.mobile.data.composer.MentionKind
 import com.letta.mobile.data.composer.Mentionable
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * The `@mention` popup (Penpot "Composer (@ mentions)"): FILES / AGENTS / MEMORY
@@ -46,22 +47,22 @@ fun MentionPopup(
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
-        Column(modifier = Modifier.verticalScroll(rememberScrollState()).padding(vertical = 6.dp)) {
+        Column(modifier = Modifier.verticalScroll(rememberScrollState()).padding(vertical = LettaDimens.Space.sm)) {
             groups.forEach { (kind, items) ->
                 Text(
                     text = MentionCatalog.sectionTitle(kind).uppercase(),
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 2.dp),
+                    modifier = Modifier.padding(start = LettaDimens.Space.lg, end = LettaDimens.Space.lg, top = LettaDimens.Space.sm, bottom = LettaDimens.Space.hair),
                 )
                 items.take(6).forEach { mention ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { onSelect(mention) }
-                            .padding(horizontal = 14.dp, vertical = 7.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
+                        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(
@@ -72,7 +73,7 @@ fun MentionPopup(
                             },
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(15.dp),
+                            modifier = Modifier.size(LettaDimens.Space.lg),
                         )
                         Text(
                             text = mention.label,

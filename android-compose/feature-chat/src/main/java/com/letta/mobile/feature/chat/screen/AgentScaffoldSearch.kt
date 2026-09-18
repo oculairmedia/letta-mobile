@@ -33,6 +33,7 @@ import com.letta.mobile.ui.components.rememberSearchHighlightColors
 import com.letta.mobile.ui.components.searchResultSnippet
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.util.formatRelativeTime
+import com.letta.mobile.ui.theme.LettaDimens
 
 internal data class ChatSearchResultsParams(
     val searchQuery: String,
@@ -55,8 +56,8 @@ internal fun ChatSearchResultsContent(
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(12.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        contentPadding = PaddingValues(LettaDimens.Space.md),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
     ) {
         item(key = "chat-search-header") {
             ChatSearchResultsHeader(isSearching = params.isSearching)
@@ -91,7 +92,7 @@ private fun ChatSearchResultsHeader(isSearching: Boolean) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = 4.dp),
+            .padding(bottom = LettaDimens.Space.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -101,7 +102,7 @@ private fun ChatSearchResultsHeader(isSearching: Boolean) {
             modifier = Modifier.weight(1f),
         )
         if (isSearching) {
-            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+            CircularProgressIndicator(modifier = Modifier.size(LettaDimens.Space.lg), strokeWidth = LettaDimens.Space.hair)
         }
     }
 }
@@ -114,7 +115,7 @@ private fun ChatSearchResultsEmptyState() {
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(32.dp),
+            .padding(LettaDimens.Space.xxl),
     )
 }
 
@@ -142,7 +143,7 @@ private fun ChatSearchResultCard(params: ChatSearchResultCardParams) {
             .fillMaxWidth()
             .clickable { params.onResultClick(params.result) },
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(LettaDimens.Space.md)) {
             ChatSearchResultCardHeader(
                 conversationScope = conversationScope,
                 isCurrentConversation = isCurrentConversation,
@@ -155,7 +156,7 @@ private fun ChatSearchResultCard(params: ChatSearchResultCardParams) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 2.dp),
+                    modifier = Modifier.padding(top = LettaDimens.Space.hair),
                 )
             }
             Text(
@@ -168,7 +169,7 @@ private fun ChatSearchResultCard(params: ChatSearchResultCardParams) {
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 6.dp),
+                modifier = Modifier.padding(top = LettaDimens.Space.sm),
             )
         }
     }
@@ -189,9 +190,9 @@ private fun ChatSearchResultCardHeader(
             } else {
                 MaterialTheme.colorScheme.tertiary
             },
-            modifier = Modifier.size(18.dp),
+            modifier = Modifier.size(LettaDimens.Space.lg),
         )
-        Spacer(modifier = Modifier.width(8.dp))
+        Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
         Text(
             text = conversationScope,
             style = MaterialTheme.typography.labelSmall,
@@ -202,7 +203,7 @@ private fun ChatSearchResultCardHeader(
             },
         )
         result.date?.let(::formatRelativeTime)?.takeIf { it.isNotBlank() }?.let { timeText ->
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
             Text(
                 text = timeText,
                 style = MaterialTheme.typography.labelSmall,

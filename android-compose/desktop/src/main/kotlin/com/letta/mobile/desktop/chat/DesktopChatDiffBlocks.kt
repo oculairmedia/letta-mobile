@@ -40,6 +40,7 @@ import com.letta.mobile.data.diff.DiffLineKind
 import com.letta.mobile.data.diff.UnifiedDiff
 import com.letta.mobile.ui.theme.customColors
 import kotlinx.coroutines.launch
+import com.letta.mobile.ui.theme.LettaDimens
 
 internal data class ToolOutputBlockParams(
     val text: String,
@@ -78,7 +79,7 @@ private fun PlainToolOutputBlock(params: ToolOutputBlockParams) {
     val horizontalScrollState = rememberScrollState()
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(6.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.sm),
         color = blockColor,
     ) {
         ToolOutputContents(outputWindow, params.isError, horizontalScrollState)
@@ -113,14 +114,14 @@ private fun ToolOutputViewport(
                     }
                     .focusable()
                     .horizontalScroll(horizontalScrollState)
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                    .padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.md),
             ) {
                 visibleLines.forEach { line -> ToolOutputLine(line, isError) }
             }
         }
         HorizontalScrollbar(
             adapter = rememberScrollbarAdapter(horizontalScrollState),
-            modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth().height(10.dp).testTag("tool-output-scrollbar"),
+            modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth().height(LettaDimens.Space.md).testTag("tool-output-scrollbar"),
         )
     }
 }
@@ -161,7 +162,7 @@ private fun ToolOutputTruncationLabel(outputWindow: ToolOutputWindow) {
         text = outputWindow.truncationLabel,
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+        modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),
     )
 }
 
@@ -192,11 +193,11 @@ internal fun DiffBlock(text: String) {
     val removed = Color(0xFFE5484D)
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(6.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.sm),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
         SelectionContainer {
-            Column(modifier = Modifier.padding(vertical = 8.dp)) {
+            Column(modifier = Modifier.padding(vertical = LettaDimens.Space.sm)) {
                 lines.take(200).forEach { line ->
                     DiffBlockRow(line = line, added = added, removed = removed)
                 }
@@ -225,7 +226,7 @@ private fun DiffBlockRow(
         modifier = Modifier
             .fillMaxWidth()
             .background(rowColor)
-            .padding(horizontal = 8.dp, vertical = 1.dp),
+            .padding(horizontal = LettaDimens.Space.sm, vertical = 1.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         DiffGutter(line.oldLine)
@@ -234,7 +235,7 @@ private fun DiffBlockRow(
             text = marker,
             style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
             color = textColor,
-            modifier = Modifier.width(12.dp),
+            modifier = Modifier.width(LettaDimens.Space.md),
         )
         Text(
             text = line.text,
@@ -254,7 +255,7 @@ internal fun DiffGutter(lineNumber: Int?) {
         style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
         maxLines = 1,
-        modifier = Modifier.width(34.dp).padding(end = 6.dp),
+        modifier = Modifier.width(LettaDimens.Space.xxl).padding(end = LettaDimens.Space.sm),
     )
 }
 

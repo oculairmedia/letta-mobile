@@ -51,6 +51,7 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.util.formatRelativeTime
 import kotlinx.collections.immutable.toImmutableList
+import com.letta.mobile.ui.theme.LettaDimens
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -108,7 +109,7 @@ fun ArchivalScreen(
         },
     ) { paddingValues ->
         when (val state = uiState) {
-            is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(16.dp))
+            is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(LettaDimens.Space.lg))
             is UiState.Error -> com.letta.mobile.ui.components.ErrorContent(
                 message = state.message,
                 onRetry = { viewModel.loadPassages() },
@@ -174,8 +175,8 @@ private fun ArchivalContent(
 ) {
     Column(modifier = modifier.fillMaxSize()) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.lg),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             FilterChip(
                 selected = state.filterHasSource,
@@ -201,8 +202,8 @@ private fun ArchivalContent(
             )
         } else {
             LazyColumn(
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(LettaDimens.Space.lg),
+                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
             ) {
                 items(filteredPassages, key = { it.id }) { passage ->
                     PassageCard(
@@ -228,7 +229,7 @@ private fun PassageCard(
         modifier = modifier.fillMaxWidth(),
         colors = LettaCardDefaults.listCardColors(),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(LettaDimens.Space.lg)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -246,7 +247,7 @@ private fun PassageCard(
                 }
             }
             passage.createdAt?.let { createdAt ->
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(LettaDimens.Space.xs))
                 val createdText = formatRelativeTime(createdAt).takeIf { it.isNotBlank() } ?: createdAt
                 Text(
                     text = "Created $createdText",
@@ -271,7 +272,7 @@ private fun PassageDetailDialog(
         onConfirm = onDismiss,
         onDismiss = onDismiss,
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
             passage.sourceId?.let {
                 Text(stringResource(R.string.screen_archival_source_id_label, it), style = MaterialTheme.typography.bodySmall)
             }
@@ -379,7 +380,7 @@ private fun PassageCardPreview() {
             passage = previewPassages.first(),
             onInspect = {},
             onDelete = {},
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(LettaDimens.Space.lg),
         )
     }
 }

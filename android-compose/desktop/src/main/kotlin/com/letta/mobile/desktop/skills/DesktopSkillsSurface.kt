@@ -54,6 +54,7 @@ import com.letta.mobile.desktop.components.DesktopRefreshAction
 import com.letta.mobile.desktop.components.desktopCardGrid
 import com.letta.mobile.desktop.tools.DesktopToolLibraryState
 import com.letta.mobile.ui.theme.customColors
+import com.letta.mobile.ui.theme.LettaDimens
 
 private enum class SkillsTab(val label: String) { Skills("Skills"), Tools("Tools") }
 
@@ -199,7 +200,7 @@ private fun SkillsContent(
     Row(Modifier.fillMaxSize()) {
         Column(Modifier.weight(1f).fillMaxHeight()) {
             state.skillsError?.let {
-                Box(Modifier.padding(horizontal = 32.dp, vertical = 4.dp)) {
+                Box(Modifier.padding(horizontal = LettaDimens.Space.xxl, vertical = LettaDimens.Space.xs)) {
                     DesktopInlineError(message = it, onRetry = actions.onRetry, retrying = state.skillsLoading)
                 }
             }
@@ -214,7 +215,7 @@ private fun SkillsContent(
                 )
                 else -> LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
                     contentPadding = DesktopCatalogGridPadding,
                 ) {
                     desktopCardGrid(grouped.map { it.first.label to it.second }, keyOf = { it.name }) { skill, cardModifier ->
@@ -264,7 +265,7 @@ private fun ToolsContent(
 
     Column(Modifier.fillMaxSize()) {
         toolState.errorMessage?.let {
-            Box(Modifier.padding(horizontal = 32.dp, vertical = 4.dp)) {
+            Box(Modifier.padding(horizontal = LettaDimens.Space.xxl, vertical = LettaDimens.Space.xs)) {
                 DesktopInlineError(message = it, onRetry = onRefresh, retrying = toolState.isLoading)
             }
         }
@@ -275,8 +276,8 @@ private fun ToolsContent(
         if (tags.isNotEmpty()) {
             Row(
                 modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 32.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    .padding(horizontal = LettaDimens.Space.xxl, vertical = LettaDimens.Space.xs),
+                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 DesktopChipTab("All", toolState.selectedTags.isEmpty()) { onClearTags() }
@@ -290,7 +291,7 @@ private fun ToolsContent(
             tools.isEmpty() -> DesktopInfoBox("No tools match your search.")
             else -> LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(18.dp),
+                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
                 contentPadding = DesktopCatalogGridPadding,
             ) {
                 // Backend tools have loaded but MCP handshakes may still be in
@@ -322,7 +323,7 @@ private fun ToolsContent(
                         if (toolState.isLoadingMore) {
                             DesktopInfoBox("Loading more tools…")
                         } else {
-                            Box(Modifier.fillMaxWidth().padding(top = 4.dp), contentAlignment = Alignment.Center) {
+                            Box(Modifier.fillMaxWidth().padding(top = LettaDimens.Space.xs), contentAlignment = Alignment.Center) {
                                 DesktopOutlinedButton(onClick = onLoadMore) { DesktopButtonContent("Load more") }
                             }
                         }
@@ -339,7 +340,7 @@ private fun ToolsContent(
 private fun SkillAddButton(installed: Boolean, canManage: Boolean, onInstall: () -> Unit, onUninstall: () -> Unit) {
     val bg = if (installed) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f) else MaterialTheme.colorScheme.surfaceContainerHighest
     Box(
-        Modifier.size(30.dp).clip(MaterialTheme.shapes.small).background(bg)
+        Modifier.size(LettaDimens.Space.xxl).clip(MaterialTheme.shapes.small).background(bg)
             .clickable(enabled = canManage) { if (installed) onUninstall() else onInstall() },
         contentAlignment = Alignment.Center,
     ) {
@@ -347,7 +348,7 @@ private fun SkillAddButton(installed: Boolean, canManage: Boolean, onInstall: ()
             imageVector = if (installed) Icons.Outlined.Check else Icons.Outlined.Add,
             contentDescription = if (installed) "Remove skill" else "Add skill",
             tint = if (installed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(18.dp),
+            modifier = Modifier.size(LettaDimens.Space.lg),
         )
     }
 }
@@ -396,8 +397,8 @@ private fun SkillDetailPanel(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(22.dp).verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            modifier = Modifier.fillMaxSize().padding(LettaDimens.Space.xl).verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -406,11 +407,11 @@ private fun SkillDetailPanel(
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f),
                 )
-                Box(modifier = Modifier.size(28.dp).clickable(onClick = onClose), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Outlined.Close, contentDescription = "Close", modifier = Modifier.size(16.dp))
+                Box(modifier = Modifier.size(LettaDimens.Space.xxl).clickable(onClick = onClose), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Outlined.Close, contentDescription = "Close", modifier = Modifier.size(LettaDimens.Control.icon))
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
                 skill.version?.takeIf { it.isNotBlank() }?.let { DesktopPill("v$it", MaterialTheme.colorScheme.secondary) }
                 skill.author?.takeIf { it.isNotBlank() }?.let { DesktopPill("@$it", MaterialTheme.colorScheme.tertiary) }
                 skill.installedCount?.let { DesktopPill("$it installs", MaterialTheme.colorScheme.onSurfaceVariant) }
@@ -419,7 +420,7 @@ private fun SkillDetailPanel(
                 Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (skill.tags.isNotEmpty()) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
                     skill.tags.forEach { DesktopPill(it, MaterialTheme.colorScheme.secondary) }
                 }
             }

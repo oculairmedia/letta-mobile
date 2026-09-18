@@ -36,8 +36,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.theme.LettaDimens
 
-private val PillHeight: Dp = 40.dp
+private val PillHeight: Dp = LettaDimens.Orb.lg
 
 /**
  * Title-row half of the expandable-search pattern. Lives inside the
@@ -83,7 +84,7 @@ fun ExpandableTitleSearch(
     Row(
         modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -110,7 +111,7 @@ fun ExpandableTitleSearch(
             }
         } else {
             Surface(
-                shape = RoundedCornerShape(24.dp),
+                shape = RoundedCornerShape(LettaDimens.Radius.lg),
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
                 modifier = Modifier
                     .weight(1f)
@@ -122,17 +123,17 @@ fun ExpandableTitleSearch(
                     .clickable(enabled = enabled) { onExpandedChange(true) },
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 12.dp),
+                    modifier = Modifier.padding(horizontal = LettaDimens.Space.md),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
                         imageVector = LettaIcons.Search,
                         contentDescription = null,
-                        modifier = Modifier.size(18.dp),
+                        modifier = Modifier.size(LettaDimens.Space.lg),
                     )
                     val collapsedText = query.ifBlank { collapsedHint }
                     if (collapsedText.isNotBlank()) {
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
                         Text(
                             text = collapsedText,
                             style = MaterialTheme.typography.bodySmall,
@@ -187,7 +188,7 @@ fun ExpandableSearchField(
             clearIconContentDescription = clearSearchContentDescription,
             modifier = modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm)
                 .heightIn(min = PillHeight)
                 .focusRequester(focusRequester),
         )

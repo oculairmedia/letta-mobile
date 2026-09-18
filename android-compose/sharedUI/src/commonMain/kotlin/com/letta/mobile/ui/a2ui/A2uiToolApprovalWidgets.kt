@@ -44,6 +44,7 @@ import kotlinx.serialization.json.put
 
 
 import kotlin.time.Duration.Companion.seconds
+import com.letta.mobile.ui.theme.LettaDimens
 @Composable
 internal fun A2uiToolApprovalCard(
     component: A2uiComponent,
@@ -110,17 +111,17 @@ internal fun A2uiToolApprovalCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(LettaDimens.Space.lg),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
                 verticalAlignment = Alignment.Top,
             ) {
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
                 ) {
                     Text(
                         text = props.toolName,
@@ -149,7 +150,7 @@ internal fun A2uiToolApprovalCard(
             }
 
             if (props.arguments.isNotEmpty()) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -171,8 +172,8 @@ internal fun A2uiToolApprovalCard(
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f),
                         ) {
                             Column(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),
+                                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                             ) {
                                 props.arguments.forEach { argument ->
                                     ToolApprovalArgumentRow(
@@ -196,12 +197,12 @@ internal fun A2uiToolApprovalCard(
 
             Column(
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
             ) {
                 props.affordances.chunked(ToolApprovalButtonsPerRow).forEach { rowAffordances ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                     ) {
                         rowAffordances.forEach { affordance ->
                             ToolApprovalAffordanceButton(
@@ -300,7 +301,7 @@ internal fun ToolApprovalRiskPill(
             text = risk.label,
             style = MaterialTheme.typography.labelSmall,
             color = style.pillContent,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs),
         )
     }
 }
@@ -313,7 +314,7 @@ internal fun ToolApprovalArgumentRow(
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         verticalAlignment = Alignment.Top,
     ) {
         Text(
