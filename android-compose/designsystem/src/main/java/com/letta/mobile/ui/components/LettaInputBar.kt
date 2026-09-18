@@ -429,7 +429,7 @@ private fun ComposerTrailingAction(
                 containerColor = spec.containerColor,
                 contentColor = spec.contentColor,
                 disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = LettaDimens.Alpha.disabled),
             ),
         ) {
             ComposerActionIcon(

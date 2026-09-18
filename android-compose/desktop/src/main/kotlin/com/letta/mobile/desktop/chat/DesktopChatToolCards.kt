@@ -151,7 +151,7 @@ private fun ToolCardProvenanceHeader(
         Icon(
             imageVector = Icons.Outlined.CallMade,
             contentDescription = null,
-            modifier = Modifier.size(LettaDimens.Space.md),
+            modifier = Modifier.size(LettaDimens.Control.iconSm),
             tint = tint.copy(alpha = 0.85f),
         )
         Text(
@@ -184,7 +184,7 @@ private fun ToolCardDisclosureIcon(expanded: Boolean) {
     Icon(
         imageVector = glyph,
         contentDescription = label,
-        modifier = Modifier.size(LettaDimens.Space.lg),
+        modifier = Modifier.size(LettaDimens.Control.iconSm),
         tint = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }
@@ -230,7 +230,7 @@ private fun ToolCardHeader(
         Icon(
             imageVector = Icons.Outlined.Terminal,
             contentDescription = null,
-            modifier = Modifier.size(LettaDimens.Space.md),
+            modifier = Modifier.size(LettaDimens.Control.iconSm),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
@@ -711,7 +711,7 @@ internal fun ArtifactCard(
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
-                        modifier = Modifier.size(LettaDimens.Space.lg),
+                        modifier = Modifier.size(LettaDimens.Control.icon),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -739,7 +739,7 @@ internal fun ToolFailureBadge(status: ToolStatusToken) {
     val color = MaterialTheme.colorScheme.error
     Surface(
         modifier = Modifier.testTag("tool-failure-badge"),
-        shape = RoundedCornerShape(LettaDimens.Space.xs),
+        shape = RoundedCornerShape(LettaDimens.Radius.sm),
         color = Color.Transparent,
         contentColor = color,
         border = BorderStroke(1.dp, color.copy(alpha = 0.55f)),

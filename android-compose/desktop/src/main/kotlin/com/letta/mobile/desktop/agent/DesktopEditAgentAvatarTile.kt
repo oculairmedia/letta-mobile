@@ -77,7 +77,7 @@ internal fun EditorAvatarTile(
         Box(
             Modifier
                 .align(Alignment.BottomEnd)
-                .size(LettaDimens.Space.xl)
+                .size(LettaDimens.Control.iconButtonSm)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.surfaceContainerHighest)
                 .clickable { pickerOpen = true },
@@ -87,7 +87,7 @@ internal fun EditorAvatarTile(
                 Icons.Outlined.Edit,
                 contentDescription = "Change mascot",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(LettaDimens.Space.md),
+                modifier = Modifier.size(LettaDimens.Control.iconSm),
             )
         }
     }

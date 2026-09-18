@@ -99,7 +99,7 @@ private fun HomeScreenTopBarTitleRow(params: HomeScreenTopBarParams) {
                 LettaIcons.Circle,
                 contentDescription = "Connected",
                 tint = MaterialTheme.customColors.onlineColor,
-                modifier = Modifier.size(LettaDimens.Space.sm),
+                modifier = Modifier.size(LettaDimens.Control.iconSm),
             )
         }
         HomeScreenTopBarBackendChip(params)

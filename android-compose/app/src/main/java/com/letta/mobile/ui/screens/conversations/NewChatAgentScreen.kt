@@ -171,7 +171,7 @@ private fun NewChatAgentRow(
     Card(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(LettaDimens.Space.xs),
+        shape = RoundedCornerShape(LettaDimens.Radius.sm),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainer,
         ),

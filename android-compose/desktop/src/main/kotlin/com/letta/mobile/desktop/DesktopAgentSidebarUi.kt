@@ -171,7 +171,7 @@ internal fun DesktopNavRow(
                 JewelIcon(
                     imageVector = model.icon,
                     contentDescription = null,
-                    modifier = Modifier.size(LettaDimens.Space.lg),
+                    modifier = Modifier.size(LettaDimens.Control.icon),
                     tint = content,
                 )
                 JewelText(

@@ -116,7 +116,7 @@ fun ReliabilityStrip(squares: List<Boolean?>, count: Int = 12) {
     Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
         val padded = (squares.takeLast(count) + List(count) { null }).take(count)
         padded.forEach { ok ->
-            Box(Modifier.size(LettaDimens.Space.lg).clip(RoundedCornerShape(LettaDimens.Space.xs)).background(reliabilitySquareColor(ok)))
+            Box(Modifier.size(LettaDimens.Control.icon).clip(RoundedCornerShape(LettaDimens.Radius.sm)).background(reliabilitySquareColor(ok)))
         }
     }
 }

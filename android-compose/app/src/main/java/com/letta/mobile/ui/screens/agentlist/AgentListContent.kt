@@ -392,7 +392,7 @@ internal fun AgentHydratingBanner(
             horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            LoadingIndicator(modifier = Modifier.size(LettaDimens.Space.lg))
+            LoadingIndicator(modifier = Modifier.size(LettaDimens.Control.icon))
             Column {
                 Text("Loading more agents", style = MaterialTheme.typography.labelLarge)
                 Text(

@@ -219,7 +219,7 @@ private fun Row(
             Icon(
                 imageVector = Icons.Outlined.Refresh,
                 contentDescription = null,
-                modifier = Modifier.size(LettaDimens.Space.lg),
+                modifier = Modifier.size(LettaDimens.Control.icon),
             )
             Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
             Text(text = "Regenerate")

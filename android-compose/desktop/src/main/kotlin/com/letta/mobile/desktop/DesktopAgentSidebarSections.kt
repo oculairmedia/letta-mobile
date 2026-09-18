@@ -196,7 +196,7 @@ private fun SidebarAgentOverflowMenu(actions: DesktopAgentSidebarActions) {
             contentDescription = "Agent menu",
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier
-                .size(LettaDimens.Space.lg)
+                .size(LettaDimens.Control.icon)
                 .clickable { menuOpen = true },
         )
         if (menuOpen) {

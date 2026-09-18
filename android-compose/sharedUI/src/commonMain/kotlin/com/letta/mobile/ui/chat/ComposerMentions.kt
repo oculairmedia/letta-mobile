@@ -73,7 +73,7 @@ fun MentionPopup(
                             },
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(LettaDimens.Space.lg),
+                            modifier = Modifier.size(LettaDimens.Control.icon),
                         )
                         Text(
                             text = mention.label,

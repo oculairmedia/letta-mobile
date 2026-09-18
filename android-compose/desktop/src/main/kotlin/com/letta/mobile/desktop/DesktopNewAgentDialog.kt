@@ -184,7 +184,7 @@ private fun NewAgentModelTrigger(label: String, onOpen: () -> Unit) {
             Icon(
                 Icons.Outlined.KeyboardArrowDown,
                 null,
-                modifier = Modifier.size(LettaDimens.Space.lg),
+                modifier = Modifier.size(LettaDimens.Control.icon),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }

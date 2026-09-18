@@ -116,7 +116,7 @@ internal fun DesktopModelPickerSheet(
                         imageVector = Icons.Outlined.Search,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(LettaDimens.Space.lg),
+                        modifier = Modifier.size(LettaDimens.Control.icon),
                     )
                     JewelTextField(
                         value = query,
@@ -181,7 +181,7 @@ internal fun DesktopModelPickerSheet(
                                 imageVector = Icons.Outlined.Settings,
                                 contentDescription = null,
                                 tint = AccentTeal,
-                                modifier = Modifier.size(LettaDimens.Space.lg),
+                                modifier = Modifier.size(LettaDimens.Control.icon),
                             )
                             Text(
                                 text = "Edit models…",
@@ -248,14 +248,14 @@ private fun ModelRow(
         option.badge?.let { ModelBadgePill(it) }
         if (selected) {
             Box(
-                modifier = Modifier.size(LettaDimens.Space.xl).background(AccentTeal, CircleShape),
+                modifier = Modifier.size(LettaDimens.Control.iconButtonSm).background(AccentTeal, CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     imageVector = Icons.Outlined.Check,
                     contentDescription = "Selected",
                     tint = Color.White,
-                    modifier = Modifier.size(LettaDimens.Space.md),
+                    modifier = Modifier.size(LettaDimens.Control.iconSm),
                 )
             }
         }

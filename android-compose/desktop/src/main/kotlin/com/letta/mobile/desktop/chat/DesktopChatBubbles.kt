@@ -240,7 +240,7 @@ private fun CopyButtonVisual(
             imageVector = if (state.copied) Icons.Outlined.Check else Icons.Outlined.ContentCopy,
             contentDescription = null,
             tint = if (state.copied) MaterialTheme.customColors.successColor else style.tint,
-            modifier = Modifier.size(LettaDimens.Space.lg),
+            modifier = Modifier.size(LettaDimens.Control.icon),
         )
     }
 }
@@ -414,7 +414,7 @@ private fun PromptExpandButton(expanded: Boolean, onToggle: () -> Unit) {
                 imageVector = if (expanded) Icons.Outlined.KeyboardArrowUp else Icons.Outlined.KeyboardArrowDown,
                 contentDescription = description,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                modifier = Modifier.size(LettaDimens.Space.lg),
+                modifier = Modifier.size(LettaDimens.Control.icon),
             )
         }
     }

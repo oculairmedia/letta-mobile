@@ -33,7 +33,7 @@ fun StatusChip(
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
         modifier = modifier
-            .clip(RoundedCornerShape(LettaDimens.Space.xs))
+            .clip(RoundedCornerShape(LettaDimens.Radius.sm))
             .background(backgroundColor)
             .padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.hair),
     )

@@ -438,7 +438,7 @@ private fun ComposerAttachButton(
         DesktopTooltip(text = if (onOpenCanvas == null) "Attach" else "Add") {
             Box(
                 modifier = Modifier
-                    .size(LettaDimens.Space.xxl)
+                    .size(LettaDimens.Control.iconButton)
                     .clip(CircleShape)
                     .clickable(enabled = enabled) {
                         if (onOpenCanvas == null) onAttachImage() else menuOpen = true
@@ -448,7 +448,7 @@ private fun ComposerAttachButton(
                 Icon(
                     imageVector = Icons.Outlined.Add,
                     contentDescription = if (onOpenCanvas == null) "Attach" else "Add",
-                    modifier = Modifier.size(LettaDimens.Space.lg),
+                    modifier = Modifier.size(LettaDimens.Control.icon),
                     // onSurface, not onSurfaceVariant: this is an action, and on
                     // the composer's own container the muted role sank into it.
                     tint = MaterialTheme.colorScheme.onSurface,
@@ -566,7 +566,7 @@ private fun ComposerSendButton(canSend: Boolean, onSend: () -> Unit) {
             Icon(
                 imageVector = Icons.Outlined.ArrowUpward,
                 contentDescription = "Send message",
-                modifier = Modifier.size(LettaDimens.Space.lg),
+                modifier = Modifier.size(LettaDimens.Control.icon),
             )
         }
     }

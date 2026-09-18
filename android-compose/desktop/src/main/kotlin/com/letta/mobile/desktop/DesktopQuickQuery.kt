@@ -340,7 +340,7 @@ private fun QuickQuerySearchRow(
             imageVector = Icons.Outlined.Search,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(LettaDimens.Space.lg),
+            modifier = Modifier.size(LettaDimens.Control.icon),
         )
         JewelTextField(
             value = query,
@@ -523,7 +523,7 @@ private fun AmbientContextChip(title: String, onDismiss: () -> Unit) {
                     imageVector = Icons.Outlined.Close,
                     contentDescription = "Remove context",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(LettaDimens.Space.lg).clickable(onClick = onDismiss),
+                    modifier = Modifier.size(LettaDimens.Control.icon).clickable(onClick = onDismiss),
                 )
             }
         }

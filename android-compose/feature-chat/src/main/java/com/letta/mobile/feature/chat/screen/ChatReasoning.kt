@@ -155,7 +155,7 @@ internal fun MessageReasoning(
             ) {
                 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
                 LoadingIndicator(
-                    modifier = Modifier.size(LettaDimens.Space.lg),
+                    modifier = Modifier.size(LettaDimens.Control.icon),
                     color = MaterialTheme.colorScheme.primary,
                 )
             }

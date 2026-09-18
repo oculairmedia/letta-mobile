@@ -75,7 +75,7 @@ fun PresenceLayer(
                     .testTag("presence_cursor_${presence.peerId}")
             ) {
                 // Draw cursor pointer
-                Canvas(modifier = Modifier.size(LettaDimens.Space.lg)) {
+                Canvas(modifier = Modifier.size(LettaDimens.Control.icon)) {
                     val path = Path().apply {
                         moveTo(0f, 0f)
                         lineTo(size.width, size.height * 0.6f)
@@ -90,7 +90,7 @@ fun PresenceLayer(
                 Box(
                     modifier = Modifier
                         .offset { IntOffset(14, 14) }
-                        .background(color, RoundedCornerShape(LettaDimens.Space.xs))
+                        .background(color, RoundedCornerShape(LettaDimens.Radius.sm))
                         .padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.hair)
                 ) {
                     Text(

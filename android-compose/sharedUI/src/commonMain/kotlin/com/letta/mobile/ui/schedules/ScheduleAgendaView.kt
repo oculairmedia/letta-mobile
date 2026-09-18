@@ -197,7 +197,7 @@ fun AgendaDayCell(date: LocalDate, selectedDate: LocalDate, today: LocalDate, on
         )
         Spacer(Modifier.height(LettaDimens.Space.xs))
         Box(
-            Modifier.size(LettaDimens.Space.xxl).clip(CircleShape)
+            Modifier.size(LettaDimens.Orb.md).clip(CircleShape)
                 .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent),
             contentAlignment = Alignment.Center,
         ) {
@@ -270,7 +270,7 @@ private fun AgendaStatusRail(status: RunStatus) {
                 .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
         )
         Box(
-            Modifier.align(Alignment.TopCenter).padding(top = LettaDimens.Space.lg).size(LettaDimens.Space.md).clip(CircleShape)
+            Modifier.align(Alignment.TopCenter).padding(top = LettaDimens.Space.lg).size(LettaDimens.Control.iconSm).clip(CircleShape)
                 .background(statusColor(status)),
         )
     }

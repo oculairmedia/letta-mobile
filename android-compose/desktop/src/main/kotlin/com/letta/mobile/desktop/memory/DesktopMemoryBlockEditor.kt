@@ -284,7 +284,7 @@ private fun BlockEditorHeader(
             imageVector = Icons.Outlined.Close,
             contentDescription = "Close",
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(LettaDimens.Space.lg).clickable(onClick = onDismiss),
+            modifier = Modifier.size(LettaDimens.Control.icon).clickable(onClick = onDismiss),
         )
     }
 }

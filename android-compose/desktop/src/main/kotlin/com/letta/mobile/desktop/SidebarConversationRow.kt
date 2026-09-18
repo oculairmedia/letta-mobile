@@ -251,7 +251,7 @@ private fun SidebarConversationLeadingIcon(
 ) {
     when {
         model.deleting -> CircularProgressIndicator(
-            modifier = Modifier.size(LettaDimens.Space.lg),
+            modifier = Modifier.size(LettaDimens.Control.icon),
             strokeWidth = LettaDimens.Space.hair,
             color = MaterialTheme.colorScheme.primary,
         )
@@ -261,7 +261,7 @@ private fun SidebarConversationLeadingIcon(
             contentDescription = if (model.archived) "Restore chat" else "Archive chat",
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier
-                .size(LettaDimens.Space.lg)
+                .size(LettaDimens.Control.icon)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
@@ -276,7 +276,7 @@ private fun SidebarConversationLeadingIcon(
             },
             contentDescription = if (model.thinking) "thinking" else null,
             tint = model.iconColor,
-            modifier = Modifier.size(LettaDimens.Space.lg),
+            modifier = Modifier.size(LettaDimens.Control.icon),
         )
     }
 }

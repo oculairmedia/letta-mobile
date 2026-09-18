@@ -37,7 +37,7 @@ fun ImageDropOverlay(modifier: Modifier = Modifier) {
         Surface(
             shape = MaterialTheme.shapes.extraLarge,
             color = MaterialTheme.colorScheme.surfaceContainer,
-            border = BorderStroke(LettaDimens.Space.hair, MaterialTheme.colorScheme.primary),
+            border = BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.primary),
             shadowElevation = LettaDimens.Space.md,
         ) {
             Column(

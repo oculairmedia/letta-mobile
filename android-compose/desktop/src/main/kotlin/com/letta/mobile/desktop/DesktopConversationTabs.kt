@@ -328,7 +328,7 @@ internal fun DesktopConversationTabRow(
             Icon(
                 Icons.Outlined.Add,
                 contentDescription = null,
-                modifier = Modifier.size(LettaDimens.Space.lg),
+                modifier = Modifier.size(LettaDimens.Control.icon),
                 tint = MaterialTheme.colorScheme.onSurface,
             )
         }
@@ -432,12 +432,12 @@ private fun DesktopConversationTabCloseButton(
     // with a small cross adrift in it.
     IconButton(
         onClick = onClose,
-        modifier = modifier.size(LettaDimens.Space.xl),
+        modifier = modifier.size(LettaDimens.Control.iconButtonSm),
     ) {
         Icon(
             imageVector = Icons.Outlined.Close,
             contentDescription = "Close $title tab",
-            modifier = Modifier.size(LettaDimens.Space.md),
+            modifier = Modifier.size(LettaDimens.Control.iconSm),
             tint = MaterialTheme.colorScheme.onSurface,
         )
     }

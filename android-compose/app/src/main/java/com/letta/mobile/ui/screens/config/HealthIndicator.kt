@@ -70,7 +70,7 @@ fun HealthDot(
     }
     Box(
         modifier = modifier
-            .size(LettaDimens.Space.md)
+            .size(LettaDimens.Control.iconSm)
             .clip(CircleShape)
             .background(color),
     )

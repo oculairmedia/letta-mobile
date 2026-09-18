@@ -121,7 +121,7 @@ internal fun DesktopSidebarToggleButton(
                 // content color for chrome icons: it flips light/dark with
                 // the theme (onSurfaceVariant), unlike a hardcoded color.
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(LettaDimens.Space.lg),
+                modifier = Modifier.size(LettaDimens.Control.icon),
             )
         }
     }
@@ -154,7 +154,7 @@ internal fun DesktopSidebarOverflowMenu(
                 imageVector = Icons.Outlined.MoreVert,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(LettaDimens.Space.lg),
+                modifier = Modifier.size(LettaDimens.Control.icon),
             )
         }
     }

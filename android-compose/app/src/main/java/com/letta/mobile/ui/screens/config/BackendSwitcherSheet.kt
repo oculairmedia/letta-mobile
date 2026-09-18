@@ -280,7 +280,7 @@ private fun BackendSwitcherRow(
                     .padding(top = LettaDimens.Space.sm, end = LettaDimens.Space.sm),
             )
             Box(
-                modifier = Modifier.size(LettaDimens.Space.xxl),
+                modifier = Modifier.size(LettaDimens.Orb.md),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(

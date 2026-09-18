@@ -193,9 +193,9 @@ private fun CanvasNoteCard(
         shape = RoundedCornerShape(NOTE_CORNER),
         color = cardColor,
         border = when {
-            active || selection.selected -> BorderStroke(LettaDimens.Space.hair, MaterialTheme.colorScheme.primary)
+            active || selection.selected -> BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.primary)
             plain -> null
-            else -> BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
+            else -> BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
         },
         shadowElevation = when {
             plain && !active -> 0.dp
@@ -302,7 +302,7 @@ private fun NoteHandleBar(
         Icon(
             imageVector = Lucide.GripVertical,
             contentDescription = "Move note",
-            modifier = Modifier.size(LettaDimens.Space.lg),
+            modifier = Modifier.size(LettaDimens.Control.icon),
             tint = onCard,
         )
         Spacer(modifier = Modifier.size(LettaDimens.Space.sm))
@@ -317,7 +317,7 @@ private fun NoteHandleBar(
             Icon(
                 imageVector = Lucide.Maximize2,
                 contentDescription = "Open note",
-                modifier = Modifier.size(LettaDimens.Space.lg),
+                modifier = Modifier.size(LettaDimens.Control.icon),
                 tint = onCard,
             )
         }
@@ -325,7 +325,7 @@ private fun NoteHandleBar(
             Icon(
                 imageVector = Lucide.X,
                 contentDescription = "Remove note",
-                modifier = Modifier.size(LettaDimens.Space.lg),
+                modifier = Modifier.size(LettaDimens.Control.icon),
                 tint = onCard,
             )
         }
@@ -342,7 +342,7 @@ private fun TextMoveGrip(
 ) {
     Box(
         modifier = modifier
-            .size(LettaDimens.Space.lg)
+            .size(LettaDimens.Control.icon)
             .dragHandle(onDragStart, onDrag, onDragEnd)
             .semantics { contentDescription = "Move text" },
         contentAlignment = Alignment.Center,
@@ -350,7 +350,7 @@ private fun TextMoveGrip(
         Icon(
             imageVector = Lucide.GripVertical,
             contentDescription = null,
-            modifier = Modifier.size(LettaDimens.Space.lg),
+            modifier = Modifier.size(LettaDimens.Control.icon),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
@@ -365,7 +365,7 @@ private fun NoteResizeHandle(
 ) {
     Box(
         modifier = modifier
-            .size(LettaDimens.Space.lg)
+            .size(LettaDimens.Control.icon)
             .dragHandle(onDragStart, onDrag, onDragEnd)
             .semantics { contentDescription = "Resize note" },
         contentAlignment = Alignment.BottomEnd,
@@ -374,7 +374,7 @@ private fun NoteResizeHandle(
             modifier = Modifier
                 .padding(LettaDimens.Space.xs)
                 .size(LettaDimens.Space.sm)
-                .clip(RoundedCornerShape(LettaDimens.Space.xs))
+                .clip(RoundedCornerShape(LettaDimens.Radius.sm))
                 .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)),
         )
     }
@@ -414,5 +414,5 @@ private const val TEXT_DEFAULT_HEIGHT = 120f
 private const val NOTE_DEFAULT_ORIGIN = 80f
 private const val NOTE_STAGGER = 40f
 private const val NOTE_MIN_SIZE = 140f
-private val NOTE_CORNER = LettaDimens.Space.md
-private val HANDLE_HEIGHT = LettaDimens.Space.xxl
+private val NOTE_CORNER = LettaDimens.Radius.md
+private val HANDLE_HEIGHT = LettaDimens.Control.iconButton

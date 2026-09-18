@@ -48,7 +48,6 @@ import sh.calvin.autolinktext.SimpleTextMatchResult
 import sh.calvin.autolinktext.TextMatcher
 import sh.calvin.autolinktext.TextRule
 import sh.calvin.autolinktext.rememberAutoLinkText
-import com.letta.mobile.ui.theme.LettaDimens
 
 @Composable
 fun DesktopMemorySurface(
@@ -91,7 +90,7 @@ internal fun MemoryHeader(
     onNewBlock: (() -> Unit)? = null,
 ) {
     Row(
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth(),
     ) {
@@ -120,7 +119,7 @@ internal fun AgentSelector(
     // Slim inline agent strip (no card) — keeps the top compact like the
     // Schedules header.
     LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth(),
     ) {
@@ -129,7 +128,7 @@ internal fun AgentSelector(
                 text = "Agent",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.customColors.onSurfaceMutedColor,
-                modifier = Modifier.padding(end = LettaDimens.Space.xs),
+                modifier = Modifier.padding(end = 4.dp),
             )
         }
         items(
@@ -152,12 +151,12 @@ internal fun MemorySummaryCard(summary: MemoryParitySummary) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainer,
         shape = MaterialTheme.shapes.medium,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = LettaDimens.Alpha.hairline)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md),
-            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 11.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             summary.metrics.forEach { metric ->
@@ -176,7 +175,7 @@ private fun SummaryMetric(
     modifier: Modifier = Modifier,
 ) {
     Row(
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+        horizontalArrangement = Arrangement.spacedBy(7.dp),
         verticalAlignment = Alignment.Bottom,
         modifier = modifier,
     ) {
@@ -201,7 +200,7 @@ private fun MemoryItemRow(
     onClick: (() -> Unit)? = null,
 ) {
     Row(
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.Top,
         modifier = Modifier
             .fillMaxWidth()
@@ -209,12 +208,12 @@ private fun MemoryItemRow(
     ) {
         Box(
             modifier = Modifier
-                .padding(top = LettaDimens.Space.xs)
-                .size(LettaDimens.Space.md)
+                .padding(top = 4.dp)
+                .size(10.dp)
                 .background(item.accentColor(), MaterialTheme.shapes.small),
         )
         Column(
-            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
             modifier = Modifier.weight(1f),
         ) {
             Text(
@@ -274,7 +273,7 @@ private fun LinkedDetailText(
 @Composable
 private fun MetadataRow(item: MemoryParityItem) {
     if (item.metadataLabels.isEmpty()) return
-    Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         item.metadataLabels.forEach { label ->
             MetadataPill(label, item.accentColor())
         }
@@ -297,7 +296,7 @@ private fun MetadataPill(
             style = MaterialTheme.typography.labelMedium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.xs),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
         )
     }
 }

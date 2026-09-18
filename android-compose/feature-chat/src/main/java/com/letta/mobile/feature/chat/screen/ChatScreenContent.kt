@@ -294,7 +294,7 @@ internal fun DismissibleA2uiSurface(
                         imageVector = LettaIcons.Delete,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(LettaDimens.Space.xl)
+                        modifier = Modifier.size(LettaDimens.Control.iconButtonSm)
                     )
                 },
                 onClick = {

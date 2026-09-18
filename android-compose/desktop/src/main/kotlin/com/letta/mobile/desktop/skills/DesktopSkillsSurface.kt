@@ -340,7 +340,7 @@ private fun ToolsContent(
 private fun SkillAddButton(installed: Boolean, canManage: Boolean, onInstall: () -> Unit, onUninstall: () -> Unit) {
     val bg = if (installed) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f) else MaterialTheme.colorScheme.surfaceContainerHighest
     Box(
-        Modifier.size(LettaDimens.Space.xxl).clip(MaterialTheme.shapes.small).background(bg)
+        Modifier.size(LettaDimens.Control.iconButton).clip(MaterialTheme.shapes.small).background(bg)
             .clickable(enabled = canManage) { if (installed) onUninstall() else onInstall() },
         contentAlignment = Alignment.Center,
     ) {
@@ -348,7 +348,7 @@ private fun SkillAddButton(installed: Boolean, canManage: Boolean, onInstall: ()
             imageVector = if (installed) Icons.Outlined.Check else Icons.Outlined.Add,
             contentDescription = if (installed) "Remove skill" else "Add skill",
             tint = if (installed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(LettaDimens.Space.lg),
+            modifier = Modifier.size(LettaDimens.Control.icon),
         )
     }
 }
@@ -407,7 +407,7 @@ private fun SkillDetailPanel(
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f),
                 )
-                Box(modifier = Modifier.size(LettaDimens.Space.xxl).clickable(onClick = onClose), contentAlignment = Alignment.Center) {
+                Box(modifier = Modifier.size(LettaDimens.Control.iconButton).clickable(onClick = onClose), contentAlignment = Alignment.Center) {
                     Icon(Icons.Outlined.Close, contentDescription = "Close", modifier = Modifier.size(LettaDimens.Control.icon))
                 }
             }

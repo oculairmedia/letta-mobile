@@ -101,7 +101,7 @@ internal fun ProjectAgentsCard(
                     horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    CircularProgressIndicator(modifier = Modifier.size(LettaDimens.Space.xl), strokeWidth = LettaDimens.Space.hair)
+                    CircularProgressIndicator(modifier = Modifier.size(LettaDimens.Control.iconButtonSm), strokeWidth = LettaDimens.Space.hair)
                     Text(
                         text = stringResource(R.string.screen_project_agents_loading),
                         style = MaterialTheme.typography.bodyMedium,
@@ -162,11 +162,11 @@ internal fun ProjectAgentsCard(
                                 label = { Text(agent.statusLabel) },
                                 leadingIcon = {
                                     Box(
-                                        modifier = Modifier.size(LettaDimens.Space.md),
+                                        modifier = Modifier.size(LettaDimens.Control.iconSm),
                                         contentAlignment = Alignment.Center,
                                     ) {
                                         Card(
-                                            modifier = Modifier.size(LettaDimens.Space.md),
+                                            modifier = Modifier.size(LettaDimens.Control.iconSm),
                                             colors = CardDefaults.cardColors(containerColor = toneColor(agent.statusTone)),
                                         ) {}
                                     }
@@ -471,7 +471,7 @@ internal fun ProjectBriefCard(
                         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        CircularProgressIndicator(modifier = Modifier.size(LettaDimens.Space.xl), strokeWidth = LettaDimens.Space.hair)
+                        CircularProgressIndicator(modifier = Modifier.size(LettaDimens.Control.iconButtonSm), strokeWidth = LettaDimens.Space.hair)
                         Text(
                             text = stringResource(R.string.screen_project_brief_loading),
                             style = MaterialTheme.typography.bodyMedium,

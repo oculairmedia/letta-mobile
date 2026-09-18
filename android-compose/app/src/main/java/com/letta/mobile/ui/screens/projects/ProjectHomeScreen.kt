@@ -688,7 +688,7 @@ private fun ProjectTileMetaRow(
             Icon(
                 imageVector = LettaIcons.Pin,
                 contentDescription = "Pinned project",
-                modifier = Modifier.size(LettaDimens.Space.lg),
+                modifier = Modifier.size(LettaDimens.Control.icon),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -808,7 +808,7 @@ private fun ProjectTile(
 
                 IconButton(
                     onClick = onOpenActions,
-                    modifier = Modifier.size(LettaDimens.Space.xxl),
+                    modifier = Modifier.size(LettaDimens.Orb.railSlotHeight),
                 ) {
                     Icon(
                         imageVector = LettaIcons.Menu,

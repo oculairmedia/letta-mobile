@@ -195,7 +195,7 @@ internal fun PaletteItemLeading(item: PaletteItem) {
             imageVector = Icons.Outlined.ArrowForward,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(LettaDimens.Space.lg),
+            modifier = Modifier.size(LettaDimens.Control.icon),
         )
     } else {
         AgentOrb(index = item.orbIndex ?: 0, size = LettaDimens.Orb.sm, cornerRadius = LettaDimens.Radius.sm, agentId = item.mascotAgentId())

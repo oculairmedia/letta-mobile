@@ -272,7 +272,7 @@ private fun LookdevRoot() {
 @Composable
 private fun Chip(label: String, selected: Boolean = false, onClick: () -> Unit) {
     Surface(
-        shape = RoundedCornerShape(LettaDimens.Space.xs),
+        shape = RoundedCornerShape(LettaDimens.Radius.sm),
         color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.30f)
         else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = LettaDimens.Alpha.hairline),
         modifier = Modifier.clickable(onClick = onClick),
@@ -358,7 +358,7 @@ private fun ControlsColumn(state: LookdevState) {
             ).forEach { color ->
                 Box(
                     Modifier
-                        .size(LettaDimens.Space.xxl)
+                        .size(LettaDimens.Control.iconButton)
                         .clip(RoundedCornerShape(LettaDimens.Radius.sm))
                         .background(color)
                         .clickable { state.tint = color },

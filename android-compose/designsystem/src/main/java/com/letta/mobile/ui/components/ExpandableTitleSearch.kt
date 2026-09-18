@@ -129,7 +129,7 @@ fun ExpandableTitleSearch(
                     Icon(
                         imageVector = LettaIcons.Search,
                         contentDescription = null,
-                        modifier = Modifier.size(LettaDimens.Space.lg),
+                        modifier = Modifier.size(LettaDimens.Control.icon),
                     )
                     val collapsedText = query.ifBlank { collapsedHint }
                     if (collapsedText.isNotBlank()) {

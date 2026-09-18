@@ -350,7 +350,7 @@ private fun DesktopWorkingDirectoryRow(
             imageVector = Icons.Outlined.Folder,
             contentDescription = "Working directory",
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(LettaDimens.Space.lg),
+            modifier = Modifier.size(LettaDimens.Control.icon),
         )
         Text(
             text = when {
@@ -459,7 +459,7 @@ private fun NewConversationWelcome(
                                     },
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(LettaDimens.Space.lg),
+                                    modifier = Modifier.size(LettaDimens.Control.icon),
                                 )
                                 Text(task.title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
                             }
@@ -552,7 +552,7 @@ private fun OnboardingTaskRow(task: OnboardingTask, onClick: () -> Unit) {
             },
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(LettaDimens.Space.lg),
+            modifier = Modifier.size(LettaDimens.Control.icon),
         )
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair)) {
             Text(

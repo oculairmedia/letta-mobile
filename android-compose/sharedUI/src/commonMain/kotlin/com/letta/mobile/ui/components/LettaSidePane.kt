@@ -117,7 +117,7 @@ fun LettaSidePaneHeader(
             imageVector = Lucide.X,
             contentDescription = "Close",
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(LettaDimens.Space.lg).clickable(onClick = onClose),
+            modifier = Modifier.size(LettaDimens.Control.icon).clickable(onClick = onClose),
         )
     }
 }

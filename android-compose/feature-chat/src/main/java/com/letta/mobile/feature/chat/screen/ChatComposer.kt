@@ -564,7 +564,7 @@ private fun SlashCommandSuggestionRow(
                         Icon(
                             imageVector = if (command.installed) LettaIcons.Check else LettaIcons.Add,
                             contentDescription = null,
-                            modifier = Modifier.size(LettaDimens.Space.lg),
+                            modifier = Modifier.size(LettaDimens.Control.icon),
                         )
                         androidx.compose.material3.Text(
                             text = command.command,
@@ -666,7 +666,7 @@ private fun AttachmentThumbnail(
         // Remove button overlay (top-right)
         Surface(
             modifier = Modifier
-                .size(LettaDimens.Space.xl)
+                .size(LettaDimens.Control.iconButtonSm)
                 .align(Alignment.TopEnd)
                 .clip(CircleShape),
             color = MaterialTheme.colorScheme.errorContainer,
@@ -675,13 +675,13 @@ private fun AttachmentThumbnail(
             IconButton(
                 onClick = onRemove,
                 modifier = Modifier
-                    .size(LettaDimens.Space.xl)
+                    .size(LettaDimens.Control.iconButtonSm)
                     .testTag(ChatComposerTestTags.ATTACHMENT_THUMBNAIL_REMOVE_BUTTON),
             ) {
                 Icon(
                     LettaIcons.Close,
                     contentDescription = stringResource(R.string.action_remove_attachment),
-                    modifier = Modifier.size(LettaDimens.Space.md),
+                    modifier = Modifier.size(LettaDimens.Control.iconSm),
                 )
             }
         }

@@ -107,7 +107,7 @@ private fun ConfirmDialogTitleBar(
                         imageVector = Icons.Outlined.Close,
                         contentDescription = "Close",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(LettaDimens.Space.lg),
+                        modifier = Modifier.size(LettaDimens.Control.icon),
                     )
                 }
             }

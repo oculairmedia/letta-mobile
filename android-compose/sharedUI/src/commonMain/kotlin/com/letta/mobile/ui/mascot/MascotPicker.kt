@@ -174,7 +174,7 @@ private fun MascotColorChoice(
     val hex = argb.toUInt().toString(16).padStart(8, '0')
     Box(
         Modifier
-            .size(LettaDimens.Space.xxl)
+            .size(LettaDimens.Control.iconButton)
             .clip(CircleShape)
             .background(Color(argb))
             .border(if (selected) LettaDimens.Space.xs else 1.dp, if (selected) accent else Color.Black.copy(alpha = 0.25f), CircleShape)

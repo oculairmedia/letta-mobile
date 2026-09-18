@@ -105,7 +105,7 @@ private fun FirstRunStep(text: String) {
             imageVector = LettaIcons.Check,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(LettaDimens.Space.xl),
+            modifier = Modifier.size(LettaDimens.Control.iconButtonSm),
         )
         Text(
             text = text,

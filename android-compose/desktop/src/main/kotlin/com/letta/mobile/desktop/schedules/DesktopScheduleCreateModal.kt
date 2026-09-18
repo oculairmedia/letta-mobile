@@ -132,7 +132,7 @@ private fun CreateScheduleModalHeader(onDismiss: () -> Unit) {
             Icons.Outlined.Close,
             "Close",
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(LettaDimens.Space.xl).clickable(onClick = onDismiss),
+            modifier = Modifier.size(LettaDimens.Control.iconButtonSm).clickable(onClick = onDismiss),
         )
     }
 }
@@ -382,7 +382,7 @@ internal fun cadenceChip(label: String, selected: Boolean, onClick: () -> Unit) 
 @Composable
 internal fun IconBtn(icon: androidx.compose.ui.graphics.vector.ImageVector, desc: String, onClick: () -> Unit) {
     Box(
-        Modifier.size(LettaDimens.Space.xxl).clip(RoundedCornerShape(LettaDimens.Radius.sm)).clickable(onClick = onClick),
+        Modifier.size(LettaDimens.Control.fieldHeight).clip(RoundedCornerShape(LettaDimens.Radius.sm)).clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Icon(icon, desc, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(LettaDimens.Control.icon))

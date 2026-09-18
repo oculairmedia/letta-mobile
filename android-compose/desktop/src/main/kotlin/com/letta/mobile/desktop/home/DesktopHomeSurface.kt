@@ -269,7 +269,7 @@ private fun HomeComposerField(
         value = text,
         onValueChange = onTextChanged,
         modifier = modifier
-            .heightIn(min = LettaDimens.Space.xxl, max = 120.dp)
+            .heightIn(min = LettaDimens.Control.fieldHeight, max = 120.dp)
             .padding(vertical = LettaDimens.Space.xs)
             .onPreviewKeyEvent { event ->
                 val isSend = event.type == KeyEventType.KeyDown &&
@@ -301,7 +301,7 @@ private fun HomeComposerSendButton(canSend: Boolean, onSend: () -> Unit) {
     Surface(
         onClick = onSend,
         enabled = canSend,
-        modifier = Modifier.size(LettaDimens.Space.xxl),
+        modifier = Modifier.size(LettaDimens.Control.iconButtonLg),
         shape = CircleShape,
         color = if (canSend) {
             MaterialTheme.colorScheme.primary
@@ -311,14 +311,14 @@ private fun HomeComposerSendButton(canSend: Boolean, onSend: () -> Unit) {
         contentColor = if (canSend) {
             MaterialTheme.colorScheme.onPrimary
         } else {
-            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = LettaDimens.Alpha.hairline)
+            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = LettaDimens.Alpha.disabled)
         },
     ) {
         Box(contentAlignment = Alignment.Center) {
             Icon(
                 imageVector = Icons.Outlined.ArrowUpward,
                 contentDescription = "Send message",
-                modifier = Modifier.size(LettaDimens.Space.lg),
+                modifier = Modifier.size(LettaDimens.Control.iconButtonLg),
             )
         }
     }

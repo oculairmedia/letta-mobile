@@ -92,7 +92,7 @@ fun CanvasPropertyControl(
             modifier = Modifier
                 .size(OPENER_SIZE)
                 .background(swatch, CircleShape)
-                .border(LettaDimens.Space.hair, MaterialTheme.colorScheme.outline.copy(alpha = 0.6f), CircleShape)
+                .border(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outline.copy(alpha = 0.6f), CircleShape)
                 .semantics { contentDescription = label }
                 .clickable { open = !open },
             contentAlignment = Alignment.Center,
@@ -307,7 +307,7 @@ private fun TargetChip(target: ColorTarget, color: Color, selected: Boolean, onC
         ) {
             Box(
                 modifier = Modifier
-                    .size(LettaDimens.Space.lg)
+                    .size(LettaDimens.Control.icon)
                     .background(color, CircleShape)
                     .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
                 contentAlignment = Alignment.Center,
@@ -377,5 +377,5 @@ internal val StrokeStyles: List<Pair<String, StrokeStyle>> = listOf(
 
 private const val MAX_CORNER_RADIUS = 64f
 private val OPENER_SIZE = LettaDimens.Space.xl
-private val CHIP_HEIGHT = LettaDimens.Space.xxl
+private val CHIP_HEIGHT = LettaDimens.Control.fieldHeight
 private val PANEL_WIDTH = 280.dp

@@ -600,7 +600,7 @@ internal fun ContextWindowCard(
                     LettaIcons.Database,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.tertiary,
-                    modifier = Modifier.size(LettaDimens.Space.lg),
+                    modifier = Modifier.size(LettaDimens.Control.icon),
                 )
                 Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
                 Text(
@@ -621,13 +621,13 @@ internal fun ContextWindowCard(
                     Spacer(modifier = Modifier.width(LettaDimens.Space.xs))
                 }
                 if (state.isLoading) {
-                    CircularProgressIndicator(modifier = Modifier.size(LettaDimens.Space.lg), strokeWidth = LettaDimens.Space.hair)
+                    CircularProgressIndicator(modifier = Modifier.size(LettaDimens.Control.icon), strokeWidth = LettaDimens.Space.hair)
                 } else {
                     IconButton(onClick = onRefresh, modifier = Modifier.size(LettaDimens.Control.iconButton)) {
                         Icon(
                             LettaIcons.Refresh,
                             contentDescription = stringResource(R.string.action_refresh),
-                            modifier = Modifier.size(LettaDimens.Space.lg),
+                            modifier = Modifier.size(LettaDimens.Control.icon),
                         )
                     }
                 }
@@ -712,7 +712,7 @@ internal fun ModelInfoCard(
                 LettaIcons.Psychology,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.tertiary,
-                modifier = Modifier.size(LettaDimens.Space.lg),
+                modifier = Modifier.size(LettaDimens.Control.icon),
             )
             Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
             Text(
@@ -1107,7 +1107,7 @@ private fun DrawerAgentHeader(
                 Icon(
                     LettaIcons.Storage,
                     contentDescription = null,
-                    modifier = Modifier.size(LettaDimens.Space.md),
+                    modifier = Modifier.size(LettaDimens.Control.icon),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
@@ -1201,14 +1201,14 @@ private fun DrawerFactTile(
     ) {
         Column(modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.md)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
-                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.tertiary, modifier = Modifier.size(LettaDimens.Space.lg))
+                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.tertiary, modifier = Modifier.size(LettaDimens.Control.icon))
                 Text(
                     text = label,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f),
                 )
-                if (loading) CircularProgressIndicator(modifier = Modifier.size(LettaDimens.Space.md), strokeWidth = LettaDimens.Space.hair)
+                if (loading) CircularProgressIndicator(modifier = Modifier.size(LettaDimens.Control.icon), strokeWidth = LettaDimens.Space.hair)
             }
             Spacer(modifier = Modifier.height(LettaDimens.Space.xs))
             Text(

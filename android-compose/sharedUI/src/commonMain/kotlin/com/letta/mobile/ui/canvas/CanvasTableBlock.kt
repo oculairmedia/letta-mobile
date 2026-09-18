@@ -144,7 +144,7 @@ private fun TableGrid(
     onCell: (row: Int, column: Int, text: String) -> Unit,
 ) {
     val line = MaterialTheme.colorScheme.outlineVariant
-    Column(modifier = modifier.border(1.dp, line, RoundedCornerShape(LettaDimens.Space.xs)).semantics { contentDescription = "Table" }) {
+    Column(modifier = modifier.border(1.dp, line, RoundedCornerShape(LettaDimens.Radius.sm)).semantics { contentDescription = "Table" }) {
         rows.forEachIndexed { r, row ->
             Row(modifier = Modifier.fillMaxWidth()) {
                 row.forEachIndexed { c, cell ->

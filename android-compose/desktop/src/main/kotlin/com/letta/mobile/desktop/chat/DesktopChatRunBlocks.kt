@@ -104,7 +104,7 @@ internal fun ReasoningRow(text: String) {
             Icon(
                 imageVector = if (open) Icons.Outlined.KeyboardArrowUp else Icons.Outlined.KeyboardArrowDown,
                 contentDescription = null,
-                modifier = Modifier.size(LettaDimens.Space.lg),
+                modifier = Modifier.size(LettaDimens.Control.icon),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -161,7 +161,7 @@ private fun RunStepsCardHeader(
         Icon(
             imageVector = Icons.Outlined.Terminal,
             contentDescription = null,
-            modifier = Modifier.size(LettaDimens.Space.md),
+            modifier = Modifier.size(LettaDimens.Control.iconSm),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
@@ -173,7 +173,7 @@ private fun RunStepsCardHeader(
         Icon(
             imageVector = if (expanded) Icons.Outlined.KeyboardArrowUp else Icons.Outlined.KeyboardArrowDown,
             contentDescription = if (expanded) "Collapse" else "Expand",
-            modifier = Modifier.size(LettaDimens.Space.lg),
+            modifier = Modifier.size(LettaDimens.Control.iconSm),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
@@ -232,29 +232,29 @@ internal fun StepStatusCircle(state: StepState) {
     val teal = MaterialTheme.colorScheme.primary
     when (state) {
         StepState.Done -> Box(
-            modifier = Modifier.size(LettaDimens.Space.md).background(teal, CircleShape),
+            modifier = Modifier.size(LettaDimens.Control.iconSm).background(teal, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 imageVector = Icons.Outlined.Check,
                 contentDescription = "done",
-                modifier = Modifier.size(LettaDimens.Space.sm),
+                modifier = Modifier.size(LettaDimens.Control.iconSm),
                 tint = MaterialTheme.colorScheme.onPrimary,
             )
         }
         StepState.Running -> Box(
             modifier = Modifier
-                .size(LettaDimens.Space.md)
-                .border(LettaDimens.Space.hair, teal, CircleShape),
+                .size(LettaDimens.Control.iconSm)
+                .border(LettaDimens.Stroke.hairline, teal, CircleShape),
         )
         StepState.Error -> Box(
-            modifier = Modifier.size(LettaDimens.Space.md).background(MaterialTheme.colorScheme.error, CircleShape),
+            modifier = Modifier.size(LettaDimens.Control.iconSm).background(MaterialTheme.colorScheme.error, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 imageVector = Icons.Outlined.Close,
                 contentDescription = "failed",
-                modifier = Modifier.size(LettaDimens.Space.sm),
+                modifier = Modifier.size(LettaDimens.Control.iconSm),
                 tint = MaterialTheme.colorScheme.onError,
             )
         }

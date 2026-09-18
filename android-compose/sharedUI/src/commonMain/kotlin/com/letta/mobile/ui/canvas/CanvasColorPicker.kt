@@ -93,7 +93,7 @@ fun ColorSwatchPicker(
     modifier: Modifier = Modifier,
     allowNone: Boolean = false,
     glyph: ImageVector? = null,
-    swatchSize: androidx.compose.ui.unit.Dp = LettaDimens.Space.xl,
+    swatchSize: androidx.compose.ui.unit.Dp = LettaDimens.Orb.sm,
 ) {
     var open by remember { mutableStateOf(false) }
     val recent = rememberRecentColors()
@@ -102,7 +102,7 @@ fun ColorSwatchPicker(
             modifier = Modifier
                 .size(swatchSize)
                 .background(current, CircleShape)
-                .border(LettaDimens.Space.hair, MaterialTheme.colorScheme.outline.copy(alpha = 0.6f), CircleShape)
+                .border(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outline.copy(alpha = 0.6f), CircleShape)
                 .semantics { contentDescription = label }
                 .clickable { open = !open },
             contentAlignment = Alignment.Center,
@@ -178,7 +178,7 @@ fun CanvasColorPicker(
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
                 Box(
                     modifier = Modifier
-                        .size(LettaDimens.Space.xl)
+                        .size(LettaDimens.Control.iconButtonSm)
                         .background(hsl.toColor(), CircleShape)
                         .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
                 )
@@ -239,10 +239,10 @@ private fun HslSlider(label: String, value: Float, range: ClosedFloatingPointRan
 private fun PaletteEntry(color: Color, name: String, selected: Boolean, onClick: () -> Unit) {
     Box(
         modifier = Modifier
-            .size(LettaDimens.Space.xl)
+            .size(LettaDimens.Orb.sm)
             .background(color, CircleShape)
             .border(
-                width = if (selected) LettaDimens.Space.hair else 1.dp,
+                width = 1.dp,
                 color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
                 shape = CircleShape,
             )

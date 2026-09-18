@@ -114,7 +114,7 @@ internal data class DesktopHeaderChromeState(
 
 /** Title-bar height: taller than a stock 32-44dp caption bar to comfortably
  * fit the two-line agent identity block (title over agent name). */
-private val TitleBarHeight = LettaDimens.Orb.railSlotWidth
+private val TitleBarHeight = 48.dp
 
 /** With tabs the strip is one line per tab (title, then agent), so the bar can be browser-thin. */
 private val TabbedTitleBarHeight = LettaDimens.Control.actionButton
@@ -349,7 +349,7 @@ internal fun DesktopJewelWindow(
                                         imageVector = Icons.Outlined.ChatBubbleOutline,
                                         contentDescription = null,
                                         tint = colorScheme.onSurface,
-                                        modifier = Modifier.size(LettaDimens.Space.lg),
+                                        modifier = Modifier.size(LettaDimens.Control.icon),
                                     )
                                     Text(
                                         text = title,

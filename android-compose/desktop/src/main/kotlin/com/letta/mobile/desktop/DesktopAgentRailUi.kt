@@ -414,7 +414,7 @@ private fun LibrarySearchField(
             imageVector = Icons.Outlined.Search,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(LettaDimens.Space.lg),
+            modifier = Modifier.size(LettaDimens.Control.icon),
         )
         JewelTextField(
             value = query,
@@ -533,10 +533,9 @@ private fun ColumnScope.AgentRailOrbList(
                 bottomFadeLength = RailFadeLength,
             ),
         horizontalAlignment = Alignment.CenterHorizontally,
-        // Each 30dp orb already sits in a 34dp slot (2dp slack top and bottom),
-        // so this spacing is ON TOP of that: 4dp here is an 8dp gap between
-        // adjacent orbs. The slot itself stays 34dp — the thinking ring is
-        // exactly that size, so shrinking the slot would crowd it.
+        // Each 40dp orb (Orb.lg) already sits in a 44dp slot (Orb.railSlotHeight,
+        // 2dp slack top and bottom), so this spacing is ON TOP of that.
+        // Sized to fit the slot so it doesn't crowd neighbouring orbs.
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
     ) {
         itemsIndexed(groups, key = { _, group -> "orb-${group.name}" }) { index, group ->
@@ -559,7 +558,7 @@ private fun NewSessionButton(onNewSession: () -> Unit) {
     DesktopTooltip(text = "New") {
         Box(
             modifier = Modifier
-                .size(LettaDimens.Space.xxl)
+                .size(LettaDimens.Control.iconButton)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                 .clickable(onClick = onNewSession),
@@ -569,7 +568,7 @@ private fun NewSessionButton(onNewSession: () -> Unit) {
                 imageVector = Icons.Outlined.Add,
                 contentDescription = "New",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(LettaDimens.Space.lg),
+                modifier = Modifier.size(LettaDimens.Control.icon),
             )
         }
     }
@@ -656,7 +655,7 @@ private fun AgentRailOrbContent(
             SelectedAgentRailMarker(modifier = Modifier.align(Alignment.CenterStart))
         }
         if (flags.thinking && target.identity == null) {
-            // Concentric with the 30dp orb (2dp gap) and sized to fit the
+            // Concentric with the orb and sized to fit the
             // slot so it doesn't crowd neighbouring orbs.
             ThinkingRing(diameter = LettaDimens.Orb.md)
         }
@@ -678,7 +677,7 @@ private fun RailAgentTile(
     target: AgentRailOrbTarget,
     initial: String,
     size: androidx.compose.ui.unit.Dp,
-    cornerRadius: androidx.compose.ui.unit.Dp = LettaDimens.Space.sm,
+    cornerRadius: androidx.compose.ui.unit.Dp = LettaDimens.Radius.sm,
     onClick: (() -> Unit)? = null,
 ) {
     AgentOrb(index = target.orbStyle, size = size, cornerRadius = cornerRadius, onClick = onClick, agentId = target.agentId) {
@@ -690,8 +689,8 @@ private fun RailAgentTile(
 private fun SelectedAgentRailMarker(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
-            .size(width = LettaDimens.Space.xs, height = LettaDimens.Space.xxl)
-            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(LettaDimens.Space.xs)),
+            .size(width = LettaDimens.Space.xs, height = LettaDimens.Control.iconButton)
+            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(LettaDimens.Radius.sm)),
     )
 }
 
@@ -710,7 +709,7 @@ private fun RailActionIcon(model: RailActionIconModel) {
     DesktopTooltip(text = model.description) {
         Box(
             modifier = Modifier
-                .size(LettaDimens.Space.xxl)
+                .size(LettaDimens.Control.iconButtonLg)
                 .clip(CircleShape)
                 .background(if (model.selected) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent)
                 .clickable(onClick = model.onClick),
@@ -721,7 +720,7 @@ private fun RailActionIcon(model: RailActionIconModel) {
                 contentDescription = model.description,
                 tint = model.tint.takeIf { it != Color.Unspecified }
                     ?: if (model.selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(LettaDimens.Space.lg),
+                modifier = Modifier.size(LettaDimens.Control.icon),
             )
         }
     }

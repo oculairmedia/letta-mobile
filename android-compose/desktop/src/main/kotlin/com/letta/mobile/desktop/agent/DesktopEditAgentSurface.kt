@@ -452,7 +452,7 @@ private fun InterestChip(text: String, onRemove: () -> Unit) {
             Icon(
                 Icons.Outlined.Add,
                 contentDescription = "Remove $text",
-                modifier = Modifier.size(LettaDimens.Space.md).rotate(45f),
+                modifier = Modifier.size(LettaDimens.Control.iconSm).rotate(45f),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }

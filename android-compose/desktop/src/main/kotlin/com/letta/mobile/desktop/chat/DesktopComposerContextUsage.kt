@@ -147,7 +147,7 @@ private fun ContextUsageBar(usage: ContextWindowUsage) {
         modifier = Modifier
             .fillMaxWidth()
             .height(LettaDimens.Space.sm)
-            .clip(RoundedCornerShape(LettaDimens.Space.xs))
+            .clip(RoundedCornerShape(LettaDimens.Radius.sm))
             .background(MaterialTheme.colorScheme.surfaceContainerLowest),
         horizontalArrangement = Arrangement.spacedBy(1.dp),
     ) {
@@ -190,8 +190,8 @@ private fun ContextUsageRow(segment: ContextWindowSegment) {
     ) {
         Box(
             modifier = Modifier
-                .size(LettaDimens.Space.sm)
-                .clip(RoundedCornerShape(LettaDimens.Space.xs))
+                .size(LettaDimens.Control.iconSm)
+                .clip(RoundedCornerShape(LettaDimens.Radius.sm))
                 .background(contextSegmentColor(segment.kind)),
         )
         Text(

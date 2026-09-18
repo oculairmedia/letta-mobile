@@ -194,7 +194,7 @@ private fun RunningTaskCard(
                         imageVector = if (expanded) Icons.Outlined.KeyboardArrowUp else Icons.Outlined.KeyboardArrowDown,
                         contentDescription = if (expanded) "Collapse" else "Expand",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(LettaDimens.Space.lg),
+                        modifier = Modifier.size(LettaDimens.Control.icon),
                     )
                 }
             }
@@ -279,7 +279,7 @@ private fun FinishedTaskRow(entry: SubagentEntry) {
             imageVector = if (isFailure) Icons.Outlined.ErrorOutline else Icons.Outlined.CheckCircle,
             contentDescription = null,
             tint = accent,
-            modifier = Modifier.size(LettaDimens.Space.lg),
+            modifier = Modifier.size(LettaDimens.Control.icon),
         )
         Column(
             modifier = Modifier.weight(1f),

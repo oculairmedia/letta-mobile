@@ -231,7 +231,7 @@ fun AllToolsScreen(
                                         ) {
                                             @OptIn(ExperimentalMaterial3ExpressiveApi::class)
                                             LoadingIndicator(
-                                                modifier = Modifier.size(LettaDimens.Space.xl),
+                                                modifier = Modifier.size(LettaDimens.Orb.sm),
                                             )
                                         }
                                     }
@@ -274,7 +274,7 @@ private fun McpLoadingBanner(modifier: Modifier = Modifier) {
         ) {
             @OptIn(ExperimentalMaterial3ExpressiveApi::class)
             LoadingIndicator(
-                modifier = Modifier.size(LettaDimens.Space.lg),
+                modifier = Modifier.size(LettaDimens.Control.icon),
             )
             Column {
                 Text(
@@ -311,7 +311,7 @@ private fun ToolTile(
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier
-                    .size(LettaDimens.Space.xl)
+                    .size(LettaDimens.Control.iconButtonSm)
                     .optionalSharedElement("tool_icon_${tool.id}"),
             )
             Spacer(modifier = Modifier.weight(1f))

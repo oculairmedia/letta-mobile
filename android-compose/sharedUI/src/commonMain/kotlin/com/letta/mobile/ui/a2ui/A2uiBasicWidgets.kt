@@ -1231,7 +1231,7 @@ internal fun A2uiButton(
                 if (inFlight) {
                     CircularProgressIndicator(
                         modifier = Modifier
-                            .size(LettaDimens.Space.lg)
+                            .size(LettaDimens.Control.icon)
                             .testTag(A2uiTestTags.BUTTON_PROGRESS),
                         strokeWidth = LettaDimens.Space.hair,
                     )

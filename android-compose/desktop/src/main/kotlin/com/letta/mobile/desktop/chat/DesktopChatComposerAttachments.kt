@@ -85,7 +85,7 @@ internal fun ComposerDropdownChip(model: ComposerDropdownChipModel) {
                     Icon(
                         imageVector = model.leadingIcon,
                         contentDescription = null,
-                        modifier = Modifier.size(LettaDimens.Space.md),
+                        modifier = Modifier.size(LettaDimens.Control.iconSm),
                         tint = contentColor,
                     )
                 }
@@ -97,7 +97,7 @@ internal fun ComposerDropdownChip(model: ComposerDropdownChipModel) {
                 Icon(
                     imageVector = Icons.Outlined.KeyboardArrowDown,
                     contentDescription = null,
-                    modifier = Modifier.size(LettaDimens.Space.lg),
+                    modifier = Modifier.size(LettaDimens.Control.iconSm),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -148,7 +148,7 @@ internal fun ComposerAttachmentChip(
         ) {
             DesktopAttachmentImage(
                 attachment = UiImageAttachment(base64 = image.base64, mediaType = image.mediaType),
-                modifier = Modifier.size(LettaDimens.Space.lg),
+                modifier = Modifier.size(LettaDimens.Control.icon),
             )
             Text(
                 text = "image",
@@ -159,7 +159,7 @@ internal fun ComposerAttachmentChip(
                 imageVector = Icons.Outlined.Close,
                 contentDescription = "Remove attachment",
                 modifier = Modifier
-                    .size(LettaDimens.Space.lg)
+                    .size(LettaDimens.Control.icon)
                     .clickable(onClick = onRemove),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )

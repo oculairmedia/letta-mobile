@@ -177,7 +177,7 @@ private fun EffortLevelRow(
                 imageVector = Icons.Outlined.Check,
                 contentDescription = "Selected",
                 tint = Color(0xFF00BFA5),
-                modifier = Modifier.size(LettaDimens.Space.lg),
+                modifier = Modifier.size(LettaDimens.Control.icon),
             )
         }
     }
@@ -216,7 +216,7 @@ internal fun ComposerActionChip(
                 Icon(
                     imageVector = leadingIcon,
                     contentDescription = null,
-                    modifier = Modifier.size(LettaDimens.Space.md),
+                    modifier = Modifier.size(LettaDimens.Control.iconSm),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -224,7 +224,7 @@ internal fun ComposerActionChip(
             Icon(
                 imageVector = Icons.Outlined.KeyboardArrowDown,
                 contentDescription = null,
-                modifier = Modifier.size(LettaDimens.Space.lg),
+                modifier = Modifier.size(LettaDimens.Control.iconSm),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }

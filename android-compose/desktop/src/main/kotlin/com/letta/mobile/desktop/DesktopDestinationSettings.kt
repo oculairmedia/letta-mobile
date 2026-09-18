@@ -310,7 +310,7 @@ internal fun ReadinessRow(feature: DesktopFeatureReadiness) {
         Box(
             modifier = Modifier
                 .padding(top = LettaDimens.Space.xs)
-                .size(LettaDimens.Space.md)
+                .size(LettaDimens.Control.iconSm)
                 .background(feature.state.color(), MaterialTheme.shapes.small),
         )
         Column(

@@ -295,7 +295,7 @@ private fun BarIconButton(
 ) {
     Box(
         modifier = Modifier
-            .size(LettaDimens.Space.xxl)
+            .size(LettaDimens.Control.iconButton)
             .clip(CircleShape)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
@@ -304,7 +304,7 @@ private fun BarIconButton(
             imageVector = icon,
             contentDescription = description,
             tint = tint,
-            modifier = Modifier.size(LettaDimens.Space.lg),
+            modifier = Modifier.size(LettaDimens.Control.icon),
         )
     }
 }

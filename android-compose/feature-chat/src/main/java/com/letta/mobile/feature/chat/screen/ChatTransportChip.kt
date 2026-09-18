@@ -70,7 +70,7 @@ internal fun ChatTransportChip(
             Box(
                 modifier = Modifier
                     .size(LettaDimens.Space.sm)
-                    .clip(RoundedCornerShape(LettaDimens.Space.xs))
+                    .clip(RoundedCornerShape(LettaDimens.Radius.sm))
                     .background(content),
             )
             Text(

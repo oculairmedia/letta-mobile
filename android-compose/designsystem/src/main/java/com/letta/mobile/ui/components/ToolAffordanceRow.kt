@@ -80,7 +80,7 @@ fun ToolAffordanceRow(
                         Icon(
                             imageVector = LettaIcons.Tool,
                             contentDescription = null,
-                            modifier = Modifier.size(LettaDimens.Space.lg),
+                            modifier = Modifier.size(LettaDimens.Control.icon),
                         )
                     },
                     modifier = Modifier

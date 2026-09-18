@@ -279,7 +279,7 @@ private fun ToolRunSummaryRow(
             imageVector = LettaIcons.ExpandMore,
             contentDescription = "Open command details",
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(LettaDimens.Space.lg),
+            modifier = Modifier.size(LettaDimens.Control.icon),
         )
     }
 }
@@ -598,7 +598,7 @@ private fun ProjectedToolOutcomeLabel(
         Icon(
             imageVector = icon,
             contentDescription = null,
-            modifier = Modifier.size(LettaDimens.Space.md),
+            modifier = Modifier.size(LettaDimens.Control.iconSm),
             tint = tint,
         )
         Text(

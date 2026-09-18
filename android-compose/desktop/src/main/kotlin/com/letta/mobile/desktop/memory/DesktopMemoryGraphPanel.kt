@@ -259,7 +259,7 @@ internal fun EntityTypeFilterBar(
                         Text(
                             memoryNodeKindLabel(kind),
                             style = MaterialTheme.typography.labelMedium,
-                            color = if (on) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = LettaDimens.Alpha.hairline),
+                            color = if (on) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = LettaDimens.Alpha.disabled),
                         )
                     }
                 }
@@ -308,7 +308,7 @@ internal fun MemoryGraphNodeDot(
                     .size(diameter)
                     .clip(CircleShape)
                     .background(accentColor)
-                    .border(LettaDimens.Space.hair, MaterialTheme.colorScheme.surface, CircleShape),
+                    .border(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.surface, CircleShape),
             )
             Text(
                 text = resolvedNode.title,
@@ -336,7 +336,7 @@ internal fun MemoryNodeTooltip(node: MemoryGraphNode, degree: Int, accentColor: 
     ) {
         Column(Modifier.widthIn(max = 280.dp).padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
-                Box(Modifier.size(LettaDimens.Space.md).clip(CircleShape).background(accentColor))
+                Box(Modifier.size(LettaDimens.Control.iconSm).clip(CircleShape).background(accentColor))
                 Text(node.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {

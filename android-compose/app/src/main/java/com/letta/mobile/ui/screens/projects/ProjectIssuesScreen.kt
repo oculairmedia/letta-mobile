@@ -619,7 +619,7 @@ private fun ProjectIssueCompletedTimelineCard(
                             stringResource(R.string.action_expand)
                         },
                         modifier = Modifier
-                            .size(LettaDimens.Space.xl)
+                            .size(LettaDimens.Control.iconButtonSm)
                             .rotate(chevronRotation),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

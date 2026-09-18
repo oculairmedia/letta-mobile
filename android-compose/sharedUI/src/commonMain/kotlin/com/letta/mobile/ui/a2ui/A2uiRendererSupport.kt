@@ -43,7 +43,6 @@ import kotlinx.datetime.toLocalDateTime
 import kotlin.math.roundToInt
 import kotlin.time.Clock
 import kotlin.time.Instant
-import com.letta.mobile.ui.theme.LettaDimens
 
 
 @Composable
@@ -55,8 +54,8 @@ internal fun A2uiSkeletonCard(modifier: Modifier = Modifier) {
         ),
     ) {
         Column(
-            modifier = Modifier.padding(LettaDimens.Space.lg),
-            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             A2uiSkeletonLine(widthFraction = 0.65f)
             A2uiSkeletonLine(widthFraction = 1f)
@@ -69,13 +68,13 @@ internal fun A2uiSkeletonCard(modifier: Modifier = Modifier) {
 internal fun A2uiSkeletonLine(
     modifier: Modifier = Modifier,
     widthFraction: Float = 0.7f,
-    height: Dp = LettaDimens.Space.lg,
+    height: Dp = 14.dp,
 ) {
     Box(
         modifier = modifier
             .fillMaxWidth(widthFraction)
             .height(height)
-            .clip(RoundedCornerShape(LettaDimens.Radius.sm))
+            .clip(RoundedCornerShape(8.dp))
             .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.16f))
     )
 }
@@ -86,7 +85,7 @@ internal fun A2uiSkeletonImage(modifier: Modifier = Modifier) {
         modifier = modifier
             .fillMaxWidth()
             .height(120.dp)
-            .clip(RoundedCornerShape(LettaDimens.Radius.sm))
+            .clip(RoundedCornerShape(8.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant),
     )
 }
@@ -363,12 +362,12 @@ internal fun A2uiComponent.localOpenUrl(surface: A2uiSurfaceState, renderScope: 
 internal fun A2uiComponent.spacing(): Dp =
     raw.dpValue("spacing") ?: when (raw.stringValue("spacing")) {
         "none" -> 0.dp
-        "xs" -> LettaDimens.Space.xs
-        "sm" -> LettaDimens.Space.sm
-        "md" -> LettaDimens.Space.md
-        "lg" -> LettaDimens.Space.lg
-        "xl" -> LettaDimens.Space.xl
-        else -> LettaDimens.Space.sm
+        "xs" -> 4.dp
+        "sm" -> 8.dp
+        "md" -> 12.dp
+        "lg" -> 16.dp
+        "xl" -> 24.dp
+        else -> 8.dp
     }
 
 internal fun A2uiComponent.horizontalArrangement(): Arrangement.Horizontal =
@@ -396,7 +395,7 @@ internal fun A2uiComponent.weightRowChildren(): Boolean =
     ))
 
 internal fun A2uiComponent.cornerRadius(): Dp =
-    raw.dpValue("cornerRadius", "corner_radius") ?: LettaDimens.Space.md
+    raw.dpValue("cornerRadius", "corner_radius") ?: 12.dp
 
 internal fun A2uiComponent.elevation(): Dp =
     raw.dpValue("elevation") ?: 1.dp
@@ -668,7 +667,7 @@ internal fun ToolApprovalRisk.style(): ToolApprovalRiskStyle =
         )
         ToolApprovalRisk.Destructive -> ToolApprovalRiskStyle(
             borderColor = MaterialTheme.colorScheme.error,
-            borderWidth = LettaDimens.Space.hair,
+            borderWidth = 2.dp,
             pillContainer = MaterialTheme.colorScheme.error,
             pillContent = MaterialTheme.colorScheme.onError,
         )

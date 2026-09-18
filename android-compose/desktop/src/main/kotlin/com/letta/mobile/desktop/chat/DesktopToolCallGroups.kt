@@ -200,7 +200,7 @@ internal fun DesktopToolGroupCard(group: DesktopChatRow.ToolGroup) {
                 imageVector = Icons.Outlined.Terminal,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(LettaDimens.Space.md),
+                modifier = Modifier.size(LettaDimens.Control.iconSm),
             )
             Text(
                 text = "${group.toolCallCount} tool calls",
@@ -224,7 +224,7 @@ internal fun DesktopToolGroupCard(group: DesktopChatRow.ToolGroup) {
                 imageVector = if (expanded) Icons.Outlined.KeyboardArrowUp else Icons.Outlined.KeyboardArrowDown,
                 contentDescription = if (expanded) "Collapse tool calls" else "Expand tool calls",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(LettaDimens.Space.lg),
+                modifier = Modifier.size(LettaDimens.Control.iconSm),
             )
         }
         if (expanded) {

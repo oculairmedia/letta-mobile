@@ -340,7 +340,7 @@ private fun MemorySectionCard(section: MemoryParitySection) {
                     imageVector = section.kind.icon(),
                     contentDescription = null,
                     tint = section.kind.tint(),
-                    modifier = Modifier.size(LettaDimens.Space.xl),
+                    modifier = Modifier.size(LettaDimens.Control.iconButtonSm),
                 )
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -390,7 +390,7 @@ private fun MemoryItemRow(item: MemoryParityItem) {
                     imageVector = item.icon(),
                     contentDescription = null,
                     tint = item.tint(),
-                    modifier = Modifier.size(LettaDimens.Space.lg),
+                    modifier = Modifier.size(LettaDimens.Control.icon),
                 )
                 Column(modifier = Modifier.weight(1f)) {
                     Text(

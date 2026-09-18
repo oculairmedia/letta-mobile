@@ -102,7 +102,7 @@ private fun ChatSearchResultsHeader(isSearching: Boolean) {
             modifier = Modifier.weight(1f),
         )
         if (isSearching) {
-            CircularProgressIndicator(modifier = Modifier.size(LettaDimens.Space.lg), strokeWidth = LettaDimens.Space.hair)
+            CircularProgressIndicator(modifier = Modifier.size(LettaDimens.Control.icon), strokeWidth = LettaDimens.Space.hair)
         }
     }
 }
@@ -190,7 +190,7 @@ private fun ChatSearchResultCardHeader(
             } else {
                 MaterialTheme.colorScheme.tertiary
             },
-            modifier = Modifier.size(LettaDimens.Space.lg),
+            modifier = Modifier.size(LettaDimens.Control.icon),
         )
         Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
         Text(

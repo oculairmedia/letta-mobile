@@ -85,7 +85,7 @@ private fun <T> androidx.compose.foundation.lazy.LazyListScope.searchSection(
                         cardIcon,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(LettaDimens.Space.xl),
+                        modifier = Modifier.size(LettaDimens.Control.iconButtonSm),
                     )
                     Spacer(modifier = Modifier.width(LettaDimens.Space.md))
                     Column {
@@ -219,7 +219,7 @@ internal fun SearchResultsContent(
                                     LettaIcons.Chat,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(LettaDimens.Space.lg),
+                                    modifier = Modifier.size(LettaDimens.Control.icon),
                                 )
                                 Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
                                 Text(
@@ -261,7 +261,7 @@ internal fun SearchResultsContent(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     androidx.compose.material3.CircularProgressIndicator(
-                        modifier = Modifier.size(LettaDimens.Space.lg),
+                        modifier = Modifier.size(LettaDimens.Control.icon),
                         strokeWidth = LettaDimens.Space.hair,
                     )
                 }

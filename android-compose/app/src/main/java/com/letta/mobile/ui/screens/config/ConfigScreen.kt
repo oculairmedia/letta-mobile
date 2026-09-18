@@ -424,7 +424,7 @@ private fun ConfigContent(
                 leadingContent = { Icon(LettaIcons.Save, contentDescription = null) },
                 trailingContent = {
                     if (state.isSaving) {
-                        CircularProgressIndicator(modifier = Modifier.size(LettaDimens.Space.xl))
+                        CircularProgressIndicator(modifier = Modifier.size(LettaDimens.Orb.sm))
                     }
                 },
             )
@@ -544,7 +544,7 @@ private fun ConfigRefreshStatus(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             CircularProgressIndicator(
-                modifier = Modifier.size(LettaDimens.Space.lg),
+                modifier = Modifier.size(LettaDimens.Control.icon),
                 strokeWidth = LettaDimens.Space.hair,
             )
             Text(
@@ -724,7 +724,7 @@ private fun LocalModelSettingsItem(
         ) {
             if (state.isImportingLocalModel) {
                 CircularProgressIndicator(
-                    modifier = Modifier.size(LettaDimens.Space.lg),
+                    modifier = Modifier.size(LettaDimens.Control.icon),
                     strokeWidth = LettaDimens.Space.hair,
                 )
                 Spacer(modifier = Modifier.width(LettaDimens.Space.sm))

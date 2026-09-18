@@ -255,7 +255,7 @@ private fun EditAgentTagsCard(
                                     Icon(
                                         LettaIcons.Close,
                                         contentDescription = stringResource(R.string.screen_agent_edit_remove_tag),
-                                        modifier = Modifier.size(LettaDimens.Space.lg),
+                                        modifier = Modifier.size(LettaDimens.Control.icon),
                                     )
                                 },
                             )
@@ -595,7 +595,7 @@ private fun EditAgentAttachedToolsCard(params: EditAgentContentListParams) {
                         Icon(
                             LettaIcons.Tool,
                             contentDescription = null,
-                            modifier = Modifier.size(LettaDimens.Space.xl),
+                            modifier = Modifier.size(LettaDimens.Control.iconButtonSm),
                             tint = MaterialTheme.colorScheme.primary,
                         )
                     },

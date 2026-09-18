@@ -98,7 +98,7 @@ internal fun DangerZoneSection(
                     Icon(
                         LettaIcons.Refresh,
                         contentDescription = null,
-                        modifier = Modifier.size(LettaDimens.Space.lg),
+                        modifier = Modifier.size(LettaDimens.Control.icon),
                     )
                     Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
                     Text(stringResource(R.string.action_reset_messages))
@@ -118,7 +118,7 @@ internal fun DangerZoneSection(
                     Icon(
                         LettaIcons.Delete,
                         contentDescription = null,
-                        modifier = Modifier.size(LettaDimens.Space.lg),
+                        modifier = Modifier.size(LettaDimens.Control.icon),
                     )
                     Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
                     Text(stringResource(R.string.screen_agents_dialog_delete_title))

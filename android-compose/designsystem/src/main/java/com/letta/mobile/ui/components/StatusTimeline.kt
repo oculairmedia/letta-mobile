@@ -53,29 +53,28 @@ import com.letta.mobile.ui.motion.ChatMotionPolicy
 import com.letta.mobile.ui.motion.rememberChatMotionPolicy
 import com.letta.mobile.ui.theme.LettaTheme
 import com.letta.mobile.ui.theme.sectionTitle
-import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * Standard sizing and layout tokens for timeline components.
  */
 object TimelineDefaults {
     /** Fixed width allocated for the left timeline rail column. */
-    val RailWidth: Dp = LettaDimens.Space.xxl
+    val RailWidth: Dp = 32.dp
 
     /** Fixed thickness of the vertical timeline connector rail line. */
-    val ConnectorWidth: Dp = LettaDimens.Space.hair
+    val ConnectorWidth: Dp = 2.dp
 
     /** Visual diameter of a standard timeline node. */
-    val NodeSize: Dp = LettaDimens.Space.xl
+    val NodeSize: Dp = 24.dp
 
     /** Size of the inner icon inside a timeline node. */
-    val NodeIconSize: Dp = LettaDimens.Space.lg
+    val NodeIconSize: Dp = 14.dp
 
     /** Minimum touch target size required for accessibility (48dp). */
-    val MinTouchTargetSize: Dp = LettaDimens.Orb.railSlotWidth
+    val MinTouchTargetSize: Dp = 48.dp
 
     /** Minimum height of a timeline row header to guarantee a 48dp touch target. */
-    val HeaderMinHeight: Dp = LettaDimens.Orb.railSlotWidth
+    val HeaderMinHeight: Dp = 48.dp
 }
 
 /**
@@ -300,12 +299,12 @@ fun CollapsibleStatusRow(
                         }
                     }
                 }
-                .padding(vertical = LettaDimens.Space.sm, horizontal = LettaDimens.Space.xs),
+                .padding(vertical = 8.dp, horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (node != null) {
                 Box(
-                    modifier = Modifier.padding(end = LettaDimens.Space.sm),
+                    modifier = Modifier.padding(end = 8.dp),
                     contentAlignment = Alignment.Center,
                 ) {
                     node()
@@ -318,7 +317,7 @@ fun CollapsibleStatusRow(
                         title()
                     }
                     if (statusLabel != null) {
-                        Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = statusLabel,
                             style = MaterialTheme.typography.labelSmall,
@@ -340,12 +339,12 @@ fun CollapsibleStatusRow(
             }
 
             if (badge != null) {
-                Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
+                Spacer(modifier = Modifier.width(8.dp))
                 badge()
             }
 
             if (content != null) {
-                Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
+                Spacer(modifier = Modifier.width(8.dp))
                 Icon(
                     imageVector = LettaIcons.ExpandMore,
                     contentDescription = null,
@@ -366,7 +365,7 @@ fun CollapsibleStatusRow(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = if (node != null) LettaDimens.Space.xxl else 0.dp, top = LettaDimens.Space.xs, bottom = LettaDimens.Space.sm),
+                        .padding(start = if (node != null) 32.dp else 0.dp, top = 4.dp, bottom = 8.dp),
                 ) {
                     content()
                 }
@@ -533,7 +532,7 @@ fun StatusTimeline(
 internal fun PreviewStatusTimelineContent() {
     LettaTheme(dynamicColor = false) {
         Surface {
-            Column(modifier = Modifier.padding(LettaDimens.Space.lg)) {
+            Column(modifier = Modifier.padding(16.dp)) {
                 StatusTimeline(
                     items = listOf(
                         Triple("Analyzing codebase", "Completed", false),

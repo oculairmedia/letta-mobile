@@ -228,7 +228,7 @@ private fun TelemetryEventRow(ev: Telemetry.Event) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(bgColor, RoundedCornerShape(LettaDimens.Space.xs))
+            .background(bgColor, RoundedCornerShape(LettaDimens.Radius.sm))
             .padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.sm),
     ) {
         Row(

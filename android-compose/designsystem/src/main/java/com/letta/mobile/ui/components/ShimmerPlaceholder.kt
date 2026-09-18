@@ -146,8 +146,8 @@ fun ShimmerConversationCard(
         ) {
             Box(
                 modifier = Modifier
-                    .size(LettaDimens.Space.lg)
-                    .clip(RoundedCornerShape(LettaDimens.Space.xs))
+                    .size(LettaDimens.Control.icon)
+                    .clip(RoundedCornerShape(LettaDimens.Radius.sm))
                     .background(color)
             )
             ShimmerBox(widthFraction = 0.4f, height = LettaDimens.Space.md)

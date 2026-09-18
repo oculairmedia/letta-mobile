@@ -214,7 +214,7 @@ private fun CreateProjectBottomBar(
             if (isSubmitting) {
                 CircularProgressIndicator(
                     strokeWidth = LettaDimens.Space.hair,
-                    modifier = Modifier.size(LettaDimens.Space.lg),
+                    modifier = Modifier.size(LettaDimens.Control.icon),
                     color = MaterialTheme.colorScheme.onPrimary,
                 )
                 Spacer(modifier = Modifier.width(LettaDimens.Space.sm))

@@ -278,7 +278,7 @@ private fun SubagentCompletedSummaryRow(
             imageVector = LettaIcons.ExpandMore,
             contentDescription = disclosure,
             modifier = Modifier
-                .size(LettaDimens.Space.lg)
+                .size(LettaDimens.Control.icon)
                 .rotate(if (expanded) 180f else 0f),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -408,7 +408,7 @@ private fun SubagentNotificationActions(
                     imageVector = LettaIcons.ExpandMore,
                     contentDescription = disclosure,
                     modifier = Modifier
-                        .size(LettaDimens.Space.lg)
+                        .size(LettaDimens.Control.icon)
                         .rotate(if (expanded) 180f else 0f),
                     tint = MaterialTheme.colorScheme.primary,
                 )
@@ -509,7 +509,7 @@ internal fun SubagentDispatchCard(
                     imageVector = LettaIcons.ExpandMore,
                     contentDescription = if (expanded) "Hide prompt" else "Show prompt",
                     modifier = Modifier
-                        .size(LettaDimens.Space.lg)
+                        .size(LettaDimens.Control.icon)
                         .rotate(if (expanded) 180f else 0f),
                     tint = MaterialTheme.colorScheme.primary,
                 )
@@ -1135,7 +1135,7 @@ private fun ToolCallExpandedBodyContentInner(
                         imageVector = LettaIcons.ExpandMore,
                         contentDescription = if (resultExpanded) "Collapse output" else "Expand output",
                         modifier = Modifier
-                            .size(LettaDimens.Space.lg)
+                            .size(LettaDimens.Control.icon)
                             .rotate(resultChevronRotation),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
                     )

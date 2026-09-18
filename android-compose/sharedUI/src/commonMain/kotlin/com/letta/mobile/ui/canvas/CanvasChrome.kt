@@ -170,7 +170,7 @@ internal fun CanvasActionsPill(
                     BoardBackgrounds.forEach { entry ->
                         Box(
                             modifier = Modifier
-                                .size(LettaDimens.Space.xl)
+                                .size(LettaDimens.Control.iconButton)
                                 .background(entry.color, CircleShape)
                                 .border(
                                     width = if (entry.color == background.color) LettaDimens.Space.hair else 1.dp,
@@ -187,7 +187,7 @@ internal fun CanvasActionsPill(
                         label = "Background color",
                         onPick = background.onColor,
                         swatchSize = LettaDimens.Space.xl,
-                        modifier = Modifier.size(LettaDimens.Space.xl),
+                        modifier = Modifier.size(LettaDimens.Control.iconButton),
                     )
                 }
                 BackgroundPatternRows(background)
@@ -229,7 +229,7 @@ private fun BackgroundPatternRows(background: CanvasBackgroundActions) {
                 label = "Pattern color",
                 onPick = { background.onPattern(pattern.copy(colorHex = it.toHex())) },
                 swatchSize = LettaDimens.Space.xl,
-                modifier = Modifier.size(LettaDimens.Space.xl),
+                modifier = Modifier.size(LettaDimens.Control.iconButton),
             )
         }
     }

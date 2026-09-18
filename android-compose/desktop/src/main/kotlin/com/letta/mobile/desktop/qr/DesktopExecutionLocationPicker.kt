@@ -107,7 +107,7 @@ private fun CollapsedChip(
 ) {
     Surface(
         modifier = Modifier
-            .heightIn(min = LettaDimens.Space.xxl)
+            .heightIn(min = LettaDimens.Control.fieldHeight)
             .clip(RoundedCornerShape(LettaDimens.Radius.lg))
             .clickable(onClick = onToggle)
             .semantics { contentDescription = "Execution location: $label" },
@@ -121,7 +121,7 @@ private fun CollapsedChip(
             Icon(
                 imageVector = Icons.Outlined.Place,
                 contentDescription = null,
-                modifier = Modifier.size(LettaDimens.Space.lg),
+                modifier = Modifier.size(LettaDimens.Control.icon),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
@@ -134,7 +134,7 @@ private fun CollapsedChip(
             Icon(
                 imageVector = if (expanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
                 contentDescription = null,
-                modifier = Modifier.size(LettaDimens.Space.lg),
+                modifier = Modifier.size(LettaDimens.Control.icon),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }

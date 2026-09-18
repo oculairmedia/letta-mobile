@@ -121,7 +121,7 @@ internal fun PinnedAgentCard(
                 LettaIcons.Agent,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(LettaDimens.Space.xl),
+                modifier = Modifier.size(LettaDimens.Control.iconButtonSm),
             )
             Spacer(modifier = Modifier.height(LettaDimens.Space.xs))
             Text(
@@ -272,7 +272,7 @@ internal fun DashboardWidgetTile(
                 imageVector = shortcut.icon,
                 contentDescription = null,
                 tint = contentColor,
-                modifier = Modifier.size(LettaDimens.Space.xl),
+                modifier = Modifier.size(LettaDimens.Control.iconButtonSm),
             )
             Spacer(modifier = Modifier.height(LettaDimens.Space.xs))
             if (contextualInfo != null) {
@@ -434,7 +434,7 @@ internal fun CollapsibleSectionHeader(
             imageVector = if (state.expanded) LettaIcons.ExpandLess else LettaIcons.ExpandMore,
             contentDescription = if (state.expanded) "Collapse" else "Expand",
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(LettaDimens.Space.lg),
+            modifier = Modifier.size(LettaDimens.Control.icon),
         )
     }
 }

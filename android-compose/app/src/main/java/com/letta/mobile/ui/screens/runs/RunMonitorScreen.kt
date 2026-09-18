@@ -449,10 +449,10 @@ private fun RunCard(
                         fontFamily = LettaCodeFont,
                         fontSize = LettaDimens.Type.caption,
                     ),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = LettaDimens.Alpha.hairline),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = LettaDimens.Alpha.disabled),
                     maxLines = 1,
                     modifier = Modifier
-                        .clip(RoundedCornerShape(LettaDimens.Space.xs))
+                        .clip(RoundedCornerShape(LettaDimens.Radius.sm))
                         .clickable {
                             clipboard.setText(AnnotatedString(run.id))
                             HapticEffects.longPress(haptic, view)

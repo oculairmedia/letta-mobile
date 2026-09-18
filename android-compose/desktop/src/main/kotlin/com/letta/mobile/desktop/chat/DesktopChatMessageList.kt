@@ -497,7 +497,7 @@ internal fun ScrollToLatestButton(
     // dominated the reading area; this is a quiet utility control.
     Surface(
         onClick = onClick,
-        modifier = modifier.size(LettaDimens.Space.xxl),
+        modifier = modifier.size(LettaDimens.Control.iconButton),
         shape = RoundedCornerShape(LettaDimens.Radius.sm),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -507,7 +507,7 @@ internal fun ScrollToLatestButton(
             Icon(
                 imageVector = Icons.Outlined.KeyboardArrowDown,
                 contentDescription = "Scroll to latest message",
-                modifier = Modifier.size(LettaDimens.Space.lg),
+                modifier = Modifier.size(LettaDimens.Control.icon),
             )
         }
     }

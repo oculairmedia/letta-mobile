@@ -313,7 +313,7 @@ private fun OverflowBadge(
 ) {
     Box(
         modifier = modifier
-            .size(LettaDimens.Space.xxl)
+            .size(LettaDimens.Orb.md)
             .clip(CircleShape)
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .semantics {

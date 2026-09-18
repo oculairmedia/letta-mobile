@@ -143,7 +143,7 @@ private fun TelemetryMetricItem(
                     fontSize = LettaDimens.Type.micro,
                     fontWeight = FontWeight.SemiBold,
                 ),
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = LettaDimens.Alpha.hairline),
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = LettaDimens.Alpha.disabled),
                 maxLines = 1,
             )
         }

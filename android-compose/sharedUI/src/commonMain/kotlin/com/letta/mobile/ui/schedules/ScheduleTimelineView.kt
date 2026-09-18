@@ -203,10 +203,10 @@ fun TimelineDayCell(
 private fun TimelineHighFreqBar(date: LocalDate, today: LocalDate, nowFrac: Float) {
     val success = MaterialTheme.customColors.successColor
     val upcoming = MaterialTheme.colorScheme.outline
-    Row(Modifier.fillMaxWidth(0.86f).height(LettaDimens.Space.lg).clip(RoundedCornerShape(LettaDimens.Space.xs))) {
+    Row(Modifier.fillMaxWidth(0.86f).height(LettaDimens.Space.lg).clip(RoundedCornerShape(LettaDimens.Radius.sm))) {
         when {
             date < today -> Box(Modifier.fillMaxSize().background(success))
-            date > today -> Box(Modifier.fillMaxSize().border(1.dp, upcoming, RoundedCornerShape(LettaDimens.Space.xs)))
+            date > today -> Box(Modifier.fillMaxSize().border(1.dp, upcoming, RoundedCornerShape(LettaDimens.Radius.sm)))
             else -> {
                 val frac = nowFrac.coerceIn(0.02f, 0.98f)
                 Box(Modifier.weight(frac).fillMaxHeight().background(success))
@@ -222,12 +222,12 @@ private fun TimelineTickMarks(ticks: List<TimelineTick>) {
         ticks.take(6).forEach { tick ->
             val past = tick.status == RunStatus.Done || tick.status == RunStatus.Failed
             Box(
-                Modifier.size(width = LettaDimens.Space.sm, height = LettaDimens.Space.lg).clip(RoundedCornerShape(LettaDimens.Space.xs))
+                Modifier.size(width = LettaDimens.Space.sm, height = LettaDimens.Control.icon).clip(RoundedCornerShape(LettaDimens.Radius.sm))
                     .background(if (past) statusColor(tick.status) else Color.Transparent)
                     .border(
                         1.dp,
                         statusColor(tick.status).copy(alpha = if (past) 1f else 0.6f),
-                        RoundedCornerShape(LettaDimens.Space.xs),
+                        RoundedCornerShape(LettaDimens.Radius.sm),
                     ),
             )
         }
@@ -254,7 +254,7 @@ fun TimelineLegend() {
         LegendItem(MaterialTheme.colorScheme.error, "failed", filled = true)
         LegendItem(MaterialTheme.colorScheme.outline, "upcoming", filled = false)
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(width = LettaDimens.Space.hair, height = LettaDimens.Space.lg).background(MaterialTheme.colorScheme.primary))
+            Box(Modifier.size(width = LettaDimens.Space.hair, height = LettaDimens.Control.iconSm).background(MaterialTheme.colorScheme.primary))
             Spacer(Modifier.width(LettaDimens.Space.xs))
             Text("now", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -265,9 +265,9 @@ fun TimelineLegend() {
 fun LegendItem(color: Color, label: String, filled: Boolean) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
-            Modifier.size(LettaDimens.Space.md).clip(RoundedCornerShape(LettaDimens.Space.xs))
+            Modifier.size(LettaDimens.Control.iconSm).clip(RoundedCornerShape(LettaDimens.Radius.sm))
                 .background(if (filled) color else Color.Transparent)
-                .border(1.dp, color, RoundedCornerShape(LettaDimens.Space.xs)),
+                .border(1.dp, color, RoundedCornerShape(LettaDimens.Radius.sm)),
         )
         Spacer(Modifier.width(LettaDimens.Space.xs))
         Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

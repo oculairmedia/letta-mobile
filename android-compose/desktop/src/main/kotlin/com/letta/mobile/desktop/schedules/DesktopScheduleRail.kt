@@ -287,7 +287,7 @@ internal fun RunDetailRail(run: ScheduleRun, zone: TimeZone, onBack: () -> Unit)
         }
         Spacer(Modifier.height(LettaDimens.Space.md))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(LettaDimens.Space.md).clip(CircleShape).background(statusColor(run.status)))
+            Box(Modifier.size(LettaDimens.Control.iconSm).clip(CircleShape).background(statusColor(run.status)))
             Spacer(Modifier.width(LettaDimens.Space.sm))
             Text(run.scheduleName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
         }
