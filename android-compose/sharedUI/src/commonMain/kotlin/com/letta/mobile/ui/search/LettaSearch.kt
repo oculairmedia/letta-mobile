@@ -32,10 +32,22 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.testTag
@@ -141,9 +153,10 @@ private fun LettaSearchScaffold(
         }
         if (parts == LettaSearchParts.FieldOnly) return@Column
 
-        if (config.scopes.isNotEmpty() || config.toggle != null) {
+        if (config.scopes.isNotEmpty()) {
             LettaSearchScopeRow(config)
         }
+        config.toggle?.let { LettaSearchToggleRow(it) }
 
         config.actions.forEach { action ->
             LettaSearchActionRow(action = action, query = query)
@@ -225,10 +238,28 @@ private fun LettaSearchField(
     prefix: String?,
     focusRequester: FocusRequester,
 ) {
+    var focused by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),
+            .padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.xs)
+            // Claim focus on press, ourselves, on the Initial pass.
+            //
+            // Desktop hosts this field inside Jewel's title bar, which is a
+            // NATIVE caption region: a press there is the window's drag-to-move
+            // gesture. Buttons survive that because a click is all they need,
+            // but a text field needs FOCUS, and the caption handler never moves
+            // Compose focus — so the field could be clicked and still never
+            // receive a keystroke. Asking for focus before anyone else sees the
+            // event fixes it without consuming the press, so caret placement and
+            // selection still work normally once focused.
+            .onFocusChanged { focused = it.isFocused }
+            .pointerInput(focusRequester) {
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                    if (!focused) runCatching { focusRequester.requestFocus() }
+                }
+            },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
@@ -248,9 +279,24 @@ private fun LettaSearchField(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+        // TextFieldValue, not the String overload.
+        //
+        // With the String overload the caret is derived from a value that round
+        // trips through the caller's state, so the first keystroke landed with
+        // the selection still at index 0 and the character appeared AFTER the
+        // cursor. Owning the selection here and only resyncing when the caller
+        // changes the text out from under us (a clear, a pick) keeps the caret
+        // where the typist put it.
+        var fieldValue by remember { mutableStateOf(TextFieldValue(query)) }
+        if (fieldValue.text != query) {
+            fieldValue = TextFieldValue(query, TextRange(query.length))
+        }
         BasicTextField(
-            value = query,
-            onValueChange = onQueryChange,
+            value = fieldValue,
+            onValueChange = {
+                fieldValue = it
+                if (it.text != query) onQueryChange(it.text)
+            },
             singleLine = true,
             textStyle = MaterialTheme.typography.bodyMedium.copy(
                 color = MaterialTheme.colorScheme.onSurface,
@@ -279,9 +325,9 @@ private fun LettaSearchScopeRow(config: LettaSearchConfig) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.xs),
+            .padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.hair),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
     ) {
         config.scopes.forEach { scope ->
             val selected = scope.id == config.selectedScopeId
@@ -309,15 +355,39 @@ private fun LettaSearchScopeRow(config: LettaSearchConfig) {
                 )
             }
         }
-        config.toggle?.let { toggle ->
-            Box(modifier = Modifier.weight(WEIGHT_FILL))
-            Checkbox(checked = toggle.checked, onCheckedChange = toggle.onCheckedChange)
-            Text(
-                text = toggle.label,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+    }
+}
+
+/**
+ * The filter toggle, on its own line under the scope buttons.
+ *
+ * It shared the scope row until the panel narrowed, at which point there was no
+ * horizontal room left and the label wrapped to one character per line. A
+ * checkbox and a sentence do not belong in a row that is already competing for
+ * width with a variable number of scope buttons.
+ */
+@Composable
+private fun LettaSearchToggleRow(toggle: LettaSearchToggle) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = { toggle.onCheckedChange(!toggle.checked) },
             )
-        }
+            .padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.hair),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
+    ) {
+        Checkbox(checked = toggle.checked, onCheckedChange = toggle.onCheckedChange)
+        Text(
+            text = toggle.label,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -407,8 +477,8 @@ private fun LettaSearchSectionHeader(title: String) {
         modifier = Modifier.padding(
             start = LettaDimens.Space.md,
             end = LettaDimens.Space.md,
-            top = LettaDimens.Space.md,
-            bottom = LettaDimens.Space.xs,
+            top = LettaDimens.Space.sm,
+            bottom = LettaDimens.Space.hair,
         ),
     )
 }
@@ -424,10 +494,10 @@ private fun LettaSearchResultRow(row: LettaSearchRow, onClick: () -> Unit) {
         Row(
             modifier = Modifier.padding(
                 horizontal = LettaDimens.Space.md,
-                vertical = LettaDimens.Space.sm,
+                vertical = LettaDimens.Space.xs,
             ),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             LettaSearchRowLeading(row.leading)
             Column(modifier = Modifier.weight(WEIGHT_FILL)) {
@@ -481,7 +551,7 @@ private fun LettaSearchRowLeading(leading: LettaSearchLeading) {
         )
         is LettaSearchLeading.Orb -> AgentOrb(
             index = leading.orbIndex,
-            size = LettaDimens.Orb.md,
+            size = LettaDimens.Orb.sm,
             cornerRadius = LettaDimens.Radius.md,
             agentId = leading.agentId,
         )
@@ -593,14 +663,22 @@ fun LettaSearchPopover(
 /**
  * Anchored field: the header expression.
  *
- * The field is ALWAYS visible and typed into directly — it is not hidden behind
- * a chevron — and the results hang under it in a panel that appears only once
- * there is something to show. Same [LettaSearchBody] as every other host; the
- * difference is entirely in where it is drawn.
+ * The header box is a TRIGGER, not the input. Clicking it opens a focusable
+ * [Popup] directly beneath, and the real field lives in there.
  *
- * The panel is a non-focusable [Popup] on purpose: a focusable one (which is
- * what `DropdownMenu` is) steals focus from the field the instant results
- * appear, so the second keystroke goes nowhere.
+ * That indirection is forced by the host, not preference. Nucleus's title bar
+ * applies `focusProperties { canFocus = false }` to its whole subtree on
+ * Windows and Linux, so Tab navigation cannot wander into the window-drag
+ * region — which also means NOTHING inside it can take keyboard focus. In
+ * Compose a parent's `canFocus = false` deactivates the subtree and a
+ * descendant cannot re-enable it, so an inline field there can be clicked and
+ * will never receive a keystroke. A Popup composes in its own layer, outside
+ * that focus scope, so the field inside one focuses normally.
+ *
+ * The trigger mirrors the live query, so it still reads as one control: you
+ * click where the text is and type where the text appears.
+ *
+ * It is the same [LettaSearchScaffold] as every other expression.
  */
 @Composable
 fun LettaSearchAnchoredField(
@@ -612,53 +690,102 @@ fun LettaSearchAnchoredField(
     modifier: Modifier = Modifier,
     config: LettaSearchConfig = LettaSearchConfig(),
 ) {
-    // The field alone: the body with results suppressed, so the header row
-    // stays one line high whether or not a search is running.
+    var expanded by remember { mutableStateOf(false) }
+
+    val overlaying = expanded && config.anchorMode == LettaSearchAnchorMode.Overlay
     Box(modifier = modifier) {
-        LettaSearchScaffold(
+        // While the panel overlays it, the trigger keeps its space but draws
+        // nothing: the panel's own field is sitting on top of it, and showing
+        // both meant the same query rendered twice, once truncated.
+        LettaSearchTrigger(
             query = query,
-            onQueryChange = onQueryChange,
-            sections = emptyList(),
-            onRowSelected = {},
-            modifier = Modifier,
-            config = config,
-            parts = LettaSearchParts.FieldOnly,
+            placeholder = config.placeholder,
+            onClick = { expanded = true },
+            visible = !overlaying,
         )
-        // Only once something is typed. TextMatch treats a blank query as
-        // "matches everything", so keying the panel off whether there are rows
-        // meant it hung open under an empty field from the moment it mounted.
-        if (query.isNotBlank()) {
+        if (expanded) {
             Popup(
                 alignment = Alignment.TopStart,
                 offset = IntOffset(0, 0),
-                onDismissRequest = onDismiss,
-                properties = PopupProperties(focusable = false),
+                onDismissRequest = {
+                    expanded = false
+                    onDismiss()
+                },
+                // Focusable, unlike the panel this replaced: taking focus is the
+                // entire reason the input lives out here.
+                properties = PopupProperties(focusable = true),
             ) {
                 Surface(
                     modifier = Modifier
-                        .padding(top = AnchoredPanelTopInset)
+                        .padding(
+                            top = if (config.anchorMode == LettaSearchAnchorMode.Below) {
+                                AnchoredPanelTopInset
+                            } else {
+                                0.dp
+                            },
+                        )
                         .widthIn(min = AnchoredPanelMinWidth, max = AnchoredPanelMaxWidth),
                     shape = RoundedCornerShape(LettaDimens.Radius.lg),
                     color = MaterialTheme.colorScheme.surfaceContainer,
                     contentColor = MaterialTheme.colorScheme.onSurface,
                     shadowElevation = PopoverElevation,
                 ) {
-                    // The field is drawn above, so the panel shows everything
-                    // else: scopes, the filter toggle, actions and results.
                     LettaSearchScaffold(
                         query = query,
                         onQueryChange = onQueryChange,
                         sections = sections,
-                        onRowSelected = onRowSelected,
+                        onRowSelected = { row ->
+                            expanded = false
+                            onRowSelected(row)
+                        },
                         modifier = Modifier,
                         config = config.copy(
+                            autoFocus = true,
                             maxResultsHeight = config.maxResultsHeight ?: AnchoredPanelMaxHeight,
                         ),
-                        parts = LettaSearchParts.PanelOnly,
+                        parts = LettaSearchParts.All,
                     )
                 }
             }
         }
+    }
+}
+
+/** The header's stand-in for the field: shows the live query, opens the real one. */
+@Composable
+private fun LettaSearchTrigger(
+    query: String,
+    placeholder: String,
+    onClick: () -> Unit,
+    visible: Boolean,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .alpha(if (visible) 1f else 0f)
+            .clip(RoundedCornerShape(LettaDimens.Radius.sm))
+            .clickable(onClick = onClick)
+            .padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.Search,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(LettaDimens.Control.iconSm),
+        )
+        Text(
+            text = query.ifBlank { placeholder },
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (query.isBlank()) {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            },
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -677,8 +804,8 @@ private val PopoverMinWidth = 520.dp
 private val PopoverMaxWidth = 640.dp
 private val PopoverMaxResultsHeight = 420.dp
 private val PopoverElevation = 8.dp
-private val AnchoredPanelMinWidth = 360.dp
-private val AnchoredPanelMaxWidth = 520.dp
-private val AnchoredPanelMaxHeight = 420.dp
+private val AnchoredPanelMinWidth = 280.dp
+private val AnchoredPanelMaxWidth = 380.dp
+private val AnchoredPanelMaxHeight = 280.dp
 private val AnchoredPanelTopInset = 36.dp
 private val RecentTileWidth = 64.dp

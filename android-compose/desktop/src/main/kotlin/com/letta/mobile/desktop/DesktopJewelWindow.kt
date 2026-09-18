@@ -20,6 +20,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.LayoutCoordinates
@@ -279,7 +280,18 @@ internal fun DesktopJewelWindow(
                                     sections = search.sections,
                                     onRowSelected = search.onRowSelected,
                                     onDismiss = search.onDismiss,
-                                    modifier = Modifier.width(HeaderSearchWidth),
+                                    // Re-enable focus for this subtree. Nucleus's TitleBarCore
+                                    // applies `focusProperties { canFocus = false }` to the whole
+                                    // title bar on Windows/Linux, so Tab navigation cannot wander
+                                    // into the window-drag area — which also means no child there
+                                    // can take focus. Buttons never noticed; a text field could be
+                                    // clicked and never receive a keystroke. Nucleus's own comment
+                                    // notes macOS keeps focus enabled exactly so TextField children
+                                    // in the title bar work, so this restores that locally rather
+                                    // than moving the field out of the header.
+                                    modifier = Modifier
+                                        .width(HeaderSearchWidth)
+                                        .focusProperties { canFocus = true },
                                     config = search.config,
                                 )
                             }

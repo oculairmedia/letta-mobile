@@ -62,6 +62,17 @@ data class LettaSearchSection(
     val rows: List<LettaSearchRow>,
 )
 
+/**
+ * Where an anchored panel sits relative to the trigger that opened it.
+ *
+ * [Overlay] is the default and exists to stop the trigger and the panel's own
+ * field showing the same text twice: the panel covers the trigger, so its field
+ * lands exactly where the trigger was and the two read as one control that
+ * expanded. [Below] keeps the trigger visible and drops the panel under it,
+ * for hosts where the trigger carries something the panel does not repeat.
+ */
+enum class LettaSearchAnchorMode { Overlay, Below }
+
 /** One of the scope tabs across the top ("All", "Messages", "Conversations"). */
 @Immutable
 data class LettaSearchScope(
@@ -126,6 +137,8 @@ data class LettaSearchConfig(
     val toggle: LettaSearchToggle? = null,
     /** Pinned, unfiltered actions above the results. */
     val actions: List<LettaSearchAction> = emptyList(),
+    /** Where an anchored panel sits relative to its trigger. */
+    val anchorMode: LettaSearchAnchorMode = LettaSearchAnchorMode.Overlay,
     /** Section headers. Off for flat lists even when sections are supplied. */
     val showSectionHeaders: Boolean = true,
     /** Focus the field when the surface appears. */

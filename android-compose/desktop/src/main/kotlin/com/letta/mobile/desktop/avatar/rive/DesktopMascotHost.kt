@@ -23,6 +23,7 @@ import kotlinx.coroutines.withContext
  * kept in order and replayed onto the scene, so the identity written at creation is the first
  * thing the scene sees, before its first advance (a body drawn before it has a colour is black).
  */
+
 class DesktopMascotEntry private constructor(
     private val bytes: ByteArray,
     identity: MascotIdentity,
@@ -56,10 +57,6 @@ class DesktopMascotEntry private constructor(
                     // Host rule: identity before the first advance, or the first frame is a black body -
                     // attaching replays every write made so far, the identity first among them.
                     sink.attach(scene.inputSink)
-                    // Desynchronise: every scene starts at the same instant, so without this the
-                    // mascots on one screen blink, wander and fidget in lockstep. A random head start
-                    // (0-20 s in small steps, so the state machines take their transitions) breaks it.
-                    repeat(kotlin.random.Random.nextInt(0, 60)) { _ -> scene.advance(kotlin.random.Random.nextFloat() * 0.3f + 0.05f) }
                 }.onFailure { scene.close() }.getOrThrow() // a scene that failed after creation is released, not leaked
                 scene
             }.onFailure { System.err.println("[mascot] scene failed to load: ${'$'}it") }.getOrNull()

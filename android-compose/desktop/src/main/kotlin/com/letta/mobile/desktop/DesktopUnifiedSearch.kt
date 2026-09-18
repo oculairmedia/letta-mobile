@@ -79,8 +79,10 @@ object DesktopUnifiedSearch {
                     LettaSearchRow(
                         id = rowId(CONVERSATIONS, conversation.id),
                         label = conversation.displayTitle(),
-                        sublabel = conversation.agentName,
-                        meta = conversation.updatedAtLabel,
+                        // Scoped to one agent, every row would carry the same
+                        // agent name — a column of the answer you already gave.
+                        sublabel = conversation.agentName.takeIf { scopedAgentId == null },
+                        meta = formatRelativeTimestamp(conversation.updatedAtLabel),
                         leading = orbFor(conversation.agentId, avatarStyleByAgentId),
                     )
                 }
