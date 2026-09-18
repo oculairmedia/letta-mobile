@@ -82,7 +82,8 @@ All scene mutations are expressed as typed `CanvasOp` instances carrying:
    - Canvas exports are packaged via `CanvasShare.createChatImageAttachment` / `CanvasShare.packageForChat` enforcing `AttachmentLimits.maxRawBytesPerImage` (2 MiB limit).
    - If payload exceeds limits, `CanvasAttachmentTooLargeException` is thrown.
    - Sniffs MIME type (prefers raster `image/png` and `image/jpeg` for chat LLM vision capabilities; supports `image/svg+xml`).
-   - The `CanvasShare` pending queue is the single delivery state. `stagedAttachmentEvents` only names the recipient that has something waiting; the chat screen answers by draining `consumeStagedAttachments` (and drains once on subscription), so an image is never added twice.
+   - The `CanvasShare` pending queue is the single delivery state. `stagedAttachmentEvents` only names the recipient that has something waiting; the chat screen answers by draining `consumeStagedAttachments` (and drains once on subscription), so an image is never added twice. The drain removes an image only once the composer accepts it: at the attachment count or byte cap the refused image, and everything behind it, stays queued for a later drain.
+   - Canvas ids come from `CanvasId.generate()` (a UUID). Every store's `upsert` replaces an existing row and its ACL silently, so a generator that could repeat within a millisecond is not acceptable.
    - The recipient key is the chat screen instance the canvas was opened from (`AdminChatViewModel.canvasShareRecipient`, carried on `CanvasRoute.shareRecipient`), never a conversation id: the queue is process-wide and consuming is destructive, so a retained back-stack screen or one whose conversation has not resolved yet must not be able to take another chat's image.
    - On Android and Desktop, staged attachments are delivered directly into the owning conversation's `ChatComposerController` pending attachments bar.
 

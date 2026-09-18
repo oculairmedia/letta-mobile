@@ -109,6 +109,30 @@ class CanvasShareTest {
     }
 
     @Test
+    fun aRefusedImageAndEverythingBehindItStayQueued() = runTest {
+        CanvasShare.clearStagedAttachments()
+        val target = CanvasConversationTarget("conv-cap")
+        val images = (1..3).map { CanvasShare.createChatImageAttachment("img-$it".encodeToByteArray(), CanvasMimeType.PNG) }
+        images.forEach { CanvasShare.stageForConversation(target, it) }
+
+        // A composer with room for exactly one more attachment.
+        var room = 1
+        val taken = CanvasShare.consumeStagedAttachments(target) { if (room > 0) { room--; true } else false }
+        assertEquals(listOf(images[0]), taken)
+
+        // The refused second image is still first in line, and the third is behind it.
+        assertEquals(listOf(images[1], images[2]), CanvasShare.consumeStagedAttachments(target))
+        assertTrue(CanvasShare.consumeStagedAttachments(target).isEmpty())
+    }
+
+    @Test
+    fun generatedCanvasIdsDoNotCollide() {
+        val ids = (1..10_000).map { CanvasId.generate() }
+        assertEquals(ids.size, ids.toSet().size)
+        assertTrue(ids.all { it.value.startsWith("canvas-") })
+    }
+
+    @Test
     fun packageForChat_withinLimits_succeeds() {
         val bytes = "valid-payload".encodeToByteArray()
         val result = CanvasShare.packageForChat(bytes)

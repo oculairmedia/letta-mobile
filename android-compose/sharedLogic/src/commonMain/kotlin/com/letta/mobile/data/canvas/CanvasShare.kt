@@ -79,10 +79,28 @@ class CanvasShareStaging {
     /**
      * Consumes and clears any staged attachments for [target].
      */
-    suspend fun consumeStagedAttachments(target: CanvasConversationTarget): List<MessageContentPart.Image> {
+    suspend fun consumeStagedAttachments(target: CanvasConversationTarget): List<MessageContentPart.Image> =
+        consumeStagedAttachments(target) { true }
+
+    /**
+     * Hands each staged attachment for [target], in staging order, to [accept] and removes only
+     * the ones it takes. The first refusal stops the drain, so a recipient at its attachment cap
+     * keeps every image it could not fit queued, in order, for a later drain instead of losing
+     * them. Returns the accepted images.
+     */
+    suspend fun consumeStagedAttachments(
+        target: CanvasConversationTarget,
+        accept: (MessageContentPart.Image) -> Boolean,
+    ): List<MessageContentPart.Image> {
         val convId = target.id
         return stagingMutex.withLock {
-            pendingAttachmentsByConversation.remove(convId)?.toList() ?: emptyList()
+            val queue = pendingAttachmentsByConversation[convId] ?: return@withLock emptyList()
+            val accepted = mutableListOf<MessageContentPart.Image>()
+            while (queue.isNotEmpty() && accept(queue.first())) {
+                accepted += queue.removeAt(0)
+            }
+            if (queue.isEmpty()) pendingAttachmentsByConversation.remove(convId)
+            accepted
         }
     }
 
@@ -122,6 +140,15 @@ object CanvasShare {
      */
     suspend fun consumeStagedAttachments(target: CanvasConversationTarget): List<MessageContentPart.Image> =
         staging.consumeStagedAttachments(target)
+
+    /**
+     * Consumes staged attachments for [target] one by one while [accept] takes them; a refused
+     * image and everything behind it stay queued. See [CanvasShareStaging.consumeStagedAttachments].
+     */
+    suspend fun consumeStagedAttachments(
+        target: CanvasConversationTarget,
+        accept: (MessageContentPart.Image) -> Boolean,
+    ): List<MessageContentPart.Image> = staging.consumeStagedAttachments(target, accept)
 
     /**
      * Clears all pending staged attachments across all conversations.
