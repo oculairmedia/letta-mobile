@@ -39,7 +39,10 @@ object TimelineHydrationReducer {
         )
         val baseEvents = (preserved.olderConfirmed + serverEvents).withPositions()
         val merged = baseEvents.appendWithPositions(preserved.runtimeAndDisk)
-        val deduped = dedupeByOtid(conversationId, merged)
+        val deduped = collapseReconcileFinalSupersets(
+            conversationId,
+            dedupeByOtid(conversationId, merged),
+        )
         return HydratedTimelineResult(
             timeline = Timeline(
                 conversationId = conversationId,
@@ -208,6 +211,93 @@ object TimelineHydrationReducer {
         return deduped
     }
 
+    /**
+     * letta-mobile-hw2l1: second line of defence for the reconcile-final row.
+     *
+     * A reconcile final is the same logical message as the streamed row it
+     * supersedes, but it carries a NULL (or reconcile-synthetic) run id and a
+     * different server id, so it shares no [identityKeys] with that row --
+     * `semanticIdentityKeyOrNull` returns null without a stable run id. If the
+     * reconcile-time collapse in TimelineSyncReconcile misses (its content
+     * match is bounded to a recent tail), BOTH rows are persisted and every
+     * later hydrate replays the duplicate forever, because nothing downstream
+     * can key them together.
+     *
+     * This applies the same discipline as that collapse, at hydrate: identical
+     * message type, exactly one side bearing the reconcile-final signature, and
+     * a strict content-superset relation inside a bounded window. The narrow
+     * shape is deliberate -- it fires only on a streamed/final pair and never
+     * merges two independently authored messages.
+     */
+    private fun collapseReconcileFinalSupersets(
+        conversationId: String,
+        events: List<TimelineEvent>,
+    ): List<TimelineEvent> {
+        val supersededIndices = HashSet<Int>()
+        events.forEachIndexed { index, event ->
+            val final = event as? TimelineEvent.Confirmed ?: return@forEachIndexed
+            if (final.messageType !in HYDRATE_SUPERSET_MESSAGE_TYPES) return@forEachIndexed
+            if (!final.hasReconcileFinalRunIdSignature()) return@forEachIndexed
+            val finalText = final.content.trim()
+            if (finalText.length < HYDRATE_SUPERSET_MIN_CHARS) return@forEachIndexed
+            val start = maxOf(0, index - HYDRATE_SUPERSET_LOOKBACK)
+            for (candidateIndex in index - 1 downTo start) {
+                if (candidateIndex in supersededIndices) continue
+                val streamed = events[candidateIndex] as? TimelineEvent.Confirmed ?: continue
+                if (streamed.messageType != final.messageType) continue
+                if (streamed.serverId == final.serverId) continue
+                // The partner must be a real streamed row: a second null-run row
+                // is another reconcile final, not the row this one supersedes.
+                if (streamed.hasReconcileFinalRunIdSignature()) continue
+                if (!finalText.supersedes(streamed.content.trim())) continue
+                supersededIndices += candidateIndex
+                break
+            }
+        }
+        if (supersededIndices.isEmpty()) return events
+        Telemetry.event(
+            "Timeline", "hydrate.reconcileFinalSupersetCollapsed",
+            "conversationId" to conversationId,
+            "eventCount" to events.size,
+            "collapsedCount" to supersededIndices.size,
+            level = Telemetry.Level.WARN,
+        )
+        return events.filterIndexed { index, _ -> index !in supersededIndices }
+    }
+
+    /** Null or reconcile-synthetic run id -- the reconcile final's signature. */
+    private fun TimelineEvent.Confirmed.hasReconcileFinalRunIdSignature(): Boolean {
+        val stable = runId?.takeIf { it.isNotBlank() } ?: return true
+        return stable.isIrohSyntheticRunId()
+    }
+
+    /**
+     * Strict containment, retried on letters/digits only. Dropped stream
+     * fragments leave the streamed row missing scattered punctuation, so exact
+     * containment alone misses the very case this exists for.
+     */
+    private fun String.supersedes(existing: String): Boolean {
+        if (existing.length < HYDRATE_SUPERSET_MIN_CHARS) return false
+        if (this == existing) return false
+        if (contains(existing) && length > existing.length) return true
+        val normalizedExisting = existing.filter { it.isLetterOrDigit() }
+        if (normalizedExisting.length < HYDRATE_SUPERSET_MIN_CHARS) return false
+        val normalizedIncoming = filter { it.isLetterOrDigit() }
+        return normalizedIncoming.length > normalizedExisting.length &&
+            normalizedIncoming.contains(normalizedExisting)
+    }
+
+    private val HYDRATE_SUPERSET_MESSAGE_TYPES = setOf(
+        TimelineMessageType.ASSISTANT,
+        TimelineMessageType.REASONING,
+    )
+
+    /** Rows to scan back for the superseded streamed row. */
+    private const val HYDRATE_SUPERSET_LOOKBACK = 30
+
+    /** Coincidence guard: short rows are never collapsed on content alone. */
+    private const val HYDRATE_SUPERSET_MIN_CHARS = 12
+
     private fun attachToolReturnsAndDropStandaloneReturns(
         serverMessages: List<LettaMessage>,
         rawConverted: List<TimelineEvent.Confirmed>,
@@ -296,9 +386,13 @@ internal fun TimelineEvent.identityKeys(): Set<String> {
 private fun TimelineEvent.Confirmed.semanticIdentityKeyOrNull(): String? {
     val stableRunId = runId?.takeIf { it.isNotBlank() } ?: return null
     return when (messageType) {
+        // letta-mobile-zog19: TOOL_CALL deliberately does NOT belong in this
+        // list. It was here from d9356e430, which made the dedicated call-id
+        // branch below (c457d9bc4a) unreachable -- Kotlin's `when` takes the
+        // first matching branch -- so tool calls silently keyed on content and
+        // approval/tool_call pairs never collapsed.
         TimelineMessageType.ASSISTANT,
         TimelineMessageType.REASONING,
-        TimelineMessageType.TOOL_CALL,
         TimelineMessageType.ERROR -> "semantic:${messageType.name}:$stableRunId:${content.trim()}"
         // Hydrated history can expose one logical invocation twice: once as a
         // tool_call_message and once as an approval_request_message. Their
