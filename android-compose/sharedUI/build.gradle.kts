@@ -73,6 +73,9 @@ kotlin {
                 api("com.mikepenz:multiplatform-markdown-renderer-m3:0.41.0")
                 api("com.mikepenz:multiplatform-markdown-renderer-code:0.41.0")
 
+                // Block document editor for canvas notes (letta-mobile-4i2z9.7): Notion-style blocks,
+                // JSON round trip, undo; Android/JVM/iOS/wasm. MIT.
+                implementation("io.github.linreal:cascade-editor:1.9.2")
                 // DrawBox canvas editor (P0)
                 implementation(libs.drawbox)
                 implementation(libs.drawbox.ui)

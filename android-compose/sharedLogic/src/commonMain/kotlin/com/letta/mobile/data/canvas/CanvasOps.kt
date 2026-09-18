@@ -62,6 +62,59 @@ sealed interface CanvasOp {
         val colorHex: String,
     ) : CanvasOp
 
+    /**
+     * Binds (or, with both ends null, unbinds) a connector element's ends to block documents.
+     * Bindings to drawn shapes are DrawBox's own, on the element; this covers what DrawBox does
+     * not know about. Last writer wins per connector.
+     */
+    @Serializable
+    @SerialName("set_arrow_binding")
+    data class SetArrowBindingOp(
+        override val opId: String,
+        override val actorId: String,
+        override val lamport: Long,
+        val elementId: String,
+        val binding: CanvasArrowBinding,
+    ) : CanvasOp
+
+    /** Sets the board's background pattern (kind, spacing, colour); scene-level, last writer wins. */
+    @Serializable
+    @SerialName("set_background_pattern")
+    data class SetBackgroundPatternOp(
+        override val opId: String,
+        override val actorId: String,
+        override val lamport: Long,
+        val pattern: CanvasBackgroundPattern,
+    ) : CanvasOp
+
+    /**
+     * Upserts a block document (a Cascade editor JSON document) attached to the canvas. Documents
+     * live on the board beside the drawing, keyed by [documentId]; last writer wins per document.
+     * A null [frame] keeps the document where it already is, a null [color] keeps its colour and a
+     * null [style] keeps how its text is set.
+     */
+    @Serializable
+    @SerialName("set_document")
+    data class SetDocumentOp(
+        override val opId: String,
+        override val actorId: String,
+        override val lamport: Long,
+        val documentId: String,
+        val documentJson: String,
+        val frame: CanvasDocumentFrame? = null,
+        val color: String? = null,
+        val style: CanvasTextStyle? = null,
+    ) : CanvasOp
+
+    @Serializable
+    @SerialName("remove_document")
+    data class RemoveDocumentOp(
+        override val opId: String,
+        override val actorId: String,
+        override val lamport: Long,
+        val documentId: String,
+    ) : CanvasOp
+
     @Serializable
     @SerialName("batch")
     data class BatchOp(
@@ -83,6 +136,10 @@ fun CanvasOp.withActor(actorId: String): CanvasOp = when (this) {
     is CanvasOp.UpdateElementOp -> copy(actorId = actorId)
     is CanvasOp.RemoveElementOp -> copy(actorId = actorId)
     is CanvasOp.SetBackgroundOp -> copy(actorId = actorId)
+    is CanvasOp.SetBackgroundPatternOp -> copy(actorId = actorId)
+    is CanvasOp.SetArrowBindingOp -> copy(actorId = actorId)
+    is CanvasOp.SetDocumentOp -> copy(actorId = actorId)
+    is CanvasOp.RemoveDocumentOp -> copy(actorId = actorId)
     is CanvasOp.BatchOp -> copy(actorId = actorId, ops = ops.map { it.withActor(actorId) })
 }
 

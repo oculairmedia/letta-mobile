@@ -106,6 +106,9 @@ internal fun DesktopMainContentPane(
             title = canvasDocument?.title ?: "Canvas",
             onClose = actions.onCloseCanvas,
             initialWidth = 540.dp,
+            // The board's own title pill (with its back arrow) is the header: a full pane
+            // header above it only pushed the board down.
+            showHeader = false,
         ) {
             CanvasWorkspace(
                 session = inputs.activeCanvasSession,
