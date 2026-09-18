@@ -55,12 +55,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.letta.mobile.ui.search.LettaSearchConfig
-import com.letta.mobile.ui.search.LettaSearchDropdownContent
-import com.letta.mobile.ui.search.LettaSearchRow
-import com.letta.mobile.ui.search.LettaSearchSection
-import com.letta.mobile.data.desktopshell.TabPickerItem
-import com.letta.mobile.data.desktopshell.TabPickerSearch
 import sh.calvin.reorderable.DragGestureDetector
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
@@ -77,9 +71,6 @@ internal data class DesktopConversationTabActions(
     val onReorder: (conversationId: String, targetIndex: Int) -> Unit = { _, _ -> },
     /** Browser-style "+": a new conversation with the agent of the active tab. Null hides it. */
     val onNewConversation: (() -> Unit)? = null,
-    /** The chevron's picker: this agent's conversations and canvases, most recent first. */
-    val pickerItems: List<TabPickerItem> = emptyList(),
-    val onOpenPickerItem: (TabPickerItem) -> Unit = {},
 )
 
 @Immutable
@@ -341,69 +332,6 @@ internal fun DesktopConversationTabRow(
             )
         }
     }
-    if (actions.pickerItems.isNotEmpty()) {
-        DesktopTabStripPicker(items = actions.pickerItems, onOpen = actions.onOpenPickerItem)
-    }
-    }
-}
-
-/**
- * The chevron beside the "+": a menu of this agent's conversations and canvases with a search
- * field at the top, so a tab for anything the agent owns is a few keystrokes away instead of a
- * trip through the sidebar. Filtering is [TabPickerSearch]'s.
- */
-@Composable
-private fun DesktopTabStripPicker(items: List<TabPickerItem>, onOpen: (TabPickerItem) -> Unit) {
-    var open by remember { mutableStateOf(false) }
-    var query by remember { mutableStateOf("") }
-    Box {
-        IconButton(
-            onClick = { open = true },
-            modifier = Modifier.size(TabControlSize).semantics { contentDescription = "Open conversation or canvas" },
-        ) {
-            Icon(
-                Icons.Outlined.KeyboardArrowDown,
-                contentDescription = null,
-                modifier = Modifier.size(16.dp),
-                tint = MaterialTheme.colorScheme.onSurface,
-            )
-        }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false; query = "" }) {
-            val shown = remember(items, query) { TabPickerSearch.filter(items, query) }
-            val byId = remember(shown) { shown.associateBy { it.id } }
-            LettaSearchDropdownContent(
-                query = query,
-                onQueryChange = { query = it },
-                // One untitled section: a flat list, drawn by the same body the
-                // command palette's sectioned list uses.
-                sections = listOf(
-                    LettaSearchSection(
-                        title = "",
-                        rows = shown.map { item ->
-                            LettaSearchRow(
-                                id = item.id,
-                                label = item.title,
-                                sublabel = item.subtitle,
-                            )
-                        },
-                    ),
-                ),
-                onRowSelected = { row ->
-                    byId[row.id]?.let { item ->
-                        open = false
-                        query = ""
-                        onOpen(item)
-                    }
-                },
-                config = LettaSearchConfig(
-                    placeholder = "Search conversations and canvases",
-                    showSectionHeaders = false,
-                    maxResultsHeight = PickerMaxHeight,
-                    emptyText = { "Nothing matches" },
-                ),
-                modifier = Modifier.width(PickerWidth),
-            )
-        }
     }
 }
 

@@ -51,6 +51,23 @@ import java.awt.Rectangle
 /** Overflow entry points surfaced next to the sidebar toggle while the
  * sidebar is collapsed — see [DesktopSidebarOverflowMenu]. */
 @Immutable
+/**
+ * The header's unified search: a persistent field, with its results in a panel
+ * under it. Not a chevron that opens a menu — the field is always there and is
+ * typed into directly.
+ *
+ * [config] carries the scopes, the "Filter to this agent" toggle and the
+ * placeholder, so the window only has to draw it.
+ */
+internal data class DesktopHeaderSearch(
+    val query: String,
+    val onQueryChange: (String) -> Unit,
+    val sections: List<com.letta.mobile.ui.search.LettaSearchSection>,
+    val onRowSelected: (com.letta.mobile.ui.search.LettaSearchRow) -> Unit,
+    val onDismiss: () -> Unit,
+    val config: com.letta.mobile.ui.search.LettaSearchConfig,
+)
+
 internal data class DesktopHeaderSidebarOverflow(
     val mode: WorkPlayMode,
     val onNewChat: () -> Unit,
@@ -75,14 +92,13 @@ internal data class DesktopHeaderChromeState(
     val onToggleSidebar: () -> Unit,
     val sidebarToggleFocusRequester: FocusRequester? = null,
     val sidebarOverflow: DesktopHeaderSidebarOverflow? = null,
+    val search: DesktopHeaderSearch? = null,
     val conversationTabs: List<DesktopConversationTab> = emptyList(),
     val activeConversationId: String? = null,
     val onSelectConversationTab: (String) -> Unit = {},
     val onCloseConversationTab: (String) -> Unit = {},
     val onReorderConversationTab: (conversationId: String, targetIndex: Int) -> Unit = { _, _ -> },
     val onNewConversationTab: (() -> Unit)? = null,
-    val tabPickerItems: List<com.letta.mobile.data.desktopshell.TabPickerItem> = emptyList(),
-    val onOpenTabPickerItem: (com.letta.mobile.data.desktopshell.TabPickerItem) -> Unit = {},
 ) {
     companion object {
         val Empty = DesktopHeaderChromeState(
@@ -114,6 +130,7 @@ private val TabbedTitleBarHeight = 38.dp
  * to the window's right edge at any width.
  */
 private val IdentityBlockMaxWidth = 320.dp
+private val HeaderSearchWidth = 260.dp
 
 /** Always leaves an unobstructed title-bar lane for native window dragging. */
 private val MinimumTitleBarDragWidth = 96.dp
@@ -255,6 +272,18 @@ internal fun DesktopJewelWindow(
                                 }
                             }
                             Box(modifier = Modifier.width(4.dp))
+                            header.search?.let { search ->
+                                com.letta.mobile.ui.search.LettaSearchAnchoredField(
+                                    query = search.query,
+                                    onQueryChange = search.onQueryChange,
+                                    sections = search.sections,
+                                    onRowSelected = search.onRowSelected,
+                                    onDismiss = search.onDismiss,
+                                    modifier = Modifier.width(HeaderSearchWidth),
+                                    config = search.config,
+                                )
+                            }
+
                             // Agent-first identity: leading avatar, conversation
                             // title over agent name (letta-mobile-3arhe.1).
                             val identity = header.identity
@@ -284,8 +313,6 @@ internal fun DesktopJewelWindow(
                                             onClose = header.onCloseConversationTab,
                                             onReorder = header.onReorderConversationTab,
                                             onNewConversation = header.onNewConversationTab,
-                                            pickerItems = header.tabPickerItems,
-                                            onOpenPickerItem = header.onOpenTabPickerItem,
                                         ),
                                         dragLaneWidth = MinimumTitleBarDragWidth,
                                         modifier = Modifier.fillMaxHeight(),

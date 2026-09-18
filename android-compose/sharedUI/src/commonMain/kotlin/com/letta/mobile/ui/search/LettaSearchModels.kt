@@ -103,7 +103,21 @@ data class LettaSearchAction(
  */
 @Immutable
 data class LettaSearchConfig(
+    /** Heading above the field, e.g. "New conversation". Null draws none. */
+    val title: String? = null,
+    /**
+     * Static label before the field, e.g. "To:". An address-line affordance:
+     * it frames what the field accepts without spending a bordered input on it.
+     */
+    val fieldPrefix: String? = null,
     val placeholder: String = "Search",
+    /**
+     * A horizontal strip above the results — recently used entries, shown as
+     * orb-over-name tiles. Hidden once a query is typed, since at that point
+     * the results themselves are the answer.
+     */
+    val recents: List<LettaSearchRow> = emptyList(),
+    val recentsTitle: String = "Recent",
     /** Scope tabs. Empty (the default) hides the row entirely. */
     val scopes: List<LettaSearchScope> = emptyList(),
     val selectedScopeId: String? = null,

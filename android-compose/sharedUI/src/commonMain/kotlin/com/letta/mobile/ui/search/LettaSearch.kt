@@ -2,6 +2,7 @@ package com.letta.mobile.ui.search
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
@@ -36,7 +38,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
+import com.letta.mobile.ui.chat.AgentOrb
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
@@ -64,6 +71,16 @@ import com.letta.mobile.ui.theme.LettaDimens
  * All dimensions come from [LettaDimens]. This is the reference implementation
  * for that too: no literal in this file.
  */
+/**
+ * Which parts of the scaffold to draw.
+ *
+ * The anchored expression needs the field in the header and everything else in
+ * a panel below it. It selects parts of THIS composable rather than owning a
+ * second copy of the list — there is exactly one implementation of the field,
+ * the scope row, the actions, the empty state and the results.
+ */
+private enum class LettaSearchParts { All, FieldOnly, PanelOnly }
+
 @Composable
 fun LettaSearchBody(
     query: String,
@@ -73,18 +90,56 @@ fun LettaSearchBody(
     modifier: Modifier = Modifier,
     config: LettaSearchConfig = LettaSearchConfig(),
 ) {
+    LettaSearchScaffold(
+        query = query,
+        onQueryChange = onQueryChange,
+        sections = sections,
+        onRowSelected = onRowSelected,
+        modifier = modifier,
+        config = config,
+        parts = LettaSearchParts.All,
+    )
+}
+
+@Composable
+private fun LettaSearchScaffold(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    sections: List<LettaSearchSection>,
+    onRowSelected: (LettaSearchRow) -> Unit,
+    modifier: Modifier,
+    config: LettaSearchConfig,
+    parts: LettaSearchParts,
+) {
     val focusRequester = remember { FocusRequester() }
-    if (config.autoFocus) {
+    if (config.autoFocus && parts != LettaSearchParts.PanelOnly) {
         LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
     }
 
     Column(modifier = modifier) {
-        LettaSearchField(
-            query = query,
-            onQueryChange = onQueryChange,
-            placeholder = config.placeholder,
-            focusRequester = focusRequester,
-        )
+        if (parts != LettaSearchParts.PanelOnly) {
+            config.title?.let { title ->
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(
+                        start = LettaDimens.Space.lg,
+                        top = LettaDimens.Space.md,
+                        end = LettaDimens.Space.lg,
+                    ),
+                )
+            }
+            LettaSearchField(
+                query = query,
+                onQueryChange = onQueryChange,
+                placeholder = config.placeholder,
+                prefix = config.fieldPrefix,
+                focusRequester = focusRequester,
+            )
+        }
+        if (parts == LettaSearchParts.FieldOnly) return@Column
 
         if (config.scopes.isNotEmpty() || config.toggle != null) {
             LettaSearchScopeRow(config)
@@ -92,6 +147,14 @@ fun LettaSearchBody(
 
         config.actions.forEach { action ->
             LettaSearchActionRow(action = action, query = query)
+        }
+
+        if (config.recents.isNotEmpty() && query.isBlank()) {
+            LettaSearchRecentsStrip(
+                title = config.recentsTitle,
+                rows = config.recents,
+                onRowSelected = onRowSelected,
+            )
         }
 
         val rowCount = sections.sumOf { it.rows.size }
@@ -159,6 +222,7 @@ private fun LettaSearchField(
     query: String,
     onQueryChange: (String) -> Unit,
     placeholder: String,
+    prefix: String?,
     focusRequester: FocusRequester,
 ) {
     Row(
@@ -168,12 +232,22 @@ private fun LettaSearchField(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
-        Icon(
-            imageVector = Icons.Outlined.Search,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(LettaDimens.Control.iconSm),
-        )
+        if (prefix == null) {
+            Icon(
+                imageVector = Icons.Outlined.Search,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(LettaDimens.Control.iconSm),
+            )
+        } else {
+            // The prefix replaces the magnifier: "To:" already says what the
+            // field is for, and both together read as two labels on one input.
+            Text(
+                text = prefix,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         BasicTextField(
             value = query,
             onValueChange = onQueryChange,
@@ -182,7 +256,10 @@ private fun LettaSearchField(
                 color = MaterialTheme.colorScheme.onSurface,
             ),
             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-            modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
+            modifier = Modifier
+                .fillMaxWidth()
+                .focusRequester(focusRequester)
+                .testTag(SearchFieldTestTag),
             decorationBox = { inner ->
                 if (query.isEmpty()) {
                     Text(
@@ -272,6 +349,54 @@ private fun LettaSearchActionRow(action: LettaSearchAction, query: String) {
     }
 }
 
+/** Recently used entries as orb-over-name tiles, scrolling horizontally. */
+@Composable
+private fun LettaSearchRecentsStrip(
+    title: String,
+    rows: List<LettaSearchRow>,
+    onRowSelected: (LettaSearchRow) -> Unit,
+) {
+    LettaSearchSectionHeader(title)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.xs),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
+    ) {
+        rows.forEach { row ->
+            Column(
+                modifier = Modifier
+                    .width(RecentTileWidth)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = { onRowSelected(row) },
+                    ),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
+            ) {
+                when (val leading = row.leading) {
+                    is LettaSearchLeading.Orb -> AgentOrb(
+                        index = leading.orbIndex,
+                        size = LettaDimens.Orb.lg,
+                        cornerRadius = LettaDimens.Radius.md,
+                        agentId = leading.agentId,
+                    )
+                    else -> Box(modifier = Modifier.size(LettaDimens.Orb.lg))
+                }
+                Text(
+                    text = row.label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun LettaSearchSectionHeader(title: String) {
     Text(
@@ -335,10 +460,14 @@ private fun LettaSearchResultRow(row: LettaSearchRow, onClick: () -> Unit) {
 }
 
 /**
- * The orb case is intentionally a plain coloured tile here rather than the live
- * `AgentOrb`: this package must stay free of the mascot host so it can be used
- * in surfaces (and tests) that do not provide one. Hosts that want live
- * mascots supply [LettaSearchLeading.Icon] or wrap the row themselves.
+ * The orb case draws the real [AgentOrb], so a result row shows the agent's
+ * live mascot exactly as the rail, the sidebar and the chat header do. That is
+ * the whole point of one search component: an agent looks like itself
+ * everywhere, not like a grey square in search and a mascot elsewhere.
+ *
+ * `AgentOrb` degrades on its own when no mascot host or identity is registered
+ * (it falls back to the gradient), so this costs nothing in surfaces or tests
+ * that do not provide one.
  */
 @Composable
 private fun LettaSearchRowLeading(leading: LettaSearchLeading) {
@@ -350,13 +479,11 @@ private fun LettaSearchRowLeading(leading: LettaSearchLeading) {
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(LettaDimens.Control.icon),
         )
-        is LettaSearchLeading.Orb -> Box(
-            modifier = Modifier
-                .size(LettaDimens.Orb.sm)
-                .background(
-                    MaterialTheme.colorScheme.surfaceContainerHighest,
-                    RoundedCornerShape(LettaDimens.Radius.md),
-                ),
+        is LettaSearchLeading.Orb -> AgentOrb(
+            index = leading.orbIndex,
+            size = LettaDimens.Orb.md,
+            cornerRadius = LettaDimens.Radius.md,
+            agentId = leading.agentId,
         )
     }
 }
@@ -463,6 +590,81 @@ fun LettaSearchPopover(
     }
 }
 
+/**
+ * Anchored field: the header expression.
+ *
+ * The field is ALWAYS visible and typed into directly — it is not hidden behind
+ * a chevron — and the results hang under it in a panel that appears only once
+ * there is something to show. Same [LettaSearchBody] as every other host; the
+ * difference is entirely in where it is drawn.
+ *
+ * The panel is a non-focusable [Popup] on purpose: a focusable one (which is
+ * what `DropdownMenu` is) steals focus from the field the instant results
+ * appear, so the second keystroke goes nowhere.
+ */
+@Composable
+fun LettaSearchAnchoredField(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    sections: List<LettaSearchSection>,
+    onRowSelected: (LettaSearchRow) -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+    config: LettaSearchConfig = LettaSearchConfig(),
+) {
+    // The field alone: the body with results suppressed, so the header row
+    // stays one line high whether or not a search is running.
+    Box(modifier = modifier) {
+        LettaSearchScaffold(
+            query = query,
+            onQueryChange = onQueryChange,
+            sections = emptyList(),
+            onRowSelected = {},
+            modifier = Modifier,
+            config = config,
+            parts = LettaSearchParts.FieldOnly,
+        )
+        // Only once something is typed. TextMatch treats a blank query as
+        // "matches everything", so keying the panel off whether there are rows
+        // meant it hung open under an empty field from the moment it mounted.
+        if (query.isNotBlank()) {
+            Popup(
+                alignment = Alignment.TopStart,
+                offset = IntOffset(0, 0),
+                onDismissRequest = onDismiss,
+                properties = PopupProperties(focusable = false),
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .padding(top = AnchoredPanelTopInset)
+                        .widthIn(min = AnchoredPanelMinWidth, max = AnchoredPanelMaxWidth),
+                    shape = RoundedCornerShape(LettaDimens.Radius.lg),
+                    color = MaterialTheme.colorScheme.surfaceContainer,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    shadowElevation = PopoverElevation,
+                ) {
+                    // The field is drawn above, so the panel shows everything
+                    // else: scopes, the filter toggle, actions and results.
+                    LettaSearchScaffold(
+                        query = query,
+                        onQueryChange = onQueryChange,
+                        sections = sections,
+                        onRowSelected = onRowSelected,
+                        modifier = Modifier,
+                        config = config.copy(
+                            maxResultsHeight = config.maxResultsHeight ?: AnchoredPanelMaxHeight,
+                        ),
+                        parts = LettaSearchParts.PanelOnly,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Stable handle for tests and automation to type into any Letta search. */
+const val SearchFieldTestTag: String = "letta-search-field"
+
 private const val WEIGHT_FILL = 1f
 private const val ScrimAlpha = 0.45f
 
@@ -475,3 +677,8 @@ private val PopoverMinWidth = 520.dp
 private val PopoverMaxWidth = 640.dp
 private val PopoverMaxResultsHeight = 420.dp
 private val PopoverElevation = 8.dp
+private val AnchoredPanelMinWidth = 360.dp
+private val AnchoredPanelMaxWidth = 520.dp
+private val AnchoredPanelMaxHeight = 420.dp
+private val AnchoredPanelTopInset = 36.dp
+private val RecentTileWidth = 64.dp
