@@ -234,6 +234,155 @@ class CanvasSession(
     /**
      * Diffs [newJson] against current scene and applies the resulting operations locally.
      */
+    /** The canvas's block documents as of the current scene. */
+    fun documents(): List<CanvasSceneDocument> = CanvasOpProjector.documentsOf(sceneJsonOrEmpty())
+
+    /**
+     * Writes a block document (Cascade JSON) as a local op, placing it at [frame] and colouring it
+     * [color] when given; a no-op when nothing would change.
+     */
+    suspend fun setDocument(
+        documentId: String,
+        documentJson: String,
+        actorId: String = LOCAL_USER_ACTOR_ID,
+        frame: CanvasDocumentFrame? = null,
+        color: String? = null,
+        style: CanvasTextStyle? = null,
+    ): CanvasDocument? {
+        val existing = documents().firstOrNull { it.id == documentId }
+        val unchanged = existing?.json == documentJson &&
+            (frame == null || frame == existing.frame) &&
+            (color == null || color == existing.color) &&
+            (style == null || style == existing.style)
+        if (unchanged) return null
+        return applyLocal(
+            CanvasOp.SetDocumentOp(
+                opId = CanvasOpDiffer.generateOpId("doc"),
+                actorId = actorId,
+                lamport = lamportClock + 1,
+                documentId = documentId,
+                documentJson = documentJson,
+                frame = frame,
+                color = color,
+                style = style,
+            ),
+        )
+    }
+
+    /** Changes how a block document's text is set; a no-op for a document that is not there. */
+    suspend fun restyleDocument(
+        documentId: String,
+        style: CanvasTextStyle,
+        actorId: String = LOCAL_USER_ACTOR_ID,
+    ): CanvasDocument? {
+        val existing = documents().firstOrNull { it.id == documentId } ?: return null
+        return setDocument(documentId, existing.json, actorId, style = style)
+    }
+
+    /** Recolours a block document on the board; a no-op for a document that is not there. */
+    suspend fun recolorDocument(
+        documentId: String,
+        colorHex: String,
+        actorId: String = LOCAL_USER_ACTOR_ID,
+    ): CanvasDocument? {
+        val existing = documents().firstOrNull { it.id == documentId } ?: return null
+        return setDocument(documentId, existing.json, actorId, color = colorHex)
+    }
+
+    /** Moves or resizes a block document on the board; a no-op for a document that is not there. */
+    suspend fun moveDocument(
+        documentId: String,
+        frame: CanvasDocumentFrame,
+        actorId: String = LOCAL_USER_ACTOR_ID,
+    ): CanvasDocument? {
+        val existing = documents().firstOrNull { it.id == documentId } ?: return null
+        return setDocument(documentId, existing.json, actorId, frame)
+    }
+
+    /** Connector ends bound to block documents, by connector element id. */
+    fun arrowBindings(): Map<String, CanvasArrowBinding> = CanvasOpProjector.arrowBindingsOf(sceneJsonOrEmpty())
+
+    /** Binds a connector's ends to documents (both null unbinds); a no-op when already so. */
+    suspend fun bindArrow(
+        elementId: String,
+        binding: CanvasArrowBinding,
+        actorId: String = LOCAL_USER_ACTOR_ID,
+    ): CanvasDocument? {
+        val current = arrowBindings()[elementId] ?: CanvasArrowBinding()
+        if (current == binding) return null
+        return applyLocal(
+            CanvasOp.SetArrowBindingOp(
+                opId = CanvasOpDiffer.generateOpId("bind"),
+                actorId = actorId,
+                lamport = lamportClock + 1,
+                elementId = elementId,
+                binding = binding,
+            ),
+        )
+    }
+
+    /** The board's background pattern as of the current scene; null when none was set. */
+    fun backgroundPattern(): CanvasBackgroundPattern? = CanvasOpProjector.backgroundPatternOf(sceneJsonOrEmpty())
+
+    /** Sets the board's background pattern as a local op; a no-op when it is already that. */
+    suspend fun setBackgroundPattern(
+        pattern: CanvasBackgroundPattern,
+        actorId: String = LOCAL_USER_ACTOR_ID,
+    ): CanvasDocument? {
+        if (backgroundPattern() == pattern) return null
+        return applyLocal(
+            CanvasOp.SetBackgroundPatternOp(
+                opId = CanvasOpDiffer.generateOpId("bg"),
+                actorId = actorId,
+                lamport = lamportClock + 1,
+                pattern = pattern,
+            ),
+        )
+    }
+
+    /**
+     * Moves several block documents at once, as one batch with one set_document op per document,
+     * so a group drag lands as a single revision and peers see the notes move together. Documents
+     * that are not there, or already at their frame, are skipped; nothing to do returns null.
+     */
+    suspend fun moveDocuments(
+        frames: Map<String, CanvasDocumentFrame>,
+        actorId: String = LOCAL_USER_ACTOR_ID,
+    ): CanvasDocument? {
+        val existing = documents().associateBy { it.id }
+        val ops = frames.mapNotNull { (id, frame) ->
+            val doc = existing[id] ?: return@mapNotNull null
+            if (doc.frame == frame) return@mapNotNull null
+            CanvasOp.SetDocumentOp(
+                opId = CanvasOpDiffer.generateOpId("doc"),
+                actorId = actorId,
+                lamport = lamportClock + 1,
+                documentId = id,
+                documentJson = doc.json,
+                frame = frame,
+            )
+        }
+        if (ops.isEmpty()) return null
+        return applyLocal(
+            CanvasOp.BatchOp(
+                opId = CanvasOpDiffer.generateOpId("batch"),
+                actorId = actorId,
+                lamport = lamportClock + 1,
+                ops = ops,
+            ),
+        )
+    }
+
+    suspend fun removeDocument(documentId: String, actorId: String = LOCAL_USER_ACTOR_ID): CanvasDocument =
+        applyLocal(
+            CanvasOp.RemoveDocumentOp(
+                opId = CanvasOpDiffer.generateOpId("doc"),
+                actorId = actorId,
+                lamport = lamportClock + 1,
+                documentId = documentId,
+            ),
+        )
+
     suspend fun applyLocalScene(newJson: String, actorId: String = LOCAL_USER_ACTOR_ID): List<CanvasOp> {
         val doc = currentDoc()
         if (doc.acl != null && !doc.acl.canWrite(actorId)) {

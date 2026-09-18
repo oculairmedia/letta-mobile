@@ -1,14 +1,18 @@
 package com.letta.mobile.ui.canvas
 
 import io.ak1.drawbox.domain.model.Element
+import io.ak1.drawbox.domain.model.Intent
 import io.ak1.drawbox.domain.model.Mode
+import io.ak1.drawbox.domain.model.ShapeType
 import io.ak1.drawbox.domain.model.State
+import io.ak1.drawbox.domain.model.StrokeStyle
 import io.ak1.drawbox.presentation.viewmodel.DrawBoxController
 import io.ak1.drawbox.ui.controls.ControlsBarIntent
 import io.ak1.drawbox.ui.controls.ControlsBarState
 
 /**
- * Bridges DrawBoxController state and intents with DrawBox UI ControlsBar.
+ * Bridges DrawBoxController state and intents with DrawBox UI ControlsBar, and with the board's
+ * own property control for what DrawBox's bar state does not carry (width, opacity, dash, radius).
  */
 object CanvasControlsBridge {
     fun buildControlsBarState(
@@ -43,6 +47,27 @@ object CanvasControlsBridge {
         )
     }
 
+    /**
+     * The properties the master control shows for the selection, read from its first shape or
+     * stroke, or for the current tool when nothing is selected. Corner radius only applies to
+     * rectangles, so it is offered when one is selected or about to be drawn.
+     */
+    fun buildProperties(state: State): CanvasProperties {
+        val selected = state.elements.filter { it.id in state.selectedIds }
+        val shape = selected.filterIsInstance<Element.Shape>().firstOrNull()
+        val path = selected.filterIsInstance<Element.Path>().firstOrNull()
+        val text = selected.filterIsInstance<Element.Text>().firstOrNull()
+        val hasRectangle = selected.any { it is Element.Shape && it.shapeType == ShapeType.RECTANGLE }
+        return CanvasProperties(
+            selectionCount = selected.size,
+            strokeWidth = shape?.strokeWidth ?: path?.strokeWidth ?: state.strokeWidth,
+            opacity = path?.alpha ?: text?.opacity ?: state.opacity,
+            strokeStyle = shape?.strokeStyle ?: state.currentItemStrokeStyle,
+            cornerRadius = shape?.cornerRadius ?: state.currentItemCornerRadius,
+            showCornerRadius = hasRectangle || (selected.isEmpty() && state.mode == Mode.RECTANGLE),
+        )
+    }
+
     fun dispatchIntent(
         controller: DrawBoxController,
         intent: ControlsBarIntent,
@@ -66,4 +91,66 @@ object CanvasControlsBridge {
             }
         }
     }
+
+    /**
+     * Applies a property change to every selected element, or to the tool defaults when nothing
+     * is selected. DrawBox keeps opacity per stroke and per text but not per shape, and has no
+     * selection-wide opacity intent, so a selection's strokes and texts are rewritten one by one
+     * and the tool default is set alongside, which is what the next stroke inherits.
+     */
+    fun dispatchProperty(
+        controller: DrawBoxController,
+        intent: CanvasPropertyIntent,
+        state: State,
+    ) {
+        val hasSelection = state.selectedIds.isNotEmpty()
+        when (intent) {
+            is CanvasPropertyIntent.SetStrokeWidth -> {
+                if (hasSelection) controller.setSelectionStrokeWidth(intent.width)
+                else controller.setStrokeWidth(intent.width)
+            }
+            is CanvasPropertyIntent.SetStrokeStyle -> {
+                if (hasSelection) controller.setSelectionStrokeStyle(intent.style)
+                else controller.setStrokeStyle(intent.style)
+            }
+            is CanvasPropertyIntent.SetCornerRadius -> {
+                if (hasSelection) controller.setSelectionCornerRadius(intent.radius)
+                else controller.setCornerRadius(intent.radius)
+            }
+            is CanvasPropertyIntent.SetOpacity -> {
+                controller.setOpacity(intent.opacity)
+                if (!hasSelection) return
+                state.elements
+                    .filter { it.id in state.selectedIds }
+                    .forEach { element ->
+                        when (element) {
+                            is Element.Path -> controller.onIntent(Intent.UpdateElement(element.copy(alpha = intent.opacity)))
+                            is Element.Text -> controller.onIntent(Intent.UpdateElement(element.copy(opacity = intent.opacity)))
+                            else -> Unit
+                        }
+                    }
+            }
+        }
+    }
+}
+
+/** What the master control shows for a drawing selection or the current tool. */
+data class CanvasProperties(
+    val selectionCount: Int,
+    val strokeWidth: Float,
+    val opacity: Float,
+    val strokeStyle: StrokeStyle,
+    val cornerRadius: Float,
+    val showCornerRadius: Boolean,
+)
+
+/**
+ * The property changes DrawBox's own bar intents do not cover. Kept apart from
+ * [ControlsBarIntent] because that interface is sealed in its module.
+ */
+sealed interface CanvasPropertyIntent {
+    data class SetStrokeWidth(val width: Float) : CanvasPropertyIntent
+    data class SetOpacity(val opacity: Float) : CanvasPropertyIntent
+    data class SetStrokeStyle(val style: StrokeStyle) : CanvasPropertyIntent
+    data class SetCornerRadius(val radius: Float) : CanvasPropertyIntent
 }
