@@ -666,9 +666,9 @@ private fun ProjectIssueCompletedTimelineCard(
                                     position = position,
                                     pointColor = if (isHighlighted) highlightPointColor else pointColor,
                                     pointFillColor = if (isHighlighted) highlightPointFill else pointFillColor,
-                                    pointRadius = if (isHighlighted) LettaDimens.Space.md else LettaDimens.Space.md,
+                                    pointRadius = if (isHighlighted) LettaDimens.Space.md else LettaDimens.Radius.md,
                                     pointStrokeColor = if (isHighlighted) highlightStroke else pointStrokeColor,
-                                    pointStrokeWidth = if (isHighlighted) LettaDimens.Space.hair else 1.dp,
+                                    pointStrokeWidth = if (isHighlighted) LettaDimens.Space.hair else LettaDimens.Stroke.hairline,
                                     pointType = EventPointType.filled(1f),
                                 ),
                             ) {

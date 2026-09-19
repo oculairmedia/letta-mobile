@@ -61,7 +61,7 @@ internal fun RunActivityDisclosure(
     val horizontalPadding = if (isSimpleMode) LettaDimens.Space.hair else LettaDimens.Space.xs
     val verticalPadding = LettaDimens.Space.hair
     val minHeight = if (canToggle) LettaDimens.Orb.railSlotHeight else if (isSimpleMode) LettaDimens.Space.xl else LettaDimens.Space.xxl
-    val iconSize = if (isSimpleMode) LettaDimens.Space.lg else LettaDimens.Space.lg
+    val iconSize = if (isSimpleMode) LettaDimens.Control.iconSm else LettaDimens.Control.icon
     val textStyle = if (isSimpleMode) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium
     val spacing = if (isSimpleMode) LettaDimens.Space.xs else LettaDimens.Space.sm
 
