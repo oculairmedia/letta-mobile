@@ -78,6 +78,11 @@ kotlin {
                 implementation("io.github.linreal:cascade-editor:1.9.2")
                 // DrawBox canvas editor (P0)
                 implementation(libs.drawbox)
+                // Connector geometry only (letta-mobile-4i2z9.21). Kuiver's EdgePathFactory is a
+                // pure function of two points, so it computes where a connector runs while DrawBox
+                // keeps owning the element, its selection, undo and eraser. Its graph layout and
+                // renderer are deliberately unused here.
+                implementation(libs.kuiver)
                 implementation(libs.drawbox.ui)
                 // DrawBoxController inherits from androidx.lifecycle.ViewModel; exposed as api so consumers resolve ViewModel hierarchy.
                 api(libs.androidx.lifecycle.viewmodel)

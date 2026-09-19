@@ -509,8 +509,11 @@ fun CanvasWorkspace(
                     arrowBindings.forEach { (elementId, binding) ->
                         val connector = state.elements.firstOrNull { it.id == elementId } as? io.ak1.drawbox.domain.model.Element.Shape
                             ?: return@forEach
-                        CanvasSnapping.follow(connector, binding, id, frame)?.let { points ->
-                            controller.onIntent(io.ak1.drawbox.domain.model.Intent.SetElementPoints(elementId, points))
+                        CanvasSnapping.follow(connector, binding, id, frame)?.let { geometry ->
+                            controller.onIntent(io.ak1.drawbox.domain.model.Intent.SetElementPoints(elementId, geometry.points))
+                            if (geometry.bend != connector.bend) {
+                                controller.onIntent(io.ak1.drawbox.domain.model.Intent.SetLineBend(elementId, geometry.bend))
+                            }
                         }
                     }
                 }
