@@ -149,10 +149,12 @@ private fun CanvasNoteCard(
     val screenTopLeft = viewport.worldToScreen(Offset(frame.x + selection.groupOffset.x, frame.y + selection.groupOffset.y))
     val scale = viewport.scale
     val tint = parseHexColor(document.color)
-    // A "plain" note (transparent colour) is text sitting on the board: no card until it is active.
+    // A "plain" note (transparent colour) is text sitting on the board, and stays that way even
+    // while you work in it: the translucent slab that used to appear on activation read as a
+    // half-loaded card. Selection is said by the chrome now, which is what the shapes use.
     val plain = tint != null && tint.alpha == 0f
     val cardColor = when {
-        plain -> if (active) MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.6f) else Color.Transparent
+        plain -> Color.Transparent
         else -> tint ?: MaterialTheme.colorScheme.surfaceContainerHigh
     }
     val onCard = if (tint != null && !plain) contrastOn(tint) else MaterialTheme.colorScheme.onSurfaceVariant
@@ -167,7 +169,10 @@ private fun CanvasNoteCard(
         scope.launch { runCatching { session.moveDocument(document.id, committed) } }
     }
 
-    Surface(
+    // The card and its selection chrome share one placed, scaled box: the chrome draws OUTSIDE the
+    // card's bounds (the Surface clips to its shape), and it has to follow a drag, so it cannot
+    // live in the layer above.
+    Box(
         modifier = Modifier
             .offset { IntOffset(screenTopLeft.x.roundToInt(), screenTopLeft.y.roundToInt()) }
             .size(width = widthDp, height = heightDp)
@@ -175,7 +180,11 @@ private fun CanvasNoteCard(
                 scaleX = scale
                 scaleY = scale
                 transformOrigin = TransformOrigin(0f, 0f)
-            }
+            },
+    ) {
+    Surface(
+        modifier = Modifier
+            .fillMaxSize()
             .semantics { contentDescription = "Note ${document.id}" }
             // Taps and drags on the card belong to the note, never to the drawing beneath it; a
             // tap anywhere on it (the editor's own taps included, in the initial pass) makes it
@@ -192,8 +201,10 @@ private fun CanvasNoteCard(
             .pointerInput(document.id) { detectTapGestures(onTap = {}) },
         shape = RoundedCornerShape(NOTE_CORNER),
         color = cardColor,
+        // Selection is drawn by CanvasSelectionChrome, the same chrome a shape gets. The card's
+        // own border is only the resting outline of a coloured note.
         border = when {
-            active || selection.selected -> BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.primary)
+            active || selection.selected -> null
             plain -> null
             else -> BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
         },
@@ -259,6 +270,16 @@ private fun CanvasNoteCard(
                     onDragEnd = ::commit,
                 )
             }
+        }
+    }
+
+        // The same chrome a selected shape gets, over the card and outside its bounds.
+        if (active || selection.selected) {
+            CanvasSelectionChrome(
+                style = canvasSelectionStyle(),
+                scale = scale,
+                modifier = Modifier.matchParentSize(),
+            )
         }
     }
 }

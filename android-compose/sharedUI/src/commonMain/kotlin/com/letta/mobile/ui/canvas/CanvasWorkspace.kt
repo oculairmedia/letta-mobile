@@ -404,6 +404,8 @@ fun CanvasWorkspace(
             DrawBox(
                 state = state,
                 onIntent = controller::onIntent,
+                // Shapes and notes share one selection look; see CanvasSelectionChrome.
+                selectionStyle = canvasSelectionStyle(),
                 modifier = Modifier
                     .fillMaxSize()
                     .clipToBounds()
