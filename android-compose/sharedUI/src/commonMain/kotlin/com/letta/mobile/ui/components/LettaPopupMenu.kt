@@ -9,15 +9,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import com.letta.mobile.ui.theme.LettaDimens
 
 /** One row of a [LettaPopupMenu]. */
@@ -35,11 +34,13 @@ data class LettaMenuItem(
  *
  * Every menu goes through here so they all look the same and a design change is one edit.
  *
- * A chosen item runs on the frame AFTER the menu closes. A menu is its own scene layer, with its
- * own root node, and an item that acts immediately does so while that layer is being torn down -
- * so an action that replaces what is on screen (opening the canvas, navigating away) leaves the
- * scene measuring a root node it has already disposed, which throws on the render thread and
- * takes the app down. Waiting one frame costs nothing a person can perceive.
+ * A chosen item runs just after the menu closes, on a scope that does not belong to the menu.
+ *
+ * Both halves are necessary. The wait keeps screen-replacing work (opening the canvas, navigating
+ * away) off the frame that tears the popup's own scene layer down. And the scope has to outlive
+ * the popup, because callers dismiss by removing it - `if (menuOpen) { LettaPopupMenu(...) }` -
+ * so an effect owned by this composable is cancelled before it can run, and every menu item in
+ * the app silently does nothing.
  */
 @Composable
 fun LettaPopupMenu(
@@ -48,16 +49,6 @@ fun LettaPopupMenu(
     items: List<LettaMenuItem>,
     modifier: Modifier = Modifier,
 ) {
-    var chosen by remember { mutableStateOf<(() -> Unit)?>(null) }
-    LaunchedEffect(chosen) {
-        val action = chosen ?: return@LaunchedEffect
-        // The action runs BEFORE the state is cleared. Clearing first re-keys this effect, which
-        // cancels it at the very next suspension point - and withFrameNanos is one, so the action
-        // was dropped and every menu in the app stopped doing anything at all.
-        withFrameNanos { }
-        action()
-        chosen = null
-    }
     DropdownMenu(
         expanded = expanded,
         onDismissRequest = onDismiss,
@@ -88,9 +79,30 @@ fun LettaPopupMenu(
                 contentPadding = PaddingValues(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.hair),
                 onClick = {
                     onDismiss()
-                    chosen = item.onClick
+                    runMenuAction(item.onClick)
                 },
             )
         }
     }
 }
+
+/**
+ * Runs a chosen menu item once the menu has gone.
+ *
+ * Deliberately not a composition-owned scope: the popup is usually removed from the composition by
+ * its own dismiss handler, and anything belonging to it dies with it. [MENU_ACTION_DELAY_MS] is
+ * about one frame, long enough for the dismissal to be laid out and short enough that no one sees
+ * it, and the action still runs on the main dispatcher like any other click.
+ */
+private fun runMenuAction(action: () -> Unit) {
+    menuActionScope.launch {
+        delay(MENU_ACTION_DELAY_MS)
+        action()
+    }
+}
+
+/** Outlives every popup on purpose; see [runMenuAction]. */
+private val menuActionScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+/** One frame at 60Hz: the dismissal is laid out before the action replaces what is on screen. */
+private const val MENU_ACTION_DELAY_MS = 16L

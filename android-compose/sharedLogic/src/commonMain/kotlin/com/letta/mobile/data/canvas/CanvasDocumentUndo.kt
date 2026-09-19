@@ -28,12 +28,24 @@ object CanvasDocumentUndo {
     }
 
     /**
-     * Undoing a batch means undoing its parts in the opposite order: a batch that removes a note
-     * and then moves another has to put the moved one back first, or the restore lands on a scene
-     * the second inverse no longer describes.
+     * Undoing a batch means undoing its parts in the opposite order, each against the documents as
+     * they were IMMEDIATELY BEFORE that part ran.
+     *
+     * Both halves matter and they are different. Reverse order is needed because a batch that
+     * removes one note and moves another has to put the moved one back first. Sequential state is
+     * needed because children can depend on each other: a batch that creates a note and then edits
+     * it has a second child whose "before" is the note the FIRST child created, not the scene the
+     * batch started from. Computing every inverse against the pre-batch state undoes that edit to
+     * a document that did not exist yet, and the undo writes a note back rather than removing it.
      */
     private fun inverseOfBatch(change: CanvasOp.BatchOp, before: List<CanvasSceneDocument>): CanvasOp? {
-        val inverses = change.ops.reversed().mapNotNull { inverseOf(it, before) }
+        var state = before
+        val inversesInOrder = change.ops.map { child ->
+            val inverse = inverseOf(child, state)
+            state = project(child, state)
+            inverse
+        }
+        val inverses = inversesInOrder.reversed().filterNotNull()
         if (inverses.isEmpty()) return null
         return CanvasOp.BatchOp(
             opId = CanvasOpDiffer.generateOpId("undo"),
@@ -42,6 +54,32 @@ object CanvasDocumentUndo {
             ops = inverses,
         )
     }
+
+    /**
+     * [documents] with [change] applied, for walking a batch child by child.
+     *
+     * This mirrors what the projector does to the scene, for documents only: it exists so an
+     * inverse can be taken against the state its own child actually saw.
+     */
+    private fun project(change: CanvasOp, documents: List<CanvasSceneDocument>): List<CanvasSceneDocument> =
+        when (change) {
+            is CanvasOp.SetDocumentOp -> {
+                val existing = documents.firstOrNull { it.id == change.documentId }
+                val updated = CanvasSceneDocument(
+                    id = change.documentId,
+                    json = change.documentJson,
+                    // A null field means "leave it alone", which is what setDocument does, so the
+                    // projection has to keep the old value rather than clearing it.
+                    frame = change.frame ?: existing?.frame,
+                    color = change.color ?: existing?.color,
+                    style = change.style ?: existing?.style,
+                )
+                if (existing == null) documents + updated else documents.map { if (it.id == updated.id) updated else it }
+            }
+            is CanvasOp.RemoveDocumentOp -> documents.filterNot { it.id == change.documentId }
+            is CanvasOp.BatchOp -> change.ops.fold(documents) { acc, child -> project(child, acc) }
+            else -> documents
+        }
 
     private fun inverseOfSet(change: CanvasOp.SetDocumentOp, previous: CanvasSceneDocument?): CanvasOp? {
         // A document that did not exist is undone by removing it again.

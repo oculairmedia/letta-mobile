@@ -144,4 +144,97 @@ class CanvasDocumentUndoTest {
         )
         assertNull(CanvasDocumentUndo.inverseOf(batch, listOf(existing)))
     }
+
+    @Test
+    fun createThenEditInOneBatchUndoesBackToNothing() {
+        // The second child's "before" is the note the FIRST child created. Taken against the
+        // pre-batch scene instead, its inverse writes a note back that should have been removed.
+        val batch = CanvasOp.BatchOp(
+            opId = "op-6",
+            actorId = "local_user",
+            lamport = 6L,
+            ops = listOf(
+                set(id = "note-new", json = """{"blocks":["first"]}"""),
+                set(id = "note-new", json = """{"blocks":["edited"]}"""),
+            ),
+        )
+
+        val inverse = CanvasDocumentUndo.inverseOf(batch, before = emptyList())
+
+        assertTrue(inverse is CanvasOp.BatchOp)
+        // Undoing has to END with the note gone, whatever it does on the way.
+        val last = inverse.ops.last()
+        assertTrue(last is CanvasOp.RemoveDocumentOp, "the created note must end up removed, got $last")
+        assertEquals("note-new", last.documentId)
+    }
+
+    @Test
+    fun removeThenRecreateInOneBatchUndoesToTheOriginal() {
+        val original = document(id = "note-1", json = """{"blocks":["original"]}""")
+        val batch = CanvasOp.BatchOp(
+            opId = "op-7",
+            actorId = "local_user",
+            lamport = 7L,
+            ops = listOf(
+                CanvasOp.RemoveDocumentOp("op-7a", "local_user", 7L, original.id),
+                set(id = original.id, json = """{"blocks":["recreated"]}"""),
+            ),
+        )
+
+        val inverse = CanvasDocumentUndo.inverseOf(batch, listOf(original))
+
+        assertTrue(inverse is CanvasOp.BatchOp)
+        // The recreate is undone first (it saw an absent note, so its inverse removes), and the
+        // removal is undone last, putting the original back exactly as it was.
+        val last = inverse.ops.last()
+        assertTrue(last is CanvasOp.SetDocumentOp)
+        assertEquals(original.json, last.documentJson)
+        assertEquals(original.frame, last.frame)
+        assertEquals(original.color, last.color)
+    }
+
+    @Test
+    fun aRepeatedSetOnlyUndoesToTheStateBeforeTheBatch() {
+        val original = document(id = "note-1", json = """{"blocks":["v1"]}""")
+        val batch = CanvasOp.BatchOp(
+            opId = "op-8",
+            actorId = "local_user",
+            lamport = 8L,
+            ops = listOf(
+                set(id = original.id, json = """{"blocks":["v2"]}"""),
+                set(id = original.id, json = """{"blocks":["v3"]}"""),
+            ),
+        )
+
+        val inverse = CanvasDocumentUndo.inverseOf(batch, listOf(original))
+
+        assertTrue(inverse is CanvasOp.BatchOp)
+        // Whatever the intermediate steps say, the last write must restore v1 - not v2, which is
+        // what a pre-batch-state inverse would leave behind.
+        val last = inverse.ops.last() as CanvasOp.SetDocumentOp
+        assertEquals("""{"blocks":["v1"]}""", last.documentJson)
+    }
+
+    @Test
+    fun aBatchOverTwoDocumentsUndoesEachToItsOwnPriorState() {
+        val first = document(id = "note-1", json = """{"blocks":["one"]}""")
+        val batch = CanvasOp.BatchOp(
+            opId = "op-9",
+            actorId = "local_user",
+            lamport = 9L,
+            ops = listOf(
+                set(id = first.id, json = """{"blocks":["one-edited"]}"""),
+                set(id = "note-2", json = """{"blocks":["two-new"]}"""),
+            ),
+        )
+
+        val inverse = CanvasDocumentUndo.inverseOf(batch, listOf(first)) as CanvasOp.BatchOp
+
+        // note-2 was created by this batch, so its inverse removes it; note-1 existed, so its
+        // inverse restores the text it had.
+        val removal = inverse.ops.filterIsInstance<CanvasOp.RemoveDocumentOp>().single()
+        assertEquals("note-2", removal.documentId)
+        val restore = inverse.ops.filterIsInstance<CanvasOp.SetDocumentOp>().single()
+        assertEquals(first.json, restore.documentJson)
+    }
 }

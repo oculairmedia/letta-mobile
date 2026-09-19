@@ -5,6 +5,8 @@ package com.letta.mobile.desktop.canvas
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.performClick
@@ -19,6 +21,7 @@ import io.ak1.drawbox.domain.usecase.UseCase
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 
 /**
@@ -74,6 +77,7 @@ class CanvasNoteChecklistUiTest {
 
         onNodeWithContentDescription("Add note").performClick()
         waitUntil(timeoutMillis = 5000) { session.documents().size == 1 }
+        val firstNoteId = session.documents().single().id
         onNodeWithContentDescription("To-do").performClick()
         waitUntil(timeoutMillis = 5000) { onAllNodes(isCheckbox).fetchSemanticsNodes().isNotEmpty() }
 
@@ -82,15 +86,26 @@ class CanvasNoteChecklistUiTest {
         onNodeWithContentDescription("Add note").performClick()
         waitUntil(timeoutMillis = 5000) { session.documents().size == 2 }
         waitForIdle()
+        val secondNoteId = session.documents().first { it.id != firstNoteId }.id
 
         val frames = session.documents().mapNotNull { it.frame }
         assertEquals(2, frames.size)
         assertNotEquals(frames[0].x to frames[0].y, frames[1].x to frames[1].y)
 
-        // And the checklist on the older note - no longer the active one - still ticks.
-        onAllNodes(isCheckbox).onFirst().performClick()
-        waitUntil(timeoutMillis = 5000) {
-            session.documents().any { it.json.contains("\"checked\":true") }
-        }
+        // Target THAT note's checkbox, not "the first checkbox on screen". Clicking whatever is
+        // topmost and accepting any document that changed is how this test passed while the older
+        // note was buried and unclickable - the exact defect it is meant to catch.
+        onNode(isCheckbox and hasAnyAncestor(hasContentDescription("Note $firstNoteId")))
+            .performClick()
+
+        waitUntil(timeoutMillis = 5000) { session.documentJson(firstNoteId).contains("\"checked\":true") }
+        assertFalse(
+            session.documentJson(secondNoteId).contains("\"checked\":true"),
+            "the second note was ticked instead of the first",
+        )
     }
+
+    /** The stored text of one document, so a test can name which note it means. */
+    private fun CanvasSession.documentJson(id: String): String =
+        documents().firstOrNull { it.id == id }?.json.orEmpty()
 }

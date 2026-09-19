@@ -32,6 +32,14 @@ class RecoverableRenderErrorTest {
     }
 
     @Test
+    fun anUnrelatedObjectReportingTheSamePhraseIsStillFatal() {
+        // The phrase alone is not the fault. A session, a transport or anything else saying it is
+        // disposed is a real failure, and swallowing it would hide exactly what we need to see.
+        assertFalse(isRecoverableRenderError(IllegalArgumentException("CanvasSession is already disposed")))
+        assertFalse(isRecoverableRenderError(IllegalArgumentException("DesktopWsChannelTransport is already disposed")))
+    }
+
+    @Test
     fun aDifferentExceptionWithTheSameWordsIsStillFatal() {
         // Only the render path throws this as an IllegalArgumentException. A disposed-something
         // IllegalStateException is a different fault and must still be reported.

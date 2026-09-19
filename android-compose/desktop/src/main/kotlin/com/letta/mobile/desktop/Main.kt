@@ -271,10 +271,14 @@ private val loggedRecoverableRenderError = java.util.concurrent.atomic.AtomicBoo
  * scheduled - closing a menu while the screen behind it is replaced is enough. The frame is lost
  * either way; the only question is whether the app goes with it.
  *
- * Deliberately narrow: this is the one message, on the one exception type. Anything else is still
- * a crash, still reported, and still exits, because an app that swallows every render error hides
- * the faults that matter.
+ * Deliberately narrow: the owner Compose names, on the one exception type. "is already disposed"
+ * on its own was too broad - a session, a transport or any other object reporting the same phrase
+ * would have been swallowed with it, and an app that hides the faults that matter is worse than
+ * one that exits on a frame it could have survived.
  */
 internal fun isRecoverableRenderError(throwable: Throwable): Boolean =
     throwable is IllegalArgumentException &&
-        throwable.message?.contains("is already disposed", ignoreCase = true) == true
+        throwable.message?.contains(DISPOSED_SCENE_OWNER, ignoreCase = true) == true
+
+/** What Compose throws when it measures a scene layer whose root node has gone. */
+private const val DISPOSED_SCENE_OWNER = "RootNodeOwner is already disposed"
