@@ -83,6 +83,10 @@ kotlin {
                 // keeps owning the element, its selection, undo and eraser. Its graph layout and
                 // renderer are deliberately unused here.
                 implementation(libs.kuiver)
+                // Colour picking (anyColorPicker, Apache-2.0): HSL/RGB/CMYK/LAB/Okhsl pickers with
+                // zero-drift conversions, published for android and jvm like everything else here.
+                // Replaces three hand-rolled sliders that only spoke HSL and drifted on round trip.
+                implementation(libs.colorpicker)
                 implementation(libs.drawbox.ui)
                 // DrawBoxController inherits from androidx.lifecycle.ViewModel; exposed as api so consumers resolve ViewModel hierarchy.
                 api(libs.androidx.lifecycle.viewmodel)

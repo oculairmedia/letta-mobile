@@ -97,6 +97,7 @@ nucleus = "2.1.5"
 nucleus-native-tray = "2.0.1"
 jewel = "0.37.0-262.4852.51"
 kuiver = "0.3.0"
+colorpicker = "1.2.0"
 autolinktext = "2.0.2"
 texty = "1.0.0-alpha"
 calendar = "2.10.1"
@@ -298,6 +299,7 @@ compose-desktop-material3 = { module = "org.jetbrains.compose.material3:material
 compose-desktop-material-icons = { module = "org.jetbrains.compose.material:material-icons-extended", version.ref = "compose-desktop-material-icons" }
 skiko-awt = { module = "org.jetbrains.skiko:skiko-awt", version.ref = "skiko" }
 kuiver = { module = "io.github.justdeko:kuiver", version.ref = "kuiver" }
+colorpicker = { module = "codes.side:colorpicker", version.ref = "colorpicker" }
 autolinktext = { module = "sh.calvin.autolinktext:autolinktext", version.ref = "autolinktext" }
 texty = { module = "com.arjunjadeja:texty", version.ref = "texty" }
 calendar-compose-multiplatform = { module = "com.kizitonwose.calendar:compose-multiplatform", version.ref = "calendar" }

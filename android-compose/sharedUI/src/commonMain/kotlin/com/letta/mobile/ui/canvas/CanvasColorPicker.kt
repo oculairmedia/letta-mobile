@@ -19,6 +19,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import codes.side.colorpicker.state.ColoringMode
+import codes.side.colorpicker.conversion.toComposeColor
+import codes.side.colorpicker.ui.HslColorPicker
+import codes.side.colorpicker.model.HslColor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
@@ -172,9 +176,21 @@ fun CanvasColorPicker(
                     allowNone = false,
                 ) { onPick(it, true) }
             }
-            HslSlider("Hue", hsl.h, 0f..360f) { hsl = hsl.copy(h = it); onPick(hsl.toColor(), false) }
-            HslSlider("Saturation", hsl.s, 0f..1f) { hsl = hsl.copy(s = it); onPick(hsl.toColor(), false) }
-            HslSlider("Lightness", hsl.l, 0f..1f) { hsl = hsl.copy(l = it); onPick(hsl.toColor(), false) }
+            // anyColorPicker's HSL picker, in place of three sliders of our own. It holds the
+            // colour in the space you are editing, so dragging hue no longer walks saturation and
+            // lightness a little on every round trip through RGB. Stateless overload: this screen
+            // already owns the colour, and two sources of truth for it would drift.
+            HslColorPicker(
+                color = HslColor(hue = hsl.h, saturation = hsl.s, lightness = hsl.l),
+                onColorChange = { picked ->
+                    hsl = Hsl(picked.hue, picked.saturation, picked.lightness)
+                    val color = picked.toComposeColor()
+                    hexText = color.toHex()
+                    onPick(color, false)
+                },
+                coloringMode = ColoringMode.Contextual,
+                modifier = Modifier.fillMaxWidth(),
+            )
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
                 Box(
                     modifier = Modifier
