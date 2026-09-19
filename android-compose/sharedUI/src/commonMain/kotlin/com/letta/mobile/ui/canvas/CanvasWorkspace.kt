@@ -143,7 +143,10 @@ fun CanvasWorkspace(
         localPattern
     }
     LaunchedEffect(backgroundPattern) {
-        controller.setBackgroundPattern(backgroundPattern.painter(), backgroundPattern.tint())
+        // The grid is DrawBox's own (see showGrid below), so the tiled pattern is left unset for
+        // it; otherwise both would draw and we would be back to two grids.
+        val tiled = backgroundPattern.takeIf { it.kind != CanvasBackgroundPattern.GRID }
+        controller.setBackgroundPattern(tiled?.painter(), backgroundPattern.tint())
     }
     var boardSize by remember { mutableStateOf(IntSize.Zero) }
     // Connector snapping: Alt held (from the last pointer event) turns it off; while a line or
@@ -433,11 +436,15 @@ fun CanvasWorkspace(
                 onIntent = controller::onIntent,
                 // Shapes and notes share one selection look; see CanvasSelectionChrome.
                 selectionStyle = canvasSelectionStyle(),
-                // DrawBox draws a grid of its own, on by default, underneath the board's own
-                // background pattern. Two grids at two spacings is what made the background
-                // impossible to turn off: ours went away and its did not. The board's pattern is
-                // the only grid now, so "none" means none.
-                showGrid = false,
+                // DrawBox draws a grid of its own, on by default, and the board draws a pattern of
+                // its own on top: two grids at two spacings, which is why the background could not
+                // be turned off — ours went away and its did not.
+                //
+                // Now the setting picks exactly one of them. A grid IS DrawBox's grid, drawn by the
+                // engine that owns the viewport, so it stays crisp at every zoom. Dots and lines
+                // are the board's tiled pattern, which DrawBox has no equivalent for. "None" turns
+                // off both, so none means none.
+                showGrid = backgroundPattern.kind == CanvasBackgroundPattern.GRID,
                 modifier = Modifier
                     .fillMaxSize()
                     .clipToBounds()
