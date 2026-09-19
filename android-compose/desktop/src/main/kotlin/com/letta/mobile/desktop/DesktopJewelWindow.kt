@@ -30,7 +30,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.window.WindowState
 import com.letta.mobile.data.lens.LensDestination
 import com.letta.mobile.data.lens.WorkPlayMode
@@ -172,12 +171,7 @@ internal fun DesktopJewelWindow(
             // The pen, read from Windows Ink and posted as ordinary mouse input, so it can draw
             // AND press things. AWT reports no stylus of its own — measured, see
             // letta-mobile-4i2z9.5 — so without this the tablet does nothing at all.
-            val penScope = rememberCoroutineScope()
-            DisposableEffect(window) {
-                val pen = com.letta.mobile.desktop.input.TabletPen(window)
-                val started = pen.start(penScope)
-                onDispose { if (started) pen.stop() }
-            }
+            com.letta.mobile.desktop.input.InstallTabletPen(window)
             DesktopMaterialTheme {
                 val colorScheme = MaterialTheme.colorScheme
                 // With a tab strip the active tab is painted in the page

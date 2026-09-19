@@ -176,18 +176,22 @@ internal class TabletPen(
                     post(target, point, MouseEvent.MOUSE_PRESSED)
                 }
                 TabletBridge.KIND_UP -> {
+                    // Cleared BEFORE the release is posted: AWT's extended modifiers describe the
+                    // button state AFTER the event, so releasing while [down] is still true tells
+                    // everything downstream that button 1 is held, and the pointer stays stuck in
+                    // a drag it never leaves.
+                    down = false
                     post(target, point, MouseEvent.MOUSE_RELEASED)
                     // A tap is a press, a release and a click: without the click, buttons that
                     // listen for one do nothing and the pen appears to select nothing.
                     if (point.near(lastPoint)) post(target, point, MouseEvent.MOUSE_CLICKED)
-                    down = false
                 }
                 TabletBridge.KIND_MOVE ->
                     post(target, point, if (down) MouseEvent.MOUSE_DRAGGED else MouseEvent.MOUSE_MOVED)
                 TabletBridge.KIND_OUT -> {
                     if (down) {
-                        post(target, point, MouseEvent.MOUSE_RELEASED)
                         down = false
+                        post(target, point, MouseEvent.MOUSE_RELEASED)
                     }
                     post(target, point, MouseEvent.MOUSE_EXITED)
                 }

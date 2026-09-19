@@ -113,18 +113,23 @@ mod platform {
                     ToolEvent::Pose(pose) => {
                         self.last_position = pose.position;
                         self.last_pressure = pose.pressure.get().unwrap_or(NO_PRESSURE);
-                        push(&mut out, KIND_MOVE, self.last_position, self.last_pressure, kind_of_tool);
+                        push(&mut out, encode_event(KIND_MOVE, self.last_position, self.last_pressure, kind_of_tool));
                     }
                     ToolEvent::Down => {
-                        push(&mut out, KIND_DOWN, self.last_position, self.last_pressure, kind_of_tool)
+                        push(&mut out, encode_event(KIND_DOWN, self.last_position, self.last_pressure, kind_of_tool))
                     }
                     ToolEvent::Up => {
-                        push(&mut out, KIND_UP, self.last_position, self.last_pressure, kind_of_tool)
+                        push(&mut out, encode_event(KIND_UP, self.last_position, self.last_pressure, kind_of_tool))
                     }
                     ToolEvent::In { .. } => {
-                        push(&mut out, KIND_IN, self.last_position, NO_PRESSURE, kind_of_tool)
+                        push(&mut out, encode_event(KIND_IN, self.last_position, NO_PRESSURE, kind_of_tool))
                     }
-                    ToolEvent::Out => push(&mut out, KIND_OUT, self.last_position, NO_PRESSURE, kind_of_tool),
+                    // Removed is a termination event in its own right: octotablet 0.1 does not
+                    // promise an Up or an Out before it, so dropping it leaves the pen pressed
+                    // for good - the nib lifts and the canvas keeps drawing.
+                    ToolEvent::Out | ToolEvent::Removed => {
+                        push(&mut out, encode_event(KIND_OUT, self.last_position, NO_PRESSURE, kind_of_tool))
+                    }
                     _ => {}
                 }
             }
@@ -132,13 +137,13 @@ mod platform {
         }
     }
 
-    fn push(out: &mut Vec<f32>, kind: f32, position: [f32; 2], pressure: f32, tool: f32) {
-        out.reserve(STRIDE);
-        out.push(kind);
-        out.push(position[0]);
-        out.push(position[1]);
-        out.push(pressure);
-        out.push(tool);
+    /// One event in the flattened layout the Kotlin side reads: kind, x, y, pressure, tool.
+    fn encode_event(kind: f32, position: [f32; 2], pressure: f32, tool: f32) -> [f32; STRIDE] {
+        [kind, position[0], position[1], pressure, tool]
+    }
+
+    fn push(out: &mut Vec<f32>, event: [f32; STRIDE]) {
+        out.extend_from_slice(&event);
     }
 }
 

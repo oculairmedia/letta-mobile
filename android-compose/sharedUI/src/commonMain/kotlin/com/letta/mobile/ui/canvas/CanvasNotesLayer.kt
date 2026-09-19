@@ -181,16 +181,24 @@ private fun CanvasNoteCard(
         val committed = frame
         val started = resizeStartFrame
         resizeStartFrame = null
+        // Scale the type by however much the box grew, height being what type is measured by.
+        val scaledStyle = if (plain && started != null && started.height > 0f) {
+            val factor = committed.height / started.height
+            if (factor == 1f) {
+                null
+            } else {
+                val style = document.style ?: CanvasTextStyle()
+                style.copy(fontScale = ((style.fontScale ?: 1f) * factor).coerceIn(MIN_FONT_SCALE, MAX_FONT_SCALE))
+            }
+        } else {
+            null
+        }
         scope.launch {
-            runCatching { session.moveDocument(document.id, committed) }
-            // Scale the type by however much the box grew, height being what type is measured by.
-            if (plain && started != null && started.height > 0f) {
-                val factor = committed.height / started.height
-                if (factor != 1f) {
-                    val style = document.style ?: CanvasTextStyle()
-                    val scaled = ((style.fontScale ?: 1f) * factor).coerceIn(MIN_FONT_SCALE, MAX_FONT_SCALE)
-                    runCatching { session.restyleDocument(document.id, style.copy(fontScale = scaled)) }
-                }
+            // One commit, not two. A frame op followed by a style op can half-succeed, leaving a
+            // box that grew with type that did not - and the second op runs even when the first
+            // has already failed.
+            runCatching {
+                session.setDocument(document.id, document.json, frame = committed, style = scaledStyle)
             }
         }
     }
@@ -420,6 +428,26 @@ internal fun defaultNoteFrame(index: Int): CanvasDocumentFrame = CanvasDocumentF
     height = NOTE_DEFAULT_HEIGHT,
 )
 
+/**
+ * [wanted], moved clear of anything already sitting at that spot.
+ *
+ * Every new note is placed at the middle of the board, so the second one lands exactly on top of
+ * the first: it hides it and takes every click meant for it. The note underneath cannot be typed
+ * in, ticked or picked up, which reads as that note being broken rather than covered.
+ */
+internal fun clearOfExisting(
+    wanted: CanvasDocumentFrame,
+    taken: List<CanvasDocumentFrame>,
+): CanvasDocumentFrame {
+    var frame = wanted
+    var moves = 0
+    while (moves < MAX_CASCADE && taken.any { it.x == frame.x && it.y == frame.y }) {
+        frame = frame.copy(x = frame.x + NOTE_STAGGER, y = frame.y + NOTE_STAGGER)
+        moves++
+    }
+    return frame
+}
+
 /** A frame for a new note centred on [worldCenter]. */
 internal fun newNoteFrame(worldCenter: Offset): CanvasDocumentFrame = CanvasDocumentFrame(
     x = worldCenter.x - NOTE_DEFAULT_WIDTH / 2f,
@@ -445,6 +473,9 @@ private const val TEXT_DEFAULT_WIDTH = 360f
 private const val TEXT_DEFAULT_HEIGHT = 120f
 private const val NOTE_DEFAULT_ORIGIN = 80f
 private const val NOTE_STAGGER = 40f
+
+/** How far a new note will cascade before it is left to overlap: a board can be crowded. */
+private const val MAX_CASCADE = 24
 private const val NOTE_MIN_SIZE = 140f
 private val NOTE_CORNER = LettaDimens.Radius.md
 private val HANDLE_HEIGHT = LettaDimens.Control.iconButton

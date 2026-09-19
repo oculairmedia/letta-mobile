@@ -10,8 +10,8 @@ import java.nio.file.StandardCopyOption
  * as an ordinary mouse at best and on some machines not at all — so the pen is read from the OS
  * itself, through Windows Ink, and handed back here.
  *
- * Events arrive flattened, four floats each: kind, x, y, pressure. One poll carries a whole frame
- * of pen motion, which is why this is a poll rather than a callback per event.
+ * Events arrive flattened, five floats each: kind, x, y, pressure, tool. One poll carries a whole
+ * frame of pen motion, which is why this is a poll rather than a callback per event.
  */
 internal object TabletBridge {
 

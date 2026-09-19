@@ -184,7 +184,6 @@ internal fun DesktopNucleusEffects(
     state: DesktopNucleusEffectState,
     actions: DesktopNucleusEffectActions,
 ) {
-    val applicationScope = bindings.applicationScope
     val window = bindings.window
     val activate = remember(window) { { activateDesktopWindow(window) } }
 
@@ -197,7 +196,6 @@ internal fun DesktopNucleusEffects(
     }
 
     DesktopTray(
-        applicationScope = applicationScope,
         isAgentWorking = state.isAgentWorking,
         actions = DesktopTrayActions(
             onShow = activate,
@@ -428,11 +426,10 @@ private fun disposeDesktopIntegrations(window: Window, focusListener: WindowFocu
 
 @Composable
 private fun DesktopTray(
-    applicationScope: NucleusApplicationScope,
     isAgentWorking: Boolean,
     actions: DesktopTrayActions,
 ) {
-    applicationScope.Tray(
+    Tray(
         icon = Icons.Outlined.SmartToy,
         tooltip = if (isAgentWorking) "Letta Desktop — agent working" else "Letta Desktop",
         primaryAction = actions.onShow,

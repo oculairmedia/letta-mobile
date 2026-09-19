@@ -125,6 +125,11 @@ fun CanvasWorkspace(
 
     var statusMessage by remember { mutableStateOf("Ready") }
     var initialLoadDone by remember { mutableStateOf(false) }
+    // The session revision the controller's elements were built from. Documents are derived
+    // from `sessionDoc` and so are current the instant a revision lands, while the elements
+    // only catch up when the collector below re-imports the scene. Until the two agree, the
+    // label reconciler would see every label's shape as missing and delete it.
+    var importedRevision by remember { mutableStateOf(0L) }
     var lastExportedJson by remember { mutableStateOf<String?>(null) }
     // The drawing (scene minus our metadata and documents) DrawBox last agreed with the session
     // on. Only a change to *this* re-imports, so a moved note or a saved stroke never reloads
@@ -178,6 +183,7 @@ fun CanvasWorkspace(
                     lastExportedJson = sessionJson
                     statusMessage = "Loaded from session (rev ${session.document.value?.revision ?: 1})"
                 }
+                importedRevision = lastImportedRev
                 delay(100)
                 initialLoadDone = true
 
@@ -194,6 +200,9 @@ fun CanvasWorkspace(
                                 statusMessage = "Agent updated canvas (rev ${doc.revision})"
                             }
                         }
+                        // Set after any re-import: a bump that changed only documents leaves the
+                        // elements already current, so the gate must not stick closed on it.
+                        importedRevision = doc.revision
                     }
                 }
             } finally {
@@ -641,10 +650,15 @@ fun CanvasWorkspace(
             // A label lives inside its shape: it is re-framed whenever the shape moves or is
             // resized, and removed with it. Keyed on the element list so a shape dragged by
             // DrawBox carries its text along in the same frame.
-            LaunchedEffect(state.elements, liveDocuments, session) {
+            LaunchedEffect(state.elements, liveDocuments, session, importedRevision, initialLoadDone) {
                 val s = session ?: return@LaunchedEffect
                 val work = CanvasShapeLabels.reconcile(state.elements, liveDocuments)
+                // Re-framing is safe at any time: it only touches labels whose shape is present.
                 if (work.moved.isNotEmpty()) runCatching { s.moveDocuments(work.moved) }
+                // Deleting is not. A label is only an orphan once the elements and the documents
+                // describe the same revision; before that "no such shape" means "not imported
+                // yet", and acting on it destroys the text the shape is holding.
+                if (!initialLoadDone || sessionDoc?.revision != importedRevision) return@LaunchedEffect
                 work.orphaned.forEach { id ->
                     if (activeNoteId == id) activeNoteId = null
                     runCatching { s.removeDocument(id) }
@@ -898,7 +912,10 @@ fun CanvasWorkspace(
                 dispatchProperty = dispatchProperty,
                 onAddNote = session?.let { s ->
                     {
-                        val frame = newNoteFrame(state.viewport.screenToWorld(boardCenter))
+                        val frame = clearOfExisting(
+                            newNoteFrame(state.viewport.screenToWorld(boardCenter)),
+                            liveDocuments.mapNotNull { it.frame },
+                        )
                         val id = "note-${Clock.System.now().toEpochMilliseconds()}"
                         coroutineScope.launch {
                             runCatching { s.setDocument(id, "", frame = frame, color = NoteColors.first().hex) }
@@ -912,7 +929,10 @@ fun CanvasWorkspace(
                 },
                 onAddText = session?.let { s ->
                     {
-                        val frame = newTextFrame(state.viewport.screenToWorld(boardCenter))
+                        val frame = clearOfExisting(
+                            newTextFrame(state.viewport.screenToWorld(boardCenter)),
+                            liveDocuments.mapNotNull { it.frame },
+                        )
                         val id = "text-${Clock.System.now().toEpochMilliseconds()}"
                         coroutineScope.launch {
                             runCatching { s.setDocument(id, "", frame = frame, color = PLAIN_TEXT_COLOR) }

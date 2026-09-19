@@ -7,8 +7,12 @@
 //!
 //! Run with: cargo run --example probe
 
+#[cfg(windows)]
 use std::sync::Arc;
 
+/// `octotablet` is declared only for Windows, so everything below it is too: without this gate a
+/// plain `cargo build --examples` on any other host fails to resolve the crate.
+#[cfg(windows)]
 fn main() {
     let event_loop = winit::event_loop::EventLoopBuilder::<()>::default()
         .build()
@@ -80,4 +84,9 @@ fn main() {
             std::thread::sleep(std::time::Duration::from_millis(5));
         })
         .expect("run");
+}
+
+#[cfg(not(windows))]
+fn main() {
+    eprintln!("The pen probe is Windows-only: it reads Windows Ink through octotablet.");
 }
