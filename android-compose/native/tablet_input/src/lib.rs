@@ -19,8 +19,15 @@ const KIND_MOVE: f32 = 2.0;
 const KIND_IN: f32 = 3.0;
 const KIND_OUT: f32 = 4.0;
 
-/// Floats per event: kind, x, y, pressure.
-const STRIDE: usize = 4;
+/// Floats per event: kind, x, y, pressure, tool.
+const STRIDE: usize = 5;
+
+/// Which nib is in use. The eraser end of a stylus is a tool in its own right, so flipping the pen
+/// over is something the app can see rather than something it has to be told.
+const TOOL_UNKNOWN: f32 = -1.0;
+const TOOL_DRAW: f32 = 0.0;
+const TOOL_ERASER: f32 = 1.0;
+const TOOL_EMULATED: f32 = 2.0;
 
 /// Pressure we report when the tool does not have a pressure axis.
 const NO_PRESSURE: f32 = -1.0;
@@ -30,6 +37,7 @@ mod platform {
     use super::*;
     use octotablet::builder::Builder;
     use octotablet::events::{Event, ToolEvent};
+    use octotablet::tool::Type as ToolType;
     use octotablet::Manager;
     use raw_window_handle::{
         DisplayHandle, HandleError, HasDisplayHandle, HasWindowHandle, RawWindowHandle,
@@ -93,17 +101,30 @@ mod platform {
                 Err(_) => return out,
             };
             for event in events {
-                let Event::Tool { event, .. } = event else { continue };
+                let Event::Tool { tool, event } = event else { continue };
+                let kind_of_tool = match tool.tool_type {
+                    Some(ToolType::Eraser) => TOOL_ERASER,
+                    Some(ToolType::Pen | ToolType::Pencil | ToolType::Brush | ToolType::Airbrush) => TOOL_DRAW,
+                    Some(ToolType::Emulated) => TOOL_EMULATED,
+                    Some(_) => TOOL_UNKNOWN,
+                    None => TOOL_UNKNOWN,
+                };
                 match event {
                     ToolEvent::Pose(pose) => {
                         self.last_position = pose.position;
                         self.last_pressure = pose.pressure.get().unwrap_or(NO_PRESSURE);
-                        push(&mut out, KIND_MOVE, self.last_position, self.last_pressure);
+                        push(&mut out, KIND_MOVE, self.last_position, self.last_pressure, kind_of_tool);
                     }
-                    ToolEvent::Down => push(&mut out, KIND_DOWN, self.last_position, self.last_pressure),
-                    ToolEvent::Up => push(&mut out, KIND_UP, self.last_position, self.last_pressure),
-                    ToolEvent::In { .. } => push(&mut out, KIND_IN, self.last_position, NO_PRESSURE),
-                    ToolEvent::Out => push(&mut out, KIND_OUT, self.last_position, NO_PRESSURE),
+                    ToolEvent::Down => {
+                        push(&mut out, KIND_DOWN, self.last_position, self.last_pressure, kind_of_tool)
+                    }
+                    ToolEvent::Up => {
+                        push(&mut out, KIND_UP, self.last_position, self.last_pressure, kind_of_tool)
+                    }
+                    ToolEvent::In { .. } => {
+                        push(&mut out, KIND_IN, self.last_position, NO_PRESSURE, kind_of_tool)
+                    }
+                    ToolEvent::Out => push(&mut out, KIND_OUT, self.last_position, NO_PRESSURE, kind_of_tool),
                     _ => {}
                 }
             }
@@ -111,12 +132,13 @@ mod platform {
         }
     }
 
-    fn push(out: &mut Vec<f32>, kind: f32, position: [f32; 2], pressure: f32) {
+    fn push(out: &mut Vec<f32>, kind: f32, position: [f32; 2], pressure: f32, tool: f32) {
         out.reserve(STRIDE);
         out.push(kind);
         out.push(position[0]);
         out.push(position[1]);
         out.push(pressure);
+        out.push(tool);
     }
 }
 

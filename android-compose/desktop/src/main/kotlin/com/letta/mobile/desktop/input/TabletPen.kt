@@ -13,6 +13,9 @@ import kotlinx.coroutines.withContext
 import java.awt.Component
 import java.awt.Point
 import java.awt.Window
+import com.letta.mobile.ui.canvas.CanvasPenEvent
+import com.letta.mobile.ui.canvas.CanvasPenInput
+import com.letta.mobile.ui.canvas.CanvasPenTool
 import java.awt.event.MouseEvent
 import javax.swing.SwingUtilities
 
@@ -153,12 +156,19 @@ internal class TabletPen(
         var index = 0
         while (index + TabletBridge.STRIDE <= events.size) {
             val kind = events[index].toInt()
-            val x = (events[index + 1] / scale).toInt()
-            val y = (events[index + 2] / scale).toInt()
+            val x = (events[index + 1] / scale).toFloat()
+            val y = (events[index + 2] / scale).toFloat()
             val force = events[index + 3]
+            val tool = events[index + 4].toInt()
             index += TabletBridge.STRIDE
             if (force != TabletBridge.NO_PRESSURE) _pressure.value = force
-            val point = Point(x, y)
+
+            // The canvas gets first refusal: a stroke carries pressure per sample, which the mouse
+            // path below cannot express. What it takes, it keeps — delivering the same event twice
+            // would draw the stroke a second time without pressure.
+            if (offerToCanvas(kind, x, y, force, tool)) continue
+
+            val point = Point(x.toInt(), y.toInt())
             when (kind) {
                 TabletBridge.KIND_DOWN -> {
                     down = true
@@ -184,6 +194,44 @@ internal class TabletPen(
                 TabletBridge.KIND_IN -> post(target, point, MouseEvent.MOUSE_ENTERED)
             }
         }
+    }
+
+    /** True when the canvas took this event and it must not also become a mouse event. */
+    private fun offerToCanvas(kind: Int, x: Float, y: Float, force: Float, tool: Int): Boolean {
+        val consumer = CanvasPenInput.consumer ?: return false
+        val phase = when (kind) {
+            TabletBridge.KIND_DOWN -> CanvasPenEvent.Phase.DOWN
+            TabletBridge.KIND_UP -> CanvasPenEvent.Phase.UP
+            TabletBridge.KIND_MOVE -> CanvasPenEvent.Phase.MOVE
+            TabletBridge.KIND_IN -> CanvasPenEvent.Phase.IN
+            TabletBridge.KIND_OUT -> CanvasPenEvent.Phase.OUT
+            else -> return false
+        }
+        val penTool = when (tool) {
+            TabletBridge.TOOL_DRAW -> CanvasPenTool.DRAW
+            TabletBridge.TOOL_ERASER -> CanvasPenTool.ERASER
+            else -> CanvasPenTool.OTHER
+        }
+        val taken = runCatching {
+            consumer(
+                CanvasPenEvent(
+                    phase = phase,
+                    x = x,
+                    y = y,
+                    pressure = force.takeIf { it != TabletBridge.NO_PRESSURE },
+                    tool = penTool,
+                ),
+            )
+        }.getOrDefault(false)
+        // A stroke the canvas is drawing must not also arrive as a drag, so the press state is
+        // kept in step even for events we hand over.
+        if (taken) {
+            when (kind) {
+                TabletBridge.KIND_DOWN -> down = true
+                TabletBridge.KIND_UP, TabletBridge.KIND_OUT -> down = false
+            }
+        }
+        return taken
     }
 
     private fun post(target: Component, point: Point, id: Int) {

@@ -1,6 +1,7 @@
 package com.letta.mobile.ui.canvas
 
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,6 +28,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -287,6 +289,9 @@ fun CanvasWorkspace(
     // gesture for UI zoom is told where the board is so it leaves those events alone.
     val wheelZoomRegions = LocalWheelZoomRegions.current
     var boardBounds by remember { mutableStateOf<Rect?>(null) }
+    // The stroke under the nib. It lives up here because the board paints it and the pen consumer
+    // fills it, and those are far apart in this function.
+    val penPreview = remember { mutableStateListOf<io.ak1.drawbox.domain.model.Element.PathSample>() }
     DisposableEffect(wheelZoomRegions) {
         val unregister = wheelZoomRegions?.register { boardBounds }
         onDispose { unregister?.invoke() }
@@ -502,6 +507,15 @@ fun CanvasWorkspace(
                     },
             )
 
+            // The stroke under the nib, until DrawBox owns it.
+            CanvasPenPreview(
+                samples = penPreview,
+                viewport = state.viewport,
+                color = state.strokeColor,
+                alpha = state.opacity,
+                modifier = Modifier.fillMaxSize(),
+            )
+
             // Block documents live on the board as note cards, in world coordinates.
             if (session != null && documents.isNotEmpty()) {
                 CanvasNotesLayer(
@@ -551,6 +565,71 @@ fun CanvasWorkspace(
 
             // Picking a drawing element hands the selection to DrawBox; the note lets go.
             LaunchedEffect(hasSelection) { if (hasSelection) activeNoteId = null }
+
+            // The pen draws its own strokes.
+            //
+            // Everything else the pen does — pressing a button, picking a note, dragging a handle —
+            // arrives as ordinary input and needs nothing here. Drawing is the exception: pressure
+            // is per sample and no mouse event can carry it, so those events are taken here and
+            // built into one Element.Path on lift. Taking them also stops the platform delivering
+            // the same stroke a second time without pressure.
+            //
+            // Flipping the stylus over erases: the eraser nib is a tool in its own right, so it is
+            // read from the event rather than asked of the user.
+            // Layout coordinates are in pixels; the pen reports in the window's logical units. On
+            // a scaled display those differ by the density, and subtracting a pixel-space board
+            // offset from a logical-space point put every event outside the board — so the canvas
+            // declined them all and the stroke quietly fell back to the pressureless mouse path.
+            val penDensity = LocalDensity.current.density
+            DisposableEffect(session, state.mode, penDensity) {
+                var stroke: CanvasPenStroke? = null
+                CanvasPenInput.consumer = consumer@{ event ->
+                    val current = controller.state.value
+                    // The pen reports against the window; the board sits somewhere inside it. Going
+                    // straight to screenToWorld skips the offset that Compose's own hit testing
+                    // would have applied, and the ink lands away from the nib by however far the
+                    // board is inset.
+                    val board = boardBounds ?: return@consumer false
+                    val onBoard = Offset(event.x * penDensity - board.left, event.y * penDensity - board.top)
+                    if (onBoard.x < 0f || onBoard.y < 0f || onBoard.x > board.width || onBoard.y > board.height) {
+                        return@consumer false
+                    }
+                    val world = current.viewport.screenToWorld(onBoard)
+                    if (event.tool == CanvasPenTool.ERASER) {
+                        if (event.phase == CanvasPenEvent.Phase.DOWN || event.phase == CanvasPenEvent.Phase.MOVE) {
+                            controller.onIntent(io.ak1.drawbox.domain.model.Intent.EraseAt(world, current.eraserSize))
+                            eraseNotesAt(world, current.eraserSize / current.viewport.scale.coerceAtLeast(0.01f))
+                            return@consumer true
+                        }
+                        return@consumer false
+                    }
+                    if (event.tool != CanvasPenTool.DRAW || !current.mode.isFreehandDrawing()) return@consumer false
+                    when (event.phase) {
+                        CanvasPenEvent.Phase.DOWN -> {
+                            penPreview.clear()
+                            stroke = current.beginPenStroke().also { started ->
+                                started.add(world, event.pressure)?.let { penPreview += it }
+                            }
+                            true
+                        }
+                        CanvasPenEvent.Phase.MOVE -> stroke?.let { active ->
+                            active.add(world, event.pressure)?.let { penPreview += it }
+                            true
+                        } ?: false
+                        CanvasPenEvent.Phase.UP, CanvasPenEvent.Phase.OUT -> {
+                            val finished = stroke ?: return@consumer false
+                            stroke = null
+                            penPreview.clear()
+                            finished.finish("pen-${Clock.System.now().toEpochMilliseconds()}")?.let { path ->
+                                controller.onIntent(io.ak1.drawbox.domain.model.Intent.AddElement(path))
+                            }
+                            true
+                        }
+                        CanvasPenEvent.Phase.IN -> false
+                    }
+                }
+                onDispose { CanvasPenInput.consumer = null }
+            }
 
             // A label lives inside its shape: it is re-framed whenever the shape moves or is
             // resized, and removed with it. Keyed on the element list so a shape dragged by

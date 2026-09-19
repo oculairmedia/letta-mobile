@@ -22,8 +22,14 @@ internal object TabletBridge {
     const val KIND_IN = 3
     const val KIND_OUT = 4
 
-    /** Floats per event. */
-    const val STRIDE = 4
+    /** Floats per event: kind, x, y, pressure, tool. */
+    const val STRIDE = 5
+
+    /** Tool codes, matching the Rust side. */
+    const val TOOL_UNKNOWN = -1
+    const val TOOL_DRAW = 0
+    const val TOOL_ERASER = 1
+    const val TOOL_EMULATED = 2
 
     /** Reported when the tool has no pressure axis. */
     const val NO_PRESSURE = -1f
