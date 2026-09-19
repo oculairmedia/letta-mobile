@@ -136,6 +136,41 @@ val buildDesktopMermaidNative = tasks.register<Exec>("buildDesktopMermaidNative"
         manifest.asFile.absolutePath,
     )
 }
+// The pen bridge (native/tablet_input): Windows Ink read directly, because AWT never reports a
+// stylus and Compose Desktop has no stylus path at all. Built and staged exactly like the Mermaid
+// renderer above.
+val tabletNativeLibraryName = when {
+    System.getProperty("os.name").startsWith("Windows", ignoreCase = true) -> "letta_tablet_input.dll"
+    System.getProperty("os.name").startsWith("Mac", ignoreCase = true) -> "libletta_tablet_input.dylib"
+    else -> "libletta_tablet_input.so"
+}
+val tabletInputDir = rootProject.layout.projectDirectory.dir("native/tablet_input")
+// Its own staging directory: Sync clears whatever it does not own, so two of them pointed at one
+// directory would take turns deleting each other's library.
+val tabletNativeDir = layout.buildDirectory.dir("generated/tablet-native")
+val buildDesktopTabletNative = tasks.register<Exec>("buildDesktopTabletNative") {
+    val manifest = tabletInputDir.file("Cargo.toml")
+    inputs.files(
+        manifest,
+        tabletInputDir.file("Cargo.lock"),
+        fileTree(tabletInputDir.dir("src")),
+    )
+    outputs.file(tabletInputDir.file("target/release/$tabletNativeLibraryName"))
+    commandLine(
+        providers.environmentVariable("CARGO").orElse("cargo").get(),
+        "build",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        manifest.asFile.absolutePath,
+    )
+}
+val stageDesktopTabletNative = tasks.register<Sync>("stageDesktopTabletNative") {
+    dependsOn(buildDesktopTabletNative)
+    from(tabletInputDir.file("target/release/$tabletNativeLibraryName"))
+    into(tabletNativeDir)
+}
+
 val stageDesktopMermaidNative = tasks.register<Sync>("stageDesktopMermaidNative") {
     dependsOn(buildDesktopMermaidNative)
     from(mermaidRendererDir.file("target/release/$mermaidNativeLibraryName"))
@@ -144,10 +179,11 @@ val stageDesktopMermaidNative = tasks.register<Sync>("stageDesktopMermaidNative"
 
 sourceSets.main {
     resources.srcDir(mermaidNativeDir)
+    resources.srcDir(tabletNativeDir)
 }
 
 tasks.named("processResources") {
-    dependsOn(stageDesktopMermaidNative)
+    dependsOn(stageDesktopMermaidNative, stageDesktopTabletNative)
 }
 
 dependencies {
