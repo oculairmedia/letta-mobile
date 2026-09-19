@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.canvas
 
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -445,6 +446,26 @@ fun CanvasWorkspace(
                             }
                         }
                     }
+                    // A shape holds text: double-tap one to write in it. Placed after DrawBox in
+                    // the chain, so DrawBox's own gestures see the pointer first and this only
+                    // catches taps nothing else wanted.
+                    .pointerInput(session) {
+                        detectTapGestures(onDoubleTap = { position ->
+                            val current = controller.state.value
+                            val world = current.viewport.screenToWorld(position)
+                            val shape = CanvasShapeLabels.shapeAt(current.elements, world) ?: return@detectTapGestures
+                            val labelId = CanvasShapeLabels.labelIdOf(shape.id)
+                            val frame = CanvasShapeLabels.frameFor(shape.bounds())
+                            val s = session ?: return@detectTapGestures
+                            coroutineScope.launch {
+                                val existing = s.documents().firstOrNull { it.id == labelId }
+                                if (existing == null) {
+                                    runCatching { s.setDocument(labelId, "", frame = frame, color = PLAIN_TEXT_COLOR) }
+                                }
+                                activeNoteId = labelId
+                            }
+                        })
+                    }
                     // After DrawBox has handled the event (Final pass): track Alt and the pointer
                     // while a connector is drawn, and on release snap the connector just finished.
                     .pointerInput(session) {
@@ -530,6 +551,19 @@ fun CanvasWorkspace(
 
             // Picking a drawing element hands the selection to DrawBox; the note lets go.
             LaunchedEffect(hasSelection) { if (hasSelection) activeNoteId = null }
+
+            // A label lives inside its shape: it is re-framed whenever the shape moves or is
+            // resized, and removed with it. Keyed on the element list so a shape dragged by
+            // DrawBox carries its text along in the same frame.
+            LaunchedEffect(state.elements, liveDocuments, session) {
+                val s = session ?: return@LaunchedEffect
+                val work = CanvasShapeLabels.reconcile(state.elements, liveDocuments)
+                if (work.moved.isNotEmpty()) runCatching { s.moveDocuments(work.moved) }
+                work.orphaned.forEach { id ->
+                    if (activeNoteId == id) activeNoteId = null
+                    runCatching { s.removeDocument(id) }
+                }
+            }
 
             // A bound connector end follows its note: whenever a document's frame changes (a local
             // drag, a peer, the agent), every arrow bound to it is re-pointed through DrawBox, so
