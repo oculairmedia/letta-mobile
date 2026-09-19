@@ -2,10 +2,7 @@ package com.letta.mobile.desktop.input
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import androidx.compose.runtime.rememberCoroutineScope
 import java.awt.Window
 
 /**
@@ -18,21 +15,23 @@ import java.awt.Window
  * rather than written out at each window: a new window gets the pen by calling one function, and
  * forgetting it is the kind of thing a reviewer can see.
  *
- * The polling coroutine belongs to this effect, not to the composition around it. A scope from
- * `rememberCoroutineScope` outlives a window swap, and the loop it carries keeps posting events
- * into the window it was opened against - which is how the pen came to drive a layout pass on a
- * Compose scene that had already been disposed, and take the app down with it.
+ * The scope belongs to the composition; the JOB belongs to this window. That distinction is the
+ * whole point: a remembered scope outlives a window swap, so a loop left running on it keeps
+ * posting events into the window it was opened against - a window whose Compose scene has been
+ * disposed. Cancelling this window's own job on disposal ends that, without an ad-hoc scope of
+ * its own to leak.
  */
 @Composable
 internal fun InstallTabletPen(window: Window) {
+    val scope = rememberCoroutineScope()
     DisposableEffect(window) {
-        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
         val pen = TabletPen(window)
-        pen.start(scope)
+        val polling = pen.start(scope)
         onDispose {
-            // Cancel first: it stops the poll loop AND any open that has not finished, so no
-            // handle can be registered after this point and then outlive the window.
-            scope.cancel()
+            // Cancelled BEFORE the handles close: it stops the poll loop and any open that has
+            // not finished, so no handle can be registered after this point and outlive the
+            // window it belongs to.
+            polling?.cancel()
             pen.stop()
         }
     }

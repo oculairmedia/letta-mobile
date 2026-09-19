@@ -15,7 +15,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -23,6 +25,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
+import com.letta.mobile.ui.canvas.LocalCanvasPenTarget
+import com.letta.mobile.ui.components.LocalMenuActionScope
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionOnScreen
@@ -377,7 +381,18 @@ internal fun DesktopJewelWindow(
                             }
                         }
                     }
-                    content()
+                    // The pen belongs to this window: a canvas composed inside it registers
+                    // under this window's identity, so two open windows cannot take each other's
+                    // strokes.
+                    // The window's own scope runs what a menu item chose: a popup is dismissed by
+                    // being removed, so the action cannot belong to the popup.
+                    val windowScope = rememberCoroutineScope()
+                    CompositionLocalProvider(
+                        LocalCanvasPenTarget provides com.letta.mobile.desktop.input.WindowPenTarget(window),
+                        LocalMenuActionScope provides windowScope,
+                    ) {
+                        content()
+                    }
                 }
             }
         }

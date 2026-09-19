@@ -5,6 +5,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -17,6 +18,7 @@ import androidx.compose.ui.window.singleWindowApplication
 import com.letta.mobile.desktop.initializeDesktopLifecycleMainThread
 import com.letta.mobile.desktop.input.InstallTabletPen
 import com.letta.mobile.ui.canvas.CanvasSamples
+import com.letta.mobile.ui.canvas.LocalCanvasPenTarget
 import com.letta.mobile.ui.canvas.CanvasWorkspace
 
 /**
@@ -31,12 +33,14 @@ fun main() {
     ) {
         // Without this the canvas sees the pen as a mouse: flat pressure, no eraser end.
         InstallTabletPen(window)
+        CompositionLocalProvider(LocalCanvasPenTarget provides com.letta.mobile.desktop.input.WindowPenTarget(window)) {
         MaterialTheme(colorScheme = darkColorScheme()) {
             Surface(modifier = Modifier.fillMaxSize()) {
                 CanvasWorkspace(
                     initialJson = CanvasSamples.buildCycleJson,
                 )
             }
+        }
         }
     }
 }
@@ -62,6 +66,7 @@ internal fun CanvasDebugWindow(
     ) {
         // Without this the canvas sees the pen as a mouse: flat pressure, no eraser end.
         InstallTabletPen(window)
+        CompositionLocalProvider(LocalCanvasPenTarget provides com.letta.mobile.desktop.input.WindowPenTarget(window)) {
         MaterialTheme(colorScheme = darkColorScheme()) {
             Surface(modifier = Modifier.fillMaxSize()) {
                 CanvasWorkspace(
@@ -72,6 +77,7 @@ internal fun CanvasDebugWindow(
                     },
                 )
             }
+        }
         }
     }
 }

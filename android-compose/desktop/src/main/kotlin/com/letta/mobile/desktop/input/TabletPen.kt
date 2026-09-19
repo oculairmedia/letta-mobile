@@ -3,6 +3,7 @@ package com.letta.mobile.desktop.input
 import com.sun.jna.Native
 import com.sun.jna.Pointer
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,6 +15,7 @@ import java.awt.Component
 import java.awt.Point
 import java.awt.Window
 import com.letta.mobile.ui.canvas.CanvasPenEvent
+import com.letta.mobile.ui.canvas.CanvasPenTarget
 import com.letta.mobile.ui.canvas.CanvasPenInput
 import com.letta.mobile.ui.canvas.CanvasPenTool
 import java.awt.event.MouseEvent
@@ -50,13 +52,20 @@ internal class TabletPen(
     /** True when a tablet is present and its events are being delivered. */
     val connected: Boolean get() = handles.isNotEmpty()
 
-    fun start(scope: CoroutineScope): Boolean {
+    /**
+     * Opens the tablet and starts polling on [scope], returning the polling job.
+     *
+     * The job is handed back rather than kept: the caller's scope belongs to a composition that
+     * outlives a single window, so cancelling THIS job is how one window's polling stops without
+     * touching anything else the scope is doing.
+     */
+    fun start(scope: CoroutineScope): Job? {
         // Every step says what happened. A pen bridge that fails silently is indistinguishable
         // from a pen that is not there, which is exactly how long this took to find.
         val load = runCatching { TabletBridge.available }
         if (load.getOrDefault(false) != true) {
             println("TABLET: native library did not load: ${load.exceptionOrNull()}")
-            return false
+            return null
         }
 
         // Windows Ink is COM, and COM is apartment-threaded: the manager must be created AND
@@ -70,10 +79,10 @@ internal class TabletPen(
         }
         if (targets.isEmpty()) {
             println("TABLET: no native handle anywhere")
-            return false
+            return null
         }
 
-        scope.launch(Dispatchers.Main) {
+        return scope.launch(Dispatchers.Main) {
             // Open against every window that has a handle. Windows Ink delivers to exactly one of
             // them and there is no way to ask which from here, so we listen on both and say which
             // one spoke. The standalone probe (native/tablet_input/examples/probe.rs) proves this
@@ -117,7 +126,6 @@ internal class TabletPen(
                 stop()
             }
         }
-        return true
     }
 
     /**
@@ -250,7 +258,8 @@ internal class TabletPen(
 
     /** True when the canvas took this event and it must not also become a mouse event. */
     private fun offerToCanvas(kind: Int, x: Float, y: Float, force: Float, tool: Int): Boolean {
-        val consumer = CanvasPenInput.consumer ?: return false
+        // Offered to the canvas in THIS pen's window, never to whichever canvas registered last.
+        if (!CanvasPenInput.hasConsumer(WindowPenTarget(window))) return false
         val phase = when (kind) {
             TabletBridge.KIND_DOWN -> CanvasPenEvent.Phase.DOWN
             TabletBridge.KIND_UP -> CanvasPenEvent.Phase.UP
@@ -265,7 +274,8 @@ internal class TabletPen(
             else -> CanvasPenTool.OTHER
         }
         val taken = runCatching {
-            consumer(
+            CanvasPenInput.deliver(
+                WindowPenTarget(window),
                 CanvasPenEvent(
                     phase = phase,
                     x = x,
@@ -322,3 +332,11 @@ internal class TabletPen(
         const val TAP_SLOP = 4
     }
 }
+
+/**
+ * The canvas surface belonging to one AWT window.
+ *
+ * A data class on purpose: the pen builds one from the window it polls and the canvas builds one
+ * from the window it was composed in, and they have to be equal for the event to arrive.
+ */
+internal data class WindowPenTarget(val window: Window) : CanvasPenTarget

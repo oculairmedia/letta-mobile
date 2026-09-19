@@ -41,6 +41,55 @@ data class CanvasPenEvent(
  * declaration.
  */
 object CanvasPenInput {
-    /** Set by the canvas while it is on screen; null when nothing is listening. */
-    var consumer: ((CanvasPenEvent) -> Boolean)? = null
+
+    /**
+     * One consumer per window, by that window's identity.
+     *
+     * A single consumer was a bug waiting for a second window: each canvas overwrote the other's
+     * registration, the one that disposed first cleared whichever was current, and a pen event
+     * from one window was offered coordinates belonging to another. Pressure and the eraser end
+     * would go quiet in whichever window had not registered last, for no reason a person could
+     * see.
+     */
+    private val consumers = mutableMapOf<CanvasPenTarget, (CanvasPenEvent) -> Boolean>()
+
+    /**
+     * Registers [consumer] for [target], returning a disposer.
+     *
+     * The disposer is identity-safe: it removes this registration and never a replacement, so a
+     * canvas that is re-created before the old one disposes cannot be silenced by its
+     * predecessor's teardown.
+     */
+    fun register(target: CanvasPenTarget, consumer: (CanvasPenEvent) -> Boolean): () -> Unit {
+        consumers[target] = consumer
+        return { if (consumers[target] === consumer) consumers.remove(target) }
+    }
+
+    /**
+     * Offers [event] to the canvas in [target]'s window; false when it was not taken, including
+     * when that window has no canvas listening. An event never crosses to another window.
+     */
+    fun deliver(target: CanvasPenTarget, event: CanvasPenEvent): Boolean = consumers[target]?.invoke(event) == true
+
+    /** True when [target]'s window has a canvas listening, for hosts that poll only when it does. */
+    fun hasConsumer(target: CanvasPenTarget): Boolean = consumers.containsKey(target)
 }
+
+/**
+ * Which window the canvas in this composition belongs to, for pen routing.
+ *
+ * Hosts that read a tablet provide their window here; anything else shares the default, which is
+ * correct for a platform with one surface (Android) and for previews.
+ */
+val LocalCanvasPenTarget = androidx.compose.runtime.compositionLocalOf<CanvasPenTarget> { DefaultPenTarget }
+
+/**
+ * Which surface a pen and a canvas belong to.
+ *
+ * Implementations are equal when they mean the same surface, because that equality is what routes
+ * an event: a host makes one for its window, and the canvas inside that window registers under it.
+ */
+interface CanvasPenTarget
+
+/** The target for hosts that never provide one: one surface, as on Android and in previews. */
+object DefaultPenTarget : CanvasPenTarget

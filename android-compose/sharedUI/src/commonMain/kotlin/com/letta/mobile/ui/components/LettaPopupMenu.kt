@@ -12,9 +12,8 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.compositionLocalOf
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.letta.mobile.ui.theme.LettaDimens
@@ -49,6 +48,7 @@ fun LettaPopupMenu(
     items: List<LettaMenuItem>,
     modifier: Modifier = Modifier,
 ) {
+    val actionScope = LocalMenuActionScope.current
     DropdownMenu(
         expanded = expanded,
         onDismissRequest = onDismiss,
@@ -79,7 +79,15 @@ fun LettaPopupMenu(
                 contentPadding = PaddingValues(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.hair),
                 onClick = {
                     onDismiss()
-                    runMenuAction(item.onClick)
+                    val action = item.onClick
+                    if (actionScope == null) {
+                        action()
+                    } else {
+                        actionScope.launch {
+                            delay(MENU_ACTION_DELAY_MS)
+                            action()
+                        }
+                    }
                 },
             )
         }
@@ -87,22 +95,15 @@ fun LettaPopupMenu(
 }
 
 /**
- * Runs a chosen menu item once the menu has gone.
+ * A scope that outlives a popup, for running what a menu item chose.
  *
- * Deliberately not a composition-owned scope: the popup is usually removed from the composition by
- * its own dismiss handler, and anything belonging to it dies with it. [MENU_ACTION_DELAY_MS] is
- * about one frame, long enough for the dismissal to be laid out and short enough that no one sees
- * it, and the action still runs on the main dispatcher like any other click.
+ * The popup is usually removed from the composition by its own dismiss handler, so anything owned
+ * by it - a `LaunchedEffect`, a `rememberCoroutineScope` - dies before the action can run. A host
+ * provides a scope that lives as long as its window; without one the action runs immediately,
+ * which is correct, just without the frame of daylight between dismissal and a screen-replacing
+ * action.
  */
-private fun runMenuAction(action: () -> Unit) {
-    menuActionScope.launch {
-        delay(MENU_ACTION_DELAY_MS)
-        action()
-    }
-}
-
-/** Outlives every popup on purpose; see [runMenuAction]. */
-private val menuActionScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+val LocalMenuActionScope = compositionLocalOf<CoroutineScope?> { null }
 
 /** One frame at 60Hz: the dismissal is laid out before the action replaces what is on screen. */
 private const val MENU_ACTION_DELAY_MS = 16L

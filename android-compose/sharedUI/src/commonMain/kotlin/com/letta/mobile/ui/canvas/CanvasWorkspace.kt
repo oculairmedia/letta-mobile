@@ -603,12 +603,15 @@ fun CanvasWorkspace(
             // offset from a logical-space point put every event outside the board — so the canvas
             // declined them all and the stroke quietly fell back to the pressureless mouse path.
             val penDensity = LocalDensity.current.density
-            DisposableEffect(session, state.mode, penDensity) {
+            // Which window's pen this canvas answers, so two open boards cannot take each other's
+            // events or clear each other's registration.
+            val penTarget = LocalCanvasPenTarget.current
+            DisposableEffect(session, state.mode, penDensity, penTarget) {
                 var stroke: CanvasPenStroke? = null
                 // True while the stroke in progress began on a note: the whole stroke belongs to
                 // the note, not only the samples that happen to fall inside it.
                 var strokeStartedOnDocument = false
-                CanvasPenInput.consumer = consumer@{ event ->
+                val penConsumer: (CanvasPenEvent) -> Boolean = consumer@{ event ->
                     val current = controller.state.value
                     // The pen reports against the window; the board sits somewhere inside it. Going
                     // straight to screenToWorld skips the offset that Compose's own hit testing
@@ -678,7 +681,8 @@ fun CanvasWorkspace(
                         CanvasPenEvent.Phase.IN -> false
                     }
                 }
-                onDispose { CanvasPenInput.consumer = null }
+                val disposePen = CanvasPenInput.register(penTarget, penConsumer)
+                onDispose { disposePen() }
             }
 
             // A label lives inside its shape: it is re-framed whenever the shape moves or is
