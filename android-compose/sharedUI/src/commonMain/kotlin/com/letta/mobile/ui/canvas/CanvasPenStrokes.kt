@@ -27,15 +27,23 @@ internal class CanvasPenStroke(
     private var last: Offset? = null
 
     /**
+     * True when [world] is so close to the last sample that it would only thicken the same dot.
+     *
+     * Kept per axis rather than as a distance: it is the same test, without the square root, on
+     * the hot path of every pen sample.
+     */
+    private fun isOnTopOfPrevious(world: Offset): Boolean {
+        val previous = last ?: return false
+        return abs(previous.x - world.x) < MIN_STEP && abs(previous.y - world.y) < MIN_STEP
+    }
+
+    /**
      * Adds a sample unless it lands on top of the previous one, and returns it so the board can
      * draw the stroke as it is being made. Without that the ink only appears on lift, and you are
      * drawing blind.
      */
     fun add(world: Offset, pressure: Float?): Element.PathSample? {
-        val previous = last
-        if (previous != null && abs(previous.x - world.x) < MIN_STEP && abs(previous.y - world.y) < MIN_STEP) {
-            return null
-        }
+        if (isOnTopOfPrevious(world)) return null
         last = world
         val sample = Element.PathSample(position = world, width = widthFor(pressure))
         samples += sample

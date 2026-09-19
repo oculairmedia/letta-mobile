@@ -15,10 +15,10 @@ import kotlin.test.assertTrue
 /** A shape's label moves and resizes with it, and goes when it goes. */
 class CanvasShapeLabelsTest {
 
-    private fun rect(id: String, x: Float, y: Float, w: Float, h: Float) = Element.Shape(
+    private fun rect(id: String, bounds: Rect) = Element.Shape(
         id = id,
         shapeType = ShapeType.RECTANGLE,
-        points = listOf(Offset(x, y), Offset(x + w, y + h)),
+        points = listOf(Offset(bounds.left, bounds.top), Offset(bounds.right, bounds.bottom)),
         strokeColor = Color.Black,
         strokeWidth = 2f,
     )
@@ -37,7 +37,7 @@ class CanvasShapeLabelsTest {
 
     @Test
     fun labelIsReFramedWhenItsShapeMoves() {
-        val shape = rect("rect-1", 300f, 400f, 200f, 100f)
+        val shape = rect("rect-1", Rect(300f, 400f, 300f + 200f, 400f + 100f))
         val stale = label(CanvasShapeLabels.labelIdOf("rect-1"), CanvasShapeLabels.frameFor(Rect(0f, 0f, 200f, 100f)))
         val work = CanvasShapeLabels.reconcile(listOf(shape), listOf(stale))
         assertEquals(CanvasShapeLabels.frameFor(shape.bounds()), work.moved[stale.id])
@@ -69,7 +69,7 @@ class CanvasShapeLabelsTest {
             strokeColor = Color.Black,
             strokeWidth = 2f,
         )
-        assertTrue(CanvasShapeLabels.canLabel(rect("rect-1", 0f, 0f, 10f, 10f)))
+        assertTrue(CanvasShapeLabels.canLabel(rect("rect-1", Rect(0f, 0f, 0f + 10f, 0f + 10f))))
         assertTrue(!CanvasShapeLabels.canLabel(line), "a line has no inside to write in")
     }
 }
