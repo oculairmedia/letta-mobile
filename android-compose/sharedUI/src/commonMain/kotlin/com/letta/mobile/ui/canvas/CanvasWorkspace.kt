@@ -28,6 +28,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -112,6 +113,11 @@ fun CanvasWorkspace(
     }
     val checkpoints by (session?.checkpoints?.collectAsState() ?: remember { mutableStateOf(emptyList()) })
     val documents = remember(sessionDoc) { session?.documents().orEmpty() }
+    // Long-lived lambdas — the intent collector, the pointer handlers on the board — are created
+    // once and keep whatever `documents` held at the time. That is why the eraser and connector
+    // snapping worked on every drawn shape and on no note: shapes are read fresh from
+    // controller.state, notes came from a list captured before they existed.
+    val liveDocuments by rememberUpdatedState(documents)
     val coroutineScope = rememberCoroutineScope()
 
     var statusMessage by remember { mutableStateOf("Ready") }
@@ -299,6 +305,21 @@ fun CanvasWorkspace(
         coroutineScope.launch { runCatching { session.moveDocuments(frames) } }
     }
 
+    // The eraser is a drag, not a click, and DrawBoxController does not surface EraseAt on its
+    // intent flow, so notes are taken by watching the eraser's own pointer instead.
+    fun eraseNotesAt(world: Offset, radius: Float) {
+        if (session == null) return
+        val hit = liveDocuments.filter { doc ->
+            val f = doc.frame ?: return@filter false
+            Rect(f.x - radius, f.y - radius, f.x + f.width + radius, f.y + f.height + radius).contains(world)
+        }
+        if (hit.isEmpty()) return
+        val ids = hit.map { it.id }.toSet()
+        if (activeNoteId in ids) activeNoteId = null
+        selectedNoteIds = selectedNoteIds - ids
+        coroutineScope.launch { ids.forEach { id -> runCatching { session.removeDocument(id) } } }
+    }
+
     // Marquee and move are DrawBox gestures; the notes follow the same intents so a marquee
     // takes in note cards and dragging the selection moves them too, committed on release.
     LaunchedEffect(controller, session) {
@@ -306,7 +327,7 @@ fun CanvasWorkspace(
             when (intent) {
                 is io.ak1.drawbox.domain.model.Intent.CommitMarquee -> {
                     val rect = intent.rect
-                    selectedNoteIds = documents.filter { doc ->
+                    selectedNoteIds = liveDocuments.filter { doc ->
                         val f = doc.frame ?: return@filter false
                         rect.overlaps(Rect(f.x, f.y, f.x + f.width, f.y + f.height))
                     }.map { it.id }.toSet()
@@ -406,6 +427,11 @@ fun CanvasWorkspace(
                 onIntent = controller::onIntent,
                 // Shapes and notes share one selection look; see CanvasSelectionChrome.
                 selectionStyle = canvasSelectionStyle(),
+                // DrawBox draws a grid of its own, on by default, underneath the board's own
+                // background pattern. Two grids at two spacings is what made the background
+                // impossible to turn off: ours went away and its did not. The board's pattern is
+                // the only grid now, so "none" means none.
+                showGrid = false,
                 modifier = Modifier
                     .fillMaxSize()
                     .clipToBounds()
@@ -430,6 +456,14 @@ fun CanvasWorkspace(
                                 val connectorMode = current.mode == io.ak1.drawbox.domain.model.Mode.LINE ||
                                     current.mode == io.ak1.drawbox.domain.model.Mode.ARROW
                                 val position = event.changes.firstOrNull()?.position
+                                if (current.mode == io.ak1.drawbox.domain.model.Mode.ERASER &&
+                                    position != null && event.changes.any { it.pressed }
+                                ) {
+                                    eraseNotesAt(
+                                        current.viewport.screenToWorld(position),
+                                        current.eraserSize / current.viewport.scale.coerceAtLeast(0.01f),
+                                    )
+                                }
                                 when {
                                     !connectorMode -> drawingConnectorAt = null
                                     event.type == PointerEventType.Press || event.type == PointerEventType.Move -> {
@@ -439,7 +473,7 @@ fun CanvasWorkspace(
                                     }
                                     event.type == PointerEventType.Release -> {
                                         drawingConnectorAt = null
-                                        if (!altHeld) snapLatestConnector(controller, session, documents, coroutineScope)
+                                        if (!altHeld) snapLatestConnector(controller, session, liveDocuments, coroutineScope)
                                     }
                                 }
                             }
@@ -522,7 +556,7 @@ fun CanvasWorkspace(
             val connectorMode = state.mode == io.ak1.drawbox.domain.model.Mode.LINE || state.mode == io.ak1.drawbox.domain.model.Mode.ARROW
             val snapAnchor = drawingConnectorAt?.takeIf { connectorMode && !altHeld }?.let { at ->
                 val drawing = CanvasSnapping.latestConnector(state.elements)
-                CanvasSnapping.nearest(at, CanvasSnapping.anchors(state.elements, documents, drawing?.id), state.viewport.scale)
+                CanvasSnapping.nearest(at, CanvasSnapping.anchors(state.elements, liveDocuments, drawing?.id), state.viewport.scale)
             }
             if (snapAnchor != null) CanvasSnapIndicator(anchor = snapAnchor, viewport = state.viewport)
 

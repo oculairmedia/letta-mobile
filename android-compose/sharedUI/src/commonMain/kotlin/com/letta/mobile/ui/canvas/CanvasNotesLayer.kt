@@ -52,6 +52,7 @@ import com.composables.icons.lucide.Maximize2
 import com.composables.icons.lucide.X
 import com.letta.mobile.data.canvas.CanvasDocumentFrame
 import com.letta.mobile.data.canvas.CanvasSceneDocument
+import com.letta.mobile.data.canvas.CanvasTextStyle
 import com.letta.mobile.data.canvas.CanvasSession
 import io.ak1.drawbox.domain.model.Viewport
 import kotlinx.coroutines.launch
@@ -150,6 +151,10 @@ private fun CanvasNoteCard(
     val density = LocalDensity.current
     var frame by remember(document.id) { mutableStateOf(document.frame ?: defaultFrame) }
     var gestureActive by remember(document.id) { mutableStateOf(false) }
+    // The frame a resize started from. A text element has no card to hold its type, so dragging
+    // it bigger has to make the text bigger — otherwise the box grows and the words stay put,
+    // which reads as a bug rather than a scale.
+    var resizeStartFrame by remember(document.id) { mutableStateOf<CanvasDocumentFrame?>(null) }
     LaunchedEffect(document.frame) {
         if (!gestureActive) frame = document.frame ?: defaultFrame
     }
@@ -174,7 +179,20 @@ private fun CanvasNoteCard(
     fun commit() {
         gestureActive = false
         val committed = frame
-        scope.launch { runCatching { session.moveDocument(document.id, committed) } }
+        val started = resizeStartFrame
+        resizeStartFrame = null
+        scope.launch {
+            runCatching { session.moveDocument(document.id, committed) }
+            // Scale the type by however much the box grew, height being what type is measured by.
+            if (plain && started != null && started.height > 0f) {
+                val factor = committed.height / started.height
+                if (factor != 1f) {
+                    val style = document.style ?: CanvasTextStyle()
+                    val scaled = ((style.fontScale ?: 1f) * factor).coerceIn(MIN_FONT_SCALE, MAX_FONT_SCALE)
+                    runCatching { session.restyleDocument(document.id, style.copy(fontScale = scaled)) }
+                }
+            }
+        }
     }
 
     // The card and its selection chrome share one placed, scaled box, and the box carries the
@@ -206,7 +224,10 @@ private fun CanvasNoteCard(
             // Taps and drags on the card belong to the note, never to the drawing beneath it; a
             // tap anywhere on it (the editor's own taps included, in the initial pass) makes it
             // the active note.
-            .pointerInput(document.id) {
+            // eraseMode is a key, not just a capture: a pointerInput block keeps the values it
+            // was created with, so keying on the id alone left this handler believing the eraser
+            // was never active.
+            .pointerInput(document.id, eraseMode) {
                 awaitEachGesture {
                     awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
                     if (eraseMode) onErase() else selection.onPress(currentEvent.keyboardModifiers.isShiftPressed)
@@ -288,6 +309,7 @@ private fun CanvasNoteCard(
                 contentWidth = widthDp,
                 contentHeight = heightDp,
                 onResize = { handle, delta ->
+                    if (resizeStartFrame == null) resizeStartFrame = frame
                     gestureActive = true
                     frame = frame.resizedBy(handle, delta)
                 },
@@ -457,3 +479,7 @@ internal fun CanvasDocumentFrame.resizedBy(handle: ResizeHandle, delta: Offset):
     if (movesBottom) height = (height + delta.y).coerceAtLeast(NOTE_MIN_SIZE)
     return copy(x = x, y = y, width = width, height = height)
 }
+
+/** Type may be scaled this far by dragging a text element's box, and no further. */
+private const val MIN_FONT_SCALE = 0.4f
+private const val MAX_FONT_SCALE = 8f
