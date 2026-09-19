@@ -460,11 +460,24 @@ fun CanvasWorkspace(
                     onToolbar = { noteToolbar = it },
                     selectedIds = selectedNoteIds,
                     groupOffset = groupOffset,
+                    // The eraser takes a note the way it takes a stroke: touch it and it is gone.
+                    eraseMode = state.mode == io.ak1.drawbox.domain.model.Mode.ERASER,
+                    onErase = { id ->
+                        if (session != null) {
+                            if (activeNoteId == id) activeNoteId = null
+                            selectedNoteIds = selectedNoteIds - id
+                            coroutineScope.launch { runCatching { session.removeDocument(id) } }
+                        }
+                    },
                     onPress = { id, shift ->
                         if (shift) {
                             selectedNoteIds = if (id in selectedNoteIds) selectedNoteIds - id else selectedNoteIds + id
                             activeNoteId = null
                         } else if (id !in selectedNoteIds) {
+                            // Picking a note replaces the board's selection, exactly as picking a
+                            // shape does. Without this the drawn selection stayed put and the note
+                            // joined it, so a plain click read as a shift-click.
+                            controller.clearSelection()
                             selectedNoteIds = emptySet()
                             activeNoteId = id
                         }

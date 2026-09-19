@@ -43,6 +43,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
+import io.ak1.drawbox.domain.model.ResizeHandle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
 import com.composables.icons.lucide.GripVertical
@@ -90,6 +91,9 @@ fun CanvasNotesLayer(
     /** Dragging a selected card moves the whole selection; the host owns that gesture. */
     onGroupDrag: ((Offset) -> Unit)? = null,
     onGroupDragEnd: (() -> Unit)? = null,
+    /** True while the eraser tool is held: a press on a card removes it instead of selecting it. */
+    eraseMode: Boolean = false,
+    onErase: (String) -> Unit = {},
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         documents.forEachIndexed { index, document ->
@@ -104,6 +108,8 @@ fun CanvasNotesLayer(
                 onActivate = { onActivate(document.id) },
                 onExpand = { onExpand(document.id) },
                 onToolbar = onToolbar,
+                eraseMode = eraseMode,
+                onErase = { onErase(document.id) },
                 selection = NoteSelection(
                     selected = selected,
                     groupOffset = if (selected) groupOffset else Offset.Zero,
@@ -137,6 +143,8 @@ private fun CanvasNoteCard(
     onExpand: () -> Unit,
     onToolbar: ((NoteToolbar?) -> Unit)?,
     selection: NoteSelection,
+    eraseMode: Boolean = false,
+    onErase: () -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
@@ -169,13 +177,21 @@ private fun CanvasNoteCard(
         scope.launch { runCatching { session.moveDocument(document.id, committed) } }
     }
 
-    // The card and its selection chrome share one placed, scaled box: the chrome draws OUTSIDE the
-    // card's bounds (the Surface clips to its shape), and it has to follow a drag, so it cannot
-    // live in the layer above.
+    // The card and its selection chrome share one placed, scaled box, and the box carries the
+    // chrome's margin on every side: the chrome sits OUTSIDE the card, and a handle hanging past
+    // its parent's bounds is drawn but never hit, which is how the handles came to look draggable
+    // without being draggable.
+    val chromeInset = canvasSelectionStyle().chromeInset()
+    val insetPx = with(density) { chromeInset.toPx() } * scale
     Box(
         modifier = Modifier
-            .offset { IntOffset(screenTopLeft.x.roundToInt(), screenTopLeft.y.roundToInt()) }
-            .size(width = widthDp, height = heightDp)
+            .offset {
+                IntOffset(
+                    (screenTopLeft.x - insetPx).roundToInt(),
+                    (screenTopLeft.y - insetPx).roundToInt(),
+                )
+            }
+            .size(width = widthDp + chromeInset * 2, height = heightDp + chromeInset * 2)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
@@ -184,7 +200,8 @@ private fun CanvasNoteCard(
     ) {
     Surface(
         modifier = Modifier
-            .fillMaxSize()
+            .padding(chromeInset)
+            .size(width = widthDp, height = heightDp)
             .semantics { contentDescription = "Note ${document.id}" }
             // Taps and drags on the card belong to the note, never to the drawing beneath it; a
             // tap anywhere on it (the editor's own taps included, in the initial pass) makes it
@@ -192,7 +209,7 @@ private fun CanvasNoteCard(
             .pointerInput(document.id) {
                 awaitEachGesture {
                     awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-                    selection.onPress(currentEvent.keyboardModifiers.isShiftPressed)
+                    if (eraseMode) onErase() else selection.onPress(currentEvent.keyboardModifiers.isShiftPressed)
                     do {
                         val event = awaitPointerEvent(PointerEventPass.Initial)
                     } while (event.changes.any { it.pressed })
@@ -258,27 +275,23 @@ private fun CanvasNoteCard(
                         onDragEnd = onMoveEnd,
                     )
                 }
-                NoteResizeHandle(
-                    modifier = Modifier.align(Alignment.BottomEnd),
-                    onDragStart = { gestureActive = true },
-                    onDrag = { delta ->
-                        frame = frame.copy(
-                            width = (frame.width + delta.x).coerceAtLeast(NOTE_MIN_SIZE),
-                            height = (frame.height + delta.y).coerceAtLeast(NOTE_MIN_SIZE),
-                        )
-                    },
-                    onDragEnd = ::commit,
-                )
             }
         }
     }
 
-        // The same chrome a selected shape gets, over the card and outside its bounds.
+        // The same chrome a selected shape gets — outline, eight handles, and resize — over the
+        // card and reaching outside it, so the outer half of each handle can still be grabbed.
         if (active || selection.selected) {
             CanvasSelectionChrome(
                 style = canvasSelectionStyle(),
                 scale = scale,
-                modifier = Modifier.matchParentSize(),
+                contentWidth = widthDp,
+                contentHeight = heightDp,
+                onResize = { handle, delta ->
+                    gestureActive = true
+                    frame = frame.resizedBy(handle, delta)
+                },
+                onResizeEnd = ::commit,
             )
         }
     }
@@ -377,30 +390,6 @@ private fun TextMoveGrip(
     }
 }
 
-@Composable
-private fun NoteResizeHandle(
-    modifier: Modifier,
-    onDragStart: () -> Unit,
-    onDrag: (Offset) -> Unit,
-    onDragEnd: () -> Unit,
-) {
-    Box(
-        modifier = modifier
-            .size(LettaDimens.Control.icon)
-            .dragHandle(onDragStart, onDrag, onDragEnd)
-            .semantics { contentDescription = "Resize note" },
-        contentAlignment = Alignment.BottomEnd,
-    ) {
-        Box(
-            modifier = Modifier
-                .padding(LettaDimens.Space.xs)
-                .size(LettaDimens.Space.sm)
-                .clip(RoundedCornerShape(LettaDimens.Radius.sm))
-                .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)),
-        )
-    }
-}
-
 /** Where the [index]th never-placed document lands: a stagger so several stay visible. */
 internal fun defaultNoteFrame(index: Int): CanvasDocumentFrame = CanvasDocumentFrame(
     x = NOTE_DEFAULT_ORIGIN + index * NOTE_STAGGER,
@@ -437,3 +426,34 @@ private const val NOTE_STAGGER = 40f
 private const val NOTE_MIN_SIZE = 140f
 private val NOTE_CORNER = LettaDimens.Radius.md
 private val HANDLE_HEIGHT = LettaDimens.Control.iconButton
+
+/**
+ * This frame after dragging [handle] by [delta], in world units.
+ *
+ * A side handle moves one edge, a corner moves two. An edge being dragged past its opposite is
+ * clamped at [NOTE_MIN_SIZE] rather than inverting the frame, which is what a shape does too.
+ */
+internal fun CanvasDocumentFrame.resizedBy(handle: ResizeHandle, delta: Offset): CanvasDocumentFrame {
+    val movesLeft = handle == ResizeHandle.TopLeft || handle == ResizeHandle.Left || handle == ResizeHandle.BottomLeft
+    val movesRight = handle == ResizeHandle.TopRight || handle == ResizeHandle.Right || handle == ResizeHandle.BottomRight
+    val movesTop = handle == ResizeHandle.TopLeft || handle == ResizeHandle.Top || handle == ResizeHandle.TopRight
+    val movesBottom = handle == ResizeHandle.BottomLeft || handle == ResizeHandle.Bottom || handle == ResizeHandle.BottomRight
+
+    var x = x
+    var y = y
+    var width = width
+    var height = height
+    if (movesLeft) {
+        val dx = delta.x.coerceAtMost(width - NOTE_MIN_SIZE)
+        x += dx
+        width -= dx
+    }
+    if (movesRight) width = (width + delta.x).coerceAtLeast(NOTE_MIN_SIZE)
+    if (movesTop) {
+        val dy = delta.y.coerceAtMost(height - NOTE_MIN_SIZE)
+        y += dy
+        height -= dy
+    }
+    if (movesBottom) height = (height + delta.y).coerceAtLeast(NOTE_MIN_SIZE)
+    return copy(x = x, y = y, width = width, height = height)
+}
